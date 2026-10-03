@@ -15,7 +15,7 @@ if(DRAFT_RUN_CORPUS_VERSION!==V5_PARENT_CORPUS_VERSION)throw Error('Cutover must
 const query=corpusDatabase(connection);
 const catalog=JSON.parse(fs.readFileSync(candidateRoot+'/v5-trophy-import/catalog.json','utf8'));
 const baseline=JSON.parse(fs.readFileSync(stateFile,'utf8'));
-if(catalog.corpus_version!==V5_PARENT_CORPUS_VERSION||catalog.sets.length!==32||baseline.sets?.length!==32)throw Error('Incomplete v9 candidate or rollback baseline.');
+if(catalog.corpus_version!==V5_PARENT_CORPUS_VERSION||catalog.sets.length!==30||baseline.sets?.length!==30)throw Error('Incomplete v9 candidate or rollback baseline.');
 const bySet=new Map(catalog.sets.map(s=>[s.id,s]));
 const baselineBySet=new Map((baseline.environment||[]).map(e=>[e.set_id,e]));
 const mapping=[...bySet].sort(([a],[b])=>a.localeCompare(b)).map(([set_id,set])=>{

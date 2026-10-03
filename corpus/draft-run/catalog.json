@@ -5,52 +5,6 @@
   "verification": "official_archive_trajectory",
   "sets": [
     {
-      "id": "vow",
-      "name": "VOW",
-      "puzzles": 517,
-      "trophy_drafts": 47,
-      "first_pick": 1,
-      "last_pick": 11,
-      "category": "expansion",
-      "source_date": "2024-01-11",
-      "source_archive": {
-        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.VOW.PremierDraft.csv.gz",
-        "etag": "\"46f8289e8810483ea516093196faea0e-11\"",
-        "last_modified": "Thu, 11 Jan 2024 09:46:43 GMT",
-        "sha256": "53f24ea0f87ec0db0018addb700657e180e4c9c028572726f4b92dc811b5c24c",
-        "compressed_bytes": 168271164,
-        "rows_scanned": 4134959,
-        "matched_replays": 298
-      },
-      "evidence_sha256": "9ca12d786b337ce0261be6ca91e098092d2b66164280285d948daa7416865876",
-      "exclusions": {},
-      "unresolved_image_names": [],
-      "sha256": "e0ed820e7734ae4594d1e8d557d37aca8fc548e394e13d914fbf62bf6ad1bb1d"
-    },
-    {
-      "id": "mid",
-      "name": "MID",
-      "puzzles": 561,
-      "trophy_drafts": 51,
-      "first_pick": 1,
-      "last_pick": 11,
-      "category": "expansion",
-      "source_date": "2024-01-11",
-      "source_archive": {
-        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.MID.PremierDraft.csv.gz",
-        "etag": "\"577d141610a7e5a42b1daf97dd0c9932-10\"",
-        "last_modified": "Thu, 11 Jan 2024 09:47:36 GMT",
-        "sha256": "1d6eed578230b321f8afb0060f70aac5a38b38249d231cbf259f017d139ccb1e",
-        "compressed_bytes": 152471891,
-        "rows_scanned": 3738146,
-        "matched_replays": 272
-      },
-      "evidence_sha256": "23fa2c1a9233a287ce7b81c06fac51d786bb8c212308e6122972e6d060bf97e4",
-      "exclusions": {},
-      "unresolved_image_names": [],
-      "sha256": "a41e1bee453f22f7062011def903adddec9351ea99ef0b327f03b027b67c87a2"
-    },
-    {
       "id": "ktk",
       "name": "KTK",
       "puzzles": 704,

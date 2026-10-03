@@ -32,10 +32,10 @@ if(release.corpus_version!==modelVersions.v5.corpus_version||release.model_versi
 const accounting=read('results/v5-rebuild/v5-rebuild-accounting.json');
 const qa=read('results/v5-rebuild/v5-rebuild-qa.json');
 if(accounting.model_version!==modelVersions.v5.model_version||accounting.corpus_version!==modelVersions.v5.corpus_version||
-   accounting.build_identity!==release.build_identity||Number(accounting.environments)!==32)
-  throw Error('Reviewed rebuild accounting is not the exact 32-environment v5/v9 build.');
-if(!Array.isArray(accounting.sets)||accounting.sets.length!==32||new Set(accounting.sets.map(s=>s.id)).size!==32)
-  throw Error('Reviewed rebuild accounting does not contain 32 unique environments.');
+   accounting.build_identity!==release.build_identity||Number(accounting.environments)!==30)
+  throw Error('Reviewed rebuild accounting is not the exact 30-environment v5/v9 build.');
+if(!Array.isArray(accounting.sets)||accounting.sets.length!==30||new Set(accounting.sets.map(s=>s.id)).size!==30)
+  throw Error('Reviewed rebuild accounting does not contain 30 unique environments.');
 for(const s of accounting.sets) {
   if(s.training_mode!=='all-qualified'||s.training_cap!==null)
     throw Error(s.id+': reviewed accounting is not uncapped all-qualified training.');
@@ -47,11 +47,11 @@ if(Number(accounting.total_trained)!==Number(accounting.total_qualified))
   throw Error('Uncapped v5 total trained drafts do not equal total qualified training drafts.');
 
 if(qa.schema!=='v5-rebuild-qa-v1'||qa.model_version!==modelVersions.v5.model_version||
-   qa.corpus_version!==modelVersions.v5.corpus_version||Number(qa.environments)!==32||
+   qa.corpus_version!==modelVersions.v5.corpus_version||Number(qa.environments)!==30||
    qa.mixed_identities!==false||Number(qa.invalid_numerical_outputs)!==0)
   throw Error('Reviewed v5 implementation QA is incomplete or invalid.');
-if(!Array.isArray(qa.sets)||qa.sets.length!==32||new Set(qa.sets.map(s=>s.id)).size!==32)
-  throw Error('Reviewed v5 QA does not contain 32 unique environments.');
+if(!Array.isArray(qa.sets)||qa.sets.length!==30||new Set(qa.sets.map(s=>s.id)).size!==30)
+  throw Error('Reviewed v5 QA does not contain 30 unique environments.');
 const refreshed=qa.sets.filter(s=>s.source_refreshed).map(s=>s.id).sort();
 if(!same(refreshed,['hob']))throw Error('Authorized source refresh set drifted: '+refreshed.join(','));
 if(qa.sets.some(s=>s.cohort_changed&&s.id!=='hob'))

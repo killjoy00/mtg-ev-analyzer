@@ -159,8 +159,8 @@ try {
     JOIN draft_run_environment_policy p ON p.set_id=v.set_id
     LEFT JOIN corpus_source_snapshots s ON s.source_snapshot_id=p.active_snapshot_id
     WHERE v.corpus_version=$1`,[modelVersions.v5.corpus_version])).rows[0];
-  assert.equal(Number(coverage.expected),32,'v9 release must contain all 32 rebuilt environments');
-  assert.equal(Number(coverage.active),32,'all rebuilt environments must point at v9 snapshots');
+  assert.equal(Number(coverage.expected),30,'v9 release must contain all 30 rebuilt environments');
+  assert.equal(Number(coverage.active),30,'all rebuilt environments must point at v9 snapshots');
 
   const ownerGuest=await guest('owner');
   await call('draftrunapi','/v1/runs',{body:{environment:'mixed',qa:true},playerToken:ownerGuest.token,status:403});

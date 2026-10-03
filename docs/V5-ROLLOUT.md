@@ -58,7 +58,7 @@ metadata is an availability check and never replaces byte verification.
    are retained by SHA-256 before computation. Failed phases can be rerun without
    losing completed environments or earlier phases. The existing regular,
    legacy and measured Cube builders retain replay selection and normalization.
-2. Rebuild all 32 replay/path environments and every Premier trophy payload.
+2. Rebuild all 30 active replay/path environments and every active Premier trophy payload. MID and VOW were owner-retired from the active v5 plan on 2026-10-02; their historical v4/v8 records remain retained.
    For normal environments assert trained equals qualified. For legacy rank
    environments record the complete unchanged rank-proxy training cohort
    separately from source/trophy eligibility. No arbitrary replacement cap.

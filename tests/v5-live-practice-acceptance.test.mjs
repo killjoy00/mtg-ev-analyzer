@@ -21,5 +21,5 @@ test('v5 live Practice acceptance completes and persists every required Practice
   assert.match(smoke,/archiveRun=await finish\(archiveRun,owner\)/);
   assert.match(smoke,/client_result_id=\$2/);
   assert.match(smoke,/Number\(ranked\.n\),0/);
-  assert.match(smoke,/coverage\.active\),32/);
+  assert.match(smoke,/coverage\.active\),30/);
 });
