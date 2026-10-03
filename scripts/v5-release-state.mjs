@@ -4,10 +4,27 @@ import {pathToFileURL} from 'node:url';
 import modelVersions from '../model-versions.json' with {type:'json'};
 import {corpusDatabase} from './neon-corpus-db.mjs';
 
-const HISTORY_SQL=Object.freeze({
-  game_results: `SELECT md5((to_jsonb(t)-ARRAY['id','player_id','opponent_name','opponent_score','outcome']::text[])::text) fingerprint,count(*)::int n FROM game_results t GROUP BY 1 ORDER BY 1`,
+export const HISTORY_SQL=Object.freeze({
+  // Identity/privacy maintenance may move a result to another player or scrub
+  // its opponent reference/name. Score and outcome semantics remain immutable.
+  game_results: `SELECT md5((to_jsonb(t)-ARRAY['id','player_id','challenge_id','opponent_name']::text[])::text) fingerprint,count(*)::int n FROM game_results t GROUP BY 1 ORDER BY 1`,
   scores: `SELECT md5((to_jsonb(t)-ARRAY['id','player_id','is_featured']::text[])::text) fingerprint,count(*)::int n FROM scores t GROUP BY 1 ORDER BY 1`,
-  draft_run_sessions: `SELECT md5((to_jsonb(t)-ARRAY['player_id','day','answers','rerolls','revision','challenge_id','score','updated_at','result_persisted_at','merged_daily_date']::text[])::text) fingerprint,count(*)::int n FROM draft_run_sessions t GROUP BY 1 ORDER BY 1`,
+  // Every captured session must keep its release identity while active gameplay
+  // is free to advance and account linking may attach/merge identity fields.
+  draft_run_sessions: `SELECT md5((to_jsonb(t)-ARRAY[
+      'player_id','day','daily_account_id','leaderboard_eligible','merged_daily_date',
+      'puzzle_ids','answers','seen_sources','rerolls','revision','score',
+      'updated_at','result_persisted_at','challenge_id'
+    ]::text[])::text) fingerprint,count(*)::int n FROM draft_run_sessions t GROUP BY 1 ORDER BY 1`,
+  // Sessions already complete at capture get a second, stricter semantic
+  // fingerprint: answers, puzzle IDs, rerolls, revision and score must survive.
+  completed_draft_run_sessions: `SELECT md5((to_jsonb(t)-ARRAY[
+      'player_id','day','daily_account_id','leaderboard_eligible','merged_daily_date',
+      'updated_at','result_persisted_at','challenge_id'
+    ]::text[])::text) fingerprint,count(*)::int n
+    FROM draft_run_sessions t
+    WHERE jsonb_array_length(t.answers)=jsonb_array_length(t.puzzle_ids)
+    GROUP BY 1 ORDER BY 1`,
   draft_run_schedules: `SELECT md5(to_jsonb(t)::text) fingerprint,count(*)::int n FROM draft_run_schedules t GROUP BY 1 ORDER BY 1`,
 });
 
