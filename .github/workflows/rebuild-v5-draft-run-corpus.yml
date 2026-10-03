@@ -10,7 +10,7 @@ permissions:
 
 concurrency:
   group: set-data-import-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 env:
   PYTHONPATH: scripts:.
@@ -50,7 +50,7 @@ jobs:
           catalog=json.loads(Path('data/catalog.json').read_text())
           components=json.loads(Path('research/v5-production-component-pins.json').read_text())
           ids={p['id'] for p in pins['sets']}
-          if len(ids)!=32 or ids!={p['id'] for p in catalog['sets']}:
+          if len(ids)!=30 or ids!={p['id'] for p in catalog['sets']}:
               raise SystemExit('Incomplete source/environment plan')
           if {p['model_version'] for p in catalog['sets']}!={'strong-player-colour-stage-v4'}:
               raise SystemExit('Expected immutable v4 replay baseline')
@@ -151,7 +151,7 @@ jobs:
           run-id: 35646313155
           name: verified-premier-trophies-35646313155-1
           path: generated/v5-production-baseline
-      - name: Assemble only the 32 complete identity-checked environments
+      - name: Assemble only the 30 complete identity-checked environments
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -232,7 +232,7 @@ jobs:
           fi
           git push origin "HEAD:$branch"
           cat > "$RUNNER_TEMP/v5-pr-body.md" <<'EOF'
-          Rebuilds all 32 environments under strong-player-colour-stage-v5 and creates the separate elite-trophy-colour-stage-v9 corpus. Every environment uses its complete unchanged qualified behavior-training cohort, with unchanged five-fold and puzzle-source isolation. The explicitly authorized updated HOB archives are recorded separately from immutable production v8 inputs.
+          Rebuilds all 30 active environments under strong-player-colour-stage-v5 and creates the separate elite-trophy-colour-stage-v9 corpus. Every active environment uses its complete unchanged qualified behavior-training cohort, with unchanged five-fold and puzzle-source isolation. MID and VOW are intentionally retired from the active v5 plan while their historical v4/v8 data remains retained. The explicitly authorized updated HOB archives are recorded separately from immutable production v8 inputs.
 
           The admitted Traditional sources are rescored using Premier-trained v5 graders with their original membership and Cube P2-P7 window. Rebuild accounting, probability/leader/score/rating QA and source-quality checks are in results/v5-rebuild. Exact validated load artifacts are attached to the rebuild run; historical v4/v8 data remains available.
 

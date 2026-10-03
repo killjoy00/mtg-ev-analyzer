@@ -14,57 +14,6 @@ test('user admin filters stay account-scoped',()=>{
 });
 
 
-test('admin username rename normalizes through the shared helper and uses the atomic database function',async()=>{
-  const calls=[];
-  const query=async(sql,params)=>{
-    calls.push({sql,params});
-    assert.match(sql,/pack1_admin_rename_public_username/);
-    return {rows:[{result_status:'renamed',player_id:PLAYER,previous_display_name:'Old Name',new_display_name:'New Name',username_owned:'t'}],rowCount:1};
-  };
-  const request=new Request('https://packone.pro/v1/admin/users/'+TARGET+'/username',{
-    method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({displayName:'  New   Name  ',reason:'requested'}),
-  });
-  const result=await handleUserAdmin(request,query,undefined,{readJson:req=>req.json(),adminAuthUserId:ADMIN});
-  assert.equal(result.display_name,'New Name');
-  assert.equal(result.username_owned,true);
-  assert.deepEqual(calls[0].params,[TARGET,ADMIN,'New Name',true,'requested']);
-});
-
-test('admin username rename reuses prohibited-name and database conflict behavior',async()=>{
-  const prohibited=new Request('https://packone.pro/v1/admin/users/'+TARGET+'/username',{
-    method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({displayName:'Pack One Admin'}),
-  });
-  await assert.rejects(
-    handleUserAdmin(prohibited,async()=>{throw Error('must not query');},undefined,{readJson:req=>req.json(),adminAuthUserId:ADMIN}),
-    error=>error?.code==='USERNAME_NOT_ALLOWED',
-  );
-
-  const conflict=new Request('https://packone.pro/v1/admin/users/'+TARGET+'/username',{
-    method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({displayName:'Already Taken'}),
-  });
-  await assert.rejects(
-    handleUserAdmin(conflict,async()=>{throw Object.assign(Error('players_username_uq'),{pgCode:'23505',pgConstraint:'players_username_uq'});},undefined,{readJson:req=>req.json(),adminAuthUserId:ADMIN}),
-    error=>error?.status===409&&error?.code==='USERNAME_TAKEN',
-  );
-});
-
-test('admin username rename surfaces moderation, deletion and public-placeholder boundaries',async()=>{
-  for(const [status,code] of [
-    ['moderated','PUBLIC_IDENTITY_MODERATED'],
-    ['deleting','ACCOUNT_DELETING'],
-    ['public_profile_requires_username','PUBLIC_PROFILE_REQUIRES_USERNAME'],
-  ]) {
-    const query=async()=>({rows:[{result_status:status,player_id:PLAYER,previous_display_name:'Old',new_display_name:'Old',username_owned:'t'}]});
-    const request=new Request('https://packone.pro/v1/admin/users/'+TARGET+'/username',{
-      method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({displayName:status==='public_profile_requires_username'?'Pack Player':'Allowed Name'}),
-    });
-    await assert.rejects(
-      handleUserAdmin(request,query,undefined,{readJson:req=>req.json(),adminAuthUserId:ADMIN}),
-      error=>error?.code===code,
-    );
-  }
-});
-
 test('user search includes the linked public username without broadening beyond authenticated accounts',async()=>{
   const seen=[];
   const query=async(sql)=>{
@@ -79,30 +28,4 @@ test('user search includes the linked public username without broadening beyond 
   assert.match(sql,/search_player\.display_name/);
   assert.match(sql,/FROM neon_auth\."user" u/);
   assert.match(sql,/LIMIT 100/);
-});
-
-
-test('admin username placeholder releases ownership through the same atomic function',async()=>{
-  const calls=[];
-  const query=async(sql,params)=>{
-    calls.push({sql,params});
-    return {rows:[{result_status:'renamed',player_id:PLAYER,previous_display_name:'Owned Name',new_display_name:'Pack Player',username_owned:'f'}],rowCount:1};
-  };
-  const request=new Request('https://packone.pro/v1/admin/users/'+TARGET+'/username',{
-    method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({displayName:' Pack   Player '}),
-  });
-  const result=await handleUserAdmin(request,query,undefined,{readJson:req=>req.json(),adminAuthUserId:ADMIN});
-  assert.equal(result.display_name,'Pack Player');
-  assert.equal(result.username_owned,false);
-  assert.deepEqual(calls[0].params,[TARGET,ADMIN,'Pack Player',false,null]);
-});
-
-test('admin username rejects unlinked accounts cleanly',async()=>{
-  const request=new Request('https://packone.pro/v1/admin/users/'+TARGET+'/username',{
-    method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({displayName:'Allowed Name'}),
-  });
-  await assert.rejects(
-    handleUserAdmin(request,async()=>({rows:[{result_status:'unlinked'}]}),undefined,{readJson:req=>req.json(),adminAuthUserId:ADMIN}),
-    error=>error?.status===409&&/linked public identity/i.test(error.message),
-  );
 });

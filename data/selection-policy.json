@@ -36,9 +36,7 @@
     "bro",
     "dmu",
     "snc",
-    "neo",
-    "vow",
-    "mid"
+    "neo"
   ],
   "daily_weight_tiers": [
     {
@@ -97,9 +95,7 @@
     "bro": "2022-11-18",
     "dmu": "2022-09-09",
     "snc": "2022-04-29",
-    "neo": "2022-02-18",
-    "vow": "2021-11-19",
-    "mid": "2021-09-24"
+    "neo": "2022-02-18"
   },
   "release_dates_source": "https://api.scryfall.com/sets",
   "release_dates_verified_at": "2026-09-14",

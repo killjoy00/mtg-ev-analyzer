@@ -14,6 +14,7 @@ const request=(path,{method='GET',body}={})=>new Request('https://packone.pro'+p
   body:body===undefined?undefined:JSON.stringify(body),
 });
 const readJson=req=>req.json();
+const skipNotify=async()=>({status:'skipped',reason:'not_configured'});
 const row=(overrides={})=>({
   operation_id:OP,
   auth_user_id:TARGET,
@@ -83,7 +84,7 @@ test('admin deletion requires literal destructive confirmation and prohibits sel
 
 test('target-admin acknowledgement is enforced by the atomic database initializer',async()=>{
   const query=async(sql)=>{
-    if(sql.includes('SELECT email FROM neon_auth."user"'))return {rows:[{email:'target@example.test'}],rowCount:1};
+    if(sql.includes('SELECT email,"emailVerified" email_verified FROM neon_auth."user"'))return {rows:[{email:'target@example.test'}],rowCount:1};
     if(sql.includes('pack1_begin_admin_account_deletion'))return {rows:[{start_status:'admin_ack_required'}],rowCount:1};
     throw Error('unexpected SQL');
   };
@@ -101,14 +102,14 @@ test('admin initiation needs no target credential and runs the supplied complete
   const created=row({state:'pending',attempts:'0',last_error_code:null,app_cleanup_completed_at:null,deletion_reason:'spam cleanup'});
   const query=async(sql,params=[])=>{
     calls.push({sql,params});
-    if(sql.includes('SELECT email FROM neon_auth."user"'))return {rows:[{email:'target@example.test'}],rowCount:1};
+    if(sql.includes('SELECT email,"emailVerified" email_verified FROM neon_auth."user"'))return {rows:[{email:'target@example.test'}],rowCount:1};
     if(sql.includes('pack1_begin_admin_account_deletion'))return {rows:[{start_status:'created',...created}],rowCount:1};
     throw Error('unexpected SQL');
   };
   const result=await handleAdminAccountDeletion(
     request('/v1/admin/users/'+TARGET+'/delete',{method:'POST',body:{confirm:'DELETE',reason:'spam cleanup'}}),
     query,undefined,{
-      readJson,adminAuthUserId:ADMIN,deletionEnabled:()=>true,
+      readJson,adminAuthUserId:ADMIN,deletionEnabled:()=>true,notify:skipNotify,
       resumeDeletionOperation:async(operation,options)=>{
         resumed={operation,options};
         return row({state:'complete',last_error_code:null,completed_at:'2026-10-02T10:02:00Z',deletion_reason:null});
@@ -126,7 +127,7 @@ test('admin initiation needs no target credential and runs the supplied complete
 test('admin deletion lifecycle failures propagate after the durable start so normal route logging can report them',async()=>{
   const created=row({state:'pending',attempts:'0',last_error_code:null,app_cleanup_completed_at:null});
   const query=async(sql)=>{
-    if(sql.includes('SELECT email FROM neon_auth."user"'))return {rows:[{email:'target@example.test'}],rowCount:1};
+    if(sql.includes('SELECT email,"emailVerified" email_verified FROM neon_auth."user"'))return {rows:[{email:'target@example.test'}],rowCount:1};
     if(sql.includes('pack1_begin_admin_account_deletion'))return {rows:[{start_status:'created',...created}],rowCount:1};
     if(sql.includes('FROM account_deletion_operations WHERE auth_user_id='))return {rows:[created],rowCount:1};
     throw Error('unexpected SQL');
@@ -137,7 +138,7 @@ test('admin deletion lifecycle failures propagate after the durable start so nor
       handleAdminAccountDeletion(
         request('/v1/admin/users/'+TARGET+'/delete',{method:'POST',body:{confirm:'DELETE'}}),
         query,undefined,{
-          readJson,adminAuthUserId:ADMIN,deletionEnabled:()=>true,
+          readJson,adminAuthUserId:ADMIN,deletionEnabled:()=>true,notify:skipNotify,
           resumeDeletionOperation:async()=>{throw Object.assign(Error('synthetic resume failure'),{code:'PROVIDER_NETWORK'});},
         },
       ),
@@ -148,6 +149,7 @@ test('admin deletion lifecycle failures propagate after the durable start so nor
         assert.equal(error?.deletion?.operation_id,OP);
         assert.equal(error?.deletion?.state,'pending');
         assert.equal('deletion_reason' in error.deletion,false);
+        assert.deepEqual(error?.notification,{status:'skipped',reason:'not_configured'});
         return true;
       },
     );
@@ -161,7 +163,7 @@ test('admin deletion lifecycle failures propagate after the durable start so nor
 test('retrying an existing self-service operation preserves its original attribution',async()=>{
   const existing=row({state:'provider_delete_pending',initiation_source:'self_service',initiated_by_admin_auth_user_id:null,target_was_admin:false});
   const query=async(sql)=>{
-    if(sql.includes('SELECT email FROM neon_auth."user"'))return {rows:[],rowCount:0};
+    if(sql.includes('SELECT email,"emailVerified" email_verified FROM neon_auth."user"'))return {rows:[],rowCount:0};
     if(sql.includes('pack1_begin_admin_account_deletion'))return {rows:[{start_status:'existing',...existing}],rowCount:1};
     throw Error('unexpected SQL');
   };
@@ -185,7 +187,7 @@ test('admin deletion rejects malformed and unknown target identities',async()=>{
     error=>error?.status===400,
   );
   const query=async(sql)=>{
-    if(sql.includes('SELECT email FROM neon_auth."user"'))return {rows:[],rowCount:0};
+    if(sql.includes('SELECT email,"emailVerified" email_verified FROM neon_auth."user"'))return {rows:[],rowCount:0};
     if(sql.includes('pack1_begin_admin_account_deletion'))return {rows:[{start_status:'unknown_target'}],rowCount:1};
     throw Error('unexpected SQL');
   };
@@ -196,4 +198,60 @@ test('admin deletion rejects malformed and unknown target identities',async()=>{
     ),
     error=>error?.status===404,
   );
+});
+
+const emailQuery=({email='target@example.test',verified=true,startStatus='created',operation=null}={})=>async sql=>{
+  if(sql.includes('FROM neon_auth."user"'))return {rows:email?[{email,email_verified:verified}]:[],rowCount:email?1:0};
+  if(sql.includes('pack1_begin_admin_account_deletion'))
+    return {rows:[{start_status:startStatus,...(operation||row({state:'pending',attempts:'0',last_error_code:null}))}],rowCount:1};
+  throw Error('unexpected SQL');
+};
+
+test('a newly committed admin deletion emails the verified address once, before the provider phase',async()=>{
+  const order=[];let notice=null;
+  const result=await handleAdminAccountDeletion(
+    request('/v1/admin/users/'+TARGET+'/delete',{method:'POST',body:{confirm:'DELETE',reason:'spam account'}}),
+    emailQuery(),undefined,{
+      readJson,adminAuthUserId:ADMIN,deletionEnabled:()=>true,
+      notify:async options=>{order.push('notify');notice=options;return {status:'sent'};},
+      resumeDeletionOperation:async()=>{order.push('resume');return row({state:'complete',completed_at:'2026-10-02T10:02:00Z'});},
+    },
+  );
+  assert.deepEqual(order,['notify','resume']);
+  assert.equal(notice.kind,'admin_deletion');
+  assert.equal(notice.requested,true);
+  assert.equal(notice.email,'target@example.test');
+  assert.equal(notice.idempotencyKey,'pack1-admin-deletion/'+OP);
+  assert.match(notice.message.text,/Reason: spam account/);
+  assert.deepEqual(result.body.notification,{status:'sent'});
+});
+
+test('admin deletion notice respects the opt-out and never uses an unverified address',async()=>{
+  const seen=[];
+  const notify=async options=>{seen.push({requested:options.requested,email:options.email});return {status:'skipped',reason:'x'};};
+  const options={readJson,adminAuthUserId:ADMIN,deletionEnabled:()=>true,notify,resumeDeletionOperation:async x=>x};
+  await handleAdminAccountDeletion(
+    request('/v1/admin/users/'+TARGET+'/delete',{method:'POST',body:{confirm:'DELETE',notifyUser:false}}),
+    emailQuery(),undefined,options,
+  );
+  await handleAdminAccountDeletion(
+    request('/v1/admin/users/'+TARGET+'/delete',{method:'POST',body:{confirm:'DELETE'}}),
+    emailQuery({verified:'f'}),undefined,options,
+  );
+  assert.deepEqual(seen,[
+    {requested:false,email:'target@example.test'},
+    {requested:true,email:null},
+  ]);
+});
+
+test('retrying an already started deletion does not email the user again',async()=>{
+  const result=await handleAdminAccountDeletion(
+    request('/v1/admin/users/'+TARGET+'/delete',{method:'POST',body:{confirm:'DELETE'}}),
+    emailQuery({startStatus:'existing',operation:row()}),undefined,{
+      readJson,adminAuthUserId:ADMIN,deletionEnabled:()=>true,
+      notify:async()=>{throw Error('must not notify');},
+      resumeDeletionOperation:async x=>x,
+    },
+  );
+  assert.deepEqual(result.body.notification,{status:'skipped',reason:'already_started'});
 });

@@ -2,8 +2,8 @@
 """Checkpointed orchestration of the unchanged builders using frozen v5 inputs.
 
 Each environment runs in its own checkout. Source bytes and completed phases
-are content-addressed in R2; the final corpus is assembled only after all 32
-independent environments pass provenance, training and file-integrity checks.
+are content-addressed in R2; the final corpus is assembled only after all 30
+active environments pass provenance, training and file-integrity checks.
 """
 import argparse
 import csv
@@ -203,8 +203,8 @@ def environment(sid):
     if not build_id or len(build_id) != 64:
         raise ValueError('Missing reviewed build identity')
     pins = {p['id']:p for p in read(PINS)['sets']}
-    if sid not in pins or len(pins)!=32:
-        raise ValueError('Expected one of the 32 pinned production environments')
+    if sid not in pins or len(pins)!=30:
+        raise ValueError('Expected one of the 30 active pinned environments')
     pin = pins[sid]
     destination = BUILD/sid
     destination.mkdir(parents=True,exist_ok=True)
@@ -289,7 +289,7 @@ def assemble():
     consolidate(BUILD, ROOT/'generated/v5-traditional')
     write(ROOT/'generated/v5-rebuild-accounting.json',{
         'model_version':V5_MODEL,'corpus_version':V5_CORPUS,'build_identity':os.environ['V5_BUILD_ID'],
-        'environments':32,'total_qualified':sum(p['qualified_training_drafts'] for p in summaries),
+        'environments':30,'total_qualified':sum(p['qualified_training_drafts'] for p in summaries),
         'total_trained':sum(p['training_drafts'] for p in summaries),
         'sets':[{k:p[k] for k in ('id','qualified_drafts','qualified_training_drafts',
             'training_drafts','training_picks','training_mode','training_cap',

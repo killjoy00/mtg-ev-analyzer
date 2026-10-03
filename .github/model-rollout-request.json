@@ -1,6 +1,6 @@
 {
   "operation": "rebuild-v5",
-  "request_id": "uncapped-v5-full-rebuild-20261002-retry1",
-  "replay_of": "uncapped-v5-full-rebuild-20261002",
-  "reason": "Retry the owner-authorized full all-qualified v5 rebuild after repairing the rollout mainline-history guard; exact v5/v9 scope and authorized HOB inputs are unchanged."
+  "request_id": "uncapped-v5-full-rebuild-20261002-retry2",
+  "replay_of": "uncapped-v5-full-rebuild-20261002-retry1",
+  "reason": "Restart the owner-authorized all-qualified v5/v9 rebuild as an exact 30-environment active corpus after retiring legacy MID/VOW from active service; qualification, no-cap policy, five-fold holdout and authorized HOB inputs are otherwise unchanged."
 }

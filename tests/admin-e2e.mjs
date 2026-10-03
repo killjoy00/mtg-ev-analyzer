@@ -28,7 +28,7 @@ try {
     if(path===`/v1/admin/users/${userId}/username`&&route.request().method()==='PATCH') {
       usernameBodies.push(route.request().postDataJSON());
       renamedPublicUsername=String(usernameBodies.at(-1).displayName);
-      return route.fulfill({json:{ok:true}});
+      return route.fulfill({json:{ok:true,notification:{status:'sent'}}});
     }
     if(path===`/v1/admin/users/${userId}/deletion`&&method==='GET') {
       if(holdDeletionStatus)await new Promise(resolve=>{releaseDeletionStatus=resolve;});
@@ -43,6 +43,7 @@ try {
         deletionCommitted:true,
         operationId:deletionFixture.operation_id,
         deletion:deletionFixture,
+        notification:{status:'skipped',reason:'not_requested'},
       }});
       return route.fulfill({status:202,json:{ok:true,deletion:'accepted',operationId:deletionFixture.operation_id,operation:deletionFixture}});
     }
@@ -142,11 +143,12 @@ try {
   const renameRequest=page.waitForRequest(request=>new URL(request.url()).pathname===`/v1/admin/users/${userId}/username`&&request.method()==='PATCH');
   await renameForm.getByRole('button',{name:'Save username'}).click();
   const actualRenameRequest=await renameRequest;
-  assert.ok(actualRenameRequest.url().includes('/v1/admin/users/'));
+  assert.ok(actualRenameRequest.url().startsWith(growthBase),'rename goes to Growth, which sends the account notice: '+actualRenameRequest.url());
   await page.waitForFunction(node=>!node.isConnected,oldDetailBody);
   await page.locator('#change-username-form input[name="displayName"]').waitFor();
   assert.equal(await page.locator('#change-username-form input[name="displayName"]').inputValue(),'Renamed Member');
-  assert.deepEqual(usernameBodies,[{displayName:'Renamed Member',reason:'support request'}]);
+  assert.deepEqual(usernameBodies,[{displayName:'Renamed Member',reason:'support request',notifyUser:true}]);
+  await page.locator('#username-status').getByText('Username saved. The user was emailed.').waitFor();
   assert.ok(adminControlRequests.some(item=>item.path===`/v1/admin/users/${userId}/username`&&item.method==='PATCH'));
 
   // Simulate an interrupted initiating request after the durable deletion tombstone committed.
@@ -155,13 +157,16 @@ try {
   const deleteForm=page.locator('#delete-account-form');
   await deleteForm.getByLabel('Type DELETE to confirm').fill('DELETE');
   await deleteForm.getByLabel('Reason (optional)').fill('requested by account owner');
+  assert.equal(await deleteForm.getByLabel('Email the user about this deletion').isChecked(),true);
+  await deleteForm.getByLabel('Email the user about this deletion').uncheck();
   const deleteRequest=page.waitForRequest(request=>new URL(request.url()).pathname===`/v1/admin/users/${userId}/delete`&&request.method()==='POST');
   await deleteForm.getByRole('button',{name:'Delete account'}).click();
   const actualDeleteRequest=await deleteRequest;
   assert.ok(actualDeleteRequest.url().startsWith(growthBase),actualDeleteRequest.url());
   await page.locator('#deletion-status').getByText('Deletion has started and is continuing.',{exact:false}).waitFor();
   await page.getByText('interrupted after permanent deletion committed',{exact:false}).waitFor();
-  assert.deepEqual(deleteBodies,[{confirm:'DELETE',reason:'requested by account owner',acknowledgeAdmin:false}]);
+  await page.locator('#deletion-status').getByText('No email sent: notification was turned off.').waitFor();
+  assert.deepEqual(deleteBodies,[{confirm:'DELETE',reason:'requested by account owner',acknowledgeAdmin:false,notifyUser:false}]);
   assert.equal(await page.locator('#delete-account-form').count(),0,'committed deletion must never re-enable delete controls');
   assert.equal(await page.getByRole('button',{name:'Save username'}).isDisabled(),true);
   assert.ok(adminControlRequests.some(item=>item.path===`/v1/admin/users/${userId}/delete`&&item.method==='POST'));

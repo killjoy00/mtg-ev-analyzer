@@ -20,6 +20,7 @@ import {reconcileLaunchWatcherAlert} from './launch-watcher-alert.mjs';
 import {launchWatcherRecoveryConfigured,reconcileLaunchWatcherCadence,reconcileLaunchWatcherDispatch} from './launch-watcher-dispatch.mjs';
 import {campaignLinkPublishConfigured,handleCampaignLinkPublish} from './campaign-link-publish.mjs';
 import {handleAdminAccountDeletion} from './admin-account-deletion.mjs';
+import {handleAdminUsernameChange} from './admin-username-change.mjs';
 import {maintainServingReadiness} from './corpus-readiness.mjs';
 import {PLACEHOLDER_USERNAME,isPlaceholderUsername,isUsernameConflict,normalizeDisplayName as normalizeName,rethrowUsernameConflict} from './username.mjs';
 import {rankingIdentityStatus} from './account-identity.mjs';
@@ -2363,6 +2364,10 @@ async function route(request) {
   if (url.pathname.startsWith('/v1/patreon/')) return handlePatreon(request,{query,authSession,json});
   if (url.pathname.startsWith('/v1/apple-subscriptions/')) return handleAppleSubscriptions(request,{query,json,readJson,mobileAccountIdentity});
   const adminUserDeletionMatch=url.pathname.match(/^\/v1\/admin\/users\/[a-f0-9-]+\/(?:delete|deletion)$/i);
+  if(request.method==='PATCH'&&/^\/v1\/admin\/users\/[a-f0-9-]+\/username$/i.test(url.pathname)) {
+    const admin=await adminAccountIdentity(request,{mutation:true});
+    return json(await handleAdminUsernameChange(request,query,url,{readJson,adminAuthUserId:admin.user_id}));
+  }
   if(adminUserDeletionMatch&&['GET','POST'].includes(request.method)) {
     const admin=await adminAccountIdentity(request,{mutation:request.method==='POST'});
     const result=await handleAdminAccountDeletion(request,query,url,{
@@ -2460,6 +2465,7 @@ export default {
           deletionCommitted:true,
           operationId:error.operationId||error.deletion.operation_id||null,
           deletion:error.deletion,
+          ...(error.notification?{notification:error.notification}:{}),
         }:{}),
       },status);
       if(error.retryAfter)response.headers.set('retry-after',String(error.retryAfter));

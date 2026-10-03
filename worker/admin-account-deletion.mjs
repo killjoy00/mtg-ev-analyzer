@@ -1,4 +1,5 @@
 import {beginAdminDeletion,loadDeletionForAuth} from './account-deletion.mjs';
+import {adminDeletionEmail,adminNotificationRequested,sendAdminActionEmail} from './admin-user-notifications.mjs';
 
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const fail=(message,status=400,code=null)=>{throw Object.assign(Error(message),{status,...(code?{code}:{})});};
@@ -48,7 +49,7 @@ export async function handleAdminAccountDeletion(
   request,
   query,
   url=new URL(request.url),
-  {readJson=null,adminAuthUserId=null,deletionEnabled=()=>false,resumeDeletionOperation=null}={},
+  {readJson=null,adminAuthUserId=null,deletionEnabled=()=>false,resumeDeletionOperation=null,notify=sendAdminActionEmail}={},
 ) {
   const match=url.pathname.match(/^\/v1\/admin\/users\/([a-f0-9-]+)\/(delete|deletion)$/i);
   if(!match)return null;
@@ -71,8 +72,11 @@ export async function handleAdminAccountDeletion(
   if(reason.length>200)fail('Deletion reason must be 200 characters or fewer.',400);
   const acknowledgeAdmin=body.acknowledgeAdmin===true;
 
-  const target=await query('SELECT email FROM neon_auth."user" WHERE id=$1::uuid LIMIT 1',[targetAuthUserId]);
+  // Read before deletion starts: the auth record, and with it the address, is
+  // removed by the provider phase.
+  const target=await query('SELECT email,"emailVerified" email_verified FROM neon_auth."user" WHERE id=$1::uuid LIMIT 1',[targetAuthUserId]);
   const knownEmail=target.rows[0]?.email||null;
+  const noticeEmail=bool(target.rows[0]?.email_verified)?knownEmail:null;
   const started=await beginAdminDeletion(query,{
     authUserId:targetAuthUserId,
     adminAuthUserId,
@@ -89,6 +93,18 @@ export async function handleAdminAccountDeletion(
 
   let operation=operationFromStart(started);
   if(!operation)fail('Account deletion could not be started.',500,'DELETE_START');
+  // Only the request that created the operation notifies, so a retried or
+  // concurrent submit cannot email the user twice. The deletion is committed
+  // at this point, so the notice is sent before the slower provider phase.
+  const notification=started.start_status==='created'
+    ? await notify({
+      kind:'admin_deletion',
+      requested:adminNotificationRequested(body),
+      email:noticeEmail,
+      idempotencyKey:'pack1-admin-deletion/'+operation.operation_id,
+      message:adminDeletionEmail({reason}),
+    })
+    : {status:'skipped',reason:'already_started'};
   try {
     operation=await resumeDeletionOperation(operation,{knownEmail});
   } catch(error) {
@@ -107,6 +123,7 @@ export async function handleAdminAccountDeletion(
       deletionCommitted:true,
       operationId:committed?.operation_id||null,
       deletion:committed,
+      notification,
     });
   }
 
@@ -119,6 +136,7 @@ export async function handleAdminAccountDeletion(
       deletion:complete?'complete':'accepted',
       operationId:view?.operation_id||null,
       operation:view,
+      notification,
     },
   };
 }
