@@ -133,7 +133,7 @@ export async function importComponents(query,prepared) {
  }
  for(const s of prepared) {
   const component=s.manifest.component_version,expectedModel=modelVersionForComponent(component);
-  if(!defaultModel)throw Error('Unsupported component identity');
+  if(!expectedModel)throw Error('Unsupported component identity');
   if(!s.health.ready) {
    await query("INSERT INTO corpus_sources(set_id,event_type,archive_url,archive_available,import_status,last_error) VALUES($1,'TradDraft',$2,true,'failed',$3) ON CONFLICT(set_id,event_type) DO UPDATE SET import_status='failed',last_error=EXCLUDED.last_error",[s.sid,s.manifest.source_archive.url,'Research quality gate blocked: '+Object.entries(s.health.gates).filter(([,v])=>!v).map(([k])=>k).join(', ')]);
    console.log(JSON.stringify({set:s.sid,status:'blocked before Candidate',gates:s.health.gates}));
