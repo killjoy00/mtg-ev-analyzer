@@ -1,9 +1,8 @@
 {
-  "operation": "v5-corpus-release",
-  "request_id": "v5-v9-production-stage-20261003",
-  "target": "production",
-  "action": "stage",
-  "candidate_run_id": "37132557406",
-  "release_commit": "f2a6083daecb09f3098c46e29625c51aa41ad217",
-  "reason": "Stage the exact accepted v5/v9 candidate in production only after development activation and full exact-runtime Daily and Practice acceptance pass. Preserve existing v8 serving pointers, readiness and history, and require exact artifact, health, canary, count, rating and preservation evidence before any production bridge or activation."
+  "operation": "deploy",
+  "request_id": "v5-v9-development-rollback-bridge-20261003",
+  "replay_of": "v5-v9-development-bridge-20261003",
+  "reason": "Owner-authorized issue #889 rollback rehearsal. Merge only after exact development v9 runtime acceptance from PR #919; redeploy the same reviewed v8 bridge before restoring captured v8 parent pointers. Preserve all histories.",
+  "target": "development",
+  "commit": "c7e90fe333395bcb3f7468744c943c20a7231978"
 }
