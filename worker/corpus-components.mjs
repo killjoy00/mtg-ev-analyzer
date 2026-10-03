@@ -1,4 +1,5 @@
 import {modelVersionForComponent,supportedComponent} from '../corpus-components.mjs';
+import modelVersions from '../model-versions.json' with {type:'json'};
 export function corpusMembership({serving=false,parameter=1}={}) {
  const live=serving?" AND c.status='Live'":'';
  const activeSnapshot=serving?`
@@ -9,7 +10,14 @@ export function corpusMembership({serving=false,parameter=1}={}) {
        OR (p.source_snapshot_id IS NULL AND EXISTS(
          SELECT 1 FROM corpus_source_snapshots hs
          WHERE hs.source_snapshot_id=e.active_snapshot_id AND hs.schema_version='historical-frozen'
-       )))
+       ))
+       OR (p.source_snapshot_id IS NULL
+         AND p.corpus_version='${modelVersions.v4.corpus_version}'
+         AND EXISTS(
+           SELECT 1 FROM corpus_source_snapshots next_snapshot
+           WHERE next_snapshot.source_snapshot_id=e.active_snapshot_id
+             AND next_snapshot.corpus_version='${modelVersions.v5.corpus_version}'
+         )))
  ))`:'';
  // Bound the version index, enforce publication independently per set, and for
  // the parent Premier corpus expose only the environment's explicitly active

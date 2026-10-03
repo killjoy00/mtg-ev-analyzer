@@ -75,6 +75,34 @@ metadata is an availability check and never replaces byte verification.
    stage the exact candidate to development and run real API/game acceptance.
    Promote those same verified artifacts to production and run acceptance there.
 
+## Cross-version serving cutover
+
+The environment policy has one active Premier snapshot pointer per set while a
+deployed worker requests one explicit parent corpus version. Therefore activation
+and worker deployment are not treated as atomic.
+
+Before activating any v9 pointer, the target must have migration
+`0049_cross_version_corpus_cutover.sql` and the v8 bridge worker deployed. The
+bridge keeps immutable historical-frozen v8 parent rows eligible only when the
+environment's active pointer belongs to a different corpus version. It does not
+relax same-version snapshot selection, component publication, source exclusions,
+quality floors or lifecycle gates.
+
+Use this order in development, then production with the exact same candidate:
+
+1. apply the cross-version migration as part of the stage-only operation, then
+   stage and verify v9 without changing active pointers; inactive future-version
+   rows and Candidate components do not churn the current serving revision;
+2. deploy the reviewed v8 bridge worker before any active pointer changes;
+3. health-check and activate the exact v9 snapshots/components. A revision
+   change may carry the verified v8 cache forward only when an exact database
+   comparison proves its selector inventory and environment metadata are
+   unchanged; otherwise normal readiness remains fail-closed;
+4. deploy the exact accepted v9 release commit, then complete v9 readiness and
+   gameplay acceptance;
+5. on rollback, deploy the bridge/v8 worker before restoring the captured v8
+   pointers with compare-and-swap, then verify the restored v8 revision.
+
 ## Fresh v5 standings and rollback
 
 The owner selected fresh v5 standings for every public leaderboard period and
