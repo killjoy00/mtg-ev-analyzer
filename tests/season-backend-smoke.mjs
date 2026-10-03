@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 
 const connection=process.argv[2];
 const productionBootstrap=process.argv.includes('--production-bootstrap');
@@ -176,7 +177,7 @@ assert.equal(season.set_id,'hob');
 await assert.rejects(()=>resolveCurrentSeason(query,{today:'2026-09-03',ensureSchedule:async()=>{throw Object.assign(new Error('unexpected'),{status:500});}}),/unexpected/);
 
 // Seed all three environment standings in the same HOB season.
-await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) VALUES ($1::uuid,'2026-09-01','mixed','draft_run',10,'F','[]'::jsonb),($1::uuid,'2026-09-01','powered-cube','draft_run',91,'A','[]'::jsonb),($1::uuid,'2026-09-01','latest','draft_run',82,'B','[]'::jsonb)",[targetPlayer]);
+await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json,details_json) VALUES ($1::uuid,'2026-09-01','mixed','draft_run',10,'F','[]'::jsonb,jsonb_build_object('corpus_version',$2::text)),($1::uuid,'2026-09-01','powered-cube','draft_run',91,'A','[]'::jsonb,jsonb_build_object('corpus_version',$2::text)),($1::uuid,'2026-09-01','latest','draft_run',82,'B','[]'::jsonb,jsonb_build_object('corpus_version',$2::text))",[targetPlayer,DRAFT_RUN_CORPUS_VERSION]);
 
 // More than 100 eligible peers prove profile rank is calculated before the
 // public board's LIMIT 100.
@@ -184,7 +185,7 @@ const peers=Array.from({length:105},(_,i)=>({id:crypto.randomUUID(),auth_id:cryp
 await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") SELECT auth_id::uuid,name,email,false FROM jsonb_to_recordset($1::jsonb) AS x(auth_id text,name text,email text)',[JSON.stringify(peers)]);
 await query('INSERT INTO players(id,display_name,username_owned) SELECT id::uuid,name,true FROM jsonb_to_recordset($1::jsonb) AS x(id text,name text)',[JSON.stringify(peers)]);
 await query('INSERT INTO account_links(auth_user_id,player_id) SELECT auth_id::uuid,id::uuid FROM jsonb_to_recordset($1::jsonb) AS x(id text,auth_id text)',[JSON.stringify(peers)]);
-await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) SELECT id::uuid,'2026-09-01','mixed','draft_run',20,'F','[]'::jsonb FROM jsonb_to_recordset($1::jsonb) AS x(id text)",[JSON.stringify(peers)]);
+await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json,details_json) SELECT id::uuid,'2026-09-01','mixed','draft_run',20,'F','[]'::jsonb,jsonb_build_object('corpus_version',$2::text) FROM jsonb_to_recordset($1::jsonb) AS x(id text)",[JSON.stringify(peers),DRAFT_RUN_CORPUS_VERSION]);
 
 const profileSeason=await currentSeasonForPlayer(query,targetPlayer,{today:'2026-09-03',ensureSchedule:async()=>({created:false})});
 assert.equal(profileSeason.set_id,'hob');
