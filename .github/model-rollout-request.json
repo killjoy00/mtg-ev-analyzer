@@ -1,9 +1,11 @@
 {
   "operation": "v5-corpus-release",
-  "request_id": "v5-v9-development-stage-verification-fix-20261003",
+  "request_id": "v5-v9-development-activate-20261003",
   "target": "development",
-  "action": "stage",
+  "action": "activate",
   "candidate_run_id": "37132557406",
   "release_commit": "7b2d8f342c43a2c7d3f9fa89e9964674d8769666",
-  "reason": "Retry development staging of the unchanged accepted candidate after fixing whole-corpus SQL timeouts and health/canary checks that ignored the pinned pick-2 opening for ECL, TLA and TMT. Preserve all v8 serving pointers and history; require every exact byte, rating, count and preservation gate before bridge deployment."
+  "stage_run_id": "37144578913",
+  "bridge_commit": "c7e90fe333395bcb3f7468744c943c20a7231978",
+  "reason": "Activate the exact accepted v5/v9 candidate only after development stage 37144578913 and the exact reviewed v8 bridge deployment pass. Reverify staged bytes and preserved history, atomically switch all parent snapshots, build readiness, and publish only eligible Traditional components."
 }
