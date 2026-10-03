@@ -65,11 +65,10 @@ try {
   FROM draft_run_verified_puzzles p
   WHERE p.set_id=$3 AND p.corpus_version=$4
   ORDER BY p.puzzle_id LIMIT 1`,[futurePuzzle,futureVersion,setId,DRAFT_RUN_CORPUS_VERSION]);
- await query(`INSERT INTO draft_run_puzzle_ratings(puzzle_id,difficulty_version,rating,top_two_ratio,target_support_ratio,band)
-  SELECT $1,r.difficulty_version,r.rating,r.top_two_ratio,r.target_support_ratio,r.band
-  FROM draft_run_verified_puzzles p JOIN draft_run_puzzle_ratings r USING(puzzle_id)
-  WHERE p.set_id=$2 AND p.corpus_version=$3 AND r.difficulty_version=$4
-  ORDER BY p.puzzle_id LIMIT 1`,[futurePuzzle,setId,DRAFT_RUN_CORPUS_VERSION,DRAFT_RUN_DIFFICULTY_VERSION]);
+ assert.equal((await query(
+  'SELECT count(*)::int n FROM draft_run_puzzle_ratings WHERE puzzle_id=$1 AND difficulty_version=$2',
+  [futurePuzzle,DRAFT_RUN_DIFFICULTY_VERSION]
+ )).rows[0].n,1,'Puzzle insertion must derive its rating automatically');
  assert.equal(await revision(),beforeFutureStage,'Inactive future-parent baseline and ratings must not churn the serving revision');
  await query('DELETE FROM draft_run_verified_puzzles WHERE puzzle_id=$1',[futurePuzzle]);
  futurePuzzle=null;
