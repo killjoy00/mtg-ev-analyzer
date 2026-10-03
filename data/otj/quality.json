@@ -3,26 +3,26 @@
   "errors": [],
   "metrics": {
     "cards": {
-      "candidate_occurrences": 93791,
+      "candidate_occurrences": 93765,
       "image_metadata_coverage": 1.0,
       "rarity_metadata_coverage": 1.0,
       "unique_candidates": 381
     },
     "consensus": {
-      "historical_pack_score_p10": 72.28,
-      "historical_pack_score_p50": 84.42,
-      "historical_pack_score_p90": 92.75,
-      "opening_top_support_p10": 0.28,
-      "opening_top_support_p50": 0.45,
-      "opening_top_support_p90": 0.66
+      "historical_pack_score_p10": 71.88,
+      "historical_pack_score_p50": 85.82,
+      "historical_pack_score_p90": 94.26,
+      "opening_top_support_p10": 0.3,
+      "opening_top_support_p50": 0.48,
+      "opening_top_support_p90": 0.72
     },
     "path_model": {
-      "bytes": 1916648,
+      "bytes": 2354057,
       "candidate_card_coverage": 1.0,
       "cards": 381,
       "excluded_replay_drafts": 299,
       "model_version": "strong-player-counterfactual-path-v3",
-      "pairs": 119596,
+      "pairs": 138516,
       "present": true
     },
     "replays": {
@@ -30,8 +30,8 @@
       "declared": 299
     },
     "training": {
-      "drafts": 5000,
-      "picks": 208998,
+      "drafts": 21902,
+      "picks": 915447,
       "win_rate_cutoff": 0.6
     }
   },

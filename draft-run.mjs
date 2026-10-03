@@ -18,7 +18,7 @@ export const DRAFT_RUN_SCORING_VERSION = 'trophy-consensus-v3';
 // scripts/set_policy.py reads this value rather than copying it, and a test
 // refuses any stale literal elsewhere - a half-landed bump is what lets the
 // importer reuse old payloads under a new label and ship two models as one.
-export const DRAFT_RUN_CORPUS_VERSION = 'elite-trophy-colour-stage-v8';
+export const DRAFT_RUN_CORPUS_VERSION = 'elite-trophy-colour-stage-v9';
 export const V5_CORPUS_VERSION = modelVersions.v5.corpus_version;
 export const V5_CONTEXT_MODEL_VERSION = 'strong-player-colour-stage-v5';
 // Pooled validation fitted 2.0 for the old pair model and 1.75 for the
