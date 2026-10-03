@@ -1,7 +1,7 @@
 {
   "operation": "deploy",
   "request_id": "v5-v9-production-bridge-20261003",
-  "reason": "Owner-authorized issue #889 production bridge deployment after exact production staging and successful development rollback rehearsal. Require development still serving this exact bridge with complete Daily acceptance before uploading production bundles. Preserve v8 serving while enabling reversible v9 activation.",
+  "reason": "Owner-authorized #889. Require successful production staging and development rollback rehearsal. Development must still serve this exact bridge with complete Daily acceptance before uploading production bundles; preserve v8 serving for reversible v9 activation.",
   "target": "production",
   "commit": "c7e90fe333395bcb3f7468744c943c20a7231978"
 }
