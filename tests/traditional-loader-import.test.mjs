@@ -1,7 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {importComponents} from '../scripts/load-traditional-components.mjs';
-import {TRADITIONAL_V5_PHASE2_COMPONENT_VERSION} from '../corpus-components.mjs';
+import fs from 'node:fs';
+import modelVersions from '../model-versions.json' with {type:'json'};
+import {importComponents,sourceQuality} from '../scripts/load-traditional-components.mjs';
+import {TRADITIONAL_V5_PHASE2_COMPONENT_VERSION,TRADITIONAL_V4_PHASE2_COMPONENT_VERSION,V4_CONTEXT_MODEL_VERSION} from '../corpus-components.mjs';
+
+test('historical v4 admission remains pinned to v8 when the current release is v9',()=>{
+ const original=JSON.parse(fs.readFileSync(new URL('../results/rebuild-2026-09-18/traditional-puzzle-report.json',import.meta.url)));
+ const evidence={...original.sets.blb,v8_parity_picks:original.sets.blb.parity_picks};
+ delete evidence.parity_picks;
+ const report={schema:1,corrected:{component_version:TRADITIONAL_V4_PHASE2_COMPONENT_VERSION,
+  parent_corpus:modelVersions.v4.corpus_version,model:V4_CONTEXT_MODEL_VERSION},
+  format_training_audit:{valid_despite_issue_164:true},sets:{blb:evidence}};
+ const n=evidence.quality.usable_traditional_puzzles;
+ const metrics={puzzles:n,usable:n,metadataComplete:n,imagesComplete:n};
+ assert.equal(sourceQuality(report,'blb',metrics).ready,true);
+ assert.equal(sourceQuality({...report,corrected:{...report.corrected,parent_corpus:modelVersions.v5.corpus_version}},'blb',metrics).ready,false);
+});
 
 test('Traditional importer records a blocked component without creating a Candidate',async()=>{
  const writes=[];

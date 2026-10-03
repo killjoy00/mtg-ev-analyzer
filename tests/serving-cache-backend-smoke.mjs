@@ -73,11 +73,18 @@ const activated=await loadServingSnapshot(query,version);
 assert.notEqual(activated.id,snapshot.id,'activation publishes a new serving-cache generation');
 const selected=await selectCachedDatabaseRun(query,version,'snapshot-activation-'+stageSet,'mixed',{setIds:[stageSet]});
 assert.equal(selected.length,8);
-const selectedFromSnapshot=Number((await query(
-  'SELECT count(*) n FROM draft_run_verified_puzzles WHERE source_snapshot_id=$1 AND puzzle_id=ANY($2::text[])',
-  [stagedSnapshot,toPgArray(selected.map(p=>p.puzzle_id))]
-)).rows[0].n);
-assert.equal(selectedFromSnapshot,selected.length,'live custom selection uses only the activated source snapshot');
+const selectedSources=(await query(`SELECT
+ count(*) FILTER(WHERE p.corpus_version=$3)::int parent,
+ count(*) FILTER(WHERE p.corpus_version=$3 AND p.source_snapshot_id=$1)::int active_parent,
+ count(*) FILTER(WHERE p.corpus_version<>$3 AND EXISTS(
+  SELECT 1 FROM corpus_components c WHERE c.set_id=p.set_id
+   AND c.component_version=p.corpus_version AND c.parent_version=$3 AND c.status='Live'
+ ))::int live_component
+ FROM draft_run_verified_puzzles p WHERE p.puzzle_id=ANY($2::text[])`,
+ [stagedSnapshot,toPgArray(selected.map(p=>p.puzzle_id)),version])).rows[0];
+assert.ok(Number(selectedSources.parent)>0,'custom selection must exercise the activated Premier snapshot');
+assert.equal(Number(selectedSources.active_parent),Number(selectedSources.parent),'every selected Premier decision comes from the activated snapshot');
+assert.equal(Number(selectedSources.parent)+Number(selectedSources.live_component),selected.length,'other selected decisions belong to Live components of this parent');
 
 const restoreBefore=await revision();
 await query('UPDATE draft_run_environment_policy SET active_snapshot_id=$2 WHERE set_id=$1',[stageSet,originalSnapshot]);

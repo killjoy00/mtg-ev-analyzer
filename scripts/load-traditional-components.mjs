@@ -4,6 +4,7 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import readline from 'node:readline';
 import {createHash} from 'node:crypto';
+import modelVersions from '../model-versions.json' with {type:'json'};
 import {DRAFT_RUN_CORPUS_VERSION as parent,validateDraftRunPuzzle,interestingDraftRunPuzzle} from '../draft-run.mjs';
 import {
  TRADITIONAL_COMPONENT_VERSION,TRADITIONAL_PHASE2_COMPONENT_VERSION,CUBE_TRADITIONAL_COMPONENT_VERSION,
@@ -21,7 +22,7 @@ const files=root=>fs.readdirSync(root,{withFileTypes:true}).flatMap(e=>e.isDirec
 async function* records(file){const reader=readline.createInterface({input:fs.createReadStream(file).pipe(zlib.createGunzip()),crlfDelay:Infinity});for await(const line of reader)if(line.trim())yield JSON.parse(line);}
 const PHASE2_SCOPE=['hob','msh','sos','eoe','fin','tdm','dft','fdn','dsk','blb','mh3','otj','mkm','ktk','lci','woe','ltr','mom','one','bro','dmu','snc','neo','hbg','sir','pio','powered-cube'];
 const sameSet=(a,b)=>[...a].sort().join(',')===[...b].sort().join(',');
-const isV4Phase2=report=>report.schema===1&&report.corrected?.component_version===TRADITIONAL_V4_PHASE2_COMPONENT_VERSION&&report.corrected?.parent_corpus===parent&&report.corrected?.model===V4_CONTEXT_MODEL_VERSION;
+const isV4Phase2=report=>report.schema===1&&report.corrected?.component_version===TRADITIONAL_V4_PHASE2_COMPONENT_VERSION&&report.corrected?.parent_corpus===modelVersions.v4.corpus_version&&report.corrected?.model===V4_CONTEXT_MODEL_VERSION;
 const isV4Cube=report=>report.schema==='cube-p2p7-v4-admission-v1';
 const expansionSupported=report=>report.expansion_supported===true||report.automatic_expansion_supported===true||
  (isV4Phase2(report)&&report.format_training_audit?.valid_despite_issue_164===true&&!report.persistent_category_patterns?.length&&!report.residuals?.persistent_category_patterns?.length);
@@ -85,13 +86,13 @@ export async function validateComponents(root) {
   }
   if(!s)throw Error('Missing per-set evidence');
   if(phase2V4) {
-   if(!reportSet||summary.set!==sid||summary.model_version!==V4_CONTEXT_MODEL_VERSION||summary.parent_corpus_version!==parent||summary.traditional_used_for_training!==false)throw Error('Invalid v4 per-set evidence');
+   if(!reportSet||summary.set!==sid||summary.model_version!==V4_CONTEXT_MODEL_VERSION||summary.parent_corpus_version!==modelVersions.v4.corpus_version||summary.traditional_used_for_training!==false)throw Error('Invalid v4 per-set evidence');
    if(summary.production_input_signature!==reportSet.production_input_signature||Number(summary.v8_parity_picks)!==Number(reportSet.v8_parity_picks)||Boolean(summary.pass)!==(reportSet.new_v4_result==='PASS'))throw Error('v4 summary differs from consolidated report');
   }
   const signature=summary?.frozen_input_signature||summary?.production_input_signature||s?.frozen_input_signature||s?.production_input_signature;
   const manifestSignature=manifest.frozen_input_signature||manifest.model_input_signature;
   if(manifest.component_version!==component||manifest.model_version!==expectedModel||manifest.model_source_event!=='PremierDraft'||manifest.source_event_type!=='TradDraft'||manifest.publication_authorized!==false||!/^[a-f0-9]{64}$/.test(signature||'')||manifestSignature!==signature)throw Error('Invalid component identity');
-  if(expectedModel===V4_CONTEXT_MODEL_VERSION&&manifest.parent_corpus_version!==parent)throw Error('v4 component is not pinned to the v8 parent');
+  if(expectedModel===V4_CONTEXT_MODEL_VERSION&&manifest.parent_corpus_version!==modelVersions.v4.corpus_version)throw Error('v4 component is not pinned to the v8 parent');
   if(summary&&!phase2V4&&!v5&&(summary.set!==sid||summary.model_version!==expectedModel||summary.model_training_changed!==false||summary.frozen_input_signature!==manifest.frozen_input_signature))throw Error('Invalid per-set Phase 2 evidence');
   if(!manifest.source_archive?.url?.endsWith(`/draft_data_public.${cube?'Cube_-_Powered':sid.toUpperCase()}.TradDraft.csv.gz`)||!manifest.source_archive.url.startsWith('https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/'))throw Error('Invalid source archive');
   for(const name of ['puzzles','trophies'])if(hash(path.join(dir,name+'.jsonl.gz'))!==manifest[name==='puzzles'?'puzzle_file_sha256':'ledger_file_sha256'])throw Error('Component checksum mismatch');
@@ -117,7 +118,7 @@ export async function validateComponents(root) {
   if(puzzles!==manifest.puzzles||groups.size!==included||[...groups.values()].some(p=>p.length!==(cube?7:8)))throw Error('Incomplete first-eight source accounting');
   const health=sourceQuality(report,sid,{puzzles,usable,metadataComplete,storedMetadataComplete,imagesComplete},s);
   if(phase2&&health.ready!==passing.includes(sid))throw Error('Phase 2 pass status differs from reconstructed component health');
-  prepared.push({sid,dir,ledger,health,manifest:{...manifest,model_source_corpus:parent,research_report_sha256:hash(reports[0]),qualified_trophies:qualified,included_trophies:included,excluded_trophies:ledger.size-included,source_trophies:ledger.size}});
+  prepared.push({sid,dir,ledger,health,manifest:{...manifest,model_source_corpus:expectedModel===V4_CONTEXT_MODEL_VERSION?modelVersions.v4.corpus_version:parent,research_report_sha256:hash(reports[0]),qualified_trophies:qualified,included_trophies:included,excluded_trophies:ledger.size-included,source_trophies:ledger.size}});
  }
  if(!sameSet(seen,expectedSets)||!sameSet(prepared.map(s=>s.sid),preparedSets))throw Error('Complete reviewed component artifact set required');
  return prepared;
