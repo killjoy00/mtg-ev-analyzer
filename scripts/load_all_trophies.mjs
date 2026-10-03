@@ -10,6 +10,7 @@ import {validateDraftRunPuzzle, interestingDraftRunPuzzle, draftRunDifficulty, D
 import {refreshServingStatistics} from '../worker/serving-statistics.mjs';
 import {corpusDatabase} from './neon-corpus-db.mjs';
 import {sameSourceSnapshotManifest} from './source-snapshot-manifest.mjs';
+import {verifyStagedSnapshot} from './verify-staged-snapshot.mjs';
 if(process.argv[2]?.startsWith('https://'))throw Error('Remote trophy import is disabled; pass a reviewed direct connection file.');
 const directory=process.argv[3]||'generated/trophy-import';
 const catalog=JSON.parse(fs.readFileSync(path.join(directory,'catalog.json')));
@@ -63,12 +64,20 @@ async function loadSet(s) {
     draft_last_modified,game_last_modified,importer_identity,model_identity,manifest,lifecycle_status)
     VALUES($1,$2,'PremierDraft',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,'Blocked')
     ON CONFLICT(source_snapshot_id) DO NOTHING
-    RETURNING source_snapshot_id,manifest`,
+    RETURNING source_snapshot_id,manifest,lifecycle_status`,
     [s.source_snapshot_id,s.id,DRAFT_RUN_CORPUS_VERSION,s.schema_version,s.source_archive.sha256,s.skill_source.sha256,
      s.source_archive.etag||null,s.skill_source.etag||null,s.source_archive.last_modified||null,s.skill_source.last_modified||null,
      s.import_version,s.model_version,snapshotManifest])).rows[0]
-    ||(await query('SELECT source_snapshot_id,manifest FROM corpus_source_snapshots WHERE source_snapshot_id=$1',[s.source_snapshot_id])).rows[0];
+    ||(await query('SELECT source_snapshot_id,manifest,lifecycle_status FROM corpus_source_snapshots WHERE source_snapshot_id=$1',[s.source_snapshot_id])).rows[0];
   if(snapshot?.source_snapshot_id!==s.source_snapshot_id||!sameSourceSnapshotManifest(snapshot?.manifest,snapshotManifest))throw Error('Existing source snapshot differs; immutable snapshot cannot be rewritten: '+s.id);
+  if(stageOnly&&snapshot.lifecycle_status==='Candidate') {
+    async function* existingLedger() {
+      for await(const d of records(fileFor(s,'ledger_file')))yield {source_draft_hash:d.source_draft_hash||createHash('sha256').update(`${s.id}|${d.draft_id}`).digest('hex').slice(0,32),event_type:'PremierDraft',wins:d.wins??7,losses:d.losses??null,qualified:d.qualified,included:d.status==='included',puzzle_count:d.puzzles||0,exclusion_reason:d.reason||d.trajectory_limit||null};
+    }
+    const verified=await verifyStagedSnapshot(query,s,records(fileFor(s,'puzzle_file')),existingLedger());
+    console.log(s.id,JSON.stringify(verified),'immutable Candidate verified; import skipped');
+    return;
+  }
   let batch=[],added=0;
   for await(const p of records(fileFor(s,'puzzle_file'))) {batch.push(p);if(batch.length===250){added+=await batchInsert(batch,s.source_snapshot_id);batch=[];}}
   if(batch.length)added+=await batchInsert(batch,s.source_snapshot_id);
