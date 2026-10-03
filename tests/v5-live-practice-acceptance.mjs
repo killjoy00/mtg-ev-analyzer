@@ -123,22 +123,12 @@ async function cleanup() {
   for(const f of fixtures) {
     assert.match(f.playerId,/^[a-f0-9-]{36}$/i);
     assert.match(f.authId,/^[a-f0-9-]{36}$/i);
-    // Draft Run shares have NO ACTION to sessions and must go first.
-    await query(`DELETE FROM draft_run_shares WHERE session_id IN
-      (SELECT id FROM draft_run_sessions WHERE player_id=$1::uuid)`,[f.playerId]);
-    await query('DELETE FROM draft_run_sessions WHERE player_id=$1::uuid',[f.playerId]);
-    await query('DELETE FROM player_achievements WHERE player_id=$1::uuid',[f.playerId]);
-    await query('DELETE FROM analytics_events WHERE player_id=$1::uuid',[f.playerId]);
-    await query('DELETE FROM scores WHERE player_id=$1::uuid',[f.playerId]);
-    await query('DELETE FROM game_results WHERE player_id=$1::uuid',[f.playerId]);
-    await query('DELETE FROM player_request_limits WHERE player_id=$1::uuid',[f.playerId]);
-    await query('DELETE FROM share_challenges WHERE player_id=$1::uuid',[f.playerId]);
-    await query('DELETE FROM player_identity_merges WHERE source_player_id=$1::uuid OR target_player_id=$1::uuid',[f.playerId]);
+    // Keep completed QA gameplay rows as release evidence, just like the
+    // existing Daily acceptance. Remove only temporary managed-auth access.
     await query('DELETE FROM entitlement_grants WHERE auth_user_id=$1::uuid AND provider=$2',[f.authId,'test']);
     await query('DELETE FROM account_links WHERE auth_user_id=$1::uuid',[f.authId]);
     await query('DELETE FROM neon_auth.session WHERE "userId"=$1::uuid',[f.authId]);
     await query('DELETE FROM neon_auth."user" WHERE id=$1::uuid',[f.authId]);
-    await query('DELETE FROM players WHERE id=$1::uuid',[f.playerId]);
   }
 }
 
@@ -258,5 +248,5 @@ try {
   },null,2));
 } finally {
   await cleanup();
-  if(!completed)console.error('v5 live Practice acceptance failed; QA fixture cleanup completed.');
+  if(!completed)console.error('v5 live Practice acceptance failed; temporary QA auth cleanup completed.');
 }
