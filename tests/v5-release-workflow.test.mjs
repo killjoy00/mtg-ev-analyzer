@@ -4,6 +4,7 @@ import fs from 'node:fs';
 
 const workflow=fs.readFileSync(new URL('../.github/workflows/release-v5-corpus.yml',import.meta.url),'utf8');
 const deployWorkflow=fs.readFileSync(new URL('../.github/workflows/deploy-functions.yml',import.meta.url),'utf8');
+const candidateVerifier=fs.readFileSync(new URL('../scripts/verify-v5-release-candidate.mjs',import.meta.url),'utf8');
 
 test('v5 stage loads the exact rebuilt baseline before Premier additions',()=>{
   const capture=workflow.indexOf('v5-release-state.mjs "$RUNNER_TEMP/target.connection" capture');
@@ -39,4 +40,16 @@ test('v5 target Practice acceptance runs after exact-revision Daily smoke',()=>{
   const practice=deployWorkflow.indexOf('Verify live v5 account-linked Practice flows');
   assert.ok(daily>=0&&practice>daily);
   assert.match(deployWorkflow,/v5-live-practice-acceptance\.mjs "\$TARGET_BRANCH" "\$RELEASE_COMMIT" "\$RUNNER_TEMP\/target\.connection"/);
+});
+
+
+test('v5 candidate release fails closed on uncapped accounting and source refresh drift',()=>{
+  assert.match(candidateVerifier,/training_mode!=='all-qualified'/);
+  assert.match(candidateVerifier,/training_cap!==null/);
+  assert.match(candidateVerifier,/training_drafts\)!==Number\(s\.qualified_training_drafts/);
+  assert.match(candidateVerifier,/total_trained\)!==Number\(accounting\.total_qualified/);
+  assert.match(candidateVerifier,/holdout!=='5-fold by draft_id'/);
+  assert.match(candidateVerifier,/same\(refreshed,\['hob'\]\)/);
+  assert.match(candidateVerifier,/mixed_identities!==false/);
+  assert.match(candidateVerifier,/invalid_numerical_outputs/);
 });
