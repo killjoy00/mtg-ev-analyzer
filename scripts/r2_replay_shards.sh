@@ -20,6 +20,10 @@ export AWS_MAX_ATTEMPTS="${AWS_MAX_ATTEMPTS:-10}"
 # the target model namespace without pretending the whole checkout is uniform.
 model_override="${REPLAY_MODEL_VERSION:-}"
 set_filter="${REPLAY_SETS:-}"
+upload_delete=()
+# Preserve the existing contract: only an explicitly scoped upload removes
+# stale remote shards. Default catalog operations remain non-destructive.
+if [[ -n "$set_filter" ]]; then upload_delete=(--delete); fi
 
 if [[ -n "$model_override" && -z "$set_filter" ]]; then
   echo "REPLAY_MODEL_VERSION requires REPLAY_SETS for a scoped shard operation." >&2
@@ -29,19 +33,34 @@ fi
 if [[ -n "$model_override" ]]; then
   model_version="$model_override"
 else
-  model_version="$(python3 - <<'PY'
+  # Retired manifests remain available for history and can belong to an older
+  # model. Ordinary operations follow the active catalog, never those files.
+  active_plan="$(python3 - <<'PY'
 import json
+import re
 from pathlib import Path
 
-versions = {
-    json.loads(path.read_text())['model']['model_version']
-    for path in Path('data').glob('*/manifest.json')
-}
+entries = json.loads(Path('data/catalog.json').read_text())['sets']
+ids = [entry['id'] for entry in entries]
+if not ids or len(set(ids)) != len(ids) or any(not re.fullmatch(r'[a-z0-9-]+', sid) for sid in ids):
+    raise SystemExit('Expected nonempty unique safe active replay set IDs')
+versions = set()
+for entry in entries:
+    manifest = json.loads(Path('data', entry['id'], 'manifest.json').read_text())
+    model = manifest['model']['model_version']
+    if entry['model_version'] != model:
+        raise SystemExit(f"Active replay catalog/manifest model mismatch: {entry['id']}")
+    versions.add(model)
 if len(versions) != 1:
-    raise SystemExit(f'Expected one replay model in data/, found: {sorted(versions)}')
+    raise SystemExit(f'Expected one active replay model, found: {sorted(versions)}')
 print(next(iter(versions)))
+print(','.join(ids))
 PY
 )"
+  model_version="${active_plan%%$'\n'*}"
+  if [[ -z "$set_filter" ]]; then
+    set_filter="${active_plan#*$'\n'}"
+  fi
 fi
 
 if [[ "$model_version" == "strong-player-colour-stage-v3" ]]; then
@@ -111,7 +130,7 @@ case "$mode" in
         }
         aws s3 sync "$shard_dir/" "s3://${R2_BUCKET}/${replay_prefix}/${sid}/shards/" \
           --endpoint-url "$R2_ENDPOINT" \
-          --delete \
+          "${upload_delete[@]}" \
           --content-type 'application/json; charset=utf-8' \
           --cache-control 'public, max-age=3600'
       done
