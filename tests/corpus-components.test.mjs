@@ -22,7 +22,7 @@ import {
 import {componentBelongsTo,corpusMembership} from '../worker/corpus-components.mjs';
 const original=JSON.parse(gunzipSync(fs.readFileSync(new URL('../corpus/draft-run/blb.json.gz',import.meta.url)))).find(p=>p.pick_number===1);
 const candidate=()=>({...structuredClone(original),corpus_version:component,source_event_type:'TradDraft',model_source_event:'PremierDraft',model_version:model,event_match_wins:3,event_match_losses:0});
-const v4Candidate=()=>({...structuredClone(original),corpus_version:v4Component,parent_corpus_version:DRAFT_RUN_CORPUS_VERSION,source_event_type:'TradDraft',model_source_event:'PremierDraft',model_version:v4Model,event_match_wins:3,event_match_losses:0});
+const v4Candidate=()=>({...structuredClone(original),corpus_version:v4Component,parent_corpus_version:modelVersions.v4.corpus_version,source_event_type:'TradDraft',model_source_event:'PremierDraft',model_version:v4Model,event_match_wins:3,event_match_losses:0});
 
 test('Traditional source revisions map to exactly one grader version',()=>{
  assert.equal(modelVersionForComponent(component),model);
@@ -39,7 +39,7 @@ test('Traditional source revisions map to exactly one grader version',()=>{
 test('v5 components require their separate parent and preserve the Cube serving window',()=>{
  const p={...v4Candidate(),corpus_version:v5Component,model_version:v5Model,parent_corpus_version:v5Parent};
  assert.equal(validateDraftRunPuzzle(p,v5Component),true);
- assert.equal(validateDraftRunPuzzle({...p,parent_corpus_version:DRAFT_RUN_CORPUS_VERSION},v5Component),false);
+ assert.equal(validateDraftRunPuzzle({...p,parent_corpus_version:modelVersions.v4.corpus_version},v5Component),false);
  assert.equal(validateDraftRunPuzzle({...p,model_version:v4Model},v5Component),false);
  const cube=JSON.parse(gunzipSync(fs.readFileSync(new URL('../corpus/draft-run/powered-cube.json.gz',import.meta.url))));
  for(const source of cube.filter(row=>row.pick_number<=9)) {
