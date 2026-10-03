@@ -84,6 +84,15 @@ class FullTrophyTests(unittest.TestCase):
         self.assertEqual(classify_source_schema(base,'stx'),'premier-historical-arena-rank-v1')
         self.assertEqual(classify_source_schema(base+['user_n_games_bucket','user_game_win_rate_bucket'],'fra'),'premier-modern-skill-buckets-v1')
 
+    def test_frozen_legacy_schema_uses_game_data_for_missing_identity_and_skill_columns(self):
+        legacy=['event_type','draft_id','event_match_wins','event_match_losses','pack_number','pick_number','pick']
+        for sid in ('mid','vow'):
+            self.assertEqual(classify_source_schema(legacy,sid),'premier-historical-arena-rank-v1')
+        with self.assertRaisesRegex(ValueError,'unknown Draft schema'):
+            classify_source_schema(legacy,'fra')
+        with self.assertRaisesRegex(ValueError,'required identity/outcome columns missing'):
+            classify_source_schema([c for c in legacy if c!='event_match_wins'],'mid')
+
     def test_source_snapshot_identity_changes_with_either_source(self):
         draft={'sha256':'a'*64};game={'sha256':'b'*64}
         first=source_snapshot_identity('fra','premier-modern-skill-buckets-v1',draft,game)
