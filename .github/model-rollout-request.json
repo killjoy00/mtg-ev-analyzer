@@ -1,7 +1,9 @@
 {
-  "operation": "deploy",
-  "request_id": "v5-v9-development-runtime-20261003",
-  "target": "development",
-  "commit": "3ce9fc14263b682cba04c62fe6e6423e1282ead5",
-  "reason": "Owner-authorized #889. Deploy corrected exact v5 runtime only after full read-only development acceptance 37153281899 passes. Require exact markers, all three Daily flows and complete account-linked Practice acceptance."
+  "operation": "v5-corpus-release",
+  "request_id": "v5-v9-production-stage-20261003",
+  "target": "production",
+  "action": "stage",
+  "candidate_run_id": "37132557406",
+  "release_commit": "3ce9fc14263b682cba04c62fe6e6423e1282ead5",
+  "reason": "Owner-authorized #889. Stage the unchanged exact candidate only after the corrected development runtime from #919 passes complete Daily and account-linked Practice acceptance; preserve v8 serving and every historical row."
 }
