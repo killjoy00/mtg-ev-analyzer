@@ -53,3 +53,11 @@ test('v5 candidate release fails closed on uncapped accounting and source refres
   assert.match(candidateVerifier,/mixed_identities!==false/);
   assert.match(candidateVerifier,/invalid_numerical_outputs/);
 });
+
+
+test('v5 activation requires the bounded bridge revision contract',()=>{
+  assert.match(workflow,/modelVersions\.v4\.corpus_version/);
+  assert.match(workflow,/modelVersions\.v5\.corpus_version/);
+  assert.match(workflow,/next_snapshot\.corpus_version=/);
+  assert.doesNotMatch(workflow,/next_snapshot\.corpus_version<>p\.corpus_version/);
+});
