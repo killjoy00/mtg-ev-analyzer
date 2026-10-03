@@ -47,6 +47,11 @@ test('all-qualified v5 rebuild is fixed to reviewed main and accepts no source/c
   for(const extra of [{corpus_version:'other'},{target:'production'},{ref:'branch'},{training_cap:5000}])
     assert.throws(()=>rolloutDispatch({...request,...extra}));
 });
+test('v5 finalizer recovery accepts only an exact numeric source run on the fixed workflow',()=>{
+ const request={...common,operation:'rebuild-v5',reuse_run_id:'37097278712'};
+ assert.deepEqual(rolloutDispatch(request),{workflow:'rebuild-v5-draft-run-corpus.yml',body:{ref:'main',inputs:{reuse_run_id:'37097278712'}}});
+ for(const patch of [{reuse_run_id:'latest'},{reuse_run_id:'1; echo bad'},{ref:'other'},{build_identity:'override'},{training_cap:5000}])assert.throws(()=>rolloutDispatch({...request,...patch}));
+});
 test('format research dispatch cannot select arbitrary sets, code refs or targets',()=>{
   const request={operation:'format-research',reason:'Predeclared protocol',request_id:'research-1'};
   assert.deepEqual(rolloutDispatch(request),{workflow:'format-research.yml',body:{ref:'main',inputs:{}}});

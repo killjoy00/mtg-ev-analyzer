@@ -61,3 +61,18 @@ test('v5 activation requires the bounded bridge revision contract',()=>{
   assert.match(workflow,/next_snapshot\.corpus_version=/);
   assert.doesNotMatch(workflow,/next_snapshot\.corpus_version<>p\.corpus_version/);
 });
+
+test('v5 recovery runs full acceptance and records separate environment and finalizer provenance',()=>{
+ const rebuild=fs.readFileSync('.github/workflows/rebuild-v5-draft-run-corpus.yml','utf8');
+ assert.match(rebuild,/if: inputs\.reuse_run_id == ''/);
+ assert.match(rebuild,/verify-v5-rebuild-reuse\.mjs/);
+ const assemble=rebuild.indexOf('python scripts/v5_rebuild.py assemble');
+ const admission=rebuild.indexOf('node scripts/v5-cube-reroll-admission.mjs');
+ const validation=rebuild.indexOf('Validate corpus accounting, source trajectories, models and Traditional gates');
+ const upload=rebuild.indexOf('name: validated-v5-candidate-');
+ assert.ok(assemble>=0&&admission>assemble&&validation>admission&&upload>validation);
+ assert.match(rebuild.slice(validation,upload),/npm test/);
+ assert.match(rebuild,/environment_commit/);assert.match(rebuild,/cube_admission_sha256/);
+ assert.match(candidateVerifier,/verifyCubeSessionRerolls/);
+ assert.match(candidateVerifier,/Candidate environment provenance differs/);
+});

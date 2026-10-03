@@ -1,6 +1,6 @@
 {
   "operation": "rebuild-v5",
-  "request_id": "uncapped-v5-full-rebuild-20261002-retry2",
-  "replay_of": "uncapped-v5-full-rebuild-20261002-retry1",
-  "reason": "Restart the owner-authorized all-qualified v5/v9 rebuild as an exact 30-environment active corpus after retiring legacy MID/VOW from active service; qualification, no-cap policy, five-fold holdout and authorized HOB inputs are otherwise unchanged."
+  "request_id": "uncapped-v5-finalize-20261003",
+  "reuse_run_id": "37097278712",
+  "reason": "Recover finalization from the 30 successful immutable environment artifacts, fix stale model-specific assertions and prove Cube rerolls under complete session exclusions without retraining or changing historical data."
 }

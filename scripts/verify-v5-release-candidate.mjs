@@ -1,7 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
+import {gunzipSync} from 'node:zlib';
 import modelVersions from '../model-versions.json' with {type:'json'};
+import {CUBE_SESSION_ADMISSION_VERSION,verifyCubeSessionRerolls} from './v5-cube-reroll-admission.mjs';
 
 const root=process.argv[2]||'generated/v5-candidate';
 const expectedRun=String(process.argv[3]||'');
@@ -27,6 +29,21 @@ const identity=read(path.join(root,'v5-artifact-identity.json'));
 const release=read('research/v5-validated-release.json');
 if(String(identity.run_id)!==expectedRun||String(release.run_id)!==expectedRun)throw Error('Candidate run ID does not match the reviewed release record.');
 if(identity.commit!==release.commit||identity.build_identity!==release.build_identity)throw Error('Candidate identity differs from the reviewed generated release.');
+for(const key of ['environment_run_id','environment_commit']) {
+  if(!identity[key]||identity[key]!==release[key])throw Error('Candidate environment provenance differs from the reviewed release: '+key);
+}
+const origin=read(path.join(root,'v5-environment-origin.json'));
+if(origin.schema!=='v5-environment-origin-v1'||origin.environment_run_id!==identity.environment_run_id||
+   origin.environment_commit!==identity.environment_commit||origin.build_identity!==identity.build_identity)
+  throw Error('Environment artifacts were not preserved under their original build identity.');
+const cubeReportFile=path.join(root,'v5-cube-reroll-admission.json');
+if(identity.cube_admission_sha256!==digest(cubeReportFile)||identity.cube_admission_sha256!==digest('results/v5-rebuild/v5-cube-reroll-admission.json'))
+  throw Error('Cube session admission differs from the reviewed exact candidate.');
+const cubeReport=read(cubeReportFile),cubeBytes=fs.readFileSync('corpus/draft-run/powered-cube.json.gz');
+const cubeProof=verifyCubeSessionRerolls(JSON.parse(gunzipSync(cubeBytes)));
+if(cubeReport.schema!==CUBE_SESSION_ADMISSION_VERSION||cubeReport.output_sha256!==createHash('sha256').update(cubeBytes).digest('hex')||
+   cubeReport.model_payloads_changed!==false||cubeReport.environment_artifacts_changed!==false||!cubeProof.valid||!same(cubeProof,cubeReport.proof))
+  throw Error('Cube cannot guarantee two rerolls under complete session source exclusions.');
 if(release.corpus_version!==modelVersions.v5.corpus_version||release.model_version!==modelVersions.v5.model_version)throw Error('Reviewed release is not the v5/v9 identity.');
 
 const accounting=read('results/v5-rebuild/v5-rebuild-accounting.json');
