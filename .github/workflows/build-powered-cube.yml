@@ -266,10 +266,13 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
           if [[ "$CUBE_OUTCOME" == 'success' ]]; then
-            # status.json is derived from the catalog. Do not put the stale
-            # pre-rebase copy in the Cube commit; that was the source of the
-            # previous conflict with normal-set imports.
-            git restore --staged --worktree data/status.json >/dev/null 2>&1 || true
+            # status.json and per-set quality.json are derived audit output.
+            # Do not carry their pre-rebase copies into the generated commit or
+            # leave them dirty: git pull --rebase refuses a dirty worktree. They
+            # are regenerated from the newest catalog after each successful rebase.
+            git restore --source=HEAD --staged --worktree -- data/status.json >/dev/null 2>&1 || true
+            git diff --name-only -z -- 'data/*/quality.json' |
+              xargs -0 -r git restore --source=HEAD --staged --worktree --
             git add data/catalog.json data/powered-cube/
             message='Build Powered Cube mode [data-generated]'
 
