@@ -168,7 +168,7 @@ jobs:
         run: |
           python scripts/audit_datasets.py --fail-on-error
           node scripts/load_all_trophies.mjs unused generated/v5-trophy-import --validate-only
-          node scripts/verify-v5-cube-rerolls.mjs generated/v5-trophy-import/powered-cube/puzzles.jsonl.gz
+          node scripts/verify-v5-cube-rerolls.mjs generated/v5-trophy-import/powered-cube/puzzles.jsonl.gz generated/v5-traditional/powered-cube/puzzles.jsonl.gz
           node scripts/load-traditional-components.mjs unused generated/v5-traditional --validate-only > generated/v5-traditional-health.json
           npm test
       - name: Verify every new replay byte against versioned R2
