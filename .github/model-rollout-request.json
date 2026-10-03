@@ -4,6 +4,6 @@
   "target": "development",
   "action": "stage",
   "candidate_run_id": "37132557406",
-  "release_commit": "76a4a67981720a5f9daaf40d2b38c79efbfb2530",
+  "release_commit": "7b2d8f342c43a2c7d3f9fa89e9964674d8769666",
   "reason": "Retry development staging of the unchanged accepted candidate after fixing whole-corpus SQL timeouts and health/canary checks that ignored the pinned pick-2 opening for ECL, TLA and TMT. Preserve all v8 serving pointers and history; require every exact byte, rating, count and preservation gate before bridge deployment."
 }
