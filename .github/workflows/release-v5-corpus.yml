@@ -50,6 +50,7 @@ jobs:
       ACTION: ${{ inputs.action }}
       CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
       RELEASE_COMMIT: ${{ inputs.release_commit }}
+      PACK1_RELEASE_COMMIT: ${{ inputs.release_commit }}
       STAGE_RUN_ID: ${{ inputs.stage_run_id }}
       BRIDGE_COMMIT: ${{ inputs.bridge_commit }}
       V5_CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
