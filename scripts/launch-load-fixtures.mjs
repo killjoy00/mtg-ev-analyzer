@@ -9,6 +9,7 @@ import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {gameDateKey} from '../game-date.mjs';
 import {PUBLIC_IDENTITY_TERMS_VERSION} from '../worker/public-identity-safety.mjs';
 
+let fixtureStage='target-verification';
 async function main() {
 
 const branch=process.env.PREVIEW_BRANCH,connection=process.env.DATABASE_URL,key=process.env.NEON_API_KEY;
@@ -18,12 +19,14 @@ const control=async suffix=>{
   });
   if(!r.ok)throw Error('Cannot verify isolated load target.');return r.json();
 };
+fixtureStage='target-verification';
 const [b,e]=await Promise.all([control(''),control('/endpoints')]);
 const endpoint=verifyTarget({branch,connection,branchRecord:b.branch,endpoints:e.endpoints||[]});
 if(Number(endpoint.autoscaling_limit_max_cu)>8)throw Error('Load branch exceeds compute budget.');
 if(process.env.PREVIEW_CREATED!=='true')throw Error('Fresh disposable branch required.');
 const {query}=await import('../worker/growth-function.js');
 const tag=randomBytes(4).toString('hex'),digest=x=>createHash('sha256').update(x).digest('hex');
+fixtureStage='load-player-secret';
 const secret=(await query("SELECT value FROM settings WHERE key='player_secret'")).rows[0].value;
 // Fixture identities and tokens never leave the runner. No auth, email, billing
 // or provider APIs are invoked. All data disappears with the isolated branch.
@@ -33,25 +36,35 @@ const users=Array.from({length:1000},(_,i)=>{
     token:'p1_'+player+'.'+createHmac('sha256',secret).update(player).digest('base64url')};
 });
 const data=JSON.stringify(users.map(({account,csrf,token,...stored})=>stored));
+fixtureStage='insert-auth-users';
 await query(`INSERT INTO neon_auth."user"(id,name,email,"emailVerified")
   SELECT (u->>'auth')::uuid,u->>'name',(u->>'auth')||'@example.invalid',true FROM jsonb_array_elements($1::jsonb) u`,[data]);
+fixtureStage='insert-players';
 await query(`INSERT INTO players(id,display_name,username_owned,profile_public,public_identity_terms_version,public_identity_terms_accepted_at)
   SELECT (u->>'player')::uuid,u->>'name',true,true,$2,now() FROM jsonb_array_elements($1::jsonb) u`,[data,PUBLIC_IDENTITY_TERMS_VERSION]);
+fixtureStage='insert-account-links';
 await query(`INSERT INTO account_links(auth_user_id,player_id)
   SELECT (u->>'auth')::uuid,(u->>'player')::uuid FROM jsonb_array_elements($1::jsonb) u`,[data]);
+fixtureStage='insert-account-sessions';
 await query(`INSERT INTO account_sessions(session_hash,auth_user_id,csrf_hash,expires_at)
   SELECT u->>'account_hash',(u->>'auth')::uuid,u->>'csrf_hash',now()+interval '2 hours' FROM jsonb_array_elements($1::jsonb) u`,[data]);
+fixtureStage='insert-entitlements';
 await query(`INSERT INTO entitlement_grants(auth_user_id,capability,provider,provider_reference)
   SELECT (u->>'auth')::uuid,c,'patreon',$2 FROM jsonb_array_elements($1::jsonb) u
   CROSS JOIN unnest(ARRAY['unlimited_cube_practice','custom_corpus']) c`,[data,tag]);
 const today=gameDateKey();
+fixtureStage='insert-score-history';
 await query(`INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json,details_json)
   SELECT (u->>'player')::uuid,$2::date-d,environment,'draft_run',(50+d%45)::smallint,'B','[]'::jsonb,'{"isolated_load":true}'::jsonb
   FROM jsonb_array_elements($1::jsonb) u CROSS JOIN generate_series(1,30) d
   CROSS JOIN unnest(ARRAY['mixed','powered-cube','latest']) environment`,[data,today]);
+fixtureStage='analyze-fixtures';
 await query('ANALYZE scores');await query('ANALYZE players');await query('ANALYZE account_links');
+fixtureStage='ensure-daily-schedules';
 for(const environment of ['mixed','powered-cube','latest'])await ensureDailySchedule(query,today,environment);
+fixtureStage='load-serving-snapshot';
 await loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION);
+fixtureStage='load-custom-set-metadata';
 const sets=await loadCachedCustomSetMetadata(query,DRAFT_RUN_CORPUS_VERSION,today);
 const artifact='artifacts/launch-load';fs.mkdirSync(artifact,{recursive:true});
 const records=[];
@@ -63,11 +76,13 @@ const measured=async(sql,params)=>{
   }
   return result;
 };
+fixtureStage='measure-leaderboards';
 for(const days of [0,6,29,3650])await draftRunLeaderboardRows(measured,{start:new Date(Date.parse(today+'T12:00:00Z')-days*86400000).toISOString().slice(0,10),end:today,environment:'mixed'});
+fixtureStage='measure-current-season';
 await currentSeasonForPlayer(measured,users[0].player,{today});
 fs.writeFileSync(path.join(artifact,'fixture-report.json'),JSON.stringify({branch,code_sha:process.env.GITHUB_SHA,users:users.length,synthetic_score_rows:users.length*30*3,compute:endpoint.autoscaling_limit_max_cu,standings:records},null,2));
 fs.writeFileSync(process.env.LOAD_FIXTURE_FILE,JSON.stringify({branch,sha:process.env.GITHUB_SHA,users,sets:sets.slice(0,3).map(s=>s.set_id)}),{mode:0o600});
 console.log('Prepared isolated accounts, entitlements, 90000 score rows, Dailies and serving cache; no provider calls.');
 
 }
-main().catch(error=>{console.error(JSON.stringify({error:'Isolated load setup or acceptance failed',code:error.pgCode||error.code||'unknown'}));process.exitCode=1;});
+main().catch(error=>{console.error(JSON.stringify({error:'Isolated load setup or acceptance failed',stage:fixtureStage,code:error.pgCode||error.code||'unknown',message:String(error?.message||'Unknown error').slice(0,500)}));process.exitCode=1;});
