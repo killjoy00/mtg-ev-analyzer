@@ -5,11 +5,21 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <base href="/">
   <title>Pack One auth context test harness</title>
-  <link rel="stylesheet" href="/pack1.css">
+  <link rel="stylesheet" href="/visual-c.css?v=9">
 </head>
 <body>
-  <header><a id="brand-home" href="/">Pack One</a><nav class="top-actions"><button id="account-nav" type="button">Sign in</button></nav></header>
-  <main id="app"></main>
+  <div class="app-shell">
+    <header class="topbar">
+      <button class="brand" id="brand-home" type="button" aria-label="Return to Pack One home">
+        <span class="brand-mark" aria-hidden="true"><span>P</span><sup>1</sup></span>
+        <span class="brand-copy"><strong>Pack One</strong></span>
+      </button>
+      <div class="top-actions is-signed-nav" data-account-state="signed-out">
+        <button class="top-nav-button" id="account-nav" type="button" data-account-state="signed-out">Sign in</button>
+      </div>
+    </header>
+    <main id="app" class="app"></main>
+  </div>
   <script>
     window.PACK1_API={
       firstParty:true,

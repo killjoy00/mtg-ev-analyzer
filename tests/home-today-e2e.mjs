@@ -23,6 +23,8 @@ await page.route('**/*.neon.tech/**',async route=>{
 async function progress(expected){await page.waitForFunction(text=>document.querySelector('[data-daily-home]')?.dataset.completed===text,expected);}
 try{
  await page.goto(process.env.PACK1_E2E_URL||'http://127.0.0.1:4173');await progress('0');
+ assert.equal((await page.locator('.daily-home-status [data-daily-reset]').innerText()).trim(),'New Dailies in 15h');
+ assert.equal(await page.locator('.daily-home-status .daily-home-streak').count(),0,'no streak badge is rendered for a real zero streak');
  complete=true;await page.evaluate(()=>document.dispatchEvent(new CustomEvent('pack1:result-completed')));await progress('1');
  // A slow older profile response must not undo a newer completed-result refresh.
  complete=false;holdNext=true;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
@@ -32,7 +34,9 @@ try{
  held();await page.waitForTimeout(100);await progress('1');
  both=true;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await progress('3');
  assert.ok(await page.getByRole('link',{name:'Go to Practice',exact:true}).isVisible());
- assert.equal((await page.locator('.daily-home-next-cue').innerText()).trim(),'New Dailies in 15h · 3-day streak','all-Dailies-complete home shows one local countdown/streak line');
+ assert.equal((await page.locator('.daily-home-status [data-daily-reset]').innerText()).trim(),'New Dailies in 15h','Daily reset countdown stays visible at the top of the Daily section');
+ assert.equal((await page.locator('.daily-home-status .daily-home-streak').innerText()).trim(),'3-day streak','current streak stays beside the reset countdown');
+ assert.equal(await page.locator('.daily-home-next-cue').count(),0,'completed-Dailies handoff does not duplicate the reset/streak cue');
  for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:`artifacts/ui-dailies-complete-${width}.png`,fullPage:true});}
  both=false;
  await page.evaluate(()=>{window.__todayNow=Date.parse('2026-09-15T07:00:00Z');window.dispatchEvent(new Event('focus'));});await progress('0');

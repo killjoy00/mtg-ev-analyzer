@@ -509,6 +509,7 @@ test('Profile visibility toggles an initially public profile off on the first ta
       View: host('View'),
     },
     'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    '@/src/api/client': { ApiError: class ApiError extends Error {} },
     '@/src/api/career': {
       updateMobileProfile: async (_session, body) => {
         writes.push(body);
@@ -528,6 +529,7 @@ test('Profile visibility toggles an initially public profile off on the first ta
         enrichmentBusy: false,
         enrichmentWarning: null,
         refresh: async () => null,
+        adoptProfile: () => null,
       }),
     },
     '@/src/theme': theme,
@@ -547,7 +549,7 @@ test('Profile visibility toggles an initially public profile off on the first ta
   await act(async () => { await save.props.onPress(); });
   assert.equal(writes.length, 1);
   assert.equal(writes[0].profilePublic, false);
-  assert.equal(Object.prototype.hasOwnProperty.call(writes[0], 'acceptPublicIdentityTerms'), false);
+  assert.equal(writes[0].acceptPublicIdentityTerms, true);
   await act(async () => root.unmount());
 });
 

@@ -34,7 +34,7 @@ async function enhance(detail={}) {
       box.innerHTML=`<p class="post-game-progress-label">Achievements</p>${unlocked.length?`<p><strong>${esc(unlocked[0].label)}</strong> unlocked.</p>`:''}${next?`<p><strong>Up next: ${esc(next.label)}</strong><br><span>${esc(next.progress_text)} · ${esc(next.description)}</span></p>`:''}`;
       return;
     }
-    box.innerHTML=`${unlocked.length?`<p><strong>${esc(unlocked[0].label)}</strong> unlocked.</p>`:''}${next?`<p><strong>Up next: ${esc(next.label)}</strong><br><span>${esc(next.progress_text)} · ${esc(next.description)}</span></p>`:''}<div><button class="text-button" data-open-career>View your career</button>${reason?'<button class="text-button" data-claim-progress>Save my progress</button>':''}</div>${reason?`<small>${esc(reason)}</small>`:''}`;
+    box.innerHTML=`${unlocked.length?`<p><strong>${esc(unlocked[0].label)}</strong> unlocked.</p>`:''}${next?`<p><strong>Up next: ${esc(next.label)}</strong><br><span>${esc(next.progress_text)} · ${esc(next.description)}</span></p>`:''}<div><button class="text-button" data-open-career>My Pack One</button>${reason?'<button class="text-button" data-claim-progress>Save my progress</button>':''}</div>${reason?`<small>${esc(reason)}</small>`:''}`;
     if(box!==root)root.append(box);
     box.querySelector('[data-open-career]').onclick=()=>document.querySelector('#account-nav')?.click();
     box.querySelector('[data-claim-progress]')?.addEventListener('click',()=>{trackEvent('account_claim_prompt_clicked',{source:'result'});void renderAccount();});

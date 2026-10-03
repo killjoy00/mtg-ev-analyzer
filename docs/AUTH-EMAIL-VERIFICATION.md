@@ -58,13 +58,25 @@ For email/password accounts:
 - ownership verification is triggered immediately on sign-up;
 - verification uses a click-through email link;
 - an unverified password user cannot authenticate;
-- successful verification returns the user to `https://packone.pro/?auth=verify`;
-- verified users can then sign in normally;
+- successful web verification returns the user to `https://packone.pro/?auth=verify`;
+- on the October 2 UAT candidate, a usable auto-signed-in provider session is converted into the first-party Pack One session and authenticated Account-ready onboarding; a browser without that session falls back to sign-in;
 - resend is available through Pack One's first-party account API;
 - expired, invalid or already-consumed verification links have a Pack One recovery screen that can request a new link;
 - verification links are presented to users as expiring after 15 minutes;
 - password recovery remains a separate `forget-password` flow, but successfully consuming a password-reset link also marks that same account email verified because the reset link proves mailbox possession;
 - Google OAuth remains independent of password email verification.
+
+## October 2 onboarding completion candidate
+
+The UAT candidate on `codex/uat-auth-profile-parity-20261002` changes the Pack One return behavior without changing the production verification policy or the provider's `auto sign-in after successful verification` setting.
+
+For a normal same-browser web signup, Pack One now consumes the authenticated provider session created by the verification click, migrates it through the existing first-party account boundary, links the current Pack One player/guest identity, and opens **Your account is ready** directly. It does not show authenticated onboarding until a valid Pack One session exists.
+
+If the verification link is opened in a different browser/device and no usable provider session can be established there, the email is still treated as verified but Pack One falls back to sign-in instead of pretending the browser is authenticated. Expired, invalid, and reused links continue to use the resend/recovery path.
+
+Native email signup uses a verification callback marked `native=1`. After the provider consumes the verification link, the browser offers a return to `packone://account?emailVerified=1`. On the originating app session, the app can finish the signup using the still-in-memory email credential and the existing mobile player/account-link boundary, preserving the device's guest progress. If the app was restarted or the verification happened on another device, Pack One falls back to sign-in; it does not transfer a password or account token through the URL.
+
+This is source/automated behavior only until the candidate is merged and the existing secure-auth/mobile release gates are run. Required physical acceptance is: same-browser web, different-browser web, iPhone, iPad, Android, long verification-link wrapping in a real received email, app/browser return, expired link, reused link, and preservation of the originating guest record.
 
 ## Existing-account migration
 
@@ -175,7 +187,7 @@ The client supports:
 - `?auth=verify` success and error handling;
 - removal of verification/error query parameters after handling the return.
 
-The focused Chromium + WebKit mobile verification contract covers the pending state, resend, expired-link recovery and successful return.
+The focused Chromium + WebKit mobile verification contract covers the pending state, resend, expired-link recovery, authenticated same-browser Account-ready return, and the different-browser verified-but-sign-in fallback.
 
 ## Acceptance evidence
 

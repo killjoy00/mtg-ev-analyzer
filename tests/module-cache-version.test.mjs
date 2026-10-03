@@ -28,6 +28,6 @@ test('account and profile entry modules use release-versioned imports', async ()
   assert.match(progression, /growth\.mjs\?v=8/);
   assert.match(draft, /growth\.mjs\?v=8/);
   assert.match(draft, /share-cards\.mjs\?v=7/);
-  assert.match(patreonHtml, /patreon-page\.mjs\?v=2/);
+  assert.match(patreonHtml, /patreon-page\.mjs\?v=3/);
   assert.match(patreonPage, /patreon-activation\.mjs\?v=2/);
 });

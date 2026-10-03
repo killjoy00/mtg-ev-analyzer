@@ -54,6 +54,20 @@ function periodLabel(product: AppleStoreSubscription | undefined) {
   return count === 1 ? `per ${unit}` : `every ${count} ${plural}`;
 }
 
+function readableTimestamp(value?: string | null) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  return date.toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    timeZoneName: 'short',
+  });
+}
+
 function AppleElitePanel({
   hasAccountElite,
   onAccessChanged,
@@ -450,7 +464,7 @@ export default function MembershipScreen() {
             <Text style={styles.body}>{current.connected ? 'Patreon is connected to this account.' : 'No Patreon account is connected.'}</Text>
             {!current.configured ? <Text style={styles.body}>Patreon is temporarily unavailable. Your current access is unchanged.</Text> : null}
             {current.membership?.sync_pending ? (
-              <Text style={styles.body}>Membership reconciliation is pending. A refresh request is not confirmation of a completed sync.</Text>
+              <Text style={styles.body}>Patreon is still updating your membership. A refresh was requested, but access changes are not confirmed yet.</Text>
             ) : current.connected ? (
               <Text style={styles.body}>{current.capabilities.includes('custom_corpus') && current.capabilities.includes('unlimited_cube_practice')
                 ? 'Elite from Patreon is active.'
@@ -458,23 +472,23 @@ export default function MembershipScreen() {
                   ? 'Some Pack One benefits from Patreon are active.'
                   : 'Patreon is connected, but Elite is not currently active. Manage your membership on Patreon.'}</Text>
             ) : null}
-            {current.membership?.last_synced_at ? <Text style={styles.help}>Last Patreon sync: {current.membership.last_synced_at}</Text> : null}
-            {current.configured ? (
-              <Pressable accessibilityRole="button" accessibilityLabel="Sign in with Patreon" disabled={state.busy}
+            {readableTimestamp(current.membership?.last_synced_at) ? <Text style={styles.help}>Last Patreon sync: {readableTimestamp(current.membership?.last_synced_at)}</Text> : null}
+            {current.configured && !current.connected ? (
+              <Pressable accessibilityRole="button" accessibilityLabel="Connect Patreon" disabled={state.busy}
                 onPress={() => void controller.connect()} style={[styles.button, state.busy && styles.disabled]}>
-                <Text style={styles.buttonText}>Sign in with Patreon</Text>
+                <Text style={styles.buttonText}>Connect Patreon</Text>
               </Pressable>
             ) : null}
             {current.connected && current.configured ? (
-              <Pressable accessibilityRole="button" accessibilityLabel="Request Patreon refresh" disabled={state.busy}
+              <Pressable accessibilityRole="button" accessibilityLabel="Refresh Patreon access" disabled={state.busy}
                 onPress={() => void controller.refresh()} style={[styles.button, state.busy && styles.disabled]}>
-                <Text style={styles.buttonText}>Request Patreon refresh</Text>
+                <Text style={styles.buttonText}>Refresh Patreon access</Text>
               </Pressable>
             ) : null}
             {current.connected ? (
               <Pressable accessibilityRole="button" accessibilityLabel="Disconnect Patreon" disabled={state.busy}
-                onPress={confirmDisconnect} style={[styles.button, state.busy && styles.disabled]}>
-                <Text style={styles.buttonText}>Disconnect Patreon</Text>
+                onPress={confirmDisconnect} style={[styles.button, styles.destructiveButton, state.busy && styles.disabled]}>
+                <Text style={[styles.buttonText, styles.destructiveButtonText]}>Disconnect Patreon</Text>
               </Pressable>
             ) : null}
           </View>
@@ -491,7 +505,7 @@ export default function MembershipScreen() {
             <Text style={styles.buttonText}>Sign in to manage membership</Text>
           </Pressable>
         ) : null}
-        <Text style={styles.help}>Sign in with Patreon connects an existing Patreon account. Patreon membership changes remain managed through Patreon.</Text>
+        <Text style={styles.help}>Connect Patreon links an existing Patreon account. Patreon membership changes remain managed through Patreon.</Text>
         <Text style={styles.help}>When Patreon authorization finishes, close the browser and return here. Check status verifies the current account; a browser message alone does not grant access.</Text>
       </ScrollView>
     </SafeAreaView>
@@ -510,6 +524,8 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, fontSize: 15, lineHeight: 23 },
   button: { minHeight: 48, padding: spacing.md, borderWidth: 1, borderColor: colors.accent, justifyContent: 'center', alignItems: 'center' },
   buttonText: { color: colors.accentDark, fontSize: 15, fontWeight: '800', textAlign: 'center' },
+  destructiveButton: { borderColor: colors.danger },
+  destructiveButtonText: { color: colors.danger },
   disabled: { opacity: 0.5 },
   linkRow: { flexDirection: 'row', gap: spacing.lg },
   linkText: { color: colors.accentDark, fontSize: 13, fontWeight: '800', textDecorationLine: 'underline' },
