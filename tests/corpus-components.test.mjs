@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {gunzipSync} from 'node:zlib';
+import modelVersions from '../model-versions.json' with {type:'json'};
 import {gradeDraftRunPick,validateDraftRunPuzzle,supportSharpening,DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {
  TRADITIONAL_COMPONENT_VERSION as component,
@@ -63,8 +64,8 @@ test('historical membership survives source pauses; new generation requires expl
  const serving=corpusMembership({serving:true});
  assert.ok(serving.includes("c.status='Live'"));
  assert.ok(serving.includes('active_snapshot_id=p.source_snapshot_id'));
- assert.ok(serving.includes("p.corpus_version='elite-trophy-colour-stage-v8'"));
- assert.ok(serving.includes("next_snapshot.corpus_version='elite-trophy-colour-stage-v9'"));
+ assert.ok(serving.includes(`p.corpus_version='${modelVersions.v4.corpus_version}'`));
+ assert.ok(serving.includes(`next_snapshot.corpus_version='${modelVersions.v5.corpus_version}'`));
  assert.ok(!serving.includes('historical.corpus_version=p.corpus_version'),'runtime membership must not scan historical snapshots per puzzle');
  assert.ok(serving.includes('p.corpus_version<>$1'));
  assert.ok(serving.includes('c.parent_version=$1'));
