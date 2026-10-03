@@ -15,9 +15,12 @@ for(const environment of ['mixed','powered-cube']) {
   assert.deepEqual(cached,await selectDatabaseRun(query,version,seed,environment),'exact IDs, source trajectories and difficulty anchors');
   assert.equal(cached.servingRevision,snapshot.revision);
 }
+console.log('PASS: exact mixed/Cube serving-cache selection parity.');
 
-// Stage a complete first-class snapshot for one currently Live regular set.
-// The staging insert intentionally exercises the real per-row rating writer too.
+// Stage a fixture with complete custom-pick coverage for one Live regular set.
+// Keep 32 real sources in every required pick/band; copying the full uncapped
+// set makes the per-row rating writer exceed the HTTP query timeout in CI.
+// The unmodified active corpus above still owns the exact SQL/JS parity check.
 const stageSet=snapshot.metadata.find(s=>s.status==='Live'&&s.regular_run&&s.set_id!=='powered-cube'&&
   Array.from({length:8},(_,i)=>i+1).every(pick=>['medium','hard'].every(band=>
     snapshot.groups.some(g=>g.set_id===s.set_id&&Number(g.pick_number)===pick&&g.band===band&&Number(g.sources)>=16))))?.set_id;
@@ -31,7 +34,18 @@ await query(`INSERT INTO corpus_source_snapshots(
 ) VALUES($1,$2,'PremierDraft',$3,'premier-modern-skill-buckets-v1',$1,$4,'qa-serving-revision','qa-serving-revision','{"qa":true}','Candidate')`,
 [stagedSnapshot,stageSet,version,stagedGameHash]);
 const stageBefore=await revision();
-await query(`INSERT INTO draft_run_verified_puzzles(
+await query(`WITH ranked AS MATERIALIZED (
+  SELECT i.puzzle_id,row_number() OVER (
+    PARTITION BY i.pick_number,i.band ORDER BY i.puzzle_id COLLATE "C"
+  ) AS fixture_row
+  FROM draft_run_serving_inventory i
+  JOIN draft_run_verified_puzzles p ON p.puzzle_id=i.puzzle_id AND p.corpus_version=$3
+  WHERE i.snapshot_id=$4::bigint AND i.set_id=$2
+    AND i.pick_number BETWEEN 1 AND 8 AND i.band IN ('medium','hard')
+), fixture AS MATERIALIZED (
+  SELECT puzzle_id FROM ranked WHERE fixture_row<=32
+)
+INSERT INTO draft_run_verified_puzzles(
   puzzle_id,set_id,source_draft_hash,corpus_version,pick_number,candidate_count,
   consensus_top_gap,support_entropy,interesting,payload,pack_number,source_snapshot_id
 )
@@ -44,9 +58,10 @@ SELECT 'qa-'||substr($1,1,8)||'-'||p.puzzle_id,p.set_id,md5($1||p.source_draft_h
   ),
   p.pack_number,$1
 FROM draft_run_verified_puzzles p
-JOIN draft_run_serving_inventory i ON i.puzzle_id=p.puzzle_id AND i.snapshot_id=$4::bigint
+JOIN fixture i ON i.puzzle_id=p.puzzle_id
 WHERE p.set_id=$2 AND p.corpus_version=$3`,
 [stagedSnapshot,stageSet,version,snapshot.id]);
+console.log('Staged bounded custom-coverage snapshot fixture for '+stageSet+'.');
 assert.equal(await revision(),stageBefore,'non-active Candidate staging leaves serving revision stable');
 assert.equal((await loadServingSnapshot(query,version)).id,snapshot.id,'unrelated staging does not put Practice into refresh churn');
 
