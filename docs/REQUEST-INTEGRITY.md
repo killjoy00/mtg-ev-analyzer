@@ -120,6 +120,12 @@ The initializer takes the same per-Auth-user advisory lock as self-service delet
 
 After initiation, the exact existing lifecycle runs: Pack One cleanup and cross-player de-identification, Apple authorization revocation, isolated provider-admin removal, transient retry, expected not-found recovery and operator-review handling. The retained operation can be queried by target Auth UUID after the target's account/player/provider rows are gone. Status exposes the operation ID, lifecycle state, original initiation source/permitted actor UUID, timestamps, attempts, sanitized error code and operator message—not the free-text deletion reason. If a later phase throws after the tombstone commits, the browser receives the persisted accepted/status state when it can be recovered.
 
+### Account notices for admin actions
+
+An admin deletion or admin username change emails the account's **verified** address unless the admin clears the "Email the user" checkbox (on by default; the API treats an absent `notifyUser` as on). Both actions are served by Growth, which already holds `PACK1_ACCOUNT_DELETE_RESEND_API_KEY`; the notice uses the same `accounts@packone.pro` sender with replies to `admin@packone.pro`, and includes the admin's optional reason verbatim. For deletion the address is read before the operation starts, and only the request whose initializer returns `created` sends, with the operation ID as the Resend idempotency key, so retries and concurrent submits cannot email twice. The notice is sent once the tombstone commits and before the provider phase.
+
+Delivery is best effort. A missing key (development/QA), an unverified or absent address, a lookup error or a provider failure never blocks or rolls back the admin action; the response carries `notification: {status: sent|skipped|failed, reason}` and Admin Users shows it. Failures log `admin_user_notification_failed` without the address.
+
 Admin deletion reasons are retained only while the operation is incomplete and are cleared when deletion reaches `complete`. Rename audit username text and rename reasons are redacted during Pack One cleanup; durable UUID/admin attribution remains. Deleting Pack One does not cancel an Apple subscription or Patreon membership.
 
 Migration `0047_admin_user_account_controls.sql` must be applied before the #859 function revision is deployed. The secure-auth release path applies it in development and production before function deployment; a Git merge alone does not activate this capability.

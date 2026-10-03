@@ -83,6 +83,22 @@ export async function renderUsers(root,request,growthRequest=request) {
     }
   }
 
+  function notifyControl(user,action) {
+    return `<label><input type="checkbox" name="notifyUser" value="yes" checked> Email the user about this ${action}</label>
+      ${user.email_verified?'':'<p class="muted">This account has no verified email address, so no email will be sent.</p>'}`;
+  }
+
+  function notificationText(notification) {
+    if(!notification)return '';
+    if(notification.status==='sent')return 'The user was emailed.';
+    if(notification.status==='failed')return 'The user email could not be sent.';
+    if(notification.reason==='not_requested')return 'No email sent: notification was turned off.';
+    if(notification.reason==='no_verified_email')return 'No email sent: the account has no verified email address.';
+    if(notification.reason==='not_configured')return 'No email sent: account email is not configured in this environment.';
+    if(notification.reason==='unchanged')return 'Username unchanged; no email sent.';
+    return 'No email sent.';
+  }
+
   function identityHistory(actions) {
     return actions.length?`<div class="scroll"><table><thead><tr><th>When</th><th>Action</th><th>Change</th><th>Reason</th><th>Admin</th></tr></thead><tbody>
       ${actions.map(action=>`<tr>
@@ -120,7 +136,8 @@ export async function renderUsers(root,request,growthRequest=request) {
       <p><strong>This permanently deletes the selected Pack One account.</strong> Attributable profile, leaderboard, gameplay, and career data are removed under the existing account-deletion contract. Retained opponent/shared results are de-identified. Once the deletion state is committed, it cannot be canceled.</p>
       <p class="muted">Deleting Pack One does not cancel Apple subscriptions or Patreon memberships.</p>
       <label>Type DELETE to confirm<input name="confirm" autocomplete="off" spellcheck="false" required></label>
-      <label>Reason (optional)<input name="reason" maxlength="200" autocomplete="off"></label>
+      <label>Reason (optional), included in the email to the user<input name="reason" maxlength="200" autocomplete="off"></label>
+      ${notifyControl(user,'deletion')}
       ${user.is_admin?'<label><input type="checkbox" name="acknowledgeAdmin" value="yes" required> I understand this permanently deletes another Pack One administrator account.</label>':''}
       <div class="actions"><button type="submit" class="danger">Delete account</button></div>
       <p id="delete-account-status" role="status"></p>
@@ -194,7 +211,8 @@ export async function renderUsers(root,request,growthRequest=request) {
             ${u.public_identity_hidden_at?'<p class="error">This public identity is moderated. Use the existing audited restore action before renaming; restore does not republish or re-own the identity.</p>':''}
             <label>Public username<input name="displayName" value="${esc(u.profile_name||'Pack Player')}" minlength="2" maxlength="24" required ${renameBlocked?'disabled':''}></label>
             <p class="muted">2–24 characters. Whitespace/case equivalence, prohibited-name checks, placeholder release behavior, and database uniqueness are the same as the normal profile flow.</p>
-            <label>Reason (optional)<input name="reason" maxlength="200" autocomplete="off" ${renameBlocked?'disabled':''}></label>
+            <label>Reason (optional), included in the email to the user<input name="reason" maxlength="200" autocomplete="off" ${renameBlocked?'disabled':''}></label>
+            ${renameBlocked?'':notifyControl(u,'change')}
             <div class="actions"><button type="submit" ${renameBlocked?'disabled':''}>Save username</button></div>
             <p id="username-status" role="status"></p>
           </form>`:'<p class="muted">This account has no linked Pack One player, so it has no public username to change.</p>'}
@@ -223,7 +241,7 @@ export async function renderUsers(root,request,growthRequest=request) {
         form.querySelectorAll('button,input').forEach(control=>control.disabled=true);
       }
 
-      function renderDeletionState(deletion,{statusUnavailable=false,recoveryMessage=null}={}) {
+      function renderDeletionState(deletion,{statusUnavailable=false,recoveryMessage=null,notice=''}={}) {
         if(detailSerial!==detailLoadSerial||!dialog.open)return;
         const section=body.querySelector('#permanent-deletion-section');
         if(!section)return;
@@ -232,6 +250,10 @@ export async function renderUsers(root,request,growthRequest=request) {
         if(recoveryMessage) {
           const target=section.querySelector('#deletion-status');
           if(target)target.insertAdjacentHTML('beforeend',`<p class="error">${esc(recoveryMessage)}</p>`);
+        }
+        if(notice) {
+          const target=section.querySelector('#deletion-status');
+          if(target)target.insertAdjacentHTML('beforeend',`<p class="muted" role="status">${esc(notice)}</p>`);
         }
         wireDeletionControls();
       }
@@ -248,17 +270,18 @@ export async function renderUsers(root,request,growthRequest=request) {
               confirm:String(values.get('confirm')||''),
               reason:String(values.get('reason')||''),
               acknowledgeAdmin:values.get('acknowledgeAdmin')==='yes',
+              notifyUser:values.get('notifyUser')==='yes',
             },'POST');
             if(result.deletion==='complete') {
               detailLoadSerial++;
               dialog.close();
               await load();
               const globalStatus=document.querySelector('#status');
-              if(globalStatus)globalStatus.textContent='Account deletion completed.';
+              if(globalStatus)globalStatus.textContent=['Account deletion completed.',notificationText(result.notification)].filter(Boolean).join(' ');
               return;
             }
             if(result.operation) {
-              renderDeletionState(result.operation);
+              renderDeletionState(result.operation,{notice:notificationText(result.notification)});
               return;
             }
             const recovered=await deletionStatus(id);
@@ -268,6 +291,7 @@ export async function renderUsers(root,request,growthRequest=request) {
             if(committed) {
               renderDeletionState(committed,{
                 recoveryMessage:'The request was interrupted after permanent deletion committed. The account remains in deletion; refresh status to continue monitoring it.',
+                notice:notificationText(error.data?.notification),
               });
               return;
             }
@@ -314,12 +338,15 @@ export async function renderUsers(root,request,growthRequest=request) {
         const values=new FormData(form),buttons=form.querySelectorAll('button,input');
         buttons.forEach(control=>control.disabled=true);status.textContent='Saving username…';
         try {
-          await request('/v1/admin/users/'+encodeURIComponent(id)+'/username',{
+          const result=await growthRequest('/v1/admin/users/'+encodeURIComponent(id)+'/username',{
             displayName:String(values.get('displayName')||''),
             reason:String(values.get('reason')||''),
+            notifyUser:values.get('notifyUser')==='yes',
           },'PATCH');
           await load();
           await openDetail(id);
+          const saved=document.querySelector('#username-status');
+          if(saved)saved.textContent=['Username saved.',notificationText(result.notification)].filter(Boolean).join(' ');
         } catch(error) {
           status.textContent=error.message;
           buttons.forEach(control=>control.disabled=false);

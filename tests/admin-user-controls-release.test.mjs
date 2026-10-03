@@ -20,8 +20,11 @@ test('admin user control migration keeps rename and audit atomic and deletion at
 });
 
 test('gateway allows only the narrow admin username and deletion routes and methods',()=>{
-  assert.equal(adminPath('/v1/admin/users/22222222-2222-4222-8222-222222222222/username','PATCH'),true);
-  assert.equal(adminPath('/v1/admin/users/22222222-2222-4222-8222-222222222222/username','POST'),false);
+  // Renames are served by growth, which sends the account notice; draft-run no longer accepts them.
+  assert.equal(adminPath('/v1/admin/users/22222222-2222-4222-8222-222222222222/username','PATCH'),false);
+  assert.equal(adminGrowthPath('/v1/admin/users/22222222-2222-4222-8222-222222222222/username','PATCH','production'),true);
+  assert.equal(adminGrowthPath('/v1/admin/users/22222222-2222-4222-8222-222222222222/username','POST','production'),false);
+  assert.equal(adminGrowthPath('/v1/admin/users/22222222-2222-4222-8222-222222222222/username','PATCH','preview'),false);
   assert.equal(adminGrowthPath('/v1/admin/users/22222222-2222-4222-8222-222222222222/delete','POST','production'),true);
   assert.equal(adminGrowthPath('/v1/admin/users/22222222-2222-4222-8222-222222222222/delete','GET','production'),false);
   assert.equal(adminGrowthPath('/v1/admin/users/22222222-2222-4222-8222-222222222222/deletion','GET','production'),true);
@@ -32,7 +35,11 @@ test('gateway allows only the narrow admin username and deletion routes and meth
 test('Admin Users browser uses PATCH rename, typed destructive confirmation, status recovery and separate services',()=>{
   const users=fs.readFileSync('admin/users.mjs','utf8');
   const shell=fs.readFileSync('admin/admin.mjs','utf8');
-  assert.match(users,/\/username'.*'PATCH'/s);
+  assert.match(users,/growthRequest\('\/v1\/admin\/users\/'\+encodeURIComponent\(id\)\+'\/username'.*'PATCH'/s);
+  assert.doesNotMatch(users,/[^h]request\('\/v1\/admin\/users\/'\+encodeURIComponent\(id\)\+'\/username'/);
+  assert.match(users,/name="notifyUser" value="yes" checked/);
+  assert.equal((users.match(/notifyUser:values\.get\('notifyUser'\)==='yes'/g)||[]).length,2);
+  assert.match(users,/Reason \(optional\), included in the email to the user/);
   assert.match(users,/confirm:String\(values\.get\('confirm'\)/);
   assert.match(users,/acknowledgeAdmin/);
   assert.match(users,/const deletionPromise=deletionStatus\(id\)\.then/);
@@ -48,6 +55,8 @@ test('Admin Users browser uses PATCH rename, typed destructive confirmation, sta
   const growth=fs.readFileSync('worker/growth-function.js','utf8');
   assert.match(growth,/deletionCommitted:true/);
   assert.match(growth,/operationId:error\.operationId/);
+  assert.match(growth,/handleAdminUsernameChange\(request,query,url,\{readJson,adminAuthUserId:admin\.user_id\}\)/);
+  assert.match(growth,/username\$\/i\.test\(url\.pathname\)\) \{\n\s*const admin=await adminAccountIdentity\(request,\{mutation:true\}\)/);
 });
 
 test('0047 is registered in secure auth and isolated backend release paths',()=>{
