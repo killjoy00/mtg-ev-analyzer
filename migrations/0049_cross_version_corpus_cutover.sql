@@ -366,7 +366,7 @@ BEGIN
       ORDER BY j.revision DESC LIMIT 1
     ) prior ON true
     WHERE next.revision=p_revision AND next.state='queued'
-      AND prior.evidence->>'day'=(clock_timestamp() AT TIME ZONE 'America/Los_Angeles')::date::text
+      AND prior.evidence->'inventory'->>'verified'='true'
       AND NOT EXISTS(
         SELECT 1 FROM draft_run_serving_snapshots s
         WHERE s.corpus_version=k.corpus_version
@@ -390,13 +390,16 @@ BEGIN
           cache_snapshot_id=carry.cache_snapshot_id,worker_release=carry.worker_release,last_error=NULL,
           evidence=jsonb_build_object(
             'revision',p_revision::text,
-            'day',(clock_timestamp() AT TIME ZONE 'America/Los_Angeles')::date::text,
+            -- Exact-equivalent carry does not pretend to re-run date-sensitive
+            -- gameplay samples. Preserve the original evidence day verbatim.
+            'day',carry.evidence->>'day',
             'cache_snapshot_id',carry.cache_snapshot_id::text,
             'inventory',jsonb_build_object('verified',true,'expected',inventory_count,'actual',inventory_count,'missing',0,'extra',0),
             'samples',jsonb_build_array(jsonb_build_object(
               'mode','exact-serving-input-carry-forward',
               'previous_revision',carry.prior_revision::text,
-              'cache_snapshot_id',carry.cache_snapshot_id::text
+              'cache_snapshot_id',carry.cache_snapshot_id::text,
+              'carried_evidence_day',carry.evidence->>'day'
             ))
           )
         WHERE id=carry.next_job_id AND state='queued';
