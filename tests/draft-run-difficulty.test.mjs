@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {rateDraftRunPuzzle,publicDifficulty,difficultyBand,DRAFT_RUN_DIFFICULTY_VERSION} from '../draft-run-difficulty.mjs';
 import {selectDraftRun,selectDraftRunReroll} from '../draft-run.mjs';
-import {dailySetWeight,chooseRunSet,REGULAR_SET_ORDER} from '../draft-run-policy.mjs';
+import {dailySetWeight,practiceSetWeight,chooseRunSet,REGULAR_SET_ORDER,PRACTICE_RECENCY_HALF_LIFE} from '../draft-run-policy.mjs';
 import {seededRandom} from '../gameplay.mjs';
 
 const meta=(id,rating,{set='a',pick=1,entropy=.8,gap=.1}={})=>({puzzle_id:id,source_draft_hash:id,set_id:set,pick_number:pick,candidate_count:15-pick,
@@ -64,14 +64,20 @@ test('historical v3 selection retains exclusions and its original Daily recency 
     assert.ok(run.every(p=>!['hbg','sir','pio'].includes(p.set_id)&&p.pick_number<=10));
   }
   assert.equal(selectDraftRunReroll([meta('excluded',65,{set:'hbg'})],meta('source',65),{type:'set',round:0,seed:'exclude'}),null);
-  const ids=[REGULAR_SET_ORDER[0],REGULAR_SET_ORDER[6],REGULAR_SET_ORDER.at(-1)];
-  assert.deepEqual(ids.map(id=>dailySetWeight(id)),[6,2,1]);
+  const weightDay='2026-10-02',ids=[REGULAR_SET_ORDER[0],REGULAR_SET_ORDER[6],REGULAR_SET_ORDER.at(-1)];
+  assert.deepEqual(ids.map(id=>dailySetWeight(id,undefined,weightDay)),[6,2,1]);
+  assert.equal(PRACTICE_RECENCY_HALF_LIFE,12);
+  assert.equal(practiceSetWeight(REGULAR_SET_ORDER[0],undefined,weightDay),1);
+  assert.ok(Math.abs(practiceSetWeight(REGULAR_SET_ORDER[12],undefined,weightDay)-.5)<1e-12);
   for(const daily of [false,true]){
     const counts=Object.fromEntries(ids.map(id=>[id,0])),random=seededRandom('weight-check');
-    for(let n=0;n<30000;n++)counts[chooseRunSet(ids,random,daily)]++;
-    const weights=ids.map(id=>daily?dailySetWeight(id):1),total=weights.reduce((a,b)=>a+b,0);
+    for(let n=0;n<30000;n++)counts[chooseRunSet(ids,random,daily,undefined,weightDay)]++;
+    const weights=ids.map(id=>daily?dailySetWeight(id,undefined,weightDay):practiceSetWeight(id,undefined,weightDay)),total=weights.reduce((a,b)=>a+b,0);
     ids.forEach((id,i)=>assert.ok(Math.abs(counts[id]/30000-weights[i]/total)<.01));
   }
+  const historical=Object.fromEntries(ids.map(id=>[id,0])),historicalRandom=seededRandom('historical-practice-weight-check');
+  for(let n=0;n<30000;n++)historical[chooseRunSet(ids,historicalRandom,false,'eight-pick-v3',weightDay)]++;
+  ids.forEach(id=>assert.ok(Math.abs(historical[id]/30000-1/ids.length)<.01));
 });
 
 test('rerolls cannot cross bands, jump ratings, drift after two uses, or consume an unavailable replacement',()=>{

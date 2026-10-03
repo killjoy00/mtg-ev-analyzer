@@ -2,7 +2,7 @@ name: isolated distributed launch acceptance
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths: ['scripts/launch-distributed*', 'scripts/launch-change-scope.mjs', 'tests/launch-change-scope.test.mjs', 'tests/launch-distributed-capacity.test.mjs', 'tests/draft-start-timing.test.mjs', 'tests/ingress.test.mjs', 'worker/draft-start-timing.mjs', 'worker/draft-run-function.mjs', 'worker/draft-run-selection.mjs', 'migrations/0045_batched_practice_selector.sql', 'edge/gateway.mjs', 'scripts/edge-control.mjs', '.github/workflows/launch-distributed.yml']
+    paths: ['scripts/launch-distributed*', 'scripts/launch-change-scope.mjs', 'tests/launch-change-scope.test.mjs', 'tests/launch-distributed-capacity.test.mjs', 'tests/draft-start-timing.test.mjs', 'tests/ingress.test.mjs', 'worker/draft-start-timing.mjs', 'worker/draft-run-function.mjs', 'worker/draft-run-selection.mjs', 'migrations/0045_batched_practice_selector.sql', 'migrations/0050_practice_recency_bias.sql', 'edge/gateway.mjs', 'scripts/edge-control.mjs', '.github/workflows/launch-distributed.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -109,11 +109,17 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0041_corpus_source_snapshots.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0041_apple_auth.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0042_serving_revision_snapshot_staging.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0043_corpus_activation_readiness.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0044_snapshot_scoped_puzzle_uniqueness.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0045_batched_practice_selector.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0045_apple_subscriptions.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0046_public_identity_safety.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0047_admin_user_account_controls.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0048_uncapped_v5_components.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0049_cross_version_corpus_cutover.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0050_practice_recency_bias.sql
           node scripts/verify-neon-schema.mjs
+          PACK1_RELEASE_COMMIT="$GITHUB_SHA" node scripts/warm-practice-cache.mjs
           node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$GITHUB_SHA"
       - name: Prepare accounts, entitlements, score history and query plans
         env:
