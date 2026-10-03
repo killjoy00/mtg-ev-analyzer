@@ -1,7 +1,8 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, Share, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, FlatList, Pressable, Share, StyleSheet, View } from 'react-native';
+import { Text } from '@/src/components/Text';
+import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 
 import type { CareerHistoryRow, CareerProfile } from '@/src/api/career';
 import { ApiError } from '@/src/api/client';

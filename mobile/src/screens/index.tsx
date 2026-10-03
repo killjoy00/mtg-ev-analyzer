@@ -1,9 +1,10 @@
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/src/components/Text';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 
 import {
   DAILY_ENVIRONMENT_META,
@@ -13,22 +14,14 @@ import {
 } from '@/src/api/draftRun';
 import { ensureGuestSession } from '@/src/api/guest';
 import { loadNativePatreonStatus } from '@/src/api/patreon';
+import { useNavigationSession } from '@/src/navigation/session';
+import { readSession, subscribeSession, type MobileSession } from '@/src/storage/session';
+import { pacificDay, dailyDate, dailyResetCue } from '@/src/dailyClock';
 import { useAppResume } from '@/src/hooks/useAppResume';
 import { tcgplayerMagicUrl } from '@/src/tcgplayer';
 import { colors, spacing } from '@/src/theme';
 
 const dailyEnvironments: DailyEnvironment[] = ['mixed', 'powered-cube', 'latest'];
-
-function pacificDay(date = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Los_Angeles',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${values.year}-${values.month}-${values.day}`;
-}
 
 function Brand() {
   return (
@@ -38,7 +31,7 @@ function Brand() {
       </View>
       <View>
         <Text style={styles.brandName}>Pack One</Text>
-        <Text style={styles.brandSub}>DRAFT DECISION LAB</Text>
+
       </View>
     </View>
   );
@@ -52,59 +45,82 @@ function completed(status: DailyStatus | null, environment: DailyEnvironment) {
 }
 
 export default function HomeScreen() {
+  const accountState = useNavigationSession();
   const [status, setStatus] = useState<DailyStatus | null>(null);
   const [promotionAllowed, setPromotionAllowed] = useState<boolean | null>(null);
   const [promotionError, setPromotionError] = useState<string | null>(null);
+  const [phase, setPhase] = useState<'checking' | 'ready' | 'unavailable'>('checking');
+  const [now, setNow] = useState(() => new Date());
+  const [claimed, setClaimed] = useState(false);
   const statusRef = useRef<DailyStatus | null>(null);
+  const owner = useRef('');
   const requestId = useRef(0);
+  const identity = (session: MobileSession | null) => session ? `${session.playerToken}:${session.accountToken ?? ''}` : '';
 
   const refresh = useCallback(async () => {
     const id = ++requestId.current;
+    const day = pacificDay();
+    setNow(new Date());
+    setPhase('checking');
     setPromotionAllowed(null);
     try {
       const session = await ensureGuestSession();
+      if (id !== requestId.current) return;
+      const key = identity(session);
+      if (owner.current !== key || statusRef.current?.day !== day) {
+        statusRef.current = null;
+        setStatus(null);
+      }
+      owner.current = key;
+      setClaimed(Boolean(session.accountToken));
       const [dailyResult, promotionResult] = await Promise.allSettled([
         loadDailyStatus(session),
         session.accountToken
           ? loadNativePatreonStatus(session).then((membership) => membership.ads_allowed === true)
           : Promise.resolve(true),
       ]);
-      if (id !== requestId.current) return;
-      if (dailyResult.status === 'fulfilled') {
+      const current = await readSession();
+      if (id !== requestId.current || identity(current) !== key || day !== pacificDay()) return;
+      if (dailyResult.status === 'fulfilled' && dailyResult.value.day === day) {
         statusRef.current = dailyResult.value;
         setStatus(dailyResult.value);
-      }
+        setPhase('ready');
+      } else setPhase('unavailable');
       setPromotionAllowed(promotionResult.status === 'fulfilled' && promotionResult.value === true);
     } catch {
-      if (id === requestId.current) setPromotionAllowed(false);
-      // Daily state is enrichment. Keep the last loaded UI while revalidating;
-      // starting a Daily remains server-authoritative and safely resumes.
+      if (id !== requestId.current) return;
+      setPhase('unavailable');
+      setPromotionAllowed(false);
     }
   }, []);
 
   useFocusEffect(useCallback(() => {
     void refresh();
-    return () => {
-      requestId.current += 1;
-    };
+    return () => { requestId.current += 1; };
   }, [refresh]));
-
-  useAppResume(() => refresh());
-
+  useEffect(() => subscribeSession(() => {
+    requestId.current += 1;
+    owner.current = '';
+    statusRef.current = null;
+    setStatus(null);
+    setPromotionAllowed(null);
+    setPromotionError(null);
+    void refresh();
+  }), [refresh]);
+  useAppResume(refresh);
   useEffect(() => {
     const timer = setInterval(() => {
-      const current = statusRef.current;
-      if (current?.day && current.day !== pacificDay()) void refresh();
+      setNow(new Date());
+      if (statusRef.current?.day !== pacificDay()) void refresh();
     }, 30_000);
     return () => clearInterval(timer);
   }, [refresh]);
 
-  const dailies = useMemo(() => [...dailyEnvironments].sort((a, b) => (
-    Number(completed(status, a)) - Number(completed(status, b))
-  )), [status]);
-
-  const completedCount = dailyEnvironments.filter((environment) => completed(status, environment)).length;
-  const rankingReason = status?.ranking_identity?.reason;
+  // The website deliberately keeps this order even after a Daily is completed.
+  const dailies = dailyEnvironments;
+  const currentStatus = status?.day === pacificDay(now) ? status : null;
+  const completedCount = currentStatus ? dailyEnvironments.filter((environment) => completed(currentStatus, environment)).length : null;
+  const rankingReason = currentStatus?.ranking_identity?.reason;
   const openPromotion = async () => {
     setPromotionError(null);
     try {
@@ -118,7 +134,9 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.page}>
-        <Brand />
+        <View style={styles.brandRow}><Brand />
+          <Pressable accessibilityRole="button" accessibilityLabel="Help and information" onPress={() => router.push('/help')} style={styles.helpLink}><Text style={styles.cardAction}>Help</Text></Pressable>
+        </View>
 
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>THE DAILY DRAFT</Text>
@@ -126,8 +144,22 @@ export default function HomeScreen() {
           <Text style={styles.lede}>
             Make your pick, then see what the trophy drafter chose and how strong your pick was.
           </Text>
-          {status?.day ? <Text style={styles.today}>{status.day} · {completedCount}/3 complete</Text> : null}
+          <Text style={styles.today}>{dailyDate(pacificDay(now))}’s Daily Runs{completedCount !== null ? ` · ${completedCount}/3 complete` : ''}</Text>
         </View>
+
+        {accountState.message ? <Pressable accessibilityRole="button" onPress={() => void accountState.refresh()} style={styles.warning}>
+          <Text style={styles.warningBody}>{accountState.message}</Text><Text style={styles.cardAction}>Retry account check</Text>
+        </Pressable> : accountState.status === 'checking' ? <Text style={styles.statusText}>Checking account…</Text> : null}
+        <View style={styles.statusStrip} accessibilityLabel="Daily reset and streak">
+          <Text style={styles.resetCue}>{dailyResetCue(now)}</Text>
+          <Text style={styles.statusText}>{currentStatus ? `${currentStatus.daily_streak}-day streak` : phase === 'unavailable' ? 'Streak unavailable' : 'Checking streak…'}</Text>
+          <Text style={styles.statusText}>Resets at midnight Pacific</Text>
+        </View>
+        {phase === 'checking' ? <Text style={styles.statusText}>{currentStatus ? 'Refreshing Daily progress…' : 'Checking Daily progress…'}</Text> : null}
+        {phase === 'unavailable' ? <View style={styles.warning}>
+          <Text accessibilityRole="alert" style={styles.warningBody}>Daily progress is temporarily unavailable. Play now still resumes your saved attempt.{currentStatus ? ' Showing your last loaded progress.' : ''}</Text>
+          <Pressable accessibilityRole="button" onPress={() => void refresh()} style={styles.helpLink}><Text style={styles.cardAction}>Retry</Text></Pressable>
+        </View> : null}
 
         {displayNameAttention ? (
           <Pressable
@@ -153,7 +185,9 @@ export default function HomeScreen() {
           <Text style={styles.sectionLabel}>PLAY TODAY</Text>
           {dailies.map((environment, index) => {
             const meta = DAILY_ENVIRONMENT_META[environment];
-            const isComplete = completed(status, environment);
+            const isComplete = completed(currentStatus, environment);
+            const result = currentStatus?.daily_history.find((row) => row.date === currentStatus.day && row.mode === 'draft_run' && row.set_id === environment);
+            const startHere = currentStatus && !claimed && completedCount === 0 && environment === 'mixed';
             return (
               <Pressable
                 key={environment}
@@ -167,12 +201,13 @@ export default function HomeScreen() {
                 ]}
               >
                 <View style={styles.cardHeading}>
-                  <Text style={styles.cardKicker}>{meta.eyebrow}</Text>
+                  <Text style={styles.cardKicker}>{startHere ? 'Start here' : meta.eyebrow}</Text>
                   {isComplete ? <Text style={styles.completeBadge}>COMPLETE</Text> : null}
                 </View>
                 <Text style={index === 0 && !isComplete ? styles.cardTitle : styles.dailyTitle}>{meta.title}</Text>
-                <Text style={styles.cardBody}>{meta.description}</Text>
+                <Text style={styles.cardBody}>{isComplete ? `Complete · ${result?.score}/100` : meta.description}</Text>
                 <Text style={styles.cardAction}>{isComplete ? 'View result →' : 'Play now →'}</Text>
+                {startHere ? <Text style={styles.statusText}>Free · No account required</Text> : null}
               </Pressable>
             );
           })}
@@ -183,19 +218,16 @@ export default function HomeScreen() {
             <Text style={styles.cardKicker}>DAILIES COMPLETE</Text>
             <Text style={styles.utilityTitle}>Keep drafting.</Text>
             <Text style={styles.cardBody}>
-              {status?.player.claimed
+              {claimed
                 ? 'Your practice options are all in one place.'
                 : 'A free account adds unlimited regular Draft Run practice.'}
             </Text>
-            <Text style={styles.resetCue}>
-              Next Daily · midnight Pacific{Number(status?.daily_streak || 0) >= 2 ? ` · ${status?.daily_streak}-day streak` : ''}
-            </Text>
             <Pressable
               accessibilityRole="button"
-              onPress={() => router.push(status?.player.claimed ? '/practice' : '/account')}
+              onPress={() => router.push(claimed ? '/practice' : '/account')}
               style={styles.primaryButton}
             >
-              <Text style={styles.primaryButtonText}>{status?.player.claimed ? 'Go to Practice' : 'Create a free account'}</Text>
+              <Text style={styles.primaryButtonText}>{claimed ? 'Go to Practice' : 'Create a free account'}</Text>
             </Pressable>
           </View>
         ) : null}
@@ -225,84 +257,21 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Open practice"
-          onPress={() => router.push('/practice')}
-          style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}
-        >
-          <Text style={styles.cardKicker}>PRACTICE</Text>
-          <Text style={styles.utilityTitle}>Keep drafting</Text>
-          <Text style={styles.cardBody}>Regular practice is included with a free account. Some accounts also include Powered Cube and custom-set practice.</Text>
-          <Text style={styles.cardAction}>Choose practice →</Text>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Resume saved shared run"
-          onPress={() => router.push('/resume-shared-run')}
-          style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}
-        >
-          <Text style={styles.cardKicker}>SHARED RUN</Text>
-          <Text style={styles.utilityTitle}>Your last shared run</Text>
-          <Text style={styles.cardBody}>Reopen this device&apos;s saved picks or result with the same Pack One account.</Text>
-          <Text style={styles.cardAction}>Find saved run →</Text>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Open leaderboard"
-          onPress={() => router.push('/leaderboard')}
-          style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}
-        >
-          <Text style={styles.cardKicker}>RANKINGS</Text>
-          <Text style={styles.utilityTitle}>Leaderboard</Text>
-          <Text style={styles.cardBody}>Compare Today, This week, This season, and All time across all three Dailies.</Text>
-          <Text style={styles.cardAction}>View rankings →</Text>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Open My Pack One"
-          onPress={() => router.push('/career')}
-          style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}
-        >
-          <Text style={styles.cardKicker}>MY PACK ONE</Text>
-          <Text style={styles.utilityTitle}>Career & achievements</Text>
-          <Text style={styles.cardBody}>Review your season standings, progression, achievements, Daily history, archive progress, and completed games.</Text>
-          <Text style={styles.cardAction}>Open My Pack One →</Text>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Open Learn"
-          onPress={() => router.push('/learn')}
-          style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}
-        >
-          <Text style={styles.cardKicker}>LEARN</Text>
-          <Text style={styles.utilityTitle}>Learn Pack One</Text>
-          <Text style={styles.cardBody}>Start with the native rules, scoring, method, and set coverage, then open the current drafting guides.</Text>
-          <Text style={styles.cardAction}>Open Learn →</Text>
-        </Pressable>
-
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push('/account')}
-          style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}
-        >
-          <Text style={styles.cardKicker}>PACK ONE ACCOUNT</Text>
-          <Text style={styles.utilityTitle}>Sign in or manage your account</Text>
-          <Text style={styles.cardBody}>
-            Use email, Google, or Apple, keep your player identity across devices, and manage account settings from the app.
-          </Text>
-          <Text style={styles.cardAction}>Open account →</Text>
-        </Pressable>
+        {!claimed ? <View style={styles.guestLinks}>
+          <Pressable accessibilityRole="button" onPress={() => router.navigate('/leaderboard')} style={styles.helpLink}><Text style={styles.cardAction}>View Leaders</Text></Pressable>
+          <Pressable accessibilityRole="button" onPress={() => router.navigate('/practice')} style={styles.helpLink}><Text style={styles.cardAction}>Explore Practice</Text></Pressable>
+        </View> : null}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
+  brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  helpLink: { minHeight: 44, justifyContent: 'center' },
+  guestLinks: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg },
+  statusStrip: { padding: spacing.md, backgroundColor: colors.accentSoft, gap: spacing.xs },
+  statusText: { color: colors.muted, fontSize: 14, lineHeight: 20 },
   safe: { flex: 1, backgroundColor: colors.page },
   page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.xl, alignSelf: 'center', width: '100%', maxWidth: 860 },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 10 },
@@ -316,8 +285,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   brandMarkText: { color: colors.accentDark, fontSize: 18, fontWeight: '800' },
-  brandName: { color: colors.ink, fontSize: 17, fontWeight: '800' },
-  brandSub: { color: colors.muted, fontSize: 9, fontWeight: '800', letterSpacing: 1.2, marginTop: 2 },
+  brandName: { color: colors.ink, fontSize: 26, fontWeight: '800' },
+  removedBrandSub: { color: colors.muted, fontSize: 9, fontWeight: '800', letterSpacing: 1.2, marginTop: 2 },
   hero: { gap: spacing.sm, paddingTop: spacing.lg },
   eyebrow: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
   title: { color: colors.ink, fontSize: 42, lineHeight: 44, fontWeight: '800', letterSpacing: -1.2 },
@@ -342,7 +311,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   completeCard: { opacity: 0.86 },
-  cardHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
+  cardHeading: { flexWrap: 'wrap', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   completeBadge: { color: colors.accentDark, fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
   pressed: { opacity: 0.78 },
   warning: {
@@ -366,13 +335,13 @@ const styles = StyleSheet.create({
   },
   resetCue: { color: colors.accentDark, fontSize: 13, fontWeight: '800' },
   affiliatePromo: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.md, gap: spacing.xs },
-  affiliateLink: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  affiliateLink: { minHeight: 72, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.md },
   affiliateLogo: { width: 92, height: 42 },
-  affiliateCopy: { flex: 1, gap: 2 },
+  affiliateCopy: { flex: 1, minWidth: 150, gap: 2 },
   affiliateTitle: { color: colors.ink, fontSize: 15, fontWeight: '800' },
   affiliateDetail: { color: colors.muted, fontSize: 12 },
   affiliateAction: { color: colors.accentDark, fontSize: 12, fontWeight: '800' },
-  affiliateDisclosure: { color: colors.muted, fontSize: 10, lineHeight: 15 },
+  affiliateDisclosure: { color: colors.muted, fontSize: 12, lineHeight: 18 },
   promotionError: { color: colors.danger, fontSize: 12, lineHeight: 17 },
   utilityCard: {
     backgroundColor: colors.surface,

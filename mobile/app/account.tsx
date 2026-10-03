@@ -8,11 +8,11 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text } from '@/src/components/Text';
+import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 
 import { ApiError } from '@/src/api/client';
 import {
@@ -167,11 +167,9 @@ export default function AccountScreen() {
     }
     await adoptSession(next);
     if (!newlyClaimed) {
-      if (result.linked.validatedDailyScore || returnToPractice || returnProfileKey) {
-        returnAfterAccount(false);
-      }
+      returnAfterAccount(true);
     }
-  }, [adoptSession, returnToPractice, returnProfileKey, returnAfterAccount, setMessage]);
+  }, [adoptSession, returnAfterAccount, setMessage]);
 
   const submitEmail = async () => {
     if (!session || actionBusy) return;
@@ -398,7 +396,7 @@ export default function AccountScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive">
         <Text style={styles.eyebrow}>PACK ONE ACCOUNT</Text>
 
         {busy && !session ? <ActivityIndicator color={colors.accent} /> : null}
@@ -603,6 +601,7 @@ export default function AccountScreen() {
 
         {message || routeNotice ? <Text accessibilityRole="alert" style={styles.message}>{message || routeNotice}</Text> : null}
         {enrichmentWarning ? <Text accessibilityRole="alert" style={styles.enrichmentWarning}>{enrichmentWarning}</Text> : null}
+        <Pressable accessibilityRole="button" onPress={() => router.push('/help')} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Help & information</Text></Pressable>
       </ScrollView>
     </SafeAreaView>
   );

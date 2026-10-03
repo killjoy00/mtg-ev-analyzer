@@ -1,7 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 
 import { config } from '@/src/config';
-import { screenshotSession } from '@/src/screenshots/session';
+import { screenshotSession, readScreenshotSession, writeScreenshotSession } from '@/src/screenshots/session';
 
 const SESSION_KEY = 'packone.mobile.session.v2';
 const LEGACY_SESSION_KEY = 'packone.mobile.session.v1';
@@ -76,7 +76,7 @@ async function migrateLegacy(): Promise<MobileSession | null> {
 }
 
 export async function readSession(): Promise<MobileSession | null> {
-  if (config.screenshots.fixtures) return screenshotSession;
+  if (config.screenshots.fixtures) return readScreenshotSession();
 
   const raw = await SecureStore.getItemAsync(SESSION_KEY);
   if (!raw) return migrateLegacy();
@@ -91,7 +91,8 @@ export async function readSession(): Promise<MobileSession | null> {
 export async function writeSession(session: MobileSession) {
   if (!validSession(session)) throw new Error('Invalid Pack One mobile session.');
   if (config.screenshots.fixtures) {
-    notifySession(screenshotSession);
+    await writeScreenshotSession(session);
+    notifySession(session);
     return;
   }
   await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(session), {
@@ -102,7 +103,9 @@ export async function writeSession(session: MobileSession) {
 
 export async function clearSession() {
   if (config.screenshots.fixtures) {
-    notifySession(screenshotSession);
+    const guest = { playerToken: screenshotSession.playerToken, subjectId: screenshotSession.subjectId };
+    await writeScreenshotSession(guest);
+    notifySession(guest);
     return;
   }
   await Promise.all([

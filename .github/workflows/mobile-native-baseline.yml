@@ -1,6 +1,7 @@
 name: Native UX baseline evidence
 on:
   pull_request:
+    types: [opened, reopened]
     paths: ['.github/workflows/mobile-native-baseline.yml', 'mobile/scripts/native-baseline-evidence.py']
 permissions:
   contents: read

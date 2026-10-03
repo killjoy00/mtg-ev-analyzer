@@ -1,9 +1,10 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Text } from '@/src/components/Text';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 
 import { setArchive } from '@/src/content/setArchives';
 import { tcgplayerUrl } from '@/src/tcgplayer';

@@ -2,11 +2,11 @@ import type { ReactNode } from 'react';
 import {
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '@/src/components/Text';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 
 import { colors, spacing } from '@/src/theme';
 
@@ -22,12 +22,14 @@ export function ArticleScreen({
   deck,
   sections,
   footer,
+  intro,
 }: {
   kicker: string;
   title: string;
   deck: string;
   sections: ArticleSection[];
   footer?: ReactNode;
+  intro?: ReactNode;
 }) {
   return (
     <SafeAreaView style={styles.safe}>
@@ -38,6 +40,7 @@ export function ArticleScreen({
           <Text style={styles.deck}>{deck}</Text>
         </View>
 
+        {intro}
         <View style={styles.prose}>
           {sections.map((section) => (
             <View key={section.title} style={styles.section}>

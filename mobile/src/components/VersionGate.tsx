@@ -7,11 +7,11 @@ import {
   Platform,
   Pressable,
   StyleSheet,
-  Text,
   View,
   type AppStateStatus,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text } from '@/src/components/Text';
+import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 
 import { requestJson } from '@/src/api/client';
 import { VersionGateBoundary } from '@/src/components/VersionGateBoundary';

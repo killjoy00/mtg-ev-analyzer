@@ -1,8 +1,9 @@
 import { useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/src/components/Text';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 
 import { colors, spacing } from '@/src/theme';
 

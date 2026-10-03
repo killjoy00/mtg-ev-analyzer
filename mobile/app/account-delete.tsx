@@ -9,11 +9,11 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text } from '@/src/components/Text';
+import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 
 import {
   deleteMobileAccount,
@@ -146,7 +146,7 @@ export default function AccountDeleteScreen() {
   const disabled = actionBusy;
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive">
         <Text style={styles.eyebrow}>DELETE ACCOUNT</Text>
         <Text style={styles.title}>Delete your Pack One account</Text>
         <Text style={styles.body}>Deleting your account permanently removes your Pack One profile, career and scores. This cannot be undone.</Text>

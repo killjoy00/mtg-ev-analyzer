@@ -76,7 +76,7 @@ async function fixture(t, options = {}) {
   const mocks = {
     'expo-router': { router: { push(value) { pushes.push(value); } } },
     'expo-web-browser': { openBrowserAsync: async () => ({ type: 'opened' }) },
-    'react-native': {
+    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       ActivityIndicator: host('ActivityIndicator'),
       Pressable: host('Pressable'),
       ScrollView: host('ScrollView'),
@@ -137,6 +137,9 @@ async function fixture(t, options = {}) {
     }).outputText;
     const prior = Module._load;
     Module._load = function load(request, parent, main) {
+    if (request === '@/src/components/Text') return { Text: mocks['react-native'].Text };
+    if (request === '@/src/components/ScreenArea') return { ScreenArea: mocks['react-native-safe-area-context'].SafeAreaView };
+
       if (Object.prototype.hasOwnProperty.call(mocks, request)) return mocks[request];
       return prior.call(this, request, parent, main);
     };

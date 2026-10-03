@@ -11,11 +11,14 @@ import {
   ScrollView,
   Share,
   StyleSheet,
-  Text,
+  useWindowDimensions,
+  type LayoutChangeEvent,
+  type TextLayoutEvent,
   View,
 } from 'react-native';
+import { Text } from '@/src/components/Text';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 
 import { ensureGuestSession } from '@/src/api/guest';
 import {
@@ -61,6 +64,13 @@ type RunResponseToken = {
 
 function mobileSessionIdentity(session: MobileSession) {
   return `${session.playerToken}\n${session.accountToken ?? ''}`;
+}
+
+function recordLayout(label: string, event: LayoutChangeEvent) {
+  if (config.screenshots.fixtures) console.info('PACKONE_LAYOUT', JSON.stringify({ label, ...event.nativeEvent.layout }));
+}
+function recordText(label: string, event: TextLayoutEvent) {
+  if (config.screenshots.fixtures) console.info('PACKONE_TEXT', JSON.stringify({ label, lines: event.nativeEvent.lines.map(({ width, height }) => ({ width, height })) }));
 }
 
 function Progress({ run }: { run: DraftRunState }) {
@@ -130,7 +140,7 @@ function CardTile({
           <Text style={styles.cardFallbackText}>{card.name}</Text>
         </View>
       )}
-      <Text style={styles.cardName} numberOfLines={2}>{card.name}</Text>
+      <Text style={styles.cardName}>{card.name}</Text>
     </Pressable>
   );
 }
@@ -186,7 +196,7 @@ function FeedbackCard({
             <Text style={styles.cardFallbackText}>{card.name}</Text>
           </View>
         )}
-        <Text style={styles.feedbackCardName} numberOfLines={2}>{card.name}</Text>
+        <Text style={styles.feedbackCardName}>{card.name}</Text>
       </Pressable>
       {affiliate && onAffiliatePress ? (
         <Pressable
@@ -211,6 +221,8 @@ function FeedbackAnalysis({
   onZoom: (card: DraftRunCard) => void;
   onAffiliatePress: (card: DraftRunCard) => void;
 }) {
+  const { width, fontScale } = useWindowDimensions();
+  const stackComparison = width < 360 || fontScale > 1.35;
   const candidates = answer.puzzle.candidates;
   const selected = candidates.find((card) => card.id === answer.selectedId);
   const trophy = candidates.find((card) => card.id === answer.historicalId);
@@ -230,7 +242,7 @@ function FeedbackAnalysis({
 
   return (
     <View style={styles.analysisPanel}>
-      <View style={styles.feedbackComparison}>
+      <View style={[styles.feedbackComparison, stackComparison && { flexDirection: 'column' }]}>
         <FeedbackCard
           affiliate
           card={selected}
@@ -367,7 +379,7 @@ function PackReview({
                 <Text style={styles.cardFallbackText}>{card.name}</Text>
               </View>
             )}
-            <Text style={styles.cardName} numberOfLines={2}>{card.name}</Text>
+            <Text style={styles.cardName}>{card.name}</Text>
             {card.id === answer.selectedId ? <Text style={styles.reviewBadge}>YOUR PICK</Text> : null}
             {card.id === answer.historicalId ? <Text style={styles.reviewBadge}>TROPHY PICK</Text> : null}
           </Pressable>
@@ -437,6 +449,13 @@ export default function DraftRunScreen({
             : environment === 'powered-cube' ? 'Powered Cube practice complete.' : 'Practice complete.',
         }
       : dailyMeta;
+  const { width: windowWidth, fontScale } = useWindowDimensions();
+  const [feedbackWidth, setFeedbackWidth] = useState(0);
+  const wideFeedback = feedbackWidth >= 520 * fontScale;
+  const stackComparison = windowWidth < 360 || fontScale > 1.35;
+  useEffect(() => {
+    if (config.screenshots.fixtures) console.info('PACKONE_WINDOW', JSON.stringify({ width: windowWidth, fontScale }));
+  }, [windowWidth, fontScale]);
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const stateRef = useRef<LoadState>(state);
   const refreshGeneration = useRef(0);
@@ -884,6 +903,9 @@ export default function DraftRunScreen({
           >
             <Text style={styles.secondaryButtonText}>Share result</Text>
           </Pressable>
+          <Pressable accessibilityRole="button" onPress={() => router.dismissTo(practice || shared ? '/practice' : '/')} style={styles.primaryButton}>
+            <Text style={styles.primaryButtonText}>{practice || shared ? 'Return to Practice' : 'Home'}</Text>
+          </Pressable>
           {shareError ? <Text accessibilityRole="alert" style={styles.actionError}>{shareError}</Text> : null}
           <View style={styles.guestNote}>
             <Text style={styles.guestNoteTitle}>
@@ -893,9 +915,9 @@ export default function DraftRunScreen({
               {shared
                 ? 'This is your saved shared run. Reopening the invitation recovers the same picks and result, not another attempt.'
                 : practice
-                  ? 'Practice uses your signed-in Pack One identity and does not enter the Daily leaderboard.'
+                  ? 'Practice builds your career. Play the Dailies to join the leaderboard.'
                   : state.session.accountToken
-                    ? 'This result used your signed-in Pack One identity and the same server eligibility rules as web.'
+                    ? 'Your result is saved to your Pack One account.'
                     : 'Sign in or create your Pack One account to validate this Daily score and keep your career across devices.'}
             </Text>
             {!shared && !practice && !state.session.accountToken ? (
@@ -933,22 +955,19 @@ export default function DraftRunScreen({
 
           {mode === 'feedback' && answer ? (
             <>
-              <View style={styles.feedback}>
-                <View style={styles.feedbackScore}>
-                  <Text style={styles.feedbackScoreNumber}>{answer.score}</Text>
-                  <Text style={styles.feedbackScoreSuffix}>/100</Text>
-                </View>
-                <View style={styles.feedbackCopy}>
-                  <Text style={styles.feedbackTitle}>
+              <View testID="pick-feedback" onLayout={(event) => { setFeedbackWidth(event.nativeEvent.layout.width); recordLayout('feedback', event); }} style={[styles.feedback, wideFeedback && styles.feedbackWide]}>
+                <Text testID="feedback-score" onLayout={(event) => recordLayout('score', event)} onTextLayout={(event) => recordText('score', event)} style={styles.feedbackScoreNumber}>{answer.score}<Text style={styles.feedbackScoreSuffix}>/100</Text></Text>
+                <View testID="feedback-copy" onLayout={(event) => recordLayout('copy', event)} style={[styles.feedbackCopy, wideFeedback && styles.feedbackCopyWide]}>
+                  <Text testID="feedback-title" onLayout={(event) => recordLayout('title', event)} onTextLayout={(event) => recordText('title', event)} style={styles.feedbackTitle}>
                     {answer.historicalMatch
                       ? 'You matched the trophy drafter.'
                       : `The trophy drafter took ${answer.historicalName ?? 'another card'}.`}
                   </Text>
-                  <Text style={styles.feedbackBody}>You chose {answer.selectedName}.</Text>
+                  <Text testID="feedback-choice" onLayout={(event) => recordLayout('choice', event)} onTextLayout={(event) => recordText('choice', event)} style={styles.feedbackBody}>You chose {answer.selectedName}.</Text>
                 </View>
               </View>
 
-              <View style={styles.feedbackComparison}>
+              <View style={[styles.feedbackComparison, stackComparison && { flexDirection: 'column' }]}>
                 <FeedbackCard
                   card={puzzle.candidates.find((card) => card.id === answer.selectedId)}
                   label={answer.historicalMatch ? 'Trophy and Your Pick' : 'Your Pick'}
@@ -1179,6 +1198,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   primaryButton: {
+    paddingVertical: spacing.sm,
     minHeight: 52,
     backgroundColor: colors.accent,
     alignItems: 'center',
@@ -1195,19 +1215,24 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderTopColor: colors.accent,
     backgroundColor: colors.surface,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.lg,
+    flexDirection: 'column',
+    gap: spacing.md,
   },
+  feedbackWide: { flexDirection: 'row', alignItems: 'center' },
+  feedbackCopyWide: { flex: 1 },
   feedbackScore: { flexDirection: 'row', alignItems: 'baseline' },
-  feedbackScoreNumber: { color: colors.ink, fontSize: 44, lineHeight: 48, fontWeight: '800' },
+  feedbackScoreNumber: { flexShrink: 1, color: colors.ink, fontSize: 44, lineHeight: 48, fontWeight: '800' },
   feedbackScoreSuffix: { color: colors.muted, fontSize: 14, fontWeight: '700' },
-  feedbackCopy: { flex: 1, minWidth: 220, gap: spacing.xs, justifyContent: 'center' },
+  feedbackCopy: { minWidth: 0, flexShrink: 1, gap: spacing.sm, justifyContent: 'center' },
   feedbackTitle: { color: colors.ink, fontSize: 17, lineHeight: 22, fontWeight: '800' },
   feedbackBody: { color: colors.muted, fontSize: 14, lineHeight: 20 },
   feedbackComparison: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
   feedbackCard: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 'auto',
+    width: '100%',
+    maxWidth: 420,
     minWidth: 0,
     borderWidth: 1,
     borderColor: colors.line,
@@ -1261,7 +1286,7 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
   },
   resultReviewIndex: { width: 28, color: colors.accentDark, fontSize: 16, fontWeight: '800' },
-  resultReviewCopy: { flex: 1, gap: 2 },
+  resultReviewCopy: { flex: 1, minWidth: 0, gap: 2 },
   resultReviewTitle: { color: colors.ink, fontSize: 14, lineHeight: 19, fontWeight: '800' },
   resultReviewScore: { color: colors.ink, fontSize: 18, fontWeight: '800' },
   resultPage: { padding: spacing.lg, paddingTop: spacing.xxl, paddingBottom: spacing.xxl, gap: spacing.lg, alignSelf: 'center', width: '100%', maxWidth: 980 },

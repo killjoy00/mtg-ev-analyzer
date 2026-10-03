@@ -43,6 +43,8 @@ function compileGraph(mocks) {
     compiled.paths = Module._nodeModulePaths(path.dirname(filename));
     cache.set(filename, compiled);
     compiled.require = (request) => {
+      if (request === '@/src/components/Text') return { Text: mocks['react-native'].Text };
+      if (request === '@/src/components/ScreenArea') return { ScreenArea: mocks['react-native-safe-area-context'].SafeAreaView };
       if (Object.hasOwn(mocks, request)) return mocks[request];
       const base = request.startsWith('@/') ? path.resolve(process.cwd(), request.slice(2))
         : request.startsWith('.') ? path.resolve(path.dirname(filename), request) : null;
@@ -65,7 +67,7 @@ async function fixture(options = {}) {
   const store = new Map([[SESSION, JSON.stringify(options.session ?? session())]]);
   if (options.saved !== null) store.set(SAVED, options.saved ?? checkpoint());
   let locked = Boolean(options.locked);
-  let route = '/';
+  let route = options.route ?? '/';
   let params = {};
   let root;
   let sessionApi;
@@ -78,7 +80,7 @@ async function fixture(options = {}) {
   Image.prefetch = async () => {};
   const run = {
     id: RUN, environment: 'mixed', day: null, revision: 3, round: 0, run_length: 8,
-    answers: [], complete: false, score: null, rerolls: { set: 0, pack: 0 }, set_reroll_allowed: false,
+    answers: [], complete: Boolean(options.complete), score: null, rerolls: { set: 0, pack: 0 }, set_reroll_allowed: false,
     leaderboard_eligible: false, current: { puzzle_id: 'saved-puzzle', set_id: 'msh', pack_number: 1, pick_number: 5,
       prior_picks: [], candidates: [{ id: 'a', name: 'Saved Card' }] },
   };
@@ -95,7 +97,7 @@ async function fixture(options = {}) {
       useLocalSearchParams: () => params,
       useFocusEffect(callback) { React.useEffect(callback, [callback]); },
     },
-    'react-native': {
+    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       Pressable: host('Pressable'), View: host('View'), Text: host('Text'), ActivityIndicator: host('ActivityIndicator'),
       ScrollView, Modal: (props) => props.visible ? React.createElement('Modal', props, props.children) : null,
       StyleSheet: { create: (value) => value }, AccessibilityInfo: { announceForAccessibility() {} }, Share: { share: async () => {} },
@@ -118,7 +120,7 @@ async function fixture(options = {}) {
       DAILY_ENVIRONMENT_META: Object.fromEntries(['mixed', 'powered-cube', 'latest'].map((id) => [id, { title: id, eyebrow: id, description: id, resultTitle: id }])),
       isDailyEnvironment: (value) => ['mixed', 'powered-cube', 'latest'].includes(value),
       loadDailyStatus: async () => { throw new Error('Home enrichment offline.'); },
-      loadDraftRun: async (id, current) => { calls.push(['get', id, current.accountUser.id]); return run; },
+      loadDraftRun: async (id, current) => { calls.push(['get', id, current.accountUser.id]); if (options.runError) throw Error('Run unavailable'); return run; },
       loadSharedDraftRunInfo: async () => { calls.push(['preview']); throw new Error('Saved run should not need invitation preview.'); },
       startSharedDraftRun: async () => { calls.push(['start']); throw new Error('Resume must never start another run.'); },
       startDailyDraftRun: async () => { calls.push(['daily']); throw new Error('Resume is not a Daily.'); },
@@ -129,11 +131,11 @@ async function fixture(options = {}) {
   };
   const load = compileGraph(mocks);
   sessionApi = load('src/storage/session.ts');
-  const Home = load('app/index.tsx').default;
+  const Recovery = load('src/components/SharedRunRecovery.tsx').SharedRunRecovery;
   const Resume = load('app/resume-shared-run.tsx').default;
   const Shared = load('app/shared-run.tsx').default;
   function Navigation() {
-    if (route === '/') return React.createElement(Home);
+    if (route === '/') return React.createElement(Recovery);
     if (route === '/shared-run') return React.createElement(Shared);
     // The native Stack retains the previous Resume route beneath Account.
     return React.createElement(React.Fragment, null, React.createElement(Resume),
@@ -144,6 +146,7 @@ async function fixture(options = {}) {
   return {
     calls, store,
     text: () => text(root.toJSON()),
+    hasButton: (label) => Boolean(button(label)),
     async press(label) {
       const target = button(label);
       assert.ok(target, `Missing button: ${label}`);
@@ -155,10 +158,10 @@ async function fixture(options = {}) {
   };
 }
 
-test('fresh Home opens the stored shared run without the invitation URL, even if Daily enrichment fails', async () => {
+test('Practice recovery opens the stored shared run without the invitation URL or Daily enrichment', async () => {
   const h = await fixture();
   try {
-    await h.press('Resume saved shared run');
+    await h.press('Continue shared run');
     assert.match(h.text(), /Saved Card/);
     assert.deepEqual(h.calls.find(([kind]) => kind === 'get'), ['get', RUN, ACCOUNT]);
     assert.equal(h.calls.some(([kind]) => ['start', 'daily', 'preview'].includes(kind)), false);
@@ -169,20 +172,20 @@ test('fresh Home opens the stored shared run without the invitation URL, even if
 });
 
 for (const saved of [null, 'malformed checkpoint']) {
-  test(`Home recovery handles ${saved === null ? 'missing' : 'corrupt'} storage without creating a run`, async () => {
+  test(`Practice recovery handles ${saved === null ? 'missing' : 'corrupt'} storage without creating a run`, async () => {
     const h = await fixture({ saved });
     try {
-      await h.press('Resume saved shared run');
+      assert.equal(h.hasButton('Continue shared run'), false);
       assert.match(h.text(), /No shared run is saved for this account/);
       assert.equal(h.calls.some(([kind]) => ['get', 'start', 'replace'].includes(kind)), false);
     } finally { await h.close(); }
   });
 }
 
-test('another account cannot discover the previous account checkpoint from Home', async () => {
+test('another account cannot discover the previous account checkpoint from Practice', async () => {
   const h = await fixture({ session: session(OTHER) });
   try {
-    await h.press('Resume saved shared run');
+    assert.equal(h.hasButton('Continue shared run'), false);
     assert.match(h.text(), /No shared run is saved for this account/);
     assert.equal(h.calls.some(([kind]) => kind === 'get' || kind === 'replace'), false);
     assert.equal(h.store.get(SAVED), checkpoint());
@@ -190,9 +193,9 @@ test('another account cannot discover the previous account checkpoint from Home'
 });
 
 test('guest recovery requests sign-in and a saved same-account session resumes afterward', async () => {
-  const h = await fixture({ session: { playerToken: session().playerToken, subjectId: PLAYER } });
+  const h = await fixture({ route: '/resume-shared-run', session: { playerToken: session().playerToken, subjectId: PLAYER } });
   try {
-    await h.press('Resume saved shared run');
+    assert.equal(h.hasButton('Continue shared run'), false);
     assert.match(h.text(), /Sign in to the same Pack One account/);
     await h.press('Sign in to recover your run');
     await h.writeSession(session());
@@ -205,7 +208,7 @@ test('an identity change during discovery cannot route to the previous account r
   const read = deferred();
   const h = await fixture({ delayRead: read });
   try {
-    await h.press('Resume saved shared run');
+    assert.equal(h.hasButton('Continue shared run'), false);
     await h.writeSession(session(OTHER));
     await act(async () => { read.resolve(checkpoint()); await flush(); });
     assert.equal(h.calls.some(([kind]) => kind === 'replace' || kind === 'get'), false);
@@ -216,11 +219,12 @@ test('an identity change during discovery cannot route to the previous account r
 test('locked storage keeps the checkpoint and offers a read-only retry', async () => {
   const h = await fixture({ locked: true });
   try {
-    await h.press('Resume saved shared run');
-    assert.match(h.text(), /Secure store is locked/);
+    assert.equal(h.hasButton('Continue shared run'), false);
+    assert.match(h.text(), /Could not check your saved shared run/);
     assert.equal(h.store.get(SAVED), checkpoint());
     h.unlock();
-    await h.press('Try again');
+    await h.press('Retry shared activity');
+    await h.press('Continue shared run');
     assert.match(h.text(), /Saved Card/);
     assert.equal(h.calls.some(([kind]) => kind === 'start'), false);
   } finally { await h.close(); }
@@ -229,8 +233,31 @@ test('locked storage keeps the checkpoint and offers a read-only retry', async (
 test('a player-token and subject mismatch cannot discover a checkpoint', async () => {
   const h = await fixture({ session: { ...session(), subjectId: OTHER } });
   try {
-    await h.press('Resume saved shared run');
+    assert.equal(h.hasButton('Continue shared run'), false);
     assert.match(h.text(), /No shared run is saved for this account/);
     assert.equal(h.calls.some(([kind]) => kind === 'get' || kind === 'replace'), false);
+  } finally { await h.close(); }
+});
+
+
+test('a completed checkpoint exposes View shared result without creating an attempt', async () => {
+  const h = await fixture({ complete: true });
+  try {
+    assert.equal(h.hasButton('Continue shared run'), false);
+    assert.equal(h.hasButton('View shared result'), true);
+    await h.press('View shared result');
+    assert.equal(h.calls.some(([kind]) => kind === 'start'), false);
+  } finally { await h.close(); }
+});
+
+test('an unavailable server run never offers an unverified continuation or replacement', async () => {
+  const h = await fixture({ runError: true });
+  try {
+    assert.equal(h.hasButton('Continue shared run'), false);
+    assert.equal(h.hasButton('View shared result'), false);
+    assert.match(h.text(), /checkpoint is retained/);
+    await h.press('Retry shared activity');
+    assert.equal(h.calls.some(([kind]) => ['start', 'daily', 'replace'].includes(kind)), false);
+    assert.equal(h.store.get(SAVED), checkpoint());
   } finally { await h.close(); }
 });

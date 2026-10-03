@@ -6,11 +6,11 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text } from '@/src/components/Text';
+import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 
 import { ApiError } from '@/src/api/client';
 import { updateMobileProfile } from '@/src/api/career';
@@ -123,7 +123,7 @@ export default function AccountProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive">
         <View style={styles.editorHeading}>
           <View style={styles.editorHeadingCopy}>
             <Text style={styles.eyebrow}>PROFILE &amp; VISIBILITY</Text>
