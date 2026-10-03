@@ -92,6 +92,32 @@ async function fill(kind){
 }
 
 try {
+  // The public Patreon page leads with authoritative current access and one
+  // relevant next action instead of repeating the activation explanation.
+  await reset();
+  await page.goto(base+'/patreon/');
+  await page.getByRole('heading',{name:'Sign in to check your access',exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Sign in to Pack One',exact:true}).count(),1);
+  assert.equal(await page.locator('.patreon-troubleshooting').count(),1);
+  await page.screenshot({path:'artifacts/ui-patreon-page-signed-out-390.png',fullPage:true});
+
+  await reset({isSigned:true,status:disconnected});
+  await page.goto(base+'/patreon/');
+  await page.getByRole('heading',{name:'Connect Patreon to activate Elite',exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Connect Patreon',exact:true}).count(),1);
+  assert.equal(await page.getByRole('link',{name:'View Patreon membership',exact:true}).count(),1);
+  assert.doesNotMatch((await page.locator('#app').textContent())||'',/Joining Patreon and connecting Patreon to Pack One are two separate steps/i);
+  await page.screenshot({path:'artifacts/ui-patreon-page-unconnected-390.png',fullPage:true});
+
+  await reset({isSigned:true,status:elite});
+  await page.goto(base+'/patreon/');
+  await page.getByRole('heading',{name:'Elite is active',exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Open Practice',exact:true}).count(),1);
+  assert.equal(await page.getByRole('link',{name:'Manage Patreon membership',exact:true}).count(),1);
+  await page.setViewportSize({width:1440,height:900});
+  await page.screenshot({path:'artifacts/ui-patreon-page-elite-desktop.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+
   // Password auth keeps a separate activation marker through account auth and Patreon OAuth.
   await reset();
   await page.goto(base+'/?patreon=activate');

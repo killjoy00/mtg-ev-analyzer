@@ -371,7 +371,7 @@ for (const provider of ['email', 'Google', 'Apple']) {
         await h.resume();
         assert.equal(h.root.root.findAll((node) => node.type === 'TextInput' && node.props.accessibilityLabel === 'Email')[0].props.value, 'qa@example.invalid');
         await h.press('Sign in');
-      } else await h.press(`Continue with ${provider}`);
+      } else await h.press(`Sign in with ${provider}`);
       assert.match(h.text(), /Play this run and compare/);
       assert.ok(h.button('Play or resume this run'));
       assert.equal(h.count('start'), 0);

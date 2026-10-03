@@ -150,7 +150,7 @@ async function api(path,{method='GET',body,auth=true,authSession=null}={}) {
   if(authSession)headers.set('x-pack1-auth-session',authSession);
   const response=await fetch(`${baseUrl()}${path}`,{method,headers,body:body===undefined?undefined:JSON.stringify(body),keepalive:path==='/v1/events'});
   const data=await response.json().catch(()=>({}));
-  if(!response.ok)throw Object.assign(new Error(data.error||`Pack 1 API failed (${response.status}).`),{status:response.status});
+  if(!response.ok)throw Object.assign(new Error(data.error||`Pack 1 API failed (${response.status}).`),{status:response.status,code:data.code||null});
   return data;
 }
 
@@ -497,6 +497,29 @@ export async function startGoogleSignIn() {
   try {target=new URL(String(data?.url||''));} catch {}
   if(!target||target.protocol!=='https:')throw new Error('Google sign in is temporarily unavailable.');
   location.assign(target.toString());
+}
+
+export async function completeEmailVerification() {
+  if(!firstPartyAuthEnabled())return getAuthSession();
+  await ensurePackSession();
+  const provider=authBase();
+  if(!/^https:\/\//.test(provider))throw new Error('Email verification is temporarily unavailable.');
+  const verifier=new URL(location.href).searchParams.get('neon_auth_session_verifier');
+  const suffix=verifier?'?neon_auth_session_verifier='+encodeURIComponent(verifier):'';
+  const sessionResponse=await fetch(provider+'/get-session'+suffix,{
+    credentials:'include',
+    headers:{accept:'application/json'},
+  });
+  const data=await sessionResponse.json().catch(()=>({}));
+  if(sessionResponse.status===401||sessionResponse.status===403||!data?.session?.token||!data?.user)return null;
+  if(!sessionResponse.ok)throw new Error(data.message||data.error||'Email verification could not establish your account session.');
+  await raw('/v1/account/migrate',{
+    method:'POST',
+    body:{},
+    headers:new Headers({'content-type':'application/json','x-pack1-auth-session':data.session.token}),
+  });
+  clearLegacyAuth();
+  return {user:data.user,session:data.session};
 }
 
 export async function completeGoogleSignIn() {

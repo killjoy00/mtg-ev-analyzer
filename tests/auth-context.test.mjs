@@ -8,7 +8,7 @@ const [growth,draft]=await Promise.all([
 ]);
 
 test('account access renders one contextual email mode with explicit Google continue copy',()=>{
-  assert.match(growth,/Continue with Google/);
+  assert.match(growth,/\$\{providerVerb\} with Google/);
   const render=growth.slice(growth.indexOf('export async function renderAccount'),growth.indexOf('function shareCompletedAnalytics'));
   assert.doesNotMatch(render,/account-columns/,'auth screen must not render both email columns');
   assert.match(render,/validatingDaily\|\|upgradingElite\|\|activatingPatreon\?'signup':'signin'/);

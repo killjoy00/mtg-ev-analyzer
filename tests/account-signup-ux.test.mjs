@@ -59,3 +59,30 @@ test('web signed-in auth callbacks route newly claimed accounts through account-
   assert.match(growth,/Optional\. Choose a display name if you want to join Daily leaderboards\./);
   assert.match(growth,/input\?\.addEventListener\('input',\(\)=>\{if\(status\)status\.textContent=''\;\}\)/);
 });
+
+
+test('create-account provider labels and consent are mode-specific across web and native',()=>{
+  assert.match(growth,/const providerVerb=authMode==='signup'\?'Create':'Sign in'/);
+  assert.match(growth,/\$\{providerVerb\} with Apple/);
+  assert.match(growth,/\$\{providerVerb\} with Google/);
+  assert.match(growth,/By creating an account, you agree to the <a href="https:\/\/packone\.pro\/terms\/">Pack One Terms<\/a>\./);
+  assert.doesNotMatch(growth,/By continuing, you agree to the <a href="\/terms\/">Pack One Terms/);
+
+  assert.match(mobileScreen,/AppleAuthenticationButtonType\.SIGN_UP/);
+  assert.match(mobileScreen,/AppleAuthenticationButtonType\.SIGN_IN/);
+  assert.match(mobileScreen,/mode === 'signup' \? 'Create with Google' : 'Sign in with Google'/);
+  assert.match(mobileScreen,/mode === 'signup' \? 'Create with Apple' : 'Sign in with Apple'/);
+  assert.match(mobileScreen,/By creating an account, you agree to the Pack One Terms\./);
+  assert.match(mobileScreen,/https:\/\/packone\.pro\/terms\//);
+  assert.doesNotMatch(mobileScreen,/By continuing, you agree to the Pack One Terms/);
+});
+
+test('mobile verification returns through the app handoff while web uses authenticated onboarding',()=>{
+  assert.match(worker,/callbackURL:ACCOUNT_RETURN\+'\?auth=verify&native=1'/);
+  assert.match(worker,/callbackURL:ACCOUNT_RETURN\+'\?auth=verify'\+\(mobile\?'&native=1':''\)/);
+  assert.match(growth,/completeEmailVerification/);
+  assert.match(growth,/Your email is verified\./);
+  assert.match(growth,/packone:\/\/account\?emailVerified=1/);
+  assert.match(mobileScreen,/verificationReturnHandled/);
+  assert.match(mobileScreen,/Email verified\. Finishing your account/);
+});

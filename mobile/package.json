@@ -17,7 +17,7 @@
     "test:shared-run-storage": "node --test ./tests/shared-run-storage.test.cjs",
     "test:shared-run-screen": "node --test ./tests/shared-run-screen.test.cjs ./tests/shared-run-home-resume.test.cjs",
     "test:membership": "node --test ./tests/membership.test.cjs",
-    "test:profiles": "node --test ./tests/public-profile-api.test.cjs ./tests/profile-browsing.test.cjs",
+    "test:profiles": "node --test ./tests/public-profile-api.test.cjs ./tests/profile-browsing.test.cjs ./tests/account-profile-save.test.cjs",
     "test:activity": "node --test ./tests/profile-activity.test.cjs ./tests/profile-activity-screen.test.cjs",
     "test:screenshots": "node --test ./tests/store-screenshot-contract.test.cjs",
     "test:ci-scope": "node --test ./tests/native-ci-scope.test.mjs ./tests/gradle-cache-key.test.mjs"

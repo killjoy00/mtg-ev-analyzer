@@ -273,7 +273,23 @@ test('Career retains loaded same-account data through a transient refresh failur
 
 test('Career sign-out notifications immediately remove private data', async (t) => {
   const f = await fixture(t, { privateView: true }); await f.signOut();
-  assert.match(f.text(), /Sign in to see your full career/); assert.doesNotMatch(f.text(), /Private Alice/); assert.equal(f.rows().length, 0);
+  assert.match(f.text(), /Welcome to My Pack One/); assert.match(f.text(), /Play Daily/); assert.doesNotMatch(f.text(), /Private Alice/); assert.equal(f.rows().length, 0);
+});
+
+test('first-time signed-in Career leads with Play Daily instead of zero metrics and empty sections', async (t) => {
+  const zero = profile(KEY_A, true);
+  zero.summary = { ...zero.summary, games:0, average_score:0, best_score:0, challenge_wins:0, challenge_losses:0, current_streak:0 };
+  zero.recent = [];
+  zero.daily_history = [];
+  zero.by_set = [];
+  zero.by_mode = [];
+  zero.achievements = [];
+  const f = await fixture(t, { privateView:true, privateProfile:()=>zero, privateHistory:()=>({rows:[],next_cursor:null}) });
+  assert.match(f.text(), /Start with today.s Daily/);
+  assert.match(f.text(), /Your real scores, streaks, environments, achievements, and history will appear here after you play/);
+  assert.doesNotMatch(f.text(), /0\.0 average|Recent Games|Share my record/);
+  await f.press('Play Daily');
+  assert.equal(f.pushes.at(-1),'/');
 });
 
 test('a late initial A result cannot replace B after a session change', async (t) => {
