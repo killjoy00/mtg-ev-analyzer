@@ -423,13 +423,18 @@ def select_import_sets(sources, requested='all', allow_historical_frozen=False):
 
 
 def classify_source_schema(header, sid):
-    required = {'expansion','event_type','draft_id','draft_time','rank','event_match_wins','pack_number','pick_number'}
-    if not required.issubset(header):
+    modern_required = {'expansion','event_type','draft_id','draft_time','rank','event_match_wins','pack_number','pick_number'}
+    legacy_required = {'event_type','draft_id','event_match_wins','pack_number','pick_number'}
+    # MID/VOW predate the modern draft-data identity/skill columns. Their
+    # qualification rank and experience are intentionally joined from each
+    # draft's earliest game row below, so requiring draft_time/expansion/rank
+    # here rejects the exact frozen legacy sources before that reviewed join.
+    if sid in LEGACY_SCHEMA_SETS and legacy_required.issubset(header):
+        return 'premier-historical-arena-rank-v1'
+    if not modern_required.issubset(header):
         raise ValueError(f'{sid}: unknown Draft schema; required identity/outcome columns missing')
     if {'user_n_games_bucket','user_game_win_rate_bucket'}.issubset(header):
         return 'premier-modern-skill-buckets-v1'
-    if sid in LEGACY_SCHEMA_SETS:
-        return 'premier-historical-arena-rank-v1'
     raise ValueError(f'{sid}: unknown Draft schema; modern skill columns missing and legacy mode is not allowed')
 
 def source_snapshot_identity(sid, schema_version, source, skill_source):
