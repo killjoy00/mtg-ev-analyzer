@@ -173,13 +173,15 @@ try {
   assert.equal(await page.locator('#profile-stats-tab').getAttribute('aria-selected'),'true');
   assert.equal(await page.locator('#profile-account-panel').isHidden(),true);
 
-  const catalogTotal = await page.evaluate(async () => {
+  const catalogIds = await page.evaluate(async () => {
     const response = await fetch('/data/catalog.json', { cache:'no-store' });
     const data = await response.json();
-    return (data.sets || []).filter((entry) => entry?.id && !entry.is_fixture).length;
+    return (data.sets || []).filter((entry) => entry?.id && !entry.is_fixture).map((entry) => entry.id);
   });
+  const catalogTotal = catalogIds.length;
+  const activePlayed = fixture.by_set.filter((row) => catalogIds.includes(row.set_id)).length;
   assert.equal(await page.locator('.my-archive-item').count(), catalogTotal, 'My Pack One archive must follow the production catalog dynamically');
-  assert.match((await page.locator('.my-archive-summary').textContent()) || '', new RegExp(`6/${catalogTotal}\\s*environments played`));
+  assert.match((await page.locator('.my-archive-summary').textContent()) || '', new RegExp(`${activePlayed}/${catalogTotal}\\s*environments played`));
   assert.equal(await page.locator('[data-environment-id="powered-cube"].is-played').count(), 1, 'Powered Cube must be part of archive progression');
   assert.match((await page.locator('.my-daily-preview li').first().textContent()) || '', /Top 7%/i);
   assert.match((await page.locator('.my-daily-preview li').first().textContent()) || '', /NEO/i);
