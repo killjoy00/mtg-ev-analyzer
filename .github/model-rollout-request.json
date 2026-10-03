@@ -1,11 +1,7 @@
 {
-  "operation": "v5-corpus-release",
-  "request_id": "v5-v9-development-selector-acceptance-20261003",
-  "reason": "Owner-authorized #889 recovery after activation 37147670630 completed all publication/readiness and serving-quality gates but found retained baseline copies decrementing active Cube counts. Reverify the identical fully published candidate with the corrected descendant runtime, all history checks and full quality gates; do not publish or mutate pointers again.",
+  "operation": "deploy",
+  "request_id": "v5-v9-development-runtime-20261003",
   "target": "development",
-  "action": "verify-active",
-  "candidate_run_id": "37132557406",
-  "release_commit": "3ce9fc14263b682cba04c62fe6e6423e1282ead5",
-  "stage_run_id": "37146043862",
-  "bridge_commit": "c7e90fe333395bcb3f7468744c943c20a7231978"
+  "commit": "3ce9fc14263b682cba04c62fe6e6423e1282ead5",
+  "reason": "Owner-authorized #889. Deploy corrected exact v5 runtime only after full read-only development acceptance 37153281899 passes. Require exact markers, all three Daily flows and complete account-linked Practice acceptance."
 }
