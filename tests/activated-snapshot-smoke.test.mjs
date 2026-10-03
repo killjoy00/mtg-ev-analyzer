@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import modelVersions from '../model-versions.json' with {type:'json'};
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {loadActivatedEnvironment,assertFromActiveSnapshot,runActivatedSnapshotSmoke,loadRecentActivations,runRecentActivationSmokes,verifyMixedOnlySnapshot} from '../scripts/activated-snapshot-smoke.mjs';
 
@@ -27,7 +28,7 @@ test('first-class snapshots expect their own ID on puzzles; historical ones expe
 });
 
 test('mixed-only inheritance requires a recorded v8 historical to v9 cutover',async()=>{
- const inherited={...live,corpus_version:DRAFT_RUN_CORPUS_VERSION,previous_corpus_version:'elite-trophy-colour-stage-v8',previous_schema_version:'historical-frozen'};
+ const inherited={...live,corpus_version:DRAFT_RUN_CORPUS_VERSION,previous_corpus_version:modelVersions.v4.corpus_version,previous_schema_version:'historical-frozen'};
  assert.equal((await loadActivatedEnvironment(environment(inherited),'fra')).legacy_coverage_parent,true);
  for(const change of [{previous_corpus_version:DRAFT_RUN_CORPUS_VERSION},{previous_schema_version:'premier-modern-skill-buckets-v1'},{previous_corpus_version:null}])
   assert.equal((await loadActivatedEnvironment(environment({...inherited,...change}),'fra')).legacy_coverage_parent,false);
