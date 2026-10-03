@@ -62,6 +62,20 @@ fixtureStage='analyze-fixtures';
 await query('ANALYZE scores');await query('ANALYZE players');await query('ANALYZE account_links');
 fixtureStage='ensure-daily-schedules';
 for(const environment of ['mixed','powered-cube','latest'])await ensureDailySchedule(query,today,environment);
+fixtureStage='inspect-serving-readiness';
+const readinessBefore=(await query(`SELECT r.revision::text current_revision,
+  k.id::text key_id,j.id::text job_id,j.revision::text job_revision,j.state,
+  j.cache_snapshot_id::text cache_snapshot_id
+  FROM draft_run_serving_revision r
+  LEFT JOIN draft_run_readiness_keys k ON k.corpus_version=$1
+    AND k.difficulty_version='support-ratio-v1'
+    AND k.serving_policy_version='trophy-implied-score-20-v1'
+    AND k.cache_schema='serving-cache-v1'
+  LEFT JOIN draft_run_readiness_jobs j ON j.key_id=k.id AND j.revision=r.revision
+  WHERE r.singleton`,[DRAFT_RUN_CORPUS_VERSION])).rows[0];
+console.log(JSON.stringify({fixture:'serving-readiness-before-load',...readinessBefore}));
+fixtureStage='warm-serving-snapshot';
+await loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION,{readiness:true});
 fixtureStage='load-serving-snapshot';
 await loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION);
 fixtureStage='load-custom-set-metadata';
