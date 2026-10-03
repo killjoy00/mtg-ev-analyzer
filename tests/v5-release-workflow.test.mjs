@@ -73,6 +73,10 @@ test('v5 recovery runs full acceptance and records separate environment and fina
  assert.ok(assemble>=0&&admission>assemble&&validation>admission&&upload>validation);
  assert.match(rebuild.slice(validation,upload),/npm test/);
  assert.match(rebuild,/environment_commit/);assert.match(rebuild,/cube_admission_sha256/);
+ const replay=rebuild.slice(rebuild.indexOf('Verify every new replay byte against versioned R2'),rebuild.indexOf('Preserve exact validated artifacts and reviewed QA'));
+ assert.match(replay,/REPLAY_MODEL_VERSION=strong-player-colour-stage-v5/);
+ assert.match(replay,/REPLAY_SETS=.*data\/catalog\.json/);
+ assert.doesNotMatch(replay,/Path\('data'\)\.glob/,'retired historical manifests are not active v5 replay inputs');
  assert.match(candidateVerifier,/verifyCubeSessionRerolls/);
  assert.match(candidateVerifier,/Candidate environment provenance differs/);
 });

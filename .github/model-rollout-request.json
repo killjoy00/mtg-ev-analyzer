@@ -1,6 +1,7 @@
 {
   "operation": "rebuild-v5",
-  "request_id": "uncapped-v5-finalize-20261003",
+  "request_id": "uncapped-v5-finalize-20261003-python",
+  "replay_of": "uncapped-v5-finalize-20261003",
   "reuse_run_id": "37097278712",
-  "reason": "Recover finalization from the 30 successful immutable environment artifacts, fix stale model-specific assertions and prove Cube rerolls under complete session exclusions without retraining or changing historical data."
+  "reason": "Retry exact-artifact finalization after all 889 assembled-v9 JavaScript tests passed; explicitly version historical capped Python fixtures, preflight both serving versions, and scope replay verification to the 30 active v5 environments while retaining MID/VOW history. Training code and inputs remain unchanged."
 }

@@ -39,6 +39,7 @@ class DatasetValidationTests(unittest.TestCase):
                         "deck_A": "1", "deck_B": "0",
                     })
             args = argparse.Namespace(
+                model_version="strong-player-colour-stage-v4",
                 input=str(csv_path), output_dir=str(data_dir), catalog=None,
                 expansion="TST", format="PremierDraft", source_date="2026-01-01",
                 minimum_games=100, top_fraction=1.0, max_training_drafts=10,

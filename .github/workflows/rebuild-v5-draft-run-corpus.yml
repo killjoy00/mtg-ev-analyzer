@@ -85,6 +85,22 @@ jobs:
       - name: Hydrate historical replay shards for the normal repository suite
         run: bash scripts/r2_replay_shards.sh hydrate
       - run: npm test
+      - name: Check Python fixtures against the future serving version before expensive work
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import sys
+          from scripts.set_policy import set_corpus_version
+          from scripts.model_training import V5_CORPUS
+          path=Path('draft-run.mjs')
+          original=path.read_bytes()
+          try:
+              set_corpus_version(V5_CORPUS)
+              subprocess.run([sys.executable,'-m','unittest','discover','-s','tests','-p','test_*.py'],check=True)
+          finally:
+              path.write_bytes(original)
+          PY
 
   environments:
     if: inputs.reuse_run_id == ''
@@ -208,16 +224,21 @@ jobs:
           npm test
       - name: Verify every new replay byte against versioned R2
         run: |
+          export REPLAY_MODEL_VERSION=strong-player-colour-stage-v5
+          REPLAY_SETS="$(python -c 'import json; print(",".join(s["id"] for s in json.load(open("data/catalog.json"))["sets"]))')"
+          export REPLAY_SETS
           bash scripts/r2_replay_shards.sh verify
           mkdir -p generated/v5-r2-readback
           aws s3 sync "s3://$R2_BUCKET/replay-models/strong-player-colour-stage-v5/data/" generated/v5-r2-readback --endpoint-url "$R2_ENDPOINT" --exclude '*' --include '*/shards/*.json'
           python - <<'PY'
+          import json
           from pathlib import Path
           from scripts.v5_rebuild import sha
-          for local in Path('data').glob('*/shards/*.json'):
-              remote=Path('generated/v5-r2-readback')/local.relative_to('data')
-              if not remote.exists() or sha(local)!=sha(remote):
-                  raise SystemExit(f'R2 byte mismatch: {local}')
+          for entry in json.loads(Path('data/catalog.json').read_text())['sets']:
+              for local in (Path('data')/entry['id']/'shards').glob('*.json'):
+                  remote=Path('generated/v5-r2-readback')/local.relative_to('data')
+                  if not remote.exists() or sha(local)!=sha(remote):
+                      raise SystemExit(f'R2 byte mismatch: {local}')
           PY
       - name: Preserve exact validated artifacts and reviewed QA
         run: |
