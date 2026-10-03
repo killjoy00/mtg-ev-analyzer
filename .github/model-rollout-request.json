@@ -1,8 +1,7 @@
 {
   "operation": "deploy",
   "request_id": "v5-v9-development-runtime-restored-20261003",
-  "replay_of": "v5-v9-development-runtime-20261003",
-  "reason": "Owner-authorized #889. After successful development v9 reactivation from rollback successor evidence, redeploy the exact corrected runtime and repeat stable marker, all three Daily, and full account-linked Practice/replay/reroll/persistence acceptance.",
+  "reason": "Owner-authorized #889. After successful development readiness recovery, deploy exact repaired v9 runtime and require stable markers, all three Daily flows, and full account-linked Practice/replay/reroll/completion/persistence acceptance.",
   "target": "development",
-  "commit": "3ce9fc14263b682cba04c62fe6e6423e1282ead5"
+  "commit": "5ef9c9230d83ca6a72210cf50e76c12b3ceb471a"
 }

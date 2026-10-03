@@ -13,6 +13,7 @@
 //   smoke every environment activated (first publication, reactivation or snapshot
 //   switch) within HOURS; reads only status events when there is none.
 import assert from 'node:assert/strict';
+import modelVersions from '../model-versions.json' with {type:'json'};
 import {DRAFT_RUN_CORPUS_VERSION,runPickWindows} from '../draft-run.mjs';
 import {DRAFT_RUN_SELECTION_VERSION} from '../draft-run-policy.mjs';
 import {DRAFT_RUN_DIFFICULTY_VERSION} from '../draft-run-difficulty.mjs';
@@ -29,9 +30,19 @@ const fail=message=>{throw Error('Activated snapshot smoke: '+message);};
 // than treating an absent snapshot as a pass.
 export async function loadActivatedEnvironment(query,setId,expectedSnapshotId=null) {
  const env=(await query(`SELECT p.set_id,p.status,p.regular_run,p.release_date::text release_date,p.active_snapshot_id,
-   s.schema_version,s.lifecycle_status
+   s.schema_version,s.lifecycle_status,s.corpus_version,
+   previous.schema_version previous_schema_version,previous.corpus_version previous_corpus_version
   FROM draft_run_environment_policy p
   LEFT JOIN corpus_source_snapshots s ON s.source_snapshot_id=p.active_snapshot_id
+  LEFT JOIN LATERAL (
+   SELECT old.schema_version,old.corpus_version
+   FROM corpus_status_events event JOIN corpus_source_snapshots old
+    ON old.source_snapshot_id=event.previous_source_snapshot_id
+   WHERE event.set_id=p.set_id AND event.source_snapshot_id=p.active_snapshot_id
+    AND event.old_status='Live' AND event.new_status='Live' AND old.set_id=p.set_id
+    AND old.schema_version='historical-frozen' AND old.corpus_version='${modelVersions.v4.corpus_version}'
+   ORDER BY event.changed_at DESC,event.id DESC LIMIT 1
+  ) previous ON true
   WHERE p.set_id=$1`,[setId])).rows[0];
  if(!env)fail(`${setId} has no serving environment.`);
  if(env.status!=='Live')fail(`${setId} is ${env.status}, not Live; activate it before running this smoke.`);
@@ -46,6 +57,9 @@ export async function loadActivatedEnvironment(query,setId,expectedSnapshotId=nu
   release_date:env.release_date,
   active_snapshot_id:env.active_snapshot_id,
   historical,
+  legacy_coverage_parent:env.corpus_version===modelVersions.v5.corpus_version&&
+   env.previous_corpus_version===modelVersions.v4.corpus_version&&
+   env.previous_schema_version==='historical-frozen',
   // Historical rows keep source_snapshot_id NULL behind a frozen metadata snapshot.
   puzzle_snapshot_id:historical?null:env.active_snapshot_id,
  };
@@ -76,6 +90,47 @@ export function assertFromActiveSnapshot(env,picks,snapshots,label) {
  return premier;
 }
 
+// A version-only rebuild must preserve a historical mixed-only capability.
+// Prove the retained bridge also excludes custom Practice, then exercise the
+// rebuilt set through real mixed selection and a comparable pack reroll.
+export async function verifyMixedOnlySnapshot(query,env,cache,{day,seed,readiness=false,
+ selectRun=selectCachedDatabaseRun,selectReroll=selectDatabaseReroll}={}) {
+ assert.ok(env.legacy_coverage_parent,'Mixed-only proof requires a recorded v8 historical cutover');
+ const bridge=await loadServingSnapshot(query,modelVersions.v4.corpus_version,{readiness});
+ assert.equal(String(bridge.revision),String(cache.revision),'Bridge capability proof changed revision');
+ assert.ok(liveRegularSets(bridge.metadata,day).some(s=>s.set_id===env.set_id),'Historical set was not a released mixed environment');
+ assert.equal(customSetsFromSnapshot(bridge,day,[env.set_id]).length,0,'Rebuild removed previously available single-set Practice');
+ await assert.rejects(selectRun(query,DRAFT_RUN_CORPUS_VERSION,seed+':custom-denied','mixed',
+  {setIds:[env.set_id],day,readiness}),cause=>Number(cause.status)===400,'Incomplete coverage must still reject single-set Practice');
+ let practice;
+ for(let attempt=0;attempt<128;attempt++) {
+  const candidate=await selectRun(query,DRAFT_RUN_CORPUS_VERSION,seed+':mixed:'+attempt,'mixed',{day,readiness});
+  assert.equal(String(candidate.servingRevision),String(cache.revision),'Mixed Practice changed revision');
+  assert.deepEqual(candidate.map(p=>Number(p.pick_number)),runPickWindows('mixed').map(w=>w[0]),'Mixed Practice does not follow the run windows');
+  if(candidate.some(p=>p.set_id===env.set_id)){practice=candidate;break;}
+ }
+ assert.ok(practice,`${env.set_id}: rebuilt snapshot was never selected for mixed Practice`);
+ const selected=practice.filter(p=>p.set_id===env.set_id);
+ assertFromActiveSnapshot(env,selected,await puzzleSnapshots(query,selected.map(p=>p.puzzle_id)),'mixed practice');
+ const excludedSources=practice.map(p=>p.source_draft_hash);
+ let reroll,round;
+ for(let i=0;i<practice.length&&!reroll;i++) {
+  if(practice[i].set_id!==env.set_id)continue;
+  const candidate=await selectReroll(query,DRAFT_RUN_CORPUS_VERSION,practice[i],{
+   type:'pack',round:i,seed,environment:'mixed',excludedSources,
+   difficultyVersion:DRAFT_RUN_DIFFICULTY_VERSION,selectionVersion:DRAFT_RUN_SELECTION_VERSION,daily:false,day});
+  if(!candidate)continue;
+  assert.ok(!excludedSources.includes(candidate.source_draft_hash),'Mixed reroll reused a source already in the run');
+  const snapshots=await puzzleSnapshots(query,[candidate.puzzle_id]);
+  if(snapshots.get(candidate.puzzle_id)?.corpus_version!==DRAFT_RUN_CORPUS_VERSION)continue;
+  assertFromActiveSnapshot(env,[candidate],snapshots,'mixed reroll');
+  reroll=candidate;round=i;
+ }
+ assert.ok(reroll,`${env.set_id}: no mixed round produced a comparable Premier pack reroll`);
+ return {practice:{mode:'mixed',single_set_offered:false,legacy_corpus_version:modelVersions.v4.corpus_version,
+  puzzles:practice.map(p=>p.puzzle_id)},reroll:{round,replaced:practice[round].puzzle_id,replacement:reroll.puzzle_id}};
+}
+
 export async function runActivatedSnapshotSmoke(query,{setId,snapshotId=null,day=gameDateKey(),seed=`activation-smoke:${setId}:${day}`,log=console.log,readiness=false,expectedRevision=null}={}) {
  if(!setId)fail('--set is required.');
  const env=await loadActivatedEnvironment(query,setId,snapshotId);
@@ -101,6 +156,8 @@ export async function runActivatedSnapshotSmoke(query,{setId,snapshotId=null,day
  if(!eligible&&env.historical) {
   result.checks.practice={applicable:false,reason:'historical environment is not offered for single-set practice'};
   result.checks.reroll={applicable:false,reason:'no single-set practice run to reroll'};
+ } else if(!eligible&&env.legacy_coverage_parent) {
+  Object.assign(result.checks,await verifyMixedOnlySnapshot(query,env,cache,{day,seed,readiness}));
  } else {
   assert.ok(eligible,`${setId}: not offered for single-set practice (needs P1-P8 medium and hard coverage of at least 16 sources)`);
   const practice=await selectCachedDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,environment,{setIds:cube?[]:[setId],day,readiness});
@@ -174,4 +231,3 @@ export async function runRecentActivationSmokes(query,{hours,day=gameDateKey(),l
  if(failures.length)fail(`${failures.length} of ${activations.length} recent activations failed: ${failures.join('; ')}`);
  return results;
 }
-
