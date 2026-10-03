@@ -82,7 +82,7 @@ try {
  const crossVersion='qa-cross-version-'+tag;
  const bridgeBefore=await loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION);
  const bridgeRevision=await revision();
- const priorEvidenceDay=(await query("SELECT ((clock_timestamp() AT TIME ZONE 'America/Los_Angeles')::date-1)::text day")).rows[0].day;
+ const priorEvidenceDay=(await query("SELECT ((clock_timestamp() AT TIME ZONE 'America/Los_Angeles')::date-1)::text AS evidence_day")).rows[0].evidence_day;
  await query(`UPDATE draft_run_readiness_jobs j SET evidence=jsonb_set(j.evidence,'{day}',to_jsonb($2::text))
    FROM draft_run_readiness_keys k,draft_run_serving_revision rv
    WHERE j.key_id=k.id AND k.corpus_version=$1 AND j.revision=rv.revision AND j.state='ready' AND rv.singleton`,
