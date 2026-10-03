@@ -83,6 +83,11 @@ try {
  const crossVersion='qa-cross-version-'+tag;
  const bridgeBefore=await loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION);
  const bridgeRevision=await revision();
+ const priorEvidenceDay=(await query("SELECT ((clock_timestamp() AT TIME ZONE 'America/Los_Angeles')::date-1)::text day")).rows[0].day;
+ await query(`UPDATE draft_run_readiness_jobs j SET evidence=jsonb_set(j.evidence,'{day}',to_jsonb($2::text))
+   FROM draft_run_readiness_keys k,draft_run_serving_revision rv
+   WHERE j.key_id=k.id AND k.corpus_version=$1 AND j.revision=rv.revision AND j.state='ready' AND rv.singleton`,
+  [DRAFT_RUN_CORPUS_VERSION,priorEvidenceDay]);
  await query(`INSERT INTO corpus_source_snapshots(source_snapshot_id,set_id,event_type,corpus_version,schema_version,importer_identity,model_identity,manifest,lifecycle_status)
   VALUES($1,$2,'PremierDraft',$3,'qa-cross-version-v1','isolated-fixture','future-model',$4::jsonb,'Candidate')`,
  [crossSnapshot,setId,crossVersion,JSON.stringify({fixture:reason,cross_version:true})]);
@@ -92,7 +97,9 @@ try {
  assert.notEqual(bridgedReadiness.revision,bridgeRevision);
  assert.equal(bridgedReadiness.ready,true,JSON.stringify(bridgedReadiness));
  assert.equal(String(bridged.id),String(bridgeBefore.id),'Exact-equivalent bridge should retain the verified cache identity');
+ assert.equal(bridgedReadiness.evidence.day,priorEvidenceDay,'Carry must preserve the original evidence day rather than claim a fresh Daily verification');
  assert.equal(bridgedReadiness.evidence.samples[0].mode,'exact-serving-input-carry-forward');
+ assert.equal(bridgedReadiness.evidence.samples[0].carried_evidence_day,priorEvidenceDay);
  await query('UPDATE draft_run_environment_policy SET active_snapshot_id=$2 WHERE set_id=$1',[setId,original.active_snapshot_id]);
  const restoredBridge=await readServingReadiness(query);
  assert.equal(restoredBridge.ready,true,JSON.stringify(restoredBridge));
