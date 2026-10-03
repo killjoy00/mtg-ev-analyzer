@@ -423,10 +423,14 @@ def select_import_sets(sources, requested='all', allow_historical_frozen=False):
 
 
 def classify_source_schema(header, sid):
-    required = {'expansion','event_type','draft_id','draft_time','rank','event_match_wins','pack_number','pick_number'}
+    # MID/VOW predate the draft-data rank/skill columns. Their rank and prior
+    # games are recovered from the pinned game_data archive before eligibility
+    # is evaluated, so requiring raw draft_data.rank here rejects the authorized
+    # historical schema before that fail-closed join can run.
+    required = {'expansion','event_type','draft_id','draft_time','event_match_wins','pack_number','pick_number'}
     if not required.issubset(header):
         raise ValueError(f'{sid}: unknown Draft schema; required identity/outcome columns missing')
-    if {'user_n_games_bucket','user_game_win_rate_bucket'}.issubset(header):
+    if {'rank','user_n_games_bucket','user_game_win_rate_bucket'}.issubset(header):
         return 'premier-modern-skill-buckets-v1'
     if sid in LEGACY_SCHEMA_SETS:
         return 'premier-historical-arena-rank-v1'
