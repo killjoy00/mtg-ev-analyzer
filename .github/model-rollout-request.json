@@ -1,11 +1,7 @@
 {
-  "operation": "v5-corpus-release",
-  "request_id": "v5-v9-development-activate-20261003",
+  "operation": "deploy",
+  "request_id": "v5-v9-development-runtime-20261003",
   "target": "development",
-  "action": "activate",
-  "candidate_run_id": "37132557406",
-  "release_commit": "f2a6083daecb09f3098c46e29625c51aa41ad217",
-  "stage_run_id": "37146043862",
-  "bridge_commit": "c7e90fe333395bcb3f7468744c943c20a7231978",
-  "reason": "Activate the exact accepted v5/v9 candidate only after development stage 37146043862 and the exact reviewed v8 bridge deployment pass. Reverify staged bytes and preserved history, atomically switch all parent snapshots, build readiness, and publish only eligible Traditional components."
+  "commit": "f2a6083daecb09f3098c46e29625c51aa41ad217",
+  "reason": "Deploy the exact reviewed v5/v9 runtime only after development stage 37146043862, the reviewed v8 bridge, and exact v9 activation all pass. Require schema checks, release markers, all three complete unranked Daily flows and account-linked v5 Practice acceptance before production promotion or rollback rehearsal."
 }
