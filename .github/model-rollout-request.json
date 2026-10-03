@@ -3,5 +3,5 @@
   "request_id": "v5-v9-development-bridge-20261003",
   "target": "development",
   "commit": "c7e90fe333395bcb3f7468744c943c20a7231978",
-  "reason": "Deploy the reviewed v8 bridge after exact v5/v9 development staging passes. Preserve v8 serving while enabling the guarded cross-version pointer transition; require schema checks, exact release markers and complete unranked Daily acceptance before activation."
+  "reason": "Deploy the reviewed v8 bridge after exact v5/v9 development staging run 37144578913 passes. Preserve v8 serving while enabling the guarded cross-version pointer transition; require schema checks, exact release markers and complete unranked Daily acceptance before activation."
 }

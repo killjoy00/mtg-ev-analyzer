@@ -150,6 +150,22 @@ jobs:
 
           if [[ -z "$SETS" && "$pending" -le 0 ]]; then
             echo 'Normal import queue is already complete.'
+            # A reviewed queue/catalog change can finish or retire work while
+            # an older automatic run is still building. Stop only those stale
+            # push runs before they can republish the retired environments.
+            # Explicit workflow_dispatch imports remain independently owned.
+            if [[ "$GITHUB_EVENT_NAME" == push ]]; then
+              mapfile -t stale_runs < <(gh api --paginate \
+                "repos/$GITHUB_REPOSITORY/actions/workflows/build-more-sets.yml/runs?branch=main&event=push&status=in_progress&per_page=100" \
+                --jq '.workflow_runs[].id')
+              for run_id in "${stale_runs[@]}"; do
+                [[ "$run_id" == "$GITHUB_RUN_ID" ]] && continue
+                if ! gh run cancel "$run_id"; then
+                  status=$(gh run view "$run_id" --json status --jq .status)
+                  [[ "$status" == completed ]] || exit 1
+                fi
+              done
+            fi
             exit 0
           fi
 

@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import {DRAFT_RUN_CORPUS_VERSION,V5_CORPUS_VERSION} from '../draft-run.mjs';
 import {DRAFT_RUN_DIFFICULTY_VERSION} from '../draft-run-difficulty.mjs';
 import {corpusDatabase} from './neon-corpus-db.mjs';
+import {corpusLoadCounts} from './corpus-load-counts.mjs';
 
 const query=corpusDatabase(process.argv[2]);
 const baseline=JSON.parse(fs.readFileSync('corpus/draft-run/catalog.json','utf8'));
@@ -24,12 +25,8 @@ if(process.argv.includes('--complete')) {
   const missing=baseline.sets.filter(s=>!HISTORICAL_FROZEN_SETS.has(s.id)&&!bySet.has(s.id)).map(s=>s.id);
   assert.deepEqual(missing,[],'Every non-frozen baseline environment, including Cube, must finish before release');
 }
-const result=await query(`SELECT p.set_id,count(*)::int puzzles,
-  count(*) FILTER(WHERE r.puzzle_id IS NULL)::int unrated,
-  count(*) FILTER(WHERE p.payload->>'corpus_version' IS DISTINCT FROM p.corpus_version)::int wrong_version
-  FROM draft_run_verified_puzzles p LEFT JOIN draft_run_puzzle_ratings r
-    ON r.puzzle_id=p.puzzle_id AND r.difficulty_version=$2
-  WHERE p.corpus_version=$1 GROUP BY p.set_id`,[DRAFT_RUN_CORPUS_VERSION,DRAFT_RUN_DIFFICULTY_VERSION]);
+const result=await corpusLoadCounts(query,DRAFT_RUN_CORPUS_VERSION,DRAFT_RUN_DIFFICULTY_VERSION,
+  counts=>console.log(JSON.stringify({verification_page_scan:true,...counts})));
 const manifests=await query('SELECT set_id,corpus_version,manifest FROM corpus_set_versions WHERE corpus_version=$1',[DRAFT_RUN_CORPUS_VERSION]);
 assert.ok(baseline.sets.every(s=>result.rows.some(r=>r.set_id===s.id)),'Every baseline environment must remain present');
 assert.ok(result.rows.every(r=>manifests.rows.some(m=>m.set_id===r.set_id)),'Every retained environment must have a versioned manifest');
