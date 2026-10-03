@@ -42,6 +42,10 @@ async function main() {
       LEFT JOIN corpus_source_snapshots s ON s.source_snapshot_id=p.active_snapshot_id
       WHERE p.set_id=ANY($1::text[]) ORDER BY p.set_id`,[pgArray])).rows;
     if(environment.length!==sets.length)throw Error('Release candidate environments are missing from policy.');
+    for(const row of environment) {
+      if(row.active_corpus_version!==modelVersions.v4.corpus_version||row.active_schema_version!=='historical-frozen')
+        throw Error(`${row.set_id}: stage requires the captured v8 historical-frozen rollback parent, found ${row.active_corpus_version||'none'}/${row.active_schema_version||'none'}.`);
+    }
     const state=(await query(`SELECT
       (SELECT revision::text FROM draft_run_serving_revision WHERE singleton) serving_revision,
       (SELECT coalesce(md5(string_agg(v.set_id||':'||md5(v.manifest::text),',' ORDER BY v.set_id)),'')
