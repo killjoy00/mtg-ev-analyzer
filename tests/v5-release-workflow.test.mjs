@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {assertHistoryPreserved} from '../scripts/v5-release-state.mjs';
 
 const workflow=fs.readFileSync(new URL('../.github/workflows/release-v5-corpus.yml',import.meta.url),'utf8');
 const deployWorkflow=fs.readFileSync(new URL('../.github/workflows/deploy-functions.yml',import.meta.url),'utf8');
@@ -17,6 +18,45 @@ test('v5 stage loads the exact rebuilt baseline before Premier additions',()=>{
 
 test('v5 readiness records the exact reviewed release commit',()=>{
   assert.match(workflow,/PACK1_RELEASE_COMMIT:\s*\$\{\{ inputs\.release_commit \}\}/);
+});
+
+test('rollback emits successor stage evidence only after proving restored pointers and history',()=>{
+  const rollback=workflow.slice(workflow.indexOf('Roll back to captured v8 pointers after bridge redeploy'));
+  const restored=rollback.indexOf('capture generated/v5-candidate generated/v5-rollback-restored.json');
+  const compare=rollback.indexOf('assert.deepEqual(restored[key],before[key]');
+  const history=rollback.indexOf('assertHistoryPreserved(before.history,restored.history)');
+  const successor=rollback.indexOf("fs.copyFileSync('generated/v5-rollback-restored.json'");
+  assert.ok(restored>=0&&compare>restored&&history>compare&&successor>history);
+  assert.match(rollback,/BigInt\(restored\.serving_revision\)>BigInt\(before\.serving_revision\)/);
+  assert.match(rollback,/preceding_stage_run_id:process\.env\.STAGE_RUN_ID/);
+  assert.match(rollback,/inputs\.action == 'stage' \|\| inputs\.action == 'rollback'/);
+});
+
+test('rollback evidence rejects changed history, pointers and stale revisions before writing a successor',()=>{
+  const rollback=workflow.slice(workflow.indexOf('Roll back to captured v8 pointers after bridge redeploy'));
+  const block=rollback.match(/node --input-type=module - <<'NODE'\n([\s\S]*?)\n          NODE/)[1];
+  const execute=new Function('fs','assert','assertHistoryPreserved','process',block.replace(/^\s*import .*;$/gm,''));
+  const before={sets:['hob'],environment:[{set_id:'hob',active_snapshot_id:'v8'}],
+    v8_manifest_hash:'same',serving_revision:'12',history:{scores:[{fingerprint:'score',n:1}]}};
+  function run(restored) {
+    const writes=[];
+    const memory={readFileSync:p=>JSON.stringify(p.endsWith('v5-release-baseline.json')?before:restored),
+      copyFileSync:(...args)=>writes.push(args),writeFileSync:(...args)=>writes.push(args)};
+    let error;
+    try { execute(memory,assert,assertHistoryPreserved,{env:{TARGET:'development',CANDIDATE_RUN_ID:'10000',RELEASE_COMMIT:'release',GITHUB_RUN_ID:'20000',STAGE_RUN_ID:'15000'}}); }
+    catch(e){error=e;}
+    return {writes,error};
+  }
+  const restored={...before,serving_revision:'20'};
+  const accepted=run(restored);
+  assert.equal(accepted.error,undefined);
+  assert.equal(accepted.writes.length,2);
+  assert.equal(JSON.parse(accepted.writes[1][1]).preceding_stage_run_id,'15000');
+  for(const change of [{serving_revision:'12'},{serving_revision:'bad'},{environment:[]},{v8_manifest_hash:'changed'},{history:{}}]) {
+    const rejected=run({...restored,...change});
+    assert.ok(rejected.error);
+    assert.deepEqual(rejected.writes,[]);
+  }
 });
 
 test('v5 stage stays non-serving until the explicit activation action',()=>{
