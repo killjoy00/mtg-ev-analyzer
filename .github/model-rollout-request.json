@@ -1,7 +1,9 @@
 {
-  "operation": "deploy",
-  "request_id": "v5-v9-development-runtime-20261003",
-  "target": "development",
-  "commit": "f2a6083daecb09f3098c46e29625c51aa41ad217",
-  "reason": "Deploy the exact reviewed v5/v9 runtime only after development stage 37146043862, the reviewed v8 bridge, and exact v9 activation all pass. Require schema checks, release markers, all three complete unranked Daily flows and account-linked v5 Practice acceptance before production promotion or rollback rehearsal."
+  "operation": "v5-corpus-release",
+  "request_id": "v5-v9-production-stage-20261003",
+  "target": "production",
+  "action": "stage",
+  "candidate_run_id": "37132557406",
+  "release_commit": "f2a6083daecb09f3098c46e29625c51aa41ad217",
+  "reason": "Stage the exact accepted v5/v9 candidate in production only after development activation and full exact-runtime Daily and Practice acceptance pass. Preserve existing v8 serving pointers, readiness and history, and require exact artifact, health, canary, count, rating and preservation evidence before any production bridge or activation."
 }
