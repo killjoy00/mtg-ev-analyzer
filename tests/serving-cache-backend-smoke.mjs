@@ -50,12 +50,12 @@ INSERT INTO draft_run_verified_puzzles(
   puzzle_id,set_id,source_draft_hash,corpus_version,pick_number,candidate_count,
   consensus_top_gap,support_entropy,interesting,payload,pack_number,source_snapshot_id
 )
-SELECT 'qa-'||substr($1,1,8)||'-'||p.puzzle_id,p.set_id,md5($1||p.source_draft_hash),
+SELECT 'qa-'||substr($1,1,8)||'-'||p.puzzle_id,p.set_id,p.source_draft_hash,
   p.corpus_version,p.pick_number,p.candidate_count,p.consensus_top_gap,p.support_entropy,p.interesting,
   p.payload || jsonb_build_object(
     'puzzle_id','qa-'||substr($1,1,8)||'-'||p.puzzle_id,
     'source_snapshot_id',$1,
-    'source_draft_hash',md5($1||p.source_draft_hash)
+    'source_draft_hash',p.source_draft_hash
   ),
   p.pack_number,$1
 FROM draft_run_verified_puzzles p
@@ -73,6 +73,16 @@ const activated=await loadServingSnapshot(query,version);
 assert.notEqual(activated.id,snapshot.id,'activation publishes a new serving-cache generation');
 const selected=await selectCachedDatabaseRun(query,version,'snapshot-activation-'+stageSet,'mixed',{setIds:[stageSet]});
 assert.equal(selected.length,8);
+// Retained baseline rows intentionally share source hashes with the active
+// snapshot. They must not be subtracted from counts of active candidates.
+for(const seed of ['snapshot-overlap-a','snapshot-overlap-b','snapshot-overlap-c','snapshot-overlap-d']) {
+  const options={setIds:[stageSet]};
+  const expected=await selectCachedDatabaseRun(query,version,seed,'mixed',options);
+  const live=await selectDatabaseRun(query,version,seed,'mixed',options);
+  const snapshotBaseline=await selectCachedDatabaseRun(query,version,seed,'mixed',{...options,batched:false});
+  assert.deepEqual(live.map(p=>p.puzzle_id),expected.map(p=>p.puzzle_id),'retained copies do not decrement live candidate counts');
+  assert.deepEqual(snapshotBaseline.map(p=>p.puzzle_id),expected.map(p=>p.puzzle_id),'snapshot counts use only that snapshot inventory');
+}
 const selectedSources=(await query(`SELECT
  count(*) FILTER(WHERE p.corpus_version=$3)::int parent,
  count(*) FILTER(WHERE p.corpus_version=$3 AND p.source_snapshot_id=$1)::int active_parent,

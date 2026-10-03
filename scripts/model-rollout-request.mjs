@@ -31,7 +31,7 @@ export function rolloutDispatch(request) {
     if(!['development','production'].includes(target)||!['stage','publish'].includes(action)||!['powered-cube','regular-study','regular-phase2'].includes(source))throw Error('Invalid source release request.');
     workflow='publish-puzzle-components.yml';inputs={target,action,source};extra=['target','action','source'];
   } else if(operation==='v5-corpus-release') {
-    if(!['development','production'].includes(target)||!['stage','activate','rollback'].includes(action)||
+    if(!['development','production'].includes(target)||!['stage','activate','rollback','verify-active'].includes(action)||
        !/^[1-9][0-9]{4,20}$/.test(String(candidate_run_id||''))||!/^[a-f0-9]{40}$/.test(release_commit||''))throw Error('Invalid v5 corpus release request.');
     inputs={target,action,candidate_run_id:String(candidate_run_id),release_commit};extra=['target','action','candidate_run_id','release_commit'];
     if(action!=='stage') {

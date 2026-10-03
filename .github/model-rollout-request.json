@@ -2,6 +2,6 @@
   "operation": "deploy",
   "request_id": "v5-v9-development-runtime-20261003",
   "target": "development",
-  "commit": "f2a6083daecb09f3098c46e29625c51aa41ad217",
-  "reason": "Deploy the exact reviewed v5/v9 runtime only after development stage 37146043862, the reviewed v8 bridge, and exact v9 activation all pass. Require schema checks, release markers, all three complete unranked Daily flows and account-linked v5 Practice acceptance before production promotion or rollback rehearsal."
+  "commit": "3ce9fc14263b682cba04c62fe6e6423e1282ead5",
+  "reason": "Owner-authorized #889. Deploy corrected exact v5 runtime only after full read-only development acceptance 37153281899 passes. Require exact markers, all three Daily flows and complete account-linked Practice acceptance."
 }
