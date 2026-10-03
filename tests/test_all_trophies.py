@@ -84,6 +84,14 @@ class FullTrophyTests(unittest.TestCase):
         self.assertEqual(classify_source_schema(base,'stx'),'premier-historical-arena-rank-v1')
         self.assertEqual(classify_source_schema(base+['user_n_games_bucket','user_game_win_rate_bucket'],'fra'),'premier-modern-skill-buckets-v1')
 
+        # MID/VOW get rank and prior-games evidence from their pinned game_data
+        # archive. Their raw draft archive must not be rejected before that join.
+        legacy_without_rank=[column for column in base if column!='rank']
+        for sid in ('mid','vow'):
+            self.assertEqual(classify_source_schema(legacy_without_rank,sid),'premier-historical-arena-rank-v1')
+        with self.assertRaisesRegex(ValueError,'unknown Draft schema'):
+            classify_source_schema(legacy_without_rank,'fra')
+
     def test_source_snapshot_identity_changes_with_either_source(self):
         draft={'sha256':'a'*64};game={'sha256':'b'*64}
         first=source_snapshot_identity('fra','premier-modern-skill-buckets-v1',draft,game)
