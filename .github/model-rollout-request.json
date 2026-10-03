@@ -1,7 +1,9 @@
 {
-  "operation": "deploy",
-  "request_id": "v5-v9-development-runtime-restored-20261003",
-  "reason": "Owner-authorized #889. After successful development readiness recovery, deploy exact repaired v9 runtime and require stable markers, all three Daily flows, and full account-linked Practice/replay/reroll/completion/persistence acceptance.",
-  "target": "development",
-  "commit": "5ef9c9230d83ca6a72210cf50e76c12b3ceb471a"
+  "operation": "v5-corpus-release",
+  "request_id": "v5-v9-production-restage-repaired-20261003",
+  "reason": "Owner-authorized #889. Retain the original production history baseline and immutable candidate, and refresh non-serving production stage evidence for the repaired exact runtime after complete development recovery and runtime acceptance. Preserve all v8 pointers, historical rows and Candidate publication state.",
+  "target": "production",
+  "action": "stage",
+  "candidate_run_id": "37132557406",
+  "release_commit": "5ef9c9230d83ca6a72210cf50e76c12b3ceb471a"
 }
