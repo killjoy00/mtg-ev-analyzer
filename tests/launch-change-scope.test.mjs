@@ -78,3 +78,16 @@ test('production-like load harnesses replay current serving schema before verifi
     assert.ok(i42>=0&&i43>i42&&i44>i43&&i48>i44&&i49>i48&&verify>i49,path);
   }
 });
+
+
+test('production-like load harnesses warm readiness before fixture generation',()=>{
+  for(const path of ['.github/workflows/launch-load.yml','.github/workflows/launch-distributed.yml']){
+    const workflow=fs.readFileSync(path,'utf8');
+    const verify=workflow.indexOf('node scripts/verify-neon-schema.mjs');
+    const warm=workflow.indexOf('node scripts/warm-practice-cache.mjs');
+    const fixture=workflow.indexOf('launch-load-fixtures.mjs')>=0
+      ?workflow.indexOf('launch-load-fixtures.mjs')
+      :workflow.indexOf('launch-distributed-fixtures.mjs');
+    assert.ok(verify>=0&&warm>verify&&fixture>warm,path);
+  }
+});
