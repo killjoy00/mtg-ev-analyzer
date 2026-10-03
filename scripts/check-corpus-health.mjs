@@ -12,6 +12,7 @@ import {corpusDatabase} from './neon-corpus-db.mjs';
 import {DRAFT_RUN_CORPUS_VERSION,validateDraftRunPuzzle,interestingDraftRunPuzzle,runPickWindows} from '../draft-run.mjs';
 import catalog from '../corpus/draft-run/catalog.json' with {type:'json'};
 import {corpusGates} from '../corpus-quality.mjs';
+import {corpusHealthPicks} from './corpus-health-picks.mjs';
 const query=corpusDatabase(process.argv[2]);
 const frozenAudit=validateAudit(JSON.parse(fs.readFileSync('results/rebuild-2026-09-18/frozen-premier-outcomes.json')));
 const rawArgs=process.argv.slice(3),requested=[],parse=x=>typeof x==='string'?JSON.parse(x):x;
@@ -66,7 +67,7 @@ FROM wanted_first_class s
 ORDER BY set_id,source_snapshot_id NULLS FIRST`,[DRAFT_RUN_CORPUS_VERSION])).rows.filter(s=>!requested.length||requested.includes(s.set_id));
 }
 for(const s of sets) {
- const manifest=parse(s.manifest),f=manifest.full_import||{},windows=runPickWindows(s.set_id==='powered-cube'?'powered-cube':'mixed'),picks=new Set(windows.map(w=>w[0]));
+ const manifest=parse(s.manifest),f=manifest.full_import||{},picks=new Set(corpusHealthPicks(s.set_id,catalog.sets.find(entry=>entry.id===s.set_id)));
  const historical=s.historical===true||s.historical==='t';
  const puzzleSnapshotId=historical?null:(s.source_snapshot_id||null);
  const groups=(await query(`SELECT p.pick_number,r.band,count(DISTINCT p.source_draft_hash)::int sources FROM draft_run_verified_puzzles p JOIN draft_run_puzzle_ratings r USING(puzzle_id) WHERE p.set_id=$1 AND p.corpus_version=$2 AND p.source_snapshot_id IS NOT DISTINCT FROM $3::text AND p.interesting AND ${SERVING_QUALITY_SQL} AND NOT EXISTS(SELECT 1 FROM corpus_source_exclusions x WHERE x.set_id=p.set_id AND x.corpus_version=p.corpus_version AND x.source_draft_hash=p.source_draft_hash) AND r.difficulty_version='support-ratio-v1' GROUP BY p.pick_number,r.band`,[s.set_id,DRAFT_RUN_CORPUS_VERSION,puzzleSnapshotId])).rows;
@@ -96,7 +97,7 @@ for(const s of sets) {
   }
  }
  const metrics={archiveValid:Boolean(f.source_archive?.sha256&&f.input_signature&&(f.schema_verified||sourceAuditMatches)),versionValid:f.corpus_version===DRAFT_RUN_CORPUS_VERSION&&f.model_version===catalog.model_version,qualifiedTrophies:Number(ledger.qualified),usablePuzzles:usable,
-  minimumPickBandSources:Math.min(...[...picks].flatMap(p=>['medium','hard'].map(b=>Number(groups.find(g=>Number(g.pick_number)===p&&g.band===b)?.sources||0)))),
+  servedPicks:[...picks],minimumPickBandSources:Math.min(...[...picks].flatMap(p=>['medium','hard'].map(b=>Number(groups.find(g=>Number(g.pick_number)===p&&g.band===b)?.sources||0)))),
   accountingValid:Number(ledger.trophies)===f.source_trophies&&Number(ledger.included)===f.included_trophies&&Number(ledger.qualified)===f.qualified_trophies&&Number(ledger.puzzles)===total&&total===f.total_puzzles,
   servingPolicyVersion:SERVING_POLICY_VERSION,fingerprintVariations:trajectoryAudit.fingerprintVariations(),brokenTrajectories:broken+trajectoryAudit.errors(),excludedDecisions,sourceAudit:sourceAuditMatches?{sourceArchiveSha256:audit.source_archive.sha256,outcomes:audit.approved_outcomes,approvedSources:audit.approved_sources,excludedSources:audit.blocked_sources.length}:null,qualifiedExclusionRate:Number(ledger.qualified)?Number(ledger.qualified_excluded)/Number(ledger.qualified):null,previousQualifiedExclusionRate:parse(previous?.report)?.metrics?.qualifiedExclusionRate,
   metadataCoverage:cards?metadata/cards:0,storedMetadataCoverage:cards?storedMetadata/cards:0,metadataRepairs:metadata-storedMetadata,imageCoverage:cards?images/cards:0,invalidSupport,puzzlesByPick:byPick,totalPuzzles:total,

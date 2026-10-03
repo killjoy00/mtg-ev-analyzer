@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import {corpusDatabase} from './neon-corpus-db.mjs';
 import {DRAFT_RUN_CORPUS_VERSION,gradeDraftRunPick,runPickWindows,validateDraftRunPuzzle} from '../draft-run.mjs';
 import {SERVING_QUALITY_SQL} from '../serving-quality.mjs';
+import {corpusHealthPicks} from './corpus-health-picks.mjs';
+import catalog from '../corpus/draft-run/catalog.json' with {type:'json'};
 
 const query=corpusDatabase(process.argv[2]);
 const snapshots=(await query(`SELECT s.source_snapshot_id,s.set_id
@@ -17,8 +19,7 @@ const snapshots=(await query(`SELECT s.source_snapshot_id,s.set_id
  ORDER BY s.set_id,s.created_at DESC`,[DRAFT_RUN_CORPUS_VERSION])).rows;
 
 for(const snapshot of snapshots) {
-  const windows=runPickWindows(snapshot.set_id==='powered-cube'?'powered-cube':'mixed');
-  const picks=[...new Set(windows.map(window=>Number(window[0])))];
+  const picks=corpusHealthPicks(snapshot.set_id,catalog.sets.find(entry=>entry.id===snapshot.set_id));
   const rows=(await query(`SELECT DISTINCT ON (p.pick_number) p.pick_number,p.payload
     FROM draft_run_verified_puzzles p
     JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'
