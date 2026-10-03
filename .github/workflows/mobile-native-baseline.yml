@@ -1,0 +1,137 @@
+name: Native UX baseline evidence
+on:
+  pull_request:
+    types: [opened, reopened]
+    paths: ['.github/workflows/mobile-native-baseline.yml', 'mobile/scripts/native-baseline-evidence.py']
+permissions:
+  contents: read
+concurrency:
+  group: native-baseline-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+jobs:
+  android:
+    name: reproduce original feedback on Android
+    runs-on: ubuntu-latest
+    env:
+      EXPO_PUBLIC_PACKONE_ENV: preview
+      EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES: '1'
+      PACKONE_BUILD_PROFILE: preview
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: 388d9ab045240e0d96a4b1382f140e35fc91d0b4
+      - uses: actions/checkout@v4
+        with:
+          path: acceptance
+      - name: Add measurement only to the unchanged baseline feedback
+        working-directory: .
+        run: python3 acceptance/mobile/scripts/native-baseline-evidence.py instrument
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: mobile/.node-version
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install deterministic mobile dependencies
+        run: |
+          node ./scripts/check-build-toolchain.mjs
+          npm ci --no-audit --no-fund
+      - name: Install Android screenshot image tools
+        shell: bash
+        working-directory: .
+        run: |
+          set -euo pipefail
+          if ! command -v ffmpeg >/dev/null 2>&1 || ! command -v ffprobe >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends ffmpeg
+          fi
+          command -v ffmpeg
+          command -v ffprobe
+          ffmpeg -version | head -n 1
+          ffprobe -version | head -n 1
+      - name: Generate preview Android project
+        env:
+          CI: '1'
+        run: npx expo prebuild --platform android --clean
+      - name: Build installable preview APK
+        working-directory: mobile/android
+        run: ./gradlew :app:assembleRelease --no-daemon
+      - name: Locate preview APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          apk="$(find android/app/build/outputs/apk/release -name '*.apk' -size +1M -print -quit)"
+          test -f "$apk"
+          echo "SCREENSHOT_ANDROID_APK=$GITHUB_WORKSPACE/mobile/$apk" >> "$GITHUB_ENV"
+      - name: Enable KVM for Android emulator when available
+        shell: bash
+        working-directory: .
+        run: |
+          set -euo pipefail
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules || true
+          sudo udevadm trigger --name-match=kvm || true
+          if [[ -e /dev/kvm ]]; then
+            sudo chmod 666 /dev/kvm
+            test -r /dev/kvm
+            test -w /dev/kvm
+            ls -l /dev/kvm
+          else
+            echo "No /dev/kvm exposed on this hosted runner; emulator action may fall back to software acceleration."
+          fi
+      - name: Capture Android screenshots
+        uses: reactivecircus/android-emulator-runner@v2
+        # The action runs each script line through /bin/sh. Keep the Bash
+        # program in one environment value and explicitly invoke Bash once.
+        env:
+          PACKONE_ANDROID_SCREENSHOT_SCRIPT: |
+            set -euo pipefail
+            adb wait-for-device
+            for attempt in 1 2 3 4 5 6; do
+              if adb shell service check package 2>/dev/null | grep -F 'Service package: found' >/dev/null; then
+                break
+              fi
+              if [[ "$attempt" == 6 ]]; then
+                echo "Android package manager never became ready." >&2
+                exit 1
+              fi
+              sleep 5
+            done
+            installed=0
+            for attempt in 1 2 3; do
+              if adb install -r "$SCREENSHOT_ANDROID_APK"; then
+                installed=1
+                break
+              fi
+              echo "APK install attempt $attempt failed; recovering adb before retry." >&2
+              adb kill-server || true
+              sleep 2
+              adb start-server
+              adb wait-for-device
+              sleep 5
+            done
+            [[ "$installed" == 1 ]]
+            cd mobile
+            python3 "$GITHUB_WORKSPACE/acceptance/mobile/scripts/native-baseline-evidence.py" capture "$GITHUB_WORKSPACE/native-baseline"
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7_pro
+          disable-animations: true
+          emulator-boot-timeout: 900
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: bash -c "$PACKONE_ANDROID_SCREENSHOT_SCRIPT"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pack-one-native-baseline-388d9ab0
+          path: native-baseline
+          if-no-files-found: error
+          retention-days: 30

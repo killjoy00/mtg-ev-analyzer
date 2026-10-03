@@ -49,6 +49,9 @@ function compileScreen(mocks) {
   compiled.paths = Module._nodeModulePaths(path.dirname(filename));
   const originalLoad = Module._load;
   Module._load = function load(request, parent, isMain) {
+    if (request === '@/src/components/Text') return { Text: mocks['react-native'].Text };
+    if (request === '@/src/components/ScreenArea') return { ScreenArea: mocks['react-native-safe-area-context'].SafeAreaView };
+
     if (request === '@/src/config') return { config: { screenshots: { fixtures: false } } };
     if (Object.prototype.hasOwnProperty.call(mocks, request)) return mocks[request];
     return originalLoad.call(this, request, parent, isMain);
@@ -130,7 +133,7 @@ async function fixture(options = {}) {
       router: { push() {}, replace() {} },
       useLocalSearchParams: () => params,
     },
-    'react-native': {
+    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       AccessibilityInfo: { announceForAccessibility() {} },
       ActivityIndicator: host('ActivityIndicator'), Modal: host('Modal'),
       Pressable: host('Pressable'), ScrollView, Share: { share: async () => {} },
@@ -206,7 +209,7 @@ test('reconciliation keeps all server progress but shows the exact recovered rou
     await screen.chooseAndConfirm();
     assert.match(screen.text(), /You chose\s+Card A/);
     assert.doesNotMatch(screen.text(), /You chose\s+Card B/);
-    assert.ok(screen.root.root.findAll((node) => node.type === 'Text' && node.props.children === 88).length);
+    assert.ok(screen.root.root.findAll((node) => node.type === 'Text' && node.props.testID === 'feedback-score' && node.props.children[0] === 88).length);
     const progress = screen.root.root.findAll((node) => node.type === 'View' && node.props.accessibilityRole === 'progressbar')[0];
     assert.equal(progress.props.accessibilityValue.now, 2, 'do not truncate the authoritative run to the recovered round');
   } finally { await screen.close(); }

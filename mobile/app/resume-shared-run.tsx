@@ -1,7 +1,8 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { Text } from '@/src/components/Text';
+import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 
 import { useAppResume } from '@/src/hooks/useAppResume';
 import { readSession, subscribeSession, type MobileSession } from '@/src/storage/session';
@@ -61,7 +62,7 @@ export default function ResumeSharedRunScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.page}>
-        <Text style={styles.title}>Your last shared run</Text>
+        <Text style={styles.title}>Saved shared activity</Text>
         {state === 'loading' ? <><ActivityIndicator /><Text style={styles.body}>Finding your saved run on this device...</Text></> : null}
         {state === 'signin' ? <>
           <Text style={styles.body}>Sign in to the same Pack One account to reopen this device&apos;s saved shared run.</Text>

@@ -6,12 +6,14 @@ on:
     paths:
       - '.github/store-screenshot-request.json'
   workflow_dispatch:
+  pull_request:
+    paths: ['mobile/**', '.github/workflows/mobile-store-screenshots.yml']
 
 permissions:
   contents: read
 
 concurrency:
-  group: mobile-store-screenshots
+  group: mobile-store-screenshots-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -187,7 +189,21 @@ jobs:
       - name: Capture iPad screenshots
         shell: bash
         run: bash ./scripts/capture-store-screenshots-ios.sh '${{ steps.simulators.outputs.ipad_udid }}' ipad "$GITHUB_WORKSPACE/store-screenshots"
+      - name: Capture native iPhone acceptance states
+        if: always() && env.SCREENSHOT_IOS_APP != ''
+        run: python3 ./scripts/native-acceptance.py ios "$GITHUB_WORKSPACE/native-acceptance/iphone" '${{ steps.simulators.outputs.phone_udid }}' iphone
+      - name: Capture native iPad acceptance states
+        if: always() && env.SCREENSHOT_IOS_APP != ''
+        run: python3 ./scripts/native-acceptance.py ios "$GITHUB_WORKSPACE/native-acceptance/ipad" '${{ steps.simulators.outputs.ipad_udid }}' ipad
       - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pack-one-ios-native-acceptance
+          path: native-acceptance
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: pack-one-ios-store-screenshots
           path: store-screenshots
@@ -297,6 +313,7 @@ jobs:
             [[ "$installed" == 1 ]]
             cd mobile
             bash ./scripts/capture-store-screenshots-android.sh "$GITHUB_WORKSPACE/store-screenshots"
+            python3 ./scripts/native-acceptance.py android "$GITHUB_WORKSPACE/native-acceptance"
         with:
           api-level: 35
           target: google_apis
@@ -307,6 +324,14 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: bash -c "$PACKONE_ANDROID_SCREENSHOT_SCRIPT"
       - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pack-one-android-native-acceptance
+          path: native-acceptance
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: pack-one-android-store-screenshots
           path: store-screenshots

@@ -57,6 +57,9 @@ function compileDraftRunScreen(mocks) {
 
   const priorLoad = Module._load;
   Module._load = function load(request, parent, isMain) {
+    if (request === '@/src/components/Text') return { Text: mocks['react-native'].Text };
+    if (request === '@/src/components/ScreenArea') return { ScreenArea: mocks['react-native-safe-area-context'].SafeAreaView };
+
     if (request === '@/src/config') return { config: { screenshots: { fixtures: false } } };
     if (Object.prototype.hasOwnProperty.call(mocks, request)) return mocks[request];
     return priorLoad.call(this, request, parent, isMain);
@@ -152,7 +155,7 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
       router: { push() {}, replace() {} },
       useLocalSearchParams: () => ({ environment: 'mixed' }),
     },
-    'react-native': {
+    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       AccessibilityInfo: { announceForAccessibility() {} },
       ActivityIndicator: host('ActivityIndicator'),
       Modal: host('Modal'),
@@ -278,7 +281,7 @@ test('a committed pick with a lost response is reconciled into feedback', async 
       router: { push() {}, replace() {} },
       useLocalSearchParams: () => ({ environment: 'mixed' }),
     },
-    'react-native': {
+    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       AccessibilityInfo: { announceForAccessibility() {} },
       ActivityIndicator: host('ActivityIndicator'),
       Modal: host('Modal'),

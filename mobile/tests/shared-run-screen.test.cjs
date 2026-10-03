@@ -58,6 +58,8 @@ function compileGraph(mocks) {
     compiled.paths = Module._nodeModulePaths(path.dirname(absolute));
     cache.set(absolute, compiled);
     compiled.require = (request) => {
+      if (request === '@/src/components/Text') return { Text: mocks['react-native'].Text };
+      if (request === '@/src/components/ScreenArea') return { ScreenArea: mocks['react-native-safe-area-context'].SafeAreaView };
       if (Object.prototype.hasOwnProperty.call(mocks, request)) return mocks[request];
       const base = request.startsWith('@/') ? path.join(root, request.slice(2))
         : request.startsWith('.') ? path.resolve(path.dirname(absolute), request) : null;
@@ -163,7 +165,7 @@ async function fixture(options = {}) {
       },
       async deleteItemAsync(key) { store.delete(key); },
     },
-    'react-native': {
+    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       AccessibilityInfo: { announceForAccessibility: (value) => calls.push(['announce', value]) },
       ActivityIndicator: host('ActivityIndicator'),
       Modal: (props) => props.visible ? React.createElement('Modal', props, props.children) : null,
