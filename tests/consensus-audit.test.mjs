@@ -10,11 +10,11 @@ async function loadSet(setId) {
     const payload = JSON.parse(await readFile(shard.path.replace(/^\.\//, ''), 'utf8'));
     replays.push(...(payload.replays || []));
   }
-  return replays;
+  return {manifest,replays};
 }
 
 test('MSH Arc Reactor never looks like a strong opening pick', async () => {
-  const replays = await loadSet('msh');
+  const {manifest,replays} = await loadSet('msh');
   const firstPicks = [];
 
   for (const replay of replays) {
@@ -49,10 +49,24 @@ test('MSH Arc Reactor never looks like a strong opening pick', async () => {
   }));
 
   assert.equal(replays.length, 300);
-  assert.equal(firstPicks.length, 7);
+  assert.ok(firstPicks.length > 0, 'Arc Reactor should remain represented in the pinned MSH replay audit');
   assert.ok(firstPicks.every((item) => item.rank > 1), 'Arc Reactor must never be the model first pick in the current MSH opening-pack archive');
-  assert.ok(highestSupport < 0.10, `Arc Reactor opening-pack support unexpectedly rose to ${(highestSupport * 100).toFixed(1)}%`);
-  assert.ok(secondChoiceCase, 'the known low-support #2 case should remain represented in the audit');
-  assert.ok(secondChoiceCase.pickScore < 20, `a low-support Arc Reactor P1P1 should score as a major disagreement, got ${secondChoiceCase.pickScore}`);
-  assert.ok(secondChoiceCase.bestSupport > 0.75, 'the known #2 case should remain a lopsided pack, not a close call');
+
+  const modelVersion=manifest.model?.model_version;
+  if(modelVersion==='strong-player-colour-stage-v4') {
+    // Preserve the exact v4 presentation regression that motivated this audit.
+    assert.equal(firstPicks.length, 7);
+    assert.ok(highestSupport < 0.10, `Arc Reactor opening-pack support unexpectedly rose to ${(highestSupport * 100).toFixed(1)}%`);
+    assert.ok(secondChoiceCase, 'the known low-support #2 case should remain represented in the v4 audit');
+    assert.ok(secondChoiceCase.pickScore < 20, `a low-support Arc Reactor P1P1 should score as a major disagreement, got ${secondChoiceCase.pickScore}`);
+    assert.ok(secondChoiceCase.bestSupport > 0.75, 'the known v4 #2 case should remain a lopsided pack, not a close call');
+  } else if(modelVersion==='strong-player-colour-stage-v5') {
+    // V5 deliberately changes both the uncapped training cohort and the stable
+    // 300-seat replay sample. Keep the semantic UI guard, not v4 sample counts.
+    assert.ok(bestOrdinal >= 3, `Arc Reactor unexpectedly reached model rank #${bestOrdinal} in v5`);
+    assert.ok(highestSupport < 0.15, `Arc Reactor v5 opening-pack support unexpectedly rose to ${(highestSupport * 100).toFixed(1)}%`);
+    assert.equal(secondChoiceCase, undefined, 'Arc Reactor must not regain a misleading top-two ordinal in the v5 replay sample');
+  } else {
+    assert.fail(`Unreviewed MSH model version: ${modelVersion}`);
+  }
 });
