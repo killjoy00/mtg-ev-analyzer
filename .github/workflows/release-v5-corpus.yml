@@ -85,7 +85,9 @@ jobs:
               [[ "$BRIDGE_COMMIT" =~ ^[a-f0-9]{40}$ ]] || { echo '::error::activate/rollback requires full bridge_commit'; exit 1; }
               git merge-base --is-ancestor "$BRIDGE_COMMIT" "$RELEASE_COMMIT"
               git show "$BRIDGE_COMMIT:draft-run.mjs" | grep -q "DRAFT_RUN_CORPUS_VERSION = 'elite-trophy-colour-stage-v8'"
-              git show "$BRIDGE_COMMIT:worker/corpus-components.mjs" | grep -q 'next_snapshot.corpus_version<>p.corpus_version'
+              git show "$BRIDGE_COMMIT:worker/corpus-components.mjs" | grep -q "modelVersions.v4.corpus_version"
+              git show "$BRIDGE_COMMIT:worker/corpus-components.mjs" | grep -q "modelVersions.v5.corpus_version"
+              git show "$BRIDGE_COMMIT:worker/corpus-components.mjs" | grep -q "next_snapshot.corpus_version="
               ;;
             *) exit 1 ;;
           esac
