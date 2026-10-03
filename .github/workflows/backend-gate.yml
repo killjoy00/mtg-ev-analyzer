@@ -252,8 +252,24 @@ jobs:
 
           # A corpus bump (or loader/import change) must still prove that the
           # checked-in corpus can be loaded before production serves it.
-          if git diff --quiet "$STACK_BASE_SHA" "$HEAD_SHA" -- 'corpus/draft-run/**' scripts/load_verified_draft_run.mjs worker/trophy-import.mjs; then
-            echo 'No corpus or loader/import changes; using the cloned production corpus.'
+          # During a staged rollout main can already be v9 while production is
+          # still v8. An unchanged Git diff does not make that clone current.
+          current_baseline=$(node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          import {corpusDatabase} from './scripts/neon-corpus-db.mjs';
+          const catalog=JSON.parse(fs.readFileSync('corpus/draft-run/catalog.json','utf8'));
+          const query=corpusDatabase(process.env.PACK1_CI_CONNECTION);
+          const rows=(await query(`SELECT v.set_id,v.manifest->>'sha256' checksum,s.corpus_version active_version
+            FROM corpus_set_versions v
+            LEFT JOIN draft_run_environment_policy p ON p.set_id=v.set_id
+            LEFT JOIN corpus_source_snapshots s ON s.source_snapshot_id=p.active_snapshot_id
+            WHERE v.corpus_version=$1`,[catalog.corpus_version])).rows;
+          console.log(catalog.sets.every(set=>rows.some(row=>row.set_id===set.id
+            &&row.checksum===set.sha256&&row.active_version===catalog.corpus_version)));
+          NODE
+          )
+          if [[ "$current_baseline" == true ]] && git diff --quiet "$STACK_BASE_SHA" "$HEAD_SHA" -- 'corpus/draft-run/**' scripts/load_verified_draft_run.mjs worker/trophy-import.mjs; then
+            echo 'Current baseline and active corpus already match; using the cloned production corpus.'
           else
             node scripts/load_verified_draft_run.mjs "$PACK1_CI_CONNECTION"
           fi
