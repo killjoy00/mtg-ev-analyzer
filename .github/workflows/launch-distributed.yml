@@ -109,6 +109,8 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0041_corpus_source_snapshots.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0041_apple_auth.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0042_serving_revision_snapshot_staging.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0043_corpus_activation_readiness.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0044_snapshot_scoped_puzzle_uniqueness.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0045_batched_practice_selector.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0045_apple_subscriptions.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0046_public_identity_safety.sql
