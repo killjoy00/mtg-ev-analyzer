@@ -1,9 +1,7 @@
 {
-  "operation": "v5-corpus-release",
-  "request_id": "v5-v9-development-stage-20261003",
+  "operation": "deploy",
+  "request_id": "v5-v9-development-bridge-20261003",
   "target": "development",
-  "action": "stage",
-  "candidate_run_id": "37132557406",
-  "release_commit": "e9246a15254d14d1f15a092805fbca17bbda1c99",
-  "reason": "Stage the accepted exact 30-environment v5/v9 candidate after successful recovery and QA: 427437 of 427437 qualified training drafts used, unchanged cohorts except authorized HOB refresh, zero invalid outputs. Capture v8 rollback/history evidence and require complete loader, quality, gameplay and preservation gates without switching serving."
+  "commit": "c7e90fe333395bcb3f7468744c943c20a7231978",
+  "reason": "Deploy the reviewed v8 bridge after exact v5/v9 development staging passes. Preserve v8 serving while enabling the guarded cross-version pointer transition; require schema checks, exact release markers and complete unranked Daily acceptance before activation."
 }
