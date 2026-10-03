@@ -44,8 +44,9 @@ SELECT 'qa-'||substr($1,1,8)||'-'||p.puzzle_id,p.set_id,md5($1||p.source_draft_h
   ),
   p.pack_number,$1
 FROM draft_run_verified_puzzles p
-WHERE p.set_id=$2 AND p.corpus_version=$3 AND p.source_snapshot_id IS NULL`,
-[stagedSnapshot,stageSet,version]);
+JOIN draft_run_serving_inventory i ON i.puzzle_id=p.puzzle_id AND i.snapshot_id=$4::bigint
+WHERE p.set_id=$2 AND p.corpus_version=$3`,
+[stagedSnapshot,stageSet,version,snapshot.id]);
 assert.equal(await revision(),stageBefore,'non-active Candidate staging leaves serving revision stable');
 assert.equal((await loadServingSnapshot(query,version)).id,snapshot.id,'unrelated staging does not put Practice into refresh churn');
 

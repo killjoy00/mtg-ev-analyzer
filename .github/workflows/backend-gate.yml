@@ -180,7 +180,7 @@ jobs:
           release_backlog=(migrations/0037_mobile_oauth_handoffs.sql migrations/0038_mobile_practice_idempotency.sql migrations/0039_practice_serving_cache.sql migrations/0040_mobile_minimum_version.sql migrations/0040_practice_reroll_index.sql migrations/0041_corpus_source_snapshots.sql migrations/0041_apple_auth.sql migrations/0042_serving_revision_snapshot_staging.sql migrations/0043_corpus_activation_readiness.sql migrations/0044_snapshot_scoped_puzzle_uniqueness.sql migrations/0045_apple_subscriptions.sql migrations/0046_public_identity_safety.sql migrations/0047_admin_user_account_controls.sql)
           mapfile -t pending < <(
             {
-              for migration in "${release_backlog[@]}" migrations/0048_uncapped_v5_components.sql migrations/0049_cross_version_corpus_cutover.sql; do
+              for migration in "${release_backlog[@]}" migrations/0048_uncapped_v5_components.sql migrations/0049_cross_version_corpus_cutover.sql migrations/0050_practice_recency_bias.sql; do
                 [[ -f "$migration" ]] && printf '%s\n' "$migration"
               done
               printf '%s\n' "${migration_changes[@]}" | awk -F '\t' '$1 == "A" { print $2 }'
@@ -189,7 +189,7 @@ jobs:
           if (( ${#pending[@]} == 0 )); then
             echo 'No pending migrations in this PR.'
           else
-            for migration in "${pending[@]}" migrations/0048_uncapped_v5_components.sql migrations/0049_cross_version_corpus_cutover.sql; do
+            for migration in "${pending[@]}" migrations/0048_uncapped_v5_components.sql migrations/0049_cross_version_corpus_cutover.sql migrations/0050_practice_recency_bias.sql; do
               echo "Applying $migration"
               psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
             done
