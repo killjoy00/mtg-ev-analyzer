@@ -211,22 +211,37 @@ class FullTrophyTests(unittest.TestCase):
 
     def test_training_cap_default_matches_the_published_constant(self):
         import inspect
-        from import_all_trophies import TRAINING_DRAFT_CAP, build_set
-        # The published corpus was scored at this cap. build_set must keep
-        # defaulting to it, or an ordinary import would silently re-score.
-        self.assertEqual(TRAINING_DRAFT_CAP, 5000)
+        from import_all_trophies import TRAINING_DRAFT_CAP, CONTEXT_MODEL_VERSION, build_set
+        from model_training import V4_MODEL, V5_MODEL
+        # The default follows the explicitly versioned serving model. A v9
+        # finalizer must remain uncapped while historical v8 remains at 5,000.
+        self.assertIn(CONTEXT_MODEL_VERSION, (V4_MODEL, V5_MODEL))
+        self.assertEqual(TRAINING_DRAFT_CAP, None if CONTEXT_MODEL_VERSION == V5_MODEL else 5000)
         self.assertEqual(inspect.signature(build_set).parameters['training_cap'].default,
                          TRAINING_DRAFT_CAP)
 
     def test_changing_the_cap_is_refused_once_a_set_has_published_puzzles(self):
-        from import_all_trophies import TRAINING_DRAFT_CAP, check_training_cap
-        with self.assertRaisesRegex(ValueError, 'differs from the published baseline cap'):
-            check_training_cap('blb', TRAINING_DRAFT_CAP * 2, 1200)
+        from unittest.mock import patch
+        from import_all_trophies import check_training_cap
+        for published_cap in (5000, None):
+            with self.subTest(published_cap=published_cap), patch('import_all_trophies.TRAINING_DRAFT_CAP', published_cap):
+                with self.assertRaisesRegex(ValueError, 'differs from the published baseline cap'):
+                    check_training_cap('blb', 10000, 1200)
 
-    def test_cap_change_is_allowed_for_a_set_with_no_published_puzzles(self):
-        from import_all_trophies import TRAINING_DRAFT_CAP, check_training_cap
-        check_training_cap('brandnew', TRAINING_DRAFT_CAP * 2, 0)
-        check_training_cap('blb', TRAINING_DRAFT_CAP, 1200)
+    def test_historical_v4_cap_change_is_allowed_before_publication(self):
+        from unittest.mock import patch
+        from import_all_trophies import check_training_cap
+        with patch('import_all_trophies.TRAINING_DRAFT_CAP', 5000):
+            check_training_cap('brandnew', 10000, 0)
+            check_training_cap('blb', 5000, 1200)
+
+    def test_v5_published_training_policy_remains_uncapped(self):
+        from unittest.mock import patch
+        from import_all_trophies import check_training_cap
+        with patch('import_all_trophies.TRAINING_DRAFT_CAP', None):
+            check_training_cap('blb', None, 1200)
+            with self.assertRaisesRegex(ValueError, 'differs from the published baseline cap'):
+                check_training_cap('blb', 5000, 1200)
 
     def test_retired_environment_is_rejected_before_network_or_files(self):
         import hashlib

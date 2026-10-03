@@ -209,6 +209,7 @@ class PipelineTests(unittest.TestCase):
                     "deck_A": "1", "deck_B": "1", "deck_C": "0",
                 })
         return argparse.Namespace(
+            model_version="strong-player-colour-stage-v4",
             input=str(csv_path), output_dir=str(Path(tmp)/"tst"), catalog=str(Path(tmp)/"catalog.json"),
             expansion="TST", format="PremierDraft", source_date="2026-01-01", minimum_games=100,
             top_fraction=2/3, max_training_drafts=100, max_output_drafts=4, minimum_picks=2,
