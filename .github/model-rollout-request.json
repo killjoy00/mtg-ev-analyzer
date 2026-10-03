@@ -1,7 +1,11 @@
 {
-  "operation": "deploy",
-  "request_id": "v5-v9-development-bridge-20261003",
+  "operation": "v5-corpus-release",
+  "request_id": "v5-v9-development-activate-20261003",
   "target": "development",
-  "commit": "c7e90fe333395bcb3f7468744c943c20a7231978",
-  "reason": "Deploy the reviewed v8 bridge after exact v5/v9 development staging run 37144578913 passes. Preserve v8 serving while enabling the guarded cross-version pointer transition; require schema checks, exact release markers and complete unranked Daily acceptance before activation."
+  "action": "activate",
+  "candidate_run_id": "37132557406",
+  "release_commit": "7b2d8f342c43a2c7d3f9fa89e9964674d8769666",
+  "stage_run_id": "37144578913",
+  "bridge_commit": "c7e90fe333395bcb3f7468744c943c20a7231978",
+  "reason": "Activate the exact accepted v5/v9 candidate only after development stage 37144578913 and the exact reviewed v8 bridge deployment pass. Reverify staged bytes and preserved history, atomically switch all parent snapshots, build readiness, and publish only eligible Traditional components."
 }
