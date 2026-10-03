@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 import {execFileSync} from 'node:child_process';
 import {corpusDatabase} from '../scripts/neon-corpus-db.mjs';
 import {DRAFT_RUN_CORPUS_VERSION,V5_CORPUS_VERSION} from '../draft-run.mjs';
+import {validateComponents,importComponents} from '../scripts/load-traditional-components.mjs';
 
 const [connection,candidate]=process.argv.slice(2);
 const branch=process.env.PACK1_CI_BRANCH_ID||'';
@@ -41,3 +42,13 @@ for(const s of selected) {
   await query('UPDATE draft_run_environment_policy SET active_snapshot_id=$2 WHERE set_id=$1',[s.id,s.source_snapshot_id]);
 }
 console.log(JSON.stringify({fixture:'exact-v5-trophy-custom-practice',sets:ids,branch}));
+// The lifecycle/readiness suite also needs a real Live supplemental source on
+// the current parent. Verify the complete artifact, then import exact BLB bytes.
+const traditional=(await validateComponents(path.join(candidate,'v5-traditional')))
+  .filter(s=>s.sid==='blb'&&s.health.ready);
+assert.equal(traditional.length,1,'Accepted BLB Traditional fixture must pass its gates');
+await importComponents(query,traditional);
+const component=traditional[0].manifest.component_version;
+const promoted=await query("UPDATE corpus_components SET status='Live' WHERE set_id='blb' AND parent_version=$1 AND component_version=$2 AND status='Candidate' RETURNING component_version",[V5_CORPUS_VERSION,component]);
+assert.equal(promoted.rows.length,1);
+console.log(JSON.stringify({fixture:'exact-v5-traditional-readiness',set:'blb',component,branch}));

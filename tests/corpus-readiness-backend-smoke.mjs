@@ -34,7 +34,7 @@ async function health(snapshot,setId,ready) {
   SELECT $2,corpus_version,source_snapshot_id,md5(manifest::text),$3,$4,$5::jsonb FROM corpus_source_snapshots WHERE source_snapshot_id=$1 RETURNING id`,
  [snapshot,setId,CORPUS_GATE_VERSION,ready,JSON.stringify({fixture:reason})])).rows[0].id;
 }
-let original,setId,component,componentHealth,child,crossSnapshot,futurePuzzle;
+let original,setId,component,componentHealth,child,crossSnapshot,futurePuzzle,bridgeOriginal,historicalBridge;
 try {
  await query('DELETE FROM draft_run_readiness_keys');
  const initial=await loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION);
@@ -76,7 +76,19 @@ try {
  check('future-parent NULL-snapshot baseline and ratings stage without serving revision churn');
 
  // A future-corpus pointer must not strand the still-deployed parent release.
- // The bridge keeps historical-frozen v8 membership stable, and migration 0049
+ // Establish the retained Cube baseline as an explicit historical parent. This
+ // keeps the historical bridge contract distinct from modern v9 full snapshots.
+ // The baseline already has the reviewed two-reroll admission proof.
+ const bridgeSet='powered-cube';
+ bridgeOriginal=(await query('SELECT active_snapshot_id FROM draft_run_environment_policy WHERE set_id=$1',[bridgeSet])).rows[0];
+ historicalBridge=randomBytes(32).toString('hex');
+ await query(`INSERT INTO corpus_source_snapshots(source_snapshot_id,set_id,event_type,corpus_version,schema_version,importer_identity,model_identity,manifest,lifecycle_status)
+  VALUES($1,$2,'PremierDraft',$3,'historical-frozen','isolated-fixture','retained-model',$4::jsonb,'Approved')`,
+ [historicalBridge,bridgeSet,DRAFT_RUN_CORPUS_VERSION,JSON.stringify({fixture:reason,historical_baseline:true})]);
+ await query('UPDATE draft_run_environment_policy SET active_snapshot_id=$2 WHERE set_id=$1',[bridgeSet,historicalBridge]);
+ const preparedBridge=await advanceServingReadiness(query);
+ assert.equal(preparedBridge.ready,true,JSON.stringify(preparedBridge));
+ // The bridge keeps historical-frozen membership stable, and migration 0049
  // carries the exact verified cache to the new global revision atomically.
  crossSnapshot=randomBytes(32).toString('hex');
  const crossVersion='qa-cross-version-'+tag;
@@ -89,8 +101,8 @@ try {
   [DRAFT_RUN_CORPUS_VERSION,priorEvidenceDay]);
  await query(`INSERT INTO corpus_source_snapshots(source_snapshot_id,set_id,event_type,corpus_version,schema_version,importer_identity,model_identity,manifest,lifecycle_status)
   VALUES($1,$2,'PremierDraft',$3,'qa-cross-version-v1','isolated-fixture','future-model',$4::jsonb,'Candidate')`,
- [crossSnapshot,setId,crossVersion,JSON.stringify({fixture:reason,cross_version:true})]);
- await query('UPDATE draft_run_environment_policy SET active_snapshot_id=$2 WHERE set_id=$1',[setId,crossSnapshot]);
+ [crossSnapshot,bridgeSet,crossVersion,JSON.stringify({fixture:reason,cross_version:true})]);
+ await query('UPDATE draft_run_environment_policy SET active_snapshot_id=$2 WHERE set_id=$1',[bridgeSet,crossSnapshot]);
  const bridged=await loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION);
  const bridgedReadiness=await readServingReadiness(query);
  assert.notEqual(bridgedReadiness.revision,bridgeRevision);
@@ -99,12 +111,17 @@ try {
  assert.equal(bridgedReadiness.evidence.day,priorEvidenceDay,'Carry must preserve the original evidence day rather than claim a fresh Daily verification');
  assert.equal(bridgedReadiness.evidence.samples[0].mode,'exact-serving-input-carry-forward');
  assert.equal(bridgedReadiness.evidence.samples[0].carried_evidence_day,priorEvidenceDay);
- await query('UPDATE draft_run_environment_policy SET active_snapshot_id=$2 WHERE set_id=$1',[setId,original.active_snapshot_id]);
+ await query('UPDATE draft_run_environment_policy SET active_snapshot_id=$2 WHERE set_id=$1',[bridgeSet,historicalBridge]);
  const restoredBridge=await readServingReadiness(query);
  assert.equal(restoredBridge.ready,true,JSON.stringify(restoredBridge));
  assert.equal(String((await loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION)).id),String(bridgeBefore.id));
  await query('DELETE FROM corpus_source_snapshots WHERE source_snapshot_id=$1',[crossSnapshot]);
  crossSnapshot=null;
+ await query('UPDATE draft_run_environment_policy SET active_snapshot_id=$2 WHERE set_id=$1',[bridgeSet,bridgeOriginal.active_snapshot_id]);
+ const afterBridge=await advanceServingReadiness(query);
+ assert.equal(afterBridge.ready,true,JSON.stringify(afterBridge));
+ await query('DELETE FROM corpus_source_snapshots WHERE source_snapshot_id=$1',[historicalBridge]);
+ historicalBridge=null;bridgeOriginal=null;
  check('cross-version pointer changes preserve an exactly equivalent verified parent cache without a 503 window');
 
  const beforeStaging=await revision();
@@ -113,16 +130,28 @@ try {
  [candidate,setId,DRAFT_RUN_CORPUS_VERSION,JSON.stringify({fixture:reason})]);
  // Server-side clone into a new source namespace: no payload egress, no change to
  // retained rows. Full source coverage avoids an artificial one-pick canary.
- await query(`INSERT INTO draft_run_verified_puzzles
+ let cloneCursor='';
+ for(;;) {
+ const cloned=(await query(`WITH batch AS MATERIALIZED (
+  SELECT p.* FROM draft_run_verified_puzzles p
+  JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version=$4
+  WHERE p.set_id=$2 AND p.corpus_version=$3 AND p.interesting AND p.pack_number=1
+   AND r.target_support_ratio>=0.20526315789473684::float8
+   AND (p.source_snapshot_id=$5 OR (p.source_snapshot_id IS NULL AND $6='historical-frozen'))
+   AND p.puzzle_id>$7 ORDER BY p.puzzle_id LIMIT 500
+ ), inserted AS (
+ INSERT INTO draft_run_verified_puzzles
   SELECT (jsonb_populate_record(NULL::draft_run_verified_puzzles,to_jsonb(p)||jsonb_build_object(
    'puzzle_id',md5($1||p.puzzle_id),'source_snapshot_id',$1::text,'source_draft_hash',md5($1||p.source_draft_hash),
    'payload',p.payload||jsonb_build_object('source_snapshot_id',$1::text)))).*
-  FROM draft_run_verified_puzzles p JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version=$4
-  WHERE p.set_id=$2 AND p.corpus_version=$3 AND p.interesting AND p.pack_number=1
-   AND r.target_support_ratio>=0.20526315789473684::float8
-   AND (p.source_snapshot_id=$5 OR (p.source_snapshot_id IS NULL AND $6='historical-frozen'))`,
+  FROM batch p RETURNING puzzle_id
+ ) SELECT (SELECT count(*)::int FROM inserted) n,(SELECT max(puzzle_id) FROM batch) last_id`,
  [candidate,setId,DRAFT_RUN_CORPUS_VERSION,DRAFT_RUN_DIFFICULTY_VERSION,original.active_snapshot_id,
-  (await query('SELECT schema_version FROM corpus_source_snapshots WHERE source_snapshot_id=$1',[original.active_snapshot_id])).rows[0].schema_version]);
+  (await query('SELECT schema_version FROM corpus_source_snapshots WHERE source_snapshot_id=$1',[original.active_snapshot_id])).rows[0].schema_version,cloneCursor])).rows[0];
+ if(!Number(cloned.n))break;
+ assert.ok(cloned.last_id&&cloned.last_id!==cloneCursor,'Snapshot clone must advance');
+ cloneCursor=cloned.last_id;
+ }
  assert.equal(await revision(),beforeStaging,'Staged Candidate insertion must not churn the serving revision');
  await health(candidate,setId,false);
  await assert.rejects(post('/'+setId+'/snapshot',{sourceSnapshotId:candidate,corpusVersion:DRAFT_RUN_CORPUS_VERSION,reason}),e=>e.status===409);
@@ -224,6 +253,7 @@ try {
  if(child)child.kill('SIGKILL');
  // All of these mutations are restricted to the disposable branch above.
  await query('DELETE FROM draft_run_readiness_keys');
+ if(bridgeOriginal)await query('UPDATE draft_run_environment_policy SET active_snapshot_id=$2 WHERE set_id=$1',['powered-cube',bridgeOriginal.active_snapshot_id]);
  if(component)await query('UPDATE corpus_components SET status=$3 WHERE set_id=$1 AND component_version=$2',[component.set_id,component.component_version,component.status]);
  if(componentHealth)await query('DELETE FROM corpus_health_checks WHERE id=$1::bigint',[componentHealth]);
  if(original) {
@@ -232,6 +262,7 @@ try {
  }
  if(futurePuzzle)await query('DELETE FROM draft_run_verified_puzzles WHERE puzzle_id=$1',[futurePuzzle]);
  if(crossSnapshot)await query('DELETE FROM corpus_source_snapshots WHERE source_snapshot_id=$1',[crossSnapshot]);
+ if(historicalBridge)await query('DELETE FROM corpus_source_snapshots WHERE source_snapshot_id=$1',[historicalBridge]);
  await query('DELETE FROM corpus_status_events WHERE reason=$1',[reason]);
  await query('DELETE FROM corpus_source_exclusions WHERE reason=$1',[reason]);
  await query('DELETE FROM draft_run_verified_puzzles WHERE source_snapshot_id=$1',[candidate]);

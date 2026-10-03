@@ -18,7 +18,8 @@ for(const environment of ['mixed','powered-cube']) {
 console.log('PASS: exact mixed/Cube serving-cache selection parity.');
 
 // Stage a fixture with complete custom-pick coverage for one Live regular set.
-// Keep 32 real sources in every required pick/band; copying the full uncapped
+// Keep up to 32 real sources in every pick/band, including the easy opening
+// round required by the planner. Copying the full uncapped
 // set makes the per-row rating writer exceed the HTTP query timeout in CI.
 // The unmodified active corpus above still owns the exact SQL/JS parity check.
 const stageSet=snapshot.metadata.find(s=>s.status==='Live'&&s.regular_run&&s.set_id!=='powered-cube'&&
@@ -41,7 +42,7 @@ await query(`WITH ranked AS MATERIALIZED (
   FROM draft_run_serving_inventory i
   JOIN draft_run_verified_puzzles p ON p.puzzle_id=i.puzzle_id AND p.corpus_version=$3
   WHERE i.snapshot_id=$4::bigint AND i.set_id=$2
-    AND i.pick_number BETWEEN 1 AND 8 AND i.band IN ('medium','hard')
+    AND i.pick_number BETWEEN 1 AND 8 AND i.band IN ('easy','medium','hard')
 ), fixture AS MATERIALIZED (
   SELECT puzzle_id FROM ranked WHERE fixture_row<=32
 )
