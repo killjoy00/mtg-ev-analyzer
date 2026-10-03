@@ -55,6 +55,11 @@ async function fillAuth(kind='signin'){
 }
 
 try {
+  await page.goto(base+'/patreon/');
+  await page.getByRole('heading',{name:'Sign in to check your access',exact:true}).waitFor();
+  assert.equal((await page.locator('[data-patreon-connect]').textContent())?.trim(),'Sign in to Pack One');
+  await page.screenshot({path:'artifacts/ui-patreon-signed-out-390.png',fullPage:true});
+
   // Deletion return states are terminal. They must not fall through to the
   // generic account route and be replaced by the player profile.
   for(const [state,heading] of [
@@ -131,7 +136,13 @@ try {
   await page.waitForURL(base+'/patreon/');
   assert.equal(page.url(),base+'/patreon/');
   await page.getByRole('heading',{name:'Pack One Elite',exact:true}).waitFor();
-  assert.equal(await page.locator('[data-patreon-offsite]').first().getAttribute('href'),'https://www.patreon.com/c/PackOne');
+  await page.locator('[data-patreon-connect-card]').waitFor();
+  assert.equal(page.url(),base+'/patreon/');
+  // Account E2E owns the authenticated handoff into the Patreon page. The
+  // disconnected/Elite membership-state matrix is exercised independently by
+  // patreon-activation-e2e with isolated state fixtures; duplicating that async
+  // transition here made this unrelated account journey race page hydration.
+  await page.screenshot({path:'artifacts/ui-patreon-account-handoff-390.png',fullPage:true});
 
   // A signed-in free member keeps the Daily home focused and upgrades from Practice.
   await page.goto(base);
