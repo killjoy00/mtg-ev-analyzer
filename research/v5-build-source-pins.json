@@ -878,63 +878,6 @@
       "existing_puzzles_preserved": 627
     },
     {
-      "id": "mid",
-      "status": "Live",
-      "active_snapshot_id": "historical-bd21b7830a82a0600cdf8bd75a6aacb3",
-      "holdout": "5-fold by draft_id",
-      "seconds": 346,
-      "ledger_file": "trophies.jsonl.gz",
-      "puzzle_file": "puzzles.jsonl.gz",
-      "source_rows": 3738145,
-      "skill_source": {
-        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.MID.PremierDraft.csv.gz",
-        "etag": "\"fdd5ba069b3bd5958f56777bc4b90598-3\"",
-        "sha256": "40e71861a52242ed2c9f59578a9576ba7a89f76b8600862f70b6baac7157ab0d",
-        "last_modified": "Thu, 11 Jan 2024 09:55:24 GMT",
-        "compressed_bytes": 46269199
-      },
-      "training_cap": 5000,
-      "minimum_games": 100,
-      "model_version": "strong-player-colour-stage-v4",
-      "source_drafts": 96406,
-      "total_puzzles": 29213,
-      "corpus_version": "elite-trophy-colour-stage-v8",
-      "import_version": "all-premier-trophies-v1",
-      "source_archive": {
-        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.MID.PremierDraft.csv.gz",
-        "etag": "\"577d141610a7e5a42b1daf97dd0c9932-10\"",
-        "sha256": "1d6eed578230b321f8afb0060f70aac5a38b38249d231cbf259f017d139ccb1e",
-        "last_modified": "Thu, 11 Jan 2024 09:47:36 GMT",
-        "compressed_bytes": 152471891
-      },
-      "training_picks": 191562,
-      "input_signature": "83e63e9683b7aa365f330b4cd87d839d6d78cccca9369db780d95e45e6a9a3a8",
-      "schema_verified": true,
-      "source_trophies": 14300,
-      "training_cohort": "broader elite players, independent of trophy outcome",
-      "training_drafts": 5000,
-      "trophy_outcomes": {
-        "7-0": 1702,
-        "7-1": 4644,
-        "7-2": 7954
-      },
-      "win_rate_cutoff": null,
-      "qualified_drafts": 19614,
-      "excluded_trophies": 11436,
-      "exclusion_reasons": {
-        "rank_unverified_or_below_diamond": 7020,
-        "experience_unverified_or_below_100": 4416
-      },
-      "included_trophies": 2864,
-      "source_event_type": "PremierDraft",
-      "additional_puzzles": 28652,
-      "ledger_file_sha256": "ecd9a6e8e59508bf8a1064de5989ef7a81ae9711cd377aacf49f19f3f318d7f4",
-      "puzzle_file_sha256": "3b58484b204c5d97708858ba0dc06cef9f88e676799011b39fe6e18bace79caf",
-      "qualified_trophies": 2864,
-      "missing_image_names": [],
-      "existing_puzzles_preserved": 561
-    },
-    {
       "id": "mkm",
       "status": "Live",
       "active_snapshot_id": "historical-4d9445d41f56ad1734b80df5bbe5e7ec",
@@ -1739,63 +1682,6 @@
       "qualified_trophies": 701,
       "missing_image_names": [],
       "existing_puzzles_preserved": 670
-    },
-    {
-      "id": "vow",
-      "status": "Live",
-      "active_snapshot_id": "historical-382a9376d91c15142113d14652e2c5d3",
-      "holdout": "5-fold by draft_id",
-      "seconds": 358,
-      "ledger_file": "trophies.jsonl.gz",
-      "puzzle_file": "puzzles.jsonl.gz",
-      "source_rows": 4134958,
-      "skill_source": {
-        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.VOW.PremierDraft.csv.gz",
-        "etag": "\"2342ee7ba70e55189419319b023b17d2-3\"",
-        "sha256": "0cafba42e41ad2402a6c7c978d317efdfdd7e6772fcd2bc1dc308fb9879a8454",
-        "last_modified": "Thu, 11 Jan 2024 09:52:43 GMT",
-        "compressed_bytes": 35197631
-      },
-      "training_cap": 5000,
-      "minimum_games": 100,
-      "model_version": "strong-player-colour-stage-v4",
-      "source_drafts": 99346,
-      "total_puzzles": 23330,
-      "corpus_version": "elite-trophy-colour-stage-v8",
-      "import_version": "all-premier-trophies-v1",
-      "source_archive": {
-        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.VOW.PremierDraft.csv.gz",
-        "etag": "\"46f8289e8810483ea516093196faea0e-11\"",
-        "sha256": "53f24ea0f87ec0db0018addb700657e180e4c9c028572726f4b92dc811b5c24c",
-        "last_modified": "Thu, 11 Jan 2024 09:46:43 GMT",
-        "compressed_bytes": 168271164
-      },
-      "training_picks": 208959,
-      "input_signature": "68940be6343dd952ccbf09d952a3a02d83a98eca00360229176affa0c137562f",
-      "schema_verified": true,
-      "source_trophies": 13134,
-      "training_cohort": "broader elite players, independent of trophy outcome",
-      "training_drafts": 5000,
-      "trophy_outcomes": {
-        "7-0": 1459,
-        "7-1": 4239,
-        "7-2": 7436
-      },
-      "win_rate_cutoff": null,
-      "qualified_drafts": 15093,
-      "excluded_trophies": 11002,
-      "exclusion_reasons": {
-        "rank_unverified_or_below_diamond": 4386,
-        "experience_unverified_or_below_100": 6616
-      },
-      "included_trophies": 2132,
-      "source_event_type": "PremierDraft",
-      "additional_puzzles": 22813,
-      "ledger_file_sha256": "09046eb6b02184586640d182e9b17655bbfdb454d67676034b3c29ad55954c99",
-      "puzzle_file_sha256": "712eb7e14ca4e00d87ea9ca82a9460072e8273a8061ba41f7bb5db308fe45f8e",
-      "qualified_trophies": 2132,
-      "missing_image_names": [],
-      "existing_puzzles_preserved": 517
     },
     {
       "id": "woe",
