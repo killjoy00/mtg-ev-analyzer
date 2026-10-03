@@ -1,11 +1,11 @@
 {
   "operation": "v5-corpus-release",
   "request_id": "v5-v9-development-rollback-20261003",
-  "reason": "Owner-authorized issue #889 rollback rehearsal after complete development v9 acceptance and exact v8 bridge redeploy. Restore captured v8 pointers without deleting history; emit verified successor stage evidence for reactivation.",
+  "reason": "Owner-authorized #889 rollback rehearsal. Require successful repaired acceptance 37153281899, complete development runtime acceptance, production staging, and exact development bridge redeployment. Restore captured v8 pointers and prove history preservation; emit successor evidence for v9 reactivation.",
   "target": "development",
   "action": "rollback",
   "candidate_run_id": "37132557406",
-  "release_commit": "f2a6083daecb09f3098c46e29625c51aa41ad217",
-  "stage_run_id": "37146043862",
+  "release_commit": "3ce9fc14263b682cba04c62fe6e6423e1282ead5",
+  "stage_run_id": "37153281899",
   "bridge_commit": "c7e90fe333395bcb3f7468744c943c20a7231978"
 }

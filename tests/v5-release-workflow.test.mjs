@@ -20,6 +20,41 @@ test('v5 readiness records the exact reviewed release commit',()=>{
   assert.match(workflow,/PACK1_RELEASE_COMMIT:\s*\$\{\{ inputs\.release_commit \}\}/);
 });
 
+test('read-only active acceptance binds unchanged candidate data to a reviewed descendant runtime',()=>{
+  const section=workflow.slice(workflow.indexOf('      - name: Verify stage evidence identity'),workflow.indexOf('      - name: Stage immutable'));
+  const block=section.match(/node - <<'NODE'\n([\s\S]*?)\n          NODE/)[1];
+  const execute=new Function('require','process',block);
+  const old='a'.repeat(40),next='b'.repeat(40);
+  const evidence={target:'development',candidate_run_id:'10000',release_commit:old};
+  function run(action,change={},failAt=null) {
+    const calls=[];
+    const require=name=>name==='fs'?{readFileSync:()=>JSON.stringify({...evidence,...change})}:
+      {execFileSync:(command,args)=>{calls.push([command,args]);if(args[0]===failAt)throw Error('git rejected proof');}};
+    let error;
+    try{execute(require,{env:{ACTION:action,TARGET:'development',CANDIDATE_RUN_ID:'10000',RELEASE_COMMIT:next}});}catch(e){error=e;}
+    return {calls,error};
+  }
+  const accepted=run('verify-active');
+  assert.equal(accepted.error,undefined);
+  assert.deepEqual(accepted.calls[0],['git',['merge-base','--is-ancestor',old,next]]);
+  assert.deepEqual(accepted.calls[1],['git',['diff','--exit-code',old,next,'--','corpus','data','model-versions.json','draft-run.mjs','research','results']]);
+  for(const action of ['stage','activate','rollback'])assert.ok(run(action).error);
+  for(const change of [{target:'production'},{candidate_run_id:'20000'},{release_commit:'main'}])assert.ok(run('verify-active',change).error);
+  for(const failure of ['merge-base','diff'])assert.ok(run('verify-active',{},failure).error);
+  const unchanged=run('activate',{release_commit:next});
+  assert.equal(unchanged.error,undefined);assert.deepEqual(unchanged.calls,[]);
+});
+
+test('active recovery runs every acceptance gate without another publication or pointer mutation',()=>{
+  const recovery=workflow.slice(workflow.indexOf('Reverify a completely published candidate'),workflow.indexOf('Roll back to captured v8 pointers'));
+  for(const gate of ['verify-corpus-load.mjs','verify-puzzle-components.mjs','v5-corpus-cutover.mjs','verify-preserved',
+    'verify-serving-quality.mjs','verify-cube-expansion.mjs','release-functions-smoke.mjs'])assert.ok(recovery.includes(gate),gate);
+  assert.doesNotMatch(recovery,/publish-puzzle-components|v5-corpus-cutover\.mjs[^\n]+ (activate|rollback) /);
+  assert.ok(recovery.indexOf('release-functions-smoke.mjs')<recovery.indexOf("fs.writeFileSync('generated/stage.json'"));
+  assert.match(recovery,/preceding_release_commit:preceding\.release_commit/);
+  assert.match(recovery,/action:'verified-active'/);
+});
+
 test('rollback emits successor stage evidence only after proving restored pointers and history',()=>{
   const rollback=workflow.slice(workflow.indexOf('Roll back to captured v8 pointers after bridge redeploy'));
   const restored=rollback.indexOf('capture generated/v5-candidate generated/v5-rollback-restored.json');

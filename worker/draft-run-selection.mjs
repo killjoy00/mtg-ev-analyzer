@@ -108,19 +108,23 @@ export async function selectDatabaseRun(query,version,seed,environment='mixed',{
     params.push(setId,band,Math.floor(random()*count));
     let result;
     if(snapshot) {
-      // Preserve the live selector's C ordering and random offset exactly. The
-      // trajectory still uses its original historical membership/quality rules.
+      // Preserve the live selector's C ordering and random offset exactly.
+      // Only inventory members can decrement this snapshot's group counts.
+      // Retained baseline copies may share a source with its active snapshot.
       result=await query(`WITH chosen AS (
         SELECT puzzle_id,source_draft_hash FROM draft_run_serving_inventory
         WHERE snapshot_id=$2::bigint AND pick_number BETWEEN $3::int AND $4::int
           AND source_draft_hash<>ALL($5::text[]) AND set_id=$6 AND band=$7
         ORDER BY puzzle_id COLLATE "C" LIMIT 1 OFFSET $8::int
-      ) SELECT ${columns},chosen.puzzle_id selected_id ${from} JOIN chosen ON chosen.source_draft_hash=p.source_draft_hash WHERE ${base} AND ${SERVING_QUALITY_SQL}`,
+      ) SELECT ${columns},chosen.puzzle_id selected_id ${from}
+      JOIN chosen ON chosen.source_draft_hash=p.source_draft_hash
+      JOIN draft_run_serving_inventory inventory ON inventory.snapshot_id=$2::bigint AND inventory.puzzle_id=p.puzzle_id
+      WHERE ${base} AND ${SERVING_QUALITY_SQL}`,
       [version,snapshot.id,window[0],window[1],toPgArray(sources),setId,band,params.at(-1)]);
     } else result=await query(`WITH chosen AS (
       SELECT p.puzzle_id,p.source_draft_hash ${from} WHERE ${where} AND p.set_id=$${params.length-2} AND r.band=$${params.length-1}
       ORDER BY p.puzzle_id COLLATE "C" LIMIT 1 OFFSET $${params.length}::int
-    ) SELECT ${columns},chosen.puzzle_id selected_id ${from} JOIN chosen ON chosen.source_draft_hash=p.source_draft_hash WHERE ${base} AND ${SERVING_QUALITY_SQL}`,params);
+    ) SELECT ${columns},chosen.puzzle_id selected_id ${from} JOIN chosen ON chosen.source_draft_hash=p.source_draft_hash WHERE ${servingBase}`,params);
     const trajectory=result.rows.map(decodePuzzleMetadata),p=trajectory.find(p=>p.puzzle_id===p.selected_id);
     if(!p)throw Object.assign(new Error('The corpus changed while starting this run. Please retry.'),{status:503});
     selected.push(p);sources.push(p.source_draft_hash);sets.add(p.set_id);
