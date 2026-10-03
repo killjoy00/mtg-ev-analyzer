@@ -1,9 +1,9 @@
 {
   "operation": "v5-corpus-release",
-  "request_id": "v5-v9-development-stage-verification-fix-20261003",
+  "request_id": "v5-v9-development-stage-immutable-resume-20261003",
   "target": "development",
   "action": "stage",
   "candidate_run_id": "37132557406",
-  "release_commit": "7b2d8f342c43a2c7d3f9fa89e9964674d8769666",
-  "reason": "Retry development staging of the unchanged accepted candidate after fixing whole-corpus SQL timeouts and health/canary checks that ignored the pinned pick-2 opening for ECL, TLA and TMT. Preserve all v8 serving pointers and history; require every exact byte, rating, count and preservation gate before bridge deployment."
+  "release_commit": "f2a6083daecb09f3098c46e29625c51aa41ad217",
+  "reason": "Resume development staging of the unchanged accepted candidate after adding read-only equality verification for closed Candidate snapshots. Preserve Candidate lifecycle, every existing payload and ledger row, v8 serving pointers and history; require full health, exact-count, rating and preservation gates before bridge deployment."
 }
