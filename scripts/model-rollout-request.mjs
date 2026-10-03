@@ -5,7 +5,7 @@ import {execFileSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 
 export function rolloutDispatch(request) {
-  const {operation,reason,request_id,replay_of,corpus_version,commit,sets,target,action,source,first_environment,measurement_mode,measurement_samples,card_name,environments,candidate_run_id,release_commit,stage_run_id,bridge_commit}=request||{};
+  const {operation,reason,request_id,replay_of,corpus_version,commit,sets,target,action,source,first_environment,measurement_mode,measurement_samples,card_name,environments,candidate_run_id,release_commit,stage_run_id,bridge_commit,reuse_run_id}=request||{};
   const common=['operation','reason','request_id','replay_of'];
   if(typeof reason!=='string'||!reason.trim()||!/^[-a-zA-Z0-9]+$/.test(request_id||''))throw Error('A named rollout request and reason are required.');
   if(replay_of!==undefined&&!/^[-a-zA-Z0-9]+$/.test(replay_of||''))throw Error('Invalid rollout replay reference.');
@@ -17,6 +17,10 @@ export function rolloutDispatch(request) {
     workflow='rebuild-v4-draft-run-corpus.yml';
   } else if(operation==='rebuild-v5') {
     workflow='rebuild-v5-draft-run-corpus.yml';
+    if(reuse_run_id!==undefined) {
+      if(!/^[1-9][0-9]{4,20}$/.test(String(reuse_run_id)))throw Error('Invalid source v5 rebuild run.');
+      inputs={reuse_run_id:String(reuse_run_id)};extra=['reuse_run_id'];
+    }
   } else if(operation==='import') {
     if(!/^(all|[a-z0-9-]+(?:,[a-z0-9-]+)*)$/.test(sets||'')||!['build-only','development','production'].includes(target))throw Error('Invalid import request.');
     workflow='import-all-trophies.yml';inputs={sets,target};extra=['sets','target'];
