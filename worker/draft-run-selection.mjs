@@ -2,7 +2,7 @@ import {SERVING_POLICY_VERSION,SERVING_QUALITY_SQL} from '../serving-quality.mjs
 import {DAILY_SELECTION_VERSION,dailySetPlan,latestSetPlan,balancedSetPlan,liveRegularSets} from '../daily-selection.mjs';
 import {seededRandom} from '../gameplay.mjs';
 import {runPickWindows,eligiblePickForRound,selectDraftRunReroll,draftRunDifficulty} from '../draft-run.mjs';
-import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,SELECTABLE_ONLY_SETS,chooseRunSet,practiceSetWeight,runDifficultyBands,maxRunPick,isEightPickVersion,earlyRoundsForSelection,dailyRequiredSets,releasedRunSets,requiredSetRounds} from '../draft-run-policy.mjs';
+import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,SELECTABLE_ONLY_SETS,chooseRunSet,runDifficultyBands,maxRunPick,isEightPickVersion,earlyRoundsForSelection,dailyRequiredSets,releasedRunSets,requiredSetRounds} from '../draft-run-policy.mjs';
 import {gameDateKey} from '../game-date.mjs';
 import {corpusMembership} from './corpus-components.mjs';
 import {DRAFT_RUN_DIFFICULTY_VERSION,LEGACY_DIFFICULTY_VERSION,MAX_REROLL_RATING_DELTA} from '../draft-run-difficulty.mjs';
@@ -102,25 +102,28 @@ export async function selectDatabaseRun(query,version,seed,environment='mixed',{
     const fresh=available.filter(g=>!sets.has(g.set_id));
     if(fresh.length&&!forced.has(round))available=fresh;
     else {const different=available.filter(g=>g.set_id!==selected.at(-1)?.set_id);if(different.length)available=different;}
-    const setId=chooseRunSet(available.map(g=>g.set_id).sort(),random,daily,selectionVersion,day,metadata);
+    const setId=chooseRunSet(available.map(g=>g.set_id).sort(),random,daily,selectionVersion,day);
     const count=Number(available.find(g=>g.set_id===setId)?.n||0);
     if(!count)throw Object.assign(new Error('Not enough verified puzzles for a balanced run.'),{status:503});
     params.push(setId,band,Math.floor(random()*count));
     let result;
     if(snapshot) {
       // Preserve the live selector's C ordering and random offset exactly. The
-      // trajectory still uses its original historical membership/quality rules.
+      // Only inventory members can decrement this snapshot's group counts.
+      // Retained baseline copies may share a source with its active snapshot.
       result=await query(`WITH chosen AS (
         SELECT puzzle_id,source_draft_hash FROM draft_run_serving_inventory
         WHERE snapshot_id=$2::bigint AND pick_number BETWEEN $3::int AND $4::int
           AND source_draft_hash<>ALL($5::text[]) AND set_id=$6 AND band=$7
         ORDER BY puzzle_id COLLATE "C" LIMIT 1 OFFSET $8::int
-      ) SELECT ${columns},chosen.puzzle_id selected_id ${from} JOIN chosen ON chosen.source_draft_hash=p.source_draft_hash WHERE ${base} AND ${SERVING_QUALITY_SQL}`,
+      ) SELECT ${columns},chosen.puzzle_id selected_id ${from}
+      JOIN chosen ON chosen.source_draft_hash=p.source_draft_hash
+      JOIN draft_run_serving_inventory inventory ON inventory.snapshot_id=$2::bigint AND inventory.puzzle_id=p.puzzle_id`,
       [version,snapshot.id,window[0],window[1],toPgArray(sources),setId,band,params.at(-1)]);
     } else result=await query(`WITH chosen AS (
       SELECT p.puzzle_id,p.source_draft_hash ${from} WHERE ${where} AND p.set_id=$${params.length-2} AND r.band=$${params.length-1}
       ORDER BY p.puzzle_id COLLATE "C" LIMIT 1 OFFSET $${params.length}::int
-    ) SELECT ${columns},chosen.puzzle_id selected_id ${from} JOIN chosen ON chosen.source_draft_hash=p.source_draft_hash WHERE ${base} AND ${SERVING_QUALITY_SQL}`,params);
+    ) SELECT ${columns},chosen.puzzle_id selected_id ${from} JOIN chosen ON chosen.source_draft_hash=p.source_draft_hash WHERE ${servingBase}`,params);
     const trajectory=result.rows.map(decodePuzzleMetadata),p=trajectory.find(p=>p.puzzle_id===p.selected_id);
     if(!p)throw Object.assign(new Error('The corpus changed while starting this run. Please retry.'),{status:503});
     selected.push(p);sources.push(p.source_draft_hash);sets.add(p.set_id);
@@ -151,7 +154,6 @@ export function currentPracticeBatchPlan(snapshot,seed,environment='mixed',{day=
     if(setIds.some(s=>!eligible.has(s)))throw Object.assign(Error('Choose Live sets with complete eight-pick practice coverage.'),{status:400});
   }
   const forced=requiredSetRounds(groups,bands,windows,random,required);
-  const setWeights=Object.fromEntries([...live].map(setId=>[setId,practiceSetWeight(setId,DRAFT_RUN_SELECTION_VERSION,day,metadata)]));
   // Keep policy RNG authoritative in JS. Replay only the already-consumed
   // planning draws into a clone, then materialize the per-round values that SQL
   // will consume. A failed invocation discards this local RNG exactly as today.
@@ -163,7 +165,7 @@ export function currentPracticeBatchPlan(snapshot,seed,environment='mixed',{day=
     plan:{
       selection_version:DRAFT_RUN_SELECTION_VERSION,
       groups:groups.map(({set_id,pick_number,band,n})=>({set_id,pick_number,band,n})),
-      windows,bands,required,set_weights:setWeights,
+      windows,bands,required,
       forced:Array.from({length:windows.length},(_,i)=>forced.get(i)||''),
       round_randoms:roundRandoms,
     },
