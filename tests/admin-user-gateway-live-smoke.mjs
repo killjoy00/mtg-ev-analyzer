@@ -2,7 +2,7 @@
 // Notices go to Resend's delivered+label test addresses, never real customers.
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-import {randomUUID,createHash} from 'node:crypto';
+import {randomUUID,randomBytes,createHash} from 'node:crypto';
 import {corpusDatabase} from '../scripts/neon-corpus-db.mjs';
 
 const [mode,commit,connectionFile,registryFile]=process.argv.slice(2);
@@ -19,7 +19,7 @@ async function call(path,{body,token,method,status=[200]}={}) {
   const response=await fetch(base+path,{
     method:method||(body===undefined?'GET':'POST'),redirect:'error',signal:AbortSignal.timeout(90000),
     headers:{origin,...(body===undefined?{}:{'content-type':'application/json'}),
-      ...(token?{'x-pack1-auth-session':token}:{})},
+      ...(token?{cookie:'__Host-pack1_account='+token.session,'x-pack1-csrf':token.csrf}:{})},
     body:body===undefined?undefined:JSON.stringify(body),
   });
   const data=await response.json().catch(()=>({}));
@@ -102,11 +102,12 @@ async function verify() {
   async function fixture(label,verified=true) {
     const f={label,authId:randomUUID(),email:`delivered+${tag}-${label}@resend.dev`,
       name:`QA Gateway ${label} ${tag}`,playerId:null};
-    const token=randomUUID()+randomUUID();
-    console.log('::add-mask::'+token);
+    const token={session:randomBytes(32).toString('base64url'),csrf:randomBytes(32).toString('base64url')};
+    for(const value of Object.values(token))console.log('::add-mask::'+value);
     registry.fixtures.push(f);save();
     await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,$4::boolean)',[f.authId,f.name,f.email,verified]);
-    await query('INSERT INTO neon_auth.session(token,"userId","expiresAt","updatedAt") VALUES($1,$2::uuid,now()+interval \'15 minutes\',now())',[token,f.authId]);
+    const digest=value=>createHash('sha256').update(value).digest('hex');
+    await query('INSERT INTO account_sessions(session_hash,auth_user_id,csrf_hash,expires_at) VALUES($1,$2::uuid,$3,now()+interval \'15 minutes\')',[digest(token.session),f.authId,digest(token.csrf)]);
     if(label==='admin')await query('INSERT INTO pack1_admins(auth_user_id) VALUES($1::uuid)',[f.authId]);
     else {
       const guest=await call('/growth/v1/player/session',{body:{displayName:publicName(label.slice(0,3))},status:[201]});
@@ -123,7 +124,8 @@ async function verify() {
     report.test_recipients=[notice.email,off.email];
     await call(path(notice)+'/username',{method:'PATCH',body:{displayName:publicName('deny')},status:[401]});
     await call(path(notice)+'/username',{method:'PATCH',token:notice.token,body:{displayName:publicName('deny')},status:[403]});
-    report.checks.push('unauthenticated and non-admin rename denied');
+    await call(path(notice)+'/username',{method:'PATCH',token:{...admin.token,csrf:randomBytes(32).toString('base64url')},body:{displayName:publicName('deny')},status:[403]});
+    report.checks.push('unauthenticated, non-admin and invalid-CSRF rename denied');
     const body={displayName:publicName('new'),reason:'QA gateway notice '+tag};
     const renamed=await call(path(notice)+'/username',{method:'PATCH',token:admin.token,body});
     assert.equal(renamed.changed,true);assert.deepEqual(renamed.notification,{status:'sent'});
