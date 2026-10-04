@@ -20,7 +20,10 @@ export function assembleCorpusOverview({sets,servingCache}) {
  const cache=resultRows(servingCache)[0]||{},rawGroups=parse(cache.groups),groups=Array.isArray(rawGroups)?rawGroups:[],cacheCurrent=cache.snapshot_id!=null;
  const serving=new Map(),byPick=new Map();
  for(const group of groups) {
-  const setId=group.set_id,pick=String(group.pick_number),n=number(group.n);
+  const setId=group.set_id,pickNumber=Number(group.pick_number);
+  const minPick=setId==='powered-cube'?2:1,maxPick=setId==='powered-cube'?9:8;
+  if(!Number.isInteger(pickNumber)||pickNumber<minPick||pickNumber>maxPick)continue;
+  const pick=String(pickNumber),n=number(group.n);
   serving.set(setId,(serving.get(setId)||0)+n);
   const picks=byPick.get(setId)||{};
   picks[pick]=(picks[pick]||0)+n;byPick.set(setId,picks);
