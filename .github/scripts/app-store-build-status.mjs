@@ -1,10 +1,13 @@
-import { appendFileSync } from 'node:fs';
+import { appendFileSync, writeFileSync } from 'node:fs';
+import { readTestFlightDistribution } from './testflight-distribution.mjs';
 import { createPrivateKey, sign } from 'node:crypto';
 
 const issuerId = process.env.ASC_ISSUER_ID?.trim();
 const keyId = process.env.ASC_KEY_ID?.trim();
 const privateKeyText = process.env.ASC_PRIVATE_KEY;
 const appId = process.env.PACKONE_ASC_APP_ID?.trim() || '6814318676';
+const requestedBuild = process.argv[2]?.trim();
+if (requestedBuild && !/^[1-9][0-9]*$/.test(requestedBuild)) throw new Error('Invalid exact build number.');
 
 if (!issuerId || !keyId || !privateKeyText) {
   throw new Error('ASC_ISSUER_ID, ASC_KEY_ID, and ASC_PRIVATE_KEY are required.');
@@ -33,6 +36,7 @@ const token = `${signingInput}.${base64url(signature)}`;
 const params = new URLSearchParams();
 params.set('filter[app]', appId);
 params.set('sort', '-uploadedDate');
+if (requestedBuild) params.set('filter[version]', requestedBuild);
 params.set('limit', '5');
 params.set(
   'fields[builds]',
@@ -70,8 +74,20 @@ if (builds.length === 0) {
   throw new Error(`No App Store Connect builds found for app ${appId}.`);
 }
 
-const latest = builds[0];
-console.log(JSON.stringify({ appId, latest, builds }, null, 2));
+const latest = requestedBuild ? builds.find(build => build.version === requestedBuild) : builds[0];
+if (!latest) throw new Error(`App ${appId} does not contain requested build ${requestedBuild}.`);
+const ascRead = async (path) => {
+  const response = await fetch(`https://api.appstoreconnect.apple.com${path}`, {
+    method: 'GET', headers: { Authorization: `Bearer ${token}` },
+  });
+  const body = await response.text();
+  if (!response.ok) throw new Error(`GET ${path} HTTP ${response.status}: ${body}`);
+  return JSON.parse(body);
+};
+const testFlight = await readTestFlightDistribution(ascRead, latest.id);
+const result = { appId, sourceSha: process.env.GITHUB_SHA ?? null, requestedBuild: requestedBuild ?? null, latest, builds, testFlight };
+console.log(JSON.stringify(result, null, 2));
+if (process.env.PACKONE_STATUS_OUTPUT) writeFileSync(process.env.PACKONE_STATUS_OUTPUT, JSON.stringify(result, null, 2) + '\n');
 
 const summaryPath = process.env.GITHUB_STEP_SUMMARY;
 if (summaryPath) {
@@ -83,6 +99,10 @@ if (summaryPath) {
     summaryPath,
     [
       '## Pack One TestFlight build status',
+      `- Availability read: ${testFlight.verified ? 'verified' : 'unavailable'}`,
+      `- Internal state: ${testFlight.internalBuildState ?? 'unknown'}`,
+      `- External state: ${testFlight.externalBuildState ?? 'unknown'}`,
+      `- Associated groups: ${testFlight.groups?.length ?? 'unknown'}`,
       '',
       `- App Store Connect app ID: \`${appId}\``,
       `- Latest build: \`${latest.version ?? 'unknown'}\``,
@@ -94,3 +114,5 @@ if (summaryPath) {
     ].join('\n'),
   );
 }
+
+if (!testFlight.verified) throw new Error('Exact-build TestFlight availability could not be read; see retained evidence.');

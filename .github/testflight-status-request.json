@@ -1,0 +1,5 @@
+{
+  "operation": "read-pack-one-testflight-status",
+  "reason": "Verify actual TestFlight availability and existing group associations for native repair build 100500 after correcting Apple betaGroups one-relationship-filter API restriction. Read-only: no upload, tester/group change, review submission or release.",
+  "build_number": "100500"
+}

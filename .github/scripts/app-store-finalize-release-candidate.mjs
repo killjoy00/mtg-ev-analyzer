@@ -1,3 +1,4 @@
+import { readTestFlightDistribution } from './testflight-distribution.mjs';
 import { appendFileSync } from 'node:fs';
 import { createPrivateKey, sign } from 'node:crypto';
 import { setTimeout as sleep } from 'node:timers/promises';
@@ -110,31 +111,7 @@ if (attached.data?.id !== build.id ||
 // Read Apple's separate distribution state without changing testers or groups.
 // API references: /documentation/appstoreconnectapi/get-v1-builds-_id_-buildbetadetail
 // and /documentation/appstoreconnectapi/get-v1-betagroups (filter[builds]).
-let testFlight;
-try {
-  const groupParams = new URLSearchParams({
-    'filter[app]': appId, 'filter[builds]': build.id,
-    'fields[betaGroups]': 'isInternalGroup,hasAccessToAllBuilds', limit: '200',
-  });
-  const [detail, groups] = await Promise.all([
-    asc(`/v1/builds/${encodeURIComponent(build.id)}/buildBetaDetail`),
-    asc(`/v1/betaGroups?${groupParams}`),
-  ]);
-  testFlight = {
-    verified: true,
-    internalBuildState: detail.data?.attributes?.internalBuildState ?? null,
-    externalBuildState: detail.data?.attributes?.externalBuildState ?? null,
-    groups: (groups.data || []).map(group => ({
-      id: group.id,
-      isInternalGroup: group.attributes?.isInternalGroup ?? null,
-      hasAccessToAllBuilds: group.attributes?.hasAccessToAllBuilds ?? null,
-    })),
-    groupListComplete: !groups.links?.next,
-    testersOrGroupsChanged: false,
-  };
-} catch (error) {
-  testFlight = { verified: false, reason: error.message, testersOrGroupsChanged: false };
-}
+const testFlight = await readTestFlightDistribution(asc, build.id);
 
 const result = {
   testFlight,

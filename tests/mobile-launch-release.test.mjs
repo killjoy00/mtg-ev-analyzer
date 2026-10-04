@@ -136,6 +136,17 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
       assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
       assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/android-internal-status-request\.json'/s, path);
       assert.match(workflow, /request\.get\('operation'\) != 'check-android-internal-status'/, path);
+    } else if (path === '.github/workflows/ios-testflight-status.yml') {
+      assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
+      assert.match(workflow, /push:\s+branches: \[main\]\s+paths: \['\.github\/testflight-status-request\.json'\]/s, path);
+      assert.match(workflow, /request\.operation !== 'read-pack-one-testflight-status'/, path);
+      assert.match(workflow, /app-store-build-status\.mjs "\$\{\{ steps\.request\.outputs\.build_number \}\}"/, path);
+      assert.doesNotMatch(workflow, /pull_request:|app-store-finalize-release-candidate|app-store-upload|xcodebuild/, path);
+      const request = JSON.parse(read('.github/testflight-status-request.json'));
+      assert.deepEqual(Object.keys(request).sort(), ['build_number', 'operation', 'reason']);
+      assert.equal(request.operation, 'read-pack-one-testflight-status');
+      assert.match(request.build_number, /^[1-9][0-9]*$/);
+      assert.ok(request.reason.trim());
     } else {
       assert.match(workflow, /github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main'/, path);
     }
