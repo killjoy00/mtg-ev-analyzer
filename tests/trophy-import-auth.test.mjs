@@ -277,16 +277,23 @@ test('image refresh filters already-correct payloads inside Postgres',async()=>{
   assert.doesNotMatch(calls[1].sql,/payload/);
 });
 
-test('image markers clear only after every served card has an HTTPS image',async()=>{
+test('image markers clear only after every served v9 parent or Live component card has an HTTPS image',async()=>{
   const updates=[];
   const query=async(sql,params=[])=>{
-    if(sql.includes('SELECT s.corpus_version'))return {rows:[{corpus_version:DRAFT_RUN_CORPUS_VERSION,puzzles:123,missing_images:0}]};
+    if(sql.includes('SELECT\n        (SELECT count(*)::int')) {
+      assert.match(sql,/p\.corpus_version=\$2/);
+      assert.match(sql,/c\.parent_version=\$2/);
+      assert.match(sql,/c\.status='Live'/);
+      return {rows:[{puzzles:123,missing_images:0}]};
+    }
     if(sql.includes('UPDATE draft_run_verified_sets')){
       assert.match(sql,/unresolved_image_names/);
       assert.match(sql,/full_import,missing_image_names/);
       assert.equal(params[1],DRAFT_RUN_CORPUS_VERSION);
       updates.push(params[0]);
-      return {rows:[{set_id:params[0]}]};
+      // Powered Cube may have only a stale v8 legacy pointer; zero updated legacy
+      // rows must not fail once served v9/Live-component puzzles were verified.
+      return {rows:[]};
     }
     throw new Error('Unexpected SQL in image-marker test: '+sql);
   };
@@ -296,12 +303,19 @@ test('image markers clear only after every served card has an HTTPS image',async
 
   let wrote=false;
   const missingQuery=async sql=>{
-    if(sql.includes('SELECT s.corpus_version'))return {rows:[{corpus_version:DRAFT_RUN_CORPUS_VERSION,puzzles:123,missing_images:1}]};
+    if(sql.includes('SELECT\n        (SELECT count(*)::int'))return {rows:[{puzzles:123,missing_images:1}]};
     wrote=true;
     return {rows:[]};
   };
   await assert.rejects(normalizeResolvedImageMarkers(missingQuery,['hbg']),/images are missing/);
   assert.equal(wrote,false);
+
+  const unavailableQuery=async sql=>{
+    if(sql.includes('SELECT\n        (SELECT count(*)::int'))return {rows:[{puzzles:0,missing_images:0}]};
+    throw new Error('must not write unavailable set markers');
+  };
+  await assert.rejects(normalizeResolvedImageMarkers(unavailableQuery,['powered-cube']),/Served set unavailable/);
+
   const regular=await normalizeResolvedImageMarkers(query,['msh']);
   assert.deepEqual(regular.normalized.map(item=>item.set_id),['msh']);
   await assert.rejects(normalizeResolvedImageMarkers(query,['not-a-real-environment']),/registered environments/);
