@@ -3,6 +3,7 @@ import {readJson} from '../worker/request-json.mjs';
 import {PROD_ORIGINS} from '../worker/account-config.mjs';
 import {nativePatreonAction} from '../worker/patreon-mobile-policy.mjs';
 import {appleSubscriptionAction,nativeAppleSubscriptionAction} from '../worker/apple-subscription-policy.mjs';
+import {ADMIN_API_VERSION} from '../admin-api-contract.mjs';
 
 const SERVICES={legacy:'pack1api',growth:'pack1growth',draft:'draftrunapi'};
 const PROD_BRANCH='br-orange-feather-ayps8kep';
@@ -271,12 +272,13 @@ export async function gateway(request,env,fetcher=fetch) {
     if(ORIGINS.has(origin)) {
       headers.set('access-control-allow-origin',origin);
       headers.set('access-control-allow-credentials','true');
-      headers.set('access-control-expose-headers','Retry-After');
+      headers.set('access-control-expose-headers','Retry-After, X-Pack1-Admin-Api-Version');
     }
     if(mode==='preview'&&previewNetwork&&url.pathname==='/draft/health')headers.set('x-pack1-preview-network',previewNetwork);
     if(mode==='preview'&&request.method==='POST'&&
       (url.pathname==='/draft/v1/runs'||/^\/draft\/v1\/runs\/[a-f0-9-]+\/reroll$/.test(url.pathname))&&metric.upstream_calls===1)
       headers.set('x-pack1-gateway-timing',JSON.stringify({duration_ms:duration,quota_ms:quota,upstream_ms:upstream}));
+    headers.set('x-pack1-admin-api-version',String(ADMIN_API_VERSION));
     headers.set('x-content-type-options','nosniff');
     return new Response(result.body,{status:result.status,headers});
   };
