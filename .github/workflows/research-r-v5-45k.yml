@@ -1,0 +1,95 @@
+name: "Research frozen R-LCB vs v5"
+
+on:
+  push:
+    branches:
+      - research/r-lcb-v5-45k-20261004
+    paths:
+      - scripts/run_r_vs_v5_45k.py
+      - .github/workflows/research-r-v5-45k.yml
+
+concurrency:
+  group: research-r-v5-45k-20261004
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  environment:
+    name: "R vs v5 ${{ matrix.env }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        env: [FIN, TDM, DFT]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      BASE: https://17lands-public.s3.amazonaws.com/analysis_data
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout frozen historical OPE estimator
+        uses: actions/checkout@v4
+        with:
+          ref: a7c0afd3cd5f2f872d312fe26f510894c305ef3b
+          path: historical
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check 'numpy==2.3.3'
+      - name: Download frozen R confirmation context
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-r-independent-confirmation-freeze-${{ matrix.env }}
+          path: freeze
+          run-id: 36475098718
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+      - name: Download exact pinned public snapshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 5 --retry-delay 3 --output draft.csv.gz "$BASE/draft_data/draft_data_public.${{ matrix.env }}.PremierDraft.csv.gz"
+          curl --fail --location --retry 5 --retry-delay 3 --output game.csv.gz "$BASE/game_data/game_data_public.${{ matrix.env }}.PremierDraft.csv.gz"
+      - name: Reconstruct exact uncapped v5 and compare frozen R
+        shell: bash
+        run: |
+          set -euo pipefail
+          lower=$(printf '%s' '${{ matrix.env }}' | tr '[:upper:]' '[:lower:]')
+          python scripts/run_r_vs_v5_45k.py \
+            --env '${{ matrix.env }}' \
+            --draft draft.csv.gz \
+            --game game.csv.gz \
+            --freeze freeze/frozen-evaluation-context.npz \
+            --corpus "corpus/draft-run/${lower}.json.gz" \
+            --historical-root historical \
+            --out "result-${{ matrix.env }}.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: r-v5-${{ matrix.env }}
+          path: result-${{ matrix.env }}.json
+          retention-days: 30
+
+  aggregate:
+    name: "Aggregate frozen R vs v5"
+    needs: environment
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check 'numpy==2.3.3'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: r-v5-*
+          path: env-results
+          merge-multiple: true
+      - name: Aggregate with frozen bootstrap
+        run: python scripts/run_r_vs_v5_45k.py --aggregate env-results --out final-report.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frozen-r-vs-v5-45k-final
+          path: final-report.json
+          retention-days: 90
