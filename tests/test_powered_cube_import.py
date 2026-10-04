@@ -3,6 +3,7 @@ import gzip
 import json
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 from scripts import import_powered_cube as cube
@@ -81,6 +82,49 @@ class PoweredCubeImportTests(unittest.TestCase):
         )
         with self.assertRaises(ValueError):
             cube.oracle_bulk_download_uri({"data": [{"type": "default_cards"}]})
+
+    def test_cube_metadata_ranks_real_cards_over_art_tokens_and_playtest_collisions(self):
+        def card(card_id, name, image, *, set_code="set", set_type="expansion", type_line="Creature", rarity="rare", mana_cost="{1}"):
+            return {
+                "id": card_id,
+                "oracle_id": card_id + "-oracle",
+                "name": name,
+                "set": set_code,
+                "set_type": set_type,
+                "lang": "en",
+                "released_at": "2024-01-01",
+                "collector_number": "1",
+                "promo": False,
+                "full_art": False,
+                "textless": False,
+                "oversized": False,
+                "digital": False,
+                "variation": False,
+                "border_color": "black",
+                "frame_effects": [],
+                "mana_cost": mana_cost,
+                "rarity": rarity,
+                "type_line": type_line,
+                "image_uris": {"normal": image},
+            }
+
+        art = card("art", "Hushwood Verge", "https://img/art.jpg", set_type="art_series", type_line="Card // Card", rarity="common", mana_cost="")
+        land = card("land", "Hushwood Verge", "https://img/land.jpg", type_line="Land", mana_cost="")
+        token = card("token", "Tarmogoyf", "https://img/token.jpg", set_type="token", type_line="Token Creature — Lhurgoyf", rarity="common", mana_cost="{1}{G}")
+        goyf = card("goyf", "Tarmogoyf", "https://img/goyf.jpg", type_line="Creature — Lhurgoyf", mana_cost="{1}{G}")
+        playtest = card("playtest", "Pick Your Poison", "https://img/playtest.jpg", set_code="cmb2", set_type="funny", type_line="Sorcery", mana_cost="{3}{B}{G}")
+        real = card("real", "Pick Your Poison", "https://img/real.jpg", set_code="mkm", type_line="Sorcery", rarity="common", mana_cost="{G}")
+        with mock.patch.object(cube, "_bulk_cards", return_value=iter([art, token, playtest, land, goyf, real])), mock.patch.object(
+            cube, "_named_card", side_effect=AssertionError("bulk-covered names must not use named fallback")
+        ):
+            records, unresolved = cube.fetch_cross_set_metadata({"Hushwood Verge", "Tarmogoyf", "Pick Your Poison"})
+        self.assertEqual(unresolved, [])
+        self.assertEqual(records["Hushwood Verge"]["type_line"], "Land")
+        self.assertEqual(records["Hushwood Verge"]["image_url"], "https://img/land.jpg")
+        self.assertEqual(records["Tarmogoyf"]["type_line"], "Creature — Lhurgoyf")
+        self.assertEqual(records["Tarmogoyf"]["image_url"], "https://img/goyf.jpg")
+        self.assertEqual(records["Pick Your Poison"]["mana_cost"], "{G}")
+        self.assertEqual(records["Pick Your Poison"]["image_url"], "https://img/real.jpg")
 
     def test_oracle_bulk_reader_accepts_gzipped_jsonl_and_legacy_array(self):
         cards = [
