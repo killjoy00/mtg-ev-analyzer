@@ -4,6 +4,7 @@ import {componentBelongsTo,corpusMembership} from './corpus-components.mjs';
 import {liveRegularSets,recencyWeight} from '../daily-selection.mjs';
 import {accountIdentity,linkedPlayerIdentity,rankingIdentityStatus} from './account-identity.mjs';
 import {releaseMetadata} from './release.mjs';
+import {ADMIN_API_VERSION} from '../admin-api-contract.mjs';
 import {guardIngress} from './ingress-auth.mjs';
 import {verifyDailyGenerationToken} from './daily-generation-auth.mjs';
 import {neonTriggerInvocationHeader,verifyNeonScheduleTrigger,zonedDateTime} from './neon-trigger.mjs';
@@ -387,7 +388,7 @@ async function route(request) {
   if(request.method==='OPTIONS') return new Response(null,{status:204});
   if(path.startsWith('/v1/admin/')) return json(await handleAdmin(request,query,readJson));
   if(request.method==='GET'&&path==='/health') {
-    if(url.searchParams.get('quick')==='1')return json({ok:true,service:'draft-run',...releaseMetadata()});
+    if(url.searchParams.get('quick')==='1')return json({ok:true,service:'draft-run',admin_api_version:ADMIN_API_VERSION,...releaseMetadata()});
     const result=await query(`SELECT p.set_id,count(*)::int archived,
       count(*) FILTER(WHERE r.puzzle_id IS NULL)::int unrated,
       count(*) FILTER(WHERE r.puzzle_id IS NOT NULL AND ${SERVING_QUALITY_SQL} AND p.pick_number BETWEEN CASE WHEN p.set_id='powered-cube' THEN 2 ELSE 1 END AND CASE WHEN p.set_id='powered-cube' THEN 9 ELSE 8 END)::int decisions,
@@ -405,7 +406,7 @@ async function route(request) {
     const by_set=Object.fromEntries(rows.filter(p=>Number(p.decisions)>0).sort((a,b)=>a.set_id.localeCompare(b.set_id)).map(p=>[p.set_id,{drafts:Number(p.drafts),decisions:Number(p.decisions),regular_run:regular.includes(p.set_id),status:live.some(s=>s.set_id===p.set_id)?'Live':'not-serving',daily_optional_weight:regular.includes(p.set_id)?recencyWeight(regular.indexOf(p.set_id)):null}]));
     const total=key=>rows.reduce((n,p)=>n+Number(p[key]),0),mixed=rows.filter(p=>regular.includes(p.set_id));
     const ok=!unrated&&!missingSets.length&&regular.length>=4&&corpusCatalog.corpus_version===DRAFT_RUN_CORPUS_VERSION;
-    return json({ok,service:'draft-run',scoring_version:DRAFT_RUN_SCORING_VERSION,difficulty_version:DRAFT_RUN_DIFFICULTY_VERSION,selection_version:DRAFT_RUN_SELECTION_VERSION,corpus_version:DRAFT_RUN_CORPUS_VERSION,run_length:DRAFT_RUN_LENGTH,serving_policy_version:SERVING_POLICY_VERSION,minimum_implied_trophy_score:20,daily_featured_sets:regular.slice(0,4),daily_policy:{newest_minimum:2,previous_three_minimum:4,recency_half_life_releases:4},...releaseMetadata(),
+    return json({ok,service:'draft-run',admin_api_version:ADMIN_API_VERSION,scoring_version:DRAFT_RUN_SCORING_VERSION,difficulty_version:DRAFT_RUN_DIFFICULTY_VERSION,selection_version:DRAFT_RUN_SELECTION_VERSION,corpus_version:DRAFT_RUN_CORPUS_VERSION,run_length:DRAFT_RUN_LENGTH,serving_policy_version:SERVING_POLICY_VERSION,minimum_implied_trophy_score:20,daily_featured_sets:regular.slice(0,4),daily_policy:{newest_minimum:2,previous_three_minimum:4,recency_half_life_releases:4},...releaseMetadata(),
       puzzles:total('decisions'),archived_playable_puzzles:total('archived'),sets:sets.size,expansion_sets:rows.filter(p=>p.set_id!=='powered-cube').length,regular_sets:mixed.length,
       mixed_puzzles:mixed.reduce((n,p)=>n+Number(p.decisions),0),cube_puzzles:Number(rows.find(p=>p.set_id==='powered-cube')?.decisions||0),unrated_puzzles:unrated,live_sets:live.length,missing_sets:missingSets,non_serving_sets:nonServingSets,by_set},ok?200:503);
   }
