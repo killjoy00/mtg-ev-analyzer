@@ -16,7 +16,7 @@ try {
   const userId='11111111-1111-4111-8111-111111111111';
   let renamedPublicUsername='Test Member',deletionFixture=null,deletionStatusFailure=false;
   let holdDeletionStatus=false,releaseDeletionStatus=null,failDeleteAfterCommit=false;
-  let holdHabitReport=true,releaseHabitReport=null;
+  let holdHabitReport=true,releaseHabitReport=null,holdStaleCore=false,releaseStaleCore=null;
   await page.route(/\/health\?quick=1$/,route=>route.fulfill({json:{ok:true,campaign_link_publish_configured:true}}));
   await page.route('**/v1/admin/**',async route=>{
     requests.push(route.request().url());
@@ -56,7 +56,12 @@ try {
       return route.fulfill({json:{puzzle:{prior_picks:[],historical_pick_id:'trophy',candidates:[{id:'trophy',name:'Trophy card',model_probability:.1},{id:'alternative',name:'Alternative card',model_probability:.5}]},choices:[{selected_id:'alternative',answers:20,average_score:95}]}});
     }
     if(path==='/v1/admin/measurements/habits'&&holdHabitReport)await new Promise(resolve=>{releaseHabitReport=resolve;});
-    if(path==='/v1/admin/measurements'&&requestUrl.searchParams.get('difficulty')==='hard')await new Promise(resolve=>setTimeout(resolve,25));
+    if(path==='/v1/admin/measurements') {
+      const band=requestUrl.searchParams.get('difficulty');
+      if(band==='medium'&&holdStaleCore)await new Promise(resolve=>{releaseStaleCore=resolve;});
+      if(band==='hard')await new Promise(resolve=>setTimeout(resolve,25));
+      if(band==='medium'||band==='hard')return route.fulfill({json:{...fixture,filters:{...fixture.filters,band},groups:fixture.groups.map((group,index)=>index===0?{...group,label:band==='hard'?'fresh-hard':'stale-medium'}:group)}});
+    }
     return route.fulfill({json:fixture});
   });
   await page.reload();
@@ -82,10 +87,35 @@ try {
   await page.waitForFunction(node=>!node.isConnected,previousReviews);
   await page.getByRole('heading',{name:'How the decisions play'}).waitFor();
   assert.ok(requests.some(x=>x.includes('difficulty=hard')));
+
+  // A stale core response must not replace the report backing CSV export after a newer refresh renders.
+  holdStaleCore=true;
+  await page.getByLabel('Difficulty',{exact:true}).selectOption('medium');
+  const staleRequest=page.waitForRequest(request=>{const u=new URL(request.url());return u.pathname==='/v1/admin/measurements'&&u.searchParams.get('difficulty')==='medium';});
+  await page.getByRole('button',{name:'Refresh',exact:true}).click();
+  await staleRequest;
+  assert.equal(typeof releaseStaleCore,'function','medium core request must be held before the newer refresh starts');
+  await page.getByLabel('Difficulty',{exact:true}).selectOption('hard');
+  const freshRequest=page.waitForRequest(request=>{const u=new URL(request.url());return u.pathname==='/v1/admin/measurements'&&u.searchParams.get('difficulty')==='hard';});
+  await page.getByRole('button',{name:'Refresh',exact:true}).click();
+  await freshRequest;
+  await page.getByText('fresh-hard',{exact:true}).waitFor();
+  const staleResponse=page.waitForResponse(response=>{const u=new URL(response.url());return u.pathname==='/v1/admin/measurements'&&u.searchParams.get('difficulty')==='medium';});
+  releaseStaleCore();releaseStaleCore=null;holdStaleCore=false;
+  await staleResponse;
+  await page.waitForTimeout(25);
+  await page.getByText('fresh-hard',{exact:true}).waitFor();
+
   const review=page.locator('#reviews details.review').first();
   await review.locator('summary').click();
   await review.getByText('Alternative card',{exact:true}).waitFor();
-  const download=page.waitForEvent('download');await page.getByRole('button',{name:'Export CSV'}).click();assert.ok((await download).suggestedFilename().endsWith('.csv'));
+  const downloadPromise=page.waitForEvent('download');
+  await page.getByRole('button',{name:'Export CSV'}).click();
+  const download=await downloadPromise;
+  assert.ok(download.suggestedFilename().endsWith('.csv'));
+  const csv=fs.readFileSync(await download.path(),'utf8');
+  assert.match(csv,/fresh-hard/);
+  assert.doesNotMatch(csv,/stale-medium/);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),'Mobile page must not overflow horizontally');
   fs.mkdirSync('artifacts',{recursive:true});
   await page.screenshot({path:'artifacts/ui-admin-mobile.png',fullPage:true});
