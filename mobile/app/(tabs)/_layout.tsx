@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/src/components/Text';
 import { TabIcon } from '@/src/components/TabIcon';
+import { AdaptiveTabBar } from '@/src/components/AdaptiveTabBar';
 import { useNavigationSession } from '@/src/navigation/session';
 import { colors } from '@/src/theme';
 import { config } from '@/src/config';
@@ -17,7 +18,7 @@ export default function TabLayout() {
   const insets = useSafeAreaInsets();
   const icon = (name: 'daily' | 'practice' | 'leaders' | 'learn' | 'account') => function Icon({ color }: { color: ColorValue }) { return <TabIcon name={name} color={color} />; };
   return <View style={styles.shell}>
-    <Tabs backBehavior="history" screenOptions={{
+    <Tabs backBehavior="history" tabBar={props => <AdaptiveTabBar {...props} />} screenOptions={{
       header: ({ options }) => <View style={{ backgroundColor: colors.surface, paddingTop: insets.top, paddingLeft: Math.max(insets.left, 16), paddingRight: Math.max(insets.right, 16) }}>
         <View style={styles.headerRow} onLayout={event => recordHeader('row', options.title, event)}>
           <Text accessibilityRole="header" style={styles.headerTitle} onLayout={event => recordHeader('title', options.title, event)}>{options.title}</Text>

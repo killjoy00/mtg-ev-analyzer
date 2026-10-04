@@ -5,6 +5,39 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 import test from 'node:test';
 
+test('native driver scrolls inside the visible article above landscape sticky actions', () => {
+  // Execute the real gesture helper without launching the native journey module.
+  // Bounds reproduce the failed API 35 landscape capture; the old screen-height
+  // gesture started at y=900, on Next pick below the viewport's y=849 boundary.
+  const result = spawnSync('python3', ['-c', `
+import ast, re, xml.etree.ElementTree as ET
+from pathlib import Path
+module = ast.parse(Path('mobile/scripts/native-acceptance.py').read_text())
+helper = next(node for node in module.body if isinstance(node, ast.FunctionDef) and node.name == 'swipe_page')
+calls = []
+root = None
+def require(value, message):
+    if not value: raise AssertionError(message)
+scope = {'re': re, 'require': require, 'hierarchy': lambda: ('', root), 'adb': lambda *args: calls.append(args)}
+exec(compile(ast.Module(body=[helper], type_ignores=[]), '<native-gesture>', 'exec'), scope)
+root = ET.fromstring('<hierarchy><node class="android.widget.ScrollView" scrollable="true" bounds="[0,228][2520,849]"/><node class="android.widget.HorizontalScrollView" scrollable="true" bounds="[0,0][2520,1200]"/></hierarchy>')
+scope['swipe_page'](True)
+assert calls.pop() == ('shell', 'input', 'swipe', '1260', '724', '1260', '352', '300')
+root = ET.fromstring('<hierarchy><node class="android.widget.ScrollView" scrollable="true" bounds="[0,279][1170,2073]"/></hierarchy>')
+scope['swipe_page'](False)
+assert calls.pop() == ('shell', 'input', 'swipe', '585', '637', '585', '1714', '300')
+root = ET.fromstring('<hierarchy/>')
+try:
+    scope['swipe_page'](True)
+except AssertionError as error:
+    assert 'No visible scroll viewport' in str(error)
+else:
+    raise AssertionError('Missing viewport must not gesture on a fixed action')
+assert not calls
+`], {encoding: 'utf8'});
+  assert.equal(result.status, 0, result.stderr);
+});
+
 // Exercise the action's /bin/sh boundary without an SDK or a running emulator.
 test('Android screenshot action enters one Bash script and preserves readiness/install failure gates', () => {
   const workflow = fs.readFileSync('.github/workflows/mobile-store-screenshots.yml', 'utf8');
