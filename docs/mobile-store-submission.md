@@ -1,10 +1,10 @@
 # Pack One mobile store submission packet
 
-Updated 2026-10-02. This file is the source-of-truth submission packet for the first free public mobile release.
+Updated 2026-10-04. This file is the source-of-truth submission packet for the first free public mobile release.
 
 ## Historical distributed checkpoint — 2026-10-02
 
-October 4: #910 is merged with verified native navigation, Daily, Learn, fonts and feedback repairs. The binaries below predate #890 and #910; they remain the last recorded distributed builds, not acceptance candidates for this repair. #955 also passed native verification and merged. #951 requests replacements after fresh exact-main RC certification of `f0f30c939d1016c70f5d3548d46b0b8b3f839e79` (run `37239878233`). Physical/provider acceptance and owner launch gates remain open.
+October 4: #910 is merged with verified native navigation, Daily, Learn, fonts and feedback repairs. The binaries below predate #890 and #910; they remain the last recorded distributed builds, not acceptance candidates for this repair. #955 also passed native verification and merged. #951 passed fresh checks and merged as `f721389d392867cc43c342c07ecddfc20c9f28f8` after all four exact-main RC jobs certified `f0f30c939d1016c70f5d3548d46b0b8b3f839e79` (run `37239878233`); mobile and binary build-workflow inputs are unchanged. Physical/provider acceptance and owner launch gates remain open.
 
 - **Previously distributed iOS 1.0 post-#837 candidate:** signed build `100415`, source revision `fa588b40bc380946735385abfac0ff52586e1873`. GitHub Actions run `36957484955` uploaded it; App Store Connect reported `processingState=VALID` and `buildAudienceType=APP_STORE_ELIGIBLE`, and the workflow attached build `100415` to App Store version 1.0. Release type remains manual.
 - **Previously distributed Android 1.0 post-#837 candidate:** versionCode `100444`, source revision `fa588b40bc380946735385abfac0ff52586e1873`. Build run `36957485029` produced the Play-signed production AAB and exact-artifact release run `36965315032` uploaded it unchanged to Internal Testing, then promoted that same version unchanged to Closed Testing `production-access`. Google reported `releaseStatus=completed`, `requiresConsoleRollout=false`, and `committed=true`. VersionCode `100444` is the live qualification-track candidate.
@@ -242,12 +242,13 @@ Guest path:
 3. Complete a run and view the result/share UI.
 
 Account path:
-1. Open Account and sign in with the supplied demo credentials.
-2. Open Practice.
-3. Verify regular practice.
-4. Verify Elite Powered Cube and custom-set practice.
-5. Open Career and Leaderboard.
-6. Verify sign-out. Do not delete the shared review account during routine review.
+1. Use the Sign in tab with the supplied demo credentials. The member tabs are Daily / Practice / Leaders / Learn / My Pack One.
+2. Open Practice and verify free regular practice.
+3. With Elite access, verify Powered Cube and custom-set practice.
+4. Complete a run, open decision review, and return to the existing Practice tab.
+5. Open Leaders → player profile → Back, then My Pack One → Account settings → Back.
+6. Practice offers Continue shared run or View shared result only for a valid checkpoint belonging to this account on this device.
+7. Verify sign-out from My Pack One → Account settings. Do not delete the shared review account during routine review.
 
 ### Graphics
 
