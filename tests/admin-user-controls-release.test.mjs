@@ -32,6 +32,16 @@ test('gateway allows only the narrow admin username and deletion routes and meth
   assert.equal(adminGrowthPath('/v1/admin/users/22222222-2222-4222-8222-222222222222/email','POST','production'),false);
 });
 
+test('gateway admits deferred admin report GETs without broadening mutation access',()=>{
+  assert.equal(adminPath('/v1/admin/measurements','GET'),true);
+  assert.equal(adminPath('/v1/admin/measurements/habits','GET'),true);
+  assert.equal(adminPath('/v1/admin/measurements/habits','POST'),false);
+  assert.equal(adminPath('/v1/admin/corpus','GET'),true);
+  assert.equal(adminPath('/v1/admin/corpus/blb/detail','GET'),true);
+  assert.equal(adminPath('/v1/admin/corpus/blb/detail','POST'),false);
+  assert.equal(adminPath('/v1/admin/corpus/blb/not-detail','GET'),false);
+});
+
 test('Admin Users browser uses PATCH rename, typed destructive confirmation, status recovery and separate services',()=>{
   const users=fs.readFileSync('admin/users.mjs','utf8');
   const shell=fs.readFileSync('admin/admin.mjs','utf8');
