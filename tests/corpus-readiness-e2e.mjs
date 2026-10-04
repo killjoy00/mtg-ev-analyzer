@@ -22,7 +22,12 @@ for(const [name,engine] of Object.entries({chromium,webkit})) {
    window.fixtureRequest=async(path,body)=>{
     window.calls.push({path,body});
     if(path==='/v1/admin/corpus/readiness')return structuredClone(window.readiness);
-    if(path==='/v1/admin/corpus')return structuredClone({...window.corpusFixture,readiness:window.readiness});
+    if(path==='/v1/admin/corpus'){
+     const overview=structuredClone({...window.corpusFixture,readiness:window.readiness});
+     delete overview.snapshots;
+     return overview;
+    }
+    if(path==='/v1/admin/corpus/qa/detail')return structuredClone({...window.corpusFixture,readiness:window.readiness});
     if(path==='/v1/admin/corpus/qa/snapshot') {
      const next=String(Number(window.readiness.current_revision)+1);
      window.readiness={...window.readiness,operation_id:next,current_operation_id:next,revision:next,current_revision:next,state:'warming',ready:false,cache_snapshot_id:null};
@@ -47,6 +52,7 @@ for(const [name,engine] of Object.entries({chromium,webkit})) {
   const panel=page.locator('#corpus-readiness');
   await page.locator('[data-open-set="qa"]').click();
   await page.locator('select[name="sourceSnapshotId"]').selectOption('b'.repeat(64));
+  assert.ok(await page.evaluate(()=>window.calls.some(c=>c.path==='/v1/admin/corpus/qa/detail')),'Snapshot controls must come from the deferred exact-detail request');
   await page.getByRole('button',{name:'Activate snapshot',exact:true}).click();
   assert.doesNotMatch(await panel.innerText(),/Ready: revision/,'Old readiness is not a success for a new pending activation');
   await page.waitForFunction(()=>document.querySelector('#corpus-readiness')?.textContent.includes('cache is warming'));
