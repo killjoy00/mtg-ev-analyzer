@@ -65,6 +65,16 @@ test('Admin Users browser uses PATCH rename, typed destructive confirmation, sta
   assert.match(growth,/username\$\/i\.test\(url\.pathname\)\) \{\n\s*const admin=await adminAccountIdentity\(request,\{mutation:true\}\)/);
 });
 
+test('admin shell keeps timeout handling around body parsing and publishes only current core reports',()=>{
+  const shell=fs.readFileSync('admin/admin.mjs','utf8');
+  const requestBlock=shell.slice(shell.indexOf('async function requestAt'),shell.indexOf('const request='));
+  assert.match(requestBlock,/try \{[\s\S]*await fetch\([\s\S]*await r\.json\(\)[\s\S]*\} catch\(error\)/);
+  assert.match(requestBlock,/TimeoutError.*AbortError.*admin_timeout/s);
+  const loadBlock=shell.slice(shell.indexOf('async function load()'),shell.indexOf("document.addEventListener('pack1:admin-signout'"));
+  assert.match(loadBlock,/nextReport=await request\([\s\S]*if\(loadId!==deferredLoad\)return;report=nextReport/);
+  assert.doesNotMatch(loadBlock,/report=await request\('\/v1\/admin\/measurements/);
+});
+
 test('0047 is registered in secure auth and isolated backend release paths',()=>{
   const manifest=JSON.parse(fs.readFileSync('migrations/manifest.json','utf8'));
   for(const key of ['secure-auth-release','backend-gate-backlog','launch-load','launch-distributed'])
