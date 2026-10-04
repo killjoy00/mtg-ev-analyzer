@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {randomUUID,randomBytes,createHash} from 'node:crypto';
 import {corpusDatabase} from '../scripts/neon-corpus-db.mjs';
-import {modelVersions} from '../model-versions.mjs';
+import modelVersions from '../model-versions.json' with {type:'json'};
 
 const [mode,commit,connectionFile,registryFile]=process.argv.slice(2);
 assert.ok(['preflight','verify','cleanup'].includes(mode));
