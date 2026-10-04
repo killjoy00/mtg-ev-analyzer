@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {assembleCorpusAdmin} from '../worker/corpus-admin.mjs';
+import {assembleCorpusAdmin,assembleCorpusOverview,handleCorpusAdmin} from '../worker/corpus-admin.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 
 const result=rows=>({rows});
@@ -62,4 +62,50 @@ test('historical-frozen snapshots own retained NULL-snapshot rows',()=>{
  assert.equal(data.snapshots[0].serving_count,2);
  assert.equal(data.sets[0].active_snapshot_eligible_count,2);
  assert.equal(data.sets[0].serving_count,2);
+});
+
+
+test('overview serving totals come from the verified cache groups without retained inventory scans',()=>{
+ const data=assembleCorpusOverview({
+  sets:result([
+   {set_id:'alpha',set_name:'Alpha',status:'Live',manifest:'{}',report:'{}'},
+   {set_id:'beta',set_name:'Beta',status:'Paused',manifest:'{}',report:'{}'}
+  ]),
+  servingSnapshot:result([{revision:'77',groups:JSON.stringify([
+   {set_id:'alpha',pick_number:1,band:'easy',n:4},
+   {set_id:'alpha',pick_number:1,band:'hard',n:2},
+   {set_id:'alpha',pick_number:2,band:'medium',n:3}
+  ])}])
+ });
+ assert.equal(data.serving_revision,'77');
+ assert.equal(data.overview_from_serving_cache,true);
+ assert.equal(data.sets.find(s=>s.set_id==='alpha').serving_count,9);
+ assert.deepEqual(data.sets.find(s=>s.set_id==='alpha').serving_by_pick,{'1':6,'2':3});
+ assert.equal(data.sets.find(s=>s.set_id==='beta').serving_count,0);
+ assert.equal('staged_count' in data.sets[0],false);
+});
+
+test('corpus overview handler does not scan raw verified puzzle inventory',async()=>{
+ const sql=[];
+ const query=async text=>{
+  sql.push(text);
+  if(text.includes('SELECT rv.revision::text revision,s.groups'))return result([{revision:'88',groups:[]}]);
+  return result([]);
+ };
+ await handleCorpusAdmin(new Request('https://packone.pro/v1/admin/corpus'),query,async()=>({}),'admin-fixture');
+ assert.equal(sql.some(text=>text.includes('draft_run_verified_puzzles p')),false);
+});
+
+test('exact corpus detail keeps every raw puzzle inventory scan scoped to one set',async()=>{
+ const sql=[];
+ const query=async text=>{
+  sql.push(text);
+  if(text.includes('WHERE k.set_id=$3'))return result([{set_id:'alpha',set_name:'Alpha',status:'Live',manifest:{},report:{}}]);
+  return result([]);
+ };
+ const report=await handleCorpusAdmin(new Request('https://packone.pro/v1/admin/corpus/alpha/detail'),query,async()=>({}),'admin-fixture');
+ assert.equal(report.sets[0].set_id,'alpha');
+ const raw=sql.filter(text=>text.includes('draft_run_verified_puzzles p'));
+ assert.equal(raw.length,2);
+ assert.ok(raw.every(text=>text.includes('p.set_id=$2')));
 });
