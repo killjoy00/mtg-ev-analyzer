@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {decisionClock} from '../decision-clock.mjs';
 import {measurementInput} from '../worker/decision-measurements.mjs';
 import {reportFilters,handleAdmin} from '../worker/measurement-admin.mjs';
@@ -26,4 +27,17 @@ test('admin reports never accept a guest player token and deny ordinary accounts
   assert.equal(reads,0);
   const query=async sql=>({rows:sql.includes('neon_auth.session')?[{id:'ordinary-account'}]:[]});
   await assert.rejects(handleAdmin(new Request('https://test/v1/admin/measurements',{headers:{'x-pack1-auth-session':'valid'}}),query,()=>{}),e=>e.status===403);
+});
+
+
+test('core admin measurements cannot regress to deferred habit or review aggregation',()=>{
+  const source=fs.readFileSync('worker/measurement-admin.mjs','utf8');
+  const start=source.indexOf("if(url.pathname==='/v1/admin/measurements') {");
+  const end=source.indexOf("const match=url.pathname.match",start);
+  assert.ok(start>0&&end>start);
+  const core=source.slice(start,end);
+  assert.doesNotMatch(core,/HABIT_METRICS_SQL/);
+  assert.doesNotMatch(core,/chosen AS/);
+  assert.match(source,/url\.pathname==='\/v1\/admin\/measurements\/habits'/);
+  assert.match(source,/url\.pathname==='\/v1\/admin\/measurements\/reviews'/);
 });
