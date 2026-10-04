@@ -2,13 +2,15 @@
 
 Updated 2026-10-02. This file is the source-of-truth submission packet for the first free public mobile release.
 
-## Current store release checkpoint — 2026-10-02
+## Historical distributed checkpoint — 2026-10-02
 
-- **iOS 1.0 current post-#837 candidate:** signed build `100415`, source revision `fa588b40bc380946735385abfac0ff52586e1873`. GitHub Actions run `36957484955` uploaded it; App Store Connect reported `processingState=VALID` and `buildAudienceType=APP_STORE_ELIGIBLE`, and the workflow attached build `100415` to App Store version 1.0. Release type remains manual.
-- **Android 1.0 current post-#837 candidate:** versionCode `100444`, source revision `fa588b40bc380946735385abfac0ff52586e1873`. Build run `36957485029` produced the Play-signed production AAB and exact-artifact release run `36965315032` uploaded it unchanged to Internal Testing, then promoted that same version unchanged to Closed Testing `production-access`. Google reported `releaseStatus=completed`, `requiresConsoleRollout=false`, and `committed=true`. VersionCode `100444` is the live qualification-track candidate.
+October 4: #910 is merged with verified native navigation, Daily, Learn, fonts and feedback repairs. The binaries below predate #890 and #910; they remain the last recorded distributed builds, not acceptance candidates for this repair. #955 also passed native verification and merged. #951 requests replacements after fresh exact-main RC certification of `f0f30c939d1016c70f5d3548d46b0b8b3f839e79` (run `37239878233`). Physical/provider acceptance and owner launch gates remain open.
+
+- **Previously distributed iOS 1.0 post-#837 candidate:** signed build `100415`, source revision `fa588b40bc380946735385abfac0ff52586e1873`. GitHub Actions run `36957484955` uploaded it; App Store Connect reported `processingState=VALID` and `buildAudienceType=APP_STORE_ELIGIBLE`, and the workflow attached build `100415` to App Store version 1.0. Release type remains manual.
+- **Previously distributed Android 1.0 post-#837 candidate:** versionCode `100444`, source revision `fa588b40bc380946735385abfac0ff52586e1873`. Build run `36957485029` produced the Play-signed production AAB and exact-artifact release run `36965315032` uploaded it unchanged to Internal Testing, then promoted that same version unchanged to Closed Testing `production-access`. Google reported `releaseStatus=completed`, `requiresConsoleRollout=false`, and `committed=true`. VersionCode `100444` is the live qualification-track candidate.
 - **Closed-test geography:** the `production-access` track targets Canada and the United States. Legacy `alpha` is not the qualification track.
 - **Apple public availability:** the owner completed first-time App Store availability setup for **United States + Canada only** in App Store Connect on 2026-10-01. The repo now carries a read-only API verifier; it must confirm exactly `CAN,USA`, `availableInNewTerritories=false`, and no pre-order state.
-- **Store assets:** Apple iPhone/iPad screenshots and the Elite review screenshot are uploaded. Google Play has the reviewed icon, five phone screenshots, and the feature graphic committed. Re-capture only if the final accepted RC materially changes a captured scene.
+- **Store assets:** Existing Apple iPhone/iPad and Elite review screenshots and Google phone screenshots predate #910 and need replacement. #951 requests fresh reviewed-main captures for inspection before guarded store upload. The approved icon and feature graphic remain unchanged.
 - **Google Play console setup:** complete for the currently available first-launch forms/settings: Ads, Sign-in details/App access, Target audience/content, IARC content rating, Data Safety, listing/assets, and Production countries **United States + Canada**. The remaining Google owner gate is the closed-test qualification clock followed by the Production-access application when Google enables it.
 - **Google Data Safety:** submitted successfully by run `36632174516`.
 - **Apple metadata already live:** version 1.0 is manual release; the en-US listing copy, privacy policy/choices URLs, content-rights declaration, and reviewed 12+ age-rating answers are present.
@@ -90,13 +92,16 @@ The iOS app includes the native Pack One Elite auto-renewable subscription throu
 
 Native Patreon interaction remains limited to existing-account OAuth authentication and membership reconciliation; the iOS app does not provide a Patreon purchase, price, join, or upgrade CTA. Provide a non-expiring reviewer account for account-only review paths, but reviewers can also exercise the Apple IAP flow from the Membership screen. Do not place reviewer credentials in this repository; enter them only in App Store Connect Review Information.
 
-Reviewer path after sign-in:
-1. Home -> Practice
-2. Verify regular practice is available
-3. Verify Powered Cube practice is available
-4. Verify custom-set practice is available
-5. Career shows completed-game history
-6. Account screen supports sign-out and permanent deletion
+Reviewer path for the native navigation repair (#910):
+1. Signed out, use Daily / How to Play / Sign in. How to Play opens the quick start directly and includes a Play Daily Draft Run action.
+2. Signed in, use the Daily / Practice / Leaders / Learn / My Pack One bottom tabs. Root tabs have no Back button; child screens return with a human-readable Back label.
+3. In Practice, verify free regular practice and, with Elite access, Powered Cube and custom-set practice.
+4. Complete eight picks, open decision review, then return to Daily or Practice. Results retain the actual attempt.
+5. Open a player from Leaders and return. My Pack One shows the member dashboard, with a welcome/play action for a new account.
+6. Open My Pack One → Account settings for profile, membership, sign-in/security, sign-out and permanent deletion. Help and policies are available from Help or Account settings.
+7. Shared invitations require explicit acceptance. Practice shows Continue shared run / View shared result only for a valid identity-bound checkpoint on this device; it is not a cloud history list.
+
+These revised instructions apply only to a candidate containing #890, #910 and #955. Do not use the October 2 builds (iOS 100415 / Android 100444) to accept this repair.
 
 Apple-linked account deletion requires fresh Apple authorization and revokes the Apple authorization before provider cleanup completes.
 
@@ -161,7 +166,7 @@ The guarded `Mobile store screenshots` workflow captures:
 5. Career/leaderboard — `Track your Pack One career.`
 6. iOS Membership purchase state for the App Store subscription review screenshot.
 
-Capture outputs are generated for iPhone, iPad, and Android from the same production screen implementation. Before upload, visually compare the generated scenes against the accepted 1.0 RC and recapture any scene whose production layout or copy has materially changed.
+Capture outputs are generated for iPhone, iPad, and Android from the same production screen implementation. Before upload, visually compare the generated scenes against the accepted 1.0 RC and recapture any scene whose production layout or copy has materially changed. #910 changes Daily, Practice, Career, typography and feedback, so the earlier screenshot set is not evidence for this candidate. Only passing native captures identified in the repair ledger may replace those store assets; failed diagnostic captures must not be uploaded.
 
 Apple allows 1-10 screenshots per supported device size. Pack One v1 supports iPad (`ios.supportsTablet=true`), so iPad-specific QA and required iPad App Store screenshots remain mandatory.
 
@@ -303,7 +308,7 @@ Do **not** spend console time on these unless an automated probe reports a probl
 - uploading/replacing the current RC binaries;
 - attaching the current successful App Store-eligible iOS RC to App Store version 1.0; post-#837 build `100415` is already `VALID`, `APP_STORE_ELIGIBLE`, and attached by run `36957484955`;
 - building/uploading/promoting the Android RC; versionCode `100444` is already signed, uploaded, and active on `production-access`;
-- Google Data Safety or store graphics (already done);
+- Google Data Safety (already done) or replacement store graphics after reviewed-main capture and visual inspection;
 - App Store listing copy, manual-release flag, reviewed age-rating answers, or content-rights declaration (already present);
 - release-track/API status audits;
 - App Store/Play production release mechanics after all prerequisites and explicit owner approval — these can be handled through the guarded API workflows.

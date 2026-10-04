@@ -11,9 +11,9 @@ Status vocabulary:
 - **Policy decision open** — code intentionally does not claim storefront approval.
 - **Release evidence open** — implementation exists but required device/signing/live-host evidence is still missing.
 
-## October 4 native repair — acceptance still open
+## October 4 native repair — implementation merged; physical acceptance open
 
-PR #910 addresses the original owner complaints, which were not completed by #890. See [the complaint/evidence ledger](mobile-native-ux-repair-575.md). Existing “Implemented” rows below describe source capability; they do not override failed physical observations or certify the old distributed binaries. The revised navigation, Daily, Learn and feedback require the new native capture and tester-build evidence recorded in that ledger.
+PR #910 merged as `ae70e2af79b804c137b8c289c2a1b0535e5c76dd` and addresses the original owner complaints, which were not completed by #890. See [the complaint/evidence ledger](mobile-native-ux-repair-575.md). Existing “Implemented” rows below describe source capability; they do not override failed physical observations or certify the old distributed binaries. Native run `37232560582` passed all 24 Android checks and 14 scenes plus measured text growth on each iPhone/iPad, with actual image review. Secondary tab-return correction #955 also passed 25 Android checks and the iPhone/iPad scenes in run `37236842723`; it merged as `f0f30c939d1016c70f5d3548d46b0b8b3f839e79`. Fresh exact-main smoke `37239878233` and #951 checks remain the signed-candidate prerequisites. Tester distribution and physical/provider acceptance remain separate gates recorded in that ledger.
 
 ## October 2, 2026 UAT parity candidate
 
@@ -141,7 +141,7 @@ The first main run began on `528ed80a...` and became stale when #651 advanced ma
 
 Workflow **36278475765** subsequently completed green on exact current main `8956f8c5011a7bdffd71c2184a5006558b362d69`. Validation, the unsigned iOS production archive, Android production bundle and final evidence job all passed. The evidence job re-fetched `main` after both native builds and confirmed that the source SHA had not moved. It records App Store version **1.0**, Play version name **1.0** and `publication: none`. The unsigned iOS artifact ZIP digest is `882be6c7e6218b39316857634832e2b7ad1483c576423b217980cedefa80af60`; the Android RC artifact ZIP digest is `7d4720461e7b080ed69931f47535a959076d7b42aa2fc3b318bf0d91a0c70246`, with versionCode **300003**.
 
-This exact-main evidence remains valid only while that SHA is the intended release source. Any later `main` movement requires another exact-main recertification before signed store candidates are treated as final.
+This historical exact-main evidence does not certify the current repair. Apply the source-freeze rules in [the release runbook](mobile-release-runbook.md#exact-main-source-freeze-before-signed-candidates): any later shipped runtime, configuration, dependency or binary build-input change requires new certification. A documentation/store-control-only compare must prove binary-input equivalence and be recorded in #575; it must never be presented as a smoke run on a different SHA.
 
 ### Release evidence still open
 

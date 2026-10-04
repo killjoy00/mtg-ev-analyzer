@@ -106,7 +106,38 @@ if (attached.data?.id !== build.id ||
   throw new Error('App Store version build-attachment verification failed.');
 }
 
+// Processing and App Store attachment do not prove TestFlight availability.
+// Read Apple's separate distribution state without changing testers or groups.
+// API references: /documentation/appstoreconnectapi/get-v1-builds-_id_-buildbetadetail
+// and /documentation/appstoreconnectapi/get-v1-betagroups (filter[builds]).
+let testFlight;
+try {
+  const groupParams = new URLSearchParams({
+    'filter[app]': appId, 'filter[builds]': build.id,
+    'fields[betaGroups]': 'isInternalGroup,hasAccessToAllBuilds', limit: '200',
+  });
+  const [detail, groups] = await Promise.all([
+    asc(`/v1/builds/${encodeURIComponent(build.id)}/buildBetaDetail`),
+    asc(`/v1/betaGroups?${groupParams}`),
+  ]);
+  testFlight = {
+    verified: true,
+    internalBuildState: detail.data?.attributes?.internalBuildState ?? null,
+    externalBuildState: detail.data?.attributes?.externalBuildState ?? null,
+    groups: (groups.data || []).map(group => ({
+      id: group.id,
+      isInternalGroup: group.attributes?.isInternalGroup ?? null,
+      hasAccessToAllBuilds: group.attributes?.hasAccessToAllBuilds ?? null,
+    })),
+    groupListComplete: !groups.links?.next,
+    testersOrGroupsChanged: false,
+  };
+} catch (error) {
+  testFlight = { verified: false, reason: error.message, testersOrGroupsChanged: false };
+}
+
 const result = {
+  testFlight,
   appId,
   versionString,
   versionId: version.id,
@@ -131,6 +162,10 @@ if (process.env.GITHUB_STEP_SUMMARY) {
     `- Audience: \`${result.buildAudienceType}\``,
     '- Attached to App Store version 1.0: true',
     '- App Review submission created: false',
+    `- TestFlight availability read: ${testFlight.verified ? 'verified' : 'unavailable'}`,
+    `- Internal testing state: ${testFlight.internalBuildState ?? 'unknown'}`,
+    `- External testing state: ${testFlight.externalBuildState ?? 'unknown'}`,
+    `- Existing groups associated with build: ${testFlight.groups?.length ?? 'unknown'}`,
     '',
   ].join('\n'));
 }
