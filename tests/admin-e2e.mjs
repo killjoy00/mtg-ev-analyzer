@@ -54,7 +54,13 @@ try {
       if(requestUrl.searchParams.get('difficulty')==='hard')await new Promise(resolve=>setTimeout(resolve,100));
       return route.fulfill({json:{puzzle:{prior_picks:[],historical_pick_id:'trophy',candidates:[{id:'trophy',name:'Trophy card',model_probability:.1},{id:'alternative',name:'Alternative card',model_probability:.5}]},choices:[{selected_id:'alternative',answers:20,average_score:95}]}});
     }
-    if(path==='/v1/admin/measurements'&&requestUrl.searchParams.get('difficulty')==='hard')await new Promise(resolve=>setTimeout(resolve,25));
+    if(path==='/v1/admin/measurements') {
+      if(requestUrl.searchParams.get('difficulty')==='hard')await new Promise(resolve=>setTimeout(resolve,25));
+      const section=requestUrl.searchParams.get('section')||'all';
+      if(section==='core')return route.fulfill({json:{...fixture,groups:[],reviews:[],share_funnel:undefined,habit_metrics:undefined}});
+      if(section==='analysis')return route.fulfill({json:{generated_at:fixture.generated_at,filters:fixture.filters,groups:fixture.groups,reviews:fixture.reviews}});
+      if(section==='engagement')return route.fulfill({json:{generated_at:fixture.generated_at,filters:fixture.filters,share_funnel:fixture.share_funnel,habit_metrics:fixture.habit_metrics}});
+    }
     return route.fulfill({json:fixture});
   });
   await page.reload();
