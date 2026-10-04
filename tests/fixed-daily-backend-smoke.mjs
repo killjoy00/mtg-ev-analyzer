@@ -10,7 +10,7 @@ const growthModule=await import('../worker/growth-function.js');
 const {query}=growthModule, growth=growthModule.default;
 const {default:api}=await import('../worker/draft-run-function.mjs');
 const {DRAFT_RUN_CORPUS_VERSION}=await import('../draft-run.mjs');
-const {selectDatabaseRun}=await import('../worker/draft-run-selection.mjs');
+const {loadPuzzleMetadata}=await import('../worker/draft-run-selection.mjs');
 const tag=crypto.randomUUID().slice(0,8),day='2040-01-10';
 const parse=v=>typeof v==='string'?JSON.parse(v):v;
 async function callWith(target,path,body,token,auth,status=200){
@@ -96,10 +96,19 @@ const later=await call('/v1/session',{displayName:'QA fixed later '+tag});
 assert.equal((await call('/v1/runs',{daily:true},later.token)).current.puzzle_id,schedule[0]);
 await query("UPDATE draft_run_environment_policy SET status='Live' WHERE set_id='hob'");
 // A different corpus revision cannot replace an already-published Daily.
-const retainedVersion=(await query("SELECT corpus_version FROM draft_run_verified_puzzles WHERE set_id='powered-cube' AND corpus_version<>$1 ORDER BY corpus_version LIMIT 1",[DRAFT_RUN_CORPUS_VERSION])).rows[0]?.corpus_version;
-assert.ok(retainedVersion,'A retained older corpus is required.');
-const older=await selectDatabaseRun(query,retainedVersion,'fixed-old-cube','powered-cube',{selectionVersion:'eight-pick-v3'});
-await query(`INSERT INTO draft_run_schedules(day,environment,corpus_version,puzzle_ids,selection_version,difficulty_version) VALUES($1::date,'powered-cube',$3,$2::jsonb,'eight-pick-v3','support-ratio-v1') ON CONFLICT DO NOTHING`,[day,JSON.stringify(older.map(p=>p.puzzle_id)),retainedVersion]);
+// Replay an actually published retained schedule. A superseded parent is
+// intentionally unavailable for new generation after the serving cutover.
+const retained=(await query(`SELECT corpus_version,puzzle_ids,selection_version,difficulty_version
+ FROM draft_run_schedules WHERE environment='powered-cube' AND corpus_version<>$1
+ AND jsonb_array_length(puzzle_ids)=8 ORDER BY day DESC LIMIT 1`,[DRAFT_RUN_CORPUS_VERSION])).rows[0];
+assert.ok(retained,'A retained eight-pick Cube schedule is required.');
+const retainedVersion=retained.corpus_version,retainedIds=parse(retained.puzzle_ids);
+const older=await loadPuzzleMetadata(query,retainedVersion,retainedIds);
+assert.equal(older.length,8);assert.ok(older.every(Boolean),'Every retained decision must still resolve');
+assert.deepEqual(older.map(p=>p.puzzle_id),retainedIds,'Frozen historical decision order is unchanged');
+await query(`INSERT INTO draft_run_schedules(day,environment,corpus_version,puzzle_ids,selection_version,difficulty_version)
+ VALUES($1::date,'powered-cube',$3,$2::jsonb,$4,$5) ON CONFLICT DO NOTHING`,
+ [day,JSON.stringify(retainedIds),retainedVersion,retained.selection_version,retained.difficulty_version]);
 const cube=await call('/v1/runs',{daily:true,environment:'powered-cube'},later.token);
 assert.equal(cube.current.puzzle_id,older[0].puzzle_id);
 assert.equal((await query('SELECT corpus_version FROM draft_run_sessions WHERE id=$1::uuid',[cube.id])).rows[0].corpus_version,retainedVersion);
