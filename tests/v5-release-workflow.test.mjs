@@ -6,6 +6,13 @@ import {assertHistoryPreserved} from '../scripts/v5-release-state.mjs';
 const workflow=fs.readFileSync(new URL('../.github/workflows/release-v5-corpus.yml',import.meta.url),'utf8');
 const deployWorkflow=fs.readFileSync(new URL('../.github/workflows/deploy-functions.yml',import.meta.url),'utf8');
 const candidateVerifier=fs.readFileSync(new URL('../scripts/verify-v5-release-candidate.mjs',import.meta.url),'utf8');
+test('staging rejects health-ready parents that remain Blocked and binds optional metadata repair to reviewed orchestration',()=>{
+ const stage=workflow.slice(workflow.indexOf('      - name: Stage immutable'),workflow.indexOf('      - name: Require exact bridge'));
+ assert.match(stage,/git show "\$GITHUB_SHA:\.github\/release-v5-source-metadata\.mjs"/);
+ assert.ok(stage.indexOf(' capture ')<stage.indexOf('node .github/release-v5-source-metadata.mjs'));
+ assert.ok(stage.indexOf('check-corpus-health.mjs')<stage.indexOf("s.lifecycle_status==='Candidate'"));
+ assert.ok(stage.indexOf("s.lifecycle_status==='Candidate'")<stage.indexOf('candidate-gameplay-canary.mjs'));
+});
 
 test('v5 stage loads the exact rebuilt baseline before Premier additions',()=>{
   const capture=workflow.indexOf('v5-release-state.mjs "$RUNNER_TEMP/target.connection" capture');
