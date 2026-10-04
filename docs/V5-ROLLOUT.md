@@ -3,8 +3,10 @@
 ## October 3 finalizer recovery
 
 Run `37097278712` at `388d9ab045240e0d96a4b1382f140e35fc91d0b4`
-successfully built all 30 active environments. MID/VOW remain intentionally
-retired. Finalization assembled the candidate and QA, then failed three tests.
+successfully built all 30 active v9 environments. MID/VOW were excluded from
+this active v9 rebuild/selection scope; their historical v8 policy, snapshots,
+manifests and reads remain retained and must not be purged. Finalization assembled
+the candidate and QA, then failed three tests.
 The MSH audit and v5 component negative-parent assertion referred to v4 sample
 details. The revised audit checks the actual big-disagreement scoring category;
 the negative component assertion explicitly uses immutable v8.
@@ -53,24 +55,50 @@ means every draft in the unchanged qualified Pack One cohort, not every raw
 construction, five-fold draft isolation, puzzle-source exclusion, calibration,
 scoring, difficulty and serving rules stay unchanged.
 
-## Current release state
+## Current release state — completed October 4, 2026
 
-This branch is preparation, not a releasable corpus. Production remains v8/v4.
-No corpus switch, database deletion, result rewrite, source refresh or leaderboard
-reset has occurred. The builder and version-safety changes can be reviewed independently.
-Do not deploy v9 until the full rollout gates below pass.
+Issue #889 is complete. Production serves `strong-player-colour-stage-v5` on
+`elite-trophy-colour-stage-v9`.
 
-`model-versions.json` separates the immutable v4 policy from v5. Replay, path,
-regular, legacy and Cube command-line builders accept `--model-version`; v5
-defaults to uncapped and refuses a positive or negative draft cap. `0` and an
-omitted cap both mean all qualified drafts. Existing v4 defaults stay unchanged.
-The full trophy importer follows the separately versioned corpus identity and
-refuses mixed or capped v5 manifests. Checkpoint identity includes the model and
-training-policy code. Frozen source-pin checks apply to reused checkpoints too.
+The immutable accepted candidate is rebuild run `37132557406`, build identity
+`ccd0012b4733ca94b37baa68636dee0be60b7ee2bf5b572ff4fe8e2a27e2601e`.
+It contains 30 active v9 Premier parents / 980,984 Premier puzzles. Production
+activation run `37168731594` switched all 30 approved parent pointers, published
+22 eligible Traditional v5 components, and intentionally left SIR Traditional
+Candidate. Both v8 and v9 readiness were Ready at production serving revision
+`110`.
 
-Path-model architecture retains its own historical version. A v5 path artifact
-records its v5 context parent, uncapped mode, full selected population and replay
-exclusion count separately.
+The accepted v5 runtime commit is
+`5ef9c9230d83ca6a72210cf50e76c12b3ceb471a`; production runtime acceptance
+run `37171099238` and normal live browser acceptance run `37171455258` passed.
+Later guarded worker deployments may advance application code without changing
+the immutable v5/v9 corpus. The October 4 worker deployment of
+`0ff55f6084b4ca372ec2457b0d81611054be6e96` (run `37216039560`) again passed
+live v5 health/readiness and account-linked Practice acceptance against production,
+with the same v9 corpus and readiness revision 110.
+
+Rollback was exercised for real in development. Run `37156639632` restored all
+30 captured v8 pointers and the bridge; accepted restoration run `37160251710`
+returned development to v9. Production retains all 30 original v8 rollback
+parents as Superseded with unchanged manifests and successor lineage. The original
+v8 manifest aggregate is
+`da99938bdf0ca3e618f5b7bb94c7390f`.
+
+Historical results were not rewritten or deleted. The final audit against the
+original production baseline found zero missing original rows across game
+results, environment results, scores, Draft Run sessions, completed sessions and
+schedules. Public v5 standings are corpus-scoped to v9 while historical results
+and personal history remain readable.
+
+MID and VOW are not members of the active 30-environment v9 candidate or automatic
+selection policy. Their historical v8 source records, snapshots, manifests,
+policy/history and reads are retained. In this runbook, "retired" must not be
+interpreted as authorization to purge that historical v8 state.
+
+The durable machine-readable closeout is
+`research/v5-production-release.json`. The pre-rollout handoff
+`docs/V5-HANDOFF-2026-10-02.md` is historical and must not be used as current
+deployment state.
 
 ## Source pins and authorized refresh
 
@@ -94,31 +122,35 @@ player history remain immutable even though newer inputs are authorized for v5.
 Every downloaded build archive must match the candidate pin's SHA-256. HEAD
 metadata is an availability check and never replaces byte verification.
 
-## Remaining execution gates
+## Completed execution gates
 
-1. Merge the implementation and its reviewed `rebuild-v5` request. The dedicated
-   workflow freezes the reviewed commit and source/build identity, gives each of
-   the 32 environments an independent job, and checkpoints replay, full-trophy
-   and admitted Traditional phases separately in R2. Exact raw compressed bytes
-   are retained by SHA-256 before computation. Failed phases can be rerun without
-   losing completed environments or earlier phases. The existing regular,
-   legacy and measured Cube builders retain replay selection and normalization.
-2. Rebuild all 30 active replay/path environments and every active Premier trophy payload. MID and VOW were owner-retired from the active v5 plan on 2026-10-02; their historical v4/v8 records remain retained.
-   For normal environments assert trained equals qualified. For legacy rank
-   environments record the complete unchanged rank-proxy training cohort
-   separately from source/trophy eligibility. No arbitrary replacement cap.
-3. Rescore all admitted Traditional supplements using Premier-trained v5 graders,
-   with unchanged source drafts, eligibility and Cube P2–P7 serving window.
-   Traditional evidence must never enter Premier model training. Add explicit
-   v5 component identities, additive schema constraints and loader support.
-4. Finalize v9 only after all model-dependent artifacts are v5 and exact frozen
-   provenance/accounting/holdout/trajectory/image/replay/R2 checks pass. Generate
-   rebuild QA, including training counts, support/leader/score/difficulty/rating
-   changes, largest changes, cohort drift and invalid numerical output. This is
-   implementation QA, not a separate model-selection experiment.
-5. Complete required `test` and `browser` CI, merge implementation/generated PRs,
-   stage the exact candidate to development and run real API/game acceptance.
-   Promote those same verified artifacts to production and run acceptance there.
+All rollout gates below completed without relaxing model, source, correctness or
+latency thresholds:
+
+1. The 30-environment all-qualified rebuild completed and was recovered from its
+   saved successful environment artifacts after finalizer fixes. The accepted
+   immutable candidate is run `37132557406`.
+2. Development staging, v8 bridge deployment, v9 activation and exact-runtime
+   Daily/Practice acceptance passed.
+3. A real development rollback restored the captured v8 state, verified the
+   bridge and original history, then successfully reactivated the exact v9
+   candidate.
+4. Production staging verified exact pinned sources, immutable candidate bytes,
+   all 30 parents and retained history before activation. Production activation
+   `37168731594` passed full serving quality, including 40 Daily runs / 320
+   decisions / 23 custom sets and Powered Cube 10,000 selector simulations plus
+   20 SQL parity runs.
+5. Exact production runtime acceptance `37171099238` and normal live browser
+   acceptance `37171455258` passed. Historical public scores remained retained
+   while new standings became v9-scoped.
+6. The exact-pick performance work was separately accepted and promoted through
+   #938/#939/#940 after final backend, performance and five-network distributed
+   evidence passed. Migration `0051_exact_pick_draw_index.sql` remains in the
+   normal migration manifest; its special one-time release request/workflow was
+   retired after successful production promotion.
+
+The authoritative accepted counts, run IDs, rollback evidence and historical
+retention values are recorded in `research/v5-production-release.json`.
 
 ## Cross-version serving cutover
 
