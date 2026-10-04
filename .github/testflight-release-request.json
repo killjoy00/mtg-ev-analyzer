@@ -1,1 +1,4 @@
-{"operation":"upload-testflight-app-store-eligible","reason":"Owner-authorized fresh Pack One 1.0 iOS release candidate from current main after merged PR #837 (account-flow UX cleanup), including the updated account-ready display-name behavior and native account/profile changes. Build, sign, upload to TestFlight, wait for App Store Connect processing to report VALID and APP_STORE_ELIGIBLE, and attach that exact build to editable App Store version 1.0 without submitting App Review."}
+{
+  "operation": "upload-testflight-app-store-eligible",
+  "reason": "Owner-authorized replacement Pack One 1.0 test candidate after native UX repair PR #910 and retained account/profile PR #890. Build and sign reviewed current main only after exact-main RC smoke and native acceptance are recorded in #575; upload, require VALID and APP_STORE_ELIGIBLE, attach the exact build to editable version 1.0, and report TestFlight availability separately. Do not submit App Review or publicly release."
+}

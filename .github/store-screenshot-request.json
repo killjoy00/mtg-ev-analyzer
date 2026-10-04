@@ -1,1 +1,4 @@
-{"operation":"generate-mobile-store-screenshots","reason":"Final store screenshot recapture after visual QA of Android artifact 11001309439 confirmed the routing/system-dialog fixes but exposed a fixture-only Career label typo: `September Season Season · Current`. Change the fixture season name to `September` so the shared UI renders `September Season · Current`, then regenerate store artifacts. Keep all existing Android dialog and dual-SSIM guards. Artifact generation only; do not upload, submit, publish, or release anything."}
+{
+  "operation": "generate-mobile-store-screenshots",
+  "reason": "Generate updated native iPhone, iPad and Android screenshots from reviewed current main after #910, including real bottom tabs, Daily reset/streak, bundled fonts, Learn and corrected feedback. These controlled preview artifacts require inspection before any store upload; this request does not submit or release the app."
+}

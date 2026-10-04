@@ -90,13 +90,16 @@ The iOS app includes the native Pack One Elite auto-renewable subscription throu
 
 Native Patreon interaction remains limited to existing-account OAuth authentication and membership reconciliation; the iOS app does not provide a Patreon purchase, price, join, or upgrade CTA. Provide a non-expiring reviewer account for account-only review paths, but reviewers can also exercise the Apple IAP flow from the Membership screen. Do not place reviewer credentials in this repository; enter them only in App Store Connect Review Information.
 
-Reviewer path after sign-in:
-1. Home -> Practice
-2. Verify regular practice is available
-3. Verify Powered Cube practice is available
-4. Verify custom-set practice is available
-5. Career shows completed-game history
-6. Account screen supports sign-out and permanent deletion
+Reviewer path for the native navigation repair (#910):
+1. Signed out, use Daily / How to Play / Sign in. How to Play opens the quick start directly and includes a Play Daily Draft Run action.
+2. Signed in, use the Daily / Practice / Leaders / Learn / My Pack One bottom tabs. Root tabs have no Back button; child screens return with a human-readable Back label.
+3. In Practice, verify free regular practice and, with Elite access, Powered Cube and custom-set practice.
+4. Complete eight picks, open decision review, then return to Daily or Practice. Results retain the actual attempt.
+5. Open a player from Leaders and return. My Pack One shows the member dashboard, with a welcome/play action for a new account.
+6. Open My Pack One → Account settings for profile, membership, sign-in/security, sign-out and permanent deletion. Help and policies are available from Help or Account settings.
+7. Shared invitations require explicit acceptance. Practice shows Continue shared run / View shared result only for a valid identity-bound checkpoint on this device; it is not a cloud history list.
+
+These revised instructions apply only to a candidate containing #910. Do not use the October 2 builds (iOS 100415 / Android 100444) to accept this repair.
 
 Apple-linked account deletion requires fresh Apple authorization and revokes the Apple authorization before provider cleanup completes.
 
@@ -161,7 +164,7 @@ The guarded `Mobile store screenshots` workflow captures:
 5. Career/leaderboard — `Track your Pack One career.`
 6. iOS Membership purchase state for the App Store subscription review screenshot.
 
-Capture outputs are generated for iPhone, iPad, and Android from the same production screen implementation. Before upload, visually compare the generated scenes against the accepted 1.0 RC and recapture any scene whose production layout or copy has materially changed.
+Capture outputs are generated for iPhone, iPad, and Android from the same production screen implementation. Before upload, visually compare the generated scenes against the accepted 1.0 RC and recapture any scene whose production layout or copy has materially changed. #910 changes Daily, Practice, Career, typography and feedback, so the earlier screenshot set is not evidence for this candidate. Only passing native captures identified in the repair ledger may replace those store assets; failed diagnostic captures must not be uploaded.
 
 Apple allows 1-10 screenshots per supported device size. Pack One v1 supports iPad (`ios.supportsTablet=true`), so iPad-specific QA and required iPad App Store screenshots remain mandatory.
 
