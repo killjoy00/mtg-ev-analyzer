@@ -30,6 +30,12 @@ test('gateway allows only the narrow admin username and deletion routes and meth
   assert.equal(adminGrowthPath('/v1/admin/users/22222222-2222-4222-8222-222222222222/deletion','GET','production'),true);
   assert.equal(adminGrowthPath('/v1/admin/users/22222222-2222-4222-8222-222222222222/delete','POST','preview'),false);
   assert.equal(adminGrowthPath('/v1/admin/users/22222222-2222-4222-8222-222222222222/email','POST','production'),false);
+  assert.equal(adminPath('/v1/admin/measurements','GET'),true);
+  assert.equal(adminPath('/v1/admin/measurements/habits','GET'),true);
+  assert.equal(adminPath('/v1/admin/measurements/reviews','GET'),true);
+  assert.equal(adminPath('/v1/admin/measurements/habits','POST'),false);
+  assert.equal(adminPath('/v1/admin/corpus/blb/detail','GET'),true);
+  assert.equal(adminPath('/v1/admin/corpus/blb/detail','POST'),false);
 });
 
 test('Admin Users browser uses PATCH rename, typed destructive confirmation, status recovery and separate services',()=>{
