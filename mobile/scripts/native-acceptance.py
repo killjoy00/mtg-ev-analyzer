@@ -346,7 +346,29 @@ if platform == 'android':
         adb('shell', 'input', 'keyevent', '4')
         xml, _ = snapshot('settings-back')
         require('My Pack One' in xml, 'Settings Back did not restore member dashboard')
+        tap('Account settings', exact=True)
+        tap('Profile & visibility', exact=True)
+        tap('Open My Pack One', exact=True)
+        xml, _ = snapshot('profile-editor-return-to-career')
+        require('My Pack One' in xml and 'Navigate up' not in xml, 'Profile return did not restore the root tabs')
+        adb('shell', 'input', 'keyevent', '4')
+        xml, _ = snapshot('profile-editor-return-hardware-back')
+        require('A Very Long Pack One Player Name' in xml and 'Display name' not in xml, 'Profile return left the editor under a duplicate tab stack')
+
     attempt('member-tabs-profile-settings-and-hardware-back', member_navigation)
+
+    def archive_return():
+        launch('member')
+        adb('shell', f"am start -W -a android.intent.action.VIEW -d 'packone://set-archive?setId=msh' -p '{PACKAGE}'")
+        time.sleep(4)
+        tap('Open Practice', exact=True)
+        xml, _ = snapshot('archive-return-to-practice')
+        require('Choose your Draft Run' in xml and 'Navigate up' not in xml, 'Archive return did not restore the Practice tab')
+        adb('shell', 'input', 'keyevent', '4')
+        xml, _ = snapshot('archive-return-hardware-back')
+        require('Eight picks. Your call.' in xml, 'Archive return did not preserve Daily tab history')
+    attempt('archive-deep-link-return-without-duplicate-tabs', archive_return)
+
 
     def practice_journey():
         launch('member', 'practice')
