@@ -71,8 +71,11 @@ test('admin shell keeps timeout handling around body parsing and publishes only 
   assert.match(requestBlock,/try \{[\s\S]*await fetch\([\s\S]*await r\.json\(\)[\s\S]*\} catch\(error\)/);
   assert.match(requestBlock,/TimeoutError.*AbortError.*admin_timeout/s);
   const loadBlock=shell.slice(shell.indexOf('async function load()'),shell.indexOf("document.addEventListener('pack1:admin-signout'"));
+  assert.match(loadBlock,/await verifyAdminContract\(\)/);
   assert.match(loadBlock,/nextReport=await request\([\s\S]*if\(loadId!==deferredLoad\)return;report=nextReport/);
   assert.doesNotMatch(loadBlock,/report=await request\('\/v1\/admin\/measurements/);
+  assert.match(shell,/x-pack1-admin-api-version/);
+  assert.match(shell,/admin_release_mismatch/);
 });
 
 test('0047 is registered in secure auth and isolated backend release paths',()=>{
