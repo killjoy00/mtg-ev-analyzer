@@ -149,11 +149,11 @@ jobs:
           test "$admin_status" = '200' || { echo "Admin compatibility health returned HTTP $admin_status"; cat "$admin_body"; exit 1; }
           gateway_admin_version="$(grep -i '^x-pack1-admin-api-version:' "$admin_headers" | head -n 1 | sed 's/^[^:]*:[[:space:]]*//; s/\r$//' || true)"
           backend_admin_version="$(python - "$admin_body" <<'PY'
-import json, sys
-payload=json.load(open(sys.argv[1]))
-value=payload.get("admin_api_version")
-print("" if value is None else value)
-PY
+          import json, sys
+          payload=json.load(open(sys.argv[1]))
+          value=payload.get("admin_api_version")
+          print("" if value is None else value)
+          PY
           )"
           test "$gateway_admin_version" = "$admin_version" || { echo "Gateway admin API version ${gateway_admin_version:-missing} does not match published shell $admin_version"; exit 1; }
           test "$backend_admin_version" = "$admin_version" || { echo "Draft backend admin API version ${backend_admin_version:-missing} does not match published shell $admin_version"; exit 1; }
