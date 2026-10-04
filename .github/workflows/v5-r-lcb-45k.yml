@@ -1,0 +1,178 @@
+name: v5 R-LCB frozen 45k comparison
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/v5-r-lcb-45k.yml'
+      - 'scripts/compare_v5_r_lcb_45k.py'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: v5-r-lcb-45k-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  BASE: https://17lands-public.s3.amazonaws.com/analysis_data
+  COMPAT_COMMIT: 036c8f665a4399e93e39a4d9b9f5cc45d8ec4b31
+  HISTORICAL_R_COMMIT: a7c0afd3cd5f2f872d312fe26f510894c305ef3b
+
+jobs:
+  prepare:
+    name: reconstruct v5 ${{ matrix.env }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - env: FIN
+            freeze_name: contextual-value-v1-r-independent-confirmation-freeze-FIN
+          - env: TDM
+            freeze_name: contextual-value-v1-r-independent-confirmation-freeze-TDM
+          - env: DFT
+            freeze_name: contextual-value-v1-r-independent-confirmation-freeze-DFT
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install frozen numeric dependency
+        run: python -m pip install --disable-pip-version-check 'numpy==2.3.3'
+      - name: Restore exact September model helpers
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p compat/scripts
+          git show "$COMPAT_COMMIT:scripts/audit_a_transfer_529.py" > compat/scripts/audit_a_transfer_529.py
+          git show "$COMPAT_COMMIT:scripts/build_replays.py" > compat/scripts/build_replays.py
+          python -m py_compile compat/scripts/audit_a_transfer_529.py compat/scripts/build_replays.py scripts/compare_v5_r_lcb_45k.py
+      - name: Download exact frozen evaluation context
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ matrix.freeze_name }}
+          path: freeze
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 36475098718
+      - name: Download exact public snapshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p raw
+          curl --fail --location --retry 5 --retry-delay 3 --output "raw/${{ matrix.env }}-draft.csv.gz" "$BASE/draft_data/draft_data_public.${{ matrix.env }}.PremierDraft.csv.gz"
+          curl --fail --location --retry 5 --retry-delay 3 --output "raw/${{ matrix.env }}-game.csv.gz" "$BASE/game_data/game_data_public.${{ matrix.env }}.PremierDraft.csv.gz"
+      - name: Reconstruct uncapped v5 actions
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "out/${{ matrix.env }}"
+          python scripts/compare_v5_r_lcb_45k.py prepare \
+            --env "${{ matrix.env }}" \
+            --draft "raw/${{ matrix.env }}-draft.csv.gz" \
+            --game "raw/${{ matrix.env }}-game.csv.gz" \
+            --freeze freeze/frozen-evaluation-context.npz \
+            --compat-root compat \
+            --out "out/${{ matrix.env }}/prepared.npz" \
+            --meta "out/${{ matrix.env }}/meta.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v5-r-lcb-prepared-${{ matrix.env }}
+          path: out/${{ matrix.env }}
+          if-no-files-found: error
+
+  aggregate:
+    name: aggregate frozen comparison
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install frozen numeric dependency
+        run: python -m pip install --disable-pip-version-check 'numpy==2.3.3'
+      - name: Checkout exact historical evaluator source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git worktree add "$RUNNER_TEMP/historical-r" "$HISTORICAL_R_COMMIT"
+      - name: Download prepared FIN
+        uses: actions/download-artifact@v4
+        with:
+          name: v5-r-lcb-prepared-FIN
+          path: prepared/FIN
+      - name: Download prepared TDM
+        uses: actions/download-artifact@v4
+        with:
+          name: v5-r-lcb-prepared-TDM
+          path: prepared/TDM
+      - name: Download prepared DFT
+        uses: actions/download-artifact@v4
+        with:
+          name: v5-r-lcb-prepared-DFT
+          path: prepared/DFT
+      - name: Download frozen FIN context
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-r-independent-confirmation-freeze-FIN
+          path: freeze/FIN
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 36475098718
+      - name: Download frozen TDM context
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-r-independent-confirmation-freeze-TDM
+          path: freeze/TDM
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 36475098718
+      - name: Download frozen DFT context
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-r-independent-confirmation-freeze-DFT
+          path: freeze/DFT
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 36475098718
+      - name: Download historical R confirmation
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-r-independent-confirmation-45k-final
+          path: historical-r-result
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 36475283530
+      - name: Download historical deployed-v4 Step 4 audit
+        uses: actions/download-artifact@v4
+        with:
+          name: a-transfer-529-step4-final
+          path: historical-v4-result
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 36608499362
+      - name: Aggregate with unchanged frozen evaluator
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/compare_v5_r_lcb_45k.py aggregate \
+            --freeze-dir freeze \
+            --prepared-dir prepared \
+            --historical-root "$RUNNER_TEMP/historical-r" \
+            --historical-r-report historical-r-result/report.json \
+            --historical-v4-report historical-v4-result/report.json \
+            --out results/v5-r-lcb-45k
+          cat results/v5-r-lcb-45k/report.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v5-r-lcb-45k-final
+          path: results/v5-r-lcb-45k
+          if-no-files-found: error
