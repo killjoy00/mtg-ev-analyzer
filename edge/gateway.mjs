@@ -28,11 +28,11 @@ export function ipNetwork(value) {
 
 export function adminPath(path,method) {
   if(method==='POST'&&path==='/v1/admin/claim')return true;
-  if(method==='GET'&&path==='/v1/admin/measurements')return true;
+  if(method==='GET'&&(path==='/v1/admin/measurements'||path==='/v1/admin/measurements/habits'))return true;
   if(method==='GET'&&/^\/v1\/admin\/decisions\/[a-z0-9_-]{6,120}$/.test(path))return true;
   if(/^\/v1\/admin\/users(?:\/[a-f0-9-]{36})?$/.test(path)&&method==='GET')return true;
   if(/^\/v1\/admin\/users\/[a-f0-9-]{36}\/public-identity$/.test(path)&&method==='POST')return true;
-  if(path==='/v1/admin/corpus'&&method==='GET')return true;
+  if(method==='GET'&&(path==='/v1/admin/corpus'||/^\/v1\/admin\/corpus\/[a-z0-9-]{2,80}\/detail$/.test(path)))return true;
   if(path==='/v1/admin/corpus/readiness'&&method==='GET')return true;
   if(/^\/v1\/admin\/corpus\/readiness\/[1-9][0-9]{0,18}\/retry$/.test(path)&&method==='POST')return true;
   if(/^\/v1\/admin\/corpus\/[a-z0-9-]{2,80}(?:\/components\/[a-z0-9_.-]{2,120})?\/status$/.test(path)&&method==='POST')return true;
