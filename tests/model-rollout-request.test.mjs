@@ -96,11 +96,13 @@ test('v5 corpus release dispatch pins exact candidate, release, stage and bridge
  assert.deepEqual(rolloutDispatch(activate).body.inputs,{target:'development',action:'activate',candidate_run_id:'37077353281',release_commit:'a'.repeat(40),stage_run_id:'37080000000',bridge_commit:'b'.repeat(40)});
  assert.equal(rolloutDispatch({...activate,action:'rollback',target:'production'}).workflow,'release-v5-corpus.yml');
  assert.equal(rolloutDispatch({...activate,action:'verify-active'}).body.inputs.action,'verify-active');
+ assert.equal(rolloutDispatch({...activate,action:'resume-activation'}).body.inputs.action,'resume-activation');
  for(const bad of [
    {...base,candidate_run_id:'latest'},
    {...base,release_commit:'main'},
    {...base,target:'other'},
    {...base,action:'activate'},
+   {...base,action:'resume-activation'},
    {...base,stage_run_id:'37080000000'},
    {...activate,stage_run_id:'bad'},
    {...activate,bridge_commit:'main'},

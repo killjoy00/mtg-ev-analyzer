@@ -36,11 +36,14 @@ test('read-only active acceptance binds unchanged candidate data to a reviewed d
   }
   const accepted=run('verify-active');
   assert.equal(accepted.error,undefined);
+  assert.equal(run('resume-activation').error,undefined);
   assert.deepEqual(accepted.calls[0],['git',['merge-base','--is-ancestor',old,next]]);
   assert.deepEqual(accepted.calls[1],['git',['diff','--exit-code',old,next,'--','corpus','data','model-versions.json','draft-run.mjs','research','results']]);
   for(const action of ['stage','activate','rollback'])assert.ok(run(action).error);
   for(const change of [{target:'production'},{candidate_run_id:'20000'},{release_commit:'main'}])assert.ok(run('verify-active',change).error);
   for(const failure of ['merge-base','diff'])assert.ok(run('verify-active',{},failure).error);
+  for(const change of [{target:'production'},{candidate_run_id:'20000'},{release_commit:'main'}])assert.ok(run('resume-activation',change).error);
+  for(const failure of ['merge-base','diff'])assert.ok(run('resume-activation',{},failure).error);
   const unchanged=run('activate',{release_commit:next});
   assert.equal(unchanged.error,undefined);assert.deepEqual(unchanged.calls,[]);
 });
@@ -53,6 +56,36 @@ test('active recovery runs every acceptance gate without another publication or 
   assert.ok(recovery.indexOf('release-functions-smoke.mjs')<recovery.indexOf("fs.writeFileSync('generated/stage.json'"));
   assert.match(recovery,/preceding_release_commit:preceding\.release_commit/);
   assert.match(recovery,/action:'verified-active'/);
+});
+
+test('partial activation recovery verifies committed parents before retrying and never repeats cutover SQL',async()=>{
+ const source=fs.readFileSync(new URL('../scripts/v5-corpus-cutover.mjs',import.meta.url),'utf8');
+ const marker="if(action==='resume-activation') {";
+ const block=source.slice(source.indexOf(marker)+marker.length,source.indexOf("\nif(action==='activate')")).replace(/\n\}\s*$/,'');
+ const execute=new (Object.getPrototypeOf(async function(){}).constructor)(
+  'verifyPointers','registerServingReadiness','readServingReadiness','retryServingReadiness','advanceServingReadiness',
+  'parentReady','query','identity','modelVersions','mapping','console','process',block);
+ async function run({pointerFailure=false,current=true,ready=true,bridgeReady=true}={}) {
+  const calls=[],identity={run_id:'20000'},query=()=>{throw Error('Pointer SQL must not run during recovery');};
+  let error;
+  try {await execute(
+   async target=>{calls.push(['pointers',target]);if(pointerFailure)throw Error('Pointer differs');},
+   async()=>calls.push(['register']),async()=>({current,state:'failed',operation_id:'205'}),
+   async(_q,id,actor)=>{calls.push(['retry',id,actor]);return {ready};},
+   async()=>{calls.push(['advance']);return {ready:false};},async()=>({ready:bridgeReady}),
+   query,identity,{v4:{corpus_version:'v8'}},[{},{}],{log:value=>calls.push(['evidence',JSON.parse(value)])},{exit:()=>calls.push(['exit'])});}
+  catch(cause){error=cause;}
+  return {calls,error};
+ }
+ const accepted=await run();assert.equal(accepted.error,undefined);
+ assert.deepEqual(accepted.calls.slice(0,3),[['pointers','target'],['register'],['retry','205',{run_id:'20000'}]]);
+ assert.equal(accepted.calls.find(c=>c[0]==='evidence')[1].pointer_mutations,0);
+ assert.equal(accepted.calls.filter(c=>c[0]==='pointers').length,2);
+ const mismatch=await run({pointerFailure:true});assert.match(mismatch.error.message,/Pointer differs/);assert.equal(mismatch.calls.length,1);
+ for(const options of [{current:false},{ready:false},{bridgeReady:false}]) {
+  const rejected=await run(options);assert.ok(rejected.error);assert.ok(!rejected.calls.some(c=>c[0]==='evidence'));
+  if(options.current===false)assert.ok(!rejected.calls.some(c=>c[0]==='retry'));
+ }
 });
 
 test('rollback emits successor stage evidence only after proving restored pointers and history',()=>{

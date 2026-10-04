@@ -10,7 +10,7 @@ on:
         required: true
       action:
         type: choice
-        options: [stage, activate, rollback, verify-active]
+        options: [stage, activate, rollback, verify-active, resume-activation]
         default: stage
         required: true
       candidate_run_id:
@@ -80,7 +80,7 @@ jobs:
           grep -q "DRAFT_RUN_CORPUS_VERSION = 'elite-trophy-colour-stage-v9'" draft-run.mjs
           case "$ACTION" in
             stage) test -z "$STAGE_RUN_ID" || { echo '::error::stage_run_id is not used for stage'; exit 1; } ;;
-            activate|rollback|verify-active)
+            activate|rollback|verify-active|resume-activation)
               [[ "$STAGE_RUN_ID" =~ ^[1-9][0-9]{4,20}$ ]] || { echo '::error::activate/rollback requires numeric stage_run_id'; exit 1; }
               [[ "$BRIDGE_COMMIT" =~ ^[a-f0-9]{40}$ ]] || { echo '::error::activate/rollback requires full bridge_commit'; exit 1; }
               git merge-base --is-ancestor "$BRIDGE_COMMIT" "$RELEASE_COMMIT"
@@ -156,7 +156,7 @@ jobs:
           const expected={target:process.env.TARGET,candidate_run_id:process.env.CANDIDATE_RUN_ID};
           for(const [k,v] of Object.entries(expected))if(String(e[k])!==String(v))throw Error('Stage evidence mismatch: '+k);
           if(e.release_commit!==process.env.RELEASE_COMMIT) {
-            if(process.env.ACTION!=='verify-active'||!/^[a-f0-9]{40}$/.test(e.release_commit||''))throw Error('Stage evidence mismatch: release_commit');
+            if(!['verify-active','resume-activation'].includes(process.env.ACTION)||!/^[a-f0-9]{40}$/.test(e.release_commit||''))throw Error('Stage evidence mismatch: release_commit');
             execFileSync('git',['merge-base','--is-ancestor',e.release_commit,process.env.RELEASE_COMMIT]);
             // A read-only acceptance repair may advance runtime code, never the
             // staged candidate, model identity, policies or retained data.
@@ -215,8 +215,17 @@ jobs:
         if: inputs.action == 'activate'
         run: node scripts/v5-corpus-cutover.mjs "$RUNNER_TEMP/target.connection" activate generated/v5-candidate generated/v5-release-baseline.json
 
+      - name: Reverify committed parents and recover readiness without pointer mutation
+        if: inputs.action == 'resume-activation'
+        run: |
+          set -euo pipefail
+          node scripts/verify-corpus-load.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-trophy-import --complete
+          node scripts/verify-puzzle-components.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-traditional Candidate
+          node scripts/v5-release-state.mjs "$RUNNER_TEMP/target.connection" verify-preserved generated/v5-candidate generated/v5-release-baseline.json
+          node scripts/v5-corpus-cutover.mjs "$RUNNER_TEMP/target.connection" resume-activation generated/v5-candidate generated/v5-release-baseline.json
+
       - name: Publish only eligible v5 Traditional components
-        if: inputs.action == 'activate'
+        if: inputs.action == 'activate' || inputs.action == 'resume-activation'
         run: |
           node scripts/publish-puzzle-components.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-traditional
           node scripts/verify-puzzle-components.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-traditional eligible
@@ -224,6 +233,22 @@ jobs:
           node scripts/verify-serving-quality.mjs "$RUNNER_TEMP/target.connection"
           node scripts/verify-cube-expansion.mjs "$RUNNER_TEMP/target.connection" traditional-cube-p2p7-v5-v1
           node tests/release-functions-smoke.mjs "$TARGET_BRANCH" "$BRIDGE_COMMIT"
+
+      - name: Capture fully verified recovery evidence
+        if: inputs.action == 'resume-activation'
+        run: |
+          set -euo pipefail
+          node scripts/v5-release-state.mjs "$RUNNER_TEMP/target.connection" verify-preserved generated/v5-candidate generated/v5-release-baseline.json
+          node - <<'NODE'
+          const fs=require('fs');
+          const preceding=JSON.parse(fs.readFileSync('generated/v5-stage-evidence/stage.json','utf8'));
+          fs.writeFileSync('generated/stage.json',JSON.stringify({
+            target:process.env.TARGET,candidate_run_id:process.env.CANDIDATE_RUN_ID,
+            release_commit:process.env.RELEASE_COMMIT,workflow_run_id:process.env.GITHUB_RUN_ID,
+            preceding_stage_run_id:process.env.STAGE_RUN_ID,preceding_release_commit:preceding.release_commit,
+            action:'verified-resumed-activation'
+          },null,2)+'\n');
+          NODE
 
       - name: Reverify a completely published candidate after a runtime repair
         if: inputs.action == 'verify-active'
@@ -277,7 +302,7 @@ jobs:
           NODE
 
       - uses: actions/upload-artifact@v4
-        if: always() && (inputs.action == 'stage' || inputs.action == 'rollback' || inputs.action == 'verify-active')
+        if: always() && (inputs.action == 'stage' || inputs.action == 'rollback' || inputs.action == 'verify-active' || inputs.action == 'resume-activation')
         with:
           name: v5-stage-${{ inputs.target }}-${{ github.run_id }}
           retention-days: 90

@@ -1,11 +1,11 @@
 {
   "operation": "v5-corpus-release",
   "request_id": "v5-v9-production-activate-20261003",
-  "reason": "Owner-authorized #889. Activate the exact candidate from successful inactive production stage 37155825568 only after real development rollback, production bridge acceptance, development reactivation, and corrected development Daily/Practice acceptance succeed. Preserve all historical rows and rollback parents; require full serving-quality and Cube parity.",
+  "reason": "Owner-authorized #889. Activate the unchanged candidate from refreshed inactive production stage 37164763986 only after full staging acceptance. Real development rollback, recovery, exact repaired development runtime acceptance, and production bridge acceptance have succeeded. Preserve all historical rows and rollback parents; require eligible component publication, serving quality and Cube parity.",
   "target": "production",
   "action": "activate",
   "candidate_run_id": "37132557406",
-  "release_commit": "3ce9fc14263b682cba04c62fe6e6423e1282ead5",
-  "stage_run_id": "37155825568",
+  "release_commit": "5ef9c9230d83ca6a72210cf50e76c12b3ceb471a",
+  "stage_run_id": "37164763986",
   "bridge_commit": "c7e90fe333395bcb3f7468744c943c20a7231978"
 }
