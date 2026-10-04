@@ -212,20 +212,23 @@ export async function handleAdmin(request,query,readJson) {
   const filters=reportFilters(url);
   if(url.pathname==='/v1/admin/measurements') {
     const section=url.searchParams.get('section')||'all';
-    if(!['all','core','engagement'].includes(section))fail('Invalid report section.');
+    if(!['all','core','analysis','engagement'].includes(section))fail('Invalid report section.');
     if(section==='engagement')return {
       generated_at:new Date().toISOString(),
       filters:{...filters,params:undefined},
       ...await engagementReport(query,filters)
     };
     const scope=`WITH scoped AS (SELECT * ${SCOPE}), primary_data AS (SELECT * FROM scoped WHERE observed AND NOT is_qa AND first_encounter)`;
-    const tasks=[
+    const coreQueries=()=>[
       query(`${scope} SELECT count(*)::int recorded,count(*) FILTER(WHERE is_qa)::int qa_excluded,
         count(*) FILTER(WHERE NOT observed AND NOT is_qa)::int unobserved_excluded,
         count(*) FILTER(WHERE observed AND NOT is_qa AND NOT first_encounter)::int repeats_excluded,
         min(first_seen_at) collection_started FROM scoped`,filters.params),
       query(`${scope} SELECT ${METRICS},count(DISTINCT session_id)::int runs,
         count(DISTINCT session_id) FILTER(WHERE run_complete)::int completed_runs FROM primary_data`,filters.params),
+      query(`SELECT set_id FROM draft_run_verified_sets ORDER BY set_id`)
+    ];
+    const analysisQueries=()=>[
       query(`${scope} SELECT dimension,label,${METRICS} FROM primary_data
         CROSS JOIN LATERAL (VALUES ('difficulty',coalesce(band,'unrated')),('set',set_id),('pick',pick_number::text),
         ('round',round::text),('source_event',source_event_type),('model_disagreement',model_disagreement::text),('version',selection_version||' / '||scoring_version||' / '||difficulty_version)) dimensions(dimension,label)
@@ -234,13 +237,21 @@ export async function handleAdmin(request,query,readJson) {
         FROM primary_data GROUP BY puzzle_id HAVING count(*) FILTER(WHERE outcome='pick')>=5
         ORDER BY bool_or(model_disagreement) DESC,count(*) FILTER(WHERE outcome='pick') DESC LIMIT 30)
         SELECT c.*,p.set_id,p.pick_number,p.payload->>'historical_pick_id' trophy_id
-        FROM chosen c JOIN draft_run_verified_puzzles p USING(puzzle_id)`,filters.params),
-      query(`SELECT set_id FROM draft_run_verified_sets ORDER BY set_id`)
+        FROM chosen c JOIN draft_run_verified_puzzles p USING(puzzle_id)`,filters.params)
     ];
-    if(section==='all')tasks.push(engagementReport(query,filters));
-    const [coverage,summary,groups,reviews,options,engagement={}]=await Promise.all(tasks);
-    return {generated_at:new Date().toISOString(),filters:{...filters,params:undefined},coverage:coverage.rows[0],summary:summary.rows[0],...engagement,groups:groups.rows,reviews:reviews.rows,sets:options.rows.map(r=>r.set_id),
-      definitions:{primary:'First recorded encounter per player and puzzle; observed in the browser; QA excluded.',abandonment:'Unfinished run with an open viewed decision and no activity for 24 hours. A return removes this classification.',timing:'Client-reported foreground time; missing for reloads, multiple tabs, old clients, or invalid timing. This is not a trusted gameplay score.',sample:'Fewer than 30 answers is an early signal, not a calibrated difficulty estimate.',review:'Decisions with at least five first-encounter answers; model disagreement first, then sample size.',habit_person:'Habit metrics count linked accounts as one person after identity merges; guests remain one browser/player identity.',habit_completion:'A Daily day is one or more completed Mixed, Powered Cube, or Latest Set sessions on the stored Pacific Daily date. Multiple Dailies on one date count once.',habit_exclusions:'All habit metrics exclude measurement-QA sessions, QA-pattern display names, and players linked to Pack One admin accounts.',habit_maturity:'Next-day, 7-day, and 3-in-7 rates include only cohorts whose full measurement window has closed; immature cohort counts are shown separately.',habit_attribution:'First touch is the earliest acquisition event for the merged player. Earlier product activity is pre_tracking; missing post-launch attribution is direct. Campaign is (none) when absent.',habit_ever:'Ever 3-in-7 is a lifetime observed status as of report generation, not a fixed-horizon cohort rate. Daily health counts people with 3+ distinct Daily days in each trailing seven-day window.'}};
+    if(section==='analysis') {
+      const [groups,reviews]=await Promise.all(analysisQueries());
+      return {generated_at:new Date().toISOString(),filters:{...filters,params:undefined},groups:groups.rows,reviews:reviews.rows};
+    }
+    const definitions={primary:'First recorded encounter per player and puzzle; observed in the browser; QA excluded.',abandonment:'Unfinished run with an open viewed decision and no activity for 24 hours. A return removes this classification.',timing:'Client-reported foreground time; missing for reloads, multiple tabs, old clients, or invalid timing. This is not a trusted gameplay score.',sample:'Fewer than 30 answers is an early signal, not a calibrated difficulty estimate.',review:'Decisions with at least five first-encounter answers; model disagreement first, then sample size.',habit_person:'Habit metrics count linked accounts as one person after identity merges; guests remain one browser/player identity.',habit_completion:'A Daily day is one or more completed Mixed, Powered Cube, or Latest Set sessions on the stored Pacific Daily date. Multiple Dailies on one date count once.',habit_exclusions:'All habit metrics exclude measurement-QA sessions, QA-pattern display names, and players linked to Pack One admin accounts.',habit_maturity:'Next-day, 7-day, and 3-in-7 rates include only cohorts whose full measurement window has closed; immature cohort counts are shown separately.',habit_attribution:'First touch is the earliest acquisition event for the merged player. Earlier product activity is pre_tracking; missing post-launch attribution is direct. Campaign is (none) when absent.',habit_ever:'Ever 3-in-7 is a lifetime observed status as of report generation, not a fixed-horizon cohort rate. Daily health counts people with 3+ distinct Daily days in each trailing seven-day window.'};
+    if(section==='core') {
+      const [coverage,summary,options]=await Promise.all(coreQueries());
+      return {generated_at:new Date().toISOString(),filters:{...filters,params:undefined},coverage:coverage.rows[0],summary:summary.rows[0],groups:[],reviews:[],sets:options.rows.map(r=>r.set_id),definitions};
+    }
+    const [coverage,summary,options,groups,reviews,engagement]=await Promise.all([
+      ...coreQueries(),...analysisQueries(),engagementReport(query,filters)
+    ]);
+    return {generated_at:new Date().toISOString(),filters:{...filters,params:undefined},coverage:coverage.rows[0],summary:summary.rows[0],...engagement,groups:groups.rows,reviews:reviews.rows,sets:options.rows.map(r=>r.set_id),definitions};
   }
   const match=url.pathname.match(/^\/v1\/admin\/decisions\/([a-f0-9]{32})$/);
   if(match) {
