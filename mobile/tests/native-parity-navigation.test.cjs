@@ -182,3 +182,12 @@ test('Pacific clock uses game-day midnight across both DST boundaries', () => {
   assert.equal(clock.dailyResetCue(new Date('2026-03-08T08:00:00Z')), 'New Dailies in 23h');
   assert.equal(clock.dailyResetCue(new Date('2026-11-01T07:00:00Z')), 'New Dailies in 25h');
 });
+
+// Route groups do not contribute to Expo Router URLs. Duplicate root files can
+// silently reopen the old homepage after an otherwise clean integration.
+test('each public tab URL has exactly one screen implementation', () => {
+  for (const name of ['index', 'practice', 'career', 'learn', 'leaderboard']) {
+    assert.ok(fs.existsSync(path.resolve(`app/(tabs)/${name}.tsx`)));
+    assert.equal(fs.existsSync(path.resolve(`app/${name}.tsx`)), false, `Duplicate /${name} route`);
+  }
+});

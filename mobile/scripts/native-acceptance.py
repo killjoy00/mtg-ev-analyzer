@@ -88,13 +88,21 @@ def tap(label, exact=False, scroll=True):
                     time.sleep(2)
                     return
         if scroll:
-            adb('shell', 'input', 'swipe', '450', '1700', '450', '600', '350')
+            swipe_page(up=True)
     raise AssertionError(f'No visible actionable {label!r}')
+
+
+def swipe_page(up):
+    size = adb('shell', 'wm', 'size').splitlines()[-1]
+    width, height = map(int, re.findall(r'(\d+)x(\d+)', size)[0])
+    start, end = (0.75, 0.30) if up else (0.30, 0.75)
+    adb('shell', 'input', 'swipe', str(width//2), str(int(height*start)),
+        str(width//2), str(int(height*end)), '300')
 
 
 def top():
     for _ in range(5):
-        adb('shell', 'input', 'swipe', '450', '600', '450', '1700', '150')
+        swipe_page(up=False)
 
 
 def launch(scenario, screen='home', width=390, scale=1, landscape=False):
@@ -178,7 +186,7 @@ if platform == 'android':
             xml, _ = snapshot(s+'-home')
             require('DRAFT DECISION LAB' not in xml and 'Your last shared run' not in xml, 'Old home directory still visible')
             if s == 'member-checking':
-                require('0 of 3' not in xml, 'Unknown progress shown as zero')
+                require('0/3 complete' not in xml and '0-day streak' not in xml, 'Unknown progress shown as zero')
             manifest['scenes'].append({'name': s+'-home', 'width_dp': 390, 'font_scale': 1})
         attempt(scenario+'-home', home_scene)
 
