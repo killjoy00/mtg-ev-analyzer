@@ -80,11 +80,14 @@ async function cacheCount(setId) {
  return {count,revision:String(built.revision),id:String(built.id)};
 }
 
-async function assertDashboardMatchesCache(report,setId,expected) {
- const row=findSet(report,setId),cache=await cacheCount(setId);
+async function assertDashboardMatchesCache(setId,expected) {
+ const cache=await cacheCount(setId),report=await call(''),row=findSet(report,setId);
+ assert.equal(report.serving_cache_current,true,`${setId}: overview must use the current serving cache`);
  assert.equal(row.serving_count,expected,`${setId}: dashboard serving count`);
  assert.equal(cache.count,expected,`${setId}: cache serving count`);
  assert.equal(String(report.serving_revision),cache.revision,`${setId}: revision mismatch`);
+ assert.equal(row.staged_count,null,`${setId}: exact staged inventory is deferred`);
+ assert.equal(row.under_floor_count,null,`${setId}: exact below-floor inventory is deferred`);
 }
 
 async function snapshotReportingFixture() {
@@ -118,7 +121,7 @@ async function snapshotReportingFixture() {
  await clonePuzzle({setId:historicalSet,snapshotId:null,ratio:.5});
  await clonePuzzle({setId:historicalSet,snapshotId:null,ratio:.1});
 
- let report=await call(''),row=findSet(report,snapshotSet),candidate=report.snapshots.find(s=>s.source_snapshot_id===snapshotB);
+ let report=await call('/'+snapshotSet+'/detail'),row=findSet(report,snapshotSet),candidate=report.snapshots.find(s=>s.source_snapshot_id===snapshotB);
  assert.equal(row.serving_parent_count,2);
  assert.equal(row.serving_component_count,1);
  assert.equal(row.active_snapshot_retained_count,4);
@@ -135,41 +138,41 @@ async function snapshotReportingFixture() {
  assert.equal(candidate.serving_count,0);
  assert.equal(candidate.retained_count,4);
  assert.equal(candidate.report.fixture,'candidate-b-failed');
- await assertDashboardMatchesCache(report,snapshotSet,3);
- const historical=findSet(report,historicalSet),historicalSnapshotRow=report.snapshots.find(s=>s.source_snapshot_id===historicalSnapshot);
+ await assertDashboardMatchesCache(snapshotSet,3);
+ const historicalReport=await call('/'+historicalSet+'/detail'),historical=findSet(historicalReport,historicalSet),historicalSnapshotRow=historicalReport.snapshots.find(s=>s.source_snapshot_id===historicalSnapshot);
  assert.equal(historical.serving_count,1);
  assert.equal(historical.active_snapshot_retained_count,2);
  assert.equal(historicalSnapshotRow.retained_count,2);
  assert.equal(historicalSnapshotRow.serving_count,1);
- await assertDashboardMatchesCache(report,historicalSet,1);
+ await assertDashboardMatchesCache(historicalSet,1);
 
  await call('/'+snapshotSet+'/snapshot',{sourceSnapshotId:snapshotB,corpusVersion:DRAFT_RUN_CORPUS_VERSION,reason:'QA blocked candidate'},409);
  await insertHealth(snapshotB,snapshotSet,true,'candidate-b-passing');
  await call('/'+snapshotSet+'/snapshot',{sourceSnapshotId:snapshotB,corpusVersion:DRAFT_RUN_CORPUS_VERSION,reason:'QA valid switch'});
- report=await call('');row=findSet(report,snapshotSet);
+ report=await call('/'+snapshotSet+'/detail');row=findSet(report,snapshotSet);
  assert.equal(row.active_snapshot_id,snapshotB);
  assert.equal(row.serving_parent_count,3);
  assert.equal(row.serving_component_count,1);
  assert.equal(row.report.fixture,'candidate-b-passing');
  assert.equal(report.snapshots.find(s=>s.source_snapshot_id===snapshotA).lifecycle_status,'Superseded');
  assert.equal(report.snapshots.find(s=>s.source_snapshot_id===snapshotB).lifecycle_status,'Approved');
- await assertDashboardMatchesCache(report,snapshotSet,4);
+ await assertDashboardMatchesCache(snapshotSet,4);
 
  await call('/'+snapshotSet+'/status',{oldStatus:'Live',status:'Paused',corpusVersion:DRAFT_RUN_CORPUS_VERSION,reason:'QA pause'});
- report=await call('');row=findSet(report,snapshotSet);
+ report=await call('/'+snapshotSet+'/detail');row=findSet(report,snapshotSet);
  assert.equal(row.status,'Paused');
  assert.equal(row.serving_parent_count,0);
  assert.equal(row.serving_component_count,1);
  assert.equal(row.active_snapshot_retained_count,4);
- await assertDashboardMatchesCache(report,snapshotSet,1);
+ await assertDashboardMatchesCache(snapshotSet,1);
 
  await call('/'+snapshotSet+'/status',{oldStatus:'Paused',status:'Retired',corpusVersion:DRAFT_RUN_CORPUS_VERSION,reason:'QA retire'});
- report=await call('');row=findSet(report,snapshotSet);
+ report=await call('/'+snapshotSet+'/detail');row=findSet(report,snapshotSet);
  assert.equal(row.status,'Retired');
  assert.equal(row.serving_parent_count,0);
  assert.equal(row.serving_component_count,1);
  assert.equal(row.active_snapshot_retained_count,4);
- await assertDashboardMatchesCache(report,snapshotSet,1);
+ await assertDashboardMatchesCache(snapshotSet,1);
 }
 
 async function cleanFixtureSet(setId) {
