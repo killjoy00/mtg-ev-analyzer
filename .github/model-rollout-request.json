@@ -1,7 +1,7 @@
 {
   "operation": "deploy",
   "request_id": "v5-v9-production-runtime-20261003",
-  "reason": "Owner-authorized #889. After production v9 activation passes, deploy the exact corrected runtime already accepted in restored development. Require development preflight, stable production markers, all three Daily flows and full account-linked Practice acceptance. Start fresh v9 public standings through corpus filtering while retaining historical results.",
+  "reason": "Owner-authorized #889. After complete production v9 activation and eligible-component serving-quality/Cube acceptance, deploy exact repaired runtime 5ef9c9230d83ca6a72210cf50e76c12b3ceb471a already accepted in restored development. Require development preflight, stable production markers, all three Daily flows and full account-linked Practice acceptance. Start fresh v9 public standings through corpus filtering while retaining historical results.",
   "target": "production",
-  "commit": "3ce9fc14263b682cba04c62fe6e6423e1282ead5"
+  "commit": "5ef9c9230d83ca6a72210cf50e76c12b3ceb471a"
 }
