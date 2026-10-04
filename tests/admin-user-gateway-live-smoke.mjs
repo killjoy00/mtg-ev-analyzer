@@ -37,7 +37,7 @@ async function markers() {
 }
 
 async function servingState() {
-  const policies=(await query(`SELECT e.set_id,e.status,e.active_snapshot_id,s.corpus_version
+  const policies=(await query(`SELECT e.*,s.corpus_version
     FROM draft_run_environment_policy e
     LEFT JOIN corpus_source_snapshots s ON s.source_snapshot_id=e.active_snapshot_id
     ORDER BY e.set_id`)).rows;
