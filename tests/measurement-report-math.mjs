@@ -29,7 +29,7 @@ try {
  assert.equal(Number(afterFunnel.arrivals),Number(beforeFunnel.arrivals)+1);assert.equal(Number(afterFunnel.visitors)>=Number(beforeFunnel.visitors),true);
  assert.equal(Number(afterFunnel.starts),Number(beforeFunnel.starts)+1);assert.equal(Number(afterFunnel.completions),Number(beforeFunnel.completions)+1);
  const report=await handleAdmin(new Request('https://packone.pro/v1/admin/measurements?version='+version,{headers:{'x-pack1-auth-session':token}}),query,readJson);
- assert.equal(Number(report.summary.answers),5);assert.equal(Number(report.summary.trophy_match_pct),40);assert.equal(Number(report.summary.average_partial_credit),50);assert.equal(Number(report.summary.median_seconds),3);assert.equal(Number(report.summary.p90_seconds),4.6);assert.equal(report.reviews.length,1);
+ assert.equal(Number(report.summary.answers),5);assert.equal(Number(report.summary.trophy_match_pct),40);assert.equal(Number(report.summary.average_partial_credit),50);assert.equal(Number(report.summary.median_seconds),3);assert.equal(Number(report.summary.p90_seconds),4.6);assert.equal(report.reviews.length,1);assert.equal(report.habit_metrics,undefined,'core decision report does not wait on habit cohorts');
  const detail=await handleAdmin(new Request('https://packone.pro/v1/admin/decisions/'+puzzleIds[0]+'?version='+version,{headers:{'x-pack1-auth-session':token}}),query,readJson);
  assert.equal(detail.choices.reduce((n,r)=>n+Number(r.answers),0),5);
  const empty=await handleAdmin(new Request('https://packone.pro/v1/admin/measurements?version='+version+'&difficulty=invalid',{headers:{'x-pack1-auth-session':token}}),query,readJson).catch(e=>e.status);assert.equal(empty,400);
@@ -80,7 +80,7 @@ try {
      [id,player,day,answersJson,environment,qa,createdAt,source.id]);
    return id;
  };
- const habitUrl=(from=firstDay,to=pacificToday)=>`https://packone.pro/v1/admin/measurements?from=${from}&to=${to}`;
+ const habitUrl=(from=firstDay,to=pacificToday)=>`https://packone.pro/v1/admin/measurements/habits?from=${from}&to=${to}`;
  const habitBefore=await handleAdmin(new Request(habitUrl(),{headers:{'x-pack1-auth-session':token}}),query,readJson);
  const beforeCohorts=habitBefore.habit_metrics?.cohorts||[];
  const beforePre=beforeCohorts.filter(r=>r.source==='pre_tracking').reduce((n,r)=>n+Number(r.cohort_people||0),0);
