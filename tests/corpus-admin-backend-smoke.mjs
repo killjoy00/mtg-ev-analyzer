@@ -208,6 +208,12 @@ try {
  await query("UPDATE draft_run_environment_policy SET status='Retired' WHERE set_id=$1",[discovered]);
  assert.equal((await registerHealthyCandidate(query,discovered,manifestHash)).rows.length,0);
  const report=await call('');assert.ok(report.sets.some(s=>s.set_id==='hob'));assert.equal(report.corpus_version,DRAFT_RUN_CORPUS_VERSION);
+ const summaryReport=await call('?summary=1');
+ assert.equal(summaryReport.summary,true);assert.equal(summaryReport.corpus_version,DRAFT_RUN_CORPUS_VERSION);assert.ok(summaryReport.sets.some(s=>s.set_id==='hob'));
+ assert.deepEqual(summaryReport.snapshots,[]);assert.deepEqual(summaryReport.components,[]);assert.deepEqual(summaryReport.history,[]);
+ const hobDetail=await call('?set=hob');
+ assert.ok(hobDetail.sets.length>0&&hobDetail.sets.every(s=>s.set_id==='hob'));
+ assert.ok((hobDetail.snapshots||[]).every(s=>s.set_id==='hob'));assert.ok((hobDetail.components||[]).every(s=>s.set_id==='hob'));assert.ok((hobDetail.history||[]).every(s=>s.set_id==='hob'));
  const change=(oldStatus,status)=>call('/hob/status',{oldStatus,status,corpusVersion:DRAFT_RUN_CORPUS_VERSION,reason:'QA lifecycle'});
  // The CI database is a disposable Neon child. Remove inherited production-ready evidence so this pre-health assertion is isolated.
  await query("UPDATE corpus_health_checks SET ready=false WHERE set_id='hob' AND corpus_version=$1 AND ready=true",[DRAFT_RUN_CORPUS_VERSION]);
