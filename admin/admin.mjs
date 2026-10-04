@@ -45,21 +45,27 @@ function bindReviewDetails(container,queryString){
 }
 async function loadDeferredSections(loadId,queryString){
   const suffix=queryString?'?'+queryString:'';
-  const [habits,reviews]=await Promise.allSettled([request('/v1/admin/measurements/habits'+suffix),request('/v1/admin/measurements/reviews'+suffix)]);
-  if(loadId!==deferredLoad)return;
-  const cohortTarget=document.querySelector('#habit-cohorts'),healthTarget=document.querySelector('#habit-health'),reviewTarget=document.querySelector('#reviews');
-  if(habits.status==='fulfilled'){
-    const hm=habits.value.habit_metrics||{cohorts:[],daily_health:[]};
+  const habits=request('/v1/admin/measurements/habits'+suffix).then(data=>{
+    if(loadId!==deferredLoad)return;
+    const hm=data.habit_metrics||{cohorts:[],daily_health:[]},cohortTarget=document.querySelector('#habit-cohorts'),healthTarget=document.querySelector('#habit-health');
     if(cohortTarget)cohortTarget.innerHTML=habitTable(hm.cohorts||[]);
     if(healthTarget)healthTarget.innerHTML=healthTable(hm.daily_health||[]);
-  } else {
-    const message=esc(habits.reason?.message||'Daily habit cohorts are temporarily unavailable.');
+  }).catch(error=>{
+    if(loadId!==deferredLoad)return;
+    const message=esc(error?.message||'Daily habit cohorts are temporarily unavailable.'),cohortTarget=document.querySelector('#habit-cohorts'),healthTarget=document.querySelector('#habit-health');
     if(cohortTarget)cohortTarget.innerHTML=`<p class="error" role="alert">${message}</p>`;
     if(healthTarget)healthTarget.innerHTML='<p class="muted">Daily health is unavailable until the cohort query succeeds.</p>';
-  }
-  if(reviews.status==='fulfilled'){
-    if(reviewTarget){reviewTarget.innerHTML=reviewMarkup(reviews.value.reviews||[]);bindReviewDetails(reviewTarget,queryString);}
-  } else if(reviewTarget)reviewTarget.innerHTML=`<p class="error" role="alert">${esc(reviews.reason?.message||'Review candidates are temporarily unavailable.')}</p>`;
+  });
+  const reviews=request('/v1/admin/measurements/reviews'+suffix).then(data=>{
+    if(loadId!==deferredLoad)return;
+    const reviewTarget=document.querySelector('#reviews');
+    if(reviewTarget){reviewTarget.innerHTML=reviewMarkup(data.reviews||[]);bindReviewDetails(reviewTarget,queryString);}
+  }).catch(error=>{
+    if(loadId!==deferredLoad)return;
+    const reviewTarget=document.querySelector('#reviews');
+    if(reviewTarget)reviewTarget.innerHTML=`<p class="error" role="alert">${esc(error?.message||'Review candidates are temporarily unavailable.')}</p>`;
+  });
+  await Promise.allSettled([habits,reviews]);
 }
 function render() {
   const s=report.summary,c=report.coverage,f=report.filters,sf=report.share_funnel||{};
