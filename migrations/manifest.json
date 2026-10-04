@@ -249,12 +249,6 @@
         "0050_practice_recency_bias.sql",
         "0051_exact_pick_draw_index.sql"
       ]
-    },
-    "exact-pick-draw": {
-      "workflow": ".github/workflows/practice-draw-release.yml",
-      "migrations": [
-        "0051_exact_pick_draw_index.sql"
-      ]
     }
   }
 }
