@@ -71,6 +71,13 @@ await query('UPDATE draft_run_environment_policy SET active_snapshot_id=$2 WHERE
 assert.equal(await revision(),activationBefore+1n,'activating a different snapshot invalidates serving exactly once');
 const activated=await loadServingSnapshot(query,version);
 assert.notEqual(activated.id,snapshot.id,'activation publishes a new serving-cache generation');
+// The fixture replaces one set in a newly built inventory generation. Refresh
+// planner statistics before exercising the retained JS/unbatched references;
+// inherited statistics describe the previous snapshot, not this bounded one.
+for(const table of ['draft_run_serving_inventory','draft_run_verified_puzzles','draft_run_puzzle_ratings']) {
+  await query('ANALYZE '+table);
+}
+console.log('Refreshed planner statistics for the activated bounded snapshot fixture.');
 const selected=await selectCachedDatabaseRun(query,version,'snapshot-activation-'+stageSet,'mixed',{setIds:[stageSet]});
 assert.equal(selected.length,8);
 // Retained baseline rows intentionally share source hashes with the active
@@ -78,8 +85,11 @@ assert.equal(selected.length,8);
 for(const seed of ['snapshot-overlap-a','snapshot-overlap-b','snapshot-overlap-c','snapshot-overlap-d']) {
   const options={setIds:[stageSet]};
   const expected=await selectCachedDatabaseRun(query,version,seed,'mixed',options);
+  console.log(JSON.stringify({fixture:stageSet,seed,phase:'live-reference'}));
   const live=await selectDatabaseRun(query,version,seed,'mixed',options);
+  console.log(JSON.stringify({fixture:stageSet,seed,phase:'unbatched-snapshot-reference'}));
   const snapshotBaseline=await selectCachedDatabaseRun(query,version,seed,'mixed',{...options,batched:false});
+  console.log(JSON.stringify({fixture:stageSet,seed,phase:'reference-complete'}));
   assert.deepEqual(live.map(p=>p.puzzle_id),expected.map(p=>p.puzzle_id),'retained copies do not decrement live candidate counts');
   assert.deepEqual(snapshotBaseline.map(p=>p.puzzle_id),expected.map(p=>p.puzzle_id),'snapshot counts use only that snapshot inventory');
 }
