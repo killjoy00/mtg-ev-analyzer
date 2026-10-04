@@ -1,0 +1,81 @@
+name: exact pick draw schema release
+on:
+  push:
+    branches: [main]
+    paths: ['.github/practice-draw-release-request.json']
+permissions:
+  contents: read
+  actions: read
+  checks: read
+concurrency:
+  group: exact-pick-draw-schema-release
+  cancel-in-progress: false
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify reviewed source and successful exact-source acceptance
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/practice-draw-release-request.mjs
+      - name: Check out the accepted source
+        env:
+          DRAW_SOURCE_SHA: ${{ steps.gate.outputs.source_sha }}
+        run: git checkout --detach "$DRAW_SOURCE_SHA"
+      - name: Install pinned connection tools
+        run: |
+          npm install -g neon@4.17.4
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+      - name: Require development schema and full accepted runtime before production
+        if: steps.gate.outputs.target == 'production'
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          DRAW_SOURCE_SHA: ${{ steps.gate.outputs.source_sha }}
+          DRAW_TARGET: development-preflight
+        run: |
+          set -euo pipefail
+          umask 077
+          connection=$(neon connection-string br-twilight-hill-ayffyd2b --project-id patient-shadow-91417882 --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          printf '%s' "$connection" > "$RUNNER_TEMP/development.connection"
+          node scripts/verify-practice-draw-index.mjs "$RUNNER_TEMP/development.connection"
+          node tests/v5-live-practice-acceptance.mjs br-twilight-hill-ayffyd2b 5ef9c9230d83ca6a72210cf50e76c12b3ceb471a "$RUNNER_TEMP/development.connection"
+      - name: Apply the accepted additive index and exact function
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          DRAW_BRANCH: ${{ steps.gate.outputs.branch }}
+          DRAW_SOURCE_SHA: ${{ steps.gate.outputs.source_sha }}
+          DRAW_TARGET: ${{ steps.gate.outputs.target }}
+        run: |
+          set -euo pipefail
+          umask 077
+          connection=$(neon connection-string "$DRAW_BRANCH" --project-id patient-shadow-91417882 --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          printf '%s' "$connection" > "$RUNNER_TEMP/target.connection"
+          psql -X -d "$connection" -v ON_ERROR_STOP=1 -f migrations/0051_exact_pick_draw_index.sql
+          node scripts/verify-practice-draw-index.mjs "$RUNNER_TEMP/target.connection"
+          DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+          node tests/v5-live-practice-acceptance.mjs "$DRAW_BRANCH" 5ef9c9230d83ca6a72210cf50e76c12b3ceb471a "$RUNNER_TEMP/target.connection"
+          node tests/release-functions-smoke.mjs "$DRAW_BRANCH" 5ef9c9230d83ca6a72210cf50e76c12b3ceb471a --daily --expect-deletion-email=${{ steps.gate.outputs.target == 'production' }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: exact-pick-release-${{ github.run_id }}
+          path: |
+            artifacts/practice-draw-release
+            artifacts/v5-live-practice
+            artifacts/release-functions
+          if-no-files-found: warn
+          retention-days: 30

@@ -4,11 +4,13 @@ on:
     paths:
       - 'scripts/practice-performance.mjs'
       - 'scripts/practice-reroll-performance.mjs'
+      - 'scripts/practice-draw-performance.mjs'
       - 'scripts/practice-cache-publication.mjs'
       - 'worker/draft-run-selection.mjs'
       - 'migrations/0039_practice_serving_cache.sql'
       - 'migrations/0045_batched_practice_selector.sql'
       - 'migrations/0050_practice_recency_bias.sql'
+      - 'migrations/0051_exact_pick_draw_index.sql'
       - 'tests/practice-performance.test.mjs'
       - '.github/workflows/practice-performance.yml'
   workflow_dispatch:
@@ -104,6 +106,12 @@ jobs:
           PACK1_BENCHMARK_SAMPLES: '3'
           PACK1_BENCHMARK_CACHE: '1'
         run: node scripts/practice-performance.mjs
+      - name: Diagnose exact pick-indexed draws under bounded concurrency
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PACK1_BENCHMARK_BRANCH: ${{ steps.neon.outputs.branch_id }}
+        run: node scripts/practice-draw-performance.mjs
       - name: Verify concurrent publication rollback and bulk trigger cost
         env:
           DATABASE_URL: ${{ steps.neon.outputs.db_url }}

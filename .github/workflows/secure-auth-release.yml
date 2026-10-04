@@ -122,6 +122,7 @@ jobs:
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0046_public_identity_safety.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0047_admin_user_account_controls.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0050_practice_recency_bias.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0051_exact_pick_draw_index.sql
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
 
@@ -191,6 +192,7 @@ jobs:
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0046_public_identity_safety.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0047_admin_user_account_controls.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0050_practice_recency_bias.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0051_exact_pick_draw_index.sql
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
 
