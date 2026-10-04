@@ -8,7 +8,7 @@ const fmt=x=>x==null?'N/A':Number(x).toLocaleString(undefined,{maximumFractionDi
 const pct=x=>x==null?'N/A':`${fmt(x)}%`;
 const draftBase=window.PACK1_API.draftRunUrl;
 const growthBase=window.PACK1_API.growthUrl;
-let report,params=new URLSearchParams(),invite=null;
+let report,params=new URLSearchParams(),invite=null,reportGeneration=0;
 const hash=new URLSearchParams(location.hash.slice(1));
 if(hash.has('invite')){invite=hash.get('invite');sessionStorage.setItem('pack1-admin-invite',invite);history.replaceState({},'',location.pathname);}
 invite=invite||sessionStorage.getItem('pack1-admin-invite');
@@ -36,39 +36,112 @@ function habitTable(rows) {
 function healthTable(rows) {
   return `<div class="scroll"><table><thead><tr><th>Date</th><th>People at 3+ Daily days in trailing 7</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.day)}</td><td>${fmt(r.people)}</td></tr>`).join('')||'<tr><td colspan="2">No Daily health dates in this range.</td></tr>'}</tbody></table></div>`;
 }
-function render() {
-  const s=report.summary,c=report.coverage,f=report.filters,sf=report.share_funnel||{},hm=report.habit_metrics||{cohorts:[],daily_health:[]};
-  root.innerHTML=`<h1>How the decisions play</h1><p class="muted">First encounters · QA excluded · Updated ${esc(new Date(report.generated_at).toLocaleString())}</p>
-    <form id="filters" class="filters"><label>From<input type="date" name="from" value="${f.start}" required></label><label>Through<input type="date" name="to" value="${f.end}" required></label><label>Environment<select name="environment" aria-label="Environment">${options([['all','All'],['mixed','Regular'],['powered-cube','Powered Cube']],f.environment)}</select></label><label>Run type<select name="type" aria-label="Run type">${options([['all','All'],['daily','Daily'],['practice','Practice'],['challenge','Challenge']],f.type)}</select></label><label>Set<select name="set" aria-label="Set">${options([['all','All'],...report.sets.map(x=>[x,x==='powered-cube'?'Powered Cube':x.toUpperCase()])],f.set)}</select></label><label>Difficulty<select name="difficulty" aria-label="Difficulty">${options([['all','All'],['easy','Easy'],['medium','Medium'],['hard','Hard']],f.band)}</select></label><label>Draft pick<select name="pick" aria-label="Draft pick">${options([['all','All'],...Array.from({length:12},(_,i)=>[String(i+1),'P1P'+(i+1)])],f.pick)}</select></label><label>Selection version<select name="version" aria-label="Selection version">${options([['all','All'],...Array.from(new Set(report.groups.filter(r=>r.dimension==='version').map(r=>r.label.split(' / ')[0]))).map(x=>[x,x]),...(f.version!=='all'&&!report.groups.some(r=>r.dimension==='version'&&r.label.startsWith(f.version+' / '))?[[f.version,f.version]]:[])],f.version)}</select></label><button>Refresh</button><button type="button" class="secondary" id="csv">Export CSV</button><button type="button" class="secondary" id="signout">Sign out</button></form>
-    <div class="cards">${[['First-encounter answers',fmt(s.answers)],['Trophy match rate',pct(s.trophy_match_pct)],['Average alternative credit',fmt(s.average_partial_credit)],['Median foreground time',s.median_seconds==null?'N/A':fmt(s.median_seconds)+'s'],['Players',fmt(s.players)],['Completed / observed runs',`${fmt(s.completed_runs)} / ${fmt(s.runs)}`],['Rerolls / viewed choices',`${fmt(s.rerolls)} / ${fmt(s.exposures)}`],['Likely abandonment',fmt(s.likely_abandoned)]].map(([label,value])=>`<div class="card"><span>${label}</span><strong>${value}</strong></div>`).join('')}</div>
-    <h2>Daily result-share funnel</h2>
+function engagementMarkup(sf={},hm={cohorts:[],daily_health:[]},loading=false) {
+  if(loading)return `<h2>Daily result-share funnel</h2><p class="muted">Loading share conversion...</p><h2>Daily habit cohorts</h2><p class="muted">Loading return cohorts and 3-in-7 health...</p>`;
+  return `<h2>Daily result-share funnel</h2>
     <div class="cards share-funnel">${[['Share-link arrivals',fmt(sf.arrivals)],['Unique visitors',fmt(sf.visitors)],['New Daily starts',fmt(sf.starts)],['Completed Dailies',fmt(sf.completions)]].map(([label,value])=>`<div class="card"><span>${label}</span><strong>${value}</strong></div>`).join('')}</div>
     <p class="note">Start conversion: <strong>${pct(sf.start_pct)}</strong> · Completion of attributed starts: <strong>${pct(sf.completion_pct)}</strong>. Uses the selected date range and environment. Share-link arrivals are best-effort client analytics; starts and completions are authoritative server events. Other decision filters do not apply to this funnel.</p>
     <h2>Daily habit cohorts</h2>
     <p class="note">All three Dailies · distinct Pacific Daily dates · first real Daily in the selected date range. Linked accounts collapse across merged browser identities; guests are counted per browser. QA sessions, QA-pattern names, and admin-linked players are excluded. Environment and decision filters do not change these habit metrics.</p>
     ${habitTable(hm.cohorts||[])}
-    <p class="note">Rates use only fully closed measurement windows; raw mature denominators and immature cohort counts are shown beside each rate. <code>pre_tracking</code> means product activity existed before acquisition tracking for that player. <code>direct</code> includes post-launch visits with no captured source. “Ever 3-in-7” is lifetime observed status, so it can rise after the cohort window.</p>
+    <p class="note">Rates use only fully closed measurement windows; raw mature denominators and immature cohort counts are shown beside each rate. <code>pre_tracking</code> means product activity existed before acquisition tracking for that player. <code>direct</code> includes post-launch visits with no captured source. "Ever 3-in-7" is lifetime observed status, so it can rise after the cohort window.</p>
     <h2>3-in-7 daily health</h2>
-    ${healthTable(hm.daily_health||[])}
-    <p class="note">${Number(s.answers)<30?'Early data: wait for more player answers before drawing conclusions. ':''}Difficulty is a model estimate, not a measured human success probability. “Likely abandonment” means an unfinished choice with 24 hours of inactivity; returning players leave that count.</p>
+    ${healthTable(hm.daily_health||[])}`;
+}
+function analysisMarkup(groups=[],reviews=[],loading=false) {
+  if(loading)return '<p class="muted">Loading grouped decision analysis and review candidates...</p>';
+  return `${[['difficulty','By difficulty'],['pick','By real draft pick'],['round','By game position'],['set','By set'],['source_event','By source event'],['model_disagreement','When the model questions the trophy pick'],['version','By scoring and selection version']].map(([dimension,title])=>`<h2>${title}</h2>${table(groups.filter(r=>r.dimension===dimension).sort((a,b)=>dimension==='difficulty'?['easy','medium','hard','unrated'].indexOf(a.label)-['easy','medium','hard','unrated'].indexOf(b.label):a.label.localeCompare(b.label,undefined,{numeric:true})),dimension==='model_disagreement'?'Disagreement':'Group')}`).join('')}
+    <h2>Decisions to review</h2><p class="muted">At least five first-encounter answers. Model disagreements appear first, then the largest samples. Small samples are exploratory.</p><div id="reviews">${reviews.map(r=>`<details class="review" data-puzzle="${esc(r.puzzle_id)}"><summary>${esc(r.set_id.toUpperCase())} · P1P${r.pick_number} · ${fmt(r.answers)} answers · ${pct(r.trophy_match_pct)} trophy matches${r.model_disagreement===true||r.model_disagreement==='t'?' · model disagreement':''}</summary><div class="detail"></div></details>`).join('')||'<p>No decisions have five qualifying answers yet.</p>'}</div>`;
+}
+function bindReviewDetails() {
+  document.querySelectorAll('[data-puzzle]').forEach(el=>el.ontoggle=async()=>{
+    if(!el.open||el.dataset.loaded)return;
+    const target=el.querySelector('.detail');target.textContent='Loading decision...';
+    try {
+      const data=await request(`/v1/admin/decisions/${el.dataset.puzzle}?${params}`),p=data.puzzle;
+      target.innerHTML=`<p>Earlier picks: ${esc(p.prior_picks.map(c=>c.name).join(', ')||'None')}</p><div class="decision-cards">${p.candidates.map(card=>{const count=data.choices.find(c=>c.selected_id===card.id);return `<article>${/^https:\/\//.test(card.image_url||'')?`<img src="${esc(card.image_url)}" alt="${esc(card.name)}" loading="lazy">`:''}<p><strong>${esc(card.name)}</strong>${card.id===p.historical_pick_id?' · Trophy pick':''}<br>${fmt(count?.answers||0)} choices · Model support ${pct(100*card.model_probability)}<br>Average awarded: ${fmt(count?.average_score)}</p></article>`;}).join('')}</div>`;
+      el.dataset.loaded='1';
+    } catch(err){target.textContent=err.message;}
+  });
+}
+function versionChoices() {
+  const f=report.filters,groups=report.groups||[],versions=Array.from(new Set(groups.filter(r=>r.dimension==='version').map(r=>r.label.split(' / ')[0])));
+  return [['all','All'],...versions.map(x=>[x,x]),...(f.version!=='all'&&!versions.includes(f.version)?[[f.version,f.version]]:[])];
+}
+function renderAnalysisSection() {
+  const target=document.querySelector('#decision-analysis');if(!target)return;
+  target.innerHTML=analysisMarkup(report.groups||[],report.reviews||[],!report._analysisLoaded);
+  const version=document.querySelector('select[name="version"]');
+  if(version&&report._analysisLoaded)version.innerHTML=options(versionChoices(),report.filters.version);
+  bindReviewDetails();
+}
+function renderEngagementSection() {
+  const target=document.querySelector('#decision-engagement');if(!target)return;
+  target.innerHTML=engagementMarkup(report.share_funnel||{},report.habit_metrics||{cohorts:[],daily_health:[]},!report._engagementLoaded);
+}
+function renderSectionError(section,err,generation) {
+  const target=document.querySelector(section==='analysis'?'#decision-analysis':'#decision-engagement');if(!target)return;
+  const label=section==='analysis'?'decision analysis':'Daily engagement metrics';
+  target.innerHTML=`<p class="error">${esc(label)} unavailable: ${esc(err.message)}</p><button type="button" class="secondary">Retry ${esc(label)}</button>`;
+  target.querySelector('button').onclick=()=>{if(generation!==reportGeneration)return;if(section==='analysis'){report._analysisLoaded=false;renderAnalysisSection();}else{report._engagementLoaded=false;renderEngagementSection();}loadDecisionSection(section,generation);};
+}
+async function loadDecisionSection(section,generation) {
+  const sectionParams=new URLSearchParams(params);sectionParams.set('section',section);
+  try {
+    const extra=await request('/v1/admin/measurements?'+sectionParams);
+    if(generation!==reportGeneration)return;
+    Object.assign(report,extra);
+    if(section==='analysis'){report._analysisLoaded=true;renderAnalysisSection();}
+    else {report._engagementLoaded=true;renderEngagementSection();}
+  } catch(err) {
+    if(generation===reportGeneration)renderSectionError(section,err,generation);
+  }
+}
+function render() {
+  const s=report.summary,c=report.coverage,f=report.filters;
+  root.innerHTML=`<h1>How the decisions play</h1><p class="muted">First encounters · QA excluded · Updated ${esc(new Date(report.generated_at).toLocaleString())}</p>
+    <form id="filters" class="filters"><label>From<input type="date" name="from" value="${f.start}" required></label><label>Through<input type="date" name="to" value="${f.end}" required></label><label>Environment<select name="environment" aria-label="Environment">${options([['all','All'],['mixed','Regular'],['powered-cube','Powered Cube']],f.environment)}</select></label><label>Run type<select name="type" aria-label="Run type">${options([['all','All'],['daily','Daily'],['practice','Practice'],['challenge','Challenge']],f.type)}</select></label><label>Set<select name="set" aria-label="Set">${options([['all','All'],...(report.sets||[]).map(x=>[x,x==='powered-cube'?'Powered Cube':x.toUpperCase()])],f.set)}</select></label><label>Difficulty<select name="difficulty" aria-label="Difficulty">${options([['all','All'],['easy','Easy'],['medium','Medium'],['hard','Hard']],f.band)}</select></label><label>Draft pick<select name="pick" aria-label="Draft pick">${options([['all','All'],...Array.from({length:12},(_,i)=>[String(i+1),'P1P'+(i+1)])],f.pick)}</select></label><label>Selection version<select name="version" aria-label="Selection version">${options(versionChoices(),f.version)}</select></label><button>Refresh</button><button type="button" class="secondary" id="csv">Export CSV</button><button type="button" class="secondary" id="signout">Sign out</button></form>
+    <div class="cards">${[['First-encounter answers',fmt(s.answers)],['Trophy match rate',pct(s.trophy_match_pct)],['Average alternative credit',fmt(s.average_partial_credit)],['Median foreground time',s.median_seconds==null?'N/A':fmt(s.median_seconds)+'s'],['Players',fmt(s.players)],['Completed / observed runs',`${fmt(s.completed_runs)} / ${fmt(s.runs)}`],['Rerolls / viewed choices',`${fmt(s.rerolls)} / ${fmt(s.exposures)}`],['Likely abandonment',fmt(s.likely_abandoned)]].map(([label,value])=>`<div class="card"><span>${label}</span><strong>${value}</strong></div>`).join('')}</div>
+    <p class="note">${Number(s.answers)<30?'Early data: wait for more player answers before drawing conclusions. ':''}Difficulty is a model estimate, not a measured human success probability. "Likely abandonment" means an unfinished choice with 24 hours of inactivity; returning players leave that count.</p>
     <p class="muted">Excluded: ${fmt(c.qa_excluded)} QA observations, ${fmt(c.repeats_excluded)} repeat encounters, ${fmt(c.unobserved_excluded)} outcomes without a recorded view. Pending choices: ${fmt(s.pending)}. Timing available for ${fmt(s.timed_answers)} answers; reloads and multiple tabs omit timing. P90: ${s.p90_seconds==null?'N/A':fmt(s.p90_seconds)+'s'}.</p>
-    ${[['difficulty','By difficulty'],['pick','By real draft pick'],['round','By game position'],['set','By set'],['source_event','By source event'],['model_disagreement','When the model questions the trophy pick'],['version','By scoring and selection version']].map(([dimension,title])=>`<h2>${title}</h2>${table(report.groups.filter(r=>r.dimension===dimension).sort((a,b)=>dimension==='difficulty'?['easy','medium','hard','unrated'].indexOf(a.label)-['easy','medium','hard','unrated'].indexOf(b.label):a.label.localeCompare(b.label,undefined,{numeric:true})),dimension==='model_disagreement'?'Disagreement':'Group')}`).join('')}
-    <h2>Alternative-credit distribution</h2><p>${[['0–24',s.partial_0_24],['25–49',s.partial_25_49],['50–74',s.partial_50_74],['75–95',s.partial_75_95]].map(([label,n])=>`${label} points: <strong>${fmt(n)}</strong>`).join(' · ')}</p>
-    <h2>Decisions to review</h2><p class="muted">At least five first-encounter answers. Model disagreements appear first, then the largest samples. Small samples are exploratory.</p><div id="reviews">${report.reviews.map(r=>`<details class="review" data-puzzle="${esc(r.puzzle_id)}"><summary>${esc(r.set_id.toUpperCase())} · P1P${r.pick_number} · ${fmt(r.answers)} answers · ${pct(r.trophy_match_pct)} trophy matches${r.model_disagreement===true||r.model_disagreement==='t'?' · model disagreement':''}</summary><div class="detail"></div></details>`).join('')||'<p>No decisions have five qualifying answers yet.</p>'}</div><p id="status" role="status"></p>`;
+    <h2>Alternative-credit distribution</h2><p>${[['0-24',s.partial_0_24],['25-49',s.partial_25_49],['50-74',s.partial_50_74],['75-95',s.partial_75_95]].map(([label,n])=>`${label} points: <strong>${fmt(n)}</strong>`).join(' · ')}</p>
+    <section id="decision-analysis">${analysisMarkup(report.groups||[],report.reviews||[],!report._analysisLoaded)}</section>
+    <section id="decision-engagement">${engagementMarkup(report.share_funnel||{},report.habit_metrics||{cohorts:[],daily_health:[]},!report._engagementLoaded)}</section>
+    <p id="status" role="status"></p>`;
   document.querySelector('#filters').onsubmit=async e=>{e.preventDefault();params=new URLSearchParams(new FormData(e.currentTarget));await load();};
   document.querySelector('#signout').onclick=async()=>{await signOutAccount();login();};
   document.querySelector('#csv').onclick=()=>{
-    const rows=report.groups,keys=rows.length?Object.keys(rows[0]):['dimension','label','answers'];
+    const rows=report.groups||[],keys=rows.length?Object.keys(rows[0]):['dimension','label','answers'];
     const cell=v=>'"'+String(v??'').replace(/^[=+@-]/,"'$&").replaceAll('"','""')+'"';
     const blob=new Blob([[keys,...rows.map(r=>keys.map(k=>r[k]))].map(row=>row.map(cell).join(',')).join('\r\n')],{type:'text/csv'});
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`pack-one-decisions-${f.start}-${f.end}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
   };
-  document.querySelectorAll('[data-puzzle]').forEach(el=>el.ontoggle=async()=>{if(!el.open||el.dataset.loaded)return;const target=el.querySelector('.detail');target.textContent='Loading decision…';try{const data=await request(`/v1/admin/decisions/${el.dataset.puzzle}?${params}`),p=data.puzzle;target.innerHTML=`<p>Earlier picks: ${esc(p.prior_picks.map(c=>c.name).join(', ')||'None')}</p><div class="decision-cards">${p.candidates.map(card=>{const count=data.choices.find(c=>c.selected_id===card.id);return `<article>${/^https:\/\//.test(card.image_url||'')?`<img src="${esc(card.image_url)}" alt="${esc(card.name)}" loading="lazy">`:''}<p><strong>${esc(card.name)}</strong>${card.id===p.historical_pick_id?' · Trophy pick':''}<br>${fmt(count?.answers||0)} choices · Model support ${pct(100*card.model_probability)}<br>Average awarded: ${fmt(count?.average_score)}</p></article>`;}).join('')}</div>`;el.dataset.loaded='1';}catch(err){target.textContent=err.message;}});
+  bindReviewDetails();
 }
 async function load() {
   if(!hasAccountSession()){login();return;}
-  try{if(invite){await request('/v1/admin/claim',{invite});sessionStorage.removeItem('pack1-admin-invite');invite=null;}const area=new URLSearchParams(location.search).get('area');if(area==='corpus'){await renderCorpus(root,request);return;}if(area==='users'){await renderUsers(root,request,growthRequest);return;}if(area==='campaign-links'){await renderCampaignLinks(root,growthRequest);return;}report=await request('/v1/admin/measurements?'+params);render();}
-  catch(err){if(err.status===401||err.status===403){login(err.message);return;}const status=document.querySelector('#status');if(status)status.textContent=err.message;else root.innerHTML=`<h1>Report unavailable</h1><p class="error">${esc(err.message)}</p><button id="retry">Try again</button>`;document.querySelector('#retry')?.addEventListener('click',load);}
+  const generation=++reportGeneration;
+  try {
+    if(invite){await request('/v1/admin/claim',{invite});sessionStorage.removeItem('pack1-admin-invite');invite=null;}
+    const area=new URLSearchParams(location.search).get('area');
+    if(area==='corpus'){await renderCorpus(root,request);return;}
+    if(area==='users'){await renderUsers(root,request,growthRequest);return;}
+    if(area==='campaign-links'){await renderCampaignLinks(root,growthRequest);return;}
+    const coreParams=new URLSearchParams(params);coreParams.set('section','core');
+    const core=await request('/v1/admin/measurements?'+coreParams);
+    if(generation!==reportGeneration)return;
+    report={...core,_analysisLoaded:Boolean((core.groups||[]).length||(core.reviews||[]).length),_engagementLoaded:Boolean(core.share_funnel||core.habit_metrics)};
+    render();
+    if(!report._analysisLoaded)loadDecisionSection('analysis',generation);
+    if(!report._engagementLoaded)loadDecisionSection('engagement',generation);
+  } catch(err) {
+    if(generation!==reportGeneration)return;
+    if(err.status===401||err.status===403){login(err.message);return;}
+    const status=document.querySelector('#status');
+    if(status)status.textContent=err.message;
+    else root.innerHTML=`<h1>Report unavailable</h1><p class="error">${esc(err.message)}</p><button id="retry">Try again</button>`;
+    document.querySelector('#retry')?.addEventListener('click',load);
+  }
 }
 document.addEventListener('pack1:admin-signout',async()=>{await signOutAccount();login();});
 await load();
