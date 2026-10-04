@@ -23,7 +23,7 @@ from typing import Dict, Iterable, Optional, Sequence
 
 USER_AGENT = "DraftStudy/1.0 (https://github.com/killjoy00/mtg-ev-analyzer)"
 BAD_FRAME_EFFECTS = {"showcase", "extendedart", "inverted"}
-BAD_SET_TYPES = {"art_series", "memorabilia", "minigame", "token"}
+BAD_SET_TYPES = {"art_series", "funny", "memorabilia", "minigame", "token"}
 NAMED_LOOKUP_ALIASES = {
     # 17Lands records this Arena-rebalanced Adventure by its front-face name,
     # while Scryfall named lookup resolves the full Adventure identity.

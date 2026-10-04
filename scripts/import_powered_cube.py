@@ -47,10 +47,10 @@ from typing import Iterable, Optional, Sequence
 
 try:  # Script execution (python scripts/import_powered_cube.py)
     from build_replays import truthy_count, write_sharded_dataset
-    from fetch_card_metadata import aliases, compact_card
+    from fetch_card_metadata import aliases, compact_card, fetch_named, image_url, metadata_for_alias, printing_rank
 except ModuleNotFoundError:  # Unit-test import (from scripts import import_powered_cube)
     from scripts.build_replays import truthy_count, write_sharded_dataset
-    from scripts.fetch_card_metadata import aliases, compact_card
+    from scripts.fetch_card_metadata import aliases, compact_card, fetch_named, image_url, metadata_for_alias, printing_rank
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CATALOG_PATH = REPO_ROOT / "data" / "catalog.json"
@@ -190,33 +190,41 @@ def write_model_archive(source: Path, destination: Path, *, complete_p1p1_candid
     return removed
 
 
-def oracle_bulk_download_uri(payload: dict) -> str:
+def bulk_download_uri(payload: dict, bulk_type: str) -> str:
     entries = payload.get("data") if isinstance(payload, dict) else None
     if not isinstance(entries, list):
         raise ValueError("Scryfall bulk-data discovery returned no data list.")
-    oracle = next(
-        (item for item in entries if isinstance(item, dict) and item.get("type") == "oracle_cards"),
+    entry = next(
+        (item for item in entries if isinstance(item, dict) and item.get("type") == bulk_type),
         None,
     )
-    if oracle is None:
-        raise ValueError("Scryfall bulk-data discovery did not include oracle_cards.")
+    if entry is None:
+        raise ValueError(f"Scryfall bulk-data discovery did not include {bulk_type}.")
     # jsonl_download_uri is the current 2026 contract; download_uri supports the
     # older JSON-array export and compatible mirrors.
-    download_uri = str(oracle.get("jsonl_download_uri") or oracle.get("download_uri") or "")
+    download_uri = str(entry.get("jsonl_download_uri") or entry.get("download_uri") or "")
     if not download_uri.startswith("https://"):
-        raise ValueError("Scryfall oracle_cards metadata had no HTTPS bulk download URI.")
+        raise ValueError(f"Scryfall {bulk_type} metadata had no HTTPS bulk download URI.")
     return download_uri
 
 
-def download_oracle_bulk(destination: Path) -> str:
+def oracle_bulk_download_uri(payload: dict) -> str:
+    return bulk_download_uri(payload, "oracle_cards")
+
+
+def default_bulk_download_uri(payload: dict) -> str:
+    return bulk_download_uri(payload, "default_cards")
+
+
+def download_bulk(destination: Path, bulk_type: str, *, timeout: int) -> str:
     with request(SCRYFALL_BULK_URL, accept=JSON_ACCEPT, timeout=60) as response:
         payload = json.load(response)
-    download_uri = oracle_bulk_download_uri(payload)
+    download_uri = bulk_download_uri(payload, bulk_type)
     destination.parent.mkdir(parents=True, exist_ok=True)
     with request(
         download_uri,
         accept="application/x-ndjson,application/json;q=0.9,application/gzip;q=0.8,*/*;q=0.7",
-        timeout=180,
+        timeout=timeout,
     ) as response:
         with destination.open("wb") as handle:
             while True:
@@ -225,8 +233,16 @@ def download_oracle_bulk(destination: Path) -> str:
                     break
                 handle.write(chunk)
     if destination.stat().st_size < 1024:
-        raise ValueError("Scryfall oracle_cards bulk download was unexpectedly small.")
+        raise ValueError(f"Scryfall {bulk_type} bulk download was unexpectedly small.")
     return download_uri
+
+
+def download_oracle_bulk(destination: Path) -> str:
+    return download_bulk(destination, "oracle_cards", timeout=180)
+
+
+def download_default_bulk(destination: Path) -> str:
+    return download_bulk(destination, "default_cards", timeout=300)
 
 
 def iter_oracle_bulk(path: Path) -> Iterable[dict]:
@@ -271,43 +287,44 @@ def iter_oracle_bulk(path: Path) -> Iterable[dict]:
 
 
 def _bulk_cards() -> Iterable[dict]:
-    with tempfile.TemporaryDirectory(prefix="pack1-scryfall-oracle-") as tmp:
-        path = Path(tmp) / "oracle-cards.bulk"
-        download_oracle_bulk(path)
+    """Yield every default printing so display selection can be ranked deterministically."""
+    with tempfile.TemporaryDirectory(prefix="pack1-scryfall-default-") as tmp:
+        path = Path(tmp) / "default-cards.bulk"
+        download_default_bulk(path)
         yield from iter_oracle_bulk(path)
 
 
 def _named_card(name: str) -> Optional[dict]:
-    url = "https://api.scryfall.com/cards/named?exact=" + urllib.parse.quote(name)
-    try:
-        with request(url, accept=JSON_ACCEPT, timeout=45) as response:
-            return json.load(response)
-    except urllib.error.HTTPError as exc:
-        if exc.code == 404:
-            return None
-        raise
+    """Compatibility wrapper for callers/tests that still patch the old helper."""
+    return fetch_named(name)
 
 
 def fetch_cross_set_metadata(names: Iterable[str]) -> tuple[dict[str, dict], list[str]]:
-    """Resolve Cube card metadata primarily from Scryfall's recommended bulk data.
+    """Resolve Cube display metadata from all printings, never first alias hit.
 
-    Scryfall explicitly recommends bulk data for large name-lookup jobs. We only
-    fall back to the named-card API for aliases not represented directly in the
-    oracle-card bulk file, and keep that fallback below the normal API rate cap.
+    The oracle-card export contains only one representative per Oracle identity,
+    so an art-series object, token, or same-name playtest identity can win merely
+    by appearing first. The default-card export supplies every printing; rank all
+    matching aliases with the shared main-art policy and use the shared exact-name
+    resolver only for bulk misses.
     """
     wanted = {str(name) for name in names if str(name).strip()}
-    records: dict[str, dict] = {}
+    candidates: dict[str, list[dict]] = {name: [] for name in wanted}
     for card in _bulk_cards():
-        metadata = compact_card(card)
-        for alias in aliases(card):
-            if alias in wanted and alias not in records:
-                records[alias] = metadata
+        for alias in set(aliases(card)) & wanted:
+            if image_url(card, alias):
+                candidates[alias].append(card)
 
-    missing = sorted(wanted - records.keys())
-    for name in list(missing):
+    records: dict[str, dict] = {}
+    for name in sorted(wanted):
+        options = candidates.get(name) or []
+        if options:
+            chosen = min(options, key=lambda card: printing_rank(card, name))
+            records[name] = metadata_for_alias(chosen, name)
+            continue
         card = _named_card(name)
-        if card:
-            records[name] = compact_card(card)
+        if card and image_url(card, name):
+            records[name] = metadata_for_alias(card, name)
         time.sleep(0.12)
 
     unresolved = sorted(wanted - records.keys())
