@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {assembleCorpusAdmin} from '../worker/corpus-admin.mjs';
+import fs from 'node:fs';
+import {assembleCorpusAdmin,assembleCorpusOverview} from '../worker/corpus-admin.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 
 const result=rows=>({rows});
@@ -62,4 +63,26 @@ test('historical-frozen snapshots own retained NULL-snapshot rows',()=>{
  assert.equal(data.snapshots[0].serving_count,2);
  assert.equal(data.sets[0].active_snapshot_eligible_count,2);
  assert.equal(data.sets[0].serving_count,2);
+});
+
+
+test('overview uses only the current serving cache and defers exact retained accounting',()=>{
+ const data=assembleCorpusOverview({
+  sets:result([{set_id:'qa-snapshot',set_name:'QA snapshot',status:'Live',manifest:{fixture:true},report:{fixture:'health'}}]),
+  servingCache:result([{revision:'42',snapshot_id:'7',groups:[{set_id:'qa-snapshot',pick_number:1,band:'easy',n:3},{set_id:'qa-snapshot',pick_number:1,band:'hard',n:2},{set_id:'qa-snapshot',pick_number:2,band:'medium',n:4}]}])
+ });
+ assert.equal(data.serving_cache_current,true);
+ assert.equal(data.serving_revision,'42');
+ assert.equal(data.sets[0].serving_count,9);
+ assert.deepEqual(data.sets[0].serving_by_pick,{'1':5,'2':4});
+ assert.equal(data.sets[0].staged_count,null);
+ assert.equal(data.sets[0].under_floor_count,null);
+});
+
+test('overview SQL cannot regress to a full puzzle-corpus scan',()=>{
+ const source=fs.readFileSync('worker/corpus-admin.mjs','utf8');
+ const overview=source.slice(source.indexOf("if(request.method==='GET'&&path==='/v1/admin/corpus')"),source.indexOf("const detail=path.match"));
+ assert.match(overview,/draft_run_serving_snapshots/);
+ assert.doesNotMatch(overview,/draft_run_verified_puzzles/);
+ assert.doesNotMatch(overview,/retained_inventory/);
 });
