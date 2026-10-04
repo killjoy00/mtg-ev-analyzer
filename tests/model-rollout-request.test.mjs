@@ -4,6 +4,11 @@ import assert from 'node:assert/strict';
 import {assertRolloutReplayPolicy,rolloutDispatch,rolloutFingerprint} from '../scripts/model-rollout-request.mjs';
 
 const common={request_id:'test-request',reason:'Exercise the reviewed rollout path'};
+test('legacy game metadata repair is explicit production staging on the fixed workflow',()=>{
+ const base={...common,operation:'v5-corpus-release',target:'production',action:'stage',candidate_run_id:'37132557406',release_commit:'a'.repeat(40),repair_game_metadata:true};
+ assert.equal(rolloutDispatch(base).body.inputs.repair_game_metadata,'true');
+ for(const patch of [{target:'development'},{repair_game_metadata:'true'},{repair_game_metadata:false},{action:'activate',stage_run_id:'37164763986',bridge_commit:'b'.repeat(40)}])assert.throws(()=>rolloutDispatch({...base,...patch}));
+});
 
 test('equivalent rollout requests require an explicit replay reference',()=>{
   const prior={operation:'season-migration',request_id:'season-prod-1',reason:'First reviewed request',target:'production',commit:'a'.repeat(40)};
