@@ -65,6 +65,9 @@ try {
   assert.ok(userDetail.recent_events.some(x=>x.event_name==='game_started'));
   let report=await call('/v1/admin/measurements',undefined,null,accountToken);
   assert.ok(Number(report.summary.answers)>=1);assert.ok(Number(report.coverage.repeats_excluded)>=1);
+  assert.equal(report.habit_metrics,undefined,'core report stays independent of habit metrics');
+  const habits=await call('/v1/admin/measurements/habits',undefined,null,accountToken);
+  assert.ok(Array.isArray(habits.habit_metrics?.cohorts));assert.ok(Array.isArray(habits.habit_metrics?.daily_health));
   await query('UPDATE draft_run_sessions SET measurement_qa=true WHERE id=ANY($1::uuid[])',['{'+[run.id,repeat].join(',')+'}']);
   report=await call('/v1/admin/measurements',undefined,null,accountToken);
   assert.ok(Number(report.coverage.qa_excluded)>=4);
