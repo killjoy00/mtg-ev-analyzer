@@ -72,6 +72,7 @@ try {
   assert.match(await page.locator('.share-funnel').innerText(),/20[\s\S]*17[\s\S]*12[\s\S]*9/);
   assert.match(await page.getByText('Start conversion:',{exact:false}).innerText(),/60%[\s\S]*75%/);
   await page.getByLabel('Difficulty',{exact:true}).selectOption('hard');
+  await page.locator('#reviews').waitFor();
   const previousReviews=await page.locator('#reviews').elementHandle();
   assert.ok(previousReviews);
   await page.getByRole('button',{name:'Refresh',exact:true}).click();
