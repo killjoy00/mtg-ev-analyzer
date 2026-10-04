@@ -10,7 +10,7 @@ const CONTINUATION_WORKFLOW='launch-alert.yml';
 export const MAX_CONTINUATION_DEPTH=12;
 export const GATEWAY_PAGE_SIZE=2000,GATEWAY_MAX_PAGES=32;
 const RECOVERABLE_ALERTS=new Set(['coverage_pending','coverage_continuation_failed','telemetry_unavailable']);
-export const thresholds={window_minutes:15,minimum_errors:5,estimated_error_fraction:.01,minimum_429:10,minimum_slow_samples:3,slow_ms:5000,quota_ms:1000,requests_per_day:100000,compute_cu_hours_per_day:24,compute_cu_hours_per_billing_period:200,egress_bytes_per_day:5*1024**3,egress_bytes_per_billing_period:50*1024**3};
+export const thresholds={window_minutes:15,minimum_errors:5,estimated_error_fraction:.01,minimum_429:10,minimum_slow_samples:3,slow_ms:5000,quota_ms:1000,requests_per_day:100000,compute_cu_hours_per_billing_period:200,egress_bytes_per_billing_period:50*1024**3};
 
 async function json(fetcher,url,token,body,method=body?'POST':'GET') {
   const r=await fetcher(url,{method,headers:{authorization:'Bearer '+token,'content-type':'application/json',accept:'application/json'},body:body?JSON.stringify(body):undefined,redirect:'error',signal:AbortSignal.timeout(20000)});
@@ -36,9 +36,8 @@ export function evaluate(events,usage) {
   if(slow>=thresholds.minimum_slow_samples)alerts.push('slow_requests');
   if(quotaSlow>=thresholds.minimum_slow_samples)alerts.push('slow_quota');
   if(usage.worker_requests>=thresholds.requests_per_day)alerts.push('worker_daily_usage');
-  if(usage.compute_cu_hours>=thresholds.compute_cu_hours_per_day)alerts.push('neon_compute_daily_usage');
+  // Daily Neon history is whole-project (production, development, and CI), so keep it in reports but do not route it as a production incident.
   if(usage.billing_period_compute_cu_hours>=thresholds.compute_cu_hours_per_billing_period)alerts.push('neon_compute_billing_period_usage');
-  if(usage.egress_bytes>=thresholds.egress_bytes_per_day)alerts.push('neon_egress_daily_usage');
   if(usage.billing_period_egress_bytes>=thresholds.egress_bytes_per_billing_period)alerts.push('neon_egress_billing_period_usage');
   return {alerts,sampled_events:events.length,estimated_requests:estimated,errors,limited,slow_samples:slow,slow_quota_samples:quotaSlow,releases:[...new Set(events.map(e=>e.release))],usage};
 }
