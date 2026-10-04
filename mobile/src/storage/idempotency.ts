@@ -1,4 +1,9 @@
 import * as SecureStore from 'expo-secure-store';
+import { config } from '@/src/config';
+
+async function deviceStore() {
+  return config.screenshots.fixtures ? import('@/src/screenshots/storage') : SecureStore;
+}
 
 const PRACTICE_KEY = 'packone.mobile.practice.idempotency.v2';
 
@@ -17,7 +22,7 @@ function makeIdempotencyKey() {
 }
 
 export async function practiceIdempotencyKey(fingerprint: string) {
-  const raw = await SecureStore.getItemAsync(PRACTICE_KEY);
+  const raw = await (await deviceStore()).getItemAsync(PRACTICE_KEY);
   if (raw) {
     try {
       const record = JSON.parse(raw) as Partial<PracticeKeyRecord>;
@@ -29,12 +34,12 @@ export async function practiceIdempotencyKey(fingerprint: string) {
 
   const key = makeIdempotencyKey();
   const record: PracticeKeyRecord = { fingerprint, key };
-  await SecureStore.setItemAsync(PRACTICE_KEY, JSON.stringify(record), {
+  await (await deviceStore()).setItemAsync(PRACTICE_KEY, JSON.stringify(record), {
     keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
   });
   return key;
 }
 
 export async function clearPracticeIdempotencyKey() {
-  await SecureStore.deleteItemAsync(PRACTICE_KEY);
+  await (await deviceStore()).deleteItemAsync(PRACTICE_KEY);
 }

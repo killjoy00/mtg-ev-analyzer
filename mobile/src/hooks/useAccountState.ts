@@ -1,5 +1,5 @@
 import { router, useFocusEffect } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { ApiError } from '@/src/api/client';
 import {
@@ -16,7 +16,9 @@ import {
   type PracticeSet,
 } from '@/src/api/draftRun';
 import { ensureGuestSession } from '@/src/api/guest';
-import type { MobileSession } from '@/src/storage/session';
+import { readSession, subscribeSession, type MobileSession } from '@/src/storage/session';
+
+const identity = (session: MobileSession | null) => session ? `${session.playerToken}:${session.accountToken ?? ''}` : '';
 
 type Options = {
   requireAccount?: boolean;
@@ -38,6 +40,8 @@ export function useAccountState({
   const [message, setMessage] = useState<string | null>(null);
   const [enrichmentWarning, setEnrichmentWarning] = useState<string | null>(null);
   const generation = useRef(0);
+  const owner = useRef('');
+  const focused = useRef(false);
 
   const clearEnrichment = useCallback(() => {
     setProfile(null);
@@ -74,11 +78,16 @@ export function useAccountState({
 
   const loadForSession = useCallback(async (current: MobileSession, id: number) => {
     if (id !== generation.current) return null;
+    if (owner.current !== identity(current)) {
+      owner.current = identity(current);
+      setAccount(null);
+      clearEnrichment();
+    }
     setSession(current);
     if (!current.accountToken) {
       setAccount(null);
       clearEnrichment();
-      if (requireAccount) router.replace('/account');
+      if (requireAccount && focused.current) router.replace('/account');
       return null;
     }
     try {
@@ -90,13 +99,14 @@ export function useAccountState({
     } catch (error: unknown) {
       if (id !== generation.current) return null;
       if (error instanceof ApiError && error.status === 401) {
+        if (identity(await readSession()) !== identity(current) || id !== generation.current) return null;
         const guest = await forgetAccountLocally(current);
         if (id !== generation.current) return null;
         setSession(guest);
         setAccount(null);
         clearEnrichment();
         setMessage('Your account session expired. Sign in again.');
-        if (requireAccount) router.replace('/account');
+        if (requireAccount && focused.current) router.replace('/account');
         return null;
       }
       clearEnrichment();
@@ -113,10 +123,18 @@ export function useAccountState({
       const current = await ensureGuestSession();
       if (id !== generation.current) return null;
       return await loadForSession(current, id);
+    } catch {
+      if (id !== generation.current) return null;
+      owner.current = '';
+      setSession(null);
+      setAccount(null);
+      clearEnrichment();
+      setMessage('Could not read your account. Unlock your device and try again.');
+      return null;
     } finally {
       if (id === generation.current) setBusy(false);
     }
-  }, [loadForSession]);
+  }, [clearEnrichment, loadForSession]);
 
   const adoptSession = useCallback(async (next: MobileSession) => {
     const id = ++generation.current;
@@ -141,9 +159,21 @@ export function useAccountState({
   }, []);
 
   useFocusEffect(useCallback(() => {
+    focused.current = true;
     void refresh();
-    return () => { generation.current += 1; };
+    return () => { focused.current = false; generation.current += 1; };
   }, [refresh]));
+
+  useEffect(() => subscribeSession((next) => {
+    if (owner.current === identity(next)) return;
+    const id = ++generation.current;
+    owner.current = identity(next);
+    setSession(next);
+    setAccount(null);
+    clearEnrichment();
+    setBusy(false);
+    if (next) void loadForSession(next, id);
+  }), [clearEnrichment, loadForSession]);
 
   return {
     session,

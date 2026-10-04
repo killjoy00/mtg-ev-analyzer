@@ -1,3 +1,7 @@
+import * as SecureStore from '@/src/screenshots/storage';
+import { pacificDay } from '@/src/dailyClock';
+import { config } from '@/src/config';
+import { readScreenshotSession, screenshotSession } from '@/src/screenshots/session';
 import type { NativeAppleSubscriptionStatus } from '@/src/api/apple-subscriptions';
 import type { CareerHistoryPage, CareerProfile } from '@/src/api/career';
 import type {
@@ -61,7 +65,7 @@ function puzzle(index: number): DraftRunPuzzle {
 }
 
 const initialRun: DraftRunState = {
-  id: 'screenshot-run',
+  id: '33333333-3333-4333-8333-333333333333',
   environment: 'mixed',
   run_length: 8,
   set_reroll_allowed: false,
@@ -84,7 +88,7 @@ function feedbackRun(selectedId: string): DraftRunState {
   const selected = current.candidates.find((item) => item.id === selectedId) ?? current.candidates[0];
   const historical = current.candidates.find((item) => item.id === 'web-up');
   if (!selected || !historical) throw new Error('Store screenshot draft fixture is incomplete.');
-  const score = selected.id === historical.id ? 100 : selected.id === 'hero-in-training' ? 96 : 78;
+  const score = selected.id === historical.id ? 100 : selected.id === 'cosmic-cube' ? 0 : selected.id === 'hero-in-training' ? 96 : 78;
   const answer: DraftRunAnswer = {
     score,
     selectedId: selected.id,
@@ -251,11 +255,48 @@ function parseBody(options: ScreenshotRequestOptions): Record<string, unknown> {
   return options.body && typeof options.body === 'object' ? options.body as Record<string, unknown> : {};
 }
 
+const SCENARIO_KEY = 'packone.preview.scenario.v1';
+const RUN_KEY = 'packone.preview.run.v1';
+export async function configureScreenshotScenario(scenario: string) {
+  if (!config.screenshots.fixtures) throw new Error('Acceptance fixtures are disabled.');
+  await SecureStore.setItemAsync(SCENARIO_KEY, scenario);
+  await SecureStore.deleteItemAsync(RUN_KEY);
+  await SecureStore.deleteItemAsync('packone.mobile.shared-run.v1');
+  await SecureStore.deleteItemAsync('packone.mobile.practice.idempotency.v2');
+}
+
 export async function requestScreenshotFixture<T>(
   path: string,
   options: ScreenshotRequestOptions = {},
 ): Promise<T> {
   const method = options.method ?? 'GET';
+  const scenario = await SecureStore.getItemAsync(SCENARIO_KEY) || 'elite';
+  const currentSession = await readScreenshotSession();
+  const guest = !currentSession.accountToken;
+  const elite = scenario === 'elite';
+  const today = pacificDay();
+  const readRun = async () => {
+    const saved = await SecureStore.getItemAsync(RUN_KEY);
+    return saved ? JSON.parse(saved) as DraftRunState : { ...clone(initialRun), day: today };
+  };
+  if (path === '/growth/v1/mobile/account/session') return {
+    user: currentSession.accountUser || screenshotSession.accountUser,
+    session: {}, credentials: { password: true, google: false, apple: false },
+    deletion: { enabled: true, available: true, method: 'password' },
+  } as T;
+  if (path === '/growth/v1/mobile/account/signin' && method === 'POST') {
+    const second = parseBody(options).email === 'second@packone.example';
+    return {
+      user: second ? { id: '55555555-5555-4555-8555-555555555555', email: 'second@packone.example', name: 'Second Reviewer' } : screenshotSession.accountUser,
+      session: { token: second ? 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC' : screenshotSession.accountToken, expiresAt: screenshotSession.accountExpiresAt },
+      linked: { token: screenshotSession.playerToken, playerId: screenshotSession.subjectId, displayName: second ? 'SecondReviewer' : 'PackOneReviewer', newlyClaimed: false, rankingIdentity: { eligible: true } },
+    } as T;
+  }
+  if (path === '/growth/v1/mobile/account/signout') return { ok: true } as T;
+  if (path.startsWith('/draft/v1/leaderboard?')) return {
+    period: 'daily', environment: 'mixed', start: today, today,
+    rows: [{ rank: 1, score: 94, days: 3, display_name: 'A Very Long Pack One Player Name', profile_key: 'a1b2c3d4e5f60718' }],
+  } as T;
 
   if (path === '/growth/v1/session' && method === 'POST') {
     return {
@@ -265,25 +306,71 @@ export async function requestScreenshotFixture<T>(
       profileKey: 'a1b2c3d4e5f60718',
     } as T;
   }
-  if (path === '/draft/v1/daily-status') return clone(dailyStatus) as T;
+  if (path === '/draft/v1/daily-status') {
+    if (scenario.includes('checking')) await new Promise(resolve => setTimeout(resolve, 30000));
+    if (scenario.includes('error')) throw new Error('Controlled offline fixture.');
+    const run = await readRun();
+    const environments = scenario.includes('all') ? ['mixed', 'powered-cube', 'latest'] : scenario.includes('partial') || run.complete ? ['mixed'] : [];
+    return { ...clone(dailyStatus), day: today, player: { claimed: !guest }, daily_streak: scenario.includes('zero') || scenario === 'member-new' || guest ? 0 : 12,
+      daily_history: environments.map(set_id => ({ date: today, set_id, mode: 'draft_run', score: run.complete ? run.score : 87 })) } as T;
+  }
   if (path === '/draft/v1/capabilities') {
-    return { capabilities: ['account', 'unlimited_regular_practice', 'unlimited_cube_practice', 'custom_corpus'] } as T;
+    return { capabilities: elite ? ['account', 'unlimited_regular_practice', 'unlimited_cube_practice', 'custom_corpus'] : ['account', 'unlimited_regular_practice'] } as T;
   }
   if (path === '/draft/v1/set-catalog' || path === '/draft/v1/practice-sets') {
     return { sets: clone(practiceSets) } as T;
   }
-  if (path === '/draft/v1/runs' && method === 'POST') return clone(initialRun) as T;
-  if (path === '/draft/v1/runs/screenshot-run') return clone(initialRun) as T;
-  if (path === '/draft/v1/runs/screenshot-run/pick' && method === 'POST') {
-    const selected = String(parseBody(options).cardId || 'hero-in-training');
-    return clone(feedbackRun(selected)) as T;
+  if (path === '/draft/v1/runs' && method === 'POST') {
+    const run = await readRun();
+    const body = parseBody(options);
+    run.day = body.daily === true ? today : null;
+    await SecureStore.setItemAsync(RUN_KEY, JSON.stringify(run));
+    console.info('PACKONE_RUN', JSON.stringify({ method: 'POST', id: run.id, round: run.round, shared: Boolean(body.challenge) }));
+    return run as T;
   }
-  if (path === '/draft/v1/runs/screenshot-run/reroll' && method === 'POST') return clone(initialRun) as T;
-  if (path === '/draft/v1/runs/screenshot-run/share' && method === 'POST') return { id: '0123456789abcdef01234567' } as T;
-  if (path === '/growth/v1/patreon/mobile/status') return clone(membershipStatus) as T;
-  if (path === '/growth/v1/apple-subscriptions/mobile/status') return clone(appleStatus) as T;
-  if (path === '/growth/v1/mobile/profile/me') return clone(careerProfile) as T;
-  if (path.startsWith('/growth/v1/mobile/profile/history?')) return clone(historyPage) as T;
+  if (path === '/draft/v1/runs/33333333-3333-4333-8333-333333333333') {
+    const run = await readRun();
+    console.info('PACKONE_RUN', JSON.stringify({ method: 'GET', id: run.id, round: run.round }));
+    return run as T;
+  }
+  if (path === '/draft/v1/shared-runs/aaaaaaaaaaaaaaaaaaaaaaaa') return { id: 'aaaaaaaaaaaaaaaaaaaaaaaa', name: 'Fixture Drafter', score: 88, scores: [], run_length: 8, environment: 'mixed', source_run_id: '44444444-4444-4444-8444-444444444444' } as T;
+  if (path === '/draft/v1/runs/33333333-3333-4333-8333-333333333333/pick' && method === 'POST') {
+    const old = await readRun();
+    const selected = scenario.includes('match') ? 'web-up' : scenario.includes('zero') ? 'cosmic-cube' : String(parseBody(options).cardId || 'hero-in-training');
+    const next = feedbackRun(selected);
+    const answer = next.answers[0]!;
+    if (scenario.includes('long')) {
+      answer.selectedName = 'Bala Ged Recovery // Bala Ged Sanctuary';
+      answer.historicalName = 'Esika, God of the Tree // The Prismatic Bridge';
+      for (const card of answer.puzzle.candidates) {
+        if (card.id === answer.selectedId) card.name = answer.selectedName;
+        if (card.id === answer.historicalId) card.name = answer.historicalName;
+      }
+    }
+    if (scenario.includes('image-error')) {
+      for (const card of answer.puzzle.candidates) card.image_url = 'data:image/png;base64,broken';
+    }
+    next.answers = [...old.answers, answer];
+    next.round = next.answers.length;
+    next.revision = old.revision + 1;
+    next.day = old.day;
+    next.complete = next.answers.length >= 8;
+    next.score = next.complete ? Math.round(next.answers.reduce((sum, answer) => sum + answer.score, 0) / 8) : null;
+    next.current = next.complete ? null : puzzle(next.round);
+    await SecureStore.setItemAsync(RUN_KEY, JSON.stringify(next));
+    return clone(next) as T;
+  }
+  if (path === '/draft/v1/runs/33333333-3333-4333-8333-333333333333/reroll' && method === 'POST') return clone(initialRun) as T;
+  if (path === '/draft/v1/runs/33333333-3333-4333-8333-333333333333/share' && method === 'POST') return { id: '0123456789abcdef01234567' } as T;
+  if (path === '/growth/v1/patreon/mobile/status') return { ...clone(membershipStatus), ad_free: elite, ads_allowed: !elite, account_capabilities: elite ? ['account', 'unlimited_regular_practice', 'unlimited_cube_practice', 'custom_corpus'] : ['account', 'unlimited_regular_practice'] } as T;
+  if (path === '/growth/v1/apple-subscriptions/mobile/status') return { ...clone(appleStatus), account_capabilities: elite ? ['account', 'unlimited_regular_practice', 'unlimited_cube_practice', 'custom_corpus'] : ['account', 'unlimited_regular_practice'] } as T;
+  if (path === '/growth/v1/mobile/profile/me' || path === '/growth/v1/mobile/profile/a1b2c3d4e5f60718') {
+    const profile = clone(careerProfile);
+    if (currentSession.accountUser?.email === 'second@packone.example') profile.player.display_name = 'SecondReviewer';
+    if (scenario === 'member-new') { profile.summary.games = 0; profile.recent = []; }
+    return profile as T;
+  }
+  if (path.startsWith('/growth/v1/mobile/profile/history?')) return (scenario === 'member-new' ? { rows: [], next_cursor: null } : clone(historyPage)) as T;
   if (path === '/draft/health?quick=1') {
     return { ok: true, service: 'draft-run', release: 'screenshot-fixtures', run_length: 8 } as T;
   }

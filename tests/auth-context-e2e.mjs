@@ -190,9 +190,20 @@ async function captureProductionAuthEvidence() {
   await page.screenshot({path:'artifacts/ui-auth-production-signup-desktop.png',fullPage:true});
 
   await page.setViewportSize({width:390,height:844});
-  await page.evaluate(()=>{document.documentElement.style.fontSize='125%';});
+  const textGrowth = await page.evaluate(() => {
+    const elements = [...document.querySelectorAll('#app *')];
+    const metrics = elements.map(element => ({ element, size: parseFloat(getComputedStyle(element).fontSize), line: parseFloat(getComputedStyle(element).lineHeight), before: element.getAttribute('style') }));
+    for (const { element, size, line } of metrics) {
+      element.dataset.textScaleOriginalStyle = element.getAttribute('style') || '';
+      element.style.fontSize = `${size * 1.25}px`;
+      if (Number.isFinite(line)) element.style.lineHeight = `${line * 1.25}px`;
+    }
+    return metrics.filter(({ element, size }) => size > 0 && element.textContent.trim())
+      .map(({ element, size }) => parseFloat(getComputedStyle(element).fontSize) / size);
+  });
+  assert.ok(textGrowth.length > 0 && textGrowth.every(ratio => ratio >= 1.24), 'Large-text evidence must enlarge actual computed typography by 25%.');
   await page.screenshot({path:'artifacts/ui-auth-production-signup-large-text-390.png',fullPage:true});
-  await page.evaluate(()=>{document.documentElement.style.fontSize='';});
+  await page.evaluate(() => document.querySelectorAll('[data-text-scale-original-style]').forEach(element => { element.setAttribute('style', element.dataset.textScaleOriginalStyle); delete element.dataset.textScaleOriginalStyle; }));
 
   // Verification completion remains on the deterministic harness below so the
   // E2E safety guard never permits the real production growth endpoint. The

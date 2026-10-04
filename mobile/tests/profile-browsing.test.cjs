@@ -55,7 +55,7 @@ async function fixture(t, options = {}) {
       router: { push(value) { pushes.push(value); }, back() { backs += 1; } }, useLocalSearchParams: () => params,
       useFocusEffect(callback) { React.useEffect(() => { focus = callback; const cleanup = callback(); return () => { if (focus === callback) focus = null; cleanup?.(); }; }, [callback]); },
     },
-    'react-native': { ActivityIndicator: host('ActivityIndicator'), FlatList, Pressable: host('Pressable'), Text: host('Text'), View: host('View'),
+    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }), ActivityIndicator: host('ActivityIndicator'), FlatList, Pressable: host('Pressable'), Text: host('Text'), View: host('View'),
       StyleSheet: { create: (value) => value }, Share: { share: async (value) => { shares.push(value); return {}; } } },
     'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
     'expo-secure-store': {
@@ -74,6 +74,9 @@ async function fixture(t, options = {}) {
       compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX, esModuleInterop: true } }).outputText;
     const prior = Module._load;
     Module._load = function load(request, parent, main) {
+    if (request === '@/src/components/Text') return { Text: mocks['react-native'].Text };
+    if (request === '@/src/components/ScreenArea') return { ScreenArea: mocks['react-native-safe-area-context'].SafeAreaView };
+
       if (Object.prototype.hasOwnProperty.call(mocks, request)) return mocks[request];
       const base = request.startsWith('@/') ? path.join(mobile, request.slice(2))
         : request.startsWith('.') && parent?.filename.startsWith(mobile) ? path.resolve(path.dirname(parent.filename), request) : null;
@@ -102,7 +105,7 @@ async function fixture(t, options = {}) {
     } else throw new Error(`Unexpected request: ${target.pathname}`);
     return result instanceof Response ? result : Response.json(result);
   };
-  const Screen = compile(path.join(mobile, 'app', options.privateView ? 'career.tsx' : 'profile.tsx')).default;
+  const Screen = compile(path.join(mobile, options.privateView ? 'src/screens/career.tsx' : 'app/profile.tsx')).default;
   const sessions = compile(path.join(mobile, 'src/storage/session.ts'));
   let root;
   await act(async () => { root = Renderer.create(React.createElement(Screen)); await drain(); });

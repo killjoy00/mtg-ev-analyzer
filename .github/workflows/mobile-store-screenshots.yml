@@ -6,12 +6,14 @@ on:
     paths:
       - '.github/store-screenshot-request.json'
   workflow_dispatch:
+  pull_request:
+    paths: ['mobile/**', '.github/workflows/mobile-store-screenshots.yml']
 
 permissions:
   contents: read
 
 concurrency:
-  group: mobile-store-screenshots
+  group: mobile-store-screenshots-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -69,6 +71,7 @@ jobs:
       EXPO_PUBLIC_PACKONE_ENV: preview
       EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES: '1'
       PACKONE_BUILD_PROFILE: preview
+      ACCEPTANCE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     defaults:
       run:
         working-directory: mobile
@@ -134,10 +137,6 @@ jobs:
             echo "phone_udid=$phone_udid"
             echo "ipad_udid=$ipad_udid"
           } >> "$GITHUB_OUTPUT"
-          xcrun simctl boot "$phone_udid"
-          xcrun simctl boot "$ipad_udid"
-          xcrun simctl bootstatus "$phone_udid" -b
-          xcrun simctl bootstatus "$ipad_udid" -b
       - name: Build preview app for iOS Simulator
         shell: bash
         env:
@@ -157,6 +156,7 @@ jobs:
           fi
           echo "Building preview scheme: $scheme"
           xcodebuild \
+            -quiet \
             -workspace "$workspace" \
             -scheme "$scheme" \
             -configuration Release \
@@ -164,6 +164,8 @@ jobs:
             -derivedDataPath "$RUNNER_TEMP/PackOneScreenshotDerivedData" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
+            ONLY_ACTIVE_ARCH=YES \
+            ARCHS="$(uname -m)" \
             build
           app=""
           while IFS= read -r candidate; do
@@ -175,19 +177,53 @@ jobs:
           done < <(find "$RUNNER_TEMP/PackOneScreenshotDerivedData/Build/Products" -path '*Release-iphonesimulator/*.app' -type d -print)
           test -d "$app"
           echo "SCREENSHOT_IOS_APP=$app" >> "$GITHUB_ENV"
-      - name: Install preview app on simulators
+      - name: Boot and install iPhone preview
+        timeout-minutes: 10
         shell: bash
         run: |
           set -euo pipefail
+          # Build before booting, then keep one simulator active at a time.
+          # Two booted iOS runtimes compete with native compilation/capture on
+          # the hosted runner; preserve diagnostics with bounded capture steps.
+          xcrun simctl boot '${{ steps.simulators.outputs.phone_udid }}'
+          xcrun simctl bootstatus '${{ steps.simulators.outputs.phone_udid }}' -b
           xcrun simctl install '${{ steps.simulators.outputs.phone_udid }}' "$SCREENSHOT_IOS_APP"
-          xcrun simctl install '${{ steps.simulators.outputs.ipad_udid }}' "$SCREENSHOT_IOS_APP"
       - name: Capture iPhone screenshots
+        timeout-minutes: 10
         shell: bash
         run: bash ./scripts/capture-store-screenshots-ios.sh '${{ steps.simulators.outputs.phone_udid }}' iphone "$GITHUB_WORKSPACE/store-screenshots"
+      - name: Capture native iPhone acceptance states
+        if: always() && env.SCREENSHOT_IOS_APP != ''
+        timeout-minutes: 25
+        run: python3 ./scripts/native-acceptance.py ios "$GITHUB_WORKSPACE/native-acceptance/iphone" '${{ steps.simulators.outputs.phone_udid }}' iphone
+      - name: Switch from iPhone to iPad simulator
+        if: always() && env.SCREENSHOT_IOS_APP != ''
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun simctl shutdown '${{ steps.simulators.outputs.phone_udid }}' || true
+          xcrun simctl boot '${{ steps.simulators.outputs.ipad_udid }}'
+          xcrun simctl bootstatus '${{ steps.simulators.outputs.ipad_udid }}' -b
+          xcrun simctl install '${{ steps.simulators.outputs.ipad_udid }}' "$SCREENSHOT_IOS_APP"
       - name: Capture iPad screenshots
+        if: always() && env.SCREENSHOT_IOS_APP != ''
+        timeout-minutes: 10
         shell: bash
         run: bash ./scripts/capture-store-screenshots-ios.sh '${{ steps.simulators.outputs.ipad_udid }}' ipad "$GITHUB_WORKSPACE/store-screenshots"
+      - name: Capture native iPad acceptance states
+        if: always() && env.SCREENSHOT_IOS_APP != ''
+        timeout-minutes: 25
+        run: python3 ./scripts/native-acceptance.py ios "$GITHUB_WORKSPACE/native-acceptance/ipad" '${{ steps.simulators.outputs.ipad_udid }}' ipad
       - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pack-one-ios-native-acceptance
+          path: native-acceptance
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: pack-one-ios-store-screenshots
           path: store-screenshots
@@ -202,6 +238,7 @@ jobs:
       EXPO_PUBLIC_PACKONE_ENV: preview
       EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES: '1'
       PACKONE_BUILD_PROFILE: preview
+      ACCEPTANCE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     defaults:
       run:
         working-directory: mobile
@@ -239,7 +276,7 @@ jobs:
         run: npx expo prebuild --platform android --clean
       - name: Build installable preview APK
         working-directory: mobile/android
-        run: ./gradlew :app:assembleRelease --no-daemon
+        run: ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures=x86_64
       - name: Locate preview APK
         shell: bash
         run: |
@@ -297,6 +334,7 @@ jobs:
             [[ "$installed" == 1 ]]
             cd mobile
             bash ./scripts/capture-store-screenshots-android.sh "$GITHUB_WORKSPACE/store-screenshots"
+            python3 ./scripts/native-acceptance.py android "$GITHUB_WORKSPACE/native-acceptance"
         with:
           api-level: 35
           target: google_apis
@@ -307,6 +345,14 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: bash -c "$PACKONE_ANDROID_SCREENSHOT_SCRIPT"
       - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: pack-one-android-native-acceptance
+          path: native-acceptance
+          if-no-files-found: error
+          retention-days: 30
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: pack-one-android-store-screenshots
           path: store-screenshots

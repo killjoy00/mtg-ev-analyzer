@@ -12,7 +12,7 @@ function validGuestToken(value: string) {
   return /^p1_[a-f0-9-]{36}\.[A-Za-z0-9_-]{43}$/i.test(value);
 }
 
-export async function ensureGuestSession(): Promise<MobileSession> {
+async function createOrReadGuestSession(): Promise<MobileSession> {
   const existing = await readSession();
   if (existing && validGuestToken(existing.playerToken)) return existing;
 
@@ -28,4 +28,11 @@ export async function ensureGuestSession(): Promise<MobileSession> {
   };
   await writeSession(session);
   return session;
+}
+
+// Multiple root tabs may mount together. They must share one guest identity.
+let pendingSession: Promise<MobileSession> | null = null;
+export function ensureGuestSession(): Promise<MobileSession> {
+  if (!pendingSession) pendingSession = createOrReadGuestSession().finally(() => { pendingSession = null; });
+  return pendingSession;
 }

@@ -5,11 +5,11 @@ import {
   FlatList,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '@/src/components/Text';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 
 import {
   DAILY_ENVIRONMENTS,
@@ -89,7 +89,7 @@ function RankingRow({
   const row = (
     <>
       <Text style={styles.rank}>{item.rank}</Text>
-      <Text style={styles.player} numberOfLines={1}>{item.display_name}</Text>
+      <Text style={styles.player}>{item.display_name}</Text>
       <Text style={styles.score}>{item.score}</Text>
       {showDays ? <Text style={styles.days}>{item.days}</Text> : null}
     </>
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
   filterLabel: { color: colors.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   filterButton: {
-    minHeight: 40,
+    minHeight: 48,
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.surface,
@@ -334,6 +334,7 @@ const styles = StyleSheet.create({
   scoreHeader: { width: 64, textAlign: 'right', color: colors.muted, fontSize: 10, fontWeight: '800' },
   daysHeader: { width: 52, textAlign: 'right', color: colors.muted, fontSize: 10, fontWeight: '800' },
   rankingRow: {
+    paddingVertical: spacing.sm,
     minHeight: 54,
     marginHorizontal: spacing.lg,
     borderBottomWidth: 1,
@@ -346,7 +347,7 @@ const styles = StyleSheet.create({
   topRankingRow: { borderLeftWidth: 3, borderLeftColor: colors.accent },
   pressed: { opacity: 0.72 },
   rank: { width: 39, color: colors.ink, fontSize: 16, fontWeight: '800' },
-  player: { flex: 1, color: colors.ink, fontSize: 15, fontWeight: '700' },
+  player: { flex: 1, minWidth: 0, color: colors.ink, fontSize: 15, fontWeight: '700' },
   score: { width: 64, textAlign: 'right', color: colors.ink, fontSize: 16, fontWeight: '800' },
   days: { width: 52, textAlign: 'right', color: colors.muted, fontSize: 14 },
   center: { flex: 1, padding: spacing.xl, alignItems: 'center', justifyContent: 'center', gap: spacing.md },

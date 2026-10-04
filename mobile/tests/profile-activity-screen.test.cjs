@@ -37,6 +37,8 @@ function compile(relative, mocks, cache = new Map()) {
   const mod = new Module(filename, module); cache.set(filename, mod); mod.filename = filename;
   mod.paths = Module._nodeModulePaths(path.dirname(filename));
   mod.require = (name) => {
+      if (name === '@/src/components/Text') return { Text: mocks['react-native'].Text };
+      if (name === '@/src/components/ScreenArea') return { ScreenArea: mocks['react-native-safe-area-context'].SafeAreaView };
     if (Object.prototype.hasOwnProperty.call(mocks, name)) return mocks[name];
     if (name.startsWith('@/')) {
       const stem = name.slice(2); const extension = fs.existsSync(path.join(process.cwd(), stem + '.tsx')) ? '.tsx' : '.ts';

@@ -6,11 +6,11 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text } from '@/src/components/Text';
+import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 
 import { ApiError } from '@/src/api/client';
 import { updateMobileProfile } from '@/src/api/career';
@@ -123,7 +123,7 @@ export default function AccountProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive">
         <View style={styles.editorHeading}>
           <View style={styles.editorHeadingCopy}>
             <Text style={styles.eyebrow}>PROFILE &amp; VISIBILITY</Text>
@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
   toggleValue: { color: colors.muted, fontSize: 12, fontWeight: '900' },
   toggleValueActive: { color: colors.accentDark },
   optionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  optionChip: { minHeight: 40, maxWidth: '100%', borderWidth: 1, borderColor: colors.lineStrong, paddingHorizontal: spacing.md, alignItems: 'center', justifyContent: 'center' },
+  optionChip: { minHeight: 44, maxWidth: '100%', borderWidth: 1, borderColor: colors.lineStrong, paddingHorizontal: spacing.md, alignItems: 'center', justifyContent: 'center' },
   optionChipSelected: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
   optionText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
   optionTextSelected: { color: colors.accentDark },

@@ -52,11 +52,13 @@ Before either platform's final signed candidate is uploaded:
 
 The store-free smoke proves source/build reproducibility only. It never substitutes for signed store processing or physical-device acceptance.
 
-## Pack One 1.0 current release checkpoint
+## Pack One 1.0 release checkpoint
 
-As of 2026-10-02:
-- iOS current post-#837 candidate: build `100415`, source `fa588b40bc380946735385abfac0ff52586e1873`. Run `36957484955` completed successfully; App Store Connect reports `VALID` + `APP_STORE_ELIGIBLE`, and build `100415` is attached to App Store version 1.0.
-- Android current post-#837 candidate: versionCode `100444`, same source revision. Build run `36957485029` produced the signed production AAB; exact-artifact run `36965315032` uploaded it unchanged and promoted it to Closed Testing `production-access`, where Google reported `releaseStatus=completed`.
+October 4 repair status: #910 is implementing and verifying native navigation, Daily, Learn, typography and feedback repairs. No replacement test build is claimed yet. The October 2 builds below predate both #890 and #910 and cannot establish acceptance for those changes. Current native evidence and remaining gates are tracked in [the repair ledger](mobile-native-ux-repair-575.md) and #575.
+
+Last recorded distributed candidates, as of 2026-10-02:
+- iOS post-#837 candidate: build `100415`, source `fa588b40bc380946735385abfac0ff52586e1873`. Run `36957484955` completed successfully; App Store Connect reports `VALID` + `APP_STORE_ELIGIBLE`, and build `100415` is attached to App Store version 1.0.
+- Android post-#837 candidate: versionCode `100444`, same source revision. Build run `36957485029` produced the signed production AAB; exact-artifact run `36965315032` uploaded it unchanged and promoted it to Closed Testing `production-access`, where Google reported `releaseStatus=completed`.
 - Apple public availability is **United States + Canada only** and remains manual release.
 - Google Play first-launch console setup is complete for the currently available forms/settings, including Ads, App access/Sign-in details, Target audience/content, IARC, Data Safety, listing/assets, and Production countries **United States + Canada**.
 - The remaining Google owner gate is the closed-test qualification period, followed by the Production-access application when Google enables it.

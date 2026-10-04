@@ -47,7 +47,17 @@ function compileModule(relativePath, mocks) {
   compiled.paths = Module._nodeModulePaths(path.dirname(filename));
   const priorLoad = Module._load;
   Module._load = function load(request, parent, isMain) {
-    if (Object.prototype.hasOwnProperty.call(mocks, request)) return mocks[request];
+    if (request === '@/src/components/Text') return { Text: mocks['react-native'].Text };
+    if (request === '@/src/components/ScreenArea') return { ScreenArea: mocks['react-native-safe-area-context'].SafeAreaView };
+
+    if (Object.prototype.hasOwnProperty.call(mocks, request)) return request === '@/src/storage/session' ? { subscribeSession: () => () => {}, ...mocks[request] } : mocks[request];
+    if (request === '@/src/storage/session') return { readSession: () => mocks['@/src/api/guest'].ensureGuestSession(), subscribeSession: () => () => {} };
+    if (request === '@/src/navigation/session') return { useNavigationSession: () => ({ session: { accountToken: 'member' } }) };
+    if (request.startsWith('@/')) {
+      const base = request.slice(2);
+      const target = [base + '.ts', base + '.tsx'].find(file => fs.existsSync(file));
+      if (target) return compileModule(target, mocks);
+    }
     return priorLoad.call(this, request, parent, isMain);
   };
   try {
@@ -125,7 +135,7 @@ test('Home refreshes loaded Daily state on focus and Pacific rollover without bl
       router: { push() {} },
       useFocusEffect: focus.useFocusEffect,
     },
-    'react-native': {
+    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       Pressable: host('Pressable'),
       ScrollView,
       StyleSheet: { create: (value) => value },
@@ -141,7 +151,7 @@ test('Home refreshes loaded Daily state on focus and Pacific rollover without bl
       },
       loadDailyStatus: async () => {
         calls += 1;
-        return calls === 1 ? dailyStatus('2000-01-01', false) : dailyStatus('2026-09-26', true);
+        return calls === 1 ? dailyStatus('2000-01-01', false) : dailyStatus(new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Los_Angeles' }).format(new Date()), true);
       },
     },
     '@/src/api/guest': { ensureGuestSession: async () => guest },
@@ -153,7 +163,7 @@ test('Home refreshes loaded Daily state on focus and Pacific rollover without bl
 
   let root;
   try {
-    const HomeScreen = compileScreen('app/index.tsx', mocks);
+    const HomeScreen = compileScreen('src/screens/index.tsx', mocks);
     await act(async () => {
       root = TestRenderer.create(React.createElement(HomeScreen));
       await Promise.resolve();
@@ -162,7 +172,7 @@ test('Home refreshes loaded Daily state on focus and Pacific rollover without bl
 
     assert.equal(calls, 1);
     assert.equal(root.root.findAll(
-      (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Play Draft Run Daily',
+      (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Open Draft Run Daily',
     ).length, 1);
 
     await act(async () => {
@@ -237,7 +247,7 @@ test('Career rejects a stale pagination page after account identity changes', as
 
   const mocks = {
     'expo-router': { router: { push() {} }, useFocusEffect: focus.useFocusEffect },
-    'react-native': {
+    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       ActivityIndicator: host('ActivityIndicator'),
       FlatList: host('FlatList'),
       Pressable: host('Pressable'),
@@ -282,7 +292,7 @@ test('Career rejects a stale pagination page after account identity changes', as
     '@/src/theme': theme,
   };
 
-  const CareerScreen = compileScreen('app/career.tsx', mocks);
+  const CareerScreen = compileScreen('src/screens/career.tsx', mocks);
   let root;
   await act(async () => {
     root = TestRenderer.create(React.createElement(CareerScreen));
@@ -362,7 +372,7 @@ test('successful authentication returns to Practice even when optional profile/c
     },
     'expo-router': {
       router: {
-        replace(value) { replaced.push(value); },
+        dismissTo(value) { replaced.push(value); },
         push() {},
       },
       useLocalSearchParams: () => ({ returnTo: 'practice' }),
@@ -371,7 +381,7 @@ test('successful authentication returns to Practice even when optional profile/c
       maybeCompleteAuthSession() {},
       openAuthSessionAsync: async () => ({ type: 'cancel' }),
     },
-    'react-native': {
+    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       ActivityIndicator: host('ActivityIndicator'),
       Alert: { alert() {} },
       Platform: { OS: 'ios' },
@@ -499,7 +509,7 @@ test('Profile visibility toggles an initially public profile off on the first ta
   const mocks = {
     'expo-router': { router: { push() {} } },
     'expo-web-browser': { openBrowserAsync: async () => ({ type: 'cancel' }) },
-    'react-native': {
+    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       ActivityIndicator: host('ActivityIndicator'),
       Pressable: host('Pressable'),
       ScrollView,
@@ -644,26 +654,26 @@ test('shared account state hook keeps focus refreshes ordered and rejects late e
 });
 
 
-test('Learn keeps core education native and opens canonical guides, support, and policy pages', async () => {
+test('Learn keeps core education native and opens each selected drafting guide directly', async () => {
   const pushed = [];
   const opened = [];
   const mocks = {
     'expo-router': { router: { push(value) { pushed.push(value); } } },
     'expo-web-browser': { openBrowserAsync: async (url) => { opened.push(url); } },
-    'react-native': {
+    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       Pressable: host('Pressable'), ScrollView, StyleSheet: { create: (value) => value },
       Text: host('Text'), View: host('View'),
     },
     'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
     '@/src/contentLinks': {
       canonicalContentUrl: (key) => ({
-        learn: 'https://packone.pro/learn/', about: 'https://packone.pro/about/', contact: 'https://packone.pro/contact/',
+        firstPick: 'https://packone.pro/learn/first-pick-discipline/', consensus: 'https://packone.pro/learn/reading-consensus/', stayingOpen: 'https://packone.pro/learn/staying-open/', deckFit: 'https://packone.pro/learn/card-strength-vs-fit/', learn: 'https://packone.pro/learn/', about: 'https://packone.pro/about/', contact: 'https://packone.pro/contact/',
         privacy: 'https://packone.pro/privacy/', terms: 'https://packone.pro/terms/',
       })[key],
     },
     '@/src/theme': theme,
   };
-  const Screen = compileScreen('app/learn.tsx', mocks);
+  const Screen = compileScreen('src/screens/learn.tsx', mocks);
   let root;
   await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); });
   const press = async (label) => {
@@ -672,14 +682,15 @@ test('Learn keeps core education native and opens canonical guides, support, and
   };
   await press('Open How to Play');
   assert.deepEqual(pushed, ['/how-to']);
-  await press('Open Drafting guides on packone.pro');
-  await press('Open Support & contact on packone.pro');
-  await press('Open Privacy on packone.pro');
-  await press('Open Terms on packone.pro');
+  await press('Open First-pick discipline: commit before the reveal on packone.pro');
+  await press('Open How to read consensus without treating it as truth on packone.pro');
+  await press('Open Staying open is not the same as avoiding commitment on packone.pro');
+  await press('Open Card strength vs. deck fit: know what changed on packone.pro');
   assert.deepEqual(opened, [
-    'https://packone.pro/learn/', 'https://packone.pro/contact/', 'https://packone.pro/privacy/', 'https://packone.pro/terms/',
+    'https://packone.pro/learn/first-pick-discipline/', 'https://packone.pro/learn/reading-consensus/',
+    'https://packone.pro/learn/staying-open/', 'https://packone.pro/learn/card-strength-vs-fit/',
   ]);
-  assert.match(renderedText(root.toJSON()), /Editorial guides and policy pages open their canonical Pack One web versions/);
+  assert.doesNotMatch(renderedText(root.toJSON()), /canonical|single-source|credential|native rules/);
   await act(async () => root.unmount());
 });
 
@@ -687,7 +698,7 @@ test('Learn exposes a visible retry message when the canonical browser handoff f
   const mocks = {
     'expo-router': { router: { push() {} } },
     'expo-web-browser': { openBrowserAsync: async () => { throw new Error('browser unavailable'); } },
-    'react-native': {
+    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       Pressable: host('Pressable'), ScrollView, StyleSheet: { create: (value) => value },
       Text: host('Text'), View: host('View'),
     },
@@ -695,12 +706,12 @@ test('Learn exposes a visible retry message when the canonical browser handoff f
     '@/src/contentLinks': { canonicalContentUrl: () => 'https://packone.pro/contact/' },
     '@/src/theme': theme,
   };
-  const Screen = compileScreen('app/learn.tsx', mocks);
+  const Screen = compileScreen('src/screens/learn.tsx', mocks);
   let root;
   await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); });
-  const contact = root.root.findAll((item) => item.type === 'Pressable' && item.props.accessibilityLabel === 'Open Support & contact on packone.pro')[0];
+  const contact = root.root.findAll((item) => item.type === 'Pressable' && item.props.accessibilityLabel === 'Open First-pick discipline: commit before the reveal on packone.pro')[0];
   await act(async () => { contact.props.onPress(); await Promise.resolve(); await Promise.resolve(); });
-  assert.match(renderedText(root.toJSON()), /Could not open Support & contact\. Try again when your browser is available\./);
+  assert.match(renderedText(root.toJSON()), /Could not open First-pick discipline: commit before the reveal\. Try again when your browser is available\./);
   await act(async () => root.unmount());
 });
 
@@ -717,7 +728,7 @@ test('published set archive renders current editorial evidence and exact disclos
   const mocks = {
     'expo-image': { Image: host('Image') },
     'expo-router': { router: { replace() {}, push() {} }, useLocalSearchParams: () => ({ setId: 'msh' }) },
-    'react-native': {
+    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       Linking: { openURL: async (url) => { opened.push(url); } },
       Pressable: host('Pressable'), ScrollView, StyleSheet: { create: (value) => value },
       Text: host('Text'), View: host('View'),
@@ -754,7 +765,7 @@ test('published set archive keeps the analysis mounted when affiliate browser ha
   const mocks = {
     'expo-image': { Image: host('Image') },
     'expo-router': { router: { replace() {}, push() {} }, useLocalSearchParams: () => ({ setId: 'msh' }) },
-    'react-native': {
+    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       Linking: { openURL: async () => { throw new Error('no browser'); } },
       Pressable: host('Pressable'), ScrollView, StyleSheet: { create: (value) => value },
       Text: host('Text'), View: host('View'),
@@ -798,7 +809,7 @@ test('Daily home shows the disclosed TCGplayer fallback to guests without a memb
   const mocks = {
     'expo-image': { Image: host('Image') },
     'expo-router': { router: { push() {} }, useFocusEffect: focus.useFocusEffect },
-    'react-native': {
+    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       Linking: { openURL: async (url) => { opened.push(url); } },
       Pressable: host('Pressable'), ScrollView, StyleSheet: { create: (value) => value },
       Text: host('Text'), View: host('View'),
@@ -818,7 +829,7 @@ test('Daily home shows the disclosed TCGplayer fallback to guests without a memb
     '@/src/tcgplayer': { tcgplayerMagicUrl: () => 'https://partner.example/magic' },
     '@/src/theme': theme,
   };
-  const Screen = compileScreen('app/index.tsx', mocks);
+  const Screen = compileScreen('src/screens/index.tsx', mocks);
   let root;
   await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); await Promise.resolve(); });
   assert.equal(membershipCalls, 0);
@@ -840,7 +851,7 @@ test('Daily home hides promotion for signed-in ad-free, failed, or unverified me
     const mocks = {
       'expo-image': { Image: host('Image') },
       'expo-router': { router: { push() {} }, useFocusEffect: focus.useFocusEffect },
-      'react-native': {
+      'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
         Linking: { openURL: async () => {} }, Pressable: host('Pressable'), ScrollView,
         StyleSheet: { create: (value) => value }, Text: host('Text'), View: host('View'),
       },
@@ -859,7 +870,7 @@ test('Daily home hides promotion for signed-in ad-free, failed, or unverified me
       '@/src/tcgplayer': { tcgplayerMagicUrl: () => 'https://partner.example/magic' },
       '@/src/theme': theme,
     };
-    const Screen = compileScreen('app/index.tsx', mocks);
+    const Screen = compileScreen('src/screens/index.tsx', mocks);
     let root;
     await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); await Promise.resolve(); });
     assert.equal(root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Shop Magic on TCGplayer, affiliate link').length, 0);
@@ -876,7 +887,7 @@ test('Daily home rejects late promotion eligibility from a previous signed-in ac
   const mocks = {
     'expo-image': { Image: host('Image') },
     'expo-router': { router: { push() {} }, useFocusEffect: focus.useFocusEffect },
-    'react-native': {
+    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       Linking: { openURL: async () => {} }, Pressable: host('Pressable'), ScrollView,
       StyleSheet: { create: (value) => value }, Text: host('Text'), View: host('View'),
     },
@@ -897,7 +908,7 @@ test('Daily home rejects late promotion eligibility from a previous signed-in ac
     '@/src/tcgplayer': { tcgplayerMagicUrl: () => 'https://partner.example/magic' },
     '@/src/theme': theme,
   };
-  const Screen = compileScreen('app/index.tsx', mocks);
+  const Screen = compileScreen('src/screens/index.tsx', mocks);
   let root;
   await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); });
   await act(async () => { focus.trigger(); await Promise.resolve(); await Promise.resolve(); });
@@ -912,7 +923,7 @@ test('Daily home keeps the promo mounted and reports a retryable error when TCGp
   const mocks = {
     'expo-image': { Image: host('Image') },
     'expo-router': { router: { push() {} }, useFocusEffect: focus.useFocusEffect },
-    'react-native': {
+    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       Linking: { openURL: async () => { throw new Error('no browser'); } }, Pressable: host('Pressable'), ScrollView,
       StyleSheet: { create: (value) => value }, Text: host('Text'), View: host('View'),
     },
@@ -931,7 +942,7 @@ test('Daily home keeps the promo mounted and reports a retryable error when TCGp
     '@/src/tcgplayer': { tcgplayerMagicUrl: () => 'https://partner.example/magic' },
     '@/src/theme': theme,
   };
-  const Screen = compileScreen('app/index.tsx', mocks);
+  const Screen = compileScreen('src/screens/index.tsx', mocks);
   let root;
   await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); await Promise.resolve(); });
   const promo = root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Shop Magic on TCGplayer, affiliate link')[0];
@@ -944,7 +955,7 @@ test('Daily home keeps the promo mounted and reports a retryable error when TCGp
 
 test('first-class tablet content stays bounded on Practice, Draft Run/results, and article screens', () => {
   const article = fs.readFileSync(path.join(process.cwd(), 'src', 'components', 'ArticleScreen.tsx'), 'utf8');
-  const practice = fs.readFileSync(path.join(process.cwd(), 'app', 'practice.tsx'), 'utf8');
+  const practice = fs.readFileSync(path.join(process.cwd(), 'src', 'screens', 'practice.tsx'), 'utf8');
   const draft = fs.readFileSync(path.join(process.cwd(), 'app', 'draft-run.tsx'), 'utf8');
   assert.match(article, /maxWidth: 840/);
   assert.match(article, /alignSelf: 'center'/);
