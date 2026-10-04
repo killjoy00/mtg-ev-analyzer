@@ -95,6 +95,7 @@ async function verify() {
   await markers();
   assert.deepEqual(await servingState(),before.serving,'Gateway upload must preserve serving state');
   const tag='qa-gateway-'+randomUUID().slice(0,8);
+  const publicName=label=>'QA Gateway '+tag.slice(-8)+' '+label;
   const registry={commit,tag,fixtures:[]};
   const save=()=>fs.writeFileSync(registryFile,JSON.stringify(registry),{mode:0o600});
   save();
@@ -108,7 +109,7 @@ async function verify() {
     await query('INSERT INTO neon_auth.session(token,"userId","expiresAt","updatedAt") VALUES($1,$2::uuid,now()+interval \'15 minutes\',now())',[token,f.authId]);
     if(label==='admin')await query('INSERT INTO pack1_admins(auth_user_id) VALUES($1::uuid)',[f.authId]);
     else {
-      const guest=await call('/growth/v1/player/session',{body:{displayName:f.name},status:[201]});
+      const guest=await call('/growth/v1/player/session',{body:{displayName:publicName(label.slice(0,3))},status:[201]});
       assert.match(guest.playerId||'',/^[a-f0-9-]{36}$/);
       f.playerId=guest.playerId;save();
       await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[f.authId,f.playerId]);
@@ -120,19 +121,19 @@ async function verify() {
   try {
     const admin=await fixture('admin'),notice=await fixture('notice'),off=await fixture('off',false);
     report.test_recipients=[notice.email,off.email];
-    await call(path(notice)+'/username',{method:'PATCH',body:{displayName:'QA Gateway denied '+tag},status:[401]});
-    await call(path(notice)+'/username',{method:'PATCH',token:notice.token,body:{displayName:'QA Gateway denied '+tag},status:[403]});
+    await call(path(notice)+'/username',{method:'PATCH',body:{displayName:publicName('deny')},status:[401]});
+    await call(path(notice)+'/username',{method:'PATCH',token:notice.token,body:{displayName:publicName('deny')},status:[403]});
     report.checks.push('unauthenticated and non-admin rename denied');
-    const body={displayName:'QA Gateway notified '+tag,reason:'QA gateway notice '+tag};
+    const body={displayName:publicName('new'),reason:'QA gateway notice '+tag};
     const renamed=await call(path(notice)+'/username',{method:'PATCH',token:admin.token,body});
     assert.equal(renamed.changed,true);assert.deepEqual(renamed.notification,{status:'sent'});
     const repeated=await call(path(notice)+'/username',{method:'PATCH',token:admin.token,body});
     assert.equal(repeated.changed,false);assert.equal(repeated.notification.reason,'unchanged');
     const optedOut=await call(path(notice)+'/username',{method:'PATCH',token:admin.token,
-      body:{displayName:'QA Gateway opted out '+tag,notifyUser:false}});
+      body:{displayName:publicName('off'),notifyUser:false}});
     assert.deepEqual(optedOut.notification,{status:'skipped',reason:'not_requested'});
     const unverified=await call(path(off)+'/username',{method:'PATCH',token:admin.token,
-      body:{displayName:'QA Gateway unverified '+tag}});
+      body:{displayName:publicName('unv')}});
     assert.deepEqual(unverified.notification,{status:'skipped',reason:'no_verified_email'});
     report.checks.push('rename notice accepted; unchanged retry, opt-out and unverified address send nothing');
     for(const f of [notice,off]) {
