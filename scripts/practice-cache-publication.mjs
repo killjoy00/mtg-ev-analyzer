@@ -33,7 +33,7 @@ try {
  // revision change from another connection. No production function is replaced.
  await query('CREATE TABLE qa_publication_gates(gate text PRIMARY KEY,released boolean NOT NULL DEFAULT false)');
  await query("INSERT INTO qa_publication_gates(gate) VALUES ('builder'),('writer')");
- await query(`CREATE FUNCTION qa_wait_publication(p_gate text) RETURNS void LANGUAGE plpgsql VOLATILE AS $
+ await query(`CREATE FUNCTION qa_wait_publication(p_gate text) RETURNS void LANGUAGE plpgsql VOLATILE AS $publication$
    DECLARE deadline timestamptz:=clock_timestamp()+interval '60 seconds';
    BEGIN
     LOOP
@@ -41,9 +41,9 @@ try {
      IF clock_timestamp()>deadline THEN RAISE EXCEPTION 'Publication fixture barrier deadline exceeded';END IF;
      PERFORM pg_sleep(0.05);
     END LOOP;
-   END $`);
- await query(`CREATE FUNCTION qa_pause_snapshot() RETURNS trigger LANGUAGE plpgsql AS $ BEGIN
-   IF NEW.corpus_version LIKE 'qa-publication-%' THEN PERFORM pg_advisory_xact_lock(516,2);PERFORM qa_wait_publication('builder');END IF;RETURN NEW;END $`);
+   END; $publication$`);
+ await query(`CREATE FUNCTION qa_pause_snapshot() RETURNS trigger LANGUAGE plpgsql AS $publication$ BEGIN
+   IF NEW.corpus_version LIKE 'qa-publication-%' THEN PERFORM pg_advisory_xact_lock(516,2);PERFORM qa_wait_publication('builder');END IF;RETURN NEW;END; $publication$`);
  await query('CREATE TRIGGER qa_pause_snapshot BEFORE INSERT ON draft_run_serving_snapshots FOR EACH ROW EXECUTE FUNCTION qa_pause_snapshot()');
  const revisionBefore=String((await query('SELECT revision::text FROM draft_run_serving_revision WHERE singleton')).rows[0].revision);
  const build=loadServingSnapshot(nativeSnapshot,fixture).then(value=>({value}),error=>({error}));
@@ -73,8 +73,8 @@ try {
  }
  // Measure the known singleton contention explicitly: a writer holding its
  // transaction open also holds the revision row until commit.
- const holder=query(`DO $ BEGIN PERFORM pack1_bump_serving_revision();
-   PERFORM pg_advisory_xact_lock(516,3);PERFORM qa_wait_publication('writer');END $`).then(value=>({value}),error=>({error}));
+ const holder=query(`DO $publication$ BEGIN PERFORM pack1_bump_serving_revision();
+   PERFORM pg_advisory_xact_lock(516,3);PERFORM qa_wait_publication('writer');END; $publication$`).then(value=>({value}),error=>({error}));
  let writerHeld=false;
  for(let i=0;i<50&&!writerHeld;i++)writerHeld=(await query("SELECT EXISTS(SELECT 1 FROM pg_locks WHERE locktype='advisory' AND classid=516 AND objid=3 AND granted) held")).rows[0].held==='t';
  assert.ok(writerHeld);const waiting=performance.now();
