@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {randomUUID,randomBytes,createHash} from 'node:crypto';
 import {corpusDatabase} from '../scripts/neon-corpus-db.mjs';
+import {modelVersions} from '../model-versions.mjs';
 
 const [mode,commit,connectionFile,registryFile]=process.argv.slice(2);
 assert.ok(['preflight','verify','cleanup'].includes(mode));
@@ -41,7 +42,7 @@ async function servingState() {
     FROM draft_run_environment_policy e
     LEFT JOIN corpus_source_snapshots s ON s.source_snapshot_id=e.active_snapshot_id
     ORDER BY e.set_id`)).rows;
-  const active=policies.filter(p=>p.corpus_version==='elite-trophy-colour-stage-v9');
+  const active=policies.filter(p=>p.corpus_version===modelVersions.v5.corpus_version);
   assert.equal(active.length,30,'Preserve all 30 active v9 snapshot pointers');
   const {prosrc}=(await query(`SELECT prosrc FROM pg_proc
     WHERE oid='pack1_select_serving_run_v1(bigint,bigint,text,text,text,jsonb)'::regprocedure`)).rows[0];
