@@ -1,0 +1,74 @@
+name: release production gateway only
+on:
+  push:
+    branches: [main]
+    paths: ['.github/gateway-release-request.json']
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: pack1-secure-auth-release
+  cancel-in-progress: false
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    environment: pack-one-mobile-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+      PACK1_RATE_LIMIT_SECRET: ${{ secrets.PACK1_RATE_LIMIT_SECRET }}
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Resolve accepted production source
+        id: request
+        run: node scripts/gateway-release-request.mjs
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.request.outputs.source_sha }}
+          path: gateway-source
+      - name: Install pinned gateway and connection tools
+        run: node .github/scripts/install-wrangler-tool.mjs "$RUNNER_TEMP/gateway-tools" neon@4.17.4
+      - name: Record production runtime and serving state before gateway upload
+        env:
+          SOURCE_SHA: ${{ steps.request.outputs.source_sha }}
+        run: |
+          set -euo pipefail
+          umask 077
+          connection=$("$RUNNER_TEMP/gateway-tools/node_modules/.bin/neon" connection-string br-orange-feather-ayps8kep --project-id patient-shadow-91417882 --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          printf '%s' "$connection" > "$RUNNER_TEMP/gateway.connection"
+          node tests/admin-user-gateway-live-smoke.mjs preflight "$SOURCE_SHA" "$RUNNER_TEMP/gateway.connection" "$RUNNER_TEMP/admin-gateway-fixtures.json"
+      - name: Verify fixed production gateway ownership
+        working-directory: gateway-source
+        run: node scripts/edge-production-control.mjs preflight
+      - name: Publish only the accepted gateway and preserve quota identity
+        working-directory: gateway-source
+        env:
+          SOURCE_SHA: ${{ steps.request.outputs.source_sha }}
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/gateway-tools
+        run: GITHUB_SHA="$SOURCE_SHA" node scripts/edge-production-control.mjs deploy
+      - name: Verify production admin routes and temporary-account notices
+        env:
+          SOURCE_SHA: ${{ steps.request.outputs.source_sha }}
+        run: node tests/admin-user-gateway-live-smoke.mjs verify "$SOURCE_SHA" "$RUNNER_TEMP/gateway.connection" "$RUNNER_TEMP/admin-gateway-fixtures.json"
+      - name: Remove temporary administrative access even after a failed check
+        if: always()
+        run: |
+          if test -f "$RUNNER_TEMP/admin-gateway-fixtures.json"; then
+            node tests/admin-user-gateway-live-smoke.mjs cleanup '${{ steps.request.outputs.source_sha }}' "$RUNNER_TEMP/gateway.connection" "$RUNNER_TEMP/admin-gateway-fixtures.json"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: admin-gateway-acceptance-${{ github.run_id }}
+          path: artifacts/admin-gateway
+          if-no-files-found: error
+          retention-days: 30

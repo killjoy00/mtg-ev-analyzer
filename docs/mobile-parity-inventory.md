@@ -11,9 +11,9 @@ Status vocabulary:
 - **Policy decision open** — code intentionally does not claim storefront approval.
 - **Release evidence open** — implementation exists but required device/signing/live-host evidence is still missing.
 
-## October 4 native repair — acceptance still open
+## October 4 native repair — implementation merged; physical acceptance open
 
-PR #910 addresses the original owner complaints, which were not completed by #890. See [the complaint/evidence ledger](mobile-native-ux-repair-575.md). Existing “Implemented” rows below describe source capability; they do not override failed physical observations or certify the old distributed binaries. The revised navigation, Daily, Learn and feedback require the new native capture and tester-build evidence recorded in that ledger.
+PR #910 merged as `ae70e2af79b804c137b8c289c2a1b0535e5c76dd` and addresses the original owner complaints, which were not completed by #890. See [the complaint/evidence ledger](mobile-native-ux-repair-575.md). Existing “Implemented” rows below describe source capability; they do not override failed physical observations or certify the old distributed binaries. Native run `37232560582` passed all 24 Android checks and 14 scenes plus measured text growth on each iPhone/iPad, with actual image review. Tester distribution and physical/provider acceptance remain separate gates recorded in that ledger.
 
 ## October 2, 2026 UAT parity candidate
 

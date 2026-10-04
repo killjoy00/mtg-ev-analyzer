@@ -1,0 +1,6 @@
+{
+  "operation": "deploy-gateway",
+  "source_sha": "0ff55f6084b4ca372ec2457b0d81611054be6e96",
+  "production_run_id": "37216039560",
+  "reason": "Owner-authorized gateway-only completion of PR #903. Enable the Growth admin rename route using the already deployed and accepted v9 Function revision; retain production quota identity, Functions, corpus pointers and serving SQL. Verify temporary-account notices, opt-out and retry behavior."
+}

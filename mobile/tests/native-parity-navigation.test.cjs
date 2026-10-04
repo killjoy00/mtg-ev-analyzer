@@ -63,6 +63,7 @@ async function fixture(options = {}) {
       useFocusEffect: callback => React.useEffect(callback, [callback]) },
     '@/src/components/Text': { Text: native.Text, FontsReady: React.createContext(true) },
     '@/src/components/TabIcon': { TabIcon: host('Icon') },
+    '@/src/components/AdaptiveTabBar': { AdaptiveTabBar: host('AdaptiveTabBar') },
     '@/src/components/ScreenArea': { ScreenArea: host('SafeAreaView') },
     '@/src/api/guest': { ensureGuestSession: async () => current },
     '@/src/storage/session': { readSession: async () => current, subscribeSession: callback => { listeners.add(callback); return () => listeners.delete(callback); } },
@@ -108,6 +109,64 @@ test('guest/member navigation changes with persisted identity and keeps public r
     assert.deepEqual(h.visibleTabs(), ['Daily', 'How to Play', 'Sign in']);
     assert.equal(h.root.root.findAllByType('TabScreen').length, 6, 'Hidden public routes remain navigable');
   } finally { await h.close(); }
+});
+
+test('accessibility tab bar keeps real navigation events, hidden routes and keyboard behavior', async () => {
+  const listeners = new Map(), navigations = [], events = [], heights = [];
+  let prevented = false;
+  let dimensions = { width: 440, height: 956, fontScale: 3.571 };
+  const Height = React.createContext(undefined);
+  const native = Object.fromEntries(['Pressable', 'Text', 'View', 'ScrollView'].map(name => [name, host(name)]));
+  const load = compiler({
+    'react-native': { ...native, useWindowDimensions: () => dimensions,
+      StyleSheet: { create: x => x, flatten: value => Object.assign({}, ...[value].flat().filter(Boolean)) },
+      Keyboard: { addListener: (name, callback) => { listeners.set(name, callback); return { remove: () => listeners.delete(name) }; } } },
+    'expo-router/tabs': { BottomTabBar: host('DefaultTabBar'), BottomTabBarHeightCallbackContext: Height },
+    '@/src/components/Text': { Text: native.Text },
+    './Text': { Text: native.Text },
+    '@/src/config': { config: { screenshots: { fixtures: false } } },
+  });
+  const Bar = load('src/components/AdaptiveTabBar.tsx').AdaptiveTabBar;
+  const routes = ['Daily', 'Practice', 'Leaders', 'Learn', 'My Pack One', 'Sign in'].map((name, index) => ({ key: String(index), name }));
+  const descriptors = Object.fromEntries(routes.map(route => [route.key, { options: { title: route.name,
+    tabBarItemStyle: route.name === 'Sign in' ? { display: 'none' } : {}, tabBarIcon: () => null } }]));
+  const props = { state: { routes, index: 0 }, descriptors, insets: { top: 0, left: 0, right: 0, bottom: 34 },
+    navigation: { emit: event => { events.push(event); return { defaultPrevented: prevented }; }, navigate: (...args) => navigations.push(args) } };
+  const element = () => React.createElement(Height.Provider, { value: h => heights.push(h) }, React.createElement(Bar, props));
+  let root;
+  await act(async () => { root = Renderer.create(element()); });
+  try {
+    const buttons = () => root.root.findAllByType('Pressable');
+    assert.deepEqual(buttons().map(node => node.props.accessibilityLabel), routes.slice(0, 5).map(route => route.name));
+    assert.ok(buttons().every(node => node.props.accessibilityRole === 'tab'));
+    assert.deepEqual(buttons()[0].props.accessibilityState, { selected: true });
+    await act(async () => { buttons()[0].props.onPress(); buttons()[1].props.onPress(); });
+    assert.deepEqual(navigations, [['Practice', undefined]], 'Selected tab must not create another navigation entry');
+    assert.equal(events[0].type, 'tabPress');
+    prevented = true;
+    await act(async () => { buttons()[2].props.onPress(); buttons()[2].props.onLongPress(); });
+    assert.equal(navigations.length, 1, 'Prevented tab events must stay prevented');
+    assert.equal(events.at(-1).type, 'tabLongPress');
+    await act(async () => { root.root.findAllByType('View')[0].props.onLayout({ nativeEvent: { layout: { height: 286 } } }); });
+    assert.equal(heights.at(-1), 286, 'Navigator receives actual intrinsic bar height');
+    await act(async () => listeners.get('keyboardDidShow')());
+    assert.equal(root.toJSON(), null);
+    assert.equal(heights.at(-1), 0);
+    await act(async () => listeners.get('keyboardDidHide')());
+    assert.equal(buttons().length, 5);
+    for (const index of [1, 2, 4]) descriptors[String(index)].options.tabBarItemStyle = { display: 'none' };
+    descriptors['5'].options.tabBarItemStyle = {};
+    descriptors['3'].options.title = 'How to Play';
+    await act(async () => root.update(element()));
+    assert.deepEqual(buttons().map(node => node.props.accessibilityLabel), ['Daily', 'How to Play', 'Sign in'], 'Sign-out removes member destinations in the enlarged navigator too');
+    dimensions = { width: 840, height: 400, fontScale: 3.571 };
+    await act(async () => root.update(element()));
+    assert.equal(root.root.findByType('ScrollView').props.horizontal, true, 'Short windows retain content space with a scrollable bar');
+    dimensions = { width: 440, height: 956, fontScale: 1 };
+    await act(async () => root.update(element()));
+    assert.equal(root.root.findAllByType('DefaultTabBar').length, 1, 'Ordinary text keeps the familiar one-row navigator');
+  } finally { await act(async () => root.unmount()); }
+  assert.equal(listeners.size, 0);
 });
 
 test('Daily preserves loaded completion and zero scores through refresh failure, then retries', async () => {

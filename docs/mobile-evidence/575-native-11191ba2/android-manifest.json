@@ -1,0 +1,1460 @@
+{
+  "source_sha": "11191ba2786d3918b17fff518c32eacb467ef8b4",
+  "tested_checkout_sha": "fbb5ed7bccc7ca17bb3596d84c5615d099c2a424",
+  "platform": "android",
+  "backend": "isolated persistent preview fixtures",
+  "physical_device": false,
+  "scenes": [
+    {
+      "name": "member-long-320dp-1x",
+      "width_dp": 320,
+      "font_scale": 1,
+      "metrics": {
+        "layouts": {
+          "feedback": {
+            "label": "feedback",
+            "x": 24,
+            "y": 141.3333282470703,
+            "width": 272,
+            "height": 230.00001525878906
+          },
+          "score": {
+            "label": "score",
+            "x": 25,
+            "y": 27,
+            "width": 222,
+            "height": 48
+          },
+          "copy": {
+            "label": "copy",
+            "x": 25,
+            "y": 91,
+            "width": 222,
+            "height": 114.00001525878906
+          },
+          "title": {
+            "label": "title",
+            "x": 0,
+            "y": 0,
+            "width": 222,
+            "height": 66.00001525878906
+          },
+          "choice": {
+            "label": "choice",
+            "x": 0,
+            "y": 74,
+            "width": 222,
+            "height": 40
+          }
+        },
+        "text": {
+          "score": {
+            "label": "score",
+            "lines": [
+              {
+                "x": 0,
+                "y": 0,
+                "width": 65.41927337646484,
+                "height": 48,
+                "text": "96/100"
+              }
+            ]
+          },
+          "title": {
+            "label": "title",
+            "lines": [
+              {
+                "x": 0,
+                "y": 0,
+                "width": 178.7447967529297,
+                "height": 22,
+                "text": "The trophy drafter took "
+              },
+              {
+                "x": 0,
+                "y": 22,
+                "width": 211.1588592529297,
+                "height": 22,
+                "text": "Esika, God of the Tree // The "
+              },
+              {
+                "x": 0,
+                "y": 44,
+                "width": 129.0546875,
+                "height": 22,
+                "text": "Prismatic Bridge."
+              }
+            ]
+          },
+          "choice": {
+            "label": "choice",
+            "lines": [
+              {
+                "x": 0,
+                "y": 0,
+                "width": 214.1223907470703,
+                "height": 20,
+                "text": "You chose Bala Ged Recovery // Bala "
+              },
+              {
+                "x": 0,
+                "y": 20,
+                "width": 88.72525787353516,
+                "height": 20,
+                "text": "Ged Sanctuary."
+              }
+            ]
+          }
+        }
+      },
+      "observed_font_scale": "1"
+    },
+    {
+      "name": "member-long-320dp-1.5x",
+      "width_dp": 320,
+      "font_scale": 1.5,
+      "metrics": {
+        "layouts": {
+          "feedback": {
+            "label": "feedback",
+            "x": 24,
+            "y": 148.6666717529297,
+            "width": 272,
+            "height": 310
+          },
+          "score": {
+            "label": "score",
+            "x": 25,
+            "y": 27,
+            "width": 222,
+            "height": 48
+          },
+          "copy": {
+            "label": "copy",
+            "x": 25,
+            "y": 91,
+            "width": 222,
+            "height": 193.99998474121094
+          },
+          "title": {
+            "label": "title",
+            "x": 0,
+            "y": 0,
+            "width": 222,
+            "height": 107.99998474121094
+          },
+          "choice": {
+            "label": "choice",
+            "x": 0,
+            "y": 116,
+            "width": 222,
+            "height": 78
+          }
+        },
+        "text": {
+          "score": {
+            "label": "score",
+            "lines": [
+              {
+                "x": 0,
+                "y": 0,
+                "width": 80.80338287353516,
+                "height": 48,
+                "text": "96/100"
+              }
+            ]
+          },
+          "title": {
+            "label": "title",
+            "lines": [
+              {
+                "x": 0,
+                "y": 0,
+                "width": 196.234375,
+                "height": 27,
+                "text": "The trophy drafter "
+              },
+              {
+                "x": 0,
+                "y": 27,
+                "width": 166.15234375,
+                "height": 27,
+                "text": "took Esika, God "
+              },
+              {
+                "x": 0,
+                "y": 54,
+                "width": 180.42578125,
+                "height": 27,
+                "text": "of the Tree // The "
+              },
+              {
+                "x": 0,
+                "y": 81,
+                "width": 179.6653594970703,
+                "height": 27,
+                "text": "Prismatic Bridge."
+              }
+            ]
+          },
+          "choice": {
+            "label": "choice",
+            "lines": [
+              {
+                "x": 0,
+                "y": 0,
+                "width": 182.8112030029297,
+                "height": 26,
+                "text": "You chose Bala Ged "
+              },
+              {
+                "x": 0,
+                "y": 26,
+                "width": 194.57421875,
+                "height": 26,
+                "text": "Recovery // Bala Ged "
+              },
+              {
+                "x": 0,
+                "y": 52,
+                "width": 98.33333587646484,
+                "height": 26,
+                "text": "Sanctuary."
+              }
+            ]
+          }
+        }
+      },
+      "observed_font_scale": "1.5"
+    },
+    {
+      "name": "member-match-320dp-1.5x",
+      "width_dp": 320,
+      "font_scale": 1.5,
+      "metrics": {
+        "layouts": {
+          "feedback": {
+            "label": "feedback",
+            "x": 24,
+            "y": 148.6666717529297,
+            "width": 272,
+            "height": 203.99998474121094
+          },
+          "score": {
+            "label": "score",
+            "x": 25,
+            "y": 27,
+            "width": 222,
+            "height": 48
+          },
+          "copy": {
+            "label": "copy",
+            "x": 25,
+            "y": 91,
+            "width": 222,
+            "height": 87.99998474121094
+          },
+          "title": {
+            "label": "title",
+            "x": 0,
+            "y": 0,
+            "width": 222,
+            "height": 53.99998474121094
+          },
+          "choice": {
+            "label": "choice",
+            "x": 0,
+            "y": 62,
+            "width": 222,
+            "height": 26
+          }
+        },
+        "text": {
+          "score": {
+            "label": "score",
+            "lines": [
+              {
+                "x": 0,
+                "y": 0,
+                "width": 94.66146087646484,
+                "height": 48,
+                "text": "100/100"
+              }
+            ]
+          },
+          "title": {
+            "label": "title",
+            "lines": [
+              {
+                "x": 0,
+                "y": 0,
+                "width": 178.4387969970703,
+                "height": 27,
+                "text": "You matched the "
+              },
+              {
+                "x": 0,
+                "y": 27,
+                "width": 152.85546875,
+                "height": 27,
+                "text": "trophy drafter."
+              }
+            ]
+          },
+          "choice": {
+            "label": "choice",
+            "lines": [
+              {
+                "x": 0,
+                "y": 0,
+                "width": 173.0234375,
+                "height": 26,
+                "text": "You chose Web Up."
+              }
+            ]
+          }
+        }
+      },
+      "observed_font_scale": "1.5"
+    },
+    {
+      "name": "member-zero-320dp-1.5x",
+      "width_dp": 320,
+      "font_scale": 1.5,
+      "metrics": {
+        "layouts": {
+          "feedback": {
+            "label": "feedback",
+            "x": 24,
+            "y": 148.6666717529297,
+            "width": 272,
+            "height": 203.99998474121094
+          },
+          "score": {
+            "label": "score",
+            "x": 25,
+            "y": 27,
+            "width": 222,
+            "height": 48
+          },
+          "copy": {
+            "label": "copy",
+            "x": 25,
+            "y": 91,
+            "width": 222,
+            "height": 87.99998474121094
+          },
+          "title": {
+            "label": "title",
+            "x": 0,
+            "y": 0,
+            "width": 222,
+            "height": 53.99998474121094
+          },
+          "choice": {
+            "label": "choice",
+            "x": 0,
+            "y": 62,
+            "width": 222,
+            "height": 26
+          }
+        },
+        "text": {
+          "score": {
+            "label": "score",
+            "lines": [
+              {
+                "x": 0,
+                "y": 0,
+                "width": 62.23567581176758,
+                "height": 48,
+                "text": "0/100"
+              }
+            ]
+          },
+          "title": {
+            "label": "title",
+            "lines": [
+              {
+                "x": 0,
+                "y": 0,
+                "width": 196.234375,
+                "height": 27,
+                "text": "The trophy drafter "
+              },
+              {
+                "x": 0,
+                "y": 27,
+                "width": 138.5612030029297,
+                "height": 27,
+                "text": "took Web Up."
+              }
+            ]
+          },
+          "choice": {
+            "label": "choice",
+            "lines": [
+              {
+                "x": 0,
+                "y": 0,
+                "width": 221.19921875,
+                "height": 26,
+                "text": "You chose Cosmic Cube."
+              }
+            ]
+          }
+        }
+      },
+      "observed_font_scale": "1.5"
+    },
+    {
+      "name": "member-long-600dp-1.5x",
+      "width_dp": 600,
+      "font_scale": 1.5,
+      "metrics": {
+        "layouts": {
+          "feedback": {
+            "label": "feedback",
+            "x": 24,
+            "y": 148.6666717529297,
+            "width": 552,
+            "height": 203.99998474121094
+          },
+          "score": {
+            "label": "score",
+            "x": 25,
+            "y": 27,
+            "width": 502,
+            "height": 48
+          },
+          "copy": {
+            "label": "copy",
+            "x": 25,
+            "y": 91,
+            "width": 502,
+            "height": 87.99998474121094
+          },
+          "title": {
+            "label": "title",
+            "x": 0,
+            "y": 0,
+            "width": 502,
+            "height": 53.99998474121094
+          },
+          "choice": {
+            "label": "choice",
+            "x": 0,
+            "y": 62,
+            "width": 502,
+            "height": 26
+          }
+        },
+        "text": {
+          "score": {
+            "label": "score",
+            "lines": [
+              {
+                "x": 0,
+                "y": 0,
+                "width": 80.80338287353516,
+                "height": 48,
+                "text": "96/100"
+              }
+            ]
+          },
+          "title": {
+            "label": "title",
+            "lines": [
+              {
+                "x": 0,
+                "y": 0,
+                "width": 499.1497497558594,
+                "height": 27,
+                "text": "The trophy drafter took Esika, God of the Tree // "
+              },
+              {
+                "x": 0,
+                "y": 27,
+                "width": 223.328125,
+                "height": 27,
+                "text": "The Prismatic Bridge."
+              }
+            ]
+          },
+          "choice": {
+            "label": "choice",
+            "lines": [
+              {
+                "x": 0,
+                "y": 0,
+                "width": 475.71875,
+                "height": 26,
+                "text": "You chose Bala Ged Recovery // Bala Ged Sanctuary."
+              }
+            ]
+          }
+        }
+      },
+      "observed_font_scale": "1.5"
+    },
+    {
+      "name": "member-long-840dp-1.5x-landscape",
+      "width_dp": 840,
+      "font_scale": 1.5,
+      "metrics": {
+        "layouts": {
+          "feedback": {
+            "label": "feedback",
+            "x": 24,
+            "y": 148.6666717529297,
+            "width": 792,
+            "height": 139.99998474121094
+          },
+          "score": {
+            "label": "score",
+            "x": 25,
+            "y": 47,
+            "width": 81,
+            "height": 48
+          },
+          "copy": {
+            "label": "copy",
+            "x": 122,
+            "y": 27,
+            "width": 645,
+            "height": 87.99998474121094
+          },
+          "title": {
+            "label": "title",
+            "x": 0,
+            "y": 0,
+            "width": 645,
+            "height": 54
+          },
+          "choice": {
+            "label": "choice",
+            "x": 0,
+            "y": 62,
+            "width": 645,
+            "height": 25.999984741210938
+          }
+        },
+        "text": {
+          "score": {
+            "label": "score",
+            "lines": [
+              {
+                "x": 0,
+                "y": 0,
+                "width": 80.80338287353516,
+                "height": 48,
+                "text": "96/100"
+              }
+            ]
+          },
+          "title": {
+            "label": "title",
+            "lines": [
+              {
+                "x": 0,
+                "y": 0,
+                "width": 647.0807495117188,
+                "height": 27,
+                "text": "The trophy drafter took Esika, God of the Tree // The Prismatic "
+              },
+              {
+                "x": 0,
+                "y": 27,
+                "width": 75.39713287353516,
+                "height": 27,
+                "text": "Bridge."
+              }
+            ]
+          },
+          "choice": {
+            "label": "choice",
+            "lines": [
+              {
+                "x": 0,
+                "y": 0,
+                "width": 475.71875,
+                "height": 26,
+                "text": "You chose Bala Ged Recovery // Bala Ged Sanctuary."
+              }
+            ]
+          }
+        }
+      },
+      "observed_font_scale": "1.5"
+    },
+    {
+      "name": "guest-home",
+      "width_dp": 390,
+      "font_scale": 1,
+      "brand_metrics": {
+        "row": {
+          "label": "row",
+          "x": 20,
+          "y": 20,
+          "width": 350,
+          "height": 44
+        },
+        "brand": {
+          "label": "brand",
+          "x": 0,
+          "y": 2,
+          "width": 133.3333282470703,
+          "height": 40
+        },
+        "mark": {
+          "label": "mark",
+          "x": 0,
+          "y": 0,
+          "width": 36,
+          "height": 40
+        },
+        "name": {
+          "label": "name",
+          "x": 46,
+          "y": 2.6666667461395264,
+          "width": 87.33332824707031,
+          "height": 34.333335876464844
+        },
+        "help": {
+          "label": "help",
+          "x": 319,
+          "y": 0,
+          "width": 31,
+          "height": 44
+        }
+      }
+    },
+    {
+      "name": "guest-returning-home",
+      "width_dp": 390,
+      "font_scale": 1,
+      "brand_metrics": {
+        "row": {
+          "label": "row",
+          "x": 20,
+          "y": 20,
+          "width": 350,
+          "height": 44
+        },
+        "brand": {
+          "label": "brand",
+          "x": 0,
+          "y": 2,
+          "width": 133.3333282470703,
+          "height": 40
+        },
+        "mark": {
+          "label": "mark",
+          "x": 0,
+          "y": 0,
+          "width": 36,
+          "height": 40
+        },
+        "name": {
+          "label": "name",
+          "x": 46,
+          "y": 2.6666667461395264,
+          "width": 87.33332824707031,
+          "height": 34.333335876464844
+        },
+        "help": {
+          "label": "help",
+          "x": 319,
+          "y": 0,
+          "width": 31,
+          "height": 44
+        }
+      }
+    },
+    {
+      "name": "member-new-home",
+      "width_dp": 390,
+      "font_scale": 1,
+      "brand_metrics": {
+        "row": {
+          "label": "row",
+          "x": 20,
+          "y": 20,
+          "width": 350,
+          "height": 44
+        },
+        "brand": {
+          "label": "brand",
+          "x": 0,
+          "y": 2,
+          "width": 133.3333282470703,
+          "height": 40
+        },
+        "mark": {
+          "label": "mark",
+          "x": 0,
+          "y": 0,
+          "width": 36,
+          "height": 40
+        },
+        "name": {
+          "label": "name",
+          "x": 46,
+          "y": 2.6666667461395264,
+          "width": 87.33332824707031,
+          "height": 34.333335876464844
+        },
+        "help": {
+          "label": "help",
+          "x": 319,
+          "y": 0,
+          "width": 31,
+          "height": 44
+        }
+      }
+    },
+    {
+      "name": "member-zero-home",
+      "width_dp": 390,
+      "font_scale": 1,
+      "brand_metrics": {
+        "row": {
+          "label": "row",
+          "x": 20,
+          "y": 20,
+          "width": 350,
+          "height": 44
+        },
+        "brand": {
+          "label": "brand",
+          "x": 0,
+          "y": 2,
+          "width": 133.3333282470703,
+          "height": 40
+        },
+        "mark": {
+          "label": "mark",
+          "x": 0,
+          "y": 0,
+          "width": 36,
+          "height": 40
+        },
+        "name": {
+          "label": "name",
+          "x": 46,
+          "y": 2.6666667461395264,
+          "width": 87.33332824707031,
+          "height": 34.333335876464844
+        },
+        "help": {
+          "label": "help",
+          "x": 319,
+          "y": 0,
+          "width": 31,
+          "height": 44
+        }
+      }
+    },
+    {
+      "name": "member-partial-home",
+      "width_dp": 390,
+      "font_scale": 1,
+      "brand_metrics": {
+        "row": {
+          "label": "row",
+          "x": 20,
+          "y": 20,
+          "width": 350,
+          "height": 44
+        },
+        "brand": {
+          "label": "brand",
+          "x": 0,
+          "y": 2,
+          "width": 133.3333282470703,
+          "height": 40
+        },
+        "mark": {
+          "label": "mark",
+          "x": 0,
+          "y": 0,
+          "width": 36,
+          "height": 40
+        },
+        "name": {
+          "label": "name",
+          "x": 46,
+          "y": 2.6666667461395264,
+          "width": 87.33332824707031,
+          "height": 34.333335876464844
+        },
+        "help": {
+          "label": "help",
+          "x": 319,
+          "y": 0,
+          "width": 31,
+          "height": 44
+        }
+      }
+    },
+    {
+      "name": "member-all-home",
+      "width_dp": 390,
+      "font_scale": 1,
+      "brand_metrics": {
+        "row": {
+          "label": "row",
+          "x": 20,
+          "y": 20,
+          "width": 350,
+          "height": 44
+        },
+        "brand": {
+          "label": "brand",
+          "x": 0,
+          "y": 2,
+          "width": 133.3333282470703,
+          "height": 40
+        },
+        "mark": {
+          "label": "mark",
+          "x": 0,
+          "y": 0,
+          "width": 36,
+          "height": 40
+        },
+        "name": {
+          "label": "name",
+          "x": 46,
+          "y": 2.6666667461395264,
+          "width": 87.33332824707031,
+          "height": 34.333335876464844
+        },
+        "help": {
+          "label": "help",
+          "x": 319,
+          "y": 0,
+          "width": 31,
+          "height": 44
+        }
+      }
+    },
+    {
+      "name": "member-checking-home",
+      "width_dp": 390,
+      "font_scale": 1,
+      "brand_metrics": {
+        "row": {
+          "label": "row",
+          "x": 20,
+          "y": 20,
+          "width": 350,
+          "height": 44
+        },
+        "brand": {
+          "label": "brand",
+          "x": 0,
+          "y": 2,
+          "width": 133.3333282470703,
+          "height": 40
+        },
+        "mark": {
+          "label": "mark",
+          "x": 0,
+          "y": 0,
+          "width": 36,
+          "height": 40
+        },
+        "name": {
+          "label": "name",
+          "x": 46,
+          "y": 2.6666667461395264,
+          "width": 87.33332824707031,
+          "height": 34.333335876464844
+        },
+        "help": {
+          "label": "help",
+          "x": 319,
+          "y": 0,
+          "width": 31,
+          "height": 44
+        }
+      }
+    },
+    {
+      "name": "member-error-home",
+      "width_dp": 390,
+      "font_scale": 1,
+      "brand_metrics": {
+        "row": {
+          "label": "row",
+          "x": 20,
+          "y": 20,
+          "width": 350,
+          "height": 44
+        },
+        "brand": {
+          "label": "brand",
+          "x": 0,
+          "y": 2,
+          "width": 133.3333282470703,
+          "height": 40
+        },
+        "mark": {
+          "label": "mark",
+          "x": 0,
+          "y": 0,
+          "width": 36,
+          "height": 40
+        },
+        "name": {
+          "label": "name",
+          "x": 46,
+          "y": 2.6666667461395264,
+          "width": 87.33332824707031,
+          "height": 34.333335876464844
+        },
+        "help": {
+          "label": "help",
+          "x": 319,
+          "y": 0,
+          "width": 31,
+          "height": 44
+        }
+      }
+    },
+    {
+      "name": "elite-home",
+      "width_dp": 390,
+      "font_scale": 1,
+      "brand_metrics": {
+        "row": {
+          "label": "row",
+          "x": 20,
+          "y": 20,
+          "width": 350,
+          "height": 44
+        },
+        "brand": {
+          "label": "brand",
+          "x": 0,
+          "y": 2,
+          "width": 133.3333282470703,
+          "height": 40
+        },
+        "mark": {
+          "label": "mark",
+          "x": 0,
+          "y": 0,
+          "width": 36,
+          "height": 40
+        },
+        "name": {
+          "label": "name",
+          "x": 46,
+          "y": 2.6666667461395264,
+          "width": 87.33332824707031,
+          "height": 34.333335876464844
+        },
+        "help": {
+          "label": "help",
+          "x": 319,
+          "y": 0,
+          "width": 31,
+          "height": 44
+        }
+      }
+    },
+    {
+      "name": "guest-large-tabs",
+      "width_dp": 390,
+      "font_scale": 2.0,
+      "tab_metrics": {
+        "bar": {
+          "kind": "bar",
+          "label": "navigation",
+          "labels": [
+            "Daily",
+            "How to Play",
+            "Sign in"
+          ],
+          "windowHeight": 800,
+          "x": 0,
+          "y": 658.3333129882812,
+          "width": 390,
+          "height": 141.66668701171875
+        },
+        "items": {
+          "Daily": {
+            "item": {
+              "kind": "item",
+              "label": "Daily",
+              "x": 0,
+              "y": 0,
+              "width": 130,
+              "height": 112.66668701171875
+            },
+            "label": {
+              "kind": "label",
+              "label": "Daily",
+              "x": 8,
+              "y": 53,
+              "width": 114,
+              "height": 34.3333740234375
+            },
+            "text": {
+              "kind": "text",
+              "label": "Daily",
+              "lines": [
+                {
+                  "text": "Daily",
+                  "x": 30.66666603088379,
+                  "y": 0,
+                  "width": 52.33333206176758,
+                  "height": 34.33333206176758
+                }
+              ]
+            }
+          },
+          "How to Play": {
+            "item": {
+              "kind": "item",
+              "label": "How to Play",
+              "x": 130,
+              "y": 0,
+              "width": 130,
+              "height": 112.66668701171875
+            },
+            "label": {
+              "kind": "label",
+              "label": "How to Play",
+              "x": 8,
+              "y": 36,
+              "width": 114,
+              "height": 68.66668701171875
+            },
+            "text": {
+              "kind": "text",
+              "label": "How to Play",
+              "lines": [
+                {
+                  "text": "How to ",
+                  "x": 20.33333396911621,
+                  "y": 0,
+                  "width": 77.94791412353516,
+                  "height": 34.33333206176758
+                },
+                {
+                  "text": "Play",
+                  "x": 34.33333206176758,
+                  "y": 34.33333206176758,
+                  "width": 44.73307418823242,
+                  "height": 34.33333206176758
+                }
+              ]
+            }
+          },
+          "Sign in": {
+            "item": {
+              "kind": "item",
+              "label": "Sign in",
+              "x": 260,
+              "y": 0,
+              "width": 130,
+              "height": 112.66668701171875
+            },
+            "label": {
+              "kind": "label",
+              "label": "Sign in",
+              "x": 8,
+              "y": 53,
+              "width": 114,
+              "height": 34.3333740234375
+            },
+            "text": {
+              "kind": "text",
+              "label": "Sign in",
+              "lines": [
+                {
+                  "text": "Sign in",
+                  "x": 22,
+                  "y": 0,
+                  "width": 70,
+                  "height": 34.33333206176758
+                }
+              ]
+            }
+          }
+        }
+      },
+      "brand_metrics": {
+        "row": {
+          "label": "row",
+          "x": 20,
+          "y": 20,
+          "width": 350,
+          "height": 119.66667175292969
+        },
+        "brand": {
+          "label": "brand",
+          "x": 0,
+          "y": 0,
+          "width": 176.3333282470703,
+          "height": 57
+        },
+        "mark": {
+          "label": "mark",
+          "x": 0,
+          "y": 0,
+          "width": 43.33333206176758,
+          "height": 57
+        },
+        "name": {
+          "label": "name",
+          "x": 53.33333206176758,
+          "y": 4.333333492279053,
+          "width": 122.99999237060547,
+          "height": 48.33332824707031
+        },
+        "help": {
+          "label": "help",
+          "x": 0,
+          "y": 73,
+          "width": 55.666664123535156,
+          "height": 46.66667175292969
+        }
+      }
+    },
+    {
+      "name": "member-large-tabs",
+      "width_dp": 390,
+      "font_scale": 2.0,
+      "tab_metrics": {
+        "bar": {
+          "kind": "bar",
+          "label": "navigation",
+          "labels": [
+            "Daily",
+            "Practice",
+            "Leaders",
+            "Learn",
+            "My Pack One"
+          ],
+          "windowHeight": 800,
+          "x": 0,
+          "y": 580,
+          "width": 390,
+          "height": 220
+        },
+        "items": {
+          "Daily": {
+            "item": {
+              "kind": "item",
+              "label": "Daily",
+              "x": 0,
+              "y": 0,
+              "width": 130,
+              "height": 78.33331298828125
+            },
+            "label": {
+              "kind": "label",
+              "label": "Daily",
+              "x": 8,
+              "y": 36,
+              "width": 114,
+              "height": 34.33331298828125
+            },
+            "text": {
+              "kind": "text",
+              "label": "Daily",
+              "lines": [
+                {
+                  "text": "Daily",
+                  "x": 30.66666603088379,
+                  "y": 0,
+                  "width": 52.33333206176758,
+                  "height": 34.33333206176758
+                }
+              ]
+            }
+          },
+          "Practice": {
+            "item": {
+              "kind": "item",
+              "label": "Practice",
+              "x": 130,
+              "y": 0,
+              "width": 130,
+              "height": 78.33331298828125
+            },
+            "label": {
+              "kind": "label",
+              "label": "Practice",
+              "x": 8,
+              "y": 36,
+              "width": 114,
+              "height": 34.33331298828125
+            },
+            "text": {
+              "kind": "text",
+              "label": "Practice",
+              "lines": [
+                {
+                  "text": "Practice",
+                  "x": 15.333333015441895,
+                  "y": 0,
+                  "width": 83.33333587646484,
+                  "height": 34.33333206176758
+                }
+              ]
+            }
+          },
+          "Leaders": {
+            "item": {
+              "kind": "item",
+              "label": "Leaders",
+              "x": 260,
+              "y": 0,
+              "width": 130,
+              "height": 78.33331298828125
+            },
+            "label": {
+              "kind": "label",
+              "label": "Leaders",
+              "x": 8,
+              "y": 36,
+              "width": 114,
+              "height": 34.33331298828125
+            },
+            "text": {
+              "kind": "text",
+              "label": "Leaders",
+              "lines": [
+                {
+                  "text": "Leaders",
+                  "x": 16.33333396911621,
+                  "y": 0,
+                  "width": 81,
+                  "height": 34.33333206176758
+                }
+              ]
+            }
+          },
+          "Learn": {
+            "item": {
+              "kind": "item",
+              "label": "Learn",
+              "x": 0,
+              "y": 78.33333587646484,
+              "width": 130,
+              "height": 112.66668701171875
+            },
+            "label": {
+              "kind": "label",
+              "label": "Learn",
+              "x": 8,
+              "y": 53,
+              "width": 114,
+              "height": 34.3333740234375
+            },
+            "text": {
+              "kind": "text",
+              "label": "Learn",
+              "lines": [
+                {
+                  "text": "Learn",
+                  "x": 27.66666603088379,
+                  "y": 0,
+                  "width": 58.66666793823242,
+                  "height": 34.33333206176758
+                }
+              ]
+            }
+          },
+          "My Pack One": {
+            "item": {
+              "kind": "item",
+              "label": "My Pack One",
+              "x": 130,
+              "y": 78.33333587646484,
+              "width": 130,
+              "height": 112.66668701171875
+            },
+            "label": {
+              "kind": "label",
+              "label": "My Pack One",
+              "x": 8,
+              "y": 36,
+              "width": 114,
+              "height": 68.66668701171875
+            },
+            "text": {
+              "kind": "text",
+              "label": "My Pack One",
+              "lines": [
+                {
+                  "text": "My Pack ",
+                  "x": 15,
+                  "y": 0,
+                  "width": 88.41015625,
+                  "height": 34.33333206176758
+                },
+                {
+                  "text": "One",
+                  "x": 36,
+                  "y": 34.33333206176758,
+                  "width": 41.78255081176758,
+                  "height": 34.33333206176758
+                }
+              ]
+            }
+          }
+        }
+      },
+      "brand_metrics": {
+        "row": {
+          "label": "row",
+          "x": 20,
+          "y": 20,
+          "width": 350,
+          "height": 119.66667175292969
+        },
+        "brand": {
+          "label": "brand",
+          "x": 0,
+          "y": 0,
+          "width": 176.3333282470703,
+          "height": 57
+        },
+        "mark": {
+          "label": "mark",
+          "x": 0,
+          "y": 0,
+          "width": 43.33333206176758,
+          "height": 57
+        },
+        "name": {
+          "label": "name",
+          "x": 53.33333206176758,
+          "y": 4.333333492279053,
+          "width": 122.99999237060547,
+          "height": 48.33332824707031
+        },
+        "help": {
+          "label": "help",
+          "x": 0,
+          "y": 73,
+          "width": 55.666664123535156,
+          "height": 46.66667175292969
+        }
+      }
+    }
+  ],
+  "journeys": [
+    {
+      "name": "member-long-320-1",
+      "result": "passed"
+    },
+    {
+      "name": "member-long-320-1.5",
+      "result": "passed"
+    },
+    {
+      "name": "member-match-320-1.5",
+      "result": "passed"
+    },
+    {
+      "name": "member-zero-320-1.5",
+      "result": "passed"
+    },
+    {
+      "name": "member-long-600-1.5",
+      "result": "passed"
+    },
+    {
+      "name": "member-long-840-1.5",
+      "result": "passed"
+    },
+    {
+      "name": "actual-text-growth",
+      "result": "passed"
+    },
+    {
+      "name": "guest-home",
+      "result": "passed"
+    },
+    {
+      "name": "guest-returning-home",
+      "result": "passed"
+    },
+    {
+      "name": "member-new-home",
+      "result": "passed"
+    },
+    {
+      "name": "member-zero-home",
+      "result": "passed"
+    },
+    {
+      "name": "member-partial-home",
+      "result": "passed"
+    },
+    {
+      "name": "member-all-home",
+      "result": "passed"
+    },
+    {
+      "name": "member-checking-home",
+      "result": "passed"
+    },
+    {
+      "name": "member-error-home",
+      "result": "passed"
+    },
+    {
+      "name": "elite-home",
+      "result": "passed"
+    },
+    {
+      "name": "guest-large-tabs",
+      "result": "passed"
+    },
+    {
+      "name": "member-large-tabs",
+      "result": "passed"
+    },
+    {
+      "name": "eight-pick-daily-and-final-review",
+      "result": "passed"
+    },
+    {
+      "name": "member-tabs-profile-settings-and-hardware-back",
+      "result": "passed"
+    },
+    {
+      "name": "practice-complete-review-return",
+      "result": "passed"
+    },
+    {
+      "name": "shared-invitation-auth-accept-kill-relaunch",
+      "result": "passed"
+    },
+    {
+      "name": "image-failure-retry-keeps-run",
+      "result": "passed"
+    },
+    {
+      "name": "sign-out-and-account-switch",
+      "result": "passed"
+    }
+  ],
+  "failures": [],
+  "device": "sdk_gphone64_x86_64",
+  "os": "15",
+  "package": "Activity Resolver Table:\n  Schemes:\n      exp+pack-one:\n        432a3ce pro.packone.preview/.MainActivity filter 78731fc\n          Action: \"android.intent.action.VIEW\"\n          Category: \"android.intent.category.DEFAULT\"\n          Category: \"android.intent.category.BROWSABLE\"\n          Scheme: \"packone\"\n          Scheme: \"exp+pack-one\"\n      packone:\n        432a3ce pro.packone.preview/.MainActivity filter 78731fc\n          Action: \"android.intent.action.VIEW\"\n          Category: \"android.intent.category.DEFAULT\"\n          Category: \"android.intent.category.BROWSABLE\"\n          Scheme: \"packone\"\n          Scheme: \"exp+pack-one\"\n      https:\n        432a3ce pro.packone.preview/.MainActivity filter ab34085\n          Action: \"android.intent.action.VIEW\"\n          Category: \"android.intent.category.BROWSABLE\"\n          Category: \"android.intent.category.DEFAULT\"\n          Scheme: \"https\"\n          Authority: \"packone.pro\": -1\n          Path: \"PatternMatcher{PREFIX: /open/profile/}\"\n          AutoVerify=true\n        432a3ce pro.packone.preview/.MainActivity filter 7d92eda\n          Action: \"android.intent.action.VIEW\"\n          Category: \"android.intent.category.BROWSABLE\"\n          Category: \"android.intent.category.DEFAULT\"\n          Scheme: \"https\"\n          Authority: \"packone.pro\": -1\n          Path: \"PatternMatcher{PREFIX: /open/shared/}\"\n          AutoVerify=true\n        432a3ce pro.packone.preview/.MainActivity filter a5b8f0b\n          Action: \"android.intent.action.VIEW\"\n          Category: \"android.intent.category.BROWSABLE\"\n          Category: \"android.intent.category.DEFAULT\"\n          Scheme: \"https\"\n          Authority: \"packone.pro\": -1\n          Path: \"PatternMatcher{PREFIX: /open/daily/}\"\n          AutoVerify=true\n\n  Non-Data Actions:\n      android.intent.action.MAIN:\n        432a3ce pro.packone.preview/.MainActivity filter 6ccb2ef\n          Action: \"android.intent.action.MAIN\"\n          Category: \"android.intent.category.LAUNCHER\"\n\nReceiver Resolver Table:\n  Non-Data Actions:\n      androidx.profileinstaller.action.SAVE_PROFILE:\n        c1371e8 pro.packone.preview/androidx.profileinstaller.ProfileInstallReceiver filter 6b210e7\n          Action: \"androidx.profileinstaller.action.SAVE_PROFILE\"\n      androidx.profileinstaller.action.INSTALL_PROFILE:\n        c1371e8 pro.packone.preview/androidx.profileinstaller.ProfileInstallReceiver filter 26c6001\n          Action: \"androidx.profileinstaller.action.INSTALL_PROFILE\"\n      androidx.profileinstaller.action.SKIP_FILE:\n        c1371e8 pro.packone.preview/androidx.profileinstaller.ProfileInstallReceiver filter f2b5ea6\n          Action: \"androidx.profileinstaller.action.SKIP_FILE\"\n      androidx.profileinstaller.action.BENCHMARK_OPERATION:\n        c1371e8 pro.packone.preview/androidx.profileinstaller.ProfileInstallReceiver filter 4a1c494\n          Action: \"androidx.profileinstaller.action.BENCHMARK_OPERATION\"\n\nDomain verification status:\n  pro.packone.preview:\n    ID: e8c598e4-d9a8-459d-818f-0250a9745f9d\n    Signatures: [FA:C6:17:45:DC:09:03:78:6F:B9:ED:E6:2A:96:2B:39:9F:73:48:F0:BB:6F:89:9B:83:32:66:75:91:03:3B:9C]\n    Domain verification state:\n      packone.pro: legacy_failure\n    User all:\n      Verification link handling allowed: true\n      Selection state:\n        Disabled:\n          packone.pro\n\nPermissions:\n  Permission [pro.packone.preview.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION] (9258de5):\n    sourcePackage=pro.packone.preview\n    uid=10209 gids=[] type=0 prot=signature\n    perm=PermissionInfo{a5760ba pro.packone.preview.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION}\n    flags=0x0\n\nRegistered ContentProviders:\n  pro.packone.preview/androidx.startup.InitializationProvider:\n    Provider{890b6b pro.packone.preview/androidx.startup.InitializationProvider}\n  pro.packone.preview/expo.modules.filesystem.FileSystemFileProvider:\n    Provider{b96a6c8 pro.packone.preview/expo.modules.filesystem.FileSystemFileProvider}\n\nContentProvider Authorities:\n  [pro.packone.preview.FileSystemFileProvider]:\n    Provider{b96a6c8 pro.packone.preview/expo.modules.filesystem.FileSystemFileProvider}\n      applicationInfo=ApplicationInfo{ca62361 pro.packone.preview}\n  [pro.packone.preview.androidx-startup]:\n    Provider{890b6b pro.packone.preview/androidx.startup.InitializationProvider}\n      applicationInfo=ApplicationInfo{f8ace86 pro.packone.preview}\n\nKey Set Manager:\n  [pro.packone.preview]\n      Signing KeySets: 59\n\nPackages:\n  Package [pro.packone.preview] (618ee3b):\n    appId=10209\n    pkg=Package{aaaf347 pro.packone.preview}\n    codePath=/data/app/~~SueS7dXYfHoyEi5lNH2LLQ==/pro.packone.preview-V7Fnjbn5VXzA5abv3xu2Rw==\n    resourcePath=/data/app/~~SueS7dXYfHoyEi5lNH2LLQ==/pro.packone.preview-V7Fnjbn5VXzA5abv3xu2Rw==\n    legacyNativeLibraryDir=/data/app/~~SueS7dXYfHoyEi5lNH2LLQ==/pro.packone.preview-V7Fnjbn5VXzA5abv3xu2Rw==/lib\n    extractNativeLibs=false\n    primaryCpuAbi=x86_64\n    secondaryCpuAbi=null\n    cpuAbiOverride=null\n    versionCode=1 minSdk=24 targetSdk=36\n    minExtensionVersions=[]\n    versionName=1.0\n    hiddenApiEnforcementPolicy=2\n    usesNonSdkApi=false\n    splits=[base]\n    apkSigningVersion=2\n    flags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]\n    privateFlags=[ PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION ALLOW_AUDIO_PLAYBACK_CAPTURE HAS_DOMAIN_URLS PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING ]\n    forceQueryable=false\n    queriesIntents=[Intent { act=android.intent.action.VIEW cat=[android.intent.category.BROWSABLE] dat=https:/... }, Intent { act=android.intent.action.OPEN_DOCUMENT_TREE }, Intent { act=android.support.customtabs.action.CustomTabsService }]\n    scannedAsStoppedSystemApp=false\n    supportsScreens=[small, medium, large, xlarge, resizeable, anyDensity]\n    usesOptionalLibraries:\n      androidx.window.extensions\n      androidx.window.sidecar\n    usesLibraryFiles:\n      /system_ext/framework/androidx.window.extensions.jar\n      /system_ext/framework/androidx.window.sidecar.jar\n    timeStamp=2026-10-04 20:47:51\n    lastUpdateTime=2026-10-04 20:47:52\n    installerPackageName=null\n    installerPackageUid=-1\n    initiatingPackageName=com.android.shell\n    originatingPackageName=null\n    packageSource=1\n    appMetadataFilePath=null\n    appMetadataSource=0\n    signatures=PackageSignatures{d36774 version:2, signatures:[51ed3f60], past signatures:[]}\n    installPermissionsFixed=false\n    pkgFlags=[ HAS_CODE ALLOW_CLEAR_USER_DATA ALLOW_BACKUP ]\n    privatePkgFlags=[ PRIVATE_FLAG_ACTIVITIES_RESIZE_MODE_RESIZEABLE_VIA_SDK_VERSION ALLOW_AUDIO_PLAYBACK_CAPTURE HAS_DOMAIN_URLS PRIVATE_FLAG_ALLOW_NATIVE_HEAP_POINTER_TAGGING ]\n    apexModuleName=null\n    declared permissions:\n      pro.packone.preview.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION: prot=signature\n    requested permissions:\n      com.google.android.finsky.permission.BIND_GET_INSTALL_REFERRER_SERVICE\n      pro.packone.preview.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION\n      android.permission.SYSTEM_ALERT_WINDOW\n      android.permission.INTERNET\n      android.permission.ACCESS_NETWORK_STATE\n      android.permission.USE_FINGERPRINT\n      android.permission.VIBRATE\n      android.permission.USE_BIOMETRIC\n    install permissions:\n      pro.packone.preview.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION: granted=true\n      android.permission.INTERNET: granted=true\n      android.permission.ACCESS_NETWORK_STATE: granted=true\n      android.permission.USE_FINGERPRINT: granted=true\n      android.permission.VIBRATE: granted=true\n      android.permission.USE_BIOMETRIC: granted=true\n    User 0: ceDataInode=352689 deDataInode=65572 installed=true hidden=false suspended=false distractionFlags=0 stopped=false notLaunched=false enabled=0 instant=false virtual=false quarantined=false\n      installReason=0\n      dataDir=/data/user/0/pro.packone.preview\n      firstInstallTime=2026-10-04 20:47:52\n      uninstallReason=0\n      overlay paths:\n        /product/overlay/EmulationPixel7Pro/EmulationPixel7ProOverlay.apk\n        /product/overlay/NavigationBarModeGestural/NavigationBarModeGesturalOverlay.apk\n      legacy overlay paths:\n        /product/overlay/EmulationPixel7Pro/EmulationPixel7ProOverlay.apk\n        /product/overlay/NavigationBarModeGestural/NavigationBarModeGesturalOverlay.apk\n      gids=[3003]\n      runtime permissions:\n\nQueries:\n  system apps queryable: false\n  queries via forceQueryable:\n  queries via package name:\n  queries via component:\n    com.google.android.apps.messaging:\n      pro.packone.preview\n    com.google.android.as:\n      pro.packone.preview\n    com.google.android.settings.intelligence:\n      pro.packone.preview\n    pro.packone.preview:\n      com.google.android.documentsui\n      com.android.chrome\n      com.google.android.apps.docs\n  queryable via interaction:\n    User 0:\n      [com.android.emulator.multidisplay,com.android.DeviceAsWebcam,com.android.inputdevices,com.android.providers.settings,com.android.keychain,com.android.settings,com.android.location.fused,com.android.server.telecom,com.android.dynsystem,com.android.localtransport,android]:\n        pro.packone.preview\n      [com.google.android.gsf,com.google.android.gms]:\n        pro.packone.preview\n      com.google.android.inputmethod.latin:\n        pro.packone.preview\n  queryable via uses-library:\n\nDexopt state:\n  [pro.packone.preview]\n    path: /data/app/~~SueS7dXYfHoyEi5lNH2LLQ==/pro.packone.preview-V7Fnjbn5VXzA5abv3xu2Rw==/base.apk\n      x86_64: [status=verify] [reason=install] [primary-abi]\n        [location is /data/app/~~SueS7dXYfHoyEi5lNH2LLQ==/pro.packone.preview-V7Fnjbn5VXzA5abv3xu2Rw==/oat/x86_64/base.odex]\n\nCompiler stats:\n  [pro.packone.preview]\n     base.apk - 4855",
+  "actual_text_growth": {
+    "normal_line_height": 20,
+    "large_line_height": 26,
+    "ratio": 1.3
+  }
+}

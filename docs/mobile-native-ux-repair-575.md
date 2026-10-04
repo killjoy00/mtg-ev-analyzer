@@ -1,6 +1,6 @@
 # Native navigation and visual parity repair — #575 / #910
 
-Status at October 4, 2026, 2:15 p.m. CDT: implementation and native verification in progress. No new distributed candidate is claimed by this document. Pacific time remains the game-day boundary.
+Status at October 4, 2026, 4:20 p.m. CDT: #910 merged as `ae70e2af79b804c137b8c289c2a1b0535e5c76dd` after completed emulator/simulator verification. Exact-main RC smoke is running; #951 prepares signed test candidates. No new distributed candidate is claimed by this document. Pacific time remains the game-day boundary.
 
 PR #890 is retained. It fixed the account/profile batch, not the original native navigation, Daily, Learn, or feedback complaints. Builds iOS 100415 and Android 100444 predate #890 and this repair. Unsigned archives and bundle smoke jobs are not tester distribution.
 
@@ -8,13 +8,13 @@ PR #890 is retained. It fixed the account/profile batch, not the original native
 
 | Original failed item | Repair in #910 | Acceptance evidence |
 | --- | --- | --- |
-| Dated “Draft Decision Lab” heading | Pack One brand and bundled Barlow Condensed / Source Sans 3 TTF faces, with OFL licenses and system fallback | Android rendering observed; final iOS/Android recapture pending |
-| Main destinations buried in home scroll | Real Expo Router tabs: member Daily / Practice / Leaders / Learn / My Pack One; guest Daily / How to Play / Sign in | Mounted identity-transition tests; first Android tab/profile/settings/hardware-Back journey passed; label truncation found and corrected for recapture |
-| Feedback escapes its box | Intrinsic column layout on narrow/enlarged-text screens; measured-width row on wider screens; shrinking copy, nested score suffix, wrapping names and stacked comparisons | Original native failure reproduced; repaired geometry recapture pending |
+| Dated “Draft Decision Lab” heading | Pack One brand and bundled Barlow Condensed / Source Sans 3 TTF faces, with OFL licenses and system fallback | Actual Android, iPhone and iPad branding/fonts inspected |
+| Main destinations buried in home scroll | Real Expo Router tabs: member Daily / Practice / Leaders / Learn / My Pack One; guest Daily / How to Play / Sign in | Android tab/profile/settings/hardware-Back journey passed; revised iPhone/iPad maximum-text and Android 2.0 tab labels passed measurement and image review |
+| Feedback escapes its box | Intrinsic column layout on narrow/enlarged-text screens; measured-width row on wider screens; shrinking copy, nested score suffix, wrapping names and stacked comparisons | Original 11 dp overflow reproduced; Android 320/600/840 dp, landscape analysis/pack interaction, and iPhone/iPad normal/maximum-text containment passed |
 | Back says `index` | Headerless root tabs; root stack uses human Back labels; stable original public paths | Android tab root and child Back observed; iOS swipe and final deep-link journey pending |
-| “Your last shared run” misrepresents history | Removed from Daily. Practice checks this identity's local checkpoint and server UUID before offering Continue/View result; failures preserve the checkpoint | Mounted empty, corrupt, wrong-owner, completed and failed-GET tests; native auth/relaunch journey added |
-| New versus established account mismatch | Guest first-play cues; first-use Career from #890 retained; member dashboard remains primary account entry | Mounted first-use/profile-save coverage; native new/established fixtures added |
-| Signed-out Learn should be How to Play | Guest education tab renders How to Play directly | Android article entry observed; direct play journey recapture pending |
+| “Your last shared run” misrepresents history | Removed from Daily. Practice checks this identity's local checkpoint and server UUID before offering Continue/View result; failures preserve the checkpoint | Mounted empty, corrupt, wrong-owner, completed and failed-GET tests; Android invitation/authentication/accept/kill/relaunch restored the same UUID without POST |
+| New versus established account mismatch | Guest first-play cues; first-use Career from #890 retained; member dashboard remains primary account entry | Mounted first-use/profile-save coverage; actual new-account iPhone/iPad Career and established Android dashboard inspected |
+| Signed-out Learn should be How to Play | Guest education tab renders How to Play directly | Android guest article → direct Daily → eight picks → result/review → Home passed |
 | Member Learn is just links | Prominent How to Play, Scoring / Method / Sets, individually described drafting guides, play action | Mounted selected-article destinations pass; native member Learn observed |
 | My Pack One competes with Account | Removed home account panels; member tab opens Career, with Account settings leading to profile, membership, security, deletion and Help | Android dashboard/settings/Back passed; #890 profile-save suite retained |
 
@@ -26,7 +26,7 @@ Reviewed web sources: `index.html`, `bootstrap.mjs`, `site-nav.mjs`, `daily-home
 | --- | --- | --- |
 | Fresh/returning guest; new/established member; free/Elite | Controlled native fixtures and mounted tests; browser auth/profile/Practice suite | No owner's account or production game records were mutated |
 | Checking/failure/expired session/account switching | Mounted request-order and authoritative-401 tests; native checking/error fixtures | Live provider expiration and switching on physical builds remain required |
-| No/partial/all Dailies complete, score 0, unavailable progress | Mounted Daily tests and Android home captures | Final revised-home rendering still to recapture |
+| No/partial/all Dailies complete, score 0, unavailable progress | Mounted Daily tests and Android home captures | Nine revised Android home states captured; native countdown is visible before completion |
 | Unfinished Daily/Practice/shared run | Existing lifecycle, idempotency, pick reconciliation and shared UUID recovery tests; native eight-pick/relaunch journeys added | Host mocks prove behavior, not layout; native journey results recorded separately |
 | Midnight Pacific and DST | Focus/foreground tests and 23/25-hour reset tests | No CDT game-day calculations |
 
@@ -60,9 +60,36 @@ Artifact `pack-one-android-native-acceptance`, ID `11311069094`, SHA-256 `87b1b3
 
 The iOS artifact `pack-one-ios-native-acceptance`, ID `11312183831`, SHA-256 `82e54d6aa11b6f90f46d83b6be9d739f3298a87c58d534e0798d93df3c0541ea`, retains these diagnostics. The next revision also adds font licenses in Help, correct new-account empty history fixtures, 44-point minimum small actions, and full card names in pack review.
 
+## Native revision 1c2b: Android continuity and visual verification
+
+Source `1c2b7800d3a4b0b20d1052873683db3e148ba179`, tested PR merge checkout `68ffec2aedec6134e7be9e5fc3bc7f7033cf6f26`: [run 37227661370](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/37227661370). Android 15 / API 35, `sdk_gphone64_x86_64`, Pixel 7 Pro emulator; preview 1.0/versionCode 1. All 21 completed checks passed: normal and enlarged 320 dp feedback, score 0/100/intermediate and long double-faced names, 600 dp enlarged feedback/analysis/pack review, nine Daily identity/progress states, eight-pick Daily including leave-after-first-pick/resume of the same attempt and final review, eight-pick Practice/review/return, tabs/profile/settings/hardware Back, shared invitation → email authentication → acceptance → force-stop → same-UUID recovery, image failure/retry, and sign-out/account switch without the prior profile. Android 1.5 OS text scaling again produced measured line growth 20 → 26 dp. Actual PNG inspection confirms visible tab icons and readable selected labels.
+
+One landscape check failed: the driver swiped from display y=900, on the sticky Next pick button, while the actual ScrollView occupied y=228–849. The article consequently never scrolled to Why this score. The correction derives gestures from the visible scroll viewport; a regression uses those exact failed-capture bounds and rejects gestures when no viewport exists. This is a test-driver correction, not a change to the app. Landscape interaction still requires a successful native rerun. Analysis/pack captures now scroll their expanded content into view.
+
+Native artifact `11313283547`, SHA-256 `664a50286a0d2db83820378b15c946df7096cc19542c47959c83632d41560abb`; Android store artifact `11313139045`, SHA-256 `741063db6c0d8fd990117e2d1e6eda144935703b30bfbe634c05a38361ccdbb3`. All five store images were visually inspected, including the updated Daily tabs, Practice and Career. These remain PR preview assets; fresh reviewed-main assets are required before replacing the store listing images. The iOS simulator archive compiled, but installation took almost five minutes and the subsequent iPhone capture did not advance for over ten minutes before eventually succeeding. The next verification run builds before booting simulators, runs one device at a time, bounds each capture step, and reduces compiler log verbosity so runtime diagnostics are readable. These driver/workflow changes do not modify production builds.
+
+## Native revision 1c2b: iPhone/iPad results and additional visual defect
+
+The same run completed all 14 scenes plus actual-text-growth checks on each device: iPhone 17 Pro Max and iPad Pro 13-inch (M4, 8GB), iOS/iPadOS 26.5, preview version 1.0/build 1, normal `large` and maximum `accessibility-extra-extra-extra-large` text settings. Native line height grew 20 → 71.4200 points (3.571x). Feedback for 0/100/intermediate scores and long double-faced names stayed contained. Images confirm the branding/header fixes and the corrected new-account Career content; the prior blank captures are resolved.
+
+However, visual inspection found that the five-column member tab bar split labels into fragments and cut off My Pack One at maximum iPhone text size. The earlier automatic checks did not measure tab labels, so their green result is **not overall visual acceptance**. The next revision uses an intrinsic-height adaptive tile layout at enlarged text sizes (a horizontal strip in short windows), retains full font scaling, emits the normal tab navigation events, and reports measured height to the navigator. Native verification now checks every tab label's frame, actual line extent and complete rendered text. Mounted tests separately cover selected-tab presses, prevention/long-press events, guest/member visibility, keyboard hiding and measured-height reporting; those tests do not claim layout proof.
+
+iOS native artifact `11314610964`, SHA-256 `c6bd0d8f866e0d1ced6369251da992fa4aa3715b81a583ca70ce6a3a8662491c`; iOS store artifact `11314126907`, SHA-256 `b7a458ff249e2d59d3ec6576f7e42f06db6e3516e7897e3865a8213e465f697e`. Revised tab rendering and the Android landscape driver still require native reruns before merge.
+
+## Accepted native revision 11191 and protected merge
+
+[Run 37232560582](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/37232560582) passed every job on source `11191ba2786d3918b17fff518c32eacb467ef8b4`, tested checkout `fbb5ed7bccc7ca17bb3596d84c5615d099c2a424`. Required `test` / `browser`, full mobile validation and both production platform build validations also passed. The three PR publishing jobs were intentionally skipped. #910 merged through the active ruleset, without bypass, as `ae70e2af79b804c137b8c289c2a1b0535e5c76dd`. A reviewed compare confirms identical mobile and native build workflow inputs; concurrent main changes are retained.
+
+- **Android:** Pixel 7 Pro emulator, Android 15/API 35, `sdk_gphone64_x86_64`, preview 1.0/versionCode 1. All 24 checks passed: 320/600/840 dp feedback, 0/100/intermediate/long double-faced names, landscape expanded analysis/pack interaction, nine Daily identity/progress states, 2.0 guest/member tab labels, eight-pick Daily with same-attempt leave/resume and final review, eight-pick Practice/review/return, Leaders/profile and My Pack One/settings hardware Back, shared invitation/authentication/accept/force-stop/same-UUID GET with no replacement POST, image failure/retry, and account switching. Android 1.5 OS scaling measured 20 → 26 dp text growth. Actual small-phone feedback, landscape and enlarged-tab PNGs were inspected.
+- **iPhone/iPad:** iPhone 17 Pro Max and iPad Pro 13-inch (M4, 8GB), iOS/iPadOS 26.5, preview 1.0/build 1. Each passed 14 scenes plus measured growth, normal `large` and maximum `accessibility-extra-extra-extra-large`. Text measured 20 → 71.42 points (3.571x). Every enlarged tab label is complete and contained; actual images confirm visible icons/selected state, repaired branding, normal guest quick start, member Learn and first-use Career. Feedback containment passed 0/100/intermediate/long-name scenes. These iOS checks are native scene/layout captures, not automated iOS tap/swipe journeys.
+- **Evidence:** [unmodified retained screenshots and manifests](mobile-evidence/575-native-11191ba2/README.md). Android native artifact `11315351570`, SHA-256 `0d527ce2558e0915428f3b2a135b418829016232a0f4f30ab034f2bc32a6136e`; iOS native artifact `11314324442`, SHA-256 `2b8748b56761ba10eb87ec57a4e0ca5655a89f6b4148371bbab78d5ba9e2275c`. PR store artifact digests: Android `7c8b9ca5af95ab4771bfe465af0a2a62f7fb3a8041f8d6643f1a2860a4795352`, iOS `b5a5263420bf127d0a040d13d437c220800402a2b960f4f2c5524c104f903797`. Fresh reviewed-main store images are still required before listing replacement.
+
+The accepted results above supersede earlier pending rerun entries. No physical acceptance or new tester distribution is inferred. Exact-main smoke run `37235554314` must complete both builds and write its final current-main manifest before #951 merges. Short-window enlarged navigation has mounted behavior coverage; iPad landscape/narrow multitasking and physical accessibility remain open as specified below.
+
 ## Intentional native differences and release gates
 
 - Native bottom tabs replace web navigation; gameplay uses the existing full-screen stack. Original URLs remain routable.
+- Enlarged text uses adaptive tab tiles so labels remain complete. Short windows use a horizontal tab strip to retain space for screen content. Ordinary text retains the familiar single row.
 - Individual drafting guides open their selected HTTPS article and retain the native screen underneath. Help, About and policies are secondary destinations.
 - Native explicitly shows a zero-day streak. Web currently omits the zero badge.
 - Signed production builds retain SecureStore identity and checkpoint keys. Only synthetic preview fixture values use simulator preferences on unsigned iOS simulators.

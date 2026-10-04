@@ -113,11 +113,23 @@ def sign_in(email):
 
 
 def swipe_page(up):
-    size = adb('shell', 'wm', 'size').splitlines()[-1]
-    width, height = map(int, re.findall(r'(\d+)x(\d+)', size)[0])
-    start, end = (0.75, 0.30) if up else (0.30, 0.75)
-    adb('shell', 'input', 'swipe', str(width//2), str(int(height*start)),
-        str(width//2), str(int(height*end)), '300')
+    # Use the actual visible scroll viewport. In a short landscape window the
+    # bottom quarter of the display is the fixed Next pick action, so gestures
+    # based on display height never reach the ScrollView.
+    _, root = hierarchy()
+    viewports = []
+    for node in root.iter():
+        if node.get('scrollable') != 'true' or node.get('class') == 'android.widget.HorizontalScrollView':
+            continue
+        bounds = [int(n) for n in re.findall(r'-?\d+', node.get('bounds', ''))]
+        if len(bounds) == 4 and bounds[2] > bounds[0] and bounds[3] > bounds[1]:
+            viewports.append(bounds)
+    require(viewports, 'No visible scroll viewport is available for the gesture')
+    left, top, right, bottom = max(viewports, key=lambda b: (b[2]-b[0])*(b[3]-b[1]))
+    start, end = (0.80, 0.20) if up else (0.20, 0.80)
+    x = str((left+right)//2)
+    adb('shell', 'input', 'swipe', x, str(int(top+(bottom-top)*start)),
+        x, str(int(top+(bottom-top)*end)), '300')
 
 
 def top():
@@ -169,6 +181,32 @@ def measure(logs):
                     f'{label} native line extends beyond the feedback border: {line}')
     require('PACKONE_FONTS' in logs, 'Bundled fonts did not finish loading')
     return {'layouts': layouts, 'text': texts}
+
+
+def measure_tabs(logs):
+    records = {}
+    for line in logs.splitlines():
+        if 'PACKONE_TAB_LAYOUT' in line:
+            raw = line.split('PACKONE_TAB_LAYOUT', 1)[1]
+            record = json.loads(raw[raw.find('{'):raw.rfind('}')+1])
+            records[(record['kind'], record['label'])] = record
+    require(('bar', 'navigation') in records, 'Missing intrinsic tab bar measurement')
+    bar = records[('bar', 'navigation')]
+    require(bar['height'] > 0 and bar['y']+bar['height'] <= bar['windowHeight']+1, 'Tab bar extends beyond the window')
+    result = {'bar': bar, 'items': {}}
+    for label in bar['labels']:
+        for kind in ['item', 'label', 'text']:
+            require((kind, label) in records, f'Missing native tab {kind}: {label}')
+        item, box, text = [records[(kind, label)] for kind in ['item', 'label', 'text']]
+        require(box['x'] >= -1 and box['x']+box['width'] <= item['width']+1, f'{label} tab text frame overflows horizontally')
+        require(box['y'] >= -1 and box['y']+box['height'] <= item['height']+1, f'{label} tab text frame is clipped vertically')
+        rendered = ''.join(line['text'] for line in text['lines'])
+        require(re.sub(r'\s+', '', rendered) == re.sub(r'\s+', '', label), f'{label} tab text was truncated: {rendered}')
+        for line in text['lines']:
+            require(box['x']+line['x'] >= 0 and box['x']+line['x']+line['width'] <= item['width'], f'{label} tab line overflows its tile')
+            require(line['y']+line['height'] <= box['height']+1, f'{label} tab line is clipped')
+        result['items'][label] = {'item': item, 'label': box, 'text': text}
+    return result
 
 
 def measure_header(logs):
@@ -223,8 +261,10 @@ if platform == 'android':
         if 'match' in scenario:
             require('You matched the trophy drafter' in xml, 'Trophy-match fixture missing')
         tap('Why this score?')
+        swipe_page(up=True)
         snapshot(name+'-analysis')
         tap('Review the pack')
+        swipe_page(up=True)
         snapshot(name+'-pack')
 
     for scenario, width, scale, landscape in [
@@ -253,6 +293,14 @@ if platform == 'android':
                 require('0/3 complete' not in xml and '0-day streak' not in xml, 'Unknown progress shown as zero')
             manifest['scenes'].append({'name': s+'-home', 'width_dp': 390, 'font_scale': 1, 'brand_metrics': measure_brand(logs)})
         attempt(scenario+'-home', home_scene)
+
+    for scenario in ['guest', 'member']:
+        def enlarged_navigation(s=scenario):
+            launch(s, scale=2.0)
+            _, logs = snapshot(s+'-large-tabs')
+            manifest['scenes'].append({'name': s+'-large-tabs', 'width_dp': 390, 'font_scale': 2.0,
+                                      'tab_metrics': measure_tabs(logs), 'brand_metrics': measure_brand(logs)})
+        attempt(scenario+'-large-tabs', enlarged_navigation)
 
     def daily_journey():
         launch('guest')
@@ -401,6 +449,8 @@ elif platform == 'ios':
                         layout_ready = ('"label":"choice"' in logs if screen == 'feedback' else
                                         'PACKONE_BRAND' in logs if screen == 'home' else
                                         'PACKONE_CAREER_READY' in logs if screen == 'career' else 'PACKONE_HEADER' in logs)
+                        if screen != 'feedback' and setting != 'large':
+                            layout_ready = layout_ready and '"kind":"bar"' in logs
                         ready = scene_ready and 'PACKONE_FONTS' in logs and layout_ready
                         if ready:
                             time.sleep(2)
@@ -417,6 +467,8 @@ elif platform == 'ios':
                         scene['header_metrics'] = measure_header(logs)
                     if screen == 'home':
                         scene['brand_metrics'] = measure_brand(logs)
+                    if screen != 'feedback' and setting != 'large':
+                        scene['tab_metrics'] = measure_tabs(logs)
                     if screen == 'feedback':
                         scene['metrics'] = measure(logs)
                         ios_metrics[(scenario, setting)] = scene['metrics']

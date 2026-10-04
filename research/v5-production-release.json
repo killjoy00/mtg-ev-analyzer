@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "issue": 889,
+  "status": "completed",
+  "completed_at": "2026-10-04T13:14:50.350Z",
+  "model": {
+    "version": "strong-player-colour-stage-v5",
+    "training_mode": "all-qualified",
+    "training_cap": null,
+    "qualified_training_drafts": 427437
+  },
+  "corpus": {
+    "version": "elite-trophy-colour-stage-v9",
+    "build_identity": "ccd0012b4733ca94b37baa68636dee0be60b7ee2bf5b572ff4fe8e2a27e2601e",
+    "active_environments": 30,
+    "premier_puzzles": 980984,
+    "traditional_live_components": 22,
+    "traditional_candidate_components": [
+      "sir"
+    ],
+    "excluded_from_active_v9": [
+      "mid",
+      "vow"
+    ]
+  },
+  "candidate": {
+    "run_id": 37132557406,
+    "artifact_id": 11276994475,
+    "artifact_sha256": "5c32e80f793420f45092614dc22949e944e7c871b61eccaf3b224d5f7cc71e80",
+    "environment_run_id": 37097278712,
+    "environment_commit": "388d9ab045240e0d96a4b1382f140e35fc91d0b4",
+    "finalizer_commit": "c7e90fe333395bcb3f7468744c943c20a7231978"
+  },
+  "production": {
+    "activation_run_id": 37168731594,
+    "activation_artifact_id": 11291361969,
+    "activation_artifact_sha256": "19170c6593525505c29a0decfcf7b37049208d4a530ef39bdd30c3ae677e9dab",
+    "accepted_runtime_commit": "5ef9c9230d83ca6a72210cf50e76c12b3ceb471a",
+    "runtime_acceptance_run_id": 37171099238,
+    "browser_acceptance_run_id": 37171455258,
+    "readiness_revision": 110,
+    "latest_verified_worker": {
+      "commit": "0ff55f6084b4ca372ec2457b0d81611054be6e96",
+      "deployment_run_id": 37216039560,
+      "v5_live_acceptance": "passed",
+      "observed_readiness_revision": 110
+    }
+  },
+  "rollback": {
+    "development_rollback_run_id": 37156639632,
+    "development_restore_run_id": 37160251710,
+    "original_v8_manifest_aggregate": "da99938bdf0ca3e618f5b7bb94c7390f",
+    "original_v8_parents_retained": 30
+  },
+  "standings": {
+    "v9_public_standings_corpus_scoped": true,
+    "historical_results_retained": true,
+    "historical_public_scores_at_final_audit": 115
+  },
+  "history_audit": {
+    "baseline_run_id": 37155825568,
+    "baseline_artifact_id": 11285457706,
+    "baseline_artifact_sha256": "3c4f198224635bb9b3d3f9eb127bae74286dbbcc82215503da2230e60f5ceb03",
+    "missing_original_rows": {
+      "game_results": 0,
+      "game_result_environments": 0,
+      "scores": 0,
+      "draft_run_sessions": 0,
+      "completed_draft_run_sessions": 0,
+      "draft_run_schedules": 0
+    },
+    "original_counts": {
+      "game_results": 301,
+      "game_result_environments": 726,
+      "scores": 115,
+      "draft_run_sessions": 651,
+      "completed_draft_run_sessions": 301,
+      "draft_run_schedules": 62
+    },
+    "counts_at_final_audit": {
+      "game_results": 323,
+      "game_result_environments": 790,
+      "scores": 115,
+      "draft_run_sessions": 683,
+      "completed_draft_run_sessions": 323,
+      "draft_run_schedules": 65
+    }
+  },
+  "performance_promotion": {
+    "source_commit": "5b745284b5f642efd5895b71b9ab92990d14f493",
+    "tested_code_commit": "61bdaacf54cedc82c83eda02653541bcad516840",
+    "backend_run_id": 37179231420,
+    "performance_run_id": 37179231416,
+    "distributed_run_id": 37179231428,
+    "independent_review_run_id": 37180907946,
+    "development_promotion_run_id": 37182014757,
+    "production_promotion_run_id": 37204608013,
+    "migration": "0051_exact_pick_draw_index.sql"
+  },
+  "notes": [
+    "MID/VOW are excluded from the active v9 rebuild and automatic selection, but historical v8 policy/snapshots/manifests/reads are retained.",
+    "The v5 corpus/model candidate is immutable; later guarded worker deployments may advance application code without changing corpus identity.",
+    "The special one-time exact-pick release workflow/request was retired after successful production promotion; migration 0051 remains in normal schema release paths."
+  ]
+}
