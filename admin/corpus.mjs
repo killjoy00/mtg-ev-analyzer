@@ -32,11 +32,11 @@ function setDetails(s,data){const m=s.manifest||{},f=m.full_import||{},q=s.repor
  ${(data.blocked_sources||[]).filter(c=>c.set_id===s.set_id).map(c=>`<p class="error">${esc(c.event_type)} blocked before Candidate: ${esc(c.last_error)}</p>`).join('')}
  <details class="corpus-section"><summary>Status history</summary><div class="scroll"><table><thead><tr><th>When</th><th>Change</th><th>Who</th><th>Reason</th></tr></thead><tbody>${data.history.filter(h=>h.set_id===s.set_id).map(h=>`<tr><td>${esc(date(h.changed_at))}</td><td>${esc(h.old_status)} → ${esc(h.new_status)}${h.component_version?`<small>${esc(h.component_version)}</small>`:''}${h.source_snapshot_id?`<small>${esc(String(h.previous_source_snapshot_id||'none').slice(0,12))} → ${esc(String(h.source_snapshot_id).slice(0,12))}</small>`:''}</td><td>${esc(h.auth_user_id||h.admin_identity?.actor||h.admin_identity?.subject)}</td><td>${esc(h.reason)}</td></tr>`).join('')||'<tr><td colspan="4">No status changes recorded.</td></tr>'}</tbody></table></div></details>`;}
 export async function renderCorpus(root,request){
- const data=await request('/v1/admin/corpus'),sets=data.sets||[];
+ const data=await request('/v1/admin/corpus?summary=1'),sets=data.sets||[];let detailData=null;
  const totals=Object.fromEntries(['Live','Candidate','Paused','Retired'].map(status=>[status,sets.filter(s=>s.status===status).length]));
  root.innerHTML=`<h1>Corpus operations</h1><p class="muted">${esc(data.corpus_version)} · Serving revision ${esc(data.serving_revision)} · Select a set to inspect active, staged and retained inventory.</p><div class="corpus-overview">${Object.entries(totals).map(([name,n])=>`<div><strong>${n}</strong><span>${name}</span></div>`).join('')}</div><p id="corpus-status" role="status"></p><section id="corpus-readiness" aria-label="Serving readiness">${readinessMarkup(data.readiness)}</section>
  <div class="filters corpus-filters"><label>Find a set<input type="search" id="corpus-search" placeholder="Name or code"></label><label>Serving status<select id="corpus-filter"><option value="">All statuses</option>${['Live','Candidate','Paused','Retired','Awaiting corpus'].map(s=>`<option>${s}</option>`).join('')}</select></label><label>Quality<select id="corpus-quality"><option value="">All checks</option><option>Ready</option><option>Verified</option><option>Blocked</option><option>Check needed</option></select></label><span id="corpus-row-count" class="muted" aria-live="polite"></span></div>
- <div class="scroll corpus-table-wrap" tabindex="0" aria-label="Corpus sets; scroll horizontally for all columns"><table class="corpus-table"><thead><tr>${[['set_name','Set'],['status','Status'],['serving_count','Serving'],['staged_count','Staged'],['under_floor_count','Below 20'],['health','Live quality'],['release_date','Release'],['import_status','Import']].map(([key,label])=>`<th scope="col"><button type="button" class="corpus-sort" data-sort="${key}">${label}<span aria-hidden="true"></span></button></th>`).join('')}</tr></thead><tbody id="corpus-rows"></tbody></table></div><p class="muted corpus-table-note">Serving exactly matches the current runtime membership predicate: the active Premier snapshot plus separately Live supplemental components, after source exclusions and the score floor. Staged and retained snapshots never inflate that number. Fixed Dailies and historical runs remain unchanged.</p><dialog id="corpus-detail" aria-label="Set operations"></dialog>`;
+ <div class="scroll corpus-table-wrap" tabindex="0" aria-label="Corpus sets; scroll horizontally for all columns"><table class="corpus-table"><thead><tr>${[['set_name','Set'],['status','Status'],['serving_count','Serving'],['staged_count','Staged'],['under_floor_count','Below 20'],['health','Live quality'],['release_date','Release'],['import_status','Import']].map(([key,label])=>`<th scope="col"><button type="button" class="corpus-sort" data-sort="${key}">${label}<span aria-hidden="true"></span></button></th>`).join('')}</tr></thead><tbody id="corpus-rows"></tbody></table></div><p class="muted corpus-table-note">Serving totals come from the current runtime cache so this overview stays fast. Open a set to load exact retained, staged, supplemental and below-floor inventory for that set only. Fixed Dailies and historical runs remain unchanged.</p><dialog id="corpus-detail" aria-label="Set operations"></dialog>`;
  const body=root.querySelector('#corpus-rows'),dialog=root.querySelector('#corpus-detail');let sort='release_date',direction=-1;
  function draw(){const search=root.querySelector('#corpus-search').value.toLowerCase(),status=root.querySelector('#corpus-filter').value,quality=root.querySelector('#corpus-quality').value;
   const rows=sets.filter(s=>(!search||`${s.set_name} ${s.set_id}`.toLowerCase().includes(search))&&(!status||(s.status||'Awaiting corpus')===status)&&(!quality||health(s)===quality)).sort((a,b)=>{const left=sort==='health'?health(a):a[sort],right=sort==='health'?health(b):b[sort];return direction*(typeof left==='number'&&typeof right==='number'?left-right:String(left??'').localeCompare(String(right??'')))||a.set_id.localeCompare(b.set_id);});
@@ -46,10 +46,26 @@ export async function renderCorpus(root,request){
  }
  root.querySelectorAll('.corpus-filters input,.corpus-filters select').forEach(e=>e.addEventListener('input',draw));
  root.querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>{direction=sort===b.dataset.sort?-direction:1;sort=b.dataset.sort;draw();});
- body.onclick=e=>{const b=e.target.closest('[data-open-set]');if(!b)return;const s=sets.find(s=>s.set_id===b.dataset.openSet);dialog.innerHTML=setDetails(s,data);dialog.showModal();dialog.querySelector('#close-corpus-detail').onclick=()=>dialog.close();};
+ body.onclick=async e=>{
+  const b=e.target.closest('[data-open-set]');if(!b)return;
+  const summarySet=sets.find(s=>s.set_id===b.dataset.openSet);if(!summarySet)return;
+  detailData=null;
+  dialog.innerHTML=`<div class="corpus-detail-heading"><div><p class="muted">${esc(summarySet.set_id.toUpperCase())}</p><h2>${esc(summarySet.set_name)}</h2></div><button type="button" class="secondary" id="close-corpus-detail" aria-label="Close set details">Close</button></div><p class="muted">Loading exact retained and snapshot inventory…</p>`;
+  dialog.showModal();dialog.querySelector('#close-corpus-detail').onclick=()=>dialog.close();
+  try {
+   detailData=await request('/v1/admin/corpus?set='+encodeURIComponent(summarySet.set_id));
+   const s=(detailData.sets||[]).find(row=>row.set_id===summarySet.set_id);
+   if(!s)throw Error('Set details are unavailable.');
+   dialog.innerHTML=setDetails(s,detailData);dialog.querySelector('#close-corpus-detail').onclick=()=>dialog.close();
+  } catch(cause) {
+   detailData=null;
+   dialog.innerHTML=`<div class="corpus-detail-heading"><div><p class="muted">${esc(summarySet.set_id.toUpperCase())}</p><h2>${esc(summarySet.set_name)}</h2></div><button type="button" class="secondary" id="close-corpus-detail" aria-label="Close set details">Close</button></div><p class="error">${esc(cause.message)}</p>`;
+   dialog.querySelector('#close-corpus-detail').onclick=()=>dialog.close();
+  }
+ };
  dialog.onsubmit=async e=>{
   const form=e.target.closest('[data-status-form],[data-snapshot-form]');if(!form)return;e.preventDefault();
-  const component=form.dataset.component,s=component?data.components.find(c=>c.set_id===form.dataset.set&&c.component_version===component):sets.find(s=>s.set_id===form.dataset.set);
+  const activeData=detailData||data,component=form.dataset.component,s=component?activeData.components.find(c=>c.set_id===form.dataset.set&&c.component_version===component):activeData.sets.find(s=>s.set_id===form.dataset.set);
   const b=Object.fromEntries(new FormData(form)),snapshot=form.matches('[data-snapshot-form]');
   if(snapshot?!b.sourceSnapshotId:!b.status)return;
   form.querySelector('button').disabled=true;
