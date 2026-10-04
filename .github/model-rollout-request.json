@@ -1,10 +1,11 @@
 {
   "operation": "v5-corpus-release",
-  "request_id": "v5-v9-production-stage-source-metadata-20261004",
-  "reason": "Owner-authorized #889. Repair legacy unknown game-source availability only after HEAD responses match all 30 unchanged pinned archives, then use the existing health promotion gate and fully re-stage the same candidate/runtime. Failed production activation changed zero pointers; retain original history and v8 rollback parents. Require every exact parent Candidate before accepting staging.",
+  "request_id": "v5-v9-production-activate-pinned-sources-20261004",
+  "reason": "Owner-authorized #889. Activate the unchanged v9 candidate only after production stage 37167356315 verifies exact pinned game headers, repairs only unknown metadata, proves all 30 exact parents Candidate, and passes full staging/canary/history gates. Prior cutover guard changed zero pointers. Preserve all original history and rollback assets; require complete eligible-component readiness, quality and Cube acceptance.",
   "target": "production",
-  "action": "stage",
+  "action": "activate",
   "candidate_run_id": "37132557406",
   "release_commit": "5ef9c9230d83ca6a72210cf50e76c12b3ceb471a",
-  "repair_game_metadata": true
+  "stage_run_id": "37167356315",
+  "bridge_commit": "c7e90fe333395bcb3f7468744c943c20a7231978"
 }
