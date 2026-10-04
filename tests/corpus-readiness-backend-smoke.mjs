@@ -25,7 +25,7 @@ async function fingerprints() {
   (SELECT md5(coalesce(jsonb_agg(to_jsonb(s) ORDER BY s.day,s.environment)::text,'')) FROM draft_run_schedules s) schedules,
   (SELECT md5(coalesce(jsonb_agg(to_jsonb(s) ORDER BY s.id)::text,'')) FROM (SELECT * FROM draft_run_sessions ORDER BY id LIMIT 40) s) sessions`)).rows[0];
 }
-const post=(path,body)=>handleCorpusAdmin(new Request('https://isolated.invalid/v1/admin/corpus'+path,{method:'POST'}),query,async()=>body,null,identity);
+const post=(path,body,activationQuery=query)=>handleCorpusAdmin(new Request('https://isolated.invalid/v1/admin/corpus'+path,{method:'POST'}),activationQuery,async()=>body,null,identity);
 async function resetJob(id) {
  await query("UPDATE draft_run_readiness_jobs SET state='queued',attempts=0,lease_token=NULL,lease_expires_at=NULL,next_attempt_at=now(),finished_at=NULL WHERE id=$1::bigint",[id]);
 }
@@ -159,18 +159,40 @@ try {
  await health(candidate,setId,true);
  check('non-serving staging stays stable and failing quality evidence blocks activation');
 
- const activation=post('/'+setId+'/snapshot',{sourceSnapshotId:candidate,expectedActiveSnapshotId:original.active_snapshot_id,corpusVersion:DRAFT_RUN_CORPUS_VERSION,reason});
- let observed;
- for(let i=0;i<30;i++) {
-  observed=await readServingReadiness(query);
-  if(observed.revision!==beforeStaging&&['warming','verifying','ready','failed'].includes(observed.state))break;
-  await new Promise(resolve=>setTimeout(resolve,200));
+ // Hold the real builder after its committed readiness claim. Observe that
+ // state before allowing publication; elapsed metadata validation time does
+ // not decide whether the concurrency assertion runs.
+ let releaseBuild,observeBuild,timer;
+ const buildHeld=new Promise(resolve=>{releaseBuild=resolve;});
+ const buildObserved=new Promise(resolve=>{observeBuild=resolve;});
+ const activationQuery=async(sql,params)=>{
+  if(/^SELECT pack1_build_serving_snapshot\(/.test(sql)) {
+   observeBuild();await buildHeld;
+  }
+  return query(sql,params);
+ };
+ const activation=post('/'+setId+'/snapshot',{sourceSnapshotId:candidate,expectedActiveSnapshotId:original.active_snapshot_id,corpusVersion:DRAFT_RUN_CORPUS_VERSION,reason},activationQuery);
+ const settled=activation.then(value=>({value}),error=>({error}));
+ let outcome;
+ try {
+  await Promise.race([
+   buildObserved,
+   settled.then(result=>{if(result.error)throw result.error;throw Error('Activation completed before the builder synchronization point');}),
+   new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('Activation never reached its committed builder claim')),120000);}),
+  ]);
+  const observed=await readServingReadiness(query);
+  assert.notEqual(observed.revision,beforeStaging);
+  assert.equal(observed.state,'warming');
+  assert.equal(observed.ready,false);
+  await assert.rejects(loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION),e=>e.status===503);
+  const concurrent=await advanceServingReadiness(query);
+  assert.equal(concurrent.state,'warming',JSON.stringify(concurrent));
+  assert.equal(concurrent.operation_id,observed.operation_id,'Concurrent worker must retain the same claimed operation');
+ } finally {
+  clearTimeout(timer);releaseBuild();outcome=await settled;
  }
- assert.notEqual(observed.revision,beforeStaging);
- if(!observed.ready)await assert.rejects(loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION),e=>e.status===503);
- const concurrent=await advanceServingReadiness(query);
- assert.ok(['warming','verifying','ready'].includes(concurrent.state),JSON.stringify(concurrent));
- const activated=await activation;
+ if(outcome.error)throw outcome.error;
+ const activated=outcome.value;
  assert.equal(activated.activation_committed,true);
  assert.equal(activated.ok,true,JSON.stringify(activated));
  assert.equal(activated.readiness.attempts,1,'Concurrent worker must not claim a second build');
