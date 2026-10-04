@@ -220,31 +220,56 @@ export async function normalizeResolvedImageMarkers(query,rawSetIds) {
   const normalized=[];
   for(const setId of setIds) {
     const status=(await query(
-      `SELECT s.corpus_version,
-        (SELECT count(*)::int FROM draft_run_verified_puzzles p WHERE p.set_id=s.set_id AND p.corpus_version=$2) puzzles,
+      `SELECT
         (SELECT count(*)::int
-          FROM draft_run_verified_puzzles p
-          CROSS JOIN LATERAL jsonb_array_elements(
-            COALESCE(p.payload->'candidates','[]'::jsonb) || COALESCE(p.payload->'prior_picks','[]'::jsonb)
-          ) card
-          WHERE p.set_id=s.set_id AND p.corpus_version=$2
-            AND COALESCE(card->>'image_url','') NOT LIKE 'https://%') missing_images
-       FROM draft_run_verified_sets s WHERE s.set_id=$1`,
+         FROM draft_run_verified_puzzles p
+         WHERE p.set_id=$1
+           AND (
+             p.corpus_version=$2
+             OR EXISTS (
+               SELECT 1
+               FROM corpus_components c
+               WHERE c.set_id=p.set_id
+                 AND c.parent_version=$2
+                 AND c.component_version=p.corpus_version
+                 AND c.status='Live'
+             )
+           )) puzzles,
+        (SELECT count(*)::int
+         FROM draft_run_verified_puzzles p
+         CROSS JOIN LATERAL jsonb_array_elements(
+           COALESCE(p.payload->'candidates','[]'::jsonb) || COALESCE(p.payload->'prior_picks','[]'::jsonb)
+         ) card
+         WHERE p.set_id=$1
+           AND (
+             p.corpus_version=$2
+             OR EXISTS (
+               SELECT 1
+               FROM corpus_components c
+               WHERE c.set_id=p.set_id
+                 AND c.parent_version=$2
+                 AND c.component_version=p.corpus_version
+                 AND c.status='Live'
+             )
+           )
+           AND COALESCE(card->>'image_url','') NOT LIKE 'https://%') missing_images`,
       [setId,VERSION],
     )).rows[0];
-    if(status?.corpus_version!==VERSION||Number(status.puzzles)<1)throw error(`Verified set unavailable for image-marker normalization: ${setId}`,409);
+    if(Number(status?.puzzles)<1)throw error(`Served set unavailable for image-marker normalization: ${setId}`,409);
     if(Number(status.missing_images)!==0)throw error(`Cannot clear unresolved image markers while images are missing: ${setId}`,409);
-    const result=await query(
+    // draft_run_verified_sets is a legacy marker store. Cross-version serving can
+    // legitimately leave it pointing at v8 while the active v9 parent and Live
+    // components are served from snapshot/component tables. Clear markers only
+    // when a v9 legacy row exists; the served-puzzle checks above are authoritative.
+    await query(
       `UPDATE draft_run_verified_sets
        SET manifest=jsonb_set(
          jsonb_set(manifest,'{unresolved_image_names}','[]'::jsonb,true),
          '{full_import,missing_image_names}','[]'::jsonb,true
        )
-       WHERE set_id=$1 AND corpus_version=$2
-       RETURNING set_id`,
+       WHERE set_id=$1 AND corpus_version=$2`,
       [setId,VERSION],
     );
-    if(result.rows.length!==1)throw error(`Image-marker normalization update failed: ${setId}`,409);
     normalized.push({set_id:setId,puzzles:Number(status.puzzles),missing_images:0});
   }
   return {normalized};
