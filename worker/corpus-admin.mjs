@@ -93,8 +93,53 @@ export function assembleCorpusAdmin({sets,history,components,blockedSources,reta
 }
 
 async function handleCorpusLifecycle(request,query,readJson,accountId,automationIdentity=null) {
- const path=new URL(request.url).pathname;
+ const url=new URL(request.url),path=url.pathname;
  if(request.method==='GET'&&path==='/v1/admin/corpus') {
+  const setId=url.searchParams.get('set'),summary=url.searchParams.get('summary')==='1';
+  if(setId&&!/^[a-z0-9-]{2,40}$/.test(setId))fail('Invalid corpus set.');
+  if(summary&&setId)fail('Choose either corpus summary or set detail.');
+  if(summary) {
+   const [sets,servingRevision]=await Promise.all([
+    query(`WITH known AS (SELECT set_id FROM draft_run_verified_sets UNION SELECT set_id FROM corpus_sources),
+     current_cache AS (
+      SELECT s.groups FROM draft_run_serving_snapshots s
+      JOIN draft_run_serving_revision rv ON rv.singleton AND rv.revision=s.revision
+      WHERE s.corpus_version=$1 AND s.difficulty_version='support-ratio-v1'
+       AND s.serving_policy_version=$3 AND s.cache_schema='serving-cache-v1'
+      ORDER BY s.id DESC LIMIT 1
+     ), serving AS (
+      SELECT item->>'set_id' set_id,sum((item->>'n')::int)::int serving_count
+      FROM current_cache c CROSS JOIN LATERAL jsonb_array_elements(coalesce(c.groups,'[]'::jsonb)) item
+      GROUP BY item->>'set_id'
+     )
+     SELECT k.set_id,p.status,coalesce(p.set_name,s.set_name,k.set_id) set_name,
+      coalesce(p.release_date,s.release_date)::text release_date,coalesce(s.event_type,p.source_event_type) source_event_type,
+      s.import_status,s.last_error,h.ready,CASE WHEN h.has_report THEN '{}'::jsonb ELSE NULL END report,
+      (h.manifest_hash=md5(coalesce(a.manifest,v.manifest)::text) AND h.checked_at>now()-interval '7 days' AND h.gate_version=$2) health_current,
+      serving.serving_count
+     FROM known k LEFT JOIN draft_run_environment_policy p USING(set_id)
+     LEFT JOIN corpus_sources s ON s.set_id=k.set_id AND s.event_type='PremierDraft'
+     LEFT JOIN corpus_set_versions v ON v.set_id=k.set_id AND v.corpus_version=$1
+     LEFT JOIN corpus_source_snapshots a ON a.source_snapshot_id=p.active_snapshot_id AND a.set_id=k.set_id
+     LEFT JOIN LATERAL (
+      SELECT c.manifest_hash,c.checked_at,c.gate_version,c.ready,(c.report IS NOT NULL) has_report
+      FROM corpus_health_checks c
+      WHERE CASE WHEN a.source_snapshot_id IS NOT NULL THEN c.source_snapshot_id=a.source_snapshot_id
+       ELSE c.set_id=k.set_id AND c.corpus_version=$1 AND c.source_snapshot_id IS NULL END
+      ORDER BY c.checked_at DESC,c.id DESC LIMIT 1
+     ) h ON true
+     LEFT JOIN serving ON serving.set_id=k.set_id
+     ORDER BY coalesce(p.release_date,s.release_date) DESC NULLS LAST,k.set_id,s.event_type`,
+     [DRAFT_RUN_CORPUS_VERSION,CORPUS_GATE_VERSION,SERVING_POLICY_VERSION]),
+    query('SELECT revision::text revision FROM draft_run_serving_revision WHERE singleton')
+   ]);
+   return {
+    corpus_version:DRAFT_RUN_CORPUS_VERSION,serving_policy_version:SERVING_POLICY_VERSION,
+    serving_revision:resultRows(servingRevision)[0]?.revision??null,minimum_implied_trophy_score:MINIMUM_IMPLIED_TROPHY_SCORE,
+    thresholds:CORPUS_THRESHOLDS,gate_version:CORPUS_GATE_VERSION,sets:resultRows(sets),
+    components:[],blocked_sources:[],snapshots:[],history:[],transitions:CORPUS_TRANSITIONS,summary:true
+   };
+  }
   const [sets,history,components,blockedSources,retainedInventory,servingInventory,snapshots,servingRevision]=await Promise.all([
    query(`WITH known AS (SELECT set_id FROM draft_run_verified_sets UNION SELECT set_id FROM corpus_sources)
     SELECT k.set_id,p.status,p.regular_run,coalesce(p.set_name,s.set_name,k.set_id) set_name,
@@ -116,14 +161,15 @@ async function handleCorpusLifecycle(request,query,readJson,accountId,automation
       ELSE c.set_id=k.set_id AND c.corpus_version=$1 AND c.source_snapshot_id IS NULL END
      ORDER BY checked_at DESC,id DESC LIMIT 1
     ) h ON true
-    ORDER BY coalesce(p.release_date,s.release_date) DESC NULLS LAST,k.set_id,s.event_type`,[DRAFT_RUN_CORPUS_VERSION,CORPUS_GATE_VERSION]),
-   query('SELECT set_id,component_version,auth_user_id,admin_identity,changed_at,old_status,new_status,reason,source_snapshot_id,previous_source_snapshot_id FROM corpus_status_events ORDER BY changed_at DESC,id DESC LIMIT 100'),
+    WHERE ($3::text IS NULL OR k.set_id=$3)
+    ORDER BY coalesce(p.release_date,s.release_date) DESC NULLS LAST,k.set_id,s.event_type`,[DRAFT_RUN_CORPUS_VERSION,CORPUS_GATE_VERSION,setId]),
+   query('SELECT set_id,component_version,auth_user_id,admin_identity,changed_at,old_status,new_status,reason,source_snapshot_id,previous_source_snapshot_id FROM corpus_status_events WHERE ($1::text IS NULL OR set_id=$1) ORDER BY changed_at DESC,id DESC LIMIT 100',[setId]),
    query(`SELECT c.*,v.manifest,h.checked_at,h.ready,h.report,
      (h.manifest_hash=md5(v.manifest::text) AND h.checked_at>now()-interval '7 days' AND h.gate_version=$2) health_current
      FROM corpus_components c JOIN corpus_set_versions v ON v.set_id=c.set_id AND v.corpus_version=c.component_version
      LEFT JOIN LATERAL(SELECT * FROM corpus_health_checks q WHERE q.set_id=c.set_id AND q.corpus_version=c.component_version ORDER BY checked_at DESC,id DESC LIMIT 1) h ON true
-     WHERE c.parent_version=$1 ORDER BY c.set_id,c.component_version`,[DRAFT_RUN_CORPUS_VERSION,TRADITIONAL_GATE_VERSION]),
-   query("SELECT s.set_id,s.event_type,s.archive_url,s.import_status,s.last_error FROM corpus_sources s WHERE s.event_type='TradDraft' AND s.import_status='failed' AND NOT EXISTS(SELECT 1 FROM corpus_components c WHERE c.set_id=s.set_id AND c.parent_version=$1)",[DRAFT_RUN_CORPUS_VERSION]),
+     WHERE c.parent_version=$1 AND ($3::text IS NULL OR c.set_id=$3) ORDER BY c.set_id,c.component_version`,[DRAFT_RUN_CORPUS_VERSION,TRADITIONAL_GATE_VERSION,setId]),
+   query("SELECT s.set_id,s.event_type,s.archive_url,s.import_status,s.last_error FROM corpus_sources s WHERE s.event_type='TradDraft' AND s.import_status='failed' AND ($2::text IS NULL OR s.set_id=$2) AND NOT EXISTS(SELECT 1 FROM corpus_components c WHERE c.set_id=s.set_id AND c.parent_version=$1)",[DRAFT_RUN_CORPUS_VERSION,setId]),
    query(`SELECT p.set_id,p.corpus_version,p.source_snapshot_id,p.pick_number,count(*)::int retained,
     count(*) FILTER(WHERE x.source_draft_hash IS NOT NULL)::int excluded,
     count(*) FILTER(WHERE x.source_draft_hash IS NULL AND r.puzzle_id IS NOT NULL AND ${SERVING_QUALITY_SQL})::int eligible,
@@ -131,9 +177,9 @@ async function handleCorpusLifecycle(request,query,readJson,accountId,automation
     FROM draft_run_verified_puzzles p
     LEFT JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'
     LEFT JOIN corpus_source_exclusions x ON x.set_id=p.set_id AND x.corpus_version=p.corpus_version AND x.source_draft_hash=p.source_draft_hash
-    WHERE (${corpusMembership()}) AND p.interesting AND p.pack_number=1
+    WHERE (${corpusMembership()}) AND ($2::text IS NULL OR p.set_id=$2) AND p.interesting AND p.pack_number=1
     AND p.pick_number BETWEEN CASE WHEN p.set_id='powered-cube' THEN 2 ELSE 1 END AND CASE WHEN p.set_id='powered-cube' THEN 9 ELSE 8 END
-    GROUP BY p.set_id,p.corpus_version,p.source_snapshot_id,p.pick_number`,[DRAFT_RUN_CORPUS_VERSION]),
+    GROUP BY p.set_id,p.corpus_version,p.source_snapshot_id,p.pick_number`,[DRAFT_RUN_CORPUS_VERSION,setId]),
    query(`SELECT p.set_id,p.corpus_version,p.source_snapshot_id,p.pick_number,rv.revision::text serving_revision,count(*)::int retained,
     count(*) FILTER(WHERE r.puzzle_id IS NOT NULL AND ${SERVING_QUALITY_SQL})::int eligible,
     count(*) FILTER(WHERE r.puzzle_id IS NULL OR NOT coalesce((${SERVING_QUALITY_SQL}),false))::int under_floor,
@@ -141,10 +187,10 @@ async function handleCorpusLifecycle(request,query,readJson,accountId,automation
     FROM draft_run_verified_puzzles p
     LEFT JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'
     CROSS JOIN draft_run_serving_revision rv
-    WHERE (${corpusMembership({serving:true})}) AND p.interesting AND p.pack_number=1
+    WHERE (${corpusMembership({serving:true})}) AND ($2::text IS NULL OR p.set_id=$2) AND p.interesting AND p.pack_number=1
     AND p.pick_number BETWEEN CASE WHEN p.set_id='powered-cube' THEN 2 ELSE 1 END AND CASE WHEN p.set_id='powered-cube' THEN 9 ELSE 8 END
     AND NOT EXISTS(SELECT 1 FROM corpus_source_exclusions x WHERE x.set_id=p.set_id AND x.corpus_version=p.corpus_version AND x.source_draft_hash=p.source_draft_hash)
-    GROUP BY p.set_id,p.corpus_version,p.source_snapshot_id,p.pick_number,rv.revision`,[DRAFT_RUN_CORPUS_VERSION]),
+    GROUP BY p.set_id,p.corpus_version,p.source_snapshot_id,p.pick_number,rv.revision`,[DRAFT_RUN_CORPUS_VERSION,setId]),
    query(`SELECT s.source_snapshot_id,s.set_id,s.event_type,s.corpus_version,s.schema_version,s.lifecycle_status,s.created_at,s.status_changed_at,s.superseded_by,
      s.importer_identity,s.model_identity,s.draft_sha256,s.game_sha256,s.draft_etag,s.game_etag,s.draft_last_modified,s.game_last_modified,
      h.checked_at,h.ready,h.report,(h.manifest_hash=md5(s.manifest::text) AND h.checked_at>now()-interval '7 days' AND h.gate_version=$2) health_current,
@@ -152,8 +198,8 @@ async function handleCorpusLifecycle(request,query,readJson,accountId,automation
     FROM corpus_source_snapshots s
     LEFT JOIN draft_run_environment_policy p ON p.set_id=s.set_id
     LEFT JOIN LATERAL(SELECT * FROM corpus_health_checks q WHERE q.source_snapshot_id=s.source_snapshot_id ORDER BY checked_at DESC,id DESC LIMIT 1) h ON true
-    WHERE s.corpus_version=$1 OR p.active_snapshot_id=s.source_snapshot_id
-    ORDER BY s.set_id,(p.active_snapshot_id=s.source_snapshot_id) DESC,s.created_at DESC,s.source_snapshot_id DESC`,[DRAFT_RUN_CORPUS_VERSION,CORPUS_GATE_VERSION]),
+    WHERE (s.corpus_version=$1 OR p.active_snapshot_id=s.source_snapshot_id) AND ($3::text IS NULL OR s.set_id=$3)
+    ORDER BY s.set_id,(p.active_snapshot_id=s.source_snapshot_id) DESC,s.created_at DESC,s.source_snapshot_id DESC`,[DRAFT_RUN_CORPUS_VERSION,CORPUS_GATE_VERSION,setId]),
    query('SELECT revision::text revision FROM draft_run_serving_revision WHERE singleton')
   ]);
   return assembleCorpusAdmin({sets,history,components,blockedSources,retainedInventory,servingInventory,snapshots,servingRevision});
