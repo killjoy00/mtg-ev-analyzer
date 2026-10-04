@@ -1,4 +1,4 @@
 {
   "operation": "generate-mobile-store-screenshots",
-  "reason": "Generate updated native iPhone, iPad and Android screenshots from reviewed current main after #910 and #955, including real bottom tabs, Daily reset/streak, bundled fonts, Learn and corrected feedback. These controlled preview artifacts require inspection before any store upload; this request does not submit or release the app."
+  "reason": "Capture the final native repair on reviewed main after #960 corrects the membership provider label for manual Elite grants. Include the real Daily, gameplay, feedback, Practice, Career and membership screens plus native acceptance evidence on iPhone, iPad and Android. The previous f721389d membership images were rejected during visual review. New artifacts must be inspected before guarded store upload; no App Review submission or public release."
 }
