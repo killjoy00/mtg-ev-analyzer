@@ -94,7 +94,7 @@ export default function AccountDeleteScreen() {
       }
       const fresh = await ensureGuestSession();
       clearAccount(fresh);
-      router.replace('/');
+      router.dismissTo('/');
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : 'Could not delete the account.');
     } finally {

@@ -1,4 +1,4 @@
 {
   "operation": "generate-mobile-store-screenshots",
-  "reason": "Generate updated native iPhone, iPad and Android screenshots from reviewed current main after #910, including real bottom tabs, Daily reset/streak, bundled fonts, Learn and corrected feedback. These controlled preview artifacts require inspection before any store upload; this request does not submit or release the app."
+  "reason": "Generate updated native iPhone, iPad and Android screenshots from reviewed current main after #910 and #955, including real bottom tabs, Daily reset/streak, bundled fonts, Learn and corrected feedback. These controlled preview artifacts require inspection before any store upload; this request does not submit or release the app."
 }

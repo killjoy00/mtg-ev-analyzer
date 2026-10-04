@@ -248,7 +248,7 @@ export default function AccountProfileScreen() {
 
           {enrichmentWarning ? <Text accessibilityRole="alert" style={styles.help}>{enrichmentWarning}</Text> : null}
 
-          <Pressable accessibilityRole="button" onPress={() => router.push('/career')} style={styles.secondaryButton}>
+          <Pressable accessibilityRole="button" onPress={() => router.dismissTo('/career')} style={styles.secondaryButton}>
             <Text style={styles.secondaryButtonText}>Open My Pack One</Text>
           </Pressable>
         </View>

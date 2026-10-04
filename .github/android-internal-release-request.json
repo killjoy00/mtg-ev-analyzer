@@ -1,4 +1,4 @@
 {
   "operation": "upload-android-internal",
-  "reason": "Owner-authorized replacement Pack One 1.0 Android test candidate after native UX repair PR #910 and retained account/profile PR #890. Build and sign reviewed current main after exact-main RC smoke and native acceptance, upload to Internal Testing, and record the exact allocated versionCode for a later reviewed promotion to the existing production-access Closed Testing track. Preserve testers and qualification continuity; do not publish to Production."
+  "reason": "Owner-authorized replacement Pack One 1.0 Android test candidate after native UX repair PR #910, tab-return continuity PR #955, and retained account/profile PR #890. Build and sign reviewed current main after exact-main RC smoke and native acceptance, upload to Internal Testing, and record the exact allocated versionCode for a later reviewed promotion to the existing production-access Closed Testing track. Preserve testers and qualification continuity; do not publish to Production."
 }
