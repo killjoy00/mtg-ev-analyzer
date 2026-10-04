@@ -590,6 +590,7 @@ export default function AccountScreen() {
                 value={password}
               />
               <Pressable accessibilityRole="button" disabled={disabled || !email.trim() || !password}
+                accessibilityLabel={mode === 'signin' ? 'Sign in with email' : 'Create account with email'}
                 onPress={() => void submitEmail()}
                 style={[styles.primaryButton, (disabled || !email.trim() || !password) && styles.disabled]}>
                 {actionBusy ? <ActivityIndicator color="#fff" /> : (

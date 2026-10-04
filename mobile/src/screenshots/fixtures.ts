@@ -284,11 +284,14 @@ export async function requestScreenshotFixture<T>(
     session: {}, credentials: { password: true, google: false, apple: false },
     deletion: { enabled: true, available: true, method: 'password' },
   } as T;
-  if (path === '/growth/v1/mobile/account/signin' && method === 'POST') return {
-    user: screenshotSession.accountUser,
-    session: { token: screenshotSession.accountToken, expiresAt: screenshotSession.accountExpiresAt },
-    linked: { token: screenshotSession.playerToken, playerId: screenshotSession.subjectId, displayName: 'PackOneReviewer', newlyClaimed: false, rankingIdentity: { eligible: true } },
-  } as T;
+  if (path === '/growth/v1/mobile/account/signin' && method === 'POST') {
+    const second = parseBody(options).email === 'second@packone.example';
+    return {
+      user: second ? { id: '55555555-5555-4555-8555-555555555555', email: 'second@packone.example', name: 'Second Reviewer' } : screenshotSession.accountUser,
+      session: { token: second ? 'CCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCCC' : screenshotSession.accountToken, expiresAt: screenshotSession.accountExpiresAt },
+      linked: { token: screenshotSession.playerToken, playerId: screenshotSession.subjectId, displayName: second ? 'SecondReviewer' : 'PackOneReviewer', newlyClaimed: false, rankingIdentity: { eligible: true } },
+    } as T;
+  }
   if (path === '/growth/v1/mobile/account/signout') return { ok: true } as T;
   if (path.startsWith('/draft/v1/leaderboard?')) return {
     period: 'daily', environment: 'mixed', start: today, today,
@@ -344,6 +347,9 @@ export async function requestScreenshotFixture<T>(
         if (card.id === answer.historicalId) card.name = answer.historicalName;
       }
     }
+    if (scenario.includes('image-error')) {
+      for (const card of answer.puzzle.candidates) card.image_url = 'data:image/png;base64,broken';
+    }
     next.answers = [...old.answers, answer];
     next.round = next.answers.length;
     next.revision = old.revision + 1;
@@ -360,6 +366,7 @@ export async function requestScreenshotFixture<T>(
   if (path === '/growth/v1/apple-subscriptions/mobile/status') return clone(appleStatus) as T;
   if (path === '/growth/v1/mobile/profile/me' || path === '/growth/v1/mobile/profile/a1b2c3d4e5f60718') {
     const profile = clone(careerProfile);
+    if (currentSession.accountUser?.email === 'second@packone.example') profile.player.display_name = 'SecondReviewer';
     if (scenario === 'member-new') { profile.summary.games = 0; profile.recent = []; }
     return profile as T;
   }

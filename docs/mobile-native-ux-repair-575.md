@@ -42,6 +42,8 @@ At 320 dp and Android font scale 1.5, the feedback box measured 272 × 234 dp. C
 
 Source `096fa73fdeb7de8f9672fd8f38f9a88081f24fcb`: [native run 37132614433](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/37132614433). Native compilation succeeded for Android and iOS. Android home states and the tabs → profile → Back / settings → Back journey ran. The run **failed acceptance**: labels truncated; a reserved route parameter misdirected feedback fixtures; unsigned iOS preview persistence tried to use unavailable Keychain entitlements; one play-action lookup missed its label. Corrections are in the next revision. These captures are diagnostic evidence, not approved store screenshots.
 
+Integration verification on `32232698f1613034e4b723c896a3384d1051d4bd` passed required root tests, browser tests and the full mobile suite. Integration review then found that rename detection had omitted deletion of five old root routes; `3cbae747d3d5193ad07151118d088b803b26c8ff` removes those duplicates and adds a unique-public-route contract. Its full mobile command passed locally. Native acceptance is being rerun on the final revision, including image failure/retry and explicit sign-out/account-switch journeys.
+
 The full browser gate [37132614437](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/37132614437) passed, including real computed font-size growth before the 125% screenshot. The required root test gate found a missing acceptance-script stub in the screenshot-runner harness; that test was updated without removing readiness/install failure assertions. Full mobile tests passed on the first revision; subsequent changes are being rerun.
 
 ## Intentional native differences and release gates

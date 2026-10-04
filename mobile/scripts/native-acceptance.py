@@ -255,7 +255,7 @@ if platform == 'android':
         tap('Password', exact=True)
         adb('shell', 'input', 'text', 'fixture-password')
         adb('shell', 'input', 'keyevent', '4')
-        tap('Sign in', exact=True)
+        tap('Sign in with email', exact=True)
         tap('Play or resume this run', exact=True)
         top()
         tap('Pick Hero in Training')
@@ -272,6 +272,37 @@ if platform == 'android':
         require('"method":"GET","id":"33333333-3333-4333-8333-333333333333","round":1' in after, 'Exact attempt and progress were not loaded')
         require('"method":"POST"' not in after, 'Relaunch created another shared attempt')
     attempt('shared-invitation-auth-accept-kill-relaunch', shared_journey)
+
+    def image_failure():
+        launch('member-image-error', 'feedback')
+        tap('Your Pick: Hero in Training. Open enlarged card.', exact=True)
+        xml, _ = snapshot('card-image-unavailable')
+        require('Image unavailable' in xml and 'Retry image' in xml, 'Missing image failure and retry state')
+        tap('Retry image', exact=True)
+        xml, _ = snapshot('card-image-retry')
+        require('Image unavailable' in xml, 'Deterministic broken image should remain retryable')
+        tap('Close', exact=True)
+        xml, _ = snapshot('card-image-close')
+        require('You chose' in xml, 'Closing card zoom lost the run')
+    attempt('image-failure-retry-keeps-run', image_failure)
+
+    def account_switch():
+        launch('member', 'career')
+        xml, _ = snapshot('account-a-career')
+        require('PackOneReviewer' in xml, 'Account A fixture was not loaded')
+        tap('Account settings', exact=True)
+        tap('Sign out', exact=True)
+        xml, _ = snapshot('signed-out-settings')
+        require('Sign in to Pack One' in xml and 'PackOneReviewer' not in xml, 'Sign-out retained private account details')
+        tap('Email', exact=True)
+        adb('shell', 'input', 'text', 'second@packone.example')
+        tap('Password', exact=True)
+        adb('shell', 'input', 'text', 'fixture-password')
+        adb('shell', 'input', 'keyevent', '4')
+        tap('Sign in with email', exact=True)
+        xml, _ = snapshot('account-b-career')
+        require('SecondReviewer' in xml and 'PackOneReviewer' not in xml, 'Account B retained account A profile')
+    attempt('sign-out-and-account-switch', account_switch)
 
 elif platform == 'ios':
     udid, label = sys.argv[3:5]

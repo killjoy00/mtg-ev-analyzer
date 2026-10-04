@@ -14,6 +14,8 @@ import {
   useWindowDimensions,
   type LayoutChangeEvent,
   type TextLayoutEvent,
+  type StyleProp,
+  type ViewStyle,
   View,
 } from 'react-native';
 import { Text } from '@/src/components/Text';
@@ -101,6 +103,26 @@ function Progress({ run }: { run: DraftRunState }) {
   );
 }
 
+// Keep card names and picking available when artwork is offline. Zoom supplies
+// an explicit retry without adding another action inside the pick target.
+function CardArtwork({ uri, name, style, zoom = false }: {
+  uri: string; name: string; style: StyleProp<ViewStyle>; zoom?: boolean;
+}) {
+  const [failed, setFailed] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  return <View style={[style, { backgroundColor: colors.surfaceSoft }]}>
+    {failed === uri ? <View style={styles.imageError}>
+      <Text style={styles.imageErrorText}>Image unavailable</Text>
+      {zoom ? <Pressable accessibilityRole="button" accessibilityLabel={`Retry image for ${name}`}
+        onPress={() => { setFailed(null); setAttempt(value => value + 1); }} style={styles.disclosureButton}>
+        <Text style={styles.disclosureText}>Retry image</Text>
+      </Pressable> : null}
+    </View> : <Image key={`${uri}:${attempt}`} source={uri} style={StyleSheet.absoluteFill}
+      contentFit={zoom ? 'contain' : 'cover'} cachePolicy="memory-disk" accessibilityLabel={name}
+      onError={() => setFailed(uri)} />}
+  </View>;
+}
+
 function CardTile({
   card,
   selected,
@@ -127,14 +149,7 @@ function CardTile({
       style={[styles.card, selected && styles.cardSelected]}
     >
       {card.image_url ? (
-        <Image
-          source={card.image_url}
-          style={styles.cardImage}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-          transition={120}
-          accessibilityLabel={card.name}
-        />
+        <CardArtwork key={card.image_url} uri={card.image_url} name={card.name} style={styles.cardImage} />
       ) : (
         <View style={styles.cardFallback}>
           <Text style={styles.cardFallbackText}>{card.name}</Text>
@@ -184,13 +199,7 @@ function FeedbackCard({
       >
         <Text style={styles.feedbackCardLabel}>{label}</Text>
         {card.image_url ? (
-          <Image
-            source={card.image_url}
-            style={styles.feedbackCardImage}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-            accessibilityLabel={card.name}
-          />
+          <CardArtwork key={card.image_url} uri={card.image_url} name={card.name} style={styles.feedbackCardImage} />
         ) : (
           <View style={styles.feedbackCardFallback}>
             <Text style={styles.cardFallbackText}>{card.name}</Text>
@@ -1115,13 +1124,7 @@ export default function DraftRunScreen({
           <SafeAreaView style={styles.zoomSafe}>
             <View accessibilityViewIsModal style={styles.zoomPanel}>
               {zoomedCard?.image_url ? (
-                <Image
-                  accessibilityLabel={`${zoomedCard.name} enlarged card`}
-                  cachePolicy="memory-disk"
-                  contentFit="contain"
-                  source={zoomedCard.image_url}
-                  style={styles.zoomImage}
-                />
+                <CardArtwork key={zoomedCard.image_url} uri={zoomedCard.image_url} name={`${zoomedCard.name} enlarged card`} style={styles.zoomImage} zoom />
               ) : (
                 <View style={styles.zoomFallback}>
                   <Text style={styles.zoomFallbackName}>{zoomedCard?.name}</Text>
@@ -1333,6 +1336,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   secondaryButtonText: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
+  imageError: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.sm, gap: spacing.sm },
+  imageErrorText: { color: colors.muted, fontSize: 14, lineHeight: 20, textAlign: 'center' },
   zoomSafe: {
     flex: 1,
     backgroundColor: 'rgba(16, 24, 32, 0.96)',
