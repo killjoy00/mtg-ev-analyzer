@@ -16,6 +16,7 @@ try {
   const userId='11111111-1111-4111-8111-111111111111';
   let renamedPublicUsername='Test Member',deletionFixture=null,deletionStatusFailure=false;
   let holdDeletionStatus=false,releaseDeletionStatus=null,failDeleteAfterCommit=false;
+  let holdHabitReport=true,releaseHabitReport=null;
   await page.route(/\/health\?quick=1$/,route=>route.fulfill({json:{ok:true,campaign_link_publish_configured:true}}));
   await page.route('**/v1/admin/**',async route=>{
     requests.push(route.request().url());
@@ -54,16 +55,22 @@ try {
       if(requestUrl.searchParams.get('difficulty')==='hard')await new Promise(resolve=>setTimeout(resolve,100));
       return route.fulfill({json:{puzzle:{prior_picks:[],historical_pick_id:'trophy',candidates:[{id:'trophy',name:'Trophy card',model_probability:.1},{id:'alternative',name:'Alternative card',model_probability:.5}]},choices:[{selected_id:'alternative',answers:20,average_score:95}]}});
     }
+    if(path==='/v1/admin/measurements/habits'&&holdHabitReport)await new Promise(resolve=>{releaseHabitReport=resolve;});
     if(path==='/v1/admin/measurements'&&requestUrl.searchParams.get('difficulty')==='hard')await new Promise(resolve=>setTimeout(resolve,25));
     return route.fulfill({json:fixture});
   });
   await page.reload();
   await page.getByRole('heading',{name:'How the decisions play'}).waitFor();
   await page.getByRole('heading',{name:'Daily result-share funnel'}).waitFor();
-  await page.getByRole('heading',{name:'Daily habit cohorts'}).waitFor();
+  assert.match(await page.locator('.share-funnel').innerText(),/20[\s\S]*17[\s\S]*12[\s\S]*9/);
+  await page.getByText('Loading Daily habit cohorts…',{exact:true}).waitFor();
+  assert.equal(typeof releaseHabitReport,'function','core report must render while the independent habit query is still held');
+  releaseHabitReport();releaseHabitReport=null;holdHabitReport=false;
+  await page.getByText('creator_one',{exact:true}).waitFor();
   assert.match(await page.getByText('creator_one',{exact:true}).locator('xpath=ancestor::tr').innerText(),/reddit[\s\S]*10[\s\S]*37\.5%[\s\S]*3 \/ 8 mature[\s\S]*2 immature/);
   assert.match(await page.getByRole('heading',{name:'3-in-7 daily health'}).locator('xpath=following-sibling::div[1]').innerText(),/2026-09-12[\s\S]*4/);
-  assert.match(await page.locator('.share-funnel').innerText(),/20[\s\S]*17[\s\S]*12[\s\S]*9/);
+  assert.ok(requests.some(x=>new URL(x).pathname==='/v1/admin/measurements/habits'));
+  assert.ok(requests.some(x=>new URL(x).pathname==='/v1/admin/measurements/reviews'));
   assert.match(await page.getByText('Start conversion:',{exact:false}).innerText(),/60%[\s\S]*75%/);
   await page.getByLabel('Difficulty',{exact:true}).selectOption('hard');
   const previousReviews=await page.locator('#reviews').elementHandle();
