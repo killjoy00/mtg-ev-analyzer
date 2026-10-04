@@ -172,7 +172,7 @@ test('Home refreshes loaded Daily state on focus and Pacific rollover without bl
 
     assert.equal(calls, 1);
     assert.equal(root.root.findAll(
-      (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Play Draft Run Daily',
+      (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Open Draft Run Daily',
     ).length, 1);
 
     await act(async () => {
@@ -372,7 +372,7 @@ test('successful authentication returns to Practice even when optional profile/c
     },
     'expo-router': {
       router: {
-        replace(value) { replaced.push(value); },
+        dismissTo(value) { replaced.push(value); },
         push() {},
       },
       useLocalSearchParams: () => ({ returnTo: 'practice' }),

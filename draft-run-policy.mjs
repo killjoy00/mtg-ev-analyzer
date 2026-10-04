@@ -10,6 +10,7 @@ export const runLengthForSelection=version=>isEightPickVersion(version)?DRAFT_RU
 export const earlyRoundsForSelection=version=>isEightPickVersion(version)?5:6;
 export const SELECTABLE_ONLY_SETS=new Set(policy.selectable_only_sets);
 export const REGULAR_SET_ORDER=Object.freeze(policy.regular_sets_newest_first);
+export const PRACTICE_RECENCY_HALF_LIFE=12;
 export const maxRunPick=environment=>policy.max_pick[environment==='powered-cube'?'powered-cube':'mixed'];
 export const eligibleRunPuzzle=p=>Number(p.pack_number??1)===1 && Number(p.pick_number)<=maxRunPick(p.set_id);
 export const regularRunSet=setId=>setId!=='powered-cube'&&!SELECTABLE_ONLY_SETS.has(setId);
@@ -30,9 +31,25 @@ export function dailySetWeight(setId,version=DRAFT_RUN_SELECTION_VERSION,day=gam
   return 1;
 }
 
-export function chooseRunSet(setIds,random,daily=false,version=DRAFT_RUN_SELECTION_VERSION,day=gameDateKey()) {
+// Current regular Practice keeps the same broad, distinct-set sampler but gives
+// newer releases a gentle nudge. Historical selection versions stay uniform so
+// archived/reference behavior is not silently reinterpreted.
+export function practiceSetWeight(setId,version=DRAFT_RUN_SELECTION_VERSION,day=gameDateKey(),metadata=null) {
+  if(version!==DRAFT_RUN_SELECTION_VERSION)return 1;
+  // Serving metadata can contain Live releases absent from the checked-in list.
+  // Include those dates in Practice chronology rather than giving an older set
+  // the newest-set fallback weight. Daily/historical release lists stay intact.
+  const dates={...policy.release_dates};
+  for(const s of metadata||[])if(s.status==='Live'&&s.regular_run&&s.release_date&&regularRunSet(s.set_id))dates[s.set_id]=s.release_date;
+  const ordered=Object.keys(dates).filter(id=>dates[id]<=day)
+    .sort((a,b)=>dates[b].localeCompare(dates[a])||a.localeCompare(b));
+  const rank=ordered.indexOf(setId);
+  return rank<0?1:2**(-rank/PRACTICE_RECENCY_HALF_LIFE);
+}
+
+export function chooseRunSet(setIds,random,daily=false,version=DRAFT_RUN_SELECTION_VERSION,day=gameDateKey(),metadata=null) {
   if(!setIds.length)return undefined;
-  const weights=setIds.map(s=>daily?dailySetWeight(s,version,day):1);
+  const weights=setIds.map(s=>daily?dailySetWeight(s,version,day):practiceSetWeight(s,version,day,metadata));
   let ticket=random()*weights.reduce((a,b)=>a+b,0);
   for(let i=0;i<setIds.length;i++){ticket-=weights[i];if(ticket<0)return setIds[i];}
   return setIds.at(-1);

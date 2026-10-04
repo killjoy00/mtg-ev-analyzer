@@ -18,7 +18,7 @@ function ScreenshotFixtureEntry() {
       void Linking.getInitialURL().then((url) => {
         if (url?.startsWith('packone://native-acceptance')) {
           const query = new URL(url).searchParams;
-          router.replace({ pathname: '/native-acceptance', params: { scenario: query.get('scenario') || 'member', screen: query.get('screen') || 'home' } });
+          router.replace({ pathname: '/native-acceptance', params: { scenario: query.get('scenario') || 'member', destination: query.get('destination') || 'home' } });
         } else if (url?.startsWith('packone://store-screenshot-feedback')) {
           router.replace('/store-screenshot-feedback');
         }
@@ -31,7 +31,7 @@ function ScreenshotFixtureEntry() {
 
     if (scene.startsWith('acceptance:')) {
       const [, scenario, screen] = scene.split(':');
-      router.replace({ pathname: '/native-acceptance', params: { scenario: scenario || 'member', screen: screen || 'home' } });
+      router.replace({ pathname: '/native-acceptance', params: { scenario: scenario || 'member', destination: screen || 'home' } });
     } else if (scene === 'daily-decision') {
       router.replace({ pathname: '/draft-run', params: { environment: 'mixed' } });
     } else if (scene === 'reveal-comparison') {

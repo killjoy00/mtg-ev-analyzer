@@ -60,6 +60,7 @@ function compileDraftRunScreen(mocks) {
     if (request === '@/src/components/Text') return { Text: mocks['react-native'].Text };
     if (request === '@/src/components/ScreenArea') return { ScreenArea: mocks['react-native-safe-area-context'].SafeAreaView };
 
+    if (request === '@/src/storage/session' && !mocks[request]) return { readSession: mocks['@/src/api/guest'].ensureGuestSession, subscribeSession: () => () => {} };
     if (request === '@/src/config') return { config: { screenshots: { fixtures: false } } };
     if (Object.prototype.hasOwnProperty.call(mocks, request)) return mocks[request];
     return priorLoad.call(this, request, parent, isMain);

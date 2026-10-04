@@ -4,6 +4,11 @@ import assert from 'node:assert/strict';
 import {assertRolloutReplayPolicy,rolloutDispatch,rolloutFingerprint} from '../scripts/model-rollout-request.mjs';
 
 const common={request_id:'test-request',reason:'Exercise the reviewed rollout path'};
+test('legacy game metadata repair is explicit production staging on the fixed workflow',()=>{
+ const base={...common,operation:'v5-corpus-release',target:'production',action:'stage',candidate_run_id:'37132557406',release_commit:'a'.repeat(40),repair_game_metadata:true};
+ assert.equal(rolloutDispatch(base).body.inputs.repair_game_metadata,'true');
+ for(const patch of [{target:'development'},{repair_game_metadata:'true'},{repair_game_metadata:false},{action:'activate',stage_run_id:'37164763986',bridge_commit:'b'.repeat(40)}])assert.throws(()=>rolloutDispatch({...base,...patch}));
+});
 
 test('equivalent rollout requests require an explicit replay reference',()=>{
   const prior={operation:'season-migration',request_id:'season-prod-1',reason:'First reviewed request',target:'production',commit:'a'.repeat(40)};
@@ -46,6 +51,11 @@ test('all-qualified v5 rebuild is fixed to reviewed main and accepts no source/c
   assert.deepEqual(rolloutDispatch(request),{workflow:'rebuild-v5-draft-run-corpus.yml',body:{ref:'main',inputs:{}}});
   for(const extra of [{corpus_version:'other'},{target:'production'},{ref:'branch'},{training_cap:5000}])
     assert.throws(()=>rolloutDispatch({...request,...extra}));
+});
+test('v5 finalizer recovery accepts only an exact numeric source run on the fixed workflow',()=>{
+ const request={...common,operation:'rebuild-v5',reuse_run_id:'37097278712'};
+ assert.deepEqual(rolloutDispatch(request),{workflow:'rebuild-v5-draft-run-corpus.yml',body:{ref:'main',inputs:{reuse_run_id:'37097278712'}}});
+ for(const patch of [{reuse_run_id:'latest'},{reuse_run_id:'1; echo bad'},{ref:'other'},{build_identity:'override'},{training_cap:5000}])assert.throws(()=>rolloutDispatch({...request,...patch}));
 });
 test('format research dispatch cannot select arbitrary sets, code refs or targets',()=>{
   const request={operation:'format-research',reason:'Predeclared protocol',request_id:'research-1'};
@@ -90,11 +100,14 @@ test('v5 corpus release dispatch pins exact candidate, release, stage and bridge
  const activate={...base,request_id:'v5-activate',action:'activate',stage_run_id:'37080000000',bridge_commit:'b'.repeat(40)};
  assert.deepEqual(rolloutDispatch(activate).body.inputs,{target:'development',action:'activate',candidate_run_id:'37077353281',release_commit:'a'.repeat(40),stage_run_id:'37080000000',bridge_commit:'b'.repeat(40)});
  assert.equal(rolloutDispatch({...activate,action:'rollback',target:'production'}).workflow,'release-v5-corpus.yml');
+ assert.equal(rolloutDispatch({...activate,action:'verify-active'}).body.inputs.action,'verify-active');
+ assert.equal(rolloutDispatch({...activate,action:'resume-activation'}).body.inputs.action,'resume-activation');
  for(const bad of [
    {...base,candidate_run_id:'latest'},
    {...base,release_commit:'main'},
    {...base,target:'other'},
    {...base,action:'activate'},
+   {...base,action:'resume-activation'},
    {...base,stage_run_id:'37080000000'},
    {...activate,stage_run_id:'bad'},
    {...activate,bridge_commit:'main'},

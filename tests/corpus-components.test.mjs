@@ -39,7 +39,7 @@ test('Traditional source revisions map to exactly one grader version',()=>{
 test('v5 components require their separate parent and preserve the Cube serving window',()=>{
  const p={...v4Candidate(),corpus_version:v5Component,model_version:v5Model,parent_corpus_version:v5Parent};
  assert.equal(validateDraftRunPuzzle(p,v5Component),true);
- assert.equal(validateDraftRunPuzzle({...p,parent_corpus_version:DRAFT_RUN_CORPUS_VERSION},v5Component),false);
+ assert.equal(validateDraftRunPuzzle({...p,parent_corpus_version:modelVersions.v4.corpus_version},v5Component),false);
  assert.equal(validateDraftRunPuzzle({...p,model_version:v4Model},v5Component),false);
  const cube=JSON.parse(gunzipSync(fs.readFileSync(new URL('../corpus/draft-run/powered-cube.json.gz',import.meta.url))));
  for(const source of cube.filter(row=>row.pick_number<=9)) {

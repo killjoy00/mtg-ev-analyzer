@@ -1,5 +1,50 @@
 # Uncapped v5 rollout — issue #889
 
+## October 3 finalizer recovery
+
+Run `37097278712` at `388d9ab045240e0d96a4b1382f140e35fc91d0b4`
+successfully built all 30 active environments. MID/VOW remain intentionally
+retired. Finalization assembled the candidate and QA, then failed three tests.
+The MSH audit and v5 component negative-parent assertion referred to v4 sample
+details. The revised audit checks the actual big-disagreement scoring category;
+the negative component assertion explicitly uses immutable v8.
+
+The Cube failure was a real session exclusion gap. At `cube-22`, round 1, the
+first replacement `d4e96322d884d6805decda0fcbf86c91` could only reroll to a source
+already used in round 5. The old assembly check excluded only the original and
+first replacement. Gameplay excludes all eight original source drafts.
+
+V5 final assembly now uses the runtime eligibility, difficulty and distance
+functions to prune unsafe Cube baseline decisions. Each retained decision has
+at least nine distinct eligible first-replacement sources; every possible first
+replacement has at least eight second-replacement sources, excluding the
+original and first sources and preserving the original difficulty anchor.
+Any seven other run sources therefore leave two first choices and at least one
+second choice. The check considers all candidates because exclusions can alter
+the closest 20. It also preserves each round's medium/hard availability.
+
+On the exact saved Cube artifact, this retains 722 of 781 baseline decisions,
+including 416 currently selectable decisions. All retained payloads are
+unchanged. The complete 13,673-puzzle Premier trophy snapshot, Traditional
+artifacts, replay selection, training and historical v8 remain unchanged.
+The exact preflight report is `results/v5-recovery/cube-session-preflight.json`;
+1,000 seeds passed 16,000 chained runtime rerolls with original anchors.
+
+The reviewed `rebuild-v5` request accepts an optional numeric `reuse_run_id`.
+Recovery verifies the source was the main v5 workflow, every expected environment
+job succeeded, all 30 matching artifacts remain available, and the source
+commit's computed build identity equals the current one. It refuses code/input
+identity changes rather than relabeling checkpoints. All environment phase
+hashes, assembly, QA, normal tests, loaders and R2 verification still run.
+
+For this recovery the environment build identity remains
+`ccd0012b4733ca94b37baa68636dee0be60b7ee2bf5b572ff4fe8e2a27e2601e`.
+No Python training/build script changed. The candidate separately records the
+original environment run/commit and the reviewed finalizer run/commit. Cube
+admission evidence is checksum-bound to the candidate and reverified before
+staging. A successful recovered candidate must still complete the development
+and production release procedure below.
+
 The proposed model is `strong-player-colour-stage-v5`, with corpus
 `elite-trophy-colour-stage-v9`. V5 inherits the v4 architecture; its sole intended
 model change removes the 5,000 behavior/co-pick training draft cap. “All drafts”

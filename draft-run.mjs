@@ -18,7 +18,7 @@ export const DRAFT_RUN_SCORING_VERSION = 'trophy-consensus-v3';
 // scripts/set_policy.py reads this value rather than copying it, and a test
 // refuses any stale literal elsewhere - a half-landed bump is what lets the
 // importer reuse old payloads under a new label and ship two models as one.
-export const DRAFT_RUN_CORPUS_VERSION = 'elite-trophy-colour-stage-v8';
+export const DRAFT_RUN_CORPUS_VERSION = 'elite-trophy-colour-stage-v9';
 export const V5_CORPUS_VERSION = modelVersions.v5.corpus_version;
 export const V5_CONTEXT_MODEL_VERSION = 'strong-player-colour-stage-v5';
 // Pooled validation fitted 2.0 for the old pair model and 1.75 for the
@@ -270,9 +270,9 @@ export function selectDraftRun(pool, seed, environment = 'mixed', {daily=false,d
       const different = available.filter(p => p.set_id !== selected.at(-1)?.set_id);
       if (different.length) available = different;
     }
-    // Equal chance per environment: large sets must not crowd out small sets.
+    // Set weights are independent of corpus size; large sets cannot crowd out small sets.
     const setIds = [...new Set(available.map(p => p.set_id))].sort();
-    const setId = chooseRunSet(setIds,random,daily,selectionVersion,day);
+    const setId = chooseRunSet(setIds,random,daily,selectionVersion,day,metadata);
     available = available.filter(p => p.set_id === setId);
     if (!available.length) throw new Error('Not enough verified puzzles for a balanced run.');
     const chosen = available[Math.floor(random() * available.length)];

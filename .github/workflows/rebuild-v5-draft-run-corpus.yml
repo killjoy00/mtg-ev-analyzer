@@ -2,6 +2,12 @@ name: rebuild-v5-draft-run-corpus
 
 on:
   workflow_dispatch:
+    inputs:
+      reuse_run_id:
+        description: 'Completed main rebuild whose 30 successful environments have the identical build identity'
+        required: false
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -10,7 +16,7 @@ permissions:
 
 concurrency:
   group: set-data-import-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 env:
   PYTHONPATH: scripts:.
@@ -28,8 +34,12 @@ jobs:
     outputs:
       matrix: ${{ steps.plan.outputs.matrix }}
       build_id: ${{ steps.plan.outputs.build_id }}
+      environment_run_id: ${{ steps.origin.outputs.environment_run_id }}
+      environment_commit: ${{ steps.origin.outputs.environment_commit }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -60,11 +70,40 @@ jobs:
               output.write('matrix='+json.dumps(matrix,separators=(',',':'))+'\n')
               output.write('build_id='+identity()+'\n')
           PY
+      - name: Verify exact environment provenance before reusing completed work
+        id: origin
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V5_BUILD_ID: ${{ steps.plan.outputs.build_id }}
+          REUSE_RUN_ID: ${{ inputs.reuse_run_id }}
+        run: node scripts/verify-v5-rebuild-reuse.mjs "$REUSE_RUN_ID"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v5-environment-origin
+          path: generated/v5-environment-origin.json
+          if-no-files-found: error
       - name: Hydrate historical replay shards for the normal repository suite
         run: bash scripts/r2_replay_shards.sh hydrate
       - run: npm test
+      - name: Check Python fixtures against the future serving version before expensive work
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import sys
+          from scripts.set_policy import set_corpus_version
+          from scripts.model_training import V5_CORPUS
+          path=Path('draft-run.mjs')
+          original=path.read_bytes()
+          try:
+              set_corpus_version(V5_CORPUS)
+              subprocess.run([sys.executable,'-m','unittest','discover','-s','tests','-p','test_*.py'],check=True)
+          finally:
+              path.write_bytes(original)
+          PY
 
   environments:
+    if: inputs.reuse_run_id == ''
     name: v5 ${{ matrix.set }}
     needs: prepare
     runs-on: ubuntu-latest
@@ -126,11 +165,14 @@ jobs:
   finalize:
     name: Assemble, validate, publish exact candidate, open rollout PR
     needs: [prepare, environments]
+    if: ${{ always() && needs.prepare.result == 'success' && (needs.environments.result == 'success' || needs.environments.result == 'skipped') }}
     runs-on: ubuntu-latest
     timeout-minutes: 180
     env:
       V5_BUILD_ID: ${{ needs.prepare.outputs.build_id }}
       GH_TOKEN: ${{ github.token }}
+      V5_ENVIRONMENT_RUN_ID: ${{ needs.prepare.outputs.environment_run_id }}
+      V5_ENVIRONMENT_COMMIT: ${{ needs.prepare.outputs.environment_commit }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -143,8 +185,14 @@ jobs:
           node-version: 24
       - uses: actions/download-artifact@v4
         with:
+          github-token: ${{ github.token }}
+          run-id: ${{ needs.prepare.outputs.environment_run_id }}
           pattern: v5-environment-*
           path: generated/v5-downloads
+      - uses: actions/download-artifact@v4
+        with:
+          name: v5-environment-origin
+          path: generated
       - uses: actions/download-artifact@v4
         with:
           github-token: ${{ github.token }}
@@ -159,9 +207,13 @@ jobs:
           root=Path('generated/v5-build')
           root.mkdir(parents=True,exist_ok=True)
           for p in Path('generated/v5-downloads').glob('v5-environment-*'):
+              if not (p/'summary.json').exists():
+                  continue
               shutil.copytree(p,root/p.name.removeprefix('v5-environment-'),dirs_exist_ok=True)
           PY
           python scripts/v5_rebuild.py assemble
+      - name: Prove Cube rerolls under complete session source exclusions
+        run: node scripts/v5-cube-reroll-admission.mjs
       - name: Generate post-build v4 to v5 implementation QA
         run: python scripts/v5_rebuild_qa.py --baseline generated/v5-production-baseline
       - name: Validate corpus accounting, source trajectories, models and Traditional gates
@@ -172,28 +224,36 @@ jobs:
           npm test
       - name: Verify every new replay byte against versioned R2
         run: |
+          export REPLAY_MODEL_VERSION=strong-player-colour-stage-v5
+          REPLAY_SETS="$(python -c 'import json; print(",".join(s["id"] for s in json.load(open("data/catalog.json"))["sets"]))')"
+          export REPLAY_SETS
           bash scripts/r2_replay_shards.sh verify
           mkdir -p generated/v5-r2-readback
           aws s3 sync "s3://$R2_BUCKET/replay-models/strong-player-colour-stage-v5/data/" generated/v5-r2-readback --endpoint-url "$R2_ENDPOINT" --exclude '*' --include '*/shards/*.json'
           python - <<'PY'
+          import json
           from pathlib import Path
           from scripts.v5_rebuild import sha
-          for local in Path('data').glob('*/shards/*.json'):
-              remote=Path('generated/v5-r2-readback')/local.relative_to('data')
-              if not remote.exists() or sha(local)!=sha(remote):
-                  raise SystemExit(f'R2 byte mismatch: {local}')
+          for entry in json.loads(Path('data/catalog.json').read_text())['sets']:
+              for local in (Path('data')/entry['id']/'shards').glob('*.json'):
+                  remote=Path('generated/v5-r2-readback')/local.relative_to('data')
+                  if not remote.exists() or sha(local)!=sha(remote):
+                      raise SystemExit(f'R2 byte mismatch: {local}')
           PY
       - name: Preserve exact validated artifacts and reviewed QA
         run: |
           set -euo pipefail
           mkdir -p results/v5-rebuild
-          cp generated/v5-rebuild-accounting.json generated/v5-rebuild-qa.json generated/V5-REBUILD-QA.md generated/v5-traditional-health.json results/v5-rebuild/
+          cp generated/v5-rebuild-accounting.json generated/v5-rebuild-qa.json generated/V5-REBUILD-QA.md generated/v5-traditional-health.json generated/v5-cube-reroll-admission.json generated/v5-environment-origin.json results/v5-rebuild/
           python - <<'PY'
           import os
           from pathlib import Path
-          from scripts.v5_rebuild import phase_files, write
+          from scripts.v5_rebuild import phase_files, write, sha
           write('generated/v5-artifact-identity.json',{'run_id':os.environ['GITHUB_RUN_ID'],
               'commit':os.environ['GITHUB_SHA'],'build_identity':os.environ['V5_BUILD_ID'],
+              'environment_run_id':os.environ['V5_ENVIRONMENT_RUN_ID'],
+              'environment_commit':os.environ['V5_ENVIRONMENT_COMMIT'],
+              'cube_admission_sha256':sha(Path('generated/v5-cube-reroll-admission.json')),
               'premier_files':phase_files(Path('generated/v5-trophy-import')),
               'traditional_files':phase_files(Path('generated/v5-traditional'))})
           PY
@@ -210,6 +270,8 @@ jobs:
             generated/v5-rebuild-accounting.json
             generated/v5-rebuild-qa.json
             generated/V5-REBUILD-QA.md
+            generated/v5-cube-reroll-admission.json
+            generated/v5-environment-origin.json
       - name: Open or update the generated-data rollout PR without switching serving
         run: |
           set -euo pipefail
@@ -222,6 +284,8 @@ jobs:
           from scripts.v5_rebuild import write
           write('research/v5-validated-release.json',{'run_id':os.environ['GITHUB_RUN_ID'],
               'commit':os.environ['GITHUB_SHA'],'build_identity':os.environ['V5_BUILD_ID'],
+              'environment_run_id':os.environ['V5_ENVIRONMENT_RUN_ID'],
+              'environment_commit':os.environ['V5_ENVIRONMENT_COMMIT'],
               'corpus_version':'elite-trophy-colour-stage-v9','model_version':'strong-player-colour-stage-v5'})
           PY
           git add data corpus/draft-run draft-run.mjs results/v5-rebuild research/v5-validated-release.json

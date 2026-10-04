@@ -71,6 +71,7 @@ jobs:
       EXPO_PUBLIC_PACKONE_ENV: preview
       EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES: '1'
       PACKONE_BUILD_PROFILE: preview
+      ACCEPTANCE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     defaults:
       run:
         working-directory: mobile
@@ -218,6 +219,7 @@ jobs:
       EXPO_PUBLIC_PACKONE_ENV: preview
       EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES: '1'
       PACKONE_BUILD_PROFILE: preview
+      ACCEPTANCE_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
     defaults:
       run:
         working-directory: mobile
@@ -255,7 +257,7 @@ jobs:
         run: npx expo prebuild --platform android --clean
       - name: Build installable preview APK
         working-directory: mobile/android
-        run: ./gradlew :app:assembleRelease --no-daemon
+        run: ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures=x86_64
       - name: Locate preview APK
         shell: bash
         run: |

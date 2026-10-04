@@ -11,6 +11,10 @@ Status vocabulary:
 - **Policy decision open** — code intentionally does not claim storefront approval.
 - **Release evidence open** — implementation exists but required device/signing/live-host evidence is still missing.
 
+## October 4 native repair — acceptance still open
+
+PR #910 addresses the original owner complaints, which were not completed by #890. See [the complaint/evidence ledger](mobile-native-ux-repair-575.md). Existing “Implemented” rows below describe source capability; they do not override failed physical observations or certify the old distributed binaries. The revised navigation, Daily, Learn and feedback require the new native capture and tester-build evidence recorded in that ledger.
+
 ## October 2, 2026 UAT parity candidate
 
 Branch `codex/uat-auth-profile-parity-20261002` carries the Pack One acceptance changes below. These rows track source/automated status separately from physical-device acceptance so no item can be silently treated as complete.

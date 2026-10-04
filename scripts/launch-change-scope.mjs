@@ -7,6 +7,8 @@ const LOAD_SENSITIVE_PATHS=[
   path=>path==='worker/draft-run-function.mjs',
   path=>path==='worker/draft-run-selection.mjs',
   path=>path==='migrations/0045_batched_practice_selector.sql',
+  path=>path==='migrations/0050_practice_recency_bias.sql',
+  path=>path==='migrations/0051_exact_pick_draw_index.sql',
   path=>path==='scripts/edge-control.mjs',
 ];
 

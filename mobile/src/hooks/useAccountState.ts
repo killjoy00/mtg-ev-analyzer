@@ -41,6 +41,7 @@ export function useAccountState({
   const [enrichmentWarning, setEnrichmentWarning] = useState<string | null>(null);
   const generation = useRef(0);
   const owner = useRef('');
+  const focused = useRef(false);
 
   const clearEnrichment = useCallback(() => {
     setProfile(null);
@@ -86,7 +87,7 @@ export function useAccountState({
     if (!current.accountToken) {
       setAccount(null);
       clearEnrichment();
-      if (requireAccount) router.replace('/account');
+      if (requireAccount && focused.current) router.replace('/account');
       return null;
     }
     try {
@@ -105,7 +106,7 @@ export function useAccountState({
         setAccount(null);
         clearEnrichment();
         setMessage('Your account session expired. Sign in again.');
-        if (requireAccount) router.replace('/account');
+        if (requireAccount && focused.current) router.replace('/account');
         return null;
       }
       clearEnrichment();
@@ -158,8 +159,9 @@ export function useAccountState({
   }, []);
 
   useFocusEffect(useCallback(() => {
+    focused.current = true;
     void refresh();
-    return () => { generation.current += 1; };
+    return () => { focused.current = false; generation.current += 1; };
   }, [refresh]));
 
   useEffect(() => subscribeSession((next) => {

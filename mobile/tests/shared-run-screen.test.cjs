@@ -128,6 +128,7 @@ async function fixture(options = {}) {
     'expo-image': { Image },
     'expo-router': {
       router: {
+        dismissTo(value) { this.replace(value); },
         push(value) {
           calls.push(['push', value]);
           if (value.pathname === '/account' || value === '/account') {
@@ -142,7 +143,7 @@ async function fixture(options = {}) {
           root.update(React.createElement(TestApp));
         },
       },
-      useLocalSearchParams: () => params,
+      useLocalSearchParams: () => accountVisible ? { returnTo: 'shared', shared: params.shared } : params,
       useFocusEffect(callback) {
         React.useEffect(() => {
           const entry = { callback, cleanup: callback() };

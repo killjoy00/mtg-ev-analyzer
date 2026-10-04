@@ -52,6 +52,7 @@ function compileScreen(mocks) {
     if (request === '@/src/components/Text') return { Text: mocks['react-native'].Text };
     if (request === '@/src/components/ScreenArea') return { ScreenArea: mocks['react-native-safe-area-context'].SafeAreaView };
 
+    if (request === '@/src/storage/session' && !mocks[request]) return { readSession: mocks['@/src/api/guest'].ensureGuestSession, subscribeSession: () => () => {} };
     if (request === '@/src/config') return { config: { screenshots: { fixtures: false } } };
     if (Object.prototype.hasOwnProperty.call(mocks, request)) return mocks[request];
     return originalLoad.call(this, request, parent, isMain);
@@ -117,10 +118,11 @@ async function flush() {
 
 async function fixture(options = {}) {
   let params = options.params ?? { environment: 'mixed' };
-  const session = {
+  let session = {
     playerToken: `p1_11111111-1111-4111-8111-111111111111.${'A'.repeat(43)}`,
     accountToken: 'B'.repeat(43),
   };
+  const sessionListeners = new Set();
   const Image = host('Image');
   Image.prefetch = async () => {};
   const mocks = {
@@ -142,6 +144,7 @@ async function fixture(options = {}) {
     },
     'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
     '@/src/api/guest': { ensureGuestSession: async () => session },
+    '@/src/storage/session': { readSession: async () => session, subscribeSession: callback => { sessionListeners.add(callback); return () => sessionListeners.delete(callback); } },
     '@/src/api/draftRun': {
       createDraftRunShare: async () => ({ id: 'a'.repeat(24) }),
       DAILY_ENVIRONMENT_META: {
@@ -178,6 +181,7 @@ async function fixture(options = {}) {
   });
   return {
     root,
+    async switchAccount() { await act(async () => { session = { ...session, accountToken: 'C'.repeat(43) }; for (const callback of sessionListeners) callback(session); await flush(); }); },
     text: () => renderedText(root.toJSON()),
     async chooseAndConfirm() {
       const pick = root.root.findAll((node) => (
@@ -331,4 +335,18 @@ test('TCGplayer helper rejects blank names and preserves the approved nested car
     compiled.exports.tcgplayerUrl('Black Lotus & Co'),
     'https://partner.tcgplayer.com/c/7742974/1780961/21018?u=https%3A%2F%2Fwww.tcgplayer.com%2Fsearch%2Fmagic%2Fproduct%3Fq%3DBlack%2520Lotus%2520%2526%2520Co%26view%3Dgrid',
   );
+});
+
+
+test('account switching invalidates mounted gameplay and discards a delayed pick', async () => {
+  const pending = deferred();
+  const screen = await fixture({ submitPick: () => pending.promise });
+  try {
+    await screen.chooseAndConfirm();
+    await screen.switchAccount();
+    assert.match(screen.text(), /Your account changed/);
+    await act(async () => { pending.resolve({ ...runZero(), revision: 5, round: 1, answers: [answer(0, 'a', 88)], current: puzzle(1) }); await flush(); });
+    assert.doesNotMatch(screen.text(), /You chose/);
+    assert.match(screen.text(), /Your account changed/);
+  } finally { await screen.close(); }
 });

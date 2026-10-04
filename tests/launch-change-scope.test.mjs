@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {adminOnlyGatewayPatch,classifyLaunchChange} from '../scripts/launch-change-scope.mjs';
 
 const patch=lines=>[
@@ -44,6 +45,7 @@ test('capacity-sensitive application and harness paths always require the load r
     'worker/draft-run-selection.mjs',
     'worker/draft-start-timing.mjs',
     'migrations/0045_batched_practice_selector.sql',
+    'migrations/0050_practice_recency_bias.sql',
     'scripts/edge-control.mjs',
     'scripts/launch-distributed-run.mjs',
     'scripts/launch-distributed-policy.json',
@@ -61,4 +63,31 @@ test('workflow, classifier and test-only changes stay on fast regression coverag
 
 test('missing gateway diff evidence fails safe into the full rehearsal',()=>{
   assert.deepEqual(classifyLaunchChange({files:['edge/gateway.mjs'],gatewayPatch:''}),{runLoad:true,reason:'shared_or_gameplay_gateway'});
+});
+
+
+test('production-like load harnesses replay current serving schema before verification',()=>{
+  for(const path of ['.github/workflows/launch-load.yml','.github/workflows/launch-distributed.yml']){
+    const workflow=fs.readFileSync(path,'utf8');
+    const i42=workflow.indexOf('migrations/0042_serving_revision_snapshot_staging.sql');
+    const i43=workflow.indexOf('migrations/0043_corpus_activation_readiness.sql');
+    const i44=workflow.indexOf('migrations/0044_snapshot_scoped_puzzle_uniqueness.sql');
+    const i48=workflow.indexOf('migrations/0048_uncapped_v5_components.sql');
+    const i49=workflow.indexOf('migrations/0049_cross_version_corpus_cutover.sql');
+    const verify=workflow.indexOf('node scripts/verify-neon-schema.mjs');
+    assert.ok(i42>=0&&i43>i42&&i44>i43&&i48>i44&&i49>i48&&verify>i49,path);
+  }
+});
+
+
+test('production-like load harnesses warm readiness before fixture generation',()=>{
+  for(const path of ['.github/workflows/launch-load.yml','.github/workflows/launch-distributed.yml']){
+    const workflow=fs.readFileSync(path,'utf8');
+    const verify=workflow.indexOf('node scripts/verify-neon-schema.mjs');
+    const warm=workflow.indexOf('node scripts/warm-practice-cache.mjs');
+    const fixture=workflow.indexOf('launch-load-fixtures.mjs')>=0
+      ?workflow.indexOf('launch-load-fixtures.mjs')
+      :workflow.indexOf('launch-distributed-fixtures.mjs');
+    assert.ok(verify>=0&&warm>verify&&fixture>warm,path);
+  }
 });

@@ -38,7 +38,7 @@ export function SharedRunRecovery() {
   return <View style={styles.panel}>
     <Text style={styles.title}>Shared activity</Text>
     <Text style={styles.body}>{state.kind === 'ready'
-      ? 'Saved on this device for your account. Your full shared-run record is in My Pack One.'
+      ? 'Saved on this device for your account. Visit My Pack One for your account activity.'
       : state.kind === 'empty' ? 'No shared run is saved for this account on this device. Open a friend’s invitation to play.'
         : state.kind === 'checking' ? 'Checking this device’s saved shared run…'
           : 'Could not check your saved shared run. Your checkpoint is retained; retry to reopen the same attempt.'}</Text>

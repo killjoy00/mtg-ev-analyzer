@@ -24,6 +24,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: backend-gate-pr-${{ github.event.pull_request.number }}
@@ -179,7 +180,7 @@ jobs:
           release_backlog=(migrations/0037_mobile_oauth_handoffs.sql migrations/0038_mobile_practice_idempotency.sql migrations/0039_practice_serving_cache.sql migrations/0040_mobile_minimum_version.sql migrations/0040_practice_reroll_index.sql migrations/0041_corpus_source_snapshots.sql migrations/0041_apple_auth.sql migrations/0042_serving_revision_snapshot_staging.sql migrations/0043_corpus_activation_readiness.sql migrations/0044_snapshot_scoped_puzzle_uniqueness.sql migrations/0045_apple_subscriptions.sql migrations/0046_public_identity_safety.sql migrations/0047_admin_user_account_controls.sql)
           mapfile -t pending < <(
             {
-              for migration in "${release_backlog[@]}" migrations/0048_uncapped_v5_components.sql migrations/0049_cross_version_corpus_cutover.sql; do
+              for migration in "${release_backlog[@]}" migrations/0048_uncapped_v5_components.sql migrations/0049_cross_version_corpus_cutover.sql migrations/0050_practice_recency_bias.sql migrations/0051_exact_pick_draw_index.sql; do
                 [[ -f "$migration" ]] && printf '%s\n' "$migration"
               done
               printf '%s\n' "${migration_changes[@]}" | awk -F '\t' '$1 == "A" { print $2 }'
@@ -188,11 +189,50 @@ jobs:
           if (( ${#pending[@]} == 0 )); then
             echo 'No pending migrations in this PR.'
           else
-            for migration in "${pending[@]}" migrations/0048_uncapped_v5_components.sql migrations/0049_cross_version_corpus_cutover.sql; do
+            for migration in "${pending[@]}"; do
               echo "Applying $migration"
               psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
             done
           fi
+
+      - name: Resolve accepted v5 fixtures for custom Practice domains
+        id: v5_fixture
+        if: matrix.domain == 'corpus' || matrix.domain == 'subscriptions'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          import {DRAFT_RUN_CORPUS_VERSION,V5_CORPUS_VERSION} from './draft-run.mjs';
+          import {corpusDatabase} from './scripts/neon-corpus-db.mjs';
+          if(DRAFT_RUN_CORPUS_VERSION===V5_CORPUS_VERSION) {
+            const query=corpusDatabase(process.env.PACK1_CI_CONNECTION);
+            const active=(await query(`SELECT count(*)::int n FROM draft_run_environment_policy p
+              JOIN corpus_source_snapshots s ON s.source_snapshot_id=p.active_snapshot_id
+              WHERE p.set_id IN ('blb','hob','msh','neo') AND p.status='Live'
+                AND s.corpus_version=$1 AND s.lifecycle_status='Approved'`,[V5_CORPUS_VERSION])).rows[0];
+            if(Number(active.n)===4)process.exit(0); // deployed v5 clones already have complete fixtures
+            const release=JSON.parse(fs.readFileSync('research/v5-validated-release.json'));
+            const id=String(release.run_id);
+            if(!/^[1-9][0-9]{4,20}$/.test(id))throw Error('Invalid accepted candidate run');
+            const response=await fetch(`https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}/actions/runs/${id}`,{
+              headers:{authorization:`Bearer ${process.env.GH_TOKEN}`,accept:'application/vnd.github+json'},signal:AbortSignal.timeout(30000)});
+            if(!response.ok)throw Error('Cannot verify candidate workflow');
+            const run=await response.json();
+            if(run.conclusion!=='success'||run.head_branch!=='main'||run.event!=='workflow_dispatch'||
+              run.path!=='.github/workflows/rebuild-v5-draft-run-corpus.yml'||run.head_sha!==release.commit)
+              throw Error('Fixture must come from the exact successful main candidate');
+            fs.appendFileSync(process.env.GITHUB_OUTPUT,`run_id=${id}\n`);
+          }
+          NODE
+
+      - uses: actions/download-artifact@v4
+        if: steps.v5_fixture.outputs.run_id != ''
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.v5_fixture.outputs.run_id }}
+          name: validated-v5-candidate-${{ steps.v5_fixture.outputs.run_id }}
+          path: generated/v5-ci-candidate
 
       - name: Run isolated backend domain
         shell: bash
@@ -200,6 +240,7 @@ jobs:
           PACK1_CI_BRANCH_ID: ${{ steps.neon.outputs.branch_id }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           BACKEND_DOMAIN: ${{ matrix.domain }}
+          V5_FIXTURE_RUN_ID: ${{ steps.v5_fixture.outputs.run_id }}
         run: |
           set -euo pipefail
           connection="$(cat "$PACK1_CI_CONNECTION")"
@@ -211,10 +252,29 @@ jobs:
 
           # A corpus bump (or loader/import change) must still prove that the
           # checked-in corpus can be loaded before production serves it.
-          if git diff --quiet "$STACK_BASE_SHA" "$HEAD_SHA" -- 'corpus/draft-run/**' scripts/load_verified_draft_run.mjs worker/trophy-import.mjs; then
-            echo 'No corpus or loader/import changes; using the cloned production corpus.'
+          # During a staged rollout main can already be v9 while production is
+          # still v8. An unchanged Git diff does not make that clone current.
+          current_baseline=$(node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          import {corpusDatabase} from './scripts/neon-corpus-db.mjs';
+          const catalog=JSON.parse(fs.readFileSync('corpus/draft-run/catalog.json','utf8'));
+          const query=corpusDatabase(process.env.PACK1_CI_CONNECTION);
+          const rows=(await query(`SELECT v.set_id,v.manifest->>'sha256' checksum,s.corpus_version active_version
+            FROM corpus_set_versions v
+            LEFT JOIN draft_run_environment_policy p ON p.set_id=v.set_id
+            LEFT JOIN corpus_source_snapshots s ON s.source_snapshot_id=p.active_snapshot_id
+            WHERE v.corpus_version=$1`,[catalog.corpus_version])).rows;
+          console.log(catalog.sets.every(set=>rows.some(row=>row.set_id===set.id
+            &&row.checksum===set.sha256&&row.active_version===catalog.corpus_version)));
+          NODE
+          )
+          if [[ "$current_baseline" == true ]] && git diff --quiet "$STACK_BASE_SHA" "$HEAD_SHA" -- 'corpus/draft-run/**' scripts/load_verified_draft_run.mjs worker/trophy-import.mjs; then
+            echo 'Current baseline and active corpus already match; using the cloned production corpus.'
           else
             node scripts/load_verified_draft_run.mjs "$PACK1_CI_CONNECTION"
+          fi
+          if [[ -n "$V5_FIXTURE_RUN_ID" ]]; then
+            node tests/v5-backend-corpus-fixture.mjs "$PACK1_CI_CONNECTION" generated/v5-ci-candidate --dev-fixtures
           fi
 
           mapfile -t targeted_suites < <(

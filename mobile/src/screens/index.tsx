@@ -192,7 +192,7 @@ export default function HomeScreen() {
               <Pressable
                 key={environment}
                 accessibilityRole="button"
-                accessibilityLabel={`${isComplete ? 'View' : 'Play'} ${meta.title} Daily`}
+                accessibilityLabel={`${isComplete ? 'View' : currentStatus ? 'Play' : 'Open'} ${meta.title} Daily`}
                 onPress={() => router.push({ pathname: '/draft-run', params: { environment } })}
                 style={({ pressed }) => [
                   index === 0 && !isComplete ? styles.primaryCard : styles.dailyCard,
@@ -206,7 +206,7 @@ export default function HomeScreen() {
                 </View>
                 <Text style={index === 0 && !isComplete ? styles.cardTitle : styles.dailyTitle}>{meta.title}</Text>
                 <Text style={styles.cardBody}>{isComplete ? `Complete · ${result?.score}/100` : meta.description}</Text>
-                <Text style={styles.cardAction}>{isComplete ? 'View result →' : 'Play now →'}</Text>
+                <Text style={styles.cardAction}>{isComplete ? 'View result →' : currentStatus ? 'Play now →' : 'Open Daily →'}</Text>
                 {startHere ? <Text style={styles.statusText}>Free · No account required</Text> : null}
               </Pressable>
             );
@@ -270,10 +270,10 @@ const styles = StyleSheet.create({
   brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   helpLink: { minHeight: 44, justifyContent: 'center' },
   guestLinks: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg },
-  statusStrip: { padding: spacing.md, backgroundColor: colors.accentSoft, gap: spacing.xs },
+  statusStrip: { padding: spacing.md, backgroundColor: colors.accentSoft, flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.md, rowGap: spacing.xs },
   statusText: { color: colors.muted, fontSize: 14, lineHeight: 20 },
   safe: { flex: 1, backgroundColor: colors.page },
-  page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.xl, alignSelf: 'center', width: '100%', maxWidth: 860 },
+  page: { padding: 20, paddingBottom: spacing.xxl, gap: spacing.md, alignSelf: 'center', width: '100%', maxWidth: 860 },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   brandMark: {
     width: 36,
@@ -287,10 +287,10 @@ const styles = StyleSheet.create({
   brandMarkText: { color: colors.accentDark, fontSize: 18, fontWeight: '800' },
   brandName: { color: colors.ink, fontSize: 26, fontWeight: '800' },
   removedBrandSub: { color: colors.muted, fontSize: 9, fontWeight: '800', letterSpacing: 1.2, marginTop: 2 },
-  hero: { gap: spacing.sm, paddingTop: spacing.lg },
+  hero: { gap: spacing.sm, paddingTop: spacing.sm },
   eyebrow: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
-  title: { color: colors.ink, fontSize: 42, lineHeight: 44, fontWeight: '800', letterSpacing: -1.2 },
-  lede: { color: colors.muted, fontSize: 17, lineHeight: 26, maxWidth: 640 },
+  title: { color: colors.ink, fontSize: 38, lineHeight: 40, fontWeight: '800', letterSpacing: -1.2 },
+  lede: { color: colors.muted, fontSize: 16, lineHeight: 23, maxWidth: 640 },
   today: { color: colors.muted, fontSize: 13, fontWeight: '800' },
   dailySection: { gap: spacing.md },
   sectionLabel: { color: colors.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1.3 },
@@ -333,7 +333,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.sm,
   },
-  resetCue: { color: colors.accentDark, fontSize: 13, fontWeight: '800' },
+  resetCue: { width: '100%', color: colors.accentDark, fontSize: 13, fontWeight: '800' },
   affiliatePromo: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.md, gap: spacing.xs },
   affiliateLink: { minHeight: 72, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.md },
   affiliateLogo: { width: 92, height: 42 },

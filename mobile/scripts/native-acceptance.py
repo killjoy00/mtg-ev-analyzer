@@ -17,8 +17,9 @@ platform, out_arg = sys.argv[1:3]
 out = Path(out_arg)
 out.mkdir(parents=True, exist_ok=True)
 manifest = {'source_sha': os.environ.get('ACCEPTANCE_SOURCE_SHA', os.environ.get('GITHUB_SHA')),
+            'tested_checkout_sha': subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip(),
             'platform': platform, 'backend': 'isolated persistent preview fixtures',
-            'physical_device': False, 'scenes': [], 'journeys': [], 'failures': []}
+    'physical_device': False, 'scenes': [], 'journeys': [], 'failures': []}
 
 
 def command(*args, check=True):
@@ -103,7 +104,7 @@ def launch(scenario, screen='home', width=390, scale=1, landscape=False):
     adb('shell', 'settings', 'put', 'system', 'font_scale', str(scale))
     adb('logcat', '-c')
     # Quote the entire URI for Android's remote shell (& separates commands).
-    url = f'packone://native-acceptance?scenario={scenario}&screen={screen}'
+    url = f'packone://native-acceptance?scenario={scenario}&destination={screen}'
     adb('shell', f"am start -W -a android.intent.action.VIEW -d '{url}' -p '{PACKAGE}'")
     time.sleep(12)
 
@@ -220,9 +221,57 @@ if platform == 'android':
         require('My Pack One' in xml, 'Settings Back did not restore member dashboard')
     attempt('member-tabs-profile-settings-and-hardware-back', member_navigation)
 
+    def practice_journey():
+        launch('member', 'practice')
+        tap('Start regular Draft Run practice')
+        for pick in range(8):
+            top()
+            tap('Pick Hero in Training')
+            tap('Confirm pick', exact=True)
+            tap('See result' if pick == 7 else 'Next pick', exact=True)
+        snapshot('practice-result')
+        tap('Review pick 1,')
+        snapshot('practice-final-review')
+        tap('See result', exact=True)
+        tap('Return to Practice', exact=True)
+        xml, _ = snapshot('practice-return')
+        require('Choose your Draft Run' in xml, 'Practice tab was not restored')
+        require('Navigate up' not in xml, 'Practice root has a Back button')
+    attempt('practice-complete-review-return', practice_journey)
+
+    def shared_journey():
+        launch('guest-shared', 'shared')
+        tap('Sign in to play this run', exact=True)
+        tap('Email', exact=True)
+        adb('shell', 'input', 'text', 'reviewer@packone.example')
+        tap('Password', exact=True)
+        adb('shell', 'input', 'text', 'fixture-password')
+        adb('shell', 'input', 'keyevent', '4')
+        tap('Sign in', exact=True)
+        tap('Play or resume this run', exact=True)
+        top()
+        tap('Pick Hero in Training')
+        tap('Confirm pick', exact=True)
+        _, before = snapshot('shared-before-relaunch')
+        require('"method":"POST"' in before, 'Invitation was not accepted')
+        adb('shell', 'am', 'force-stop', PACKAGE)
+        adb('logcat', '-c')
+        # Launch the normal public recovery route, not the reset-fixture entry.
+        adb('shell', f"am start -W -a android.intent.action.VIEW -d 'packone://resume-shared-run' -p '{PACKAGE}'")
+        time.sleep(12)
+        xml, after = snapshot('shared-after-relaunch')
+        require('You chose' in xml, 'Shared feedback was not restored')
+        require('"method":"GET","id":"33333333-3333-4333-8333-333333333333","round":1' in after, 'Exact attempt and progress were not loaded')
+        require('"method":"POST"' not in after, 'Relaunch created another shared attempt')
+    attempt('shared-invitation-auth-accept-kill-relaunch', shared_journey)
+
 elif platform == 'ios':
     udid, label = sys.argv[3:5]
-    manifest.update(device=label, simulator_udid=udid,
+    import plistlib
+    app = command('xcrun', 'simctl', 'get_app_container', udid, PACKAGE, 'app')
+    with (Path(app) / 'Info.plist').open('rb') as info:
+        version = plistlib.load(info)
+    manifest.update(device=label, simulator_udid=udid, build_number=version['CFBundleVersion'], version=version['CFBundleShortVersionString'],
                     runtime=json.loads(command('xcrun', 'simctl', 'list', 'devices', '-j')))
     app_log = out / 'runtime.log'
     # Unified logging includes native JS console messages in release preview builds.
@@ -230,18 +279,33 @@ elif platform == 'ios':
                                '--predicate', 'process CONTAINS "PackOne" OR eventMessage CONTAINS "PACKONE_"'],
                               stdout=app_log.open('w'), stderr=subprocess.STDOUT)
     try:
+        ios_metrics = {}
         for setting in ['large', 'accessibility-extra-extra-extra-large']:
             command('xcrun', 'simctl', 'ui', udid, 'content_size', setting)
             for scenario, screen in [('guest','home'), ('guest','learn'), ('member','learn'), ('member-new','career'),
                                      ('member-long','feedback'), ('member-match','feedback'), ('member-zero','feedback')]:
                 name = f'{label}-{scenario}-{screen}-{setting}'
-                command('xcrun', 'simctl', 'terminate', udid, PACKAGE, check=False)
-                command('xcrun', 'simctl', 'launch', udid, PACKAGE, '-packoneScreenshotScene', f'acceptance:{scenario}:{screen}')
-                time.sleep(12)
-                command('xcrun', 'simctl', 'io', udid, 'screenshot', str(out / f'{name}.png'))
-                manifest['scenes'].append({'name': name, 'text_setting': setting,
-                    'observed_text_setting': command('xcrun', 'simctl', 'ui', udid, 'content_size')})
-                save_manifest()
+                def ios_scene():
+                    command('xcrun', 'simctl', 'terminate', udid, PACKAGE, check=False)
+                    offset = app_log.stat().st_size
+                    command('xcrun', 'simctl', 'launch', udid, PACKAGE, '-packoneScreenshotScene', f'acceptance:{scenario}:{screen}')
+                    time.sleep(15)
+                    command('xcrun', 'simctl', 'io', udid, 'screenshot', str(out / f'{name}.png'))
+                    logs = app_log.read_bytes()[offset:].decode(errors='replace')
+                    require('PACKONE_SCENE' in logs, 'Requested native fixture did not finish loading')
+                    scene = {'name': name, 'text_setting': setting,
+                             'observed_text_setting': command('xcrun', 'simctl', 'ui', udid, 'content_size')}
+                    if screen == 'feedback':
+                        scene['metrics'] = measure(logs)
+                        ios_metrics[(scenario, setting)] = scene['metrics']
+                    manifest['scenes'].append(scene)
+                attempt(name, ios_scene)
+        def ios_text_growth():
+            normal = ios_metrics[('member-long', 'large')]['text']['choice']['lines'][0]['height']
+            large = ios_metrics[('member-long', 'accessibility-extra-extra-extra-large')]['text']['choice']['lines'][0]['height']
+            require(large > normal * 1.2, f'Actual iOS text did not grow: {normal} -> {large}')
+            manifest['actual_text_growth'] = {'normal_line_height': normal, 'large_line_height': large, 'ratio': large/normal}
+        attempt('ios-actual-text-growth', ios_text_growth)
     finally:
         logger.terminate()
         logger.wait(timeout=10)

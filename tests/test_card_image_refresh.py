@@ -99,6 +99,35 @@ class CardImageRefreshTests(unittest.TestCase):
                 self.assertEqual(by_set["powered-cube"][name]["image_url"], f"https://img/{name}-base.jpg")
                 self.assertEqual(details["powered-cube"], {})
 
+    def test_funny_playtest_loses_to_normal_same_name_printing(self):
+        playtest = self.card(
+            "playtest",
+            "cmb2",
+            "2021-08-20",
+            "https://img/playtest.jpg",
+            name="Pick Your Poison",
+            set_type="funny",
+            mana_cost="{3}{B}{G}",
+            rarity="rare",
+            type_line="Sorcery",
+        )
+        real = self.card(
+            "real",
+            "mkm",
+            "2024-02-09",
+            "https://img/real.jpg",
+            name="Pick Your Poison",
+            mana_cost="{G}",
+            rarity="common",
+            type_line="Sorcery",
+        )
+        with mock.patch.object(refresh, "all_printings", return_value=iter([playtest, real])):
+            by_set, global_records, details = refresh.resolve_inventory({"powered-cube": {"Pick Your Poison"}})
+        self.assertEqual(by_set["powered-cube"]["Pick Your Poison"]["image_url"], "https://img/real.jpg")
+        self.assertEqual(by_set["powered-cube"]["Pick Your Poison"]["mana_cost"], "{G}")
+        self.assertEqual(global_records["Pick Your Poison"]["image_url"], "https://img/real.jpg")
+        self.assertEqual(details["powered-cube"], {})
+
     def test_only_available_special_frame_is_marked_unavoidable(self):
         only = self.card(
             "only",

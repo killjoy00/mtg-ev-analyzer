@@ -5,7 +5,7 @@ import {execFileSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 
 export function rolloutDispatch(request) {
-  const {operation,reason,request_id,replay_of,corpus_version,commit,sets,target,action,source,first_environment,measurement_mode,measurement_samples,card_name,environments,candidate_run_id,release_commit,stage_run_id,bridge_commit}=request||{};
+  const {operation,reason,request_id,replay_of,corpus_version,commit,sets,target,action,source,first_environment,measurement_mode,measurement_samples,card_name,environments,candidate_run_id,release_commit,stage_run_id,bridge_commit,reuse_run_id,repair_game_metadata}=request||{};
   const common=['operation','reason','request_id','replay_of'];
   if(typeof reason!=='string'||!reason.trim()||!/^[-a-zA-Z0-9]+$/.test(request_id||''))throw Error('A named rollout request and reason are required.');
   if(replay_of!==undefined&&!/^[-a-zA-Z0-9]+$/.test(replay_of||''))throw Error('Invalid rollout replay reference.');
@@ -17,6 +17,10 @@ export function rolloutDispatch(request) {
     workflow='rebuild-v4-draft-run-corpus.yml';
   } else if(operation==='rebuild-v5') {
     workflow='rebuild-v5-draft-run-corpus.yml';
+    if(reuse_run_id!==undefined) {
+      if(!/^[1-9][0-9]{4,20}$/.test(String(reuse_run_id)))throw Error('Invalid source v5 rebuild run.');
+      inputs={reuse_run_id:String(reuse_run_id)};extra=['reuse_run_id'];
+    }
   } else if(operation==='import') {
     if(!/^(all|[a-z0-9-]+(?:,[a-z0-9-]+)*)$/.test(sets||'')||!['build-only','development','production'].includes(target))throw Error('Invalid import request.');
     workflow='import-all-trophies.yml';inputs={sets,target};extra=['sets','target'];
@@ -27,13 +31,17 @@ export function rolloutDispatch(request) {
     if(!['development','production'].includes(target)||!['stage','publish'].includes(action)||!['powered-cube','regular-study','regular-phase2'].includes(source))throw Error('Invalid source release request.');
     workflow='publish-puzzle-components.yml';inputs={target,action,source};extra=['target','action','source'];
   } else if(operation==='v5-corpus-release') {
-    if(!['development','production'].includes(target)||!['stage','activate','rollback'].includes(action)||
+    if(!['development','production'].includes(target)||!['stage','activate','rollback','verify-active','resume-activation'].includes(action)||
        !/^[1-9][0-9]{4,20}$/.test(String(candidate_run_id||''))||!/^[a-f0-9]{40}$/.test(release_commit||''))throw Error('Invalid v5 corpus release request.');
     inputs={target,action,candidate_run_id:String(candidate_run_id),release_commit};extra=['target','action','candidate_run_id','release_commit'];
     if(action!=='stage') {
       if(!/^[1-9][0-9]{4,20}$/.test(String(stage_run_id||''))||!/^[a-f0-9]{40}$/.test(bridge_commit||''))throw Error('v5 activation/rollback requires exact stage and bridge identities.');
       inputs.stage_run_id=String(stage_run_id);inputs.bridge_commit=bridge_commit;extra.push('stage_run_id','bridge_commit');
     } else if(stage_run_id!==undefined||bridge_commit!==undefined)throw Error('v5 stage does not accept activation identities.');
+    if(repair_game_metadata!==undefined) {
+      if(repair_game_metadata!==true||action!=='stage'||target!=='production')throw Error('Pinned game metadata repair requires explicit production staging.');
+      inputs.repair_game_metadata='true';extra.push('repair_game_metadata');
+    }
     workflow='release-v5-corpus.yml';
   } else if(operation==='corpus-health') {
     if(!['development','production'].includes(target))throw Error('Invalid health target.');

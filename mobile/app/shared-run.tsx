@@ -42,7 +42,6 @@ function SharedRunGate({ shareId }: { shareId: string }) {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const busyRef = useRef(false);
-  const pendingAuth = useRef(false);
   const mounted = useRef(true);
   const generation = useRef(0);
   const epoch = useRef(0);
@@ -155,12 +154,8 @@ function SharedRunGate({ shareId }: { shareId: string }) {
   useEffect(() => {
     mounted.current = true;
     const unsubscribe = subscribeSession((next) => {
-      // Account stays on its normal route, including Google/Apple AuthSession
-      // callbacks. Only the invitation that initiated sign-in requests a return.
-      if (pendingAuth.current && next?.accountToken) {
-        pendingAuth.current = false;
-        router.replace({ pathname: '/shared-run', params: { shared: shareId } });
-      }
+      // Account owns its explicit return destination so profile/verification
+      // continuation can finish before navigating back to this invitation.
       const current = stateRef.current;
       if ('session' in current && sameSession(current.session, next)) return;
       invalidate();
@@ -169,15 +164,12 @@ function SharedRunGate({ shareId }: { shareId: string }) {
     return () => {
       unsubscribe();
       mounted.current = false;
-      pendingAuth.current = false;
       generation.current += 1;
       epoch.current += 1;
     };
   }, [invalidate, shareId]);
 
   useFocusEffect(useCallback(() => {
-    // Returning with Back cancels the old authentication-return intent.
-    pendingAuth.current = false;
     void reload();
     return () => {
       generation.current += 1;
@@ -191,8 +183,7 @@ function SharedRunGate({ shareId }: { shareId: string }) {
     const invitation = stateRef.current;
     if (invitation.status !== 'invite' || busyRef.current) return;
     if (!invitation.session.accountToken) {
-      pendingAuth.current = true;
-      router.push({ pathname: '/account' });
+      router.push({ pathname: '/account', params: { returnTo: 'shared', shared: shareId } });
       return;
     }
     busyRef.current = true;
@@ -246,7 +237,7 @@ function SharedRunGate({ shareId }: { shareId: string }) {
         <Pressable accessibilityRole="button" onPress={() => void reload()} style={styles.button}>
           <Text style={styles.buttonText}>Try again</Text>
         </Pressable>
-        <Pressable accessibilityRole="button" onPress={() => router.push('/account')} style={styles.button}>
+        <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/account', params: { returnTo: 'shared', shared: shareId } })} style={styles.button}>
           <Text style={styles.buttonText}>Manage account</Text>
         </Pressable>
       </View>

@@ -74,7 +74,11 @@ function safeNativeSearch(pathname: string, searchParams: URLSearchParams) {
   if (pathname === '/account') {
     const next = new URLSearchParams();
     const returnTo = searchParams.get('returnTo');
-    if (returnTo === 'practice') next.set('returnTo', 'practice');
+    if (returnTo === 'practice' || returnTo === 'shared-recovery') next.set('returnTo', returnTo);
+    const shared = searchParams.get('shared');
+    if (returnTo === 'shared' && shared && /^[a-f0-9]{24}$/.test(shared)) {
+      next.set('returnTo', 'shared'); next.set('shared', shared);
+    }
     const environment = environmentFromSet(searchParams.get('environment'));
     if (searchParams.has('environment')) next.set('environment', environment);
     return next.size ? `?${next.toString()}` : '';

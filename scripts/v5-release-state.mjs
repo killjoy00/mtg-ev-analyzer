@@ -44,7 +44,7 @@ export function assertHistoryPreserved(before,after) {
 
 async function main() {
   const connection=process.argv[2],action=process.argv[3],candidateRoot=process.argv[4]||'generated/v5-candidate',stateFile=process.argv[5]||'generated/v5-release-baseline.json';
-  if(!connection||!['capture','verify'].includes(action))throw Error('Usage: node scripts/v5-release-state.mjs CONNECTION capture|verify CANDIDATE_ROOT STATE_FILE');
+  if(!connection||!['capture','verify','verify-preserved'].includes(action))throw Error('Usage: node scripts/v5-release-state.mjs CONNECTION capture|verify|verify-preserved CANDIDATE_ROOT STATE_FILE');
   const query=corpusDatabase(connection);
   const catalog=JSON.parse(fs.readFileSync(candidateRoot+'/v5-trophy-import/catalog.json','utf8'));
   if(catalog.corpus_version!==modelVersions.v5.corpus_version||!catalog.complete||Object.keys(catalog.errors||{}).length)throw Error('Expected the complete reviewed v9 candidate.');
@@ -78,7 +78,20 @@ async function main() {
       history_counts:Object.fromEntries(Object.entries(preservedHistory).map(([table,rows])=>[table,rows.reduce((n,row)=>n+Number(row.n),0)]))};
   }
 
-  if(action==='capture') {
+  if(action==='verify-preserved') {
+    const before=JSON.parse(fs.readFileSync(stateFile,'utf8'));
+    const environment=(await query('SELECT set_id,status FROM draft_run_environment_policy WHERE set_id=ANY($1::text[]) ORDER BY set_id',[pgArray])).rows;
+    const manifest=(await query(`SELECT coalesce(md5(string_agg(set_id||':'||md5(manifest::text),',' ORDER BY set_id)),'') hash
+      FROM corpus_set_versions WHERE corpus_version=$2 AND set_id=ANY($1::text[])`,[pgArray,modelVersions.v4.corpus_version])).rows[0];
+    if(JSON.stringify(sets)!==JSON.stringify(before.sets)||
+       JSON.stringify(environment)!==JSON.stringify(before.environment.map(({set_id,status})=>({set_id,status})))||
+       manifest?.hash!==before.v8_manifest_hash)throw Error('Active acceptance changed environment policy or retained v8 manifests.');
+    const after=await history();
+    assertHistoryPreserved(before.history,after);
+    console.log(JSON.stringify({preserved:true,sets:sets.length,original_stage_revision:before.serving_revision,
+      before_history_counts:before.history_counts,
+      after_history_counts:Object.fromEntries(Object.entries(after).map(([table,rows])=>[table,rows.reduce((n,row)=>n+Number(row.n),0)]))}));
+  } else if(action==='capture') {
     const value=await snapshot();
     fs.mkdirSync(path.dirname(stateFile),{recursive:true});
     fs.writeFileSync(stateFile,JSON.stringify(value,null,2)+'\n');

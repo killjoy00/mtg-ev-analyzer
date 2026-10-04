@@ -39,7 +39,7 @@ import {
 import { config } from '@/src/config';
 import { useAppResume } from '@/src/hooks/useAppResume';
 import { clearPracticeIdempotencyKey, practiceIdempotencyKey } from '@/src/storage/idempotency';
-import type { MobileSession } from '@/src/storage/session';
+import { readSession, subscribeSession, type MobileSession } from '@/src/storage/session';
 import type { SharedRunSurface } from '@/src/state/sharedRunSurface';
 import { tcgplayerUrl } from '@/src/tcgplayer';
 import { colors, spacing } from '@/src/theme';
@@ -460,6 +460,7 @@ export default function DraftRunScreen({
   const stateRef = useRef<LoadState>(state);
   const refreshGeneration = useRef(0);
   const mutationGeneration = useRef(0);
+  const identityGeneration = useRef(0);
   const [mode, setMode] = useState<ViewMode>('pick');
   const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -476,6 +477,18 @@ export default function DraftRunScreen({
     stateRef.current = next;
     setState(next);
   };
+
+  useEffect(() => subscribeSession((next) => {
+    const current = stateRef.current;
+    if (current.status !== 'ready' || (next && mobileSessionIdentity(next) === mobileSessionIdentity(current.session))) return;
+    identityGeneration.current += 1;
+    refreshGeneration.current += 1;
+    mutationGeneration.current += 1;
+    setSelected(null);
+    setZoomedCard(null);
+    setBusy(false);
+    commitState({ status: 'error', message: 'Your account changed. Return to Daily or Practice to open a run for your current account.' });
+  }), []);
 
   const beginRefresh = (current: ReadyState): RunResponseToken => ({
     request: ++refreshGeneration.current,
@@ -551,6 +564,7 @@ export default function DraftRunScreen({
 
   useEffect(() => {
     let active = true;
+    const identityEpoch = identityGeneration.current;
     const initial = shared
       ? Promise.resolve({ status: 'ready' as const, run: shared.initialRun, session: shared.session })
       : loadDraftSurface(environment, practice, setIds);
@@ -559,6 +573,12 @@ export default function DraftRunScreen({
         if (!active) return;
         if (loaded.status === 'signin-required') {
           commitState({ status: 'signin-required' });
+          return;
+        }
+        const persisted = await readSession();
+        if (!active || identityEpoch !== identityGeneration.current) return;
+        if (!persisted || mobileSessionIdentity(persisted) !== mobileSessionIdentity(loaded.session)) {
+          commitState({ status: 'error', message: 'Your account changed while opening this run. Return to Daily or Practice.' });
           return;
         }
         let run = loaded.run;
@@ -601,12 +621,19 @@ export default function DraftRunScreen({
     setSelected(null);
     setActionError(null);
     setMode('pick');
+    const identityEpoch = identityGeneration.current;
     try {
       const loaded = shared
         ? { status: 'ready' as const, run: await shared.loadRun(), session: shared.session }
         : await loadDraftSurface(environment, practice, setIds);
       if (loaded.status === 'signin-required') {
         commitState({ status: 'signin-required' });
+        return;
+      }
+      const persisted = await readSession();
+      if (identityEpoch !== identityGeneration.current) return;
+      if (!persisted || mobileSessionIdentity(persisted) !== mobileSessionIdentity(loaded.session)) {
+        commitState({ status: 'error', message: 'Your account changed while opening this run. Return to Daily or Practice.' });
         return;
       }
       const recoveredFeedback = Boolean(shared && !loaded.run.complete && loaded.run.answers.length);

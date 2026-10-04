@@ -66,7 +66,7 @@ export default function ResumeSharedRunScreen() {
         {state === 'loading' ? <><ActivityIndicator /><Text style={styles.body}>Finding your saved run on this device...</Text></> : null}
         {state === 'signin' ? <>
           <Text style={styles.body}>Sign in to the same Pack One account to reopen this device&apos;s saved shared run.</Text>
-          <Pressable accessibilityRole="button" onPress={() => router.push('/account')} style={styles.button}>
+          <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/account', params: { returnTo: 'shared-recovery' } })} style={styles.button}>
             <Text style={styles.buttonText}>Sign in to recover your run</Text>
           </Pressable>
         </> : null}

@@ -1,5 +1,5 @@
 import type { MobileSession } from '@/src/storage/session';
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/src/screenshots/storage';
 
 const PLAYER_ID = '11111111-1111-4111-8111-111111111111';
 const ACCOUNT_ID = '22222222-2222-4222-8222-222222222222';

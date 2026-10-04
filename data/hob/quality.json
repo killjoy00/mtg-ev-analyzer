@@ -1,5 +1,5 @@
 {
-  "data_date": "2026-09-03",
+  "data_date": "2026-10-01",
   "errors": [],
   "metrics": {
     "cards": {
@@ -9,20 +9,20 @@
       "unique_candidates": 193
     },
     "consensus": {
-      "historical_pack_score_p10": 73.68,
-      "historical_pack_score_p50": 85.44,
-      "historical_pack_score_p90": 94.19,
-      "opening_top_support_p10": 0.28,
-      "opening_top_support_p50": 0.43,
-      "opening_top_support_p90": 0.65
+      "historical_pack_score_p10": 73.31,
+      "historical_pack_score_p50": 85.32,
+      "historical_pack_score_p90": 94.06,
+      "opening_top_support_p10": 0.32,
+      "opening_top_support_p50": 0.47,
+      "opening_top_support_p90": 0.67
     },
     "path_model": {
-      "bytes": 550595,
+      "bytes": 595229,
       "candidate_card_coverage": 1.0,
       "cards": 193,
       "excluded_replay_drafts": 300,
       "model_version": "strong-player-counterfactual-path-v3",
-      "pairs": 34044,
+      "pairs": 35772,
       "present": true
     },
     "replays": {
@@ -30,8 +30,8 @@
       "declared": 300
     },
     "training": {
-      "drafts": 2341,
-      "picks": 98322,
+      "drafts": 4191,
+      "picks": 176022,
       "win_rate_cutoff": 0.62
     }
   },

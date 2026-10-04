@@ -5,12 +5,12 @@ import {DRAFT_RUN_DIFFICULTY_VERSION} from '../draft-run-difficulty.mjs';
 import {SERVING_POLICY_VERSION} from '../serving-quality.mjs';
 import {CORPUS_GATE_VERSION} from '../corpus-quality.mjs';
 import {V5_PARENT_CORPUS_VERSION} from '../corpus-components.mjs';
-import {READINESS_CACHE_SCHEMA,registerServingReadiness,advanceServingReadiness,readServingReadiness} from '../worker/corpus-readiness.mjs';
+import {READINESS_CACHE_SCHEMA,registerServingReadiness,advanceServingReadiness,readServingReadiness,retryServingReadiness} from '../worker/corpus-readiness.mjs';
 import {verifyCorpusPublicationToken,CORPUS_PUBLICATION_AUDIENCE} from '../worker/trophy-import-auth.mjs';
 import {corpusDatabase} from './neon-corpus-db.mjs';
 
 const [connection,action,candidateRoot='generated/v5-candidate',stateFile='generated/v5-release-baseline.json']=process.argv.slice(2);
-if(!connection||!['activate','rollback','verify-active'].includes(action))throw Error('Usage: node scripts/v5-corpus-cutover.mjs CONNECTION activate|rollback|verify-active CANDIDATE_ROOT STATE_FILE');
+if(!connection||!['activate','rollback','verify-active','resume-activation'].includes(action))throw Error('Usage: node scripts/v5-corpus-cutover.mjs CONNECTION activate|rollback|verify-active|resume-activation CANDIDATE_ROOT STATE_FILE');
 if(DRAFT_RUN_CORPUS_VERSION!==V5_PARENT_CORPUS_VERSION)throw Error('Cutover must run from the reviewed v9 release commit.');
 const query=corpusDatabase(connection);
 const catalog=JSON.parse(fs.readFileSync(candidateRoot+'/v5-trophy-import/catalog.json','utf8'));
@@ -71,6 +71,21 @@ const identity=await workflowIdentity();
 const reason=`Owner-authorized v5/v9 ${action}; exact candidate run ${process.env.V5_CANDIDATE_RUN_ID||'unknown'}, workflow run ${identity.run_id}`;
 const identityJson=JSON.stringify(identity);
 const mapJson=JSON.stringify(mapping);
+
+if(action==='resume-activation') {
+  await verifyPointers('target');
+  await registerServingReadiness(query);
+  const before=await readServingReadiness(query);
+  const readiness=before.current&&['failed','retry_wait'].includes(before.state)
+    ?await retryServingReadiness(query,before.operation_id,identity)
+    :await advanceServingReadiness(query);
+  if(!readiness.ready)throw Error('Published v9 parents are not ready after recovery: '+JSON.stringify(readiness));
+  const v8=await parentReady(modelVersions.v4.corpus_version);
+  if(!v8.ready)throw Error('Recovery did not preserve the v8 bridge readiness.');
+  await verifyPointers('target');
+  console.log(JSON.stringify({resumed:true,pointer_mutations:0,sets:mapping.length,v8,v9:readiness}));
+  process.exit(0);
+}
 
 if(action==='activate') {
   const result=(await query(`WITH requested AS MATERIALIZED (

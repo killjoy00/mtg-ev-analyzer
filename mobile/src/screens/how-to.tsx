@@ -71,7 +71,7 @@ const links = [
 ];
 
 function PlayDaily() {
-  return <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/draft-run', params: { environment: 'mixed' } })} style={articleStyles.callout}>
+  return <Pressable accessibilityRole="button" accessibilityLabel="Play Daily Draft Run" onPress={() => router.push({ pathname: '/draft-run', params: { environment: 'mixed' } })} style={articleStyles.callout}>
     <Text style={articleStyles.linkAction}>Play Daily Draft Run →</Text>
     <Text style={articleStyles.calloutBody}>Free · No account required</Text>
   </Pressable>;

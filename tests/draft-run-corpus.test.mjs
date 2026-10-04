@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
+import {rateDraftRunPuzzle} from '../draft-run-difficulty.mjs';
 import {validateDraftRunPuzzle,interestingDraftRunPuzzle,gradeDraftRunPick,selectDraftRun,selectDraftRunReroll,eligiblePickForRound,publicDraftRunPuzzle,summarizeDraftRun,poolForEnvironment} from '../draft-run.mjs';
 
 const catalog=JSON.parse(fs.readFileSync(new URL('../corpus/draft-run/catalog.json',import.meta.url)));
@@ -88,10 +89,10 @@ test('Cube has eight independent trophy decisions and two sequential pack replac
     assert.equal(run.length,8);assert.equal(new Set(run.map(p=>p.source_draft_hash)).size,8);
     assert.equal(run[0].pick_number,2);assert.equal(run[1].pick_number,3);
     for(let round=0;round<8;round++){
-      let current=run[round],seen=run.map(p=>p.source_draft_hash);
+      let current=run[round],seen=run.map(p=>p.source_draft_hash),anchor=rateDraftRunPuzzle(run[round]);
       assert.equal(current.set_id,environment);assert.ok(eligiblePickForRound(round,current.pick_number,environment));
       for(let reroll=0;reroll<2;reroll++){
-        const replacement=selectDraftRunReroll(pool,current,{type:'pack',round,seed,environment,excludedSources:seen});
+        const replacement=selectDraftRunReroll(pool,current,{type:'pack',round,seed,environment,excludedSources:seen,anchor});
         assert.ok(replacement,`missing Cube replacement seed=${seed} round=${round} reroll=${reroll} source=${current.puzzle_id}`);assert.equal(replacement.set_id,environment);assert.ok(!seen.includes(replacement.source_draft_hash));
         seen.push(replacement.source_draft_hash);current=replacement;
       }

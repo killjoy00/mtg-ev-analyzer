@@ -1,6 +1,7 @@
-import * as SecureStore from 'expo-secure-store';
+import * as SecureStore from '@/src/screenshots/storage';
 import { pacificDay } from '@/src/dailyClock';
 import { config } from '@/src/config';
+import { readScreenshotSession, screenshotSession } from '@/src/screenshots/session';
 import type { NativeAppleSubscriptionStatus } from '@/src/api/apple-subscriptions';
 import type { CareerHistoryPage, CareerProfile } from '@/src/api/career';
 import type {
@@ -64,7 +65,7 @@ function puzzle(index: number): DraftRunPuzzle {
 }
 
 const initialRun: DraftRunState = {
-  id: 'screenshot-run',
+  id: '33333333-3333-4333-8333-333333333333',
   environment: 'mixed',
   run_length: 8,
   set_reroll_allowed: false,
@@ -260,6 +261,8 @@ export async function configureScreenshotScenario(scenario: string) {
   if (!config.screenshots.fixtures) throw new Error('Acceptance fixtures are disabled.');
   await SecureStore.setItemAsync(SCENARIO_KEY, scenario);
   await SecureStore.deleteItemAsync(RUN_KEY);
+  await SecureStore.deleteItemAsync('packone.mobile.shared-run.v1');
+  await SecureStore.deleteItemAsync('packone.mobile.practice.idempotency.v2');
 }
 
 export async function requestScreenshotFixture<T>(
@@ -268,7 +271,8 @@ export async function requestScreenshotFixture<T>(
 ): Promise<T> {
   const method = options.method ?? 'GET';
   const scenario = await SecureStore.getItemAsync(SCENARIO_KEY) || 'elite';
-  const guest = scenario.startsWith('guest');
+  const currentSession = await readScreenshotSession();
+  const guest = !currentSession.accountToken;
   const elite = scenario === 'elite';
   const today = pacificDay();
   const readRun = async () => {
@@ -276,9 +280,14 @@ export async function requestScreenshotFixture<T>(
     return saved ? JSON.parse(saved) as DraftRunState : { ...clone(initialRun), day: today };
   };
   if (path === '/growth/v1/mobile/account/session') return {
-    user: { id: '22222222-2222-4222-8222-222222222222', email: 'reviewer@packone.example', name: 'Pack One Reviewer' },
+    user: currentSession.accountUser || screenshotSession.accountUser,
     session: {}, credentials: { password: true, google: false, apple: false },
     deletion: { enabled: true, available: true, method: 'password' },
+  } as T;
+  if (path === '/growth/v1/mobile/account/signin' && method === 'POST') return {
+    user: screenshotSession.accountUser,
+    session: { token: screenshotSession.accountToken, expiresAt: screenshotSession.accountExpiresAt },
+    linked: { token: screenshotSession.playerToken, playerId: screenshotSession.subjectId, displayName: 'PackOneReviewer', newlyClaimed: false, rankingIdentity: { eligible: true } },
   } as T;
   if (path === '/growth/v1/mobile/account/signout') return { ok: true } as T;
   if (path.startsWith('/draft/v1/leaderboard?')) return {
@@ -308,9 +317,21 @@ export async function requestScreenshotFixture<T>(
   if (path === '/draft/v1/set-catalog' || path === '/draft/v1/practice-sets') {
     return { sets: clone(practiceSets) } as T;
   }
-  if (path === '/draft/v1/runs' && method === 'POST') return await readRun() as T;
-  if (path === '/draft/v1/runs/screenshot-run') return await readRun() as T;
-  if (path === '/draft/v1/runs/screenshot-run/pick' && method === 'POST') {
+  if (path === '/draft/v1/runs' && method === 'POST') {
+    const run = await readRun();
+    const body = parseBody(options);
+    run.day = body.daily === true ? today : null;
+    await SecureStore.setItemAsync(RUN_KEY, JSON.stringify(run));
+    console.info('PACKONE_RUN', JSON.stringify({ method: 'POST', id: run.id, round: run.round, shared: Boolean(body.challenge) }));
+    return run as T;
+  }
+  if (path === '/draft/v1/runs/33333333-3333-4333-8333-333333333333') {
+    const run = await readRun();
+    console.info('PACKONE_RUN', JSON.stringify({ method: 'GET', id: run.id, round: run.round }));
+    return run as T;
+  }
+  if (path === '/draft/v1/shared-runs/aaaaaaaaaaaaaaaaaaaaaaaa') return { id: 'aaaaaaaaaaaaaaaaaaaaaaaa', name: 'Fixture Drafter', score: 88, scores: [], run_length: 8, environment: 'mixed', source_run_id: '44444444-4444-4444-8444-444444444444' } as T;
+  if (path === '/draft/v1/runs/33333333-3333-4333-8333-333333333333/pick' && method === 'POST') {
     const old = await readRun();
     const selected = scenario.includes('match') ? 'web-up' : scenario.includes('zero') ? 'cosmic-cube' : String(parseBody(options).cardId || 'hero-in-training');
     const next = feedbackRun(selected);
@@ -326,15 +347,15 @@ export async function requestScreenshotFixture<T>(
     next.answers = [...old.answers, answer];
     next.round = next.answers.length;
     next.revision = old.revision + 1;
-    next.day = today;
+    next.day = old.day;
     next.complete = next.answers.length >= 8;
     next.score = next.complete ? Math.round(next.answers.reduce((sum, answer) => sum + answer.score, 0) / 8) : null;
     next.current = next.complete ? null : puzzle(next.round);
     await SecureStore.setItemAsync(RUN_KEY, JSON.stringify(next));
     return clone(next) as T;
   }
-  if (path === '/draft/v1/runs/screenshot-run/reroll' && method === 'POST') return clone(initialRun) as T;
-  if (path === '/draft/v1/runs/screenshot-run/share' && method === 'POST') return { id: '0123456789abcdef01234567' } as T;
+  if (path === '/draft/v1/runs/33333333-3333-4333-8333-333333333333/reroll' && method === 'POST') return clone(initialRun) as T;
+  if (path === '/draft/v1/runs/33333333-3333-4333-8333-333333333333/share' && method === 'POST') return { id: '0123456789abcdef01234567' } as T;
   if (path === '/growth/v1/patreon/mobile/status') return clone(membershipStatus) as T;
   if (path === '/growth/v1/apple-subscriptions/mobile/status') return clone(appleStatus) as T;
   if (path === '/growth/v1/mobile/profile/me' || path === '/growth/v1/mobile/profile/a1b2c3d4e5f60718') {

@@ -10,7 +10,7 @@ on:
         required: true
       action:
         type: choice
-        options: [stage, activate, rollback]
+        options: [stage, activate, rollback, verify-active, resume-activation]
         default: stage
         required: true
       candidate_run_id:
@@ -29,6 +29,10 @@ on:
         description: 'Full reviewed v8 bridge SHA currently deployed to target; required for activate/rollback'
         type: string
         required: false
+      repair_game_metadata:
+        description: 'Verify exact pinned game archive headers and repair unknown legacy production metadata'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -54,6 +58,7 @@ jobs:
       STAGE_RUN_ID: ${{ inputs.stage_run_id }}
       BRIDGE_COMMIT: ${{ inputs.bridge_commit }}
       V5_CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+      REPAIR_GAME_METADATA: ${{ inputs.repair_game_metadata }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
@@ -78,9 +83,12 @@ jobs:
           git merge-base --is-ancestor "$RELEASE_COMMIT" origin/main
           test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
           grep -q "DRAFT_RUN_CORPUS_VERSION = 'elite-trophy-colour-stage-v9'" draft-run.mjs
+          if [[ "$REPAIR_GAME_METADATA" == true ]]; then
+            [[ "$ACTION" == stage && "$TARGET" == production ]] || { echo '::error::metadata repair requires production stage'; exit 1; }
+          fi
           case "$ACTION" in
             stage) test -z "$STAGE_RUN_ID" || { echo '::error::stage_run_id is not used for stage'; exit 1; } ;;
-            activate|rollback)
+            activate|rollback|verify-active|resume-activation)
               [[ "$STAGE_RUN_ID" =~ ^[1-9][0-9]{4,20}$ ]] || { echo '::error::activate/rollback requires numeric stage_run_id'; exit 1; }
               [[ "$BRIDGE_COMMIT" =~ ^[a-f0-9]{40}$ ]] || { echo '::error::activate/rollback requires full bridge_commit'; exit 1; }
               git merge-base --is-ancestor "$BRIDGE_COMMIT" "$RELEASE_COMMIT"
@@ -151,9 +159,18 @@ jobs:
           set -euo pipefail
           node - <<'NODE'
           const fs=require('fs');
+          const {execFileSync}=require('node:child_process');
           const e=JSON.parse(fs.readFileSync('generated/v5-stage-evidence/stage.json','utf8'));
-          const expected={target:process.env.TARGET,candidate_run_id:process.env.CANDIDATE_RUN_ID,release_commit:process.env.RELEASE_COMMIT};
+          const expected={target:process.env.TARGET,candidate_run_id:process.env.CANDIDATE_RUN_ID};
           for(const [k,v] of Object.entries(expected))if(String(e[k])!==String(v))throw Error('Stage evidence mismatch: '+k);
+          if(e.release_commit!==process.env.RELEASE_COMMIT) {
+            if(!['verify-active','resume-activation'].includes(process.env.ACTION)||!/^[a-f0-9]{40}$/.test(e.release_commit||''))throw Error('Stage evidence mismatch: release_commit');
+            execFileSync('git',['merge-base','--is-ancestor',e.release_commit,process.env.RELEASE_COMMIT]);
+            // A read-only acceptance repair may advance runtime code, never the
+            // staged candidate, model identity, policies or retained data.
+            execFileSync('git',['diff','--exit-code',e.release_commit,process.env.RELEASE_COMMIT,'--',
+              'corpus','data','model-versions.json','draft-run.mjs','research','results']);
+          }
           NODE
           cp generated/v5-stage-evidence/v5-release-baseline.json generated/v5-release-baseline.json
 
@@ -163,11 +180,17 @@ jobs:
         run: |
           set -euo pipefail
           connection=$(cat "$RUNNER_TEMP/target.connection")
-          for migration in migrations/0048_uncapped_v5_components.sql migrations/0049_cross_version_corpus_cutover.sql; do
+          for migration in migrations/0048_uncapped_v5_components.sql migrations/0049_cross_version_corpus_cutover.sql migrations/0050_practice_recency_bias.sql; do
             psql "$connection" -v ON_ERROR_STOP=1 --single-transaction -f "$migration"
           done
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           node scripts/v5-release-state.mjs "$RUNNER_TEMP/target.connection" capture generated/v5-candidate generated/v5-release-baseline.json
+          if [[ "$REPAIR_GAME_METADATA" == true ]]; then
+            # This orchestration helper comes from the reviewed workflow SHA;
+            # the accepted release runtime remains checked out unchanged.
+            git show "$GITHUB_SHA:.github/release-v5-source-metadata.mjs" > .github/release-v5-source-metadata.mjs
+            node .github/release-v5-source-metadata.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-trophy-import/catalog.json generated/v5-release-baseline.json
+          fi
           # Stage the exact checked-in v9 baseline without replacing v8 serving.
           # Migration 0049 makes inactive future-version puzzle/rating inserts
           # revision-neutral; the complete snapshot below remains separately
@@ -176,6 +199,17 @@ jobs:
           node scripts/load_all_trophies.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-trophy-import --stage-only
           node scripts/load-traditional-components.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-traditional
           node scripts/check-corpus-health.mjs "$RUNNER_TEMP/target.connection"
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          import {corpusDatabase} from './scripts/neon-corpus-db.mjs';
+          const query=corpusDatabase(process.env.RUNNER_TEMP+'/target.connection');
+          const catalog=JSON.parse(fs.readFileSync('generated/v5-candidate/v5-trophy-import/catalog.json'));
+          const ids=catalog.sets.map(s=>s.source_snapshot_id);
+          const rows=(await query("SELECT source_snapshot_id,lifecycle_status FROM corpus_source_snapshots WHERE source_snapshot_id=ANY($1::text[])",['{'+ids.join(',')+'}'])).rows;
+          assert.equal(rows.length,30,'Every exact staged parent must exist');
+          assert.ok(rows.every(s=>s.lifecycle_status==='Candidate'),'Every exact staged parent must be Candidate before stage acceptance');
+          NODE
           node scripts/candidate-gameplay-canary.mjs "$RUNNER_TEMP/target.connection"
           node scripts/verify-corpus-load.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-trophy-import --complete
           node scripts/verify-puzzle-components.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-traditional Candidate
@@ -206,8 +240,17 @@ jobs:
         if: inputs.action == 'activate'
         run: node scripts/v5-corpus-cutover.mjs "$RUNNER_TEMP/target.connection" activate generated/v5-candidate generated/v5-release-baseline.json
 
+      - name: Reverify committed parents and recover readiness without pointer mutation
+        if: inputs.action == 'resume-activation'
+        run: |
+          set -euo pipefail
+          node scripts/verify-corpus-load.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-trophy-import --complete
+          node scripts/verify-puzzle-components.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-traditional Candidate
+          node scripts/v5-release-state.mjs "$RUNNER_TEMP/target.connection" verify-preserved generated/v5-candidate generated/v5-release-baseline.json
+          node scripts/v5-corpus-cutover.mjs "$RUNNER_TEMP/target.connection" resume-activation generated/v5-candidate generated/v5-release-baseline.json
+
       - name: Publish only eligible v5 Traditional components
-        if: inputs.action == 'activate'
+        if: inputs.action == 'activate' || inputs.action == 'resume-activation'
         run: |
           node scripts/publish-puzzle-components.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-traditional
           node scripts/verify-puzzle-components.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-traditional eligible
@@ -216,15 +259,75 @@ jobs:
           node scripts/verify-cube-expansion.mjs "$RUNNER_TEMP/target.connection" traditional-cube-p2p7-v5-v1
           node tests/release-functions-smoke.mjs "$TARGET_BRANCH" "$BRIDGE_COMMIT"
 
+      - name: Capture fully verified recovery evidence
+        if: inputs.action == 'resume-activation'
+        run: |
+          set -euo pipefail
+          node scripts/v5-release-state.mjs "$RUNNER_TEMP/target.connection" verify-preserved generated/v5-candidate generated/v5-release-baseline.json
+          node - <<'NODE'
+          const fs=require('fs');
+          const preceding=JSON.parse(fs.readFileSync('generated/v5-stage-evidence/stage.json','utf8'));
+          fs.writeFileSync('generated/stage.json',JSON.stringify({
+            target:process.env.TARGET,candidate_run_id:process.env.CANDIDATE_RUN_ID,
+            release_commit:process.env.RELEASE_COMMIT,workflow_run_id:process.env.GITHUB_RUN_ID,
+            preceding_stage_run_id:process.env.STAGE_RUN_ID,preceding_release_commit:preceding.release_commit,
+            action:'verified-resumed-activation'
+          },null,2)+'\n');
+          NODE
+
+      - name: Reverify a completely published candidate after a runtime repair
+        if: inputs.action == 'verify-active'
+        run: |
+          set -euo pipefail
+          node scripts/verify-corpus-load.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-trophy-import --complete
+          node scripts/verify-puzzle-components.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-traditional eligible
+          node scripts/v5-corpus-cutover.mjs "$RUNNER_TEMP/target.connection" verify-active generated/v5-candidate generated/v5-release-baseline.json
+          node scripts/v5-release-state.mjs "$RUNNER_TEMP/target.connection" verify-preserved generated/v5-candidate generated/v5-release-baseline.json
+          node scripts/verify-serving-quality.mjs "$RUNNER_TEMP/target.connection"
+          node scripts/verify-cube-expansion.mjs "$RUNNER_TEMP/target.connection" traditional-cube-p2p7-v5-v1
+          node tests/release-functions-smoke.mjs "$TARGET_BRANCH" "$BRIDGE_COMMIT"
+          node - <<'NODE'
+          const fs=require('fs');
+          const preceding=JSON.parse(fs.readFileSync('generated/v5-stage-evidence/stage.json','utf8'));
+          fs.writeFileSync('generated/stage.json',JSON.stringify({
+            target:process.env.TARGET,candidate_run_id:process.env.CANDIDATE_RUN_ID,
+            release_commit:process.env.RELEASE_COMMIT,workflow_run_id:process.env.GITHUB_RUN_ID,
+            preceding_stage_run_id:process.env.STAGE_RUN_ID,preceding_release_commit:preceding.release_commit,
+            action:'verified-active'
+          },null,2)+'\n');
+          NODE
+
       - name: Roll back to captured v8 pointers after bridge redeploy
         if: inputs.action == 'rollback'
         run: |
           node scripts/v5-corpus-cutover.mjs "$RUNNER_TEMP/target.connection" rollback generated/v5-candidate generated/v5-release-baseline.json
           node scripts/verify-puzzle-components.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-traditional Candidate
           node tests/release-functions-smoke.mjs "$TARGET_BRANCH" "$BRIDGE_COMMIT"
+          # The original stage remains immutable. Record a verified successor
+          # at the restored v8 revision for a later explicit reactivation.
+          node scripts/v5-release-state.mjs "$RUNNER_TEMP/target.connection" capture generated/v5-candidate generated/v5-rollback-restored.json
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          import {assertHistoryPreserved} from './scripts/v5-release-state.mjs';
+          const before=JSON.parse(fs.readFileSync('generated/v5-release-baseline.json'));
+          const restored=JSON.parse(fs.readFileSync('generated/v5-rollback-restored.json'));
+          for(const key of ['sets','environment','v8_manifest_hash'])
+            assert.deepEqual(restored[key],before[key],`Rollback did not restore ${key}`);
+          assert.match(String(before.serving_revision),/^\d+$/);
+          assert.match(String(restored.serving_revision),/^\d+$/);
+          assert.ok(BigInt(restored.serving_revision)>BigInt(before.serving_revision),'Rollback must have a newer serving revision');
+          assertHistoryPreserved(before.history,restored.history);
+          fs.copyFileSync('generated/v5-rollback-restored.json','generated/v5-release-baseline.json');
+          fs.writeFileSync('generated/stage.json',JSON.stringify({
+            target:process.env.TARGET,candidate_run_id:process.env.CANDIDATE_RUN_ID,
+            release_commit:process.env.RELEASE_COMMIT,workflow_run_id:process.env.GITHUB_RUN_ID,
+            preceding_stage_run_id:process.env.STAGE_RUN_ID,action:'verified-rollback'
+          },null,2)+'\n');
+          NODE
 
       - uses: actions/upload-artifact@v4
-        if: always() && inputs.action == 'stage'
+        if: always() && (inputs.action == 'stage' || inputs.action == 'rollback' || inputs.action == 'verify-active' || inputs.action == 'resume-activation')
         with:
           name: v5-stage-${{ inputs.target }}-${{ github.run_id }}
           retention-days: 90
@@ -233,6 +336,7 @@ jobs:
             generated/v5-release-baseline.json
             generated/stage.json
             generated/v5-traditional-validated.json
+            generated/v5-game-source-metadata.json
 
       - uses: actions/upload-artifact@v4
         if: always() && inputs.action != 'stage'

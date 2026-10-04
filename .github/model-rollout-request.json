@@ -1,6 +1,6 @@
 {
-  "operation": "rebuild-v5",
-  "request_id": "uncapped-v5-full-rebuild-20261002-retry2",
-  "replay_of": "uncapped-v5-full-rebuild-20261002-retry1",
-  "reason": "Restart the owner-authorized all-qualified v5/v9 rebuild as an exact 30-environment active corpus after retiring legacy MID/VOW from active service; qualification, no-cap policy, five-fold holdout and authorized HOB inputs are otherwise unchanged."
+  "operation": "card-image-release",
+  "request_id": "powered-cube-v9-image-repair-backend-fix-20261004",
+  "reason": "Owner-authorized guarded release of the reviewed cross-version image-marker normalization fix, followed by the full Pack One card-image refresh to repair Powered Cube v9 display metadata and verify development before production.",
+  "commit": "0ff55f6084b4ca372ec2457b0d81611054be6e96"
 }

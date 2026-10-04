@@ -1,31 +1,29 @@
 {
-  "schema_version": 2,
-  "set_id": "woe",
-  "name": "WOE",
-  "format": "PremierDraft",
-  "is_fixture": false,
-  "source": {
-    "provider": "17Lands",
-    "dataset_kind": "draft_data",
-    "data_date": "2023-10-18",
-    "license": "CC BY 4.0 unless otherwise noted by 17Lands"
-  },
+  "build_identity": "ccd0012b4733ca94b37baa68636dee0be60b7ee2bf5b572ff4fe8e2a27e2601e",
   "cohort": {
     "definition": "experienced drafts in top 15% of parsed 17Lands user win-rate buckets",
-    "minimum_games_bucket_lower_bound": 100,
-    "win_rate_cutoff": 0.6,
     "experienced_drafts": 119073,
-    "training_drafts": 5000,
-    "training_picks": 206585
+    "minimum_games_bucket_lower_bound": 100,
+    "qualified_training_drafts": 23347,
+    "training_cap": null,
+    "training_drafts": 23347,
+    "training_mode": "all-qualified",
+    "training_picks": 964202,
+    "win_rate_cutoff": 0.6
   },
+  "format": "PremierDraft",
+  "is_fixture": false,
   "model": {
-    "model_version": "strong-player-colour-stage-v4",
-    "holdout": "5-fold by draft_id",
-    "probabilities_are_calibrated": false,
     "description": "Hierarchical strong-player pick tendency, adjusted by a stage-matched card/pool co-pick lift and a stage-matched colour-commitment shift; normalized within each pack.",
-    "pool_conditioned": true
+    "holdout": "5-fold by draft_id",
+    "model_version": "strong-player-colour-stage-v5",
+    "pool_conditioned": true,
+    "probabilities_are_calibrated": false
   },
+  "name": "WOE",
   "replay_count": 296,
+  "schema_version": 2,
+  "set_id": "woe",
   "shard_size": 2,
   "shards": [
     {
@@ -620,5 +618,27 @@
       "path": "./data/woe/shards/147.json",
       "replay_count": 2
     }
-  ]
+  ],
+  "source": {
+    "data_date": "2023-10-18",
+    "dataset_kind": "draft_data",
+    "license": "CC BY 4.0 unless otherwise noted by 17Lands",
+    "provider": "17Lands"
+  },
+  "v5_source_provenance": {
+    "skill_source": {
+      "compressed_bytes": 82198920,
+      "etag": "\"5a86892a3ae3870a120782dfa4444021-10\"",
+      "last_modified": "Wed, 18 Oct 2023 03:06:42 GMT",
+      "sha256": "3d9a55acb2846905ea7fc930c6ec0b5954d1e6ff78187936b4db8da3baa8b8a6",
+      "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.WOE.PremierDraft.csv.gz"
+    },
+    "source_archive": {
+      "compressed_bytes": 252414156,
+      "etag": "\"c9e8024b62d66a52bfceb1a4995142da-31\"",
+      "last_modified": "Wed, 18 Oct 2023 03:07:46 GMT",
+      "sha256": "7c62add350ff9689e0da469bc2911860fb34df0ca2a468aa7e6e511c88675431",
+      "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.WOE.PremierDraft.csv.gz"
+    }
+  }
 }

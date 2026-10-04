@@ -65,6 +65,7 @@ export default function AccountScreen() {
     validateDailyRunId?: string;
     environment?: string;
     returnTo?: string;
+    shared?: string;
     profileKey?: string;
     pendingAction?: string;
     reportReason?: string;
@@ -77,6 +78,8 @@ export default function AccountScreen() {
   const requestedEnvironment = typeof params.environment === 'string' ? params.environment : 'mixed';
   const returnEnvironment = isDailyEnvironment(requestedEnvironment) ? requestedEnvironment : 'mixed';
   const returnToPractice = params.returnTo === 'practice';
+  const returnShared = params.returnTo === 'shared' && typeof params.shared === 'string' && /^[a-f0-9]{24}$/.test(params.shared) ? params.shared : null;
+  const returnSharedRecovery = params.returnTo === 'shared-recovery';
   const returnProfileKey = typeof params.profileKey === 'string' && /^[a-f0-9]{16}$/.test(params.profileKey)
     ? params.profileKey
     : null;
@@ -112,19 +115,27 @@ export default function AccountScreen() {
   const verificationReturnHandled = useRef(false);
 
   const returnAfterAccount = useCallback((fallbackToCareer = false) => {
+    if (returnShared) {
+      router.dismissTo({ pathname: '/shared-run', params: { shared: returnShared } });
+      return;
+    }
+    if (returnSharedRecovery) {
+      router.dismissTo('/resume-shared-run');
+      return;
+    }
     if (validateDailyRunId) {
-      router.replace({
+      router.dismissTo({
         pathname: '/draft-run',
         params: { environment: returnEnvironment },
       });
       return;
     }
     if (returnToPractice) {
-      router.replace('/practice');
+      router.dismissTo('/practice');
       return;
     }
     if (returnProfileKey) {
-      router.replace({
+      router.dismissTo({
         pathname: '/profile',
         params: {
           key: returnProfileKey,
@@ -134,8 +145,8 @@ export default function AccountScreen() {
       });
       return;
     }
-    if (fallbackToCareer) router.replace('/career');
-  }, [validateDailyRunId, returnEnvironment, returnToPractice, returnProfileKey, pendingAction, reportReason]);
+    if (fallbackToCareer) router.dismissTo('/career');
+  }, [validateDailyRunId, returnEnvironment, returnToPractice, returnShared, returnSharedRecovery, returnProfileKey, pendingAction, reportReason]);
 
   const continueAfterDisplayNamePrompt = useCallback((validatedDailyScore = pendingClaimValidatedDaily) => {
     setPromptDisplayName(false);
