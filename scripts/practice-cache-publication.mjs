@@ -20,11 +20,17 @@ try {
  await query(`CREATE FUNCTION qa_pause_snapshot() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
    IF NEW.corpus_version LIKE 'qa-publication-%' THEN PERFORM pg_advisory_xact_lock(516,2);PERFORM pg_sleep(4);END IF;RETURN NEW;END $$`);
  await query('CREATE TRIGGER qa_pause_snapshot BEFORE INSERT ON draft_run_serving_snapshots FOR EACH ROW EXECUTE FUNCTION qa_pause_snapshot()');
+ const revisionBefore=String((await query('SELECT revision::text FROM draft_run_serving_revision WHERE singleton')).rows[0].revision);
  const build=loadServingSnapshot(query,fixture).then(value=>({value}),error=>({error}));
  let held=false;
  for(let i=0;i<50&&!held;i++)held=(await query("SELECT EXISTS(SELECT 1 FROM pg_locks WHERE locktype='advisory' AND classid=516 AND objid=2 AND granted) held")).rows[0].held==='t';
  assert.ok(held,'builder pause observed');
- await query('UPDATE draft_run_environment_policy SET status=status WHERE false');
+ // Empty/no-op policy updates intentionally do not invalidate current caches.
+ // Use the existing revision function to commit an actual concurrent change.
+ await query('SELECT pack1_bump_serving_revision()');
+ const revisionAfter=String((await query('SELECT revision::text FROM draft_run_serving_revision WHERE singleton')).rows[0].revision);
+ assert.ok(BigInt(revisionAfter)>BigInt(revisionBefore),'concurrent revision change committed');
+ report.race_revisions={before:revisionBefore,after:revisionAfter};
  const result=await build;assert.equal(result.error?.status,503,'mixed-revision build is rejected');
  assert.equal(Number((await query('SELECT count(*) n FROM draft_run_serving_snapshots WHERE corpus_version=$1',[fixture])).rows[0].n),0,'partial snapshot rolled back');
  report.race_passed=true;
@@ -39,12 +45,12 @@ try {
  }
  // Measure the known singleton contention explicitly: a writer holding its
  // transaction open also holds the revision row until commit.
- const holder=query(`DO $$ BEGIN UPDATE draft_run_environment_policy SET status=status WHERE false;
+ const holder=query(`DO $ BEGIN PERFORM pack1_bump_serving_revision();
    PERFORM pg_advisory_xact_lock(516,3);PERFORM pg_sleep(2);END $$`);
  let writerHeld=false;
  for(let i=0;i<50&&!writerHeld;i++)writerHeld=(await query("SELECT EXISTS(SELECT 1 FROM pg_locks WHERE locktype='advisory' AND classid=516 AND objid=3 AND granted) held")).rows[0].held==='t';
  assert.ok(writerHeld);const waiting=performance.now();
- await query('UPDATE draft_run_environment_policy SET status=status WHERE false');
+ await query('SELECT pack1_bump_serving_revision()');
  report.writer_wait_ms=Math.round(performance.now()-waiting);await holder;
  assert.ok(report.writer_wait_ms>=1000,'second writer waits for the held revision transaction');
  report.passed=report.race_passed;console.log(JSON.stringify(report));
