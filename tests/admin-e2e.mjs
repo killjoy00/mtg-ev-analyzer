@@ -64,7 +64,9 @@ try {
   await page.getByRole('heading',{name:'Daily result-share funnel'}).waitFor();
   assert.match(await page.locator('.share-funnel').innerText(),/20[\s\S]*17[\s\S]*12[\s\S]*9/);
   await page.getByText('Loading Daily habit cohorts…',{exact:true}).waitFor();
-  assert.equal(typeof releaseHabitReport,'function','core report must render while the independent habit query is still held');
+  const initialReview=page.locator('#reviews details.review').first();
+  await initialReview.locator('summary').waitFor();
+  assert.equal(typeof releaseHabitReport,'function','core and review report must render while the independent habit query is still held');
   releaseHabitReport();releaseHabitReport=null;holdHabitReport=false;
   await page.getByText('creator_one',{exact:true}).waitFor();
   assert.match(await page.getByText('creator_one',{exact:true}).locator('xpath=ancestor::tr').innerText(),/reddit[\s\S]*10[\s\S]*37\.5%[\s\S]*3 \/ 8 mature[\s\S]*2 immature/);
