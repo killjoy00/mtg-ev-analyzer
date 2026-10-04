@@ -2,5 +2,5 @@
   "operation": "card-images",
   "request_id": "powered-cube-v9-image-repair-20261004",
   "replay_of": "refresh-titania-main-art-20260926",
-  "reason": "Owner-authorized repair of the production v9 Powered Cube display-metadata regression. Run the guarded full Pack One image normalization from current main after the ingestion fix, update R2 and development/production Draft Run image metadata including Live v5 components, verify gameplay, and change display fields only."
+  "reason": "Owner-authorized repair after the v9 Powered Cube rebuild admitted art-series, token, and same-name playtest display identities. Run the guarded full deterministic Pack One image normalization from the merged ingestion fix, update R2 and development/production backend image metadata, and verify gameplay without changing scoring or puzzle identity."
 }
