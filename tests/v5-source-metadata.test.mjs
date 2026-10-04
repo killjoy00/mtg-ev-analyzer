@@ -1,16 +1,17 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {pinnedGameSources,verifyPinnedGameHeader,repairPinnedGameMetadata} from '../.github/release-v5-source-metadata.mjs';
+import versions from '../model-versions.json' with {type:'json'};
 
 function fixture() {
  const sets=Array.from({length:30},(_,i)=>({id:'set'+String(i).padStart(2,'0'),
-  source_snapshot_id:(i+1).toString(16).padStart(64,'0'),model_version:'strong-player-colour-stage-v5',
+  source_snapshot_id:(i+1).toString(16).padStart(64,'0'),model_version:versions.v5.model_version,
   source_archive:{sha256:'a'.repeat(64)},input_signature:'input',puzzle_file_sha256:'b'.repeat(64),
   skill_source:{sha256:'c'.repeat(64),etag:'"'+'d'.repeat(32)+'-2"',compressed_bytes:12345,
    last_modified:'Thu, 01 Oct 2026 13:17:00 GMT',
    url:'https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.SET'+String(i).padStart(2,'0')+'.PremierDraft.csv.gz'}}));
- const catalog={corpus_version:'elite-trophy-colour-stage-v9',complete:true,errors:{},sets};
- const baseline={sets:sets.map(s=>s.id),environment:sets.map(s=>({set_id:s.id,active_corpus_version:'elite-trophy-colour-stage-v8',active_snapshot_id:'old-'+s.id,active_manifest_hash:'old-hash'}))};
+ const catalog={corpus_version:versions.v5.corpus_version,complete:true,errors:{},sets};
+ const baseline={sets:sets.map(s=>s.id),environment:sets.map(s=>({set_id:s.id,active_corpus_version:versions.v4.corpus_version,active_snapshot_id:'old-'+s.id,active_manifest_hash:'old-hash'}))};
  return {catalog,baseline};
 }
 function response(pin,patch={}) {
@@ -25,7 +26,7 @@ test('pinned metadata requires the complete unchanged v9 cohort, model, exact so
   c=>c.sets[0].skill_source.compressed_bytes=0,c=>c.sets[0].skill_source.etag='bad']) {
   const c=structuredClone(catalog);change(c);assert.throws(()=>pinnedGameSources(c,baseline));
  }
- const b=structuredClone(baseline);b.environment[0].active_corpus_version='elite-trophy-colour-stage-v9';
+ const b=structuredClone(baseline);b.environment[0].active_corpus_version=versions.v5.corpus_version;
  assert.throws(()=>pinnedGameSources(catalog,b));
 });
 test('archive probe is HEAD-only and fails on unavailable, redirected or changed pinned archives',async()=>{
