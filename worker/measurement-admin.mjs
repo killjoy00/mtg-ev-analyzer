@@ -217,7 +217,7 @@ export async function handleAdmin(request,query,readJson) {
           FROM analytics_events e JOIN players p ON p.id=e.player_id CROSS JOIN corpus_epoch epoch
           WHERE e.event_name='daily_share_arrival'
             AND e.created_at >= $1::date AND e.created_at < $2::date+interval '1 day'
-            AND (epoch.started_at IS NULL OR e.created_at>=epoch.started_at)
+            AND epoch.started_at IS NOT NULL AND e.created_at>=epoch.started_at
             AND ($3='all' OR coalesce(e.event_props->>'set','mixed')=$3)
             AND NOT coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
         ), starts AS (
