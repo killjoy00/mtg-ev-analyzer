@@ -1,6 +1,9 @@
 name: iOS TestFlight status
 
 on:
+  push:
+    branches: [main]
+    paths: ['.github/testflight-status-request.json']
   workflow_dispatch:
 
 permissions:
@@ -9,7 +12,7 @@ permissions:
 jobs:
   status:
     name: read App Store Connect build status
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') }}
     runs-on: ubuntu-latest
     environment: pack-one-mobile-release
     env:
@@ -35,7 +38,29 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Read latest Pack One TestFlight builds
-        run: node .github/scripts/app-store-build-status.mjs
+      - name: Resolve reviewed exact-build status request
+        id: request
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync, appendFileSync } from 'node:fs';
+          const request = JSON.parse(readFileSync('.github/testflight-status-request.json', 'utf8'));
+          const keys = ['build_number', 'operation', 'reason'];
+          if (JSON.stringify(Object.keys(request).sort()) !== JSON.stringify(keys)) throw Error('Invalid status request keys.');
+          if (request.operation !== 'read-pack-one-testflight-status') throw Error('Invalid status operation.');
+          if (!/^[1-9][0-9]*$/.test(request.build_number)) throw Error('Invalid build number.');
+          if (typeof request.reason !== 'string' || !request.reason.trim()) throw Error('Status reason required.');
+          appendFileSync(process.env.GITHUB_OUTPUT, `build_number=${request.build_number}\n`);
+          NODE
+      - name: Read exact Pack One TestFlight availability
+        env:
+          PACKONE_STATUS_OUTPUT: ${{ runner.temp }}/pack-one-testflight-status.json
+        run: node .github/scripts/app-store-build-status.mjs "${{ steps.request.outputs.build_number }}"
+      - name: Retain read-only distribution evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-testflight-status
+          path: ${{ runner.temp }}/pack-one-testflight-status.json
+          if-no-files-found: warn
       - name: Verify next monotonic build allocation
         run: node .github/scripts/app-store-next-build-number.mjs
