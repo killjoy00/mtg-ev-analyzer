@@ -29,6 +29,10 @@ on:
         description: 'Full reviewed v8 bridge SHA currently deployed to target; required for activate/rollback'
         type: string
         required: false
+      repair_game_metadata:
+        description: 'Verify exact pinned game archive headers and repair unknown legacy production metadata'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -54,6 +58,7 @@ jobs:
       STAGE_RUN_ID: ${{ inputs.stage_run_id }}
       BRIDGE_COMMIT: ${{ inputs.bridge_commit }}
       V5_CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+      REPAIR_GAME_METADATA: ${{ inputs.repair_game_metadata }}
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
@@ -78,6 +83,9 @@ jobs:
           git merge-base --is-ancestor "$RELEASE_COMMIT" origin/main
           test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
           grep -q "DRAFT_RUN_CORPUS_VERSION = 'elite-trophy-colour-stage-v9'" draft-run.mjs
+          if [[ "$REPAIR_GAME_METADATA" == true ]]; then
+            [[ "$ACTION" == stage && "$TARGET" == production ]] || { echo '::error::metadata repair requires production stage'; exit 1; }
+          fi
           case "$ACTION" in
             stage) test -z "$STAGE_RUN_ID" || { echo '::error::stage_run_id is not used for stage'; exit 1; } ;;
             activate|rollback|verify-active|resume-activation)
@@ -177,6 +185,12 @@ jobs:
           done
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           node scripts/v5-release-state.mjs "$RUNNER_TEMP/target.connection" capture generated/v5-candidate generated/v5-release-baseline.json
+          if [[ "$REPAIR_GAME_METADATA" == true ]]; then
+            # This orchestration helper comes from the reviewed workflow SHA;
+            # the accepted release runtime remains checked out unchanged.
+            git show "$GITHUB_SHA:.github/release-v5-source-metadata.mjs" > .github/release-v5-source-metadata.mjs
+            node .github/release-v5-source-metadata.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-trophy-import/catalog.json generated/v5-release-baseline.json
+          fi
           # Stage the exact checked-in v9 baseline without replacing v8 serving.
           # Migration 0049 makes inactive future-version puzzle/rating inserts
           # revision-neutral; the complete snapshot below remains separately
@@ -185,6 +199,17 @@ jobs:
           node scripts/load_all_trophies.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-trophy-import --stage-only
           node scripts/load-traditional-components.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-traditional
           node scripts/check-corpus-health.mjs "$RUNNER_TEMP/target.connection"
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          import {corpusDatabase} from './scripts/neon-corpus-db.mjs';
+          const query=corpusDatabase(process.env.RUNNER_TEMP+'/target.connection');
+          const catalog=JSON.parse(fs.readFileSync('generated/v5-candidate/v5-trophy-import/catalog.json'));
+          const ids=catalog.sets.map(s=>s.source_snapshot_id);
+          const rows=(await query("SELECT source_snapshot_id,lifecycle_status FROM corpus_source_snapshots WHERE source_snapshot_id=ANY($1::text[])",['{'+ids.join(',')+'}'])).rows;
+          assert.equal(rows.length,30,'Every exact staged parent must exist');
+          assert.ok(rows.every(s=>s.lifecycle_status==='Candidate'),'Every exact staged parent must be Candidate before stage acceptance');
+          NODE
           node scripts/candidate-gameplay-canary.mjs "$RUNNER_TEMP/target.connection"
           node scripts/verify-corpus-load.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-trophy-import --complete
           node scripts/verify-puzzle-components.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-traditional Candidate
@@ -311,6 +336,7 @@ jobs:
             generated/v5-release-baseline.json
             generated/stage.json
             generated/v5-traditional-validated.json
+            generated/v5-game-source-metadata.json
 
       - uses: actions/upload-artifact@v4
         if: always() && inputs.action != 'stage'
