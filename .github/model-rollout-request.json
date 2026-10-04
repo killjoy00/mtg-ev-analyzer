@@ -1,11 +1,7 @@
 {
-  "operation": "v5-corpus-release",
-  "request_id": "v5-v9-development-readiness-recovery-20261003",
-  "reason": "Owner-authorized #889. Development restoration 37157183204 committed all 30 v9 pointers but failed readiness because inherited mixed-only ECL/TLA/TMT were treated as newly admitted custom sets. Verify unchanged candidate bytes/history and exact committed pointers, recover current readiness with mixed-selection/reroll proof and unchanged custom coverage guards, then publish eligible components and run all acceptance without repeating pointer cutover.",
+  "operation": "deploy",
+  "request_id": "v5-v9-development-runtime-restored-20261003",
+  "reason": "Owner-authorized #889. After successful development readiness recovery, deploy exact repaired v9 runtime and require stable markers, all three Daily flows, and full account-linked Practice/replay/reroll/completion/persistence acceptance.",
   "target": "development",
-  "action": "resume-activation",
-  "candidate_run_id": "37132557406",
-  "release_commit": "5ef9c9230d83ca6a72210cf50e76c12b3ceb471a",
-  "stage_run_id": "37156639632",
-  "bridge_commit": "c7e90fe333395bcb3f7468744c943c20a7231978"
+  "commit": "5ef9c9230d83ca6a72210cf50e76c12b3ceb471a"
 }
