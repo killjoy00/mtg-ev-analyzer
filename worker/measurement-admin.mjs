@@ -3,6 +3,12 @@ import {createHash} from 'node:crypto';
 import {handleCorpusAdmin} from './corpus-admin.mjs';
 import {handleUserAdmin} from './user-admin.mjs';
 const fail=(message,status=400)=>{throw Object.assign(Error(message),{status});};
+const jsonArray=value=>Array.isArray(value)?value:(typeof value==='string'?JSON.parse(value):[]);
+async function timedAdminQuery(query,report,label,sql,params) {
+  const started=Date.now();
+  try { return await query(sql,params); }
+  finally { console.info(JSON.stringify({event:'admin_query_timing',report,label,elapsed_ms:Date.now()-started})); }
+}
 export function reportFilters(url,now=new Date()) {
   const end=url.searchParams.get('to')||now.toISOString().slice(0,10);
   const start=url.searchParams.get('from')||new Date(now.getTime()-29*86400000).toISOString().slice(0,10);
@@ -172,26 +178,36 @@ export async function handleAdmin(request,query,readJson) {
   if(url.pathname.startsWith('/v1/admin/corpus'))return handleCorpusAdmin(request,query,readJson,id);
   if(request.method!=='GET')fail('Method not allowed.',405);
   const filters=reportFilters(url);
+  if(url.pathname==='/v1/admin/measurements/habits') {
+    const habitMetrics=await timedAdminQuery(query,'measurements_habits','habit_metrics',HABIT_METRICS_SQL,[filters.start,filters.end]);
+    const habit=habitMetrics.rows[0]||{};
+    return {generated_at:new Date().toISOString(),filters:{start:filters.start,end:filters.end},
+      habit_metrics:{cohorts:jsonArray(habit.cohorts),daily_health:jsonArray(habit.daily_health)}};
+  }
+  if(url.pathname==='/v1/admin/measurements/reviews') {
+    const scope=`WITH scoped AS (SELECT * ${SCOPE}), primary_data AS (SELECT * FROM scoped WHERE observed AND NOT is_qa AND first_encounter)`;
+    const reviews=await timedAdminQuery(query,'measurements_reviews','reviews',`${scope}, chosen AS (SELECT puzzle_id,${METRICS},bool_or(model_disagreement) model_disagreement
+      FROM primary_data GROUP BY puzzle_id HAVING count(*) FILTER(WHERE outcome='pick')>=5
+      ORDER BY bool_or(model_disagreement) DESC,count(*) FILTER(WHERE outcome='pick') DESC LIMIT 30)
+      SELECT c.*,p.set_id,p.pick_number,p.payload->>'historical_pick_id' trophy_id
+      FROM chosen c JOIN draft_run_verified_puzzles p USING(puzzle_id)`,filters.params);
+    return {generated_at:new Date().toISOString(),filters:{...filters,params:undefined},reviews:reviews.rows};
+  }
   if(url.pathname==='/v1/admin/measurements') {
     const scope=`WITH scoped AS (SELECT * ${SCOPE}), primary_data AS (SELECT * FROM scoped WHERE observed AND NOT is_qa AND first_encounter)`;
-    const [coverage,summary,groups,reviews,options,shareFunnel,habitMetrics]=await Promise.all([
-      query(`${scope} SELECT count(*)::int recorded,count(*) FILTER(WHERE is_qa)::int qa_excluded,
+    const [coverage,summary,groups,options,shareFunnel]=await Promise.all([
+      timedAdminQuery(query,'measurements','coverage',`${scope} SELECT count(*)::int recorded,count(*) FILTER(WHERE is_qa)::int qa_excluded,
         count(*) FILTER(WHERE NOT observed AND NOT is_qa)::int unobserved_excluded,
         count(*) FILTER(WHERE observed AND NOT is_qa AND NOT first_encounter)::int repeats_excluded,
         min(first_seen_at) collection_started FROM scoped`,filters.params),
-      query(`${scope} SELECT ${METRICS},count(DISTINCT session_id)::int runs,
+      timedAdminQuery(query,'measurements','summary',`${scope} SELECT ${METRICS},count(DISTINCT session_id)::int runs,
         count(DISTINCT session_id) FILTER(WHERE run_complete)::int completed_runs FROM primary_data`,filters.params),
-      query(`${scope} SELECT dimension,label,${METRICS} FROM primary_data
+      timedAdminQuery(query,'measurements','groups',`${scope} SELECT dimension,label,${METRICS} FROM primary_data
         CROSS JOIN LATERAL (VALUES ('difficulty',coalesce(band,'unrated')),('set',set_id),('pick',pick_number::text),
         ('round',round::text),('source_event',source_event_type),('model_disagreement',model_disagreement::text),('version',selection_version||' / '||scoring_version||' / '||difficulty_version)) dimensions(dimension,label)
         GROUP BY dimension,label ORDER BY dimension,label`,filters.params),
-      query(`${scope}, chosen AS (SELECT puzzle_id,${METRICS},bool_or(model_disagreement) model_disagreement
-        FROM primary_data GROUP BY puzzle_id HAVING count(*) FILTER(WHERE outcome='pick')>=5
-        ORDER BY bool_or(model_disagreement) DESC,count(*) FILTER(WHERE outcome='pick') DESC LIMIT 30)
-        SELECT c.*,p.set_id,p.pick_number,p.payload->>'historical_pick_id' trophy_id
-        FROM chosen c JOIN draft_run_verified_puzzles p USING(puzzle_id)`,filters.params),
-      query(`SELECT set_id FROM draft_run_verified_sets ORDER BY set_id`),
-      query(`WITH arrivals AS (
+      timedAdminQuery(query,'measurements','set_options','SELECT set_id FROM draft_run_verified_sets ORDER BY set_id'),
+      timedAdminQuery(query,'measurements','share_funnel',`WITH arrivals AS (
           SELECT e.player_id,e.created_at
           FROM analytics_events e JOIN players p ON p.id=e.player_id
           WHERE e.event_name='daily_share_arrival'
@@ -216,11 +232,10 @@ export async function handleAdmin(request,query,readJson) {
           (SELECT count(*) FROM starts s WHERE EXISTS(SELECT 1 FROM completed c WHERE c.run_id=s.run_id))::int completions,
           round(100.0*(SELECT count(*) FROM starts)/nullif((SELECT count(*) FROM arrivals),0),1) start_pct,
           round(100.0*(SELECT count(*) FROM starts s WHERE EXISTS(SELECT 1 FROM completed c WHERE c.run_id=s.run_id))/nullif((SELECT count(*) FROM starts),0),1) completion_pct`,
-        [filters.start,filters.end,filters.environment]),
-      query(HABIT_METRICS_SQL,[filters.start,filters.end])
+        [filters.start,filters.end,filters.environment])
     ]);
-    const habit=habitMetrics.rows[0]||{},jsonArray=value=>Array.isArray(value)?value:(typeof value==='string'?JSON.parse(value):[]);
-    return {generated_at:new Date().toISOString(),filters:{...filters,params:undefined},coverage:coverage.rows[0],summary:summary.rows[0],share_funnel:shareFunnel.rows[0],habit_metrics:{cohorts:jsonArray(habit.cohorts),daily_health:jsonArray(habit.daily_health)},groups:groups.rows,reviews:reviews.rows,sets:options.rows.map(r=>r.set_id),
+    return {generated_at:new Date().toISOString(),filters:{...filters,params:undefined},coverage:coverage.rows[0],summary:summary.rows[0],share_funnel:shareFunnel.rows[0],
+      groups:groups.rows,sets:options.rows.map(r=>r.set_id),reviews_deferred:true,habit_metrics_deferred:true,
       definitions:{primary:'First recorded encounter per player and puzzle; observed in the browser; QA excluded.',abandonment:'Unfinished run with an open viewed decision and no activity for 24 hours. A return removes this classification.',timing:'Client-reported foreground time; missing for reloads, multiple tabs, old clients, or invalid timing. This is not a trusted gameplay score.',sample:'Fewer than 30 answers is an early signal, not a calibrated difficulty estimate.',review:'Decisions with at least five first-encounter answers; model disagreement first, then sample size.',habit_person:'Habit metrics count linked accounts as one person after identity merges; guests remain one browser/player identity.',habit_completion:'A Daily day is one or more completed Mixed, Powered Cube, or Latest Set sessions on the stored Pacific Daily date. Multiple Dailies on one date count once.',habit_exclusions:'All habit metrics exclude measurement-QA sessions, QA-pattern display names, and players linked to Pack One admin accounts.',habit_maturity:'Next-day, 7-day, and 3-in-7 rates include only cohorts whose full measurement window has closed; immature cohort counts are shown separately.',habit_attribution:'First touch is the earliest acquisition event for the merged player. Earlier product activity is pre_tracking; missing post-launch attribution is direct. Campaign is (none) when absent.',habit_ever:'Ever 3-in-7 is a lifetime observed status as of report generation, not a fixed-horizon cohort rate. Daily health counts people with 3+ distinct Daily days in each trailing seven-day window.'}};
   }
   const match=url.pathname.match(/^\/v1\/admin\/decisions\/([a-f0-9]{32})$/);

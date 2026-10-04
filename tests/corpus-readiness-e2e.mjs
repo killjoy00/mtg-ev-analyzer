@@ -23,6 +23,7 @@ for(const [name,engine] of Object.entries({chromium,webkit})) {
     window.calls.push({path,body});
     if(path==='/v1/admin/corpus/readiness')return structuredClone(window.readiness);
     if(path==='/v1/admin/corpus')return structuredClone({...window.corpusFixture,readiness:window.readiness});
+    if(path==='/v1/admin/corpus/qa/detail')return structuredClone({...window.corpusFixture,readiness:window.readiness});
     if(path==='/v1/admin/corpus/qa/snapshot') {
      const next=String(Number(window.readiness.current_revision)+1);
      window.readiness={...window.readiness,operation_id:next,current_operation_id:next,revision:next,current_revision:next,state:'warming',ready:false,cache_snapshot_id:null};

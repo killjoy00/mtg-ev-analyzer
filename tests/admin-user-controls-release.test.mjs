@@ -30,6 +30,12 @@ test('gateway allows only the narrow admin username and deletion routes and meth
   assert.equal(adminGrowthPath('/v1/admin/users/22222222-2222-4222-8222-222222222222/deletion','GET','production'),true);
   assert.equal(adminGrowthPath('/v1/admin/users/22222222-2222-4222-8222-222222222222/delete','POST','preview'),false);
   assert.equal(adminGrowthPath('/v1/admin/users/22222222-2222-4222-8222-222222222222/email','POST','production'),false);
+  assert.equal(adminPath('/v1/admin/measurements','GET'),true);
+  assert.equal(adminPath('/v1/admin/measurements/habits','GET'),true);
+  assert.equal(adminPath('/v1/admin/measurements/reviews','GET'),true);
+  assert.equal(adminPath('/v1/admin/measurements/habits','POST'),false);
+  assert.equal(adminPath('/v1/admin/corpus/blb/detail','GET'),true);
+  assert.equal(adminPath('/v1/admin/corpus/blb/detail','POST'),false);
 });
 
 test('Admin Users browser uses PATCH rename, typed destructive confirmation, status recovery and separate services',()=>{
@@ -57,6 +63,16 @@ test('Admin Users browser uses PATCH rename, typed destructive confirmation, sta
   assert.match(growth,/operationId:error\.operationId/);
   assert.match(growth,/handleAdminUsernameChange\(request,query,url,\{readJson,adminAuthUserId:admin\.user_id\}\)/);
   assert.match(growth,/username\$\/i\.test\(url\.pathname\)\) \{\n\s*const admin=await adminAccountIdentity\(request,\{mutation:true\}\)/);
+});
+
+test('admin shell keeps timeout handling around body parsing and publishes only current core reports',()=>{
+  const shell=fs.readFileSync('admin/admin.mjs','utf8');
+  const requestBlock=shell.slice(shell.indexOf('async function requestAt'),shell.indexOf('const request='));
+  assert.match(requestBlock,/try \{[\s\S]*await fetch\([\s\S]*await r\.json\(\)[\s\S]*\} catch\(error\)/);
+  assert.match(requestBlock,/TimeoutError.*AbortError.*admin_timeout/s);
+  const loadBlock=shell.slice(shell.indexOf('async function load()'),shell.indexOf("document.addEventListener('pack1:admin-signout'"));
+  assert.match(loadBlock,/nextReport=await request\([\s\S]*if\(loadId!==deferredLoad\)return;report=nextReport/);
+  assert.doesNotMatch(loadBlock,/report=await request\('\/v1\/admin\/measurements/);
 });
 
 test('0047 is registered in secure auth and isolated backend release paths',()=>{
