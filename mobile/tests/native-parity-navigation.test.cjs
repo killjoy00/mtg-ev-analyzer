@@ -250,3 +250,90 @@ test('each public tab URL has exactly one screen implementation', () => {
     assert.equal(fs.existsSync(path.resolve(`app/${name}.tsx`)), false, `Duplicate /${name} route`);
   }
 });
+
+// Exercise the installed navigator. A child return must retain the tabs' key,
+// history and nested state, not merely render a second copy of the same screen.
+function returnStack(child) {
+  const { StackRouter } = require(path.resolve('node_modules/expo-router/build/react-navigation/routers/StackRouter.js'));
+  const navigator = StackRouter({ initialRouteName: '(tabs)' });
+  const tabs = { key: 'saved-tabs', type: 'tab', index: 1, routeNames: ['index', 'practice', 'career'],
+    routes: [{ key: 'daily', name: 'index' }, { key: 'practice', name: 'practice', params: { environment: 'mixed' } }, { key: 'career', name: 'career' }],
+    history: [{ type: 'route', key: 'daily' }, { type: 'route', key: 'practice' }] };
+  let state = { stale: false, type: 'stack', key: 'root', index: 2,
+    routeNames: ['(tabs)', 'account', child], preloadedRoutes: [],
+    routes: [{ key: 'existing-tabs', name: '(tabs)', state: tabs }, { key: 'account', name: 'account' }, { key: 'child', name: child }] };
+  const options = { routeNames: state.routeNames, routeParamList: {}, routeGetIdList: {} };
+  return { tabs, state: () => state, dispatch(type, destination) {
+    const screen = destination === '/' ? 'index' : destination.slice(1);
+    state = navigator.getStateForAction(state, { type, payload: { name: '(tabs)', params: { screen } } }, options);
+  } };
+}
+
+test('tab returns pop child screens and preserve the existing navigator state', () => {
+  for (const [child, destination, oldAction] of [['account-profile', '/career', 'PUSH'], ['set-archive', '/practice', 'PUSH'], ['account-delete', '/', 'REPLACE']]) {
+    const old = returnStack(child); old.dispatch(oldAction, destination);
+    assert.equal(old.state().routes.filter(route => route.name === '(tabs)').length, 2, 'Reproduces the prior duplicate-tab stack');
+    const fixed = returnStack(child); fixed.dispatch('POP_TO', destination);
+    assert.equal(fixed.state().routes.length, 1);
+    assert.equal(fixed.state().routes[0].key, 'existing-tabs');
+    assert.equal(fixed.state().routes[0].state, fixed.tabs, 'Filters, history and mounted tab state remain attached');
+    assert.equal(fixed.state().routes[0].params.screen, destination === '/' ? 'index' : destination.slice(1));
+  }
+});
+
+test('archive play action returns to the existing Practice tab', async () => {
+  const stack = returnStack('set-archive');
+  const native = Object.fromEntries(['Pressable', 'Text', 'View', 'ScrollView'].map(name => [name, host(name)]));
+  const load = compiler({
+    'react-native': { ...native, StyleSheet: { create: x => x }, Linking: { openURL: async () => {} } },
+    'expo-image': { Image: host('Image') },
+    'expo-router': { useLocalSearchParams: () => ({ setId: 'msh' }), router: { dismissTo: to => stack.dispatch('POP_TO', to) } },
+    '@/src/components/Text': { Text: native.Text }, '@/src/components/ScreenArea': { ScreenArea: host('SafeAreaView') },
+    '@/src/tcgplayer': { tcgplayerUrl: () => 'https://example.invalid' },
+  });
+  const Screen = load('app/set-archive.tsx').default;
+  let root;
+  await act(async () => { root = Renderer.create(React.createElement(Screen)); });
+  try {
+    const button = root.root.findAllByType('Pressable').find(node => text(node).trim() === 'Open Practice');
+    assert.ok(button); await act(async () => button.props.onPress());
+    assert.equal(stack.state().routes.length, 1);
+    assert.equal(stack.state().routes[0].state, stack.tabs);
+    assert.equal(stack.state().routes[0].params.screen, 'practice');
+  } finally { await act(async () => root.unmount()); }
+});
+
+for (const fails of [false, true]) test(`deletion ${fails ? 'failure retains the current screen and identity' : 'success clears identity before returning to the existing Daily tabs'}`, async () => {
+  const stack = returnStack('account-delete'), events = [];
+  let confirmation;
+  const native = Object.fromEntries(['Pressable', 'Text', 'View', 'ScrollView', 'TextInput', 'ActivityIndicator'].map(name => [name, host(name)]));
+  const guest = session('guest');
+  const accountSession = session('A');
+  const load = compiler({
+    'react-native': { ...native, StyleSheet: { create: x => x }, Platform: { OS: 'android' }, Linking: { openURL: async () => {} },
+      Alert: { alert: (_title, _body, buttons) => { confirmation = buttons.find(button => button.style === 'destructive').onPress; } } },
+    'expo-router': { router: { dismissTo: to => { events.push('return'); stack.dispatch('POP_TO', to); } } },
+    'expo-web-browser': {}, '@/src/components/Text': { Text: native.Text }, '@/src/components/ScreenArea': { ScreenArea: host('SafeAreaView') },
+    '@/src/hooks/useAccountState': { useAccountState: () => ({ session: accountSession, account: { deletion: { enabled: true, method: 'password' } }, busy: false,
+      clearAccount: value => { assert.equal(value, guest); events.push('clear'); } }) },
+    '@/src/api/account': { deleteMobileAccount: async (_session, body) => { assert.deepEqual(body, { currentPassword: 'fixture' }); events.push('delete'); if (fails) throw Error('Delete unavailable'); } },
+    '@/src/api/guest': { ensureGuestSession: async () => { events.push('guest'); return guest; } },
+    '@/src/api/apple-subscriptions': { loadNativeAppleSubscriptionStatus: async () => ({ subscription: { linked: false, active: false } }) },
+    '@/src/iap/apple-store': {},
+  });
+  const Screen = load('app/account-delete.tsx').default;
+  let root;
+  await act(async () => { root = Renderer.create(React.createElement(Screen)); await flush(); });
+  try {
+    await act(async () => root.root.findByProps({ accessibilityLabel: 'Current password for account deletion' }).props.onChangeText('fixture'));
+    const button = root.root.findAllByType('Pressable').find(node => text(node).trim() === 'Permanently delete account');
+    assert.ok(button); assert.equal(button.props.disabled, false);
+    await act(async () => button.props.onPress());
+    assert.deepEqual(events, [], 'Confirmation remains required');
+    await act(async () => { confirmation(); await flush(); });
+    assert.deepEqual(events, fails ? ['delete'] : ['delete', 'guest', 'clear', 'return']);
+    assert.equal(stack.state().routes.length, fails ? 3 : 1);
+    if (fails) assert.match(text(root.toJSON()), /Delete unavailable/);
+    else { assert.equal(stack.state().routes[0].state, stack.tabs); assert.equal(stack.state().routes[0].params.screen, 'index'); }
+  } finally { await act(async () => root.unmount()); }
+});

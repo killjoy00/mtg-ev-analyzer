@@ -71,10 +71,11 @@ async function fixture(t, options = {}) {
   const adopted = [];
   const calls = [];
   const pushes = [];
+  const dismissed = [];
   const initialProfile = options.profile ?? makeProfile();
 
   const mocks = {
-    'expo-router': { router: { push(value) { pushes.push(value); } } },
+    'expo-router': { router: { push(value) { pushes.push(value); }, dismissTo(value) { dismissed.push(value); } } },
     'expo-web-browser': { openBrowserAsync: async () => ({ type: 'opened' }) },
     'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       ActivityIndicator: host('ActivityIndicator'),
@@ -159,6 +160,7 @@ async function fixture(t, options = {}) {
     root,
     calls,
     adopted,
+    dismissed,
     text: () => text(root.toJSON()),
     inputValue: () => displayNameInput().props.value,
     async changeName(value) {
@@ -270,4 +272,13 @@ test('a successful correction adopts the returned profile without overwriting a 
   assert.doesNotMatch(f.text(), /Display name needs attention/);
   assert.match(f.text(), /Profile saved\./);
   assert.equal(f.adopted.length, 1);
+});
+
+
+test('Open My Pack One returns to the existing member tabs after profile editing', async (t) => {
+  const f = await fixture(t);
+  const button = f.root.root.findAll(node => node.type === 'Pressable' && text(node).includes('Open My Pack One'))[0];
+  assert.ok(button);
+  await act(async () => { button.props.onPress(); await drain(); });
+  assert.deepEqual(f.dismissed, ['/career']);
 });
