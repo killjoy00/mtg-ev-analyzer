@@ -139,6 +139,44 @@ const HABIT_METRICS_SQL=`WITH eligible_daily_sessions AS (
 SELECT
   coalesce((SELECT jsonb_agg(to_jsonb(c) ORDER BY c.source,c.campaign) FROM cohort_summary c),'[]'::jsonb) cohorts,
   coalesce((SELECT jsonb_agg(to_jsonb(h) ORDER BY h.day) FROM daily_health h),'[]'::jsonb) daily_health`;
+const SHARE_FUNNEL_SQL=`WITH arrivals AS (
+  SELECT e.player_id,e.created_at
+  FROM analytics_events e JOIN players p ON p.id=e.player_id
+  WHERE e.event_name='daily_share_arrival'
+    AND e.created_at >= $1::date AND e.created_at < $2::date+interval '1 day'
+    AND ($3='all' OR coalesce(e.event_props->>'set','mixed')=$3)
+    AND NOT coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
+), starts AS (
+  SELECT DISTINCT e.event_props->>'run_id' run_id
+  FROM analytics_events e
+  JOIN draft_run_sessions s ON s.id::text=e.event_props->>'run_id'
+  WHERE e.event_name='daily_started' AND e.event_props->>'source'='result_share'
+    AND e.created_at >= $1::date AND e.created_at < $2::date+interval '1 day'
+    AND ($3='all' OR e.event_props->>'set_id'=$3)
+    AND NOT s.measurement_qa
+), completed AS (
+  SELECT DISTINCT event_props->>'run_id' run_id
+  FROM analytics_events WHERE event_name='daily_completed'
+)
+SELECT (SELECT count(*) FROM arrivals)::int arrivals,
+  (SELECT count(DISTINCT player_id) FROM arrivals)::int visitors,
+  (SELECT count(*) FROM starts)::int starts,
+  (SELECT count(*) FROM starts s WHERE EXISTS(SELECT 1 FROM completed c WHERE c.run_id=s.run_id))::int completions,
+  round(100.0*(SELECT count(*) FROM starts)/nullif((SELECT count(*) FROM arrivals),0),1) start_pct,
+  round(100.0*(SELECT count(*) FROM starts s WHERE EXISTS(SELECT 1 FROM completed c WHERE c.run_id=s.run_id))/nullif((SELECT count(*) FROM starts),0),1) completion_pct`;
+
+const jsonArray=value=>Array.isArray(value)?value:(typeof value==='string'?JSON.parse(value):[]);
+async function engagementReport(query,filters) {
+  const [shareFunnel,habitMetrics]=await Promise.all([
+    query(SHARE_FUNNEL_SQL,[filters.start,filters.end,filters.environment]),
+    query(HABIT_METRICS_SQL,[filters.start,filters.end])
+  ]);
+  const habit=habitMetrics.rows[0]||{};
+  return {
+    share_funnel:shareFunnel.rows[0],
+    habit_metrics:{cohorts:jsonArray(habit.cohorts),daily_health:jsonArray(habit.daily_health)}
+  };
+}
 async function account(request,query) {
   let auth;
   try {auth=await accountSession(request,query,{allowLegacy:true});}
@@ -173,8 +211,15 @@ export async function handleAdmin(request,query,readJson) {
   if(request.method!=='GET')fail('Method not allowed.',405);
   const filters=reportFilters(url);
   if(url.pathname==='/v1/admin/measurements') {
+    const section=url.searchParams.get('section')||'all';
+    if(!['all','core','engagement'].includes(section))fail('Invalid report section.');
+    if(section==='engagement')return {
+      generated_at:new Date().toISOString(),
+      filters:{...filters,params:undefined},
+      ...await engagementReport(query,filters)
+    };
     const scope=`WITH scoped AS (SELECT * ${SCOPE}), primary_data AS (SELECT * FROM scoped WHERE observed AND NOT is_qa AND first_encounter)`;
-    const [coverage,summary,groups,reviews,options,shareFunnel,habitMetrics]=await Promise.all([
+    const tasks=[
       query(`${scope} SELECT count(*)::int recorded,count(*) FILTER(WHERE is_qa)::int qa_excluded,
         count(*) FILTER(WHERE NOT observed AND NOT is_qa)::int unobserved_excluded,
         count(*) FILTER(WHERE observed AND NOT is_qa AND NOT first_encounter)::int repeats_excluded,
@@ -190,37 +235,11 @@ export async function handleAdmin(request,query,readJson) {
         ORDER BY bool_or(model_disagreement) DESC,count(*) FILTER(WHERE outcome='pick') DESC LIMIT 30)
         SELECT c.*,p.set_id,p.pick_number,p.payload->>'historical_pick_id' trophy_id
         FROM chosen c JOIN draft_run_verified_puzzles p USING(puzzle_id)`,filters.params),
-      query(`SELECT set_id FROM draft_run_verified_sets ORDER BY set_id`),
-      query(`WITH arrivals AS (
-          SELECT e.player_id,e.created_at
-          FROM analytics_events e JOIN players p ON p.id=e.player_id
-          WHERE e.event_name='daily_share_arrival'
-            AND e.created_at >= $1::date AND e.created_at < $2::date+interval '1 day'
-            AND ($3='all' OR coalesce(e.event_props->>'set','mixed')=$3)
-            AND NOT coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
-        ), starts AS (
-          SELECT DISTINCT e.event_props->>'run_id' run_id
-          FROM analytics_events e
-          JOIN draft_run_sessions s ON s.id::text=e.event_props->>'run_id'
-          WHERE e.event_name='daily_started' AND e.event_props->>'source'='result_share'
-            AND e.created_at >= $1::date AND e.created_at < $2::date+interval '1 day'
-            AND ($3='all' OR e.event_props->>'set_id'=$3)
-            AND NOT s.measurement_qa
-        ), completed AS (
-          SELECT DISTINCT event_props->>'run_id' run_id
-          FROM analytics_events WHERE event_name='daily_completed'
-        )
-        SELECT (SELECT count(*) FROM arrivals)::int arrivals,
-          (SELECT count(DISTINCT player_id) FROM arrivals)::int visitors,
-          (SELECT count(*) FROM starts)::int starts,
-          (SELECT count(*) FROM starts s WHERE EXISTS(SELECT 1 FROM completed c WHERE c.run_id=s.run_id))::int completions,
-          round(100.0*(SELECT count(*) FROM starts)/nullif((SELECT count(*) FROM arrivals),0),1) start_pct,
-          round(100.0*(SELECT count(*) FROM starts s WHERE EXISTS(SELECT 1 FROM completed c WHERE c.run_id=s.run_id))/nullif((SELECT count(*) FROM starts),0),1) completion_pct`,
-        [filters.start,filters.end,filters.environment]),
-      query(HABIT_METRICS_SQL,[filters.start,filters.end])
-    ]);
-    const habit=habitMetrics.rows[0]||{},jsonArray=value=>Array.isArray(value)?value:(typeof value==='string'?JSON.parse(value):[]);
-    return {generated_at:new Date().toISOString(),filters:{...filters,params:undefined},coverage:coverage.rows[0],summary:summary.rows[0],share_funnel:shareFunnel.rows[0],habit_metrics:{cohorts:jsonArray(habit.cohorts),daily_health:jsonArray(habit.daily_health)},groups:groups.rows,reviews:reviews.rows,sets:options.rows.map(r=>r.set_id),
+      query(`SELECT set_id FROM draft_run_verified_sets ORDER BY set_id`)
+    ];
+    if(section==='all')tasks.push(engagementReport(query,filters));
+    const [coverage,summary,groups,reviews,options,engagement={}]=await Promise.all(tasks);
+    return {generated_at:new Date().toISOString(),filters:{...filters,params:undefined},coverage:coverage.rows[0],summary:summary.rows[0],...engagement,groups:groups.rows,reviews:reviews.rows,sets:options.rows.map(r=>r.set_id),
       definitions:{primary:'First recorded encounter per player and puzzle; observed in the browser; QA excluded.',abandonment:'Unfinished run with an open viewed decision and no activity for 24 hours. A return removes this classification.',timing:'Client-reported foreground time; missing for reloads, multiple tabs, old clients, or invalid timing. This is not a trusted gameplay score.',sample:'Fewer than 30 answers is an early signal, not a calibrated difficulty estimate.',review:'Decisions with at least five first-encounter answers; model disagreement first, then sample size.',habit_person:'Habit metrics count linked accounts as one person after identity merges; guests remain one browser/player identity.',habit_completion:'A Daily day is one or more completed Mixed, Powered Cube, or Latest Set sessions on the stored Pacific Daily date. Multiple Dailies on one date count once.',habit_exclusions:'All habit metrics exclude measurement-QA sessions, QA-pattern display names, and players linked to Pack One admin accounts.',habit_maturity:'Next-day, 7-day, and 3-in-7 rates include only cohorts whose full measurement window has closed; immature cohort counts are shown separately.',habit_attribution:'First touch is the earliest acquisition event for the merged player. Earlier product activity is pre_tracking; missing post-launch attribution is direct. Campaign is (none) when absent.',habit_ever:'Ever 3-in-7 is a lifetime observed status as of report generation, not a fixed-horizon cohort rate. Daily health counts people with 3+ distinct Daily days in each trailing seven-day window.'}};
   }
   const match=url.pathname.match(/^\/v1\/admin\/decisions\/([a-f0-9]{32})$/);
