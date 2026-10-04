@@ -6,6 +6,7 @@ import {DAILY_SELECTION_VERSION} from '../daily-selection.mjs';
 import {registerHealthyCandidate} from '../scripts/corpus-candidate.mjs';
 import {CORPUS_GATE_VERSION} from '../corpus-quality.mjs';
 import {SERVING_POLICY_VERSION} from '../serving-quality.mjs';
+import {registerServingReadiness,advanceServingReadiness} from '../worker/corpus-readiness.mjs';
 import {TRADITIONAL_GATE_VERSION,TRADITIONAL_V4_PHASE2_COMPONENT_VERSION,V4_CONTEXT_MODEL_VERSION,TRADITIONAL_V5_PHASE2_COMPONENT_VERSION,V5_CONTEXT_MODEL_VERSION,V5_PARENT_CORPUS_VERSION} from '../corpus-components.mjs';
 
 if(!process.argv.includes('--dev-fixtures'))throw Error('Isolated development branch required.');
@@ -117,6 +118,13 @@ async function snapshotReportingFixture() {
  await insertHealth(historicalSnapshot,historicalSet,true,'historical-frozen');
  await clonePuzzle({setId:historicalSet,snapshotId:null,ratio:.5});
  await clonePuzzle({setId:historicalSet,snapshotId:null,ratio:.1});
+
+ // Direct fixture writes correctly invalidate the current serving revision. Bring
+ // that durable readiness job through the same warm/verify path production uses
+ // before asserting that the lightweight overview reflects current serving.
+ await registerServingReadiness(query);
+ const initialReadiness=await advanceServingReadiness(query);
+ assert.equal(initialReadiness.ready,true,JSON.stringify(initialReadiness));
 
  let overview=await call(''),detail=await call('/'+snapshotSet+'/detail'),row=findSet(detail,snapshotSet),candidate=detail.snapshots.find(s=>s.source_snapshot_id===snapshotB);
  assert.equal(row.serving_parent_count,2);
