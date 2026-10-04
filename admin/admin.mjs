@@ -16,10 +16,10 @@ async function requestAt(base,path,body,method=body?'POST':'GET') {
   const headers={'content-type':'application/json'};
   if(firstPartyAuthEnabled()){const csrf=accountCsrfToken();if(!['GET','HEAD'].includes(method)&&csrf)headers['x-pack1-csrf']=csrf;}
   else headers['x-pack1-auth-session']=storedAccountToken()||'';
-  let r;
-  try {r=await fetch(base+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),credentials:firstPartyAuthEnabled()?'include':'omit',signal:AbortSignal.timeout(45000)});}
-  catch(error){if(error?.name==='TimeoutError'||error?.name==='AbortError')throw Object.assign(Error('This admin request exceeded the 45-second load limit.'),{status:0,code:'admin_timeout'});throw error;}
-  const d=await r.json();if(!r.ok)throw Object.assign(Error(d.error||'Report unavailable.'),{status:r.status,code:d.code||null,data:d});return d;
+  try {
+    const r=await fetch(base+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),credentials:firstPartyAuthEnabled()?'include':'omit',signal:AbortSignal.timeout(45000)});
+    const d=await r.json();if(!r.ok)throw Object.assign(Error(d.error||'Report unavailable.'),{status:r.status,code:d.code||null,data:d});return d;
+  } catch(error){if(error?.name==='TimeoutError'||error?.name==='AbortError')throw Object.assign(Error('This admin request exceeded the 45-second load limit.'),{status:0,code:'admin_timeout'});throw error;}
 }
 const request=(path,body,method)=>requestAt(draftBase,path,body,method);
 const growthRequest=(path,body,method)=>requestAt(growthBase,path,body,method);
@@ -98,7 +98,7 @@ function render() {
 async function load() {
   if(!hasAccountSession()){login();return;}
   const loadId=++deferredLoad;
-  try{if(invite){await request('/v1/admin/claim',{invite});sessionStorage.removeItem('pack1-admin-invite');invite=null;}const area=new URLSearchParams(location.search).get('area');if(area==='corpus'){await renderCorpus(root,request);return;}if(area==='users'){await renderUsers(root,request,growthRequest);return;}if(area==='campaign-links'){await renderCampaignLinks(root,growthRequest);return;}const queryString=params.toString();report=await request('/v1/admin/measurements'+(queryString?'?'+queryString:''));if(loadId!==deferredLoad)return;const effectiveQuery=reportQuery(report.filters);render();void loadDeferredSections(loadId,effectiveQuery);}
+  try{if(invite){await request('/v1/admin/claim',{invite});sessionStorage.removeItem('pack1-admin-invite');invite=null;}const area=new URLSearchParams(location.search).get('area');if(area==='corpus'){await renderCorpus(root,request);return;}if(area==='users'){await renderUsers(root,request,growthRequest);return;}if(area==='campaign-links'){await renderCampaignLinks(root,growthRequest);return;}const queryString=params.toString(),nextReport=await request('/v1/admin/measurements'+(queryString?'?'+queryString:''));if(loadId!==deferredLoad)return;report=nextReport;const effectiveQuery=reportQuery(report.filters);render();void loadDeferredSections(loadId,effectiveQuery);}
   catch(err){if(loadId!==deferredLoad)return;if(err.status===401||err.status===403){login(err.message);return;}const status=document.querySelector('#status');if(status)status.textContent=err.message;else root.innerHTML=`<h1>Report unavailable</h1><p class="error">${esc(err.message)}</p><button id="retry">Try again</button>`;document.querySelector('#retry')?.addEventListener('click',load);}
 }
 document.addEventListener('pack1:admin-signout',async()=>{await signOutAccount();login();});
