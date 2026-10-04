@@ -1,8 +1,6 @@
 {
-  "operation": "production-browser",
-  "request_id": "v5-v9-production-browser-20261003",
-  "reason": "Owner-authorized #889 final browser acceptance after exact production v9 runtime deployment passes. Verify live website Daily behavior, sharing, completion, images and responsive layouts, starting with Latest Set; retain all historical data.",
-  "first_environment": "latest",
-  "measurement_mode": false,
-  "measurement_samples": 1
+  "operation": "card-images",
+  "request_id": "powered-cube-v9-image-repair-20261004",
+  "replay_of": "refresh-titania-main-art-20260926",
+  "reason": "Owner-authorized repair of the production v9 Powered Cube display-metadata regression. Run the guarded full Pack One image normalization from current main after the ingestion fix, update R2 and development/production Draft Run image metadata including Live v5 components, verify gameplay, and change display fields only."
 }
