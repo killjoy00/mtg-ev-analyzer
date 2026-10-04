@@ -1,6 +1,6 @@
 # Native navigation and visual parity repair — #575 / #910
 
-Status at October 4, 2026, 1:00 p.m. CDT: implementation and native verification in progress. No new distributed candidate is claimed by this document. Pacific time remains the game-day boundary.
+Status at October 4, 2026, 2:15 p.m. CDT: implementation and native verification in progress. No new distributed candidate is claimed by this document. Pacific time remains the game-day boundary.
 
 PR #890 is retained. It fixed the account/profile batch, not the original native navigation, Daily, Learn, or feedback complaints. Builds iOS 100415 and Android 100444 predate #890 and this repair. Unsigned archives and bundle smoke jobs are not tester distribution.
 
@@ -45,6 +45,20 @@ Source `096fa73fdeb7de8f9672fd8f38f9a88081f24fcb`: [native run 37132614433](http
 Integration verification on `32232698f1613034e4b723c896a3384d1051d4bd` passed required root tests, browser tests and the full mobile suite. Integration review then found that rename detection had omitted deletion of five old root routes; `3cbae747d3d5193ad07151118d088b803b26c8ff` removes those duplicates and adds a unique-public-route contract. Its full mobile command passed locally. Native acceptance is being rerun on the final revision, including image failure/retry and explicit sign-out/account-switch journeys.
 
 The full browser gate [37132614437](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/37132614437) passed, including real computed font-size growth before the 125% screenshot. The required root test gate found a missing acceptance-script stub in the screenshot-runner harness; that test was updated without removing readiness/install failure assertions. Full mobile tests passed on the first revision; subsequent changes are being rerun.
+
+## Native revision 82ee: observed Android results
+
+Source `82ee04750642e65ba9a7df918df69df6d6951d02`, tested PR merge checkout `fb37aa9619347037adcf9a16b5402ba607d2e63e`: [run 37223468146](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/37223468146). Android 15 / API 35, `sdk_gphone64_x86_64`, Pixel 7 Pro emulator with explicit 320/390/600/840 dp overrides. Preview package `pro.packone.preview`, version 1.0 / versionCode 1. Preview fixtures; no physical-device or live-provider claim.
+
+- At 320 dp, both normal and Android 1.5 font scaling passed real native frame containment, including trophy match 100, non-match intermediate score, zero, and double-faced names. The measured choice line grew from 20 to 26 dp (1.3x); Android nonlinear scaling means the setting is not itself the measured growth.
+- Eight-pick Daily → final decision review → Home; eight-pick Practice → review → return; Leaders → profile → hardware Back; My Pack One → settings → Back; and image failure → zoom retry → close preserving the run all passed.
+- Fresh/returning guest, new/established member, free/Elite, no/partial/all completed, checking, and failure home scenes were captured. These are controlled fixture states, not production account acceptance.
+- The job failed four checks. Shared authentication and account-switch drivers entered the password while Email still had focus behind the keyboard. The corrected driver dismisses the keyboard and verifies the focused field before typing. Expanded analysis at 600 dp exceeded the driver's scroll limit. At 840 dp landscape, a native line measured 647.08 dp against a 645 dp text frame, inside the card's 24 dp padding; the revised assertion records line positions/text and checks actual extent against the feedback border as well as each frame's containment.
+- Visual review found missing SVG tab icons despite readable labels. The next revision replaces data-URI SVG decoding with native PNG images and checks icon load callbacks, followed by screenshot review.
+
+Artifact `pack-one-android-native-acceptance`, ID `11311069094`, SHA-256 `87b1b36af2e7352f5ab47da3dd75680a61ebbd511f919dab88c59a1415280fbd`. These are diagnostic captures, not approved store assets. iOS evidence was then inspected: iPhone 17 Pro Max and iPad Pro 13-inch (M4), iOS/iPadOS 26.5, preview 1.0/build 1. Long-name and trophy feedback passed native containment at normal and maximum accessibility text, with measured choice-line growth 20 → 71.42 points (3.571x); zero also passed at maximum size. The fixed 15-second cold-launch capture missed two iPhone scenes and one iPad scene. Two Career images were blank despite an early scene marker, so the next driver also requires actual content/header readiness and rejects blank images. Preview entry dismisses to the existing root tab. Visual review found enlarged Daily branding overflow and tab header clipping; the corrected layouts use intrinsic height and wrapping without disabling text scaling. All are being recaptured before acceptance.
+
+The iOS artifact `pack-one-ios-native-acceptance`, ID `11312183831`, SHA-256 `82e54d6aa11b6f90f46d83b6be9d739f3298a87c58d534e0798d93df3c0541ea`, retains these diagnostics. The next revision also adds font licenses in Help, correct new-account empty history fixtures, 44-point minimum small actions, and full card names in pack review.
 
 ## Intentional native differences and release gates
 

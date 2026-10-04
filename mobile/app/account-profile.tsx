@@ -288,7 +288,7 @@ const styles = StyleSheet.create({
   toggleValue: { color: colors.muted, fontSize: 12, fontWeight: '900' },
   toggleValueActive: { color: colors.accentDark },
   optionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  optionChip: { minHeight: 40, maxWidth: '100%', borderWidth: 1, borderColor: colors.lineStrong, paddingHorizontal: spacing.md, alignItems: 'center', justifyContent: 'center' },
+  optionChip: { minHeight: 44, maxWidth: '100%', borderWidth: 1, borderColor: colors.lineStrong, paddingHorizontal: spacing.md, alignItems: 'center', justifyContent: 'center' },
   optionChipSelected: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
   optionText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
   optionTextSelected: { color: colors.accentDark },

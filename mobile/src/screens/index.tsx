@@ -1,8 +1,9 @@
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
 import { Text } from '@/src/components/Text';
+import { config } from '@/src/config';
 
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 
@@ -23,16 +24,17 @@ import { colors, spacing } from '@/src/theme';
 
 const dailyEnvironments: DailyEnvironment[] = ['mixed', 'powered-cube', 'latest'];
 
+function recordBrandLayout(label: string, event: LayoutChangeEvent) {
+  if (config.screenshots.fixtures) console.info('PACKONE_BRAND', JSON.stringify({ label, ...event.nativeEvent.layout }));
+}
+
 function Brand() {
   return (
-    <View style={styles.brand}>
-      <View style={styles.brandMark}>
+    <View style={styles.brand} onLayout={event => recordBrandLayout('brand', event)}>
+      <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.brandMark} onLayout={event => recordBrandLayout('mark', event)}>
         <Text style={styles.brandMarkText}>P¹</Text>
       </View>
-      <View>
-        <Text style={styles.brandName}>Pack One</Text>
-
-      </View>
+      <Text style={styles.brandName} onLayout={event => recordBrandLayout('name', event)}>Pack One</Text>
     </View>
   );
 }
@@ -46,6 +48,7 @@ function completed(status: DailyStatus | null, environment: DailyEnvironment) {
 
 export default function HomeScreen() {
   const accountState = useNavigationSession();
+  const { fontScale } = useWindowDimensions();
   const [status, setStatus] = useState<DailyStatus | null>(null);
   const [promotionAllowed, setPromotionAllowed] = useState<boolean | null>(null);
   const [promotionError, setPromotionError] = useState<string | null>(null);
@@ -134,8 +137,8 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.page}>
-        <View style={styles.brandRow}><Brand />
-          <Pressable accessibilityRole="button" accessibilityLabel="Help and information" onPress={() => router.push('/help')} style={styles.helpLink}><Text style={styles.cardAction}>Help</Text></Pressable>
+        <View onLayout={event => recordBrandLayout('row', event)} style={[styles.brandRow, fontScale > 1.5 && styles.brandRowStacked]}><Brand />
+          <Pressable accessibilityRole="button" accessibilityLabel="Help and information" onLayout={event => recordBrandLayout('help', event)} onPress={() => router.push('/help')} style={styles.helpLink}><Text style={styles.cardAction}>Help</Text></Pressable>
         </View>
 
         <View style={styles.hero}>
@@ -267,17 +270,20 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
+  brandRowStacked: { flexDirection: 'column', alignItems: 'flex-start' },
   helpLink: { minHeight: 44, justifyContent: 'center' },
   guestLinks: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg },
   statusStrip: { padding: spacing.md, backgroundColor: colors.accentSoft, flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.md, rowGap: spacing.xs },
   statusText: { color: colors.muted, fontSize: 14, lineHeight: 20 },
   safe: { flex: 1, backgroundColor: colors.page },
   page: { padding: 20, paddingBottom: spacing.xxl, gap: spacing.md, alignSelf: 'center', width: '100%', maxWidth: 860 },
-  brand: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1, minWidth: 0, maxWidth: '100%' },
   brandMark: {
-    width: 36,
-    height: 36,
+    minWidth: 36,
+    minHeight: 36,
+    padding: 6,
+    flexShrink: 0,
     borderWidth: 1,
     borderColor: colors.accent,
     alignItems: 'center',
@@ -285,7 +291,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   brandMarkText: { color: colors.accentDark, fontSize: 18, fontWeight: '800' },
-  brandName: { color: colors.ink, fontSize: 26, fontWeight: '800' },
+  brandName: { color: colors.ink, fontSize: 26, fontWeight: '800', flexShrink: 1, minWidth: 0 },
   removedBrandSub: { color: colors.muted, fontSize: 9, fontWeight: '800', letterSpacing: 1.2, marginTop: 2 },
   hero: { gap: spacing.sm, paddingTop: spacing.sm },
   eyebrow: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },

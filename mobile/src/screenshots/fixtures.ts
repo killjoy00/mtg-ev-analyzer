@@ -311,7 +311,7 @@ export async function requestScreenshotFixture<T>(
     if (scenario.includes('error')) throw new Error('Controlled offline fixture.');
     const run = await readRun();
     const environments = scenario.includes('all') ? ['mixed', 'powered-cube', 'latest'] : scenario.includes('partial') || run.complete ? ['mixed'] : [];
-    return { ...clone(dailyStatus), day: today, player: { claimed: !guest }, daily_streak: scenario.includes('zero') || guest ? 0 : 12,
+    return { ...clone(dailyStatus), day: today, player: { claimed: !guest }, daily_streak: scenario.includes('zero') || scenario === 'member-new' || guest ? 0 : 12,
       daily_history: environments.map(set_id => ({ date: today, set_id, mode: 'draft_run', score: run.complete ? run.score : 87 })) } as T;
   }
   if (path === '/draft/v1/capabilities') {
@@ -362,15 +362,15 @@ export async function requestScreenshotFixture<T>(
   }
   if (path === '/draft/v1/runs/33333333-3333-4333-8333-333333333333/reroll' && method === 'POST') return clone(initialRun) as T;
   if (path === '/draft/v1/runs/33333333-3333-4333-8333-333333333333/share' && method === 'POST') return { id: '0123456789abcdef01234567' } as T;
-  if (path === '/growth/v1/patreon/mobile/status') return clone(membershipStatus) as T;
-  if (path === '/growth/v1/apple-subscriptions/mobile/status') return clone(appleStatus) as T;
+  if (path === '/growth/v1/patreon/mobile/status') return { ...clone(membershipStatus), ad_free: elite, ads_allowed: !elite, account_capabilities: elite ? ['account', 'unlimited_regular_practice', 'unlimited_cube_practice', 'custom_corpus'] : ['account', 'unlimited_regular_practice'] } as T;
+  if (path === '/growth/v1/apple-subscriptions/mobile/status') return { ...clone(appleStatus), account_capabilities: elite ? ['account', 'unlimited_regular_practice', 'unlimited_cube_practice', 'custom_corpus'] : ['account', 'unlimited_regular_practice'] } as T;
   if (path === '/growth/v1/mobile/profile/me' || path === '/growth/v1/mobile/profile/a1b2c3d4e5f60718') {
     const profile = clone(careerProfile);
     if (currentSession.accountUser?.email === 'second@packone.example') profile.player.display_name = 'SecondReviewer';
     if (scenario === 'member-new') { profile.summary.games = 0; profile.recent = []; }
     return profile as T;
   }
-  if (path.startsWith('/growth/v1/mobile/profile/history?')) return clone(historyPage) as T;
+  if (path.startsWith('/growth/v1/mobile/profile/history?')) return (scenario === 'member-new' ? { rows: [], next_cursor: null } : clone(historyPage)) as T;
   if (path === '/draft/health?quick=1') {
     return { ok: true, service: 'draft-run', release: 'screenshot-fixtures', run_length: 8 } as T;
   }

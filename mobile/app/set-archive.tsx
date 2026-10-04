@@ -155,7 +155,7 @@ const styles = StyleSheet.create({
   marketCard: { width: 166, maxWidth: '48%', flexGrow: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.sm, gap: spacing.xs },
   cardImage: { width: '100%', aspectRatio: 0.716, backgroundColor: colors.surfaceSoft },
   cardName: { color: colors.ink, fontSize: 13, lineHeight: 18, fontWeight: '800' },
-  shopLink: { minHeight: 38, justifyContent: 'center' },
+  shopLink: { minHeight: 44, justifyContent: 'center' },
   shopLinkText: { color: colors.accentDark, fontSize: 12, lineHeight: 16, fontWeight: '800', textDecorationLine: 'underline' },
   disclosure: { color: colors.muted, fontSize: 11, lineHeight: 17 },
   error: { color: colors.danger, fontSize: 13, lineHeight: 19 },

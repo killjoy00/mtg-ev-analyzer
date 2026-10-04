@@ -77,7 +77,7 @@ def snapshot(name):
 
 
 def tap(label, exact=False, scroll=True):
-    for step in range(8 if scroll else 1):
+    for step in range(24 if scroll else 1):
         _, root = hierarchy()
         for node in root.iter():
             values = [node.get('text', ''), node.get('content-desc', '')]
@@ -90,6 +90,26 @@ def tap(label, exact=False, scroll=True):
         if scroll:
             swipe_page(up=True)
     raise AssertionError(f'No visible actionable {label!r}')
+
+
+def enter_field(label, value):
+    tap(label, exact=True)
+    _, root = hierarchy()
+    require(any(node.get('class') == 'android.widget.EditText' and node.get('focused') == 'true'
+                and node.get('content-desc') == label for node in root.iter()),
+            f'{label} field did not receive keyboard focus')
+    adb('shell', 'input', 'text', value)
+    # The keyboard covers later fields on a phone. Dismiss before locating them.
+    adb('shell', 'input', 'keyevent', '4')
+
+
+def sign_in(email):
+    enter_field('Email', email)
+    enter_field('Password', 'fixture-password')
+    tap('Sign in with email', exact=True)
+    _, root = hierarchy()
+    require(not any(node.get('content-desc') == 'Password' for node in root.iter()),
+            'Email sign-in did not finish; account-switch assertions have not run')
 
 
 def swipe_page(up):
@@ -139,9 +159,48 @@ def measure(logs):
                 f'{child} overflows {parent} vertically: {box} / {container}')
     for label in ['score', 'title', 'choice']:
         require(label in texts and texts[label]['lines'], f'Missing real text metrics: {label}')
-        require(all(line['width'] <= layouts[label]['width']+2 for line in texts[label]['lines']), f'{label} glyph lines exceed text box')
+        # Native line widths can include trailing whitespace and fractional
+        # glyph overhang. Check their actual extent against the feedback border,
+        # while the layout checks above separately contain every text frame.
+        offset = layouts[label]['x'] + (layouts['copy']['x'] if label != 'score' else 0)
+        for line in texts[label]['lines']:
+            left = offset + line.get('x', 0)
+            require(left >= 1 and left + line['width'] <= layouts['feedback']['width'] - 1,
+                    f'{label} native line extends beyond the feedback border: {line}')
     require('PACKONE_FONTS' in logs, 'Bundled fonts did not finish loading')
     return {'layouts': layouts, 'text': texts}
+
+
+def measure_header(logs):
+    boxes = {}
+    for line in logs.splitlines():
+        if 'PACKONE_HEADER' in line:
+            raw = line.split('PACKONE_HEADER', 1)[1]
+            record = json.loads(raw[raw.find('{'):raw.rfind('}')+1])
+            boxes[record['label']] = record
+    for label in ['title', 'help']:
+        require(label in boxes and 'row' in boxes, f'Missing native header measurement: {label}')
+        box, row = boxes[label], boxes['row']
+        require(box['x'] >= -1 and box['x']+box['width'] <= row['width']+1, f'Header {label} overflows horizontally')
+        require(box['y'] >= -1 and box['y']+box['height'] <= row['height']+1, f'Header {label} overflows vertically')
+    return boxes
+
+
+def measure_brand(logs):
+    boxes = {}
+    for line in logs.splitlines():
+        if 'PACKONE_BRAND' in line:
+            raw = line.split('PACKONE_BRAND', 1)[1]
+            record = json.loads(raw[raw.find('{'):raw.rfind('}')+1])
+            boxes[record['label']] = record
+    for child, parent in [('brand', 'row'), ('help', 'row'), ('mark', 'brand'), ('name', 'brand')]:
+        require(child in boxes and parent in boxes, f'Missing native brand layout: {child}/{parent}')
+        box, container = boxes[child], boxes[parent]
+        require(box['x'] >= -1 and box['x']+box['width'] <= container['width']+1,
+                f'{child} overflows {parent} horizontally')
+        require(box['y'] >= -1 and box['y']+box['height'] <= container['height']+1,
+                f'{child} overflows {parent} vertically')
+    return boxes
 
 
 if platform == 'android':
@@ -153,6 +212,8 @@ if platform == 'android':
     def feedback(scenario, width, scale, landscape=False):
         name = f'{scenario}-{width}dp-{scale}x' + ('-landscape' if landscape else '')
         launch(scenario, 'feedback', width, scale, landscape)
+        if landscape:
+            swipe_page(up=True)
         xml, logs = snapshot(name)
         metric = measure(logs)
         metrics[name] = metric
@@ -183,11 +244,14 @@ if platform == 'android':
     for scenario in ['guest', 'guest-returning', 'member-new', 'member-zero', 'member-partial', 'member-all', 'member-checking', 'member-error', 'elite']:
         def home_scene(s=scenario):
             launch(s)
-            xml, _ = snapshot(s+'-home')
+            xml, logs = snapshot(s+'-home')
+            for icon in ['daily', 'learn', 'account']:
+                require(any('PACKONE_TAB_ICON' in line and f'"name":"{icon}"' in line for line in logs.splitlines()),
+                        f'{icon} tab icon did not load natively')
             require('DRAFT DECISION LAB' not in xml and 'Your last shared run' not in xml, 'Old home directory still visible')
             if s == 'member-checking':
                 require('0/3 complete' not in xml and '0-day streak' not in xml, 'Unknown progress shown as zero')
-            manifest['scenes'].append({'name': s+'-home', 'width_dp': 390, 'font_scale': 1})
+            manifest['scenes'].append({'name': s+'-home', 'width_dp': 390, 'font_scale': 1, 'brand_metrics': measure_brand(logs)})
         attempt(scenario+'-home', home_scene)
 
     def daily_journey():
@@ -202,6 +266,13 @@ if platform == 'android':
             xml, _ = snapshot(f'journey-pick-{pick+1}')
             require('You chose' in xml, f'No feedback after pick {pick+1}')
             tap('See result' if pick == 7 else 'Next pick', exact=True)
+            if pick == 0:
+                adb('shell', 'input', 'keyevent', '4')
+                tap('Daily', exact=True, scroll=False)
+                tap('Play Draft Run Daily', exact=True)
+                _, logs = snapshot('daily-leave-and-resume')
+                require('"method":"POST","id":"33333333-3333-4333-8333-333333333333","round":1' in logs,
+                        'Returning to the Daily did not preserve the existing attempt and first pick')
         snapshot('journey-result')
         tap('Review pick 1,')
         snapshot('journey-final-review')
@@ -250,12 +321,7 @@ if platform == 'android':
     def shared_journey():
         launch('guest-shared', 'shared')
         tap('Sign in to play this run', exact=True)
-        tap('Email', exact=True)
-        adb('shell', 'input', 'text', 'reviewer@packone.example')
-        tap('Password', exact=True)
-        adb('shell', 'input', 'text', 'fixture-password')
-        adb('shell', 'input', 'keyevent', '4')
-        tap('Sign in with email', exact=True)
+        sign_in('reviewer@packone.example')
         tap('Play or resume this run', exact=True)
         top()
         tap('Pick Hero in Training')
@@ -294,12 +360,7 @@ if platform == 'android':
         tap('Sign out', exact=True)
         xml, _ = snapshot('signed-out-settings')
         require('Sign in to Pack One' in xml and 'PackOneReviewer' not in xml, 'Sign-out retained private account details')
-        tap('Email', exact=True)
-        adb('shell', 'input', 'text', 'second@packone.example')
-        tap('Password', exact=True)
-        adb('shell', 'input', 'text', 'fixture-password')
-        adb('shell', 'input', 'keyevent', '4')
-        tap('Sign in with email', exact=True)
+        sign_in('second@packone.example')
         xml, _ = snapshot('account-b-career')
         require('SecondReviewer' in xml and 'PackOneReviewer' not in xml, 'Account B retained account A profile')
     attempt('sign-out-and-account-switch', account_switch)
@@ -328,12 +389,34 @@ elif platform == 'ios':
                     command('xcrun', 'simctl', 'terminate', udid, PACKAGE, check=False)
                     offset = app_log.stat().st_size
                     command('xcrun', 'simctl', 'launch', udid, PACKAGE, '-packoneScreenshotScene', f'acceptance:{scenario}:{screen}')
-                    time.sleep(15)
+                    # Cold Simulator launches can exceed 15 seconds under CI
+                    # load. Wait for this scene and native fonts/layout, keeping
+                    # a bounded timeout and capturing failures for diagnosis.
+                    deadline = time.monotonic() + 60
+                    ready = False
+                    while time.monotonic() < deadline:
+                        logs = app_log.read_bytes()[offset:].decode(errors='replace')
+                        scene_ready = any('PACKONE_SCENE' in line and f'"scenario":"{scenario}"' in line
+                                          and f'"destination":"{screen}"' in line for line in logs.splitlines())
+                        layout_ready = ('"label":"choice"' in logs if screen == 'feedback' else
+                                        'PACKONE_BRAND' in logs if screen == 'home' else
+                                        'PACKONE_CAREER_READY' in logs if screen == 'career' else 'PACKONE_HEADER' in logs)
+                        ready = scene_ready and 'PACKONE_FONTS' in logs and layout_ready
+                        if ready:
+                            time.sleep(2)
+                            break
+                        time.sleep(1)
                     command('xcrun', 'simctl', 'io', udid, 'screenshot', str(out / f'{name}.png'))
                     logs = app_log.read_bytes()[offset:].decode(errors='replace')
-                    require('PACKONE_SCENE' in logs, 'Requested native fixture did not finish loading')
+                    (out / f'{name}.log').write_text(logs)
+                    require(ready, 'Requested native scene/fonts/layout did not become ready within 60 seconds')
+                    require((out / f'{name}.png').stat().st_size > 120000, 'Native capture is blank or incomplete')
                     scene = {'name': name, 'text_setting': setting,
                              'observed_text_setting': command('xcrun', 'simctl', 'ui', udid, 'content_size')}
+                    if screen in ['learn', 'career']:
+                        scene['header_metrics'] = measure_header(logs)
+                    if screen == 'home':
+                        scene['brand_metrics'] = measure_brand(logs)
                     if screen == 'feedback':
                         scene['metrics'] = measure(logs)
                         ios_metrics[(scenario, setting)] = scene['metrics']

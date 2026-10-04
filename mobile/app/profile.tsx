@@ -366,7 +366,7 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   safetyPanel: { backgroundColor: colors.surface, padding: spacing.lg, gap: spacing.md, borderWidth: 1, borderColor: colors.line },
   reasonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  reasonChip: { minHeight: 36, borderWidth: 1, borderColor: colors.line, paddingHorizontal: spacing.sm, alignItems: 'center', justifyContent: 'center' },
+  reasonChip: { minHeight: 44, borderWidth: 1, borderColor: colors.line, paddingHorizontal: spacing.sm, alignItems: 'center', justifyContent: 'center' },
   reasonChipSelected: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
   reasonText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
   reasonTextSelected: { color: colors.accentDark },

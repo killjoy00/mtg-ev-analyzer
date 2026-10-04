@@ -12,6 +12,7 @@ import { ProfileOverview } from '@/src/components/ProfileOverview';
 import { useAppResume } from '@/src/hooks/useAppResume';
 import { readSession, subscribeSession, type MobileSession } from '@/src/storage/session';
 import { colors, spacing } from '@/src/theme';
+import { config } from '@/src/config';
 
 type LoadState =
   | { status: 'loading' }
@@ -252,7 +253,7 @@ export default function CareerScreen() {
 
   const firstRun = Number(state.profile.summary.games || 0) === 0;
   const header = (
-    <View style={styles.header}>
+    <View style={styles.header} onLayout={() => { if (config.screenshots.fixtures) console.info('PACKONE_CAREER_READY', JSON.stringify({ firstRun })); }}>
       {firstRun ? (
         <View style={styles.firstRunCard}>
           <Text style={styles.eyebrow}>WELCOME TO MY PACK ONE</Text>

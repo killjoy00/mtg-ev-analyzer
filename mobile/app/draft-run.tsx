@@ -72,7 +72,7 @@ function recordLayout(label: string, event: LayoutChangeEvent) {
   if (config.screenshots.fixtures) console.info('PACKONE_LAYOUT', JSON.stringify({ label, ...event.nativeEvent.layout }));
 }
 function recordText(label: string, event: TextLayoutEvent) {
-  if (config.screenshots.fixtures) console.info('PACKONE_TEXT', JSON.stringify({ label, lines: event.nativeEvent.lines.map(({ width, height }) => ({ width, height })) }));
+  if (config.screenshots.fixtures) console.info('PACKONE_TEXT', JSON.stringify({ label, lines: event.nativeEvent.lines.map(({ x, y, width, height, text }) => ({ x, y, width, height, text })) }));
 }
 
 function Progress({ run }: { run: DraftRunState }) {
@@ -355,7 +355,7 @@ function PackReview({
                 {card.image_url ? (
                   <Image source={card.image_url} style={styles.poolImage} contentFit="cover" cachePolicy="memory-disk" />
                 ) : null}
-                <Text style={styles.poolName} numberOfLines={2}>{index + 1}. {card.name}</Text>
+                <Text style={styles.poolName}>{index + 1}. {card.name}</Text>
               </Pressable>
             ))}
           </ScrollView>
@@ -1061,7 +1061,7 @@ export default function DraftRunScreen({
                         {card.image_url ? (
                           <Image source={card.image_url} style={styles.poolImage} contentFit="cover" cachePolicy="memory-disk" />
                         ) : null}
-                        <Text style={styles.poolName} numberOfLines={2}>{index + 1}. {card.name}</Text>
+                        <Text style={styles.poolName}>{index + 1}. {card.name}</Text>
                       </Pressable>
                     ))}
                   </ScrollView>
@@ -1121,7 +1121,7 @@ export default function DraftRunScreen({
           transparent
           visible={zoomedCard !== null}
         >
-          <SafeAreaView style={styles.zoomSafe}>
+          <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={styles.zoomSafe}>
             <View accessibilityViewIsModal style={styles.zoomPanel}>
               {zoomedCard?.image_url ? (
                 <CardArtwork key={zoomedCard.image_url} uri={zoomedCard.image_url} name={`${zoomedCard.name} enlarged card`} style={styles.zoomImage} zoom />
@@ -1211,7 +1211,7 @@ const styles = StyleSheet.create({
   rerollPanel: { gap: spacing.sm, paddingVertical: spacing.xs },
   rerollRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   rerollButton: {
-    minHeight: 42,
+    minHeight: 44,
     borderWidth: 1,
     borderColor: colors.lineStrong,
     backgroundColor: colors.surface,
@@ -1292,7 +1292,7 @@ const styles = StyleSheet.create({
   },
   disclosureText: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
   feedbackCardZoom: { gap: spacing.xs },
-  shopLink: { minHeight: 40, justifyContent: 'center', paddingVertical: spacing.xs },
+  shopLink: { minHeight: 44, justifyContent: 'center', paddingVertical: spacing.xs },
   shopLinkText: { color: colors.accentDark, fontSize: 12, lineHeight: 16, fontWeight: '800', textDecorationLine: 'underline' },
   affiliateDisclosure: { color: colors.muted, fontSize: 11, lineHeight: 16 },
   analysisPanel: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: spacing.lg, gap: spacing.md },

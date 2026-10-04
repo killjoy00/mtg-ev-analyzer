@@ -661,7 +661,7 @@ const styles = StyleSheet.create({
   fieldHelp: { color: colors.muted, fontSize: 12, lineHeight: 18 },
   termsBox: { gap: spacing.sm },
   linkText: { color: colors.accentDark, fontSize: 13, fontWeight: '700', textDecorationLine: 'underline' },
-  textButton: { minHeight: 40, alignItems: 'center', justifyContent: 'center' },
+  textButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   textButtonText: { color: colors.accentDark, fontSize: 14, fontWeight: '800', textDecorationLine: 'underline' },
   row: { minHeight: 68, borderTopWidth: 1, borderColor: colors.line, paddingVertical: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   rowCopy: { flex: 1, gap: 4 },
