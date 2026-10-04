@@ -1,0 +1,11 @@
+{
+  "source_sha": "f0f30c939d1016c70f5d3548d46b0b8b3f839e79",
+  "workflow_run_id": "37239878233",
+  "workflow_run_number": "42",
+  "ref": "refs/heads/main",
+  "app_store_version": "1.0",
+  "play_version_name": "1.0",
+  "publication": "none",
+  "ios_artifact": "unsigned archive; not installable/store-published",
+  "android_artifact": "production bundle smoke; not Play-published"
+}
