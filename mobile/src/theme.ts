@@ -23,6 +23,6 @@ export const spacing = Object.freeze({
 });
 
 export const type = Object.freeze({
-  body: 'System',
-  display: 'System',
+  body: 'SourceSans3-Regular',
+  display: 'BarlowCondensed-Bold',
 });

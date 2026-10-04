@@ -67,7 +67,7 @@ async function mount(t, options = {}) {
       Stack: Object.assign(host('Stack'), { Screen: host('Screen') }) },
     'expo-status-bar': { StatusBar: host('StatusBar') },
     'expo-web-browser': { openBrowserAsync: async (url) => { h.opened.push(url); return h.browser ? h.browser(url) : { type: 'cancel' }; } },
-    'react-native': { ActivityIndicator: host('ActivityIndicator'), Pressable: host('Pressable'), ScrollView: host('ScrollView'),
+    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }), ActivityIndicator: host('ActivityIndicator'), Pressable: host('Pressable'), ScrollView: host('ScrollView'),
       Text: host('Text'), View: host('View'), StyleSheet: { create: (value) => value }, Alert: { alert: (...args) => h.alerts.push(args) },
       Platform: { OS: h.platform }, Linking: { openURL: async (url) => { h.links.push(url); return true; } } },
     'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
@@ -86,6 +86,8 @@ async function mount(t, options = {}) {
       if (route.endsWith('/connect')) return { url: authorize() };
       return { ok: true, requested: true };
     } },
+    '@/src/components/BrandFonts': { BrandFonts: ({ children }) => children },
+    '@/src/navigation/session': { NavigationSessionProvider: ({ children }) => children },
     '@/src/components/VersionGate': { VersionGate: ({ children }) => children },
     '@/src/components/ScreenErrorBoundary': { ScreenErrorBoundary: host('ErrorBoundary') },
     '@/src/theme': { colors: new Proxy({}, { get: () => '#000' }), spacing: new Proxy({}, { get: () => 8 }) },
@@ -101,6 +103,9 @@ async function mount(t, options = {}) {
     compiled.filename = filename; compiled.paths = Module._nodeModulePaths(path.dirname(filename)); cache.set(filename, compiled);
     const prior = Module._load;
     Module._load = function load(request, parent, isMain) {
+    if (request === '@/src/components/Text') return { Text: mocks['react-native'].Text };
+    if (request === '@/src/components/ScreenArea') return { ScreenArea: mocks['react-native-safe-area-context'].SafeAreaView };
+
       if (Object.hasOwn(mocks, request)) return mocks[request];
       if (request.startsWith('@/')) return compile(request.slice(2) + '.ts');
       return original.call(this, request, parent, isMain);

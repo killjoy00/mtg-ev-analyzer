@@ -10,7 +10,7 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "config:check": "node ./scripts/check-config.mjs",
-    "test": "npm run test:lifecycle && npm run test:draft-run && npm run test:shared-run-storage && npm run test:shared-run-screen && npm run test:membership && npm run test:profiles && npm run test:activity && npm run test:screenshots && npm run lint && npm run typecheck && npm run config:check && npm run release:check && npm run test:ci-scope",
+    "test": "npm run test:navigation && npm run test:lifecycle && npm run test:draft-run && npm run test:shared-run-storage && npm run test:shared-run-screen && npm run test:membership && npm run test:profiles && npm run test:activity && npm run test:screenshots && npm run lint && npm run typecheck && npm run config:check && npm run release:check && npm run test:ci-scope",
     "release:check": "node ./scripts/release-preflight.mjs",
     "test:lifecycle": "node --test ./tests/version-gate-lifecycle.test.cjs",
     "test:draft-run": "node --test ./tests/draft-run-race.test.cjs ./tests/draft-run-recovery.test.cjs",
@@ -20,7 +20,8 @@
     "test:profiles": "node --test ./tests/public-profile-api.test.cjs ./tests/profile-browsing.test.cjs ./tests/account-profile-save.test.cjs",
     "test:activity": "node --test ./tests/profile-activity.test.cjs ./tests/profile-activity-screen.test.cjs",
     "test:screenshots": "node --test ./tests/store-screenshot-contract.test.cjs",
-    "test:ci-scope": "node --test ./tests/native-ci-scope.test.mjs ./tests/gradle-cache-key.test.mjs"
+    "test:ci-scope": "node --test ./tests/native-ci-scope.test.mjs ./tests/gradle-cache-key.test.mjs",
+    "test:navigation": "node --test ./tests/native-parity-navigation.test.cjs"
   },
   "dependencies": {
     "expo": "~57.0.24",
@@ -42,7 +43,8 @@
     "react-dom": "19.2.3",
     "react-native-reanimated": "4.5.1",
     "react-native-worklets": "0.10.1",
-    "expo-iap": "5.6.2"
+    "expo-iap": "5.6.2",
+    "expo-font": "~57.0.4"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",

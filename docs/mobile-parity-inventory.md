@@ -11,6 +11,10 @@ Status vocabulary:
 - **Policy decision open** — code intentionally does not claim storefront approval.
 - **Release evidence open** — implementation exists but required device/signing/live-host evidence is still missing.
 
+## October 4 native repair — acceptance still open
+
+PR #910 addresses the original owner complaints, which were not completed by #890. See [the complaint/evidence ledger](mobile-native-ux-repair-575.md). Existing “Implemented” rows below describe source capability; they do not override failed physical observations or certify the old distributed binaries. The revised navigation, Daily, Learn and feedback require the new native capture and tester-build evidence recorded in that ledger.
+
 ## October 2, 2026 UAT parity candidate
 
 Branch `codex/uat-auth-profile-parity-20261002` carries the Pack One acceptance changes below. These rows track source/automated status separately from physical-device acceptance so no item can be silently treated as complete.
@@ -23,7 +27,7 @@ Branch `codex/uat-auth-profile-parity-20261002` carries the Pack One acceptance 
 | 4 | Verification completes onboarding | Same-browser provider auto-sign-in is bridged into a first-party Pack One session before **Your account is ready**. Different-browser/device links fail closed to a verified-but-sign-in recovery when no authenticated session can be established. | Native signup uses a native-marked verification callback. Returning to the originating app can finish the email signup on that device without another credential prompt; a different device/app restart falls back to sign-in. | **Physical device + real inbox open.** Guest identity remains bound through the existing mobile/web link boundary; no authenticated onboarding is shown without a valid session. |
 | 5 | Save profile visibility | Save profile is top-right beside Change name, wraps on narrow screens, and shows saving/success/failure near the action. Failed edits remain in place. | Same top action pattern and semantic states. | **Physical larger-text/keyboard open.** |
 | 6 | Patreon page declutter | Current access first, concise benefits, one relevant next action, troubleshooting below. Signed-out/unconnected/connected/Elite/error states remain distinct. | Membership keeps provider/store policy differences rather than copying web purchase UI. | **Physical + live provider return open.** |
-| 7 | Daily status prominence | Reset countdown is always prominent at the top of the Daily section; real streak gets a badge and the reset cue updates through rollover. | Existing native Daily status remains server-authoritative; parity review must verify prominence/readability on the candidate. | **Physical device open**, including no-streak/loading/rollover and large text. |
+| 7 | Daily status prominence | Reset countdown is always prominent at the top of the Daily section; real streak gets a badge and the reset cue updates through rollover. | #910 puts reset/streak before completion, with real zero, checking, unavailable and foreground/rollover states; native candidate acceptance is in progress. | **Physical device open**, including no-streak/loading/rollover and large text. |
 | 8 | Public profile alignment | Full-row clickable/tappable control with the requested description and preserved opt-in semantics. | Same description and switch semantics. | **Physical screen-reader/touch open.** |
 | 9 | Disconnect Patreon styling/copy | Bordered secondary/destructive action; explicitly says disconnecting Pack One does not cancel Patreon billing. | Same visual/action distinction. iOS subscription cancellation remains in Apple subscription management; Patreon disconnect stays provider-scoped. | **Physical + live disconnect/refresh open.** |
 | 10 | Consolidated authentication screen | Provider methods, `or` divider, email/password, consent, and mode switch live in one compact panel. | Same information hierarchy, using the native Apple control on iOS. | **Physical keyboard/large-text open.** |
@@ -45,7 +49,7 @@ Automated browser evidence for this candidate emits screenshots for compact auth
 | Post-pick comparison | **Implemented** | Your Pick vs Trophy Pick, score explanation, pack review and reopened completed decisions. |
 | Revealed-card TCGplayer links | **Implemented** | Links appear only inside expanded score analysis, use exact card-specific destinations, carry visible affiliate disclosure, and fail visibly if OS handoff fails. |
 | Practice | **Implemented** | Regular/custom/Cube access remains server-capability-authoritative. |
-| Shared practice / friend run | **Implemented** | Explicit invitation acceptance, exact server run continuity, no silent replacement on failed GET, no recipient reroll, creator/result recovery, kill/relaunch/Home recovery. |
+| Shared practice / friend run | **Implemented** | Explicit invitation acceptance, exact server run continuity, no silent replacement on failed GET, no recipient reroll, creator/result recovery and kill/relaunch. #910 moves local checkpoint discovery from Home to conditional Practice shared activity. |
 | Historical challenge compatibility | **Implemented** | Genuine 12-hex historical challenge links remain distinct from modern 24-hex shared runs. |
 | Leaderboards / seasons | **Implemented** | Today / This week / This season / All time, current season context, three environments and public-profile navigation. |
 | My Pack One / Career | **Implemented** | Current-season standings, snapshot, recent performance, best environments, achievements/showcase, paginated games, Daily history, archive progress, shared activity and record/profile sharing. |
@@ -54,7 +58,7 @@ Automated browser evidence for this candidate emits screenshots for compact auth
 | Membership / Patreon existing access | **Implemented** | Provider-independent account access is separate from Patreon provenance; connect/reconnect, refresh and disconnect are available. Unknown/failure is never labeled Free. |
 | Elite subscription purchase | **Implemented on iOS; deliberate difference on Android** | iOS offers Pack One Elite as an Apple auto-renewable subscription using StoreKit, StoreKit-displayed pricing, Restore Purchases, and Apple subscription management. Patreon remains an existing-access provider with no native Patreon purchase/upgrade CTA. Google Play billing is deliberately outside this v1 change. |
 | Learn: How to Play / Scoring / Method / Sets | **Implemented** | Core education is native. |
-| Editorial drafting guides | **Deliberate continuation** | Opens canonical `https://packone.pro/learn/` so article copy remains single-source. |
+| Editorial drafting guides | **Deliberate continuation** | In #910, Learn opens the selected, individually described article directly; browser close returns to the native screen. Native capture evidence remains open. |
 | Published MSH/ECL/TMT/SOS archive analyses | **Implemented** | Native archive screen uses current checked-in web evidence, native routing and disclosed card links. |
 | About / Support / Privacy / Terms | **Deliberate continuation** | First-class native entries open canonical Pack One HTTPS pages; no native credential is placed in the URL. |
 | Daily-home TCGplayer fallback | **Implemented** | Guest visibility; signed-in visibility only when authoritative `ads_allowed===true`; unknown/pending/failure hides it; no gameplay/result placement. |

@@ -1,6 +1,11 @@
 import * as SecureStore from 'expo-secure-store';
-
+import { config } from '@/src/config';
 import type { MobileSession } from '@/src/storage/session';
+
+async function deviceStore() {
+  return config.screenshots.fixtures ? import('@/src/screenshots/storage') : SecureStore;
+}
+
 
 const SHARED_RUN_KEY = 'packone.mobile.shared-run.v1';
 const SHARE_ID = /^[a-f0-9]{24}$/;
@@ -50,7 +55,7 @@ function validRecord(value: unknown): value is SharedRunRecord {
 export async function readLatestSharedRunContinuation(session: MobileSession) {
   const current = identity(session);
   if (!current) return null;
-  const raw = await SecureStore.getItemAsync(SHARED_RUN_KEY);
+  const raw = await (await deviceStore()).getItemAsync(SHARED_RUN_KEY);
   if (!raw) return null;
   try {
     const record: unknown = JSON.parse(raw);
@@ -85,11 +90,11 @@ export async function writeSharedRunContinuation(
     playerId: current.player,
     accountUserId: current.account,
   };
-  await SecureStore.setItemAsync(SHARED_RUN_KEY, JSON.stringify(record), {
+  await (await deviceStore()).setItemAsync(SHARED_RUN_KEY, JSON.stringify(record), {
     keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
   });
 }
 
 export async function clearSharedRunContinuation() {
-  await SecureStore.deleteItemAsync(SHARED_RUN_KEY);
+  await (await deviceStore()).deleteItemAsync(SHARED_RUN_KEY);
 }

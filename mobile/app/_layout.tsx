@@ -1,11 +1,14 @@
 import { router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { Linking, Platform, Pressable, Settings, Text } from 'react-native';
+import { Linking, Platform, Settings, } from 'react-native';
 
 import { ScreenErrorBoundary } from '@/src/components/ScreenErrorBoundary';
 import { VersionGate } from '@/src/components/VersionGate';
 import { config } from '@/src/config';
+import { BrandFonts } from '@/src/components/BrandFonts';
+import { NavigationSessionProvider } from '@/src/navigation/session';
+
 import { colors } from '@/src/theme';
 
 function ScreenshotFixtureEntry() {
@@ -13,7 +16,10 @@ function ScreenshotFixtureEntry() {
     if (!config.screenshots.fixtures) return;
     if (Platform.OS === 'android') {
       void Linking.getInitialURL().then((url) => {
-        if (url?.startsWith('packone://store-screenshot-feedback')) {
+        if (url?.startsWith('packone://native-acceptance')) {
+          const query = new URL(url).searchParams;
+          router.replace({ pathname: '/native-acceptance', params: { scenario: query.get('scenario') || 'member', destination: query.get('destination') || 'home' } });
+        } else if (url?.startsWith('packone://store-screenshot-feedback')) {
           router.replace('/store-screenshot-feedback');
         }
       });
@@ -23,7 +29,10 @@ function ScreenshotFixtureEntry() {
     const scene = Settings.get('packoneScreenshotScene');
     if (typeof scene !== 'string' || !scene) return;
 
-    if (scene === 'daily-decision') {
+    if (scene.startsWith('acceptance:')) {
+      const [, scenario, screen] = scene.split(':');
+      router.replace({ pathname: '/native-acceptance', params: { scenario: scenario || 'member', destination: screen || 'home' } });
+    } else if (scene === 'daily-decision') {
       router.replace({ pathname: '/draft-run', params: { environment: 'mixed' } });
     } else if (scene === 'reveal-comparison') {
       // Use the dedicated fixture-only route instead of replacing into the
@@ -46,18 +55,11 @@ function ScreenshotFixtureEntry() {
   return null;
 }
 
-function MembershipEntry() {
-  return (
-    <Pressable accessibilityRole="button" accessibilityLabel="Open membership and account access"
-      onPress={() => router.push('/membership')} style={{ minHeight: 44, minWidth: 44, justifyContent: 'center' }}>
-      <Text style={{ color: colors.accentDark, fontWeight: '700' }}>Membership</Text>
-    </Pressable>
-  );
-}
+export const unstable_settings = { initialRouteName: '(tabs)' };
 
 export default function RootLayout() {
   return (
-    <VersionGate>
+    <BrandFonts><VersionGate><NavigationSessionProvider>
       <>
         <StatusBar style="dark" />
         <ScreenshotFixtureEntry />
@@ -67,20 +69,19 @@ export default function RootLayout() {
             headerStyle: { backgroundColor: colors.surface },
             headerShadowVisible: false,
             headerTintColor: colors.ink,
+            headerBackTitle: 'Back',
+            headerBackButtonDisplayMode: 'generic',
             contentStyle: { backgroundColor: colors.page },
           }}
         >
-          <Stack.Screen name="index" options={{ headerShown: false }} />
+          <Stack.Screen name="(tabs)" options={{ headerShown: false, title: 'Daily' }} />
           <Stack.Screen name="draft-run" options={{ title: 'Draft Run' }} />
+          <Stack.Screen name="native-acceptance" options={{ headerShown: false }} />
           <Stack.Screen name="store-screenshot-feedback" options={{ title: 'Draft Run' }} />
           <Stack.Screen name="shared-run" options={{ title: 'Shared Draft Run' }} />
           <Stack.Screen name="resume-shared-run" options={{ title: 'Saved Shared Run' }} />
-          <Stack.Screen name="practice" options={{ title: 'Practice', headerRight: MembershipEntry }} />
-          <Stack.Screen name="leaderboard" options={{ title: 'Leaderboard' }} />
-          <Stack.Screen name="career" options={{ title: 'My Pack One' }} />
           <Stack.Screen name="profile" options={{ title: 'Player Profile' }} />
           <Stack.Screen name="historical-challenge" options={{ title: 'Historical Challenge' }} />
-          <Stack.Screen name="learn" options={{ title: 'Learn' }} />
           <Stack.Screen name="how-to" options={{ title: 'How to Play' }} />
           <Stack.Screen name="scoring" options={{ title: 'Scoring' }} />
           <Stack.Screen name="method" options={{ title: 'Method' }} />
@@ -88,11 +89,12 @@ export default function RootLayout() {
           <Stack.Screen name="set-archive" options={{ title: 'Set Archive' }} />
           <Stack.Screen name="account" options={{ title: 'Account settings' }} />
           <Stack.Screen name="account-profile" options={{ title: 'Profile & visibility' }} />
+          <Stack.Screen name="help" options={{ title: 'Help & information' }} />
           <Stack.Screen name="membership" options={{ title: 'Membership' }} />
           <Stack.Screen name="account-security" options={{ title: 'Sign-in & security' }} />
           <Stack.Screen name="account-delete" options={{ title: 'Delete account' }} />
         </Stack>
       </>
-    </VersionGate>
+    </NavigationSessionProvider></VersionGate></BrandFonts>
   );
 }

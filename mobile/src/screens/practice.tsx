@@ -1,15 +1,15 @@
-import { router } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '@/src/components/Text';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 
 import {
   loadPracticeCapabilities,
@@ -17,6 +17,8 @@ import {
   type PracticeSet,
 } from '@/src/api/draftRun';
 import { ensureGuestSession } from '@/src/api/guest';
+import { readSession, subscribeSession } from '@/src/storage/session';
+import { SharedRunRecovery } from '@/src/components/SharedRunRecovery';
 import { useAppResume } from '@/src/hooks/useAppResume';
 import { colors, spacing } from '@/src/theme';
 
@@ -26,57 +28,49 @@ type PracticeState =
   | { status: 'ready'; capabilities: string[]; sets: PracticeSet[] }
   | { status: 'error'; message: string };
 
-async function loadPracticeHub(): Promise<PracticeState> {
-  const session = await ensureGuestSession();
-  if (!session.accountToken) return { status: 'signin-required' };
-
-  const { capabilities } = await loadPracticeCapabilities(session);
-  const sets = capabilities.includes('custom_corpus')
-    ? (await loadPracticeSets(session)).sets
-    : [];
-
-  return { status: 'ready', capabilities, sets };
-}
-
 export default function PracticeScreen() {
   const [state, setState] = useState<PracticeState>({ status: 'loading' });
   const [selectedSets, setSelectedSets] = useState<string[]>([]);
-  const [reloadKey, setReloadKey] = useState(0);
-
-  useAppResume(() => {
-    setReloadKey((value) => value + 1);
-  });
-
-  useEffect(() => {
-    let active = true;
-    void loadPracticeHub()
-      .then((loaded) => {
-        if (active) setState(loaded);
-      })
-      .catch((error: unknown) => {
-        if (!active) return;
-        setState({
-          status: 'error',
-          message: error instanceof Error ? error.message : 'Practice options are unavailable.',
-        });
-      });
-    return () => {
-      active = false;
-    };
-  }, [reloadKey]);
-
-  const retry = async () => {
+  const [refreshError, setRefreshError] = useState<string | null>(null);
+  const generation = useRef(0);
+  const owner = useRef('');
+  const refresh = useCallback(async () => {
+    const id = ++generation.current;
+    try {
+      const session = await ensureGuestSession();
+      if (id !== generation.current) return;
+      const key = `${session.playerToken}:${session.accountToken ?? ''}`;
+      if (key !== owner.current) {
+        owner.current = key;
+        setState({ status: 'loading' });
+        setSelectedSets([]);
+      }
+      if (!session.accountToken) { setState({ status: 'signin-required' }); return; }
+      const { capabilities } = await loadPracticeCapabilities(session);
+      const sets = capabilities.includes('custom_corpus') ? (await loadPracticeSets(session)).sets : [];
+      const current = await readSession();
+      if (id !== generation.current || key !== `${current?.playerToken}:${current?.accountToken ?? ''}`) return;
+      setState({ status: 'ready', capabilities, sets });
+      setSelectedSets((current) => current.filter((id) => sets.some((set) => set.set_id === id)));
+      setRefreshError(null);
+    } catch {
+      if (id !== generation.current) return;
+      const message = 'Practice options could not refresh. Please try again.';
+      setRefreshError(message);
+      setState((current) => current.status === 'ready' ? current : { status: 'error', message });
+    }
+  }, []);
+  useFocusEffect(useCallback(() => { void refresh(); return () => { generation.current += 1; }; }, [refresh]));
+  useEffect(() => subscribeSession(() => {
+    generation.current += 1;
+    owner.current = '';
     setState({ status: 'loading' });
     setSelectedSets([]);
-    try {
-      setState(await loadPracticeHub());
-    } catch (error: unknown) {
-      setState({
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Practice options are unavailable.',
-      });
-    }
-  };
+    setRefreshError(null);
+    void refresh();
+  }), [refresh]);
+  useAppResume(refresh);
+  const retry = refresh;
 
   const toggleSet = (setId: string) => {
     setSelectedSets((current) => (
@@ -145,7 +139,7 @@ export default function PracticeScreen() {
           <Text style={styles.eyebrow}>PRACTICE</Text>
           <Text style={styles.title}>Choose your Draft Run.</Text>
           <Text style={styles.body}>
-            Practice uses Pack One&apos;s server-authoritative packs and scoring. Practice results save to your career but do not enter the Daily leaderboard.
+            Build confidence with eight real draft decisions. Practice results save to your career; Daily runs are where you compete on the leaderboard.
           </Text>
         </View>
 
@@ -215,7 +209,7 @@ export default function PracticeScreen() {
                       style={[styles.setButton, selected && styles.setButtonSelected]}
                     >
                       <Text style={[styles.setCode, selected && styles.setCodeSelected]}>{set.set_id.toUpperCase()}</Text>
-                      <Text style={[styles.setName, selected && styles.setNameSelected]} numberOfLines={2}>{set.set_name}</Text>
+                      <Text style={[styles.setName, selected && styles.setNameSelected]} >{set.set_name}</Text>
                     </Pressable>
                   );
                 })}
@@ -246,11 +240,14 @@ export default function PracticeScreen() {
           )}
         </View>
 
+        <SharedRunRecovery />
+        {refreshError ? <Pressable accessibilityRole="button" onPress={() => void refresh()} style={styles.note}><Text style={styles.body}>{refreshError}</Text><Text style={styles.cardAction}>Retry</Text></Pressable> : null}
         <View style={styles.note}>
-          <Text style={styles.noteTitle}>Existing account access only</Text>
+          <Text style={styles.noteTitle}>Your practice access</Text>
           <Text style={styles.body}>
-            The app reads practice access from your Pack One account. This screen does not change account capabilities.
+            A free account includes regular Draft Runs. Elite adds Powered Cube and custom-set practice.
           </Text>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/membership')} style={styles.secondaryButton}><Text style={styles.cardAction}>Membership & access →</Text></Pressable>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -258,6 +255,7 @@ export default function PracticeScreen() {
 }
 
 const styles = StyleSheet.create({
+  secondaryButton: { minHeight: 48, justifyContent: 'center' },
   safe: { flex: 1, backgroundColor: colors.page },
   page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.lg, alignSelf: 'center', width: '100%', maxWidth: 860 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
@@ -282,7 +280,7 @@ const styles = StyleSheet.create({
   lockedText: { color: colors.muted, fontSize: 14, fontWeight: '800', marginTop: spacing.xs },
   setGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginTop: spacing.sm },
   setButton: {
-    width: '48%',
+    flexBasis: 150, flexGrow: 1, flexShrink: 1, minWidth: 0,
     minHeight: 72,
     borderWidth: 1,
     borderColor: colors.lineStrong,

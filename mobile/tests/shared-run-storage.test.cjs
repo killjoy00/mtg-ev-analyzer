@@ -21,6 +21,8 @@ function compileStorage(store) {
   compiled.paths = Module._nodeModulePaths(path.dirname(filename));
   const priorLoad = Module._load;
   Module._load = function load(request, parent, isMain) {
+
+    if (request === '@/src/config') return { config: { screenshots: { fixtures: false } } };
     if (request === 'expo-secure-store') return store;
     return priorLoad.call(this, request, parent, isMain);
   };

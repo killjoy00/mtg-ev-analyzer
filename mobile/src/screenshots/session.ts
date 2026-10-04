@@ -1,4 +1,5 @@
 import type { MobileSession } from '@/src/storage/session';
+import * as SecureStore from '@/src/screenshots/storage';
 
 const PLAYER_ID = '11111111-1111-4111-8111-111111111111';
 const ACCOUNT_ID = '22222222-2222-4222-8222-222222222222';
@@ -16,3 +17,12 @@ export const screenshotSession: MobileSession = Object.freeze({
     name: 'Pack One Reviewer',
   }),
 });
+
+const PREVIEW_SESSION = 'packone.preview.session.v1';
+export async function readScreenshotSession(): Promise<MobileSession> {
+  const raw = await SecureStore.getItemAsync(PREVIEW_SESSION);
+  return raw ? JSON.parse(raw) : screenshotSession;
+}
+export async function writeScreenshotSession(session: MobileSession) {
+  await SecureStore.setItemAsync(PREVIEW_SESSION, JSON.stringify(session));
+}

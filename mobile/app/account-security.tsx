@@ -5,11 +5,11 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  Text,
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Text } from '@/src/components/Text';
+import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 
 import { changeMobilePassword, forgetAccountLocally } from '@/src/api/account';
 import { useAccountState } from '@/src/hooks/useAccountState';
@@ -72,7 +72,7 @@ export default function AccountSecurityScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive">
         <Text style={styles.eyebrow}>SIGN-IN &amp; SECURITY</Text>
         <Text style={styles.title}>Sign-in methods</Text>
         <View style={styles.panel}>

@@ -11,11 +11,16 @@ import {
   ScrollView,
   Share,
   StyleSheet,
-  Text,
+  useWindowDimensions,
+  type LayoutChangeEvent,
+  type TextLayoutEvent,
+  type StyleProp,
+  type ViewStyle,
   View,
 } from 'react-native';
+import { Text } from '@/src/components/Text';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 
 import { ensureGuestSession } from '@/src/api/guest';
 import {
@@ -36,7 +41,7 @@ import {
 import { config } from '@/src/config';
 import { useAppResume } from '@/src/hooks/useAppResume';
 import { clearPracticeIdempotencyKey, practiceIdempotencyKey } from '@/src/storage/idempotency';
-import type { MobileSession } from '@/src/storage/session';
+import { readSession, subscribeSession, type MobileSession } from '@/src/storage/session';
 import type { SharedRunSurface } from '@/src/state/sharedRunSurface';
 import { tcgplayerUrl } from '@/src/tcgplayer';
 import { colors, spacing } from '@/src/theme';
@@ -61,6 +66,13 @@ type RunResponseToken = {
 
 function mobileSessionIdentity(session: MobileSession) {
   return `${session.playerToken}\n${session.accountToken ?? ''}`;
+}
+
+function recordLayout(label: string, event: LayoutChangeEvent) {
+  if (config.screenshots.fixtures) console.info('PACKONE_LAYOUT', JSON.stringify({ label, ...event.nativeEvent.layout }));
+}
+function recordText(label: string, event: TextLayoutEvent) {
+  if (config.screenshots.fixtures) console.info('PACKONE_TEXT', JSON.stringify({ label, lines: event.nativeEvent.lines.map(({ x, y, width, height, text }) => ({ x, y, width, height, text })) }));
 }
 
 function Progress({ run }: { run: DraftRunState }) {
@@ -91,6 +103,26 @@ function Progress({ run }: { run: DraftRunState }) {
   );
 }
 
+// Keep card names and picking available when artwork is offline. Zoom supplies
+// an explicit retry without adding another action inside the pick target.
+function CardArtwork({ uri, name, style, zoom = false }: {
+  uri: string; name: string; style: StyleProp<ViewStyle>; zoom?: boolean;
+}) {
+  const [failed, setFailed] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  return <View style={[style, { backgroundColor: colors.surfaceSoft }]}>
+    {failed === uri ? <View style={styles.imageError}>
+      <Text style={styles.imageErrorText}>Image unavailable</Text>
+      {zoom ? <Pressable accessibilityRole="button" accessibilityLabel={`Retry image for ${name}`}
+        onPress={() => { setFailed(null); setAttempt(value => value + 1); }} style={styles.disclosureButton}>
+        <Text style={styles.disclosureText}>Retry image</Text>
+      </Pressable> : null}
+    </View> : <Image key={`${uri}:${attempt}`} source={uri} style={StyleSheet.absoluteFill}
+      contentFit={zoom ? 'contain' : 'cover'} cachePolicy="memory-disk" accessibilityLabel={name}
+      onError={() => setFailed(uri)} />}
+  </View>;
+}
+
 function CardTile({
   card,
   selected,
@@ -117,20 +149,13 @@ function CardTile({
       style={[styles.card, selected && styles.cardSelected]}
     >
       {card.image_url ? (
-        <Image
-          source={card.image_url}
-          style={styles.cardImage}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-          transition={120}
-          accessibilityLabel={card.name}
-        />
+        <CardArtwork key={card.image_url} uri={card.image_url} name={card.name} style={styles.cardImage} />
       ) : (
         <View style={styles.cardFallback}>
           <Text style={styles.cardFallbackText}>{card.name}</Text>
         </View>
       )}
-      <Text style={styles.cardName} numberOfLines={2}>{card.name}</Text>
+      <Text style={styles.cardName}>{card.name}</Text>
     </Pressable>
   );
 }
@@ -174,19 +199,13 @@ function FeedbackCard({
       >
         <Text style={styles.feedbackCardLabel}>{label}</Text>
         {card.image_url ? (
-          <Image
-            source={card.image_url}
-            style={styles.feedbackCardImage}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-            accessibilityLabel={card.name}
-          />
+          <CardArtwork key={card.image_url} uri={card.image_url} name={card.name} style={styles.feedbackCardImage} />
         ) : (
           <View style={styles.feedbackCardFallback}>
             <Text style={styles.cardFallbackText}>{card.name}</Text>
           </View>
         )}
-        <Text style={styles.feedbackCardName} numberOfLines={2}>{card.name}</Text>
+        <Text style={styles.feedbackCardName}>{card.name}</Text>
       </Pressable>
       {affiliate && onAffiliatePress ? (
         <Pressable
@@ -211,6 +230,8 @@ function FeedbackAnalysis({
   onZoom: (card: DraftRunCard) => void;
   onAffiliatePress: (card: DraftRunCard) => void;
 }) {
+  const { width, fontScale } = useWindowDimensions();
+  const stackComparison = width < 360 || fontScale > 1.35;
   const candidates = answer.puzzle.candidates;
   const selected = candidates.find((card) => card.id === answer.selectedId);
   const trophy = candidates.find((card) => card.id === answer.historicalId);
@@ -230,7 +251,7 @@ function FeedbackAnalysis({
 
   return (
     <View style={styles.analysisPanel}>
-      <View style={styles.feedbackComparison}>
+      <View style={[styles.feedbackComparison, stackComparison && { flexDirection: 'column' }]}>
         <FeedbackCard
           affiliate
           card={selected}
@@ -334,7 +355,7 @@ function PackReview({
                 {card.image_url ? (
                   <Image source={card.image_url} style={styles.poolImage} contentFit="cover" cachePolicy="memory-disk" />
                 ) : null}
-                <Text style={styles.poolName} numberOfLines={2}>{index + 1}. {card.name}</Text>
+                <Text style={styles.poolName}>{index + 1}. {card.name}</Text>
               </Pressable>
             ))}
           </ScrollView>
@@ -367,7 +388,7 @@ function PackReview({
                 <Text style={styles.cardFallbackText}>{card.name}</Text>
               </View>
             )}
-            <Text style={styles.cardName} numberOfLines={2}>{card.name}</Text>
+            <Text style={styles.cardName}>{card.name}</Text>
             {card.id === answer.selectedId ? <Text style={styles.reviewBadge}>YOUR PICK</Text> : null}
             {card.id === answer.historicalId ? <Text style={styles.reviewBadge}>TROPHY PICK</Text> : null}
           </Pressable>
@@ -437,10 +458,18 @@ export default function DraftRunScreen({
             : environment === 'powered-cube' ? 'Powered Cube practice complete.' : 'Practice complete.',
         }
       : dailyMeta;
+  const { width: windowWidth, fontScale } = useWindowDimensions();
+  const [feedbackWidth, setFeedbackWidth] = useState(0);
+  const wideFeedback = feedbackWidth >= 520 * fontScale;
+  const stackComparison = windowWidth < 360 || fontScale > 1.35;
+  useEffect(() => {
+    if (config.screenshots.fixtures) console.info('PACKONE_WINDOW', JSON.stringify({ width: windowWidth, fontScale }));
+  }, [windowWidth, fontScale]);
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const stateRef = useRef<LoadState>(state);
   const refreshGeneration = useRef(0);
   const mutationGeneration = useRef(0);
+  const identityGeneration = useRef(0);
   const [mode, setMode] = useState<ViewMode>('pick');
   const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -457,6 +486,18 @@ export default function DraftRunScreen({
     stateRef.current = next;
     setState(next);
   };
+
+  useEffect(() => subscribeSession((next) => {
+    const current = stateRef.current;
+    if (current.status !== 'ready' || (next && mobileSessionIdentity(next) === mobileSessionIdentity(current.session))) return;
+    identityGeneration.current += 1;
+    refreshGeneration.current += 1;
+    mutationGeneration.current += 1;
+    setSelected(null);
+    setZoomedCard(null);
+    setBusy(false);
+    commitState({ status: 'error', message: 'Your account changed. Return to Daily or Practice to open a run for your current account.' });
+  }), []);
 
   const beginRefresh = (current: ReadyState): RunResponseToken => ({
     request: ++refreshGeneration.current,
@@ -532,6 +573,7 @@ export default function DraftRunScreen({
 
   useEffect(() => {
     let active = true;
+    const identityEpoch = identityGeneration.current;
     const initial = shared
       ? Promise.resolve({ status: 'ready' as const, run: shared.initialRun, session: shared.session })
       : loadDraftSurface(environment, practice, setIds);
@@ -540,6 +582,12 @@ export default function DraftRunScreen({
         if (!active) return;
         if (loaded.status === 'signin-required') {
           commitState({ status: 'signin-required' });
+          return;
+        }
+        const persisted = await readSession();
+        if (!active || identityEpoch !== identityGeneration.current) return;
+        if (!persisted || mobileSessionIdentity(persisted) !== mobileSessionIdentity(loaded.session)) {
+          commitState({ status: 'error', message: 'Your account changed while opening this run. Return to Daily or Practice.' });
           return;
         }
         let run = loaded.run;
@@ -582,12 +630,19 @@ export default function DraftRunScreen({
     setSelected(null);
     setActionError(null);
     setMode('pick');
+    const identityEpoch = identityGeneration.current;
     try {
       const loaded = shared
         ? { status: 'ready' as const, run: await shared.loadRun(), session: shared.session }
         : await loadDraftSurface(environment, practice, setIds);
       if (loaded.status === 'signin-required') {
         commitState({ status: 'signin-required' });
+        return;
+      }
+      const persisted = await readSession();
+      if (identityEpoch !== identityGeneration.current) return;
+      if (!persisted || mobileSessionIdentity(persisted) !== mobileSessionIdentity(loaded.session)) {
+        commitState({ status: 'error', message: 'Your account changed while opening this run. Return to Daily or Practice.' });
         return;
       }
       const recoveredFeedback = Boolean(shared && !loaded.run.complete && loaded.run.answers.length);
@@ -884,6 +939,9 @@ export default function DraftRunScreen({
           >
             <Text style={styles.secondaryButtonText}>Share result</Text>
           </Pressable>
+          <Pressable accessibilityRole="button" onPress={() => router.dismissTo(practice || shared ? '/practice' : '/')} style={styles.primaryButton}>
+            <Text style={styles.primaryButtonText}>{practice || shared ? 'Return to Practice' : 'Home'}</Text>
+          </Pressable>
           {shareError ? <Text accessibilityRole="alert" style={styles.actionError}>{shareError}</Text> : null}
           <View style={styles.guestNote}>
             <Text style={styles.guestNoteTitle}>
@@ -893,9 +951,9 @@ export default function DraftRunScreen({
               {shared
                 ? 'This is your saved shared run. Reopening the invitation recovers the same picks and result, not another attempt.'
                 : practice
-                  ? 'Practice uses your signed-in Pack One identity and does not enter the Daily leaderboard.'
+                  ? 'Practice builds your career. Play the Dailies to join the leaderboard.'
                   : state.session.accountToken
-                    ? 'This result used your signed-in Pack One identity and the same server eligibility rules as web.'
+                    ? 'Your result is saved to your Pack One account.'
                     : 'Sign in or create your Pack One account to validate this Daily score and keep your career across devices.'}
             </Text>
             {!shared && !practice && !state.session.accountToken ? (
@@ -933,22 +991,19 @@ export default function DraftRunScreen({
 
           {mode === 'feedback' && answer ? (
             <>
-              <View style={styles.feedback}>
-                <View style={styles.feedbackScore}>
-                  <Text style={styles.feedbackScoreNumber}>{answer.score}</Text>
-                  <Text style={styles.feedbackScoreSuffix}>/100</Text>
-                </View>
-                <View style={styles.feedbackCopy}>
-                  <Text style={styles.feedbackTitle}>
+              <View testID="pick-feedback" onLayout={(event) => { setFeedbackWidth(event.nativeEvent.layout.width); recordLayout('feedback', event); }} style={[styles.feedback, wideFeedback && styles.feedbackWide]}>
+                <Text testID="feedback-score" onLayout={(event) => recordLayout('score', event)} onTextLayout={(event) => recordText('score', event)} style={styles.feedbackScoreNumber}>{answer.score}<Text style={styles.feedbackScoreSuffix}>/100</Text></Text>
+                <View testID="feedback-copy" onLayout={(event) => recordLayout('copy', event)} style={[styles.feedbackCopy, wideFeedback && styles.feedbackCopyWide]}>
+                  <Text testID="feedback-title" onLayout={(event) => recordLayout('title', event)} onTextLayout={(event) => recordText('title', event)} style={styles.feedbackTitle}>
                     {answer.historicalMatch
                       ? 'You matched the trophy drafter.'
                       : `The trophy drafter took ${answer.historicalName ?? 'another card'}.`}
                   </Text>
-                  <Text style={styles.feedbackBody}>You chose {answer.selectedName}.</Text>
+                  <Text testID="feedback-choice" onLayout={(event) => recordLayout('choice', event)} onTextLayout={(event) => recordText('choice', event)} style={styles.feedbackBody}>You chose {answer.selectedName}.</Text>
                 </View>
               </View>
 
-              <View style={styles.feedbackComparison}>
+              <View style={[styles.feedbackComparison, stackComparison && { flexDirection: 'column' }]}>
                 <FeedbackCard
                   card={puzzle.candidates.find((card) => card.id === answer.selectedId)}
                   label={answer.historicalMatch ? 'Trophy and Your Pick' : 'Your Pick'}
@@ -1006,7 +1061,7 @@ export default function DraftRunScreen({
                         {card.image_url ? (
                           <Image source={card.image_url} style={styles.poolImage} contentFit="cover" cachePolicy="memory-disk" />
                         ) : null}
-                        <Text style={styles.poolName} numberOfLines={2}>{index + 1}. {card.name}</Text>
+                        <Text style={styles.poolName}>{index + 1}. {card.name}</Text>
                       </Pressable>
                     ))}
                   </ScrollView>
@@ -1066,16 +1121,10 @@ export default function DraftRunScreen({
           transparent
           visible={zoomedCard !== null}
         >
-          <SafeAreaView style={styles.zoomSafe}>
+          <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={styles.zoomSafe}>
             <View accessibilityViewIsModal style={styles.zoomPanel}>
               {zoomedCard?.image_url ? (
-                <Image
-                  accessibilityLabel={`${zoomedCard.name} enlarged card`}
-                  cachePolicy="memory-disk"
-                  contentFit="contain"
-                  source={zoomedCard.image_url}
-                  style={styles.zoomImage}
-                />
+                <CardArtwork key={zoomedCard.image_url} uri={zoomedCard.image_url} name={`${zoomedCard.name} enlarged card`} style={styles.zoomImage} zoom />
               ) : (
                 <View style={styles.zoomFallback}>
                   <Text style={styles.zoomFallbackName}>{zoomedCard?.name}</Text>
@@ -1162,7 +1211,7 @@ const styles = StyleSheet.create({
   rerollPanel: { gap: spacing.sm, paddingVertical: spacing.xs },
   rerollRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   rerollButton: {
-    minHeight: 42,
+    minHeight: 44,
     borderWidth: 1,
     borderColor: colors.lineStrong,
     backgroundColor: colors.surface,
@@ -1179,6 +1228,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   primaryButton: {
+    paddingVertical: spacing.sm,
     minHeight: 52,
     backgroundColor: colors.accent,
     alignItems: 'center',
@@ -1195,19 +1245,24 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
     borderTopColor: colors.accent,
     backgroundColor: colors.surface,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.lg,
+    flexDirection: 'column',
+    gap: spacing.md,
   },
+  feedbackWide: { flexDirection: 'row', alignItems: 'center' },
+  feedbackCopyWide: { flex: 1 },
   feedbackScore: { flexDirection: 'row', alignItems: 'baseline' },
-  feedbackScoreNumber: { color: colors.ink, fontSize: 44, lineHeight: 48, fontWeight: '800' },
+  feedbackScoreNumber: { flexShrink: 1, color: colors.ink, fontSize: 44, lineHeight: 48, fontWeight: '800' },
   feedbackScoreSuffix: { color: colors.muted, fontSize: 14, fontWeight: '700' },
-  feedbackCopy: { flex: 1, minWidth: 220, gap: spacing.xs, justifyContent: 'center' },
+  feedbackCopy: { minWidth: 0, flexShrink: 1, gap: spacing.sm, justifyContent: 'center' },
   feedbackTitle: { color: colors.ink, fontSize: 17, lineHeight: 22, fontWeight: '800' },
   feedbackBody: { color: colors.muted, fontSize: 14, lineHeight: 20 },
   feedbackComparison: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
   feedbackCard: {
-    flex: 1,
+    flexGrow: 1,
+    flexShrink: 1,
+    flexBasis: 'auto',
+    width: '100%',
+    maxWidth: 420,
     minWidth: 0,
     borderWidth: 1,
     borderColor: colors.line,
@@ -1237,7 +1292,7 @@ const styles = StyleSheet.create({
   },
   disclosureText: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
   feedbackCardZoom: { gap: spacing.xs },
-  shopLink: { minHeight: 40, justifyContent: 'center', paddingVertical: spacing.xs },
+  shopLink: { minHeight: 44, justifyContent: 'center', paddingVertical: spacing.xs },
   shopLinkText: { color: colors.accentDark, fontSize: 12, lineHeight: 16, fontWeight: '800', textDecorationLine: 'underline' },
   affiliateDisclosure: { color: colors.muted, fontSize: 11, lineHeight: 16 },
   analysisPanel: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: spacing.lg, gap: spacing.md },
@@ -1261,7 +1316,7 @@ const styles = StyleSheet.create({
     borderColor: colors.line,
   },
   resultReviewIndex: { width: 28, color: colors.accentDark, fontSize: 16, fontWeight: '800' },
-  resultReviewCopy: { flex: 1, gap: 2 },
+  resultReviewCopy: { flex: 1, minWidth: 0, gap: 2 },
   resultReviewTitle: { color: colors.ink, fontSize: 14, lineHeight: 19, fontWeight: '800' },
   resultReviewScore: { color: colors.ink, fontSize: 18, fontWeight: '800' },
   resultPage: { padding: spacing.lg, paddingTop: spacing.xxl, paddingBottom: spacing.xxl, gap: spacing.lg, alignSelf: 'center', width: '100%', maxWidth: 980 },
@@ -1281,6 +1336,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   secondaryButtonText: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
+  imageError: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.sm, gap: spacing.sm },
+  imageErrorText: { color: colors.muted, fontSize: 14, lineHeight: 20, textAlign: 'center' },
   zoomSafe: {
     flex: 1,
     backgroundColor: 'rgba(16, 24, 32, 0.96)',

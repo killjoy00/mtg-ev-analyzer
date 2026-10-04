@@ -2,11 +2,11 @@ import { router, type ErrorBoundaryProps } from 'expo-router';
 import {
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from 'react-native';
+import { Text } from '@/src/components/Text';
 
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 
 import { colors, spacing } from '@/src/theme';
 
@@ -17,7 +17,7 @@ export function ScreenErrorBoundary({ error, retry }: ErrorBoundaryProps) {
         <Text style={styles.eyebrow}>PACK ONE</Text>
         <Text style={styles.title}>This screen hit a problem.</Text>
         <Text style={styles.body}>
-          Your saved Pack One account and server-authoritative game state are unchanged. You can retry this screen or return home.
+          Your account and saved game are still available. You can retry this screen or return home.
         </Text>
 
         {__DEV__ ? (
