@@ -25,7 +25,7 @@ const draw=`    SELECT i.puzzle_id,i.source_draft_hash
       AND i.source_draft_hash<>ALL(selected_sources) AND i.set_id=chosen_set AND i.band=chosen_band
     ORDER BY i.puzzle_id COLLATE "C" LIMIT 1 OFFSET chosen_offset;`;
 assert.equal(original.split(draw).length,2,'Installed draw body must match the reviewed reference');
-const proposed=original.replace(draw,()=>`    IF window_start=window_end THEN
+const generated=original.replace(draw,()=>`    IF window_start=window_end THEN
       SELECT i.puzzle_id,i.source_draft_hash
         INTO chosen_puzzle_id,chosen_source
       FROM draft_run_serving_inventory i
@@ -35,6 +35,11 @@ const proposed=original.replace(draw,()=>`    IF window_start=window_end THEN
     ELSE
 ${draw}
     END IF;`);
+const migration=fs.readFileSync('migrations/0051_exact_pick_draw_index.sql','utf8');
+const proposed=migration.slice(migration.indexOf('CREATE OR REPLACE FUNCTION'));
+const generatedBody=generated.split('AS $function$')[1]?.split('$function$')[0];
+const proposedBody=proposed.split('AS $function$')[1]?.split('$function$')[0];
+assert.equal(proposedBody.replace(/    -- Equality[^\n]*\n    -- Keep[^\n]*\n/,''),generatedBody,'Migration changes only the measured exact-pick draw');
 const report={branch,sha:process.env.GITHUB_SHA,snapshot:snapshot.id,revision:snapshot.revision,sets,scope:'bounded clone SQL draw diagnosis; exact parity and concurrent SQL timing, not API capacity',phases:[],plans:[],passed:false};
 const dir='artifacts/practice-performance';fs.mkdirSync(dir,{recursive:true});
 const sql=statement=>execFileSync('psql',['-X','-q','-d',connection,'-v','ON_ERROR_STOP=1'],{input:statement,stdio:['pipe','ignore','pipe'],timeout:240000});
@@ -69,10 +74,13 @@ async function phase(name,exactPick) {
 try {
  await phase('reference',false);
  const start=performance.now();
- sql('CREATE INDEX draft_run_inventory_pick_draw_idx ON draft_run_serving_inventory(snapshot_id,set_id,band,pick_number,puzzle_id) INCLUDE(source_draft_hash);\n'+proposed);
+ sql(migration);
  report.install_ms=Math.round(performance.now()-start);
  report.index_bytes=Number((await query("SELECT pg_relation_size('draft_run_inventory_pick_draw_idx') bytes")).rows[0].bytes);
  await phase('pick_index',true);
+ // Repeat both implementations after the index build has warmed the copy.
+ sql(original);await phase('reference_recheck',false);
+ sql(proposed);await phase('pick_index_recheck',true);
  report.passed=true;
  console.log(JSON.stringify({branch,passed:report.passed,index_bytes:report.index_bytes,install_ms:report.install_ms,phases:report.phases.map(p=>({name:p.name,summary:p.summary}))}));
 } finally {

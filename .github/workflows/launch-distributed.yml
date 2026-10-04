@@ -2,10 +2,12 @@ name: isolated distributed launch acceptance
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths: ['scripts/launch-distributed*', 'scripts/launch-change-scope.mjs', 'tests/launch-change-scope.test.mjs', 'tests/launch-distributed-capacity.test.mjs', 'tests/draft-start-timing.test.mjs', 'tests/ingress.test.mjs', 'worker/draft-start-timing.mjs', 'worker/draft-run-function.mjs', 'worker/draft-run-selection.mjs', 'migrations/0045_batched_practice_selector.sql', 'migrations/0050_practice_recency_bias.sql', 'edge/gateway.mjs', 'scripts/edge-control.mjs', '.github/workflows/launch-distributed.yml']
+    paths: ['scripts/launch-distributed*', 'scripts/launch-change-scope.mjs', 'tests/launch-change-scope.test.mjs', 'tests/launch-distributed-capacity.test.mjs', 'tests/draft-start-timing.test.mjs', 'tests/ingress.test.mjs', 'worker/draft-start-timing.mjs', 'worker/draft-run-function.mjs', 'worker/draft-run-selection.mjs', 'migrations/0045_batched_practice_selector.sql', 'migrations/0050_practice_recency_bias.sql', 'migrations/0051_exact_pick_draw_index.sql', 'edge/gateway.mjs', 'scripts/edge-control.mjs', '.github/workflows/launch-distributed.yml']
   workflow_dispatch:
 permissions:
   contents: read
+  checks: read
+  pull-requests: read
 concurrency:
   group: pack1-gateway-preview
   cancel-in-progress: false
@@ -51,8 +53,47 @@ jobs:
         run: |
           node --test tests/launch-distributed-capacity.test.mjs tests/launch-alert.test.mjs tests/launch-controls.test.mjs
           npm run test:js
+  checked-source:
+    needs: scope
+    if: needs.scope.outputs.run_load == 'true' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Require CI and exact selector/performance acceptance before provisioning load
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEWED_HEAD: ${{ github.event.pull_request.head.sha }}
+          REVIEWED_PR: ${{ github.event.pull_request.number }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const {GITHUB_REPOSITORY:repo,GH_TOKEN:token,REVIEWED_HEAD:head,REVIEWED_PR:pr}=process.env;
+          const headers={authorization:'Bearer '+token,accept:'application/vnd.github+json'};
+          async function get(path) {
+            const response=await fetch('https://api.github.com/repos/'+repo+path,{headers,redirect:'error',signal:AbortSignal.timeout(30000)});
+            assert.equal(response.status,200,'GitHub CI gate read');
+            return response.json();
+          }
+          let accepted=false;
+          for(let attempt=0;attempt<180;attempt++) {
+            const [pull,checks]=await Promise.all([get('/pulls/'+pr),get('/commits/'+head+'/check-runs?per_page=100')]);
+            assert.equal(pull.head.sha,head,'reviewed source head must remain unchanged');
+            assert.equal(pull.state,'open','load acceptance is for the open reviewed PR');
+            const latest=new Map();
+            for(const check of checks.check_runs) {
+              if(check.head_sha===head&&check.app?.slug==='github-actions'&&['test','browser','baseline'].includes(check.name)&&!latest.has(check.name))latest.set(check.name,check);
+            }
+            const required=['test','browser','baseline'].map(name=>latest.get(name));
+            if(required.every(check=>check?.status==='completed'&&check.conclusion==='success')) {accepted=true;break;}
+            assert.ok(!required.some(check=>check?.status==='completed'&&check.conclusion!=='success'),'required CI must pass before disposable database writes');
+            await new Promise(resolve=>setTimeout(resolve,10000));
+          }
+          assert.ok(accepted,'required CI did not finish within the source gate');
+          console.log('Unchanged source passed test, browser and selector/performance acceptance.');
+          NODE
   setup:
-    needs: [scope, regression]
+    needs: [scope, regression, checked-source]
     if: needs.scope.outputs.run_load == 'true' && (github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.draft == false))
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -118,6 +159,7 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0048_uncapped_v5_components.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0049_cross_version_corpus_cutover.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0050_practice_recency_bias.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0051_exact_pick_draw_index.sql
           node scripts/verify-neon-schema.mjs
           PACK1_RELEASE_COMMIT="$GITHUB_SHA" node scripts/warm-practice-cache.mjs
           node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$GITHUB_SHA"
