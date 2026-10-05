@@ -146,6 +146,7 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
   Image.prefetch = async () => {};
 
   const mocks = {
+    'expo-application': { nativeApplicationVersion: '1.0', nativeBuildVersion: '1' },
     'expo-haptics': {
       selectionAsync: async () => {},
       notificationAsync: async () => {},
@@ -159,12 +160,15 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
     'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       AccessibilityInfo: { announceForAccessibility() {} },
       ActivityIndicator: host('ActivityIndicator'),
+      KeyboardAvoidingView: host('KeyboardAvoidingView'),
       Modal: host('Modal'),
+      Platform: { OS: 'ios' },
       Pressable: host('Pressable'),
       ScrollView,
       Share: { share: async () => {} },
       StyleSheet: { create: (value) => value },
       Text: host('Text'),
+      TextInput: host('TextInput'),
       View: host('View'),
     },
     'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
@@ -272,6 +276,7 @@ test('a committed pick with a lost response is reconciled into feedback', async 
   Image.prefetch = async () => {};
 
   const mocks = {
+    'expo-application': { nativeApplicationVersion: '1.0', nativeBuildVersion: '1' },
     'expo-haptics': {
       selectionAsync: async () => {},
       notificationAsync: async () => {},
@@ -285,12 +290,15 @@ test('a committed pick with a lost response is reconciled into feedback', async 
     'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       AccessibilityInfo: { announceForAccessibility() {} },
       ActivityIndicator: host('ActivityIndicator'),
+      KeyboardAvoidingView: host('KeyboardAvoidingView'),
       Modal: host('Modal'),
+      Platform: { OS: 'ios' },
       Pressable: host('Pressable'),
       ScrollView,
       Share: { share: async () => {} },
       StyleSheet: { create: (value) => value },
       Text: host('Text'),
+      TextInput: host('TextInput'),
       View: host('View'),
     },
     'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
