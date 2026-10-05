@@ -48,7 +48,9 @@ async function completePractice(player) {
 }
 
 async function cloneCreatorAttempt(templateId,{id,playerId,challengeId,authId=null,complete=true}) {
-  const startHash='a'.repeat(64),requestHash='b'.repeat(64);
+  const challengeHex=challengeId.replaceAll('-',''),runHex=id.replaceAll('-','');
+  const startHash=(challengeHex+challengeHex).slice(0,64);
+  const requestHash=(runHex+runHex).slice(0,64);
   const result=await query(`
     INSERT INTO draft_run_sessions
     SELECT (jsonb_populate_record(NULL::draft_run_sessions,
