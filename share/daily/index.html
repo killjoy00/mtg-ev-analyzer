@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Pack One: Daily MTG Draft Decisions">
+  <meta property="og:description" content="Eight real MTG draft decisions every day. Can you beat today’s score?">
+  <meta property="og:url" content="https://packone.pro/share/daily/">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Pack One: Daily MTG Draft Decisions">
+  <meta name="twitter:description" content="Eight real MTG draft decisions every day. Can you beat today’s score?">
+  <title>Pack One: Daily MTG Draft Decisions</title>
+</head>
+<body>
+  <p>Opening Pack One…</p>
+  <script>
+    const params=new URLSearchParams(location.search);
+    const environment=params.get('environment')||'mixed';
+    const set=environment==='powered-cube'||environment==='latest'?environment:'mixed';
+    const target=new URL('/',location.origin);
+    target.searchParams.set('game','draft-run');
+    target.searchParams.set('daily','1');
+    if(set!=='mixed')target.searchParams.set('set',set);
+    if(params.get('ref')==='result_share')target.searchParams.set('ref','result_share');
+    location.replace(target.pathname+target.search);
+  </script>
+  <noscript><a href="/">Open Pack One</a></noscript>
+</body>
+</html>

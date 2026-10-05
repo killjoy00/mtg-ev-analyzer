@@ -86,10 +86,9 @@ test('generated reddit launch page is static crawler-friendly redirect HTML',asy
   const file='go/reddit-launch/index.html';
   const html=await readFile(file,'utf8');
   assert.equal(html,renderCampaignRedirectPage(productionEntry),'committed generated page must match deterministic renderer');
-  assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/social-preview-v4\.jpg"/);
-  assert.match(html,/property="og:image:width" content="520"/);
-  assert.match(html,/property="og:image:height" content="328"/);
-  assert.match(html,/name="twitter:card" content="summary_large_image"/);
+  assert.doesNotMatch(html,/property="og:image"/);
+  assert.doesNotMatch(html,/name="twitter:image"/);
+  assert.match(html,/name="twitter:card" content="summary"/);
   assert.match(html,/name="robots" content="noindex,nofollow"/);
   assert.match(html,/property="og:url" content="https:\/\/packone\.pro\/"/);
   assert.match(html,/rel="canonical" href="https:\/\/packone\.pro\/"/);
@@ -116,12 +115,14 @@ test('generated campaign social previews stay in parity with the homepage',async
   for(const [key,value] of [
     ['property','og:title'],
     ['property','og:description'],
-    ['property','og:image'],
+    ['name','twitter:card'],
     ['name','twitter:title'],
-    ['name','twitter:description'],
-    ['name','twitter:image']
+    ['name','twitter:description']
   ]) {
     assert.equal(meta(campaign,key,value),meta(homepage,key,value),value+' must match homepage preview metadata');
+  }
+  for(const html of [homepage,campaign]) {
+    assert.doesNotMatch(html,/property="og:image"|name="twitter:image"/,'compact previews must not expose image metadata');
   }
 });
 
