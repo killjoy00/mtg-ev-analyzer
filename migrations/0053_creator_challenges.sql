@@ -155,6 +155,7 @@ LANGUAGE plpgsql
 AS $creator_merge$
 DECLARE
   target_auth uuid;
+  target_attempt_id uuid;
   duplicate_attempt boolean;
 BEGIN
   IF NEW.player_id IS NOT DISTINCT FROM OLD.player_id OR OLD.creator_challenge_id IS NULL THEN
@@ -166,18 +167,28 @@ BEGIN
   WHERE player_id=NEW.player_id
   LIMIT 1;
 
-  SELECT EXISTS(
-    SELECT 1
-    FROM draft_run_sessions target
-    WHERE target.id<>OLD.id
-      AND target.creator_challenge_id=OLD.creator_challenge_id
-      AND (
-        target.player_id=NEW.player_id
-        OR (target_auth IS NOT NULL AND target.creator_participant_auth_user_id=target_auth)
-      )
-  ) INTO duplicate_attempt;
+  SELECT target.id INTO target_attempt_id
+  FROM draft_run_sessions target
+  WHERE target.id<>OLD.id
+    AND target.creator_challenge_id=OLD.creator_challenge_id
+    AND (
+      target.player_id=NEW.player_id
+      OR (target_auth IS NOT NULL AND target.creator_participant_auth_user_id=target_auth)
+    )
+  ORDER BY
+    (target_auth IS NOT NULL AND target.creator_participant_auth_user_id=target_auth) DESC,
+    (target.player_id=NEW.player_id) DESC,
+    target.created_at,target.id
+  LIMIT 1;
+
+  duplicate_attempt=target_attempt_id IS NOT NULL;
 
   IF duplicate_attempt THEN
+    UPDATE draft_run_sessions
+    SET creator_participant_auth_user_id=COALESCE(creator_participant_auth_user_id,target_auth)
+    WHERE id=target_attempt_id;
+
+
     -- merge_pack1_player copies the source result to NEW.player_id and deletes
     -- the source result before it updates draft_run_sessions. Demote that
     -- copied history in the same transaction while preserving its score/grade.
