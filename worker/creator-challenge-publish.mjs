@@ -399,6 +399,83 @@ export async function handleCreatorChallengePublication(request,{query,readJson,
   if(!row)fail('Creator challenge not found.',404);
 
   if(request.method==='GET') {
+    if(row.publication_operation_ref)return Response.json(
+      await reconcile(query,row,{today,env,fetcher}),
+      {headers:{'cache-control':'no-store'}},
+    );
+    return Response.json(statePayload(row),{headers:{'cache-control':'no-store'}});
+  }
+  if(request.method!=='POST')fail('Method not allowed.',405);
+
+  const body=await readJson(request);
+  const action=body?.action==='retire'?'retire':body?.action==='publish'?'publish':null;
+  if(!action)fail('Choose publish or retire.');
+
+  if(action==='publish') {
+    if(row.status==='published')return Response.json(
+      {...statePayload(row),already_published:true},
+      {headers:{'cache-control':'no-store'}},
+    );
+    if(row.status==='retired')fail('Retired creator challenges cannot be republished.',409,'CREATOR_RETIRED');
+    await validateCreatorChallengeSource(query,row,{today,requireClosed:true});
+  }
+
+  if(action==='retire'&&!staticCleanupMayExist(row)) {
+    const changed=await query(\`UPDATE creator_challenges SET status='retired',
+        retired_at=COALESCE(retired_at,now()),
+        retired_by_admin_auth_user_id=COALESCE(retired_by_admin_auth_user_id,$2::uuid),
+        publication_operation_ref=NULL,
+        publication_detail=$3::jsonb,publication_error=NULL,updated_at=now()
+      WHERE id=$1::uuid AND status<>'retired'
+      RETURNING id\`,[
+      row.id,auth.user_id,JSON.stringify({action:'retire',reason:'admin_retire',live_verified:true,static_cleanup:'not_required'}),
+    ]);
+    if(changed.rows[0])await query(\`INSERT INTO creator_challenge_audit(creator_challenge_id,admin_auth_user_id,action,detail)
+      VALUES($1::uuid,$2::uuid,'retired',jsonb_build_object('reason','admin_retire','static_cleanup','not_required'))\`,[
+      row.id,auth.user_id,
+    ]);
+    row=await creatorChallengeById(query,row.id);
+    return Response.json({...statePayload(row),ok:true},{headers:{'cache-control':'no-store'}});
+  }
+
+  const begun=await beginOperation(query,row,action,{
+    adminAuthUserId:auth.user_id,
+    reason:action==='retire'?'admin_retire':'admin_publish',
+    privacy:false,
+  });
+  row=begun.row;
+  if(begun.complete)return Response.json({...statePayload(row),ok:true},{headers:{'cache-control':'no-store'}});
+
+  let state=await reconcile(query,row,{today,env,fetcher});
+  row=state.challenge;
+  const detail=operationDetail(row);
+  if(operationMatches(row,begun.operation,action)&&!detail.workflow&&dispatchRetryDue(detail)) {
+    const dispatch=await dispatchAttempt(query,row,begun.operation,action,{env,fetcher});
+    row=await creatorChallengeById(query,row.id);
+    state=statePayload(row,{dispatch});
+    if(dispatch.state==='rejected')return Response.json(
+      {...state,ok:false,error:dispatch.error||'Creator publication dispatch was rejected.'},
+      {status:503,headers:{'cache-control':'no-store'}},
+    );
+  }
+  return Response.json({
+    ...statePayload(await creatorChallengeById(query,row.id)),
+    ok:true,
+    operation:begun.operation,
+    reused_operation:begun.reused,
+  },{status:202,headers:{'cache-control':'no-store'}});
+}={}) {
+  if(typeof query!=='function'||typeof readJson!=='function'||!(allowedOrigins instanceof Set))
+    throw Error('Creator publisher dependencies are unavailable.');
+  const url=new URL(request.url);
+  const match=url.pathname.match(/^\/v1\/admin\/creator-challenges\/([a-f0-9-]{36})\/publication$/i);
+  if(!match)fail('Not found.',404);
+  const mutation=request.method==='POST';
+  const auth=await requireCreatorAdmin(request,{query,allowedOrigins,csrf:mutation});
+  let row=await creatorChallengeById(query,match[1]);
+  if(!row)fail('Creator challenge not found.',404);
+
+  if(request.method==='GET') {
     if(row.publication_operation_ref&&['publishing','retired'].includes(row.status))return Response.json(await reconcile(query,row,{env,fetcher}),{headers:{'cache-control':'no-store'}});
     return Response.json({state:row.status,challenge:row,reconciled:false},{headers:{'cache-control':'no-store'}});
   }
