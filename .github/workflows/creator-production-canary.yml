@@ -1,0 +1,101 @@
+name: Creator production canary
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/creator-canary-request.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pack1-creator-production-canary
+  cancel-in-progress: false
+
+jobs:
+  canary:
+    name: Practice and closed Daily creator canary
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    timeout-minutes: 75
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      PROJECT_ID: patient-shadow-91417882
+      PROD_BRANCH: br-orange-feather-ayps8kep
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - id: request
+        name: Resolve reviewed creator canary request
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE' >> "$GITHUB_OUTPUT"
+          const fs=require('node:fs');
+          const request=JSON.parse(fs.readFileSync('.github/creator-canary-request.json','utf8'));
+          const expected=['operation','reason','release_commit'];
+          if(JSON.stringify(Object.keys(request).sort())!==JSON.stringify(expected.sort()))
+            throw new Error('Invalid creator canary request keys.');
+          if(request.operation!=='run-creator-canary')throw new Error('Invalid creator canary operation.');
+          if(typeof request.reason!=='string'||!request.reason.trim())throw new Error('Creator canary requires a reason.');
+          if(!/^[a-f0-9]{40}$/.test(String(request.release_commit||'')))
+            throw new Error('Creator canary requires an exact released commit.');
+          console.log('release_commit='+request.release_commit);
+          NODE
+
+      - name: Require exact current main and released ancestor
+        env:
+          RELEASE_COMMIT: ${{ steps.request.outputs.release_commit }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$NEON_API_KEY"
+          git fetch --no-tags --depth=100 origin main
+          head_sha="$(git rev-parse HEAD)"
+          main_sha="$(git rev-parse FETCH_HEAD)"
+          [[ "$head_sha" == "$main_sha" ]] || {
+            echo "Checked-out canary request $head_sha is no longer current main ($main_sha)." >&2
+            exit 1
+          }
+          git merge-base --is-ancestor "$RELEASE_COMMIT" "$head_sha" || {
+            echo "Requested released commit $RELEASE_COMMIT is not an ancestor of current main." >&2
+            exit 1
+          }
+          echo "Creator canary request is current main; backend release source is $RELEASE_COMMIT."
+
+      - name: Install pinned production connection tool
+        run: node .github/scripts/install-wrangler-tool.mjs "$RUNNER_TEMP/creator-canary-tools" neon@4.17.4
+
+      - name: Prepare production connection
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          neon="$RUNNER_TEMP/creator-canary-tools/node_modules/.bin/neon"
+          connection="$("$neon" connection-string "$PROD_BRANCH" --project-id "$PROJECT_ID" --database-name pack1 --role-name pack1_owner)"
+          echo "::add-mask::$connection"
+          printf '%s' "$connection" > "$RUNNER_TEMP/creator-canary.connection"
+
+      - name: Validate canary helper syntax
+        run: node --check tests/creator-production-canary.mjs
+
+      - name: Run real production creator canary and cleanup
+        env:
+          RELEASE_COMMIT: ${{ steps.request.outputs.release_commit }}
+        run: node tests/creator-production-canary.mjs "$RELEASE_COMMIT" "$RUNNER_TEMP/creator-canary.connection"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: creator-production-canary-${{ github.run_id }}
+          path: artifacts/creator-canary
+          if-no-files-found: error
+          retention-days: 30
