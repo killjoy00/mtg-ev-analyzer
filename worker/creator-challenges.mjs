@@ -75,7 +75,7 @@ async function validateHistoricalPuzzles(query,source) {
   }
 }
 
-async function sourceSession(query,id,{expectedPlayerId=null,expectedType=null,shareId=null}={}) {
+async function sourceSession(query,id,{expectedPlayerId=null,expectedType=null,shareId=null,validatePuzzles=true}={}) {
   if(!UUID.test(String(id||'')))fail('Invalid creator source session.');
   const result=await query(`SELECT s.*,p.display_name,p.profile_public,p.username_owned,p.public_identity_hidden_at,
       a.auth_user_id source_owner_auth_user_id
@@ -97,7 +97,7 @@ async function sourceSession(query,id,{expectedPlayerId=null,expectedType=null,s
     const linked=await query('SELECT 1 FROM draft_run_shares WHERE id=$1 AND session_id=$2::uuid',[shareId,source.id]);
     if(!linked.rows[0])fail('Shared Practice source no longer matches its authoritative run.',409,'CREATOR_SOURCE_MISMATCH');
   }
-  await validateHistoricalPuzzles(query,source);
+  if(validatePuzzles)await validateHistoricalPuzzles(query,source);
   return source;
 }
 
@@ -182,7 +182,7 @@ function challengeRow(row) {
 export async function creatorChallengeById(query,id,{forUpdate=false}={}) {
   if(!UUID.test(String(id||'')))fail('Invalid creator challenge.');
   const result=await query(`SELECT c.*,s.score source_score,s.day authoritative_source_day,s.environment authoritative_environment,
-      s.puzzle_ids,s.answers,s.player_id authoritative_owner_player_id,s.measurement_qa,
+      s.player_id authoritative_owner_player_id,s.measurement_qa,
       p.public_identity_hidden_at,p.profile_public,
       stats.attempts,stats.wins,stats.ties,stats.losses,stats.beat_percentage,stats.average_score
     FROM creator_challenges c
@@ -291,6 +291,7 @@ export async function loadCreatorChallengeForExistingSession(query,id) {
   const source=await sourceSession(query,challenge.source_session_id,{
     expectedPlayerId:challenge.source_owner_player_id,
     expectedType:challenge.source_type,
+    validatePuzzles:false,
   });
   return {challenge,source};
 }
@@ -428,6 +429,7 @@ export async function listCreatorPlayers(query,search,{limit=20,offset=0}={}) {
     LEFT JOIN account_links a ON a.player_id=p.id
     LEFT JOIN neon_auth."user" u ON u.id=a.auth_user_id
     WHERE p.public_identity_hidden_at IS NULL
+      AND p.profile_public=true
       AND (p.display_name ILIKE '%'||$1||'%' OR coalesce(u.email,'') ILIKE '%'||$1||'%')
     ORDER BY (lower(p.display_name)=lower($1)) DESC,p.updated_at DESC,p.id
     LIMIT $2::int OFFSET $3::int`,[q,safeLimit,safeOffset]);
@@ -454,6 +456,7 @@ export async function listCompletedDailies(query,playerId,{limit=20,before=null}
       AND jsonb_array_length(s.answers)=8
       AND NOT s.measurement_qa
       AND p.public_identity_hidden_at IS NULL
+      AND p.profile_public=true
       AND ($3::date IS NULL OR s.day<$3::date)
     ORDER BY s.day DESC,s.environment,s.created_at
     LIMIT $2::int`,[playerId,safeLimit,cursor]);
