@@ -15,7 +15,9 @@ test('mobile linking distinguishes modern shares, historical challenges, and pub
   assert.equal(rewriteIncomingPath('https://packone.pro/?game=draft-run&shared='+share), '/shared-run?shared='+share);
   assert.equal(rewriteIncomingPath('https://packone.pro/?game=draft-run&challenge='+share), '/shared-run?shared='+share);
   assert.equal(rewriteIncomingPath('https://packone.pro/?game=draft-run&creator='+creator), '/creator-run?creator='+creator);
-  assert.equal(rewriteIncomingPath('https://packone.pro/go/creator-reality-fracture/'), '/creator-run?creator=creator-reality-fracture');
+  assert.equal(rewriteIncomingPath('https://packone.pro/creator/creator-reality-fracture/'), '/creator-run?creator=creator-reality-fracture');
+  assert.equal(rewriteIncomingPath('https://packone.pro/go/reddit-launch/'), '/',
+    'ordinary campaign vanity links remain web-only and must not be captured as creator routes');
   assert.equal(rewriteIncomingPath('https://packone.pro/?challenge='+historical), '/historical-challenge?challenge='+historical);
   assert.equal(rewriteIncomingPath('https://packone.pro/?game=draft-run&challenge='+historical), '/',
     'historical 12-character IDs must never be treated as modern Draft Run shares');
@@ -60,7 +62,7 @@ test('Android app-link configuration does not capture all Pack One HTTPS traffic
     .filter((item)=>item.scheme==='https'&&item.host==='packone.pro')
     .map((item)=>item.pathPrefix)
     .sort();
-  assert.deepEqual(prefixes,['/go/','/open/daily/','/open/profile/','/open/shared/']);
+  assert.deepEqual(prefixes,['/creator/','/open/daily/','/open/profile/','/open/shared/']);
   assert.equal(prefixes.includes('/'),false);
 });
 
@@ -73,7 +75,7 @@ test('published association files match the production mobile identities and nar
   assert.deepEqual(aasa.applinks.details[0].appIDs,['3564X3VTDB.pro.packone.app']);
   assert.deepEqual(
     aasa.applinks.details[0].components.map((item)=>item['/']).sort(),
-    ['/go/*','/open/daily/*','/open/profile/*','/open/shared/*'],
+    ['/creator/*','/open/daily/*','/open/profile/*','/open/shared/*'],
   );
 
   const assetlinks=JSON.parse(fs.readFileSync('.well-known/assetlinks.json','utf8'));
