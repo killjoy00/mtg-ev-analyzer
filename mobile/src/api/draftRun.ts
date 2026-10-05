@@ -157,12 +157,6 @@ export type CreatorChallengeInfo = {
   source_type: 'practice' | 'daily';
   source_day?: string | null;
   run_length: number;
-  attempts: number;
-  wins: number;
-  ties: number;
-  losses: number;
-  beat_percentage?: number | null;
-  average_score?: number | null;
   public_url: string;
   tracked_url: string;
 };
