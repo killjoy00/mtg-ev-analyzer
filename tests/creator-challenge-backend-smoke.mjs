@@ -96,7 +96,7 @@ async function insertCreatorStart(playerId,runId,challengeId) {
 }
 
 const tag=crypto.randomUUID().slice(0,8);
-const creator=await call(growth,'/v1/session',{displayName:'Merge Creator '+tag});
+const creator=await call(growth,'/v1/session',{displayName:'QA Merge Creator '+tag});
 const target=await call(growth,'/v1/session',{displayName:'Merge Account '+tag});
 const guestCompleted=await call(growth,'/v1/session',{displayName:'Merge Guest Complete '+tag});
 const guestPartial=await call(growth,'/v1/session',{displayName:'Merge Guest Partial '+tag});
