@@ -34,7 +34,8 @@ test('fresh Practice source is played through live APIs and later marked QA/priv
   const start=script.indexOf('async function createFreshPracticeSource()');
   const end=script.indexOf('async function cleanupFreshPracticeSource()',start);
   const block=script.slice(start,end);
-  assert.match(block,/QA Creator Source/);
+  assert.match(block,/Creator Canary Source/);
+  assert.doesNotMatch(block,/QA Creator Source/);
   assert.match(block,/\/growth\/v1\/player\/session/);
   assert.match(block,/\/draft\/v1\/runs/);
   assert.match(block,/\/share/);
@@ -58,7 +59,7 @@ test('borrowed closed Daily eligibility is restored and canary is protected',()=
 test('reviewed retry request explicitly forbids customer rows',()=>{
   assert.equal(request.operation,'run-creator-production-canary');
   assert.equal(request.expected_release,'f6ea0910d322f007f0ac0004b98fea6bab09422a');
-  assert.match(request.reason,/fresh QA Practice/i);
+  assert.match(request.reason,/fresh owned canary Practice/i);
   assert.match(request.reason,/retained (?:closed )?QA release Daily/i);
   assert.match(request.reason,/Never select or mutate customer rows/i);
 });
