@@ -23,6 +23,7 @@ import {
 import {prepareCreatorChallengePublish} from '../scripts/prepare-creator-challenge-publish.mjs';
 import {checkCreatorChallenges} from '../scripts/check-creator-challenges.mjs';
 import {
+  beginCreatorPublicationOperation,
   creatorPublicationDispatchRetryDue,
   discoverCreatorPublicationWorkflowRun,
   dispatchCreatorPublicationAttempt,
@@ -369,6 +370,59 @@ test('account deletion pauses after dispatching creator retirement until the sta
     [],
     'creator dispatch may only send declared workflow_dispatch inputs',
   );
+});
+
+test('repeated publish reuses one operation and a competing retire supersedes it safely',async()=>{
+  const admin='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const state={
+    id:CHALLENGE,slug:'lola-rft',status:'draft',
+    publication_operation_ref:null,publication_detail:{},publication_error:null,
+    creator_public_name:'Lola',headline:'Can you beat Lola?',source_score:87,
+    source_environment:'mixed',source_type:'practice',source_day:null,
+    acquisition_source:'creator',acquisition_campaign:'lola-rft',acquisition_medium:'creator',
+    authoritative_owner_player_id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    source_owner_player_id:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+    profile_public:true,public_identity_hidden_at:null,measurement_qa:false,
+  };
+  const row=()=>({...state,publication_detail:{...state.publication_detail}});
+  const query=async(sql,params=[])=>{
+    if(sql.startsWith("UPDATE creator_challenges SET status='publishing'")) {
+      const expectedStatus=params[3],expectedOperation=params[4]||null;
+      const currentOperation=state.publication_operation_ref||null;
+      const matches=state.status===expectedStatus&&currentOperation===expectedOperation;
+      if(matches){
+        state.status='publishing';state.publication_operation_ref=params[1];
+        state.publication_detail=JSON.parse(params[2]);state.publication_error=null;
+      }
+      return {rows:matches?[{id:CHALLENGE}]:[]};
+    }
+    if(sql.startsWith("UPDATE creator_challenges SET status='retired'")) {
+      const expectedStatus=params[5],expectedOperation=params[6]||null;
+      const currentOperation=state.publication_operation_ref||null;
+      const matches=state.status===expectedStatus&&currentOperation===expectedOperation;
+      if(matches){
+        state.status='retired';state.publication_operation_ref=params[3];
+        state.publication_detail=JSON.parse(params[4]);state.publication_error=null;
+      }
+      return {rows:matches?[{id:CHALLENGE}]:[]};
+    }
+    if(sql.startsWith('INSERT INTO creator_challenge_audit'))return {rows:[],rowCount:1};
+    if(sql.includes('SELECT c.*,s.score source_score'))return {rows:[row()]};
+    throw new Error('Unexpected query: '+sql);
+  };
+
+  const first=await beginCreatorPublicationOperation(query,row(),'publish',{adminAuthUserId:admin,reason:'test_publish'});
+  assert.equal(first.reused,false);assert.match(first.operation,/^[a-f0-9-]{36}$/i);
+  const second=await beginCreatorPublicationOperation(query,{...row(),status:'draft',publication_operation_ref:null,publication_detail:{}},'publish',{adminAuthUserId:admin,reason:'test_publish'});
+  assert.equal(second.reused,true);
+  assert.equal(second.operation,first.operation,'concurrent/repeated publish must converge on the in-flight operation');
+
+  const retired=await beginCreatorPublicationOperation(query,row(),'retire',{adminAuthUserId:admin,reason:'test_retire'});
+  assert.equal(retired.reused,false);
+  assert.notEqual(retired.operation,first.operation);
+  assert.equal(state.status,'retired');
+  assert.equal(state.publication_detail.action,'retire');
+  assert.equal(state.publication_operation_ref,retired.operation);
 });
 
 test('creator publication dispatch distinguishes rejection from ambiguous delivery and retries only after the ambiguity window',async()=>{
