@@ -1,5 +1,5 @@
 {
   "operation": "run-creator-production-canary",
-  "reason": "Owner-authorized retry of the Issue #984 production acceptance after fixing the canary-only PostgreSQL day-alias syntax error. Use authentic completed non-QA Practice and closed Daily sources through the live Admin creator APIs; publish protected creator routes, exercise guest play, creator self-open, progressive reveal, final comparison, stats, attribution dedupe and Daily isolation, then verify Admin retirement and privacy retirement remove personalized static assets before completion. Leave no live canary route.",
+  "reason": "Owner-authorized retry of Issue #984 production acceptance after fixing the canary-only SQL alias. Source selection is restricted to retained QA release fixtures only: a completed QA v5 Practice/share and a closed QA release Daily are temporarily made eligible, exercised through the live Admin/public creator path, then restored. Never select or mutate customer rows. Verify protected publication, guest play, self-open, progressive reveal, final comparison, stats, attribution dedupe, Daily isolation, Admin retirement and privacy retirement; leave no live personalized canary route.",
   "expected_release": "f6ea0910d322f007f0ac0004b98fea6bab09422a"
 }
