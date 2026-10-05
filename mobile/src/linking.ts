@@ -161,7 +161,7 @@ export function rewriteIncomingPath(path: string) {
       return id && /^[a-f0-9]{24}$/.test(id) ? `/shared-run?shared=${id}` : '/';
     }
 
-    const creatorVanity = pathname.replace(/\/+$/, '').match(/^\/go\/([a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?)$/);
+    const creatorVanity = pathname.replace(/\/+$/, '').match(/^\/creator\/([a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?)$/);
     if (creatorVanity) return `/creator-run?creator=${creatorVanity[1]}`;
     if (pathname === '/open/daily/' || pathname === '/open/daily') {
       return `/draft-run?environment=${environmentFromSet(searchParams.get('environment'))}`;
