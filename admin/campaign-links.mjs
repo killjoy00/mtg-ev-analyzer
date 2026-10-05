@@ -1,7 +1,11 @@
-import {buildCampaignDraft,SUPPORTED_CAMPAIGN_DESTINATIONS,validateCampaignEntries} from '../campaign-links.mjs';
+import {buildCampaignDraft,SUPPORTED_CAMPAIGN_DESTINATIONS,validateCampaignEntries,normalizeCampaignSlug} from '../campaign-links.mjs';
 
 const valueOf=(form,name)=>form.elements.namedItem(name)?.value??'';
 const show=value=>value||'—';
+const esc=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+const creatorDefaults=()=>({source:'creator',campaign:'beat-the-creator',medium:'creator'});
+const environmentLabel=value=>value==='latest'?'Latest Set':value==='powered-cube'?'Powered Cube':'Mixed';
+const dateLabel=value=>value?new Date(value+'T12:00:00Z').toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):'';
 
 function setError(form,name,message) {
   const input=form.elements.namedItem(name);
@@ -10,43 +14,128 @@ function setError(form,name,message) {
   if(error){error.textContent=message||'';error.hidden=!message;}
 }
 
-export async function renderCampaignLinks(root,publishRequest) {
+async function copy(value,status) {
+  try{await navigator.clipboard.writeText(value);status.textContent='Copied.';}
+  catch{status.textContent='Copy failed. Select the value and copy it manually.';}
+}
+
+function creatorEntry(source,form) {
+  const creatorName=String(valueOf(form,'creator_public_name')).trim();
+  return {
+    source_type:source?.source_type,
+    ...(source?.source_type==='practice'?{share:source.share_id}:{creator_player_id:source?.creator_player_id,source_session_id:source?.source_session_id}),
+    creator_public_name:creatorName,
+    creator_handle:String(valueOf(form,'creator_handle')).trim()||null,
+    slug:normalizeCampaignSlug(valueOf(form,'slug'))||String(valueOf(form,'slug')).trim().toLowerCase(),
+    acquisition_source:String(valueOf(form,'source')).trim().toLowerCase(),
+    acquisition_campaign:String(valueOf(form,'campaign')).trim().toLowerCase(),
+    acquisition_medium:String(valueOf(form,'medium')).trim().toLowerCase(),
+    headline:String(valueOf(form,'headline')).trim()||`Can you beat ${creatorName}?`,
+    creator_post_run_note:String(valueOf(form,'creator_post_run_note')).trim()||null,
+  };
+}
+
+function creatorShareCopy(challenge) {
+  const name=challenge.creator_public_name;
+  const score=Number(challenge.source_score);
+  return `I scored ${score} on this Pack One Draft Run. Think you can beat me? ${challenge.public_url||`https://packone.pro/go/${challenge.slug}/`}`;
+}
+
+export async function renderCampaignLinks(root,publishRequest,draftRequest) {
   root.innerHTML=`<section class="campaign-link-builder">
-    <h1>Campaign Links / Link Builder</h1>
-    <p class="muted">Build a tracked campaign URL immediately, or add a slug when you also want a static vanity route.</p>
-    <p class="note"><strong>One-click publish.</strong> The tracked URL works immediately. For a vanity URL, Publish opens a protected site PR, runs the required checks, merges it, and waits for the Pages route to go live.</p>
-    <form id="campaign-link-form" class="campaign-form" novalidate>
-      <label>Slug (needed for vanity URL)<input name="slug" autocomplete="off" spellcheck="false" placeholder="reddit-launch"><small data-error="slug" class="error" hidden></small></label>
-      <label>Source<input name="source" autocomplete="off" spellcheck="false" placeholder="reddit"><small data-error="source" class="error" hidden></small></label>
-      <label>Campaign<input name="campaign" autocomplete="off" spellcheck="false" placeholder="launch-week"><small data-error="campaign" class="error" hidden></small></label>
-      <label>Medium (optional)<input name="medium" autocomplete="off" spellcheck="false" placeholder="social"><small data-error="medium" class="error" hidden></small></label>
-      <label>Destination<select name="destination">${SUPPORTED_CAMPAIGN_DESTINATIONS.map(value=>`<option value="${value}">Homepage (${value})</option>`).join('')}</select><small data-error="destination" class="error" hidden></small></label>
-    </form>
-    <div class="campaign-normalized" aria-label="Canonical normalized values">
-      <div><span>Canonical slug</span><output id="canonical-slug">—</output></div>
-      <div><span>Canonical source</span><output id="canonical-source">—</output></div>
-      <div><span>Canonical campaign</span><output id="canonical-campaign">—</output></div>
-      <div><span>Canonical medium</span><output id="canonical-medium">—</output></div>
+    <h1>Campaign Links / Creator Challenges</h1>
+    <div class="campaign-mode-tabs" role="tablist" aria-label="Creation mode">
+      <button type="button" class="secondary" data-mode="campaign" role="tab" aria-selected="true">Campaign Link</button>
+      <button type="button" class="secondary" data-mode="creator" role="tab" aria-selected="false">Beat the Creator</button>
     </div>
-    <p id="slug-warning" class="campaign-warning" role="status" hidden></p>
-    <div class="campaign-output">
-      <label>Tracked UTM URL<input id="tracked-url" readonly aria-label="Tracked UTM URL"></label>
-      <button type="button" class="secondary" data-copy="tracked-url">Copy tracked URL</button>
-      <label>Intended vanity URL<input id="vanity-url" readonly aria-label="Intended vanity URL"></label>
-      <button type="button" class="secondary" data-copy="vanity-url">Copy vanity URL</button>
-      <label>campaign-links.json entry<textarea id="campaign-json" readonly aria-label="campaign-links.json entry" rows="8"></textarea></label>
-      <button type="button" class="secondary" data-copy="campaign-json">Copy JSON entry</button>
-    </div>
-    <div class="campaign-publish-actions">
-      <button type="button" id="publish-campaign">Publish vanity link</button>
-      <p id="publish-status" role="status"></p>
-    </div>
-    <p id="copy-status" role="status"></p>
-    <h2>Existing campaign links</h2>
-    <p id="existing-status" class="muted">Loading the checked-in campaign registry…</p>
-    <ul id="existing-campaign-links" class="campaign-existing"></ul>
+
+    <section data-panel="campaign">
+      <p class="muted">Build a tracked campaign URL immediately, or add a slug when you also want a static vanity route.</p>
+      <p class="note"><strong>One-click publish.</strong> The tracked URL works immediately. For a vanity URL, Publish opens a protected site PR, runs the required checks, merges it, and waits for the Pages route to go live.</p>
+      <form id="campaign-link-form" class="campaign-form" novalidate>
+        <label>Slug (needed for vanity URL)<input name="slug" autocomplete="off" spellcheck="false" placeholder="reddit-launch"><small data-error="slug" class="error" hidden></small></label>
+        <label>Source<input name="source" autocomplete="off" spellcheck="false" placeholder="reddit"><small data-error="source" class="error" hidden></small></label>
+        <label>Campaign<input name="campaign" autocomplete="off" spellcheck="false" placeholder="launch-week"><small data-error="campaign" class="error" hidden></small></label>
+        <label>Medium (optional)<input name="medium" autocomplete="off" spellcheck="false" placeholder="social"><small data-error="medium" class="error" hidden></small></label>
+        <label>Destination<select name="destination">${SUPPORTED_CAMPAIGN_DESTINATIONS.map(value=>`<option value="${value}">Homepage (${value})</option>`).join('')}</select><small data-error="destination" class="error" hidden></small></label>
+      </form>
+      <div class="campaign-normalized" aria-label="Canonical normalized values">
+        <div><span>Canonical slug</span><output id="canonical-slug">—</output></div>
+        <div><span>Canonical source</span><output id="canonical-source">—</output></div>
+        <div><span>Canonical campaign</span><output id="canonical-campaign">—</output></div>
+        <div><span>Canonical medium</span><output id="canonical-medium">—</output></div>
+      </div>
+      <p id="slug-warning" class="campaign-warning" role="status" hidden></p>
+      <div class="campaign-output">
+        <label>Tracked UTM URL<input id="tracked-url" readonly aria-label="Tracked UTM URL"></label>
+        <button type="button" class="secondary" data-copy="tracked-url">Copy tracked URL</button>
+        <label>Intended vanity URL<input id="vanity-url" readonly aria-label="Intended vanity URL"></label>
+        <button type="button" class="secondary" data-copy="vanity-url">Copy vanity URL</button>
+        <label>campaign-links.json entry<textarea id="campaign-json" readonly aria-label="campaign-links.json entry" rows="8"></textarea></label>
+        <button type="button" class="secondary" data-copy="campaign-json">Copy JSON entry</button>
+      </div>
+      <div class="campaign-publish-actions">
+        <button type="button" id="publish-campaign">Publish vanity link</button>
+        <p id="publish-status" role="status"></p>
+      </div>
+      <p id="copy-status" role="status"></p>
+      <h2>Existing campaign links</h2>
+      <p id="existing-status" class="muted">Loading the checked-in campaign registry…</p>
+      <ul id="existing-campaign-links" class="campaign-existing"></ul>
+    </section>
+
+    <section data-panel="creator" hidden>
+      <p class="muted">Promote one authentic completed Pack One run. The source session remains the gameplay authority; creator score, answers, and serving versions are never entered here.</p>
+      <form id="creator-source-form" class="campaign-form">
+        <fieldset><legend>Source run</legend>
+          <label><input type="radio" name="source_type" value="practice" checked> Shared Practice Run</label>
+          <label><input type="radio" name="source_type" value="daily"> Completed Daily</label>
+        </fieldset>
+        <div data-creator-source="practice">
+          <label>Pack One shared-run URL or ID<input name="share" autocomplete="off" spellcheck="false" placeholder="https://packone.pro/?game=draft-run&shared=…"></label>
+          <button type="button" id="resolve-practice">Resolve source</button>
+        </div>
+        <div data-creator-source="daily" hidden>
+          <label>Find creator<input name="creator_search" autocomplete="off" placeholder="Display name"></label>
+          <button type="button" id="find-creator">Find creator</button>
+          <div id="creator-search-results"></div>
+          <div id="creator-daily-results"></div>
+        </div>
+      </form>
+      <p id="creator-source-status" role="status"></p>
+      <section id="creator-source-preview" class="note" hidden></section>
+
+      <form id="creator-meta-form" class="campaign-form" hidden novalidate>
+        <label>Creator name<input name="creator_public_name" maxlength="80" required></label>
+        <label>Creator handle (optional)<input name="creator_handle" maxlength="80" placeholder="@creator"></label>
+        <label>Slug<input name="slug" autocomplete="off" spellcheck="false" placeholder="creator-reality-fracture" required></label>
+        <label>Source<input name="source" value="creator" required></label>
+        <label>Campaign<input name="campaign" value="beat-the-creator" required></label>
+        <label>Medium<input name="medium" value="creator"></label>
+        <label>Headline (optional)<input name="headline" maxlength="160" placeholder="Can you beat this creator?"></label>
+        <label>Post-run creator note (optional)<textarea name="creator_post_run_note" maxlength="500" rows="3" placeholder="P3 was the one I really wasn’t sure about."></textarea></label>
+      </form>
+      <section id="creator-publish-preview" class="campaign-output" hidden></section>
+      <div class="campaign-publish-actions">
+        <button type="button" id="publish-creator" disabled>Publish creator challenge</button>
+        <p id="creator-publish-status" role="status"></p>
+      </div>
+      <section id="creator-kit" class="note" hidden></section>
+
+      <h2>Existing creator challenges</h2>
+      <p id="creator-existing-status" class="muted">Loading creator challenges…</p>
+      <div id="creator-existing"></div>
+    </section>
   </section>`;
 
+  const campaignPanel=root.querySelector('[data-panel="campaign"]'),creatorPanel=root.querySelector('[data-panel="creator"]');
+  root.querySelectorAll('[data-mode]').forEach(button=>button.addEventListener('click',()=>{
+    const creator=button.dataset.mode==='creator';
+    campaignPanel.hidden=creator;creatorPanel.hidden=!creator;
+    root.querySelectorAll('[data-mode]').forEach(item=>item.setAttribute('aria-selected',String(item===button)));
+  }));
+
+  // Existing Campaign Link mode remains intentionally unchanged below.
   const form=root.querySelector('#campaign-link-form');
   const existingStatus=root.querySelector('#existing-status');
   const existingList=root.querySelector('#existing-campaign-links');
@@ -82,7 +171,7 @@ export async function renderCampaignLinks(root,publishRequest) {
     tracked.value=draft.trackedUrl;
     vanity.value=draft.vanityUrl;
     json.value=draft.entry?JSON.stringify(draft.entry,null,2):'';
-    for(const button of root.querySelectorAll('[data-copy]')) {
+    for(const button of campaignPanel.querySelectorAll('[data-copy]')) {
       const target=button.dataset.copy;
       if(target==='tracked-url')button.disabled=!draft.trackedUrl;
       else if(target==='campaign-json')button.disabled=!draft.entry||duplicate;
@@ -108,9 +197,7 @@ export async function renderCampaignLinks(root,publishRequest) {
       const response=await fetch('/campaign-links.json',{cache:'no-store'});
       if(!response.ok)throw new Error(`HTTP ${response.status}`);
       const entries=validateCampaignEntries(await response.json());
-      renderExisting(entries);
-      update();
-      return true;
+      renderExisting(entries);update();return true;
     } catch {
       if(!quiet)existingStatus.textContent='Existing campaign links could not be loaded. Form validation still works, but slug reuse cannot be checked here.';
       return false;
@@ -119,22 +206,15 @@ export async function renderCampaignLinks(root,publishRequest) {
 
   async function loadPublishAvailability() {
     if(typeof publishRequest!=='function') {
-      publishConfigured=false;
-      publishStatus.textContent='Vanity publishing is not available in this Admin build.';
-      update();
-      return false;
+      publishConfigured=false;publishStatus.textContent='Vanity publishing is not available in this Admin build.';update();return false;
     }
     try {
       const health=await publishRequest('/health?quick=1');
       publishConfigured=health?.campaign_link_publish_configured===true;
       if(!publishConfigured)publishStatus.textContent='Vanity publishing will become available after the production publisher is deployed.';
-      update();
-      return publishConfigured;
+      update();return publishConfigured;
     } catch {
-      publishConfigured=false;
-      publishStatus.textContent='Vanity publishing status could not be verified. Try again after the production publisher is deployed.';
-      update();
-      return false;
+      publishConfigured=false;publishStatus.textContent='Vanity publishing status could not be verified. Try again after the production publisher is deployed.';update();return false;
     }
   }
 
@@ -142,50 +222,162 @@ export async function renderCampaignLinks(root,publishRequest) {
     for(let attempt=0;attempt<100;attempt++) {
       await new Promise(resolve=>setTimeout(resolve,6000));
       await loadExisting({quiet:true});
-      if(existing.has(slug)) {
-        publishStatus.classList.remove('error');
-        publishStatus.textContent=`Published: ${vanityUrl}`;
-        return;
-      }
+      if(existing.has(slug)) {publishStatus.classList.remove('error');publishStatus.textContent=`Published: ${vanityUrl}`;return true;}
     }
     publishStatus.classList.add('error');
     publishStatus.textContent='Publish was accepted, but the vanity route is not live yet. Check the campaign publishing workflow before distributing it.';
+    return false;
   }
 
-  form.addEventListener('input',update);
-  form.addEventListener('change',update);
-  for(const button of root.querySelectorAll('[data-copy]'))button.addEventListener('click',async()=>{
-    const target=root.querySelector('#'+button.dataset.copy);
-    const value='value' in target?target.value:target.textContent;
-    try{await navigator.clipboard.writeText(value);copyStatus.textContent='Copied.';}
-    catch{copyStatus.textContent='Copy failed. Select the value and copy it manually.';}
+  form.addEventListener('input',update);form.addEventListener('change',update);
+  for(const button of campaignPanel.querySelectorAll('[data-copy]'))button.addEventListener('click',()=>{
+    const target=root.querySelector('#'+button.dataset.copy);return copy('value' in target?target.value:target.textContent,copyStatus);
   });
-  update();
-
   publishButton.addEventListener('click',async()=>{
-    const draft=currentDraft();
-    if(publishing||!publishConfigured||!draft.entry||existing.has(draft.entry.slug))return;
-    if(typeof publishRequest!=='function') {
-      publishStatus.classList.add('error');
-      publishStatus.textContent='Campaign publishing is unavailable in this Admin build.';
-      return;
-    }
-    publishing=true;
-    publishStatus.classList.remove('error');
-    publishStatus.textContent='Starting protected publish…';
-    update();
+    const draft=currentDraft();if(publishing||!publishConfigured||!draft.entry||existing.has(draft.entry.slug))return;
+    publishing=true;publishStatus.classList.remove('error');publishStatus.textContent='Starting protected publish…';update();
     try {
       const result=await publishRequest('/v1/admin/campaign-links/publish',draft.entry);
       publishStatus.textContent=`Publishing ${result.vanity_url}. Required checks and the Pages deploy are running automatically.`;
       await waitForPublished(draft.entry.slug,result.vanity_url);
-    } catch(error) {
-      publishStatus.classList.add('error');
-      publishStatus.textContent=error.message||'Campaign publishing failed.';
-    } finally {
-      publishing=false;
-      update();
-    }
+    } catch(error) {publishStatus.classList.add('error');publishStatus.textContent=error.message||'Campaign publishing failed.';}
+    finally {publishing=false;update();}
   });
 
-  await Promise.all([loadExisting(),loadPublishAvailability()]);
+  // Beat the Creator.
+  const sourceForm=root.querySelector('#creator-source-form'),metaForm=root.querySelector('#creator-meta-form');
+  const sourceStatus=root.querySelector('#creator-source-status'),sourcePreview=root.querySelector('#creator-source-preview');
+  const creatorPreview=root.querySelector('#creator-publish-preview'),creatorPublish=root.querySelector('#publish-creator');
+  const creatorPublishStatus=root.querySelector('#creator-publish-status'),creatorKit=root.querySelector('#creator-kit');
+  const creatorExisting=root.querySelector('#creator-existing'),creatorExistingStatus=root.querySelector('#creator-existing-status');
+  let creatorSource=null,creatorBusy=false;
+
+  function setCreatorSource(next) {
+    creatorSource=next;
+    sourcePreview.hidden=!next;metaForm.hidden=!next;creatorPreview.hidden=!next;
+    if(!next){creatorPublish.disabled=true;return;}
+    const type=next.source_type==='daily'?`Daily · ${dateLabel(next.day)}`:'Practice';
+    sourcePreview.innerHTML=`<strong>${esc(next.creator_default_name)}</strong><br>${esc(environmentLabel(next.environment))} · ${next.decisions} decisions · Creator score <strong>${Number(next.score)}/100</strong><br>Source: ${esc(type)}<br><small>Authoritative session: ${esc(next.source_session_id)}${next.share_id?` · share ${esc(next.share_id)}`:''}</small>`;
+    metaForm.elements.namedItem('creator_public_name').value=next.creator_default_name||'';
+    if(!valueOf(metaForm,'headline'))metaForm.elements.namedItem('headline').value=`Can you beat ${next.creator_default_name}?`;
+    renderCreatorPreview();
+  }
+
+  function renderCreatorPreview() {
+    if(!creatorSource)return;
+    const entry=creatorEntry(creatorSource,metaForm),slug=normalizeCampaignSlug(entry.slug);
+    const duplicate=Boolean(slug&&existing.has(slug));
+    creatorPublish.disabled=creatorBusy||!publishConfigured||!slug||!entry.creator_public_name||duplicate;
+    const sourceContext=creatorSource.source_type==='daily'
+      ? `${environmentLabel(creatorSource.environment)} Daily · ${dateLabel(creatorSource.day)}`
+      : environmentLabel(creatorSource.environment);
+    creatorPreview.innerHTML=`<p class="eyebrow">BEAT THE CREATOR</p><h2>${esc(entry.headline)}</h2><p>${esc(sourceContext)} · 8 decisions<br>Creator score: <strong>${Number(creatorSource.score)}/100</strong></p><p>Public URL: <code>https://packone.pro/go/${esc(slug||'your-slug')}/</code><br>Attribution: source=${esc(entry.acquisition_source)} · campaign=${esc(entry.acquisition_campaign)}${entry.acquisition_medium?` · medium=${esc(entry.acquisition_medium)}`:''}</p>${duplicate?'<p class="error">That slug is already in the campaign registry.</p>':''}`;
+  }
+
+  sourceForm.addEventListener('change',event=>{
+    if(event.target?.name!=='source_type')return;
+    const type=valueOf(sourceForm,'source_type');
+    sourceForm.querySelector('[data-creator-source="practice"]').hidden=type!=='practice';
+    sourceForm.querySelector('[data-creator-source="daily"]').hidden=type!=='daily';
+    sourceStatus.textContent='';setCreatorSource(null);
+  });
+  metaForm.addEventListener('input',renderCreatorPreview);
+
+  root.querySelector('#resolve-practice').addEventListener('click',async()=>{
+    sourceStatus.textContent='Resolving authoritative shared run…';
+    try {
+      const result=await draftRequest('/v1/admin/creator-challenges/resolve',{source_type:'practice',share:valueOf(sourceForm,'share')});
+      setCreatorSource(result.source);sourceStatus.textContent='Source resolved.';
+    } catch(error){setCreatorSource(null);sourceStatus.textContent=error.message||'Source could not be resolved.';}
+  });
+
+  root.querySelector('#find-creator').addEventListener('click',async()=>{
+    const target=root.querySelector('#creator-search-results'),dailyTarget=root.querySelector('#creator-daily-results');
+    target.textContent='Searching…';dailyTarget.replaceChildren();setCreatorSource(null);
+    try {
+      const result=await draftRequest('/v1/admin/creator-challenges/players?search='+encodeURIComponent(valueOf(sourceForm,'creator_search')));
+      target.replaceChildren(...result.players.map(player=>{
+        const button=document.createElement('button');button.type='button';button.className='secondary';
+        button.textContent=player.display_name+(player.linked_account?' · account':'');
+        button.onclick=async()=>{
+          dailyTarget.textContent='Loading recent completed Dailies…';
+          try {
+            const data=await draftRequest(`/v1/admin/creator-challenges/players/${player.player_id}/dailies`);
+            if(!data.dailies.length){dailyTarget.textContent='No eligible completed Dailies found.';return;}
+            dailyTarget.replaceChildren(...data.dailies.map(run=>{
+              const use=document.createElement('button');use.type='button';use.className='secondary';
+              use.textContent=`${dateLabel(run.day)} · ${environmentLabel(run.environment)} · ${Number(run.score)}/100 — Use this run`;
+              use.onclick=async()=>{
+                sourceStatus.textContent='Resolving authoritative Daily…';
+                try {
+                  const resolved=await draftRequest('/v1/admin/creator-challenges/resolve',{source_type:'daily',creator_player_id:player.player_id,source_session_id:run.session_id});
+                  setCreatorSource(resolved.source);sourceStatus.textContent='Source resolved.';
+                }catch(error){setCreatorSource(null);sourceStatus.textContent=error.message||'Daily could not be resolved.';}
+              };
+              return use;
+            }));
+          }catch(error){dailyTarget.textContent=error.message||'Dailies could not be loaded.';}
+        };
+        return button;
+      }));
+      if(!result.players.length)target.textContent='No matching public creator identity found.';
+    }catch(error){target.textContent=error.message||'Creator search failed.';}
+  });
+
+  async function waitForCreatorPublished(challenge) {
+    const vanityUrl=`https://packone.pro/go/${challenge.slug}/`;
+    for(let attempt=0;attempt<100;attempt++) {
+      await new Promise(resolve=>setTimeout(resolve,6000));
+      await loadExisting({quiet:true});
+      if(existing.has(challenge.slug)) {
+        const done=await draftRequest(`/v1/admin/creator-challenges/${challenge.id}/published`,{});
+        return done.challenge;
+      }
+    }
+    throw new Error('Protected publish was accepted, but the creator route is not live yet. Retry Publish after checking the campaign workflow.');
+  }
+
+  creatorPublish.addEventListener('click',async()=>{
+    if(!creatorSource||creatorBusy||!publishConfigured)return;
+    creatorBusy=true;creatorPublishStatus.classList.remove('error');creatorPublishStatus.textContent='Creating immutable challenge draft…';renderCreatorPreview();
+    try {
+      const created=await draftRequest('/v1/admin/creator-challenges',creatorEntry(creatorSource,metaForm));
+      const challenge=created.challenge;
+      creatorPublishStatus.textContent='Starting protected vanity publication…';
+      const requested=await draftRequest(`/v1/admin/creator-challenges/${challenge.id}/publish`,{});
+      if(!requested.already_published)await publishRequest('/v1/admin/campaign-links/publish',requested.entry);
+      const published=requested.already_published?challenge:await waitForCreatorPublished(challenge);
+      const publicUrl=`https://packone.pro/go/${published.slug}/`;
+      creatorPublishStatus.textContent=`Published: ${publicUrl}`;
+      creatorKit.hidden=false;
+      creatorKit.innerHTML=`<h3>Creator kit</h3><label>Public link<input readonly value="${esc(publicUrl)}"></label><label>Ready-to-send copy<textarea readonly rows="3">${esc(creatorShareCopy({...published,public_url:publicUrl}))}</textarea></label><button type="button" class="secondary" data-copy-creator-link>Copy public link</button> <button type="button" class="secondary" data-copy-creator-copy>Copy post copy</button>`;
+      creatorKit.querySelector('[data-copy-creator-link]').onclick=()=>copy(publicUrl,creatorPublishStatus);
+      creatorKit.querySelector('[data-copy-creator-copy]').onclick=()=>copy(creatorShareCopy({...published,public_url:publicUrl}),creatorPublishStatus);
+      await loadCreatorChallenges();
+    } catch(error) {
+      creatorPublishStatus.classList.add('error');creatorPublishStatus.textContent=error.message||'Creator challenge publication failed.';
+    } finally {creatorBusy=false;renderCreatorPreview();}
+  });
+
+  async function loadCreatorChallenges() {
+    try {
+      const data=await draftRequest('/v1/admin/creator-challenges?limit=100');
+      creatorExistingStatus.textContent=data.challenges.length?`${data.challenges.length} creator challenge(s).`:'No creator challenges yet.';
+      creatorExisting.replaceChildren(...data.challenges.map(challenge=>{
+        const item=document.createElement('article');item.className='note';
+        const publicUrl=`https://packone.pro/go/${challenge.slug}/`;
+        item.innerHTML=`<strong>${esc(challenge.creator_public_name)}</strong> · ${esc(challenge.slug)}<br>${esc(challenge.source_type==='daily'?`Daily · ${dateLabel(challenge.source_day)}`:'Practice')} · ${esc(environmentLabel(challenge.source_environment))} · ${Number(challenge.source_score)}/100<br>Status: <strong>${esc(challenge.status)}</strong> · Attempts: ${Number(challenge.attempts||0)} · Beat rate: ${challenge.beat_percentage==null?'—':Number(challenge.beat_percentage)+'%'}<br><small>${esc(publicUrl)} · created ${esc(dateLabel(String(challenge.created_at||'').slice(0,10)))}${challenge.published_at?` · published ${esc(dateLabel(String(challenge.published_at).slice(0,10)))}`:''}</small><div class="actions"><button type="button" class="secondary" data-copy-public>Copy public URL</button><a class="button secondary" target="_blank" rel="noopener" href="${esc(publicUrl)}">Open challenge</a>${challenge.status!=='retired'?'<button type="button" class="secondary" data-retire>Retire challenge</button>':''}</div>`;
+        item.querySelector('[data-copy-public]').onclick=()=>copy(publicUrl,creatorExistingStatus);
+        item.querySelector('[data-retire]')?.addEventListener('click',async()=>{
+          if(!confirm(`Retire ${challenge.creator_public_name} / ${challenge.slug}? The URL will no longer start new challenge attempts.`))return;
+          try{await draftRequest(`/v1/admin/creator-challenges/${challenge.id}/retire`,{});await loadCreatorChallenges();}
+          catch(error){creatorExistingStatus.textContent=error.message||'Could not retire challenge.';}
+        });
+        return item;
+      }));
+    }catch(error){creatorExistingStatus.textContent=error.message||'Creator challenges could not be loaded.';}
+  }
+
+  update();
+  await Promise.all([loadExisting(),loadPublishAvailability(),typeof draftRequest==='function'?loadCreatorChallenges():Promise.resolve()]);
 }
