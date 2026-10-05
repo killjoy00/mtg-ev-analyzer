@@ -9,6 +9,7 @@ if(!process.argv.includes('--dev-fixtures'))throw new Error('Use an isolated dev
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 const {default:growth,query,gameDateKey}=await import('../worker/growth-function.js');
 const {default:runApi}=await import('../worker/draft-run-function.mjs');
+const {requestCreatorPrivacyRetirement}=await import('../worker/creator-challenge-publish.mjs');
 const tag=crypto.randomUUID().slice(0,8),timings=[];
 const httpPrefix=process.env.PACK1_QA_FUNCTION_PREFIX;
 if(httpPrefix&&!/^https:\/\/br-[a-z0-9-]+-$/.test(httpPrefix))throw new Error('Invalid development function prefix');
@@ -160,11 +161,152 @@ const authId=crypto.randomUUID(),authToken=crypto.randomUUID()+crypto.randomUUID
 await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,false)',[authId,'QA owner '+tag,`qa-${tag}@example.invalid`]);
 await query('INSERT INTO neon_auth.session(token,"userId","expiresAt","updatedAt") VALUES($1,$2::uuid,now()+interval \'1 hour\',now())',[authToken,authId]);
 const authHeaders={'x-pack1-auth-session':authToken};
+
+// Creator replay identity-merge fixtures exercise the real pack1_merge_player
+// ordering: results copy first, source results delete, then sessions move.
+const creatorChallengeCompletedTarget=crypto.randomUUID();
+const creatorChallengePartialTarget=crypto.randomUUID();
+const creatorTargetCompletedRun=crypto.randomUUID();
+const creatorSourcePartialRun=crypto.randomUUID();
+const creatorTargetPartialRun=crypto.randomUUID();
+const creatorSourceCompletedRun=crypto.randomUUID();
+const creatorSourceSession=concurrentStarts[0].id;
+const creatorSourcePlayer=idemOwner.playerId;
+const sourceEnvironment=(await query('SELECT environment FROM draft_run_sessions WHERE id=$1::uuid',[creatorSourceSession])).rows[0].environment||'mixed';
+for(const [id,slug] of [
+  [creatorChallengeCompletedTarget,'qa-merge-complete-'+tag],
+  [creatorChallengePartialTarget,'qa-merge-partial-'+tag],
+]) {
+  await query(`INSERT INTO creator_challenges(
+      id,slug,source_session_id,source_owner_player_id,source_type,source_environment,
+      creator_public_name,acquisition_source,acquisition_campaign,status,created_by_admin_auth_user_id
+    ) VALUES($1::uuid,$2,$3::uuid,$4::uuid,'practice',$5,'Merge Creator','creator',$2,'draft',$6::uuid)`,[
+    id,slug,creatorSourceSession,creatorSourcePlayer,sourceEnvironment,authId,
+  ]);
+}
+async function cloneCreatorAttempt(id,playerId,challengeId,{answers,score,resultPersistedAt}) {
+  const overrides={
+    id,player_id:playerId,day:null,challenge_id:null,
+    creator_challenge_id:challengeId,creator_participant_auth_user_id:null,
+    start_idempotency_hash:digest(`creator:${challengeId}`),
+    start_request_hash:digest(`creator-request:${challengeId}`),
+    answers,score,result_persisted_at:resultPersistedAt,revision:answers.length,
+    leaderboard_eligible:false,
+  };
+  await query(`INSERT INTO draft_run_sessions
+    SELECT (jsonb_populate_record(NULL::draft_run_sessions,to_jsonb(src)||$2::jsonb)).*
+    FROM draft_run_sessions src WHERE src.id=$1::uuid`,[s.id,JSON.stringify(overrides)]);
+}
+const completedAnswers=s.answers;
+const completedScore=s.score;
+await cloneCreatorAttempt(creatorTargetCompletedRun,owner.playerId,creatorChallengeCompletedTarget,{
+  answers:completedAnswers,score:completedScore,resultPersistedAt:new Date().toISOString(),
+});
+await cloneCreatorAttempt(creatorSourcePartialRun,guest.playerId,creatorChallengeCompletedTarget,{
+  answers:completedAnswers.slice(0,3),score:null,resultPersistedAt:null,
+});
+await cloneCreatorAttempt(creatorTargetPartialRun,owner.playerId,creatorChallengePartialTarget,{
+  answers:completedAnswers.slice(0,2),score:null,resultPersistedAt:null,
+});
+await cloneCreatorAttempt(creatorSourceCompletedRun,guest.playerId,creatorChallengePartialTarget,{
+  answers:completedAnswers,score:completedScore,resultPersistedAt:new Date().toISOString(),
+});
+const seedResult=(await query(
+  'SELECT set_id,mode,score,grade,seed FROM game_results WHERE player_id=$1::uuid AND client_result_id=$2 LIMIT 1',
+  [guest.playerId,`draft-run:${s.id}`],
+)).rows[0];
+assert.ok(seedResult,'completed Practice result fixture must exist before creator merge test');
+for(const [playerId,runId,challengeId] of [
+  [owner.playerId,creatorTargetCompletedRun,creatorChallengeCompletedTarget],
+  [guest.playerId,creatorSourceCompletedRun,creatorChallengePartialTarget],
+]) {
+  await query(`INSERT INTO game_results(
+      player_id,set_id,mode,score,grade,seed,is_daily,challenge_id,
+      opponent_name,opponent_score,outcome,client_result_id,creator_challenge_id
+    ) VALUES($1::uuid,$2,$3,$4::int,$5,$6,false,NULL,'Merge Creator',95,'loss',$7,$8::uuid)`,[
+    playerId,seedResult.set_id,seedResult.mode,seedResult.score,seedResult.grade,seedResult.seed,
+    `draft-run:${runId}`,challengeId,
+  ]);
+}
+for(const [playerId,runId,challengeId] of [
+  [owner.playerId,creatorTargetCompletedRun,creatorChallengeCompletedTarget],
+  [guest.playerId,creatorSourcePartialRun,creatorChallengeCompletedTarget],
+  [owner.playerId,creatorTargetPartialRun,creatorChallengePartialTarget],
+  [guest.playerId,creatorSourceCompletedRun,creatorChallengePartialTarget],
+]) {
+  await query(`INSERT INTO analytics_events(player_id,event_name,event_props)
+    VALUES($1::uuid,'creator_challenge_started',jsonb_build_object(
+      'run_id',$2::text,'creator_challenge_id',$3::text
+    ))`,[playerId,runId,challengeId]);
+}
+
 // Even an unfinished established Daily takes priority over a guest's finished score.
 await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) VALUES($1::uuid,$2::date,'mixed','draft_run',100,'A','[]'::jsonb)",[guest.playerId,gameDateKey()]);
 await call(growth,'/v1/account/link',{},owner.token,200,{headers:authHeaders});
 const linked=await call(growth,'/v1/account/link',{},guest.token,200,{headers:authHeaders});
 assert.equal(linked.token,owner.token);
+
+const creatorMerged=(await query(`SELECT id,player_id,creator_challenge_id,creator_participant_auth_user_id,
+    score,jsonb_array_length(answers)::int answered,start_idempotency_hash
+  FROM draft_run_sessions
+  WHERE id=ANY($1::uuid[]) ORDER BY id`,[[
+  creatorTargetCompletedRun,creatorSourcePartialRun,creatorTargetPartialRun,creatorSourceCompletedRun,
+]])).rows;
+const mergedById=new Map(creatorMerged.map(row=>[row.id,row]));
+assert.equal(mergedById.get(creatorTargetCompletedRun).player_id,owner.playerId);
+assert.equal(mergedById.get(creatorTargetCompletedRun).creator_challenge_id,creatorChallengeCompletedTarget);
+assert.equal(mergedById.get(creatorTargetCompletedRun).creator_participant_auth_user_id,authId);
+assert.equal(mergedById.get(creatorSourcePartialRun).player_id,owner.playerId);
+assert.equal(mergedById.get(creatorSourcePartialRun).creator_challenge_id,null);
+assert.equal(mergedById.get(creatorSourcePartialRun).creator_participant_auth_user_id,null);
+assert.equal(mergedById.get(creatorSourcePartialRun).answered,3);
+assert.equal(mergedById.get(creatorSourcePartialRun).start_idempotency_hash,null);
+assert.equal(mergedById.get(creatorTargetPartialRun).creator_challenge_id,creatorChallengePartialTarget);
+assert.equal(mergedById.get(creatorTargetPartialRun).creator_participant_auth_user_id,authId);
+assert.equal(mergedById.get(creatorTargetPartialRun).answered,2);
+assert.equal(mergedById.get(creatorSourceCompletedRun).creator_challenge_id,null);
+assert.equal(mergedById.get(creatorSourceCompletedRun).score,completedScore);
+
+const demotedResult=(await query(`SELECT score,grade,creator_challenge_id,opponent_name,opponent_score,outcome
+  FROM game_results WHERE player_id=$1::uuid AND client_result_id=$2`,[
+  owner.playerId,`draft-run:${creatorSourceCompletedRun}`,
+])).rows[0];
+assert.equal(Number(demotedResult.score),Number(seedResult.score),'duplicate creator result keeps ordinary Practice score history');
+assert.equal(demotedResult.grade,seedResult.grade);
+assert.equal(demotedResult.creator_challenge_id,null);
+assert.equal(demotedResult.opponent_name,null);
+assert.equal(demotedResult.opponent_score,null);
+assert.equal(demotedResult.outcome,null);
+
+assert.equal(Number((await query(`SELECT count(*)::int n FROM draft_run_sessions
+  WHERE creator_challenge_id=$1::uuid AND score IS NOT NULL
+    AND jsonb_array_length(answers)=jsonb_array_length(puzzle_ids)`,[
+  creatorChallengeCompletedTarget,
+])).rows[0].n),1,'completed target remains the only counted creator completion');
+assert.equal(Number((await query(`SELECT count(*)::int n FROM draft_run_sessions
+  WHERE creator_challenge_id=$1::uuid AND score IS NOT NULL
+    AND jsonb_array_length(answers)=jsonb_array_length(puzzle_ids)`,[
+  creatorChallengePartialTarget,
+])).rows[0].n),0,'partial target remains authoritative and duplicate completed replay is demoted');
+for(const challengeId of [creatorChallengeCompletedTarget,creatorChallengePartialTarget]) {
+  assert.equal(Number((await query(`SELECT count(*)::int n FROM analytics_events
+    WHERE player_id=$1::uuid AND event_name='creator_challenge_started'
+      AND event_props->>'creator_challenge_id'=$2`,[owner.playerId,challengeId])).rows[0].n),1,
+  'merge keeps exactly one creator start for the authoritative attempt');
+}
+const privacyReady=await requestCreatorPrivacyRetirement(query,creatorSourcePlayer,{reason:'account_deletion'});
+assert.equal(privacyReady,true,'unpublished creator fixtures need no static cleanup before privacy completion');
+for(const challengeId of [creatorChallengeCompletedTarget,creatorChallengePartialTarget]) {
+  const privacyRow=(await query('SELECT status,creator_public_name,privacy_removed_at FROM creator_challenges WHERE id=$1::uuid',[challengeId])).rows[0];
+  assert.equal(privacyRow.status,'retired');
+  assert.equal(privacyRow.creator_public_name,'A creator');
+  assert.ok(privacyRow.privacy_removed_at);
+}
+const retainedCreatorResult=(await query(`SELECT opponent_name FROM game_results
+  WHERE player_id=$1::uuid AND client_result_id=$2`,[
+  owner.playerId,`draft-run:${creatorTargetCompletedRun}`,
+])).rows[0];
+assert.equal(retainedCreatorResult.opponent_name,'A creator','later creator privacy cleanup scrubs retained challenger labels');
 const resumed=await call(runApi,'/v1/runs',{daily:true},owner.token);assert.equal(resumed.id,original.id);
 assert.equal((await query("SELECT count(*) n FROM scores WHERE player_id=$1::uuid AND challenge_date=$2::date AND mode='draft_run'",[owner.playerId,gameDateKey()])).rows[0].n,'0');
 const transferred=await call(runApi,`/v1/runs/${duplicate.id}`,undefined,owner.token);assert.equal(transferred.day,null);
