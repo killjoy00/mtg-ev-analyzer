@@ -72,19 +72,16 @@ async function persistResult(s) {
   if(s.answers.length!==runLength(s) || s.result_persisted_at) return;
   const score=Math.round(s.answers.reduce((n,a)=>n+a.score,0)/runLength(s));
   const grade=score>=90?'A':score>=80?'B':score>=65?'C':score>=50?'D':'F';
-  const shared=s.challenge_id ? await share(s.challenge_id) : null;
+  const creator=s.creator_challenge_id?await loadCreatorChallengeForExistingSession(query,s.creator_challenge_id):null;
+  const shared=!creator&&s.challenge_id ? await share(s.challenge_id) : null;
   const other=shared?.owner_player_id===s.player_id ? null : shared;
-  const exact=other && JSON.stringify(other.puzzle_ids)===JSON.stringify(s.puzzle_ids);
-  const creatorState=s.creator_challenge_id?await loadCreatorChallengeForExistingSession(query,s.creator_challenge_id):null;
-  const creatorReveal=creatorState?creatorRevealState(creatorState.challenge,creatorState.source,s.answers,{complete:true}):null;
-  const outcome=creatorReveal?.outcome ?? (exact ? score>other.score?'win':score<other.score?'loss':'tie' : null);
-  const opponentName=creatorState?.challenge?.creator_public_name || (exact?other?.display_name:null);
-  const opponentScore=creatorState?.source?.score ?? (exact?other?.score:null);
+  const exact=creator
+    ? JSON.stringify(creator.source.puzzle_ids)===JSON.stringify(s.puzzle_ids)
+    : other && JSON.stringify(other.puzzle_ids)===JSON.stringify(s.puzzle_ids);
+  const opponentName=creator?.challenge.creator_public_name||(exact?other?.display_name:null);
+  const opponentScore=creator?.source.score??(exact?other?.score:null);
+  const outcome=exact && opponentScore!=null ? score>opponentScore?'win':score<opponentScore?'loss':'tie' : null;
   const sets=[...new Set(s.answers.map(a=>a.puzzle.set_id))].map(id=>({set_id:id,score:Math.round(s.answers.filter(a=>a.puzzle.set_id===id).reduce((n,a)=>n+a.score,0)/s.answers.filter(a=>a.puzzle.set_id===id).length)}));
-  const creatorId=creatorState?.challenge?.id||null;
-  const details={run:s.id,corpus_version:s.corpus_version,source_components:s.source_components,serving_policy_version:s.serving_policy_version||LEGACY_SERVING_POLICY_VERSION,scoring_version:s.scoring_version,historical_matches:s.answers.filter(a=>a.historicalMatch).length,run_length:runLength(s),selection_version:s.selection_version,...(creatorReveal?{creator_challenge_id:creatorId,creator_matches:creatorReveal.creatorMatches}: {})};
-  const eventProps={mode:'draft_run',set_id:environmentOf(s),daily:Boolean(s.day),score,run_id:s.id,challenge:Boolean(other||creatorState),outcome,...(creatorId?{creator_challenge_id:creatorId}: {})};
-  const eventNames=['game_completed',...(environmentOf(s)==='powered-cube'?['cube_completed']:[]),...(s.day?['daily_completed']:[]),...(exact?['challenge_complete']:[]),...(creatorId?['creator_challenge_completed']:[])];
   // The unique result key makes completion retryable after a dropped response.
   // All career, environment, ranked, and funnel writes commit together.
   await query(`WITH ranked AS (
@@ -109,20 +106,33 @@ async function persistResult(s) {
   ), events AS (INSERT INTO analytics_events(player_id,event_name,event_props)
     SELECT $1::uuid,event_name,$14::jsonb FROM result CROSS JOIN jsonb_array_elements_text($15::jsonb) n(event_name)
   ) UPDATE draft_run_sessions SET result_persisted_at=now() WHERE id=$17::uuid AND player_id=$1::uuid`,
-  [s.player_id,s.day,score,grade,JSON.stringify(s.answers.map(a=>a.selectedId)),JSON.stringify(details),s.seed,other?s.challenge_id:null,opponentName,opponentScore,outcome,`draft-run:${s.id}`,JSON.stringify(sets),JSON.stringify(eventProps),JSON.stringify(eventNames),environmentOf(s),s.id,s.leaderboard_eligible,creatorId]);
+  [
+    s.player_id,s.day,score,grade,JSON.stringify(s.answers.map(a=>a.selectedId)),
+    JSON.stringify({run:s.id,corpus_version:s.corpus_version,source_components:s.source_components,serving_policy_version:s.serving_policy_version||LEGACY_SERVING_POLICY_VERSION,scoring_version:s.scoring_version,historical_matches:s.answers.filter(a=>a.historicalMatch).length,run_length:runLength(s),selection_version:s.selection_version,creator_challenge_id:s.creator_challenge_id||null}),
+    s.seed,other?s.challenge_id:null,opponentName,opponentScore,outcome,`draft-run:${s.id}`,JSON.stringify(sets),
+    JSON.stringify({mode:'draft_run',set_id:environmentOf(s),daily:Boolean(s.day),score,run_id:s.id,challenge:Boolean(other),outcome,creator_challenge_id:s.creator_challenge_id||null,creator_challenge_slug:creator?.challenge.slug||null,creator_source_type:creator?.challenge.source_type||null}),
+    JSON.stringify(['game_completed',...(environmentOf(s)==='powered-cube'?['cube_completed']:[]),...(s.day?['daily_completed']:[]),...(exact&&other?['challenge_complete']:[]),...(creator?['creator_challenge_complete']:[])]),
+    environmentOf(s),s.id,s.leaderboard_eligible,s.creator_challenge_id||null,
+  ]);
 }
-async function responseFor(s,timing=null,creatorOverride=null) {
+
+async function responseFor(s,timing=null) {
   const complete=s.answers.length===runLength(s);
-  if(complete && !s.result_persisted_at && !creatorOverride?.self) await persistResult(s);
+  if(complete && !s.result_persisted_at) await persistResult(s);
   const current=complete ? null : publicDraftRunPuzzle(await (timing?
     timing.step('first_puzzle',()=>puzzle(s.puzzle_ids[s.answers.length],s.corpus_version)):
     puzzle(s.puzzle_ids[s.answers.length],s.corpus_version)));
-  const shared=s.challenge_id ? await share(s.challenge_id) : null;
+  const creator=s.creator_challenge_id?await loadCreatorChallengeForExistingSession(query,s.creator_challenge_id):null;
+  const shared=!creator&&s.challenge_id ? await share(s.challenge_id) : null;
   const other=shared?.owner_player_id===s.player_id ? null : shared;
-  const creatorState=creatorOverride || (s.creator_challenge_id?await loadCreatorChallengeForExistingSession(query,s.creator_challenge_id):null);
-  const creator=creatorState?creatorRevealState(creatorState.challenge,creatorState.source,s.answers,{complete,self:Boolean(creatorState.self)}):null;
-  const comparison=creator?.comparison || (other ? {kind:'friend',name:other.display_name,score:other.score,exact:JSON.stringify(other.puzzle_ids)===JSON.stringify(s.puzzle_ids)} : null);
-  const answers=creator?.answers||s.answers;
+  let answers=s.answers,comparison=null;
+  if(creator) {
+    const reveal=creatorRevealState(creator.challenge,creator.source,s.answers,{complete,self:creator.source.player_id===s.player_id});
+    answers=reveal.answers;
+    comparison=reveal.comparison;
+  } else if(other) {
+    comparison={kind:'friend',name:other.display_name,score:other.score,exact:JSON.stringify(other.puzzle_ids)===JSON.stringify(s.puzzle_ids)};
+  }
   const identityStatus=s.day?await rankingIdentityStatus(query,s.player_id):null;
   const rankedIdentity=s.day&&s.leaderboard_eligible&&identityStatus?.eligible?identityStatus:null;
   let standing=null;
@@ -140,9 +150,9 @@ async function responseFor(s,timing=null,creatorOverride=null) {
     standing={rank:Number(row.rank),total,percentile:total>=10?Math.max(1,Math.ceil(Number(row.through_ties)/total*100)):null,final:s.day<gameDateKey()};
   }
   const rankedName=rankedIdentity?.display_name||null;
-  return {ranked_name:rankedName,ranking_identity:identityStatus?{eligible:identityStatus.eligible,reason:identityStatus.reason}:null,id:s.id,corpus_version:s.corpus_version,source_components:s.source_components,serving_policy_version:s.serving_policy_version||LEGACY_SERVING_POLICY_VERSION,run_length:runLength(s),daily_featured_sets:s.daily_featured_sets,set_reroll_allowed:!s.day&&!s.challenge_id&&!s.creator_challenge_id&&!s.custom_set_ids.length,custom_set_ids:s.custom_set_ids,leaderboard_eligible:Boolean(s.leaderboard_eligible&&rankedIdentity),environment:environmentOf(s),day:s.day,revision:s.revision,round:s.answers.length+1,complete,score:s.score,answers,rerolls:s.day||s.creator_challenge_id?{set:0,pack:0}:s.rerolls,current,comparison,standing,scoring_version:s.scoring_version,difficulty_version:s.difficulty_version,selection_version:s.selection_version,...(creatorState?{creator_challenge_id:creatorState.challenge.id}: {})};
+  return {ranked_name:rankedName,ranking_identity:identityStatus?{eligible:identityStatus.eligible,reason:identityStatus.reason}:null,id:s.id,corpus_version:s.corpus_version,source_components:s.source_components,serving_policy_version:s.serving_policy_version||LEGACY_SERVING_POLICY_VERSION,run_length:runLength(s),daily_featured_sets:s.daily_featured_sets,set_reroll_allowed:!s.day&&!s.challenge_id&&!s.creator_challenge_id&&!s.custom_set_ids.length,custom_set_ids:s.custom_set_ids,leaderboard_eligible:Boolean(s.leaderboard_eligible&&rankedIdentity),environment:environmentOf(s),day:s.day,revision:s.revision,round:s.answers.length+1,complete,score:s.score,answers,rerolls:s.day||s.creator_challenge_id?{set:0,pack:0}:s.rerolls,current,comparison,standing,scoring_version:s.scoring_version,difficulty_version:s.difficulty_version,selection_version:s.selection_version,creator_challenge_id:s.creator_challenge_id||null};
 }
-const ensureDailySchedule=(day,environment)=>ensureDailyScheduleForQuery(query,day,environment);
+
 async function generateDailySchedules(request) {
   if(request.method!=='POST')fail('Not found.',404);
   const body=await readJson(request);
