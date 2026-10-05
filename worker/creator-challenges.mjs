@@ -318,6 +318,7 @@ export function creatorRevealState(challenge,source,answers,{complete=false,self
     kind:'creator',
     id:challenge.id,
     slug:challenge.slug,
+    public_url:buildCampaignVanityUrl(challenge.slug),
     name:challenge.creator_public_name,
     handle:challenge.creator_handle||null,
     headline:challenge.headline||`Can you beat ${challenge.creator_public_name}?`,
