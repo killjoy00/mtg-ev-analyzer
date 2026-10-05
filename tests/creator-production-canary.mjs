@@ -262,14 +262,19 @@ async function cleanupOwned() {
   const challengeIds=[...owned.challenges];
   if(owned.adminToken) {
     for(const id of challengeIds) {
-      const row=(await query('SELECT id,slug,status,creator_public_name,publication_detail FROM creator_challenges WHERE id=$1::uuid',[id])).rows[0];
+      const row=(await query('SELECT id,slug,status,creator_public_name,published_at,publication_detail FROM creator_challenges WHERE id=$1::uuid',[id])).rows[0];
       if(!row)continue;
       const detail=parse(row.publication_detail||{});
+      const hadStatic=Boolean(row.published_at)
+        ||['publishing','published'].includes(String(row.status||''))
+        ||detail?.action==='publish'
+        ||detail?.static_cleanup==='required'
+        ||Boolean(detail?.workflow);
       if(row.status!=='retired'||detail?.live_verified!==true) {
         const challenge={...row,creator_public_name:row.creator_public_name};
         await publication(owned.adminToken,id,'retire');
         await waitPublication(owned.adminToken,id,'retired');
-        await verifyRetiredRoute(challenge);
+        if(hadStatic)await verifyRetiredRoute(challenge);
       }
     }
   }
