@@ -15,10 +15,11 @@ test('production creator canary is syntax-valid and cannot select customer sourc
   const block=script.slice(start,end);
   assert.match(block,/createFreshPracticeSource\(\)/);
   assert.match(block,/s\.measurement_qa=true/);
-  assert.match(block,/p\.display_name=\$2/);
-  assert.match(block,/QA release/);
-  assert.match(block,/expectedRelease\.slice\(0,7\)/);
+  assert.match(block,/p\.display_name ~ '\^QA release \[0-9a-f\]\{7\}\$'/);
+  assert.match(block,/LIMIT 25/);
+  assert.doesNotMatch(block,/expectedRelease\.slice\(0,7\)/);
   assert.match(block,/NOT EXISTS\(SELECT 1 FROM account_links a WHERE a\.player_id=s\.player_id\)/);
+  assert.match(block,/NOT EXISTS\(SELECT 1 FROM creator_challenges c WHERE c\.source_owner_player_id=s\.player_id\)/);
   assert.match(block,/refusing customer fallback/);
   assert.doesNotMatch(block,/QA v5 owner/);
   assert.doesNotMatch(block,/NOT s\.measurement_qa/);
@@ -60,6 +61,6 @@ test('reviewed retry request explicitly forbids customer rows',()=>{
   assert.equal(request.operation,'run-creator-production-canary');
   assert.equal(request.expected_release,'f6ea0910d322f007f0ac0004b98fea6bab09422a');
   assert.match(request.reason,/fresh owned canary Practice/i);
-  assert.match(request.reason,/retained (?:closed )?QA release Daily/i);
+  assert.match(request.reason,/strict `QA release <7-hex>` name contract/i);
   assert.match(request.reason,/Never select or mutate customer rows/i);
 });

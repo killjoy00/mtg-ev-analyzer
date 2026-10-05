@@ -151,36 +151,43 @@ async function cleanupFreshPracticeSource() {
 async function borrowSource(row,type) {
   assert.ok(row?.session_id&&row?.player_id,type+' retained QA source is required.');
   assert.equal(row.measurement_qa,true,type+' retained source must begin as measurement QA.');
-  borrowedSources.push({
+  const original={
     type,
     session_id:row.session_id,
     player_id:row.player_id,
     measurement_qa:true,
     profile_public:Boolean(row.profile_public),
-  });
+  };
+  borrowedSources.push(original);
   await query('UPDATE draft_run_sessions SET measurement_qa=false WHERE id=$1::uuid',[row.session_id]);
   await query('UPDATE players SET profile_public=true,updated_at=now() WHERE id=$1::uuid',[row.player_id]);
-  return {...row,measurement_qa:false,profile_public:true};
+  return {...row,measurement_qa:false,profile_public:true,_borrowed_source:original};
+}
+
+async function restoreBorrowedSource(source) {
+  if(!source)return;
+  await query('UPDATE draft_run_sessions SET measurement_qa=$2::boolean WHERE id=$1::uuid',[
+    source.session_id,source.measurement_qa,
+  ]);
+  await query('UPDATE players SET profile_public=$2::boolean,updated_at=now() WHERE id=$1::uuid',[
+    source.player_id,source.profile_public,
+  ]);
+  const index=borrowedSources.indexOf(source);
+  if(index>=0)borrowedSources.splice(index,1);
 }
 
 async function restoreBorrowedSources() {
-  for(const source of [...borrowedSources].reverse()) {
-    await query('UPDATE draft_run_sessions SET measurement_qa=$2::boolean WHERE id=$1::uuid',[
-      source.session_id,source.measurement_qa,
-    ]);
-    await query('UPDATE players SET profile_public=$2::boolean,updated_at=now() WHERE id=$1::uuid',[
-      source.player_id,source.profile_public,
-    ]);
-  }
+  for(const source of [...borrowedSources].reverse())await restoreBorrowedSource(source);
 }
 
 async function candidatePools() {
   // Practice is generated fresh through the live production API using an
-  // owned QA player/account. Daily must already be closed, so borrow only the
-  // exact retained QA release fixture from the corrected backend release.
+  // owned canary player/account. Daily must already be closed, so select only
+  // retained rows created by the release acceptance harness. The strict QA
+  // release name, measurement flag, missing account link, and no prior creator
+  // work prevent customer fallback; live Admin resolution remains authoritative.
   const practice=await createFreshPracticeSource();
-  const dailyName='QA release '+expectedRelease.slice(0,7);
-  const dailyRow=(await query(`SELECT s.id::text session_id,s.player_id::text player_id,s.day::text AS source_day,
+  const dailyRows=(await query(`SELECT s.id::text session_id,s.player_id::text player_id,s.day::text AS source_day,
       s.score::int score,s.environment,s.answers,s.puzzle_ids,s.measurement_qa,
       p.profile_public,p.public_identity_hidden_at,p.display_name
     FROM draft_run_sessions s
@@ -189,26 +196,28 @@ async function candidatePools() {
       AND s.environment='mixed'
       AND jsonb_array_length(s.puzzle_ids)=8 AND jsonb_array_length(s.answers)=8
       AND s.measurement_qa=true
-      AND p.display_name=$2
+      AND p.display_name ~ '^QA release [0-9a-f]{7}$'
       AND p.public_identity_hidden_at IS NULL
       AND NOT EXISTS(SELECT 1 FROM account_links a WHERE a.player_id=s.player_id)
       AND NOT EXISTS(SELECT 1 FROM creator_challenges c WHERE c.source_owner_player_id=s.player_id)
-    ORDER BY s.day DESC,s.updated_at DESC LIMIT 1`,[gameDateKey(),dailyName])).rows[0];
-  assert.ok(dailyRow,'No retained closed QA Daily from the corrected release is available; refusing customer fallback.');
-  const daily=await borrowSource(dailyRow,'daily');
-  report.checks.push('source selection uses only fresh owned QA Practice plus the corrected release QA Daily; customer rows excluded');
-  return {practice:[practice],daily:[daily]};
+    ORDER BY s.day DESC,s.updated_at DESC
+    LIMIT 25`,[gameDateKey()])).rows;
+  assert.ok(dailyRows.length,'No retained closed QA release Daily is available; refusing customer fallback.');
+  report.checks.push('source selection uses only fresh owned canary Practice plus strict retained QA release Daily fixtures; customer rows excluded');
+  return {practice:[practice],daily:dailyRows};
 }
 
 async function resolveCandidate(type,candidates) {
   for(const candidate of candidates){
+    const borrowed=type==='daily'?await borrowSource(candidate,'daily'):candidate;
     const body=type==='practice'
       ?{source_type:'practice',share:candidate.share_id}
-      :{source_type:'daily',creator_player_id:candidate.player_id,source_session_id:candidate.session_id};
+      :{source_type:'daily',creator_player_id:borrowed.player_id,source_session_id:borrowed.session_id};
     try{
       const {data}=await call('/growth/v1/admin/creator-challenges/resolve',{body,token:admin.token});
-      if(data?.source?.source_session_id===candidate.session_id)return {...candidate,summary:data.source};
+      if(data?.source?.source_session_id===borrowed.session_id)return {...borrowed,summary:data.source};
     }catch{}
+    if(type==='daily')await restoreBorrowedSource(borrowed._borrowed_source);
   }
   throw Error('No '+type+' source passed the live Admin authority checks.');
 }
