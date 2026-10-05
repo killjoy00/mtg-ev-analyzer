@@ -560,12 +560,24 @@ async function route(request) {
     if(viewer) {
       const acquisition=creatorAcquisitionProps(challenge);
       await query(`INSERT INTO analytics_events(player_id,event_name,event_props)
-        VALUES
-          ($1::uuid,'creator_challenge_open',$2::jsonb),
-          ($1::uuid,'acquisition_touch',$3::jsonb)`,[
+        SELECT $1::uuid,event_name,event_props
+        FROM players p
+        CROSS JOIN (VALUES
+          ('creator_challenge_open',$2::jsonb),
+          ('acquisition_touch',$3::jsonb)
+        ) event(event_name,event_props)
+        WHERE p.id=$1::uuid
+          AND p.id<>$4::uuid
+          AND NOT coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
+          AND NOT EXISTS (
+            SELECT 1 FROM account_links a
+            JOIN pack1_admins admin ON admin.auth_user_id=a.auth_user_id
+            WHERE a.player_id=p.id
+          )`,[
         viewer,
         JSON.stringify({creator_challenge_id:challenge.id,creator_challenge_slug:challenge.slug,creator_source_type:challenge.source_type}),
         JSON.stringify(acquisition),
+        challenge.source_owner_player_id,
       ]);
     }
     return json(publicCreatorChallenge(challenge));
