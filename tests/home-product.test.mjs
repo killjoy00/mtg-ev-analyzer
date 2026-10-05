@@ -13,25 +13,33 @@ test('homepage metadata names MTG and uses a complete 1200x630 social preview',(
  const html=fs.readFileSync('index.html','utf8');
  assert.match(html,/<title>Pack One: Daily MTG Draft Decisions<\/title>/);
  assert.match(html,/Magic: The Gathering draft decisions every day/);
- assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/social-preview-v2\.png"/);
+ assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/social-preview-v3\.jpg"/);
  assert.match(html,/property="og:image:width" content="1200"/);
  assert.match(html,/property="og:image:height" content="630"/);
- const png=fs.readFileSync('social-preview-v2.png');
- assert.equal(png.subarray(0,8).toString('hex'),'89504e470d0a1a0a');
- assert.equal(png.readUInt32BE(16),1200);
- assert.equal(png.readUInt32BE(20),630);
- let offset=8,sawIend=false;
- while(offset<png.length){
-  assert.ok(offset+12<=png.length,'PNG chunk header/CRC must be complete');
-  const length=png.readUInt32BE(offset);
-  const type=png.subarray(offset+4,offset+8).toString('ascii');
-  const next=offset+12+length;
-  assert.ok(next<=png.length,'PNG '+type+' chunk must not be truncated');
-  offset=next;
-  if(type==='IEND'){sawIend=true;break;}
+ const jpg=fs.readFileSync('social-preview-v3.jpg');
+ assert.equal(jpg.subarray(0,2).toString('hex'),'ffd8','JPEG must start with SOI');
+ assert.equal(jpg.subarray(-2).toString('hex'),'ffd9','JPEG must end with EOI');
+ let offset=2,width=null,height=null;
+ while(offset+4<=jpg.length){
+  assert.equal(jpg[offset],0xff,'JPEG segment must start with a marker');
+  while(offset<jpg.length&&jpg[offset]===0xff)offset++;
+  const marker=jpg[offset++];
+  if(marker===0xd9||marker===0xda)break;
+  if(marker===0x01||(marker>=0xd0&&marker<=0xd7))continue;
+  assert.ok(offset+2<=jpg.length,'JPEG segment length must be complete');
+  const length=jpg.readUInt16BE(offset);
+  assert.ok(length>=2&&offset+length<=jpg.length,'JPEG segment must not be truncated');
+  const sof=(marker>=0xc0&&marker<=0xc3)||(marker>=0xc5&&marker<=0xc7)||(marker>=0xc9&&marker<=0xcb)||(marker>=0xcd&&marker<=0xcf);
+  if(sof){
+   assert.ok(length>=7,'JPEG SOF segment must contain dimensions');
+   height=jpg.readUInt16BE(offset+3);
+   width=jpg.readUInt16BE(offset+5);
+   break;
+  }
+  offset+=length;
  }
- assert.equal(sawIend,true,'PNG must end with IEND');
- assert.equal(offset,png.length,'PNG must not contain trailing bytes after IEND');
+ assert.equal(width,1200);
+ assert.equal(height,630);
 });
 test('Daily descriptions reinforce trophy-draft provenance',()=>{
  const html=dailyHomeMarkup(null,day);
