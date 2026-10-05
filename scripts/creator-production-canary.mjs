@@ -278,10 +278,14 @@ async function verifyRetiredApi(challenge,player) {
 
 async function cleanupGuest(guestId,challengeIds) {
   if(!guestId)return;
-  await query(`UPDATE draft_run_sessions SET measurement_qa=true
-    WHERE player_id=$1::uuid AND creator_challenge_id=ANY($2::uuid[])`,[guestId,challengeIds]);
-  await query(`DELETE FROM analytics_events WHERE player_id=$1::uuid
-    AND event_props->>'creator_challenge_id'=ANY($2::text[])`,[guestId,challengeIds]);
+  for(const challengeId of challengeIds){
+    await query(`UPDATE draft_run_sessions SET measurement_qa=true
+      WHERE player_id=$1::uuid AND creator_challenge_id=$2::uuid`,[guestId,challengeId]);
+    await query(`DELETE FROM analytics_events WHERE player_id=$1::uuid
+      AND event_props->>'creator_challenge_id'=$2`,[guestId,challengeId]);
+  }
+  await query(`UPDATE players SET display_name='QA Creator Canary',profile_public=false,username_owned=false,updated_at=now()
+    WHERE id=$1::uuid AND NOT EXISTS(SELECT 1 FROM account_links WHERE player_id=$1::uuid)`,[guestId]);
 }
 
 async function bestEffortRetire() {
