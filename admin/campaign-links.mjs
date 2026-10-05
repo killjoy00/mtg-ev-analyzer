@@ -53,6 +53,68 @@ function creatorShareCopy(challenge) {
   return `I scored ${score}/100 on ${context}. Think you can beat me? ${challenge.public_url||`https://packone.pro/creator/${challenge.slug}/`}`;
 }
 
+
+function creatorKitValues(challenge) {
+  const publicUrl=`https://packone.pro/creator/${challenge.slug}/`;
+  return {
+    publicUrl,
+    trackedUrl:creatorTrackedUrl(challenge),
+    socialImage:publicUrl+'creator-card.png',
+    copy:creatorShareCopy({...challenge,public_url:publicUrl}),
+  };
+}
+
+async function downloadCreatorImage(challenge,status) {
+  const {socialImage}=creatorKitValues(challenge);
+  status.textContent='Downloading social image…';
+  try {
+    const response=await fetch(socialImage,{cache:'no-store'});
+    if(!response.ok)throw new Error(`HTTP ${response.status}`);
+    const blob=await response.blob();
+    if(!String(blob.type||'').startsWith('image/'))throw new Error('Published social asset is not an image.');
+    const url=URL.createObjectURL(blob),anchor=document.createElement('a');
+    anchor.href=url;anchor.download=`pack-one-${challenge.slug}-creator.png`;
+    document.body.append(anchor);anchor.click();anchor.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),0);
+    status.textContent='Social image downloaded.';
+  } catch {
+    status.textContent='Social image download failed. Retry after publication finishes.';
+  }
+}
+
+function renderCreatorKit(target,challenge,status) {
+  const {publicUrl,trackedUrl,socialImage,copy:postCopy}=creatorKitValues(challenge);
+  target.hidden=false;
+  target.innerHTML=`<h3>Creator kit</h3>
+    <label>Public link<input readonly value="${esc(publicUrl)}"></label>
+    <label>Tracked link<input readonly value="${esc(trackedUrl)}"></label>
+    <label>Social image<input readonly value="${esc(socialImage)}"></label>
+    <p data-creator-image-status class="muted">Loading published social image…</p>
+    <img data-creator-kit-image src="${esc(socialImage)}" alt="${esc(challenge.headline||`Can you beat ${challenge.creator_public_name}?`)}" style="max-width:100%;height:auto">
+    <label>Ready-to-send copy<textarea readonly rows="3">${esc(postCopy)}</textarea></label>
+    <button type="button" class="secondary" data-copy-creator-link>Copy public link</button>
+    <button type="button" class="secondary" data-copy-creator-tracked>Copy tracked link</button>
+    <button type="button" class="secondary" data-copy-creator-image>Copy image URL</button>
+    <button type="button" class="secondary" data-download-creator-image>Download social image</button>
+    <button type="button" class="secondary" data-retry-creator-image hidden>Retry image preview</button>
+    <button type="button" class="secondary" data-copy-creator-copy>Copy post copy</button>`;
+  const image=target.querySelector('[data-creator-kit-image]');
+  const imageStatus=target.querySelector('[data-creator-image-status]');
+  const retry=target.querySelector('[data-retry-creator-image]');
+  const reloadImage=()=>{
+    retry.hidden=true;imageStatus.textContent='Loading published social image…';
+    image.src=socialImage+(socialImage.includes('?')?'&':'?')+'v='+Date.now();
+  };
+  image.onload=()=>{imageStatus.textContent='Published social image ready.';retry.hidden=true;};
+  image.onerror=()=>{imageStatus.textContent='Social image is not available yet.';retry.hidden=false;};
+  retry.onclick=reloadImage;
+  target.querySelector('[data-copy-creator-link]').onclick=()=>copy(publicUrl,status);
+  target.querySelector('[data-copy-creator-tracked]').onclick=()=>copy(trackedUrl,status);
+  target.querySelector('[data-copy-creator-image]').onclick=()=>copy(socialImage,status);
+  target.querySelector('[data-download-creator-image]').onclick=()=>void downloadCreatorImage(challenge,status);
+  target.querySelector('[data-copy-creator-copy]').onclick=()=>copy(postCopy,status);
+}
+
 export async function renderCampaignLinks(root,publishRequest,draftRequest) {
   root.innerHTML=`<section class="campaign-link-builder">
     <h1>Campaign Links / Creator Challenges</h1>
@@ -359,14 +421,9 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
       creatorPublishStatus.textContent='Starting protected vanity publication…';
       const requested=await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/publication`,{action:'publish'});
       const published=requested.already_published?requested.challenge:await waitForCreatorPublication(challenge,'published');
-      const publicUrl=`https://packone.pro/creator/${published.slug}/`,trackedUrl=creatorTrackedUrl(published),socialImage=publicUrl+'creator-card.png';
+      const publicUrl=`https://packone.pro/creator/${published.slug}/`;
       creatorPublishStatus.textContent=`Published: ${publicUrl}`;
-      creatorKit.hidden=false;
-      creatorKit.innerHTML=`<h3>Creator kit</h3><label>Public link<input readonly value="${esc(publicUrl)}"></label><label>Tracked link<input readonly value="${esc(trackedUrl)}"></label><label>Social image<input readonly value="${esc(socialImage)}"></label><img src="${esc(socialImage)}" alt="${esc(published.headline||`Can you beat ${published.creator_public_name}?`)}" style="max-width:100%;height:auto"><label>Ready-to-send copy<textarea readonly rows="3">${esc(creatorShareCopy({...published,public_url:publicUrl}))}</textarea></label><button type="button" class="secondary" data-copy-creator-link>Copy public link</button> <button type="button" class="secondary" data-copy-creator-tracked>Copy tracked link</button> <button type="button" class="secondary" data-copy-creator-image>Copy image URL</button> <button type="button" class="secondary" data-copy-creator-copy>Copy post copy</button>`;
-      creatorKit.querySelector('[data-copy-creator-link]').onclick=()=>copy(publicUrl,creatorPublishStatus);
-      creatorKit.querySelector('[data-copy-creator-tracked]').onclick=()=>copy(trackedUrl,creatorPublishStatus);
-      creatorKit.querySelector('[data-copy-creator-image]').onclick=()=>copy(socialImage,creatorPublishStatus);
-      creatorKit.querySelector('[data-copy-creator-copy]').onclick=()=>copy(creatorShareCopy({...published,public_url:publicUrl}),creatorPublishStatus);
+      renderCreatorKit(creatorKit,published,creatorPublishStatus);
       await loadCreatorChallenges();
     } catch(error) {
       creatorPublishStatus.classList.add('error');creatorPublishStatus.textContent=error.message||'Creator challenge publication failed.';
@@ -382,9 +439,14 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
         const item=document.createElement('article');item.className='note';
         const publicUrl=`https://packone.pro/creator/${challenge.slug}/`,trackedUrl=creatorTrackedUrl(challenge);
         const retiredVerified=challenge.status==='retired'&&challenge.publication_detail?.live_verified===true;
-        item.innerHTML=`<strong>${esc(challenge.creator_public_name)}</strong> · ${esc(challenge.slug)}<br>${esc(challenge.source_type==='daily'?`Daily · ${dateLabel(challenge.source_day)}`:'Practice')} · ${esc(environmentLabel(challenge.source_environment))} · ${Number(challenge.source_score)}/100<br>Status: <strong>${esc(challenge.status)}</strong>${challenge.status==='retired'&&!retiredVerified?' · retired page not yet verified':''} · Opens: ${Number(challenge.opens||0)} · Starts: ${Number(challenge.starts||0)} · Completions: ${Number(challenge.completions||challenge.attempts||0)}<br>Attempts: ${Number(challenge.attempts||0)} · Beat rate: ${challenge.beat_percentage==null?'—':Number(challenge.beat_percentage)+'%'} · Avg challenger: ${challenge.average_score==null?'—':Number(challenge.average_score)+'/100'} · W/T/L: ${Number(challenge.wins||0)}/${Number(challenge.ties||0)}/${Number(challenge.losses||0)}<br><small>${esc(publicUrl)} · created ${esc(dateLabel(String(challenge.created_at||'').slice(0,10)))}${challenge.published_at?` · published ${esc(dateLabel(String(challenge.published_at).slice(0,10))) }`:''}</small><div class="actions">${['draft','failed','publishing'].includes(challenge.status)?'<button type="button" class="secondary" data-resume-publish>Publish / resume</button>':''}${challenge.status==='retired'&&!retiredVerified?'<button type="button" class="secondary" data-resume-retire>Resume retirement</button>':''}<button type="button" class="secondary" data-copy-public>Copy public URL</button><button type="button" class="secondary" data-copy-tracked>Copy tracked URL</button>${challenge.status==='published'?'<a class="button secondary" target="_blank" rel="noopener" href="'+esc(publicUrl)+'">Open challenge</a>':''}${challenge.status!=='retired'?'<button type="button" class="secondary" data-retire>Retire challenge</button>':''}</div>`;
+        item.innerHTML=`<strong>${esc(challenge.creator_public_name)}</strong> · ${esc(challenge.slug)}<br>${esc(challenge.source_type==='daily'?`Daily · ${dateLabel(challenge.source_day)}`:'Practice')} · ${esc(environmentLabel(challenge.source_environment))} · ${Number(challenge.source_score)}/100<br>Status: <strong>${esc(challenge.status)}</strong>${challenge.status==='retired'&&!retiredVerified?' · retired page not yet verified':''} · Opens: ${Number(challenge.opens||0)} · Starts: ${Number(challenge.starts||0)} · Completions: ${Number(challenge.completions||challenge.attempts||0)}<br>Attempts: ${Number(challenge.attempts||0)} · Beat rate: ${challenge.beat_percentage==null?'—':Number(challenge.beat_percentage)+'%'} · Avg challenger: ${challenge.average_score==null?'—':Number(challenge.average_score)+'/100'} · W/T/L: ${Number(challenge.wins||0)}/${Number(challenge.ties||0)}/${Number(challenge.losses||0)}<br><small>${esc(publicUrl)} · created ${esc(dateLabel(String(challenge.created_at||'').slice(0,10)))}${challenge.published_at?` · published ${esc(dateLabel(String(challenge.published_at).slice(0,10))) }`:''}</small><div class="actions">${['draft','failed','publishing'].includes(challenge.status)?'<button type="button" class="secondary" data-resume-publish>Publish / resume</button>':''}${challenge.status==='retired'&&!retiredVerified?'<button type="button" class="secondary" data-resume-retire>Resume retirement</button>':''}<button type="button" class="secondary" data-copy-public>Copy public URL</button><button type="button" class="secondary" data-copy-tracked>Copy tracked URL</button>${challenge.status==='published'?'<button type="button" class="secondary" data-show-kit>Creator kit</button><a class="button secondary" target="_blank" rel="noopener" href="'+esc(publicUrl)+'">Open challenge</a>':''}${challenge.status!=='retired'?'<button type="button" class="secondary" data-retire>Retire challenge</button>':''}</div><section class="note" data-existing-creator-kit hidden></section>`;
         item.querySelector('[data-copy-public]').onclick=()=>copy(publicUrl,creatorExistingStatus);
         item.querySelector('[data-copy-tracked]').onclick=()=>copy(trackedUrl,creatorExistingStatus);
+        item.querySelector('[data-show-kit]')?.addEventListener('click',()=>{
+          const kit=item.querySelector('[data-existing-creator-kit]');
+          if(!kit.hidden){kit.hidden=true;return;}
+          renderCreatorKit(kit,challenge,creatorExistingStatus);
+        });
         item.querySelector('[data-resume-publish]')?.addEventListener('click',async()=>{
           creatorExistingStatus.textContent='Reconciling publication…';
           try {
