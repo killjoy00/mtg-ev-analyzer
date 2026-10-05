@@ -22,6 +22,18 @@ async function call(service,path,body,token,status=200) {
   return data;
 }
 
+async function directCall(service,path,body,token,status=200,extraHeaders={}) {
+  const request=new Request('https://packone.pro'+path,{
+    method:body===undefined?'GET':'POST',
+    headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{}),...extraHeaders},
+    body:body===undefined?undefined:JSON.stringify(body),
+  });
+  const response=await service.fetch(request);
+  const data=await response.json();
+  assert.equal(response.status,status,path+': '+JSON.stringify(data));
+  return data;
+}
+
 async function completePractice(player) {
   let run=await call(runApi,'/v1/runs',{},player.token);
   while(!run.complete) {
@@ -88,11 +100,103 @@ const creator=await call(growth,'/v1/session',{displayName:'Merge Creator '+tag}
 const target=await call(growth,'/v1/session',{displayName:'Merge Account '+tag});
 const guestCompleted=await call(growth,'/v1/session',{displayName:'Merge Guest Complete '+tag});
 const guestPartial=await call(growth,'/v1/session',{displayName:'Merge Guest Partial '+tag});
+const replayGuest=await call(growth,'/v1/session',{displayName:'Creator Replay Guest '+tag});
+const dailyFirstGuest=await call(growth,'/v1/session',{displayName:'Creator Daily First '+tag});
+const paidModeGuest=await call(growth,'/v1/session',{displayName:'Creator Paid Mode Guest '+tag});
 const targetAuth=crypto.randomUUID();
 
 try {
   const template=await completePractice(creator);
   await query(`UPDATE players SET profile_public=true,username_owned=true WHERE id=$1::uuid`,[creator.playerId]);
+
+  // Route-level creator behavior: standard campaigns remain guest-playable,
+  // source owners open the original run, creator answers reveal only after a
+  // submitted pick, and creator replay state never consumes the real Daily.
+  const runtimeChallenge=crypto.randomUUID(),runtimeSlug=`runtime-${tag}`;
+  await query(`INSERT INTO creator_challenges(
+      id,slug,source_session_id,source_owner_player_id,source_type,source_day,source_environment,
+      creator_public_name,headline,acquisition_source,acquisition_campaign,acquisition_medium,status,
+      created_by_admin_auth_user_id,published_at,publication_detail
+    ) VALUES($1::uuid,$2,$3::uuid,$4::uuid,'practice',NULL,'mixed',
+      'Runtime Creator','Beat Runtime Creator','creator',$2,'creator','published',
+      $5::uuid,now(),'{"live_verified":true}'::jsonb)`,[
+    runtimeChallenge,runtimeSlug,template.id,creator.playerId,targetAuth,
+  ]);
+
+  const publicOne=await directCall(runApi,`/v1/creator-challenges/${runtimeSlug}`,undefined,replayGuest.token);
+  const publicTwo=await directCall(runApi,`/v1/creator-challenges/${runtimeSlug}`,undefined,replayGuest.token);
+  assert.equal(publicOne.id,runtimeChallenge);assert.equal(publicTwo.id,runtimeChallenge);
+  assert.equal('answers' in publicOne,false,'public challenge metadata never serializes creator decisions');
+  for(const eventName of ['creator_challenge_open','acquisition_touch']) {
+    assert.equal(Number((await query(`SELECT count(*)::int n FROM analytics_events
+      WHERE player_id=$1::uuid AND event_name=$2
+        AND event_props->>'creator_challenge_id'=$3`,[
+      replayGuest.playerId,eventName,runtimeChallenge,
+    ])).rows[0].n),1,`${eventName} is deduplicated per player/challenge`);
+  }
+
+  const selfOpen=await directCall(runApi,'/v1/runs',{creatorChallenge:runtimeChallenge},creator.token);
+  assert.equal(selfOpen.id,template.id,'creator self-open returns the authoritative source run');
+  assert.equal(selfOpen.creator_source_owner.challenge_id,runtimeChallenge);
+  assert.equal(selfOpen.creator_source_owner.source_type,'practice');
+
+  const beforeDaily=await directCall(runApi,'/v1/daily-status',undefined,replayGuest.token);
+  assert.equal(beforeDaily.daily_history.length,0);
+  let replay=await directCall(runApi,'/v1/runs',{creatorChallenge:runtimeChallenge},replayGuest.token);
+  assert.equal(replay.creator_challenge_id,runtimeChallenge);
+  assert.equal(replay.day,null);
+  assert.equal(replay.comparison.kind,'creator');
+  assert.equal(replay.answers.length,0);
+  const sourceAnswers=template.answers;
+  for(let round=0;round<2;round++) {
+    const selected=replay.current.candidates[0].id;
+    replay=await directCall(runApi,`/v1/runs/${replay.id}/pick`,{
+      revision:replay.revision,
+      round:replay.answers.length,
+      puzzleId:replay.current.puzzle_id,
+      cardId:selected,
+    },replayGuest.token);
+    assert.equal(replay.answers.length,round+1);
+    assert.ok(replay.answers.every(answer=>answer.creatorId),'only submitted rounds receive creator comparison fields');
+    assert.equal(replay.answers[round].creatorId,sourceAnswers[round].selectedId);
+  }
+  assert.equal((await directCall(runApi,'/v1/daily-status',undefined,replayGuest.token)).daily_history.length,0,
+    'creator replay does not create Daily history');
+  const realDaily=await directCall(runApi,'/v1/runs',{daily:true},replayGuest.token);
+  assert.notEqual(realDaily.id,replay.id);
+  assert.equal(realDaily.creator_challenge_id??null,null);
+  assert.ok(realDaily.day,'real Daily remains independently available after creator replay');
+
+  const dailyFirst=await directCall(runApi,'/v1/runs',{daily:true},dailyFirstGuest.token);
+  const replayAfterDaily=await directCall(runApi,'/v1/runs',{creatorChallenge:runtimeChallenge},dailyFirstGuest.token);
+  assert.notEqual(replayAfterDaily.id,dailyFirst.id);
+  assert.equal(replayAfterDaily.day,null);
+  assert.equal((await directCall(runApi,'/v1/runs',{daily:true},dailyFirstGuest.token)).id,dailyFirst.id,
+    'creator replay after Daily leaves the Daily reservation unchanged');
+
+  // Paid creator sources keep the same paid capability gate as ordinary Practice.
+  const paidSourceId=crypto.randomUUID(),paidChallenge=crypto.randomUUID(),paidSlug=`paid-${tag}`;
+  await query(`INSERT INTO draft_run_sessions
+    SELECT (jsonb_populate_record(NULL::draft_run_sessions,
+      to_jsonb(source)||jsonb_build_object(
+        'id',$2::text,'environment','powered-cube','seed',$3::text,
+        'created_at',now(),'updated_at',now()
+      )
+    )).* FROM draft_run_sessions source WHERE source.id=$1::uuid`,[
+    template.id,paidSourceId,`creator-paid-${tag}`,
+  ]);
+  await query(`INSERT INTO creator_challenges(
+      id,slug,source_session_id,source_owner_player_id,source_type,source_day,source_environment,
+      creator_public_name,headline,acquisition_source,acquisition_campaign,status,
+      created_by_admin_auth_user_id,published_at,publication_detail
+    ) VALUES($1::uuid,$2,$3::uuid,$4::uuid,'practice',NULL,'powered-cube',
+      'Runtime Creator','Paid creator challenge','creator',$2,'published',
+      $5::uuid,now(),'{"live_verified":true}'::jsonb)`,[
+    paidChallenge,paidSlug,paidSourceId,creator.playerId,targetAuth,
+  ]);
+  const paidDenied=await directCall(runApi,'/v1/runs',{creatorChallenge:paidChallenge},paidModeGuest.token,403);
+  assert.equal(paidDenied.capability,'unlimited_cube_practice');
+
   await query(`INSERT INTO neon_auth."user"(id,name,email,"emailVerified")
     VALUES($1::uuid,$2,$3,true)`,[
     targetAuth,'Creator merge target',`creator-merge-${targetAuth}@example.invalid`,
