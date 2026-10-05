@@ -356,69 +356,6 @@ export async function createCreatorChallenge(query,payload,adminAuthUserId) {
   return creatorChallengeById(query,id);
 }
 
-export function creatorCampaignEntry(row) {
-  if(!row?.id||!row?.slug)fail('Creator challenge is incomplete.',409,'CREATOR_CHALLENGE_INCOMPLETE');
-  const title=row.headline||`Can you beat ${row.creator_public_name}?`;
-  const daily=row.source_type==='daily'&&row.source_day
-    ? ` on the ${row.source_day} Daily`
-    : '';
-  const description=`${row.creator_public_name} scored ${row.source_score}/100${daily}. Play the same eight real draft decisions.`;
-  return {
-    slug:row.slug,
-    destination:`/?game=draft-run&creator=${row.id}`,
-    source:row.acquisition_source,
-    campaign:row.acquisition_campaign,
-    ...(row.acquisition_medium?{medium:row.acquisition_medium}:{}),
-    social_title:title,
-    social_description:description,
-  };
-}
-
-export async function requestCreatorChallengePublication(query,id,adminAuthUserId) {
-  const row=await creatorChallengeById(query,id);
-  if(!row)fail('Creator challenge not found.',404);
-  if(row.status==='retired')fail('Retired creator challenges cannot be republished.',409,'CREATOR_CHALLENGE_RETIRED');
-  await assertCreatorSourceAvailable(query,row);
-  if(row.status==='published')return {challenge:row,entry:creatorCampaignEntry(row),already_published:true};
-  const operation=row.publication_operation_ref||crypto.randomUUID();
-  const updated=await query(`UPDATE creator_challenges
-    SET status='publishing',publication_operation_ref=$2::uuid,publication_error=NULL,
-        published_by_admin_auth_user_id=COALESCE(published_by_admin_auth_user_id,$3::uuid),updated_at=now()
-    WHERE id=$1::uuid AND status IN ('draft','failed','publishing')
-    RETURNING id`,[id,operation,adminAuthUserId]);
-  if(!updated.rows[0])fail('Creator challenge publication state changed. Reload and try again.',409);
-  await query(`INSERT INTO creator_challenge_audit(creator_challenge_id,admin_auth_user_id,action,detail)
-    VALUES($1::uuid,$2::uuid,'publish_requested',jsonb_build_object('operation',$3::text))
-  `,[id,adminAuthUserId,operation]);
-  const challenge=await creatorChallengeById(query,id);
-  return {challenge,entry:creatorCampaignEntry(challenge),already_published:false};
-}
-
-export async function completeCreatorChallengePublication(query,id,adminAuthUserId) {
-  const row=await creatorChallengeById(query,id);
-  if(!row)fail('Creator challenge not found.',404);
-  await assertCreatorSourceAvailable(query,row);
-  if(row.status==='retired')fail('Retired creator challenges cannot be published.',409);
-  if(row.status==='published')return row;
-  const result=await query(`UPDATE creator_challenges SET status='published',
-      published_at=COALESCE(published_at,now()),published_by_admin_auth_user_id=COALESCE(published_by_admin_auth_user_id,$2::uuid),
-      publication_error=NULL,updated_at=now()
-    WHERE id=$1::uuid AND status='publishing' RETURNING id`,[id,adminAuthUserId]);
-  if(!result.rows[0])fail('Creator challenge is not awaiting publication.',409);
-  await query(`INSERT INTO creator_challenge_audit(creator_challenge_id,admin_auth_user_id,action)
-    VALUES($1::uuid,$2::uuid,'published')`,[id,adminAuthUserId]);
-  return creatorChallengeById(query,id);
-}
-
-export async function failCreatorChallengePublication(query,id,adminAuthUserId,errorMessage) {
-  const message=plain(errorMessage,{max:300,label:'Publication error'})||'Publication failed.';
-  const result=await query(`UPDATE creator_challenges SET status='failed',publication_error=$3,updated_at=now()
-    WHERE id=$1::uuid AND status='publishing' RETURNING id`,[id,adminAuthUserId,message]);
-  if(result.rows[0])await query(`INSERT INTO creator_challenge_audit(creator_challenge_id,admin_auth_user_id,action,detail)
-    VALUES($1::uuid,$2::uuid,'publish_failed',jsonb_build_object('error',$3))`,[id,adminAuthUserId,message]);
-  return creatorChallengeById(query,id);
-}
-
 export async function listCreatorPlayers(query,search,{limit=20,offset=0}={}) {
   const q=String(search||'').trim();
   if(!q||q.length>100)fail('Enter a creator search of 1-100 characters.');
@@ -472,18 +409,6 @@ export async function listCreatorChallenges(query,{limit=100}={}) {
   return rows;
 }
 
-export async function retireCreatorChallenge(query,id,adminAuthUserId,{privacy=false}={}) {
-  const result=await query(`UPDATE creator_challenges SET
-      status='retired',retired_at=COALESCE(retired_at,now()),retired_by_admin_auth_user_id=COALESCE(retired_by_admin_auth_user_id,$2::uuid),
-      updated_at=now(),publication_error=NULL
-    WHERE id=$1::uuid AND status<>'retired' RETURNING id`,[id,adminAuthUserId||null]);
-  const exists=result.rows[0]|| (await query('SELECT id FROM creator_challenges WHERE id=$1::uuid',[id])).rows[0];
-  if(!exists)fail('Creator challenge not found.',404);
-  await query(`INSERT INTO creator_challenge_audit(creator_challenge_id,admin_auth_user_id,action,detail)
-    VALUES($1::uuid,$2::uuid,$3,$4::jsonb)`,[id,adminAuthUserId||null,privacy?'privacy_retired':'retired',JSON.stringify({privacy})]);
-  return creatorChallengeById(query,id);
-}
-
 export async function handleCreatorChallengeAdmin(request,query,readJson,adminAuthUserId) {
   const url=new URL(request.url),path=url.pathname;
   if(path==='/v1/admin/creator-challenges/players'&&request.method==='GET')
@@ -505,19 +430,5 @@ export async function handleCreatorChallengeAdmin(request,query,readJson,adminAu
     if(!challenge)fail('Creator challenge not found.',404);
     return {challenge};
   }
-  const publish=path.match(/^\/v1\/admin\/creator-challenges\/([a-f0-9-]{36})\/publish$/i);
-  if(publish&&request.method==='POST')
-    return await requestCreatorChallengePublication(query,publish[1],adminAuthUserId);
-  const published=path.match(/^\/v1\/admin\/creator-challenges\/([a-f0-9-]{36})\/published$/i);
-  if(published&&request.method==='POST')
-    return {challenge:await completeCreatorChallengePublication(query,published[1],adminAuthUserId)};
-  const publishFailed=path.match(/^\/v1\/admin\/creator-challenges\/([a-f0-9-]{36})\/publish-failed$/i);
-  if(publishFailed&&request.method==='POST') {
-    const body=await readJson(request);
-    return {challenge:await failCreatorChallengePublication(query,publishFailed[1],adminAuthUserId,body?.error)};
-  }
-  const retire=path.match(/^\/v1\/admin\/creator-challenges\/([a-f0-9-]{36})\/retire$/i);
-  if(retire&&request.method==='POST')
-    return {challenge:await retireCreatorChallenge(query,retire[1],adminAuthUserId)};
   fail('Not found.',404);
 }
