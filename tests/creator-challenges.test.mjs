@@ -264,6 +264,11 @@ test('account deletion pauses after dispatching creator retirement until the sta
   assert.equal(dispatchBody.inputs.kind,'creator');
   assert.equal(dispatchBody.inputs.creator_action,'retire');
   assert.equal(dispatchBody.inputs.creator_challenge_id,CHALLENGE);
+  assert.equal(dispatchBody.inputs.creator_name,'A creator');
+  assert.equal(dispatchBody.inputs.creator_headline,'Creator challenge unavailable');
+  assert.equal(dispatchBody.inputs.creator_score,'0');
+  assert.equal(dispatchBody.inputs.campaign,'retired');
+  assert.equal(JSON.stringify(dispatchBody).includes('Lola'),false);
 });
 
 
