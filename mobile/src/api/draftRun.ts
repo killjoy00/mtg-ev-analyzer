@@ -128,6 +128,7 @@ export type DraftRunState = {
     self?: boolean;
   } | null;
   creator_challenge_id?: string | null;
+  creator_source_owner?: { challenge_id: string; source_type: 'practice' | 'daily'; source_day?: string | null } | null;
 };
 
 export type DecisionReportReason =
@@ -280,7 +281,7 @@ export function loadCreatorChallengeInfo(id: string, session: MobileSession) {
 }
 
 export function startCreatorChallenge(session: MobileSession, id: string) {
-  if (!/^[a-f0-9-]{36}$/.test(id)) throw new Error('Invalid creator challenge.');
+  if (!/^(?:[a-f0-9-]{36}|[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?)$/.test(id)) throw new Error('Invalid creator challenge.');
   return requestJson<DraftRunState>('/draft/v1/runs', {
     method: 'POST',
     mobileSessionToken: session.playerToken,
