@@ -1,5 +1,6 @@
 import {
   deepLinkToSubscriptions,
+  finishTransaction,
   getAvailablePurchases,
   useIAP,
 } from 'expo-iap';
@@ -51,6 +52,13 @@ export async function getAvailableApplePurchases(
   if (config.screenshots.fixtures) return [];
   const purchases = await getAvailablePurchases(options);
   return purchases as unknown as AppleStorePurchase[];
+}
+
+// For transactions read outside the purchase hook. Finishing a transaction that is
+// already finished is a no-op in StoreKit's OpenIAP bridge.
+export async function finishApplePurchase(purchase: AppleStorePurchase): Promise<void> {
+  if (config.screenshots.fixtures) return;
+  await finishTransaction({ purchase: purchase as unknown as Purchase, isConsumable: false });
 }
 
 export async function openAppleSubscriptionManagement(): Promise<void> {
