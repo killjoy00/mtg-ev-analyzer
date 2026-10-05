@@ -49,6 +49,31 @@ CREATE INDEX IF NOT EXISTS creator_challenges_owner_idx
 CREATE INDEX IF NOT EXISTS creator_challenges_status_idx
   ON creator_challenges(status,created_at DESC);
 -- statement
+CREATE OR REPLACE FUNCTION pack1_sync_creator_challenge_source_owner()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $
+BEGIN
+  IF NEW.player_id IS DISTINCT FROM OLD.player_id THEN
+    UPDATE creator_challenges
+    SET source_owner_player_id=NEW.player_id,
+        source_owner_auth_user_id=COALESCE(
+          (SELECT auth_user_id FROM account_links WHERE player_id=NEW.player_id LIMIT 1),
+          source_owner_auth_user_id
+        ),
+        updated_at=now()
+    WHERE source_session_id=NEW.id;
+  END IF;
+  RETURN NEW;
+END;
+$;
+-- statement
+DROP TRIGGER IF EXISTS creator_challenge_source_owner_sync ON draft_run_sessions;
+-- statement
+CREATE TRIGGER creator_challenge_source_owner_sync
+AFTER UPDATE OF player_id ON draft_run_sessions
+FOR EACH ROW EXECUTE FUNCTION pack1_sync_creator_challenge_source_owner();
+-- statement
 ALTER TABLE draft_run_sessions
   ADD COLUMN IF NOT EXISTS creator_challenge_id uuid;
 -- statement
