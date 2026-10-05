@@ -24,7 +24,7 @@ export async function prepareCreatorChallengePublish({root=process.cwd(),action=
   if(slugMatch)registry=registry.map(candidate=>candidate.slug===incoming.slug?incoming:candidate);
   else registry=[...registry,incoming].sort((a,b)=>a.slug.localeCompare(b.slug));
   await writeFile(registryPath,JSON.stringify(registry,null,2)+'\n','utf8');
-  const routeDir=path.join(root,'go',incoming.slug);
+  const routeDir=path.join(root,'creator',incoming.slug);
   await mkdir(routeDir,{recursive:true});
   await writeFile(path.join(routeDir,'index.html'),renderCreatorChallengePage(incoming),'utf8');
   if(action==='retire')await rm(path.join(routeDir,'creator-card.png'),{force:true});
