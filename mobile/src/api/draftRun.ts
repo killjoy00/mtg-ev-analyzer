@@ -370,7 +370,7 @@ export async function submitDraftRunDecisionReport(
 }
 
 export function createDraftRunShare(id: string, session: MobileSession) {
-  return requestJson<{ id?: string; creator?: boolean; slug?: string; url?: string }>(`/draft/v1/runs/${encodeURIComponent(id)}/share`, {
+  return requestJson<{ id: string; creator?: boolean; slug?: string; url?: string }>(`/draft/v1/runs/${encodeURIComponent(id)}/share`, {
     method: 'POST',
     mobileSessionToken: session.playerToken,
     mobileAccountToken: session.accountToken,
