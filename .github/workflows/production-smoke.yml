@@ -134,6 +134,31 @@ jobs:
             echo "$name: preflight + GET contract OK"
           done
 
+          # The static admin shell may publish before the manually promoted
+          # Functions/gateway release. Fail that mismatch explicitly instead of
+          # allowing a new UI to call routes an older production stack lacks.
+          admin_contract="$(mktemp)"
+          curl --fail --silent --show-error --location --max-time 20 "$PACKONE_ORIGIN/admin-api-contract.mjs" -o "$admin_contract"
+          admin_version="$(sed -nE 's/^export const ADMIN_API_VERSION=([0-9]+);$/\1/p' "$admin_contract")"
+          [[ "$admin_version" =~ ^[0-9]+$ ]] || { echo 'Could not read the published admin API version.'; cat "$admin_contract"; exit 1; }
+
+          admin_headers="$(mktemp)"
+          admin_body="$(mktemp)"
+          admin_status="$(curl --silent --show-error --max-time 20 -o "$admin_body" -D "$admin_headers" -w '%{http_code}' \
+            "https://api.packone.pro/draft/health?quick=1" -H "Origin: $PACKONE_ORIGIN")"
+          test "$admin_status" = '200' || { echo "Admin compatibility health returned HTTP $admin_status"; cat "$admin_body"; exit 1; }
+          gateway_admin_version="$(grep -i '^x-pack1-admin-api-version:' "$admin_headers" | head -n 1 | sed 's/^[^:]*:[[:space:]]*//; s/\r$//' || true)"
+          backend_admin_version="$(python - "$admin_body" <<'PY'
+          import json, sys
+          payload=json.load(open(sys.argv[1]))
+          value=payload.get("admin_api_version")
+          print("" if value is None else value)
+          PY
+          )"
+          test "$gateway_admin_version" = "$admin_version" || { echo "Gateway admin API version ${gateway_admin_version:-missing} does not match published shell $admin_version"; exit 1; }
+          test "$backend_admin_version" = "$admin_version" || { echo "Draft backend admin API version ${backend_admin_version:-missing} does not match published shell $admin_version"; exit 1; }
+          echo "admin release contract OK: version $admin_version"
+
       - name: Verify the served Draft Run corpus is complete
         shell: bash
         run: |

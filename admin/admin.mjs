@@ -1,6 +1,7 @@
 import {renderCorpus} from './corpus.mjs';
 import {renderUsers} from './users.mjs';
 import {renderCampaignLinks} from './campaign-links.mjs';
+import {ADMIN_API_VERSION} from '../admin-api-contract.mjs';
 import {accountCsrfToken,firstPartyAuthEnabled,hasAccountSession,storedAccountToken,signInAccount,signUpAccount,signOutAccount} from '../growth-api.mjs';
 const root=document.querySelector('#admin');
 const esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
@@ -8,7 +9,7 @@ const fmt=x=>x==null?'N/A':Number(x).toLocaleString(undefined,{maximumFractionDi
 const pct=x=>x==null?'N/A':`${fmt(x)}%`;
 const draftBase=window.PACK1_API.draftRunUrl;
 const growthBase=window.PACK1_API.growthUrl;
-let report,params=new URLSearchParams(),invite=null,deferredLoad=0;
+let report,params=new URLSearchParams(),invite=null,deferredLoad=0,adminContractVerified=false;
 const hash=new URLSearchParams(location.hash.slice(1));
 if(hash.has('invite')){invite=hash.get('invite');sessionStorage.setItem('pack1-admin-invite',invite);history.replaceState({},'',location.pathname);}
 invite=invite||sessionStorage.getItem('pack1-admin-invite');
@@ -23,6 +24,24 @@ async function requestAt(base,path,body,method=body?'POST':'GET') {
 }
 const request=(path,body,method)=>requestAt(draftBase,path,body,method);
 const growthRequest=(path,body,method)=>requestAt(growthBase,path,body,method);
+async function verifyAdminContract() {
+  if(adminContractVerified)return;
+  let response,data;
+  try {
+    response=await fetch(draftBase+'/health?quick=1',{credentials:firstPartyAuthEnabled()?'include':'omit',cache:'no-store',signal:AbortSignal.timeout(15000)});
+    data=await response.json();
+  } catch(error) {
+    if(error?.name==='TimeoutError'||error?.name==='AbortError')throw Object.assign(Error('The admin API compatibility check timed out. Refresh and try again.'),{status:0,code:'admin_contract_timeout'});
+    throw error;
+  }
+  const backendVersion=Number(data?.admin_api_version),gatewayVersion=Number(response.headers.get('x-pack1-admin-api-version'));
+  const gatewayMatches=!firstPartyAuthEnabled()||gatewayVersion===ADMIN_API_VERSION;
+  if(!response.ok||backendVersion!==ADMIN_API_VERSION||!gatewayMatches)throw Object.assign(
+    Error('Pack One administration is updating. The admin page, gateway, and backend are on different releases; refresh after deployment completes.'),
+    {status:503,code:'admin_release_mismatch',data:{required:ADMIN_API_VERSION,backend:backendVersion||null,gateway:gatewayVersion||null}}
+  );
+  adminContractVerified=true;
+}
 const reportQuery=f=>new URLSearchParams({from:f.start,to:f.end,environment:f.environment,type:f.type,set:f.set,version:f.version,difficulty:f.band,pick:f.pick}).toString();
 function login(message='') {
   root.innerHTML=`<section class="login"><h1>Pack One administration</h1><p>${invite?'Your private invitation is ready. Sign in, or create your admin account below.':'Sign in with the account granted admin access.'}</p><form id="login"><label>Name<input name="name" autocomplete="name"></label><label>Email<input name="email" type="email" autocomplete="username" required></label><label>Password<input name="password" type="password" autocomplete="current-password" minlength="8" required></label><label>Setup code (first visit only)<input name="invite" autocomplete="off" spellcheck="false" value="${esc(invite||'')}" placeholder="Paste your private setup code"></label><div class="actions"><button type="submit">Sign in</button><button type="submit" name="create" value="yes" class="secondary">Create account</button></div></form><p id="status" class="error" role="alert">${esc(message)}</p><a href="/">Back to Pack One</a></section>`;
@@ -69,14 +88,14 @@ async function loadDeferredSections(loadId,queryString){
 }
 function render() {
   const s=report.summary,c=report.coverage,f=report.filters,sf=report.share_funnel||{};
-  root.innerHTML=`<h1>How the decisions play</h1><p class="muted">First encounters · QA excluded · Updated ${esc(new Date(report.generated_at).toLocaleString())}</p>
+  root.innerHTML=`<h1>How the decisions play</h1><p class="muted">Current corpus ${esc(report.corpus_version||'unknown')} · First encounters · QA excluded · Historical corpus measurements retained but excluded · Updated ${esc(new Date(report.generated_at).toLocaleString())}</p>
     <form id="filters" class="filters"><label>From<input type="date" name="from" value="${f.start}" required></label><label>Through<input type="date" name="to" value="${f.end}" required></label><label>Environment<select name="environment" aria-label="Environment">${options([['all','All'],['mixed','Regular'],['powered-cube','Powered Cube']],f.environment)}</select></label><label>Run type<select name="type" aria-label="Run type">${options([['all','All'],['daily','Daily'],['practice','Practice'],['challenge','Challenge']],f.type)}</select></label><label>Set<select name="set" aria-label="Set">${options([['all','All'],...report.sets.map(x=>[x,x==='powered-cube'?'Powered Cube':x.toUpperCase()])],f.set)}</select></label><label>Difficulty<select name="difficulty" aria-label="Difficulty">${options([['all','All'],['easy','Easy'],['medium','Medium'],['hard','Hard']],f.band)}</select></label><label>Draft pick<select name="pick" aria-label="Draft pick">${options([['all','All'],...Array.from({length:12},(_,i)=>[String(i+1),'P1P'+(i+1)])],f.pick)}</select></label><label>Selection version<select name="version" aria-label="Selection version">${options([['all','All'],...Array.from(new Set(report.groups.filter(r=>r.dimension==='version').map(r=>r.label.split(' / ')[0]))).map(x=>[x,x]),...(f.version!=='all'&&!report.groups.some(r=>r.dimension==='version'&&r.label.startsWith(f.version+' / '))?[[f.version,f.version]]:[])],f.version)}</select></label><button>Refresh</button><button type="button" class="secondary" id="csv">Export CSV</button><button type="button" class="secondary" id="signout">Sign out</button></form>
     <div class="cards">${[['First-encounter answers',fmt(s.answers)],['Trophy match rate',pct(s.trophy_match_pct)],['Average alternative credit',fmt(s.average_partial_credit)],['Median foreground time',s.median_seconds==null?'N/A':fmt(s.median_seconds)+'s'],['Players',fmt(s.players)],['Completed / observed runs',`${fmt(s.completed_runs)} / ${fmt(s.runs)}`],['Rerolls / viewed choices',`${fmt(s.rerolls)} / ${fmt(s.exposures)}`],['Likely abandonment',fmt(s.likely_abandoned)]].map(([label,value])=>`<div class="card"><span>${label}</span><strong>${value}</strong></div>`).join('')}</div>
     <h2>Daily result-share funnel</h2>
     <div class="cards share-funnel">${[['Share-link arrivals',fmt(sf.arrivals)],['Unique visitors',fmt(sf.visitors)],['New Daily starts',fmt(sf.starts)],['Completed Dailies',fmt(sf.completions)]].map(([label,value])=>`<div class="card"><span>${label}</span><strong>${value}</strong></div>`).join('')}</div>
-    <p class="note">Start conversion: <strong>${pct(sf.start_pct)}</strong> · Completion of attributed starts: <strong>${pct(sf.completion_pct)}</strong>. Uses the selected date range and environment. Share-link arrivals are best-effort client analytics; starts and completions are authoritative server events. Other decision filters do not apply to this funnel.</p>
+    <p class="note">Start conversion: <strong>${pct(sf.start_pct)}</strong> · Completion of attributed starts: <strong>${pct(sf.completion_pct)}</strong>. Uses the selected date range and environment inside the current-corpus baseline. Share-link arrivals are best-effort client analytics bounded to the current corpus epoch; starts and completions are authoritative current-corpus sessions. Other decision filters do not apply to this funnel.</p>
     <h2>Daily habit cohorts</h2>
-    <p class="note">All three Dailies · distinct Pacific Daily dates · first real Daily in the selected date range. Linked accounts collapse across merged browser identities; guests are counted per browser. QA sessions, QA-pattern names, and admin-linked players are excluded. Environment and decision filters do not change these habit metrics.</p>
+    <p class="note">Current-corpus Dailies only · distinct Pacific Daily dates · first current-corpus Daily in the selected date range. Linked accounts collapse across merged browser identities; guests are counted per browser. QA sessions, QA-pattern names, and admin-linked players are excluded. Environment and decision filters do not change these habit metrics.</p>
     <div id="habit-cohorts"><p class="muted">Loading Daily habit cohorts…</p></div>
     <p class="note">Rates use only fully closed measurement windows; raw mature denominators and immature cohort counts are shown beside each rate. <code>pre_tracking</code> means product activity existed before acquisition tracking for that player. <code>direct</code> includes post-launch visits with no captured source. “Ever 3-in-7” is lifetime observed status, so it can rise after the cohort window.</p>
     <h2>3-in-7 daily health</h2>
@@ -98,6 +117,7 @@ function render() {
 async function load() {
   if(!hasAccountSession()){login();return;}
   const loadId=++deferredLoad;
+  await verifyAdminContract();
   try{if(invite){await request('/v1/admin/claim',{invite});sessionStorage.removeItem('pack1-admin-invite');invite=null;}const area=new URLSearchParams(location.search).get('area');if(area==='corpus'){await renderCorpus(root,request);return;}if(area==='users'){await renderUsers(root,request,growthRequest);return;}if(area==='campaign-links'){await renderCampaignLinks(root,growthRequest);return;}const queryString=params.toString(),nextReport=await request('/v1/admin/measurements'+(queryString?'?'+queryString:''));if(loadId!==deferredLoad)return;report=nextReport;const effectiveQuery=reportQuery(report.filters);render();void loadDeferredSections(loadId,effectiveQuery);}
   catch(err){if(loadId!==deferredLoad)return;if(err.status===401||err.status===403){login(err.message);return;}const status=document.querySelector('#status');if(status)status.textContent=err.message;else root.innerHTML=`<h1>Report unavailable</h1><p class="error">${esc(err.message)}</p><button id="retry">Try again</button>`;document.querySelector('#retry')?.addEventListener('click',load);}
 }

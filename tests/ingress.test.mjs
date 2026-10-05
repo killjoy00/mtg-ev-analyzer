@@ -11,6 +11,7 @@ import {freshDeployment,deployPreviewFunction} from '../scripts/edge-neon-deploy
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {ADMIN_API_VERSION} from '../admin-api-contract.mjs';
 const key='a'.repeat(64);
 const env={MODE:'preview',NEON_BRANCH_ID:'br-isolated-preview',ORIGIN_SECRET:key,PREVIEW_KEY:'b'.repeat(64),QUOTA_KEY:'c'.repeat(64),
   NETWORK_QUOTA:{idFromName(name){assert.match(name,/^[a-f0-9]{64}$/);return name;},get(){return {fetch:async()=>new Response(null,{status:204})};}}};
@@ -53,6 +54,8 @@ test('gateway constructs a fixed upstream and strips caller-controlled infrastru
   assert.equal(calls,1);assert.equal(result.status,200);assert.equal(result.headers.get('set-cookie'),null);
   assert.equal(result.headers.get('x-pack1-ingress-secret'),null);assert.equal(result.headers.get('cache-control'),'no-store');
   assert.equal(result.headers.get('access-control-allow-origin'),'https://packone.pro');
+  assert.equal(result.headers.get('x-pack1-admin-api-version'),String(ADMIN_API_VERSION));
+  assert.match(result.headers.get('access-control-expose-headers')||'',/X-Pack1-Admin-Api-Version/i);
 });
 test('start timing is relayed only from the protected draft origin in private preview',async()=>{
   const timing=JSON.stringify({v:1,total_ms:80,phases:{selection:60},selector:{}});

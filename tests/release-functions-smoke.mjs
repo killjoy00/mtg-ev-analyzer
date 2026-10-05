@@ -1,5 +1,6 @@
 // HTTP acceptance using private QA guests. Dailies are unranked and immutable.
 import assert from 'node:assert/strict';
+import {ADMIN_API_VERSION} from '../admin-api-contract.mjs';
 const [branch,commit]=process.argv.slice(2);
 if(!/^br-[a-z0-9-]+$/.test(branch||'')||!/^[a-f0-9]{40}$/.test(commit||''))throw Error('Usage: release-functions-smoke.mjs BRANCH_ID FULL_COMMIT_SHA [--daily] [--expect-deletion-email=true|false] (legacy --practice also runs unranked Daily acceptance)');
 const emailExpectationArg=process.argv.find(value=>value.startsWith('--expect-deletion-email='));
@@ -34,6 +35,7 @@ async function verifyMarkers({settle=false}={}) {
     for(;;) {
       const h=await call(slug,'/health?quick=1');
       assert.equal(h.ok,true);
+      if(slug==='draftrunapi')assert.equal(h.admin_api_version,ADMIN_API_VERSION,'draftrunapi admin API version');
       if(h.release_commit===commit) {
         if(slug==='pack1growth'&&expectedDeletionEmail!==null)
           assert.equal(h.deletion_email_configured,expectedDeletionEmail,'pack1growth deletion email configuration');
@@ -74,7 +76,7 @@ async function waitForStableMarkers() {
   assert.deepEqual(last,{draftrunapi:commit,pack1growth:commit,pack1api:commit},'release markers did not stabilize');
 }
 const health=await call('draftrunapi','/health');
-assert.equal(health.ok,true);assert.equal(health.run_length,8);assert.equal(health.selection_version,'eight-pick-v4');
+assert.equal(health.ok,true);assert.equal(health.admin_api_version,ADMIN_API_VERSION);assert.equal(health.run_length,8);assert.equal(health.selection_version,'eight-pick-v4');
 assert.equal(health.unrated_puzzles,0);assert.deepEqual(health.missing_sets,[]);assert.equal(health.daily_featured_sets.length,4);
 await call('pack1growth','/v1/events',{events:[{event:'page_view',props:{}}]},null,401);
 const dailyAcceptance=process.argv.includes('--daily')||process.argv.includes('--practice');
