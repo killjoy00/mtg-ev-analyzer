@@ -1,4 +1,5 @@
-import { createHash, createPrivateKey, sign } from 'node:crypto';
+import { createHash } from 'node:crypto';
+import { createAscTokenProvider, waitForAsset as pollAsset } from './app-store-asset-upload-helpers.mjs';
 import { readFileSync } from 'node:fs';
 import { basename, join } from 'node:path';
 
@@ -24,30 +25,13 @@ const editableVersionStates = new Set([
   'DEVELOPER_REJECTED',
 ]);
 
-function base64url(value) {
-  return Buffer.from(value).toString('base64url');
-}
-
-const now = Math.floor(Date.now() / 1000);
-const header = base64url(JSON.stringify({ alg: 'ES256', kid: keyId, typ: 'JWT' }));
-const payload = base64url(JSON.stringify({
-  iss: issuerId,
-  aud: 'appstoreconnect-v1',
-  iat: now,
-  exp: now + 15 * 60,
-}));
-const signingInput = `${header}.${payload}`;
-const signature = sign('sha256', Buffer.from(signingInput), {
-  key: createPrivateKey(privateKeyText),
-  dsaEncoding: 'ieee-p1363',
-});
-const token = `${signingInput}.${signature.toString('base64url')}`;
+const getToken = createAscTokenProvider({ issuerId, keyId, privateKeyText });
 
 async function apiRaw(path, { method = 'GET', body } = {}) {
   const response = await fetch(`https://api.appstoreconnect.apple.com${path}`, {
     method,
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${getToken()}`,
       Accept: 'application/json',
       ...(body ? { 'Content-Type': 'application/json' } : {}),
     },
@@ -161,19 +145,12 @@ async function uploadParts(buffer, operations, label) {
 }
 
 async function waitForAsset(resourceType, id) {
-  for (let attempt = 1; attempt <= 90; attempt += 1) {
-    const result = await api(
-      `/v1/${resourceType}/${encodeURIComponent(id)}?fields%5B${resourceType}%5D=fileName,sourceFileChecksum,assetDeliveryState`,
-    );
-    const delivery = result?.data?.attributes?.assetDeliveryState;
-    const state = delivery?.state;
-    if (state === 'COMPLETE') return result.data;
-    if (state === 'FAILED') {
-      throw new Error(`${resourceType} ${id} failed processing: ${JSON.stringify(delivery?.errors || [])}`);
-    }
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-  }
-  throw new Error(`${resourceType} ${id} did not finish processing in time.`);
+  return pollAsset({
+    resourceType,
+    id,
+    readAsset: () => api(`/v1/${resourceType}/${encodeURIComponent(id)}?fields%5B${resourceType}%5D=fileName,sourceFileChecksum,assetDeliveryState`),
+    onProgress: (progress) => console.log(JSON.stringify({ assetProcessing: progress })),
+  });
 }
 
 async function reserveUploadAndCommit({
