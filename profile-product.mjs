@@ -22,9 +22,9 @@ import {
 import { loadReplayJson } from './replay-data.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
 import { trackEvent } from './retention-events.mjs';
-import { nextMilestones } from './progression.mjs?v=8';
+import { nextMilestones } from './progression.mjs?v=9';
 import { PATREON_POLICY } from './patreon-policy.mjs';
-import { renderAccount, renderDeletionState } from './growth.mjs?v=8';
+import { renderAccount, renderDeletionState } from './growth.mjs?v=9';
 import {
   bestPercentile,
   environmentProgress,
