@@ -15,15 +15,15 @@ export async function checkCreatorChallenges({root=process.cwd()}={}) {
   const problems=[];
   for(const entry of creator) {
     if(ordinary.has(entry.slug))problems.push(`creator slug collides with ordinary campaign: ${entry.slug}`);
-    const route=path.join(root,'go',entry.slug,'index.html');
+    const route=path.join(root,'creator',entry.slug,'index.html');
     const current=await readFile(route,'utf8').catch(()=>null);
     const expected=renderCreatorChallengePage(entry);
-    if(current===null)problems.push(`missing creator page: go/${entry.slug}/index.html`);
-    else if(current!==expected)problems.push(`stale creator page: go/${entry.slug}/index.html`);
-    const card=path.join(root,'go',entry.slug,'creator-card.png');
+    if(current===null)problems.push(`missing creator page: creator/${entry.slug}/index.html`);
+    else if(current!==expected)problems.push(`stale creator page: creator/${entry.slug}/index.html`);
+    const card=path.join(root,'creator',entry.slug,'creator-card.png');
     const hasCard=await exists(card);
-    if(entry.status==='published'&&!hasCard)problems.push(`missing creator social card: go/${entry.slug}/creator-card.png`);
-    if(entry.status==='retired'&&hasCard)problems.push(`retired creator route retains social card: go/${entry.slug}/creator-card.png`);
+    if(entry.status==='published'&&!hasCard)problems.push(`missing creator social card: creator/${entry.slug}/creator-card.png`);
+    if(entry.status==='retired'&&hasCard)problems.push(`retired creator route retains social card: creator/${entry.slug}/creator-card.png`);
   }
   if(problems.length)throw new Error(problems.join('\n'));
   return {entries:creator.length,published:creator.filter(entry=>entry.status==='published').length,retired:creator.filter(entry=>entry.status==='retired').length};
