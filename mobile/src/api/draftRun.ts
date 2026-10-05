@@ -69,6 +69,9 @@ export type DraftRunAnswer = {
   historicalId: string | null;
   historicalName: string | null;
   historicalMatch: boolean;
+  creatorId?: string;
+  creatorName?: string;
+  creatorMatch?: boolean;
   consensusId?: string;
   consensusName?: string;
   consensusSupport?: number;
@@ -107,10 +110,23 @@ export type DraftRunState = {
     final?: boolean;
   } | null;
   comparison?: {
+    kind?: 'friend' | 'creator';
+    id?: string;
+    slug?: string;
     name: string;
+    handle?: string | null;
+    headline?: string;
     score: number;
     exact: boolean;
+    source_type?: 'practice' | 'daily';
+    source_day?: string | null;
+    creator_matches?: number | null;
+    trophy_matches?: number | null;
+    outcome?: 'win' | 'loss' | 'tie' | null;
+    creator_post_run_note?: string;
+    self?: boolean;
   } | null;
+  creator_challenge_id?: string | null;
 };
 
 export type DecisionReportReason =
@@ -127,6 +143,27 @@ export type SharedDraftRunInfo = {
   scores: { name: string; score: number }[];
   environment: string;
   run_length: number;
+};
+
+export type CreatorChallengeInfo = {
+  id: string;
+  slug: string;
+  creator_name: string;
+  creator_handle?: string | null;
+  headline: string;
+  score: number;
+  environment: string;
+  source_type: 'practice' | 'daily';
+  source_day?: string | null;
+  run_length: number;
+  attempts: number;
+  wins: number;
+  ties: number;
+  losses: number;
+  beat_percentage?: number | null;
+  average_score?: number | null;
+  public_url: string;
+  tracked_url: string;
 };
 
 export type PracticeSet = {
@@ -236,6 +273,28 @@ export function startSharedDraftRun(session: MobileSession, id: string) {
   });
 }
 
+export function loadCreatorChallengeInfo(id: string, session: MobileSession) {
+  if (!/^(?:[a-f0-9-]{36}|[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?)$/.test(id)) {
+    throw new Error('Invalid creator challenge.');
+  }
+  return requestJson<CreatorChallengeInfo>(`/draft/v1/creator-challenges/${encodeURIComponent(id)}`, {
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    timeoutMs: 15_000,
+  });
+}
+
+export function startCreatorChallenge(session: MobileSession, id: string) {
+  if (!/^[a-f0-9-]{36}$/.test(id)) throw new Error('Invalid creator challenge.');
+  return requestJson<DraftRunState>('/draft/v1/runs', {
+    method: 'POST',
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    body: { creatorChallenge: id },
+    timeoutMs: 30_000,
+  });
+}
+
 export function startPracticeDraftRun(
   session: MobileSession,
   {
@@ -316,7 +375,7 @@ export async function submitDraftRunDecisionReport(
 }
 
 export function createDraftRunShare(id: string, session: MobileSession) {
-  return requestJson<{ id: string }>(`/draft/v1/runs/${encodeURIComponent(id)}/share`, {
+  return requestJson<{ id?: string; creator?: boolean; slug?: string; url?: string }>(`/draft/v1/runs/${encodeURIComponent(id)}/share`, {
     method: 'POST',
     mobileSessionToken: session.playerToken,
     mobileAccountToken: session.accountToken,
