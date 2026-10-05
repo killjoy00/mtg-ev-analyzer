@@ -53,7 +53,7 @@ CREATE INDEX IF NOT EXISTS creator_challenges_status_idx
 CREATE OR REPLACE FUNCTION pack1_sync_creator_challenge_source_owner()
 RETURNS trigger
 LANGUAGE plpgsql
-AS $
+AS $$
 BEGIN
   IF NEW.player_id IS DISTINCT FROM OLD.player_id THEN
     UPDATE creator_challenges
@@ -67,7 +67,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 -- statement
 DROP TRIGGER IF EXISTS creator_challenge_source_owner_sync ON draft_run_sessions;
 -- statement
