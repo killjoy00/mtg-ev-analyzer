@@ -1,4 +1,5 @@
 import {createHmac} from 'node:crypto';
+import {requestCreatorPrivacyRetirement} from './creator-challenge-publish.mjs';
 
 export const DELETION_STATES=new Set([
   'pending','app_cleanup_complete','provider_delete_pending','provider_deleted','complete','operator_review',
@@ -113,16 +114,24 @@ export async function cleanupPackOne(query,operation,{recoveryKey=null}={}) {
   await query('DELETE FROM corpus_status_events WHERE auth_user_id=$1::uuid',[auth]);
 
   if(player) {
-    await query(`WITH retired AS (
-      UPDATE creator_challenges
+    // Dispatch the privacy-safe static route replacement before deleting the
+    // source/account. If GitHub cannot accept the retirement request, deletion
+    // remains retryable instead of leaving creator metadata stranded on Pages.
+    await requestCreatorPrivacyRetirement(query,player);
+    await query(`UPDATE creator_challenges
       SET status='retired',creator_public_name='A creator',creator_handle=NULL,headline='Creator challenge unavailable',
           creator_post_run_note=NULL,privacy_removed_at=COALESCE(privacy_removed_at,now()),
-          retired_at=COALESCE(retired_at,now()),updated_at=now(),publication_error=NULL
-      WHERE source_owner_player_id=$1::uuid
-      RETURNING id
-    )
-    INSERT INTO creator_challenge_audit(creator_challenge_id,action,detail)
-    SELECT id,'privacy_retired','{"reason":"account_deletion"}'::jsonb FROM retired`,[player]);
+          retired_at=COALESCE(retired_at,now()),updated_at=now()
+      WHERE source_owner_player_id=$1::uuid`,[player]);
+    await query(`INSERT INTO creator_challenge_audit(creator_challenge_id,action,detail)
+      SELECT c.id,'privacy_retired','{"reason":"account_deletion"}'::jsonb
+      FROM creator_challenges c
+      WHERE c.source_owner_player_id=$1::uuid
+        AND NOT EXISTS (
+          SELECT 1 FROM creator_challenge_audit a
+          WHERE a.creator_challenge_id=c.id AND a.action='privacy_retired'
+            AND a.detail->>'reason'='account_deletion'
+        )`,[player]);
   }
 
   // Shares have NO ACTION to sessions and must be removed first.
