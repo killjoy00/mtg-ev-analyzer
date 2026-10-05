@@ -1,6 +1,7 @@
 import {buildCampaignTrackingUrl,normalizeAcquisitionValue,normalizeCampaignSlug} from '../campaign-links.mjs';
 import {componentBelongsTo} from './corpus-components.mjs';
-import {validateDraftRunPuzzle} from '../draft-run.mjs';
+import {DRAFT_RUN_SCORING_VERSION,gradeDraftRunPick,validateDraftRunPuzzle} from '../draft-run.mjs';
+import {gameDateKey} from '../game-date.mjs';
 
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
 const SHARE=/^[a-f0-9]{24}$/;
@@ -63,6 +64,9 @@ function decodeSource(row) {
 async function validateHistoricalPuzzles(query,source) {
   if(!Array.isArray(source.puzzle_ids)||source.puzzle_ids.length!==8)fail('Creator source must contain exactly eight decisions.',409,'CREATOR_SOURCE_INELIGIBLE');
   if(!Array.isArray(source.answers)||source.answers.length!==8||source.score==null)fail('Creator source run is not complete.',409,'CREATOR_SOURCE_INELIGIBLE');
+  if(source.scoring_version!==DRAFT_RUN_SCORING_VERSION)
+    fail('This source uses a historical scoring version that the current replay engine cannot reproduce.',409,'CREATOR_SOURCE_SCORING_VERSION');
+  let scoreTotal=0;
   for(let index=0;index<8;index++) {
     const id=source.puzzle_ids[index],answer=source.answers[index];
     if(!answer||answer?.puzzle?.puzzle_id!==id||!answer.selectedId)fail('Creator source answers do not match the authoritative decision order.',409,'CREATOR_SOURCE_INELIGIBLE');
@@ -72,7 +76,13 @@ async function validateHistoricalPuzzles(query,source) {
       fail('This source uses historical puzzle data that Pack One can no longer serve safely.',409,'CREATOR_SOURCE_UNAVAILABLE');
     if(!puzzle.candidates.some(card=>card.id===answer.selectedId))
       fail('A creator selection is not part of its authoritative historical pack.',409,'CREATOR_SOURCE_INELIGIBLE');
+    const reproduced=gradeDraftRunPick(puzzle,answer.selectedId).score;
+    if(Number(answer.score)!==Number(reproduced))
+      fail('This source cannot be reproduced exactly by the current scoring engine.',409,'CREATOR_SOURCE_SCORING_VERSION');
+    scoreTotal+=Number(reproduced);
   }
+  if(Math.round(scoreTotal/8)!==Number(source.score))
+    fail('This source score cannot be reproduced exactly by the current scoring engine.',409,'CREATOR_SOURCE_SCORING_VERSION');
 }
 
 async function sourceSession(query,id,{expectedPlayerId=null,expectedType=null,shareId=null,validatePuzzles=true}={}) {
@@ -240,13 +250,15 @@ export async function creatorChallengeBySlug(query,slug) {
   return creatorChallengeById(query,result.rows[0].id);
 }
 
-export async function validateCreatorChallengeSource(query,row) {
+export async function validateCreatorChallengeSource(query,row,{today=gameDateKey(),requireClosed=true}={}) {
   if(!row||!row.source_session_id||!row.authoritative_owner_player_id||row.source_score==null)
     fail('This creator challenge is no longer available.',410,'CREATOR_CHALLENGE_UNAVAILABLE');
   if(row.public_identity_hidden_at||!bool(row.profile_public)||bool(row.measurement_qa))
     fail('This creator is not currently eligible for public promotion.',409,'CREATOR_IDENTITY_PRIVATE');
   if(row.source_type==='daily'&&String(row.authoritative_source_day)!==String(row.source_day))
     fail('Creator challenge source no longer matches its frozen Daily.',409,'CREATOR_SOURCE_MISMATCH');
+  if(row.source_type==='daily'&&requireClosed&&String(row.authoritative_source_day||'')>=String(today||gameDateKey()))
+    fail('This completed Daily can be previewed now, but it cannot become a creator replay until the Pack One game date rolls over.',409,'CREATOR_DAILY_STILL_OPEN');
   if(String(row.authoritative_environment||'')!==String(row.source_environment||''))
     fail('Creator challenge source no longer matches its frozen environment.',409,'CREATOR_SOURCE_MISMATCH');
   const source=await sourceSession(query,row.source_session_id,{expectedPlayerId:row.source_owner_player_id,expectedType:row.source_type});
@@ -254,9 +266,9 @@ export async function validateCreatorChallengeSource(query,row) {
   return source;
 }
 
-export async function assertCreatorChallengePlayable(query,row) {
+export async function assertCreatorChallengePlayable(query,row,{today=gameDateKey()}={}) {
   if(!row||row.status!=='published')fail('This creator challenge is not available.',410,'CREATOR_CHALLENGE_UNAVAILABLE');
-  return validateCreatorChallengeSource(query,row);
+  return validateCreatorChallengeSource(query,row,{today,requireClosed:true});
 }
 
 export function creatorAcquisitionProps(row) {
@@ -293,15 +305,15 @@ export function publicCreatorChallenge(row) {
   };
 }
 
-export async function creatorChallengeForPublic(query,identifier) {
+export async function creatorChallengeForPublic(query,identifier,{today=gameDateKey()}={}) {
   const row=UUID.test(String(identifier||''))?await creatorChallengeById(query,identifier):await creatorChallengeBySlug(query,identifier);
-  await assertCreatorChallengePlayable(query,row);
+  await assertCreatorChallengePlayable(query,row,{today});
   return row;
 }
 
-export async function loadCreatorChallengeForStart(query,identifier) {
+export async function loadCreatorChallengeForStart(query,identifier,{today=gameDateKey()}={}) {
   const challenge=UUID.test(String(identifier||''))?await creatorChallengeById(query,identifier):await creatorChallengeBySlug(query,identifier);
-  const source=await assertCreatorChallengePlayable(query,challenge);
+  const source=await assertCreatorChallengePlayable(query,challenge,{today});
   return {challenge,source};
 }
 
