@@ -8,6 +8,7 @@ import {
   reconcileAppleSubscriptions,
   requestTestNotification,
   diagnoseRejectedKey,
+  testNotifications,
 } from '../scripts/apple-subscription-reconcile.mjs';
 import {APPLE_APP_ID,APPLE_ELITE_PRODUCT_ID} from '../worker/apple-subscription-policy.mjs';
 import {acceptAppleNotification} from '../worker/apple-subscriptions.mjs';
@@ -187,6 +188,31 @@ test('test notification fails loudly on a rejected key and reports a missing URL
   assert.deepEqual(await requestTestNotification(credentials,'Production',{wait:async()=>{},checks:2,fetchImpl:async(url,options)=>
     options.method==='POST'?Response.json({testNotificationToken:'t'}):new Response(null,{status:404})}),{environment:'Production',key_accepted:true,delivery:'pending'});
   await assert.rejects(requestTestNotification(credentials,'Xcode',{fetchImpl:async()=>{throw Error('must not call');}}));
+});
+
+test('a production 401 before the first App Store release does not fail a key Sandbox accepted',async()=>{
+  const rejected=()=>Object.assign(Error('App Store Server API rejected the In-App Purchase key'),{fatal:true});
+  const request=outcomes=>async(_credentials,environment)=>{
+    const outcome=outcomes[environment];
+    if(outcome==='401')throw rejected();
+    return {environment,key_accepted:true,delivery:outcome};
+  };
+  const lookup=resultCount=>async url=>{
+    assert.equal(String(url),`https://itunes.apple.com/lookup?id=${APPLE_APP_ID}`);
+    return Response.json({resultCount,results:[]});
+  };
+  assert.deepEqual(await testNotifications(credentials,{request:request({Sandbox:'SUCCESS',Production:'401'}),fetchImpl:lookup(0)}),[
+    {environment:'Sandbox',key_accepted:true,delivery:'SUCCESS'},
+    {environment:'Production',key_accepted:null,delivery:'unavailable_until_app_store_release'},
+  ]);
+  // Once the app is listed, or when its listing cannot be checked, a production 401 is a key problem.
+  for(const fetchImpl of [lookup(1),async()=>{throw Error('offline');}]) {
+    await assert.rejects(testNotifications(credentials,{request:request({Sandbox:'SUCCESS',Production:'401'}),fetchImpl}),
+      error=>error.fatal&&error.environment==='Production'&&error.results.length===1&&error.results[0].environment==='Sandbox');
+  }
+  // A Sandbox rejection is never excused, and the listing is not consulted.
+  await assert.rejects(testNotifications(credentials,{request:request({Sandbox:'401',Production:'SUCCESS'}),fetchImpl:async()=>{throw Error('must not call');}}),
+    error=>error.fatal&&error.environment==='Sandbox'&&error.results.length===0);
 });
 
 test('a rejected key is diagnosed with safe facts only',async()=>{
