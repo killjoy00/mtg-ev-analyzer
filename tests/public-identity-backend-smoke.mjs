@@ -388,9 +388,12 @@ try {
     assert.ok(row.privacy_removed_at,'moderation scrubs dynamic creator identity immediately');
     assert.equal(row.publication_operation_ref,null,'moderation never blocks on or starts GitHub publication synchronously');
   }
-  const publishedPrivacy=creatorPrivacyById.get(publishedCreatorChallenge).publication_detail;
-  const draftPrivacy=creatorPrivacyById.get(draftCreatorChallenge).publication_detail;
-  const publishingPrivacy=creatorPrivacyById.get(publishingCreatorChallenge).publication_detail;
+  const publishedPrivacyRaw=creatorPrivacyById.get(publishedCreatorChallenge).publication_detail;
+  const draftPrivacyRaw=creatorPrivacyById.get(draftCreatorChallenge).publication_detail;
+  const publishingPrivacyRaw=creatorPrivacyById.get(publishingCreatorChallenge).publication_detail;
+  const publishedPrivacy=typeof publishedPrivacyRaw==='string'?JSON.parse(publishedPrivacyRaw):publishedPrivacyRaw;
+  const draftPrivacy=typeof draftPrivacyRaw==='string'?JSON.parse(draftPrivacyRaw):draftPrivacyRaw;
+  const publishingPrivacy=typeof publishingPrivacyRaw==='string'?JSON.parse(publishingPrivacyRaw):publishingPrivacyRaw;
   assert.equal(publishedPrivacy.action,'retire');
   assert.equal(publishedPrivacy.reason,'public_identity_hidden');
   assert.equal(publishedPrivacy.live_verified,false);
