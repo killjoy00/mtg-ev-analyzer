@@ -54,6 +54,6 @@ test('reviewed retry request explicitly forbids customer rows',()=>{
   assert.equal(request.operation,'run-creator-production-canary');
   assert.equal(request.expected_release,'f6ea0910d322f007f0ac0004b98fea6bab09422a');
   assert.match(request.reason,/fresh QA Practice/i);
-  assert.match(request.reason,/retained QA release Daily/i);
+  assert.match(request.reason,/retained (?:closed )?QA release Daily/i);
   assert.match(request.reason,/Never select or mutate customer rows/i);
 });
