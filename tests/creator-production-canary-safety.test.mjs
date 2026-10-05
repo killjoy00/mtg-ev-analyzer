@@ -25,6 +25,11 @@ test('production creator canary is syntax-valid and cannot select customer sourc
   assert.match(block,/s\.day::text AS source_day/);
 });
 
+test('production player traffic uses the gateway-approved player session transport',()=>{
+  assert.match(script,/headers\['x-pack1-mobile-session'\]=player/);
+  assert.doesNotMatch(script,/headers\.authorization='Bearer '\+player/);
+});
+
 test('fresh Practice source is played through live APIs and later marked QA/private',()=>{
   const start=script.indexOf('async function createFreshPracticeSource()');
   const end=script.indexOf('async function cleanupFreshPracticeSource()',start);
