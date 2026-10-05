@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
-import {routeFamily} from '../edge/gateway.mjs';
+import {gateway,routeFamily} from '../edge/gateway.mjs';
 
 const worker=fs.readFileSync('worker/draft-run-function.mjs','utf8');
 const migration=fs.readFileSync('migrations/0052_decision_reports.sql','utf8');
@@ -46,4 +46,23 @@ test('decision report route is classified and migration is on a guarded release 
   assert.ok(manifest.ordered.includes('0052_decision_reports.sql'));
   assert.ok(manifest.release_paths['secure-auth-release'].migrations.includes('0052_decision_reports.sql'));
   assert.equal(secureRelease.split('migrations/0052_decision_reports.sql').length-1,2);
+});
+
+test('the production gateway forwards decision reports from web and native sessions',async()=>{
+  const run='11111111-1111-4111-8111-111111111111';
+  const production={MODE:'production',NEON_BRANCH_ID:'br-orange-feather-ayps8kep',QUOTA_KEY:'d'.repeat(64),
+    NETWORK_QUOTA:{idFromName:name=>name,get:()=>({fetch:async()=>new Response(null,{status:204})})}};
+  const nativeSession=`p1_22222222-2222-4222-8222-222222222222.${'A'.repeat(43)}`;
+  for(const headers of [{},{'x-pack1-mobile-session':nativeSession}]) {
+    let forwarded=null;
+    const response=await gateway(new Request(`https://api.packone.pro/draft/v1/runs/${run}/report`,{
+      method:'POST',headers:{'cf-connecting-ip':'192.0.2.1','content-type':'application/json',...headers},body:'{}',
+    }),production,async url=>{forwarded=String(url);return Response.json({ok:true,id:'r'});});
+    assert.equal(response.status,200,JSON.stringify(headers));
+    assert.match(forwarded,new RegExp(`/v1/runs/${run}/report$`));
+  }
+  const unknown=await gateway(new Request(`https://api.packone.pro/draft/v1/runs/${run}/unknown`,{
+    method:'POST',headers:{'cf-connecting-ip':'192.0.2.1','content-type':'application/json'},body:'{}',
+  }),production,async()=>{throw Error('must not forward');});
+  assert.equal(unknown.status,404);
 });
