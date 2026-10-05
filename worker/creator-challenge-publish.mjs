@@ -134,7 +134,7 @@ async function workflowRun(operation,{env,fetcher}) {
 }
 
 async function verifyLive(row,action,{fetcher}) {
-  const url=`https://packone.pro/go/${row.slug}/`;
+  const url=`https://packone.pro/creator/${row.slug}/`;
   let response,text;
   try {
     response=await fetcher(url,{headers:{accept:'text/html','cache-control':'no-cache'},redirect:'error',signal:AbortSignal.timeout(15000)});
