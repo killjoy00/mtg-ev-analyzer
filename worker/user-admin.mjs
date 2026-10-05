@@ -81,10 +81,18 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
              privacy_removed_at=COALESCE(privacy_removed_at,now()),
              retired_at=COALESCE(retired_at,now()),updated_at=now(),publication_error=NULL,
              publication_operation_ref=NULL,
-             publication_detail=jsonb_build_object(
-               'action','retire','reason','public_identity_hidden',
-               'live_verified',false,'dispatch',jsonb_build_object('state','pending','attempts',0)
-             )
+             publication_detail=CASE
+               WHEN published_at IS NULL AND status NOT IN ('published','publishing') THEN
+                 jsonb_build_object(
+                   'action','retire','reason','public_identity_hidden',
+                   'live_verified',true,'static_cleanup','not_required'
+                 )
+               ELSE
+                 jsonb_build_object(
+                   'action','retire','reason','public_identity_hidden',
+                   'live_verified',false,'dispatch',jsonb_build_object('state','pending','attempts',0)
+                 )
+             END
            WHERE source_owner_player_id=$1::uuid
            RETURNING id
          ), creator_audit AS (
