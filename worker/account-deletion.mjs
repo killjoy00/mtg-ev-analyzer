@@ -117,7 +117,8 @@ export async function cleanupPackOne(query,operation,{recoveryKey=null}={}) {
     // Dispatch the privacy-safe static route replacement before deleting the
     // source/account. If GitHub cannot accept the retirement request, deletion
     // remains retryable instead of leaving creator metadata stranded on Pages.
-    await requestCreatorPrivacyRetirement(query,player);
+    const creatorPrivacyReady=await requestCreatorPrivacyRetirement(query,player);
+    if(!creatorPrivacyReady)return current;
     await query(`UPDATE creator_challenges
       SET status='retired',creator_public_name='A creator',creator_handle=NULL,headline='Creator challenge unavailable',
           creator_post_run_note=NULL,privacy_removed_at=COALESCE(privacy_removed_at,now()),
