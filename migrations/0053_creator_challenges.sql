@@ -120,6 +120,101 @@ CREATE INDEX IF NOT EXISTS game_results_creator_challenge_idx
   ON game_results(creator_challenge_id,played_at DESC)
   WHERE creator_challenge_id IS NOT NULL;
 -- statement
+CREATE OR REPLACE FUNCTION pack1_fill_creator_challenge_result()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $
+DECLARE
+  run_id uuid;
+BEGIN
+  IF NEW.creator_challenge_id IS NULL
+     AND NEW.mode='draft_run'
+     AND NEW.client_result_id ~ '^draft-run:[0-9a-fA-F-]{36}CREATE TABLE IF NOT EXISTS creator_challenge_audit (
+  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  creator_challenge_id uuid NOT NULL REFERENCES creator_challenges(id) ON DELETE CASCADE,
+  admin_auth_user_id uuid,
+  action text NOT NULL CHECK (action IN ('created','publish_requested','published','publish_failed','retired','privacy_retired')),
+  detail jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+-- statement
+CREATE INDEX IF NOT EXISTS creator_challenge_audit_challenge_idx
+  ON creator_challenge_audit(creator_challenge_id,created_at DESC);
+ THEN
+    BEGIN
+      run_id=split_part(NEW.client_result_id,':',2)::uuid;
+      SELECT s.creator_challenge_id INTO NEW.creator_challenge_id
+      FROM draft_run_sessions s
+      WHERE s.id=run_id;
+    EXCEPTION WHEN invalid_text_representation THEN
+      NULL;
+    END;
+  END IF;
+  RETURN NEW;
+END;
+$;
+-- statement
+DROP TRIGGER IF EXISTS creator_challenge_result_fill ON game_results;
+-- statement
+CREATE TRIGGER creator_challenge_result_fill
+BEFORE INSERT ON game_results
+FOR EACH ROW EXECUTE FUNCTION pack1_fill_creator_challenge_result();
+-- statement
+CREATE OR REPLACE FUNCTION pack1_prepare_creator_challenge_player_merge()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $
+DECLARE
+  target_auth uuid;
+  duplicate_attempt boolean;
+BEGIN
+  IF NEW.player_id IS NOT DISTINCT FROM OLD.player_id OR OLD.creator_challenge_id IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT auth_user_id INTO target_auth
+  FROM account_links
+  WHERE player_id=NEW.player_id
+  LIMIT 1;
+
+  SELECT EXISTS(
+    SELECT 1
+    FROM draft_run_sessions target
+    WHERE target.id<>OLD.id
+      AND target.creator_challenge_id=OLD.creator_challenge_id
+      AND (
+        target.player_id=NEW.player_id
+        OR (target_auth IS NOT NULL AND target.creator_participant_auth_user_id=target_auth)
+      )
+  ) INTO duplicate_attempt;
+
+  IF duplicate_attempt THEN
+    -- The established account attempt remains authoritative. Preserve the
+    -- guest run as ordinary Practice without double-counting creator stats or
+    -- colliding with the practice-start idempotency key during player merge.
+    UPDATE game_results
+    SET creator_challenge_id=NULL
+    WHERE player_id=NEW.player_id
+      AND client_result_id='draft-run:'||OLD.id::text;
+
+    NEW.creator_challenge_id=NULL;
+    NEW.creator_participant_auth_user_id=NULL;
+    NEW.start_idempotency_hash=NULL;
+    NEW.start_request_hash=NULL;
+  ELSE
+    NEW.creator_participant_auth_user_id=COALESCE(NEW.creator_participant_auth_user_id,target_auth);
+  END IF;
+
+  RETURN NEW;
+END;
+$;
+-- statement
+DROP TRIGGER IF EXISTS creator_challenge_player_merge_guard ON draft_run_sessions;
+-- statement
+CREATE TRIGGER creator_challenge_player_merge_guard
+BEFORE UPDATE OF player_id ON draft_run_sessions
+FOR EACH ROW EXECUTE FUNCTION pack1_prepare_creator_challenge_player_merge();
+-- statement
 CREATE TABLE IF NOT EXISTS creator_challenge_audit (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   creator_challenge_id uuid NOT NULL REFERENCES creator_challenges(id) ON DELETE CASCADE,
