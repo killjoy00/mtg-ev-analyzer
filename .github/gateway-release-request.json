@@ -1,6 +1,6 @@
 {
   "operation": "deploy-gateway",
-  "source_sha": "0ff55f6084b4ca372ec2457b0d81611054be6e96",
-  "production_run_id": "37216039560",
-  "reason": "Owner-authorized gateway-only completion of PR #903. Enable the Growth admin rename route using the already deployed and accepted v9 Function revision; retain production quota identity, Functions, corpus pointers and serving SQL. Verify temporary-account notices, opt-out and retry behavior."
+  "source_sha": "effcde36bfd5c4e4f9d137ea0a574a08f6f7e43b",
+  "production_run_id": "37247837110",
+  "reason": "Promote the gateway matching the accepted admin API v2 Functions release from PR #962. Restore progressive admin corpus/measurement routes, enforce admin release-contract parity, and keep the current-corpus admin baseline aligned with the production Functions revision."
 }
