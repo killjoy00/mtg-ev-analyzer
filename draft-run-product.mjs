@@ -12,6 +12,7 @@ import { dailyResetCue } from './game-date.mjs';
 
 const base = () => String(window.PACK1_API?.draftRunUrl||'').replace(/\/$/,'');
 const webClientBuild=()=>new URL(import.meta.url).searchParams.get('v')||null;
+const reportSentText='Thanks \u2014 report sent.';
 let run=null,selection=null,review=null,busy=false,dailyValidationConfirmation=null;
 const reportedDecisions=new Set();
 const clock=decisionClock();let viewPromise=Promise.resolve(),viewKey=null;
@@ -94,7 +95,7 @@ function revealComparison(p,answer) {
 }
 function revealAnalysis(p,answer) {
   const sent=reportedDecisions.has(answer.puzzle.puzzle_id);
-  return `<details class="run-analysis"><summary>Why this score?</summary><div class="run-analysis-body">${revealComparison(p,answer)}${consensusFeedback(answer)}<div class="run-decision-report"><button type="button" class="text-button" data-report-decision>Report this decision</button><span id="run-report-status" role="status">${sent?'Thanks — report sent.':''}</span></div></div></details>`;
+  return `<details class="run-analysis"><summary>Why this score?</summary><div class="run-analysis-body">${revealComparison(p,answer)}${consensusFeedback(answer)}<div class="run-decision-report"><button type="button" class="text-button" data-report-decision>Report this decision</button><span id="run-report-status" role="status">${sent?esc(reportSentText):''}</span></div></div></details>`;
 }
 function compactResultLabel(answer,sentence='') {
   const verdict=answer.historicalMatch
@@ -175,7 +176,7 @@ function openDecisionReport(answer) {
       reportedDecisions.add(answer.puzzle.puzzle_id);
       dialog.close();
       const status=document.querySelector('#run-report-status');
-      if(status)status.textContent='Thanks — report sent.';
+      if(status)status.textContent=reportSentText;
     } catch(e) {
       error.textContent=e.message||'Could not send the report. Try again.';
       submit.disabled=false;
