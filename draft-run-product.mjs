@@ -73,9 +73,23 @@ function pool(p) {
 // matches still show the shared card once.
 function compactRevealCards(p,answer) {
   const byId=new Map((p.candidates||[]).map(c=>[c.id,c]));
+  const mine=byId.get(answer.selectedId),trophy=byId.get(answer.historicalId);
+  const cardFigure=(card,label,cls)=>card
+    ? `<figure class="run-reveal-pick ${cls}"><span>${esc(label)}</span><button type="button" data-zoom="${esc(card.id)}" aria-label="Enlarge ${esc(label)}: ${esc(card.name)}">${image(card)}</button></figure>`
+    : '';
+
+  if(run?.comparison?.kind!=='creator') {
+    if(answer.historicalMatch) {
+      const shared=mine||trophy;
+      return shared?`<div class="run-reveal-picks is-match">${cardFigure(shared,'Trophy and Your Pick','is-shared')}</div>`:'';
+    }
+    const cards=`${cardFigure(mine,'Your Pick','is-mine')}${cardFigure(trophy,'Trophy Pick','is-trophy')}`;
+    return cards?`<div class="run-reveal-picks">${cards}</div>`:'';
+  }
+
   const roles=[
     ['Your Pick',answer.selectedId,'is-mine'],
-    ...(run?.comparison?.kind==='creator'&&answer.creatorId?[[run.comparison.name+"'s Pick",answer.creatorId,'is-creator']]:[]),
+    ...(answer.creatorId?[[run.comparison.name+"'s Pick",answer.creatorId,'is-creator']]:[]),
     ['Trophy Pick',answer.historicalId,'is-trophy'],
   ].filter(([,id])=>id);
   const grouped=new Map();
@@ -83,12 +97,11 @@ function compactRevealCards(p,answer) {
     const item=grouped.get(id)||{id,labels:[],classes:[]};
     item.labels.push(label);item.classes.push(cls);grouped.set(id,item);
   }
-  const cardFigure=item=>{
+  const cards=[...grouped.values()].map(item=>{
     const card=byId.get(item.id);if(!card)return '';
     const label=item.labels.join(' · ');
-    return `<figure class="run-reveal-pick ${item.classes.join(' ')}"><span>${esc(label)}</span><button type="button" data-zoom="${esc(card.id)}" aria-label="Enlarge ${esc(label)}: ${esc(card.name)}">${image(card)}</button></figure>`;
-  };
-  const cards=[...grouped.values()].map(cardFigure).join('');
+    return cardFigure(card,label,item.classes.join(' '));
+  }).join('');
   return cards?`<div class="run-reveal-picks ${grouped.size===1?'is-match':''}">${cards}</div>`:'';
 }
 function revealComparison(p,answer) {
