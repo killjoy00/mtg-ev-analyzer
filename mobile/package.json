@@ -10,7 +10,7 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "config:check": "node ./scripts/check-config.mjs",
-    "test": "npm run test:navigation && npm run test:lifecycle && npm run test:draft-run && npm run test:shared-run-storage && npm run test:shared-run-screen && npm run test:membership && npm run test:profiles && npm run test:activity && npm run test:screenshots && npm run lint && npm run typecheck && npm run config:check && npm run release:check && npm run test:ci-scope",
+    "test": "npm run test:navigation && npm run test:lifecycle && npm run test:draft-run && npm run test:shared-run-storage && npm run test:shared-run-screen && npm run test:creator-run-screen && npm run test:membership && npm run test:profiles && npm run test:activity && npm run test:screenshots && npm run lint && npm run typecheck && npm run config:check && npm run release:check && npm run test:ci-scope",
     "release:check": "node ./scripts/release-preflight.mjs",
     "test:lifecycle": "node --test ./tests/version-gate-lifecycle.test.cjs",
     "test:draft-run": "node --test ./tests/draft-run-race.test.cjs ./tests/draft-run-recovery.test.cjs",
@@ -21,7 +21,8 @@
     "test:activity": "node --test ./tests/profile-activity.test.cjs ./tests/profile-activity-screen.test.cjs",
     "test:screenshots": "node --test ./tests/store-screenshot-contract.test.cjs",
     "test:ci-scope": "node --test ./tests/native-ci-scope.test.mjs ./tests/gradle-cache-key.test.mjs",
-    "test:navigation": "node --test ./tests/native-parity-navigation.test.cjs"
+    "test:navigation": "node --test ./tests/native-parity-navigation.test.cjs",
+    "test:creator-run-screen": "node --test ./tests/creator-run-screen.test.cjs"
   },
   "dependencies": {
     "expo": "~57.0.24",
