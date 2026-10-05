@@ -45,8 +45,6 @@ function workflowInputs(row,operation,action) {
     source:retired?'creator':row.acquisition_source,
     campaign:retired?'retired':row.acquisition_campaign,
     medium:retired?'':row.acquisition_medium||'',
-    social_title:'',
-    social_description:'',
     creator_challenge_id:row.id,
     creator_name:retired?'A creator':row.creator_public_name,
     creator_headline:retired?'Creator challenge unavailable':row.headline||`Can you beat ${row.creator_public_name}?`,
