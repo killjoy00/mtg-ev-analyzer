@@ -110,6 +110,6 @@ const result=await query(`SELECT
   position('America/New_York' in pg_get_viewdef('analytics_daily_next_day_retention'::regclass))=0 daily_retention_not_eastern`);
 // Worker SQL references `username_owned` and `pack1_username_key` on the
 // session and profile paths, so 0033 has to land before the code that reads it.
-for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations first.`);
+for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0047 first.`);
 await verifyServingStatistics(query);
 console.log('Neon schema and serving-statistics prerequisites verified.');
