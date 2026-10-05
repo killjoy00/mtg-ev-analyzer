@@ -19,7 +19,7 @@ import growth, { query, player, readJson, json, withCors, gameDateKey } from './
 import { handleTrophyImport } from './trophy-import.mjs';
 import {observeDecision,measurementInput,MEASUREMENT_CTE} from './decision-measurements.mjs';
 import {handleAdmin} from './measurement-admin.mjs';
-import {creatorChallengeForPublic,publicCreatorChallenge,loadCreatorChallengeForStart,loadCreatorChallengeForExistingSession,creatorRevealState} from './creator-challenges.mjs';
+import {creatorAcquisitionProps,creatorChallengeForPublic,publicCreatorChallenge,loadCreatorChallengeForStart,loadCreatorChallengeForExistingSession,creatorRevealState} from './creator-challenges.mjs';
 import {loadPuzzleMetadata,selectCachedDatabaseRun,selectDatabaseReroll,loadLiveSetMetadata,loadCachedCustomSetMetadata,servingRevisionMatches,servingCacheUnavailable} from './draft-run-selection.mjs';
 import {DRAFT_RUN_DIFFICULTY_VERSION,LEGACY_DIFFICULTY_VERSION,publicDifficulty,rateDraftRunPuzzle} from '../draft-run-difficulty.mjs';
 import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,regularRunSet,dailySetWeight,dailyRequiredSets,DRAFT_RUN_LENGTH} from '../draft-run-policy.mjs';
@@ -557,10 +557,17 @@ async function route(request) {
   if(request.method==='GET'&&creatorPublic) {
     const challenge=await creatorChallengeForPublic(query,creatorPublic[1],{today:gameDateKey()});
     const viewer=await player(request,false);
-    if(viewer)await query(`INSERT INTO analytics_events(player_id,event_name,event_props)
-      VALUES($1::uuid,'creator_challenge_open',$2::jsonb)`,[
-        viewer,JSON.stringify({creator_challenge_id:challenge.id,creator_challenge_slug:challenge.slug,creator_source_type:challenge.source_type}),
+    if(viewer) {
+      const acquisition=creatorAcquisitionProps(challenge);
+      await query(`INSERT INTO analytics_events(player_id,event_name,event_props)
+        VALUES
+          ($1::uuid,'creator_challenge_open',$2::jsonb),
+          ($1::uuid,'acquisition_touch',$3::jsonb)`,[
+        viewer,
+        JSON.stringify({creator_challenge_id:challenge.id,creator_challenge_slug:challenge.slug,creator_source_type:challenge.source_type}),
+        JSON.stringify(acquisition),
       ]);
+    }
     return json(publicCreatorChallenge(challenge));
   }
   const match=path.match(/^\/v1\/runs\/([a-f0-9-]+)(?:\/(pick|reroll|share|view|report))?$/);
