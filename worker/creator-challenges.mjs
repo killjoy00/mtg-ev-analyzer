@@ -218,23 +218,25 @@ export async function creatorChallengeBySlug(query,slug) {
   return creatorChallengeById(query,result.rows[0].id);
 }
 
-async function assertCreatorSourceAvailable(query,row) {
+export async function validateCreatorChallengeSource(query,row,{today,requireClosed=true}={}) {
   if(!row||!row.source_session_id||!row.authoritative_owner_player_id||row.source_score==null)
     fail('This creator challenge is no longer available.',410,'CREATOR_CHALLENGE_UNAVAILABLE');
   if(row.public_identity_hidden_at||!bool(row.profile_public)||bool(row.measurement_qa))
-    fail('This creator challenge is no longer available.',410,'CREATOR_CHALLENGE_UNAVAILABLE');
+    fail('This creator is not currently eligible for public promotion.',409,'CREATOR_IDENTITY_PRIVATE');
   if(row.source_type==='daily'&&String(row.authoritative_source_day)!==String(row.source_day))
     fail('Creator challenge source no longer matches its frozen Daily.',409,'CREATOR_SOURCE_MISMATCH');
   if(String(row.authoritative_environment||'')!==String(row.source_environment||''))
     fail('Creator challenge source no longer matches its frozen environment.',409,'CREATOR_SOURCE_MISMATCH');
+  if(requireClosed&&row.source_type==='daily'&&String(row.authoritative_source_day||'')>=String(today||''))
+    fail('This creator Daily is not yet available as a replay.',409,'CREATOR_DAILY_STILL_OPEN');
   const source=await sourceSession(query,row.source_session_id,{expectedPlayerId:row.source_owner_player_id,expectedType:row.source_type});
   if(source.score!==row.source_score)fail('Creator challenge source score changed unexpectedly.',409,'CREATOR_SOURCE_MISMATCH');
   return source;
 }
 
-export async function assertCreatorChallengePlayable(query,row) {
+export async function assertCreatorChallengePlayable(query,row,{today}={}) {
   if(!row||row.status!=='published')fail('This creator challenge is not available.',410,'CREATOR_CHALLENGE_UNAVAILABLE');
-  return assertCreatorSourceAvailable(query,row);
+  return validateCreatorChallengeSource(query,row,{today,requireClosed:true});
 }
 
 export function publicCreatorChallenge(row) {
@@ -266,15 +268,15 @@ export function publicCreatorChallenge(row) {
   };
 }
 
-export async function creatorChallengeForPublic(query,identifier) {
+export async function creatorChallengeForPublic(query,identifier,{today}={}) {
   const row=UUID.test(String(identifier||''))?await creatorChallengeById(query,identifier):await creatorChallengeBySlug(query,identifier);
-  await assertCreatorChallengePlayable(query,row);
+  await assertCreatorChallengePlayable(query,row,{today});
   return row;
 }
 
-export async function loadCreatorChallengeForStart(query,identifier) {
+export async function loadCreatorChallengeForStart(query,identifier,{today}={}) {
   const challenge=UUID.test(String(identifier||''))?await creatorChallengeById(query,identifier):await creatorChallengeBySlug(query,identifier);
-  const source=await assertCreatorChallengePlayable(query,challenge);
+  const source=await assertCreatorChallengePlayable(query,challenge,{today});
   return {challenge,source};
 }
 
