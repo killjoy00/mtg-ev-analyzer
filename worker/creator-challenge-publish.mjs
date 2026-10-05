@@ -58,7 +58,11 @@ function workflowInputs(row,operation,action) {
 
 export async function requestCreatorPrivacyRetirement(query,playerId,{env=process.env,fetcher=fetch}={}) {
   const result=await query(`SELECT id FROM creator_challenges
-    WHERE source_owner_player_id=$1::uuid AND status<>'retired'
+    WHERE source_owner_player_id=$1::uuid
+      AND NOT (
+        status='retired'
+        AND COALESCE(publication_detail->>'live_verified','false')='true'
+      )
     ORDER BY created_at,id`,[playerId]);
   for(const item of result.rows) {
     let row=await creatorChallengeById(query,item.id);
