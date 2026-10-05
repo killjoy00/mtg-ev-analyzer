@@ -413,6 +413,12 @@ async function createShare(request,id) {
   const owner=await player(request),s=await session(id,owner);
   if(s.answers.length!==runLength(s)) fail('Finish the run before sharing it.');
   if(s.day)return json({daily:true,day:s.day,environment:environmentOf(s),url:`/?game=draft-run&daily=1${environmentOf(s)!=='mixed'?'&set='+environmentOf(s):''}`});
+  if(s.creator_challenge_id) {
+    const state=await loadCreatorChallengeForExistingSession(query,s.creator_challenge_id);
+    if(state.challenge.status!=='published')fail('This creator challenge is retired and can no longer be shared.',410);
+    const info=publicCreatorChallenge(state.challenge);
+    return json({creator:true,id:state.challenge.id,slug:state.challenge.slug,url:info.public_url});
+  }
   if(s.challenge_id){const original=await share(s.challenge_id);if(JSON.stringify(original.puzzle_ids)===JSON.stringify(s.puzzle_ids))return json({id:original.id});}
   const name=(await linkedPlayerIdentity(query,owner))?.display_name||'A friend';
   const key=crypto.randomUUID().replaceAll('-','').slice(0,24);
@@ -524,6 +530,11 @@ async function route(request) {
   if(request.method==='GET'&&path==='/v1/practice-sets') {const owner=await player(request),caps=await accountCapabilities(await accountIdentity(request,query,owner),query);requireCapability(caps,'custom_corpus');return json({sets:await loadCachedCustomSetMetadata(query,DRAFT_RUN_CORPUS_VERSION)});}
   if(request.method==='GET'&&path==='/v1/daily-status') return dailyStatus(request);
   if(request.method==='GET'&&path==='/v1/leaderboard') return leaderboard(request);
+  const creatorPublic=path.match(/^\/v1\/creator-challenges\/([a-z0-9-]{1,64})$/);
+  if(request.method==='GET'&&creatorPublic) {
+    const challenge=await creatorChallengeForPublic(query,creatorPublic[1],{today:gameDateKey()});
+    return json(publicCreatorChallenge(challenge));
+  }
   const match=path.match(/^\/v1\/runs\/([a-f0-9-]+)(?:\/(pick|reroll|share|view|report))?$/);
   if(match) {
     if(request.method==='POST'&&match[2]==='view') {
