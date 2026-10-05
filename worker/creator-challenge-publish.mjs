@@ -211,7 +211,7 @@ export async function handleCreatorChallengePublication(request,{query,readJson,
   if(action==='publish') {
     if(row.status==='retired')fail('Retired creator challenges cannot be republished.',409,'CREATOR_RETIRED');
     if(row.status==='published')return Response.json({state:'published',challenge:row,already_published:true},{headers:{'cache-control':'no-store'}});
-    await validateCreatorChallengeSource(query,row,{today,requireClosed:true});
+    await validateCreatorChallengeSource(query,row);
   }
   const operation=crypto.randomUUID();
   if(action==='publish') {
