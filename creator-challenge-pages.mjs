@@ -68,7 +68,7 @@ export function creatorChallengeTrackedUrl(entry) {
     source:valid.source,
     campaign:valid.campaign,
     ...(valid.medium?{medium:valid.medium}:{}),
-  });
+  },{allowCreator:true});
 }
 
 export function renderCreatorChallengePage(entry) {
