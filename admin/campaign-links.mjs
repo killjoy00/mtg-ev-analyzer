@@ -36,9 +36,12 @@ function creatorEntry(source,form) {
 }
 
 function creatorShareCopy(challenge) {
-  const name=challenge.creator_public_name;
   const score=Number(challenge.source_score);
-  return `I scored ${score} on this Pack One Draft Run. Think you can beat me? ${challenge.public_url||`https://packone.pro/go/${challenge.slug}/`}`;
+  const environment=environmentLabel(challenge.source_environment);
+  const context=challenge.source_type==='daily'
+    ? `the ${dateLabel(challenge.source_day)} Pack One ${environment} Daily`
+    : `this Pack One ${environment} Practice run`;
+  return `I scored ${score}/100 on ${context}. Think you can beat me? ${challenge.public_url||`https://packone.pro/go/${challenge.slug}/`}`;
 }
 
 export async function renderCampaignLinks(root,publishRequest,draftRequest) {
@@ -250,10 +253,10 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
   const creatorPreview=root.querySelector('#creator-publish-preview'),creatorPublish=root.querySelector('#publish-creator');
   const creatorPublishStatus=root.querySelector('#creator-publish-status'),creatorKit=root.querySelector('#creator-kit');
   const creatorExisting=root.querySelector('#creator-existing'),creatorExistingStatus=root.querySelector('#creator-existing-status');
-  let creatorSource=null,creatorBusy=false;
+  let creatorSource=null,creatorBusy=false,creatorDraft=null,creatorSlugs=new Set();
 
   function setCreatorSource(next) {
-    creatorSource=next;
+    creatorSource=next;creatorDraft=null;
     sourcePreview.hidden=!next;metaForm.hidden=!next;creatorPreview.hidden=!next;
     if(!next){creatorPublish.disabled=true;return;}
     const type=next.source_type==='daily'?`Daily · ${dateLabel(next.day)}`:'Practice';
@@ -266,12 +269,12 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
   function renderCreatorPreview() {
     if(!creatorSource)return;
     const entry=creatorEntry(creatorSource,metaForm),slug=normalizeCampaignSlug(entry.slug);
-    const duplicate=Boolean(slug&&existing.has(slug));
-    creatorPublish.disabled=creatorBusy||!publishConfigured||!slug||!entry.creator_public_name||duplicate;
+    const duplicate=Boolean(slug&&(existing.has(slug)||creatorSlugs.has(slug)));
+    creatorPublish.disabled=creatorBusy||!publishConfigured||!slug||!entry.creator_public_name||(duplicate&&!creatorDraft);
     const sourceContext=creatorSource.source_type==='daily'
       ? `${environmentLabel(creatorSource.environment)} Daily · ${dateLabel(creatorSource.day)}`
       : environmentLabel(creatorSource.environment);
-    creatorPreview.innerHTML=`<p class="eyebrow">BEAT THE CREATOR</p><h2>${esc(entry.headline)}</h2><p>${esc(sourceContext)} · 8 decisions<br>Creator score: <strong>${Number(creatorSource.score)}/100</strong></p><p>Public URL: <code>https://packone.pro/go/${esc(slug||'your-slug')}/</code><br>Attribution: source=${esc(entry.acquisition_source)} · campaign=${esc(entry.acquisition_campaign)}${entry.acquisition_medium?` · medium=${esc(entry.acquisition_medium)}`:''}</p>${duplicate?'<p class="error">That slug is already in the campaign registry.</p>':''}`;
+    creatorPreview.innerHTML=`<p class="eyebrow">BEAT THE CREATOR</p><h2>${esc(entry.headline)}</h2><p>${esc(sourceContext)} · 8 decisions<br>Creator score: <strong>${Number(creatorSource.score)}/100</strong></p><p>Public URL: <code>https://packone.pro/go/${esc(slug||'your-slug')}/</code><br>Attribution: source=${esc(entry.acquisition_source)} · campaign=${esc(entry.acquisition_campaign)}${entry.acquisition_medium?` · medium=${esc(entry.acquisition_medium)}`:''}</p>${duplicate&&!creatorDraft?'<p class="error">That slug is already reserved.</p>':''}`;
   }
 
   sourceForm.addEventListener('change',event=>{
@@ -324,34 +327,35 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
     }catch(error){target.textContent=error.message||'Creator search failed.';}
   });
 
-  async function waitForCreatorPublished(challenge) {
-    const vanityUrl=`https://packone.pro/go/${challenge.slug}/`;
+  async function waitForCreatorPublication(challenge,expected='published') {
     for(let attempt=0;attempt<100;attempt++) {
+      const status=await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/publication`);
+      if(expected==='published'&&status.state==='published'&&status.live_verified!==false)return status.challenge;
+      if(expected==='retired'&&status.state==='retired'&&status.live_verified===true)return status.challenge;
+      if(status.state==='failed')throw new Error(status.challenge?.publication_error||'Creator challenge publication failed.');
       await new Promise(resolve=>setTimeout(resolve,6000));
-      await loadExisting({quiet:true});
-      if(existing.has(challenge.slug)) {
-        const done=await draftRequest(`/v1/admin/creator-challenges/${challenge.id}/published`,{});
-        return done.challenge;
-      }
     }
-    throw new Error('Protected publish was accepted, but the creator route is not live yet. Retry Publish after checking the campaign workflow.');
+    throw new Error('Publication is still running. Reload Admin to reconcile the existing operation before distributing the URL.');
   }
 
   creatorPublish.addEventListener('click',async()=>{
     if(!creatorSource||creatorBusy||!publishConfigured)return;
-    creatorBusy=true;creatorPublishStatus.classList.remove('error');creatorPublishStatus.textContent='Creating immutable challenge draft…';renderCreatorPreview();
+    creatorBusy=true;creatorPublishStatus.classList.remove('error');creatorPublishStatus.textContent=creatorDraft?'Resuming protected publication…':'Creating immutable challenge draft…';renderCreatorPreview();
     try {
-      const created=await draftRequest('/v1/admin/creator-challenges',creatorEntry(creatorSource,metaForm));
-      const challenge=created.challenge;
+      if(!creatorDraft) {
+        const created=await draftRequest('/v1/admin/creator-challenges',creatorEntry(creatorSource,metaForm));
+        creatorDraft=created.challenge;
+      }
+      const challenge=creatorDraft;
       creatorPublishStatus.textContent='Starting protected vanity publication…';
-      const requested=await draftRequest(`/v1/admin/creator-challenges/${challenge.id}/publish`,{});
-      if(!requested.already_published)await publishRequest('/v1/admin/campaign-links/publish',requested.entry);
-      const published=requested.already_published?challenge:await waitForCreatorPublished(challenge);
-      const publicUrl=`https://packone.pro/go/${published.slug}/`;
+      const requested=await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/publication`,{action:'publish'});
+      const published=requested.already_published?requested.challenge:await waitForCreatorPublication(challenge,'published');
+      const publicUrl=`https://packone.pro/go/${published.slug}/`,socialImage=publicUrl+'creator-card.png';
       creatorPublishStatus.textContent=`Published: ${publicUrl}`;
       creatorKit.hidden=false;
-      creatorKit.innerHTML=`<h3>Creator kit</h3><label>Public link<input readonly value="${esc(publicUrl)}"></label><label>Ready-to-send copy<textarea readonly rows="3">${esc(creatorShareCopy({...published,public_url:publicUrl}))}</textarea></label><button type="button" class="secondary" data-copy-creator-link>Copy public link</button> <button type="button" class="secondary" data-copy-creator-copy>Copy post copy</button>`;
+      creatorKit.innerHTML=`<h3>Creator kit</h3><label>Public link<input readonly value="${esc(publicUrl)}"></label><label>Social image<input readonly value="${esc(socialImage)}"></label><img src="${esc(socialImage)}" alt="${esc(published.headline||`Can you beat ${published.creator_public_name}?`)}" style="max-width:100%;height:auto"><label>Ready-to-send copy<textarea readonly rows="3">${esc(creatorShareCopy({...published,public_url:publicUrl}))}</textarea></label><button type="button" class="secondary" data-copy-creator-link>Copy public link</button> <button type="button" class="secondary" data-copy-creator-image>Copy image URL</button> <button type="button" class="secondary" data-copy-creator-copy>Copy post copy</button>`;
       creatorKit.querySelector('[data-copy-creator-link]').onclick=()=>copy(publicUrl,creatorPublishStatus);
+      creatorKit.querySelector('[data-copy-creator-image]').onclick=()=>copy(socialImage,creatorPublishStatus);
       creatorKit.querySelector('[data-copy-creator-copy]').onclick=()=>copy(creatorShareCopy({...published,public_url:publicUrl}),creatorPublishStatus);
       await loadCreatorChallenges();
     } catch(error) {
@@ -362,16 +366,31 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
   async function loadCreatorChallenges() {
     try {
       const data=await draftRequest('/v1/admin/creator-challenges?limit=100');
+      creatorSlugs=new Set(data.challenges.map(challenge=>challenge.slug));
       creatorExistingStatus.textContent=data.challenges.length?`${data.challenges.length} creator challenge(s).`:'No creator challenges yet.';
       creatorExisting.replaceChildren(...data.challenges.map(challenge=>{
         const item=document.createElement('article');item.className='note';
         const publicUrl=`https://packone.pro/go/${challenge.slug}/`;
-        item.innerHTML=`<strong>${esc(challenge.creator_public_name)}</strong> · ${esc(challenge.slug)}<br>${esc(challenge.source_type==='daily'?`Daily · ${dateLabel(challenge.source_day)}`:'Practice')} · ${esc(environmentLabel(challenge.source_environment))} · ${Number(challenge.source_score)}/100<br>Status: <strong>${esc(challenge.status)}</strong> · Attempts: ${Number(challenge.attempts||0)} · Beat rate: ${challenge.beat_percentage==null?'—':Number(challenge.beat_percentage)+'%'}<br><small>${esc(publicUrl)} · created ${esc(dateLabel(String(challenge.created_at||'').slice(0,10)))}${challenge.published_at?` · published ${esc(dateLabel(String(challenge.published_at).slice(0,10)))}`:''}</small><div class="actions"><button type="button" class="secondary" data-copy-public>Copy public URL</button><a class="button secondary" target="_blank" rel="noopener" href="${esc(publicUrl)}">Open challenge</a>${challenge.status!=='retired'?'<button type="button" class="secondary" data-retire>Retire challenge</button>':''}</div>`;
+        item.innerHTML=`<strong>${esc(challenge.creator_public_name)}</strong> · ${esc(challenge.slug)}<br>${esc(challenge.source_type==='daily'?`Daily · ${dateLabel(challenge.source_day)}`:'Practice')} · ${esc(environmentLabel(challenge.source_environment))} · ${Number(challenge.source_score)}/100<br>Status: <strong>${esc(challenge.status)}</strong> · Attempts: ${Number(challenge.attempts||0)} · Beat rate: ${challenge.beat_percentage==null?'—':Number(challenge.beat_percentage)+'%'}<br><small>${esc(publicUrl)} · created ${esc(dateLabel(String(challenge.created_at||'').slice(0,10)))}${challenge.published_at?` · published ${esc(dateLabel(String(challenge.published_at).slice(0,10))) }`:''}</small><div class="actions">${['draft','failed','publishing'].includes(challenge.status)?'<button type="button" class="secondary" data-resume-publish>Publish / resume</button>':''}<button type="button" class="secondary" data-copy-public>Copy public URL</button>${challenge.status==='published'?'<a class="button secondary" target="_blank" rel="noopener" href="'+esc(publicUrl)+'">Open challenge</a>':''}${challenge.status!=='retired'?'<button type="button" class="secondary" data-retire>Retire challenge</button>':''}</div>`;
         item.querySelector('[data-copy-public]').onclick=()=>copy(publicUrl,creatorExistingStatus);
+        item.querySelector('[data-resume-publish]')?.addEventListener('click',async()=>{
+          creatorExistingStatus.textContent='Reconciling publication…';
+          try {
+            const current=await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/publication`);
+            if(current.state!=='publishing')await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/publication`,{action:'publish'});
+            await waitForCreatorPublication(challenge,'published');
+            creatorExistingStatus.textContent='Creator challenge published.';
+            await loadCreatorChallenges();
+          } catch(error){creatorExistingStatus.textContent=error.message||'Could not publish challenge.';}
+        });
         item.querySelector('[data-retire]')?.addEventListener('click',async()=>{
           if(!confirm(`Retire ${challenge.creator_public_name} / ${challenge.slug}? The URL will no longer start new challenge attempts.`))return;
-          try{await draftRequest(`/v1/admin/creator-challenges/${challenge.id}/retire`,{});await loadCreatorChallenges();}
-          catch(error){creatorExistingStatus.textContent=error.message||'Could not retire challenge.';}
+          try {
+            await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/publication`,{action:'retire'});
+            creatorExistingStatus.textContent='Challenge retired. Publishing the privacy-safe retired route…';
+            await waitForCreatorPublication(challenge,'retired');
+            await loadCreatorChallenges();
+          } catch(error){creatorExistingStatus.textContent=error.message||'Could not retire challenge.';}
         });
         return item;
       }));
