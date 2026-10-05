@@ -317,7 +317,7 @@ test('decision report stays inside score analysis and preserves the run', async 
     assert.equal(reports[0][1], 0);
     assert.equal(reports[0][2], 'score_recommendation');
     assert.equal(reports[0][3], 'The recommendation looks reversed.');
-    assert.deepEqual(reports[0][4], { platform: 'ios', version: '1.0', build: '1' });
+    assert.equal(reports[0][4].playerToken, screen.session.playerToken);
     assert.match(screen.text(), /Thanks — report sent\./);
     assert.match(screen.text(), /Hide score analysis/);
   } finally { await screen.close(); }
