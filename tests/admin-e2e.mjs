@@ -21,6 +21,7 @@ try {
   const retryCreatorId='55555555-5555-4555-8555-555555555555';
   const existingDailyCreatorId='66666666-6666-4666-8666-666666666666';
   const creatorPublicationBodies=[];
+  let creatorImageRequests=0;
   let creatorChallenges=[
     {id:existingDailyCreatorId,slug:'daily-creator',creator_public_name:'Daily Creator',creator_handle:'@daily',headline:'Beat Daily Creator',source_type:'daily',source_day:'2026-09-11',source_environment:'latest',source_score:91,acquisition_source:'creator',acquisition_campaign:'daily-creator',acquisition_medium:'creator',status:'published',publication_detail:{live_verified:true},published_at:'2026-09-12T01:00:00Z',created_at:'2026-09-11T20:00:00Z',opens:12,starts:8,attempts:6,completions:6,wins:2,ties:1,losses:3,beat_percentage:33.3,average_score:84.2},
     {id:retryCreatorId,slug:'retry-creator',creator_public_name:'Retry Creator',creator_handle:null,headline:'Beat Retry Creator',source_type:'practice',source_day:null,source_environment:'mixed',source_score:82,acquisition_source:'creator',acquisition_campaign:'retry-creator',acquisition_medium:'creator',status:'failed',publication_detail:{action:'publish'},publication_error:'Synthetic dispatch failure',created_at:'2026-09-12T01:00:00Z',opens:0,starts:0,attempts:0,completions:0,wins:0,ties:0,losses:0},
@@ -29,10 +30,14 @@ try {
   let holdDeletionStatus=false,releaseDeletionStatus=null,failDeleteAfterCommit=false;
   let holdHabitReport=true,releaseHabitReport=null,holdStaleCore=false,releaseStaleCore=null;
   await page.route(/\/health\?quick=1$/,route=>route.fulfill({headers:{'x-pack1-admin-api-version':String(ADMIN_API_VERSION)},json:{ok:true,admin_api_version:ADMIN_API_VERSION,campaign_link_publish_configured:true}}));
-  await page.route('https://packone.pro/creator/**/creator-card.png',route=>route.fulfill({
-    status:200,contentType:'image/png',
-    body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=','base64'),
-  }));
+  await page.route('https://packone.pro/creator/**/creator-card.png',route=>{
+    creatorImageRequests+=1;
+    if(creatorImageRequests===1)return route.fulfill({status:404,body:'not published yet'});
+    return route.fulfill({
+      status:200,contentType:'image/png',
+      body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=','base64'),
+    });
+  });
   await page.route('**/v1/admin/**',async route=>{
     requests.push(route.request().url());
     const requestUrl=new URL(route.request().url()),path=requestUrl.pathname,method=route.request().method();
@@ -315,6 +320,9 @@ try {
   const dailyKit=dailyRow.locator('[data-existing-creator-kit]');
   await dailyKit.getByText('Creator kit',{exact:true}).waitFor();
   assert.match(await dailyKit.getByLabel('Ready-to-send copy').inputValue(),/91\/100[\s\S]*Sep 11, 2026[\s\S]*Latest Set Daily/);
+  await dailyKit.getByText('Social image is not available yet.',{exact:true}).waitFor();
+  await dailyKit.getByRole('button',{name:'Retry image preview'}).click();
+  await dailyKit.getByText('Published social image ready.',{exact:true}).waitFor();
   const imageDownload=page.waitForEvent('download');
   await dailyKit.getByRole('button',{name:'Download social image'}).click();
   const creatorDownload=await imageDownload;
