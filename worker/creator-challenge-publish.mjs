@@ -224,10 +224,27 @@ function statePayload(row,extra={}) {
   };
 }
 
+async function supersededPublishStillPending(detail,{env,fetcher}) {
+  const prior=detail?.superseded_publish;
+  const operation=String(prior?.operation||'');
+  if(!UUID.test(operation))return false;
+  const stored=prior?.workflow?.id;
+  const exact=stored?await fetchWorkflowRunById(stored,{env,fetcher}):null;
+  const run=exact||await discoverCreatorPublicationWorkflowRun(operation,{env,fetcher});
+  if(run)return run.status!=='completed';
+  const state=String(prior?.dispatch?.state||'pending');
+  if(state==='accepted')return true;
+  if(state==='rejected')return false;
+  const attempted=Date.parse(String(prior?.dispatch?.last_attempt_at||prior?.requested_at||''));
+  return !Number.isFinite(attempted)||Date.now()-attempted<DISPATCH_RETRY_MS;
+}
+
 async function reconcile(query,row,{today,env,fetcher}) {
   row=await creatorChallengeById(query,row.id);
   const detail=operationDetail(row),operation=String(row.publication_operation_ref||''),action=operationAction(row);
   if(!UUID.test(operation)||!action)return statePayload(row);
+  if(action==='retire'&&await supersededPublishStillPending(detail,{env,fetcher}))
+    return statePayload(row,{workflow_status:'waiting_for_superseded_publish'});
   let run=await workflowRun(row,operation,{env,fetcher});
   if(!run&&operationMatches(row,operation,action)&&creatorPublicationDispatchRetryDue(detail)) {
     await dispatchCreatorPublicationAttempt(query,row,operation,action,{env,fetcher});
@@ -288,12 +305,46 @@ async function reconcile(query,row,{today,env,fetcher}) {
 function staticCleanupMayExist(row) {
   const detail=operationDetail(row),action=operationAction(row);
   if(row.published_at||row.status==='published'||row.status==='publishing')return true;
-  if(action==='publish')return Boolean(detail.workflow)||['accepted','ambiguous'].includes(detail?.dispatch?.state);
+  if(action==='publish')return UUID.test(String(row.publication_operation_ref||''))
+    ||Boolean(detail.workflow)
+    ||['pending','accepted','ambiguous'].includes(String(detail?.dispatch?.state||''));
   if(action==='retire'&&detail.live_verified!==true)
     return detail.static_cleanup==='required'
       ||Boolean(detail.workflow)
       ||['pending','accepted','ambiguous','rejected'].includes(String(detail?.dispatch?.state||''));
   return false;
+}
+
+async function completeRetirementWithoutStaticCleanup(query,row,{adminAuthUserId=null,reason='retired'}={}) {
+  for(let attempt=0;attempt<4;attempt++) {
+    if(staticCleanupMayExist(row))return {complete:false,row};
+    const expectedOperation=UUID.test(String(row.publication_operation_ref||''))
+      ?String(row.publication_operation_ref)
+      :null;
+    const expectedDetail=operationDetail(row);
+    const detail={
+      action:'retire',
+      reason,
+      live_verified:true,
+      static_cleanup:'not_required',
+    };
+    const changed=await query(`UPDATE creator_challenges SET status='retired',
+        retired_at=COALESCE(retired_at,now()),
+        retired_by_admin_auth_user_id=COALESCE(retired_by_admin_auth_user_id,$2::uuid),
+        publication_operation_ref=NULL,publication_detail=$3::jsonb,
+        publication_error=NULL,updated_at=now()
+      WHERE id=$1::uuid AND status=$4
+        AND publication_operation_ref IS NOT DISTINCT FROM $5::uuid
+        AND publication_detail=$6::jsonb
+        AND published_at IS NOT DISTINCT FROM $7::timestamptz
+      RETURNING id`,[
+      row.id,adminAuthUserId,JSON.stringify(detail),row.status,
+      expectedOperation,JSON.stringify(expectedDetail),row.published_at||null,
+    ]);
+    if(changed.rows[0])return {complete:true,row:await creatorChallengeById(query,row.id)};
+    row=await creatorChallengeById(query,row.id);
+  }
+  return {complete:false,row};
 }
 
 export async function beginCreatorPublicationOperation(query,row,action,{adminAuthUserId=null,reason=null,privacy=false}={}) {
@@ -309,9 +360,21 @@ export async function beginCreatorPublicationOperation(query,row,action,{adminAu
       return {row,operation:null,reused:true,complete:true};
     const operation=crypto.randomUUID();
     const expectedOperation=UUID.test(existingOperation)?existingOperation:null;
+    const supersededPublish=action==='retire'
+      &&existingAction==='publish'
+      &&UUID.test(existingOperation)
+      ?{
+        operation:existingOperation,
+        requested_at:detail.requested_at||null,
+        dispatch:detail.dispatch||null,
+        workflow:detail.workflow||null,
+      }
+      :null;
     const nextDetail={
       action,
       ...(reason?{reason}:{}),
+      ...(action==='retire'&&staticCleanupMayExist(row)?{static_cleanup:'required'}:{}),
+      ...(supersededPublish?{superseded_publish:supersededPublish}:{}),
       requested_at:new Date().toISOString(),
       dispatch:{state:'pending',attempts:0},
       live_verified:false,
@@ -361,7 +424,6 @@ export async function requestCreatorPrivacyRetirement(query,playerId,{reason='ac
   let ready=true;
   for(const item of result.rows) {
     let row=await creatorChallengeById(query,item.id);
-    const needsStatic=staticCleanupMayExist(row);
     await query(`UPDATE game_results SET opponent_name='A creator'
       WHERE creator_challenge_id=$1::uuid`,[row.id]);
     await query(`UPDATE creator_challenges SET status='retired',
@@ -371,14 +433,9 @@ export async function requestCreatorPrivacyRetirement(query,playerId,{reason='ac
         retired_at=COALESCE(retired_at,now()),updated_at=now()
       WHERE id=$1::uuid`,[row.id]);
     row=await creatorChallengeById(query,row.id);
-    if(!needsStatic) {
-      await query(`UPDATE creator_challenges SET publication_operation_ref=NULL,
-          publication_detail=$2::jsonb,publication_error=NULL,updated_at=now()
-        WHERE id=$1::uuid`,[
-        row.id,JSON.stringify({action:'retire',reason,live_verified:true,static_cleanup:'not_required'}),
-      ]);
-      continue;
-    }
+    const direct=await completeRetirementWithoutStaticCleanup(query,row,{reason});
+    if(direct.complete)continue;
+    row=direct.row;
     const begun=await beginCreatorPublicationOperation(query,row,'retire',{reason,privacy:true});
     row=begun.row;
     try {
@@ -425,22 +482,19 @@ export async function handleCreatorChallengePublication(request,{query,readJson,
     await validateCreatorChallengeSource(query,row,{today,requireClosed:true});
   }
 
-  if(action==='retire'&&!staticCleanupMayExist(row)) {
-    const changed=await query(`UPDATE creator_challenges SET status='retired',
-        retired_at=COALESCE(retired_at,now()),
-        retired_by_admin_auth_user_id=COALESCE(retired_by_admin_auth_user_id,$2::uuid),
-        publication_operation_ref=NULL,
-        publication_detail=$3::jsonb,publication_error=NULL,updated_at=now()
-      WHERE id=$1::uuid AND status<>'retired'
-      RETURNING id`,[
-      row.id,auth.user_id,JSON.stringify({action:'retire',reason:'admin_retire',live_verified:true,static_cleanup:'not_required'}),
-    ]);
-    if(changed.rows[0])await query(`INSERT INTO creator_challenge_audit(creator_challenge_id,admin_auth_user_id,action,detail)
-      VALUES($1::uuid,$2::uuid,'retired',jsonb_build_object('reason','admin_retire','static_cleanup','not_required'))`,[
-      row.id,auth.user_id,
-    ]);
-    row=await creatorChallengeById(query,row.id);
-    return Response.json({...statePayload(row),ok:true},{headers:{'cache-control':'no-store'}});
+  if(action==='retire'&&row.status!=='retired'&&!staticCleanupMayExist(row)) {
+    const direct=await completeRetirementWithoutStaticCleanup(query,row,{
+      adminAuthUserId:auth.user_id,
+      reason:'admin_retire',
+    });
+    row=direct.row;
+    if(direct.complete) {
+      await query(`INSERT INTO creator_challenge_audit(creator_challenge_id,admin_auth_user_id,action,detail)
+        VALUES($1::uuid,$2::uuid,'retired',jsonb_build_object('reason','admin_retire','static_cleanup','not_required'))`,[
+        row.id,auth.user_id,
+      ]);
+      return Response.json({...statePayload(row),ok:true},{headers:{'cache-control':'no-store'}});
+    }
   }
 
   const begun=await beginCreatorPublicationOperation(query,row,action,{

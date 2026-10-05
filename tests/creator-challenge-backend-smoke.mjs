@@ -8,7 +8,11 @@ process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 const {default:growth,query}=await import('../worker/growth-function.js');
 const {default:runApi}=await import('../worker/draft-run-function.mjs');
 const {creatorChallengeById}=await import('../worker/creator-challenges.mjs');
-const {requestCreatorPrivacyRetirement}=await import('../worker/creator-challenge-publish.mjs');
+const {
+  beginCreatorPublicationOperation,
+  dispatchCreatorPublicationAttempt,
+  requestCreatorPrivacyRetirement,
+}=await import('../worker/creator-challenge-publish.mjs');
 
 async function call(service,path,body,token,status=200) {
   const request=new Request('https://packone.pro'+path,{
@@ -339,6 +343,104 @@ try {
     WHERE player_id=$1::uuid AND event_name='acquisition_touch'
       AND event_props->>'campaign'='merge-first-touch'`,[target.playerId])).rows[0].n),1,
     'first-touch creator attribution remains available for subsequent Daily reporting');
+
+  // A privacy retirement that initially observes an unpublished draft must
+  // re-evaluate publication state if a publish becomes accepted before the
+  // privacy scrub commits. This runs the production helper against real
+  // PostgreSQL while deliberately interleaving the two operations.
+  const privacyRaceChallenge=crypto.randomUUID(),privacyRaceSlug=`privacy-race-${tag}`;
+  await query(`INSERT INTO creator_challenges(
+      id,slug,source_session_id,source_owner_player_id,source_type,source_day,source_environment,
+      creator_public_name,headline,acquisition_source,acquisition_campaign,status,
+      created_by_admin_auth_user_id,publication_detail
+    ) VALUES($1::uuid,$2,NULL,$3::uuid,'practice',NULL,'mixed',
+      'Privacy Race Creator','Privacy race challenge','creator',$2,'draft',
+      $4::uuid,'{}'::jsonb)`,[
+    privacyRaceChallenge,privacyRaceSlug,paidModeGuest.playerId,targetAuth,
+  ]);
+  let releasePrivacyRead,signalPrivacyRead;
+  const privacyReadHeld=new Promise(resolve=>{signalPrivacyRead=resolve;});
+  const privacyReadRelease=new Promise(resolve=>{releasePrivacyRead=resolve;});
+  let privacyReadIntercepted=false;
+  const privacyRaceQuery=async(sql,params=[])=>{
+    const result=await query(sql,params);
+    if(!privacyReadIntercepted
+      &&sql.includes('SELECT c.*,s.score source_score')
+      &&String(params[0])===privacyRaceChallenge) {
+      privacyReadIntercepted=true;
+      signalPrivacyRead();
+      await privacyReadRelease;
+    }
+    return result;
+  };
+  const publicationEnv={PACK1_LAUNCH_WATCHER_GITHUB_TOKEN:'github_pat_fixture_abcdefghijklmnopqrstuvwxyz'};
+  const publicationFetcher=async(url,options={})=>{
+    if(String(url).includes('/actions/workflows/campaign-link-publish.yml/runs'))
+      return Response.json({workflow_runs:[]});
+    if(String(url).endsWith('/dispatches'))return new Response(null,{status:204});
+    throw new Error('Unexpected publication fetch: '+url+' '+String(options?.method||'GET'));
+  };
+  const privacyRacePromise=requestCreatorPrivacyRetirement(
+    privacyRaceQuery,paidModeGuest.playerId,
+    {reason:'account_deletion',env:publicationEnv,fetcher:publicationFetcher},
+  );
+  await privacyReadHeld;
+  const publishRaceRow=await creatorChallengeById(query,privacyRaceChallenge);
+  const acceptedPublish=await beginCreatorPublicationOperation(
+    query,publishRaceRow,'publish',{reason:'privacy_race_publish'},
+  );
+  await dispatchCreatorPublicationAttempt(
+    query,acceptedPublish.row,acceptedPublish.operation,'publish',
+    {env:publicationEnv,fetcher:publicationFetcher},
+  );
+  releasePrivacyRead();
+  const privacyRaceReady=await privacyRacePromise;
+  assert.equal(privacyRaceReady,false,
+    'privacy cleanup stays pending when an initially unseen publish becomes accepted');
+  const privacyRaceFinal=(await query(`SELECT status,creator_public_name,
+      publication_operation_ref::text publication_operation_ref,publication_detail
+    FROM creator_challenges WHERE id=$1::uuid`,[privacyRaceChallenge])).rows[0];
+  const privacyRaceDetail=typeof privacyRaceFinal.publication_detail==='string'
+    ?JSON.parse(privacyRaceFinal.publication_detail)
+    :privacyRaceFinal.publication_detail;
+  assert.equal(privacyRaceFinal.status,'retired');
+  assert.equal(privacyRaceFinal.creator_public_name,'A creator');
+  assert.notEqual(privacyRaceFinal.publication_operation_ref,acceptedPublish.operation,
+    'retirement supersedes the accepted publish operation instead of discarding it as unnecessary');
+  assert.equal(privacyRaceDetail.action,'retire');
+  assert.equal(privacyRaceDetail.static_cleanup,'required');
+  assert.equal(privacyRaceDetail.live_verified,false);
+  assert.equal(privacyRaceDetail.dispatch.state,'pending',
+    'retirement is not dispatched until the superseded accepted publish has settled');
+  assert.equal(privacyRaceDetail.superseded_publish.operation,acceptedPublish.operation);
+  assert.equal(privacyRaceDetail.superseded_publish.dispatch.state,'accepted');
+
+  const settledPublishFetcher=async(url,options={})=>{
+    if(String(url).includes('/actions/workflows/campaign-link-publish.yml/runs'))
+      return Response.json({workflow_runs:[{
+        id:987654,
+        display_title:'Publish creator / '+acceptedPublish.operation,
+        status:'completed',
+        conclusion:'success',
+        html_url:'https://github.example/runs/987654',
+      }]});
+    if(String(url).endsWith('/dispatches'))return new Response(null,{status:204});
+    throw new Error('Unexpected settled publication fetch: '+url+' '+String(options?.method||'GET'));
+  };
+  const privacyRaceStillPending=await requestCreatorPrivacyRetirement(
+    query,paidModeGuest.playerId,
+    {reason:'account_deletion',env:publicationEnv,fetcher:settledPublishFetcher},
+  );
+  assert.equal(privacyRaceStillPending,false,
+    'privacy cleanup remains pending after ordering the retirement behind the prior publish');
+  const orderedPrivacyRaw=(await query(
+    'SELECT publication_detail FROM creator_challenges WHERE id=$1::uuid',
+    [privacyRaceChallenge],
+  )).rows[0].publication_detail;
+  const orderedPrivacy=typeof orderedPrivacyRaw==='string'?JSON.parse(orderedPrivacyRaw):orderedPrivacyRaw;
+  assert.equal(orderedPrivacy.superseded_publish.operation,acceptedPublish.operation);
+  assert.equal(orderedPrivacy.dispatch.state,'accepted',
+    'retirement dispatch starts only after the superseded publish is completed');
 
   // Exercise later creator privacy cleanup without requiring live publication
   // infrastructure in this isolated database. The merge/result associations
