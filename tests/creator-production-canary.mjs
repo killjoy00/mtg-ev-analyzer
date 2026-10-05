@@ -21,7 +21,7 @@ const digest=value=>createHash('sha256').update(String(value)).digest('hex');
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const parse=value=>typeof value==='string'?JSON.parse(value):value;
 
-const owned={auth:[],players:new Set(),challenges:new Set(),challengers:new Set(),dailyFixture:null};
+const owned={auth:[],players:new Set(),challenges:new Set(),challengers:new Set(),dailyFixture:null,adminToken:null};
 
 async function call(path,{body,method,playerToken,accountToken,adminToken,status=[200]}={}) {
   const headers={origin};
@@ -257,9 +257,24 @@ async function deletePracticeOwner(adminToken,ownerAuth,challenge) {
 }
 
 async function cleanupOwned() {
+  // Retire any route that escaped the main flow before removing its database row.
+  // A failed retirement remains a hard canary failure rather than leaving a live test route.
+  const challengeIds=[...owned.challenges];
+  if(owned.adminToken) {
+    for(const id of challengeIds) {
+      const row=(await query('SELECT id,slug,status,creator_public_name,publication_detail FROM creator_challenges WHERE id=$1::uuid',[id])).rows[0];
+      if(!row)continue;
+      const detail=parse(row.publication_detail||{});
+      if(row.status!=='retired'||detail?.live_verified!==true) {
+        const challenge={...row,creator_public_name:row.creator_public_name};
+        await publication(owned.adminToken,id,'retire');
+        await waitPublication(owned.adminToken,id,'retired');
+        await verifyRetiredRoute(challenge);
+      }
+    }
+  }
   // Retired static routes are intentionally retained as neutral tombstones.
   // Remove only rows created by this canary and restore the borrowed Daily fixture.
-  const challengeIds=[...owned.challenges];
   if(challengeIds.length) {
     await query("DELETE FROM analytics_events WHERE event_props->>'creator_challenge_id'=ANY($1::text[])",[challengeIds]);
     await query('DELETE FROM game_results WHERE creator_challenge_id=ANY($1::uuid[])',[challengeIds]);
@@ -328,6 +343,7 @@ async function run() {
   report.checks.push('exact corrected production Draft Run revision');
 
   const admin=await createAuth('admin',{admin:true});
+  owned.adminToken=admin;
 
   // Practice source: create and complete a real non-QA production Practice run.
   const practicePlayer=await createPlayer('Practice');
