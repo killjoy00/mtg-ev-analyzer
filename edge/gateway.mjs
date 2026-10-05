@@ -43,7 +43,7 @@ export function adminPath(path,method) {
   if(path==='/v1/admin/creator-challenges/resolve'&&method==='POST')return true;
   if(path==='/v1/admin/creator-challenges/players'&&method==='GET')return true;
   if(/^\/v1\/admin\/creator-challenges\/players\/[a-f0-9-]{36}\/dailies$/.test(path)&&method==='GET')return true;
-  if(/^\/v1\/admin\/creator-challenges\/[a-f0-9-]{36}(?:\/(?:publish|published|publish-failed|retire))?$/.test(path)&&['GET','POST'].includes(method))return true;
+  if(/^\/v1\/admin\/creator-challenges\/[a-f0-9-]{36}$/.test(path)&&method==='GET')return true;
   return false;
 }
 
