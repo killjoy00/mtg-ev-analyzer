@@ -55,7 +55,7 @@ on:
         default: ''
         type: string
       slug:
-        description: Canonical /go/ slug
+        description: Canonical vanity slug
         required: true
         type: string
       destination:
@@ -142,7 +142,7 @@ jobs:
             node scripts/prepare-creator-challenge-publish.mjs
             if [[ "$CREATOR_ACTION" == "publish" ]]; then
               python3 scripts/generate-creator-social-card.py \
-                --output "go/${CAMPAIGN_SLUG}/creator-card.png" \
+                --output "creator/${CAMPAIGN_SLUG}/creator-card.png" \
                 --creator "$CREATOR_NAME" \
                 --score "$CREATOR_SCORE" \
                 --environment "$CREATOR_ENVIRONMENT" \
@@ -175,7 +175,7 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           if [[ "$PUBLISH_KIND" == "creator" ]]; then
-            git add creator-challenges.json "go/${CAMPAIGN_SLUG}"
+            git add creator-challenges.json "creator/${CAMPAIGN_SLUG}"
           else
             git add campaign-links.json "go/${CAMPAIGN_SLUG}/index.html"
           fi
@@ -301,7 +301,7 @@ jobs:
           set -euo pipefail
           node --input-type=module <<'NODE'
           const slug=process.env.CAMPAIGN_SLUG;
-          const live='https://packone.pro/go/'+slug+'/';
+          const live='https://packone.pro/'+(process.env.PUBLISH_KIND==='creator'?'creator':'go')+'/'+slug+'/';
           let last='';
           for(let attempt=0;attempt<36;attempt++) {
             try {
@@ -337,4 +337,8 @@ jobs:
           }
           throw new Error('Live publication verification failed: '+last);
           NODE
-          echo "Published https://packone.pro/go/${CAMPAIGN_SLUG}/" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$PUBLISH_KIND" == "creator" ]]; then
+            echo "Published https://packone.pro/creator/${CAMPAIGN_SLUG}/" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Published https://packone.pro/go/${CAMPAIGN_SLUG}/" >> "$GITHUB_STEP_SUMMARY"
+          fi
