@@ -79,7 +79,7 @@ function permitted(service,path,method,search,mode) {
   }
   if(service==='draft') {
     if(method==='POST'&&path==='/v1/runs')return true;
-    if(method==='POST'&&/^\/v1\/runs\/[a-f0-9-]+\/(pick|reroll|share|view)$/.test(path))return true;
+    if(method==='POST'&&/^\/v1\/runs\/[a-f0-9-]+\/(pick|reroll|report|share|view)$/.test(path))return true;
     if(method==='GET'&&['/v1/leaderboard','/v1/daily-status','/v1/capabilities','/v1/practice-sets','/v1/set-catalog'].includes(path))return true;
     if(method==='GET'&&/^\/v1\/runs\/[a-f0-9-]+$/.test(path))return true;
     if(method==='GET'&&/^\/v1\/(?:challenges|shared-runs)\/[a-f0-9]{24}$/.test(path))return true;
@@ -162,7 +162,7 @@ function mobileSessionRoute(service,path,method) {
   }
   if(service!=='draft')return false;
   if(method==='POST'&&path==='/v1/runs')return true;
-  if(method==='POST'&&/^\/v1\/runs\/[a-f0-9-]+\/(pick|reroll|share|view)$/.test(path))return true;
+  if(method==='POST'&&/^\/v1\/runs\/[a-f0-9-]+\/(pick|reroll|report|share|view)$/.test(path))return true;
   if(method==='GET'&&/^\/v1\/runs\/[a-f0-9-]+$/.test(path))return true;
   if(method==='GET'&&/^\/v1\/shared-runs\/[a-f0-9]{24}$/.test(path))return true;
   return method==='GET'&&['/v1/daily-status','/v1/capabilities','/v1/practice-sets','/v1/set-catalog'].includes(path);
@@ -177,7 +177,7 @@ function mobileAccountRoute(service,path,method) {
   }
   if(service!=='draft')return false;
   if(method==='POST'&&path==='/v1/runs')return true;
-  if(method==='POST'&&/^\/v1\/runs\/[a-f0-9-]+\/(pick|reroll|share|view)$/.test(path))return true;
+  if(method==='POST'&&/^\/v1\/runs\/[a-f0-9-]+\/(pick|reroll|report|share|view)$/.test(path))return true;
   if(method==='GET'&&/^\/v1\/runs\/[a-f0-9-]+$/.test(path))return true;
   if(method==='GET'&&/^\/v1\/shared-runs\/[a-f0-9]{24}$/.test(path))return true;
   return method==='GET'&&['/v1/daily-status','/v1/capabilities','/v1/practice-sets','/v1/set-catalog'].includes(path);
