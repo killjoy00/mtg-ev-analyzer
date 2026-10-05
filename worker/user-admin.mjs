@@ -80,6 +80,12 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
          ), scrub_results AS (
            UPDATE game_results SET opponent_name='A friend'
            WHERE challenge_id IN (SELECT id FROM share_ids) RETURNING id
+         ), creator_result_scrub AS (
+           UPDATE game_results SET opponent_name='A creator'
+           WHERE creator_challenge_id IN (
+             SELECT id FROM creator_challenges WHERE source_owner_player_id=$1::uuid
+           )
+           RETURNING id
          ), retire_creator_challenges AS (
            UPDATE creator_challenges
            SET status='retired',creator_public_name='A creator',creator_handle=NULL,headline='Creator challenge unavailable',
