@@ -142,7 +142,7 @@ async function fetchWorkflowRunById(id,{env,fetcher}) {
   return response.json().catch(()=>null);
 }
 
-async function discoverWorkflowRun(operation,{env,fetcher}) {
+export async function discoverCreatorPublicationWorkflowRun(operation,{env,fetcher}) {
   const marker=` / ${operation}`;
   for(let page=1;page<=50;page++) {
     let response;
@@ -166,7 +166,7 @@ async function discoverWorkflowRun(operation,{env,fetcher}) {
 async function workflowRun(row,operation,{env,fetcher}) {
   const stored=operationDetail(row)?.workflow?.id;
   const exact=stored?await fetchWorkflowRunById(stored,{env,fetcher}):null;
-  return exact||discoverWorkflowRun(operation,{env,fetcher});
+  return exact||discoverCreatorPublicationWorkflowRun(operation,{env,fetcher});
 }
 
 export async function verifyCreatorPublicationLive(row,action,{fetcher}) {
