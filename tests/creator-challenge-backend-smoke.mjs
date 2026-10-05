@@ -410,7 +410,37 @@ try {
   assert.equal(privacyRaceDetail.action,'retire');
   assert.equal(privacyRaceDetail.static_cleanup,'required');
   assert.equal(privacyRaceDetail.live_verified,false);
-  assert.equal(privacyRaceDetail.dispatch.state,'accepted');
+  assert.equal(privacyRaceDetail.dispatch.state,'pending',
+    'retirement is not dispatched until the superseded accepted publish has settled');
+  assert.equal(privacyRaceDetail.superseded_publish.operation,acceptedPublish.operation);
+  assert.equal(privacyRaceDetail.superseded_publish.dispatch.state,'accepted');
+
+  const settledPublishFetcher=async(url,options={})=>{
+    if(String(url).includes('/actions/workflows/campaign-link-publish.yml/runs'))
+      return Response.json({workflow_runs:[{
+        id:987654,
+        display_title:'Publish creator / '+acceptedPublish.operation,
+        status:'completed',
+        conclusion:'success',
+        html_url:'https://github.example/runs/987654',
+      }]});
+    if(String(url).endsWith('/dispatches'))return new Response(null,{status:204});
+    throw new Error('Unexpected settled publication fetch: '+url+' '+String(options?.method||'GET'));
+  };
+  const privacyRaceStillPending=await requestCreatorPrivacyRetirement(
+    query,paidModeGuest.playerId,
+    {reason:'account_deletion',env:publicationEnv,fetcher:settledPublishFetcher},
+  );
+  assert.equal(privacyRaceStillPending,false,
+    'privacy cleanup remains pending after ordering the retirement behind the prior publish');
+  const orderedPrivacyRaw=(await query(
+    'SELECT publication_detail FROM creator_challenges WHERE id=$1::uuid',
+    [privacyRaceChallenge],
+  )).rows[0].publication_detail;
+  const orderedPrivacy=typeof orderedPrivacyRaw==='string'?JSON.parse(orderedPrivacyRaw):orderedPrivacyRaw;
+  assert.equal(orderedPrivacy.superseded_publish.operation,acceptedPublish.operation);
+  assert.equal(orderedPrivacy.dispatch.state,'accepted',
+    'retirement dispatch starts only after the superseded publish is completed');
 
   // Exercise later creator privacy cleanup without requiring live publication
   // infrastructure in this isolated database. The merge/result associations
