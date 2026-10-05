@@ -2341,10 +2341,18 @@ async function handleProfileUpdate(request,{mobile=false}={}) {
           privacy_removed_at=COALESCE(privacy_removed_at,now()),
           retired_at=COALESCE(retired_at,now()),updated_at=now(),
           publication_operation_ref=NULL,publication_error=NULL,
-          publication_detail=jsonb_build_object(
-            'action','retire','reason','profile_private',
-            'live_verified',false,'dispatch',jsonb_build_object('state','pending','attempts',0)
-          )
+          publication_detail=CASE
+            WHEN published_at IS NULL AND status NOT IN ('published','publishing') THEN
+              jsonb_build_object(
+                'action','retire','reason','profile_private',
+                'live_verified',true,'static_cleanup','not_required'
+              )
+            ELSE
+              jsonb_build_object(
+                'action','retire','reason','profile_private',
+                'live_verified',false,'dispatch',jsonb_build_object('state','pending','attempts',0)
+              )
+          END
       WHERE source_owner_player_id=$1::uuid`,[id]);
     await query(`INSERT INTO analytics_events(player_id,event_name,event_props)
       SELECT $1::uuid,'creator_privacy_retirement_pending',jsonb_build_object('reason','profile_private')
