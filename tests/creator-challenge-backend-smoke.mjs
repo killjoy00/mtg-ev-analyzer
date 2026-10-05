@@ -224,6 +224,11 @@ try {
   await insertCreatorResult(guestCompleted.playerId,guestCompletedId,challengeCompletedGuest,Number(completed.score));
   await insertCreatorStart(target.playerId,targetPartialId,challengeCompletedGuest);
   await insertCreatorStart(guestCompleted.playerId,guestCompletedId,challengeCompletedGuest);
+  await query(`INSERT INTO analytics_events(player_id,event_name,event_props)
+    VALUES($1::uuid,'acquisition_touch',jsonb_build_object(
+      'source','creator','campaign','merge-first-touch',
+      'creator_challenge_id',$2::text
+    ))`,[guestCompleted.playerId,challengeCompletedGuest]);
 
   await query('SELECT merge_pack1_player($1::uuid,$2::uuid)',[guestCompleted.playerId,target.playerId]);
 
@@ -249,6 +254,10 @@ try {
   assert.equal(Number((await query(`SELECT count(*)::int n FROM analytics_events
     WHERE player_id=$1::uuid AND event_name='creator_challenge_started'
       AND event_props->>'creator_challenge_id'=$2`,[target.playerId,challengeCompletedGuest])).rows[0].n),1);
+  assert.equal(Number((await query(`SELECT count(*)::int n FROM analytics_events
+    WHERE player_id=$1::uuid AND event_name='acquisition_touch'
+      AND event_props->>'campaign'='merge-first-touch'`,[target.playerId])).rows[0].n),1,
+    'creator first-touch attribution follows the guest into the merged account');
 
   // Case 2: established account completed, guest only partial.
   const targetCompleteId=crypto.randomUUID(),guestPartialId=crypto.randomUUID();
@@ -297,6 +306,13 @@ try {
     WHERE player_id=$1::uuid AND event_name='creator_challenge_started'
       AND event_props->>'creator_challenge_id'=$2`,[target.playerId,challengePartialGuest])).rows[0].n),1,
   'duplicate creator start telemetry is removed during merge');
+
+  const mergedAccountDaily=await directCall(runApi,'/v1/runs',{daily:true},target.token);
+  assert.ok(mergedAccountDaily.day,'the merged account can start its real Daily after creator attribution merge');
+  assert.equal(Number((await query(`SELECT count(*)::int n FROM analytics_events
+    WHERE player_id=$1::uuid AND event_name='acquisition_touch'
+      AND event_props->>'campaign'='merge-first-touch'`,[target.playerId])).rows[0].n),1,
+    'first-touch creator attribution remains available for subsequent Daily reporting');
 
   // Exercise later creator privacy cleanup without requiring live publication
   // infrastructure in this isolated database. The merge/result associations
