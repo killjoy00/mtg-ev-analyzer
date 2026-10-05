@@ -133,7 +133,7 @@ export function renderCampaignRedirectPage(entry) {
   <meta property="og:title" content="${title}" />
   <meta property="og:description" content="${description}" />
   <meta property="og:url" content="https://packone.pro/" />
-  <meta property="og:image" content="https://packone.pro/social-preview-v5.png" />
+  <meta property="og:image" content="https://packone.pro/social-preview-v6.png" />
   <meta property="og:image:type" content="image/png" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="240" />
