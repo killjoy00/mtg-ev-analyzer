@@ -313,19 +313,32 @@ jobs:
           set -euo pipefail
           node --input-type=module <<'NODE'
           const slug=process.env.CAMPAIGN_SLUG;
-          const expected=new URL(process.env.CAMPAIGN_DESTINATION,'https://packone.pro');
-          expected.searchParams.set('utm_source',process.env.CAMPAIGN_SOURCE);
-          expected.searchParams.set('utm_campaign',process.env.CAMPAIGN_NAME);
-          if(process.env.CAMPAIGN_MEDIUM)expected.searchParams.set('utm_medium',process.env.CAMPAIGN_MEDIUM);
           const live='https://packone.pro/go/'+slug+'/';
-          const marker='location.replace('+JSON.stringify(expected.toString())+')';
           let last='';
           for(let attempt=0;attempt<36;attempt++) {
             try {
               const response=await fetch(live,{headers:{'cache-control':'no-cache'}});
               const html=await response.text();
-              if(response.ok&&html.includes(marker)) {
-                console.log('Published '+live+' -> '+expected);
+              let valid=false;
+              if(process.env.PUBLISH_KIND==='creator') {
+                const status=process.env.CREATOR_ACTION==='retire'?'retired':'published';
+                valid=response.ok
+                  && html.includes('data-creator-challenge-id="'+process.env.CREATOR_CHALLENGE_ID+'"')
+                  && html.includes('data-creator-challenge-status="'+status+'"');
+                if(valid&&status==='published') {
+                  const card=await fetch(live+'creator-card.png',{headers:{'cache-control':'no-cache'}});
+                  valid=card.ok&&String(card.headers.get('content-type')||'').includes('image/');
+                }
+              } else {
+                const expected=new URL(process.env.CAMPAIGN_DESTINATION,'https://packone.pro');
+                expected.searchParams.set('utm_source',process.env.CAMPAIGN_SOURCE);
+                expected.searchParams.set('utm_campaign',process.env.CAMPAIGN_NAME);
+                if(process.env.CAMPAIGN_MEDIUM)expected.searchParams.set('utm_medium',process.env.CAMPAIGN_MEDIUM);
+                const marker='location.replace('+JSON.stringify(expected.toString())+')';
+                valid=response.ok&&html.includes(marker);
+              }
+              if(valid) {
+                console.log('Verified '+live);
                 process.exit(0);
               }
               last='HTTP '+response.status;
@@ -334,6 +347,6 @@ jobs:
             }
             await new Promise(resolve=>setTimeout(resolve,5000));
           }
-          throw new Error('Live campaign route verification failed: '+last);
+          throw new Error('Live publication verification failed: '+last);
           NODE
           echo "Published https://packone.pro/go/${CAMPAIGN_SLUG}/" >> "$GITHUB_STEP_SUMMARY"
