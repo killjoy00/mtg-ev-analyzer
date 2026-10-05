@@ -31,6 +31,8 @@ function entryFromEnv(env) {
     campaign:String(env.CAMPAIGN_NAME||''),
   };
   if(String(env.CAMPAIGN_MEDIUM||''))entry.medium=String(env.CAMPAIGN_MEDIUM);
+  if(String(env.CAMPAIGN_SOCIAL_TITLE||''))entry.social_title=String(env.CAMPAIGN_SOCIAL_TITLE);
+  if(String(env.CAMPAIGN_SOCIAL_DESCRIPTION||''))entry.social_description=String(env.CAMPAIGN_SOCIAL_DESCRIPTION);
   return entry;
 }
 
