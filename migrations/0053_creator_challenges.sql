@@ -123,36 +123,25 @@ CREATE INDEX IF NOT EXISTS game_results_creator_challenge_idx
 CREATE OR REPLACE FUNCTION pack1_fill_creator_challenge_result()
 RETURNS trigger
 LANGUAGE plpgsql
-AS $
+AS $creator_result$
 DECLARE
   run_id uuid;
 BEGIN
   IF NEW.creator_challenge_id IS NULL
      AND NEW.mode='draft_run'
-     AND NEW.client_result_id ~ '^draft-run:[0-9a-fA-F-]{36}CREATE TABLE IF NOT EXISTS creator_challenge_audit (
-  id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-  creator_challenge_id uuid NOT NULL REFERENCES creator_challenges(id) ON DELETE CASCADE,
-  admin_auth_user_id uuid,
-  action text NOT NULL CHECK (action IN ('created','publish_requested','published','publish_failed','retired','privacy_retired')),
-  detail jsonb NOT NULL DEFAULT '{}'::jsonb,
-  created_at timestamptz NOT NULL DEFAULT now()
-);
--- statement
-CREATE INDEX IF NOT EXISTS creator_challenge_audit_challenge_idx
-  ON creator_challenge_audit(creator_challenge_id,created_at DESC);
- THEN
+     AND NEW.client_result_id ~ '^draft-run:[0-9a-fA-F-]{36}$' THEN
     BEGIN
-      run_id=split_part(NEW.client_result_id,':',2)::uuid;
-      SELECT s.creator_challenge_id INTO NEW.creator_challenge_id
-      FROM draft_run_sessions s
-      WHERE s.id=run_id;
+      run_id := split_part(NEW.client_result_id,':',2)::uuid;
+      SELECT session.creator_challenge_id INTO NEW.creator_challenge_id
+      FROM draft_run_sessions session
+      WHERE session.id=run_id;
     EXCEPTION WHEN invalid_text_representation THEN
       NULL;
     END;
   END IF;
   RETURN NEW;
 END;
-$;
+$creator_result$;
 -- statement
 DROP TRIGGER IF EXISTS creator_challenge_result_fill ON game_results;
 -- statement
@@ -163,7 +152,7 @@ FOR EACH ROW EXECUTE FUNCTION pack1_fill_creator_challenge_result();
 CREATE OR REPLACE FUNCTION pack1_prepare_creator_challenge_player_merge()
 RETURNS trigger
 LANGUAGE plpgsql
-AS $
+AS $creator_merge$
 DECLARE
   target_auth uuid;
   duplicate_attempt boolean;
@@ -189,12 +178,9 @@ BEGIN
   ) INTO duplicate_attempt;
 
   IF duplicate_attempt THEN
-    -- The established account attempt remains authoritative. Preserve the
-    -- guest run as ordinary Practice without double-counting creator stats or
-    -- colliding with the practice-start idempotency key during player merge.
     UPDATE game_results
     SET creator_challenge_id=NULL
-    WHERE player_id=NEW.player_id
+    WHERE player_id=OLD.player_id
       AND client_result_id='draft-run:'||OLD.id::text;
 
     NEW.creator_challenge_id=NULL;
@@ -207,7 +193,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$;
+$creator_merge$;
 -- statement
 DROP TRIGGER IF EXISTS creator_challenge_player_merge_guard ON draft_run_sessions;
 -- statement
