@@ -55,7 +55,8 @@
     "0048_uncapped_v5_components.sql",
     "0049_cross_version_corpus_cutover.sql",
     "0050_practice_recency_bias.sql",
-    "0051_exact_pick_draw_index.sql"
+    "0051_exact_pick_draw_index.sql",
+    "0052_decision_reports.sql"
   ],
   "same_prefix_order": {
     "0037": [
@@ -158,7 +159,8 @@
         "0046_public_identity_safety.sql",
         "0047_admin_user_account_controls.sql",
         "0050_practice_recency_bias.sql",
-        "0051_exact_pick_draw_index.sql"
+        "0051_exact_pick_draw_index.sql",
+        "0052_decision_reports.sql"
       ]
     },
     "daily-calendar": {
