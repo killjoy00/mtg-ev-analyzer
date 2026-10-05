@@ -112,6 +112,19 @@ export async function cleanupPackOne(query,operation,{recoveryKey=null}={}) {
   await query('UPDATE pack1_admin_invites SET redeemed_by=NULL WHERE redeemed_by=$1::uuid',[auth]);
   await query('DELETE FROM corpus_status_events WHERE auth_user_id=$1::uuid',[auth]);
 
+  if(player) {
+    await query(`WITH retired AS (
+      UPDATE creator_challenges
+      SET status='retired',creator_public_name='A creator',creator_handle=NULL,headline='Creator challenge unavailable',
+          creator_post_run_note=NULL,privacy_removed_at=COALESCE(privacy_removed_at,now()),
+          retired_at=COALESCE(retired_at,now()),updated_at=now(),publication_error=NULL
+      WHERE source_owner_player_id=$1::uuid
+      RETURNING id
+    )
+    INSERT INTO creator_challenge_audit(creator_challenge_id,action,detail)
+    SELECT id,'privacy_retired','{"reason":"account_deletion"}'::jsonb FROM retired`,[player]);
+  }
+
   // Shares have NO ACTION to sessions and must be removed first.
   await query(`DELETE FROM draft_run_shares
     WHERE session_id IN (
