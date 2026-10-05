@@ -464,9 +464,13 @@ export default function DraftRunScreen({
   const dailyMeta = DAILY_ENVIRONMENT_META[environment];
   const creatorChallenge = shared?.initialRun.comparison?.kind === 'creator';
   const surfaceMeta = shared
-    ? creatorChallenge
-      ? { eyebrow: 'BEAT THE CREATOR', resultTitle: 'Creator challenge complete.' }
-      : { eyebrow: 'SHARED DRAFT RUN', resultTitle: 'Shared run complete.' }
+    ? shared.kind==='source'
+      ? shared.sourceType==='daily'
+        ? { eyebrow: 'DAILY DRAFT RUN', resultTitle: 'Your Draft Run.' }
+        : { eyebrow: 'PRACTICE DRAFT RUN', resultTitle: 'Practice complete.' }
+      : creatorChallenge
+        ? { eyebrow: 'BEAT THE CREATOR', resultTitle: 'Creator challenge complete.' }
+        : { eyebrow: 'SHARED DRAFT RUN', resultTitle: 'Shared run complete.' }
     : practice
       ? {
           eyebrow: setIds.length
