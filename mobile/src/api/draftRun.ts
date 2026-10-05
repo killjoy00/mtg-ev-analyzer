@@ -113,6 +113,7 @@ export type DraftRunState = {
     kind?: 'friend' | 'creator';
     id?: string;
     slug?: string;
+    public_url?: string;
     name: string;
     handle?: string | null;
     headline?: string;
