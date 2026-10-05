@@ -3,7 +3,7 @@ import {accountSession,requireTrustedOrigin} from './account-session.mjs';
 
 const DISPATCH_URL='https://api.github.com/repos/killjoy00/mtg-ev-analyzer/actions/workflows/campaign-link-publish.yml/dispatches';
 const TOKEN_PATTERN=/^github_pat_[A-Za-z0-9_]{20,}$/;
-const ALLOWED_FIELDS=new Set(['slug','destination','source','campaign','medium','social_title','social_description']);
+const ALLOWED_FIELDS=new Set(['slug','destination','source','campaign','medium']);
 
 function fail(message,status=400,code=null) {
   throw Object.assign(Error(message),{status,...(code?{code}:{})});
@@ -52,8 +52,6 @@ export async function dispatchCampaignLinkPublish(entry,{env=process.env,fetcher
           source:entry.source,
           campaign:entry.campaign,
           medium:entry.medium||'',
-          social_title:entry.social_title||'',
-          social_description:entry.social_description||'',
         },
       }),
       redirect:'error',
