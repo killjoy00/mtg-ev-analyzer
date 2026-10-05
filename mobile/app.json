@@ -84,7 +84,7 @@
             {
               "scheme": "https",
               "host": "packone.pro",
-              "pathPrefix": "/go/"
+              "pathPrefix": "/creator/"
             }
           ],
           "category": [
