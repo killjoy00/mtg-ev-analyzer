@@ -23,8 +23,9 @@ const parse=value=>typeof value==='string'?JSON.parse(value):value;
 
 const owned={auth:[],players:new Set(),challenges:new Set(),challengers:new Set(),dailyFixture:null,adminToken:null};
 
-async function call(path,{body,method,playerToken,accountToken,adminToken,status=[200]}={}) {
+async function call(path,{body,method,playerToken,accountToken,adminToken,idempotencyKey,status=[200]}={}) {
   const headers={origin};
+  if(idempotencyKey)headers['x-idempotency-key']=idempotencyKey;
   if(body!==undefined)headers['content-type']='application/json';
   if(playerToken)headers.authorization='Bearer '+playerToken;
   if(accountToken)headers['x-pack1-mobile-account']=accountToken;
@@ -360,6 +361,7 @@ async function run() {
     body:{daily:false,environment:'mixed'},
     playerToken:practiceActor.playerToken,
     accountToken:practiceActor.accountToken,
+    idempotencyKey:randomUUID(),
   })).data;
   practice=await finishOrdinary(practice,practiceActor);
   const practiceSource=(await query('SELECT score,answers,measurement_qa FROM draft_run_sessions WHERE id=$1::uuid',[practice.id])).rows[0];
