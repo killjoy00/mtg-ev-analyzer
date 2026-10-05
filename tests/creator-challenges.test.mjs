@@ -3,12 +3,14 @@ import assert from 'node:assert/strict';
 import {mkdir,mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import {gunzipSync} from 'node:zlib';
 
 import {buildCampaignTrackingUrl,validateCampaignEntries} from '../campaign-links.mjs';
 import {
   creatorRevealState,
   parsePracticeShareReference,
   publicCreatorChallenge,
+  validateCreatorChallengeSource,
 } from '../worker/creator-challenges.mjs';
 import {
   creatorChallengeDescription,
@@ -91,6 +93,63 @@ test('creator reveal exposes only already-submitted rounds and keeps future crea
   assert.equal(complete.trophyMatches,6);
   assert.equal(complete.outcome,'win');
   assert.equal(complete.comparison.creator_post_run_note,'P3 was the one I was unsure about.');
+});
+
+test('completed current-day Daily remains eligible as an authoritative creator source',async()=>{
+  const corpus=JSON.parse(gunzipSync(await readFile('corpus/draft-run/blb.json.gz')));
+  const puzzles=corpus.slice(0,8);
+  assert.equal(puzzles.length,8);
+  const sessionId='22222222-2222-4222-8222-222222222222';
+  const playerId='33333333-3333-4333-8333-333333333333';
+  const day='2026-10-05';
+  const source={
+    id:sessionId,
+    player_id:playerId,
+    day,
+    environment:'mixed',
+    score:87,
+    puzzle_ids:puzzles.map(p=>p.puzzle_id),
+    answers:puzzles.map(p=>({
+      puzzle:{puzzle_id:p.puzzle_id},
+      selectedId:p.historical_pick_id,
+      selectedName:p.candidates.find(card=>card.id===p.historical_pick_id)?.name||'Trophy pick',
+    })),
+    source_components:[],
+    custom_set_ids:[],
+    measurement_qa:false,
+    profile_public:true,
+    username_owned:true,
+    public_identity_hidden_at:null,
+    challenge_id:null,
+    creator_challenge_id:null,
+    display_name:'Daily Creator',
+    source_owner_auth_user_id:null,
+    corpus_version:puzzles[0].corpus_version,
+  };
+  const byId=new Map(puzzles.map(p=>[p.puzzle_id,p]));
+  const query=async(sql,params=[])=>{
+    if(sql.includes('FROM draft_run_sessions s'))return {rows:[source]};
+    if(sql.includes('FROM draft_run_verified_puzzles'))return {rows:[{payload:byId.get(params[0])}]};
+    throw new Error('Unexpected query: '+sql);
+  };
+  const challenge={
+    source_session_id:sessionId,
+    authoritative_owner_player_id:playerId,
+    source_owner_player_id:playerId,
+    source_score:87,
+    source_type:'daily',
+    source_day:day,
+    authoritative_source_day:day,
+    source_environment:'mixed',
+    authoritative_environment:'mixed',
+    profile_public:true,
+    public_identity_hidden_at:null,
+    measurement_qa:false,
+  };
+  const resolved=await validateCreatorChallengeSource(query,challenge,{today:day,requireClosed:true});
+  assert.equal(resolved.id,sessionId);
+  assert.equal(resolved.day,day);
+  assert.equal(resolved.answers.length,8);
 });
 
 test('creator public payload uses existing acquisition tracking without weakening normal campaign destinations',()=>{
