@@ -95,6 +95,7 @@ const target=await account('target');
 const hideRaceTarget=await account('hide-race');
 const deletionRaceTarget=await account('del-race');
 const adminId=crypto.randomUUID(),adminToken=crypto.randomUUID()+crypto.randomUUID();
+const adminMobileToken=(crypto.randomUUID().replaceAll('-','')+'abcdefghijk').slice(0,43);
 
 try {
   await query(
@@ -104,6 +105,11 @@ try {
   await query(
     'INSERT INTO neon_auth.session(id,"userId",token,"updatedAt","expiresAt") VALUES($1::uuid,$2::uuid,$3,now(),now()+interval \'1 hour\')',
     [crypto.randomUUID(),adminId,adminToken],
+  );
+  const {digest}=await import('../worker/account-session.mjs');
+  await query(
+    'INSERT INTO account_sessions(session_hash,auth_user_id,csrf_hash,expires_at) VALUES($1,$2::uuid,$3,now()+interval \'1 hour\')',
+    [digest(adminMobileToken),adminId,digest('unused-csrf')],
   );
   await query('INSERT INTO pack1_admins(auth_user_id) VALUES($1::uuid)',[adminId]);
 
@@ -149,7 +155,7 @@ try {
     headers:{
       origin,
       'content-type':'application/json',
-      'x-pack1-auth-session':adminToken,
+      'x-pack1-mobile-account':adminMobileToken,
     },
     body:JSON.stringify({action:'retire'}),
   });
