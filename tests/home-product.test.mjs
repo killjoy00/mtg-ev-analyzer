@@ -15,7 +15,7 @@ test('homepage metadata uses a shallow branded preview with a compact Twitter ic
  const html=fs.readFileSync('index.html','utf8');
  assert.match(html,/<title>Pack One: Daily MTG Draft Decisions<\/title>/);
  assert.match(html,/Magic: The Gathering draft decisions every day/);
- assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/social-preview-v5\.png"/);
+ assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/social-preview-v6\.png"/);
  assert.match(html,/property="og:image:width" content="1200"/);
  assert.match(html,/property="og:image:height" content="240"/);
  assert.match(html,/name="twitter:image" content="https:\/\/packone\.pro\/pack-one-icon-v1\.png"/);
@@ -26,7 +26,7 @@ test('both Daily share bridges have the banner and preserve environment and attr
  for(const route of ['/share/daily/','/share/daily/v2/']){
   const html=fs.readFileSync(route.slice(1)+'index.html','utf8');
   assert.match(html,/property="og:title" content="Daily MTG Draft Decisions"/);
-  assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/social-preview-v5\.png"/);
+  assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/social-preview-v6\.png"/);
   assert.match(html,/property="og:image:height" content="240"/);
   assert.match(html,/name="twitter:card" content="summary"/);
   assert.ok(html.includes('property="og:url" content="https://packone.pro'+route+'"'));
@@ -43,7 +43,7 @@ test('both Daily share bridges have the banner and preserve environment and attr
  }
 });
 test('share assets are complete PNGs with genuinely shallow banner dimensions',()=>{
- for(const [file,width,height] of [['social-preview-v5.png',1200,240],['pack-one-icon-v1.png',1024,1024]]){
+ for(const [file,width,height] of [['social-preview-v6.png',1200,240],['pack-one-icon-v1.png',1024,1024]]){
   const png=fs.readFileSync(file);
   assert.equal(png.subarray(0,8).toString('hex'),'89504e470d0a1a0a');
   assert.equal(png.readUInt32BE(16),width);
