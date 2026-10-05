@@ -182,16 +182,12 @@ function challengeRow(row) {
   };
 }
 
-export async function creatorChallengeById(query,id,{forUpdate=false}={}) {
+export async function creatorChallengeById(query,id,{forUpdate=false,includeStats=false}={}) {
   if(!UUID.test(String(id||'')))fail('Invalid creator challenge.');
-  const result=await query(`SELECT c.*,s.score source_score,s.day authoritative_source_day,s.environment authoritative_environment,
-      s.player_id authoritative_owner_player_id,s.measurement_qa,
-      p.public_identity_hidden_at,p.profile_public,
-      stats.attempts,stats.attempts completions,stats.wins,stats.ties,stats.losses,stats.beat_percentage,stats.average_score,
-      funnel.opens,funnel.starts
-    FROM creator_challenges c
-    LEFT JOIN draft_run_sessions s ON s.id=c.source_session_id
-    LEFT JOIN players p ON p.id=c.source_owner_player_id
+  const statSelect=includeStats
+    ? ',stats.attempts,stats.attempts completions,stats.wins,stats.ties,stats.losses,stats.beat_percentage,stats.average_score,funnel.opens,funnel.starts'
+    : '';
+  const statJoins=includeStats ? `
     LEFT JOIN LATERAL (
       SELECT count(*)::int attempts,
         count(*) FILTER(WHERE x.score>s.score)::int wins,
@@ -217,7 +213,14 @@ export async function creatorChallengeById(query,id,{forUpdate=false}={}) {
       FROM analytics_events e
       WHERE e.event_name IN ('creator_challenge_open','creator_challenge_started')
         AND e.event_props->>'creator_challenge_id'=c.id::text
-    ) funnel ON true
+    ) funnel ON true` : '';
+  const result=await query(`SELECT c.*,s.score source_score,s.day authoritative_source_day,s.environment authoritative_environment,
+      s.player_id authoritative_owner_player_id,s.measurement_qa,
+      p.public_identity_hidden_at,p.profile_public${statSelect}
+    FROM creator_challenges c
+    LEFT JOIN draft_run_sessions s ON s.id=c.source_session_id
+    LEFT JOIN players p ON p.id=c.source_owner_player_id
+    ${statJoins}
     WHERE c.id=$1::uuid${forUpdate?' FOR UPDATE OF c':''}`,[id]);
   return challengeRow(result.rows[0]);
 }
@@ -269,12 +272,6 @@ export function publicCreatorChallenge(row) {
     source_type:row.source_type,
     source_day:row.source_day||null,
     run_length:8,
-    attempts:Number(row.attempts||0),
-    wins:Number(row.wins||0),
-    ties:Number(row.ties||0),
-    losses:Number(row.losses||0),
-    beat_percentage:row.beat_percentage==null?null:Number(row.beat_percentage),
-    average_score:row.average_score==null?null:Number(row.average_score),
     public_url:buildCampaignVanityUrl(row.slug),
     tracked_url:buildCampaignTrackingUrl(entry,{allowCreator:true}),
   };
@@ -417,7 +414,7 @@ export async function listCreatorChallenges(query,{limit=100}={}) {
   const safeLimit=Math.max(1,Math.min(200,Number(limit)||100));
   const result=await query(`SELECT c.id FROM creator_challenges c ORDER BY c.created_at DESC LIMIT $1::int`,[safeLimit]);
   const rows=[];
-  for(const item of result.rows)rows.push(await creatorChallengeById(query,item.id));
+  for(const item of result.rows)rows.push(await creatorChallengeById(query,item.id,{includeStats:true}));
   return rows;
 }
 
@@ -438,7 +435,7 @@ export async function handleCreatorChallengeAdmin(request,query,readJson,adminAu
     return {challenges:await listCreatorChallenges(query,{limit:url.searchParams.get('limit')})};
   const detail=path.match(/^\/v1\/admin\/creator-challenges\/([a-f0-9-]{36})$/i);
   if(detail&&request.method==='GET') {
-    const challenge=await creatorChallengeById(query,detail[1]);
+    const challenge=await creatorChallengeById(query,detail[1],{includeStats:true});
     if(!challenge)fail('Creator challenge not found.',404);
     return {challenge};
   }
