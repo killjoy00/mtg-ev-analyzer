@@ -90,7 +90,6 @@ function permitted(service,path,method,search,mode) {
     if(method==='GET'&&/^\/v1\/runs\/[a-f0-9-]+$/.test(path))return true;
     if(method==='GET'&&/^\/v1\/(?:challenges|shared-runs)\/[a-f0-9]{24}$/.test(path))return true;
     if(method==='GET'&&/^\/v1\/creator-challenges\/[a-z0-9-]{1,64}$/.test(path))return true;
-    if(method==='GET'&&/^\/v1\/creator-challenges\/[a-z0-9-]{1,64}$/.test(path))return true;
     return mode==='production'&&adminPath(path,method);
   }
   return (method==='POST'&&['/v1/session','/v1/scores','/v1/challenges'].includes(path))||
@@ -174,7 +173,6 @@ function mobileSessionRoute(service,path,method) {
   if(method==='GET'&&/^\/v1\/runs\/[a-f0-9-]+$/.test(path))return true;
   if(method==='GET'&&/^\/v1\/shared-runs\/[a-f0-9]{24}$/.test(path))return true;
   if(method==='GET'&&/^\/v1\/creator-challenges\/[a-z0-9-]{1,64}$/.test(path))return true;
-  if(method==='GET'&&/^\/v1\/creator-challenges\/[a-z0-9-]{1,64}$/.test(path))return true;
   return method==='GET'&&['/v1/daily-status','/v1/capabilities','/v1/practice-sets','/v1/set-catalog'].includes(path);
 }
 function mobileAccountRoute(service,path,method) {
@@ -245,7 +243,6 @@ export function routeFamily(path) {
   if(path==='/draft/v1/runs')return 'draft_start';
   if(/^\/draft\/v1\/runs\/[^/]+$/.test(path))return 'draft_read';
   if(/^\/draft\/v1\/shared-runs\/[a-f0-9]{24}$/.test(path))return 'draft_shared_read';
-  if(/^\/draft\/v1\/creator-challenges\/[a-z0-9-]{1,64}$/.test(path))return 'draft_creator_challenge_read';
   if(/^\/draft\/v1\/creator-challenges\/[a-z0-9-]{1,64}$/.test(path))return 'draft_creator_challenge_read';
   for(const name of ['leaderboard','daily-status','capabilities','practice-sets','set-catalog'])if(path==='/draft/v1/'+name)return 'draft_'+name.replaceAll('-','_');
   if(/^\/growth\/v1\/(player\/)?session$/.test(path))return 'player_session';
