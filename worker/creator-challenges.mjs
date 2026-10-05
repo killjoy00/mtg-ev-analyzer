@@ -200,6 +200,11 @@ export async function creatorChallengeById(query,id,{forUpdate=false}={}) {
         AND x.score IS NOT NULL
         AND jsonb_array_length(x.answers)=jsonb_array_length(x.puzzle_ids)
         AND NOT x.measurement_qa
+        AND NOT EXISTS (
+          SELECT 1 FROM account_links ax
+          JOIN pack1_admins admin ON admin.auth_user_id=ax.auth_user_id
+          WHERE ax.player_id=x.player_id
+        )
     ) stats ON true
     WHERE c.id=$1::uuid${forUpdate?' FOR UPDATE OF c':''}`,[id]);
   return challengeRow(result.rows[0]);
@@ -213,14 +218,11 @@ export async function creatorChallengeBySlug(query,slug) {
   return creatorChallengeById(query,result.rows[0].id);
 }
 
-export async function assertCreatorChallengePlayable(query,row,{today}) {
-  if(!row||row.status!=='published')fail('This creator challenge is not available.',410,'CREATOR_CHALLENGE_UNAVAILABLE');
-  if(!row.source_session_id||!row.authoritative_owner_player_id||row.source_score==null)
+async function assertCreatorSourceAvailable(query,row) {
+  if(!row||!row.source_session_id||!row.authoritative_owner_player_id||row.source_score==null)
     fail('This creator challenge is no longer available.',410,'CREATOR_CHALLENGE_UNAVAILABLE');
   if(row.public_identity_hidden_at||!bool(row.profile_public)||bool(row.measurement_qa))
     fail('This creator challenge is no longer available.',410,'CREATOR_CHALLENGE_UNAVAILABLE');
-  if(row.source_type==='daily'&&String(row.authoritative_source_day||'')>=String(today||''))
-    fail('This creator Daily is not yet available as a replay.',409,'CREATOR_DAILY_STILL_OPEN');
   if(row.source_type==='daily'&&String(row.authoritative_source_day)!==String(row.source_day))
     fail('Creator challenge source no longer matches its frozen Daily.',409,'CREATOR_SOURCE_MISMATCH');
   if(String(row.authoritative_environment||'')!==String(row.source_environment||''))
@@ -228,6 +230,11 @@ export async function assertCreatorChallengePlayable(query,row,{today}) {
   const source=await sourceSession(query,row.source_session_id,{expectedPlayerId:row.source_owner_player_id,expectedType:row.source_type});
   if(source.score!==row.source_score)fail('Creator challenge source score changed unexpectedly.',409,'CREATOR_SOURCE_MISMATCH');
   return source;
+}
+
+export async function assertCreatorChallengePlayable(query,row) {
+  if(!row||row.status!=='published')fail('This creator challenge is not available.',410,'CREATOR_CHALLENGE_UNAVAILABLE');
+  return assertCreatorSourceAvailable(query,row);
 }
 
 export function publicCreatorChallenge(row) {
@@ -248,20 +255,26 @@ export function publicCreatorChallenge(row) {
     source_type:row.source_type,
     source_day:row.source_day||null,
     run_length:8,
+    attempts:Number(row.attempts||0),
+    wins:Number(row.wins||0),
+    ties:Number(row.ties||0),
+    losses:Number(row.losses||0),
+    beat_percentage:row.beat_percentage==null?null:Number(row.beat_percentage),
+    average_score:row.average_score==null?null:Number(row.average_score),
     public_url:buildCampaignVanityUrl(row.slug),
     tracked_url:buildCampaignTrackingUrl(entry),
   };
 }
 
-export async function creatorChallengeForPublic(query,identifier,{today}) {
+export async function creatorChallengeForPublic(query,identifier) {
   const row=UUID.test(String(identifier||''))?await creatorChallengeById(query,identifier):await creatorChallengeBySlug(query,identifier);
-  await assertCreatorChallengePlayable(query,row,{today});
+  await assertCreatorChallengePlayable(query,row);
   return row;
 }
 
-export async function loadCreatorChallengeForStart(query,identifier,{today}) {
+export async function loadCreatorChallengeForStart(query,identifier) {
   const challenge=UUID.test(String(identifier||''))?await creatorChallengeById(query,identifier):await creatorChallengeBySlug(query,identifier);
-  const source=await assertCreatorChallengePlayable(query,challenge,{today});
+  const source=await assertCreatorChallengePlayable(query,challenge);
   return {challenge,source};
 }
 
@@ -321,10 +334,6 @@ export function creatorRevealState(challenge,source,answers,{complete=false,self
 export async function createCreatorChallenge(query,payload,adminAuthUserId) {
   const resolved=await resolveCreatorSourceInput(query,payload);
   const meta=normalizeMetadata(payload,resolved.source);
-  if(resolved.source.day&&String(resolved.source.day)>=String(payload.today||'9999-12-31')) {
-    // Draft creation is allowed while a completed Daily is still open. Publication
-    // performs the authoritative game-date cutoff.
-  }
   const inserted=await query(`INSERT INTO creator_challenges(
       slug,source_session_id,source_owner_player_id,source_owner_auth_user_id,source_share_id,source_type,source_day,source_environment,
       creator_public_name,creator_handle,headline,creator_post_run_note,
@@ -340,6 +349,69 @@ export async function createCreatorChallenge(query,payload,adminAuthUserId) {
   await query(`INSERT INTO creator_challenge_audit(creator_challenge_id,admin_auth_user_id,action,detail)
     VALUES($1::uuid,$2::uuid,'created',jsonb_build_object('source_type',$3,'source_session_id',$4::text))`,
     [id,adminAuthUserId,resolved.source.day?'daily':'practice',resolved.source.id]);
+  return creatorChallengeById(query,id);
+}
+
+export function creatorCampaignEntry(row) {
+  if(!row?.id||!row?.slug)fail('Creator challenge is incomplete.',409,'CREATOR_CHALLENGE_INCOMPLETE');
+  const title=row.headline||`Can you beat ${row.creator_public_name}?`;
+  const daily=row.source_type==='daily'&&row.source_day
+    ? ` on the ${row.source_day} Daily`
+    : '';
+  const description=`${row.creator_public_name} scored ${row.source_score}/100${daily}. Play the same eight real draft decisions.`;
+  return {
+    slug:row.slug,
+    destination:`/?game=draft-run&creator=${row.id}`,
+    source:row.acquisition_source,
+    campaign:row.acquisition_campaign,
+    ...(row.acquisition_medium?{medium:row.acquisition_medium}:{}),
+    social_title:title,
+    social_description:description,
+  };
+}
+
+export async function requestCreatorChallengePublication(query,id,adminAuthUserId) {
+  const row=await creatorChallengeById(query,id);
+  if(!row)fail('Creator challenge not found.',404);
+  if(row.status==='retired')fail('Retired creator challenges cannot be republished.',409,'CREATOR_CHALLENGE_RETIRED');
+  await assertCreatorSourceAvailable(query,row);
+  if(row.status==='published')return {challenge:row,entry:creatorCampaignEntry(row),already_published:true};
+  const operation=row.publication_operation_ref||crypto.randomUUID();
+  const updated=await query(`UPDATE creator_challenges
+    SET status='publishing',publication_operation_ref=$2::uuid,publication_error=NULL,
+        published_by_admin_auth_user_id=COALESCE(published_by_admin_auth_user_id,$3::uuid),updated_at=now()
+    WHERE id=$1::uuid AND status IN ('draft','failed','publishing')
+    RETURNING id`,[id,operation,adminAuthUserId]);
+  if(!updated.rows[0])fail('Creator challenge publication state changed. Reload and try again.',409);
+  await query(`INSERT INTO creator_challenge_audit(creator_challenge_id,admin_auth_user_id,action,detail)
+    VALUES($1::uuid,$2::uuid,'publish_requested',jsonb_build_object('operation',$3::text))
+  `,[id,adminAuthUserId,operation]);
+  const challenge=await creatorChallengeById(query,id);
+  return {challenge,entry:creatorCampaignEntry(challenge),already_published:false};
+}
+
+export async function completeCreatorChallengePublication(query,id,adminAuthUserId) {
+  const row=await creatorChallengeById(query,id);
+  if(!row)fail('Creator challenge not found.',404);
+  await assertCreatorSourceAvailable(query,row);
+  if(row.status==='retired')fail('Retired creator challenges cannot be published.',409);
+  if(row.status==='published')return row;
+  const result=await query(`UPDATE creator_challenges SET status='published',
+      published_at=COALESCE(published_at,now()),published_by_admin_auth_user_id=COALESCE(published_by_admin_auth_user_id,$2::uuid),
+      publication_error=NULL,updated_at=now()
+    WHERE id=$1::uuid AND status='publishing' RETURNING id`,[id,adminAuthUserId]);
+  if(!result.rows[0])fail('Creator challenge is not awaiting publication.',409);
+  await query(`INSERT INTO creator_challenge_audit(creator_challenge_id,admin_auth_user_id,action)
+    VALUES($1::uuid,$2::uuid,'published')`,[id,adminAuthUserId]);
+  return creatorChallengeById(query,id);
+}
+
+export async function failCreatorChallengePublication(query,id,adminAuthUserId,errorMessage) {
+  const message=plain(errorMessage,{max:300,label:'Publication error'})||'Publication failed.';
+  const result=await query(`UPDATE creator_challenges SET status='failed',publication_error=$3,updated_at=now()
+    WHERE id=$1::uuid AND status='publishing' RETURNING id`,[id,adminAuthUserId,message]);
+  if(result.rows[0])await query(`INSERT INTO creator_challenge_audit(creator_challenge_id,admin_auth_user_id,action,detail)
+    VALUES($1::uuid,$2::uuid,'publish_failed',jsonb_build_object('error',$3))`,[id,adminAuthUserId,message]);
   return creatorChallengeById(query,id);
 }
 
@@ -362,7 +434,6 @@ export async function listCreatorPlayers(query,search,{limit=20,offset=0}={}) {
     display_name:row.display_name,
     profile_public:bool(row.profile_public),
     username_owned:bool(row.username_owned),
-    account_email:row.email||null,
     linked_account:Boolean(row.auth_user_id),
   }));
 }
@@ -407,7 +478,7 @@ export async function retireCreatorChallenge(query,id,adminAuthUserId,{privacy=f
   return creatorChallengeById(query,id);
 }
 
-export async function handleCreatorChallengeAdmin(request,query,readJson,adminAuthUserId,{today}) {
+export async function handleCreatorChallengeAdmin(request,query,readJson,adminAuthUserId) {
   const url=new URL(request.url),path=url.pathname;
   if(path==='/v1/admin/creator-challenges/players'&&request.method==='GET')
     return {players:await listCreatorPlayers(query,url.searchParams.get('search'),{limit:url.searchParams.get('limit'),offset:url.searchParams.get('offset')})};
@@ -427,6 +498,17 @@ export async function handleCreatorChallengeAdmin(request,query,readJson,adminAu
     const challenge=await creatorChallengeById(query,detail[1]);
     if(!challenge)fail('Creator challenge not found.',404);
     return {challenge};
+  }
+  const publish=path.match(/^\/v1\/admin\/creator-challenges\/([a-f0-9-]{36})\/publish$/i);
+  if(publish&&request.method==='POST')
+    return await requestCreatorChallengePublication(query,publish[1],adminAuthUserId);
+  const published=path.match(/^\/v1\/admin\/creator-challenges\/([a-f0-9-]{36})\/published$/i);
+  if(published&&request.method==='POST')
+    return {challenge:await completeCreatorChallengePublication(query,published[1],adminAuthUserId)};
+  const publishFailed=path.match(/^\/v1\/admin\/creator-challenges\/([a-f0-9-]{36})\/publish-failed$/i);
+  if(publishFailed&&request.method==='POST') {
+    const body=await readJson(request);
+    return {challenge:await failCreatorChallengePublication(query,publishFailed[1],adminAuthUserId,body?.error)};
   }
   const retire=path.match(/^\/v1\/admin\/creator-challenges\/([a-f0-9-]{36})\/retire$/i);
   if(retire&&request.method==='POST')
