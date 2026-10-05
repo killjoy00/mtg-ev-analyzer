@@ -1,0 +1,94 @@
+name: creator production canary
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/creator-production-canary-request.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pack1-creator-production-canary
+  cancel-in-progress: false
+
+jobs:
+  canary:
+    name: live Practice and Daily creator canary
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    timeout-minutes: 120
+    env:
+      PROJECT_ID: patient-shadow-91417882
+      PROD_BRANCH: br-orange-feather-ayps8kep
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - id: request
+        name: Resolve reviewed creator canary request
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+          request=json.loads(Path('.github/creator-production-canary-request.json').read_text())
+          if set(request) != {'operation','reason','expected_release'}:
+              raise SystemExit('Invalid creator production-canary request keys.')
+          if request.get('operation') != 'run-creator-production-canary':
+              raise SystemExit('Invalid creator production-canary operation.')
+          reason=request.get('reason')
+          release=str(request.get('expected_release',''))
+          if not isinstance(reason,str) or not reason.strip():
+              raise SystemExit('Creator production canary requires a reason.')
+          import re
+          if not re.fullmatch(r'[a-f0-9]{40}',release):
+              raise SystemExit('Creator production canary requires an exact release SHA.')
+          print('expected_release='+release)
+          PY
+
+      - name: Require current reviewed main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]] || {
+            echo "Creator canary request is no longer current main." >&2
+            exit 1
+          }
+
+      - name: Install pinned Neon client
+        run: node .github/scripts/install-wrangler-tool.mjs "$RUNNER_TEMP/creator-canary-tools" neon@4.17.4
+
+      - name: Prepare production connection
+        shell: bash
+        run: |
+          set -euo pipefail
+          neon="$RUNNER_TEMP/creator-canary-tools/node_modules/.bin/neon"
+          connection="$("$neon" connection-string "$PROD_BRANCH" --project-id "$PROJECT_ID" --database-name pack1 --role-name pack1_owner)"
+          echo "::add-mask::$connection"
+          printf '%s' "$connection" > "$RUNNER_TEMP/creator-canary.connection"
+          chmod 600 "$RUNNER_TEMP/creator-canary.connection"
+
+      - name: Run live creator production canary
+        env:
+          PACK1_CREATOR_CANARY: '1'
+          PACK1_LAUNCH_WATCHER_GITHUB_TOKEN: ${{ secrets.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN }}
+        run: node scripts/creator-production-canary.mjs "$RUNNER_TEMP/creator-canary.connection" "${{ steps.request.outputs.expected_release }}"
+
+      - name: Upload creator canary evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: creator-production-canary-${{ github.run_id }}
+          path: artifacts/creator-production-canary
+          if-no-files-found: error
+          retention-days: 90
