@@ -30,7 +30,7 @@ try {
   let holdDeletionStatus=false,releaseDeletionStatus=null,failDeleteAfterCommit=false;
   let holdHabitReport=true,releaseHabitReport=null,holdStaleCore=false,releaseStaleCore=null;
   await page.route(/\/health\?quick=1$/,route=>route.fulfill({headers:{'x-pack1-admin-api-version':String(ADMIN_API_VERSION)},json:{ok:true,admin_api_version:ADMIN_API_VERSION,campaign_link_publish_configured:true}}));
-  await page.route('https://packone.pro/creator/**/creator-card.png',route=>{
+  await page.route(/^https:\/\/packone\.pro\/creator\/[^/]+\/creator-card\.png(?:\?.*)?$/,route=>{
     creatorImageRequests+=1;
     if(creatorImageRequests===1)return route.fulfill({status:404,body:'not published yet'});
     return route.fulfill({
