@@ -35,24 +35,25 @@ async function requireCreatorAdmin(request,{query,allowedOrigins,csrf}) {
 }
 
 function workflowInputs(row,operation,action) {
+  const retired=action==='retire';
   return {
     kind:'creator',
     operation,
     creator_action:action,
     slug:row.slug,
     destination:'/',
-    source:row.acquisition_source,
-    campaign:row.acquisition_campaign,
-    medium:row.acquisition_medium||'',
+    source:retired?'creator':row.acquisition_source,
+    campaign:retired?'retired':row.acquisition_campaign,
+    medium:retired?'':row.acquisition_medium||'',
     social_title:'',
     social_description:'',
     creator_challenge_id:row.id,
-    creator_name:row.creator_public_name,
-    creator_headline:row.headline||`Can you beat ${row.creator_public_name}?`,
-    creator_score:String(row.source_score),
-    creator_environment:row.source_environment,
-    creator_source_type:row.source_type,
-    creator_source_day:row.source_day||'',
+    creator_name:retired?'A creator':row.creator_public_name,
+    creator_headline:retired?'Creator challenge unavailable':row.headline||`Can you beat ${row.creator_public_name}?`,
+    creator_score:retired?'0':String(row.source_score),
+    creator_environment:retired?'mixed':row.source_environment,
+    creator_source_type:retired?'practice':row.source_type,
+    creator_source_day:retired?'':row.source_day||'',
   };
 }
 
