@@ -109,7 +109,7 @@ test('creator public payload uses existing acquisition tracking without weakenin
     attempts:10,wins:4,ties:1,losses:5,beat_percentage:40,average_score:82.4,
   };
   const info=publicCreatorChallenge(row);
-  assert.equal(info.public_url,'https://packone.pro/go/lola-rft/');
+  assert.equal(info.public_url,'https://packone.pro/creator/lola-rft/');
   assert.equal(
     info.tracked_url,
     `https://packone.pro/?game=draft-run&creator=${CHALLENGE}&utm_source=creator&utm_campaign=beat-the-creator&utm_medium=creator`,
@@ -178,7 +178,7 @@ test('creator publication registry is immutable, collision-safe, and retirement 
   };
   const first=await prepareCreatorChallengePublish({root,action:'publish',entry});
   assert.equal(first.created,true);
-  const page=await readFile(path.join(root,'go','lola-rft','index.html'),'utf8');
+  const page=await readFile(path.join(root,'creator','lola-rft','index.html'),'utf8');
   assert.match(page,/Can you beat Lola/);
   await assert.rejects(
     prepareCreatorChallengePublish({root,action:'publish',entry:{...entry,slug:'reddit-launch'}}),
@@ -192,7 +192,7 @@ test('creator publication registry is immutable, collision-safe, and retirement 
   assert.equal(retired.retired,true);
   const registry=JSON.parse(await readFile(path.join(root,'creator-challenges.json'),'utf8'));
   assert.deepEqual(registry,[{id:CHALLENGE,slug:'lola-rft',status:'retired'}]);
-  const retiredPage=await readFile(path.join(root,'go','lola-rft','index.html'),'utf8');
+  const retiredPage=await readFile(path.join(root,'creator','lola-rft','index.html'),'utf8');
   assert.doesNotMatch(retiredPage,/Lola|87\/100/);
   await assert.rejects(
     prepareCreatorChallengePublish({root,action:'publish',entry}),
