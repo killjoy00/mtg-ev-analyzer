@@ -2,12 +2,20 @@
 
 Updated 2026-10-04. This file is the source-of-truth submission packet for the first free public mobile release.
 
+## Current native-repair candidates — 2026-10-04
+
+Final image review found the provider-label wording corrected in #960; these core repair binaries do not yet contain that two-sentence correction and will be superseded by the final source. Both signed binaries contain #890, #910 and #955 and were built from `f721389d392867cc43c342c07ecddfc20c9f28f8`. Exact-main smoke `37239878233` certified runtime source `f0f30c939d1016c70f5d3548d46b0b8b3f839e79`; the reviewed release-control compare has identical mobile/config/dependency/binary-workflow inputs.
+
+- **Android 1.0 / 100488:** signed upload run `37240960371`; exact-bundle closed promotion `37242766267` succeeded on the existing `production-access` track, with `completed`, `committed=true`, `requiresConsoleRollout=false`, `createdTrack=false`. Qualification/tester configuration remains intact.
+- **iOS 1.0 / 100500:** signed run `37240960344`, Apple build `d3019d8b-05de-4cc0-80a1-77da4d154cd5`, VALID / APP_STORE_ELIGIBLE, attached to editable version 1.0. No App Review submission. Read-only run `37243664443` after #957 verified internal `IN_BETA_TESTING` with the existing internal all-builds group and no tester/group changes. External `READY_FOR_BETA_SUBMISSION` is not external distribution.
+- **Acceptance:** simulator/emulator evidence and every original requirement/later design change are mapped in [the full cross-reference](mobile-native-ux-requirements-575.md). Physical upgrades, iOS gestures, iPad landscape/narrow windows, accessibility and provider/billing acceptance remain open in #575.
+
 ## Historical distributed checkpoint — 2026-10-02
 
-October 4: #910 is merged with verified native navigation, Daily, Learn, fonts and feedback repairs. The binaries below predate #890 and #910; they remain the last recorded distributed builds, not acceptance candidates for this repair. #955 also passed native verification and merged. #951 passed fresh checks and merged as `f721389d392867cc43c342c07ecddfc20c9f28f8` after all four exact-main RC jobs certified `f0f30c939d1016c70f5d3548d46b0b8b3f839e79` (run `37239878233`); mobile and binary build-workflow inputs are unchanged. Physical/provider acceptance and owner launch gates remain open.
+These earlier binaries predate #890/#910/#955 and are upgrade starting points, not repair acceptance targets.
 
 - **Previously distributed iOS 1.0 post-#837 candidate:** signed build `100415`, source revision `fa588b40bc380946735385abfac0ff52586e1873`. GitHub Actions run `36957484955` uploaded it; App Store Connect reported `processingState=VALID` and `buildAudienceType=APP_STORE_ELIGIBLE`, and the workflow attached build `100415` to App Store version 1.0. Release type remains manual.
-- **Previously distributed Android 1.0 post-#837 candidate:** versionCode `100444`, source revision `fa588b40bc380946735385abfac0ff52586e1873`. Build run `36957485029` produced the Play-signed production AAB and exact-artifact release run `36965315032` uploaded it unchanged to Internal Testing, then promoted that same version unchanged to Closed Testing `production-access`. Google reported `releaseStatus=completed`, `requiresConsoleRollout=false`, and `committed=true`. VersionCode `100444` is the live qualification-track candidate.
+- **Previously distributed Android 1.0 post-#837 candidate:** versionCode `100444`, source revision `fa588b40bc380946735385abfac0ff52586e1873`. Build run `36957485029` produced the Play-signed production AAB and exact-artifact release run `36965315032` uploaded it unchanged to Internal Testing, then promoted that same version unchanged to Closed Testing `production-access`. Google reported `releaseStatus=completed`, `requiresConsoleRollout=false`, and `committed=true`. VersionCode `100444` was the qualification-track candidate before replacement by 100488.
 - **Closed-test geography:** the `production-access` track targets Canada and the United States. Legacy `alpha` is not the qualification track.
 - **Apple public availability:** the owner completed first-time App Store availability setup for **United States + Canada only** in App Store Connect on 2026-10-01. The repo now carries a read-only API verifier; it must confirm exactly `CAN,USA`, `availableInNewTerritories=false`, and no pre-order state.
 - **Store assets:** Existing Apple iPhone/iPad and Elite review screenshots and Google phone screenshots predate #910 and need replacement. #951 requests fresh reviewed-main captures for inspection before guarded store upload. The approved icon and feature graphic remain unchanged.
@@ -307,8 +315,8 @@ Physical iPhone/iPad acceptance remains separate and is intentionally not listed
 Do **not** spend console time on these unless an automated probe reports a problem:
 - Google Cloud WIF narrowing and the repo-side non-publishing Google Play access probe are complete; run `37017937127` passed on `main` and verified WIF authentication, Play track-read access, and Play signing fingerprint coverage in `.well-known/assetlinks.json`;
 - uploading/replacing the current RC binaries;
-- attaching the current successful App Store-eligible iOS RC to App Store version 1.0; post-#837 build `100415` is already `VALID`, `APP_STORE_ELIGIBLE`, and attached by run `36957484955`;
-- building/uploading/promoting the Android RC; versionCode `100444` is already signed, uploaded, and active on `production-access`;
+- attaching the current successful App Store-eligible iOS RC to App Store version 1.0; repair build `100500` is `VALID`, `APP_STORE_ELIGIBLE`, and attached by run `37240960344`; separate tester availability must also be verified;
+- building/uploading/promoting the Android RC; repair versionCode `100488` is signed, uploaded, and active on existing `production-access` via run `37242766267`;
 - Google Data Safety (already done) or replacement store graphics after reviewed-main capture and visual inspection;
 - App Store listing copy, manual-release flag, reviewed age-rating answers, or content-rights declaration (already present);
 - release-track/API status audits;

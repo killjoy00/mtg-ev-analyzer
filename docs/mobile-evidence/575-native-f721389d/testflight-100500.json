@@ -1,0 +1,37 @@
+{
+  "appId": "6814318676",
+  "sourceSha": "ec957c228bbdb2c1a55d1b2e362dc078bf805618",
+  "requestedBuild": "100500",
+  "latest": {
+    "id": "d3019d8b-05de-4cc0-80a1-77da4d154cd5",
+    "version": "100500",
+    "uploadedDate": "2026-10-04T16:00:51-07:00",
+    "processingState": "VALID",
+    "usesNonExemptEncryption": false,
+    "buildAudienceType": "APP_STORE_ELIGIBLE"
+  },
+  "builds": [
+    {
+      "id": "d3019d8b-05de-4cc0-80a1-77da4d154cd5",
+      "version": "100500",
+      "uploadedDate": "2026-10-04T16:00:51-07:00",
+      "processingState": "VALID",
+      "usesNonExemptEncryption": false,
+      "buildAudienceType": "APP_STORE_ELIGIBLE"
+    }
+  ],
+  "testFlight": {
+    "verified": true,
+    "internalBuildState": "IN_BETA_TESTING",
+    "externalBuildState": "READY_FOR_BETA_SUBMISSION",
+    "groups": [
+      {
+        "id": "a91f1a47-75e7-43bb-b863-56287fa90f0f",
+        "isInternalGroup": true,
+        "hasAccessToAllBuilds": true
+      }
+    ],
+    "groupListComplete": true,
+    "testersOrGroupsChanged": false
+  }
+}
