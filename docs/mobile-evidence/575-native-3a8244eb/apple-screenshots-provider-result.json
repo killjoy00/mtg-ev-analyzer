@@ -1,0 +1,36 @@
+{
+  "uploaded": true,
+  "appId": "6814318676",
+  "bundleId": "pro.packone.app",
+  "versionId": "04b0ee74-7d94-41e4-8463-79524972fce6",
+  "versionString": "1.0",
+  "versionState": "PREPARE_FOR_SUBMISSION",
+  "locale": "en-US",
+  "iphone": {
+    "screenshotDisplayType": "APP_IPHONE_67",
+    "setId": "eca04601-be99-41da-aa58-a95696129241",
+    "screenshotIds": [
+      "ff400019-62a4-8054-8033-4f780df1e7a0",
+      "0cc00019-62a4-8054-8010-93e4d0b31f5c",
+      "aa000019-62a4-8054-800a-05c94e58d3b5",
+      "c3400019-62a4-8054-800a-89bc7b1b13ea",
+      "c1000019-62a4-8054-8023-62b7e363afef"
+    ]
+  },
+  "ipad": {
+    "screenshotDisplayType": "APP_IPAD_PRO_3GEN_129",
+    "setId": "e3f647f7-2a04-4b52-9b6a-da7a4bf48225",
+    "screenshotIds": [
+      "15c00019-62a4-8054-8001-d570b55cdf22",
+      "2f400019-62a4-8054-803b-cc7b9533915b",
+      "e8400019-62a4-8054-8002-fec18c9abebe",
+      "fa400019-62a4-8054-801e-a5dc5fbe76ed",
+      "f5000019-62a4-8054-8029-05446e5b28e2"
+    ]
+  },
+  "subscription": {
+    "productId": "pro.packone.app.elite.monthly",
+    "subscriptionId": "6816710082",
+    "reviewScreenshotId": "026a2a95-6e67-49b8-aaf7-84e3a571c2e0"
+  }
+}

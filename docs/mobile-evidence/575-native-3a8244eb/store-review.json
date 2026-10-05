@@ -410,5 +410,178 @@
     "artifact_id": 11318859635,
     "artifact_sha256": "367c8be6a11616372a4870d800dab7f82cf090e0feca3af506fef0bcd11ebcb3",
     "runtime_equivalence": "No mobile diff between reviewed a14d8f01 and main 3a8244eb; source identities remain distinct."
+  },
+  "android_store_artifact": {
+    "id": 11319027887,
+    "sha256": "dcaa729b8a88e56c667590fedfeb8f44a9dd26882e2223cb42a71215f62391fa"
+  },
+  "android_native_artifact": {
+    "id": 11318798407,
+    "sha256": "d8b4020fc42fa6e3095f1430e3052073d9b2ccba521fdfb7a0e8f66904402ace"
+  },
+  "android_images": [
+    {
+      "path": "android/01-daily-decision.jpg",
+      "sha256": "a78bd4f5b09ffee21bdd94c685caec18686ae035ac8d18feda5183498295cffa",
+      "width": 1080,
+      "height": 1920,
+      "review": "Actual final main-source image individually inspected and approved before handoff; exact downloaded ZIP digest reconfirmed for delivery.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "android/02-reveal-comparison.jpg",
+      "sha256": "d76354830d56f25932787e3459c1ee385bb9f4e42e33d0e1d751e27fb051fc55",
+      "width": 1080,
+      "height": 1920,
+      "review": "Actual final main-source image individually inspected and approved before handoff; exact downloaded ZIP digest reconfirmed for delivery.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "android/03-daily-hub.jpg",
+      "sha256": "0993176c0930fbb2f31703bc561fb154f1ba556149b8362a69efa5dd7d7404bc",
+      "width": 1080,
+      "height": 1920,
+      "review": "Actual final main-source image individually inspected and approved before handoff; exact downloaded ZIP digest reconfirmed for delivery.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "android/04-practice.jpg",
+      "sha256": "fe146896713910013b7c1817755a8f9f9e6ce1343664f467018ef6c1e0b571c8",
+      "width": 1080,
+      "height": 1920,
+      "review": "Actual final main-source image individually inspected and approved before handoff; exact downloaded ZIP digest reconfirmed for delivery.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "android/05-career.jpg",
+      "sha256": "939e7ad3077f63a357726301536eeeac93be17a38a8b351a0c9ad35f1119290e",
+      "width": 1080,
+      "height": 1920,
+      "review": "Actual final main-source image individually inspected and approved before handoff; exact downloaded ZIP digest reconfirmed for delivery.",
+      "approved_for_upload": true
+    }
+  ],
+  "android_native_summary": {
+    "source_sha": "3a8244eb0568769c133365ea2821d512c62a3515",
+    "tested_checkout_sha": "3a8244eb0568769c133365ea2821d512c62a3515",
+    "platform": "android",
+    "backend": "isolated persistent preview fixtures",
+    "physical_device": false,
+    "device": "sdk_gphone64_x86_64",
+    "os": "15",
+    "actual_text_growth": {
+      "normal_line_height": 20,
+      "large_line_height": 26,
+      "ratio": 1.3
+    },
+    "journeys": [
+      {
+        "name": "member-long-320-1",
+        "result": "passed"
+      },
+      {
+        "name": "member-long-320-1.5",
+        "result": "passed"
+      },
+      {
+        "name": "member-match-320-1.5",
+        "result": "passed"
+      },
+      {
+        "name": "member-zero-320-1.5",
+        "result": "passed"
+      },
+      {
+        "name": "member-long-600-1.5",
+        "result": "passed"
+      },
+      {
+        "name": "member-long-840-1.5",
+        "result": "passed"
+      },
+      {
+        "name": "actual-text-growth",
+        "result": "passed"
+      },
+      {
+        "name": "guest-home",
+        "result": "passed"
+      },
+      {
+        "name": "guest-returning-home",
+        "result": "passed"
+      },
+      {
+        "name": "member-new-home",
+        "result": "passed"
+      },
+      {
+        "name": "member-zero-home",
+        "result": "passed"
+      },
+      {
+        "name": "member-partial-home",
+        "result": "passed"
+      },
+      {
+        "name": "member-all-home",
+        "result": "passed"
+      },
+      {
+        "name": "member-checking-home",
+        "result": "passed"
+      },
+      {
+        "name": "member-error-home",
+        "result": "passed"
+      },
+      {
+        "name": "elite-home",
+        "result": "passed"
+      },
+      {
+        "name": "guest-large-tabs",
+        "result": "passed"
+      },
+      {
+        "name": "member-large-tabs",
+        "result": "passed"
+      },
+      {
+        "name": "eight-pick-daily-and-final-review",
+        "result": "passed"
+      },
+      {
+        "name": "member-tabs-profile-settings-and-hardware-back",
+        "result": "passed"
+      },
+      {
+        "name": "archive-deep-link-return-without-duplicate-tabs",
+        "result": "passed"
+      },
+      {
+        "name": "practice-complete-review-return",
+        "result": "passed"
+      },
+      {
+        "name": "shared-invitation-auth-accept-kill-relaunch",
+        "result": "passed"
+      },
+      {
+        "name": "image-failure-retry-keeps-run",
+        "result": "passed"
+      },
+      {
+        "name": "sign-out-and-account-switch",
+        "result": "passed"
+      }
+    ],
+    "failures": [],
+    "preview_version": "1.0",
+    "preview_build": "1",
+    "record_type": "derived summary; original complete manifest retained in artifact",
+    "workflow_run_id": 37244011193,
+    "artifact_id": 11318798407,
+    "artifact_sha256": "d8b4020fc42fa6e3095f1430e3052073d9b2ccba521fdfb7a0e8f66904402ace"
   }
 }

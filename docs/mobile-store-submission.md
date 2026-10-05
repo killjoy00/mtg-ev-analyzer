@@ -2,13 +2,17 @@
 
 Updated 2026-10-04. This file is the source-of-truth submission packet for the first free public mobile release.
 
-## Current native-repair candidates — 2026-10-04
+## Final native-repair test candidates — 2026-10-04 CDT
 
-Final image review found the provider-label wording corrected in #960; these core repair binaries do not yet contain that two-sentence correction and will be superseded by the final source. Both signed binaries contain #890, #910 and #955 and were built from `f721389d392867cc43c342c07ecddfc20c9f28f8`. Exact-main smoke `37239878233` certified runtime source `f0f30c939d1016c70f5d3548d46b0b8b3f839e79`; the reviewed release-control compare has identical mobile/config/dependency/binary-workflow inputs.
+Final signed binary source: `747478440400e242aae32469d6ed18f1785b591d` (protected #963 merge). The mobile app, native configuration, dependencies and binary build workflows match certified runtime `3a8244eb0568769c133365ea2821d512c62a3515`; exact-main certification run `37244011180` is attributed to that earlier SHA, not relabelled as the delivery source. Concurrent #961 operations and #962 admin/backend work are preserved. Later #964/#965/#966 change release controls/probes and the gateway release request, with no mobile binary-input or supplied web-reference changes. #962 changes the production smoke contract, not the mobile binary inputs. Later #969 changes hosted social-preview metadata and assets, including index.html Open Graph/Twitter image references; it does not change visible homepage UI or mobile binary inputs. The final control-source refresh through #971 preserves that work.
 
-- **Android 1.0 / 100488:** signed upload run `37240960371`; exact-bundle closed promotion `37242766267` succeeded on the existing `production-access` track, with `completed`, `committed=true`, `requiresConsoleRollout=false`, `createdTrack=false`. Qualification/tester configuration remains intact.
-- **iOS 1.0 / 100500:** signed run `37240960344`, Apple build `d3019d8b-05de-4cc0-80a1-77da4d154cd5`, VALID / APP_STORE_ELIGIBLE, attached to editable version 1.0. No App Review submission. Read-only run `37243664443` after #957 verified internal `IN_BETA_TESTING` with the existing internal all-builds group and no tester/group changes. External `READY_FOR_BETA_SUBMISSION` is not external distribution.
-- **Acceptance:** simulator/emulator evidence and every original requirement/later design change are mapped in [the full cross-reference](mobile-native-ux-requirements-575.md). Physical upgrades, iOS gestures, iPad landscape/narrow windows, accessibility and provider/billing acceptance remain open in #575.
+- **iOS 1.0 / 100505:** signed run `37247429564`, Apple build `ba5e31a1-8e53-4123-b014-dcd883d83171`; `VALID`, `APP_STORE_ELIGIBLE`, attached to editable App Store 1.0, and verified internal `IN_BETA_TESTING` with the existing all-builds group. No tester/group mutation or App Review submission. External `READY_FOR_BETA_SUBMISSION` is not external distribution.
+- **Android 1.0 / 100491:** signed Internal run `37247429578` accepted and committed the bundle as draft; exact-version promotion run `37249437434` reports existing `production-access`, `completed`, `committed=true`, `requiresConsoleRollout=false`, `createdTrack=false`. No rebuild, tester/country/track change or Production release.
+- **Store images:** final main-source capture `37244011193` passed every job. All 17 original Android/iPhone/iPad/membership images were individually inspected and approved. Apple replacement run `37251116289`, after processing-only fix #971, verified five iPhone, five iPad and the subscription review image after provider processing/order checks. Play run `37249880752` committed and independently verified five phone screenshots and the identical approved icon; feature graphic untouched.
+
+Original provider results and source-attributed delivery metadata are retained in [mobile-evidence/575-native-3a8244eb/README.md](mobile-evidence/575-native-3a8244eb/README.md). Prior core repair builds iOS 100500 / Android 100488 remain historical evidence and exclude #960. Physical upgrades from iOS 100415 / Android 100444 must target **100505 / 100491** now.
+
+Physical upgrades, iOS gestures, iPad landscape/narrow windows, accessibility, real auth/billing/deletion and provider reviewer Notes reconfirmation remain open in #575. No App Review submission or public release is authorized by this delivery.
 
 ## Historical distributed checkpoint — 2026-10-02
 
@@ -18,7 +22,7 @@ These earlier binaries predate #890/#910/#955 and are upgrade starting points, n
 - **Previously distributed Android 1.0 post-#837 candidate:** versionCode `100444`, source revision `fa588b40bc380946735385abfac0ff52586e1873`. Build run `36957485029` produced the Play-signed production AAB and exact-artifact release run `36965315032` uploaded it unchanged to Internal Testing, then promoted that same version unchanged to Closed Testing `production-access`. Google reported `releaseStatus=completed`, `requiresConsoleRollout=false`, and `committed=true`. VersionCode `100444` was the qualification-track candidate before replacement by 100488.
 - **Closed-test geography:** the `production-access` track targets Canada and the United States. Legacy `alpha` is not the qualification track.
 - **Apple public availability:** the owner completed first-time App Store availability setup for **United States + Canada only** in App Store Connect on 2026-10-01. The repo now carries a read-only API verifier; it must confirm exactly `CAN,USA`, `availableInNewTerritories=false`, and no pre-order state.
-- **Store assets:** Existing Apple iPhone/iPad and Elite review screenshots and Google phone screenshots predate #910 and need replacement. #951 requests fresh reviewed-main captures for inspection before guarded store upload. The approved icon and feature graphic remain unchanged.
+- **Historical store assets:** The prior Apple/Play set predated #910 and was replaced by the reviewed final main-source captures, with the successful provider results recorded above. The approved icon and feature graphic remain unchanged.
 - **Google Play console setup:** complete for the currently available first-launch forms/settings: Ads, Sign-in details/App access, Target audience/content, IARC content rating, Data Safety, listing/assets, and Production countries **United States + Canada**. The remaining Google owner gate is the closed-test qualification clock followed by the Production-access application when Google enables it.
 - **Google Data Safety:** submitted successfully by run `36632174516`.
 - **Apple metadata already live:** version 1.0 is manual release; the en-US listing copy, privacy policy/choices URLs, content-rights declaration, and reviewed 12+ age-rating answers are present.
@@ -109,7 +113,7 @@ Reviewer path for the native navigation repair (#910):
 6. Open My Pack One → Account settings for profile, membership, sign-in/security, sign-out and permanent deletion. Help and policies are available from Help or Account settings.
 7. Shared invitations require explicit acceptance. Practice shows Continue shared run / View shared result only for a valid identity-bound checkpoint on this device; it is not a cloud history list.
 
-These revised instructions apply only to a candidate containing #890, #910 and #955. Do not use the October 2 builds (iOS 100415 / Android 100444) to accept this repair.
+These revised instructions apply to final iOS 100505 / Android 100491, containing #890/#910/#955/#960. Do not use the October 2 builds (iOS 100415 / Android 100444) to accept this repair.
 
 Apple-linked account deletion requires fresh Apple authorization and revokes the Apple authorization before provider cleanup completes.
 
@@ -287,10 +291,10 @@ Only unfinished owner actions are listed here. Completed, intentionally declined
 
 ### Apple / App Store Connect
 
-1. **Finish any remaining App Review Information contact/notes fields.**
+1. **Reconfirm App Review Notes against the final repaired navigation.**
    - The non-expiring reviewer credentials are already entered in App Store Connect.
    - App Store Connect -> Apps -> Pack One -> version 1.0 -> **App Review Information**.
-   - Confirm the review contact **name, phone, and email** are filled in.
+   - Review contact fields and credentials are already configured; the remaining check is the updated Notes.
    - Confirm the **Notes** field contains the prepared review instructions/reviewer path in this document.
    - Do not submit the app for review until the exact iOS RC has completed the separate physical-device acceptance gates in issue #575.
 
