@@ -95,7 +95,7 @@ async function candidatePools() {
       AND p.profile_public=true AND p.public_identity_hidden_at IS NULL
       AND NOT EXISTS(SELECT 1 FROM creator_challenges c WHERE c.source_owner_player_id=s.player_id)
     ORDER BY s.updated_at DESC LIMIT 40`)).rows;
-  const daily=(await query(`SELECT s.id::text session_id,s.player_id::text player_id,s.day::text day,
+  const daily=(await query(`SELECT s.id::text session_id,s.player_id::text player_id,s.day::text source_day,
       s.score::int score,s.environment,s.answers,s.puzzle_ids
     FROM draft_run_sessions s
     JOIN players p ON p.id=s.player_id
@@ -188,7 +188,7 @@ async function publicMetadata(challenge,token) {
 async function playChallenge(challenge,candidate,guestToken,guestId) {
   const sourceAnswers=parseJson(candidate.answers)||[];
   assert.equal(sourceAnswers.length,8);
-  const sourceBefore=(await query(`SELECT id::text id,day::text day,score::int score,answers,puzzle_ids,
+  const sourceBefore=(await query(`SELECT id::text id,day::text source_day,score::int score,answers,puzzle_ids,
       result_persisted_at,updated_at FROM draft_run_sessions WHERE id=$1::uuid`,[candidate.session_id])).rows[0];
   const dailyBefore=await count('SELECT count(*)::int n FROM draft_run_sessions WHERE player_id=$1::uuid AND day IS NOT NULL',[guestId]);
 
@@ -229,14 +229,14 @@ async function playChallenge(challenge,candidate,guestToken,guestId) {
   assert.equal(run.comparison.trophy_matches,trophyMatches);
   assert.equal(run.comparison.outcome,expectedOutcome);
 
-  const stored=(await query(`SELECT day::text day,creator_challenge_id::text creator_challenge_id,measurement_qa
+  const stored=(await query(`SELECT day::text source_day,creator_challenge_id::text creator_challenge_id,measurement_qa
     FROM draft_run_sessions WHERE id=$1::uuid`,[run.id])).rows[0];
-  assert.equal(stored.day,null,'creator replay must be unranked, not a Daily');
+  assert.equal(stored.source_day,null,'creator replay must be unranked, not a Daily');
   assert.equal(stored.creator_challenge_id,challenge.id);
   const dailyAfter=await count('SELECT count(*)::int n FROM draft_run_sessions WHERE player_id=$1::uuid AND day IS NOT NULL',[guestId]);
   assert.equal(dailyAfter,dailyBefore,'creator replay must not consume or create a real Daily');
 
-  const sourceAfter=(await query(`SELECT id::text id,day::text day,score::int score,answers,puzzle_ids,
+  const sourceAfter=(await query(`SELECT id::text id,day::text source_day,score::int score,answers,puzzle_ids,
       result_persisted_at,updated_at FROM draft_run_sessions WHERE id=$1::uuid`,[candidate.session_id])).rows[0];
   assert.deepEqual(sourceAfter,sourceBefore,'original creator source must remain immutable');
 
