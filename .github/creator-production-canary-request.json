@@ -1,0 +1,5 @@
+{
+  "operation": "run-creator-production-canary",
+  "reason": "Owner-authorized production acceptance for Issue #984 after PR #987. Use authentic completed non-QA Practice and closed Daily sources through the live Admin creator APIs; publish protected creator routes, exercise guest play, creator self-open, progressive reveal, final comparison, stats, attribution dedupe and Daily isolation, then verify Admin retirement and privacy retirement remove personalized static assets before completion. Leave no live canary route.",
+  "expected_release": "f6ea0910d322f007f0ac0004b98fea6bab09422a"
+}
