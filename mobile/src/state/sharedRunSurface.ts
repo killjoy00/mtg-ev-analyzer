@@ -7,5 +7,5 @@ export type SharedRunSurface = {
   session: MobileSession;
   loadRun: () => Promise<DraftRunState>;
   submitPick: (run: DraftRunState, cardId: string) => Promise<DraftRunState>;
-  createShare: () => Promise<{ id?: string; creator?: boolean; slug?: string; url?: string }>;
+  createShare: () => Promise<{ id: string; creator?: boolean; slug?: string; url?: string }>;
 };
