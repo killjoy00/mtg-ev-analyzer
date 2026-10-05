@@ -211,8 +211,15 @@ export async function creatorChallengeById(query,id,{forUpdate=false,includeStat
         count(*) FILTER(WHERE e.event_name='creator_challenge_open')::int opens,
         count(*) FILTER(WHERE e.event_name='creator_challenge_started')::int starts
       FROM analytics_events e
+      JOIN players ep ON ep.id=e.player_id
       WHERE e.event_name IN ('creator_challenge_open','creator_challenge_started')
         AND e.event_props->>'creator_challenge_id'=c.id::text
+        AND NOT coalesce(ep.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
+        AND NOT EXISTS (
+          SELECT 1 FROM account_links ea
+          JOIN pack1_admins admin ON admin.auth_user_id=ea.auth_user_id
+          WHERE ea.player_id=e.player_id
+        )
     ) funnel ON true` : '';
   const result=await query(`SELECT c.*,s.score source_score,s.day authoritative_source_day,s.environment authoritative_environment,
       s.player_id authoritative_owner_player_id,s.measurement_qa,
@@ -252,6 +259,17 @@ export async function validateCreatorChallengeSource(query,row,{today,requireClo
 export async function assertCreatorChallengePlayable(query,row,{today}={}) {
   if(!row||row.status!=='published')fail('This creator challenge is not available.',410,'CREATOR_CHALLENGE_UNAVAILABLE');
   return validateCreatorChallengeSource(query,row,{today,requireClosed:true});
+}
+
+export function creatorAcquisitionProps(row) {
+  return {
+    source:row.acquisition_source,
+    campaign:row.acquisition_campaign,
+    ...(row.acquisition_medium?{medium:row.acquisition_medium}:{}),
+    creator_challenge_id:row.id,
+    creator_challenge_slug:row.slug,
+    creator_source_type:row.source_type,
+  };
 }
 
 export function publicCreatorChallenge(row) {
