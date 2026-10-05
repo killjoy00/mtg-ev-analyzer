@@ -259,6 +259,65 @@ export async function creatorChallengeForPublic(query,identifier,{today}) {
   return row;
 }
 
+export async function loadCreatorChallengeForStart(query,identifier,{today}) {
+  const challenge=UUID.test(String(identifier||''))?await creatorChallengeById(query,identifier):await creatorChallengeBySlug(query,identifier);
+  const source=await assertCreatorChallengePlayable(query,challenge,{today});
+  return {challenge,source};
+}
+
+export async function loadCreatorChallengeForExistingSession(query,id) {
+  const challenge=await creatorChallengeById(query,id);
+  if(!challenge||!['published','retired'].includes(challenge.status)||challenge.privacy_removed_at)
+    fail('This creator challenge is no longer available.',410,'CREATOR_CHALLENGE_UNAVAILABLE');
+  if(!challenge.source_session_id||!challenge.authoritative_owner_player_id||challenge.source_score==null)
+    fail('This creator challenge is no longer available.',410,'CREATOR_CHALLENGE_UNAVAILABLE');
+  if(challenge.public_identity_hidden_at||!bool(challenge.profile_public)||bool(challenge.measurement_qa))
+    fail('This creator challenge is no longer available.',410,'CREATOR_CHALLENGE_UNAVAILABLE');
+  const source=await sourceSession(query,challenge.source_session_id,{
+    expectedPlayerId:challenge.source_owner_player_id,
+    expectedType:challenge.source_type,
+  });
+  return {challenge,source};
+}
+
+export function creatorRevealState(challenge,source,answers,{complete=false,self=false}={}) {
+  const sourceAnswers=Array.isArray(source?.answers)?source.answers:[];
+  const revealed=(Array.isArray(answers)?answers:[]).map((answer,index)=>{
+    const creator=sourceAnswers[index];
+    if(!creator)return answer;
+    return {
+      ...answer,
+      creatorId:creator.selectedId,
+      creatorName:creator.selectedName,
+      creatorMatch:creator.selectedId===answer.selectedId,
+    };
+  });
+  const creatorMatches=revealed.filter(answer=>answer.creatorMatch).length;
+  const trophyMatches=revealed.filter(answer=>answer.historicalMatch).length;
+  const score=complete&&revealed.length?Math.round(revealed.reduce((sum,answer)=>sum+Number(answer.score||0),0)/revealed.length):null;
+  const outcome=complete&&score!=null
+    ? score>source.score?'win':score<source.score?'loss':'tie'
+    : null;
+  const comparison={
+    kind:'creator',
+    id:challenge.id,
+    slug:challenge.slug,
+    name:challenge.creator_public_name,
+    handle:challenge.creator_handle||null,
+    headline:challenge.headline||`Can you beat ${challenge.creator_public_name}?`,
+    score:source.score,
+    exact:true,
+    source_type:challenge.source_type,
+    source_day:challenge.source_day||null,
+    creator_matches:complete?creatorMatches:null,
+    trophy_matches:complete?trophyMatches:null,
+    outcome,
+    self:Boolean(self),
+    ...(complete&&challenge.creator_post_run_note?{creator_post_run_note:challenge.creator_post_run_note}:{}),
+  };
+  return {answers:revealed,comparison,outcome,creatorMatches,trophyMatches};
+}
+
 export async function createCreatorChallenge(query,payload,adminAuthUserId) {
   const resolved=await resolveCreatorSourceInput(query,payload);
   const meta=normalizeMetadata(payload,resolved.source);
