@@ -258,3 +258,24 @@ test('account deletion pauses after dispatching creator retirement until the sta
   assert.equal(dispatchBody.inputs.creator_action,'retire');
   assert.equal(dispatchBody.inputs.creator_challenge_id,CHALLENGE);
 });
+
+
+test('creator migration preserves attribution across account merge and demotes duplicate attempts',async()=>{
+  const migration=await readFile('migrations/0053_creator_challenges.sql','utf8');
+  assert.match(migration,/pack1_fill_creator_challenge_result/);
+  assert.match(migration,/creator_challenge_result_fill/);
+  assert.match(migration,/pack1_prepare_creator_challenge_player_merge/);
+  assert.match(migration,/creator_challenge_player_merge_guard/);
+  assert.match(migration,/NEW\.creator_challenge_id=NULL/);
+  assert.match(migration,/NEW\.start_idempotency_hash=NULL/);
+  assert.match(migration,/creator_participant_auth_user_id=COALESCE/);
+});
+
+test('creator privacy cleanup scrubs retained challenger labels and creator auth identity',async()=>{
+  const deletion=await readFile('worker/account-deletion.mjs','utf8');
+  const moderation=await readFile('worker/user-admin.mjs','utf8');
+  assert.match(deletion,/UPDATE game_results SET opponent_name='A creator'/);
+  assert.match(deletion,/source_owner_auth_user_id=NULL/);
+  assert.match(moderation,/creator_result_scrub/);
+  assert.match(moderation,/UPDATE game_results SET opponent_name='A creator'/);
+});
