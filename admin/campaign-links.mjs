@@ -50,7 +50,7 @@ function creatorShareCopy(challenge) {
   const context=challenge.source_type==='daily'
     ? `the ${dateLabel(challenge.source_day)} Pack One ${environment} Daily`
     : `this Pack One ${environment} Practice run`;
-  return `I scored ${score}/100 on ${context}. Think you can beat me? ${challenge.public_url||`https://packone.pro/go/${challenge.slug}/`}`;
+  return `I scored ${score}/100 on ${context}. Think you can beat me? ${challenge.public_url||`https://packone.pro/creator/${challenge.slug}/`}`;
 }
 
 export async function renderCampaignLinks(root,publishRequest,draftRequest) {
@@ -283,7 +283,7 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
     const sourceContext=creatorSource.source_type==='daily'
       ? `${environmentLabel(creatorSource.environment)} Daily · ${dateLabel(creatorSource.day)}`
       : environmentLabel(creatorSource.environment);
-    creatorPreview.innerHTML=`<p class="eyebrow">BEAT THE CREATOR</p><h2>${esc(entry.headline)}</h2><p>${esc(sourceContext)} · 8 decisions<br>Creator score: <strong>${Number(creatorSource.score)}/100</strong></p><p>Public URL: <code>https://packone.pro/go/${esc(slug||'your-slug')}/</code><br>Attribution: source=${esc(entry.acquisition_source)} · campaign=${esc(entry.acquisition_campaign)}${entry.acquisition_medium?` · medium=${esc(entry.acquisition_medium)}`:''}</p>${duplicate&&!creatorDraft?'<p class="error">That slug is already reserved.</p>':''}`;
+    creatorPreview.innerHTML=`<p class="eyebrow">BEAT THE CREATOR</p><h2>${esc(entry.headline)}</h2><p>${esc(sourceContext)} · 8 decisions<br>Creator score: <strong>${Number(creatorSource.score)}/100</strong></p><p>Public URL: <code>https://packone.pro/creator/${esc(slug||'your-slug')}/</code><br>Attribution: source=${esc(entry.acquisition_source)} · campaign=${esc(entry.acquisition_campaign)}${entry.acquisition_medium?` · medium=${esc(entry.acquisition_medium)}`:''}</p>${duplicate&&!creatorDraft?'<p class="error">That slug is already reserved.</p>':''}`;
   }
 
   sourceForm.addEventListener('change',event=>{
@@ -359,7 +359,7 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
       creatorPublishStatus.textContent='Starting protected vanity publication…';
       const requested=await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/publication`,{action:'publish'});
       const published=requested.already_published?requested.challenge:await waitForCreatorPublication(challenge,'published');
-      const publicUrl=`https://packone.pro/go/${published.slug}/`,trackedUrl=creatorTrackedUrl(published),socialImage=publicUrl+'creator-card.png';
+      const publicUrl=`https://packone.pro/creator/${published.slug}/`,trackedUrl=creatorTrackedUrl(published),socialImage=publicUrl+'creator-card.png';
       creatorPublishStatus.textContent=`Published: ${publicUrl}`;
       creatorKit.hidden=false;
       creatorKit.innerHTML=`<h3>Creator kit</h3><label>Public link<input readonly value="${esc(publicUrl)}"></label><label>Tracked link<input readonly value="${esc(trackedUrl)}"></label><label>Social image<input readonly value="${esc(socialImage)}"></label><img src="${esc(socialImage)}" alt="${esc(published.headline||`Can you beat ${published.creator_public_name}?`)}" style="max-width:100%;height:auto"><label>Ready-to-send copy<textarea readonly rows="3">${esc(creatorShareCopy({...published,public_url:publicUrl}))}</textarea></label><button type="button" class="secondary" data-copy-creator-link>Copy public link</button> <button type="button" class="secondary" data-copy-creator-tracked>Copy tracked link</button> <button type="button" class="secondary" data-copy-creator-image>Copy image URL</button> <button type="button" class="secondary" data-copy-creator-copy>Copy post copy</button>`;
@@ -380,7 +380,7 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
       creatorExistingStatus.textContent=data.challenges.length?`${data.challenges.length} creator challenge(s).`:'No creator challenges yet.';
       creatorExisting.replaceChildren(...data.challenges.map(challenge=>{
         const item=document.createElement('article');item.className='note';
-        const publicUrl=`https://packone.pro/go/${challenge.slug}/`,trackedUrl=creatorTrackedUrl(challenge);
+        const publicUrl=`https://packone.pro/creator/${challenge.slug}/`,trackedUrl=creatorTrackedUrl(challenge);
         const retiredVerified=challenge.status==='retired'&&challenge.publication_detail?.live_verified===true;
         item.innerHTML=`<strong>${esc(challenge.creator_public_name)}</strong> · ${esc(challenge.slug)}<br>${esc(challenge.source_type==='daily'?`Daily · ${dateLabel(challenge.source_day)}`:'Practice')} · ${esc(environmentLabel(challenge.source_environment))} · ${Number(challenge.source_score)}/100<br>Status: <strong>${esc(challenge.status)}</strong>${challenge.status==='retired'&&!retiredVerified?' · retired page not yet verified':''} · Opens: ${Number(challenge.opens||0)} · Starts: ${Number(challenge.starts||0)} · Completions: ${Number(challenge.completions||challenge.attempts||0)}<br>Attempts: ${Number(challenge.attempts||0)} · Beat rate: ${challenge.beat_percentage==null?'—':Number(challenge.beat_percentage)+'%'} · Avg challenger: ${challenge.average_score==null?'—':Number(challenge.average_score)+'/100'} · W/T/L: ${Number(challenge.wins||0)}/${Number(challenge.ties||0)}/${Number(challenge.losses||0)}<br><small>${esc(publicUrl)} · created ${esc(dateLabel(String(challenge.created_at||'').slice(0,10)))}${challenge.published_at?` · published ${esc(dateLabel(String(challenge.published_at).slice(0,10))) }`:''}</small><div class="actions">${['draft','failed','publishing'].includes(challenge.status)?'<button type="button" class="secondary" data-resume-publish>Publish / resume</button>':''}${challenge.status==='retired'&&!retiredVerified?'<button type="button" class="secondary" data-resume-retire>Resume retirement</button>':''}<button type="button" class="secondary" data-copy-public>Copy public URL</button><button type="button" class="secondary" data-copy-tracked>Copy tracked URL</button>${challenge.status==='published'?'<a class="button secondary" target="_blank" rel="noopener" href="'+esc(publicUrl)+'">Open challenge</a>':''}${challenge.status!=='retired'?'<button type="button" class="secondary" data-retire>Retire challenge</button>':''}</div>`;
         item.querySelector('[data-copy-public]').onclick=()=>copy(publicUrl,creatorExistingStatus);
