@@ -19,6 +19,7 @@ import {inspectLaunchCoverageFreshness} from './launch-watcher-stale.mjs';
 import {reconcileLaunchWatcherAlert} from './launch-watcher-alert.mjs';
 import {launchWatcherRecoveryConfigured,reconcileLaunchWatcherCadence,reconcileLaunchWatcherDispatch} from './launch-watcher-dispatch.mjs';
 import {campaignLinkPublishConfigured,handleCampaignLinkPublish} from './campaign-link-publish.mjs';
+import {handleCreatorChallengePublication,requestCreatorPrivacyRetirement} from './creator-challenge-publish.mjs';
 import {handleAdminAccountDeletion} from './admin-account-deletion.mjs';
 import {handleAdminUsernameChange} from './admin-username-change.mjs';
 import {maintainServingReadiness} from './corpus-readiness.mjs';
@@ -1960,7 +1961,7 @@ function bearer(request) {
   return value.startsWith('Bearer ')?value.slice(7):'';
 }
 
-async function deletionMaintenanceSnapshot({advanced=[],swept=null,reportOnly=false}={}) {
+async function deletionMaintenanceSnapshot({advanced=[],creatorPrivacy=[],swept=null,reportOnly=false}={}) {
   const remaining=await maintenanceBatch(query,{limit:50});
   const attention=remaining.filter(row=>stuckDeletion(row)).map(row=>({
     operation_id:row.operation_id,
@@ -1975,6 +1976,7 @@ async function deletionMaintenanceSnapshot({advanced=[],swept=null,reportOnly=fa
     sweep_enabled:verificationSweepEnabled(),
     report_only:reportOnly,
     advanced,
+    creator_privacy:creatorPrivacy,
     swept_expired_verifications:swept,
     attention,
   },attention.length?503:200);
@@ -2104,7 +2106,32 @@ async function handleDeletionMaintenance(request) {
   const trigger=await authorizeDeletionMaintenance(request);
   const readiness=await maintainServingReadiness(query);
   console.log(JSON.stringify({operation:'corpus-readiness-maintenance',operation_id:readiness.operation_id,state:readiness.state,revision:readiness.current_revision,ready:readiness.ready}));
-  const advanced=[];
+  const advanced=[],creatorPrivacy=[];
+  const privacyRows=await query(`SELECT DISTINCT c.source_owner_player_id::text player_id
+    FROM creator_challenges c
+    JOIN players p ON p.id=c.source_owner_player_id
+    WHERE c.source_owner_player_id IS NOT NULL
+      AND (c.privacy_removed_at IS NOT NULL OR NOT p.profile_public OR p.public_identity_hidden_at IS NOT NULL)
+      AND NOT (
+        c.status='retired'
+        AND COALESCE(c.publication_detail->>'live_verified','false')='true'
+      )
+    ORDER BY c.source_owner_player_id::text
+    LIMIT 20`);
+  for(const row of privacyRows.rows) {
+    try {
+      const ready=await requestCreatorPrivacyRetirement(query,row.player_id,{reason:'privacy_maintenance'});
+      creatorPrivacy.push({player_id:row.player_id,ready});
+    } catch(error) {
+      creatorPrivacy.push({player_id:row.player_id,ready:false,error:String(error?.message||error).slice(0,120)});
+      console.error(JSON.stringify({
+        event:'creator_privacy_retirement_maintenance_failure',
+        player_id:row.player_id,
+        error:String(error?.message||error).slice(0,120),
+        release_commit:releaseMetadata().release_commit,
+      }));
+    }
+  }
   if(deletionEnabled()) {
     for(const operation of await maintenanceBatch(query,{limit:20})) {
       if(operation.state==='operator_review')continue;
@@ -2127,7 +2154,7 @@ async function handleDeletionMaintenance(request) {
     }
   }
   const swept=verificationSweepEnabled()?await sweepExpiredVerification(query,{limit:200}):null;
-  const response=await deletionMaintenanceSnapshot({advanced,swept});
+  const response=await deletionMaintenanceSnapshot({advanced,creatorPrivacy,swept});
   return launchWatcherSignal(trigger,json({...await response.json(),corpus_readiness:readiness},response.status));
 }
 
@@ -2302,6 +2329,44 @@ async function handleProfileUpdate(request,{mobile=false}={}) {
   } catch (error) {
     rethrowUsernameConflict(error);
   }
+  if(bool(meta.profile_public)&&!profilePublic) {
+    await query(`UPDATE game_results SET opponent_name='A creator'
+      WHERE creator_challenge_id IN (
+        SELECT id FROM creator_challenges WHERE source_owner_player_id=$1::uuid
+      )`,[id]);
+    await query(`UPDATE creator_challenges
+      SET status='retired',creator_public_name='A creator',creator_handle=NULL,
+          headline='Creator challenge unavailable',creator_post_run_note=NULL,
+          source_owner_auth_user_id=NULL,
+          privacy_removed_at=COALESCE(privacy_removed_at,now()),
+          retired_at=COALESCE(retired_at,now()),updated_at=now(),
+          publication_operation_ref=NULL,publication_error=NULL,
+          publication_detail=CASE
+            WHEN published_at IS NULL
+            AND status NOT IN ('published','publishing')
+            AND NOT (
+              publication_detail->>'action'='publish'
+              AND (
+                publication_detail ? 'workflow'
+                OR COALESCE(publication_detail#>>'{dispatch,state}','') IN ('accepted','ambiguous')
+              )
+            ) THEN
+              jsonb_build_object(
+                'action','retire','reason','profile_private',
+                'live_verified',true,'static_cleanup','not_required'
+              )
+            ELSE
+              jsonb_build_object(
+                'action','retire','reason','profile_private',
+                'live_verified',false,'static_cleanup','required',
+                'dispatch',jsonb_build_object('state','pending','attempts',0)
+              )
+          END
+      WHERE source_owner_player_id=$1::uuid`,[id]);
+    await query(`INSERT INTO analytics_events(player_id,event_name,event_props)
+      SELECT $1::uuid,'creator_privacy_retirement_pending',jsonb_build_object('reason','profile_private')
+      WHERE EXISTS(SELECT 1 FROM creator_challenges WHERE source_owner_player_id=$1::uuid)`,[id]);
+  }
   const updatedMeta = await profileMetaByPlayer(id);
   return json(await buildProfile(id, updatedMeta, { own: true }));
 }
@@ -2379,6 +2444,7 @@ async function route(request) {
     return json(result.body,result.status);
   }
   if (url.pathname === '/v1/admin/campaign-links/publish') return handleCampaignLinkPublish(request,{query,readJson,allowedOrigins:ALLOWED_ORIGINS});
+  if (/^\/v1\/admin\/creator-challenges\/[a-f0-9-]{36}\/publication$/i.test(url.pathname)) return handleCreatorChallengePublication(request,{query,readJson,allowedOrigins:ALLOWED_ORIGINS,today:gameDateKey()});
   if (request.method === 'POST' && url.pathname === '/internal/player-session-refresh') return handleBrowserPlayerSession(request,{existingOnly:true});
   if (request.method === 'POST' && url.pathname === '/v1/player/session') return handleBrowserPlayerSession(request);
   if (request.method === 'POST' && url.pathname === '/v1/player/migrate') return handlePlayerMigration(request);

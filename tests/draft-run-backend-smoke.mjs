@@ -160,6 +160,7 @@ const authId=crypto.randomUUID(),authToken=crypto.randomUUID()+crypto.randomUUID
 await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,false)',[authId,'QA owner '+tag,`qa-${tag}@example.invalid`]);
 await query('INSERT INTO neon_auth.session(token,"userId","expiresAt","updatedAt") VALUES($1,$2::uuid,now()+interval \'1 hour\',now())',[authToken,authId]);
 const authHeaders={'x-pack1-auth-session':authToken};
+
 // Even an unfinished established Daily takes priority over a guest's finished score.
 await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) VALUES($1::uuid,$2::date,'mixed','draft_run',100,'A','[]'::jsonb)",[guest.playerId,gameDateKey()]);
 await call(growth,'/v1/account/link',{},owner.token,200,{headers:authHeaders});

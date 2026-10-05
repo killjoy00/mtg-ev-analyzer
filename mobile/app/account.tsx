@@ -66,6 +66,7 @@ export default function AccountScreen() {
     environment?: string;
     returnTo?: string;
     shared?: string;
+    creator?: string;
     profileKey?: string;
     pendingAction?: string;
     reportReason?: string;
@@ -79,6 +80,7 @@ export default function AccountScreen() {
   const returnEnvironment = isDailyEnvironment(requestedEnvironment) ? requestedEnvironment : 'mixed';
   const returnToPractice = params.returnTo === 'practice';
   const returnShared = params.returnTo === 'shared' && typeof params.shared === 'string' && /^[a-f0-9]{24}$/.test(params.shared) ? params.shared : null;
+  const returnCreator = params.returnTo === 'creator' && typeof params.creator === 'string' && /^(?:[a-f0-9-]{36}|[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?)$/.test(params.creator) ? params.creator : null;
   const returnSharedRecovery = params.returnTo === 'shared-recovery';
   const returnProfileKey = typeof params.profileKey === 'string' && /^[a-f0-9]{16}$/.test(params.profileKey)
     ? params.profileKey
@@ -119,6 +121,10 @@ export default function AccountScreen() {
       router.dismissTo({ pathname: '/shared-run', params: { shared: returnShared } });
       return;
     }
+    if (returnCreator) {
+      router.dismissTo({ pathname: '/creator-run', params: { creator: returnCreator } });
+      return;
+    }
     if (returnSharedRecovery) {
       router.dismissTo('/resume-shared-run');
       return;
@@ -146,7 +152,7 @@ export default function AccountScreen() {
       return;
     }
     if (fallbackToCareer) router.dismissTo('/career');
-  }, [validateDailyRunId, returnEnvironment, returnToPractice, returnShared, returnSharedRecovery, returnProfileKey, pendingAction, reportReason]);
+  }, [validateDailyRunId, returnEnvironment, returnToPractice, returnShared, returnCreator, returnSharedRecovery, returnProfileKey, pendingAction, reportReason]);
 
   const continueAfterDisplayNamePrompt = useCallback((validatedDailyScore = pendingClaimValidatedDaily) => {
     setPromptDisplayName(false);

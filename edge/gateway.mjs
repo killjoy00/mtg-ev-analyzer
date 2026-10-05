@@ -39,6 +39,11 @@ export function adminPath(path,method) {
   if(/^\/v1\/admin\/corpus\/readiness\/[1-9][0-9]{0,18}\/retry$/.test(path)&&method==='POST')return true;
   if(/^\/v1\/admin\/corpus\/[a-z0-9-]{2,80}(?:\/components\/[a-z0-9_.-]{2,120})?\/status$/.test(path)&&method==='POST')return true;
   if(/^\/v1\/admin\/corpus\/[a-z0-9-]{2,80}\/snapshot$/.test(path)&&method==='POST')return true;
+  if(path==='/v1/admin/creator-challenges'&&['GET','POST'].includes(method))return true;
+  if(path==='/v1/admin/creator-challenges/resolve'&&method==='POST')return true;
+  if(path==='/v1/admin/creator-challenges/players'&&method==='GET')return true;
+  if(/^\/v1\/admin\/creator-challenges\/players\/[a-f0-9-]{36}\/dailies$/.test(path)&&method==='GET')return true;
+  if(/^\/v1\/admin\/creator-challenges\/[a-f0-9-]{36}$/.test(path)&&method==='GET')return true;
   return false;
 }
 
@@ -47,6 +52,7 @@ export function adminGrowthPath(path,method,mode) {
   if(method==='POST'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/delete$/.test(path))return true;
   if(method==='GET'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/deletion$/.test(path))return true;
   if(method==='PATCH'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/username$/.test(path))return true;
+  if(['GET','POST'].includes(method)&&/^\/v1\/admin\/creator-challenges\/[a-f0-9-]{36}\/publication$/.test(path))return true;
   return false;
 }
 
@@ -83,6 +89,7 @@ function permitted(service,path,method,search,mode) {
     if(method==='GET'&&['/v1/leaderboard','/v1/daily-status','/v1/capabilities','/v1/practice-sets','/v1/set-catalog'].includes(path))return true;
     if(method==='GET'&&/^\/v1\/runs\/[a-f0-9-]+$/.test(path))return true;
     if(method==='GET'&&/^\/v1\/(?:challenges|shared-runs)\/[a-f0-9]{24}$/.test(path))return true;
+    if(method==='GET'&&/^\/v1\/creator-challenges\/[a-z0-9-]{1,64}$/.test(path))return true;
     return mode==='production'&&adminPath(path,method);
   }
   return (method==='POST'&&['/v1/session','/v1/scores','/v1/challenges'].includes(path))||
@@ -165,6 +172,7 @@ function mobileSessionRoute(service,path,method) {
   if(method==='POST'&&/^\/v1\/runs\/[a-f0-9-]+\/(pick|reroll|report|share|view)$/.test(path))return true;
   if(method==='GET'&&/^\/v1\/runs\/[a-f0-9-]+$/.test(path))return true;
   if(method==='GET'&&/^\/v1\/shared-runs\/[a-f0-9]{24}$/.test(path))return true;
+  if(method==='GET'&&/^\/v1\/creator-challenges\/[a-z0-9-]{1,64}$/.test(path))return true;
   return method==='GET'&&['/v1/daily-status','/v1/capabilities','/v1/practice-sets','/v1/set-catalog'].includes(path);
 }
 function mobileAccountRoute(service,path,method) {
@@ -180,6 +188,7 @@ function mobileAccountRoute(service,path,method) {
   if(method==='POST'&&/^\/v1\/runs\/[a-f0-9-]+\/(pick|reroll|report|share|view)$/.test(path))return true;
   if(method==='GET'&&/^\/v1\/runs\/[a-f0-9-]+$/.test(path))return true;
   if(method==='GET'&&/^\/v1\/shared-runs\/[a-f0-9]{24}$/.test(path))return true;
+  if(method==='GET'&&/^\/v1\/creator-challenges\/[a-z0-9-]{1,64}$/.test(path))return true;
   return method==='GET'&&['/v1/daily-status','/v1/capabilities','/v1/practice-sets','/v1/set-catalog'].includes(path);
 }
 function safeRedirect(value,{mobileOAuth=false}={}) {
@@ -229,10 +238,12 @@ export function routeFamily(path) {
   if(path==='/growth/v1/apple-subscriptions/notifications')return 'apple_subscription_notification';
   if(path==='/growth/v1/mobile/version')return 'mobile_version';
   if(path==='/growth/v1/admin/campaign-links/publish')return 'admin_campaign_publish';
+  if(/^\/growth\/v1\/admin\/creator-challenges\/[a-f0-9-]{36}\/publication$/.test(path))return 'admin_creator_challenge_publish';
   if(/^\/draft\/v1\/runs\/[^/]+\/(pick|view|reroll|share|report)$/.test(path))return 'draft_'+path.split('/').at(-1);
   if(path==='/draft/v1/runs')return 'draft_start';
   if(/^\/draft\/v1\/runs\/[^/]+$/.test(path))return 'draft_read';
   if(/^\/draft\/v1\/shared-runs\/[a-f0-9]{24}$/.test(path))return 'draft_shared_read';
+  if(/^\/draft\/v1\/creator-challenges\/[a-z0-9-]{1,64}$/.test(path))return 'draft_creator_challenge_read';
   for(const name of ['leaderboard','daily-status','capabilities','practice-sets','set-catalog'])if(path==='/draft/v1/'+name)return 'draft_'+name.replaceAll('-','_');
   if(/^\/growth\/v1\/(player\/)?session$/.test(path))return 'player_session';
   if(/^\/growth\/v1\/(mobile\/)?account(?:\/|$)/.test(path))return 'account';

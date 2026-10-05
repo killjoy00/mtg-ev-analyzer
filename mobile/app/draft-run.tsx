@@ -462,8 +462,15 @@ export default function DraftRunScreen({
   const setIdsParam = practice && typeof params.setIds === 'string' ? params.setIds : '';
   const setIds = useMemo(() => parsePracticeSets(setIdsParam), [setIdsParam]);
   const dailyMeta = DAILY_ENVIRONMENT_META[environment];
+  const creatorChallenge = shared?.initialRun.comparison?.kind === 'creator';
   const surfaceMeta = shared
-    ? { eyebrow: 'SHARED DRAFT RUN', resultTitle: 'Shared run complete.' }
+    ? shared.kind==='source'
+      ? shared.sourceType==='daily'
+        ? { eyebrow: 'DAILY DRAFT RUN', resultTitle: 'Your Draft Run.' }
+        : { eyebrow: 'PRACTICE DRAFT RUN', resultTitle: 'Practice complete.' }
+      : creatorChallenge
+        ? { eyebrow: 'BEAT THE CREATOR', resultTitle: 'Creator challenge complete.' }
+        : { eyebrow: 'SHARED DRAFT RUN', resultTitle: 'Shared run complete.' }
     : practice
       ? {
           eyebrow: setIds.length
@@ -831,12 +838,18 @@ export default function DraftRunScreen({
     setShareError(null);
     try {
       const setParam = resultEnvironment === 'powered-cube' || resultEnvironment === 'latest' ? `&set=${resultEnvironment}` : '';
+      const share = state.run.day ? null : (shared ? await shared.createShare() : await createDraftRunShare(state.run.id, state.session));
       const url = state.run.day
         ? `https://packone.pro/?game=draft-run${setParam}&daily=1&ref=result_share`
-        : `https://packone.pro/?game=draft-run${setParam}&shared=${(shared ? await shared.createShare() : await createDraftRunShare(state.run.id, state.session)).id}`;
+        : share?.creator && share.url
+          ? share.url
+          : `https://packone.pro/?game=draft-run${setParam}&shared=${share?.id}`;
+      const creator = state.run.comparison?.kind === 'creator' ? state.run.comparison : null;
       const text = state.run.day
         ? `I scored ${state.run.score ?? 0}/100 on today’s Pack One ${label}. Can you beat it?\n${squares}\n${matches}/${state.run.run_length} trophy picks matched · Daily ${state.run.day}`
-        : `Pack One · ${label} · ${shared ? 'Shared run' : 'Practice'}\n${state.run.score ?? 0}/100  ${squares}\n${matches}/${state.run.run_length} trophy picks matched. Play this run and compare.`;
+        : creator
+          ? `I scored ${state.run.score ?? 0}/100 trying to beat ${creator.name} on Pack One.\n${Number(creator.creator_matches ?? 0)}/${state.run.run_length} creator picks matched · ${Number(creator.trophy_matches ?? matches)}/${state.run.run_length} trophy picks matched.`
+          : `Pack One · ${label} · ${shared ? 'Shared run' : 'Practice'}\n${state.run.score ?? 0}/100  ${squares}\n${matches}/${state.run.run_length} trophy picks matched. Play this run and compare.`;
       await Share.share({ message: `${text}\n${url}` });
     } catch {
       setShareError('Could not open sharing. Your result is still saved.');
@@ -949,21 +962,33 @@ export default function DraftRunScreen({
 
   if (mode === 'result') {
     const matches = run.answers.filter((item) => item.historicalMatch).length;
+    const creator = run.comparison?.kind === 'creator' ? run.comparison : null;
+    const resultTitle = creator
+      ? creator.outcome === 'win' ? `You beat ${creator.name}`
+        : creator.outcome === 'tie' ? `You tied ${creator.name}`
+          : creator.outcome === 'loss' ? `${creator.name} got you this time`
+            : surfaceMeta.resultTitle
+      : surfaceMeta.resultTitle;
     return (
       <SafeAreaView style={styles.safe}>
         <ScrollView contentContainerStyle={styles.resultPage}>
           <Text style={styles.eyebrow}>{surfaceMeta.eyebrow} COMPLETE</Text>
-          <Text style={styles.title}>{surfaceMeta.resultTitle}</Text>
+          <Text style={styles.title}>{resultTitle}</Text>
           <View style={styles.scoreBlock}>
             <Text style={styles.score}>{run.score ?? 0}</Text>
-            <Text style={styles.scoreMeta}>/100 · {matches} trophy picks matched</Text>
+            <Text style={styles.scoreMeta}>/100 · {creator
+              ? `${Number(creator.creator_matches ?? 0)}/${run.run_length} creator picks · ${Number(creator.trophy_matches ?? matches)}/${run.run_length} trophy picks`
+              : `${matches} trophy picks matched`}</Text>
           </View>
           {shared && run.comparison ? (
             <View style={styles.analysisPanel}>
               <Text style={styles.analysisTitle}>You: {run.score ?? 0} · {run.comparison.name}: {run.comparison.score}</Text>
-              <Text style={styles.resultBody}>{run.comparison.exact
-                ? Number(run.score) > run.comparison.score ? 'You won this shared run.' : Number(run.score) < run.comparison.score ? 'Your friend won this shared run.' : 'This shared run was a tie.'
-                : 'These results are not an exact same-decision comparison.'}</Text>
+              <Text style={styles.resultBody}>{creator
+                ? creator.outcome === 'win' ? `You beat ${creator.name}.` : creator.outcome === 'loss' ? `${creator.name} won this challenge.` : 'This creator challenge was a tie.'
+                : run.comparison.exact
+                  ? Number(run.score) > run.comparison.score ? 'You won this shared run.' : Number(run.score) < run.comparison.score ? 'Your friend won this shared run.' : 'This shared run was a tie.'
+                  : 'These results are not an exact same-decision comparison.'}</Text>
+              {creator?.creator_post_run_note ? <Text style={styles.resultBody}>{creator.name} after the run: “{creator.creator_post_run_note}”</Text> : null}
             </View>
           ) : null}
           {run.standing ? (
@@ -1003,18 +1028,20 @@ export default function DraftRunScreen({
           >
             <Text style={styles.secondaryButtonText}>Share result</Text>
           </Pressable>
-          <Pressable accessibilityRole="button" onPress={() => router.dismissTo(practice || shared ? '/practice' : '/')} style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>{practice || shared ? 'Return to Practice' : 'Home'}</Text>
+          <Pressable accessibilityRole="button" onPress={() => router.dismissTo(creatorChallenge ? '/' : practice || shared ? '/practice' : '/')} style={styles.primaryButton}>
+            <Text style={styles.primaryButtonText}>{creatorChallenge ? 'Back to Dailies' : practice || shared ? 'Return to Practice' : 'Home'}</Text>
           </Pressable>
           {shareError ? <Text accessibilityRole="alert" style={styles.actionError}>{shareError}</Text> : null}
           <View style={styles.guestNote}>
             <Text style={styles.guestNoteTitle}>
-              {practice || shared ? 'Saved to your career' : state.session.accountToken ? 'Saved to your account' : 'Guest result'}
+              {creatorChallenge ? 'Creator replay saved' : practice || shared ? 'Saved to your career' : state.session.accountToken ? 'Saved to your account' : 'Guest result'}
             </Text>
             <Text style={styles.resultBody}>
-              {shared
-                ? 'This is your saved shared run. Reopening the invitation recovers the same picks and result, not another attempt.'
-                : practice
+              {creatorChallenge
+                ? 'This is an unranked creator replay. It does not consume or modify your Daily attempt, streak, or leaderboard result.'
+                : shared
+                  ? 'This is your saved shared run. Reopening the invitation recovers the same picks and result, not another attempt.'
+                  : practice
                   ? 'Practice builds your career. Play the Dailies to join the leaderboard.'
                   : state.session.accountToken
                     ? 'Your result is saved to your Pack One account.'
@@ -1068,18 +1095,25 @@ export default function DraftRunScreen({
               </View>
 
               <View style={[styles.feedbackComparison, stackComparison && { flexDirection: 'column' }]}>
-                <FeedbackCard
-                  card={puzzle.candidates.find((card) => card.id === answer.selectedId)}
-                  label={answer.historicalMatch ? 'Trophy and Your Pick' : 'Your Pick'}
-                  onZoom={setZoomedCard}
-                />
-                {!answer.historicalMatch ? (
-                  <FeedbackCard
-                    card={puzzle.candidates.find((card) => card.id === answer.historicalId)}
-                    label="Trophy Pick"
-                    onZoom={setZoomedCard}
-                  />
-                ) : null}
+                {(() => {
+                  const roles: { id: string; label: string }[] = [
+                    { id: answer.selectedId, label: 'Your Pick' },
+                    ...(run.comparison?.kind === 'creator' && answer.creatorId
+                      ? [{ id: answer.creatorId, label: `${run.comparison.name}’s Pick` }]
+                      : []),
+                    ...(answer.historicalId ? [{ id: answer.historicalId, label: 'Trophy Pick' }] : []),
+                  ];
+                  const grouped = new Map<string, string[]>();
+                  for (const role of roles) grouped.set(role.id, [...(grouped.get(role.id) ?? []), role.label]);
+                  return [...grouped].map(([id, labels]) => (
+                    <FeedbackCard
+                      key={id}
+                      card={puzzle.candidates.find((card) => card.id === id)}
+                      label={labels.join(' · ')}
+                      onZoom={setZoomedCard}
+                    />
+                  ));
+                })()}
               </View>
 
               <Pressable

@@ -4,6 +4,7 @@ const NATIVE_PATHS = new Set([
   '/',
   '/account',
   '/career',
+  '/creator-run',
   '/learn',
   '/help',
   '/sign-in',
@@ -79,6 +80,10 @@ function safeNativeSearch(pathname: string, searchParams: URLSearchParams) {
     if (returnTo === 'shared' && shared && /^[a-f0-9]{24}$/.test(shared)) {
       next.set('returnTo', 'shared'); next.set('shared', shared);
     }
+    const creator = searchParams.get('creator');
+    if (returnTo === 'creator' && creator && /^(?:[a-f0-9-]{36}|[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?)$/.test(creator)) {
+      next.set('returnTo', 'creator'); next.set('creator', creator);
+    }
     const environment = environmentFromSet(searchParams.get('environment'));
     if (searchParams.has('environment')) next.set('environment', environment);
     return next.size ? `?${next.toString()}` : '';
@@ -102,6 +107,13 @@ function safeNativeSearch(pathname: string, searchParams: URLSearchParams) {
   if (pathname === '/shared-run') {
     const shared = searchParams.get('shared');
     return shared && /^[a-f0-9]{24}$/.test(shared) ? `?shared=${shared}` : '';
+  }
+
+  if (pathname === '/creator-run') {
+    const creator = searchParams.get('creator');
+    return creator && /^(?:[a-f0-9-]{36}|[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?)$/.test(creator)
+      ? `?creator=${creator}`
+      : '';
   }
 
   if (pathname === '/profile') {
@@ -148,6 +160,9 @@ export function rewriteIncomingPath(path: string) {
       const id = searchParams.get('id');
       return id && /^[a-f0-9]{24}$/.test(id) ? `/shared-run?shared=${id}` : '/';
     }
+
+    const creatorVanity = pathname.replace(/\/+$/, '').match(/^\/creator\/([a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?)$/);
+    if (creatorVanity) return `/creator-run?creator=${creatorVanity[1]}`;
     if (pathname === '/open/daily/' || pathname === '/open/daily') {
       return `/draft-run?environment=${environmentFromSet(searchParams.get('environment'))}`;
     }
@@ -181,6 +196,10 @@ export function rewriteIncomingPath(path: string) {
     }
 
     if (searchParams.get('game') === 'draft-run') {
+      const creator = searchParams.get('creator');
+      if (creator && /^(?:[a-f0-9-]{36}|[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?)$/.test(creator)) {
+        return `/creator-run?creator=${creator}`;
+      }
       const environment = environmentFromSet(searchParams.get('set'));
       if (searchParams.has('shared') || searchParams.has('challenge')) {
         const shared = searchParams.get('shared') || searchParams.get('challenge');

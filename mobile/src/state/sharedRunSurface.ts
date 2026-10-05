@@ -3,9 +3,11 @@ import type { MobileSession } from '@/src/storage/session';
 
 /** The normal DraftRun view consumes this without owning invitation/start authority. */
 export type SharedRunSurface = {
+  kind?: 'shared' | 'creator' | 'source';
+  sourceType?: 'practice' | 'daily';
   initialRun: DraftRunState;
   session: MobileSession;
   loadRun: () => Promise<DraftRunState>;
   submitPick: (run: DraftRunState, cardId: string) => Promise<DraftRunState>;
-  createShare: () => Promise<{ id: string }>;
+  createShare: () => Promise<{ id: string; creator?: boolean; slug?: string; url?: string }>;
 };

@@ -16,14 +16,63 @@ try {
   await page.addInitScript(()=>{localStorage.setItem('pack1-auth-session-v1','synthetic-admin-session');Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async value=>{window.__copiedText=value;}}});});
   const requests=[],publishBodies=[],usernameBodies=[],deleteBodies=[],adminControlRequests=[];
   const userId='11111111-1111-4111-8111-111111111111';
+  const creatorSourceSession='33333333-3333-4333-8333-333333333333';
+  const creatorId='44444444-4444-4444-8444-444444444444';
+  const retryCreatorId='55555555-5555-4555-8555-555555555555';
+  const existingDailyCreatorId='66666666-6666-4666-8666-666666666666';
+  const creatorPublicationBodies=[];
+  let creatorImageRequests=0;
+  let creatorChallenges=[
+    {id:existingDailyCreatorId,slug:'daily-creator',creator_public_name:'Daily Creator',creator_handle:'@daily',headline:'Beat Daily Creator',source_type:'daily',source_day:'2026-09-11',source_environment:'latest',source_score:91,acquisition_source:'creator',acquisition_campaign:'daily-creator',acquisition_medium:'creator',status:'published',publication_detail:{live_verified:true},published_at:'2026-09-12T01:00:00Z',created_at:'2026-09-11T20:00:00Z',opens:12,starts:8,attempts:6,completions:6,wins:2,ties:1,losses:3,beat_percentage:33.3,average_score:84.2},
+    {id:retryCreatorId,slug:'retry-creator',creator_public_name:'Retry Creator',creator_handle:null,headline:'Beat Retry Creator',source_type:'practice',source_day:null,source_environment:'mixed',source_score:82,acquisition_source:'creator',acquisition_campaign:'retry-creator',acquisition_medium:'creator',status:'failed',publication_detail:{action:'publish'},publication_error:'Synthetic dispatch failure',created_at:'2026-09-12T01:00:00Z',opens:0,starts:0,attempts:0,completions:0,wins:0,ties:0,losses:0},
+  ];
   let renamedPublicUsername='Test Member',deletionFixture=null,deletionStatusFailure=false;
   let holdDeletionStatus=false,releaseDeletionStatus=null,failDeleteAfterCommit=false;
   let holdHabitReport=true,releaseHabitReport=null,holdStaleCore=false,releaseStaleCore=null;
   await page.route(/\/health\?quick=1$/,route=>route.fulfill({headers:{'x-pack1-admin-api-version':String(ADMIN_API_VERSION)},json:{ok:true,admin_api_version:ADMIN_API_VERSION,campaign_link_publish_configured:true}}));
+  await page.route(/^https:\/\/packone\.pro\/creator\/[^/]+\/creator-card\.png(?:\?.*)?$/,route=>{
+    creatorImageRequests+=1;
+    if(creatorImageRequests===1)return route.fulfill({status:404,body:'not published yet'});
+    return route.fulfill({
+      status:200,contentType:'image/png',
+      body:Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=','base64'),
+    });
+  });
   await page.route('**/v1/admin/**',async route=>{
     requests.push(route.request().url());
     const requestUrl=new URL(route.request().url()),path=requestUrl.pathname,method=route.request().method();
     if(path.startsWith(`/v1/admin/users/${userId}`))adminControlRequests.push({url:route.request().url(),path,method});
+    if(path==='/v1/admin/creator-challenges/resolve'&&method==='POST') {
+      const body=route.request().postDataJSON();
+      assert.equal(body.source_type,'practice');
+      return route.fulfill({json:{source:{source_session_id:creatorSourceSession,source_type:'practice',creator_player_id:'77777777-7777-4777-8777-777777777777',creator_auth_user_id:null,creator_default_name:'Practice Creator',creator_profile_public:true,creator_username_owned:true,score:87,environment:'mixed',day:null,decisions:8,share_id:'abcdefabcdefabcdefabcdef',corpus_version:DRAFT_RUN_CORPUS_VERSION,scoring_version:'support-ratio-v1',difficulty_version:'draft-run-difficulty-v1',selection_version:'draft-run-selection-v1',serving_policy_version:'draft-run-serving-v1',source_components:[]}}});
+    }
+    if(path==='/v1/admin/creator-challenges'&&method==='GET')return route.fulfill({json:{challenges:creatorChallenges}});
+    if(path==='/v1/admin/creator-challenges'&&method==='POST') {
+      const body=route.request().postDataJSON();
+      const created={id:creatorId,slug:body.slug,creator_public_name:body.creator_public_name,creator_handle:body.creator_handle,headline:body.headline,creator_post_run_note:body.creator_post_run_note,source_type:'practice',source_day:null,source_environment:'mixed',source_score:87,acquisition_source:body.acquisition_source,acquisition_campaign:body.acquisition_campaign,acquisition_medium:body.acquisition_medium,status:'draft',publication_detail:{},created_at:'2026-09-12T02:00:00Z',opens:0,starts:0,attempts:0,completions:0,wins:0,ties:0,losses:0};
+      creatorChallenges=[created,...creatorChallenges];
+      return route.fulfill({json:{challenge:created}});
+    }
+    const creatorPublication=path.match(/^\/v1\/admin\/creator-challenges\/([a-f0-9-]{36})\/publication$/i);
+    if(creatorPublication) {
+      const challenge=creatorChallenges.find(item=>item.id===creatorPublication[1]);
+      assert.ok(challenge,'creator publication fixture exists');
+      if(method==='POST') {
+        const body=route.request().postDataJSON();creatorPublicationBodies.push({id:challenge.id,...body});
+        if(body.action==='publish') {
+          challenge.status='publishing';challenge.publication_detail={action:'publish',dispatch:{state:'accepted'}};
+          return route.fulfill({status:202,json:{ok:true,state:'publishing',operation:'88888888-8888-4888-8888-888888888888',challenge}});
+        }
+        challenge.status='retired';challenge.publication_detail={action:'retire',live_verified:false};
+        return route.fulfill({status:202,json:{ok:true,state:'retired',operation:'99999999-9999-4999-8999-999999999999',challenge}});
+      }
+      if(method==='GET') {
+        if(challenge.status==='publishing'){challenge.status='published';challenge.publication_detail={action:'publish',live_verified:true};challenge.published_at='2026-09-12T03:00:00Z';}
+        if(challenge.status==='retired')challenge.publication_detail={action:'retire',live_verified:true};
+        return route.fulfill({json:{state:challenge.status,live_verified:challenge.publication_detail.live_verified===true,challenge}});
+      }
+    }
     if(path==='/v1/admin/campaign-links/publish') {
       publishBodies.push(route.request().postDataJSON());
       return route.fulfill({status:202,json:{ok:true,status:'queued',slug:'new-launch',tracked_url:'https://packone.pro/?utm_source=reddit&utm_campaign=launch-week&utm_medium=social',vanity_url:'https://packone.pro/go/new-launch/'}});
@@ -226,40 +275,79 @@ try {
   for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:`artifacts/ui-users-${width}.png`,fullPage:true});}
   await page.getByRole('button',{name:'Close'}).click();
   await page.getByRole('link',{name:'Campaign Links',exact:true}).click();
-  await page.getByRole('heading',{name:'Campaign Links / Link Builder'}).waitFor();
+  await page.getByRole('heading',{name:'Campaign Links / Creator Challenges'}).waitFor();
+  const campaignPanel=page.locator('[data-panel="campaign"]');
   await page.getByText('1 published campaign link(s).',{exact:true}).waitFor();
-  await page.locator('input[name="source"]').fill(' Reddit ');
-  await page.locator('input[name="campaign"]').fill(' Launch-Week ');
-  await page.locator('input[name="medium"]').fill(' SOCIAL ');
+  await campaignPanel.locator('input[name="source"]').fill(' Reddit ');
+  await campaignPanel.locator('input[name="campaign"]').fill(' Launch-Week ');
+  await campaignPanel.locator('input[name="medium"]').fill(' SOCIAL ');
   assert.equal(await page.locator('#canonical-slug').innerText(),'—');
   assert.equal(await page.locator('#canonical-source').innerText(),'reddit');
   assert.equal(await page.locator('#canonical-campaign').innerText(),'launch-week');
   assert.equal(await page.locator('#canonical-medium').innerText(),'social');
   const tracked='https://packone.pro/?utm_source=reddit&utm_campaign=launch-week&utm_medium=social';
-  assert.equal(await page.getByLabel('Tracked UTM URL').inputValue(),tracked);
-  assert.equal(await page.getByLabel('Intended vanity URL').inputValue(),'');
-  assert.equal(await page.getByLabel('campaign-links.json entry').inputValue(),'');
-  assert.equal(await page.getByRole('button',{name:'Copy tracked URL'}).isDisabled(),false);
-  assert.equal(await page.getByRole('button',{name:'Copy vanity URL'}).isDisabled(),true);
-  assert.equal(await page.getByRole('button',{name:'Copy JSON entry'}).isDisabled(),true);
-  assert.equal(await page.getByRole('button',{name:/Publish/}).isDisabled(),true);
-  await page.getByRole('button',{name:'Copy tracked URL'}).click();
+  assert.equal(await campaignPanel.getByLabel('Tracked UTM URL').inputValue(),tracked);
+  assert.equal(await campaignPanel.getByLabel('Intended vanity URL').inputValue(),'');
+  assert.equal(await campaignPanel.getByLabel('campaign-links.json entry').inputValue(),'');
+  assert.equal(await campaignPanel.getByRole('button',{name:'Copy tracked URL'}).isDisabled(),false);
+  assert.equal(await campaignPanel.getByRole('button',{name:'Copy vanity URL'}).isDisabled(),true);
+  assert.equal(await campaignPanel.getByRole('button',{name:'Copy JSON entry'}).isDisabled(),true);
+  assert.equal(await campaignPanel.getByRole('button',{name:/Publish/}).isDisabled(),true);
+  await campaignPanel.getByRole('button',{name:'Copy tracked URL'}).click();
   assert.equal(await page.evaluate(()=>window.__copiedText),tracked);
-  await page.locator('input[name="slug"]').fill('New-Launch');
+  await campaignPanel.locator('input[name="slug"]').fill('New-Launch');
   assert.equal(await page.locator('#canonical-slug').innerText(),'new-launch');
-  assert.equal(await page.getByLabel('Intended vanity URL').inputValue(),'https://packone.pro/go/new-launch/');
-  assert.deepEqual(JSON.parse(await page.getByLabel('campaign-links.json entry').inputValue()),{slug:'new-launch',destination:'/',source:'reddit',campaign:'launch-week',medium:'social'});
-  assert.equal(await page.getByRole('button',{name:'Publish vanity link'}).isDisabled(),false);
-  await page.getByRole('button',{name:'Publish vanity link'}).click();
+  assert.equal(await campaignPanel.getByLabel('Intended vanity URL').inputValue(),'https://packone.pro/go/new-launch/');
+  assert.deepEqual(JSON.parse(await campaignPanel.getByLabel('campaign-links.json entry').inputValue()),{slug:'new-launch',destination:'/',source:'reddit',campaign:'launch-week',medium:'social'});
+  assert.equal(await campaignPanel.getByRole('button',{name:'Publish vanity link'}).isDisabled(),false);
+  await campaignPanel.getByRole('button',{name:'Publish vanity link'}).click();
   await page.getByText('Publishing https://packone.pro/go/new-launch/. Required checks and the Pages deploy are running automatically.',{exact:true}).waitFor();
   assert.deepEqual(publishBodies,[{slug:'new-launch',destination:'/',source:'reddit',campaign:'launch-week',medium:'social'}]);
-  await page.locator('input[name="source"]').fill('launch week');
-  assert.ok(await page.locator('[data-error="source"]').isVisible());
-  assert.equal(await page.getByRole('button',{name:'Copy tracked URL'}).isDisabled(),true);
-  await page.locator('input[name="source"]').fill('reddit');
-  await page.locator('input[name="slug"]').fill('REDDIT-LAUNCH');
+  await campaignPanel.locator('input[name="source"]').fill('launch week');
+  assert.ok(await campaignPanel.locator('[data-error="source"]').isVisible());
+  assert.equal(await campaignPanel.getByRole('button',{name:'Copy tracked URL'}).isDisabled(),true);
+  await campaignPanel.locator('input[name="source"]').fill('reddit');
+  await campaignPanel.locator('input[name="slug"]').fill('REDDIT-LAUNCH');
   assert.match(await page.locator('#slug-warning').innerText(),/already exists in campaign-links\.json/);
-  assert.equal(await page.getByRole('button',{name:'Copy JSON entry'}).isDisabled(),true);
+  assert.equal(await campaignPanel.getByRole('button',{name:'Copy JSON entry'}).isDisabled(),true);
+
+  await page.getByRole('tab',{name:'Beat the Creator'}).click();
+  const creatorPanel=page.locator('[data-panel="creator"]');
+  await creatorPanel.getByText('2 creator challenge(s).',{exact:true}).waitFor();
+
+  const dailyRow=creatorPanel.locator('article').filter({hasText:'daily-creator'});
+  await dailyRow.getByRole('button',{name:'Creator kit'}).click();
+  const dailyKit=dailyRow.locator('[data-existing-creator-kit]');
+  await dailyKit.getByText('Creator kit',{exact:true}).waitFor();
+  assert.match(await dailyKit.getByLabel('Ready-to-send copy').inputValue(),/91\/100[\s\S]*Sep 11, 2026[\s\S]*Latest Set Daily/);
+  await dailyKit.getByText('Social image is not available yet.',{exact:true}).waitFor();
+  await dailyKit.getByRole('button',{name:'Retry image preview'}).click();
+  await dailyKit.getByText('Published social image ready.',{exact:true}).waitFor();
+  const imageDownload=page.waitForEvent('download');
+  await dailyKit.getByRole('button',{name:'Download social image'}).click();
+  const creatorDownload=await imageDownload;
+  assert.equal(creatorDownload.suggestedFilename(),'pack-one-daily-creator-creator.png');
+
+  const retryRow=creatorPanel.locator('article').filter({hasText:'retry-creator'});
+  await retryRow.getByRole('button',{name:'Publish / resume'}).click();
+  const publishedRetryRow=creatorPanel.locator('article').filter({hasText:'retry-creator'}).filter({hasText:'Status: published'});
+  await publishedRetryRow.getByRole('button',{name:'Creator kit'}).waitFor();
+  assert.ok(creatorPublicationBodies.some(body=>body.id===retryCreatorId&&body.action==='publish'));
+
+  await creatorPanel.getByLabel('Pack One shared-run URL or ID').fill('abcdefabcdefabcdefabcdef');
+  await creatorPanel.getByRole('button',{name:'Resolve source'}).click();
+  await creatorPanel.getByText('Source resolved.',{exact:true}).waitFor();
+  await creatorPanel.locator('#creator-meta-form input[name="slug"]').fill('practice-creator');
+  await creatorPanel.locator('#creator-meta-form input[name="campaign"]').fill('practice-creator');
+  await creatorPanel.locator('#creator-meta-form textarea[name="creator_post_run_note"]').fill('P3 was the one I really wasn’t sure about.');
+  await creatorPanel.getByRole('button',{name:'Publish creator challenge'}).click();
+  await creatorPanel.getByText('Published: https://packone.pro/creator/practice-creator/',{exact:true}).waitFor();
+  const freshKit=creatorPanel.locator('#creator-kit');
+  assert.equal(await freshKit.getByLabel('Public link').inputValue(),'https://packone.pro/creator/practice-creator/');
+  assert.ok((await freshKit.getByLabel('Tracked link').inputValue()).includes('creator='+creatorId));
+  assert.equal((await freshKit.innerText()).includes('P3 was the one I really wasn’t sure about.'),false,'post-run creator note must not enter social kit assets/copy');
+  assert.ok(creatorPublicationBodies.some(body=>body.id===creatorId&&body.action==='publish'));
+
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),'Campaign link builder must not overflow horizontally');
   await page.screenshot({path:'artifacts/ui-campaign-links-mobile.png',fullPage:true});
   assert.deepEqual(errors,[]);

@@ -1,11 +1,61 @@
 name: publish Pack One campaign link
-run-name: publish campaign / ${{ inputs.slug }}
+run-name: publish ${{ inputs.kind }} / ${{ inputs.slug }} / ${{ inputs.operation }}
 
 on:
   workflow_dispatch:
     inputs:
+      kind:
+        description: Publication kind
+        required: true
+        default: campaign
+        type: string
+      operation:
+        description: Reconciliation operation reference
+        required: false
+        default: none
+        type: string
+      creator_action:
+        description: Creator route action
+        required: false
+        default: publish
+        type: string
+      creator_challenge_id:
+        description: Creator challenge UUID
+        required: false
+        default: ''
+        type: string
+      creator_name:
+        description: Sanitized creator public name
+        required: false
+        default: ''
+        type: string
+      creator_headline:
+        description: Sanitized creator campaign headline
+        required: false
+        default: ''
+        type: string
+      creator_score:
+        description: Authoritative creator score
+        required: false
+        default: ''
+        type: string
+      creator_environment:
+        description: Authoritative creator environment
+        required: false
+        default: ''
+        type: string
+      creator_source_type:
+        description: Authoritative creator source type
+        required: false
+        default: ''
+        type: string
+      creator_source_day:
+        description: Historical Daily date when applicable
+        required: false
+        default: ''
+        type: string
       slug:
-        description: Canonical /go/ slug
+        description: Canonical vanity slug
         required: true
         type: string
       destination:
@@ -48,6 +98,16 @@ jobs:
       CAMPAIGN_SOURCE: ${{ inputs.source }}
       CAMPAIGN_NAME: ${{ inputs.campaign }}
       CAMPAIGN_MEDIUM: ${{ inputs.medium }}
+      PUBLISH_KIND: ${{ inputs.kind }}
+      PUBLISH_OPERATION: ${{ inputs.operation }}
+      CREATOR_ACTION: ${{ inputs.creator_action }}
+      CREATOR_CHALLENGE_ID: ${{ inputs.creator_challenge_id }}
+      CREATOR_NAME: ${{ inputs.creator_name }}
+      CREATOR_HEADLINE: ${{ inputs.creator_headline }}
+      CREATOR_SCORE: ${{ inputs.creator_score }}
+      CREATOR_ENVIRONMENT: ${{ inputs.creator_environment }}
+      CREATOR_SOURCE_TYPE: ${{ inputs.creator_source_type }}
+      CREATOR_SOURCE_DAY: ${{ inputs.creator_source_day }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -65,12 +125,41 @@ jobs:
         with:
           node-version: 24
 
+      - uses: actions/setup-python@v5
+        if: inputs.kind == 'creator' && inputs.creator_action == 'publish'
+        with:
+          python-version: '3.12'
+
+      - name: Install creator card renderer
+        if: inputs.kind == 'creator' && inputs.creator_action == 'publish'
+        run: python3 -m pip install --quiet 'Pillow==11.3.0'
+
       - name: Prepare deterministic campaign route
-        run: node scripts/prepare-campaign-link-publish.mjs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$PUBLISH_KIND" == "creator" ]]; then
+            node scripts/prepare-creator-challenge-publish.mjs
+            if [[ "$CREATOR_ACTION" == "publish" ]]; then
+              python3 scripts/generate-creator-social-card.py \
+                --output "creator/${CAMPAIGN_SLUG}/creator-card.png" \
+                --creator "$CREATOR_NAME" \
+                --score "$CREATOR_SCORE" \
+                --environment "$CREATOR_ENVIRONMENT" \
+                --source-type "$CREATOR_SOURCE_TYPE" \
+                --source-day "$CREATOR_SOURCE_DAY"
+            fi
+          elif [[ "$PUBLISH_KIND" == "campaign" ]]; then
+            node scripts/prepare-campaign-link-publish.mjs
+          else
+            echo "::error::Unknown publication kind: $PUBLISH_KIND"
+            exit 1
+          fi
 
       - name: Validate generated source
         run: |
           node scripts/generate-campaign-links.mjs --check
+          node scripts/check-creator-challenges.mjs
           npm test
 
       - name: Publish automation branch
@@ -78,16 +167,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          branch="automation/campaign-link-${CAMPAIGN_SLUG}"
+          if [[ "$PUBLISH_KIND" == "creator" ]]; then
+            branch="automation/creator-challenge-${CAMPAIGN_SLUG}-${PUBLISH_OPERATION:0:8}"
+          else
+            branch="automation/campaign-link-${CAMPAIGN_SLUG}"
+          fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add campaign-links.json "go/${CAMPAIGN_SLUG}/index.html"
+          if [[ "$PUBLISH_KIND" == "creator" ]]; then
+            git add creator-challenges.json "creator/${CAMPAIGN_SLUG}"
+          else
+            git add campaign-links.json "go/${CAMPAIGN_SLUG}/index.html"
+          fi
           if git diff --cached --quiet; then
             echo "already_published=true" >> "$GITHUB_OUTPUT"
-            echo "Campaign link is already present on main." >> "$GITHUB_STEP_SUMMARY"
+            echo "Requested route state is already present on main." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          git commit -m "Publish campaign link: ${CAMPAIGN_SLUG}"
+          if [[ "$PUBLISH_KIND" == "creator" ]]; then
+            git commit -m "${CREATOR_ACTION^} creator challenge: ${CAMPAIGN_SLUG}"
+          else
+            git commit -m "Publish campaign link: ${CAMPAIGN_SLUG}"
+          fi
           head_sha="$(git rev-parse HEAD)"
           git push --force origin "HEAD:refs/heads/${branch}"
           echo "branch=${branch}" >> "$GITHUB_OUTPUT"
@@ -104,7 +205,14 @@ jobs:
           set -euo pipefail
           pr_url="$(gh pr list --head "$BRANCH" --base main --state open --json url --jq '.[0].url // empty')"
           if [[ -z "$pr_url" ]]; then
-            if ! pr_url="$(gh pr create               --base main               --head "$BRANCH"               --title "Publish campaign link: ${CAMPAIGN_SLUG}"               --body "Admin-requested Pack One vanity link publication. The route and registry entry were generated deterministically; required test and browser checks are dispatched explicitly before merge.")"; then
+            if [[ "$PUBLISH_KIND" == "creator" ]]; then
+              pr_title="${CREATOR_ACTION^} creator challenge: ${CAMPAIGN_SLUG}"
+              pr_body="Admin-requested Pack One creator challenge publication. The immutable source association and sanitized static route were generated deterministically; required test and browser checks are dispatched explicitly before merge."
+            else
+              pr_title="Publish campaign link: ${CAMPAIGN_SLUG}"
+              pr_body="Admin-requested Pack One vanity link publication. The route and registry entry were generated deterministically; required test and browser checks are dispatched explicitly before merge."
+            fi
+            if ! pr_url="$(gh pr create --base main --head "$BRANCH" --title "$pr_title" --body "$pr_body")"; then
               echo "::error::GitHub Actions is not allowed to create pull requests for this repository. Enable Settings > Actions > General > Workflow permissions > Allow GitHub Actions to create and approve pull requests."
               echo "The validated automation branch is \`$BRANCH\`." >> "$GITHUB_STEP_SUMMARY"
               exit 1
@@ -193,19 +301,32 @@ jobs:
           set -euo pipefail
           node --input-type=module <<'NODE'
           const slug=process.env.CAMPAIGN_SLUG;
-          const expected=new URL(process.env.CAMPAIGN_DESTINATION,'https://packone.pro');
-          expected.searchParams.set('utm_source',process.env.CAMPAIGN_SOURCE);
-          expected.searchParams.set('utm_campaign',process.env.CAMPAIGN_NAME);
-          if(process.env.CAMPAIGN_MEDIUM)expected.searchParams.set('utm_medium',process.env.CAMPAIGN_MEDIUM);
-          const live='https://packone.pro/go/'+slug+'/';
-          const marker='location.replace('+JSON.stringify(expected.toString())+')';
+          const live='https://packone.pro/'+(process.env.PUBLISH_KIND==='creator'?'creator':'go')+'/'+slug+'/';
           let last='';
           for(let attempt=0;attempt<36;attempt++) {
             try {
               const response=await fetch(live,{headers:{'cache-control':'no-cache'}});
               const html=await response.text();
-              if(response.ok&&html.includes(marker)) {
-                console.log('Published '+live+' -> '+expected);
+              let valid=false;
+              if(process.env.PUBLISH_KIND==='creator') {
+                const status=process.env.CREATOR_ACTION==='retire'?'retired':'published';
+                valid=response.ok
+                  && html.includes('data-creator-challenge-id="'+process.env.CREATOR_CHALLENGE_ID+'"')
+                  && html.includes('data-creator-challenge-status="'+status+'"');
+                if(valid&&status==='published') {
+                  const card=await fetch(live+'creator-card.png',{headers:{'cache-control':'no-cache'}});
+                  valid=card.ok&&String(card.headers.get('content-type')||'').includes('image/');
+                }
+              } else {
+                const expected=new URL(process.env.CAMPAIGN_DESTINATION,'https://packone.pro');
+                expected.searchParams.set('utm_source',process.env.CAMPAIGN_SOURCE);
+                expected.searchParams.set('utm_campaign',process.env.CAMPAIGN_NAME);
+                if(process.env.CAMPAIGN_MEDIUM)expected.searchParams.set('utm_medium',process.env.CAMPAIGN_MEDIUM);
+                const marker='location.replace('+JSON.stringify(expected.toString())+')';
+                valid=response.ok&&html.includes(marker);
+              }
+              if(valid) {
+                console.log('Verified '+live);
                 process.exit(0);
               }
               last='HTTP '+response.status;
@@ -214,6 +335,10 @@ jobs:
             }
             await new Promise(resolve=>setTimeout(resolve,5000));
           }
-          throw new Error('Live campaign route verification failed: '+last);
+          throw new Error('Live publication verification failed: '+last);
           NODE
-          echo "Published https://packone.pro/go/${CAMPAIGN_SLUG}/" >> "$GITHUB_STEP_SUMMARY"
+          if [[ "$PUBLISH_KIND" == "creator" ]]; then
+            echo "Published https://packone.pro/creator/${CAMPAIGN_SLUG}/" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Published https://packone.pro/go/${CAMPAIGN_SLUG}/" >> "$GITHUB_STEP_SUMMARY"
+          fi

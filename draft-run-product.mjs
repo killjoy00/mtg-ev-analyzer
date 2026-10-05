@@ -74,15 +74,35 @@ function pool(p) {
 function compactRevealCards(p,answer) {
   const byId=new Map((p.candidates||[]).map(c=>[c.id,c]));
   const mine=byId.get(answer.selectedId),trophy=byId.get(answer.historicalId);
-  const cardFigure=(card,label,cls='')=>card
+  const cardFigure=(card,label,cls)=>card
     ? `<figure class="run-reveal-pick ${cls}"><span>${esc(label)}</span><button type="button" data-zoom="${esc(card.id)}" aria-label="Enlarge ${esc(label)}: ${esc(card.name)}">${image(card)}</button></figure>`
     : '';
-  if(answer.historicalMatch) {
-    const shared=mine||trophy;
-    return shared?`<div class="run-reveal-picks is-match">${cardFigure(shared,'Trophy and Your Pick','is-shared')}</div>`:'';
+
+  if(run?.comparison?.kind!=='creator') {
+    if(answer.historicalMatch) {
+      const shared=mine||trophy;
+      return shared?`<div class="run-reveal-picks is-match">${cardFigure(shared,'Trophy and Your Pick','is-shared')}</div>`:'';
+    }
+    const cards=`${cardFigure(mine,'Your Pick','is-mine')}${cardFigure(trophy,'Trophy Pick','is-trophy')}`;
+    return cards?`<div class="run-reveal-picks">${cards}</div>`:'';
   }
-  const cards=`${cardFigure(mine,'Your Pick','is-mine')}${cardFigure(trophy,'Trophy Pick','is-trophy')}`;
-  return cards?`<div class="run-reveal-picks">${cards}</div>`:'';
+
+  const roles=[
+    ['Your Pick',answer.selectedId,'is-mine'],
+    ...(answer.creatorId?[[run.comparison.name+"'s Pick",answer.creatorId,'is-creator']]:[]),
+    ['Trophy Pick',answer.historicalId,'is-trophy'],
+  ].filter(([,id])=>id);
+  const grouped=new Map();
+  for(const [label,id,cls] of roles) {
+    const item=grouped.get(id)||{id,labels:[],classes:[]};
+    item.labels.push(label);item.classes.push(cls);grouped.set(id,item);
+  }
+  const cards=[...grouped.values()].map(item=>{
+    const card=byId.get(item.id);if(!card)return '';
+    const label=item.labels.join(' · ');
+    return cardFigure(card,label,item.classes.join(' '));
+  }).join('');
+  return cards?`<div class="run-reveal-picks ${grouped.size===1?'is-match':''}">${cards}</div>`:'';
 }
 function revealComparison(p,answer) {
   const byId=new Map((p.candidates||[]).map(c=>[c.id,c]));
@@ -134,7 +154,7 @@ function render() {
   document.body.classList.add('is-game');
   app().innerHTML=`<section class="draft-run-page"><header class="run-heading"><div><p class="eyebrow">${run.day?'Daily ':''}${title()} · ${run.day||'Practice'}</p><h1>${esc(setName(p.set_id))} <span>Round ${answer?review+1:run.round}/${runLength()} · Pack 1 · Pick ${p.pick_number}${answer?' · revealed':''}</span></h1></div><a class="text-button" href="./">Leave run</a></header>${steps()}
     ${rankingStateMarkup(run)}
-    ${run.comparison?`<aside class="run-friend">${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. ${run.comparison.exact?`You’re playing the same ${runLength()} packs.`:'Packs changed. This result counts as practice.'}</aside>`:''}
+    ${run.comparison?run.comparison.kind==='creator'?`<aside class="run-friend"><strong>BEAT THE CREATOR</strong> · ${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. You’re playing the same ${runLength()} decisions.</aside>`:`<aside class="run-friend">${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. ${run.comparison.exact?`You’re playing the same ${runLength()} packs.`:'Packs changed. This result counts as practice.'}</aside>`:''}
     ${answer?'':pool(p)}
     ${answer?`<section class="run-feedback"><strong class="run-feedback-score">${answer.score}<small>/100</small></strong>${compactRevealCards(p,answer)}<div class="run-feedback-copy"><h2 id="run-feedback-result" tabindex="-1" aria-label="${esc(compactResultLabel(answer,compactSentence))}">${answer.historicalMatch?'You matched the trophy drafter.':'The trophy drafter took '+esc(answer.historicalName)+'.'}</h2>${compactSentence?`<p>${esc(compactSentence)}</p>`:''}</div><div class="run-next-dock"><button class="button primary" id="run-next">${run.complete?'See result':'Next pick'}</button></div></section>${revealAnalysis(p,answer)}`:
     ''}
@@ -235,7 +255,7 @@ async function mutate(action,body) {
   } finally {busy=false;}
 }
 function resultRepeatAction() {
-  if(run.day)return {href:'./',label:'Back to Dailies'};
+  if(run.day||run.comparison?.kind==='creator')return {href:'./',label:'Back to Dailies'};
   if(run.custom_set_ids?.length)return {href:'?game=draft-run&custom=1',label:'Choose Sets for Another Run'};
   return {href:gameUrl(),label:`Start Another ${title()}`};
 }
@@ -256,12 +276,17 @@ function renderResult() {
   poolObserver?.disconnect();poolObserver=null;
   const matches=run.answers.filter(a=>a.historicalMatch).length;
   const repeat=resultRepeatAction();
-  app().innerHTML=`<section class="run-result-page"><p class="eyebrow">${run.day?'Daily ':''}${title()} complete</p><h1>Your ${cube()?'Cube Run':'Draft Run'}.</h1><div class="run-final-score"><strong>${run.score}</strong><span>/100<br>${matches} trophy picks matched</span></div>
+  const creator=run.comparison?.kind==='creator'?run.comparison:null;
+  const creatorOutcome=creator?.outcome;
+  const creatorHeadline=creatorOutcome==='win'?`You beat ${creator.name}`:creatorOutcome==='tie'?`You tied ${creator.name}`:creatorOutcome==='loss'?`${creator.name} got you this time`:null;
+  app().innerHTML=`<section class="run-result-page"><p class="eyebrow">${creator?'BEAT THE CREATOR · ':run.day?'Daily ':''}${title()} complete</p><h1>${creatorHeadline?esc(creatorHeadline):`Your ${cube()?'Cube Run':'Draft Run'}.`}</h1><div class="run-final-score"><strong>${run.score}</strong><span>/100<br>${creator?`${Number(creator.creator_matches||0)}/${runLength()} creator picks matched · ${Number(creator.trophy_matches||matches)}/${runLength()} trophy picks matched`:`${matches} trophy picks matched`}</span></div>
+    ${creator?`<p class="run-friend">You: <strong>${run.score}</strong> · ${esc(creator.name)}: <strong>${creator.score}</strong></p>`:''}
     <aside id="post-game-progress" class="post-game-progress" data-result-id="draft-run:${run.id}"></aside>
     ${run.standing?`<p class="run-standing">#${run.standing.rank} of ${run.standing.total} today${run.standing.percentile?` · Top ${run.standing.percentile}%`:''}. ${run.standing.final?'Final result.':'The board closes at midnight Pacific.'}</p>`:''}
     ${dailyValidationConfirmation?`<div class="run-validation-success" role="status" data-daily-validation-confirmation><strong>Score added to today's leaderboard</strong>${dailyValidationConfirmation.standing?`<span>#${dailyValidationConfirmation.standing.rank} of ${dailyValidationConfirmation.standing.total}${dailyValidationConfirmation.standing.percentile?` · Top ${dailyValidationConfirmation.standing.percentile}%`:''}</span>`:''}<a class="text-button" href="${gameUrl('board=daily')}">View leaderboard</a></div>`:''}
     ${rankingStateMarkup(run)}
-    ${run.comparison?`<p class="run-friend">${run.comparison.exact?`You: ${run.score} · ${esc(run.comparison.name)}: ${run.comparison.score}`:'These scores came from different decisions.'}</p>`:''}
+    ${run.comparison&&run.comparison.kind!=='creator'?`<p class="run-friend">${run.comparison.exact?`You: ${run.score} · ${esc(run.comparison.name)}: ${run.comparison.score}`:'These scores came from different decisions.'}</p>`:''}
+    ${creator?.creator_post_run_note?`<blockquote class="run-friend"><strong>${esc(creator.name)} after the run:</strong> “${esc(creator.creator_post_run_note)}”</blockquote>`:''}
     <div class="run-result-actions"><a class="button primary" href="${repeat.href}">${repeat.label}</a><button class="button secondary" id="run-share">${run.day?'Share result':'Share this run and compare'}</button><a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">${run.day&&!run.leaderboard_eligible?(['username_taken','username_required','name_not_allowed'].includes(run.ranking_identity?.reason)?'Choose display name to add score':'Sign in to add score'):'View your career'}</button></div>
     <h2>Your ${runLength()} picks</h2><ol class="run-review-list">${run.answers.map((a,i)=>`<li><button data-review="${i}"><span>${i+1}</span><div><strong>${esc(setName(a.puzzle.set_id))} · Pick ${a.pickNumber}</strong><small>${esc(a.selectedName)}${a.historicalMatch?' · Trophy match':''}</small></div><b>${a.score}</b></button></li>`).join('')}</ol>
     <p class="run-note">Your final score is the rounded average of ${runLength()} decisions. Trophy picks earn 100; other picks can earn up to 95 based on broader drafting evidence.</p><p id="run-share-status" role="status"></p><p id="run-error" role="alert"></p></section>`;
@@ -289,7 +314,11 @@ async function shareResult() {
   const button=document.querySelector('#run-share');button.disabled=true;
   try {
     const share=run.day?null:await api(`/v1/runs/${run.id}/share`,{});
-    const url=`${location.origin}${location.pathname}${gameUrl(run.day?'daily=1&ref=result_share':'shared='+share.id)}`;
+    const url=run.day
+      ? `${location.origin}${location.pathname}${gameUrl('daily=1&ref=result_share')}`
+      : share?.creator&&share.url
+        ? new URL(share.url,location.origin).toString()
+        : `${location.origin}${location.pathname}${gameUrl('shared='+share.id)}`;
     trackEvent('share_click',{surface:'draft_run_result'});
     const result=await shareDraftRunCard(run,url);
     const status=document.querySelector('#run-share-status');
@@ -327,10 +356,10 @@ async function showBoard(period='daily') {
 async function launch(options={}) {
   app().innerHTML='<section class="message-card"><h1>Finding your packs…</h1></section>';
   const entrySource=!options.id&&options.daily===true&&window.PACK1_ENTRY_SOURCE==='result_share'?'result_share':null;
-  run=options.id?await api(`/v1/runs/${options.id}`):await api('/v1/runs',{daily:options.daily===true,challenge:options.challenge,environment,setIds:options.setIds,...(entrySource?{source:entrySource}:{})});
+  run=options.id?await api(`/v1/runs/${options.id}`):await api('/v1/runs',{daily:options.daily===true,challenge:options.challenge,creatorChallenge:options.creatorChallenge,environment,setIds:options.setIds,...(entrySource?{source:entrySource}:{})});
   if(entrySource)delete window.PACK1_ENTRY_SOURCE;
   environment=run.environment||environment;
-  const url=new URL(location.href);if(environment!=='mixed')url.searchParams.set('set',environment);else url.searchParams.delete('set');url.searchParams.delete('challenge');url.searchParams.delete('shared');url.searchParams.delete('custom');url.searchParams.set('run',run.id);history.replaceState({},'',url);
+  const url=new URL(location.href);if(environment!=='mixed')url.searchParams.set('set',environment);else url.searchParams.delete('set');url.searchParams.delete('challenge');url.searchParams.delete('shared');url.searchParams.delete('creator');url.searchParams.delete('custom');url.searchParams.set('run',run.id);history.replaceState({},'',url);
   selection=null;review=null;render();
 }
 // Raw exception text ("Failed to fetch") is developer output, not an
@@ -369,7 +398,16 @@ export async function installDraftRunPage() {
   try {
     if(params.has('board')) {const period=canonicalBoardPeriod(params.get('board'));if(period!==params.get('board')){const url=new URL(location.href);url.searchParams.set('board',period);history.replaceState({},'',url);}await showBoard(period);return;}
     if(params.has('custom')&&!params.has('run')){await customPractice();return;}
-    if((params.has('shared')||params.has('challenge'))&&!params.has('run')) {
+    if(params.has('creator')&&!params.has('run')) {
+      const info=await api('/v1/creator-challenges/'+encodeURIComponent(params.get('creator')),undefined,false);
+      environment=info.environment||'mixed';
+      const sourceContext=info.source_type==='daily'&&info.source_day
+        ? `Originally played as the ${esc(new Date(info.source_day+'T12:00:00Z').toLocaleDateString(undefined,{month:'long',day:'numeric',year:'numeric'}))} ${esc(title())} Daily.`
+        : '';
+      app().innerHTML=`<section class="run-invite"><p class="eyebrow">BEAT THE CREATOR</p><h1>${esc(info.headline||('Can you beat '+info.creator_name+'?'))}</h1><p>${esc(info.creator_name)} scored <strong>${Number(info.score)}/100</strong> on these ${Number(info.run_length)} real trophy-draft decisions.</p><p>You’ll see the same packs and prior draft context.</p>${sourceContext?`<p>${sourceContext}</p>`:''}<button class="button primary" id="accept-run-challenge">Play ${esc(info.creator_name)}’s Run</button><p>This is an unranked creator replay and does not use your Daily attempt.</p><p id="run-error" role="alert"></p></section>`;
+      trackEvent('challenge_open',{mode:'draft_run',kind:'creator',creator_challenge_id:info.id,source_type:info.source_type});
+      document.querySelector('#accept-run-challenge').onclick=async()=>{try{trackEvent('challenge_start',{mode:'draft_run',kind:'creator',creator_challenge_id:info.id});await launch({creatorChallenge:info.id});}catch(e){console.warn('Creator challenge failed to start',e?.message);renderLoadFailure(e,false);}};
+    } else if((params.has('shared')||params.has('challenge'))&&!params.has('run')) {
       const info=await api('/v1/shared-runs/'+encodeURIComponent(params.get('shared')||params.get('challenge')),undefined,false);
       environment=info.environment||'mixed';
       app().innerHTML=`<section class="run-invite"><p class="eyebrow">A friend’s ${title()}</p><h1>Play this run and compare.</h1><p>${esc(info.name)} sent you ${draftRunLength(info)} real decisions from trophy drafts. You’ll see the same packs and the same earlier picks.</p><button class="button primary" id="accept-run-challenge">Play this run</button><p>${cube()?'Powered Cube practice access is required.':'A free account includes regular practice.'}</p>${info.scores?.length?`<ul class="run-shared-scores">${info.scores.map(s=>`<li>${esc(s.name)} <strong>${Number(s.score)}/100</strong></li>`).join('')}</ul>`:''}<p id="run-error" role="alert"></p></section>`;
