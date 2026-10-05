@@ -206,7 +206,8 @@
         "0048_uncapped_v5_components.sql",
         "0049_cross_version_corpus_cutover.sql",
         "0050_practice_recency_bias.sql",
-        "0051_exact_pick_draw_index.sql"
+        "0051_exact_pick_draw_index.sql",
+        "0052_decision_reports.sql"
       ]
     },
     "launch-load": {
@@ -249,7 +250,8 @@
         "0048_uncapped_v5_components.sql",
         "0049_cross_version_corpus_cutover.sql",
         "0050_practice_recency_bias.sql",
-        "0051_exact_pick_draw_index.sql"
+        "0051_exact_pick_draw_index.sql",
+        "0052_decision_reports.sql"
       ]
     }
   }
