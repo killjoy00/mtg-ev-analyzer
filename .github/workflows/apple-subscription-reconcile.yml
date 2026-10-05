@@ -38,6 +38,10 @@ jobs:
         run: node scripts/apple-subscription-reconcile.mjs
       - name: Request App Store test notifications
         if: env.MODE == 'test-notification' && env.APPLE_IAP_KEY_ID != '' && env.APPLE_IAP_KEY_P8 != '' && env.APPLE_IAP_ISSUER_ID != ''
+        env:
+          # Booleans/labels only, used to explain a rejected key without printing secrets.
+          APPLE_IAP_ISSUER_SOURCE: ${{ secrets.APPLE_IAP_ISSUER_ID != '' && 'APPLE_IAP_ISSUER_ID' || 'ASC_ISSUER_ID fallback' }}
+          APPLE_IAP_KEY_ID_MATCHES_ASC: ${{ secrets.APPLE_IAP_KEY_ID == secrets.ASC_KEY_ID }}
         run: node scripts/apple-subscription-reconcile.mjs test-notification
       - name: Reconcile Apple subscriptions with the App Store Server API
         if: env.MODE == 'reconcile' && env.APPLE_IAP_KEY_ID != '' && env.APPLE_IAP_KEY_P8 != '' && env.APPLE_IAP_ISSUER_ID != ''
