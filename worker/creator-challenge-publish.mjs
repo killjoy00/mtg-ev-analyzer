@@ -292,7 +292,7 @@ function staticCleanupMayExist(row) {
   return row.status==='publishing';
 }
 
-async function beginOperation(query,row,action,{adminAuthUserId=null,reason=null,privacy=false}={}) {
+export async function beginCreatorPublicationOperation(query,row,action,{adminAuthUserId=null,reason=null,privacy=false}={}) {
   for(let attempt=0;attempt<4;attempt++) {
     const detail=operationDetail(row),existingAction=operationAction(row),existingOperation=String(row.publication_operation_ref||'');
     const workflowFailed=detail?.workflow?.status==='completed'&&detail?.workflow?.conclusion&&detail.workflow.conclusion!=='success';
@@ -375,7 +375,7 @@ export async function requestCreatorPrivacyRetirement(query,playerId,{reason='ac
       ]);
       continue;
     }
-    const begun=await beginOperation(query,row,'retire',{reason,privacy:true});
+    const begun=await beginCreatorPublicationOperation(query,row,'retire',{reason,privacy:true});
     row=begun.row;
     try {
       const state=await reconcile(query,row,{today,env,fetcher});
@@ -439,7 +439,7 @@ export async function handleCreatorChallengePublication(request,{query,readJson,
     return Response.json({...statePayload(row),ok:true},{headers:{'cache-control':'no-store'}});
   }
 
-  const begun=await beginOperation(query,row,action,{
+  const begun=await beginCreatorPublicationOperation(query,row,action,{
     adminAuthUserId:auth.user_id,
     reason:action==='retire'?'admin_retire':'admin_publish',
     privacy:false,
