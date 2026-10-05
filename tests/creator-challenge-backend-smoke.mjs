@@ -293,9 +293,9 @@ try {
 
   const participantRows=await query(`SELECT creator_challenge_id,count(*)::int n
     FROM draft_run_sessions
-    WHERE creator_challenge_id=ANY($1::uuid[])
+    WHERE creator_challenge_id IN ($1::uuid,$2::uuid)
     GROUP BY creator_challenge_id
-    ORDER BY creator_challenge_id`,[[challengeCompletedGuest,challengePartialGuest]]);
+    ORDER BY creator_challenge_id`,[challengeCompletedGuest,challengePartialGuest]);
   assert.deepEqual(
     participantRows.rows.map(row=>[row.creator_challenge_id,Number(row.n)]).sort(),
     [[challengeCompletedGuest,1],[challengePartialGuest,1]].sort(),
@@ -319,7 +319,7 @@ try {
   // must remain internally consistent when creator identity is scrubbed.
   await query(`UPDATE creator_challenges
     SET status='draft',published_at=NULL,publication_operation_ref=NULL,publication_detail='{}'::jsonb
-    WHERE id=ANY($1::uuid[])`,[[challengeCompletedGuest,challengePartialGuest]]);
+    WHERE id IN ($1::uuid,$2::uuid)`,[challengeCompletedGuest,challengePartialGuest]);
   const privacyReady=await requestCreatorPrivacyRetirement(query,creator.playerId,{reason:'account_deletion'});
   assert.equal(privacyReady,true,'unpublished fixture challenges require no static cleanup');
   for(const challengeId of [challengeCompletedGuest,challengePartialGuest]) {
