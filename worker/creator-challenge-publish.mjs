@@ -64,8 +64,22 @@ export async function requestCreatorPrivacyRetirement(query,playerId,{env=proces
         AND COALESCE(publication_detail->>'live_verified','false')='true'
       )
     ORDER BY created_at,id`,[playerId]);
+  let ready=true;
   for(const item of result.rows) {
     let row=await creatorChallengeById(query,item.id);
+    if(row.status==='retired'&&row.publication_operation_ref) {
+      const state=await reconcile(query,row,{env,fetcher});
+      if(state.live_verified===true)continue;
+      const workflow=state.workflow||null;
+      // A successful workflow can still be waiting on Pages propagation. Keep
+      // the same operation and re-verify on the next deletion-maintenance pass.
+      if(!workflow||workflow.status!=='completed'||workflow.conclusion==='success') {
+        ready=false;
+        continue;
+      }
+      // A completed failed workflow is safe to redrive with a fresh operation.
+      row=await creatorChallengeById(query,row.id);
+    }
     const operation=crypto.randomUUID();
     await query(`UPDATE creator_challenges SET status='retired',
         retired_at=COALESCE(retired_at,now()),privacy_removed_at=COALESCE(privacy_removed_at,now()),
@@ -78,6 +92,7 @@ export async function requestCreatorPrivacyRetirement(query,playerId,{env=proces
     row=await creatorChallengeById(query,row.id);
     try {
       await dispatch(row,operation,'retire',{env,fetcher});
+      ready=false;
     } catch(error) {
       await query(`UPDATE creator_challenges SET publication_error=$2,updated_at=now() WHERE id=$1::uuid`,[
         row.id,String(error?.message||error).slice(0,500),
@@ -85,7 +100,7 @@ export async function requestCreatorPrivacyRetirement(query,playerId,{env=proces
       throw error;
     }
   }
-  return result.rows.length;
+  return ready;
 }
 
 async function dispatch(row,operation,action,{env,fetcher}) {
