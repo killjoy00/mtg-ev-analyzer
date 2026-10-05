@@ -295,7 +295,8 @@ function staticCleanupMayExist(row) {
 async function beginOperation(query,row,action,{adminAuthUserId=null,reason=null,privacy=false}={}) {
   for(let attempt=0;attempt<4;attempt++) {
     const detail=operationDetail(row),existingAction=operationAction(row),existingOperation=String(row.publication_operation_ref||'');
-    if(existingAction===action&&UUID.test(existingOperation)
+    const workflowFailed=detail?.workflow?.status==='completed'&&detail?.workflow?.conclusion&&detail.workflow.conclusion!=='success';
+    if(existingAction===action&&UUID.test(existingOperation)&&!workflowFailed
       &&((action==='publish'&&row.status==='publishing')||(action==='retire'&&row.status==='retired')))
       return {row,operation:existingOperation,reused:true};
     if(action==='publish'&&row.status==='published')return {row,operation:null,reused:true,complete:true};
@@ -446,20 +447,15 @@ export async function handleCreatorChallengePublication(request,{query,readJson,
   row=begun.row;
   if(begun.complete)return Response.json({...statePayload(row),ok:true},{headers:{'cache-control':'no-store'}});
 
-  let state=await reconcile(query,row,{today,env,fetcher});
+  const state=await reconcile(query,row,{today,env,fetcher});
   row=state.challenge;
-  const detail=operationDetail(row);
-  if(operationMatches(row,begun.operation,action)&&!detail.workflow&&dispatchRetryDue(detail)) {
-    const dispatch=await dispatchAttempt(query,row,begun.operation,action,{env,fetcher});
-    row=await creatorChallengeById(query,row.id);
-    state=statePayload(row,{dispatch});
-    if(dispatch.state==='rejected')return Response.json(
-      {...state,ok:false,error:dispatch.error||'Creator publication dispatch was rejected.'},
-      {status:503,headers:{'cache-control':'no-store'}},
-    );
-  }
+  const dispatch=operationDetail(row).dispatch||null;
+  if(dispatch?.state==='rejected')return Response.json(
+    {...statePayload(row),ok:false,error:dispatch.error||row.publication_error||'Creator publication dispatch was rejected.'},
+    {status:503,headers:{'cache-control':'no-store'}},
+  );
   return Response.json({
-    ...statePayload(await creatorChallengeById(query,row.id)),
+    ...statePayload(row),
     ok:true,
     operation:begun.operation,
     reused_operation:begun.reused,
