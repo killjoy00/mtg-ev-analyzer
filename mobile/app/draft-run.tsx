@@ -791,7 +791,7 @@ export default function DraftRunScreen({
         reportReason,
         reportComment,
         {
-          platform: Platform.OS === 'ios' || Platform.OS === 'android' ? Platform.OS : 'unknown',
+          platform: Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'unknown',
           version: Application.nativeApplicationVersion ?? null,
           build: Application.nativeBuildVersion ?? null,
         },
@@ -1102,7 +1102,7 @@ export default function DraftRunScreen({
                       <Text style={styles.decisionReportText}>Report this decision</Text>
                     </Pressable>
                     {reportedDecision === answer.puzzle.puzzle_id ? (
-                      <Text accessibilityRole="text" style={styles.decisionReportStatus}>Thanks — report sent.</Text>
+                      <Text style={styles.decisionReportStatus}>Thanks — report sent.</Text>
                     ) : null}
                   </View>
                 </>
