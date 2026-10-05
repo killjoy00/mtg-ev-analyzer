@@ -303,6 +303,20 @@ try {
     [target.playerId],
   );
   const scoreBefore=Number((await query('SELECT count(*) n FROM scores WHERE player_id=$1::uuid',[target.playerId])).rows[0].n);
+  const publishedCreatorChallenge=crypto.randomUUID(),draftCreatorChallenge=crypto.randomUUID();
+  await query(`INSERT INTO creator_challenges(
+      id,slug,source_session_id,source_owner_player_id,source_owner_auth_user_id,
+      source_type,source_day,source_environment,creator_public_name,creator_handle,headline,
+      creator_post_run_note,acquisition_source,acquisition_campaign,status,
+      created_by_admin_auth_user_id,published_at,publication_detail
+    ) VALUES
+      ($1::uuid,$2,NULL,$3::uuid,$4::uuid,'practice',NULL,'mixed',$5,'@target','Beat the target',
+       'Creator note','creator',$2,'published',$6::uuid,now(),'{"live_verified":true}'::jsonb),
+      ($7::uuid,$8,NULL,$3::uuid,$4::uuid,'practice',NULL,'mixed',$5,'@target','Draft creator challenge',
+       'Draft note','creator',$8,'draft',$6::uuid,NULL,'{}'::jsonb)`,[
+    publishedCreatorChallenge,`pi-published-${tag}`,target.playerId,target.authId,targetName,adminId,
+    draftCreatorChallenge,`pi-draft-${tag}`,
+  ]);
 
   const firstReport=await callGrowth(`/v1/profile/${key}/report`,{
     playerToken:reporter.token,accountToken:reporter.accountToken,
@@ -347,6 +361,36 @@ try {
   assert.equal(hiddenRow.profile_public===true||hiddenRow.profile_public==='t',false);
   assert.ok(hiddenRow.public_identity_hidden_at);
   assert.equal(hiddenRow.public_identity_hidden_reason,'QA moderation hide');
+
+  const creatorPrivacyRows=(await query(`SELECT id::text id,status,creator_public_name,creator_handle,headline,
+      creator_post_run_note,source_owner_auth_user_id::text source_owner_auth_user_id,
+      privacy_removed_at,publication_operation_ref::text publication_operation_ref,publication_detail
+    FROM creator_challenges WHERE id=ANY($1::uuid[]) ORDER BY id`,[
+    [publishedCreatorChallenge,draftCreatorChallenge],
+  ])).rows;
+  const creatorPrivacyById=new Map(creatorPrivacyRows.map(row=>[row.id,row]));
+  for(const challengeId of [publishedCreatorChallenge,draftCreatorChallenge]) {
+    const row=creatorPrivacyById.get(challengeId);
+    assert.equal(row.status,'retired');
+    assert.equal(row.creator_public_name,'A creator');
+    assert.equal(row.creator_handle,null);
+    assert.equal(row.headline,'Creator challenge unavailable');
+    assert.equal(row.creator_post_run_note,null);
+    assert.equal(row.source_owner_auth_user_id,null);
+    assert.ok(row.privacy_removed_at,'moderation scrubs dynamic creator identity immediately');
+    assert.equal(row.publication_operation_ref,null,'moderation never blocks on or starts GitHub publication synchronously');
+  }
+  const publishedPrivacy=creatorPrivacyById.get(publishedCreatorChallenge).publication_detail;
+  const draftPrivacy=creatorPrivacyById.get(draftCreatorChallenge).publication_detail;
+  assert.equal(publishedPrivacy.action,'retire');
+  assert.equal(publishedPrivacy.reason,'public_identity_hidden');
+  assert.equal(publishedPrivacy.live_verified,false);
+  assert.equal(publishedPrivacy.dispatch.state,'pending',
+    'a previously published creator route is queued for resumable protected retirement');
+  assert.equal(draftPrivacy.live_verified,true);
+  assert.equal(draftPrivacy.static_cleanup,'not_required',
+    'an unpublished draft is privacy-complete without waiting for a static page that never existed');
+
   const renameHidden=await callAdmin(`/v1/admin/users/${target.authId}/username`,{
     method:'PATCH',accountToken:adminToken,status:403,body:{displayName:'Cannot Rename Hidden'},
   });
