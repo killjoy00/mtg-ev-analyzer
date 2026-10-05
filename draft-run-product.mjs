@@ -11,6 +11,7 @@ import { tcgplayerUrl } from './tcgplayer.mjs';
 import { dailyResetCue } from './game-date.mjs';
 
 const base = () => String(window.PACK1_API?.draftRunUrl||'').replace(/\/$/,'');
+const webClientBuild=()=>new URL(import.meta.url).searchParams.get('v')||null;
 let run=null,selection=null,review=null,busy=false,dailyValidationConfirmation=null;
 const reportedDecisions=new Set();
 const clock=decisionClock();let viewPromise=Promise.resolve(),viewKey=null;
@@ -169,7 +170,7 @@ function openDecisionReport(answer) {
     try {
       await api(`/v1/runs/${run.id}/report`,{
         round,puzzleId:answer.puzzle.puzzle_id,reason,comment:comment||null,
-        client:{platform:'web',version:null,build:null},
+        client:{platform:'web',version:null,build:webClientBuild()},
       });
       reportedDecisions.add(answer.puzzle.puzzle_id);
       dialog.close();
