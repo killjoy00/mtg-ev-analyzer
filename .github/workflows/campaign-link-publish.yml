@@ -179,16 +179,28 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          branch="automation/campaign-link-${CAMPAIGN_SLUG}"
+          if [[ "$PUBLISH_KIND" == "creator" ]]; then
+            branch="automation/creator-challenge-${CAMPAIGN_SLUG}-${PUBLISH_OPERATION:0:8}"
+          else
+            branch="automation/campaign-link-${CAMPAIGN_SLUG}"
+          fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add campaign-links.json "go/${CAMPAIGN_SLUG}/index.html"
+          if [[ "$PUBLISH_KIND" == "creator" ]]; then
+            git add creator-challenges.json "go/${CAMPAIGN_SLUG}"
+          else
+            git add campaign-links.json "go/${CAMPAIGN_SLUG}/index.html"
+          fi
           if git diff --cached --quiet; then
             echo "already_published=true" >> "$GITHUB_OUTPUT"
-            echo "Campaign link is already present on main." >> "$GITHUB_STEP_SUMMARY"
+            echo "Requested route state is already present on main." >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          git commit -m "Publish campaign link: ${CAMPAIGN_SLUG}"
+          if [[ "$PUBLISH_KIND" == "creator" ]]; then
+            git commit -m "${CREATOR_ACTION^} creator challenge: ${CAMPAIGN_SLUG}"
+          else
+            git commit -m "Publish campaign link: ${CAMPAIGN_SLUG}"
+          fi
           head_sha="$(git rev-parse HEAD)"
           git push --force origin "HEAD:refs/heads/${branch}"
           echo "branch=${branch}" >> "$GITHUB_OUTPUT"
