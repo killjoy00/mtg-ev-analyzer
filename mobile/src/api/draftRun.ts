@@ -1,3 +1,6 @@
+import * as Application from 'expo-application';
+import { Platform } from 'react-native';
+
 import { requestJson } from '@/src/api/client';
 import type { MobileSession } from '@/src/storage/session';
 
@@ -119,12 +122,6 @@ export type DecisionReportReason =
   | 'score_recommendation'
   | 'broken'
   | 'other';
-
-export type DecisionReportClient = {
-  platform: 'ios' | 'android' | 'unknown';
-  version: string | null;
-  build: string | null;
-};
 
 export type SharedDraftRunInfo = {
   id: string;
@@ -294,7 +291,6 @@ export function submitDraftRunDecisionReport(
   round: number,
   reason: DecisionReportReason,
   comment: string,
-  client: DecisionReportClient,
   session: MobileSession,
 ) {
   const answer = run.answers[round];
@@ -308,7 +304,11 @@ export function submitDraftRunDecisionReport(
       puzzleId: answer.puzzle.puzzle_id,
       reason,
       comment: comment.trim() || null,
-      client,
+      client: {
+        platform: Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'unknown',
+        version: Application.nativeApplicationVersion ?? null,
+        build: Application.nativeBuildVersion ?? null,
+      },
     },
     timeoutMs: 15_000,
   });
