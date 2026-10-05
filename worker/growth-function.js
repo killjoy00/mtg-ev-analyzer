@@ -2330,19 +2330,6 @@ async function handleProfileUpdate(request,{mobile=false}={}) {
     rethrowUsernameConflict(error);
   }
   if(bool(meta.profile_public)&&!profilePublic) {
-    let retirementError=null;
-    try {
-      await requestCreatorPrivacyRetirement(query,id,{reason:'profile_private'});
-    } catch(error) {
-      retirementError=String(error?.message||error).slice(0,160);
-      console.error(JSON.stringify({
-        event:'creator_privacy_retirement_dispatch_failed',
-        player_id:id,
-        reason:'profile_private',
-        error:retirementError,
-        release_commit:releaseMetadata().release_commit,
-      }));
-    }
     await query(`UPDATE game_results SET opponent_name='A creator'
       WHERE creator_challenge_id IN (
         SELECT id FROM creator_challenges WHERE source_owner_player_id=$1::uuid
@@ -2350,13 +2337,18 @@ async function handleProfileUpdate(request,{mobile=false}={}) {
     await query(`UPDATE creator_challenges
       SET status='retired',creator_public_name='A creator',creator_handle=NULL,
           headline='Creator challenge unavailable',creator_post_run_note=NULL,
+          source_owner_auth_user_id=NULL,
           privacy_removed_at=COALESCE(privacy_removed_at,now()),
-          retired_at=COALESCE(retired_at,now()),updated_at=now()
+          retired_at=COALESCE(retired_at,now()),updated_at=now(),
+          publication_operation_ref=NULL,publication_error=NULL,
+          publication_detail=jsonb_build_object(
+            'action','retire','reason','profile_private',
+            'live_verified',false,'dispatch',jsonb_build_object('state','pending','attempts',0)
+          )
       WHERE source_owner_player_id=$1::uuid`,[id]);
-    if(retirementError) {
-      await query(`INSERT INTO analytics_events(player_id,event_name,event_props)
-        VALUES($1::uuid,'creator_privacy_retirement_pending',jsonb_build_object('reason','profile_private'))`,[id]);
-    }
+    await query(`INSERT INTO analytics_events(player_id,event_name,event_props)
+      SELECT $1::uuid,'creator_privacy_retirement_pending',jsonb_build_object('reason','profile_private')
+      WHERE EXISTS(SELECT 1 FROM creator_challenges WHERE source_owner_player_id=$1::uuid)`,[id]);
   }
   const updatedMeta = await profileMetaByPlayer(id);
   return json(await buildProfile(id, updatedMeta, { own: true }));
