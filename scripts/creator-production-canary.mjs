@@ -33,7 +33,7 @@ async function call(path,{method,body,token,player,status=[200]}={}) {
     headers.cookie='__Host-pack1_account='+token.session+'; __Secure-pack1_csrf='+token.csrf;
     if((method||'POST')!=='GET')headers['x-pack1-csrf']=token.csrf;
   }
-  if(player)headers.authorization='Bearer '+player;
+  if(player)headers['x-pack1-mobile-session']=player;
   const response=await fetch(api+path,{
     method:method||(body===undefined?'GET':'POST'),
     headers,
