@@ -217,7 +217,14 @@ jobs:
           set -euo pipefail
           pr_url="$(gh pr list --head "$BRANCH" --base main --state open --json url --jq '.[0].url // empty')"
           if [[ -z "$pr_url" ]]; then
-            if ! pr_url="$(gh pr create               --base main               --head "$BRANCH"               --title "Publish campaign link: ${CAMPAIGN_SLUG}"               --body "Admin-requested Pack One vanity link publication. The route and registry entry were generated deterministically; required test and browser checks are dispatched explicitly before merge.")"; then
+            if [[ "$PUBLISH_KIND" == "creator" ]]; then
+              pr_title="${CREATOR_ACTION^} creator challenge: ${CAMPAIGN_SLUG}"
+              pr_body="Admin-requested Pack One creator challenge publication. The immutable source association and sanitized static route were generated deterministically; required test and browser checks are dispatched explicitly before merge."
+            else
+              pr_title="Publish campaign link: ${CAMPAIGN_SLUG}"
+              pr_body="Admin-requested Pack One vanity link publication. The route and registry entry were generated deterministically; required test and browser checks are dispatched explicitly before merge."
+            fi
+            if ! pr_url="$(gh pr create --base main --head "$BRANCH" --title "$pr_title" --body "$pr_body")"; then
               echo "::error::GitHub Actions is not allowed to create pull requests for this repository. Enable Settings > Actions > General > Workflow permissions > Allow GitHub Actions to create and approve pull requests."
               echo "The validated automation branch is \`$BRANCH\`." >> "$GITHUB_STEP_SUMMARY"
               exit 1
