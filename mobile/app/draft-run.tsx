@@ -5,8 +5,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
+  KeyboardAvoidingView,
   Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -170,6 +172,7 @@ function relativeSupport(support: number | undefined, leader: number) {
 }
 
 const REPORT_SENT_TEXT = 'Thanks \u2014 report sent.';
+const ReportKeyboardAvoidingView = KeyboardAvoidingView ?? View;
 
 const DECISION_REPORT_OPTIONS: readonly { value: DecisionReportReason; label: string }[] = [
   { value: 'draft_context', label: 'Draft context looks wrong' },
@@ -1191,7 +1194,7 @@ export default function DraftRunScreen({
           visible={reportOpen}
         >
           <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={styles.reportModalSafe}>
-            <View style={styles.reportKeyboard}>
+            <ReportKeyboardAvoidingView behavior={Platform?.OS === 'ios' ? 'padding' : undefined} style={styles.reportKeyboard}>
               <View accessibilityViewIsModal style={styles.reportSheet}>
                 <Text style={styles.reportTitle}>What seems wrong?</Text>
                 <View accessibilityRole="radiogroup" style={styles.reportReasons}>
@@ -1240,7 +1243,7 @@ export default function DraftRunScreen({
                   </Pressable>
                 </View>
               </View>
-            </View>
+            </ReportKeyboardAvoidingView>
           </SafeAreaView>
         </Modal>
 
