@@ -1,0 +1,5 @@
+{
+  "operation": "run-creator-canary",
+  "release_commit": "f6ea0910d322f007f0ac0004b98fea6bab09422a",
+  "reason": "Owner-authorized Issue #984 production canary after the corrected guarded release. Use only temporary owned identities and retained QA release fixtures; verify Practice and closed Daily creator publication, spoiler boundaries, gameplay, attribution, Daily isolation, retirement/privacy cleanup and static-route scrubbing. Never select or mutate customer data."
+}
