@@ -109,6 +109,32 @@ export async function requestTestNotification(credentials,environment,{fetchImpl
   return {environment,key_accepted:true,delivery:'pending'};
 }
 
+// Apple answers 401 from every Production endpoint until the app's first App Store
+// release, so a Production 401 for the key Sandbox just accepted is only a key
+// problem once the app is listed.
+async function listedOnAppStore(fetchImpl) {
+  try {
+    const response=await fetchImpl(`https://itunes.apple.com/lookup?id=${APPLE_APP_ID}`,{redirect:'error',signal:AbortSignal.timeout(15000)});
+    return response.ok?Number((await response.json())?.resultCount)>0:null;
+  } catch {return null;}
+}
+
+export async function testNotifications(credentials,{request=requestTestNotification,fetchImpl=fetch}={}) {
+  const results=[];
+  for(const environment of ['Sandbox','Production']) {
+    try {
+      results.push(await request(credentials,environment));
+    } catch(error) {
+      if(error?.fatal&&environment==='Production'&&results[0]?.key_accepted&&await listedOnAppStore(fetchImpl)===false) {
+        results.push({environment,key_accepted:null,delivery:'unavailable_until_app_store_release'});
+        continue;
+      }
+      throw Object.assign(error,{environment,results});
+    }
+  }
+  return results;
+}
+
 export async function reconcileSubscription(query,row,{fetchStatus,verifyJws=verifyAppleJws}) {
   const body=await fetchStatus(row.environment,row.original_transaction_id);
   if(String(body?.bundleId||'')!==APPLE_BUNDLE_ID||String(body?.environment||'')!==row.environment
@@ -156,15 +182,16 @@ if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url) {
   const credentials=appleIapCredentials();
   if(process.argv[2]==='test-notification') {
     if(!credentials)throw Error('Add the In-App Purchase key secrets before requesting a test notification.');
-    const results=[];
+    let results;
     try {
-      for(const environment of ['Sandbox','Production'])results.push(await requestTestNotification(credentials,environment));
+      results=await testNotifications(credentials);
     } catch(error) {
-      if(error?.fatal&&!error.rateLimited)console.log(JSON.stringify({key_rejected:true,diagnosis:await diagnoseRejectedKey(credentials)}));
+      if(error?.results?.length)console.log(JSON.stringify(error.results));
+      if(error?.fatal)console.log(JSON.stringify({key_rejected_by:error.environment,diagnosis:await diagnoseRejectedKey(credentials)}));
       throw error;
     }
     console.log(JSON.stringify(results));
-    if(results.some(result=>result.delivery!=='SUCCESS'))process.exitCode=1;
+    if(results.some(result=>!['SUCCESS','unavailable_until_app_store_release'].includes(result.delivery)))process.exitCode=1;
   } else if(!credentials) {
     console.log(JSON.stringify(await reconcileAppleSubscriptions(null,{credentials})));
   } else {
