@@ -1,6 +1,6 @@
 {
   "operation": "promote-android-closed",
-  "reason": "Promote the exact final corrected Pack One 1.0 signed bundle 100491, accepted and committed to Internal draft in successful run 37247429578 from binary source 747478440400e242aae32469d6ed18f1785b591d (protected #963). Includes retained #890/#910/#955 and provider-neutral membership copy #960. iOS 100505 is separately verified in internal TestFlight. Exact-main certification 37244011180 and final main native/store evidence 37244011193 pass on equivalent runtime 3a8244eb. Use only the existing production-access Closed Testing track and preserve testers, countries and qualification continuity. Do not rebuild, create a new track, alter tester configuration, submit to Production or release publicly; physical/provider/owner gates remain open.",
-  "version_code": "100491",
+  "reason": "Promote the exact signed Pack One 1.0 bundle 100517, accepted and committed to Internal draft in successful run 37273450965 from main 6f1098ab7919333f545902948ca75ae1a5d61fc8 (#978). Includes #973 decision-quality reports and #974 Android adaptive icon, expo-system-ui and blocked SYSTEM_ALERT_WINDOW/USE_BIOMETRIC/USE_FINGERPRINT, on runtime source 48179202 that passed exact-main RC smoke 37265648669; the matching backend and gateway passed guarded releases #977 and #978. iOS 100532 is separately verified in internal TestFlight. Use only the existing production-access Closed Testing track and preserve testers, countries and qualification continuity. Do not rebuild, create a new track, alter tester configuration, submit to Production or release publicly; physical/provider/owner gates remain open.",
+  "version_code": "100517",
   "track": "production-access"
 }
