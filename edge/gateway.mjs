@@ -52,6 +52,7 @@ export function adminGrowthPath(path,method,mode) {
   if(method==='POST'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/delete$/.test(path))return true;
   if(method==='GET'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/deletion$/.test(path))return true;
   if(method==='PATCH'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/username$/.test(path))return true;
+  if(['GET','POST'].includes(method)&&/^\/v1\/admin\/creator-challenges\/[a-f0-9-]{36}\/publication$/.test(path))return true;
   return false;
 }
 
@@ -239,6 +240,7 @@ export function routeFamily(path) {
   if(path==='/growth/v1/apple-subscriptions/notifications')return 'apple_subscription_notification';
   if(path==='/growth/v1/mobile/version')return 'mobile_version';
   if(path==='/growth/v1/admin/campaign-links/publish')return 'admin_campaign_publish';
+  if(/^\/growth\/v1\/admin\/creator-challenges\/[a-f0-9-]{36}\/publication$/.test(path))return 'admin_creator_challenge_publish';
   if(/^\/draft\/v1\/runs\/[^/]+\/(pick|view|reroll|share|report)$/.test(path))return 'draft_'+path.split('/').at(-1);
   if(path==='/draft/v1/runs')return 'draft_start';
   if(/^\/draft\/v1\/runs\/[^/]+$/.test(path))return 'draft_read';
