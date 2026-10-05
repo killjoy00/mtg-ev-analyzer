@@ -330,7 +330,8 @@ try {
 
   const retryRow=creatorPanel.locator('article').filter({hasText:'retry-creator'});
   await retryRow.getByRole('button',{name:'Publish / resume'}).click();
-  await creatorPanel.getByText('Creator challenge published.',{exact:true}).waitFor();
+  const publishedRetryRow=creatorPanel.locator('article').filter({hasText:'retry-creator'}).filter({hasText:'Status: published'});
+  await publishedRetryRow.getByRole('button',{name:'Creator kit'}).waitFor();
   assert.ok(creatorPublicationBodies.some(body=>body.id===retryCreatorId&&body.action==='publish'));
 
   await creatorPanel.getByLabel('Pack One shared-run URL or ID').fill('abcdefabcdefabcdefabcdef');
