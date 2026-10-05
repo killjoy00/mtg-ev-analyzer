@@ -68,6 +68,17 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
          ), scrub_results AS (
            UPDATE game_results SET opponent_name='A friend'
            WHERE challenge_id IN (SELECT id FROM share_ids) RETURNING id
+         ), retire_creator_challenges AS (
+           UPDATE creator_challenges
+           SET status='retired',creator_public_name='A creator',creator_handle=NULL,headline='Creator challenge unavailable',
+             creator_post_run_note=NULL,privacy_removed_at=COALESCE(privacy_removed_at,now()),
+             retired_at=COALESCE(retired_at,now()),updated_at=now(),publication_error=NULL
+           WHERE source_owner_player_id=$1::uuid
+           RETURNING id
+         ), creator_audit AS (
+           INSERT INTO creator_challenge_audit(creator_challenge_id,admin_auth_user_id,action,detail)
+           SELECT id,$3::uuid,'privacy_retired',jsonb_build_object('reason','public_identity_hidden') FROM retire_creator_challenges
+           RETURNING id
          ), reports AS (
            UPDATE public_identity_reports SET status='resolved',resolved_at=now(),resolved_by=$3::uuid,updated_at=now()
            WHERE target_player_id=$1::uuid AND status='open' RETURNING id
