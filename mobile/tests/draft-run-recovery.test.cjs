@@ -126,6 +126,7 @@ async function fixture(options = {}) {
   const Image = host('Image');
   Image.prefetch = async () => {};
   const mocks = {
+    'expo-application': { nativeApplicationVersion: '1.0', nativeBuildVersion: '1' },
     'expo-haptics': {
       selectionAsync: async () => {}, notificationAsync: async () => {},
       NotificationFeedbackType: { Success: 'success' },
@@ -137,10 +138,10 @@ async function fixture(options = {}) {
     },
     'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       AccessibilityInfo: { announceForAccessibility() {} },
-      ActivityIndicator: host('ActivityIndicator'), Modal: host('Modal'),
-      Pressable: host('Pressable'), ScrollView, Share: { share: async () => {} },
+      ActivityIndicator: host('ActivityIndicator'), KeyboardAvoidingView: host('KeyboardAvoidingView'), Modal: host('Modal'),
+      Platform: { OS: 'ios' }, Pressable: host('Pressable'), ScrollView, Share: { share: async () => {} },
       Linking: { openURL: options.openURL ?? (async () => {}) },
-      StyleSheet: { create: (value) => value }, Text: host('Text'), View: host('View'),
+      StyleSheet: { create: (value) => value }, Text: host('Text'), TextInput: host('TextInput'), View: host('View'),
     },
     'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
     '@/src/api/guest': { ensureGuestSession: async () => session },
