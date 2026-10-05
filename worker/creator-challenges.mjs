@@ -1,4 +1,4 @@
-import {buildCampaignTrackingUrl,buildCampaignVanityUrl,normalizeAcquisitionValue,normalizeCampaignSlug} from '../campaign-links.mjs';
+import {buildCampaignTrackingUrl,normalizeAcquisitionValue,normalizeCampaignSlug} from '../campaign-links.mjs';
 import {componentBelongsTo} from './corpus-components.mjs';
 import {validateDraftRunPuzzle} from '../draft-run.mjs';
 
@@ -290,7 +290,7 @@ export function publicCreatorChallenge(row) {
     source_type:row.source_type,
     source_day:row.source_day||null,
     run_length:8,
-    public_url:buildCampaignVanityUrl(row.slug),
+    public_url:`https://packone.pro/creator/${row.slug}/`,
     tracked_url:buildCampaignTrackingUrl(entry,{allowCreator:true}),
   };
 }
@@ -345,7 +345,7 @@ export function creatorRevealState(challenge,source,answers,{complete=false,self
     kind:'creator',
     id:challenge.id,
     slug:challenge.slug,
-    public_url:buildCampaignVanityUrl(challenge.slug),
+    public_url:`https://packone.pro/creator/${challenge.slug}/`,
     name:challenge.creator_public_name,
     handle:challenge.creator_handle||null,
     headline:challenge.headline||`Can you beat ${challenge.creator_public_name}?`,
