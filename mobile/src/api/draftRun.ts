@@ -113,6 +113,19 @@ export type DraftRunState = {
   } | null;
 };
 
+export type DecisionReportReason =
+  | 'draft_context'
+  | 'card_or_image'
+  | 'score_recommendation'
+  | 'broken'
+  | 'other';
+
+export type DecisionReportClient = {
+  platform: 'ios' | 'android' | 'unknown';
+  version: string | null;
+  build: string | null;
+};
+
 export type SharedDraftRunInfo = {
   id: string;
   name: string;
@@ -273,6 +286,31 @@ export function rerollDraftRun(
       puzzleId: run.current.puzzle_id,
     },
     timeoutMs: 30_000,
+  });
+}
+
+export function submitDraftRunDecisionReport(
+  run: DraftRunState,
+  round: number,
+  reason: DecisionReportReason,
+  comment: string,
+  client: DecisionReportClient,
+  session: MobileSession,
+) {
+  const answer = run.answers[round];
+  if (!answer) throw new Error('Choose a revealed decision to report.');
+  return requestJson<{ ok: true; id: string }>(`/draft/v1/runs/${encodeURIComponent(run.id)}/report`, {
+    method: 'POST',
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    body: {
+      round,
+      puzzleId: answer.puzzle.puzzle_id,
+      reason,
+      comment: comment.trim() || null,
+      client,
+    },
+    timeoutMs: 15_000,
   });
 }
 
