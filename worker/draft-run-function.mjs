@@ -196,7 +196,14 @@ async function start(request) {
   // Reopening an invitation as its source owner must never manufacture a
   // self-opponent attempt. Return the authoritative source session instead.
   if(source?.owner_player_id===owner)return json(await responseFor(await session(source.session_id,owner)));
-  if(creatorState?.source?.player_id===owner)return json(await responseFor(await session(creatorState.source.id,owner)));
+  if(creatorState?.source?.player_id===owner) {
+    const original=await responseFor(await session(creatorState.source.id,owner));
+    return json({...original,creator_source_owner:{
+      challenge_id:creatorState.challenge.id,
+      source_type:creatorState.challenge.source_type,
+      source_day:creatorState.challenge.source_day||null,
+    }});
+  }
   if(source) {
     const previous=(await query(
       'SELECT * FROM draft_run_sessions WHERE player_id=$1::uuid AND challenge_id=$2 ORDER BY created_at,id LIMIT 1',
