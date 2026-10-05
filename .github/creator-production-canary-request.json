@@ -1,5 +1,5 @@
 {
   "operation": "run-creator-production-canary",
-  "reason": "Owner-authorized retry of Issue #984 production acceptance after fixing the canary-only SQL alias. Source selection is restricted to retained QA release fixtures only: a completed QA v5 Practice/share and a closed QA release Daily are temporarily made eligible, exercised through the live Admin/public creator path, then restored. Never select or mutate customer rows. Verify protected publication, guest play, self-open, progressive reveal, final comparison, stats, attribution dedupe, Daily isolation, Admin retirement and privacy retirement; leave no live personalized canary route.",
+  "reason": "Owner-authorized retry of Issue #984 production acceptance using only owned QA data. Generate a fresh QA Practice source through the live production Practice/share APIs with a temporary QA account, and borrow only the exact retained QA release Daily (closed) from corrected release f6ea0910. Never select or mutate customer rows. Verify protected publication, guest play, creator self-open, progressive reveal, final comparison, stats, attribution dedupe, Daily isolation, Admin retirement and privacy retirement; restore/privatize all QA fixtures and leave no live personalized canary route.",
   "expected_release": "f6ea0910d322f007f0ac0004b98fea6bab09422a"
 }

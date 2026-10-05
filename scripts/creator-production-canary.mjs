@@ -18,7 +18,7 @@ fs.mkdirSync(artifactDir,{recursive:true});
 const report={expected_release:expectedRelease,passed:false,checks:[],challenges:[],cleanup:{},started_at:new Date().toISOString()};
 const createdChallenges=[];
 const borrowedSources=[];
-let admin=null,guest=null;
+let admin=null,guest=null,practiceFixture=null;
 
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const parseJson=value=>typeof value==='string'?JSON.parse(value):value;
@@ -84,6 +84,70 @@ async function playerToken(playerId) {
   const token='p1_'+playerId+'.'+signature;mask(token);return token;
 }
 
+async function createFreshPracticeSource() {
+  const tag=randomUUID().slice(0,8);
+  const created=(await call('/growth/v1/player/session',{
+    body:{displayName:'QA Creator Source '+tag},status:[201],
+  })).data;
+  assert.match(created.playerId||'',/^[a-f0-9-]{36}$/i);
+  const playerId=created.playerId,player=await playerToken(playerId);
+  const authId=randomUUID(),session=randomBytes(32).toString('base64url'),csrf=randomBytes(32).toString('base64url');
+  const email='qa-creator-source-'+tag+'@example.invalid',name='QA Creator Source '+tag;
+  mask(session);mask(csrf);
+  await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,true)',[authId,name,email]);
+  await query("INSERT INTO account_sessions(session_hash,auth_user_id,csrf_hash,expires_at) VALUES($1,$2::uuid,$3,now()+interval '2 hours')",[
+    digest(session),authId,digest(csrf),
+  ]);
+  await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[authId,playerId]);
+  await query('UPDATE players SET profile_public=true,updated_at=now() WHERE id=$1::uuid',[playerId]);
+  const token={session,csrf};
+
+  let run=(await call('/draft/v1/runs',{
+    body:{environment:'mixed'},player,token,status:[200,201],
+  })).data;
+  assert.equal(run.day,null);
+  assert.equal(run.answers.length,0);
+  while(!run.complete) {
+    const round=run.answers.length;
+    run=(await call('/draft/v1/runs/'+run.id+'/pick',{
+      body:{revision:run.revision,round,puzzleId:run.current.puzzle_id,cardId:run.current.candidates[0].id},
+      player,token,
+    })).data;
+  }
+  assert.equal(run.answers.length,8);
+  const shared=(await call('/draft/v1/runs/'+run.id+'/share',{body:{},player,token})).data;
+  assert.match(shared.id||'',/^[a-f0-9]{24}$/);
+
+  const row=(await query(`SELECT s.id::text session_id,s.player_id::text player_id,
+      s.score::int score,s.environment,s.answers,s.puzzle_ids,s.measurement_qa,
+      p.profile_public,p.public_identity_hidden_at,p.display_name
+    FROM draft_run_sessions s JOIN players p ON p.id=s.player_id
+    WHERE s.id=$1::uuid AND s.player_id=$2::uuid`,[run.id,playerId])).rows[0];
+  assert.ok(row);
+  assert.equal(row.measurement_qa,false,'fresh Practice canary source must exercise ordinary creator eligibility');
+  practiceFixture={authId,email,name,playerId,player,token,sessionId:run.id,shareId:shared.id};
+  report.checks.push('fresh QA Practice source completed and shared through live production APIs');
+  return {...row,share_id:shared.id};
+}
+
+async function cleanupFreshPracticeSource() {
+  const fixture=practiceFixture;
+  if(!fixture)return;
+  await query('UPDATE draft_run_sessions SET measurement_qa=true WHERE id=$1::uuid AND player_id=$2::uuid',[
+    fixture.sessionId,fixture.playerId,
+  ]);
+  await query(`DELETE FROM analytics_events WHERE player_id=$1::uuid`,[fixture.playerId]);
+  await query('DELETE FROM draft_run_shares WHERE id=$1 AND session_id=$2::uuid',[fixture.shareId,fixture.sessionId]);
+  await query('DELETE FROM account_sessions WHERE auth_user_id=$1::uuid',[fixture.authId]);
+  await query('DELETE FROM neon_auth.session WHERE "userId"=$1::uuid',[fixture.authId]);
+  await query('DELETE FROM account_links WHERE auth_user_id=$1::uuid',[fixture.authId]);
+  await query('DELETE FROM neon_auth."user" WHERE id=$1::uuid AND email=$2 AND name=$3',[
+    fixture.authId,fixture.email,fixture.name,
+  ]);
+  await query(`UPDATE players SET profile_public=false,username_owned=false,updated_at=now()
+    WHERE id=$1::uuid AND display_name LIKE 'QA Creator Source %'`,[fixture.playerId]);
+}
+
 async function borrowSource(row,type) {
   assert.ok(row?.session_id&&row?.player_id,type+' retained QA source is required.');
   assert.equal(row.measurement_qa,true,type+' retained source must begin as measurement QA.');
@@ -111,41 +175,28 @@ async function restoreBorrowedSources() {
 }
 
 async function candidatePools() {
-  // Never select customer data for a release canary. Borrow only completed QA
-  // rows retained by the established production release acceptance suites,
-  // temporarily make that exact source eligible, then restore it in finally.
-  const practiceRow=(await query(`SELECT s.id::text session_id,sh.id share_id,s.player_id::text player_id,
-      s.score::int score,s.environment,s.answers,s.puzzle_ids,s.measurement_qa,
-      p.profile_public,p.public_identity_hidden_at,p.display_name
-    FROM draft_run_sessions s
-    JOIN draft_run_shares sh ON sh.session_id=s.id
-    JOIN players p ON p.id=s.player_id
-    WHERE s.day IS NULL AND s.score IS NOT NULL
-      AND jsonb_array_length(s.puzzle_ids)=8 AND jsonb_array_length(s.answers)=8
-      AND s.measurement_qa=true AND s.challenge_id IS NULL AND s.creator_challenge_id IS NULL
-      AND p.display_name LIKE 'QA v5 owner %'
-      AND p.public_identity_hidden_at IS NULL
-      AND NOT EXISTS(SELECT 1 FROM account_links a WHERE a.player_id=s.player_id)
-      AND NOT EXISTS(SELECT 1 FROM creator_challenges c WHERE c.source_owner_player_id=s.player_id)
-    ORDER BY s.updated_at DESC LIMIT 1`)).rows[0];
+  // Practice is generated fresh through the live production API using an
+  // owned QA player/account. Daily must already be closed, so borrow only the
+  // exact retained QA release fixture from the corrected backend release.
+  const practice=await createFreshPracticeSource();
+  const dailyName='QA release '+expectedRelease.slice(0,7);
   const dailyRow=(await query(`SELECT s.id::text session_id,s.player_id::text player_id,s.day::text AS source_day,
       s.score::int score,s.environment,s.answers,s.puzzle_ids,s.measurement_qa,
       p.profile_public,p.public_identity_hidden_at,p.display_name
     FROM draft_run_sessions s
     JOIN players p ON p.id=s.player_id
     WHERE s.day IS NOT NULL AND s.day<$1::date AND s.score IS NOT NULL
+      AND s.environment='mixed'
       AND jsonb_array_length(s.puzzle_ids)=8 AND jsonb_array_length(s.answers)=8
       AND s.measurement_qa=true
-      AND p.display_name LIKE 'QA release %'
+      AND p.display_name=$2
       AND p.public_identity_hidden_at IS NULL
       AND NOT EXISTS(SELECT 1 FROM account_links a WHERE a.player_id=s.player_id)
       AND NOT EXISTS(SELECT 1 FROM creator_challenges c WHERE c.source_owner_player_id=s.player_id)
-    ORDER BY s.day DESC,s.updated_at DESC LIMIT 1`,[gameDateKey()])).rows[0];
-  assert.ok(practiceRow,'No retained QA v5 Practice/share fixture is available; refusing customer fallback.');
-  assert.ok(dailyRow,'No retained closed QA release Daily fixture is available; refusing customer fallback.');
-  const practice=await borrowSource(practiceRow,'practice');
+    ORDER BY s.day DESC,s.updated_at DESC LIMIT 1`,[gameDateKey(),dailyName])).rows[0];
+  assert.ok(dailyRow,'No retained closed QA Daily from the corrected release is available; refusing customer fallback.');
   const daily=await borrowSource(dailyRow,'daily');
-  report.checks.push('source selection restricted to retained QA release fixtures; customer rows excluded');
+  report.checks.push('source selection uses only fresh owned QA Practice plus the corrected release QA Daily; customer rows excluded');
   return {practice:[practice],daily:[daily]};
 }
 
@@ -395,6 +446,7 @@ try{
 }finally{
   try{if(guest)await cleanupGuest(guest.id,createdChallenges.map(row=>row.id));}catch(error){report.cleanup.guest_error=error.message;}
   try{await restoreBorrowedSources();report.cleanup.borrowed_sources=true;}catch(error){report.cleanup.borrowed_source_error=error.message;process.exitCode=1;}
+  try{await cleanupFreshPracticeSource();report.cleanup.fresh_practice=true;}catch(error){report.cleanup.fresh_practice_error=error.message;process.exitCode=1;}
   try{await deleteAdminFixture(admin);report.cleanup.admin=true;}catch(error){report.cleanup.admin_error=error.message;}
   report.finished_at=new Date().toISOString();
   fs.writeFileSync(artifactDir+'/acceptance.json',JSON.stringify(report,null,2)+'\n');
