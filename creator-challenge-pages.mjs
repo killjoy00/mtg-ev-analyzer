@@ -73,7 +73,7 @@ export function creatorChallengeTrackedUrl(entry) {
 
 export function renderCreatorChallengePage(entry) {
   const valid=validateCreatorPageEntries([entry])[0];
-  const canonical=`https://packone.pro/go/${valid.slug}/`;
+  const canonical=`https://packone.pro/creator/${valid.slug}/`;
   if(valid.status==='retired')return `${GENERATED_CREATOR_MARKER}
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
