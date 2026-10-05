@@ -208,6 +208,6 @@ test('App Store screenshot upload is protected, source-pinned, and non-submittin
   assert.doesNotMatch(uploader, /reviewSubmissions/);
   assert.equal(request.operation, 'upload-pack-one-app-store-screenshots');
   assert.equal(request.versionString, '1.0');
-  assert.equal(request.screenshotRunId, 36392125277);
-  assert.equal(request.screenshotHeadSha, '73016d3240a4e1c2962257dcf81018e5ae0bc96d');
+  assert.equal(request.screenshotRunId, 37244011193);
+  assert.equal(request.screenshotHeadSha, '3a8244eb0568769c133365ea2821d512c62a3515');
 });

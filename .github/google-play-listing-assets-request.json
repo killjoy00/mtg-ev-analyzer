@@ -1,9 +1,9 @@
 {
   "operation": "upload-google-play-listing-assets",
-  "reason": "Upload the final visually reviewed Pack One Android phone screenshots from run 36493915041 / artifact 11003158035, the previously approved P¹ 512x512 Play app icon, and the corrected 1024x500 opaque P¹ feature graphic to the en-US Google Play main store listing. Replace only these three listing asset types. Do not alter tracks, releases, rollout, review submission, countries, tablet assets, or other Play listing data. Retry after correcting the pinned feature-graphic SHA-256 to the exact decoded bytes verified by CI. Retry after correcting the Google Play images.upload response parser to read the documented nested image.id field. Retry with safe featureGraphic HTTP status/body capture so any Play-side 400 rejection is visible; abort and delete the edit on failure. Commit the reviewed 512 icon and five phone screenshots in their own Play edit first. Then convert the pinned 1024x500 RGB PNG to JPEG at runtime and upload/commit featureGraphic in a separate edit so a feature-graphic rejection cannot roll back the working icon/screenshots. Clean recovery: run the rebuilt icon-plus-five-phone-screenshots workflow only; featureGraphic is now isolated in its own workflow.",
-  "source_run_id": 36493915041,
-  "source_artifact_id": 11003158035,
-  "source_sha": "6dbaf00bd80e761c0fc50c08ead2e8ad04539e58",
-  "artifact_digest": "sha256:dc7de6d7b4a925c75d3cc687ba4dca4e45be138157620e15dc2e4c5892a46d82",
+  "reason": "Replace only the en-US phone screenshots with the five individually inspected and approved final main-source captures from successful native/store run 37244011193, exact Android artifact 11319027887 and verified digest. Reupload the identical pinned approved icon through the established guarded workflow; leave the approved feature graphic untouched. Preserve tracks, testers, countries, qualification continuity and physical/provider/owner gates. No Production or public release.",
+  "source_run_id": 37244011193,
+  "source_artifact_id": 11319027887,
+  "source_sha": "3a8244eb0568769c133365ea2821d512c62a3515",
+  "artifact_digest": "sha256:dcaa729b8a88e56c667590fedfeb8f44a9dd26882e2223cb42a71215f62391fa",
   "language": "en-US"
 }
