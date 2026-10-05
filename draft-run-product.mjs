@@ -12,6 +12,7 @@ import { dailyResetCue } from './game-date.mjs';
 
 const base = () => String(window.PACK1_API?.draftRunUrl||'').replace(/\/$/,'');
 let run=null,selection=null,review=null,busy=false,dailyValidationConfirmation=null;
+const reportedDecisions=new Set();
 const clock=decisionClock();let viewPromise=Promise.resolve(),viewKey=null;
 document.addEventListener('visibilitychange',()=>{if(document.hidden)clock.pause();else if(run?.current&&review==null&&!busy)recordView(true);});
 function recordView(touch=false) {
@@ -91,7 +92,8 @@ function revealComparison(p,answer) {
   return `<div class="run-compare">${cell(mine,'Your pick','is-mine')}${cell(trophy,'Trophy pick','is-trophy')}</div>`;
 }
 function revealAnalysis(p,answer) {
-  return `<details class="run-analysis"><summary>Why this score?</summary><div class="run-analysis-body">${revealComparison(p,answer)}${consensusFeedback(answer)}</div></details>`;
+  const sent=reportedDecisions.has(answer.puzzle.puzzle_id);
+  return `<details class="run-analysis"><summary>Why this score?</summary><div class="run-analysis-body">${revealComparison(p,answer)}${consensusFeedback(answer)}<div class="run-decision-report"><button type="button" class="text-button" data-report-decision>Report this decision</button><span id="run-report-status" role="status">${sent?'Thanks — report sent.':''}</span></div></div></details>`;
 }
 function compactResultLabel(answer,sentence='') {
   const verdict=answer.historicalMatch
@@ -141,6 +143,45 @@ function render() {
   if(answer) document.querySelector('#run-feedback-result')?.focus({preventScroll:true});
   else recordView();
 }
+function openDecisionReport(answer) {
+  const round=review;
+  if(!Number.isInteger(round)||!run?.answers?.[round])return;
+  const dialog=document.createElement('dialog');
+  dialog.className='run-report-dialog';
+  dialog.innerHTML=`<form method="dialog" class="run-report-form"><h2>What seems wrong?</h2><fieldset>
+    <label><input type="radio" name="reason" value="draft_context" required> Draft context looks wrong</label>
+    <label><input type="radio" name="reason" value="card_or_image"> Card or image issue</label>
+    <label><input type="radio" name="reason" value="score_recommendation"> Score / recommendation seems wrong</label>
+    <label><input type="radio" name="reason" value="broken"> Something is broken</label>
+    <label><input type="radio" name="reason" value="other"> Other</label>
+  </fieldset><label class="run-report-comment">Anything else?<textarea name="comment" maxlength="500" rows="3"></textarea></label>
+  <p class="run-report-error" role="alert"></p><div class="run-report-actions"><button type="submit" class="button primary">Send report</button><button type="button" class="button secondary" data-report-cancel>Cancel</button></div></form>`;
+  document.body.append(dialog);
+  const form=dialog.querySelector('form'),submit=form.querySelector('[type="submit"]'),error=form.querySelector('.run-report-error');
+  dialog.querySelector('[data-report-cancel]').onclick=()=>dialog.close();
+  dialog.addEventListener('close',()=>dialog.remove());
+  form.onsubmit=async event=>{
+    event.preventDefault();
+    if(submit.disabled)return;
+    const data=new FormData(form),reason=String(data.get('reason')||''),comment=String(data.get('comment')||'').trim();
+    if(!reason){error.textContent='Choose what seems wrong.';return;}
+    submit.disabled=true;error.textContent='';
+    try {
+      await api(`/v1/runs/${run.id}/report`,{
+        round,puzzleId:answer.puzzle.puzzle_id,reason,comment:comment||null,
+        client:{platform:'web',version:null,build:null},
+      });
+      reportedDecisions.add(answer.puzzle.puzzle_id);
+      dialog.close();
+      const status=document.querySelector('#run-report-status');
+      if(status)status.textContent='Thanks — report sent.';
+    } catch(e) {
+      error.textContent=e.message||'Could not send the report. Try again.';
+      submit.disabled=false;
+    }
+  };
+  dialog.showModal();
+}
 function zoom(card) {
   const dialog=document.createElement('dialog');dialog.className='run-card-dialog';dialog.innerHTML=`<button class="button secondary" autofocus>Close</button>${image(card)}<p>${esc(card.name)}</p>`;
   document.body.append(dialog);dialog.querySelector('button').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
@@ -162,7 +203,7 @@ function bind(p,answer) {
   markPoolOverflow();
   app().querySelectorAll('[data-zoom]').forEach(b=>b.onclick=()=>zoom(p.candidates.find(c=>c.id===b.dataset.zoom)));
   app().querySelectorAll('[data-zoom-prior]').forEach(b=>b.onclick=()=>zoom(p.prior_picks[Number(b.dataset.zoomPrior)]));
-  if(answer) {document.querySelector('#run-next').onclick=()=>{review=null;selection=null;render();window.scrollTo({top:0,behavior:'instant'});};return;}
+  if(answer) {document.querySelector('#run-next').onclick=()=>{review=null;selection=null;render();window.scrollTo({top:0,behavior:'instant'});};const report=app().querySelector('[data-report-decision]');if(report)report.onclick=()=>openDecisionReport(answer);return;}
   app().querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{
     if(busy)return;selection=b.dataset.pick;
     app().querySelectorAll('[data-pick]').forEach(c=>{c.setAttribute('aria-pressed',String(c.dataset.pick===selection));c.closest('.run-card').classList.toggle('selected',c.dataset.pick===selection);});
