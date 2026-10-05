@@ -44,7 +44,10 @@ async function call(path,{method,body,token,player,status=[200]}={}) {
   const text=await response.text();
   let data={};
   try{data=text?JSON.parse(text):{};}catch{}
-  assert.ok(status.includes(response.status),path+': HTTP '+response.status+' code '+String(data?.code||'none'));
+  if(!status.includes(response.status))throw Object.assign(
+    Error(path+': HTTP '+response.status+' code '+String(data?.code||'none')+' '+String(data?.error||'').slice(0,300)),
+    {status:response.status,code:data?.code||null},
+  );
   return {response,data,text};
 }
 
@@ -62,6 +65,7 @@ async function createAdminFixture() {
   const authId=randomUUID(),session=randomBytes(32).toString('base64url'),csrf=randomBytes(32).toString('base64url');
   mask(session);mask(csrf);
   const email='delivered+'+tag+'@resend.dev',name='QA Creator Canary '+tag;
+  admin={authId,email,name,token:{session,csrf}};
   await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,true)',[authId,name,email]);
   await query("INSERT INTO account_sessions(session_hash,auth_user_id,csrf_hash,expires_at) VALUES($1,$2::uuid,$3,now()+interval '2 hours')",[digest(session),authId,digest(csrf)]);
   await query('INSERT INTO pack1_admins(auth_user_id) VALUES($1::uuid)',[authId]);
@@ -94,6 +98,7 @@ async function createFreshPracticeSource() {
   const authId=randomUUID(),session=randomBytes(32).toString('base64url'),csrf=randomBytes(32).toString('base64url');
   const email='qa-creator-source-'+tag+'@example.invalid',name='Creator Canary Source '+tag;
   mask(session);mask(csrf);
+  practiceFixture={authId,email,name,playerId,player,token:{session,csrf},sessionId:null,shareId:null};
   await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,true)',[authId,name,email]);
   await query("INSERT INTO account_sessions(session_hash,auth_user_id,csrf_hash,expires_at) VALUES($1,$2::uuid,$3,now()+interval '2 hours')",[
     digest(session),authId,digest(csrf),
@@ -105,6 +110,7 @@ async function createFreshPracticeSource() {
   let run=(await call('/draft/v1/runs',{
     body:{environment:'mixed'},player,token,status:[200,201],
   })).data;
+  practiceFixture.sessionId=run.id;
   assert.equal(run.day,null);
   assert.equal(run.answers.length,0);
   while(!run.complete) {
@@ -116,6 +122,7 @@ async function createFreshPracticeSource() {
   }
   assert.equal(run.answers.length,8);
   const shared=(await call('/draft/v1/runs/'+run.id+'/share',{body:{},player,token})).data;
+  practiceFixture.shareId=shared.id;
   assert.match(shared.id||'',/^[a-f0-9]{24}$/);
 
   const row=(await query(`SELECT s.id::text session_id,s.player_id::text player_id,
@@ -133,9 +140,7 @@ async function createFreshPracticeSource() {
 async function cleanupFreshPracticeSource() {
   const fixture=practiceFixture;
   if(!fixture)return;
-  await query('UPDATE draft_run_sessions SET measurement_qa=true WHERE id=$1::uuid AND player_id=$2::uuid',[
-    fixture.sessionId,fixture.playerId,
-  ]);
+  await query('UPDATE draft_run_sessions SET measurement_qa=true WHERE player_id=$1::uuid',[fixture.playerId]);
   await query(`DELETE FROM analytics_events WHERE player_id=$1::uuid`,[fixture.playerId]);
   await query('DELETE FROM draft_run_shares WHERE id=$1 AND session_id=$2::uuid',[fixture.shareId,fixture.sessionId]);
   await query('DELETE FROM account_sessions WHERE auth_user_id=$1::uuid',[fixture.authId]);
@@ -214,10 +219,16 @@ async function resolveCandidate(type,candidates) {
       ?{source_type:'practice',share:candidate.share_id}
       :{source_type:'daily',creator_player_id:borrowed.player_id,source_session_id:borrowed.session_id};
     try{
-      const {data}=await call('/growth/v1/admin/creator-challenges/resolve',{body,token:admin.token});
+      const {data}=await call('/draft/v1/admin/creator-challenges/resolve',{body,token:admin.token});
       if(data?.source?.source_session_id===borrowed.session_id)return {...borrowed,summary:data.source};
-    }catch{}
-    if(type==='daily')await restoreBorrowedSource(borrowed._borrowed_source);
+      throw Error('Admin resolver returned a different source session.');
+    }catch(error){
+      report.source_resolution_failures??=[];
+      report.source_resolution_failures.push({type,session_id:borrowed.session_id,status:error.status||null,code:error.code||null,error:error.message});
+      console.error(type+' source resolution: '+error.message);
+      if(type==='daily')await restoreBorrowedSource(borrowed._borrowed_source);
+      if(type==='practice'||![404,409].includes(error.status))throw error;
+    }
   }
   throw Error('No '+type+' source passed the live Admin authority checks.');
 }
@@ -234,7 +245,7 @@ async function createChallenge(type,candidate,tag) {
     acquisition_campaign:'release-canary',
     acquisition_medium:'creator',
   };
-  const {data}=await call('/growth/v1/admin/creator-challenges',{body,token:admin.token});
+  const {data}=await call('/draft/v1/admin/creator-challenges',{body,token:admin.token});
   assert.equal(data.challenge.source_session_id,candidate.session_id);
   assert.equal(Number(data.challenge.source_score),Number(candidate.score));
   createdChallenges.push({id:data.challenge.id,slug,type,owner:candidate.player_id});
@@ -339,7 +350,7 @@ async function playChallenge(challenge,candidate,guestToken,guestId) {
       result_persisted_at,updated_at FROM draft_run_sessions WHERE id=$1::uuid`,[candidate.session_id])).rows[0];
   assert.deepEqual(sourceAfter,sourceBefore,'original creator source must remain immutable');
 
-  const detail=(await call('/growth/v1/admin/creator-challenges/'+challenge.id,{method:'GET',token:admin.token})).data.challenge;
+  const detail=(await call('/draft/v1/admin/creator-challenges/'+challenge.id,{method:'GET',token:admin.token})).data.challenge;
   assert.equal(Number(detail.attempts),1);
   assert.equal(Number(detail.wins)+Number(detail.ties)+Number(detail.losses),1);
   assert.equal(await count(`SELECT count(*)::int n FROM analytics_events
@@ -391,7 +402,7 @@ async function bestEffortRetire() {
   if(!admin)return;
   for(const challenge of createdChallenges){
     try{
-      const row=(await call('/growth/v1/admin/creator-challenges/'+challenge.id,{method:'GET',token:admin.token,status:[200]})).data.challenge;
+      const row=(await call('/draft/v1/admin/creator-challenges/'+challenge.id,{method:'GET',token:admin.token,status:[200]})).data.challenge;
       if(row.status==='retired'&&parseJson(row.publication_detail)?.live_verified===true)continue;
       await publication(challenge,'retire',{timeoutMs:30*60*1000});
     }catch(error){console.error('Canary cleanup retirement failed for '+challenge.slug+': '+error.message);}
@@ -453,10 +464,11 @@ try{
   await bestEffortRetire();
   process.exitCode=1;
 }finally{
-  try{if(guest)await cleanupGuest(guest.id,createdChallenges.map(row=>row.id));}catch(error){report.cleanup.guest_error=error.message;}
+  try{if(guest)await cleanupGuest(guest.id,createdChallenges.map(row=>row.id));}catch(error){report.cleanup.guest_error=error.message;process.exitCode=1;}
   try{await restoreBorrowedSources();report.cleanup.borrowed_sources=true;}catch(error){report.cleanup.borrowed_source_error=error.message;process.exitCode=1;}
   try{await cleanupFreshPracticeSource();report.cleanup.fresh_practice=true;}catch(error){report.cleanup.fresh_practice_error=error.message;process.exitCode=1;}
-  try{await deleteAdminFixture(admin);report.cleanup.admin=true;}catch(error){report.cleanup.admin_error=error.message;}
+  try{await deleteAdminFixture(admin);report.cleanup.admin=true;}catch(error){report.cleanup.admin_error=error.message;process.exitCode=1;}
+  if(process.exitCode)report.passed=false;
   report.finished_at=new Date().toISOString();
   fs.writeFileSync(artifactDir+'/acceptance.json',JSON.stringify(report,null,2)+'\n');
 }
