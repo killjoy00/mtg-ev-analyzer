@@ -56,7 +56,7 @@ function workflowInputs(row,operation,action) {
   };
 }
 
-export async function requestCreatorPrivacyRetirement(query,playerId,{env=process.env,fetcher=fetch}={}) {
+export async function requestCreatorPrivacyRetirement(query,playerId,{reason='account_deletion',env=process.env,fetcher=fetch}={}) {
   const result=await query(`SELECT id FROM creator_challenges
     WHERE source_owner_player_id=$1::uuid
       AND NOT (
@@ -85,10 +85,10 @@ export async function requestCreatorPrivacyRetirement(query,playerId,{env=proces
         retired_at=COALESCE(retired_at,now()),privacy_removed_at=COALESCE(privacy_removed_at,now()),
         publication_operation_ref=$2::uuid,publication_detail=$3::jsonb,publication_error=NULL,updated_at=now()
       WHERE id=$1::uuid`,[
-        row.id,operation,JSON.stringify({action:'retire',reason:'account_deletion',requested_at:new Date().toISOString()}),
+        row.id,operation,JSON.stringify({action:'retire',reason,requested_at:new Date().toISOString()}),
       ]);
     await query(`INSERT INTO creator_challenge_audit(creator_challenge_id,action,detail)
-      VALUES($1::uuid,'privacy_retired',jsonb_build_object('operation',$2::text,'reason','account_deletion'))`,[row.id,operation]);
+      VALUES($1::uuid,'privacy_retired',jsonb_build_object('operation',$2::text,'reason',$3::text))`,[row.id,operation,reason]);
     row=await creatorChallengeById(query,row.id);
     try {
       await dispatch(row,operation,'retire',{env,fetcher});
