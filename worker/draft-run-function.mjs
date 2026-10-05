@@ -153,6 +153,7 @@ async function responseFor(s,timing=null) {
   return {ranked_name:rankedName,ranking_identity:identityStatus?{eligible:identityStatus.eligible,reason:identityStatus.reason}:null,id:s.id,corpus_version:s.corpus_version,source_components:s.source_components,serving_policy_version:s.serving_policy_version||LEGACY_SERVING_POLICY_VERSION,run_length:runLength(s),daily_featured_sets:s.daily_featured_sets,set_reroll_allowed:!s.day&&!s.challenge_id&&!s.creator_challenge_id&&!s.custom_set_ids.length,custom_set_ids:s.custom_set_ids,leaderboard_eligible:Boolean(s.leaderboard_eligible&&rankedIdentity),environment:environmentOf(s),day:s.day,revision:s.revision,round:s.answers.length+1,complete,score:s.score,answers,rerolls:s.day||s.creator_challenge_id?{set:0,pack:0}:s.rerolls,current,comparison,standing,scoring_version:s.scoring_version,difficulty_version:s.difficulty_version,selection_version:s.selection_version,creator_challenge_id:s.creator_challenge_id||null};
 }
 
+const ensureDailySchedule=(day,environment)=>ensureDailyScheduleForQuery(query,day,environment);
 async function generateDailySchedules(request) {
   if(request.method!=='POST')fail('Not found.',404);
   const body=await readJson(request);
@@ -191,13 +192,11 @@ async function start(request) {
   const source=body.challenge ? await share(String(body.challenge)) : null;
   const creatorState=body.creatorChallenge ? await loadCreatorChallengeForStart(query,String(body.creatorChallenge),{today:gameDateKey()}) : null;
   if(source&&creatorState)fail('Choose either a shared run or a creator challenge.');
-  if((source||creatorState)&&daily) fail('A challenge replay is separate from the Daily.');
-  // A share is an invitation to another player, not a second attempt for its
-  // creator. Reopening your own link should recover the authoritative original
-  // result instead of creating a self-challenge with a fake opponent record.
+  if((source||creatorState)&&daily)fail('A challenge replay is separate from the Daily.');
+  // Reopening an invitation as its source owner must never manufacture a
+  // self-opponent attempt. Return the authoritative source session instead.
   if(source?.owner_player_id===owner)return json(await responseFor(await session(source.session_id,owner)));
-  if(creatorState?.source?.player_id===owner)
-    return json(await responseFor(await session(creatorState.source.id,owner),null,{...creatorState,self:true}));
+  if(creatorState?.source?.player_id===owner)return json(await responseFor(await session(creatorState.source.id,owner)));
   if(source) {
     const previous=(await query(
       'SELECT * FROM draft_run_sessions WHERE player_id=$1::uuid AND challenge_id=$2 ORDER BY created_at,id LIMIT 1',
@@ -206,38 +205,41 @@ async function start(request) {
     if(previous)return json(await responseFor(decode(previous)));
   }
   const account=await timing.step('identity',()=>daily?linkedPlayerIdentity(query,owner):accountIdentity(request,query,owner));
-  const capabilities=daily?[]:await timing.step('capability',()=>accountCapabilities(account,query));
-  if(creatorState&&!account)requireCapability(capabilities,'unlimited_regular_practice');
-  if(creatorState&&account?.auth_user_id) {
+  if(creatorState) {
     const previous=(await query(
-      'SELECT * FROM draft_run_sessions WHERE creator_challenge_id=$1::uuid AND creator_participant_auth_user_id=$2::uuid ORDER BY created_at,id LIMIT 1',
-      [creatorState.challenge.id,account.auth_user_id],
+      `SELECT * FROM draft_run_sessions
+       WHERE creator_challenge_id=$1::uuid
+         AND (player_id=$2::uuid OR ($3::uuid IS NOT NULL AND creator_participant_auth_user_id=$3::uuid))
+       ORDER BY (creator_participant_auth_user_id IS NOT NULL) DESC,created_at,id LIMIT 1`,
+      [creatorState.challenge.id,owner,account?.auth_user_id||null],
     )).rows[0];
     if(previous)return json(await responseFor(decode(previous)));
   }
+  const capabilities=daily||creatorState?[]:await timing.step('capability',()=>accountCapabilities(account,query));
   let environment;
   try { environment=draftRunEnvironment(creatorState?.source?.environment || source?.environment || body.environment || 'mixed'); }
   catch { fail('Invalid Draft Run environment.'); }
   const requestedSetIds=body.setIds??[];
-  if(!Array.isArray(requestedSetIds)||requestedSetIds.some(s=>typeof s!=='string'||!/^[-a-z0-9]{2,40}$/.test(s)))fail('Choose valid sets.');
+  if(!Array.isArray(requestedSetIds)||requestedSetIds.some(value=>typeof value!=='string'||!/^[-a-z0-9]{2,40}$/.test(value)))fail('Choose valid sets.');
   if(creatorState&&requestedSetIds.length)fail('Creator challenge decisions are fixed.');
-  const setIds=creatorState?creatorState.source.custom_set_ids:requestedSetIds;
+  const setIds=creatorState?[...(creatorState.source.custom_set_ids||[])]:requestedSetIds;
   if(daily&&setIds.length)fail('Daily sets are fixed.');
   if(environment==='latest'&&!daily&&!creatorState)fail('Latest-set runs are Daily only. Choose sets for custom practice.');
   if(environment!=='mixed'&&setIds.length)fail('Custom sets use regular Draft Runs.');
-  if(!daily)requireCapability(capabilities,practiceCapability(environment,setIds));
+  if(!daily&&!creatorState)requireCapability(capabilities,practiceCapability(environment,setIds));
   const rawIdempotency=String(request.headers.get('x-idempotency-key')||'');
   if(rawIdempotency&&daily)fail('Practice idempotency keys are not valid for Daily runs.');
   if(rawIdempotency&&(source||creatorState))fail('Practice idempotency keys are not valid for challenge replays.');
   if(rawIdempotency&&!IDEMPOTENCY_KEY.test(rawIdempotency))fail('Invalid practice idempotency key.');
-  // Shared runs intentionally reject client idempotency keys. Derive the same
-  // database idempotency shape from the authoritative stored share instead so
-  // dropped/concurrent start retries converge on one player/share session.
+  // Shared and creator replays reject client idempotency keys. Their server
+  // identities provide the stable key so dropped/concurrent starts converge.
   const startIdempotencyHash=source
     ? digest(`shared:${source.id}`)
-    : rawIdempotency?digest(rawIdempotency):null;
+    : creatorState
+      ? digest(`creator:${creatorState.challenge.id}`)
+      : rawIdempotency?digest(rawIdempotency):null;
   const startRequestHash=startIdempotencyHash?digest(JSON.stringify({
-    version:1,environment,setIds:[...setIds].sort(),challenge:source?.id||null,qa:body.qa===true,
+    version:1,environment,setIds:[...setIds].sort(),challenge:source?.id||null,creatorChallenge:creatorState?.challenge.id||null,qa:body.qa===true,
   })):null;
   if(startIdempotencyHash) {
     const previous=(await timing.step('idempotency',()=>query(
@@ -266,71 +268,82 @@ async function start(request) {
   let seed=day
     ? `daily:${environment}:${day}:${DRAFT_RUN_CORPUS_VERSION}:${DRAFT_RUN_SELECTION_VERSION}`
     : creatorState
-      ? `creator:${creatorState.challenge.id}:${account?.auth_user_id||owner}`
+      ? `creator:${creatorState.challenge.id}:${owner}`
       : source
         ? `shared:${source.id}:${owner}`
         : startIdempotencyHash ? `practice:${startIdempotencyHash}` : crypto.randomUUID();
   const replaySource=creatorState?.source||source;
   let corpusVersion=replaySource?.corpus_version||DRAFT_RUN_CORPUS_VERSION,scoringVersion=replaySource?.scoring_version||DRAFT_RUN_SCORING_VERSION;
-  let servingPolicy=replaySource?.serving_policy_version|| (replaySource?LEGACY_SERVING_POLICY_VERSION:SERVING_POLICY_VERSION);
+  let servingPolicy=replaySource?.serving_policy_version||(replaySource?LEGACY_SERVING_POLICY_VERSION:SERVING_POLICY_VERSION);
   let ids,featuredSets=[],difficultyVersion=replaySource?.difficulty_version||DRAFT_RUN_DIFFICULTY_VERSION,selectionVersion=replaySource?.selection_version||DRAFT_RUN_SELECTION_VERSION;
   for(let attempt=0;attempt<2;attempt++) {
-  let practiceChoices=null;
-  if(creatorState) ids=creatorState.source.puzzle_ids;
-  else if(source) ids=source.puzzle_ids;
-  else if(day) {
-    const {schedule}=await ensureDailySchedule(day,environment);
-    corpusVersion=schedule.corpus_version;scoringVersion=schedule.scoring_version;servingPolicy=schedule.serving_policy_version||LEGACY_SERVING_POLICY_VERSION;
-    ids=parse(schedule.puzzle_ids);difficultyVersion=schedule.difficulty_version||LEGACY_DIFFICULTY_VERSION;
-    selectionVersion=schedule.selection_version||PREVIOUS_SELECTION_VERSION;
-    featuredSets=parse(schedule.daily_featured_sets||'[]');
-    seed=`daily:${environment}:${day}:${schedule.corpus_version}:${selectionVersion}`;
-  } else {
-    practiceChoices=await timing.step('selection',()=>selectCachedDatabaseRun(timing.selectionQuery(query),DRAFT_RUN_CORPUS_VERSION,seed,environment,{setIds}));
-    ids=practiceChoices.map(p=>p.puzzle_id);
-  }
-  const choices=practiceChoices||await loadPuzzleMetadata(query,corpusVersion,ids);
-  if(choices.some(p=>!p || (environment==='powered-cube')!==(p.set_id==='powered-cube'))) fail('This run uses an unavailable corpus.',409);
-  const sources=choices.map(p=>p.source_draft_hash),anchors=choices.map(publicDifficulty);
-  const rerolls=day||source||creatorState?{set:0,pack:0}:environment==='powered-cube'||setIds.length?{set:0,pack:2}:{set:1,pack:1};
-  const dailyAccountId=day?account?.auth_user_id||null:null;
-  const creatorParticipantId=creatorState?account?.auth_user_id||null:null;
-  const identityGuardId=dailyAccountId||creatorParticipantId;
-  const inserted=await timing.step('session_insert',()=>query(`WITH identity_allowed AS MATERIALIZED (
-   SELECT 1 WHERE $25::uuid IS NULL OR pack1_identity_attachment_allowed($25::uuid)
-  )
-    INSERT INTO draft_run_sessions(player_id,day,seed,corpus_version,scoring_version,puzzle_ids,seen_sources,challenge_id,environment,rerolls,difficulty_version,difficulty_anchors,selection_version,measurement_qa,daily_featured_sets,daily_account_id,leaderboard_eligible,custom_set_ids,serving_policy_version,start_idempotency_hash,start_request_hash,creator_challenge_id,creator_participant_auth_user_id)
-    SELECT $1::uuid,$2::date,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,$10::jsonb,$11,$12::jsonb,$13,
-      $14::boolean OR COALESCE((SELECT display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)' FROM players WHERE id=$1::uuid),false),$15::jsonb,$16::uuid,$17::boolean,$18::jsonb,$19,$20,$21,$23::uuid,$24::uuid
-    FROM identity_allowed
-    WHERE $22::bigint IS NULL OR EXISTS (
-      SELECT 1 FROM draft_run_serving_revision WHERE singleton AND revision=$22::bigint FOR SHARE
+    let practiceChoices=null;
+    if(creatorState)ids=creatorState.source.puzzle_ids;
+    else if(source)ids=source.puzzle_ids;
+    else if(day) {
+      const {schedule}=await ensureDailySchedule(day,environment);
+      corpusVersion=schedule.corpus_version;scoringVersion=schedule.scoring_version;servingPolicy=schedule.serving_policy_version||LEGACY_SERVING_POLICY_VERSION;
+      ids=parse(schedule.puzzle_ids);difficultyVersion=schedule.difficulty_version||LEGACY_DIFFICULTY_VERSION;
+      selectionVersion=schedule.selection_version||PREVIOUS_SELECTION_VERSION;
+      featuredSets=parse(schedule.daily_featured_sets||'[]');
+      seed=`daily:${environment}:${day}:${schedule.corpus_version}:${selectionVersion}`;
+    } else {
+      practiceChoices=await timing.step('selection',()=>selectCachedDatabaseRun(timing.selectionQuery(query),DRAFT_RUN_CORPUS_VERSION,seed,environment,{setIds}));
+      ids=practiceChoices.map(item=>item.puzzle_id);
+    }
+    const choices=practiceChoices||await loadPuzzleMetadata(query,corpusVersion,ids);
+    if(choices.some(item=>!item || (environment==='powered-cube')!==(item.set_id==='powered-cube')))fail('This run uses an unavailable corpus.',409);
+    const sources=choices.map(item=>item.source_draft_hash),anchors=choices.map(publicDifficulty);
+    const rerolls=day||source||creatorState?{set:0,pack:0}:environment==='powered-cube'||setIds.length?{set:0,pack:2}:{set:1,pack:1};
+    const dailyAccountId=day?account?.auth_user_id||null:null;
+    const creatorParticipantId=creatorState?account?.auth_user_id||null:null;
+    const identityGuardId=dailyAccountId||creatorParticipantId;
+    const inserted=await timing.step('session_insert',()=>query(`WITH identity_allowed AS MATERIALIZED (
+      SELECT 1 WHERE $25::uuid IS NULL OR pack1_identity_attachment_allowed($25::uuid)
     )
-    ON CONFLICT DO NOTHING RETURNING *`,[owner,day,seed,corpusVersion,scoringVersion,JSON.stringify(ids),JSON.stringify(sources),source?.id||null,environment,JSON.stringify(rerolls),difficultyVersion,JSON.stringify(anchors),selectionVersion,body.qa===true,JSON.stringify(featuredSets),dailyAccountId,Boolean(day&&account),JSON.stringify(setIds),servingPolicy,startIdempotencyHash,startRequestHash,practiceChoices?.servingRevision||null,creatorState?.challenge?.id||null,creatorParticipantId,identityGuardId]));
-  let s=inserted.rows[0];
-  if(!s && day) s=(await query('SELECT * FROM draft_run_sessions WHERE (player_id=$1::uuid OR daily_account_id=$4::uuid) AND day=$2::date AND environment=$3',[owner,day,environment,account?.auth_user_id||null])).rows[0];
-  if(!s && creatorState&&creatorParticipantId) {
-    s=(await query(
-      'SELECT * FROM draft_run_sessions WHERE creator_challenge_id=$1::uuid AND creator_participant_auth_user_id=$2::uuid LIMIT 1',
-      [creatorState.challenge.id,creatorParticipantId],
-    )).rows[0];
-  }
-  if(!s && startIdempotencyHash) {
-    s=(await query(
-      'SELECT * FROM draft_run_sessions WHERE player_id=$1::uuid AND start_idempotency_hash=$2 LIMIT 1',
-      [owner,startIdempotencyHash],
-    )).rows[0];
-    if(s&&s.start_request_hash!==startRequestHash)
-      fail('This practice start key was already used for a different request.',409);
-  }
-  if(!s && practiceChoices && !await servingRevisionMatches(query,practiceChoices.servingRevision))continue;
-  if(!s) fail('Could not start your run. Please retry.',409);
-  if(inserted.rows.length) await timing.step('analytics_insert',()=>query('INSERT INTO analytics_events(player_id,event_name,event_props) SELECT $1::uuid,value,$3::jsonb FROM jsonb_array_elements_text($2::jsonb)',[
-    owner,
-    JSON.stringify([day?'daily_started':'game_started',...(environment==='powered-cube'?['cube_started']:[]),...(creatorState?['creator_challenge_started']:[])]),
-    JSON.stringify({mode:'draft_run',set_id:environment,daily,challenge:Boolean(source||creatorState),run_id:s.id,...(creatorState?{creator_challenge_id:creatorState.challenge.id}:{}),...(entrySource?{source:entrySource}:{})}),
-  ]));
-  return timing.finish(json(await timing.step('response',()=>responseFor(decode(s),timing))));
+      INSERT INTO draft_run_sessions(player_id,day,seed,corpus_version,scoring_version,puzzle_ids,seen_sources,challenge_id,environment,rerolls,difficulty_version,difficulty_anchors,selection_version,measurement_qa,daily_featured_sets,daily_account_id,leaderboard_eligible,custom_set_ids,serving_policy_version,start_idempotency_hash,start_request_hash,creator_challenge_id,creator_participant_auth_user_id)
+      SELECT $1::uuid,$2::date,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,$10::jsonb,$11,$12::jsonb,$13,
+        $14::boolean OR COALESCE((SELECT display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)' FROM players WHERE id=$1::uuid),false),$15::jsonb,$16::uuid,$17::boolean,$18::jsonb,$19,$20,$21,$23::uuid,$24::uuid
+      FROM identity_allowed
+      WHERE $22::bigint IS NULL OR EXISTS (
+        SELECT 1 FROM draft_run_serving_revision WHERE singleton AND revision=$22::bigint FOR SHARE
+      )
+      ON CONFLICT DO NOTHING RETURNING *`,[
+        owner,day,seed,corpusVersion,scoringVersion,JSON.stringify(ids),JSON.stringify(sources),source?.id||null,environment,JSON.stringify(rerolls),
+        difficultyVersion,JSON.stringify(anchors),selectionVersion,body.qa===true,JSON.stringify(featuredSets),dailyAccountId,Boolean(day&&account),
+        JSON.stringify(setIds),servingPolicy,startIdempotencyHash,startRequestHash,practiceChoices?.servingRevision||null,
+        creatorState?.challenge?.id||null,creatorParticipantId,identityGuardId,
+      ]));
+    let currentSession=inserted.rows[0];
+    if(!currentSession&&day)currentSession=(await query('SELECT * FROM draft_run_sessions WHERE (player_id=$1::uuid OR daily_account_id=$4::uuid) AND day=$2::date AND environment=$3',[owner,day,environment,account?.auth_user_id||null])).rows[0];
+    if(!currentSession&&creatorState) {
+      currentSession=(await query(
+        `SELECT * FROM draft_run_sessions
+         WHERE creator_challenge_id=$1::uuid
+           AND (player_id=$2::uuid OR ($3::uuid IS NOT NULL AND creator_participant_auth_user_id=$3::uuid))
+         ORDER BY (creator_participant_auth_user_id IS NOT NULL) DESC,created_at,id LIMIT 1`,
+        [creatorState.challenge.id,owner,creatorParticipantId],
+      )).rows[0];
+    }
+    if(!currentSession&&startIdempotencyHash) {
+      currentSession=(await query(
+        'SELECT * FROM draft_run_sessions WHERE player_id=$1::uuid AND start_idempotency_hash=$2 LIMIT 1',
+        [owner,startIdempotencyHash],
+      )).rows[0];
+      if(currentSession&&currentSession.start_request_hash!==startRequestHash)
+        fail('This practice start key was already used for a different request.',409);
+    }
+    if(!currentSession&&practiceChoices&&!await servingRevisionMatches(query,practiceChoices.servingRevision))continue;
+    if(!currentSession)fail('Could not start your run. Please retry.',409);
+    if(inserted.rows.length)await timing.step('analytics_insert',()=>query(
+      'INSERT INTO analytics_events(player_id,event_name,event_props) SELECT $1::uuid,value,$3::jsonb FROM jsonb_array_elements_text($2::jsonb)',
+      [
+        owner,
+        JSON.stringify([day?'daily_started':'game_started',...(environment==='powered-cube'?['cube_started']:[]),...(creatorState?['creator_challenge_started']:[])]),
+        JSON.stringify({mode:'draft_run',set_id:environment,daily,challenge:Boolean(source||creatorState),run_id:currentSession.id,...(creatorState?{creator_challenge_id:creatorState.challenge.id,creator_challenge_slug:creatorState.challenge.slug,creator_source_type:creatorState.challenge.source_type}:{}),...(entrySource?{source:entrySource}:{})}),
+      ],
+    ));
+    return timing.finish(json(await timing.step('response',()=>responseFor(decode(currentSession),timing))));
   }
   throw servingCacheUnavailable();
 }
