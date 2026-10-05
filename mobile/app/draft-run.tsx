@@ -1,3 +1,4 @@
+import * as Application from 'expo-application';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -5,12 +6,15 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
+  KeyboardAvoidingView,
   Linking,
   Modal,
+  Platform,
   Pressable,
   ScrollView,
   Share,
   StyleSheet,
+  TextInput,
   useWindowDimensions,
   type LayoutChangeEvent,
   type TextLayoutEvent,
@@ -31,8 +35,10 @@ import {
   rerollDraftRun,
   startDailyDraftRun,
   startPracticeDraftRun,
+  submitDraftRunDecisionReport,
   submitDraftRunPick,
   type DailyEnvironment,
+  type DecisionReportReason,
   type DraftRunAnswer,
   type DraftRunCard,
   type DraftRunState,
@@ -165,6 +171,14 @@ function relativeSupport(support: number | undefined, leader: number) {
   if (!Number.isFinite(Number(support)) || leader <= 0) return 'Unavailable';
   return `${Math.round(100 * Number(support) / leader)}%`;
 }
+
+const DECISION_REPORT_OPTIONS: readonly { value: DecisionReportReason; label: string }[] = [
+  { value: 'draft_context', label: 'Draft context looks wrong' },
+  { value: 'card_or_image', label: 'Card or image issue' },
+  { value: 'score_recommendation', label: 'Score / recommendation seems wrong' },
+  { value: 'broken', label: 'Something is broken' },
+  { value: 'other', label: 'Other' },
+];
 
 function compactFeedback(answer: DraftRunAnswer) {
   if (answer.historicalMatch) return '';
@@ -480,6 +494,12 @@ export default function DraftRunScreen({
   const [reviewIndex, setReviewIndex] = useState<number | null>(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
   const [showPackReview, setShowPackReview] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState<DecisionReportReason | null>(null);
+  const [reportComment, setReportComment] = useState('');
+  const [reportSending, setReportSending] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+  const [reportedDecision, setReportedDecision] = useState<string | null>(null);
   const scroll = useRef<ScrollView>(null);
 
   const commitState = (next: LoadState) => {
@@ -686,6 +706,11 @@ export default function DraftRunScreen({
     setReviewIndex(feedbackIndex);
     setShowAnalysis(false);
     setShowPackReview(false);
+    setReportOpen(false);
+    setReportReason(null);
+    setReportComment('');
+    setReportError(null);
+    setReportedDecision(null);
     setMode('feedback');
     const latestAnswer = run.answers[feedbackIndex];
     if (latestAnswer) {
@@ -739,6 +764,48 @@ export default function DraftRunScreen({
       if (mutationStillCurrent(token)) setActionError(message);
     } finally {
       setBusy(false);
+    }
+  };
+
+  const openDecisionReport = () => {
+    const current = stateRef.current;
+    const answer = current.status === 'ready' && reviewIndex !== null ? current.run.answers[reviewIndex] : null;
+    if (!answer) return;
+    setReportReason(null);
+    setReportComment('');
+    setReportError(null);
+    setReportOpen(true);
+  };
+
+  const sendDecisionReport = async () => {
+    const current = stateRef.current;
+    if (current.status !== 'ready' || reviewIndex === null || !reportReason || reportSending) return;
+    const answer = current.run.answers[reviewIndex];
+    if (!answer) return;
+    setReportSending(true);
+    setReportError(null);
+    try {
+      await submitDraftRunDecisionReport(
+        current.run,
+        reviewIndex,
+        reportReason,
+        reportComment,
+        {
+          platform: Platform.OS === 'ios' || Platform.OS === 'android' ? Platform.OS : 'unknown',
+          version: Application.nativeApplicationVersion ?? null,
+          build: Application.nativeBuildVersion ?? null,
+        },
+        current.session,
+      );
+      setReportedDecision(answer.puzzle.puzzle_id);
+      setReportOpen(false);
+      setReportReason(null);
+      setReportComment('');
+      AccessibilityInfo.announceForAccessibility('Thanks — report sent.');
+    } catch (error: unknown) {
+      setReportError(error instanceof Error ? error.message : 'Could not send the report. Try again.');
+    } finally {
+      setReportSending(false);
     }
   };
 
@@ -1030,6 +1097,14 @@ export default function DraftRunScreen({
                 <>
                   <FeedbackAnalysis answer={answer} onAffiliatePress={openAffiliateCard} onZoom={setZoomedCard} />
                   {affiliateError ? <Text accessibilityRole="alert" style={styles.actionError}>{affiliateError}</Text> : null}
+                  <View style={styles.decisionReport}>
+                    <Pressable accessibilityRole="button" onPress={openDecisionReport} style={styles.decisionReportButton}>
+                      <Text style={styles.decisionReportText}>Report this decision</Text>
+                    </Pressable>
+                    {reportedDecision === answer.puzzle.puzzle_id ? (
+                      <Text accessibilityRole="text" style={styles.decisionReportStatus}>Thanks — report sent.</Text>
+                    ) : null}
+                  </View>
                 </>
               ) : null}
 
@@ -1114,6 +1189,66 @@ export default function DraftRunScreen({
             </>
           )}
         </ScrollView>
+
+        <Modal
+          animationType="slide"
+          onRequestClose={() => { if (!reportSending) setReportOpen(false); }}
+          transparent
+          visible={reportOpen}
+        >
+          <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={styles.reportModalSafe}>
+            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.reportKeyboard}>
+              <View accessibilityViewIsModal style={styles.reportSheet}>
+                <Text style={styles.reportTitle}>What seems wrong?</Text>
+                <View accessibilityRole="radiogroup" style={styles.reportReasons}>
+                  {DECISION_REPORT_OPTIONS.map((option) => (
+                    <Pressable
+                      key={option.value}
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: reportReason === option.value }}
+                      disabled={reportSending}
+                      onPress={() => setReportReason(option.value)}
+                      style={[styles.reportReason, reportReason === option.value && styles.reportReasonSelected]}
+                    >
+                      <View style={[styles.reportRadio, reportReason === option.value && styles.reportRadioSelected]} />
+                      <Text style={styles.reportReasonText}>{option.label}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+                <Text style={styles.reportCommentLabel}>Anything else?</Text>
+                <TextInput
+                  accessibilityLabel="Anything else?"
+                  editable={!reportSending}
+                  maxLength={500}
+                  multiline
+                  onChangeText={setReportComment}
+                  placeholder="Optional"
+                  style={styles.reportComment}
+                  value={reportComment}
+                />
+                {reportError ? <Text accessibilityRole="alert" style={styles.actionError}>{reportError}</Text> : null}
+                <View style={styles.reportActions}>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={!reportReason || reportSending}
+                    onPress={() => void sendDecisionReport()}
+                    style={[styles.reportSend, (!reportReason || reportSending) && styles.primaryButtonDisabled]}
+                  >
+                    {reportSending ? <ActivityIndicator color="#fff" /> : <Text style={styles.reportSendText}>Send report</Text>}
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={reportSending}
+                    onPress={() => setReportOpen(false)}
+                    style={styles.reportCancel}
+                  >
+                    <Text style={styles.reportCancelText}>Cancel</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </KeyboardAvoidingView>
+          </SafeAreaView>
+        </Modal>
 
         <Modal
           animationType="fade"
@@ -1304,6 +1439,27 @@ const styles = StyleSheet.create({
   rankingName: { color: colors.ink, fontSize: 14, lineHeight: 19, fontWeight: '700' },
   rankingMeta: { color: colors.muted, fontSize: 12, lineHeight: 17 },
   modelNote: { color: colors.muted, fontSize: 12, lineHeight: 18, fontStyle: 'italic' },
+  decisionReport: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.sm, gap: spacing.xs, alignItems: 'flex-start' },
+  decisionReportButton: { minHeight: 44, justifyContent: 'center', paddingVertical: spacing.xs },
+  decisionReportText: { color: colors.muted, fontSize: 13, fontWeight: '700', textDecorationLine: 'underline' },
+  decisionReportStatus: { color: colors.muted, fontSize: 12, lineHeight: 17 },
+  reportModalSafe: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(16, 24, 32, 0.58)' },
+  reportKeyboard: { flex: 1, justifyContent: 'flex-end' },
+  reportSheet: { backgroundColor: colors.surface, borderTopWidth: 1, borderColor: colors.line, padding: spacing.lg, gap: spacing.md },
+  reportTitle: { color: colors.ink, fontSize: 20, lineHeight: 25, fontWeight: '800' },
+  reportReasons: { gap: spacing.xs },
+  reportReason: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.sm, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface },
+  reportReasonSelected: { borderColor: colors.accent },
+  reportRadio: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: colors.lineStrong },
+  reportRadioSelected: { borderWidth: 6, borderColor: colors.accent },
+  reportReasonText: { flex: 1, color: colors.ink, fontSize: 14, lineHeight: 20 },
+  reportCommentLabel: { color: colors.ink, fontSize: 14, fontWeight: '700' },
+  reportComment: { minHeight: 84, maxHeight: 150, borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.surface, color: colors.ink, padding: spacing.sm, textAlignVertical: 'top', fontSize: 14 },
+  reportActions: { flexDirection: 'row', gap: spacing.sm, justifyContent: 'flex-end' },
+  reportSend: { minHeight: 48, minWidth: 120, paddingHorizontal: spacing.md, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center' },
+  reportSendText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  reportCancel: { minHeight: 48, minWidth: 90, paddingHorizontal: spacing.md, borderWidth: 1, borderColor: colors.lineStrong, alignItems: 'center', justifyContent: 'center' },
+  reportCancelText: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
   packReview: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: spacing.md, gap: spacing.md },
   resultReview: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface },
   resultReviewRow: {
