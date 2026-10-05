@@ -51,6 +51,35 @@ export function appStoreStatusClient(credentials,{fetchImpl=fetch}={}) {
   };
 }
 
+// Proves the In-App Purchase key and the notification endpoint without needing a
+// subscriber: Apple sends a TEST notification and reports whether our server
+// accepted it. The test token is not logged.
+export async function requestTestNotification(credentials,environment,{fetchImpl=fetch,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms)),checks=6}={}) {
+  const host=HOSTS[environment];
+  if(!host)throw Error('Unknown App Store environment.');
+  const request=(path,method='GET')=>fetchImpl(`${host}${path}`,{
+    method,
+    headers:{authorization:`Bearer ${appStoreServerToken(credentials)}`,accept:'application/json','user-agent':'Pack One subscription reconciliation'},
+    redirect:'error',signal:AbortSignal.timeout(30000),
+  });
+  const sent=await request('/inApps/v1/notifications/test','POST');
+  if(sent.status===401)throw fatal('App Store Server API rejected the In-App Purchase key; check APPLE_IAP_KEY_ID, APPLE_IAP_ISSUER_ID and APPLE_IAP_KEY_P8.');
+  if(sent.status===404)return {environment,key_accepted:true,delivery:'no_notification_url'};
+  if(!sent.ok)throw Error(`App Store Server API returned ${sent.status} for the ${environment} test notification.`);
+  const token=String((await sent.json())?.testNotificationToken||'');
+  if(!token)throw Error('App Store Server API did not return a test notification token.');
+  for(let attempt=0;attempt<checks;attempt++) {
+    await wait(5000);
+    const status=await request(`/inApps/v1/notifications/test/${encodeURIComponent(token)}`);
+    if(status.status===404)continue;
+    if(!status.ok)throw Error(`App Store Server API returned ${status.status} for the ${environment} test notification status.`);
+    const body=await status.json();
+    const attempts=Array.isArray(body?.sendAttempts)?body.sendAttempts:[];
+    return {environment,key_accepted:true,delivery:String(attempts.at(-1)?.sendAttemptResult||body?.firstSendAttemptResult||'pending')};
+  }
+  return {environment,key_accepted:true,delivery:'pending'};
+}
+
 export async function reconcileSubscription(query,row,{fetchStatus,verifyJws=verifyAppleJws}) {
   const body=await fetchStatus(row.environment,row.original_transaction_id);
   if(String(body?.bundleId||'')!==APPLE_BUNDLE_ID||String(body?.environment||'')!==row.environment
@@ -96,7 +125,13 @@ export async function reconcileAppleSubscriptions(query,{credentials=appleIapCre
 
 if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url) {
   const credentials=appleIapCredentials();
-  if(!credentials) {
+  if(process.argv[2]==='test-notification') {
+    if(!credentials)throw Error('Add the In-App Purchase key secrets before requesting a test notification.');
+    const results=[];
+    for(const environment of ['Sandbox','Production'])results.push(await requestTestNotification(credentials,environment));
+    console.log(JSON.stringify(results));
+    if(results.some(result=>result.delivery!=='SUCCESS'))process.exitCode=1;
+  } else if(!credentials) {
     console.log(JSON.stringify(await reconcileAppleSubscriptions(null,{credentials})));
   } else {
     if(!process.argv[2])throw Error('Pass the Neon connection file.');

@@ -3,6 +3,13 @@ on:
   schedule:
     - cron: '41 */6 * * *'
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'reconcile subscriptions, or ask Apple to send a TEST notification to prove the key and endpoint'
+        type: choice
+        options: [reconcile, test-notification]
+        default: reconcile
+        required: true
 permissions:
   contents: read
 concurrency:
@@ -19,6 +26,7 @@ jobs:
       APPLE_IAP_KEY_P8: ${{ secrets.APPLE_IAP_KEY_P8 }}
       APPLE_IAP_ISSUER_ID: ${{ secrets.APPLE_IAP_ISSUER_ID || secrets.ASC_ISSUER_ID }}
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      MODE: ${{ inputs.mode || 'reconcile' }}
     steps:
       - uses: actions/checkout@v4
       - run: test "$GITHUB_REF" = refs/heads/main
@@ -28,8 +36,11 @@ jobs:
       - name: Report missing In-App Purchase key
         if: env.APPLE_IAP_KEY_ID == '' || env.APPLE_IAP_KEY_P8 == '' || env.APPLE_IAP_ISSUER_ID == ''
         run: node scripts/apple-subscription-reconcile.mjs
+      - name: Request App Store test notifications
+        if: env.MODE == 'test-notification' && env.APPLE_IAP_KEY_ID != '' && env.APPLE_IAP_KEY_P8 != '' && env.APPLE_IAP_ISSUER_ID != ''
+        run: node scripts/apple-subscription-reconcile.mjs test-notification
       - name: Reconcile Apple subscriptions with the App Store Server API
-        if: env.APPLE_IAP_KEY_ID != '' && env.APPLE_IAP_KEY_P8 != '' && env.APPLE_IAP_ISSUER_ID != ''
+        if: env.MODE == 'reconcile' && env.APPLE_IAP_KEY_ID != '' && env.APPLE_IAP_KEY_P8 != '' && env.APPLE_IAP_ISSUER_ID != ''
         run: |
           set -euo pipefail
           umask 077
