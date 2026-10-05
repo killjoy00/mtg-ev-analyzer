@@ -56,6 +56,34 @@ function workflowInputs(row,operation,action) {
   };
 }
 
+export async function requestCreatorPrivacyRetirement(query,playerId,{env=process.env,fetcher=fetch}={}) {
+  const result=await query(`SELECT id FROM creator_challenges
+    WHERE source_owner_player_id=$1::uuid AND status<>'retired'
+    ORDER BY created_at,id`,[playerId]);
+  for(const item of result.rows) {
+    let row=await creatorChallengeById(query,item.id);
+    const operation=crypto.randomUUID();
+    await query(`UPDATE creator_challenges SET status='retired',
+        retired_at=COALESCE(retired_at,now()),privacy_removed_at=COALESCE(privacy_removed_at,now()),
+        publication_operation_ref=$2::uuid,publication_detail=$3::jsonb,publication_error=NULL,updated_at=now()
+      WHERE id=$1::uuid`,[
+        row.id,operation,JSON.stringify({action:'retire',reason:'account_deletion',requested_at:new Date().toISOString()}),
+      ]);
+    await query(`INSERT INTO creator_challenge_audit(creator_challenge_id,action,detail)
+      VALUES($1::uuid,'privacy_retired',jsonb_build_object('operation',$2::text,'reason','account_deletion'))`,[row.id,operation]);
+    row=await creatorChallengeById(query,row.id);
+    try {
+      await dispatch(row,operation,'retire',{env,fetcher});
+    } catch(error) {
+      await query(`UPDATE creator_challenges SET publication_error=$2,updated_at=now() WHERE id=$1::uuid`,[
+        row.id,String(error?.message||error).slice(0,500),
+      ]);
+      throw error;
+    }
+  }
+  return result.rows.length;
+}
+
 async function dispatch(row,operation,action,{env,fetcher}) {
   let response;
   try {
