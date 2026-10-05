@@ -1,0 +1,414 @@
+{
+  "source_sha": "3a8244eb0568769c133365ea2821d512c62a3515",
+  "workflow_run_id": 37244011193,
+  "event": "push",
+  "branch": "main",
+  "physical_device": false,
+  "preview_version": "1.0",
+  "preview_build": "1",
+  "ios_store_artifact": {
+    "id": 11319216433,
+    "sha256": "c54a128ebc4266836f3a3955613c2d454b312825933793091396503831d31602"
+  },
+  "ios_native_artifact": {
+    "id": 11319585272,
+    "sha256": "70481d0e007c4902461d42449d565e2ef41bb8c7b4d56c5f1e3f3af1de59c690"
+  },
+  "ios_images": [
+    {
+      "path": "ipad/01-daily-decision.jpg",
+      "sha256": "894189f9c242b365d13848fd262e5ef802b9ba764a72a537c74f5b36e2a094dc",
+      "width": 2064,
+      "height": 2752,
+      "review": "Inspected actual capture: readable brand fonts, safe areas, selected tabs and contained feedback/cards where applicable.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "ipad/02-reveal-comparison.jpg",
+      "sha256": "ded08dc401eb693726849971c455e296041fbb3c081f52e9d82640ea4c86809d",
+      "width": 2064,
+      "height": 2752,
+      "review": "Inspected actual capture: readable brand fonts, safe areas, selected tabs and contained feedback/cards where applicable.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "ipad/03-daily-hub.jpg",
+      "sha256": "3432f0b02abce2005509c97c489c38fdc1e7ab737a34f8935cf4b8f2994cfd1a",
+      "width": 2064,
+      "height": 2752,
+      "review": "Inspected actual capture: readable brand fonts, safe areas, selected tabs and contained feedback/cards where applicable.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "ipad/04-practice.jpg",
+      "sha256": "f5935e0a7b68eee96d756b99f7d218ceb12c861cf6cc230d8f2c877a71214ddb",
+      "width": 2064,
+      "height": 2752,
+      "review": "Inspected actual capture: readable brand fonts, safe areas, selected tabs and contained feedback/cards where applicable.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "ipad/05-career.jpg",
+      "sha256": "452a3cc34456879afc46e30b6e70dd1c2f152a4d807c0c7eff18096252136dca",
+      "width": 2064,
+      "height": 2752,
+      "review": "Inspected actual capture: readable brand fonts, safe areas, selected tabs and contained feedback/cards where applicable.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "ipad/iap-review-membership.jpg",
+      "sha256": "e6cddec0b5eb1eb881a37f734eaf7fa61b1a4c9a749d3b937ba4078e03f85311",
+      "width": 2064,
+      "height": 2752,
+      "review": "Inspected actual capture: readable brand fonts, safe areas, selected tabs and contained feedback/cards where applicable. Membership uses corrected provider-neutral active-account wording.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "iphone/01-daily-decision.jpg",
+      "sha256": "065e64b388e30821db78df29263840b735b095e697a0aae3824ce161037e5bce",
+      "width": 1320,
+      "height": 2868,
+      "review": "Inspected actual capture: readable brand fonts, safe areas, selected tabs and contained feedback/cards where applicable.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "iphone/02-reveal-comparison.jpg",
+      "sha256": "7712e0f5dcc267e816b8d82ed65417b9344792a0c51d4181e2fd1e5c26785c39",
+      "width": 1320,
+      "height": 2868,
+      "review": "Inspected actual capture: readable brand fonts, safe areas, selected tabs and contained feedback/cards where applicable.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "iphone/03-daily-hub.jpg",
+      "sha256": "648052e5a5753f54675895bf150e31a714386a9ca87e78391b112ed9967f41a8",
+      "width": 1320,
+      "height": 2868,
+      "review": "Inspected actual capture: readable brand fonts, safe areas, selected tabs and contained feedback/cards where applicable.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "iphone/04-practice.jpg",
+      "sha256": "88193c2a092731c72e2ff9ddfd1c91e721e947790b8fd13a2dc246e8661d9b65",
+      "width": 1320,
+      "height": 2868,
+      "review": "Inspected actual capture: readable brand fonts, safe areas, selected tabs and contained feedback/cards where applicable.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "iphone/05-career.jpg",
+      "sha256": "89ab83fdeba159c838cef35b09f8172f97f2e1c4c773978a4ef4f65426809871",
+      "width": 1320,
+      "height": 2868,
+      "review": "Inspected actual capture: readable brand fonts, safe areas, selected tabs and contained feedback/cards where applicable.",
+      "approved_for_upload": true
+    },
+    {
+      "path": "iphone/iap-review-membership.jpg",
+      "sha256": "8d1cd0a99c8704a07d11ee5be2af88cf8e2eb2b4d0cd3b117956b6e13ad0610d",
+      "width": 1320,
+      "height": 2868,
+      "review": "Inspected actual capture: readable brand fonts, safe areas, selected tabs and contained feedback/cards where applicable. Membership uses corrected provider-neutral active-account wording.",
+      "approved_for_upload": true
+    }
+  ],
+  "ios_native_summary": [
+    {
+      "source_sha": "3a8244eb0568769c133365ea2821d512c62a3515",
+      "tested_checkout_sha": "3a8244eb0568769c133365ea2821d512c62a3515",
+      "platform": "ios",
+      "backend": "isolated persistent preview fixtures",
+      "physical_device": false,
+      "device": "ipad",
+      "simulator_udid": "320A94B2-2EAE-432D-ABC7-1BDA713630B0",
+      "build_number": "1",
+      "version": "1.0",
+      "actual_text_growth": {
+        "normal_line_height": 20,
+        "large_line_height": 71.42000198364258,
+        "ratio": 3.571000099182129
+      },
+      "journeys": [
+        {
+          "name": "ipad-guest-home-large",
+          "result": "passed"
+        },
+        {
+          "name": "ipad-guest-learn-large",
+          "result": "passed"
+        },
+        {
+          "name": "ipad-member-learn-large",
+          "result": "passed"
+        },
+        {
+          "name": "ipad-member-new-career-large",
+          "result": "passed"
+        },
+        {
+          "name": "ipad-member-long-feedback-large",
+          "result": "passed"
+        },
+        {
+          "name": "ipad-member-match-feedback-large",
+          "result": "passed"
+        },
+        {
+          "name": "ipad-member-zero-feedback-large",
+          "result": "passed"
+        },
+        {
+          "name": "ipad-guest-home-accessibility-extra-extra-extra-large",
+          "result": "passed"
+        },
+        {
+          "name": "ipad-guest-learn-accessibility-extra-extra-extra-large",
+          "result": "passed"
+        },
+        {
+          "name": "ipad-member-learn-accessibility-extra-extra-extra-large",
+          "result": "passed"
+        },
+        {
+          "name": "ipad-member-new-career-accessibility-extra-extra-extra-large",
+          "result": "passed"
+        },
+        {
+          "name": "ipad-member-long-feedback-accessibility-extra-extra-extra-large",
+          "result": "passed"
+        },
+        {
+          "name": "ipad-member-match-feedback-accessibility-extra-extra-extra-large",
+          "result": "passed"
+        },
+        {
+          "name": "ipad-member-zero-feedback-accessibility-extra-extra-extra-large",
+          "result": "passed"
+        },
+        {
+          "name": "ios-actual-text-growth",
+          "result": "passed"
+        }
+      ],
+      "failures": [],
+      "record_type": "derived summary; original complete manifest remains in the linked immutable artifact",
+      "device_runtime": [
+        {
+          "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-26-5",
+          "name": "Pack One Store iPad",
+          "device_type": "com.apple.CoreSimulator.SimDeviceType.iPad-Pro-13-inch-M4-8GB"
+        }
+      ],
+      "scene_count": 14
+    },
+    {
+      "source_sha": "3a8244eb0568769c133365ea2821d512c62a3515",
+      "tested_checkout_sha": "3a8244eb0568769c133365ea2821d512c62a3515",
+      "platform": "ios",
+      "backend": "isolated persistent preview fixtures",
+      "physical_device": false,
+      "device": "iphone",
+      "simulator_udid": "6F49B94B-FAFE-47AF-90E7-D66123019A40",
+      "build_number": "1",
+      "version": "1.0",
+      "actual_text_growth": {
+        "normal_line_height": 20,
+        "large_line_height": 71.42000198364258,
+        "ratio": 3.571000099182129
+      },
+      "journeys": [
+        {
+          "name": "iphone-guest-home-large",
+          "result": "passed"
+        },
+        {
+          "name": "iphone-guest-learn-large",
+          "result": "passed"
+        },
+        {
+          "name": "iphone-member-learn-large",
+          "result": "passed"
+        },
+        {
+          "name": "iphone-member-new-career-large",
+          "result": "passed"
+        },
+        {
+          "name": "iphone-member-long-feedback-large",
+          "result": "passed"
+        },
+        {
+          "name": "iphone-member-match-feedback-large",
+          "result": "passed"
+        },
+        {
+          "name": "iphone-member-zero-feedback-large",
+          "result": "passed"
+        },
+        {
+          "name": "iphone-guest-home-accessibility-extra-extra-extra-large",
+          "result": "passed"
+        },
+        {
+          "name": "iphone-guest-learn-accessibility-extra-extra-extra-large",
+          "result": "passed"
+        },
+        {
+          "name": "iphone-member-learn-accessibility-extra-extra-extra-large",
+          "result": "passed"
+        },
+        {
+          "name": "iphone-member-new-career-accessibility-extra-extra-extra-large",
+          "result": "passed"
+        },
+        {
+          "name": "iphone-member-long-feedback-accessibility-extra-extra-extra-large",
+          "result": "passed"
+        },
+        {
+          "name": "iphone-member-match-feedback-accessibility-extra-extra-extra-large",
+          "result": "passed"
+        },
+        {
+          "name": "iphone-member-zero-feedback-accessibility-extra-extra-extra-large",
+          "result": "passed"
+        },
+        {
+          "name": "ios-actual-text-growth",
+          "result": "passed"
+        }
+      ],
+      "failures": [],
+      "record_type": "derived summary; original complete manifest remains in the linked immutable artifact",
+      "device_runtime": [
+        {
+          "runtime": "com.apple.CoreSimulator.SimRuntime.iOS-26-5",
+          "name": "Pack One Store iPhone",
+          "device_type": "com.apple.CoreSimulator.SimDeviceType.iPhone-17-Pro-Max"
+        }
+      ],
+      "scene_count": 14
+    }
+  ],
+  "matching_pr_android_summary": {
+    "source_sha": "a14d8f015d741a8ce3a47aada29a8348ec8e0ebf",
+    "tested_checkout_sha": "dbb88c1153f15511b10941fdf6d9b00b3733ffad",
+    "platform": "android",
+    "backend": "isolated persistent preview fixtures",
+    "physical_device": false,
+    "os": "15",
+    "actual_text_growth": {
+      "normal_line_height": 20,
+      "large_line_height": 26,
+      "ratio": 1.3
+    },
+    "journeys": [
+      {
+        "name": "member-long-320-1",
+        "result": "passed"
+      },
+      {
+        "name": "member-long-320-1.5",
+        "result": "passed"
+      },
+      {
+        "name": "member-match-320-1.5",
+        "result": "passed"
+      },
+      {
+        "name": "member-zero-320-1.5",
+        "result": "passed"
+      },
+      {
+        "name": "member-long-600-1.5",
+        "result": "passed"
+      },
+      {
+        "name": "member-long-840-1.5",
+        "result": "passed"
+      },
+      {
+        "name": "actual-text-growth",
+        "result": "passed"
+      },
+      {
+        "name": "guest-home",
+        "result": "passed"
+      },
+      {
+        "name": "guest-returning-home",
+        "result": "passed"
+      },
+      {
+        "name": "member-new-home",
+        "result": "passed"
+      },
+      {
+        "name": "member-zero-home",
+        "result": "passed"
+      },
+      {
+        "name": "member-partial-home",
+        "result": "passed"
+      },
+      {
+        "name": "member-all-home",
+        "result": "passed"
+      },
+      {
+        "name": "member-checking-home",
+        "result": "passed"
+      },
+      {
+        "name": "member-error-home",
+        "result": "passed"
+      },
+      {
+        "name": "elite-home",
+        "result": "passed"
+      },
+      {
+        "name": "guest-large-tabs",
+        "result": "passed"
+      },
+      {
+        "name": "member-large-tabs",
+        "result": "passed"
+      },
+      {
+        "name": "eight-pick-daily-and-final-review",
+        "result": "passed"
+      },
+      {
+        "name": "member-tabs-profile-settings-and-hardware-back",
+        "result": "passed"
+      },
+      {
+        "name": "archive-deep-link-return-without-duplicate-tabs",
+        "result": "passed"
+      },
+      {
+        "name": "practice-complete-review-return",
+        "result": "passed"
+      },
+      {
+        "name": "shared-invitation-auth-accept-kill-relaunch",
+        "result": "passed"
+      },
+      {
+        "name": "image-failure-retry-keeps-run",
+        "result": "passed"
+      },
+      {
+        "name": "sign-out-and-account-switch",
+        "result": "passed"
+      }
+    ],
+    "failures": [],
+    "record_type": "derived summary; original complete manifest retained in artifact",
+    "workflow_run_id": 37243635581,
+    "artifact_id": 11318859635,
+    "artifact_sha256": "367c8be6a11616372a4870d800dab7f82cf090e0feca3af506fef0bcd11ebcb3",
+    "runtime_equivalence": "No mobile diff between reviewed a14d8f01 and main 3a8244eb; source identities remain distinct."
+  }
+}

@@ -43,5 +43,5 @@ test('a long-lived legacy usage warning does not suppress new error or latency i
  };
  const result=await routeAlert(fetcher,{GITHUB_REPOSITORY:'fixture/repo',GITHUB_TOKEN:'fixture'},{alerts:['neon_egress_billing_period_usage','gateway_5xx','slow_requests']});
  assert.equal(result,'created');assert.equal(writes.length,2);assert.ok(writes.some(w=>w.title.endsWith('(gateway_5xx)')));assert.ok(writes.some(w=>w.title.endsWith('(slow_requests)')));
- assert.equal(thresholds.egress_bytes_per_day,5*1024**3);assert.equal(thresholds.egress_bytes_per_billing_period,50*1024**3);
+ assert.equal('egress_bytes_per_day' in thresholds,false);assert.equal(thresholds.egress_bytes_per_billing_period,50*1024**3);
 });
