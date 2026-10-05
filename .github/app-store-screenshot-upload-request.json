@@ -1,7 +1,7 @@
 {
   "operation": "upload-pack-one-app-store-screenshots",
-  "reason": "Retry replacement of the flawed Apple screenshot set using the visually reviewed iPhone and iPad screenshots from Mobile store screenshots run 36392125277 after App Store Connect rejected the prior relationship-reorder PATCH with STATE_ERROR. The uploader now preserves order by uploading the reviewed replacements sequentially and deleting the prior screenshots without the rejected reorder call. Replace the Pack One Elite review screenshot as well. Do not submit the app or subscription for review and do not release anything.",
-  "screenshotRunId": 36392125277,
-  "screenshotHeadSha": "73016d3240a4e1c2962257dcf81018e5ae0bc96d",
+  "reason": "Replace the Pack One 1.0 iPhone/iPad product screenshots and Elite subscription review image with the exact individually inspected and approved final main-source images from successful native/store run 37244011193, including corrected provider-neutral membership copy from #960. Preserve editable version 1.0 and all physical/provider/owner gates. Do not submit app or subscription for review and do not release publicly.",
+  "screenshotRunId": 37244011193,
+  "screenshotHeadSha": "3a8244eb0568769c133365ea2821d512c62a3515",
   "versionString": "1.0"
 }
