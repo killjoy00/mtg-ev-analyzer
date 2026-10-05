@@ -73,18 +73,18 @@ function operationMatches(row,operation,action) {
 }
 
 async function guardedDetail(query,id,operation,action,patch) {
-  const result=await query(\`UPDATE creator_challenges
+  const result=await query(`UPDATE creator_challenges
     SET publication_detail=publication_detail||$4::jsonb,updated_at=now()
     WHERE id=$1::uuid AND publication_operation_ref=$2::uuid
       AND publication_detail->>'action'=$3
-    RETURNING id\`,[id,operation,action,JSON.stringify(patch)]);
+    RETURNING id`,[id,operation,action,JSON.stringify(patch)]);
   return Boolean(result.rows[0]);
 }
 
 async function guardedError(query,id,operation,action,error) {
-  await query(\`UPDATE creator_challenges SET publication_error=$4,updated_at=now()
+  await query(`UPDATE creator_challenges SET publication_error=$4,updated_at=now()
     WHERE id=$1::uuid AND publication_operation_ref=$2::uuid
-      AND publication_detail->>'action'=$3\`,[
+      AND publication_detail->>'action'=$3`,[
     id,operation,action,String(error||'Creator publication failed.').slice(0,500),
   ]);
 }
@@ -114,7 +114,7 @@ export async function dispatchCreatorPublicationAttempt(query,row,operation,acti
     if([200,204].includes(response.status))state='accepted';
     else {
       state='rejected';
-      errorText=\`GitHub rejected creator publication dispatch with HTTP \${response.status}.\`;
+      errorText=`GitHub rejected creator publication dispatch with HTTP ${response.status}.`;
     }
   } catch(error) {
     state=error?.code==='CREATOR_PUBLISH_UNAVAILABLE'?'rejected':'ambiguous';
@@ -143,11 +143,11 @@ async function fetchWorkflowRunById(id,{env,fetcher}) {
 }
 
 async function discoverWorkflowRun(operation,{env,fetcher}) {
-  const marker=\` / \${operation}\`;
+  const marker=` / ${operation}`;
   for(let page=1;page<=50;page++) {
     let response;
     try {
-      response=await fetcher(\`\${RUNS_URL}&page=\${page}\`,{
+      response=await fetcher(`${RUNS_URL}&page=${page}`,{
         headers:githubHeaders(env),redirect:'error',signal:AbortSignal.timeout(15000),
       });
     } catch {
@@ -170,7 +170,7 @@ async function workflowRun(row,operation,{env,fetcher}) {
 }
 
 export async function verifyCreatorPublicationLive(row,action,{fetcher}) {
-  const url=\`https://packone.pro/creator/\${row.slug}/\`;
+  const url=`https://packone.pro/creator/${row.slug}/`;
   let response,text;
   try {
     response=await fetcher(url,{
@@ -181,8 +181,8 @@ export async function verifyCreatorPublicationLive(row,action,{fetcher}) {
     return {ok:false,html_verified:false,image_verified:false};
   }
   const htmlVerified=response.ok
-    &&text.includes(\`data-creator-challenge-id="\${row.id}"\`)
-    &&text.includes(\`data-creator-challenge-status="\${action==='retire'?'retired':'published'}"\`);
+    &&text.includes(`data-creator-challenge-id="${row.id}"`)
+    &&text.includes(`data-creator-challenge-status="${action==='retire'?'retired':'published'}"`);
   if(!htmlVerified)return {ok:false,html_verified:false,image_verified:false};
   let card;
   try {
@@ -200,16 +200,16 @@ export async function verifyCreatorPublicationLive(row,action,{fetcher}) {
 
 async function updatePublishFailure(query,row,operation,error) {
   const message=String(error?.message||error).slice(0,500);
-  const updated=await query(\`UPDATE creator_challenges SET status='failed',publication_error=$3,updated_at=now()
+  const updated=await query(`UPDATE creator_challenges SET status='failed',publication_error=$3,updated_at=now()
     WHERE id=$1::uuid AND publication_operation_ref=$2::uuid
       AND publication_detail->>'action'='publish' AND status='publishing'
-    RETURNING id\`,[row.id,operation,message]);
-  if(updated.rows[0])await query(\`INSERT INTO creator_challenge_audit(creator_challenge_id,admin_auth_user_id,action,detail)
+    RETURNING id`,[row.id,operation,message]);
+  if(updated.rows[0])await query(`INSERT INTO creator_challenge_audit(creator_challenge_id,admin_auth_user_id,action,detail)
     SELECT $1::uuid,NULL,'publish_failed',jsonb_build_object('operation',$2::text,'error',$3::text)
     WHERE NOT EXISTS(
       SELECT 1 FROM creator_challenge_audit
       WHERE creator_challenge_id=$1::uuid AND action='publish_failed' AND detail->>'operation'=$2::text
-    )\`,[row.id,operation,message]);
+    )`,[row.id,operation,message]);
 }
 
 function statePayload(row,extra={}) {
@@ -242,7 +242,7 @@ async function reconcile(query,row,{today,env,fetcher}) {
   if(!kept||!operationMatches(row,operation,action))return statePayload(row);
   if(run.status!=='completed')return statePayload(row,{reconciled:true,workflow});
   if(run.conclusion!=='success') {
-    const message=\`\${action==='retire'?'Retirement':'Creator'} publication finished with \${run.conclusion||'an unknown failure'}.\`;
+    const message=`${action==='retire'?'Retirement':'Creator'} publication finished with ${run.conclusion||'an unknown failure'}.`;
     if(action==='publish')await updatePublishFailure(query,row,operation,message);
     else await guardedError(query,row.id,operation,action,message);
     return statePayload(await creatorChallengeById(query,row.id),{reconciled:true,workflow});
@@ -259,27 +259,27 @@ async function reconcile(query,row,{today,env,fetcher}) {
       await updatePublishFailure(query,row,operation,error);
       return statePayload(await creatorChallengeById(query,row.id),{reconciled:true,workflow});
     }
-    await query(\`UPDATE creator_challenges SET status='published',published_at=COALESCE(published_at,now()),
+    await query(`UPDATE creator_challenges SET status='published',published_at=COALESCE(published_at,now()),
         published_by_admin_auth_user_id=COALESCE(published_by_admin_auth_user_id,created_by_admin_auth_user_id),
         publication_error=NULL,publication_detail=publication_detail||$3::jsonb,updated_at=now()
       WHERE id=$1::uuid AND publication_operation_ref=$2::uuid
         AND publication_detail->>'action'='publish' AND status='publishing'
-      RETURNING id\`,[row.id,operation,JSON.stringify({live_verified:true,live_detail:live})]);
+      RETURNING id`,[row.id,operation,JSON.stringify({live_verified:true,live_detail:live})]);
     const current=await creatorChallengeById(query,row.id);
     if(current.status==='published'&&String(current.publication_operation_ref)===operation)
-      await query(\`INSERT INTO creator_challenge_audit(creator_challenge_id,admin_auth_user_id,action,detail)
+      await query(`INSERT INTO creator_challenge_audit(creator_challenge_id,admin_auth_user_id,action,detail)
         SELECT $1::uuid,published_by_admin_auth_user_id,'published',jsonb_build_object('operation',$2::text)
         FROM creator_challenges WHERE id=$1::uuid
         AND NOT EXISTS(
           SELECT 1 FROM creator_challenge_audit
           WHERE creator_challenge_id=$1::uuid AND action='published' AND detail->>'operation'=$2::text
-        )\`,[row.id,operation]);
+        )`,[row.id,operation]);
     return statePayload(await creatorChallengeById(query,row.id),{reconciled:true,workflow});
   }
-  await query(\`UPDATE creator_challenges SET publication_error=NULL,
+  await query(`UPDATE creator_challenges SET publication_error=NULL,
       publication_detail=publication_detail||$3::jsonb,updated_at=now()
     WHERE id=$1::uuid AND publication_operation_ref=$2::uuid
-      AND publication_detail->>'action'='retire' AND status='retired'\`,[
+      AND publication_detail->>'action'='retire' AND status='retired'`,[
     row.id,operation,JSON.stringify({live_verified:true,live_detail:live}),
   ]);
   return statePayload(await creatorChallengeById(query,row.id),{reconciled:true,workflow});
@@ -314,14 +314,14 @@ async function beginOperation(query,row,action,{adminAuthUserId=null,reason=null
     };
     let changed;
     if(action==='publish') {
-      changed=await query(\`UPDATE creator_challenges SET status='publishing',
+      changed=await query(`UPDATE creator_challenges SET status='publishing',
           publication_operation_ref=$2::uuid,publication_detail=$3::jsonb,
           publication_error=NULL,updated_at=now()
         WHERE id=$1::uuid AND status=$4
           AND publication_operation_ref IS NOT DISTINCT FROM $5::uuid
-        RETURNING id\`,[row.id,operation,JSON.stringify(nextDetail),row.status,expectedOperation]);
+        RETURNING id`,[row.id,operation,JSON.stringify(nextDetail),row.status,expectedOperation]);
     } else {
-      changed=await query(\`UPDATE creator_challenges SET status='retired',
+      changed=await query(`UPDATE creator_challenges SET status='retired',
           retired_at=COALESCE(retired_at,now()),
           retired_by_admin_auth_user_id=COALESCE(retired_by_admin_auth_user_id,$2::uuid),
           privacy_removed_at=CASE WHEN $3::boolean THEN COALESCE(privacy_removed_at,now()) ELSE privacy_removed_at END,
@@ -329,13 +329,13 @@ async function beginOperation(query,row,action,{adminAuthUserId=null,reason=null
           publication_error=NULL,updated_at=now()
         WHERE id=$1::uuid AND status=$6
           AND publication_operation_ref IS NOT DISTINCT FROM $7::uuid
-        RETURNING id\`,[
+        RETURNING id`,[
         row.id,adminAuthUserId,privacy,operation,JSON.stringify(nextDetail),row.status,expectedOperation,
       ]);
     }
     if(changed.rows[0]) {
-      await query(\`INSERT INTO creator_challenge_audit(creator_challenge_id,admin_auth_user_id,action,detail)
-        VALUES($1::uuid,$2::uuid,$3,jsonb_build_object('operation',$4::text,'reason',$5::text))\`,[
+      await query(`INSERT INTO creator_challenge_audit(creator_challenge_id,admin_auth_user_id,action,detail)
+        VALUES($1::uuid,$2::uuid,$3,jsonb_build_object('operation',$4::text,'reason',$5::text))`,[
         row.id,adminAuthUserId,action==='publish'?'publish_requested':privacy?'privacy_retired':'retired',
         operation,reason||action,
       ]);
@@ -347,30 +347,30 @@ async function beginOperation(query,row,action,{adminAuthUserId=null,reason=null
 }
 
 export async function requestCreatorPrivacyRetirement(query,playerId,{reason='account_deletion',today=null,env=process.env,fetcher=fetch}={}) {
-  const result=await query(\`SELECT id FROM creator_challenges
+  const result=await query(`SELECT id FROM creator_challenges
     WHERE source_owner_player_id=$1::uuid
       AND NOT (
         status='retired'
         AND COALESCE(publication_detail->>'live_verified','false')='true'
       )
-    ORDER BY created_at,id\`,[playerId]);
+    ORDER BY created_at,id`,[playerId]);
   let ready=true;
   for(const item of result.rows) {
     let row=await creatorChallengeById(query,item.id);
     const needsStatic=staticCleanupMayExist(row);
-    await query(\`UPDATE game_results SET opponent_name='A creator'
-      WHERE creator_challenge_id=$1::uuid\`,[row.id]);
-    await query(\`UPDATE creator_challenges SET status='retired',
+    await query(`UPDATE game_results SET opponent_name='A creator'
+      WHERE creator_challenge_id=$1::uuid`,[row.id]);
+    await query(`UPDATE creator_challenges SET status='retired',
         creator_public_name='A creator',creator_handle=NULL,headline='Creator challenge unavailable',
         creator_post_run_note=NULL,source_owner_auth_user_id=NULL,
         privacy_removed_at=COALESCE(privacy_removed_at,now()),
         retired_at=COALESCE(retired_at,now()),updated_at=now()
-      WHERE id=$1::uuid\`,[row.id]);
+      WHERE id=$1::uuid`,[row.id]);
     row=await creatorChallengeById(query,row.id);
     if(!needsStatic) {
-      await query(\`UPDATE creator_challenges SET publication_operation_ref=NULL,
+      await query(`UPDATE creator_challenges SET publication_operation_ref=NULL,
           publication_detail=$2::jsonb,publication_error=NULL,updated_at=now()
-        WHERE id=$1::uuid\`,[
+        WHERE id=$1::uuid`,[
         row.id,JSON.stringify({action:'retire',reason,live_verified:true,static_cleanup:'not_required'}),
       ]);
       continue;
@@ -422,17 +422,17 @@ export async function handleCreatorChallengePublication(request,{query,readJson,
   }
 
   if(action==='retire'&&!staticCleanupMayExist(row)) {
-    const changed=await query(\`UPDATE creator_challenges SET status='retired',
+    const changed=await query(`UPDATE creator_challenges SET status='retired',
         retired_at=COALESCE(retired_at,now()),
         retired_by_admin_auth_user_id=COALESCE(retired_by_admin_auth_user_id,$2::uuid),
         publication_operation_ref=NULL,
         publication_detail=$3::jsonb,publication_error=NULL,updated_at=now()
       WHERE id=$1::uuid AND status<>'retired'
-      RETURNING id\`,[
+      RETURNING id`,[
       row.id,auth.user_id,JSON.stringify({action:'retire',reason:'admin_retire',live_verified:true,static_cleanup:'not_required'}),
     ]);
-    if(changed.rows[0])await query(\`INSERT INTO creator_challenge_audit(creator_challenge_id,admin_auth_user_id,action,detail)
-      VALUES($1::uuid,$2::uuid,'retired',jsonb_build_object('reason','admin_retire','static_cleanup','not_required'))\`,[
+    if(changed.rows[0])await query(`INSERT INTO creator_challenge_audit(creator_challenge_id,admin_auth_user_id,action,detail)
+      VALUES($1::uuid,$2::uuid,'retired',jsonb_build_object('reason','admin_retire','static_cleanup','not_required'))`,[
       row.id,auth.user_id,
     ]);
     row=await creatorChallengeById(query,row.id);
