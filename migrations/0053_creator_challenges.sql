@@ -25,6 +25,7 @@ CREATE TABLE IF NOT EXISTS creator_challenges (
   acquisition_medium text,
   status text NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','publishing','published','failed','retired')),
   publication_operation_ref uuid,
+  publication_detail jsonb NOT NULL DEFAULT '{}'::jsonb,
   publication_error text,
   created_by_admin_auth_user_id uuid NOT NULL,
   published_by_admin_auth_user_id uuid,
