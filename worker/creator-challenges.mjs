@@ -171,6 +171,9 @@ function challengeRow(row) {
     ...row,
     source_score:num(row.source_score),
     attempts:Number(row.attempts||0),
+    opens:Number(row.opens||0),
+    starts:Number(row.starts||0),
+    completions:Number(row.completions||row.attempts||0),
     wins:Number(row.wins||0),
     ties:Number(row.ties||0),
     losses:Number(row.losses||0),
@@ -184,7 +187,8 @@ export async function creatorChallengeById(query,id,{forUpdate=false}={}) {
   const result=await query(`SELECT c.*,s.score source_score,s.day authoritative_source_day,s.environment authoritative_environment,
       s.player_id authoritative_owner_player_id,s.measurement_qa,
       p.public_identity_hidden_at,p.profile_public,
-      stats.attempts,stats.wins,stats.ties,stats.losses,stats.beat_percentage,stats.average_score
+      stats.attempts,stats.attempts completions,stats.wins,stats.ties,stats.losses,stats.beat_percentage,stats.average_score,
+      funnel.opens,funnel.starts
     FROM creator_challenges c
     LEFT JOIN draft_run_sessions s ON s.id=c.source_session_id
     LEFT JOIN players p ON p.id=c.source_owner_player_id
@@ -206,6 +210,14 @@ export async function creatorChallengeById(query,id,{forUpdate=false}={}) {
           WHERE ax.player_id=x.player_id
         )
     ) stats ON true
+    LEFT JOIN LATERAL (
+      SELECT
+        count(*) FILTER(WHERE e.event_name='creator_challenge_open')::int opens,
+        count(*) FILTER(WHERE e.event_name='creator_challenge_started')::int starts
+      FROM analytics_events e
+      WHERE e.event_name IN ('creator_challenge_open','creator_challenge_started')
+        AND e.event_props->>'creator_challenge_id'=c.id::text
+    ) funnel ON true
     WHERE c.id=$1::uuid${forUpdate?' FOR UPDATE OF c':''}`,[id]);
   return challengeRow(result.rows[0]);
 }
