@@ -215,7 +215,7 @@ async function start(request) {
     )).rows[0];
     if(previous)return json(await responseFor(decode(previous)));
   }
-  const capabilities=daily||creatorState?[]:await timing.step('capability',()=>accountCapabilities(account,query));
+  const capabilities=daily?[]:await timing.step('capability',()=>accountCapabilities(account,query));
   let environment;
   try { environment=draftRunEnvironment(creatorState?.source?.environment || source?.environment || body.environment || 'mixed'); }
   catch { fail('Invalid Draft Run environment.'); }
@@ -226,7 +226,7 @@ async function start(request) {
   if(daily&&setIds.length)fail('Daily sets are fixed.');
   if(environment==='latest'&&!daily&&!creatorState)fail('Latest-set runs are Daily only. Choose sets for custom practice.');
   if(environment!=='mixed'&&setIds.length)fail('Custom sets use regular Draft Runs.');
-  if(!daily&&!creatorState)requireCapability(capabilities,practiceCapability(environment,setIds));
+  if(!daily)requireCapability(capabilities,practiceCapability(environment,setIds));
   const rawIdempotency=String(request.headers.get('x-idempotency-key')||'');
   if(rawIdempotency&&daily)fail('Practice idempotency keys are not valid for Daily runs.');
   if(rawIdempotency&&(source||creatorState))fail('Practice idempotency keys are not valid for challenge replays.');
@@ -573,11 +573,18 @@ async function route(request) {
             SELECT 1 FROM account_links a
             JOIN pack1_admins admin ON admin.auth_user_id=a.auth_user_id
             WHERE a.player_id=p.id
+          )
+          AND NOT EXISTS (
+            SELECT 1 FROM analytics_events existing
+            WHERE existing.player_id=$1::uuid
+              AND existing.event_name=event.event_name
+              AND existing.event_props->>'creator_challenge_id'=$5
           )`,[
         viewer,
         JSON.stringify({creator_challenge_id:challenge.id,creator_challenge_slug:challenge.slug,creator_source_type:challenge.source_type}),
         JSON.stringify(acquisition),
         challenge.source_owner_player_id,
+        challenge.id,
       ]);
     }
     return json(publicCreatorChallenge(challenge));
