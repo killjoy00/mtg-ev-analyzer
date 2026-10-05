@@ -388,7 +388,7 @@ export async function createCreatorChallenge(query,payload,adminAuthUserId) {
   if(!inserted.rows[0])fail('That slug is already reserved by another creator challenge.',409,'CREATOR_SLUG_TAKEN');
   const id=inserted.rows[0].id;
   await query(`INSERT INTO creator_challenge_audit(creator_challenge_id,admin_auth_user_id,action,detail)
-    VALUES($1::uuid,$2::uuid,'created',jsonb_build_object('source_type',$3,'source_session_id',$4::text))`,
+    VALUES($1::uuid,$2::uuid,'created',jsonb_build_object('source_type',$3::text,'source_session_id',$4::text))`,
     [id,adminAuthUserId,resolved.source.day?'daily':'practice',resolved.source.id]);
   return creatorChallengeById(query,id);
 }
