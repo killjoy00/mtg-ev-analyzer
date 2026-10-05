@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {inflateSync} from 'node:zlib';
+import vm from 'node:vm';
 import {dailyHomeMarkup} from '../daily-home.mjs';
 const day='2026-09-18';
 const row=set_id=>({date:day,mode:'draft_run',set_id,score:91});
@@ -9,21 +11,55 @@ test('homepage social metadata has no escaped-newline pollution',()=>{
  const html=fs.readFileSync('index.html','utf8');
  assert.equal(html.includes('\\n'),false,'Homepage HTML must not contain literal \\n escape text');
 });
-test('homepage metadata names MTG and forces a compact image-free social preview',()=>{
+test('homepage metadata uses a shallow branded preview with a compact Twitter icon',()=>{
  const html=fs.readFileSync('index.html','utf8');
  assert.match(html,/<title>Pack One: Daily MTG Draft Decisions<\/title>/);
  assert.match(html,/Magic: The Gathering draft decisions every day/);
- assert.doesNotMatch(html,/property="og:image"/);
- assert.doesNotMatch(html,/name="twitter:image"/);
+ assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/social-preview-v5\.png"/);
+ assert.match(html,/property="og:image:width" content="1200"/);
+ assert.match(html,/property="og:image:height" content="240"/);
+ assert.match(html,/name="twitter:image" content="https:\/\/packone\.pro\/pack-one-icon-v1\.png"/);
+ assert.match(html,/rel="apple-touch-icon"[^>]*href="https:\/\/packone\.pro\/pack-one-icon-v1\.png"/);
  assert.match(html,/name="twitter:card" content="summary"/);
 });
-test('Daily result share bridge is compact, image-free, and preserves result-share attribution',()=>{
- const html=fs.readFileSync('share/daily/index.html','utf8');
- assert.match(html,/property="og:title" content="Pack One: Daily MTG Draft Decisions"/);
- assert.match(html,/name="twitter:card" content="summary"/);
- assert.doesNotMatch(html,/property="og:image"|name="twitter:image"/);
- assert.match(html,/params\.get\('ref'\)==='result_share'/);
- assert.match(html,/searchParams\.set\('ref','result_share'\)/);
+test('both Daily share bridges have the banner and preserve environment and attribution',()=>{
+ for(const route of ['/share/daily/','/share/daily/v2/']){
+  const html=fs.readFileSync(route.slice(1)+'index.html','utf8');
+  assert.match(html,/property="og:title" content="Daily MTG Draft Decisions"/);
+  assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/social-preview-v5\.png"/);
+  assert.match(html,/property="og:image:height" content="240"/);
+  assert.match(html,/name="twitter:card" content="summary"/);
+  assert.ok(html.includes('property="og:url" content="https://packone.pro'+route+'"'));
+  const script=html.match(/<script>([\s\S]*?)<\/script>/)[1];
+  for(const environment of ['mixed','powered-cube','latest','untrusted-set']){
+   let redirected;
+   vm.runInNewContext(script,{URL,URLSearchParams,location:{origin:'https://packone.pro',search:'?environment='+environment+'&ref=result_share',replace(value){redirected=new URL(value,'https://packone.pro');}}});
+   assert.equal(redirected.pathname,'/');
+   assert.equal(redirected.searchParams.get('game'),'draft-run');
+   assert.equal(redirected.searchParams.get('daily'),'1');
+   assert.equal(redirected.searchParams.get('ref'),'result_share');
+   assert.equal(redirected.searchParams.get('set'),['powered-cube','latest'].includes(environment)?environment:null);
+  }
+ }
+});
+test('share assets are complete PNGs with genuinely shallow banner dimensions',()=>{
+ for(const [file,width,height] of [['social-preview-v5.png',1200,240],['pack-one-icon-v1.png',1024,1024]]){
+  const png=fs.readFileSync(file);
+  assert.equal(png.subarray(0,8).toString('hex'),'89504e470d0a1a0a');
+  assert.equal(png.readUInt32BE(16),width);
+  assert.equal(png.readUInt32BE(20),height);
+  let offset=8,ended=false;const compressed=[];
+  while(offset+12<=png.length){
+   const length=png.readUInt32BE(offset);const type=png.subarray(offset+4,offset+8).toString();
+   assert.ok(offset+12+length<=png.length,'PNG chunk must be complete');
+   if(type==='IDAT')compressed.push(png.subarray(offset+8,offset+8+length));
+   offset+=12+length;
+   if(type==='IEND'){ended=true;break;}
+  }
+  assert.equal(ended,true,'PNG must have an IEND chunk');
+  assert.equal(offset,png.length,'PNG must have no trailing bytes');
+  assert.ok(inflateSync(Buffer.concat(compressed)).length>width*height,'image data must decompress');
+ }
 });
 test('Daily descriptions reinforce trophy-draft provenance',()=>{
  const html=dailyHomeMarkup(null,day);

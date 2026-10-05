@@ -26,7 +26,7 @@ try{
   twitterCard:document.head.querySelector('meta[name="twitter:card"]')?.getAttribute('content')||null,
   canonical:document.head.querySelector('link[rel="canonical"]')?.getAttribute('href')||null,
  }));
- assert.equal(socialMetadata.ogImage,null,'homepage omits og:image so messaging clients cannot promote it to a large hero card');
+ assert.equal(socialMetadata.ogImage,'https://packone.pro/social-preview-v5.png','homepage uses the shallow branded preview');
  assert.equal(socialMetadata.twitterCard,'summary','homepage requests the compact Twitter card class');
  assert.equal(socialMetadata.canonical,'https://packone.pro/','canonical stays inside parsed <head>');
  await page.locator('.daily-home-game a').first().waitFor();
