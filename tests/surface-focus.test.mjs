@@ -70,7 +70,7 @@ test('decision reporting stays inside Why this score and away from continuation'
   assert.match(source, /Score \/ recommendation seems wrong/);
   assert.match(source, /Something is broken/);
   assert.match(source, /Anything else\?/);
-  assert.match(source, /Thanks — report sent\./);
+  assert.match(source, /Thanks \\u2014 report sent\./);
   const render = source.slice(source.indexOf('function render()'), source.indexOf('function zoom(card)'));
   assert.ok(render.indexOf('id="run-next"') < render.indexOf('revealAnalysis(p,answer)'));
   const css = await readFile('draft-run.css', 'utf8');
