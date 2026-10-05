@@ -1,6 +1,6 @@
 {
   "operation": "promote-android-closed",
-  "reason": "Promote the exact signed Pack One 1.0 native navigation and website-parity repair candidate 100488 from successful Internal upload run 37240960371, built from f721389d392867cc43c342c07ecddfc20c9f28f8. Includes #890, #910 and #955. Exact-main certification and native evidence are recorded in #575. Use the existing production-access Closed Testing track and preserve its testers, countries and qualification continuity. Do not rebuild, create a new qualification track, submit to Production or release publicly.",
-  "version_code": "100488",
+  "reason": "Promote the exact final corrected Pack One 1.0 signed bundle 100491, accepted and committed to Internal draft in successful run 37247429578 from binary source 747478440400e242aae32469d6ed18f1785b591d (protected #963). Includes retained #890/#910/#955 and provider-neutral membership copy #960. iOS 100505 is separately verified in internal TestFlight. Exact-main certification 37244011180 and final main native/store evidence 37244011193 pass on equivalent runtime 3a8244eb. Use only the existing production-access Closed Testing track and preserve testers, countries and qualification continuity. Do not rebuild, create a new track, alter tester configuration, submit to Production or release publicly; physical/provider/owner gates remain open.",
+  "version_code": "100491",
   "track": "production-access"
 }
