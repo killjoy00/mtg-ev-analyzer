@@ -190,7 +190,7 @@ async function start(request) {
   const owner=await timing.step('player',()=>player(request)),body=await timing.step('body',()=>readJson(request)),daily=body.daily===true;
   const entrySource=daily&&body.source==='result_share'?'result_share':null;
   const source=body.challenge ? await share(String(body.challenge)) : null;
-  const creatorState=body.creatorChallenge ? await loadCreatorChallengeForStart(query,String(body.creatorChallenge)) : null;
+  const creatorState=body.creatorChallenge ? await loadCreatorChallengeForStart(query,String(body.creatorChallenge),{today:gameDateKey()}) : null;
   if(source&&creatorState)fail('Choose either a shared run or a creator challenge.');
   if((source||creatorState)&&daily)fail('A challenge replay is separate from the Daily.');
   // Reopening an invitation as its source owner must never manufacture a
@@ -555,7 +555,7 @@ async function route(request) {
   if(request.method==='GET'&&path==='/v1/leaderboard') return leaderboard(request);
   const creatorPublic=path.match(/^\/v1\/creator-challenges\/([a-z0-9-]{1,64})$/);
   if(request.method==='GET'&&creatorPublic) {
-    const challenge=await creatorChallengeForPublic(query,creatorPublic[1]);
+    const challenge=await creatorChallengeForPublic(query,creatorPublic[1],{today:gameDateKey()});
     const viewer=await player(request,false);
     if(viewer)await query(`INSERT INTO analytics_events(player_id,event_name,event_props)
       VALUES($1::uuid,'creator_challenge_open',$2::jsonb)`,[
