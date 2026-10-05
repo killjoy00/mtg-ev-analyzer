@@ -82,7 +82,15 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
              retired_at=COALESCE(retired_at,now()),updated_at=now(),publication_error=NULL,
              publication_operation_ref=NULL,
              publication_detail=CASE
-               WHEN published_at IS NULL AND status NOT IN ('published','publishing') THEN
+               WHEN published_at IS NULL
+                 AND status NOT IN ('published','publishing')
+                 AND NOT (
+                   publication_detail->>'action'='publish'
+                   AND (
+                     publication_detail ? 'workflow'
+                     OR COALESCE(publication_detail#>>'{dispatch,state}','') IN ('accepted','ambiguous')
+                   )
+                 ) THEN
                  jsonb_build_object(
                    'action','retire','reason','public_identity_hidden',
                    'live_verified',true,'static_cleanup','not_required'
@@ -90,7 +98,8 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
                ELSE
                  jsonb_build_object(
                    'action','retire','reason','public_identity_hidden',
-                   'live_verified',false,'dispatch',jsonb_build_object('state','pending','attempts',0)
+                   'live_verified',false,'static_cleanup','required',
+                   'dispatch',jsonb_build_object('state','pending','attempts',0)
                  )
              END
            WHERE source_owner_player_id=$1::uuid
