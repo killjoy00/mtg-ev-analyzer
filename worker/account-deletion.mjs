@@ -119,9 +119,14 @@ export async function cleanupPackOne(query,operation,{recoveryKey=null}={}) {
     // remains retryable instead of leaving creator metadata stranded on Pages.
     const creatorPrivacyReady=await requestCreatorPrivacyRetirement(query,player);
     if(!creatorPrivacyReady)return current;
+    await query(`UPDATE game_results SET opponent_name='A creator'
+      WHERE player_id<>$1::uuid AND creator_challenge_id IN (
+        SELECT id FROM creator_challenges WHERE source_owner_player_id=$1::uuid
+      )`,[player]);
     await query(`UPDATE creator_challenges
       SET status='retired',creator_public_name='A creator',creator_handle=NULL,headline='Creator challenge unavailable',
-          creator_post_run_note=NULL,privacy_removed_at=COALESCE(privacy_removed_at,now()),
+          creator_post_run_note=NULL,source_owner_auth_user_id=NULL,
+          privacy_removed_at=COALESCE(privacy_removed_at,now()),
           retired_at=COALESCE(retired_at,now()),updated_at=now()
       WHERE source_owner_player_id=$1::uuid`,[player]);
     await query(`INSERT INTO creator_challenge_audit(creator_challenge_id,action,detail)
