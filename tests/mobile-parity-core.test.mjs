@@ -57,8 +57,9 @@ test('native Draft Run keeps web feedback and result-review parity', () => {
   assert.match(draftScreen, /Something is broken/);
   assert.match(draftScreen, /Anything else\?/);
   assert.match(draftScreen, /Thanks — report sent\./);
-  assert.match(draftScreen, /Application\.nativeApplicationVersion/);
-  assert.match(draftScreen, /Application\.nativeBuildVersion/);
+  assert.match(draftApi, /Application\.nativeApplicationVersion/);
+  assert.match(draftApi, /Application\.nativeBuildVersion/);
+  assert.match(draftApi, /Platform\.OS === 'ios'/);
   assert.match(draftScreen, /Model&apos;s strongest choice/);
   assert.match(draftScreen, /Compare all/);
   assert.match(draftScreen, /Your \{run\.run_length\} picks/);
