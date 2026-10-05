@@ -52,18 +52,6 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
     const playerId=target.rows[0]?.player_id;
     if(!playerId)fail('User has no linked public identity.',404);
     if(action==='hide') {
-      const activeCreator=(await query(`SELECT id,slug,status FROM creator_challenges
-        WHERE source_owner_player_id=$1::uuid
-          AND NOT (
-            status='retired'
-            AND COALESCE(publication_detail->>'live_verified','false')='true'
-          )
-        ORDER BY created_at LIMIT 1`,[playerId])).rows[0];
-      if(activeCreator)fail(
-        `Retire creator challenge "${activeCreator.slug}" and wait for its retired page to verify live before hiding this public identity.`,
-        409,
-        'CREATOR_CHALLENGE_RETIRE_REQUIRED',
-      );
       await query(
         `WITH snapshot AS MATERIALIZED (
            SELECT id,username_owned,profile_public FROM players WHERE id=$1::uuid FOR UPDATE
@@ -89,8 +77,14 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
          ), retire_creator_challenges AS (
            UPDATE creator_challenges
            SET status='retired',creator_public_name='A creator',creator_handle=NULL,headline='Creator challenge unavailable',
-             creator_post_run_note=NULL,privacy_removed_at=COALESCE(privacy_removed_at,now()),
-             retired_at=COALESCE(retired_at,now()),updated_at=now(),publication_error=NULL
+             creator_post_run_note=NULL,source_owner_auth_user_id=NULL,
+             privacy_removed_at=COALESCE(privacy_removed_at,now()),
+             retired_at=COALESCE(retired_at,now()),updated_at=now(),publication_error=NULL,
+             publication_operation_ref=NULL,
+             publication_detail=jsonb_build_object(
+               'action','retire','reason','public_identity_hidden',
+               'live_verified',false,'dispatch',jsonb_build_object('state','pending','attempts',0)
+             )
            WHERE source_owner_player_id=$1::uuid
            RETURNING id
          ), creator_audit AS (
