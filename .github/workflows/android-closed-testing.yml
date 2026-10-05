@@ -107,7 +107,7 @@ jobs:
             printf -- '- Track: `%s`\n' "${{ steps.request.outputs.track }}"
             printf -- '- Version code: `%s`\n' "${{ steps.request.outputs.version_code }}"
             printf -- '- Release status: `%s`\n' "$release_status"
-            echo "- Source revision: `$GITHUB_SHA`"
+            printf -- '- Source revision: `%s`\n' "$GITHUB_SHA"
             echo
             if [[ "$requires_console" == "true" ]]; then
               echo 'Google Play still classifies the app as a draft app. The closed-track release is committed as a draft and must be rolled out once in Play Console before testers can opt in.'

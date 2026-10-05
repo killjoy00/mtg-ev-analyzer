@@ -87,7 +87,7 @@ jobs:
             {
               echo "### $label shared-run self-challenge cleanup"
               echo
-              echo "- Reviewed application revision: `$RELEASE_COMMIT`"
+              printf -- '- Reviewed application revision: `%s`\n' "$RELEASE_COMMIT"
               echo "- Legacy self-share sessions removed: $before"
               echo '- Remaining self-share sessions: 0'
               echo
