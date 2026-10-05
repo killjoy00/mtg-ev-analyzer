@@ -36,7 +36,7 @@ async function requireCreatorAdmin(request,{query,allowedOrigins,csrf}) {
   return auth;
 }
 
-function workflowInputs(row,operation,action) {
+export function creatorPublicationWorkflowInputs(row,operation,action) {
   const retired=action==='retire';
   return {
     kind:'creator',
@@ -89,15 +89,15 @@ async function guardedError(query,id,operation,action,error) {
   ]);
 }
 
-function dispatchRetryDue(detail) {
+export function creatorPublicationDispatchRetryDue(detail,{now=Date.now()}={}) {
   const dispatch=detail?.dispatch||{};
   const state=String(dispatch.state||'pending');
   if(state==='pending'||state==='rejected')return true;
   const attempted=Date.parse(String(dispatch.last_attempt_at||detail?.requested_at||''));
-  return !Number.isFinite(attempted)||Date.now()-attempted>=DISPATCH_RETRY_MS;
+  return !Number.isFinite(attempted)||now-attempted>=DISPATCH_RETRY_MS;
 }
 
-async function dispatchAttempt(query,row,operation,action,{env,fetcher}) {
+export async function dispatchCreatorPublicationAttempt(query,row,operation,action,{env,fetcher}) {
   const detail=operationDetail(row);
   const attempts=Math.max(0,Number(detail?.dispatch?.attempts||0))+1;
   const lastAttemptAt=new Date().toISOString();
@@ -106,7 +106,7 @@ async function dispatchAttempt(query,row,operation,action,{env,fetcher}) {
     const response=await fetcher(DISPATCH_URL,{
       method:'POST',
       headers:githubHeaders(env),
-      body:JSON.stringify({ref:'main',inputs:workflowInputs(row,operation,action)}),
+      body:JSON.stringify({ref:'main',inputs:creatorPublicationWorkflowInputs(row,operation,action)}),
       redirect:'error',
       signal:AbortSignal.timeout(15000),
     });
@@ -169,7 +169,7 @@ async function workflowRun(row,operation,{env,fetcher}) {
   return exact||discoverWorkflowRun(operation,{env,fetcher});
 }
 
-async function verifyLive(row,action,{fetcher}) {
+export async function verifyCreatorPublicationLive(row,action,{fetcher}) {
   const url=\`https://packone.pro/creator/\${row.slug}/\`;
   let response,text;
   try {
@@ -229,8 +229,8 @@ async function reconcile(query,row,{today,env,fetcher}) {
   const detail=operationDetail(row),operation=String(row.publication_operation_ref||''),action=operationAction(row);
   if(!UUID.test(operation)||!action)return statePayload(row);
   let run=await workflowRun(row,operation,{env,fetcher});
-  if(!run&&operationMatches(row,operation,action)&&dispatchRetryDue(detail)) {
-    await dispatchAttempt(query,row,operation,action,{env,fetcher});
+  if(!run&&operationMatches(row,operation,action)&&creatorPublicationDispatchRetryDue(detail)) {
+    await dispatchCreatorPublicationAttempt(query,row,operation,action,{env,fetcher});
     row=await creatorChallengeById(query,row.id);
     if(!operationMatches(row,operation,action))return statePayload(row);
     run=await workflowRun(row,operation,{env,fetcher});
@@ -247,7 +247,7 @@ async function reconcile(query,row,{today,env,fetcher}) {
     else await guardedError(query,row.id,operation,action,message);
     return statePayload(await creatorChallengeById(query,row.id),{reconciled:true,workflow});
   }
-  const live=await verifyLive(row,action,{fetcher});
+  const live=await verifyCreatorPublicationLive(row,action,{fetcher});
   await guardedDetail(query,row.id,operation,action,{live_verified:live.ok,live_detail:live});
   row=await creatorChallengeById(query,row.id);
   if(!operationMatches(row,operation,action))return statePayload(row);
