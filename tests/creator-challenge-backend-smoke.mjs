@@ -98,14 +98,14 @@ async function insertCreatorStart(playerId,runId,challengeId) {
 }
 
 const tag=crypto.randomUUID().slice(0,8);
-const creator=await call(growth,'/v1/session',{displayName:'QA Merge Creator '+tag});
+const creator=await call(growth,'/v1/session',{displayName:'Merge Creator '+tag});
 const target=await call(growth,'/v1/session',{displayName:'Merge Account '+tag});
 const guestCompleted=await call(growth,'/v1/session',{displayName:'Merge Guest Complete '+tag});
 const guestPartial=await call(growth,'/v1/session',{displayName:'Merge Guest Partial '+tag});
 const replayGuest=await call(growth,'/v1/session',{displayName:'Creator Replay Guest '+tag});
 const dailyFirstGuest=await call(growth,'/v1/session',{displayName:'Creator Daily First '+tag});
 const paidModeGuest=await call(growth,'/v1/session',{displayName:'Creator Paid Mode Guest '+tag});
-const targetAuth=crypto.randomUUID(),creatorAuth=crypto.randomUUID();
+const targetAuth=crypto.randomUUID(),creatorAuth=crypto.randomUUID(),creatorAccountToken=crypto.randomUUID()+crypto.randomUUID();
 
 try {
   await query(`INSERT INTO neon_auth."user"(id,name,email,"emailVerified")
@@ -113,7 +113,21 @@ try {
     creatorAuth,'Creator source fixture',`creator-source-${tag}@example.invalid`,
   ]);
   await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[creatorAuth,creator.playerId]);
-  const template=await completePractice(creator);
+  await query(`INSERT INTO neon_auth.session(token,"userId","expiresAt","updatedAt")
+    VALUES($1,$2::uuid,now()+interval '1 hour',now())`,[creatorAccountToken,creatorAuth]);
+  await query(`INSERT INTO entitlement_grants(auth_user_id,capability,provider,provider_reference)
+    VALUES($1::uuid,'unlimited_cube_practice','test',$2),($1::uuid,'custom_corpus','test',$2)`,[
+    creatorAuth,'creator-source-'+tag,
+  ]);
+  let template=await directCall(runApi,'/v1/runs',{},creator.token,200,{'x-pack1-auth-session':creatorAccountToken});
+  while(!template.complete) {
+    template=await directCall(runApi,`/v1/runs/${template.id}/pick`,{
+      revision:template.revision,
+      round:template.answers.length,
+      puzzleId:template.current.puzzle_id,
+      cardId:template.current.candidates[0].id,
+    },creator.token,200,{'x-pack1-auth-session':creatorAccountToken});
+  }
   await query(`UPDATE players SET profile_public=true,username_owned=true WHERE id=$1::uuid`,[creator.playerId]);
   const creatorIdentity=(await query(`SELECT profile_public,username_owned,public_identity_hidden_at
     FROM players WHERE id=$1::uuid`,[creator.playerId])).rows[0];
