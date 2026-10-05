@@ -75,7 +75,7 @@ function compactRevealCards(p,answer) {
   const byId=new Map((p.candidates||[]).map(c=>[c.id,c]));
   const roles=[
     ['Your Pick',answer.selectedId,'is-mine'],
-    ...(run?.comparison?.kind==='creator'&&answer.creatorId?[run.comparison.name+"'s Pick",answer.creatorId,'is-creator']:[]),
+    ...(run?.comparison?.kind==='creator'&&answer.creatorId?[[run.comparison.name+"'s Pick",answer.creatorId,'is-creator']]:[]),
     ['Trophy Pick',answer.historicalId,'is-trophy'],
   ].filter(([,id])=>id);
   const grouped=new Map();
@@ -242,7 +242,7 @@ async function mutate(action,body) {
   } finally {busy=false;}
 }
 function resultRepeatAction() {
-  if(run.day)return {href:'./',label:'Back to Dailies'};
+  if(run.day||run.comparison?.kind==='creator')return {href:'./',label:'Back to Dailies'};
   if(run.custom_set_ids?.length)return {href:'?game=draft-run&custom=1',label:'Choose Sets for Another Run'};
   return {href:gameUrl(),label:`Start Another ${title()}`};
 }
