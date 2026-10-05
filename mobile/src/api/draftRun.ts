@@ -113,6 +113,13 @@ export type DraftRunState = {
   } | null;
 };
 
+export type DecisionReportReason =
+  | 'draft_context'
+  | 'card_or_image'
+  | 'score_recommendation'
+  | 'broken'
+  | 'other';
+
 export type SharedDraftRunInfo = {
   id: string;
   name: string;
@@ -273,6 +280,38 @@ export function rerollDraftRun(
       puzzleId: run.current.puzzle_id,
     },
     timeoutMs: 30_000,
+  });
+}
+
+export async function submitDraftRunDecisionReport(
+  run: DraftRunState,
+  round: number,
+  reason: DecisionReportReason,
+  comment: string,
+  session: MobileSession,
+) {
+  const answer = run.answers[round];
+  if (!answer) throw new Error('Choose a revealed decision to report.');
+  const [Application, native] = await Promise.all([
+    import('expo-application'),
+    import('react-native'),
+  ]);
+  return requestJson<{ ok: true; id: string }>(`/draft/v1/runs/${encodeURIComponent(run.id)}/report`, {
+    method: 'POST',
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    body: {
+      round,
+      puzzleId: answer.puzzle.puzzle_id,
+      reason,
+      comment: comment.trim() || null,
+      client: {
+        platform: native.Platform.OS === 'ios' ? 'ios' : native.Platform.OS === 'android' ? 'android' : 'unknown',
+        version: Application.nativeApplicationVersion ?? null,
+        build: Application.nativeBuildVersion ?? null,
+      },
+    },
+    timeoutMs: 15_000,
   });
 }
 

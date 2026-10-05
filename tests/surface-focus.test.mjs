@@ -59,6 +59,26 @@ test('Draft Run reveal puts continuation before disclosures and restores result 
 });
 
 
+test('decision reporting stays inside Why this score and away from continuation', async () => {
+  const source = await readFile('draft-run-product.mjs', 'utf8');
+  const analysis = source.slice(source.indexOf('function revealAnalysis'), source.indexOf('function compactResultLabel'));
+  assert.match(analysis, /Report this decision/);
+  assert.match(analysis, /run-analysis-body[\s\S]*run-decision-report/);
+  assert.match(source, /What seems wrong\?/);
+  assert.match(source, /Draft context looks wrong/);
+  assert.match(source, /Card or image issue/);
+  assert.match(source, /Score \/ recommendation seems wrong/);
+  assert.match(source, /Something is broken/);
+  assert.match(source, /Anything else\?/);
+  assert.match(source, /Thanks \\u2014 report sent\./);
+  const render = source.slice(source.indexOf('function render()'), source.indexOf('function zoom(card)'));
+  assert.ok(render.indexOf('id="run-next"') < render.indexOf('revealAnalysis(p,answer)'));
+  const css = await readFile('draft-run.css', 'utf8');
+  assert.match(css, /\.run-decision-report \.text-button\{[^}]*color:var\(--muted\)/);
+  assert.match(css, /\.run-report-dialog/);
+});
+
+
 test('Draft Run previous-card context stays visible and visually distinct', async () => {
   const source = await readFile('draft-run-product.mjs', 'utf8');
   assert.match(source, /No Previous Cards Selected/);

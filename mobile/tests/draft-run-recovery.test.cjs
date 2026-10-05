@@ -126,6 +126,7 @@ async function fixture(options = {}) {
   const Image = host('Image');
   Image.prefetch = async () => {};
   const mocks = {
+    'expo-application': { nativeApplicationVersion: '1.0', nativeBuildVersion: '1' },
     'expo-haptics': {
       selectionAsync: async () => {}, notificationAsync: async () => {},
       NotificationFeedbackType: { Success: 'success' },
@@ -137,10 +138,10 @@ async function fixture(options = {}) {
     },
     'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       AccessibilityInfo: { announceForAccessibility() {} },
-      ActivityIndicator: host('ActivityIndicator'), Modal: host('Modal'),
-      Pressable: host('Pressable'), ScrollView, Share: { share: async () => {} },
+      ActivityIndicator: host('ActivityIndicator'), KeyboardAvoidingView: host('KeyboardAvoidingView'), Modal: host('Modal'),
+      Platform: { OS: 'ios' }, Pressable: host('Pressable'), ScrollView, Share: { share: async () => {} },
       Linking: { openURL: options.openURL ?? (async () => {}) },
-      StyleSheet: { create: (value) => value }, Text: host('Text'), View: host('View'),
+      StyleSheet: { create: (value) => value }, Text: host('Text'), TextInput: host('TextInput'), View: host('View'),
     },
     'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
     '@/src/api/guest': { ensureGuestSession: async () => session },
@@ -157,6 +158,7 @@ async function fixture(options = {}) {
       startPracticeDraftRun: async (_session, { environment }) => ({ ...runZero(environment), day: null }),
       loadDraftRun: options.loadRun ?? (async () => runZero()),
       submitDraftRunPick: options.submitPick ?? (async () => { throw new Error('Response lost.'); }),
+      submitDraftRunDecisionReport: options.submitReport ?? (async () => ({ ok: true, id: 'report-id' })),
       rerollDraftRun: async () => runZero(),
     },
     '@/src/hooks/useAppResume': { useAppResume() {} },
@@ -283,6 +285,41 @@ test('TCGplayer affiliate destinations stay hidden until score analysis is opene
     await act(async () => why.props.onPress());
     assert.equal(screen.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityRole === 'link').length, 2);
     assert.match(screen.text(), /Affiliate links\. Pack One may earn a commission/);
+  } finally { await screen.close(); }
+});
+
+
+test('decision report stays inside score analysis and preserves the run', async () => {
+  const reports = [];
+  const completedPick = { ...runZero(), revision: 5, round: 1, answers: [answer(0, 'a', 88)], current: puzzle(1) };
+  const screen = await fixture({
+    submitPick: async () => completedPick,
+    submitReport: async (...args) => { reports.push(args); return { ok: true, id: 'report-id' }; },
+  });
+  try {
+    await screen.chooseAndConfirm();
+    assert.doesNotMatch(screen.text(), /Report this decision/);
+    const why = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Why this score?'))[0];
+    await act(async () => why.props.onPress());
+    const report = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Report this decision'))[0];
+    assert.ok(report);
+    await act(async () => report.props.onPress());
+    const reason = screen.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityRole === 'radio'
+      && renderedText(node).includes('Score / recommendation seems wrong'))[0];
+    assert.ok(reason);
+    await act(async () => reason.props.onPress());
+    const comment = screen.root.root.findAll((node) => node.type === 'TextInput' && node.props.accessibilityLabel === 'Anything else?')[0];
+    await act(async () => comment.props.onChangeText('The recommendation looks reversed.'));
+    const send = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Send report'))[0];
+    await act(async () => { send.props.onPress(); await flush(); });
+    assert.equal(reports.length, 1);
+    assert.equal(reports[0][0].id, completedPick.id);
+    assert.equal(reports[0][1], 0);
+    assert.equal(reports[0][2], 'score_recommendation');
+    assert.equal(reports[0][3], 'The recommendation looks reversed.');
+    assert.match(reports[0][4].playerToken, /^p1_11111111-1111-4111-8111-111111111111\./);
+    assert.match(screen.text(), /Thanks — report sent\./);
+    assert.match(screen.text(), /Hide score analysis/);
   } finally { await screen.close(); }
 });
 

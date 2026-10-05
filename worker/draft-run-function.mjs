@@ -29,6 +29,7 @@ import {
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9_-]{16,128}$/;
+const DECISION_REPORT_REASONS=new Set(['draft_context','card_or_image','score_recommendation','broken','other']);
 const environmentOf = s => s.environment || 'mixed';
 const runLength = s => s.puzzle_ids.length;
 const parse = value => typeof value === 'string' ? JSON.parse(value) : value;
@@ -320,6 +321,52 @@ async function change(request,id,action) {
   return timing.finish(json(await timing.step('response',()=>responseFor(decode(updated.rows[0])))));
 }
 
+async function reportDecision(request,id) {
+  const owner=await player(request);
+  await consumePlayerLimit(query,owner,'decision_report',{limit:20,seconds:3600});
+  const body=await readJson(request),s=await session(id,owner),round=Number(body.round);
+  if(!Number.isInteger(round)||round<0||round>=s.answers.length)fail('Choose a revealed decision to report.');
+  const answer=s.answers[round];
+  if(body.puzzleId!==answer?.puzzle?.puzzle_id)fail('Reported decision no longer matches this run.',409);
+  const reason=String(body.reason||'');
+  if(!DECISION_REPORT_REASONS.has(reason))fail('Choose what seems wrong.');
+  const comment=body.comment==null?'':String(body.comment).trim();
+  if(comment.length>500)fail('Comment is too long.');
+  const client=body.client&&typeof body.client==='object'?body.client:{};
+  const clientPlatform=['web','ios','android'].includes(client.platform)?client.platform:'unknown';
+  const clientField=value=>{
+    if(value==null||value==='')return null;
+    const text=String(value).trim();
+    if(!text||text.length>64)fail('Invalid client version metadata.');
+    return text;
+  };
+  const fullPuzzle=await puzzle(answer.puzzle.puzzle_id,s.corpus_version);
+  const recommended=(Array.isArray(answer.ranking)&&answer.ranking[0])
+    || [...(fullPuzzle.candidates||[])].sort((a,b)=>Number(b.model_probability||0)-Number(a.model_probability||0))[0]
+    || null;
+  const recommendedId=recommended?.id||null;
+  const recommendedName=recommended?.name||null;
+  const recommendedScore=recommendedId?gradeDraftRunPick(fullPuzzle,recommendedId).score:null;
+  const release=releaseMetadata().release_commit;
+  const inserted=await query(`INSERT INTO draft_run_decision_reports(
+      run_id,player_id,puzzle_id,set_id,pick_number,round_number,
+      selected_card_id,selected_card_name,recommended_card_id,recommended_card_name,recommended_card_score,
+      reason,comment,environment,daily_date,corpus_version,model_version,scoring_version,
+      difficulty_version,selection_version,serving_policy_version,backend_release,
+      client_platform,client_version,client_build
+    ) VALUES(
+      $1::uuid,$2::uuid,$3,$4,$5::smallint,$6::smallint,
+      $7,$8,$9,$10,$11::smallint,$12,$13,$14,$15::date,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25
+    ) RETURNING id`,[
+      s.id,owner,answer.puzzle.puzzle_id,answer.puzzle.set_id,Number(answer.pickNumber||answer.puzzle.pick_number),round+1,
+      answer.selectedId,answer.selectedName,recommendedId,recommendedName,recommendedScore,
+      reason,comment||null,environmentOf(s),s.day||null,s.corpus_version,fullPuzzle.model_version||null,s.scoring_version,
+      s.difficulty_version||null,s.selection_version||null,s.serving_policy_version||LEGACY_SERVING_POLICY_VERSION,release,
+      clientPlatform,clientField(client.version),clientField(client.build),
+    ]);
+  return json({ok:true,id:inserted.rows[0].id});
+}
+
 async function createShare(request,id) {
   const owner=await player(request),s=await session(id,owner);
   if(s.answers.length!==runLength(s)) fail('Finish the run before sharing it.');
@@ -435,7 +482,7 @@ async function route(request) {
   if(request.method==='GET'&&path==='/v1/practice-sets') {const owner=await player(request),caps=await accountCapabilities(await accountIdentity(request,query,owner),query);requireCapability(caps,'custom_corpus');return json({sets:await loadCachedCustomSetMetadata(query,DRAFT_RUN_CORPUS_VERSION)});}
   if(request.method==='GET'&&path==='/v1/daily-status') return dailyStatus(request);
   if(request.method==='GET'&&path==='/v1/leaderboard') return leaderboard(request);
-  const match=path.match(/^\/v1\/runs\/([a-f0-9-]+)(?:\/(pick|reroll|share|view))?$/);
+  const match=path.match(/^\/v1\/runs\/([a-f0-9-]+)(?:\/(pick|reroll|share|view|report))?$/);
   if(match) {
     if(request.method==='POST'&&match[2]==='view') {
       const owner=await player(request),body=await readJson(request),s=await session(match[1],owner);
@@ -444,6 +491,7 @@ async function route(request) {
     }
     if(request.method==='GET'&&!match[2]) return json(await responseFor(await session(match[1],await player(request))));
     if(request.method==='POST'&&match[2]==='share') return createShare(request,match[1]);
+    if(request.method==='POST'&&match[2]==='report') return reportDecision(request,match[1]);
     if(request.method==='POST'&&['pick','reroll'].includes(match[2])) return change(request,match[1],match[2]);
   }
   const shared=path.match(/^\/v1\/(?:challenges|shared-runs)\/([a-f0-9]+)$/);

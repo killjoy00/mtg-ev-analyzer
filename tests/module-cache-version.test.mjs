@@ -15,18 +15,18 @@ test('account and profile entry modules use release-versioned imports', async ()
     readFile('patreon-page.mjs', 'utf8'),
   ]);
 
-  assert.match(index, /bootstrap\.mjs\?v=9/);
-  assert.match(bootstrap, /growth\.mjs\?v=8/);
-  assert.match(bootstrap, /daily-home\.mjs\?v=9/);
-  assert.match(bootstrap, /profile-product\.mjs\?v=8/);
-  assert.match(bootstrap, /draft-run-product\.mjs\?v=9/);
-  assert.match(daily, /growth\.mjs\?v=8/);
-  assert.match(growth, /profile-product\.mjs\?v=8/);
+  assert.match(index, /bootstrap\.mjs\?v=10/);
+  assert.match(bootstrap, /growth\.mjs\?v=9/);
+  assert.match(bootstrap, /daily-home\.mjs\?v=10/);
+  assert.match(bootstrap, /profile-product\.mjs\?v=9/);
+  assert.match(bootstrap, /draft-run-product\.mjs\?v=10/);
+  assert.match(daily, /growth\.mjs\?v=9/);
+  assert.match(growth, /profile-product\.mjs\?v=9/);
   assert.match(growth, /patreon-activation\.mjs\?v=2/);
-  assert.match(profile, /progression\.mjs\?v=8/);
-  assert.match(profile, /growth\.mjs\?v=8/);
-  assert.match(progression, /growth\.mjs\?v=8/);
-  assert.match(draft, /growth\.mjs\?v=8/);
+  assert.match(profile, /progression\.mjs\?v=9/);
+  assert.match(profile, /growth\.mjs\?v=9/);
+  assert.match(progression, /growth\.mjs\?v=9/);
+  assert.match(draft, /growth\.mjs\?v=9/);
   assert.match(draft, /share-cards\.mjs\?v=7/);
   assert.match(patreonHtml, /patreon-page\.mjs\?v=3/);
   assert.match(patreonPage, /patreon-activation\.mjs\?v=2/);

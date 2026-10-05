@@ -68,6 +68,39 @@ for(let round=0;round<s.run_length;round++) {
   console.log('Locked decision and retries verified',round+1);
 }
 assert.equal(s.complete,true);
+const firstAnswer=s.answers[0];
+await call(runApi,`/v1/runs/${s.id}/report`,{
+  round:0,
+  puzzleId:firstAnswer.puzzle.puzzle_id,
+  reason:'score_recommendation',
+  comment:'QA decision report',
+  client:{platform:'web',version:null,build:'qa-smoke'},
+},guest.token);
+await call(runApi,`/v1/runs/${s.id}/report`,{
+  round:0,
+  puzzleId:'wrong-puzzle',
+  reason:'score_recommendation',
+  comment:'must not persist',
+  client:{platform:'web',version:null,build:'qa-smoke'},
+},guest.token,409);
+const decisionReports=await query(`SELECT
+    player_id,puzzle_id,selected_card_id,recommended_card_id,reason,comment,
+    environment,corpus_version,scoring_version,client_platform,client_build
+  FROM draft_run_decision_reports WHERE run_id=$1::uuid ORDER BY created_at,id`,[s.id]);
+assert.equal(decisionReports.rows.length,1,'Only the valid revealed decision report should persist');
+const decisionReport=decisionReports.rows[0];
+assert.equal(decisionReport.player_id,guest.playerId);
+assert.equal(decisionReport.puzzle_id,firstAnswer.puzzle.puzzle_id);
+assert.equal(decisionReport.selected_card_id,firstAnswer.selectedId);
+assert.equal(decisionReport.recommended_card_id,firstAnswer.ranking[0].id);
+assert.equal(decisionReport.reason,'score_recommendation');
+assert.equal(decisionReport.comment,'QA decision report');
+assert.equal(decisionReport.environment,s.environment);
+assert.equal(decisionReport.corpus_version,s.corpus_version);
+assert.equal(decisionReport.scoring_version,s.scoring_version);
+assert.equal(decisionReport.client_platform,'web');
+assert.equal(decisionReport.client_build,'qa-smoke');
+console.log('Decision-quality report persistence and server-owned metadata verified');
 const completedBefore=(await query('SELECT result_persisted_at FROM draft_run_sessions WHERE id=$1::uuid',[s.id])).rows[0].result_persisted_at;
 assert.ok(completedBefore);
 await call(runApi,`/v1/runs/${s.id}`,undefined,guest.token);
