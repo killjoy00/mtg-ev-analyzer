@@ -17,6 +17,7 @@ const artifactDir='artifacts/creator-production-canary';
 fs.mkdirSync(artifactDir,{recursive:true});
 const report={expected_release:expectedRelease,passed:false,checks:[],challenges:[],cleanup:{},started_at:new Date().toISOString()};
 const createdChallenges=[];
+const borrowedSources=[];
 let admin=null,guest=null;
 
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -83,31 +84,69 @@ async function playerToken(playerId) {
   const token='p1_'+playerId+'.'+signature;mask(token);return token;
 }
 
+async function borrowSource(row,type) {
+  assert.ok(row?.session_id&&row?.player_id,type+' retained QA source is required.');
+  assert.equal(row.measurement_qa,true,type+' retained source must begin as measurement QA.');
+  borrowedSources.push({
+    type,
+    session_id:row.session_id,
+    player_id:row.player_id,
+    measurement_qa:true,
+    profile_public:Boolean(row.profile_public),
+  });
+  await query('UPDATE draft_run_sessions SET measurement_qa=false WHERE id=$1::uuid',[row.session_id]);
+  await query('UPDATE players SET profile_public=true,updated_at=now() WHERE id=$1::uuid',[row.player_id]);
+  return {...row,measurement_qa:false,profile_public:true};
+}
+
+async function restoreBorrowedSources() {
+  for(const source of [...borrowedSources].reverse()) {
+    await query('UPDATE draft_run_sessions SET measurement_qa=$2::boolean WHERE id=$1::uuid',[
+      source.session_id,source.measurement_qa,
+    ]);
+    await query('UPDATE players SET profile_public=$2::boolean,updated_at=now() WHERE id=$1::uuid',[
+      source.player_id,source.profile_public,
+    ]);
+  }
+}
+
 async function candidatePools() {
-  const practice=(await query(`SELECT s.id::text session_id,sh.id share_id,s.player_id::text player_id,
-      s.score::int score,s.environment,s.answers,s.puzzle_ids
+  // Never select customer data for a release canary. Borrow only completed QA
+  // rows retained by the established production release acceptance suites,
+  // temporarily make that exact source eligible, then restore it in finally.
+  const practiceRow=(await query(`SELECT s.id::text session_id,sh.id share_id,s.player_id::text player_id,
+      s.score::int score,s.environment,s.answers,s.puzzle_ids,s.measurement_qa,
+      p.profile_public,p.public_identity_hidden_at,p.display_name
     FROM draft_run_sessions s
     JOIN draft_run_shares sh ON sh.session_id=s.id
     JOIN players p ON p.id=s.player_id
     WHERE s.day IS NULL AND s.score IS NOT NULL
       AND jsonb_array_length(s.puzzle_ids)=8 AND jsonb_array_length(s.answers)=8
-      AND NOT s.measurement_qa AND s.challenge_id IS NULL AND s.creator_challenge_id IS NULL
-      AND p.profile_public=true AND p.public_identity_hidden_at IS NULL
+      AND s.measurement_qa=true AND s.challenge_id IS NULL AND s.creator_challenge_id IS NULL
+      AND p.display_name LIKE 'QA v5 owner %'
+      AND p.public_identity_hidden_at IS NULL
+      AND NOT EXISTS(SELECT 1 FROM account_links a WHERE a.player_id=s.player_id)
       AND NOT EXISTS(SELECT 1 FROM creator_challenges c WHERE c.source_owner_player_id=s.player_id)
-    ORDER BY s.updated_at DESC LIMIT 40`)).rows;
-  const daily=(await query(`SELECT s.id::text session_id,s.player_id::text player_id,s.day::text day,
-      s.score::int score,s.environment,s.answers,s.puzzle_ids
+    ORDER BY s.updated_at DESC LIMIT 1`)).rows[0];
+  const dailyRow=(await query(`SELECT s.id::text session_id,s.player_id::text player_id,s.day::text AS source_day,
+      s.score::int score,s.environment,s.answers,s.puzzle_ids,s.measurement_qa,
+      p.profile_public,p.public_identity_hidden_at,p.display_name
     FROM draft_run_sessions s
     JOIN players p ON p.id=s.player_id
     WHERE s.day IS NOT NULL AND s.day<$1::date AND s.score IS NOT NULL
       AND jsonb_array_length(s.puzzle_ids)=8 AND jsonb_array_length(s.answers)=8
-      AND NOT s.measurement_qa
-      AND p.profile_public=true AND p.public_identity_hidden_at IS NULL
+      AND s.measurement_qa=true
+      AND p.display_name LIKE 'QA release %'
+      AND p.public_identity_hidden_at IS NULL
+      AND NOT EXISTS(SELECT 1 FROM account_links a WHERE a.player_id=s.player_id)
       AND NOT EXISTS(SELECT 1 FROM creator_challenges c WHERE c.source_owner_player_id=s.player_id)
-    ORDER BY s.day DESC,s.updated_at DESC LIMIT 40`,[gameDateKey()])).rows;
-  assert.ok(practice.length,'No eligible authentic Practice source exists for the production canary.');
-  assert.ok(daily.length,'No eligible closed authentic Daily source exists for the production canary.');
-  return {practice,daily};
+    ORDER BY s.day DESC,s.updated_at DESC LIMIT 1`,[gameDateKey()])).rows[0];
+  assert.ok(practiceRow,'No retained QA v5 Practice/share fixture is available; refusing customer fallback.');
+  assert.ok(dailyRow,'No retained closed QA release Daily fixture is available; refusing customer fallback.');
+  const practice=await borrowSource(practiceRow,'practice');
+  const daily=await borrowSource(dailyRow,'daily');
+  report.checks.push('source selection restricted to retained QA release fixtures; customer rows excluded');
+  return {practice:[practice],daily:[daily]};
 }
 
 async function resolveCandidate(type,candidates) {
@@ -188,7 +227,7 @@ async function publicMetadata(challenge,token) {
 async function playChallenge(challenge,candidate,guestToken,guestId) {
   const sourceAnswers=parseJson(candidate.answers)||[];
   assert.equal(sourceAnswers.length,8);
-  const sourceBefore=(await query(`SELECT id::text id,day::text day,score::int score,answers,puzzle_ids,
+  const sourceBefore=(await query(`SELECT id::text id,day::text source_day,score::int score,answers,puzzle_ids,
       result_persisted_at,updated_at FROM draft_run_sessions WHERE id=$1::uuid`,[candidate.session_id])).rows[0];
   const dailyBefore=await count('SELECT count(*)::int n FROM draft_run_sessions WHERE player_id=$1::uuid AND day IS NOT NULL',[guestId]);
 
@@ -229,14 +268,14 @@ async function playChallenge(challenge,candidate,guestToken,guestId) {
   assert.equal(run.comparison.trophy_matches,trophyMatches);
   assert.equal(run.comparison.outcome,expectedOutcome);
 
-  const stored=(await query(`SELECT day::text day,creator_challenge_id::text creator_challenge_id,measurement_qa
+  const stored=(await query(`SELECT day::text source_day,creator_challenge_id::text creator_challenge_id,measurement_qa
     FROM draft_run_sessions WHERE id=$1::uuid`,[run.id])).rows[0];
-  assert.equal(stored.day,null,'creator replay must be unranked, not a Daily');
+  assert.equal(stored.source_day,null,'creator replay must be unranked, not a Daily');
   assert.equal(stored.creator_challenge_id,challenge.id);
   const dailyAfter=await count('SELECT count(*)::int n FROM draft_run_sessions WHERE player_id=$1::uuid AND day IS NOT NULL',[guestId]);
   assert.equal(dailyAfter,dailyBefore,'creator replay must not consume or create a real Daily');
 
-  const sourceAfter=(await query(`SELECT id::text id,day::text day,score::int score,answers,puzzle_ids,
+  const sourceAfter=(await query(`SELECT id::text id,day::text source_day,score::int score,answers,puzzle_ids,
       result_persisted_at,updated_at FROM draft_run_sessions WHERE id=$1::uuid`,[candidate.session_id])).rows[0];
   assert.deepEqual(sourceAfter,sourceBefore,'original creator source must remain immutable');
 
@@ -355,6 +394,7 @@ try{
   process.exitCode=1;
 }finally{
   try{if(guest)await cleanupGuest(guest.id,createdChallenges.map(row=>row.id));}catch(error){report.cleanup.guest_error=error.message;}
+  try{await restoreBorrowedSources();report.cleanup.borrowed_sources=true;}catch(error){report.cleanup.borrowed_source_error=error.message;process.exitCode=1;}
   try{await deleteAdminFixture(admin);report.cleanup.admin=true;}catch(error){report.cleanup.admin_error=error.message;}
   report.finished_at=new Date().toISOString();
   fs.writeFileSync(artifactDir+'/acceptance.json',JSON.stringify(report,null,2)+'\n');
