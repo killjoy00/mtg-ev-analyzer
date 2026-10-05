@@ -7,6 +7,7 @@ import {
   appStoreStatusClient,
   reconcileAppleSubscriptions,
   requestTestNotification,
+  diagnoseRejectedKey,
 } from '../scripts/apple-subscription-reconcile.mjs';
 import {APPLE_APP_ID,APPLE_ELITE_PRODUCT_ID} from '../worker/apple-subscription-policy.mjs';
 import {acceptAppleNotification} from '../worker/apple-subscriptions.mjs';
@@ -186,4 +187,26 @@ test('test notification fails loudly on a rejected key and reports a missing URL
   assert.deepEqual(await requestTestNotification(credentials,'Production',{wait:async()=>{},checks:2,fetchImpl:async(url,options)=>
     options.method==='POST'?Response.json({testNotificationToken:'t'}):new Response(null,{status:404})}),{environment:'Production',key_accepted:true,delivery:'pending'});
   await assert.rejects(requestTestNotification(credentials,'Xcode',{fetchImpl:async()=>{throw Error('must not call');}}));
+});
+
+test('a rejected key is diagnosed with safe facts only',async()=>{
+  const env={APPLE_IAP_ISSUER_SOURCE:'ASC_ISSUER_ID fallback',APPLE_IAP_KEY_ID_MATCHES_ASC:'false'};
+  for(const [status,accepted] of [[200,true],[401,false]]) {
+    let url='';
+    const facts=await diagnoseRejectedKey(credentials,{env,fetchImpl:async(target,options)=>{
+      url=String(target);
+      const claims=JSON.parse(Buffer.from(options.headers.authorization.split('.')[1],'base64url'));
+      assert.equal('bid' in claims,false);
+      return new Response(null,{status});
+    }});
+    assert.equal(url,'https://api.appstoreconnect.apple.com/v1/apps?limit=1');
+    assert.deepEqual(facts,{key_id_format_ok:true,issuer_id_format_ok:true,issuer_id_source:'ASC_ISSUER_ID fallback',
+      private_key_is_p256:true,key_id_same_as_app_store_connect_api_key:false,accepted_by_app_store_connect_api:accepted});
+    const text=JSON.stringify(facts);
+    for(const secret of [credentials.keyId,credentials.issuerId,credentials.privateKey])assert.equal(text.includes(secret),false);
+  }
+  const offline=await diagnoseRejectedKey({...credentials,keyId:'bad id',privateKey:'not a key'},{env:{},fetchImpl:async()=>{throw Error('offline');}});
+  assert.equal(offline.key_id_format_ok,false);
+  assert.equal(offline.private_key_is_p256,false);
+  assert.equal(offline.accepted_by_app_store_connect_api,null);
 });

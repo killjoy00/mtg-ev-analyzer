@@ -27,13 +27,42 @@ export function appleIapCredentials(env=process.env) {
   return keyId&&issuerId&&privateKey?.trim()?{keyId,issuerId,privateKey}:null;
 }
 
-// ES256 JWT for the App Store Server API, signed with an In-App Purchase key.
-export function appStoreServerToken({keyId,issuerId,privateKey},now=Date.now()) {
+function signedToken({keyId,issuerId,privateKey},claims,now) {
   const iat=Math.floor(now/1000);
   const encode=value=>Buffer.from(JSON.stringify(value)).toString('base64url');
-  const unsigned=`${encode({alg:'ES256',kid:keyId,typ:'JWT'})}.${encode({iss:issuerId,iat,exp:iat+600,aud:'appstoreconnect-v1',bid:APPLE_BUNDLE_ID})}`;
+  const unsigned=`${encode({alg:'ES256',kid:keyId,typ:'JWT'})}.${encode({iss:issuerId,iat,exp:iat+600,aud:'appstoreconnect-v1',...claims})}`;
   const signature=sign('sha256',Buffer.from(unsigned),{key:createPrivateKey(privateKey),dsaEncoding:'ieee-p1363'});
   return `${unsigned}.${signature.toString('base64url')}`;
+}
+
+// ES256 JWT for the App Store Server API, signed with an In-App Purchase key.
+export function appStoreServerToken(credentials,now=Date.now()) {
+  return signedToken(credentials,{bid:APPLE_BUNDLE_ID},now);
+}
+
+// When Apple rejects the key, report only facts that separate a wrong key type
+// from a mistyped value. No secret value, or part of one, is ever printed.
+export async function diagnoseRejectedKey(credentials,{env=process.env,fetchImpl=fetch,now=Date.now()}={}) {
+  let curve=null;
+  try {curve=createPrivateKey(credentials.privateKey).asymmetricKeyDetails?.namedCurve||null;} catch {}
+  const facts={
+    key_id_format_ok:/^[A-Z0-9]{10}$/.test(credentials.keyId),
+    issuer_id_format_ok:/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(credentials.issuerId),
+    issuer_id_source:env.APPLE_IAP_ISSUER_SOURCE||'unknown',
+    private_key_is_p256:curve==='prime256v1',
+    key_id_same_as_app_store_connect_api_key:env.APPLE_IAP_KEY_ID_MATCHES_ASC==='true',
+    accepted_by_app_store_connect_api:null,
+  };
+  // An App Store Connect API team key is accepted here and rejected by the
+  // App Store Server API; an In-App Purchase key is the reverse.
+  try {
+    const response=await fetchImpl('https://api.appstoreconnect.apple.com/v1/apps?limit=1',{
+      headers:{authorization:`Bearer ${signedToken(credentials,{},now)}`,accept:'application/json'},
+      redirect:'error',signal:AbortSignal.timeout(30000),
+    });
+    facts.accepted_by_app_store_connect_api=response.ok;
+  } catch {}
+  return facts;
 }
 
 export function appStoreStatusClient(credentials,{fetchImpl=fetch}={}) {
@@ -128,7 +157,12 @@ if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url) {
   if(process.argv[2]==='test-notification') {
     if(!credentials)throw Error('Add the In-App Purchase key secrets before requesting a test notification.');
     const results=[];
-    for(const environment of ['Sandbox','Production'])results.push(await requestTestNotification(credentials,environment));
+    try {
+      for(const environment of ['Sandbox','Production'])results.push(await requestTestNotification(credentials,environment));
+    } catch(error) {
+      if(error?.fatal&&!error.rateLimited)console.log(JSON.stringify({key_rejected:true,diagnosis:await diagnoseRejectedKey(credentials)}));
+      throw error;
+    }
     console.log(JSON.stringify(results));
     if(results.some(result=>result.delivery!=='SUCCESS'))process.exitCode=1;
   } else if(!credentials) {
