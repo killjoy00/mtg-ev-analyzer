@@ -1,4 +1,3 @@
-import * as Application from 'expo-application';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -6,10 +5,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
-  KeyboardAvoidingView,
   Linking,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -790,11 +787,6 @@ export default function DraftRunScreen({
         reviewIndex,
         reportReason,
         reportComment,
-        {
-          platform: Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'unknown',
-          version: Application.nativeApplicationVersion ?? null,
-          build: Application.nativeBuildVersion ?? null,
-        },
         current.session,
       );
       setReportedDecision(answer.puzzle.puzzle_id);
@@ -1197,7 +1189,7 @@ export default function DraftRunScreen({
           visible={reportOpen}
         >
           <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={styles.reportModalSafe}>
-            <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.reportKeyboard}>
+            <View style={styles.reportKeyboard}>
               <View accessibilityViewIsModal style={styles.reportSheet}>
                 <Text style={styles.reportTitle}>What seems wrong?</Text>
                 <View accessibilityRole="radiogroup" style={styles.reportReasons}>
@@ -1246,7 +1238,7 @@ export default function DraftRunScreen({
                   </Pressable>
                 </View>
               </View>
-            </KeyboardAvoidingView>
+            </View>
           </SafeAreaView>
         </Modal>
 
