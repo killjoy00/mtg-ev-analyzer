@@ -52,6 +52,14 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
     const playerId=target.rows[0]?.player_id;
     if(!playerId)fail('User has no linked public identity.',404);
     if(action==='hide') {
+      const activeCreator=(await query(`SELECT id,slug,status FROM creator_challenges
+        WHERE source_owner_player_id=$1::uuid AND status<>'retired'
+        ORDER BY created_at LIMIT 1`,[playerId])).rows[0];
+      if(activeCreator)fail(
+        `Retire creator challenge "${activeCreator.slug}" before hiding this public identity so its static social page can be scrubbed safely.`,
+        409,
+        'CREATOR_CHALLENGE_RETIRE_REQUIRED',
+      );
       await query(
         `WITH snapshot AS MATERIALIZED (
            SELECT id,username_owned,profile_public FROM players WHERE id=$1::uuid FOR UPDATE
