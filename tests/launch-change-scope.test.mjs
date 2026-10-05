@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {adminOnlyGatewayPatch,classifyLaunchChange} from '../scripts/launch-change-scope.mjs';
+import {adminOnlyGatewayPatch,classifyLaunchChange,requiresPracticePerformance} from '../scripts/launch-change-scope.mjs';
 
 const patch=lines=>[
   'diff --git a/edge/gateway.mjs b/edge/gateway.mjs',
@@ -63,6 +63,26 @@ test('workflow, classifier and test-only changes stay on fast regression coverag
 
 test('missing gateway diff evidence fails safe into the full rehearsal',()=>{
   assert.deepEqual(classifyLaunchChange({files:['edge/gateway.mjs'],gatewayPatch:''}),{runLoad:true,reason:'shared_or_gameplay_gateway'});
+});
+
+
+test('distributed load waits for practice baseline only when that workflow is actually triggered',()=>{
+  for(const file of [
+    'worker/draft-run-selection.mjs',
+    'migrations/0045_batched_practice_selector.sql',
+    'migrations/0050_practice_recency_bias.sql',
+    'migrations/0051_exact_pick_draw_index.sql',
+    'scripts/practice-performance.mjs',
+    '.github/workflows/practice-performance.yml',
+  ])assert.equal(requiresPracticePerformance([file]),true,file);
+  for(const file of [
+    'worker/draft-run-function.mjs',
+    'worker/draft-start-timing.mjs',
+    'edge/gateway.mjs',
+    'scripts/edge-control.mjs',
+    '.github/workflows/launch-distributed.yml',
+  ])assert.equal(requiresPracticePerformance([file]),false,file);
+  assert.equal(requiresPracticePerformance(['edge/gateway.mjs','worker/draft-run-selection.mjs']),true);
 });
 
 
