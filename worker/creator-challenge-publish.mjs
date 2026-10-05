@@ -287,9 +287,13 @@ async function reconcile(query,row,{today,env,fetcher}) {
 
 function staticCleanupMayExist(row) {
   const detail=operationDetail(row),action=operationAction(row);
-  if(row.published_at||row.status==='published')return true;
+  if(row.published_at||row.status==='published'||row.status==='publishing')return true;
   if(action==='publish')return Boolean(detail.workflow)||['accepted','ambiguous'].includes(detail?.dispatch?.state);
-  return row.status==='publishing';
+  if(action==='retire'&&detail.live_verified!==true)
+    return detail.static_cleanup==='required'
+      ||Boolean(detail.workflow)
+      ||['pending','accepted','ambiguous','rejected'].includes(String(detail?.dispatch?.state||''));
+  return false;
 }
 
 export async function beginCreatorPublicationOperation(query,row,action,{adminAuthUserId=null,reason=null,privacy=false}={}) {
