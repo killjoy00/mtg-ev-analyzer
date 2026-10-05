@@ -329,10 +329,12 @@ try {
   // must remain internally consistent when creator identity is scrubbed.
   await query(`UPDATE creator_challenges
     SET status='draft',published_at=NULL,publication_operation_ref=NULL,publication_detail='{}'::jsonb
-    WHERE id IN ($1::uuid,$2::uuid)`,[challengeCompletedGuest,challengePartialGuest]);
+    WHERE id IN ($1::uuid,$2::uuid,$3::uuid,$4::uuid)`,[
+    runtimeChallenge,paidChallenge,challengeCompletedGuest,challengePartialGuest,
+  ]);
   const privacyReady=await requestCreatorPrivacyRetirement(query,creator.playerId,{reason:'account_deletion'});
-  assert.equal(privacyReady,true,'unpublished fixture challenges require no static cleanup');
-  for(const challengeId of [challengeCompletedGuest,challengePartialGuest]) {
+  assert.equal(privacyReady,true,'synthetic unpublished fixture challenges require no static cleanup');
+  for(const challengeId of [runtimeChallenge,paidChallenge,challengeCompletedGuest,challengePartialGuest]) {
     const privacy=(await query(`SELECT status,creator_public_name,creator_handle,headline,
         creator_post_run_note,source_owner_auth_user_id,privacy_removed_at
       FROM creator_challenges WHERE id=$1::uuid`,[challengeId])).rows[0];
