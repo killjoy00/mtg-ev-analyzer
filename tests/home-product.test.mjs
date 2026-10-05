@@ -9,37 +9,21 @@ test('homepage social metadata has no escaped-newline pollution',()=>{
  const html=fs.readFileSync('index.html','utf8');
  assert.equal(html.includes('\\n'),false,'Homepage HTML must not contain literal \\n escape text');
 });
-test('homepage metadata names MTG and uses a narrow 520x328 social preview',()=>{
+test('homepage metadata names MTG and forces a compact image-free social preview',()=>{
  const html=fs.readFileSync('index.html','utf8');
  assert.match(html,/<title>Pack One: Daily MTG Draft Decisions<\/title>/);
  assert.match(html,/Magic: The Gathering draft decisions every day/);
- assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/social-preview-v4\.jpg"/);
- assert.match(html,/property="og:image:width" content="520"/);
- assert.match(html,/property="og:image:height" content="328"/);
- const jpg=fs.readFileSync('social-preview-v4.jpg');
- assert.equal(jpg.subarray(0,2).toString('hex'),'ffd8','JPEG must start with SOI');
- assert.equal(jpg.subarray(-2).toString('hex'),'ffd9','JPEG must end with EOI');
- let offset=2,width=null,height=null;
- while(offset+4<=jpg.length){
-  assert.equal(jpg[offset],0xff,'JPEG segment must start with a marker');
-  while(offset<jpg.length&&jpg[offset]===0xff)offset++;
-  const marker=jpg[offset++];
-  if(marker===0xd9||marker===0xda)break;
-  if(marker===0x01||(marker>=0xd0&&marker<=0xd7))continue;
-  assert.ok(offset+2<=jpg.length,'JPEG segment length must be complete');
-  const length=jpg.readUInt16BE(offset);
-  assert.ok(length>=2&&offset+length<=jpg.length,'JPEG segment must not be truncated');
-  const sof=(marker>=0xc0&&marker<=0xc3)||(marker>=0xc5&&marker<=0xc7)||(marker>=0xc9&&marker<=0xcb)||(marker>=0xcd&&marker<=0xcf);
-  if(sof){
-   assert.ok(length>=7,'JPEG SOF segment must contain dimensions');
-   height=jpg.readUInt16BE(offset+3);
-   width=jpg.readUInt16BE(offset+5);
-   break;
-  }
-  offset+=length;
- }
- assert.equal(width,520);
- assert.equal(height,328);
+ assert.doesNotMatch(html,/property="og:image"/);
+ assert.doesNotMatch(html,/name="twitter:image"/);
+ assert.match(html,/name="twitter:card" content="summary"/);
+});
+test('Daily result share bridge is compact, image-free, and preserves result-share attribution',()=>{
+ const html=fs.readFileSync('share/daily/index.html','utf8');
+ assert.match(html,/property="og:title" content="Pack One: Daily MTG Draft Decisions"/);
+ assert.match(html,/name="twitter:card" content="summary"/);
+ assert.doesNotMatch(html,/property="og:image"|name="twitter:image"/);
+ assert.match(html,/params\.get\('ref'\)==='result_share'/);
+ assert.match(html,/searchParams\.set\('ref','result_share'\)/);
 });
 test('Daily descriptions reinforce trophy-draft provenance',()=>{
  const html=dailyHomeMarkup(null,day);
