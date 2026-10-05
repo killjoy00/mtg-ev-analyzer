@@ -10,6 +10,12 @@ const {default:growth,query}=await import('../worker/growth-function.js');
 const {default:draftRun}=await import('../worker/draft-run-function.mjs');
 const {beginAdminDeletion}=await import('../worker/account-deletion.mjs');
 const {PUBLIC_IDENTITY_TERMS_VERSION}=await import('../worker/public-identity-safety.mjs');
+const {creatorChallengeById}=await import('../worker/creator-challenges.mjs');
+const {
+  beginCreatorPublicationOperation,
+  dispatchCreatorPublicationAttempt,
+  handleCreatorChallengePublication,
+}=await import('../worker/creator-challenge-publish.mjs');
 
 const tag=crypto.randomUUID().slice(0,8);
 const origin='https://packone.pro';
@@ -100,6 +106,86 @@ try {
     [crypto.randomUUID(),adminId,adminToken],
   );
   await query('INSERT INTO pack1_admins(auth_user_id) VALUES($1::uuid)',[adminId]);
+
+  // Admin retirement must not use a stale "never published" observation when a
+  // publish becomes accepted between the read and the shortcut update. Hold
+  // the production handler after its real PostgreSQL read, accept a concurrent
+  // publish, then require the handler to supersede it with protected static
+  // retirement work instead of reporting live_verified=true.
+  const adminRaceChallenge=crypto.randomUUID(),adminRaceSlug=`admin-retire-race-${tag}`;
+  await query(`INSERT INTO creator_challenges(
+      id,slug,source_session_id,source_owner_player_id,source_owner_auth_user_id,
+      source_type,source_day,source_environment,creator_public_name,headline,
+      acquisition_source,acquisition_campaign,status,created_by_admin_auth_user_id,
+      publication_detail
+    ) VALUES($1::uuid,$2,NULL,$3::uuid,$4::uuid,'practice',NULL,'mixed',
+      'Admin Race Creator','Admin retirement race','creator',$2,'draft',$5::uuid,'{}'::jsonb)`,[
+    adminRaceChallenge,adminRaceSlug,reporter.playerId,reporter.authId,adminId,
+  ]);
+  let releaseAdminRaceRead,signalAdminRaceRead;
+  const adminRaceReadHeld=new Promise(resolve=>{signalAdminRaceRead=resolve;});
+  const adminRaceReadRelease=new Promise(resolve=>{releaseAdminRaceRead=resolve;});
+  let adminRaceReadIntercepted=false;
+  const adminRaceQuery=async(sql,params=[])=>{
+    const result=await query(sql,params);
+    if(!adminRaceReadIntercepted
+      &&sql.includes('SELECT c.*,s.score source_score')
+      &&String(params[0])===adminRaceChallenge) {
+      adminRaceReadIntercepted=true;
+      signalAdminRaceRead();
+      await adminRaceReadRelease;
+    }
+    return result;
+  };
+  const publicationEnv={PACK1_LAUNCH_WATCHER_GITHUB_TOKEN:'github_pat_fixture_abcdefghijklmnopqrstuvwxyz'};
+  const publicationFetcher=async(url,options={})=>{
+    if(String(url).includes('/actions/workflows/campaign-link-publish.yml/runs'))
+      return Response.json({workflow_runs:[]});
+    if(String(url).endsWith('/dispatches'))return new Response(null,{status:204});
+    throw new Error('Unexpected publication fetch: '+url+' '+String(options?.method||'GET'));
+  };
+  const adminRetireRequest=new Request(origin+`/v1/admin/creator-challenges/${adminRaceChallenge}/publication`,{
+    method:'POST',
+    headers:{
+      origin,
+      'content-type':'application/json',
+      'x-pack1-auth-session':adminToken,
+    },
+    body:JSON.stringify({action:'retire'}),
+  });
+  const adminRetirePromise=handleCreatorChallengePublication(adminRetireRequest,{
+    query:adminRaceQuery,
+    readJson:request=>request.json(),
+    allowedOrigins:new Set([origin]),
+    env:publicationEnv,
+    fetcher:publicationFetcher,
+  });
+  await adminRaceReadHeld;
+  const adminPublishRow=await creatorChallengeById(query,adminRaceChallenge);
+  const adminAcceptedPublish=await beginCreatorPublicationOperation(
+    query,adminPublishRow,'publish',{adminAuthUserId:adminId,reason:'admin_race_publish'},
+  );
+  await dispatchCreatorPublicationAttempt(
+    query,adminAcceptedPublish.row,adminAcceptedPublish.operation,'publish',
+    {env:publicationEnv,fetcher:publicationFetcher},
+  );
+  releaseAdminRaceRead();
+  const adminRetireResponse=await adminRetirePromise;
+  const adminRetireData=await adminRetireResponse.json();
+  assert.equal(adminRetireResponse.status,202,JSON.stringify(adminRetireData));
+  const adminRaceFinal=(await query(`SELECT status,
+      publication_operation_ref::text publication_operation_ref,publication_detail
+    FROM creator_challenges WHERE id=$1::uuid`,[adminRaceChallenge])).rows[0];
+  const adminRaceDetail=typeof adminRaceFinal.publication_detail==='string'
+    ?JSON.parse(adminRaceFinal.publication_detail)
+    :adminRaceFinal.publication_detail;
+  assert.equal(adminRaceFinal.status,'retired');
+  assert.notEqual(adminRaceFinal.publication_operation_ref,adminAcceptedPublish.operation,
+    'admin retirement supersedes accepted publication instead of clearing it as unnecessary');
+  assert.equal(adminRaceDetail.action,'retire');
+  assert.equal(adminRaceDetail.static_cleanup,'required');
+  assert.equal(adminRaceDetail.live_verified,false);
+  assert.equal(adminRaceDetail.dispatch.state,'accepted');
 
   const reporterName=`PI Reporter ${tag}`;
   let targetName=`PI Target ${tag}`;
