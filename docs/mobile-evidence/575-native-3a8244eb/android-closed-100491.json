@@ -1,0 +1,17 @@
+{
+  "packageName": "pro.packone.app",
+  "track": "production-access",
+  "versionCode": "100491",
+  "releaseName": "Pack One closed a76b258",
+  "releaseStatus": "completed",
+  "requiresConsoleRollout": false,
+  "committed": true,
+  "availableTracks": [
+    "production",
+    "beta",
+    "alpha",
+    "internal",
+    "production-access"
+  ],
+  "createdTrack": false
+}

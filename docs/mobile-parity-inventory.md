@@ -1,6 +1,6 @@
 # Mobile web/native parity inventory
 
-Tracking: #575. Reconciled through production secure-auth revision `a564a207e9f336639636624c366bff55c6a9759f` on September 27, 2026; Apple-IAP release-candidate work remains separately tracked in #673.
+Tracking: #575. Final native test delivery reconciled October 4, 2026 (CDT). Production secure-auth baseline remains `a564a207e9f336639636624c366bff55c6a9759f` from September 27; Apple-IAP physical/provider acceptance is separately tracked in #673.
 
 This document replaces blanket source-string parity claims with an A–E inventory. **Implemented** means reviewed product code is present on main. It does not mean physical-device acceptance, live association-file verification, store-console approval, or public-release authorization.
 
@@ -15,6 +15,16 @@ Status vocabulary:
 
 PR #910 merged as `ae70e2af79b804c137b8c289c2a1b0535e5c76dd` and addresses the original owner complaints, which were not completed by #890. See [the complaint/evidence ledger](mobile-native-ux-repair-575.md). Existing “Implemented” rows below describe source capability; they do not override failed physical observations or certify the old distributed binaries. Native run `37232560582` passed all 24 Android checks and 14 scenes plus measured text growth on each iPhone/iPad, with actual image review. Secondary tab-return correction #955 also passed 25 Android checks and the iPhone/iPad scenes in run `37236842723`; it merged as `f0f30c939d1016c70f5d3548d46b0b8b3f839e79`. Fresh exact-main smoke `37239878233` passed including its final manifest; #951 passed fresh checks and merged as `f721389d392867cc43c342c07ecddfc20c9f28f8`, with identical mobile and build-workflow inputs to the certified runtime source. Tester distribution and physical/provider acceptance remain separate gates recorded in that ledger.
 
+Final corrected #960 runtime is 3a8244eb; exact-main 37244011180 and main native/store 37244011193 passed, with 25 Android checks and 14 scenes plus text growth per Apple device. The [full original requirement/design cross-reference](mobile-native-ux-requirements-575.md) is authoritative for original-scope coverage.
+
+Final signed binary source: `747478440400e242aae32469d6ed18f1785b591d` (protected #963 merge). The mobile app, native configuration, dependencies and binary build workflows match certified runtime `3a8244eb0568769c133365ea2821d512c62a3515`; exact-main certification run `37244011180` is attributed to that earlier SHA, not relabelled as the delivery source. Concurrent #961 operations and #962 admin/backend work are preserved. Later #964/#965/#966 change release controls/probes and the gateway release request, with no mobile binary-input or supplied web-reference changes. #962 changes the production smoke contract, not the mobile binary inputs. Later #969 changes hosted social-preview metadata and assets, including index.html Open Graph/Twitter image references; it does not change visible homepage UI or mobile binary inputs. The final control-source refresh through #971 preserves that work.
+
+- **iOS 1.0 / 100505:** signed run `37247429564`, Apple build `ba5e31a1-8e53-4123-b014-dcd883d83171`; `VALID`, `APP_STORE_ELIGIBLE`, attached to editable App Store 1.0, and verified internal `IN_BETA_TESTING` with the existing all-builds group. No tester/group mutation or App Review submission. External `READY_FOR_BETA_SUBMISSION` is not external distribution.
+- **Android 1.0 / 100491:** signed Internal run `37247429578` accepted and committed the bundle as draft; exact-version promotion run `37249437434` reports existing `production-access`, `completed`, `committed=true`, `requiresConsoleRollout=false`, `createdTrack=false`. No rebuild, tester/country/track change or Production release.
+- **Store images:** final main-source capture `37244011193` passed every job. All 17 original Android/iPhone/iPad/membership images were individually inspected and approved. Apple replacement run `37251116289`, after processing-only fix #971, verified five iPhone, five iPad and the subscription review image after provider processing/order checks. Play run `37249880752` committed and independently verified five phone screenshots and the identical approved icon; feature graphic untouched.
+
+Original provider results and source-attributed delivery metadata are retained in [mobile-evidence/575-native-3a8244eb/README.md](mobile-evidence/575-native-3a8244eb/README.md). Prior core repair builds iOS 100500 / Android 100488 remain historical evidence and exclude #960. Physical upgrades from iOS 100415 / Android 100444 must target **100505 / 100491** now.
+
 ## October 2, 2026 UAT parity candidate
 
 Branch `codex/uat-auth-profile-parity-20261002` carries the Pack One acceptance changes below. These rows track source/automated status separately from physical-device acceptance so no item can be silently treated as complete.
@@ -27,7 +37,7 @@ Branch `codex/uat-auth-profile-parity-20261002` carries the Pack One acceptance 
 | 4 | Verification completes onboarding | Same-browser provider auto-sign-in is bridged into a first-party Pack One session before **Your account is ready**. Different-browser/device links fail closed to a verified-but-sign-in recovery when no authenticated session can be established. | Native signup uses a native-marked verification callback. Returning to the originating app can finish the email signup on that device without another credential prompt; a different device/app restart falls back to sign-in. | **Physical device + real inbox open.** Guest identity remains bound through the existing mobile/web link boundary; no authenticated onboarding is shown without a valid session. |
 | 5 | Save profile visibility | Save profile is top-right beside Change name, wraps on narrow screens, and shows saving/success/failure near the action. Failed edits remain in place. | Same top action pattern and semantic states. | **Physical larger-text/keyboard open.** |
 | 6 | Patreon page declutter | Current access first, concise benefits, one relevant next action, troubleshooting below. Signed-out/unconnected/connected/Elite/error states remain distinct. | Membership keeps provider/store policy differences rather than copying web purchase UI. | **Physical + live provider return open.** |
-| 7 | Daily status prominence | Reset countdown is always prominent at the top of the Daily section; real streak gets a badge and the reset cue updates through rollover. | #910 puts reset/streak before completion, with real zero, checking, unavailable and foreground/rollover states; native candidate acceptance is in progress. | **Physical device open**, including no-streak/loading/rollover and large text. |
+| 7 | Daily status prominence | Reset countdown is always prominent at the top of the Daily section; real streak gets a badge and the reset cue updates through rollover. | #910 puts reset/streak before completion, with real zero, checking, unavailable and foreground/rollover states; final main native fixture checks pass; physical acceptance remains open. | **Physical device open**, including no-streak/loading/rollover and large text. |
 | 8 | Public profile alignment | Full-row clickable/tappable control with the requested description and preserved opt-in semantics. | Same description and switch semantics. | **Physical screen-reader/touch open.** |
 | 9 | Disconnect Patreon styling/copy | Bordered secondary/destructive action; explicitly says disconnecting Pack One does not cancel Patreon billing. | Same visual/action distinction. iOS subscription cancellation remains in Apple subscription management; Patreon disconnect stays provider-scoped. | **Physical + live disconnect/refresh open.** |
 | 10 | Consolidated authentication screen | Provider methods, `or` divider, email/password, consent, and mode switch live in one compact panel. | Same information hierarchy, using the native Apple control on iOS. | **Physical keyboard/large-text open.** |
@@ -58,7 +68,7 @@ Automated browser evidence for this candidate emits screenshots for compact auth
 | Membership / Patreon existing access | **Implemented** | Provider-independent account access is separate from Patreon provenance; connect/reconnect, refresh and disconnect are available. Unknown/failure is never labeled Free. |
 | Elite subscription purchase | **Implemented on iOS; deliberate difference on Android** | iOS offers Pack One Elite as an Apple auto-renewable subscription using StoreKit, StoreKit-displayed pricing, Restore Purchases, and Apple subscription management. Patreon remains an existing-access provider with no native Patreon purchase/upgrade CTA. Google Play billing is deliberately outside this v1 change. |
 | Learn: How to Play / Scoring / Method / Sets | **Implemented** | Core education is native. |
-| Editorial drafting guides | **Deliberate continuation** | In #910, Learn opens the selected, individually described article directly; browser close returns to the native screen. Native capture evidence remains open. |
+| Editorial drafting guides | **Deliberate continuation** | In #910, Learn opens the selected, individually described article directly; browser close returns to the native screen. Native member Learn captures pass; article browser-return behavior has source/mounted coverage and physical return acceptance remains open. |
 | Published MSH/ECL/TMT/SOS archive analyses | **Implemented** | Native archive screen uses current checked-in web evidence, native routing and disclosed card links. |
 | About / Support / Privacy / Terms | **Deliberate continuation** | First-class native entries open canonical Pack One HTTPS pages; no native credential is placed in the URL. |
 | Daily-home TCGplayer fallback | **Implemented** | Guest visibility; signed-in visibility only when authoritative `ads_allowed===true`; unknown/pending/failure hides it; no gameplay/result placement. |
@@ -72,7 +82,7 @@ Automated browser evidence for this candidate emits screenshots for compact auth
 | Compatible modern `challenge=<24hex>` | Routes to modern shared-run flow | **Implemented** |
 | Historical `challenge=<12hex>` | Preserved as historical challenge compatibility | **Implemented** |
 | Public profile `profile=<16hex>` | Routes to privacy-safe public profile | **Implemented** |
-| `/open/shared/`, `/open/profile/`, `/open/daily/` HTTPS intents | Native configuration is present | **Release evidence open** — hosted AASA/assetlinks with production signing identities are not yet verified |
+| `/open/shared/`, `/open/profile/`, `/open/daily/` HTTPS intents | Native configuration is present | **Physical OS handoff open** — hosted association files/Apple CDN/production Team ID and Play app-signing certificate have been verified by the guarded release probes; final Android promotion reconfirmed live associations and signing. Physical signed Universal/App Link acceptance remains open |
 | Published set web routes for MSH/ECL/TMT/SOS | Rewritten to native set archive detail | **Implemented** |
 | Reset-password credential links | Canonical HTTPS browser continuation | **Implemented, device evidence open** — never intercept reset credential in a custom scheme; successful browser completion resets the password and verifies the exact Auth account |
 | Learn/support/legal | Canonical HTTPS continuation where single-source content is preferable | **Implemented** |
@@ -147,16 +157,16 @@ This historical exact-main evidence does not certify the current repair. Apply t
 
 - Completion of the guarded #651 card-image normalization / production gameplay smoke after the Titania display-art fix.
 - Physical iPhone acceptance on the exact signed TestFlight RC.
-- Physical iPad portrait/landscape/accessibility acceptance and App Store screenshots.
+- Physical iPad portrait/landscape/accessibility acceptance; final main-source App Store screenshots are now replaced and provider-verified.
 - Physical Android acceptance on the exact Play Internal/Closed Testing RC.
 - Upgrade-path acceptance from prior store builds.
 - Sign in with Apple normal + Hide My Email, relay email and deletion/revocation acceptance.
-- Hosted `.well-known/apple-app-site-association` and `.well-known/assetlinks.json` verification using the real Apple Team ID and Google Play **app-signing** certificate.
-- App Store Connect subscription group/product `pro.packone.app.elite.monthly`, pricing/localization/review metadata, and App Store Server Notifications V2 production+sandbox URLs configured for the final app.
+- Physical signed OS handoff for the hosted association files; live HTTPS/CDN/production identity verification is complete, with final Android promotion reconfirmation.
+- Physical StoreKit acceptance against the configured subscription group/product `pro.packone.app.elite.monthly`, pricing/localization and V2 notification URLs; provider configuration is recorded complete in #575 and the final subscription review image is now replaced.
 - TestFlight/Sandbox acceptance for Apple subscribe, server verification, renewal, cancellation-at-period-end, billing grace, refund/revocation, Restore Purchases, Manage Subscription, account switching, and duplicate-provider protection.
-- Signed binary hashes/build numbers and exact backend/gateway release recorded against the final store RCs.
-- App Store / Play Console metadata, app-content declarations, reviewer access and production-access qualification.
-- Explicit owner approval before TestFlight/Play/store publication.
+- Final signed test build numbers/source/provider results are recorded; signed binary hashes, physical signed-build acceptance and backend/gateway release acceptance remain separate.
+- Provider reviewer Notes reconfirmation and Google closed-test qualification/Production access; existing metadata, app-content declarations and reviewer credentials are recorded complete in #575.
+- Explicit owner approval before App Review submission, Play Production or public launch; guarded internal TestFlight/existing closed-test distribution is authorized and verified.
 
 ## Parity-change rule going forward
 
