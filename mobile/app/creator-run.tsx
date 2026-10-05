@@ -37,6 +37,26 @@ function checked(run:DraftRunState,challengeId:string){
   return run;
 }
 
+function infoFromRun(run:DraftRunState):CreatorChallengeInfo|null{
+  const comparison=run.comparison;
+  if(comparison?.kind!=='creator'||!comparison.id||!comparison.slug||!comparison.source_type)return null;
+  const publicUrl=comparison.public_url||`https://packone.pro/creator/${comparison.slug}/`;
+  return {
+    id:comparison.id,
+    slug:comparison.slug,
+    creator_name:comparison.name,
+    creator_handle:comparison.handle||null,
+    headline:comparison.headline||`Can you beat ${comparison.name}?`,
+    score:comparison.score,
+    environment:run.environment,
+    source_type:comparison.source_type,
+    source_day:comparison.source_day||null,
+    run_length:run.run_length,
+    public_url:publicUrl,
+    tracked_url:publicUrl,
+  };
+}
+
 function CreatorRunGate({identifier}:{identifier:string}){
   const [state,setState]=useState<State>({status:'loading'});
   const stateRef=useRef<State>(state);
@@ -46,36 +66,60 @@ function CreatorRunGate({identifier}:{identifier:string}){
   const reloadRef=useRef<()=>Promise<void>>(async()=>{});
 
   const commit=useCallback((next:State)=>{stateRef.current=next;setState(next);},[]);
-  const makeSurface=useCallback((run:DraftRunState,session:MobileSession,info:CreatorChallengeInfo):SharedRunSurface=>({
-    initialRun:checked(run,info.id),
-    session,
-    async loadRun(){return checked(await loadDraftRun(run.id,session),info.id);},
-    async submitPick(current,cardId){return checked(await submitDraftRunPick(current,cardId,session),info.id);},
-    async createShare(){return createDraftRunShare(run.id,session);},
-  }),[]);
+  const makeSurface=useCallback((run:DraftRunState,session:MobileSession,info:CreatorChallengeInfo):SharedRunSurface=>{
+    const sourceOwner=run.creator_source_owner?.challenge_id===info.id;
+    return {
+      kind:sourceOwner?'source':'creator',
+      ...(sourceOwner?{sourceType:run.creator_source_owner?.source_type}:{}),
+      initialRun:sourceOwner?run:checked(run,info.id),
+      session,
+      async loadRun(){
+        const loaded=await loadDraftRun(run.id,session);
+        return sourceOwner?loaded:checked(loaded,info.id);
+      },
+      async submitPick(current,cardId){
+        const updated=await submitDraftRunPick(current,cardId,session);
+        return sourceOwner?updated:checked(updated,info.id);
+      },
+      async createShare(){return createDraftRunShare(run.id,session);},
+    };
+  },[]);
 
   const reload=useCallback(async()=>{
     const request=++generation.current;
     const current=()=>mounted.current&&request===generation.current;
     try{
       const session=await ensureGuestSession();if(!current())return;
-      const info=await loadCreatorChallengeInfo(identifier,session);if(!current())return;
       const persisted=await readSession();if(!current())return;
       if(!sameSession(session,persisted))throw new Error('Your Pack One player session changed. Reopen this creator challenge.');
-      const runId=await readCreatorChallengeContinuation(info.id,session);if(!current())return;
+
+      const runId=await readCreatorChallengeContinuation(identifier,session);if(!current())return;
       if(runId){
-        const run=checked(await loadDraftRun(runId,session),info.id);if(!current())return;
-        commit({status:'ready',info,session,surface:makeSurface(run,session,info),epoch:epoch.current});
-      }else{
-        const previous=stateRef.current;
-        if(previous.status==='ready'&&sameSession(previous.session,session))return;
-        commit({status:'invite',info,session});
+        try{
+          const run=await loadDraftRun(runId,session);if(!current())return;
+          const recoveredInfo=infoFromRun(run);
+          if(recoveredInfo){
+            commit({status:'ready',info:recoveredInfo,session,surface:makeSurface(run,session,recoveredInfo),epoch:epoch.current});
+            setMessage(null);
+            return;
+          }
+        }catch(error:unknown){
+          // A different signed-in account cannot read this device's stored run.
+          // Fall through to the public invite only for an authorization/not-found
+          // miss. Privacy retirement remains a hard fail-closed 410.
+          if(!(error instanceof ApiError)||error.status!==404)throw error;
+        }
       }
+
+      const info=await loadCreatorChallengeInfo(identifier,session);if(!current())return;
+      const previous=stateRef.current;
+      if(previous.status==='ready'&&sameSession(previous.session,session))return;
+      commit({status:'invite',info,session});
       setMessage(null);
     }catch(error:unknown){
       if(!current())return;
-      // /go/<slug>/ is also used by ordinary campaign links. Before this feature
-      // those universal links fell back to Home; preserve that behavior when a
+      // Unknown /creator/<slug>/ links fall back to Home rather than trapping
+      // the native app on a malformed invitation. Preserve that behavior when a
       // slug is not an authoritative creator challenge.
       if(error instanceof ApiError&&error.status===404&&!/^[a-f0-9-]{36}$/.test(identifier)){
         router.replace('/');
@@ -102,14 +146,14 @@ function CreatorRunGate({identifier}:{identifier:string}){
 
   const accept=async()=>{
     const current=stateRef.current;if(current.status!=='invite'||busy)return;
-    if(!current.session.accountToken){
-      router.push({pathname:'/account',params:{returnTo:'creator',creator:identifier}});
-      return;
-    }
     setBusy(true);setMessage(null);const request=++generation.current;
     try{
-      const run=checked(await startCreatorChallenge(current.session,current.info.id),current.info.id);
-      await writeCreatorChallengeContinuation(current.info.id,run.id,current.session);
+      const run=await startCreatorChallenge(current.session,current.info.id);
+      const sourceOwner=run.creator_source_owner?.challenge_id===current.info.id;
+      if(!sourceOwner){
+        checked(run,current.info.id);
+        await writeCreatorChallengeContinuation(current.info.id,run.id,current.session,current.info.slug);
+      }
       if(!mounted.current||request!==generation.current)return;
       commit({status:'ready',info:current.info,session:current.session,surface:makeSurface(run,current.session,current.info),epoch:epoch.current});
     }catch(error:unknown){
@@ -130,7 +174,7 @@ function CreatorRunGate({identifier}:{identifier:string}){
     <Text style={styles.body}>{state.info.creator_name} scored {state.info.score}/100 on these {state.info.run_length} real trophy-draft decisions.</Text>
     <Text style={styles.body}>You will see the same packs and prior draft context.</Text>
     {dailyContext?<Text style={styles.body}>{dailyContext} This replay is unranked and does not use your Daily attempt.</Text>:null}
-    <Pressable accessibilityRole="button" disabled={busy} onPress={()=>void accept()} style={styles.button}><Text style={styles.buttonText}>{busy?'Starting…':state.session.accountToken?`Play ${state.info.creator_name}’s Run`:'Sign in to play this challenge'}</Text></Pressable>
+    <Pressable accessibilityRole="button" disabled={busy} onPress={()=>void accept()} style={styles.button}><Text style={styles.buttonText}>{busy?'Starting…':`Play ${state.info.creator_name}’s Run`}</Text></Pressable>
     {message?<Text accessibilityRole="alert" style={styles.error}>{message}</Text>:null}
     <Pressable accessibilityRole="button" onPress={()=>router.dismissTo('/')}><Text style={styles.link}>Back home</Text></Pressable>
   </ScrollView></SafeAreaView>;
