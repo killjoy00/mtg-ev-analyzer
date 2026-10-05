@@ -80,6 +80,10 @@ function safeNativeSearch(pathname: string, searchParams: URLSearchParams) {
     if (returnTo === 'shared' && shared && /^[a-f0-9]{24}$/.test(shared)) {
       next.set('returnTo', 'shared'); next.set('shared', shared);
     }
+    const creator = searchParams.get('creator');
+    if (returnTo === 'creator' && creator && /^(?:[a-f0-9-]{36}|[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?)$/.test(creator)) {
+      next.set('returnTo', 'creator'); next.set('creator', creator);
+    }
     const environment = environmentFromSet(searchParams.get('environment'));
     if (searchParams.has('environment')) next.set('environment', environment);
     return next.size ? `?${next.toString()}` : '';
