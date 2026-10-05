@@ -133,14 +133,14 @@ export function renderCampaignRedirectPage(entry) {
   <meta property="og:title" content="${title}" />
   <meta property="og:description" content="${description}" />
   <meta property="og:url" content="https://packone.pro/" />
-  <meta property="og:image" content="https://packone.pro/social-preview-v3.jpg" />
-  <meta property="og:image:width" content="1200" />
-  <meta property="og:image:height" content="630" />
+  <meta property="og:image" content="https://packone.pro/social-preview-v4.jpg" />
+  <meta property="og:image:width" content="520" />
+  <meta property="og:image:height" content="328" />
   <meta property="og:image:alt" content="Pack One: Daily MTG Draft Decisions" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${title}" />
   <meta name="twitter:description" content="${description}" />
-  <meta name="twitter:image" content="https://packone.pro/social-preview-v3.jpg" />
+  <meta name="twitter:image" content="https://packone.pro/social-preview-v4.jpg" />
   <meta name="twitter:image:alt" content="Pack One: Daily MTG Draft Decisions" />
   <link rel="canonical" href="https://packone.pro/" />
   <title>${title}</title>

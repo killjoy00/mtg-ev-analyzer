@@ -9,14 +9,14 @@ test('homepage social metadata has no escaped-newline pollution',()=>{
  const html=fs.readFileSync('index.html','utf8');
  assert.equal(html.includes('\\n'),false,'Homepage HTML must not contain literal \\n escape text');
 });
-test('homepage metadata names MTG and uses a complete 1200x630 social preview',()=>{
+test('homepage metadata names MTG and uses a narrow 520x328 social preview',()=>{
  const html=fs.readFileSync('index.html','utf8');
  assert.match(html,/<title>Pack One: Daily MTG Draft Decisions<\/title>/);
  assert.match(html,/Magic: The Gathering draft decisions every day/);
- assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/social-preview-v3\.jpg"/);
- assert.match(html,/property="og:image:width" content="1200"/);
- assert.match(html,/property="og:image:height" content="630"/);
- const jpg=fs.readFileSync('social-preview-v3.jpg');
+ assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/social-preview-v4\.jpg"/);
+ assert.match(html,/property="og:image:width" content="520"/);
+ assert.match(html,/property="og:image:height" content="328"/);
+ const jpg=fs.readFileSync('social-preview-v4.jpg');
  assert.equal(jpg.subarray(0,2).toString('hex'),'ffd8','JPEG must start with SOI');
  assert.equal(jpg.subarray(-2).toString('hex'),'ffd9','JPEG must end with EOI');
  let offset=2,width=null,height=null;
@@ -38,8 +38,8 @@ test('homepage metadata names MTG and uses a complete 1200x630 social preview',(
   }
   offset+=length;
  }
- assert.equal(width,1200);
- assert.equal(height,630);
+ assert.equal(width,520);
+ assert.equal(height,328);
 });
 test('Daily descriptions reinforce trophy-draft provenance',()=>{
  const html=dailyHomeMarkup(null,day);
