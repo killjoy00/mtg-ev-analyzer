@@ -169,6 +169,8 @@ function relativeSupport(support: number | undefined, leader: number) {
   return `${Math.round(100 * Number(support) / leader)}%`;
 }
 
+const REPORT_SENT_TEXT = 'Thanks \u2014 report sent.';
+
 const DECISION_REPORT_OPTIONS: readonly { value: DecisionReportReason; label: string }[] = [
   { value: 'draft_context', label: 'Draft context looks wrong' },
   { value: 'card_or_image', label: 'Card or image issue' },
@@ -793,7 +795,7 @@ export default function DraftRunScreen({
       setReportOpen(false);
       setReportReason(null);
       setReportComment('');
-      AccessibilityInfo.announceForAccessibility('Thanks — report sent.');
+      AccessibilityInfo.announceForAccessibility(REPORT_SENT_TEXT);
     } catch (error: unknown) {
       setReportError(error instanceof Error ? error.message : 'Could not send the report. Try again.');
     } finally {
@@ -1094,7 +1096,7 @@ export default function DraftRunScreen({
                       <Text style={styles.decisionReportText}>Report this decision</Text>
                     </Pressable>
                     {reportedDecision === answer.puzzle.puzzle_id ? (
-                      <Text style={styles.decisionReportStatus}>Thanks — report sent.</Text>
+                      <Text style={styles.decisionReportStatus}>{REPORT_SENT_TEXT}</Text>
                     ) : null}
                   </View>
                 </>
