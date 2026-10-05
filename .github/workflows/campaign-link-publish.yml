@@ -26,6 +26,16 @@ on:
         required: false
         default: ''
         type: string
+      social_title:
+        description: Optional Pack One social title
+        required: false
+        default: ''
+        type: string
+      social_description:
+        description: Optional Pack One social description
+        required: false
+        default: ''
+        type: string
 
 permissions:
   contents: write
@@ -48,6 +58,8 @@ jobs:
       CAMPAIGN_SOURCE: ${{ inputs.source }}
       CAMPAIGN_NAME: ${{ inputs.campaign }}
       CAMPAIGN_MEDIUM: ${{ inputs.medium }}
+      CAMPAIGN_SOCIAL_TITLE: ${{ inputs.social_title }}
+      CAMPAIGN_SOCIAL_DESCRIPTION: ${{ inputs.social_description }}
     steps:
       - uses: actions/checkout@v4
         with:
