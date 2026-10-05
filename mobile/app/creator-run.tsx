@@ -14,6 +14,7 @@ import {
   type CreatorChallengeInfo,
   type DraftRunState,
 } from '@/src/api/draftRun';
+import { ApiError } from '@/src/api/client';
 import { ensureGuestSession } from '@/src/api/guest';
 import { useAppResume } from '@/src/hooks/useAppResume';
 import type { SharedRunSurface } from '@/src/state/sharedRunSurface';
@@ -73,6 +74,13 @@ function CreatorRunGate({identifier}:{identifier:string}){
       setMessage(null);
     }catch(error:unknown){
       if(!current())return;
+      // /go/<slug>/ is also used by ordinary campaign links. Before this feature
+      // those universal links fell back to Home; preserve that behavior when a
+      // slug is not an authoritative creator challenge.
+      if(error instanceof ApiError&&error.status===404&&!/^[a-f0-9-]{36}$/.test(identifier)){
+        router.replace('/');
+        return;
+      }
       const detail=error instanceof Error?error.message:'This creator challenge is unavailable.';
       if(stateRef.current.status==='ready')setMessage(detail);else commit({status:'error',message:detail});
     }
