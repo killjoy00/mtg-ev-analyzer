@@ -94,6 +94,10 @@ function CreatorRunGate({identifier}:{identifier:string}){
 
   const accept=async()=>{
     const current=stateRef.current;if(current.status!=='invite'||busy)return;
+    if(!current.session.accountToken){
+      router.push({pathname:'/account',params:{returnTo:'creator',creator:identifier}});
+      return;
+    }
     setBusy(true);setMessage(null);const request=++generation.current;
     try{
       const run=checked(await startCreatorChallenge(current.session,current.info.id),current.info.id);
@@ -118,7 +122,7 @@ function CreatorRunGate({identifier}:{identifier:string}){
     <Text style={styles.body}>{state.info.creator_name} scored {state.info.score}/100 on these {state.info.run_length} real trophy-draft decisions.</Text>
     <Text style={styles.body}>You will see the same packs and prior draft context.</Text>
     {dailyContext?<Text style={styles.body}>{dailyContext} This replay is unranked and does not use your Daily attempt.</Text>:null}
-    <Pressable accessibilityRole="button" disabled={busy} onPress={()=>void accept()} style={styles.button}><Text style={styles.buttonText}>{busy?'Starting…':`Play ${state.info.creator_name}’s Run`}</Text></Pressable>
+    <Pressable accessibilityRole="button" disabled={busy} onPress={()=>void accept()} style={styles.button}><Text style={styles.buttonText}>{busy?'Starting…':state.session.accountToken?`Play ${state.info.creator_name}’s Run`:'Sign in to play this challenge'}</Text></Pressable>
     {message?<Text accessibilityRole="alert" style={styles.error}>{message}</Text>:null}
     <Pressable accessibilityRole="button" onPress={()=>router.dismissTo('/')}><Text style={styles.link}>Back home</Text></Pressable>
   </ScrollView></SafeAreaView>;
