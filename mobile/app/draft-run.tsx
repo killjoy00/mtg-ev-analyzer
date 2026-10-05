@@ -840,7 +840,7 @@ export default function DraftRunScreen({
       const setParam = resultEnvironment === 'powered-cube' || resultEnvironment === 'latest' ? `&set=${resultEnvironment}` : '';
       const share = state.run.day ? null : (shared ? await shared.createShare() : await createDraftRunShare(state.run.id, state.session));
       const url = state.run.day
-        ? `https://packone.pro/share/daily/?environment=${encodeURIComponent(resultEnvironment)}&ref=result_share`
+        ? `https://packone.pro/share/daily/v2/?environment=${encodeURIComponent(resultEnvironment)}&ref=result_share`
         : share?.creator && share.url
           ? share.url
           : `https://packone.pro/?game=draft-run${setParam}&shared=${share?.id}`;
@@ -1554,3 +1554,4 @@ const styles = StyleSheet.create({
   },
   zoomCloseText: { color: '#fff', fontSize: 16, fontWeight: '800' },
 });
+

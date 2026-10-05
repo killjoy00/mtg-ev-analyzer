@@ -119,7 +119,7 @@ export function renderCampaignRedirectPage(entry) {
   const valid=validateCampaignEntries([entry])[0];
   const trackedUrl=buildCampaignTrackingUrl(valid);
   const trackedHref=htmlEscape(trackedUrl);
-  const title='Pack One: Daily MTG Draft Decisions';
+  const title='Daily MTG Draft Decisions';
   const description='Eight real MTG draft decisions every day. Make your pick, then compare with a trophy drafter.';
   return `${GENERATED_CAMPAIGN_MARKER}
 <!doctype html>
@@ -133,9 +133,18 @@ export function renderCampaignRedirectPage(entry) {
   <meta property="og:title" content="${title}" />
   <meta property="og:description" content="${description}" />
   <meta property="og:url" content="https://packone.pro/" />
+  <meta property="og:image" content="https://packone.pro/social-preview-v5.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="240" />
+  <meta property="og:image:alt" content="Pack One" />
   <meta name="twitter:card" content="summary" />
   <meta name="twitter:title" content="${title}" />
   <meta name="twitter:description" content="${description}" />
+  <meta name="twitter:image" content="https://packone.pro/pack-one-icon-v1.png" />
+  <meta name="twitter:image:alt" content="Pack One P¹ logo" />
+  <link rel="icon" type="image/png" sizes="1024x1024" href="https://packone.pro/pack-one-icon-v1.png" />
+  <link rel="apple-touch-icon" sizes="1024x1024" href="https://packone.pro/pack-one-icon-v1.png" />
   <link rel="canonical" href="https://packone.pro/" />
   <title>${title}</title>
   <script>location.replace(${JSON.stringify(trackedUrl)});</script>

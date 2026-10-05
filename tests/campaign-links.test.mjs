@@ -86,8 +86,8 @@ test('generated reddit launch page is static crawler-friendly redirect HTML',asy
   const file='go/reddit-launch/index.html';
   const html=await readFile(file,'utf8');
   assert.equal(html,renderCampaignRedirectPage(productionEntry),'committed generated page must match deterministic renderer');
-  assert.doesNotMatch(html,/property="og:image"/);
-  assert.doesNotMatch(html,/name="twitter:image"/);
+  assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/social-preview-v5\.png"/);
+  assert.match(html,/property="og:image:height" content="240"/);
   assert.match(html,/name="twitter:card" content="summary"/);
   assert.match(html,/name="robots" content="noindex,nofollow"/);
   assert.match(html,/property="og:url" content="https:\/\/packone\.pro\/"/);
@@ -115,6 +115,10 @@ test('generated campaign social previews stay in parity with the homepage',async
   for(const [key,value] of [
     ['property','og:title'],
     ['property','og:description'],
+    ['property','og:image'],
+    ['property','og:image:width'],
+    ['property','og:image:height'],
+    ['name','twitter:image'],
     ['name','twitter:card'],
     ['name','twitter:title'],
     ['name','twitter:description']
@@ -122,7 +126,7 @@ test('generated campaign social previews stay in parity with the homepage',async
     assert.equal(meta(campaign,key,value),meta(homepage,key,value),value+' must match homepage preview metadata');
   }
   for(const html of [homepage,campaign]) {
-    assert.doesNotMatch(html,/property="og:image"|name="twitter:image"/,'compact previews must not expose image metadata');
+    assert.match(html,/rel="apple-touch-icon"[^>]*href="https:\/\/packone\.pro\/pack-one-icon-v1\.png"/,'previews expose the existing brand icon');
   }
 });
 
