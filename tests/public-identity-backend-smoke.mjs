@@ -191,7 +191,50 @@ try {
   assert.equal(adminRaceDetail.action,'retire');
   assert.equal(adminRaceDetail.static_cleanup,'required');
   assert.equal(adminRaceDetail.live_verified,false);
-  assert.equal(adminRaceDetail.dispatch.state,'accepted');
+  assert.equal(adminRaceDetail.dispatch.state,'pending',
+    'admin retirement waits for the superseded accepted publish');
+  assert.equal(adminRaceDetail.superseded_publish.operation,adminAcceptedPublish.operation);
+  assert.equal(adminRaceDetail.superseded_publish.dispatch.state,'accepted');
+
+  const settledAdminFetcher=async(url,options={})=>{
+    if(String(url).includes('/actions/workflows/campaign-link-publish.yml/runs'))
+      return Response.json({workflow_runs:[{
+        id:876543,
+        display_title:'Publish creator / '+adminAcceptedPublish.operation,
+        status:'completed',
+        conclusion:'success',
+        html_url:'https://github.example/runs/876543',
+      }]});
+    if(String(url).endsWith('/dispatches'))return new Response(null,{status:204});
+    throw new Error('Unexpected settled admin publication fetch: '+url+' '+String(options?.method||'GET'));
+  };
+  const orderedAdminResponse=await handleCreatorChallengePublication(
+    new Request(origin+`/v1/admin/creator-challenges/${adminRaceChallenge}/publication`,{
+      method:'POST',
+      headers:{
+        origin,
+        'content-type':'application/json',
+        'x-pack1-mobile-account':adminMobileToken,
+      },
+      body:JSON.stringify({action:'retire'}),
+    }),
+    {
+      query,
+      readJson:request=>request.json(),
+      allowedOrigins:new Set([origin]),
+      env:publicationEnv,
+      fetcher:settledAdminFetcher,
+    },
+  );
+  assert.equal(orderedAdminResponse.status,202);
+  const orderedAdminRaw=(await query(
+    'SELECT publication_detail FROM creator_challenges WHERE id=$1::uuid',
+    [adminRaceChallenge],
+  )).rows[0].publication_detail;
+  const orderedAdmin=typeof orderedAdminRaw==='string'?JSON.parse(orderedAdminRaw):orderedAdminRaw;
+  assert.equal(orderedAdmin.superseded_publish.operation,adminAcceptedPublish.operation);
+  assert.equal(orderedAdmin.dispatch.state,'accepted',
+    'admin retirement dispatch starts only after the superseded publish is completed');
 
   const reporterName=`PI Reporter ${tag}`;
   let targetName=`PI Target ${tag}`;
