@@ -4,6 +4,7 @@ const NATIVE_PATHS = new Set([
   '/',
   '/account',
   '/career',
+  '/creator-run',
   '/learn',
   '/help',
   '/sign-in',
@@ -104,6 +105,13 @@ function safeNativeSearch(pathname: string, searchParams: URLSearchParams) {
     return shared && /^[a-f0-9]{24}$/.test(shared) ? `?shared=${shared}` : '';
   }
 
+  if (pathname === '/creator-run') {
+    const creator = searchParams.get('creator');
+    return creator && /^(?:[a-f0-9-]{36}|[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?)$/.test(creator)
+      ? `?creator=${creator}`
+      : '';
+  }
+
   if (pathname === '/profile') {
     const key = searchParams.get('key');
     return key && /^[a-f0-9]{16}$/.test(key) ? `?key=${key}` : '';
@@ -148,6 +156,9 @@ export function rewriteIncomingPath(path: string) {
       const id = searchParams.get('id');
       return id && /^[a-f0-9]{24}$/.test(id) ? `/shared-run?shared=${id}` : '/';
     }
+
+    const creatorVanity = pathname.replace(/\/+$/, '').match(/^\/go\/([a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?)$/);
+    if (creatorVanity) return `/creator-run?creator=${creatorVanity[1]}`;
     if (pathname === '/open/daily/' || pathname === '/open/daily') {
       return `/draft-run?environment=${environmentFromSet(searchParams.get('environment'))}`;
     }
@@ -181,6 +192,10 @@ export function rewriteIncomingPath(path: string) {
     }
 
     if (searchParams.get('game') === 'draft-run') {
+      const creator = searchParams.get('creator');
+      if (creator && /^(?:[a-f0-9-]{36}|[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?)$/.test(creator)) {
+        return `/creator-run?creator=${creator}`;
+      }
       const environment = environmentFromSet(searchParams.get('set'));
       if (searchParams.has('shared') || searchParams.has('challenge')) {
         const shared = searchParams.get('shared') || searchParams.get('challenge');
