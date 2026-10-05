@@ -1,5 +1,5 @@
 import {SERVING_POLICY_VERSION,LEGACY_SERVING_POLICY_VERSION,SERVING_QUALITY_SQL} from '../serving-quality.mjs';
-import {accountCapabilities,requireCapability,practiceCapability} from './capabilities.mjs';
+import {accountCapabilities,PAID_CAPABILITIES,requireCapability,practiceCapability} from './capabilities.mjs';
 import {componentBelongsTo,corpusMembership} from './corpus-components.mjs';
 import {liveRegularSets,recencyWeight} from '../daily-selection.mjs';
 import {accountIdentity,linkedPlayerIdentity,rankingIdentityStatus} from './account-identity.mjs';
@@ -233,7 +233,13 @@ async function start(request) {
   if(daily&&setIds.length)fail('Daily sets are fixed.');
   if(environment==='latest'&&!daily&&!creatorState)fail('Latest-set runs are Daily only. Choose sets for custom practice.');
   if(environment!=='mixed'&&setIds.length)fail('Custom sets use regular Draft Runs.');
-  if(!daily)requireCapability(capabilities,practiceCapability(environment,setIds));
+  if(!daily) {
+    const requiredPracticeCapability=practiceCapability(environment,setIds);
+    // Official creator campaigns are intentionally guest-playable for the
+    // standard mixed environment, but must never bypass paid Cube/custom access.
+    if(!creatorState||PAID_CAPABILITIES.has(requiredPracticeCapability))
+      requireCapability(capabilities,requiredPracticeCapability);
+  }
   const rawIdempotency=String(request.headers.get('x-idempotency-key')||'');
   if(rawIdempotency&&daily)fail('Practice idempotency keys are not valid for Daily runs.');
   if(rawIdempotency&&(source||creatorState))fail('Practice idempotency keys are not valid for challenge replays.');
