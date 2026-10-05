@@ -143,6 +143,7 @@ async function apply(query,state) {
     throw problem('This subscription is linked to a different Pack One account.',409,'APPLE_ACCOUNT_MISMATCH');
   return {applied:row?.applied==='t'||row?.applied===true,state};
 }
+export {apply as applyAppleSubscriptionState};
 
 export async function appleSubscriptionAccountState(query,authUserId) {
   const result=await query(
@@ -240,8 +241,10 @@ export async function acceptAppleNotification(query,{
   if(await notificationExists(query,uuid))return {duplicate:true,processed:true};
 
   const data=notification.data||{};
+  // Apple omits appAppleId in the sandbox environment, so TestFlight and sandbox
+  // notifications are matched on bundle ID; production must also carry the app ID.
   if(Object.keys(data).length&&(
-    Number(data.appAppleId)!==APPLE_APP_ID
+    ((data.environment==='Production'||data.appAppleId!=null)&&Number(data.appAppleId)!==APPLE_APP_ID)
     ||String(data.bundleId||'')!==APPLE_BUNDLE_ID
     ||!ENVIRONMENTS.has(String(data.environment||''))
   ))throw problem('Apple notification is for another app.');

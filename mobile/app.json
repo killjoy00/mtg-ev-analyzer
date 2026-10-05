@@ -30,7 +30,6 @@
       ]
     },
     "android": {
-      "edgeToEdgeEnabled": true,
       "package": "pro.packone.app",
       "intentFilters": [
         {

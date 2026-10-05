@@ -1,4 +1,5 @@
 import { getAuthSession, loadPatreonStatus } from '/growth-api.mjs';
+import { eliteSource } from '/membership-source.mjs';
 
 function practiceCard({label,title,description,href,cta,badge=null,locked=false,elite=false}) {
   const action=locked
@@ -30,10 +31,13 @@ function signedOutMarkup() {
 }
 
 function practiceMarkup(patreon) {
-  const capabilities=patreon?.capabilities||[];
-  const elite=capabilities.includes('custom_corpus')&&capabilities.includes('unlimited_cube_practice');
+  // Any Elite source unlocks the modes; the server enforces the same capabilities.
+  const source=eliteSource(patreon);
+  const elite=Boolean(source);
   const membershipConnected=Boolean(patreon?.connected);
-  const eliteNote=elite
+  const eliteNote=source==='apple'
+    ? 'Elite is active through your Apple App Store subscription. Powered Cube and custom-set practice are unlocked.'
+    : elite
     ? 'Elite is active. Powered Cube and custom-set practice are unlocked.'
     : membershipConnected
       ? 'Your Patreon account is connected. Upgrade to Elite to unlock both premium practice modes.'

@@ -73,6 +73,10 @@ export async function getAvailableApplePurchases(
   return [];
 }
 
+export async function finishApplePurchase(_purchase: AppleStorePurchase): Promise<void> {
+  await unavailable();
+}
+
 export async function openAppleSubscriptionManagement(): Promise<void> {
   await unavailable();
 }

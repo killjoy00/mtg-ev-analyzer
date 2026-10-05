@@ -1,5 +1,6 @@
 import { getAuthSession, loadPatreonStatus } from '/growth-api.mjs';
 import { startPatreonOAuth } from '/patreon-activation.mjs?v=2';
+import { eliteSource } from '/membership-source.mjs';
 
 const statusNode=document.querySelector('[data-patreon-status]');
 const action=document.querySelector('[data-patreon-connect]');
@@ -66,12 +67,17 @@ async function renderMembershipState() {
     return;
   }
 
-  const elite=patreon?.capabilities?.includes('custom_corpus')&&patreon?.capabilities?.includes('unlimited_cube_practice');
-  if(elite) {
+  const source=eliteSource(patreon);
+  if(source) {
     action.textContent='Open Practice';
     action.disabled=false;
     action.onclick=()=>location.assign('/practice/');
-    setStatus('Powered Cube and custom-set practice are unlocked on this Pack One account.',{state:'elite',heading:'Elite is active',showPatreon:true,patreonLabel:'Manage Patreon membership'});
+    // Only Patreon-sourced Elite is managed on Patreon; an Apple subscriber is not sent there.
+    setStatus(source==='apple'
+      ? 'Powered Cube and custom-set practice are unlocked through your Apple App Store subscription. Manage it in your Apple subscription settings.'
+      : 'Powered Cube and custom-set practice are unlocked on this Pack One account.',source==='patreon'
+      ? {state:'elite',heading:'Elite is active',showPatreon:true,patreonLabel:'Manage Patreon membership'}
+      : {state:'elite',heading:'Elite is active'});
     return;
   }
 

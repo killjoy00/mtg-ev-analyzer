@@ -2,6 +2,7 @@ import {escapeHtml as esc} from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
 import {environmentProgress,formatChallengeRecord,modeName,unlockedAchievements} from './profile-core.mjs';
 import {PATREON_POLICY} from './patreon-policy.mjs';
+import {eliteSource} from './membership-source.mjs';
 
 let activeTab='stats';
 
@@ -114,8 +115,8 @@ function archiveMarkup(progress) {
 function profileAside(profile,progress,account,patreon) {
   const favorite=progress.environments.find(entry=>entry.id===profile.player.favorite_set_id);
   const showcased=(profile.achievements||[]).find(item=>item.id===profile.player.showcase_achievement&&item.unlocked);
-  const elite=patreon?.capabilities?.includes('custom_corpus')&&patreon?.capabilities?.includes('unlimited_cube_practice');
-  const membershipLabel=patreon?.configured!==true?'Status unavailable':elite?'Elite':patreon?.connected?'Patreon connected':'Free';
+  const elite=Boolean(eliteSource(patreon));
+  const membershipLabel=elite?'Elite':patreon?.configured!==true?'Status unavailable':patreon?.connected?'Patreon connected':'Free';
   const email=account?.user?.email||'';
   return '<section class="my-side-card my-profile-card" aria-labelledby="my-profile-card-title">'+
     '<div class="my-profile-head"><div class="my-avatar" aria-hidden="true">'+esc(initials(profile.player.display_name))+'</div><div><h2 id="my-profile-card-title" class="profile-name-line">'+esc(profile.player.display_name)+(showcased?achievementMark(showcased.id,{compact:true}):'')+'</h2>'+(email?'<p>'+esc(email)+'</p>':'')+'</div></div>'+
@@ -124,7 +125,15 @@ function profileAside(profile,progress,account,patreon) {
 }
 
 function membershipAside(patreon) {
-  const elite=patreon?.capabilities?.includes('custom_corpus')&&patreon?.capabilities?.includes('unlimited_cube_practice');
+  const source=eliteSource(patreon);
+  // Elite from the Apple subscription or a manual grant: no Patreon purchase or management link.
+  if(source==='apple'||source==='other') {
+    const copy=source==='apple'
+      ?'Your Elite access comes from your Apple App Store subscription. Manage it in your Apple subscription settings.'
+      :'Powered Cube and custom-set practice are unlocked on this account.';
+    return '<section class="my-side-card my-membership-card"><div><span class="my-card-icon" aria-hidden="true">♛</span><h2>You&rsquo;re an Elite Member</h2><p>'+copy+'</p></div></section>';
+  }
+  const elite=source==='patreon';
   const supportUrl=esc(patreon?.support_url||PATREON_POLICY.supportUrl);
   const membershipUrl=elite?supportUrl:'/patreon/';
   const connected=patreon?.connected===true;

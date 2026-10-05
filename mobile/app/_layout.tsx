@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { Linking, Platform, Settings, } from 'react-native';
 
+import { AppleSubscriptionSync } from '@/src/components/AppleSubscriptionSync';
 import { ScreenErrorBoundary } from '@/src/components/ScreenErrorBoundary';
 import { VersionGate } from '@/src/components/VersionGate';
 import { config } from '@/src/config';
@@ -63,6 +64,7 @@ export default function RootLayout() {
       <>
         <StatusBar style="dark" />
         <ScreenshotFixtureEntry />
+        <AppleSubscriptionSync />
         <Stack
           unstable_screenErrorBoundary={ScreenErrorBoundary}
           screenOptions={{
