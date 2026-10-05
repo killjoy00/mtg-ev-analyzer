@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {spawnSync} from 'node:child_process';
+import {adminPath,adminGrowthPath} from '../edge/gateway.mjs';
 
 const script=fs.readFileSync('scripts/creator-production-canary.mjs','utf8');
 const workflow=fs.readFileSync('.github/workflows/creator-production-canary.yml','utf8');
@@ -63,4 +64,18 @@ test('reviewed retry request explicitly forbids customer rows',()=>{
   assert.match(request.reason,/fresh owned canary Practice/i);
   assert.match(request.reason,/strict `QA release <7-hex>` name contract/i);
   assert.match(request.reason,/Never select or mutate customer rows/i);
+});
+
+// Check every actual canary Admin call against the production routing contract.
+// An allowlisted path on another service still returns 404 at the gateway.
+test('all canary creator Admin calls use their authoritative gateway service',()=>{
+  const routes=[...script.matchAll(/call\('\/(draft|growth)(\/v1\/admin\/creator-challenges[^']*)'([^;]*?)(?:;|\n\s*\})/g)];
+  assert.ok(routes.length>=6,'all source/create/detail/publication/cleanup calls must be checked');
+  for(const [,service,prefix,tail] of routes){
+    const path=prefix.endsWith('creator-challenges/')
+      ? prefix+'11111111-1111-4111-8111-111111111111'+(tail.includes("'/publication'")?'/publication':'')
+      : prefix;
+    const method=tail.includes("method:'GET'")?'GET':'POST';
+    assert.equal(service==='draft'?adminPath(path,method):adminGrowthPath(path,method,'production'),true,service+path+' '+method);
+  }
 });
