@@ -35,8 +35,8 @@ async function verifyMarkers({settle=false}={}) {
     for(;;) {
       const h=await call(slug,'/health?quick=1');
       assert.equal(h.ok,true);
-      if(slug==='draftrunapi')assert.equal(h.admin_api_version,ADMIN_API_VERSION,'draftrunapi admin API version');
       if(h.release_commit===commit) {
+        if(slug==='draftrunapi')assert.equal(h.admin_api_version,ADMIN_API_VERSION,'draftrunapi admin API version');
         if(slug==='pack1growth'&&expectedDeletionEmail!==null)
           assert.equal(h.deletion_email_configured,expectedDeletionEmail,'pack1growth deletion email configuration');
         const waited=Math.round((Date.now()-started)/1000);
