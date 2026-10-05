@@ -178,10 +178,24 @@ BEGIN
   ) INTO duplicate_attempt;
 
   IF duplicate_attempt THEN
+    -- merge_pack1_player copies the source result to NEW.player_id and deletes
+    -- the source result before it updates draft_run_sessions. Demote that
+    -- copied history in the same transaction while preserving its score/grade.
     UPDATE game_results
-    SET creator_challenge_id=NULL
-    WHERE player_id=OLD.player_id
+    SET creator_challenge_id=NULL,
+        opponent_name=NULL,
+        opponent_score=NULL,
+        outcome=NULL
+    WHERE player_id=NEW.player_id
       AND client_result_id='draft-run:'||OLD.id::text;
+
+    -- Creator funnel starts are still attached to OLD.player_id at this point;
+    -- remove only the duplicate attempt's run-scoped creator telemetry before
+    -- merge_pack1_player moves the remaining analytics to the account player.
+    DELETE FROM analytics_events
+    WHERE player_id=OLD.player_id
+      AND event_name IN ('creator_challenge_started','creator_challenge_complete')
+      AND event_props->>'run_id'=OLD.id::text;
 
     NEW.creator_challenge_id=NULL;
     NEW.creator_participant_auth_user_id=NULL;
