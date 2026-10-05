@@ -328,6 +328,13 @@ test('account deletion pauses after dispatching creator retirement until the sta
   assert.equal(dispatchBody.inputs.creator_score,'0');
   assert.equal(dispatchBody.inputs.campaign,'retired');
   assert.equal(JSON.stringify(dispatchBody).includes('Lola'),false);
+  const workflow=await readFile('.github/workflows/campaign-link-publish.yml','utf8');
+  const declaredInputs=new Set([...workflow.matchAll(/^      ([a-z_]+):\\s*$/gm)].map(match=>match[1]));
+  assert.deepEqual(
+    Object.keys(dispatchBody.inputs).filter(key=>!declaredInputs.has(key)),
+    [],
+    'creator dispatch may only send declared workflow_dispatch inputs',
+  );
 });
 
 
