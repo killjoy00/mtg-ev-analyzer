@@ -87,6 +87,7 @@ async function mount(t, options = {}) {
       return { ok: true, requested: true };
     } },
     '@/src/components/BrandFonts': { BrandFonts: ({ children }) => children },
+    '@/src/components/AppleSubscriptionSync': { AppleSubscriptionSync: () => null },
     '@/src/navigation/session': { NavigationSessionProvider: ({ children }) => children },
     '@/src/components/VersionGate': { VersionGate: ({ children }) => children },
     '@/src/components/ScreenErrorBoundary': { ScreenErrorBoundary: host('ErrorBoundary') },

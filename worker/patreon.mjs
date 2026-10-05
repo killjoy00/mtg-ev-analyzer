@@ -3,6 +3,8 @@ import {createHash,createHmac,randomBytes,timingSafeEqual} from 'node:crypto';
 import {readJson} from './request-json.mjs';
 import {nativePatreonAction,nativePatreonState,validPatreonState,patreonReturnUrl} from './patreon-mobile-policy.mjs';
 import {nativePatreonIdentity,nativePatreonStatus,requestNativePatreonRefresh} from './patreon-mobile.mjs';
+import {APPLE_IAP_PROVIDER} from './apple-subscription-policy.mjs';
+import {accountCapabilities} from './capabilities.mjs';
 
 const PROVIDER='patreon';
 const PATREON_ORIGIN='https://www.patreon.com';
@@ -186,15 +188,22 @@ export function verifyPatreonSignature(raw,signature,secret) {
 }
 
 async function status(query,authUserId) {
-  const [provider,grants]=await Promise.all([
+  const [provider,grants,allCapabilities]=await Promise.all([
     query(`SELECT provider_campaign_id,membership_status,last_charge_status,currently_entitled_amount_cents,is_free_trial,is_gifted,tier_ids,connected_at,last_synced_at,sync_requested_at
       FROM provider_accounts WHERE auth_user_id=$1::uuid AND provider=$2`,[authUserId,PROVIDER]),
-    query(`SELECT capability FROM entitlement_grants WHERE auth_user_id=$1::uuid AND provider=$2
-      AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>now()) ORDER BY capability`,[authUserId,PROVIDER]),
+    // Apple grants are read alongside Patreon's so an Apple Elite subscriber gets
+    // the same ad-free benefit as the Patreon Elite tier it stands in for.
+    query(`SELECT capability,provider FROM entitlement_grants WHERE auth_user_id=$1::uuid AND provider IN ($2,$3)
+      AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>now()) ORDER BY capability`,[authUserId,PROVIDER,APPLE_IAP_PROVIDER]),
+    // Provider-independent access, so web pages don't treat Elite from another source as Free.
+    accountCapabilities({auth_user_id:authUserId},query),
   ]);
   const row=provider.rows[0];
+  const appleSubscriptionActive=grants.rows.some(grant=>grant.provider===APPLE_IAP_PROVIDER);
   return {
-    ...patreonAdvertisingStatus(row),
+    ...accountAdvertisingStatus(row,{appleSubscriptionActive}),
+    patreon_ad_free:patreonAdvertisingStatus(row).ad_free,
+    apple_subscription_active:appleSubscriptionActive,
     configured:configured()&&patreonAccountAllowed(authUserId),
     support_url:PATREON_POLICY.supportUrl,
     webhook_configured:Boolean(process.env.PATREON_WEBHOOK_SECRET),
@@ -210,8 +219,16 @@ async function status(query,authUserId) {
       effective_state:effectivePatreonMembership(row),
       sync_pending:Boolean(row.sync_requested_at),
     }:null,
-    capabilities:grants.rows.map(row=>row.capability),
+    capabilities:grants.rows.filter(grant=>grant.provider===PROVIDER).map(grant=>grant.capability),
+    account_capabilities:allCapabilities,
   };
+}
+
+// Account-level advertising decision. An active Apple Elite subscription is
+// ad-free regardless of Patreon state; otherwise Patreon's rules apply unchanged.
+export function accountAdvertisingStatus(row,{appleSubscriptionActive=false}={},now=Date.now(),policy=PATREON_POLICY) {
+  if(appleSubscriptionActive===true)return {ad_free:true,ads_allowed:false};
+  return patreonAdvertisingStatus(row,now,policy);
 }
 
 export function patreonAdvertisingStatus(row,now=Date.now(),policy=PATREON_POLICY) {

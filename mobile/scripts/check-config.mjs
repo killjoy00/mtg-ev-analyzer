@@ -74,6 +74,12 @@ assert.equal(production.version, storeRelease.appStoreVersion);
 assert.equal(production.ios.bundleIdentifier, 'pro.packone.app');
 assert.equal(production.android.package, 'pro.packone.app');
 assert.equal(production.icon, './assets/images/icon.png');
+assert.deepEqual(production.android.adaptiveIcon, {
+  foregroundImage: './assets/images/adaptive-icon-foreground.png',
+  monochromeImage: './assets/images/adaptive-icon-monochrome.png',
+  backgroundColor: '#1E4D7A',
+});
+assert.equal(production.android.edgeToEdgeEnabled, undefined);
 assert.equal(production.extra.buildProfile, 'production');
 assert.equal(production.extra?.eas?.projectId, undefined);
 assert.deepEqual(
@@ -81,6 +87,9 @@ assert.deepEqual(
   new Set([
     'android.permission.READ_EXTERNAL_STORAGE',
     'android.permission.WRITE_EXTERNAL_STORAGE',
+    'android.permission.SYSTEM_ALERT_WINDOW',
+    'android.permission.USE_BIOMETRIC',
+    'android.permission.USE_FINGERPRINT',
   ]),
 );
 

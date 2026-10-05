@@ -20,7 +20,9 @@ export async function nativePatreonIdentity(request,{query,authSession,playerSes
 export async function nativePatreonStatus(query,identity,providerStatus) {
   // Provider grants describe provenance only. The same provider-independent
   // capability function used by gameplay decides overall account access.
-  const capabilities=await accountCapabilities({auth_user_id:identity.authUserId},query);
+  const capabilities=Array.isArray(providerStatus?.account_capabilities)
+    ? providerStatus.account_capabilities
+    : await accountCapabilities({auth_user_id:identity.authUserId},query);
   const {support_url:_supportUrl,...provider}=providerStatus;
   return {
     ...provider,

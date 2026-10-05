@@ -33,6 +33,9 @@ FORBIDDEN_PERMISSIONS = {
     "android.permission.BODY_SENSORS",
     "android.permission.ACTIVITY_RECOGNITION",
     "com.android.vending.BILLING",
+    "android.permission.SYSTEM_ALERT_WINDOW",
+    "android.permission.USE_BIOMETRIC",
+    "android.permission.USE_FINGERPRINT",
 }
 
 def attr(node, name):

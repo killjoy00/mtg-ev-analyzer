@@ -3,6 +3,13 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
 type BuildProfile = 'development' | 'preview' | 'production';
 
 const STORE_IDENTIFIER = 'pro.packone.app';
+// Added by the React Native template (dev overlays) and expo-secure-store (biometric
+// unlock, which Pack One does not use). Store builds never need them.
+const PRODUCTION_BLOCKED_PERMISSIONS = [
+  'android.permission.SYSTEM_ALERT_WINDOW',
+  'android.permission.USE_BIOMETRIC',
+  'android.permission.USE_FINGERPRINT',
+];
 const MAX_ANDROID_VERSION_CODE = 2_100_000_000;
 const NON_STORE_IDENTIFIERS: Record<Exclude<BuildProfile, 'production'>, string> = {
   development: 'pro.packone.development',
@@ -82,6 +89,20 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     android: {
       ...config.android,
       package: identifier,
+      ...(production
+        ? {
+            blockedPermissions: [
+              ...(config.android?.blockedPermissions || []),
+              ...PRODUCTION_BLOCKED_PERMISSIONS,
+            ],
+            // Glyph sized inside the 66dp adaptive-icon safe zone, on the website's brand blue.
+            adaptiveIcon: {
+              foregroundImage: './assets/images/adaptive-icon-foreground.png',
+              monochromeImage: './assets/images/adaptive-icon-monochrome.png',
+              backgroundColor: '#1E4D7A',
+            },
+          }
+        : {}),
       ...(androidVersionCode ? { versionCode: androidVersionCode } : {}),
     },
   };

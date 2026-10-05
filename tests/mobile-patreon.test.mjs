@@ -54,6 +54,33 @@ test('provider-independent grants do not become Free when Patreon is unconnected
   assert.equal(Object.hasOwn(data,'support_url'),false);
 });
 
+test('an active Apple subscription is ad-free and is not reported as Patreon provenance',async()=>{
+  const response=await handlePatreon(request('status'),deps({query:async(sql,params)=>{
+    if(sql.includes('FROM account_links'))return {rows:[{auth_user_id:ACCOUNT,player_id:PLAYER}]};
+    if(sql.includes('FROM provider_accounts'))return {rows:[]};
+    if(sql.includes('SELECT DISTINCT capability'))return {rows:[{capability:'custom_corpus'},{capability:'unlimited_cube_practice'}]};
+    if(sql.includes('SELECT capability')) {
+      assert.deepEqual(params,[ACCOUNT,'patreon','apple-app-store']);
+      return {rows:[{capability:'custom_corpus',provider:'apple-app-store'},{capability:'unlimited_cube_practice',provider:'apple-app-store'}]};
+    }
+    throw Error('Unexpected query: '+sql.slice(0,100));
+  }}));
+  const data=await response.json();
+  assert.equal(data.apple_subscription_active,true);
+  assert.equal(data.ad_free,true);
+  assert.equal(data.ads_allowed,false);
+  assert.equal(data.patreon_ad_free,false);
+  assert.equal(data.connected,false);
+  assert.deepEqual(data.capabilities,[]);
+  assert.deepEqual(data.account_capabilities,['account','unlimited_regular_practice','custom_corpus','unlimited_cube_practice']);
+});
+
+test('without an Apple subscription an unconnected account keeps the promotion',async()=>{
+  const data=await (await handlePatreon(request('status'),deps())).json();
+  assert.equal(data.apple_subscription_active,false);
+  assert.equal(data.ads_allowed,true);
+});
+
 for(const headers of [{cookie:'__Host-pack1_account=other'},{'x-pack1-auth-session':'legacy'},{'x-pack1-mobile-account':''}]) {
   test('native identity rejects cookie, legacy or missing native authentication '+Object.keys(headers)[0],async()=>{
     await assert.rejects(nativePatreonIdentity(request('status','GET',headers),deps()),{status:401});

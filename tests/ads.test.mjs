@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {advertisingAllowed,promotionalContentAllowed,slotIdForPlacement} from '../ads.mjs';
 import {adFreePatreonMembership,premiumPatreonMembership,PATREON_POLICY} from '../patreon-policy.mjs';
-import {patreonAdvertisingStatus} from '../worker/patreon.mjs';
+import {accountAdvertisingStatus,patreonAdvertisingStatus} from '../worker/patreon.mjs';
 import {ACCOUNT_SIGNAL_KEY,signalAccountChange} from '../growth-api.mjs';
 import {tcgplayerAffiliateUrl,tcgplayerHomeBannerActive,tcgplayerMagicUrl} from '../tcgplayer.mjs';
 
@@ -113,4 +113,14 @@ test('TCGplayer home destination uses the approved Impact deep-link template',()
     if(saved===undefined)delete globalThis.PACKONE_TCGPLAYER;
     else globalThis.PACKONE_TCGPLAYER=saved;
   }
+});
+
+test('an active Apple Elite subscription is ad-free; otherwise Patreon rules decide',()=>{
+  const now=Date.parse('2026-09-19T19:00:00Z');
+  const free={provider_campaign_id:PATREON_POLICY.campaignId,tier_ids:['29623888'],membership_status:'active_patron',last_charge_status:'Paid',last_synced_at:new Date(now-1000).toISOString()};
+  for(const row of [undefined,free,{...free,membership_status:'declined_patron'}])
+    assert.deepEqual(accountAdvertisingStatus(row,{appleSubscriptionActive:true},now),{ad_free:true,ads_allowed:false});
+  assert.deepEqual(accountAdvertisingStatus(undefined,{},now),{ad_free:false,ads_allowed:true});
+  assert.deepEqual(accountAdvertisingStatus(free,{appleSubscriptionActive:false},now),patreonAdvertisingStatus(free,now));
+  assert.deepEqual(accountAdvertisingStatus(free,{appleSubscriptionActive:'true'},now),{ad_free:false,ads_allowed:true});
 });

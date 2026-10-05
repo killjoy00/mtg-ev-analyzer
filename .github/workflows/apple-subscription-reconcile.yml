@@ -1,0 +1,40 @@
+name: Apple subscription reconciliation
+on:
+  schedule:
+    - cron: '41 */6 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: apple-subscription-reconciliation
+  cancel-in-progress: false
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      # App Store Server API requires an In-App Purchase key (Users and Access >
+      # Integrations > In-App Purchase), not the App Store Connect API key.
+      APPLE_IAP_KEY_ID: ${{ secrets.APPLE_IAP_KEY_ID }}
+      APPLE_IAP_KEY_P8: ${{ secrets.APPLE_IAP_KEY_P8 }}
+      APPLE_IAP_ISSUER_ID: ${{ secrets.APPLE_IAP_ISSUER_ID || secrets.ASC_ISSUER_ID }}
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Report missing In-App Purchase key
+        if: env.APPLE_IAP_KEY_ID == '' || env.APPLE_IAP_KEY_P8 == '' || env.APPLE_IAP_ISSUER_ID == ''
+        run: node scripts/apple-subscription-reconcile.mjs
+      - name: Reconcile Apple subscriptions with the App Store Server API
+        if: env.APPLE_IAP_KEY_ID != '' && env.APPLE_IAP_KEY_P8 != '' && env.APPLE_IAP_ISSUER_ID != ''
+        run: |
+          set -euo pipefail
+          umask 077
+          npm install -g neon@4.17.4
+          connection=$(neon connection-string br-orange-feather-ayps8kep --project-id patient-shadow-91417882 --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          printf '%s' "$connection" > "$RUNNER_TEMP/apple.connection"
+          node scripts/apple-subscription-reconcile.mjs "$RUNNER_TEMP/apple.connection"

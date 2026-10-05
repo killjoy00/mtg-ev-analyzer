@@ -24,6 +24,7 @@ import { onAppRender } from './render-lifecycle.mjs';
 import { trackEvent } from './retention-events.mjs';
 import { nextMilestones } from './progression.mjs?v=9';
 import { PATREON_POLICY } from './patreon-policy.mjs';
+import { eliteSource } from './membership-source.mjs';
 import { renderAccount, renderDeletionState } from './growth.mjs?v=9';
 import {
   bestPercentile,
@@ -196,7 +197,12 @@ function settingsMarkup(profile, progress, account, patreon) {
       : nameReason==='username_required'
         ? 'Choose a display name to join Daily leaderboards.'
         : '';
-  const elite=patreon?.capabilities?.includes('custom_corpus')&&patreon?.capabilities?.includes('unlimited_cube_practice');
+  // Elite from the iOS app's Apple subscription (or a manual grant) is a separate
+  // source; that member must not be told to join or upgrade on Patreon.
+  const source=eliteSource(patreon);
+  const nonPatreonElite=source==='apple'||source==='other';
+  const elite=Boolean(source);
+  const patreonAdFree=patreon?.patreon_ad_free??patreon?.ad_free;
   const supportUrl=esc(patreon?.support_url||PATREON_POLICY.supportUrl);
   const membershipUrl=elite?supportUrl:'/patreon/';
   return `<section class="profile-settings profile-account" id="profile-account" aria-labelledby="profile-account-title">
@@ -214,18 +220,22 @@ function settingsMarkup(profile, progress, account, patreon) {
     </section>`:`<p class="profile-empty">${account?.unavailable?'Profile settings are temporarily unavailable.':'Sign in to edit your profile settings.'}</p>`}
     ${account?.user?`<section class="profile-membership profile-settings-membership profile-settings-group" aria-labelledby="patreon-membership-title">
       <div><p class="eyebrow">Membership</p><h3 id="patreon-membership-title">Membership</h3>
-        ${patreon?.configured!==true
+        ${source==='apple'
+          ? `<p><strong>Elite active</strong><br><span>Powered Cube practice and custom-set practice are unlocked through your Apple App Store subscription.</span></p><p>Ad-free browsing is included. Manage or cancel the subscription in your Apple subscription settings.</p>`
+          : source==='other'
+          ? `<p><strong>Elite active</strong><br><span>Powered Cube practice and custom-set practice are unlocked on this account.</span></p>`
+          : patreon?.configured!==true
           ? `<p><strong>Membership status unavailable.</strong><br><span>Pack One can’t verify Patreon right now. Your current access is unchanged.</span></p>`
           : elite
-            ? `<p><strong>Elite active</strong><br><span>Powered Cube practice and custom-set practice are unlocked.</span></p>${patreon?.ad_free?'<p>Ad-free browsing is included while your membership is connected.</p>':''}`
+            ? `<p><strong>Elite active</strong><br><span>Powered Cube practice and custom-set practice are unlocked.</span></p>${patreonAdFree?'<p>Ad-free browsing is included while your membership is connected.</p>':''}`
             : patreon?.connected
-              ? `<p><strong>Patreon connected</strong><br><span>Elite unlocks Powered Cube practice and custom-set practice. If you just upgraded on Patreon, refresh your access here.</span></p>${patreon?.ad_free?'<p>Your current paid membership includes ad-free browsing.</p>':''}`
+              ? `<p><strong>Patreon connected</strong><br><span>Elite unlocks Powered Cube practice and custom-set practice. If you just upgraded on Patreon, refresh your access here.</span></p>${patreonAdFree?'<p>Your current paid membership includes ad-free browsing.</p>':''}`
               : `<p><strong>Unlock Elite practice.</strong><br><span>Join on Patreon, then connect your Patreon account here so Pack One can activate the benefits.</span></p>`}
       </div>
       ${new URLSearchParams(location.search).has('patreon')?`<p role="status">${esc(({connected:'Patreon connected.',expired:'The connection expired. Please try again.',unavailable:'Patreon linking is not available yet.',conflict:'This Patreon account is already connected to another Pack One account.','identity-mismatch':'This Pack One account is already connected to a different Patreon account. Disconnect Patreon before switching accounts.',error:'Patreon could not be connected. Please try again.'})[new URLSearchParams(location.search).get('patreon')]||'Patreon connection returned.')}</p>`:''}
       <div class="profile-membership-actions">
-        <a class="button ${patreon?.configured===true&&!elite?'primary':'secondary'}" href="${membershipUrl}"${elite?' rel="noopener noreferrer"':''}>${patreon?.configured!==true?'Learn about Elite':elite?'Open Patreon':patreon?.connected?'Upgrade to Elite':'Become Elite'}</a>
-        ${patreon?.configured===true?`<button type="button" class="button secondary" id="patreon-connect">${patreon?.connected?'Refresh Patreon access':'Already a member? Connect Patreon'}</button>`:''}
+        ${nonPatreonElite?'':`<a class="button ${patreon?.configured===true&&!elite?'primary':'secondary'}" href="${membershipUrl}"${elite?' rel="noopener noreferrer"':''}>${patreon?.configured!==true?'Learn about Elite':elite?'Open Patreon':patreon?.connected?'Upgrade to Elite':'Become Elite'}</a>`}
+        ${patreon?.configured===true&&!(nonPatreonElite&&!patreon?.connected)?`<button type="button" class="button secondary" id="patreon-connect">${patreon?.connected?'Refresh Patreon access':'Already a member? Connect Patreon'}</button>`:''}
         ${patreon?.connected?'<button type="button" class="button secondary destructive" id="patreon-disconnect">Disconnect Patreon</button><small class="profile-membership-note">Disconnecting Patreon from Pack One does not cancel Patreon billing.</small>':''}
         <span id="patreon-status" aria-live="polite"></span>
       </div>
