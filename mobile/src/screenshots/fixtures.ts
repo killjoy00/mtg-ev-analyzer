@@ -360,6 +360,7 @@ export async function requestScreenshotFixture<T>(
     await SecureStore.setItemAsync(RUN_KEY, JSON.stringify(next));
     return clone(next) as T;
   }
+  if (path === '/draft/v1/runs/33333333-3333-4333-8333-333333333333/report' && method === 'POST') return { ok: true, id: '77777777-7777-4777-8777-777777777777' } as T;
   if (path === '/draft/v1/runs/33333333-3333-4333-8333-333333333333/reroll' && method === 'POST') return clone(initialRun) as T;
   if (path === '/draft/v1/runs/33333333-3333-4333-8333-333333333333/share' && method === 'POST') return { id: '0123456789abcdef01234567' } as T;
   if (path === '/growth/v1/patreon/mobile/status') return { ...clone(membershipStatus), ad_free: elite, ads_allowed: !elite, account_capabilities: elite ? ['account', 'unlimited_regular_practice', 'unlimited_cube_practice', 'custom_corpus'] : ['account', 'unlimited_regular_practice'] } as T;
