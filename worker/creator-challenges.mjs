@@ -264,7 +264,7 @@ export function publicCreatorChallenge(row) {
     beat_percentage:row.beat_percentage==null?null:Number(row.beat_percentage),
     average_score:row.average_score==null?null:Number(row.average_score),
     public_url:buildCampaignVanityUrl(row.slug),
-    tracked_url:buildCampaignTrackingUrl(entry),
+    tracked_url:buildCampaignTrackingUrl(entry,{allowCreator:true}),
   };
 }
 
