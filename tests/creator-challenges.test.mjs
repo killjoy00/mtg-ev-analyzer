@@ -282,46 +282,71 @@ test('protected campaign publication workflow has a creator path without direct 
 
 
 test('account deletion pauses after dispatching creator retirement until the static scrub is verified live',async()=>{
-  let operation=null,dispatchBody=null;
-  const row={
+  let dispatchBody=null;
+  const state={
     id:CHALLENGE,
     slug:'lola-rft',
     status:'published',
     creator_public_name:'Lola',
+    creator_handle:'@lola',
     headline:'Can you beat Lola?',
     source_score:87,
     source_environment:'latest',
     source_type:'daily',
     source_day:'2026-10-08',
+    acquisition_source:'creator',
+    acquisition_campaign:'lola-rft',
+    acquisition_medium:'creator',
+    published_at:'2026-10-08T18:00:00Z',
     publication_operation_ref:null,
     publication_detail:{},
+    publication_error:null,
   };
+  const row=()=>({...state,publication_detail:{...state.publication_detail}});
   const query=async(sql,params=[])=>{
     if(sql.includes('SELECT id FROM creator_challenges'))return {rows:[{id:CHALLENGE}]};
-    if(sql.includes('SELECT c.*,s.score source_score')) {
-      return {rows:[{
-        ...row,
-        status:operation?'retired':'published',
-        publication_operation_ref:operation,
-        publication_detail:operation?{action:'retire',reason:'account_deletion'}:{},
-      }]};
-    }
-    if(sql.startsWith('UPDATE creator_challenges SET status=\'retired\'')) {
-      operation=params[1];
+    if(sql.includes('SELECT c.*,s.score source_score'))return {rows:[row()]};
+    if(sql.startsWith("UPDATE game_results SET opponent_name='A creator'"))return {rows:[],rowCount:1};
+    if(sql.startsWith("UPDATE creator_challenges SET status='retired',\n        creator_public_name='A creator'")) {
+      Object.assign(state,{
+        status:'retired',creator_public_name:'A creator',creator_handle:null,
+        headline:'Creator challenge unavailable',publication_error:null,
+      });
       return {rows:[],rowCount:1};
+    }
+    if(sql.startsWith("UPDATE creator_challenges SET status='retired',\n          retired_at=")) {
+      state.status='retired';
+      state.publication_operation_ref=params[3];
+      state.publication_detail=JSON.parse(params[4]);
+      state.publication_error=null;
+      return {rows:[{id:CHALLENGE}],rowCount:1};
+    }
+    if(sql.startsWith('UPDATE creator_challenges\n    SET publication_detail=publication_detail||')) {
+      state.publication_detail={...state.publication_detail,...JSON.parse(params[3])};
+      return {rows:[{id:CHALLENGE}],rowCount:1};
+    }
+    if(sql.startsWith('UPDATE creator_challenges SET publication_error=')) {
+      state.publication_error=params[3];
+      return {rows:[{id:CHALLENGE}],rowCount:1};
     }
     if(sql.startsWith('INSERT INTO creator_challenge_audit'))return {rows:[],rowCount:1};
     throw new Error('Unexpected query: '+sql);
   };
   const ready=await requestCreatorPrivacyRetirement(query,'22222222-2222-4222-8222-222222222222',{
     env:{PACK1_LAUNCH_WATCHER_GITHUB_TOKEN:'github_pat_fixture_abcdefghijklmnopqrstuvwxyz'},
-    fetcher:async(_url,options)=>{
-      dispatchBody=JSON.parse(options.body);
-      return new Response(null,{status:204});
+    fetcher:async(url,options={})=>{
+      if(String(url).includes('/actions/workflows/campaign-link-publish.yml/runs'))
+        return Response.json({workflow_runs:[]});
+      if(String(url).endsWith('/dispatches')) {
+        dispatchBody=JSON.parse(options.body);
+        return new Response(null,{status:204});
+      }
+      throw new Error('Unexpected fetch: '+url);
     },
   });
   assert.equal(ready,false,'deletion must pause after dispatch instead of deleting the account immediately');
-  assert.match(operation,/^[a-f0-9-]{36}$/i);
+  assert.match(state.publication_operation_ref,/^[a-f0-9-]{36}$/i);
+  assert.equal(state.publication_detail.dispatch.state,'accepted');
   assert.equal(dispatchBody.ref,'main');
   assert.equal(dispatchBody.inputs.kind,'creator');
   assert.equal(dispatchBody.inputs.creator_action,'retire');
@@ -339,7 +364,6 @@ test('account deletion pauses after dispatching creator retirement until the sta
     'creator dispatch may only send declared workflow_dispatch inputs',
   );
 });
-
 
 test('creator migration preserves attribution across account merge and demotes duplicate attempts',async()=>{
   const migration=await readFile('migrations/0053_creator_challenges.sql','utf8');
