@@ -224,10 +224,27 @@ function statePayload(row,extra={}) {
   };
 }
 
+async function supersededPublishStillPending(detail,{env,fetcher}) {
+  const prior=detail?.superseded_publish;
+  const operation=String(prior?.operation||'');
+  if(!UUID.test(operation))return false;
+  const stored=prior?.workflow?.id;
+  const exact=stored?await fetchWorkflowRunById(stored,{env,fetcher}):null;
+  const run=exact||await discoverCreatorPublicationWorkflowRun(operation,{env,fetcher});
+  if(run)return run.status!=='completed';
+  const state=String(prior?.dispatch?.state||'pending');
+  if(state==='accepted')return true;
+  if(state==='rejected')return false;
+  const attempted=Date.parse(String(prior?.dispatch?.last_attempt_at||prior?.requested_at||''));
+  return !Number.isFinite(attempted)||Date.now()-attempted<DISPATCH_RETRY_MS;
+}
+
 async function reconcile(query,row,{today,env,fetcher}) {
   row=await creatorChallengeById(query,row.id);
   const detail=operationDetail(row),operation=String(row.publication_operation_ref||''),action=operationAction(row);
   if(!UUID.test(operation)||!action)return statePayload(row);
+  if(action==='retire'&&await supersededPublishStillPending(detail,{env,fetcher}))
+    return statePayload(row,{workflow_status:'waiting_for_superseded_publish'});
   let run=await workflowRun(row,operation,{env,fetcher});
   if(!run&&operationMatches(row,operation,action)&&creatorPublicationDispatchRetryDue(detail)) {
     await dispatchCreatorPublicationAttempt(query,row,operation,action,{env,fetcher});
@@ -288,7 +305,9 @@ async function reconcile(query,row,{today,env,fetcher}) {
 function staticCleanupMayExist(row) {
   const detail=operationDetail(row),action=operationAction(row);
   if(row.published_at||row.status==='published'||row.status==='publishing')return true;
-  if(action==='publish')return Boolean(detail.workflow)||['accepted','ambiguous'].includes(detail?.dispatch?.state);
+  if(action==='publish')return UUID.test(String(row.publication_operation_ref||''))
+    ||Boolean(detail.workflow)
+    ||['pending','accepted','ambiguous'].includes(String(detail?.dispatch?.state||''));
   if(action==='retire'&&detail.live_verified!==true)
     return detail.static_cleanup==='required'
       ||Boolean(detail.workflow)
@@ -341,10 +360,21 @@ export async function beginCreatorPublicationOperation(query,row,action,{adminAu
       return {row,operation:null,reused:true,complete:true};
     const operation=crypto.randomUUID();
     const expectedOperation=UUID.test(existingOperation)?existingOperation:null;
+    const supersededPublish=action==='retire'
+      &&existingAction==='publish'
+      &&UUID.test(existingOperation)
+      ?{
+        operation:existingOperation,
+        requested_at:detail.requested_at||null,
+        dispatch:detail.dispatch||null,
+        workflow:detail.workflow||null,
+      }
+      :null;
     const nextDetail={
       action,
       ...(reason?{reason}:{}),
       ...(action==='retire'&&staticCleanupMayExist(row)?{static_cleanup:'required'}:{}),
+      ...(supersededPublish?{superseded_publish:supersededPublish}:{}),
       requested_at:new Date().toISOString(),
       dispatch:{state:'pending',attempts:0},
       live_verified:false,
