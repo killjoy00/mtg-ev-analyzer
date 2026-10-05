@@ -1,6 +1,6 @@
 {
   "operation": "upload-pack-one-app-store-screenshots",
-  "reason": "Replace the Pack One 1.0 iPhone/iPad product screenshots and Elite subscription review image with the exact individually inspected and approved final main-source images from successful native/store run 37244011193, including corrected provider-neutral membership copy from #960. Preserve editable version 1.0 and all physical/provider/owner gates. Do not submit app or subscription for review and do not release publicly.",
+  "reason": "Replace the Pack One 1.0 iPhone/iPad product screenshots and Elite subscription review image with the exact individually inspected and approved final main-source images from successful native/store run 37244011193, including corrected provider-neutral membership copy from #960. Preserve editable version 1.0 and all physical/provider/owner gates. Do not submit app or subscription for review and do not release publicly. Retry after run 37249880765 attempts 1 and 2 hit the prior roughly three-minute Apple screenshot processing limit. The reviewed uploader now waits up to 300 two-second polls per asset, reports actual processing states, and refreshes the same short-lived authorization during long sessions. Exact approved source images and upload/review/release boundaries are unchanged.",
   "screenshotRunId": 37244011193,
   "screenshotHeadSha": "3a8244eb0568769c133365ea2821d512c62a3515",
   "versionString": "1.0"
