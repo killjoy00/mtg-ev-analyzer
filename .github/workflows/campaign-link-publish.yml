@@ -1,9 +1,59 @@
 name: publish Pack One campaign link
-run-name: publish campaign / ${{ inputs.slug }}
+run-name: publish ${{ inputs.kind }} / ${{ inputs.slug }} / ${{ inputs.operation }}
 
 on:
   workflow_dispatch:
     inputs:
+      kind:
+        description: Publication kind
+        required: true
+        default: campaign
+        type: string
+      operation:
+        description: Reconciliation operation reference
+        required: false
+        default: none
+        type: string
+      creator_action:
+        description: Creator route action
+        required: false
+        default: publish
+        type: string
+      creator_challenge_id:
+        description: Creator challenge UUID
+        required: false
+        default: ''
+        type: string
+      creator_name:
+        description: Sanitized creator public name
+        required: false
+        default: ''
+        type: string
+      creator_headline:
+        description: Sanitized creator campaign headline
+        required: false
+        default: ''
+        type: string
+      creator_score:
+        description: Authoritative creator score
+        required: false
+        default: ''
+        type: string
+      creator_environment:
+        description: Authoritative creator environment
+        required: false
+        default: ''
+        type: string
+      creator_source_type:
+        description: Authoritative creator source type
+        required: false
+        default: ''
+        type: string
+      creator_source_day:
+        description: Historical Daily date when applicable
+        required: false
+        default: ''
+        type: string
       slug:
         description: Canonical /go/ slug
         required: true
@@ -60,6 +110,16 @@ jobs:
       CAMPAIGN_MEDIUM: ${{ inputs.medium }}
       CAMPAIGN_SOCIAL_TITLE: ${{ inputs.social_title }}
       CAMPAIGN_SOCIAL_DESCRIPTION: ${{ inputs.social_description }}
+      PUBLISH_KIND: ${{ inputs.kind }}
+      PUBLISH_OPERATION: ${{ inputs.operation }}
+      CREATOR_ACTION: ${{ inputs.creator_action }}
+      CREATOR_CHALLENGE_ID: ${{ inputs.creator_challenge_id }}
+      CREATOR_NAME: ${{ inputs.creator_name }}
+      CREATOR_HEADLINE: ${{ inputs.creator_headline }}
+      CREATOR_SCORE: ${{ inputs.creator_score }}
+      CREATOR_ENVIRONMENT: ${{ inputs.creator_environment }}
+      CREATOR_SOURCE_TYPE: ${{ inputs.creator_source_type }}
+      CREATOR_SOURCE_DAY: ${{ inputs.creator_source_day }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -77,12 +137,41 @@ jobs:
         with:
           node-version: 24
 
+      - uses: actions/setup-python@v5
+        if: inputs.kind == 'creator' && inputs.creator_action == 'publish'
+        with:
+          python-version: '3.12'
+
+      - name: Install creator card renderer
+        if: inputs.kind == 'creator' && inputs.creator_action == 'publish'
+        run: python3 -m pip install --quiet 'Pillow==11.3.0'
+
       - name: Prepare deterministic campaign route
-        run: node scripts/prepare-campaign-link-publish.mjs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$PUBLISH_KIND" == "creator" ]]; then
+            node scripts/prepare-creator-challenge-publish.mjs
+            if [[ "$CREATOR_ACTION" == "publish" ]]; then
+              python3 scripts/generate-creator-social-card.py \
+                --output "go/${CAMPAIGN_SLUG}/creator-card.png" \
+                --creator "$CREATOR_NAME" \
+                --score "$CREATOR_SCORE" \
+                --environment "$CREATOR_ENVIRONMENT" \
+                --source-type "$CREATOR_SOURCE_TYPE" \
+                --source-day "$CREATOR_SOURCE_DAY"
+            fi
+          elif [[ "$PUBLISH_KIND" == "campaign" ]]; then
+            node scripts/prepare-campaign-link-publish.mjs
+          else
+            echo "::error::Unknown publication kind: $PUBLISH_KIND"
+            exit 1
+          fi
 
       - name: Validate generated source
         run: |
           node scripts/generate-campaign-links.mjs --check
+          node scripts/check-creator-challenges.mjs
           npm test
 
       - name: Publish automation branch
