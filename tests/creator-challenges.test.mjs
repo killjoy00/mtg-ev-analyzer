@@ -22,7 +22,13 @@ import {
 } from '../creator-challenge-pages.mjs';
 import {prepareCreatorChallengePublish} from '../scripts/prepare-creator-challenge-publish.mjs';
 import {checkCreatorChallenges} from '../scripts/check-creator-challenges.mjs';
-import {requestCreatorPrivacyRetirement} from '../worker/creator-challenge-publish.mjs';
+import {
+  creatorPublicationDispatchRetryDue,
+  discoverCreatorPublicationWorkflowRun,
+  dispatchCreatorPublicationAttempt,
+  requestCreatorPrivacyRetirement,
+  verifyCreatorPublicationLive,
+} from '../worker/creator-challenge-publish.mjs';
 
 const SHARE='0123456789abcdef01234567';
 const CHALLENGE='11111111-1111-4111-8111-111111111111';
@@ -364,6 +370,139 @@ test('account deletion pauses after dispatching creator retirement until the sta
     'creator dispatch may only send declared workflow_dispatch inputs',
   );
 });
+
+test('creator publication dispatch distinguishes rejection from ambiguous delivery and retries only after the ambiguity window',async()=>{
+  const operation='22222222-2222-4222-8222-222222222222';
+  const env={PACK1_LAUNCH_WATCHER_GITHUB_TOKEN:'github_pat_fixture_abcdefghijklmnopqrstuvwxyz'};
+  const baseRow={
+    id:CHALLENGE,slug:'lola-rft',status:'publishing',
+    creator_public_name:'Lola',headline:'Can you beat Lola?',source_score:87,
+    source_environment:'mixed',source_type:'practice',source_day:null,
+    acquisition_source:'creator',acquisition_campaign:'lola-rft',acquisition_medium:'creator',
+    publication_operation_ref:operation,
+    publication_detail:{action:'publish',dispatch:{state:'pending',attempts:0}},
+  };
+
+  const rejectedPatches=[],rejectedErrors=[];
+  const rejectedQuery=async(sql,params)=>{
+    if(sql.startsWith('UPDATE creator_challenges\n    SET publication_detail=')){
+      rejectedPatches.push(JSON.parse(params[3]));return {rows:[{id:CHALLENGE}]};
+    }
+    if(sql.startsWith('UPDATE creator_challenges SET publication_error=')){
+      rejectedErrors.push(params[3]);return {rows:[{id:CHALLENGE}]};
+    }
+    throw new Error('Unexpected query: '+sql);
+  };
+  const rejected=await dispatchCreatorPublicationAttempt(
+    rejectedQuery,baseRow,operation,'publish',
+    {env,fetcher:async()=>new Response(null,{status:422})},
+  );
+  assert.equal(rejected.state,'rejected');
+  assert.equal(rejected.status,422);
+  assert.equal(rejectedPatches.at(-1).dispatch.state,'rejected');
+  assert.match(rejectedErrors.at(-1),/HTTP 422/);
+
+  const ambiguousPatches=[],ambiguousErrors=[];
+  const ambiguousQuery=async(sql,params)=>{
+    if(sql.startsWith('UPDATE creator_challenges\n    SET publication_detail=')){
+      ambiguousPatches.push(JSON.parse(params[3]));return {rows:[{id:CHALLENGE}]};
+    }
+    if(sql.startsWith('UPDATE creator_challenges SET publication_error=')){
+      ambiguousErrors.push(params[3]);return {rows:[{id:CHALLENGE}]};
+    }
+    throw new Error('Unexpected query: '+sql);
+  };
+  const ambiguous=await dispatchCreatorPublicationAttempt(
+    ambiguousQuery,baseRow,operation,'publish',
+    {env,fetcher:async()=>{throw new Error('socket closed after request write');}},
+  );
+  assert.equal(ambiguous.state,'ambiguous');
+  const detail={action:'publish',dispatch:ambiguousPatches.at(-1).dispatch};
+  const attempted=Date.parse(detail.dispatch.last_attempt_at);
+  assert.equal(creatorPublicationDispatchRetryDue(detail,{now:attempted+59_999}),false);
+  assert.equal(creatorPublicationDispatchRetryDue(detail,{now:attempted+60_001}),true);
+  assert.match(ambiguousErrors.at(-1),/socket closed/);
+});
+
+test('creator workflow discovery paginates beyond the newest 100 dispatch runs',async()=>{
+  const operation='33333333-3333-4333-8333-333333333333';
+  const env={PACK1_LAUNCH_WATCHER_GITHUB_TOKEN:'github_pat_fixture_abcdefghijklmnopqrstuvwxyz'};
+  const pages=[];
+  const run=await discoverCreatorPublicationWorkflowRun(operation,{
+    env,
+    fetcher:async url=>{
+      const page=Number(new URL(url).searchParams.get('page')||1);pages.push(page);
+      if(page===1)return Response.json({workflow_runs:Array.from({length:100},(_,i)=>({id:i+1,display_title:'other / '+i}))});
+      return Response.json({workflow_runs:[{id:987654,display_title:'Publish creator / '+operation,status:'queued'}]});
+    },
+  });
+  assert.deepEqual(pages,[1,2]);
+  assert.equal(run.id,987654);
+});
+
+test('stale publication operations cannot overwrite a newer retirement operation',async()=>{
+  const oldOperation='44444444-4444-4444-8444-444444444444';
+  const newOperation='55555555-5555-4555-8555-555555555555';
+  const env={PACK1_LAUNCH_WATCHER_GITHUB_TOKEN:'github_pat_fixture_abcdefghijklmnopqrstuvwxyz'};
+  const current={
+    operation:newOperation,
+    action:'retire',
+    detail:{action:'retire',dispatch:{state:'accepted',attempts:1}},
+    error:null,
+  };
+  const staleRow={
+    id:CHALLENGE,slug:'lola-rft',status:'publishing',
+    creator_public_name:'Lola',headline:'Can you beat Lola?',source_score:87,
+    source_environment:'mixed',source_type:'practice',source_day:null,
+    acquisition_source:'creator',acquisition_campaign:'lola-rft',acquisition_medium:'creator',
+    publication_operation_ref:oldOperation,
+    publication_detail:{action:'publish',dispatch:{state:'pending',attempts:0}},
+  };
+  const query=async(sql,params)=>{
+    const matches=params[1]===current.operation&&params[2]===current.action;
+    if(sql.startsWith('UPDATE creator_challenges\n    SET publication_detail=')){
+      if(matches)current.detail={...current.detail,...JSON.parse(params[3])};
+      return {rows:matches?[{id:CHALLENGE}]:[]};
+    }
+    if(sql.startsWith('UPDATE creator_challenges SET publication_error=')){
+      if(matches)current.error=params[3];
+      return {rows:matches?[{id:CHALLENGE}]:[]};
+    }
+    throw new Error('Unexpected query: '+sql);
+  };
+  const result=await dispatchCreatorPublicationAttempt(
+    query,staleRow,oldOperation,'publish',
+    {env,fetcher:async()=>new Response(null,{status:204})},
+  );
+  assert.equal(result.state,'accepted','the network response may be accepted even after a competing state change');
+  assert.equal(current.operation,newOperation);
+  assert.equal(current.action,'retire');
+  assert.deepEqual(current.detail,{action:'retire',dispatch:{state:'accepted',attempts:1}});
+  assert.equal(current.error,null);
+});
+
+test('privacy retirement is not live-verified while the old personalized social image still resolves',async()=>{
+  const row={id:CHALLENGE,slug:'lola-rft'};
+  const retiredHtml=`<!doctype html><body data-creator-challenge-id="${CHALLENGE}" data-creator-challenge-status="retired"></body>`;
+  const stale=await verifyCreatorPublicationLive(row,'retire',{
+    fetcher:async url=>String(url).endsWith('creator-card.png')
+      ? new Response('old personalized card',{status:200,headers:{'content-type':'image/png'}})
+      : new Response(retiredHtml,{status:200,headers:{'content-type':'text/html'}}),
+  });
+  assert.equal(stale.html_verified,true);
+  assert.equal(stale.image_verified,false);
+  assert.equal(stale.image_status,200);
+  assert.equal(stale.ok,false);
+
+  const scrubbed=await verifyCreatorPublicationLive(row,'retire',{
+    fetcher:async url=>String(url).endsWith('creator-card.png')
+      ? new Response(null,{status:404})
+      : new Response(retiredHtml,{status:200,headers:{'content-type':'text/html'}}),
+  });
+  assert.equal(scrubbed.ok,true);
+  assert.equal(scrubbed.image_verified,true);
+});
+
 
 test('creator migration preserves attribution across account merge and demotes duplicate attempts',async()=>{
   const migration=await readFile('migrations/0053_creator_challenges.sql','utf8');
