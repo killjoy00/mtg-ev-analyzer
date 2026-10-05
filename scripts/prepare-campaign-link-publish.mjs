@@ -2,6 +2,7 @@ import {readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {validateCampaignEntries} from '../campaign-links.mjs';
+import {validateCreatorPageEntries} from '../creator-challenge-pages.mjs';
 import {generateCampaignLinks} from './generate-campaign-links.mjs';
 
 const sameEntry=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
@@ -10,6 +11,9 @@ export async function prepareCampaignLinkPublish({root=process.cwd(),entry}={}) 
   const incoming=validateCampaignEntries([entry])[0];
   const configPath=path.join(root,'campaign-links.json');
   const existing=validateCampaignEntries(JSON.parse(await readFile(configPath,'utf8')));
+  const creatorRegistry=validateCreatorPageEntries(JSON.parse(await readFile(path.join(root,'creator-challenges.json'),'utf8')));
+  if(creatorRegistry.some(candidate=>candidate.slug===incoming.slug))
+    throw new Error(`Campaign slug "${incoming.slug}" is reserved by a creator challenge.`);
   const prior=existing.find(candidate=>candidate.slug===incoming.slug);
   if(prior&&!sameEntry(prior,incoming))
     throw new Error(`Campaign slug "${incoming.slug}" already exists with different attribution.`);
