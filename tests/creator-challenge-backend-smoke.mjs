@@ -8,6 +8,7 @@ process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 const {default:growth,query}=await import('../worker/growth-function.js');
 const {default:runApi}=await import('../worker/draft-run-function.mjs');
 const {creatorChallengeById}=await import('../worker/creator-challenges.mjs');
+const {requestCreatorPrivacyRetirement}=await import('../worker/creator-challenge-publish.mjs');
 
 async function call(service,path,body,token,status=200) {
   const request=new Request('https://packone.pro'+path,{
@@ -167,10 +168,59 @@ try {
 
   const authoritative=(await query(`SELECT creator_challenge_id,creator_participant_auth_user_id
     FROM draft_run_sessions WHERE id=$1::uuid`,[targetCompleteId])).rows[0];
-  assert.equal(authoritative.creator_challene_id,challengePartialGuest);
+  assert.equal(authoritative.creator_challenge_id,challengePartialGuest);
   assert.equal(authoritative.creator_participant_auth_user_id,targetAuth);
 
   const stats=await creatorChallengeById(query,challengePartialGuest,{includeStats:true});
   assert.equal(stats.attempts,1,'only the established completed creator attempt counts after merge');
   assert.equal(stats.wins+stats.ties+stats.losses,1);
-  assert.equal(Number( ¡Ý¥ÐÅÕÉä¡M1P½Õ¹Ð ¨¤èé¥¹Ð¸I=4ÉÑ}ÉÕ¹}ÍÍÍ¥½¹Ì(]!IÉÑ½É}¡±±¹}¥ôÄèéÕÕ¥9ÉÑ½É}ÁÉÑ¥¥Á¹Ñ}ÕÑ¡}ÕÍÉ}¥ôÈèéÕÕ¥±l(¡±±¹AÉÑ¥±ÕÍÐ±ÑÉÑÕÑ °(t¤¤¹É½ÝÍlÁt¹¸¤°Ä°ÉÑ½ÈÁÉÑ¥¥Á¹ÐÕ¹¥ÅÕ¹ÍÌÉµ¥¹Ì¥¹ÑÐÑÈµÉ¤ì(ÍÍÉÐ¹ÅÕ°¡9ÕµÈ¢vBVW'4TÄT5B6÷VçB¢£¦çBâe$ôÒæÇF75öWfVçG0¢tU$RÆW%öCÒC£§WVBäBWfVçEöæÖSÒv7&VF÷%ö6ÆÆVævU÷7F'FVBp¢äBWfVçE÷&÷2Óãâv7&VF÷%ö6ÆÆVævUöBsÒC&Å·F&vWBçÆW$BÆ6ÆÆVævU'FÄwVW7EÒç&÷w5³ÒæâÃ° ¢6öç6öÆRæÆört7&VF÷"wVW7Bö66÷VçBGWÆ6FRÖW&vR&W6W'fW2&7F6R7F÷'æBWF÷&FFfR7&VF÷"7FG2âr°§ÒfæÆÇ°¢vBVW'tDTÄUDRe$ôÒ66÷VçEöÆæ·2tU$RWF÷W6W%öCÒC£§WVBrÅ·F&vWDWFÒæ6F6Óç·Ò°¢vBVW'tDTÄUDRe$ôÒæVöåöWFâ'W6W""tU$RCÒC£§WVBrÅ·F&vWDWFÒæ6F6Óç·Ò°§Ð
+
+  const firstStats=await creatorChallengeById(query,challengeCompletedGuest,{includeStats:true});
+  assert.equal(firstStats.attempts,0,'completed guest duplicate is demoted, so the established partial attempt contributes no completed creator attempt');
+
+  const participantRows=await query(`SELECT creator_challenge_id,count(*)::int n
+    FROM draft_run_sessions
+    WHERE creator_challenge_id=ANY($1::uuid[])
+    GROUP BY creator_challenge_id
+    ORDER BY creator_challenge_id`,[[challengeCompletedGuest,challengePartialGuest]]);
+  assert.deepEqual(
+    participantRows.rows.map(row=>[row.creator_challenge_id,Number(row.n)]).sort(),
+    [[challengeCompletedGuest,1],[challengePartialGuest,1]].sort(),
+    'exactly one creator-associated session survives per challenge after merge',
+  );
+
+  assert.equal(Number((await query(`SELECT count(*)::int n FROM analytics_events
+    WHERE player_id=$1::uuid AND event_name='creator_challenge_started'
+      AND event_props->>'creator_challenge_id'=$2`,[target.playerId,challengePartialGuest])).rows[0].n),1,
+  'duplicate creator start telemetry is removed during merge');
+
+  // Exercise later creator privacy cleanup without requiring live publication
+  // infrastructure in this isolated database. The merge/result associations
+  // must remain internally consistent when creator identity is scrubbed.
+  await query(`UPDATE creator_challenges
+    SET status='draft',published_at=NULL,publication_operation_ref=NULL,publication_detail='{}'::jsonb
+    WHERE id=ANY($1::uuid[])`,[[challengeCompletedGuest,challengePartialGuest]]);
+  const privacyReady=await requestCreatorPrivacyRetirement(query,creator.playerId,{reason:'account_deletion'});
+  assert.equal(privacyReady,true,'unpublished fixture challenges require no static cleanup');
+  for(const challengeId of [challengeCompletedGuest,challengePartialGuest]) {
+    const privacy=(await query(`SELECT status,creator_public_name,creator_handle,headline,
+        creator_post_run_note,source_owner_auth_user_id,privacy_removed_at
+      FROM creator_challenges WHERE id=$1::uuid`,[challengeId])).rows[0];
+    assert.equal(privacy.status,'retired');
+    assert.equal(privacy.creator_public_name,'A creator');
+    assert.equal(privacy.creator_handle,null);
+    assert.equal(privacy.headline,'Creator challenge unavailable');
+    assert.equal(privacy.creator_post_run_note,null);
+    assert.equal(privacy.source_owner_auth_user_id,null);
+    assert.ok(privacy.privacy_removed_at);
+  }
+  const scrubbed=(await query(`SELECT opponent_name FROM game_results
+    WHERE player_id=$1::uuid AND client_result_id=$2`,[
+    target.playerId,`draft-run:${targetCompleteId}`,
+  ])).rows[0];
+  assert.equal(scrubbed.opponent_name,'A creator','privacy cleanup scrubs retained creator labels after merge');
+
+  console.log('Creator challenge identity merge, stats, result demotion, telemetry uniqueness and privacy cleanup verified.');
+} finally {
+  // The backend gate runs against an isolated disposable database branch.
+}
