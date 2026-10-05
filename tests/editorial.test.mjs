@@ -204,6 +204,8 @@ const privacy = await readFile('privacy/index.html','utf8');
 assert.match(privacy, /Google advertising is currently disabled, so Pack One does not currently load Google display ads/i);
 assert.match(privacy, /TCGplayer links are routed through Impact/i);
 assert.match(privacy, /records outbound TCGplayer clicks/i);
+assert.match(privacy, /submit a decision-quality report/i);
+assert.match(privacy, /Decision reports do not store email addresses, credentials, or auth tokens/i);
 assert.doesNotMatch(privacy, /may earn a commission|Supporter or Elite membership|membership cannot be verified/i);
 
 const noEmDashCopyFiles = [
