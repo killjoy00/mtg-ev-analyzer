@@ -365,8 +365,8 @@ try {
   const creatorPrivacyRows=(await query(`SELECT id::text id,status,creator_public_name,creator_handle,headline,
       creator_post_run_note,source_owner_auth_user_id::text source_owner_auth_user_id,
       privacy_removed_at,publication_operation_ref::text publication_operation_ref,publication_detail
-    FROM creator_challenges WHERE id=ANY($1::uuid[]) ORDER BY id`,[
-    [publishedCreatorChallenge,draftCreatorChallenge],
+    FROM creator_challenges WHERE id IN ($1::uuid,$2::uuid) ORDER BY id`,[
+    publishedCreatorChallenge,draftCreatorChallenge,
   ])).rows;
   const creatorPrivacyById=new Map(creatorPrivacyRows.map(row=>[row.id,row]));
   for(const challengeId of [publishedCreatorChallenge,draftCreatorChallenge]) {
