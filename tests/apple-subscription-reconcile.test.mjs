@@ -6,6 +6,7 @@ import {
   appStoreServerToken,
   appStoreStatusClient,
   reconcileAppleSubscriptions,
+  requestTestNotification,
 } from '../scripts/apple-subscription-reconcile.mjs';
 import {APPLE_APP_ID,APPLE_ELITE_PRODUCT_ID} from '../worker/apple-subscription-policy.mjs';
 import {acceptAppleNotification} from '../worker/apple-subscriptions.mjs';
@@ -158,4 +159,31 @@ test('sandbox App Store notifications are not rejected for a missing app ID',asy
   assert.equal(result.processed,true);
   const production={...notification,data:{...notification.data,environment:'Production'}};
   await assert.rejects(acceptAppleNotification(query,{signedPayload:'payload',verifyJws:async value=>value==='payload'?production:transaction()}),/another app/);
+});
+
+test('test notification proves the key and reports whether our endpoint accepted it',async()=>{
+  const calls=[];
+  const replies=[Response.json({testNotificationToken:'token-1'}),new Response(null,{status:404}),
+    Response.json({firstSendAttemptResult:'UNSUCCESSFUL_HTTP_RESPONSE_CODE',sendAttempts:[{attemptDate:NOW,sendAttemptResult:'UNSUCCESSFUL_HTTP_RESPONSE_CODE'},{attemptDate:NOW,sendAttemptResult:'SUCCESS'}]})];
+  const result=await requestTestNotification(credentials,'Sandbox',{wait:async()=>{},fetchImpl:async(url,options)=>{
+    calls.push(`${options.method} ${url}`);
+    assert.match(options.headers.authorization,/^Bearer /);
+    return replies.shift();
+  }});
+  assert.deepEqual(result,{environment:'Sandbox',key_accepted:true,delivery:'SUCCESS'});
+  assert.deepEqual(calls,[
+    'POST https://api.storekit-sandbox.apple.com/inApps/v1/notifications/test',
+    'GET https://api.storekit-sandbox.apple.com/inApps/v1/notifications/test/token-1',
+    'GET https://api.storekit-sandbox.apple.com/inApps/v1/notifications/test/token-1',
+  ]);
+  assert.equal(JSON.stringify(result).includes('token-1'),false);
+});
+
+test('test notification fails loudly on a rejected key and reports a missing URL',async()=>{
+  await assert.rejects(requestTestNotification(credentials,'Production',{wait:async()=>{},fetchImpl:async()=>new Response(null,{status:401})}),/In-App Purchase key/);
+  assert.deepEqual(await requestTestNotification(credentials,'Production',{wait:async()=>{},fetchImpl:async()=>new Response(null,{status:404})}),
+    {environment:'Production',key_accepted:true,delivery:'no_notification_url'});
+  assert.deepEqual(await requestTestNotification(credentials,'Production',{wait:async()=>{},checks:2,fetchImpl:async(url,options)=>
+    options.method==='POST'?Response.json({testNotificationToken:'t'}):new Response(null,{status:404})}),{environment:'Production',key_accepted:true,delivery:'pending'});
+  await assert.rejects(requestTestNotification(credentials,'Xcode',{fetchImpl:async()=>{throw Error('must not call');}}));
 });
