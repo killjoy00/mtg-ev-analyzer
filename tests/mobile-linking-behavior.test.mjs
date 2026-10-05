@@ -8,11 +8,14 @@ test('mobile linking distinguishes modern shares, historical challenges, and pub
   const profile='0123456789abcdef';
   const share='a'.repeat(24);
   const historical='b'.repeat(12);
+  const creator='11111111-1111-4111-8111-111111111111';
 
   assert.equal(rewriteIncomingPath('https://packone.pro/?profile='+profile), '/profile?key='+profile);
   assert.equal(rewriteIncomingPath('packone://profile?key='+profile), '/profile?key='+profile);
   assert.equal(rewriteIncomingPath('https://packone.pro/?game=draft-run&shared='+share), '/shared-run?shared='+share);
   assert.equal(rewriteIncomingPath('https://packone.pro/?game=draft-run&challenge='+share), '/shared-run?shared='+share);
+  assert.equal(rewriteIncomingPath('https://packone.pro/?game=draft-run&creator='+creator), '/creator-run?creator='+creator);
+  assert.equal(rewriteIncomingPath('https://packone.pro/go/creator-reality-fracture/'), '/creator-run?creator=creator-reality-fracture');
   assert.equal(rewriteIncomingPath('https://packone.pro/?challenge='+historical), '/historical-challenge?challenge='+historical);
   assert.equal(rewriteIncomingPath('https://packone.pro/?game=draft-run&challenge='+historical), '/',
     'historical 12-character IDs must never be treated as modern Draft Run shares');
@@ -57,7 +60,7 @@ test('Android app-link configuration does not capture all Pack One HTTPS traffic
     .filter((item)=>item.scheme==='https'&&item.host==='packone.pro')
     .map((item)=>item.pathPrefix)
     .sort();
-  assert.deepEqual(prefixes,['/open/daily/','/open/profile/','/open/shared/']);
+  assert.deepEqual(prefixes,['/go/','/open/daily/','/open/profile/','/open/shared/']);
   assert.equal(prefixes.includes('/'),false);
 });
 
@@ -70,7 +73,7 @@ test('published association files match the production mobile identities and nar
   assert.deepEqual(aasa.applinks.details[0].appIDs,['3564X3VTDB.pro.packone.app']);
   assert.deepEqual(
     aasa.applinks.details[0].components.map((item)=>item['/']).sort(),
-    ['/open/daily/*','/open/profile/*','/open/shared/*'],
+    ['/go/*','/open/daily/*','/open/profile/*','/open/shared/*'],
   );
 
   const assetlinks=JSON.parse(fs.readFileSync('.well-known/assetlinks.json','utf8'));
