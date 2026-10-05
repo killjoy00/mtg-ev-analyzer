@@ -103,11 +103,21 @@ const guestPartial=await call(growth,'/v1/session',{displayName:'Merge Guest Par
 const replayGuest=await call(growth,'/v1/session',{displayName:'Creator Replay Guest '+tag});
 const dailyFirstGuest=await call(growth,'/v1/session',{displayName:'Creator Daily First '+tag});
 const paidModeGuest=await call(growth,'/v1/session',{displayName:'Creator Paid Mode Guest '+tag});
-const targetAuth=crypto.randomUUID();
+const targetAuth=crypto.randomUUID(),creatorAuth=crypto.randomUUID();
 
 try {
+  await query(`INSERT INTO neon_auth."user"(id,name,email,"emailVerified")
+    VALUES($1::uuid,$2,$3,true)`,[
+    creatorAuth,'Creator source fixture',`creator-source-${tag}@example.invalid`,
+  ]);
+  await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[creatorAuth,creator.playerId]);
   const template=await completePractice(creator);
   await query(`UPDATE players SET profile_public=true,username_owned=true WHERE id=$1::uuid`,[creator.playerId]);
+  const creatorIdentity=(await query(`SELECT profile_public,username_owned,public_identity_hidden_at
+    FROM players WHERE id=$1::uuid`,[creator.playerId])).rows[0];
+  assert.equal(creatorIdentity.profile_public===true||creatorIdentity.profile_public==='t',true);
+  assert.equal(creatorIdentity.username_owned===true||creatorIdentity.username_owned==='t',true);
+  assert.equal(creatorIdentity.public_identity_hidden_at,null);
 
   // Route-level creator behavior: standard campaigns remain guest-playable,
   // source owners open the original run, creator answers reveal only after a
