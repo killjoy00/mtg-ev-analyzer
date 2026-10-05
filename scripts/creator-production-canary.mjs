@@ -445,7 +445,8 @@ try{
   process.exitCode=1;
 }finally{
   try{if(guest)await cleanupGuest(guest.id,createdChallenges.map(row=>row.id));}catch(error){report.cleanup.guest_error=error.message;}
-  try{await restoreBorrowedSources();report.cleanup.borrowed_sources=true;}catch(error){report.cleanup.borrowed_source_error=error.message;process.exitCode=1;}\n  try{await cleanupFreshPracticeSource();report.cleanup.fresh_practice=true;}catch(error){report.cleanup.fresh_practice_error=error.message;process.exitCode=1;}
+  try{await restoreBorrowedSources();report.cleanup.borrowed_sources=true;}catch(error){report.cleanup.borrowed_source_error=error.message;process.exitCode=1;}
+  try{await cleanupFreshPracticeSource();report.cleanup.fresh_practice=true;}catch(error){report.cleanup.fresh_practice_error=error.message;process.exitCode=1;}
   try{await deleteAdminFixture(admin);report.cleanup.admin=true;}catch(error){report.cleanup.admin_error=error.message;}
   report.finished_at=new Date().toISOString();
   fs.writeFileSync(artifactDir+'/acceptance.json',JSON.stringify(report,null,2)+'\n');
