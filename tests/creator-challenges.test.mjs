@@ -17,6 +17,7 @@ import {
   validateCreatorPageEntries,
 } from '../creator-challenge-pages.mjs';
 import {prepareCreatorChallengePublish} from '../scripts/prepare-creator-challenge-publish.mjs';
+import {requestCreatorPrivacyRetirement} from '../worker/creator-challenge-publish.mjs';
 
 const SHARE='0123456789abcdef01234567';
 const CHALLENGE='11111111-1111-4111-8111-111111111111';
@@ -208,4 +209,52 @@ test('protected campaign publication workflow has a creator path without direct 
   assert.match(workflow,/gh workflow run test\.yml --ref "\$BRANCH"/);
   assert.match(workflow,/gh workflow run e2e\.yml --ref "\$BRANCH"/);
   assert.doesNotMatch(workflow,/HEAD:refs\/heads\/main/);
+});
+
+
+test('account deletion pauses after dispatching creator retirement until the static scrub is verified live',async()=>{
+  let operation=null,dispatchBody=null;
+  const row={
+    id:CHALLENGE,
+    slug:'lola-rft',
+    status:'published',
+    creator_public_name:'Lola',
+    headline:'Can you beat Lola?',
+    source_score:87,
+    source_environment:'latest',
+    source_type:'daily',
+    source_day:'2026-10-08',
+    publication_operation_ref:null,
+    publication_detail:{},
+  };
+  const query=async(sql,params=[])=>{
+    if(sql.includes('SELECT id FROM creator_challenges'))return {rows:[{id:CHALLENGE}]};
+    if(sql.includes('SELECT c.*,s.score source_score')) {
+      return {rows:[{
+        ...row,
+        status:operation?'retired':'published',
+        publication_operation_ref:operation,
+        publication_detail:operation?{action:'retire',reason:'account_deletion'}:{},
+      }]};
+    }
+    if(sql.startsWith('UPDATE creator_challenges SET status=\'retired\'')) {
+      operation=params[1];
+      return {rows:[],rowCount:1};
+    }
+    if(sql.startsWith('INSERT INTO creator_challenge_audit'))return {rows:[],rowCount:1};
+    throw new Error('Unexpected query: '+sql);
+  };
+  const ready=await requestCreatorPrivacyRetirement(query,'22222222-2222-4222-8222-222222222222',{
+    env:{PACK1_LAUNCH_WATCHER_GITHUB_TOKEN:'github_pat_fixture_abcdefghijklmnopqrstuvwxyz'},
+    fetcher:async(_url,options)=>{
+      dispatchBody=JSON.parse(options.body);
+      return new Response(null,{status:204});
+    },
+  });
+  assert.equal(ready,false,'deletion must pause after dispatch instead of deleting the account immediately');
+  assert.match(operation,/^[a-f0-9-]{36}$/i);
+  assert.equal(dispatchBody.ref,'main');
+  assert.equal(dispatchBody.inputs.kind,'creator');
+  assert.equal(dispatchBody.inputs.creator_action,'retire');
+  assert.equal(dispatchBody.inputs.creator_challenge_id,CHALLENGE);
 });
