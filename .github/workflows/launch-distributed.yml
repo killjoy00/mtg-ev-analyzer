@@ -18,6 +18,7 @@ jobs:
     outputs:
       run_load: ${{ steps.scope.outputs.run_load }}
       reason: ${{ steps.scope.outputs.reason }}
+      require_performance: ${{ steps.scope.outputs.require_performance }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -34,6 +35,7 @@ jobs:
           if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
             echo "run_load=true" >> "$GITHUB_OUTPUT"
             echo "reason=manual_dispatch" >> "$GITHUB_OUTPUT"
+            echo "require_performance=false" >> "$GITHUB_OUTPUT"
           else
             node scripts/launch-change-scope.mjs "$BASE_SHA" "$HEAD_SHA" >> "$GITHUB_OUTPUT"
           fi
@@ -65,10 +67,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           REVIEWED_HEAD: ${{ github.event.pull_request.head.sha }}
           REVIEWED_PR: ${{ github.event.pull_request.number }}
+          REQUIRE_PERFORMANCE: ${{ needs.scope.outputs.require_performance }}
         run: |
           node --input-type=module <<'NODE'
           import assert from 'node:assert/strict';
-          const {GITHUB_REPOSITORY:repo,GH_TOKEN:token,REVIEWED_HEAD:head,REVIEWED_PR:pr}=process.env;
+          const {GITHUB_REPOSITORY:repo,GH_TOKEN:token,REVIEWED_HEAD:head,REVIEWED_PR:pr,REQUIRE_PERFORMANCE}=process.env;
+          const requiredNames=REQUIRE_PERFORMANCE==='true'?['test','browser','baseline']:['test','browser'];
           const headers={authorization:'Bearer '+token,accept:'application/vnd.github+json'};
           async function get(path) {
             const response=await fetch('https://api.github.com/repos/'+repo+path,{headers,redirect:'error',signal:AbortSignal.timeout(30000)});
@@ -82,15 +86,15 @@ jobs:
             assert.equal(pull.state,'open','load acceptance is for the open reviewed PR');
             const latest=new Map();
             for(const check of checks.check_runs) {
-              if(check.head_sha===head&&check.app?.slug==='github-actions'&&['test','browser','baseline'].includes(check.name)&&!latest.has(check.name))latest.set(check.name,check);
+              if(check.head_sha===head&&check.app?.slug==='github-actions'&&requiredNames.includes(check.name)&&!latest.has(check.name))latest.set(check.name,check);
             }
-            const required=['test','browser','baseline'].map(name=>latest.get(name));
+            const required=requiredNames.map(name=>latest.get(name));
             if(required.every(check=>check?.status==='completed'&&check.conclusion==='success')) {accepted=true;break;}
             assert.ok(!required.some(check=>check?.status==='completed'&&check.conclusion!=='success'),'required CI must pass before disposable database writes');
             await new Promise(resolve=>setTimeout(resolve,10000));
           }
           assert.ok(accepted,'required CI did not finish within the source gate');
-          console.log('Unchanged source passed test, browser and selector/performance acceptance.');
+          console.log('Unchanged source passed '+requiredNames.join(', ')+' acceptance.');
           NODE
   setup:
     needs: [scope, regression, checked-source]

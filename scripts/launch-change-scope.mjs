@@ -11,6 +11,22 @@ const LOAD_SENSITIVE_PATHS=[
   path=>path==='migrations/0051_exact_pick_draw_index.sql',
   path=>path==='scripts/edge-control.mjs',
 ];
+const PRACTICE_PERFORMANCE_PATHS=new Set([
+  'scripts/practice-performance.mjs',
+  'scripts/practice-reroll-performance.mjs',
+  'scripts/practice-draw-performance.mjs',
+  'scripts/practice-cache-publication.mjs',
+  'worker/draft-run-selection.mjs',
+  'migrations/0039_practice_serving_cache.sql',
+  'migrations/0045_batched_practice_selector.sql',
+  'migrations/0050_practice_recency_bias.sql',
+  'migrations/0051_exact_pick_draw_index.sql',
+  'tests/practice-performance.test.mjs',
+  '.github/workflows/practice-performance.yml',
+]);
+export function requiresPracticePerformance(files=[]) {
+  return [...new Set(files.filter(Boolean))].some(path=>PRACTICE_PERFORMANCE_PATHS.has(path));
+}
 
 function changedPatchLines(patch) {
   return String(patch||'').split('\n')
@@ -54,10 +70,12 @@ function main() {
     const result=classifyLaunchChange({files,gatewayPatch});
     console.log('run_load='+(result.runLoad?'true':'false'));
     console.log('reason='+result.reason);
+    console.log('require_performance='+(requiresPracticePerformance(files)?'true':'false'));
   } catch {
     // Fail safe: an unreadable or unclassifiable diff gets the full rehearsal.
     console.log('run_load=true');
     console.log('reason=scope_error');
+    console.log('require_performance=true');
   }
 }
 
