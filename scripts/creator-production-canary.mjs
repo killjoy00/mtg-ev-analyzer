@@ -4,7 +4,8 @@ import {createHash,createHmac,randomBytes,randomUUID} from 'node:crypto';
 import {corpusDatabase} from './neon-corpus-db.mjs';
 import {gameDateKey} from '../game-date.mjs';
 import {requestCreatorPrivacyRetirement} from '../worker/creator-challenge-publish.mjs';
-import {recoverKnownCanaryFixtures} from './creator-canary-recovery.mjs';
+import {recoverKnownCanaryFixtures,practiceCanaryIdentity} from './creator-canary-recovery.mjs';
+import {normalizeDisplayName} from '../worker/username.mjs';
 
 const [connectionFile,expectedRelease]=process.argv.slice(2);
 assert.ok(connectionFile);
@@ -92,13 +93,14 @@ async function playerToken(playerId) {
 
 async function createFreshPracticeSource() {
   const tag=randomUUID().slice(0,8);
+  const {name,email}=practiceCanaryIdentity(tag);
   const created=(await call('/growth/v1/player/session',{
-    body:{displayName:'Creator Canary Source '+tag},status:[201],
+    body:{displayName:name},status:[201],
   })).data;
   assert.match(created.playerId||'',/^[a-f0-9-]{36}$/i);
+  assert.equal(created.displayName,name,'live player name must match the owned fixture identity');
   const playerId=created.playerId,player=await playerToken(playerId);
   const authId=randomUUID(),session=randomBytes(32).toString('base64url'),csrf=randomBytes(32).toString('base64url');
-  const email='qa-creator-source-'+tag+'@example.invalid',name='Creator Canary Source '+tag;
   mask(session);mask(csrf);
   practiceFixture={authId,email,name,playerId,player,token:{session,csrf},sessionId:null,shareId:null};
   await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,true)',[authId,name,email]);
@@ -160,7 +162,7 @@ async function cleanupFreshPracticeSource() {
     fixture.authId,fixture.email,fixture.name,
   ]);
   await query(`UPDATE players SET profile_public=false,username_owned=false,updated_at=now()
-    WHERE id=$1::uuid AND display_name LIKE 'Creator Canary Source %'`,[fixture.playerId]);
+    WHERE id=$1::uuid AND display_name=$2`,[fixture.playerId,normalizeDisplayName(fixture.name)]);
 }
 
 async function borrowSource(row,type) {

@@ -36,7 +36,8 @@ test('fresh Practice source is played through live APIs and later marked QA/priv
   const start=script.indexOf('async function createFreshPracticeSource()');
   const end=script.indexOf('async function cleanupFreshPracticeSource()',start);
   const block=script.slice(start,end);
-  assert.match(block,/Creator Canary Source/);
+  assert.match(block,/practiceCanaryIdentity\(tag\)/);
+  assert.match(block,/assert\.equal\(created\.displayName,name/);
   assert.doesNotMatch(block,/QA Creator Source/);
   assert.match(block,/\/growth\/v1\/player\/session/);
   assert.match(block,/\/draft\/v1\/runs/);
