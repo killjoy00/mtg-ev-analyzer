@@ -111,6 +111,7 @@ async function createFreshPracticeSource() {
     body:{environment:'mixed'},player,token,status:[200,201],
   })).data;
   practiceFixture.sessionId=run.id;
+  report.fixtures={practice:{player_id:playerId,source_session_id:run.id}};
   assert.equal(run.day,null);
   assert.equal(run.answers.length,0);
   while(!run.complete) {
@@ -123,6 +124,7 @@ async function createFreshPracticeSource() {
   assert.equal(run.answers.length,8);
   const shared=(await call('/draft/v1/runs/'+run.id+'/share',{body:{},player,token})).data;
   practiceFixture.shareId=shared.id;
+  report.fixtures.practice.share_id=shared.id;
   assert.match(shared.id||'',/^[a-f0-9]{24}$/);
 
   const row=(await query(`SELECT s.id::text session_id,s.player_id::text player_id,
@@ -140,6 +142,12 @@ async function createFreshPracticeSource() {
 async function cleanupFreshPracticeSource() {
   const fixture=practiceFixture;
   if(!fixture)return;
+  const clean=await requestCreatorPrivacyRetirement(query,fixture.playerId,{
+    reason:'release_canary_cleanup',today:gameDateKey(),
+    env:{PACK1_LAUNCH_WATCHER_GITHUB_TOKEN:process.env.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN},
+    fetcher:fetch,
+  });
+  assert.equal(clean,true,'Owned Practice fixture still has pending static retirement.');
   await query('UPDATE draft_run_sessions SET measurement_qa=true WHERE player_id=$1::uuid',[fixture.playerId]);
   await query(`DELETE FROM analytics_events WHERE player_id=$1::uuid`,[fixture.playerId]);
   await query('DELETE FROM draft_run_shares WHERE id=$1 AND session_id=$2::uuid',[fixture.shareId,fixture.sessionId]);
