@@ -73,15 +73,19 @@ jobs:
           printf '%s\n' "${{ steps.scope.outputs.profile }}" > "$RUNNER_TEMP/ci-selected-browser-validation"
 
       - uses: actions/setup-python@v5
-        if: steps.scope.outputs.browser_mode == 'core' || steps.scope.outputs.browser_mode == 'full'
+        if: steps.scope.outputs.browser_mode == 'core' || steps.scope.outputs.browser_mode == 'selected' || steps.scope.outputs.browser_mode == 'full'
         with:
           python-version: '3.12'
 
       - name: Install focused browser dependency
-        if: steps.scope.outputs.browser_mode == 'publication' || steps.scope.outputs.browser_mode == 'core'
+        if: steps.scope.outputs.browser_mode == 'publication' || steps.scope.outputs.browser_mode == 'core' || steps.scope.outputs.browser_mode == 'selected'
         run: |
           npm install --no-save playwright@1.63.0
           npx playwright install --with-deps chromium
+
+      - name: Install WebKit for selected account browser contracts
+        if: steps.scope.outputs.browser_mode == 'selected' && contains(steps.scope.outputs.browser_groups, 'account')
+        run: npx playwright install --with-deps webkit
 
       - name: Install full browser dependencies
         if: steps.scope.outputs.browser_mode == 'full'
@@ -100,7 +104,7 @@ jobs:
           printf '%s\n' publication > "$RUNNER_TEMP/ci-selected-browser-validation"
 
       - name: Start static site
-        if: steps.scope.outputs.browser_mode == 'core' || steps.scope.outputs.browser_mode == 'full'
+        if: steps.scope.outputs.browser_mode == 'core' || steps.scope.outputs.browser_mode == 'selected' || steps.scope.outputs.browser_mode == 'full'
         run: |
           nohup python -m http.server 4173 >/tmp/pack1-http.log 2>&1 &
           echo $! > /tmp/pack1-http.pid
@@ -111,6 +115,58 @@ jobs:
         run: |
           node --import ./tests/e2e-production-guard.mjs tests/e2e.mjs
           printf '%s\n' static > "$RUNNER_TEMP/ci-selected-browser-validation"
+
+      - name: Run selected core browser regressions
+        if: steps.scope.outputs.browser_mode == 'selected' && contains(steps.scope.outputs.browser_groups, 'core')
+        run: |
+          node --import ./tests/e2e-production-guard.mjs tests/e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/home-today-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/home-auth-hydration-e2e.mjs
+
+      - name: Run selected gameplay browser regressions
+        if: steps.scope.outputs.browser_mode == 'selected' && contains(steps.scope.outputs.browser_groups, 'gameplay')
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --import ./tests/e2e-production-guard.mjs tests/sets-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/practice-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/practice-hub-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/practice-access-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/profile-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
+          PACK1_TEST_ENVIRONMENT=powered-cube node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
+          PACK1_TEST_DAILY=1 node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
+          PACK1_TEST_DAILY=1 PACK1_TEST_ENVIRONMENT=powered-cube node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
+          PACK1_TEST_SELECTION_VERSION=first-pack-v2 node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
+
+      - name: Run selected account browser regressions
+        if: steps.scope.outputs.browser_mode == 'selected' && contains(steps.scope.outputs.browser_groups, 'account')
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --import ./tests/e2e-production-guard.mjs tests/account-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/auth-context-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/email-verification-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/patreon-activation-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/password-recovery-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/credential-management-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/account-deletion-e2e.mjs
+
+      - name: Run selected ads browser regression
+        if: steps.scope.outputs.browser_mode == 'selected' && contains(steps.scope.outputs.browser_groups, 'ads')
+        run: node --import ./tests/e2e-production-guard.mjs tests/ads-e2e.mjs
+
+      - name: Run selected admin browser regression
+        if: steps.scope.outputs.browser_mode == 'selected' && contains(steps.scope.outputs.browser_groups, 'admin')
+        run: node --import ./tests/e2e-production-guard.mjs tests/admin-e2e.mjs
+
+      - name: Run selected corpus browser regression
+        if: steps.scope.outputs.browser_mode == 'selected' && contains(steps.scope.outputs.browser_groups, 'corpus')
+        run: node --import ./tests/e2e-production-guard.mjs tests/corpus-readiness-e2e.mjs
+
+      - name: Mark selected browser validation complete
+        if: success() && steps.scope.outputs.browser_mode == 'selected'
+        run: printf '%s\n' "${{ steps.scope.outputs.profile }}" > "$RUNNER_TEMP/ci-selected-browser-validation"
 
       - name: Run full affected browser regression
         if: steps.scope.outputs.browser_mode == 'full'
@@ -143,7 +199,7 @@ jobs:
           printf '%s\n' "${{ steps.scope.outputs.profile }}" > "$RUNNER_TEMP/ci-selected-browser-validation"
 
       - name: Upload UI screenshots
-        if: always() && (steps.scope.outputs.browser_mode == 'core' || steps.scope.outputs.browser_mode == 'full')
+        if: always() && (steps.scope.outputs.browser_mode == 'core' || steps.scope.outputs.browser_mode == 'selected' || steps.scope.outputs.browser_mode == 'full')
         uses: actions/upload-artifact@v4
         with:
           name: pack1-ui-screenshots
