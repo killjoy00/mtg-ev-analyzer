@@ -1,1 +1,16 @@
-[]
+[
+  {
+    "id": "e10286c0-580f-4e08-926c-df444916b65e",
+    "slug": "canary-practice-1a144cc5",
+    "status": "published",
+    "creator_name": "Pack One Canary",
+    "headline": "Pack One release canary",
+    "score": 44,
+    "environment": "mixed",
+    "source_type": "practice",
+    "source_day": null,
+    "source": "creator",
+    "campaign": "release-canary",
+    "medium": "creator"
+  }
+]
