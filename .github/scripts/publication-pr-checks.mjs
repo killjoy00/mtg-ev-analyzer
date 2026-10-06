@@ -2,8 +2,16 @@ import assert from 'node:assert/strict';
 import {pathToFileURL} from 'node:url';
 
 const paths=['.github/workflows/test.yml','.github/workflows/e2e.yml'];
+const requiredStepByPath=new Map([
+  ['.github/workflows/test.yml','Validate publication-only source'],
+  ['.github/workflows/e2e.yml','Run focused publication browser smoke'],
+]);
+const completionStepByPath=new Map([
+  ['.github/workflows/test.yml','Verify selected validation completed'],
+  ['.github/workflows/e2e.yml','Verify selected browser validation completed'],
+]);
 
-export function validatePublicationPr(pr,files,{repo,branch,headSha,slug,kind}) {
+export function validatePublicationPr(pr,files,{repo,branch,headSha,slug,kind,action='publish'}) {
   assert.equal(pr.state,'open');
   assert.equal(pr.base?.ref,'main');
   assert.equal(pr.base?.repo?.full_name,repo);
@@ -13,11 +21,27 @@ export function validatePublicationPr(pr,files,{repo,branch,headSha,slug,kind}) 
   assert.equal(pr.user?.login,'github-actions[bot]');
   assert.match(slug,/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
   assert.ok(['creator','campaign'].includes(kind));
-  const allowed=kind==='creator'
-    ? ['creator-challenges.json','creator/'+slug+'/index.html','creator/'+slug+'/creator-card.png']
-    : ['campaign-links.json','go/'+slug+'/index.html'];
+  assert.ok(['publish','retire'].includes(action));
+  const registry=kind==='creator'?'creator-challenges.json':'campaign-links.json';
+  const route=(kind==='creator'?'creator/':'go/')+slug+'/index.html';
+  const card='creator/'+slug+'/creator-card.png';
+  const allowed=kind==='creator'?[registry,route,card]:[registry,route];
   assert.ok(files.length>0&&files.length<=allowed.length);
+  const byName=new Map(files.map(file=>[file.filename,file]));
   for(const file of files)assert.ok(allowed.includes(file.filename),'unexpected publication file: '+file.filename);
+  assert.ok(byName.has(registry),'publication registry change is required');
+  assert.ok(byName.has(route),'publication route change is required');
+  assert.notEqual(byName.get(registry)?.status,'removed','publication registry cannot be deleted');
+  if(action==='publish') {
+    assert.notEqual(byName.get(route)?.status,'removed','published route cannot be deleted');
+    if(kind==='creator') {
+      assert.ok(byName.has(card),'creator publication requires the generated social card');
+      assert.notEqual(byName.get(card)?.status,'removed','published creator social card cannot be deleted');
+    }
+  } else {
+    if(kind==='campaign')assert.equal(byName.get(route)?.status,'removed','retired campaign route must be removed');
+    if(kind==='creator'&&byName.has(card))assert.equal(byName.get(card)?.status,'removed','creator retirement may only delete the social card');
+  }
 }
 
 export function requiredPublicationRuns(runs,{repo,branch,headSha,prNumber}) {
@@ -28,7 +52,26 @@ export function requiredPublicationRuns(runs,{repo,branch,headSha,prNumber}) {
     .sort((a,b)=>b.id-a.id)[0]);
 }
 
-export async function waitForPublicationChecks({repo,branch,headSha,slug,kind,prNumber,
+export function validatePublicationRunJobs(run,jobs) {
+  assert.ok(run&&paths.includes(run.path),'unexpected required publication run');
+  assert.ok(Array.isArray(jobs)&&jobs.length>0,'required publication run has no jobs');
+  const expectedStep=requiredStepByPath.get(run.path);
+  const completionStep=completionStepByPath.get(run.path);
+  const matching=jobs.filter(job=>job.status==='completed'&&job.conclusion==='success'
+    &&job.steps?.some(step=>step.name===expectedStep));
+  assert.equal(matching.length,1,'required publication run did not execute exactly one successful '+expectedStep+' step');
+  const job=matching[0];
+  const selected=job.steps.find(step=>step.name===expectedStep);
+  assert.equal(selected.status,'completed');
+  assert.equal(selected.conclusion,'success');
+  const completion=job.steps.find(step=>step.name===completionStep);
+  assert.ok(completion,'required publication run is missing completion assertion '+completionStep);
+  assert.equal(completion.status,'completed');
+  assert.equal(completion.conclusion,'success');
+  return job;
+}
+
+export async function waitForPublicationChecks({repo,branch,headSha,slug,kind,action='publish',prNumber,
   token,approvalToken,fetcher=fetch,sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),
   timeoutMs=30*60*1000,now=Date.now}) {
   assert.match(repo,/^[\w.-]+\/[\w.-]+$/);
@@ -62,10 +105,17 @@ export async function waitForPublicationChecks({repo,branch,headSha,slug,kind,pr
       await sleep(delay);
     }
   };
-  const files=await api('/pulls/'+prNumber+'/files?per_page=100');
+  const validateFrozenPr=async()=>{
+    const [pr,files]=await Promise.all([
+      api('/pulls/'+prNumber),
+      api('/pulls/'+prNumber+'/files?per_page=100'),
+    ]);
+    validatePublicationPr(pr,files,{repo,branch,headSha,slug,kind,action});
+    return files;
+  };
   const approved=new Set();
   while(now()<deadline){
-    validatePublicationPr(await api('/pulls/'+prNumber),files,{repo,branch,headSha,slug,kind});
+    await validateFrozenPr();
     let runs=[];
     for(let page=1;page<=3;page++){
       const data=await api('/actions/runs?event=pull_request&head_sha='+headSha+'&per_page=100&page='+page);
@@ -74,13 +124,18 @@ export async function waitForPublicationChecks({repo,branch,headSha,slug,kind,pr
     }
     const required=requiredPublicationRuns(runs,{repo,branch,headSha,prNumber});
     if(required.every(run=>run?.status==='completed'&&run.conclusion==='success')){
-      validatePublicationPr(await api('/pulls/'+prNumber),files,{repo,branch,headSha,slug,kind});
+      await validateFrozenPr();
+      for(const run of required) {
+        const data=await api('/actions/runs/'+run.id+'/jobs?per_page=100');
+        validatePublicationRunJobs(run,data.jobs);
+      }
+      await validateFrozenPr();
       return required;
     }
     for(const run of required.filter(Boolean)){
       if(run.conclusion==='action_required'){
         if(!approved.has(run.id)){
-          validatePublicationPr(await api('/pulls/'+prNumber),files,{repo,branch,headSha,slug,kind});
+          await validateFrozenPr();
           await api('/actions/runs/'+run.id+'/approve',{approve:true});
           approved.add(run.id);
           console.log('Approved required PR check: '+run.html_url);
@@ -97,7 +152,8 @@ export async function waitForPublicationChecks({repo,branch,headSha,slug,kind,pr
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   const prNumber=Number(new URL(process.env.PR_URL).pathname.split('/').at(-1));
   const runs=await waitForPublicationChecks({repo:process.env.GITHUB_REPOSITORY,branch:process.env.BRANCH,
-    headSha:process.env.HEAD_SHA,slug:process.env.CAMPAIGN_SLUG,kind:process.env.PUBLISH_KIND,prNumber,
+    headSha:process.env.HEAD_SHA,slug:process.env.CAMPAIGN_SLUG,kind:process.env.PUBLISH_KIND,
+    action:process.env.PUBLISH_KIND==='creator'?process.env.CREATOR_ACTION||'publish':'publish',prNumber,
     token:process.env.GH_TOKEN,approvalToken:process.env.PUBLICATION_APPROVAL_TOKEN});
   console.log('Required publication PR checks passed: '+runs.map(run=>run.html_url).join(' '));
 }
