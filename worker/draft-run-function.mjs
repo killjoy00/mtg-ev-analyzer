@@ -592,7 +592,8 @@ async function route(request) {
             WHERE existing.player_id=$1::uuid
               AND existing.event_name=event.event_name
               AND existing.event_props->>'creator_challenge_id'=$5
-          )`,[
+          )
+        ON CONFLICT DO NOTHING`,[
         viewer,
         JSON.stringify({creator_challenge_id:challenge.id,creator_challenge_slug:challenge.slug,creator_source_type:challenge.source_type}),
         JSON.stringify(acquisition),
