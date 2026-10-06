@@ -1,18 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {validatePublicationPr,requiredPublicationRuns,waitForPublicationChecks} from '../.github/scripts/publication-pr-checks.mjs';
+import {validatePublicationPr,requiredPublicationRuns,validatePublicationRunJobs,waitForPublicationChecks} from '../.github/scripts/publication-pr-checks.mjs';
 
-const expected={repo:'owner/repo',branch:'automation/creator-challenge-fixture-op',headSha:'a'.repeat(40),slug:'fixture',kind:'creator',prNumber:123};
-const pr=()=>({number:123,state:'open',base:{ref:'main',repo:{full_name:expected.repo}},
+const expected={repo:'owner/repo',branch:'automation/creator-challenge-fixture-op',headSha:'a'.repeat(40),baseSha:'b'.repeat(40),slug:'fixture',kind:'creator',prNumber:123};
+const pr=()=>({number:123,state:'open',base:{ref:'main',sha:expected.baseSha,repo:{full_name:expected.repo}},
   head:{ref:expected.branch,sha:expected.headSha,repo:{full_name:expected.repo}},user:{login:'github-actions[bot]'}});
 const files=[{filename:'creator-challenges.json'},{filename:'creator/fixture/index.html'},{filename:'creator/fixture/creator-card.png'}];
 const runs=()=>['test','e2e'].map((name,index)=>({id:index+1,path:'.github/workflows/'+name+'.yml',
   event:'pull_request',head_sha:expected.headSha,head_branch:expected.branch,head_repository:{full_name:expected.repo},
   pull_requests:[{number:123}],status:'completed',conclusion:'action_required',html_url:'https://github.com/owner/repo/actions/runs/'+(index+1)}));
+const jobsFor=runId=>({jobs:[{name:runId===1?'test':'browser',status:'completed',conclusion:'success',steps:(runId===1?[
+  'Validate publication diff and generated outputs','Run selected test validation','Verify selected test validation completed',
+]:[
+  'Validate publication diff and generated outputs','Run focused publication browser smoke','Verify selected browser validation completed',
+]).map(name=>({name,status:'completed',conclusion:'success'}))}]});
 
 test('publication approval is confined to the generated same-repo static diff and frozen head',()=>{
   validatePublicationPr(pr(),files,expected);
-  for(const wrong of [ {...pr(),head:{...pr().head,sha:'b'.repeat(40)}},
+  for(const wrong of [ {...pr(),head:{...pr().head,sha:'c'.repeat(40)}},
+    {...pr(),base:{...pr().base,sha:'d'.repeat(40)}},
     {...pr(),head:{...pr().head,repo:{full_name:'attacker/fork'}}},
     {...pr(),state:'closed'}, {...pr(),user:{login:'untrusted'}} ])
     assert.throws(()=>validatePublicationPr(wrong,files,expected));
@@ -31,6 +37,15 @@ test('manual-dispatch green checks and unrelated PR runs cannot authorize public
   assert.deepEqual(requiredPublicationRuns(distractors,expected),[undefined,undefined]);
 });
 
+test('successful publication runs must contain the selected validation steps',()=>{
+  validatePublicationRunJobs('.github/workflows/test.yml',jobsFor(1).jobs);
+  validatePublicationRunJobs('.github/workflows/e2e.yml',jobsFor(2).jobs);
+  const incomplete=jobsFor(1).jobs.map(job=>({...job,steps:job.steps.filter(step=>step.name!=='Run selected test validation')}));
+  assert.throws(()=>validatePublicationRunJobs('.github/workflows/test.yml',incomplete),/missing validation step/);
+  const failed=jobsFor(2).jobs.map(job=>({...job,steps:job.steps.map(step=>step.name==='Run focused publication browser smoke'?{...step,conclusion:'failure'}:step)}));
+  assert.throws(()=>validatePublicationRunJobs('.github/workflows/e2e.yml',failed),/did not pass/);
+});
+
 test('only exact PR runs are approved with Actions token, then both real checks must succeed',async()=>{
   const events=[];let polls=0;
   const fetcher=async(url,options)=>{
@@ -39,6 +54,8 @@ test('only exact PR runs are approved with Actions token, then both real checks 
     if(path.endsWith('/approve'))return new Response(null,{status:201});
     if(path.endsWith('/files'))return Response.json(files);
     if(path.endsWith('/pulls/123'))return Response.json(pr());
+    const jobMatch=path.match(/\/actions\/runs\/(\d+)\/jobs$/);
+    if(jobMatch)return Response.json(jobsFor(Number(jobMatch[1])));
     if(path.endsWith('/actions/runs'))return Response.json({workflow_runs:runs().map(run=>({...run,conclusion:polls?'success':'action_required'}))});
     throw Error('Unexpected request');
   };
@@ -48,6 +65,38 @@ test('only exact PR runs are approved with Actions token, then both real checks 
   assert.deepEqual(approvals.map(event=>event.path),['/repos/owner/repo/actions/runs/1/approve','/repos/owner/repo/actions/runs/2/approve']);
   assert.ok(approvals.every(event=>event.token==='Bearer actions-approve'));
   assert.ok(events.filter(event=>event.method==='GET').every(event=>event.token==='Bearer read-and-merge'));
+  assert.equal(events.filter(event=>event.path.endsWith('/jobs')).length,2);
+});
+
+test('moving main base invalidates old green publication evidence',async()=>{
+  let frozenReads=0;
+  const fetcher=async url=>{
+    const path=new URL(url).pathname;
+    if(path.endsWith('/files')){frozenReads++;return Response.json(files);}
+    if(path.endsWith('/pulls/123')){
+      const moved=frozenReads>=1;
+      return Response.json(moved?{...pr(),base:{...pr().base,sha:'d'.repeat(40)}}:pr());
+    }
+    if(path.endsWith('/actions/runs'))return Response.json({workflow_runs:runs().map(run=>({...run,conclusion:'success'}))});
+    const jobMatch=path.match(/\/actions\/runs\/(\d+)\/jobs$/);
+    if(jobMatch)return Response.json(jobsFor(Number(jobMatch[1])));
+    throw Error('Unexpected request '+path);
+  };
+  await assert.rejects(waitForPublicationChecks({...expected,token:'read',approvalToken:'approve',fetcher}),/publication base changed/);
+  assert.equal(frozenReads,2,'file evidence is refreshed on the second frozen-PR validation before old green runs can be accepted');
+});
+
+test('green run without complete selected validation is rejected',async()=>{
+  const fetcher=async(url,options)=>{
+    const path=new URL(url).pathname;
+    if(path.endsWith('/files'))return Response.json(files);
+    if(path.endsWith('/pulls/123'))return Response.json(pr());
+    if(path.endsWith('/actions/runs'))return Response.json({workflow_runs:runs().map(run=>({...run,conclusion:'success'}))});
+    if(path.endsWith('/actions/runs/1/jobs'))return Response.json({jobs:[{steps:[]}]});
+    if(path.endsWith('/actions/runs/2/jobs'))return Response.json(jobsFor(2));
+    throw Error('Unexpected request '+path+' '+options?.method);
+  };
+  await assert.rejects(waitForPublicationChecks({...expected,token:'read',approvalToken:'approve',fetcher}),/missing validation step/);
 });
 
 test('a genuine PR check failure stops publication without replacing its outcome',async()=>{
@@ -58,8 +107,14 @@ test('a genuine PR check failure stops publication without replacing its outcome
 });
 
 const greenRuns=()=>({workflow_runs:runs().map(run=>({...run,conclusion:'success'}))});
-const healthyRead=url=>new URL(url).pathname.endsWith('/files')?Response.json(files)
-  :new URL(url).pathname.endsWith('/pulls/123')?Response.json(pr()):Response.json(greenRuns());
+const healthyRead=url=>{
+  const path=new URL(url).pathname;
+  if(path.endsWith('/files'))return Response.json(files);
+  if(path.endsWith('/pulls/123'))return Response.json(pr());
+  const jobMatch=path.match(/\/actions\/runs\/(\d+)\/jobs$/);
+  if(jobMatch)return Response.json(jobsFor(Number(jobMatch[1])));
+  return Response.json(greenRuns());
+};
 
 for(const failure of [500,503,429,'network','timeout']){
   test(`transient GitHub read ${failure} recovers without approving or weakening checks`,async()=>{

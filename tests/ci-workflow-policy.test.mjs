@@ -14,9 +14,47 @@ for (const [name, flow] of [['test', unit], ['browser', browser], ['mobile', mob
   });
 }
 
-test('required test fast path keeps the account-deletion secret guard', () => {
-  assert.match(unit, /Verify account-deletion release secrets are provisioned/);
-  assert.match(unit, /if: github\.event_name == 'workflow_dispatch' \|\| \(github\.event_name == 'pull_request' && github\.event\.pull_request\.head\.repo\.full_name == github\.repository\)/);
+test('required checks share one fail-closed classifier and keep nightly broad coverage', () => {
+  for (const flow of [unit,browser]) {
+    assert.match(flow,/scripts\/ci-change-classifier\.mjs/);
+    assert.match(flow,/schedule:\n\s+- cron:/);
+    assert.match(flow,/forcing broad validation/);
+    assert.match(flow,/fallback_full/,'classifier execution failures must fail closed to broad validation');
+  }
+  assert.match(unit,/hydrate_replays/);
+  assert.match(unit,/bash scripts\/hydrate-replay-shards\.sh/);
+  assert.doesNotMatch(browser,/hydrate-replay-shards|r2_replay_shards\.sh hydrate/,'browser suites do not consume replay shards');
+});
+
+test('generic test gate no longer blocks unrelated PRs on release-secret provisioning', () => {
+  assert.doesNotMatch(unit,/Verify account-deletion release secrets are provisioned/);
+  const secureAuth=readFileSync('.github/workflows/secure-auth-release.yml','utf8');
+  assert.match(secureAuth,/PACK1_ACCOUNT_DELETE_RESEND_API_KEY/);
+  assert.match(secureAuth,/APPLE_TOKEN_ENCRYPTION_KEY_V1/);
+});
+
+test('scoped account browser validation installs WebKit for dual-engine contracts', () => {
+  assert.match(browser,/BROWSER_GROUPS/);
+  assert.match(browser,/\*,account,\*/);
+  assert.match(browser,/playwright install --with-deps chromium webkit/);
+});
+
+test('required checks cannot pass by silently skipping their selected validation', () => {
+  assert.match(unit,/Verify selected test validation completed/);
+  assert.match(unit,/test-validation-complete/);
+  assert.match(browser,/Verify selected browser validation completed/);
+  assert.match(browser,/browser-validation-complete/);
+  assert.match(browser,/Run focused publication browser smoke/);
+});
+
+test('workflow/helper-only validation is affected-contract scoped, not blanket product testing', () => {
+  const ciCase=unit.split('            ci)')[1]?.split('            full)')[0]||'';
+  assert.match(ciCase,/changed_ci/);
+  assert.match(ciCase,/node --check "\$changed"/);
+  assert.match(ciCase,/grep -lF/);
+  assert.match(ciCase,/tests\/ci-workflow-policy\.test\.mjs/);
+  assert.match(ciCase,/tests\/workflow-block-scalars\.test\.mjs/);
+  assert.doesNotMatch(ciCase,/npm test/);
 });
 
 test('signed and publishing mobile jobs remain unreachable from pull-request execution and never touch the unsigned Gradle cache', () => {

@@ -282,6 +282,8 @@ test('protected campaign publication workflow has a creator path without direct 
   assert.match(workflow,/prepare-creator-challenge-publish\.mjs/);
   assert.match(workflow,/generate-creator-social-card\.py/);
   assert.match(workflow,/check-creator-challenges\.mjs/);
+  assert.match(workflow,/node scripts\/ci-publication-validate\.mjs/);
+  assert.match(workflow,/python3 scripts\/check-creator-social-card\.py/);
   assert.match(workflow,/node \.github\/scripts\/publication-pr-checks\.mjs/);
   assert.match(workflow,/environment: pack-one-mobile-release/);
   assert.match(workflow,/--match-head-commit "\$HEAD_SHA"/);

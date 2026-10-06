@@ -2,6 +2,8 @@ name: test
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '17 9 * * *'
   pull_request:
     types: [opened, synchronize, reopened]
   push:
@@ -25,99 +27,190 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Detect required-suite scope
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Classify complete change set
         id: scope
         shell: bash
         env:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: |
           set -euo pipefail
-          run_full=true
+          head_sha="$GITHUB_SHA"
+          base_sha=''
+          force_full=false
+          changed_files=()
           if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            head_sha="$PR_HEAD_SHA"
             if ! git fetch --no-tags origin main:refs/remotes/origin/main; then
-              echo '::warning::Unable to fetch origin/main; running full validation.'
-            elif ! stack_base_sha="$(git merge-base origin/main "$PR_HEAD_SHA")"; then
-              echo '::warning::Unable to compute merge base against origin/main; running full validation.'
+              echo '::warning::Unable to fetch origin/main; forcing broad validation.'
+              force_full=true
+            elif ! base_sha="$(git merge-base origin/main "$head_sha")"; then
+              echo '::warning::Unable to compute merge base; forcing broad validation.'
+              force_full=true
             else
-              run_full=false
-              mapfile -t changed_files < <(git diff --name-only "$stack_base_sha" "$PR_HEAD_SHA")
-              if (( ${#changed_files[@]} == 0 )); then
-                run_full=true
-              else
-                printf 'Changed files:\n'
-                printf ' - %s\n' "${changed_files[@]}"
-                for path in "${changed_files[@]}"; do
-                  case "$path" in
-                    mobile/*|docs/mobile-*|docs/android-*|docs/parity.md|.github/workflows/mobile*.yml|.github/workflows/android-*.yml|.github/workflows/ios-*.yml|.github/workflows/google-play-access.yml|.github/android-*.txt|.github/ios-*.txt|.github/app-store-*.txt|.github/scripts/app-store-*.mjs|.gitignore)
-                      ;;
-                    *)
-                      run_full=true
-                      break
-                      ;;
-                  esac
-                done
-              fi
+              mapfile -t changed_files < <(git diff --name-only "$base_sha" "$head_sha")
+            fi
+          elif [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            if [[ ! "$PUSH_BEFORE_SHA" =~ ^[a-f0-9]{40}$ || "$PUSH_BEFORE_SHA" == 0000000000000000000000000000000000000000 ]]; then
+              force_full=true
+            else
+              base_sha="$PUSH_BEFORE_SHA"
+              if ! git cat-file -e "$base_sha^{commit}" 2>/dev/null; then git fetch --no-tags origin "$base_sha" || force_full=true; fi
+              if [[ "$force_full" == false ]]; then mapfile -t changed_files < <(git diff --name-only "$base_sha" "$head_sha"); fi
+            fi
+          else
+            force_full=true
+          fi
+          fallback_full() {
+            {
+              echo 'plan=full'
+              echo 'unit_plan=full'
+              echo 'browser_plan=full'
+              echo 'hydrate_replays=true'
+              echo 'dataset_audit=true'
+              echo 'build_bundles=true'
+              echo 'ci_contracts=true'
+              echo 'publication_kind='
+              echo 'publication_slug='
+              echo 'browser_groups='
+              echo 'reason=classifier failure; broad validation'
+            } >> "$GITHUB_OUTPUT"
+          }
+          if [[ "$force_full" == true ]]; then
+            if ! node scripts/ci-change-classifier.mjs --full --github-output; then
+              echo '::warning::Classifier failed while selecting broad validation; using shell fail-closed outputs.'
+              fallback_full
+            fi
+          else
+            printf 'Changed files from %s to %s:\n' "$base_sha" "$head_sha"
+            printf ' - %s\n' "${changed_files[@]}"
+            if ! node scripts/ci-change-classifier.mjs --github-output "${changed_files[@]}"; then
+              echo '::warning::Classifier failed; forcing broad validation.'
+              fallback_full
             fi
           fi
-          echo "run_full=$run_full" >> "$GITHUB_OUTPUT"
-          if [[ "$run_full" == "true" ]]; then
-            echo 'Running the full repository gate.'
-          else
-            echo 'Native-mobile/release-only PR: full web/backend gate is not required.'
-          fi
-      - uses: actions/setup-node@v4
-        if: steps.scope.outputs.run_full == 'true'
-        with:
-          node-version: 24
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+      - name: Summarize selected validation
+        env:
+          PLAN: ${{ steps.scope.outputs.plan }}
+          REASON: ${{ steps.scope.outputs.reason }}
+          BROWSER_GROUPS: ${{ steps.scope.outputs.browser_groups }}
+        run: |
+          echo "Test plan: $PLAN ($REASON)" >> "$GITHUB_STEP_SUMMARY"
+          [[ -z "$BROWSER_GROUPS" ]] || echo "Browser groups: $BROWSER_GROUPS" >> "$GITHUB_STEP_SUMMARY"
+      - name: Check changed-file whitespace
+        if: steps.scope.outputs.base_sha != ''
+        run: git diff --check "${{ steps.scope.outputs.base_sha }}" "${{ steps.scope.outputs.head_sha }}"
+      - name: Verify CI selection contracts
+        if: steps.scope.outputs.ci_contracts == 'true'
+        run: |
+          node --check tests/publication-route-e2e.mjs
+          node --test \
+            tests/ci-change-classifier.test.mjs \
+            tests/ci-publication-validate.test.mjs \
+            tests/browser-test-selection.test.mjs \
+            tests/ci-workflow-policy.test.mjs \
+            tests/workflow-block-scalars.test.mjs \
+            tests/publication-pr-checks.test.mjs \
+            tests/browser-replay-hydration.test.mjs
+      - name: Validate publication diff and generated outputs
+        id: publication
+        if: steps.scope.outputs.plan == 'publication'
+        env:
+          CI_BASE_SHA: ${{ steps.scope.outputs.base_sha }}
+          CI_HEAD_SHA: ${{ steps.scope.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          node scripts/ci-publication-validate.mjs --base "$CI_BASE_SHA" --head "$CI_HEAD_SHA" --github-output
+          node scripts/generate-campaign-links.mjs --check
+          node scripts/check-creator-challenges.mjs
       - uses: actions/setup-python@v5
-        if: steps.scope.outputs.run_full == 'true'
+        if: steps.scope.outputs.unit_plan == 'full' || steps.scope.outputs.unit_plan == 'ci' || steps.scope.outputs.dataset_audit == 'true' || (steps.scope.outputs.plan == 'publication' && steps.publication.outputs.kind == 'creator' && steps.publication.outputs.action == 'publish')
         with:
           python-version: '3.12'
+      - name: Install creator card verification dependency
+        if: steps.scope.outputs.plan == 'publication' && steps.publication.outputs.kind == 'creator' && steps.publication.outputs.action == 'publish'
+        run: python3 -m pip install --quiet 'Pillow==11.3.0'
       - name: Verify deployment bundles and embedded revisions
-        if: steps.scope.outputs.run_full == 'true'
+        if: steps.scope.outputs.build_bundles == 'true'
         shell: bash
         run: |
           set -euo pipefail
           npm install --prefix "$RUNNER_TEMP/release-tools" --no-audit --no-fund esbuild@0.28.2
           ESBUILD_BIN="$RUNNER_TEMP/release-tools/node_modules/.bin/esbuild" node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$GITHUB_SHA"
       - name: Hydrate replay shards from R2
-        if: steps.scope.outputs.run_full == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        if: steps.scope.outputs.hydrate_replays == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         run: bash scripts/hydrate-replay-shards.sh
-      - name: Run tests with replay shards required
-        if: steps.scope.outputs.run_full == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        env:
-          REQUIRE_REPLAY_SHARDS: '1'
-        run: npm test
-      - name: Run fork tests without private replay shards
-        if: steps.scope.outputs.run_full == 'true' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
-        run: npm test
-      - name: Audit production datasets
-        if: steps.scope.outputs.run_full == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        run: python scripts/audit_datasets.py --fail-on-error
-
-      # Keep this last so implementation regressions are visible even while a
-      # release-critical secret is intentionally not yet provisioned. A
-      # same-repository PR still cannot go green or merge without all four.
-      - name: Verify account-deletion release secrets are provisioned
-        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+      - name: Run selected test validation
+        id: selected_test
         shell: bash
         env:
-          RATE_LIMIT_SECRET_PRESENT: ${{ secrets.PACK1_RATE_LIMIT_SECRET != '' }}
-          DELETION_ADMIN_EMAIL_PRESENT: ${{ secrets.PACK1_DELETION_ADMIN_EMAIL != '' }}
-          DELETION_ADMIN_PASSWORD_PRESENT: ${{ secrets.PACK1_DELETION_ADMIN_PASSWORD != '' }}
-          DELETE_EMAIL_KEY: ${{ secrets.PACK1_ACCOUNT_DELETE_RESEND_API_KEY }}
-          APPLE_TEAM_ID_PRESENT: ${{ secrets.APPLE_TEAM_ID != '' }}
-          APPLE_SIGN_IN_KEY_ID_PRESENT: ${{ secrets.APPLE_SIGN_IN_KEY_ID != '' }}
-          APPLE_SIGN_IN_KEY_P8_PRESENT: ${{ secrets.APPLE_SIGN_IN_KEY_P8 != '' }}
-          APPLE_TOKEN_ENCRYPTION_KEY_V1_PRESENT: ${{ secrets.APPLE_TOKEN_ENCRYPTION_KEY_V1 != '' }}
+          UNIT_PLAN: ${{ steps.scope.outputs.unit_plan }}
+          HYDRATE_REPLAYS: ${{ steps.scope.outputs.hydrate_replays }}
+          PUBLICATION_KIND: ${{ steps.publication.outputs.kind }}
+          PUBLICATION_ACTION: ${{ steps.publication.outputs.action }}
+          PUBLICATION_SLUG: ${{ steps.publication.outputs.slug }}
+          SAME_REPO_PR: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+          CI_BASE_SHA: ${{ steps.scope.outputs.base_sha }}
+          CI_HEAD_SHA: ${{ steps.scope.outputs.head_sha }}
         run: |
           set -euo pipefail
-          [[ "$RATE_LIMIT_SECRET_PRESENT" == true ]] || { echo '::error::PACK1_RATE_LIMIT_SECRET is not provisioned.'; exit 1; }
-          [[ "$DELETION_ADMIN_EMAIL_PRESENT" == true ]] || { echo '::error::PACK1_DELETION_ADMIN_EMAIL is not provisioned.'; exit 1; }
-          [[ "$DELETION_ADMIN_PASSWORD_PRESENT" == true ]] || { echo '::error::PACK1_DELETION_ADMIN_PASSWORD is not provisioned.'; exit 1; }
-          [[ "$DELETE_EMAIL_KEY" == re_* && ${#DELETE_EMAIL_KEY} -gt 3 ]] || { echo '::error::PACK1_ACCOUNT_DELETE_RESEND_API_KEY is not provisioned or is malformed.'; exit 1; }
-          [[ "$APPLE_TEAM_ID_PRESENT" == true ]] || { echo '::error::APPLE_TEAM_ID is not provisioned.'; exit 1; }
-          [[ "$APPLE_SIGN_IN_KEY_ID_PRESENT" == true ]] || { echo '::error::APPLE_SIGN_IN_KEY_ID is not provisioned.'; exit 1; }
-          [[ "$APPLE_SIGN_IN_KEY_P8_PRESENT" == true ]] || { echo '::error::APPLE_SIGN_IN_KEY_P8 is not provisioned.'; exit 1; }
-          [[ "$APPLE_TOKEN_ENCRYPTION_KEY_V1_PRESENT" == true ]] || { echo '::error::APPLE_TOKEN_ENCRYPTION_KEY_V1 is not provisioned.'; exit 1; }
-
+          case "$UNIT_PLAN" in
+            publication)
+              if [[ "$PUBLICATION_KIND" == creator ]]; then
+                python3 scripts/check-creator-social-card.py --slug "$PUBLICATION_SLUG"
+                node --test tests/campaign-links.test.mjs tests/campaign-link-publish.test.mjs tests/creator-challenges.test.mjs tests/publication-pr-checks.test.mjs tests/public-identity-safety.test.mjs tests/account-deletion.test.mjs
+              else
+                node --test tests/campaign-links.test.mjs tests/campaign-link-publish.test.mjs tests/publication-pr-checks.test.mjs
+              fi
+              ;;
+            presentation)
+              node --test tests/editorial.test.mjs tests/home-product.test.mjs tests/surface-focus.test.mjs
+              ;;
+            ci)
+              ci_tests=(tests/ci-workflow-policy.test.mjs tests/workflow-block-scalars.test.mjs)
+              declare -A seen_tests=()
+              for test_file in "${ci_tests[@]}"; do seen_tests["$test_file"]=1; done
+              mapfile -t changed_ci < <(git diff --name-only "$CI_BASE_SHA" "$CI_HEAD_SHA" -- '.github/workflows/**' '.github/scripts/**' '.github/*-request.json' '.github/*-request.txt')
+              for changed in "${changed_ci[@]}"; do
+                if [[ "$changed" == .github/scripts/*.mjs ]]; then node --check "$changed"; fi
+                while IFS= read -r test_file; do
+                  [[ -n "$test_file" ]] || continue
+                  if [[ -z "${seen_tests[$test_file]+x}" ]]; then ci_tests+=("$test_file"); seen_tests["$test_file"]=1; fi
+                done < <(
+                  {
+                    grep -lF -- "$changed" tests/*.test.mjs 2>/dev/null || true
+                    grep -lF -- "$(basename "$changed")" tests/*.test.mjs 2>/dev/null || true
+                  } | sort -u
+                )
+              done
+              printf 'CI-specific tests:\n - %s\n' "${ci_tests[@]}"
+              node --test "${ci_tests[@]}"
+              ;;
+            full)
+              if [[ "$HYDRATE_REPLAYS" == true && "$SAME_REPO_PR" == true ]]; then
+                REQUIRE_REPLAY_SHARDS=1 npm test
+              else
+                npm test
+              fi
+              ;;
+            mobile|docs)
+              node --test tests/ci-change-classifier.test.mjs
+              ;;
+            *)
+              echo "::error::Unknown unit validation plan: $UNIT_PLAN"
+              exit 1
+              ;;
+          esac
+          touch "$RUNNER_TEMP/test-validation-complete"
+      - name: Audit production datasets
+        if: steps.scope.outputs.dataset_audit == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        run: python scripts/audit_datasets.py --fail-on-error
+      - name: Verify selected test validation completed
+        if: always()
+        run: |
+          test -f "$RUNNER_TEMP/test-validation-complete" || { echo '::error::Selected test validation did not complete successfully.'; exit 1; }

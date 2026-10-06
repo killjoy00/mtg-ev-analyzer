@@ -397,19 +397,21 @@ test('maintenance OIDC trust is exact repo owner main workflow audience and sche
   assert.doesNotMatch(source,/pull_request/);
 });
 
-test('same-repository PRs fail before merge when deletion release secrets are absent',()=>{
+test('account-deletion release secrets are enforced by the workflows that consume them',()=>{
   const testFlow=fs.readFileSync('.github/workflows/test.yml','utf8');
-  assert.match(testFlow,/Verify account-deletion release secrets are provisioned/);
-  assert.match(testFlow,/secrets\.PACK1_DELETION_ADMIN_EMAIL != ''/);
-  assert.match(testFlow,/secrets\.PACK1_DELETION_ADMIN_PASSWORD != ''/);
-  assert.match(testFlow,/secrets\.PACK1_RATE_LIMIT_SECRET != ''/);
-  assert.match(testFlow,/secrets\.PACK1_ACCOUNT_DELETE_RESEND_API_KEY/);
-  assert.match(testFlow,/DELETE_EMAIL_KEY.*re_/s);
-  assert.match(testFlow,/pull_request\.head\.repo\.full_name == github\.repository/);
+  assert.doesNotMatch(testFlow,/Verify account-deletion release secrets are provisioned/);
+  assert.doesNotMatch(testFlow,/secrets\.PACK1_ACCOUNT_DELETE_RESEND_API_KEY/);
+
   const release=fs.readFileSync('.github/workflows/secure-auth-release.yml','utf8');
   assert.match(release,/PACK1_DELETION_ADMIN_EMAIL is missing or malformed/);
   assert.match(release,/PACK1_DELETION_ADMIN_PASSWORD is missing or too short/);
   assert.match(release,/PACK1_ACCOUNT_DELETE_RESEND_API_KEY is missing or malformed/);
+  assert.match(release,/PACK1_RATE_LIMIT_SECRET is missing or too short/);
+
+  const controls=fs.readFileSync('.github/workflows/account-deletion-controls.yml','utf8');
+  assert.match(controls,/PACK1_ACCOUNT_DELETE_RESEND_API_KEY/);
+  assert.match(controls,/deletion_email_key_valid/);
+  assert.match(controls,/production account deletion remains enabled/);
 });
 
 test('manual controls redeploy the current release without migrations',()=>{
