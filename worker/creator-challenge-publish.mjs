@@ -356,7 +356,7 @@ export async function beginCreatorPublicationOperation(query,row,action,{adminAu
       return {row,operation:existingOperation,reused:true};
     if(action==='publish'&&row.status==='published')return {row,operation:null,reused:true,complete:true};
     if(action==='publish'&&row.status==='retired')fail('Retired creator challenges cannot be republished.',409,'CREATOR_RETIRED');
-    if(action==='retire'&&row.status==='retired'&&detail.live_verified===true)
+    if(action==='retire'&&row.status==='retired'&&existingAction==='retire'&&detail.live_verified===true)
       return {row,operation:null,reused:true,complete:true};
     const operation=crypto.randomUUID();
     const expectedOperation=UUID.test(existingOperation)?existingOperation:null;

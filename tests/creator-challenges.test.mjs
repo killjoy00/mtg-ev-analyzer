@@ -536,6 +536,44 @@ test('stale publication operations cannot overwrite a newer retirement operation
   assert.equal(current.error,null);
 });
 
+test('retirement never reuses a verified publish as verified static cleanup',async()=>{
+  const publishOperation='44444444-4444-4444-8444-444444444444';
+  const state={
+    id:CHALLENGE,slug:'lola-rft',status:'retired',published_at:'2026-10-06T12:00:00Z',
+    publication_operation_ref:publishOperation,
+    publication_detail:{
+      action:'publish',reason:'admin_publish',live_verified:true,
+      dispatch:{state:'accepted',attempts:1},
+      workflow:{id:123,status:'completed',conclusion:'success'},
+    },
+    publication_error:null,creator_public_name:'A creator',headline:'Creator challenge unavailable',
+    source_score:87,source_environment:'mixed',source_type:'practice',source_day:null,
+    acquisition_source:'creator',acquisition_campaign:'lola-rft',acquisition_medium:'creator',
+  };
+  const row=()=>({...state,publication_detail:structuredClone(state.publication_detail)});
+  const query=async(sql,params=[])=>{
+    if(sql.startsWith("UPDATE creator_challenges SET status='retired'")) {
+      state.status='retired';
+      state.publication_operation_ref=params[3];
+      state.publication_detail=JSON.parse(params[4]);
+      state.publication_error=null;
+      return {rows:[{id:CHALLENGE}],rowCount:1};
+    }
+    if(sql.startsWith('INSERT INTO creator_challenge_audit'))return {rows:[],rowCount:1};
+    if(sql.includes('SELECT c.*,s.score source_score'))return {rows:[row()]};
+    throw new Error('Unexpected query: '+sql);
+  };
+
+  const begun=await beginCreatorPublicationOperation(query,row(),'retire',{reason:'privacy_cleanup'});
+  assert.equal(begun.complete,undefined,'a verified publish is not a completed retirement');
+  assert.equal(begun.reused,false);
+  assert.notEqual(begun.operation,publishOperation);
+  assert.equal(state.publication_detail.action,'retire');
+  assert.equal(state.publication_detail.live_verified,false);
+  assert.equal(state.publication_detail.static_cleanup,'required');
+  assert.equal(state.publication_detail.superseded_publish.operation,publishOperation);
+});
+
 test('privacy retirement is not live-verified while the old personalized social image still resolves',async()=>{
   const row={id:CHALLENGE,slug:'lola-rft'};
   const retiredHtml=`<!doctype html><body data-creator-challenge-id="${CHALLENGE}" data-creator-challenge-status="retired"></body>`;
