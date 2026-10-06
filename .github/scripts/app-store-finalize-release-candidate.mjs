@@ -8,9 +8,10 @@ const keyId = process.env.ASC_KEY_ID?.trim();
 const privateKeyText = process.env.ASC_PRIVATE_KEY;
 const appId = process.env.PACKONE_ASC_APP_ID?.trim() || '6814318676';
 const buildNumber = String(process.argv[2] || '').trim();
-const versionString = process.env.PACKONE_ASC_VERSION?.trim() || '1.0';
+const versionString = process.env.PACKONE_ASC_VERSION?.trim();
 
 if (!issuerId || !keyId || !privateKeyText) throw new Error('ASC credentials are required.');
+if (!/^\d+\.\d+(?:\.\d+)?$/.test(versionString || '')) throw new Error('Expected PACKONE_ASC_VERSION dotted numeric marketing version.');
 if (!/^[1-9][0-9]*$/.test(buildNumber)) throw new Error('Expected positive App Store build number.');
 
 function b64(value) { return Buffer.from(value).toString('base64url'); }
@@ -137,7 +138,7 @@ if (process.env.GITHUB_STEP_SUMMARY) {
     `- Build number: \`${buildNumber}\``,
     `- Processing state: \`${result.processingState}\``,
     `- Audience: \`${result.buildAudienceType}\``,
-    '- Attached to App Store version 1.0: true',
+    `- Attached to App Store version ${versionString}: true`,
     '- App Review submission created: false',
     `- TestFlight availability read: ${testFlight.verified ? 'verified' : 'unavailable'}`,
     `- Internal testing state: ${testFlight.internalBuildState ?? 'unknown'}`,
