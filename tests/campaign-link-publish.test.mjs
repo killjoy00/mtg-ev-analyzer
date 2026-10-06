@@ -30,6 +30,11 @@ test('campaign publish workflow preserves protected-main publication',()=>{
   assert.ok(publishWorkflow.includes('gh pr merge "$PR_URL" --squash --delete-branch'));
   assert.ok(publishWorkflow.includes('repos/${GITHUB_REPOSITORY}/pages/builds'));
   assert.match(publishWorkflow,/timeout-minutes: 60/);
+  const generatedValidation=publishWorkflow.split('      - name: Validate generated source')[1]?.split('      - name: Publish automation branch')[0]||'';
+  assert.match(generatedValidation,/generate-campaign-links\.mjs --check/);
+  assert.match(generatedValidation,/check-creator-challenges\.mjs/);
+  assert.match(generatedValidation,/tests\/publication-pr-checks\.test\.mjs/);
+  assert.doesNotMatch(generatedValidation,/npm test|hydrate-replay-shards|r2_replay_shards/);
 });
 test('campaign publish configuration follows the scoped production dispatch credential',()=>{
   assert.equal(campaignLinkPublishConfigured({PACK1_LAUNCH_WATCHER_GITHUB_TOKEN:TOKEN}),true);
