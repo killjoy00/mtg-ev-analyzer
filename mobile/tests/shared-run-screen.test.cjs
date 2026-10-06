@@ -216,7 +216,7 @@ async function fixture(options = {}) {
         if (options.lostPick) throw new Error('Pick response lost after commit.');
         return clone(server);
       },
-      createDraftRunShare: async (id) => { calls.push(['create-share', id]); return { id: SHARE }; },
+      createDraftRunShare: async (id) => { calls.push(['create-share', id]); return options.shareResponse ?? { id: SHARE }; },
       startDailyDraftRun: async () => { calls.push(['daily']); throw new Error('A shared link must not start a Daily.'); },
       startPracticeDraftRun: async () => { calls.push(['practice']); throw new Error('A shared link must not start random practice.'); },
       rerollDraftRun: async () => { calls.push(['reroll']); throw new Error('Shared runs cannot reroll.'); },
@@ -498,5 +498,67 @@ test('leaving during start does not leave the returning invitation permanently b
     await h.focus();
     assert.ok(h.button('Pick Card A'));
     assert.equal(h.count('start'), 1);
+  } finally { await h.close(); }
+});
+
+// Creator entry/recovery has its own actual-route suite. These payloads exercise
+// the production DraftRun screen mounted by the shared gameplay coordinator.
+const CREATOR = '55555555-5555-4555-8555-555555555555';
+const creatorNote = 'P3 was the one I really was not sure about.';
+function creatorRun(count = 0, complete = false, sourceType = 'practice', outcome = 'win', creatorId = 'c') {
+  const base = run(count, complete);
+  const withCreatorCard = (value) => value ? { ...value, candidates: [...value.candidates, { id: 'c', name: 'Card C' }] } : null;
+  return { ...base, day: null, creator_challenge_id: CREATOR,
+    current: withCreatorCard(base.current),
+    answers: base.answers.map((item) => ({ ...item, creatorId, creatorName: creatorId === 'c' ? 'Card C' : 'Card B', puzzle: withCreatorCard(item.puzzle) })),
+    comparison: { kind: 'creator', id: CREATOR, slug: 'creator-fixture', name: 'Fixture Creator',
+      score: outcome === 'win' ? 82 : outcome === 'loss' ? 94 : 88, exact: true,
+      source_type: sourceType, source_day: sourceType === 'daily' ? '2026-10-01' : null,
+      ...(complete ? { outcome, creator_matches: 5, trophy_matches: 6, creator_post_run_note: creatorNote } : {}) },
+  };
+}
+
+for (const sourceType of ['practice', 'daily']) test(`${sourceType} creator replay reveals three actual cards only after submission`, async () => {
+  const h = await fixture({ checkpoint: true, run: creatorRun(0, false, sourceType),
+    submitPick: async () => creatorRun(1, false, sourceType) });
+  try {
+    assert.doesNotMatch(h.text(), /Fixture Creator’s Pick/);
+    assert.doesNotMatch(h.text(), /P3 was/);
+    await h.press('Pick Card A');
+    assert.equal(h.count('pick'), 0);
+    await h.press('Confirm pick');
+    assert.ok(h.button('Your Pick: Card A. Open enlarged card.'));
+    assert.ok(h.button('Fixture Creator’s Pick: Card C. Open enlarged card.'));
+    assert.ok(h.button('Trophy Pick: Card B. Open enlarged card.'));
+    assert.doesNotMatch(h.text(), /P3 was/);
+    assert.equal(h.count('pick'), 1);
+    assert.equal(h.count('daily') + h.count('practice') + h.count('reroll'), 0);
+  } finally { await h.close(); }
+});
+
+test('creator and trophy agreement shares one card with both role labels', async () => {
+  const h = await fixture({ checkpoint: true, run: creatorRun(1, false, 'practice', 'win', 'b') });
+  try {
+    assert.ok(h.button('Fixture Creator’s Pick · Trophy Pick: Card B. Open enlarged card.'));
+    const cards = h.root.root.findAll((node) => node.type === 'Pressable' && String(node.props.accessibilityLabel).endsWith('. Open enlarged card.'));
+    assert.equal(cards.length, 2, 'three roles with one matching pair require two card presentations');
+  } finally { await h.close(); }
+});
+
+for (const [outcome, title] of [['win', 'You beat Fixture Creator'], ['tie', 'You tied Fixture Creator'], ['loss', 'Fixture Creator got you this time']]) test(`creator ${outcome} result renders server comparison, final note and canonical creator sharing`, async () => {
+  const url = 'https://packone.pro/creator/creator-fixture/';
+  const h = await fixture({ checkpoint: true, run: creatorRun(8, true, 'daily', outcome), shareResponse: { creator: true, url } });
+  try {
+    assert.ok(h.text().includes(title));
+    assert.match(h.text(), /5\/8 creator picks/);
+    assert.match(h.text(), /6\/8 trophy picks/);
+    assert.ok(h.text().includes(creatorNote));
+    await h.press('Share Pack One result');
+    const message = h.calls.find(([kind]) => kind === 'share')[1].message;
+    assert.ok(message.includes(url));
+    assert.match(message, /5\/8 creator picks matched/);
+    assert.match(message, /6\/8 trophy picks matched/);
+    assert.doesNotMatch(message, /today’s|shared=/);
+    assert.equal(h.count('daily') + h.count('practice') + h.count('reroll'), 0);
   } finally { await h.close(); }
 });

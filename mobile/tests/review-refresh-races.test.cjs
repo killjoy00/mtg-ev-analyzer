@@ -47,6 +47,12 @@ function compileModule(relativePath, mocks) {
   compiled.paths = Module._nodeModulePaths(path.dirname(filename));
   const priorLoad = Module._load;
   Module._load = function load(request, parent, isMain) {
+    if (request.endsWith('.png')) {
+      const asset = path.resolve(path.dirname(parent.filename), request);
+      const bytes = fs.readFileSync(asset);
+      assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a', 'native image asset must be a real PNG');
+      return { uri: asset };
+    }
     if (request === '@/src/components/Text') return { Text: mocks['react-native'].Text };
     if (request === '@/src/components/ScreenArea') return { ScreenArea: mocks['react-native-safe-area-context'].SafeAreaView };
 

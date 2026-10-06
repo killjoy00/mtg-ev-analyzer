@@ -23,6 +23,7 @@ import { tcgplayerMagicUrl } from '@/src/tcgplayer';
 import { colors, spacing } from '@/src/theme';
 
 const dailyEnvironments: DailyEnvironment[] = ['mixed', 'powered-cube', 'latest'];
+const brandMarkImage = require('../../assets/images/header-mark.png');
 
 function recordBrandLayout(label: string, event: LayoutChangeEvent) {
   if (config.screenshots.fixtures) console.info('PACKONE_BRAND', JSON.stringify({ label, ...event.nativeEvent.layout }));
@@ -32,7 +33,7 @@ function Brand() {
   return (
     <View style={styles.brand} onLayout={event => recordBrandLayout('brand', event)}>
       <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.brandMark} onLayout={event => recordBrandLayout('mark', event)}>
-        <Text style={styles.brandMarkText}>P¹</Text>
+        <Image source={brandMarkImage} contentFit="contain" style={styles.brandMarkImage} />
       </View>
       <Text style={styles.brandName} onLayout={event => recordBrandLayout('name', event)}>Pack One</Text>
     </View>
@@ -280,18 +281,12 @@ const styles = StyleSheet.create({
   page: { padding: 20, paddingBottom: spacing.xxl, gap: spacing.md, alignSelf: 'center', width: '100%', maxWidth: 860 },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1, minWidth: 0, maxWidth: '100%' },
   brandMark: {
-    minWidth: 36,
-    minHeight: 36,
-    padding: 6,
+    width: 36,
+    height: 40,
     flexShrink: 0,
-    borderWidth: 1,
-    borderColor: colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.surface,
   },
-  brandMarkText: { color: colors.accentDark, fontSize: 18, fontWeight: '800' },
-  brandName: { color: colors.ink, fontSize: 26, fontWeight: '800', flexShrink: 1, minWidth: 0 },
+  brandMarkImage: { width: 36, height: 40 },
+  brandName: { color: colors.ink, fontSize: 26, fontWeight: '600', letterSpacing: 0.39, flexShrink: 1, minWidth: 0 },
   removedBrandSub: { color: colors.muted, fontSize: 9, fontWeight: '800', letterSpacing: 1.2, marginTop: 2 },
   hero: { gap: spacing.sm, paddingTop: spacing.sm },
   eyebrow: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
