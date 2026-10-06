@@ -60,7 +60,9 @@ test('borrowed closed Daily eligibility is restored and canary is protected',()=
 
 test('reviewed retry request explicitly forbids customer rows',()=>{
   assert.equal(request.operation,'run-creator-production-canary');
-  assert.equal(request.expected_release,'f6ea0910d322f007f0ac0004b98fea6bab09422a');
+  // The request pins the corrected protected release; live markerCheck enforces it.
+  // A previous release's literal SHA is not the production safety contract.
+  assert.match(request.expected_release,/^[a-f0-9]{40}$/);
   assert.match(request.reason,/fresh owned canary Practice/i);
   assert.match(request.reason,/strict `QA release <7-hex>` name contract/i);
   assert.match(request.reason,/Never select or mutate customer rows/i);

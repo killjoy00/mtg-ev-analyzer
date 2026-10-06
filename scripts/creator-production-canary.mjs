@@ -18,6 +18,7 @@ fs.mkdirSync(artifactDir,{recursive:true});
 const report={expected_release:expectedRelease,passed:false,checks:[],challenges:[],cleanup:{},started_at:new Date().toISOString()};
 const createdChallenges=[];
 const borrowedSources=[];
+const creatorNote='P3 was the one I really was not sure about.';
 let admin=null,guest=null,practiceFixture=null;
 
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
@@ -248,6 +249,7 @@ async function createChallenge(type,candidate,tag) {
     ...(type==='practice'?{share:candidate.share_id}:{creator_player_id:candidate.player_id,source_session_id:candidate.session_id}),
     creator_public_name:'Pack One Canary',
     headline:'Pack One release canary',
+    creator_post_run_note:creatorNote,
     slug,
     acquisition_source:'creator',
     acquisition_campaign:'release-canary',
@@ -288,6 +290,7 @@ async function staticState(challenge,status) {
   assert.equal(htmlResponse.status,200);
   assert.ok(html.includes('data-creator-challenge-id="'+challenge.id+'"'));
   assert.ok(html.includes('data-creator-challenge-status="'+status+'"'));
+  assert.equal(html.includes(creatorNote),false,'post-run note must not enter public route metadata');
   const card=await fetch(route+'creator-card.png',{headers:{'cache-control':'no-cache'},redirect:'error',signal:AbortSignal.timeout(30000)});
   if(status==='published')assert.ok(card.ok&&String(card.headers.get('content-type')||'').includes('image/'));
   else assert.ok([404,410].includes(card.status),'retired personalized card must be unavailable');
@@ -300,6 +303,7 @@ async function publicMetadata(challenge,token) {
   const second=await call('/draft/v1/creator-challenges/'+challenge.slug,{method:'GET',player:token});
   assert.equal(first.data.id,challenge.id);assert.equal(second.data.id,challenge.id);
   assert.equal('answers' in first.data,false);
+  assert.equal('creator_post_run_note' in first.data,false,'post-run note must not enter invitation metadata');
   return first.data;
 }
 
@@ -323,6 +327,7 @@ async function playChallenge(challenge,candidate,guestToken,guestId) {
   const repeated=(await call('/draft/v1/runs',{body:{creatorChallenge:challenge.id},player:guestToken,status:[200,201]})).data;
   assert.equal(repeated.id,run.id,'creator start must be idempotent');
   assert.equal(run.answers.length,0);
+  assert.equal('creator_post_run_note' in (run.comparison||{}),false);
   assert.equal(run.comparison?.kind,'creator');
   assert.equal(run.comparison?.creator_matches??null,null);
 
@@ -337,9 +342,12 @@ async function playChallenge(challenge,candidate,guestToken,guestId) {
     },player:guestToken})).data;
     assert.equal(run.answers.length,round+1);
     assert.ok(run.answers.every(answer=>answer.creatorId),'only submitted answers may expose creator selections');
+    for(const [index,answer] of run.answers.entries())assert.equal(answer.creatorId,sourceAnswers[index].selectedId,'revealed creator pick must match the authoritative source');
+    if(!run.complete)assert.equal('creator_post_run_note' in (run.comparison||{}),false,'post-run note must stay hidden during picks');
     if(!run.complete)assert.equal(run.comparison?.creator_matches??null,null);
   }
   assert.equal(run.answers.length,8);
+  assert.equal(run.comparison.creator_post_run_note,creatorNote,'post-run creator note must appear after completion');
   const creatorMatches=chosen.filter((id,index)=>id===sourceAnswers[index]?.selectedId).length;
   const trophyMatches=run.answers.filter(answer=>answer.historicalMatch).length;
   const expectedOutcome=Number(run.score)>Number(candidate.score)?'win':Number(run.score)<Number(candidate.score)?'loss':'tie';
@@ -347,10 +355,11 @@ async function playChallenge(challenge,candidate,guestToken,guestId) {
   assert.equal(run.comparison.trophy_matches,trophyMatches);
   assert.equal(run.comparison.outcome,expectedOutcome);
 
-  const stored=(await query(`SELECT day::text source_day,creator_challenge_id::text creator_challenge_id,measurement_qa
+  const stored=(await query(`SELECT day::text source_day,creator_challenge_id::text creator_challenge_id,measurement_qa,puzzle_ids
     FROM draft_run_sessions WHERE id=$1::uuid`,[run.id])).rows[0];
   assert.equal(stored.source_day,null,'creator replay must be unranked, not a Daily');
   assert.equal(stored.creator_challenge_id,challenge.id);
+  assert.deepEqual(parseJson(stored.puzzle_ids),parseJson(sourceBefore.puzzle_ids),'creator replay must retain the exact eight source puzzles in order');
   const dailyAfter=await count('SELECT count(*)::int n FROM draft_run_sessions WHERE player_id=$1::uuid AND day IS NOT NULL',[guestId]);
   assert.equal(dailyAfter,dailyBefore,'creator replay must not consume or create a real Daily');
 
@@ -443,7 +452,7 @@ try{
   const dailyRun=await playChallenge({...dailyChallenge,type:'daily'},daily,guest.token,guest.id);
   report.challenges.find(row=>row.id===practiceChallenge.id).play=practiceRun;
   report.challenges.find(row=>row.id===dailyChallenge.id).play=dailyRun;
-  report.checks.push('guest play, self-open, progressive reveal, final comparison, stats, dedupe and Daily isolation passed live');
+  report.checks.push('guest play, self-open, exact puzzle order and creator picks, progressive reveal, post-run note timing, final comparison, stats, dedupe and Daily isolation passed live');
 
   await publication(practiceChallenge,'retire');
   await staticState(practiceChallenge,'retired');
@@ -453,13 +462,14 @@ try{
   await privacyRetire(dailyChallenge,daily.player_id);
   await staticState(dailyChallenge,'retired');
   await verifyRetiredApi(dailyChallenge,guest.token);
-  const privacy=(await query(`SELECT status,creator_public_name,creator_handle,headline,
+  const privacy=(await query(`SELECT status,creator_public_name,creator_handle,headline,creator_post_run_note,
       source_owner_auth_user_id,privacy_removed_at,publication_detail
     FROM creator_challenges WHERE id=$1::uuid`,[dailyChallenge.id])).rows[0];
   assert.equal(privacy.status,'retired');
   assert.equal(privacy.creator_public_name,'A creator');
   assert.equal(privacy.creator_handle,null);
   assert.equal(privacy.headline,'Creator challenge unavailable');
+  assert.equal(privacy.creator_post_run_note,null);
   assert.equal(privacy.source_owner_auth_user_id,null);
   assert.ok(privacy.privacy_removed_at);
   assert.equal(parseJson(privacy.publication_detail)?.live_verified,true);
