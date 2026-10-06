@@ -91,6 +91,12 @@ jobs:
         run: echo "PACKONE_IOS_BUILD_NUMBER=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
       - name: Validate production mobile config
         run: npm test
+      - name: Set intended iOS marketing version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.appStoreVersion)')"
+          echo "PACKONE_IOS_MARKETING_VERSION=$version" >> "$GITHUB_ENV"
       - name: Fast-path production Metro export for iOS
         if: env.NATIVE_FULL == 'false'
         env:
@@ -250,6 +256,12 @@ jobs:
           npm ci --no-audit --no-fund
       - name: Validate production mobile config
         run: npm test
+      - name: Set intended iOS marketing version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.appStoreVersion)')"
+          echo "PACKONE_IOS_MARKETING_VERSION=$version" >> "$GITHUB_ENV"
       - name: Write App Store Connect API key
         shell: bash
         run: |
