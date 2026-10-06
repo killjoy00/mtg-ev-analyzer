@@ -24,7 +24,10 @@ test('guarded App Store metadata repair includes required legal links and reject
 test('reviewed Apple description source keeps explicit EULA, Pack One Terms, and privacy URLs',()=>{
   const script=read('.github/scripts/store-submission-config.mjs');
   const docs=read('docs/mobile-store-submission.md');
-  const appleDescription=script.match(/const appleDescription=`([\\s\\S]*?)`;\n\nconst playShort=/)?.[1]||'';
+  const start=script.indexOf('const appleDescription=`');
+  const end=script.indexOf('`;\n\nconst playShort=',start);
+  assert.ok(start>=0&&end>start);
+  const appleDescription=script.slice(start,end);
   for(const value of [eulaUrl,termsUrl,privacyUrl]){
     assert.ok(appleDescription.includes(value));
     assert.ok(docs.includes(value));
