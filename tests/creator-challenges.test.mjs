@@ -618,3 +618,17 @@ test('creator privacy cleanup scrubs retained challenger labels and creator auth
   assert.match(moderation,/creator_result_scrub/);
   assert.match(moderation,/UPDATE game_results SET opponent_name='A creator'/);
 });
+
+
+test('creator funnel events have database-backed concurrency idempotency',async()=>{
+  const migration=await readFile('migrations/0054_creator_event_idempotency.sql','utf8');
+  assert.match(migration,/row_number\(\) OVER/);
+  assert.match(migration,/CREATE UNIQUE INDEX IF NOT EXISTS analytics_creator_challenge_event_uq/);
+  assert.match(migration,/event_name IN \('creator_challenge_open','acquisition_touch'\)/);
+  assert.match(migration,/event_props \? 'creator_challenge_id'/);
+  const runtime=await readFile('worker/draft-run-function.mjs','utf8');
+  const start=runtime.indexOf("('creator_challenge_open',$2::jsonb)");
+  const end=runtime.indexOf('return json(publicCreatorChallenge(challenge));',start);
+  assert.ok(start>0&&end>start);
+  assert.match(runtime.slice(start,end),/ON CONFLICT DO NOTHING/);
+});
