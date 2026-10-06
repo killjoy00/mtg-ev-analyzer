@@ -107,16 +107,43 @@ jobs:
         run: git diff --check "${{ steps.scope.outputs.base_sha }}" "${{ steps.scope.outputs.head_sha }}"
       - name: Verify CI selection contracts
         if: steps.scope.outputs.ci_contracts == 'true'
+        env:
+          CI_BASE_SHA: ${{ steps.scope.outputs.base_sha }}
+          CI_HEAD_SHA: ${{ steps.scope.outputs.head_sha }}
         run: |
+          set -euo pipefail
           node --check tests/publication-route-e2e.mjs
-          node --test \
-            tests/ci-change-classifier.test.mjs \
-            tests/ci-publication-validate.test.mjs \
-            tests/browser-test-selection.test.mjs \
-            tests/ci-workflow-policy.test.mjs \
-            tests/workflow-block-scalars.test.mjs \
-            tests/publication-pr-checks.test.mjs \
+          ci_tests=(
+            tests/ci-change-classifier.test.mjs
+            tests/ci-publication-validate.test.mjs
+            tests/browser-test-selection.test.mjs
+            tests/ci-workflow-policy.test.mjs
+            tests/workflow-block-scalars.test.mjs
+            tests/publication-pr-checks.test.mjs
             tests/browser-replay-hydration.test.mjs
+          )
+          declare -A seen_tests=()
+          for test_file in "${ci_tests[@]}"; do seen_tests["$test_file"]=1; done
+          if [[ -n "$CI_BASE_SHA" && -n "$CI_HEAD_SHA" ]]; then
+            changed_ci_text="$(git diff --name-only "$CI_BASE_SHA" "$CI_HEAD_SHA" -- '.github/workflows/**' '.github/scripts/**' '.github/*-request.json' '.github/*-request.txt')"
+            mapfile -t changed_ci <<< "$changed_ci_text"
+            for changed in "${changed_ci[@]}"; do
+              [[ -n "$changed" ]] || continue
+              if [[ "$changed" == .github/scripts/*.mjs && -f "$changed" ]]; then node --check "$changed"; fi
+              while IFS= read -r test_file; do
+                [[ -n "$test_file" ]] || continue
+                if [[ -z "${seen_tests[$test_file]+x}" ]]; then ci_tests+=("$test_file"); seen_tests["$test_file"]=1; fi
+              done < <(
+                {
+                  grep -lF -- "$changed" tests/*.test.mjs 2>/dev/null || true
+                  grep -lF -- "$(basename "$changed")" tests/*.test.mjs 2>/dev/null || true
+                } | sort -u
+              )
+            done
+          fi
+          printf 'CI-specific tests:\n - %s\n' "${ci_tests[@]}"
+          node --test "${ci_tests[@]}"
+          touch "$RUNNER_TEMP/ci-contracts-complete"
       - name: Validate publication diff and generated outputs
         id: publication
         if: steps.scope.outputs.plan == 'publication'
@@ -172,24 +199,7 @@ jobs:
               node --test tests/editorial.test.mjs tests/home-product.test.mjs tests/surface-focus.test.mjs
               ;;
             ci)
-              ci_tests=(tests/ci-workflow-policy.test.mjs tests/workflow-block-scalars.test.mjs)
-              declare -A seen_tests=()
-              for test_file in "${ci_tests[@]}"; do seen_tests["$test_file"]=1; done
-              mapfile -t changed_ci < <(git diff --name-only "$CI_BASE_SHA" "$CI_HEAD_SHA" -- '.github/workflows/**' '.github/scripts/**' '.github/*-request.json' '.github/*-request.txt')
-              for changed in "${changed_ci[@]}"; do
-                if [[ "$changed" == .github/scripts/*.mjs ]]; then node --check "$changed"; fi
-                while IFS= read -r test_file; do
-                  [[ -n "$test_file" ]] || continue
-                  if [[ -z "${seen_tests[$test_file]+x}" ]]; then ci_tests+=("$test_file"); seen_tests["$test_file"]=1; fi
-                done < <(
-                  {
-                    grep -lF -- "$changed" tests/*.test.mjs 2>/dev/null || true
-                    grep -lF -- "$(basename "$changed")" tests/*.test.mjs 2>/dev/null || true
-                  } | sort -u
-                )
-              done
-              printf 'CI-specific tests:\n - %s\n' "${ci_tests[@]}"
-              node --test "${ci_tests[@]}"
+              test -f "$RUNNER_TEMP/ci-contracts-complete"
               ;;
             full)
               if [[ "$HYDRATE_REPLAYS" == true && "$SAME_REPO_PR" == true ]]; then
