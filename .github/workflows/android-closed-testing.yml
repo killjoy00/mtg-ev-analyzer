@@ -116,3 +116,8 @@ jobs:
             fi
             echo 'Production access requires at least 12 testers continuously opted into the closed test for 14 days.'
           } >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$requires_console" == "true" || "$release_status" != "completed" ]]; then
+            echo "::error::Closed-testing promotion is not active for testers (releaseStatus=$release_status, requiresConsoleRollout=$requires_console)." >&2
+            exit 1
+          fi
