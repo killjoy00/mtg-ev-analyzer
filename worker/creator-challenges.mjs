@@ -192,12 +192,8 @@ function challengeRow(row) {
   };
 }
 
-export async function creatorChallengeById(query,id,{forUpdate=false,includeStats=false}={}) {
-  if(!UUID.test(String(id||'')))fail('Invalid creator challenge.');
-  const statSelect=includeStats
-    ? ',stats.attempts,stats.attempts completions,stats.wins,stats.ties,stats.losses,stats.beat_percentage,stats.average_score,funnel.opens,funnel.starts'
-    : '';
-  const statJoins=includeStats ? `
+const CREATOR_STATS_SELECT=',stats.attempts,stats.attempts completions,stats.wins,stats.ties,stats.losses,stats.beat_percentage,stats.average_score,funnel.opens,funnel.starts';
+const CREATOR_STATS_JOINS=`
     LEFT JOIN LATERAL (
       SELECT count(*)::int attempts,
         count(*) FILTER(WHERE x.score>s.score)::int wins,
@@ -230,14 +226,21 @@ export async function creatorChallengeById(query,id,{forUpdate=false,includeStat
           JOIN pack1_admins admin ON admin.auth_user_id=ea.auth_user_id
           WHERE ea.player_id=e.player_id
         )
-    ) funnel ON true` : '';
-  const result=await query(`SELECT c.*,s.score source_score,s.day authoritative_source_day,s.environment authoritative_environment,
+    ) funnel ON true`;
+
+function creatorChallengeSelect({includeStats=false}={}) {
+  return `SELECT c.*,s.score source_score,s.day authoritative_source_day,s.environment authoritative_environment,
       s.player_id authoritative_owner_player_id,s.measurement_qa,
-      p.public_identity_hidden_at,p.profile_public${statSelect}
+      p.public_identity_hidden_at,p.profile_public${includeStats?CREATOR_STATS_SELECT:''}
     FROM creator_challenges c
     LEFT JOIN draft_run_sessions s ON s.id=c.source_session_id
     LEFT JOIN players p ON p.id=c.source_owner_player_id
-    ${statJoins}
+    ${includeStats?CREATOR_STATS_JOINS:''}`;
+}
+
+export async function creatorChallengeById(query,id,{forUpdate=false,includeStats=false}={}) {
+  if(!UUID.test(String(id||'')))fail('Invalid creator challenge.');
+  const result=await query(`${creatorChallengeSelect({includeStats})}
     WHERE c.id=$1::uuid${forUpdate?' FOR UPDATE OF c':''}`,[id]);
   return challengeRow(result.rows[0]);
 }
@@ -440,10 +443,10 @@ export async function listCompletedDailies(query,playerId,{limit=20,before=null}
 
 export async function listCreatorChallenges(query,{limit=100}={}) {
   const safeLimit=Math.max(1,Math.min(200,Number(limit)||100));
-  const result=await query(`SELECT c.id FROM creator_challenges c ORDER BY c.created_at DESC LIMIT $1::int`,[safeLimit]);
-  const rows=[];
-  for(const item of result.rows)rows.push(await creatorChallengeById(query,item.id,{includeStats:true}));
-  return rows;
+  const result=await query(`${creatorChallengeSelect({includeStats:true})}
+    ORDER BY c.created_at DESC
+    LIMIT $1::int`,[safeLimit]);
+  return result.rows.map(challengeRow);
 }
 
 export async function handleCreatorChallengeAdmin(request,query,readJson,adminAuthUserId) {
