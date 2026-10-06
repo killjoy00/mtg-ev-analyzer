@@ -56,7 +56,7 @@ for (const scenario of ['available', 'wrong-build', 'read-failed']) {
 
 // Isolated API contract: generated test key, stubbed fetch, no provider traffic.
 for (const available of [true, false]) {
-  test(`candidate attachment reports TestFlight availability ${available ? 'separately' : 'as unknown after a read failure'}`, () => {
+  test(`candidate attachment ${available ? 'verifies TestFlight availability separately' : 'fails when TestFlight availability cannot be verified'}`, () => {
     const script = `
       import { generateKeyPairSync } from 'node:crypto';
       const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
