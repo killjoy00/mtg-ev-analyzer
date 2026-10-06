@@ -31,6 +31,12 @@ function compiler(mocks) {
     mod.paths = Module._nodeModulePaths(path.dirname(filename));
     mod.require = request => {
       if (Object.hasOwn(mocks, request)) return mocks[request];
+      if (request.endsWith('.png')) {
+        const asset = path.resolve(path.dirname(filename), request);
+        const bytes = fs.readFileSync(asset);
+        assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a', 'native image asset must be a real PNG');
+        return { uri: asset };
+      }
       if (request.startsWith('@/') || request.startsWith('.')) {
         const base = request.startsWith('@/') ? path.resolve(request.slice(2)) : path.resolve(path.dirname(filename), request);
         const target = [base, `${base}.ts`, `${base}.tsx`].find(file => fs.existsSync(file) && fs.statSync(file).isFile());
