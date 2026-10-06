@@ -90,6 +90,7 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
     timeout-minutes: 60
     env:
       GH_TOKEN: ${{ github.token }}
@@ -207,10 +208,10 @@ jobs:
           if [[ -z "$pr_url" ]]; then
             if [[ "$PUBLISH_KIND" == "creator" ]]; then
               pr_title="${CREATOR_ACTION^} creator challenge: ${CAMPAIGN_SLUG}"
-              pr_body="Admin-requested Pack One creator challenge publication. The immutable source association and sanitized static route were generated deterministically; required test and browser checks are dispatched explicitly before merge."
+              pr_body="Admin-requested Pack One creator challenge publication. The immutable source association and sanitized static route were generated deterministically; required pull-request test and browser checks are approved for this exact generated head and must pass before merge."
             else
               pr_title="Publish campaign link: ${CAMPAIGN_SLUG}"
-              pr_body="Admin-requested Pack One vanity link publication. The route and registry entry were generated deterministically; required test and browser checks are dispatched explicitly before merge."
+              pr_body="Admin-requested Pack One vanity link publication. The route and registry entry were generated deterministically; required pull-request test and browser checks are approved for this exact generated head and must pass before merge."
             fi
             if ! pr_url="$(gh pr create --base main --head "$BRANCH" --title "$pr_title" --body "$pr_body")"; then
               echo "::error::GitHub Actions is not allowed to create pull requests for this repository. Enable Settings > Actions > General > Workflow permissions > Allow GitHub Actions to create and approve pull requests."
@@ -221,57 +222,25 @@ jobs:
           echo "url=$pr_url" >> "$GITHUB_OUTPUT"
           echo "Campaign publication PR: $pr_url" >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Dispatch required checks
-        if: steps.branch.outputs.already_published != 'true'
-        shell: bash
-        env:
-          BRANCH: ${{ steps.branch.outputs.branch }}
-        run: |
-          set -euo pipefail
-          gh workflow run test.yml --ref "$BRANCH"
-          gh workflow run e2e.yml --ref "$BRANCH"
-
-      - name: Wait for required checks
+      - name: Approve and wait for required publication PR checks
         if: steps.branch.outputs.already_published != 'true'
         shell: bash
         env:
           BRANCH: ${{ steps.branch.outputs.branch }}
           HEAD_SHA: ${{ steps.branch.outputs.head_sha }}
-        run: |
-          set -euo pipefail
-          wait_for_workflow() {
-            local workflow="$1"
-            local label="$2"
-            for attempt in $(seq 1 120); do
-              runs="$(gh run list --workflow "$workflow" --branch "$BRANCH" --event workflow_dispatch                 --limit 20 --json databaseId,headSha,status,conclusion,url)"
-              row="$(printf '%s' "$runs" | jq -r --arg sha "$HEAD_SHA"                 '[.[] | select(.headSha==$sha)][0] | if . then [.databaseId,.status,(.conclusion // ""),.url] | @tsv else "" end')"
-              if [[ -n "$row" ]]; then
-                IFS=$'\t' read -r run_id status conclusion run_url <<< "$row"
-                if [[ "$status" == completed ]]; then
-                  if [[ "$conclusion" == success ]]; then
-                    echo "$label passed: $run_url" >> "$GITHUB_STEP_SUMMARY"
-                    return 0
-                  fi
-                  echo "::error::$label failed with conclusion $conclusion: $run_url"
-                  return 1
-                fi
-              fi
-              sleep 10
-            done
-            echo "::error::Timed out waiting for $label."
-            return 1
-          }
-          wait_for_workflow test.yml test
-          wait_for_workflow e2e.yml browser
+          PR_URL: ${{ steps.pr.outputs.url }}
+          PUBLICATION_APPROVAL_TOKEN: ${{ secrets.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN }}
+        run: node .github/scripts/publication-pr-checks.mjs
 
       - name: Merge checked campaign PR
         if: steps.branch.outputs.already_published != 'true'
         shell: bash
         env:
           PR_URL: ${{ steps.pr.outputs.url }}
+          HEAD_SHA: ${{ steps.branch.outputs.head_sha }}
         run: |
           set -euo pipefail
-          gh pr merge "$PR_URL" --squash --delete-branch
+          gh pr merge "$PR_URL" --squash --delete-branch --match-head-commit "$HEAD_SHA"
           echo "Merged campaign publication PR: $PR_URL" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Request Pages build from merged main
