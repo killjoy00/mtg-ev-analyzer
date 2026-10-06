@@ -113,6 +113,19 @@ if (attached.data?.id !== build.id ||
 // API references: /documentation/appstoreconnectapi/get-v1-builds-_id_-buildbetadetail
 // and /documentation/appstoreconnectapi/get-v1-betagroups (filter[builds]).
 const testFlight = await readTestFlightDistribution(asc, build.id);
+if (!testFlight.verified) {
+  throw new Error(`Unable to verify TestFlight availability for build ${buildNumber}: ${testFlight.reason || 'unknown read failure'}`);
+}
+if (testFlight.internalBuildState !== 'IN_BETA_TESTING') {
+  throw new Error(`Build ${buildNumber} is not available for internal TestFlight testing: ${testFlight.internalBuildState ?? 'unknown'}`);
+}
+if (testFlight.groupListComplete !== true) {
+  throw new Error(`TestFlight beta-group association read was incomplete for build ${buildNumber}.`);
+}
+const internalGroups = (testFlight.groups || []).filter((group) => group.isInternalGroup === true);
+if (internalGroups.length < 1) {
+  throw new Error(`Build ${buildNumber} is not associated with an existing internal TestFlight beta group.`);
+}
 
 const result = {
   testFlight,
