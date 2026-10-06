@@ -19,7 +19,7 @@ const info = { id: CHALLENGE, slug: 'creator-fixture', creator_name: 'Fixture Cr
 const run = () => ({ id: RUN, day: null, creator_challenge_id: CHALLENGE, environment: 'mixed', run_length: 8,
   comparison: { kind: 'creator', id: CHALLENGE, slug: info.slug, name: info.creator_name, score: 87, source_type: 'practice' } });
 class ApiError extends Error { constructor(status) { super(`HTTP ${status}`); this.status = status; } }
-const host = name => props => React.createElement(name, props, props.children);
+const host = name => function Host(props) { return React.createElement(name, props, props.children); };
 const text = node => node == null ? '' : typeof node === 'string' ? node : Array.isArray(node) ? node.map(text).join(' ') : text(node.children ?? node.props?.children);
 async function flush() { for (let i = 0; i < 40; i++) await Promise.resolve(); }
 
