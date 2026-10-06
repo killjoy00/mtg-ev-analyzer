@@ -14,9 +14,33 @@ for (const [name, flow] of [['test', unit], ['browser', browser], ['mobile', mob
   });
 }
 
-test('required test fast path keeps the account-deletion secret guard', () => {
-  assert.match(unit, /Verify account-deletion release secrets are provisioned/);
-  assert.match(unit, /if: github\.event_name == 'workflow_dispatch' \|\| \(github\.event_name == 'pull_request' && github\.event\.pull_request\.head\.repo\.full_name == github\.repository\)/);
+test('required checks share one classifier and keep branch-protection job names stable', () => {
+  assert.match(unit, /name: test/);
+  assert.match(unit, /jobs:\n  test:/);
+  assert.match(browser, /name: e2e/);
+  assert.match(browser, /jobs:\n  browser:/);
+  for (const flow of [unit, browser]) assert.match(flow, /node scripts\/ci-change-scope\.mjs/);
+  assert.match(unit, /Verify selected validation completed/);
+  assert.match(browser, /Verify selected browser validation completed/);
+});
+
+test('generic required checks do not provision release-only account deletion secrets', () => {
+  assert.doesNotMatch(unit, /PACK1_ACCOUNT_DELETE_RESEND_API_KEY|Verify account-deletion release secrets are provisioned/);
+  const release = readFileSync('.github/workflows/secure-auth-release.yml','utf8');
+  const controls = readFileSync('.github/workflows/account-deletion-controls.yml','utf8');
+  assert.match(release, /PACK1_ACCOUNT_DELETE_RESEND_API_KEY/);
+  assert.match(controls, /PACK1_ACCOUNT_DELETE_RESEND_API_KEY/);
+});
+
+test('scheduled full coverage remains while publication and ordinary paths stay replay-light', () => {
+  assert.match(unit, /schedule:\n\s+- cron:/);
+  assert.match(browser, /schedule:\n\s+- cron:/);
+  assert.match(unit, /profile == 'publication'/);
+  assert.match(browser, /browser_mode == 'publication'/);
+  assert.match(browser, /browser_mode == 'selected'/);
+  assert.doesNotMatch(browser, /hydrate-replay-shards/);
+  assert.match(unit, /Hydrate replay shards from R2/);
+  assert.match(unit, /Run application tests without replay corpus hydration/);
 });
 
 test('signed and publishing mobile jobs remain unreachable from pull-request execution and never touch the unsigned Gradle cache', () => {
