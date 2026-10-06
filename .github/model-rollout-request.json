@@ -1,7 +1,7 @@
 {
   "operation": "deploy",
-  "request_id": "issue-984-privacy-retirement-dev-20261006",
-  "reason": "Owner-authorized development deployment of the exact reviewed Issue #984 creator privacy-retirement fix after PR #1034 passed test, browser, and all backend schema-gate domains. Deploy only commit 6b29a11715415aef137c403c20e165b1490c5c3f and require the standard development release smoke before any production promotion.",
+  "request_id": "issue-984-privacy-retirement-prod-20261006",
+  "reason": "Owner-authorized production promotion of the exact Issue #984 creator privacy-retirement fix after development deploy run 37479069935 passed revision coverage, all three unranked Daily flows, and live v5 account-linked Practice. Promote only commit 6b29a11715415aef137c403c20e165b1490c5c3f.",
   "commit": "6b29a11715415aef137c403c20e165b1490c5c3f",
-  "target": "development"
+  "target": "production"
 }
