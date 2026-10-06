@@ -306,6 +306,10 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   assert.match(iosFinalize, /INTERNAL_ONLY/);
   assert.match(iosFinalize, /relationships\/build/);
   assert.match(iosFinalize, /reviewSubmissionCreated: false/);
+  assert.match(iosFinalize, /internalBuildState !== 'IN_BETA_TESTING'/);
+  assert.match(iosFinalize, /groupListComplete !== true/);
+  assert.match(iosFinalize, /group\.isInternalGroup === true/);
+  assert.match(iosFinalize, /not associated with an existing internal TestFlight beta group/);
   assert.match(ios, /store-release\.json/);
 
   const android = read('.github/workflows/android-internal-testing.yml');
