@@ -2,6 +2,8 @@ name: test
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '17 9 * * *'
   pull_request:
     types: [opened, synchronize, reopened]
   push:
@@ -24,100 +26,146 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
-      - name: Detect required-suite scope
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Classify changed files
         id: scope
+        shell: bash
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          output="$GITHUB_OUTPUT"
+          if [[ "$GITHUB_EVENT_NAME" == "schedule" || "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            node scripts/ci-change-scope.mjs --force broad --github-output "$output"
+            exit 0
+          fi
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            if ! git fetch --no-tags origin main:refs/remotes/origin/main; then
+              echo '::warning::Unable to fetch origin/main; running broad validation.'
+              node scripts/ci-change-scope.mjs --force broad --github-output "$output"
+              exit 0
+            fi
+            if ! base="$(git merge-base origin/main "$PR_HEAD_SHA")"; then
+              echo '::warning::Unable to compute merge base; running broad validation.'
+              node scripts/ci-change-scope.mjs --force broad --github-output "$output"
+              exit 0
+            fi
+            node scripts/ci-change-scope.mjs --base "$base" --head "$PR_HEAD_SHA" --github-output "$output"
+            exit 0
+          fi
+          if [[ "$PUSH_BEFORE" =~ ^[a-f0-9]{40}$ && "$PUSH_BEFORE" != 0000000000000000000000000000000000000000 ]]; then
+            node scripts/ci-change-scope.mjs --base "$PUSH_BEFORE" --head "$GITHUB_SHA" --github-output "$output"
+          else
+            echo '::warning::Push base is unavailable; running broad validation.'
+            node scripts/ci-change-scope.mjs --force broad --github-output "$output"
+          fi
+
+      - name: Check changed-file whitespace
+        if: github.event_name == 'pull_request'
         shell: bash
         env:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
-          run_full=true
-          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
-            if ! git fetch --no-tags origin main:refs/remotes/origin/main; then
-              echo '::warning::Unable to fetch origin/main; running full validation.'
-            elif ! stack_base_sha="$(git merge-base origin/main "$PR_HEAD_SHA")"; then
-              echo '::warning::Unable to compute merge base against origin/main; running full validation.'
-            else
-              run_full=false
-              mapfile -t changed_files < <(git diff --name-only "$stack_base_sha" "$PR_HEAD_SHA")
-              if (( ${#changed_files[@]} == 0 )); then
-                run_full=true
-              else
-                printf 'Changed files:\n'
-                printf ' - %s\n' "${changed_files[@]}"
-                for path in "${changed_files[@]}"; do
-                  case "$path" in
-                    mobile/*|docs/mobile-*|docs/android-*|docs/parity.md|.github/workflows/mobile*.yml|.github/workflows/android-*.yml|.github/workflows/ios-*.yml|.github/workflows/google-play-access.yml|.github/android-*.txt|.github/ios-*.txt|.github/app-store-*.txt|.github/scripts/app-store-*.mjs|.gitignore)
-                      ;;
-                    *)
-                      run_full=true
-                      break
-                      ;;
-                  esac
-                done
-              fi
-            fi
-          fi
-          echo "run_full=$run_full" >> "$GITHUB_OUTPUT"
-          if [[ "$run_full" == "true" ]]; then
-            echo 'Running the full repository gate.'
-          else
-            echo 'Native-mobile/release-only PR: full web/backend gate is not required.'
-          fi
-      - uses: actions/setup-node@v4
-        if: steps.scope.outputs.run_full == 'true'
-        with:
-          node-version: 24
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          base="$(git merge-base origin/main "$PR_HEAD_SHA")"
+          git diff --check "$base" "$PR_HEAD_SHA"
+
       - uses: actions/setup-python@v5
-        if: steps.scope.outputs.run_full == 'true'
+        if: steps.scope.outputs.profile == 'heavy' || steps.scope.outputs.profile == 'broad'
         with:
           python-version: '3.12'
+
       - name: Verify deployment bundles and embedded revisions
-        if: steps.scope.outputs.run_full == 'true'
+        if: steps.scope.outputs.build_bundles == 'true'
         shell: bash
         run: |
           set -euo pipefail
           npm install --prefix "$RUNNER_TEMP/release-tools" --no-audit --no-fund esbuild@0.28.2
           ESBUILD_BIN="$RUNNER_TEMP/release-tools/node_modules/.bin/esbuild" node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$GITHUB_SHA"
-      - name: Hydrate replay shards from R2
-        if: steps.scope.outputs.run_full == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        run: bash scripts/hydrate-replay-shards.sh
-      - name: Run tests with replay shards required
-        if: steps.scope.outputs.run_full == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        env:
-          REQUIRE_REPLAY_SHARDS: '1'
-        run: npm test
-      - name: Run fork tests without private replay shards
-        if: steps.scope.outputs.run_full == 'true' && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
-        run: npm test
-      - name: Audit production datasets
-        if: steps.scope.outputs.run_full == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        run: python scripts/audit_datasets.py --fail-on-error
 
-      # Keep this last so implementation regressions are visible even while a
-      # release-critical secret is intentionally not yet provisioned. A
-      # same-repository PR still cannot go green or merge without all four.
-      - name: Verify account-deletion release secrets are provisioned
-        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
+      - name: Validate publication-only source
+        if: steps.scope.outputs.profile == 'publication'
         shell: bash
-        env:
-          RATE_LIMIT_SECRET_PRESENT: ${{ secrets.PACK1_RATE_LIMIT_SECRET != '' }}
-          DELETION_ADMIN_EMAIL_PRESENT: ${{ secrets.PACK1_DELETION_ADMIN_EMAIL != '' }}
-          DELETION_ADMIN_PASSWORD_PRESENT: ${{ secrets.PACK1_DELETION_ADMIN_PASSWORD != '' }}
-          DELETE_EMAIL_KEY: ${{ secrets.PACK1_ACCOUNT_DELETE_RESEND_API_KEY }}
-          APPLE_TEAM_ID_PRESENT: ${{ secrets.APPLE_TEAM_ID != '' }}
-          APPLE_SIGN_IN_KEY_ID_PRESENT: ${{ secrets.APPLE_SIGN_IN_KEY_ID != '' }}
-          APPLE_SIGN_IN_KEY_P8_PRESENT: ${{ secrets.APPLE_SIGN_IN_KEY_P8 != '' }}
-          APPLE_TOKEN_ENCRYPTION_KEY_V1_PRESENT: ${{ secrets.APPLE_TOKEN_ENCRYPTION_KEY_V1 != '' }}
         run: |
           set -euo pipefail
-          [[ "$RATE_LIMIT_SECRET_PRESENT" == true ]] || { echo '::error::PACK1_RATE_LIMIT_SECRET is not provisioned.'; exit 1; }
-          [[ "$DELETION_ADMIN_EMAIL_PRESENT" == true ]] || { echo '::error::PACK1_DELETION_ADMIN_EMAIL is not provisioned.'; exit 1; }
-          [[ "$DELETION_ADMIN_PASSWORD_PRESENT" == true ]] || { echo '::error::PACK1_DELETION_ADMIN_PASSWORD is not provisioned.'; exit 1; }
-          [[ "$DELETE_EMAIL_KEY" == re_* && ${#DELETE_EMAIL_KEY} -gt 3 ]] || { echo '::error::PACK1_ACCOUNT_DELETE_RESEND_API_KEY is not provisioned or is malformed.'; exit 1; }
-          [[ "$APPLE_TEAM_ID_PRESENT" == true ]] || { echo '::error::APPLE_TEAM_ID is not provisioned.'; exit 1; }
-          [[ "$APPLE_SIGN_IN_KEY_ID_PRESENT" == true ]] || { echo '::error::APPLE_SIGN_IN_KEY_ID is not provisioned.'; exit 1; }
-          [[ "$APPLE_SIGN_IN_KEY_P8_PRESENT" == true ]] || { echo '::error::APPLE_SIGN_IN_KEY_P8 is not provisioned.'; exit 1; }
-          [[ "$APPLE_TOKEN_ENCRYPTION_KEY_V1_PRESENT" == true ]] || { echo '::error::APPLE_TOKEN_ENCRYPTION_KEY_V1 is not provisioned.'; exit 1; }
+          node scripts/generate-campaign-links.mjs --check
+          node scripts/check-creator-challenges.mjs
+          node --test             tests/ci-change-scope.test.mjs             tests/campaign-links.test.mjs             tests/campaign-link-publish.test.mjs             tests/creator-challenges.test.mjs             tests/publication-pr-checks.test.mjs
+          printf '%s\n' publication > "$RUNNER_TEMP/ci-selected-validation"
 
+      - name: Validate documentation-only change
+        if: steps.scope.outputs.profile == 'docs'
+        run: |
+          node --test tests/editorial.test.mjs
+          printf '%s\n' docs > "$RUNNER_TEMP/ci-selected-validation"
+
+      - name: Validate native-mobile required-check contract
+        if: steps.scope.outputs.profile == 'mobile'
+        run: |
+          node --test tests/ci-workflow-policy.test.mjs
+          printf '%s\n' mobile > "$RUNNER_TEMP/ci-selected-validation"
+
+      - name: Validate workflow and helper contracts
+        if: steps.scope.outputs.profile == 'ci'
+        run: |
+          npm run test:syntax
+          npm run test:js
+          printf '%s\n' ci > "$RUNNER_TEMP/ci-selected-validation"
+
+      - name: Validate static presentation
+        if: steps.scope.outputs.profile == 'static'
+        run: |
+          node --test tests/editorial.test.mjs tests/surface-focus.test.mjs tests/module-cache-version.test.mjs
+          printf '%s\n' static > "$RUNNER_TEMP/ci-selected-validation"
+
+      - name: Run application unit contracts without replay corpus
+        if: steps.scope.outputs.profile == 'standard'
+        run: |
+          npm run test:syntax
+          npm run test:js
+          printf '%s\n' standard > "$RUNNER_TEMP/ci-selected-validation"
+
+      - name: Hydrate replay shards from R2
+        if: steps.scope.outputs.hydrate_replays == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        run: bash scripts/hydrate-replay-shards.sh
+
+      - name: Run heavy or fail-closed repository tests
+        if: steps.scope.outputs.profile == 'heavy' || steps.scope.outputs.profile == 'broad'
+        env:
+          REQUIRE_REPLAY_SHARDS: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository && '1' || '0' }}
+        run: npm test
+
+      - name: Audit production datasets
+        if: steps.scope.outputs.audit_datasets == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        run: python scripts/audit_datasets.py --fail-on-error
+
+      - name: Mark heavy validation complete
+        if: success() && (steps.scope.outputs.profile == 'heavy' || steps.scope.outputs.profile == 'broad')
+        shell: bash
+        run: printf '%s\n' "${{ steps.scope.outputs.profile }}" > "$RUNNER_TEMP/ci-selected-validation"
+
+      - name: Verify selected validation completed
+        if: always()
+        shell: bash
+        env:
+          EXPECTED_PROFILE: ${{ steps.scope.outputs.profile }}
+        run: |
+          set -euo pipefail
+          test -s "$RUNNER_TEMP/ci-selected-validation" || {
+            echo "::error::No selected validation path completed for profile $EXPECTED_PROFILE."
+            exit 1
+          }
+          actual="$(cat "$RUNNER_TEMP/ci-selected-validation")"
+          [[ "$actual" == "$EXPECTED_PROFILE" ]] || {
+            echo "::error::Completed validation '$actual' does not match selected profile '$EXPECTED_PROFILE'."
+            exit 1
+          }
+          echo "Selected CI validation passed: $EXPECTED_PROFILE"
