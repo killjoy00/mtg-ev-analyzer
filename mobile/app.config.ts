@@ -31,6 +31,15 @@ function optionalPositiveIntegerString(name: string): string | undefined {
   return value;
 }
 
+function optionalMarketingVersion(name: string): string | undefined {
+  const value = process.env[name]?.trim();
+  if (!value) return undefined;
+  if (!/^\d+\.\d+(?:\.\d+)?$/.test(value)) {
+    throw new Error(`${name} must be a dotted numeric marketing version.`);
+  }
+  return value;
+}
+
 function optionalAndroidVersionCode(): number | undefined {
   const value = optionalPositiveIntegerString('PACKONE_ANDROID_VERSION_CODE');
   if (!value) return undefined;
@@ -60,12 +69,16 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const iosBuildNumber = production
     ? optionalPositiveIntegerString('PACKONE_IOS_BUILD_NUMBER')
     : undefined;
+  const iosMarketingVersion = production
+    ? optionalMarketingVersion('PACKONE_IOS_MARKETING_VERSION')
+    : undefined;
   const androidVersionCode = production ? optionalAndroidVersionCode() : undefined;
 
   return {
     ...config,
     name: displayName,
     slug: 'pack-one',
+    ...(iosMarketingVersion ? { version: iosMarketingVersion } : {}),
     description: 'Practice real draft decisions, compare trophy picks, and track your Pack One career.',
     backgroundColor: '#f7f8fa',
     ...(production ? { icon: './assets/images/icon.png' } : {}),
