@@ -82,7 +82,7 @@ jobs:
           ESBUILD_BIN="$RUNNER_TEMP/release-tools/node_modules/.bin/esbuild" node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$GITHUB_SHA"
       - name: Hydrate replay shards from R2
         if: steps.scope.outputs.run_full == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        run: bash scripts/r2_replay_shards.sh hydrate
+        run: bash scripts/hydrate-replay-shards.sh
       - name: Run tests with replay shards required
         if: steps.scope.outputs.run_full == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         env:
