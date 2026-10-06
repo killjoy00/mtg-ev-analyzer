@@ -4,6 +4,7 @@ import {handleCorpusAdmin} from './corpus-admin.mjs';
 import {handleUserAdmin} from './user-admin.mjs';
 import {handleCreatorChallengeAdmin} from './creator-challenges.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
+import {gameDateKey} from '../game-date.mjs';
 const fail=(message,status=400)=>{throw Object.assign(Error(message),{status});};
 const jsonArray=value=>Array.isArray(value)?value:(typeof value==='string'?JSON.parse(value):[]);
 async function timedAdminQuery(query,report,label,sql,params) {
@@ -12,8 +13,10 @@ async function timedAdminQuery(query,report,label,sql,params) {
   finally { console.info(JSON.stringify({event:'admin_query_timing',report,label,elapsed_ms:Date.now()-started})); }
 }
 export function reportFilters(url,now=new Date()) {
-  const end=url.searchParams.get('to')||now.toISOString().slice(0,10);
-  const start=url.searchParams.get('from')||new Date(now.getTime()-29*86400000).toISOString().slice(0,10);
+  const defaultEnd=gameDateKey(now);
+  const defaultStartDate=new Date(defaultEnd+'T12:00:00Z');defaultStartDate.setUTCDate(defaultStartDate.getUTCDate()-29);
+  const end=url.searchParams.get('to')||defaultEnd;
+  const start=url.searchParams.get('from')||defaultStartDate.toISOString().slice(0,10);
   const valid=x=>/^\d{4}-\d{2}-\d{2}$/.test(x)&&Number.isFinite(Date.parse(x))&&new Date(x).toISOString().slice(0,10)===x;
   if(!valid(start)||!valid(end)||end<start||(Date.parse(end)-Date.parse(start))/86400000>365)fail('Choose a valid date range of at most one year.');
   const environment=url.searchParams.get('environment')||'all',type=url.searchParams.get('type')||'all',set=url.searchParams.get('set')||'all';
