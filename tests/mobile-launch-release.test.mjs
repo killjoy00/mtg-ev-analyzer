@@ -13,7 +13,7 @@ test('native source and intended store marketing versions stay aligned', () => {
   assert.equal(app.expo.version, release.playVersionName);
 
   const preflight = read('mobile/scripts/release-preflight.mjs');
-  assert.match(preflight, /config\.version !== storeRelease\.appStoreVersion/);
+  assert.match(preflight, /config\.version !== storeRelease\.playVersionName/);
   assert.doesNotMatch(preflight, /App Store and Play marketing versions must match/);
 });
 
