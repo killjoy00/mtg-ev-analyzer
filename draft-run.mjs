@@ -91,7 +91,9 @@ export function calibratedSupports(candidates, exponent=SUPPORT_SHARPENING) {
   return new Map((candidates || []).map((c, index) => [c.id, share[index]]));
 }
 
-export function gradeDraftRunPick(puzzle, selectedId) {
+export const DRAFT_RUN_REPLAY_SCORING_VERSIONS=Object.freeze(['trophy-consensus-v2','trophy-consensus-v3']);
+
+function gradeTrophyConsensusV2V3Pick(puzzle, selectedId) {
   const candidates = puzzle?.candidates || puzzle?.pack || [];
   const ranked = rankCandidates(candidates);
   if (!ranked.length) throw new Error('Draft Run puzzle has no candidates.');
@@ -134,6 +136,16 @@ export function gradeDraftRunPick(puzzle, selectedId) {
     supportRatio,
     pickNumber: Number(puzzle.pick_number || puzzle.pickNumber || 1),
   };
+}
+}
+
+export function gradeDraftRunPickForVersion(puzzle,selectedId,scoringVersion) {
+  if(!DRAFT_RUN_REPLAY_SCORING_VERSIONS.includes(scoringVersion))throw new Error(`Unsupported Draft Run scoring version: ${scoringVersion}`);
+  return gradeTrophyConsensusV2V3Pick(puzzle,selectedId);
+}
+
+export function gradeDraftRunPick(puzzle, selectedId) {
+  return gradeDraftRunPickForVersion(puzzle,selectedId,DRAFT_RUN_SCORING_VERSION);
 }
 
 export function summarizeDraftRun(puzzles, selectedIds) {
