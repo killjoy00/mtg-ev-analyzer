@@ -225,6 +225,35 @@ try {
   assert.equal((await directCall(runApi,'/v1/runs',{daily:true},dailyFirstGuest.token)).id,dailyFirst.id,
     'creator replay after Daily leaves the Daily reservation unchanged');
 
+  // Exercise the real final-pick/result persistence path, not a cloned completed
+  // fixture. A reserved Daily must stay independent throughout completion.
+  while(!replay.complete) {
+    replay=await directCall(runApi,`/v1/runs/${replay.id}/pick`,{
+      revision:replay.revision,round:replay.answers.length,
+      puzzleId:replay.current.puzzle_id,cardId:replay.current.candidates[0].id,
+    },replayGuest.token);
+  }
+  assert.equal(replay.answers.length,8);
+  assert.equal(replay.comparison.creator_matches,replay.answers.filter((answer,index)=>answer.selectedId===sourceAnswers[index].selectedId).length);
+  assert.equal(replay.comparison.trophy_matches,replay.answers.filter(answer=>answer.historicalMatch).length);
+  assert.equal(replay.comparison.outcome,replay.score>template.score?'win':replay.score<template.score?'loss':'tie');
+  const persisted=(await query(`SELECT creator_challenge_id::text creator_challenge_id,score,outcome,is_daily,opponent_name
+    FROM game_results WHERE player_id=$1::uuid AND client_result_id=$2`,[replayGuest.playerId,`draft-run:${replay.id}`])).rows;
+  assert.equal(persisted.length,1);
+  assert.equal(persisted[0].creator_challenge_id,runtimeChallenge);
+  assert.equal(Number(persisted[0].score),Number(replay.score));
+  assert.equal(persisted[0].outcome,replay.comparison.outcome);
+  assert.equal(persisted[0].is_daily,false);
+  assert.equal(persisted[0].opponent_name,'Runtime Creator');
+  const runtimeStats=await creatorChallengeById(query,runtimeChallenge);
+  assert.equal(runtimeStats.attempts,1);
+  assert.equal(runtimeStats.wins+runtimeStats.ties+runtimeStats.losses,1);
+  assert.equal((await directCall(runApi,'/v1/runs',{daily:true},replayGuest.token)).id,realDaily.id);
+  const reloaded=await directCall(runApi,`/v1/runs/${replay.id}`,undefined,replayGuest.token);
+  assert.equal(reloaded.complete,true);
+  assert.equal(reloaded.comparison.outcome,replay.comparison.outcome);
+  console.log('All eight creator picks, final comparison, result persistence, reload and Daily isolation verified against real PostgreSQL.');
+
   // Paid creator sources keep the same paid capability gate as ordinary Practice.
   const paidSourceId=crypto.randomUUID(),paidChallenge=crypto.randomUUID(),paidSlug=`paid-${tag}`;
   await query(`INSERT INTO draft_run_sessions
