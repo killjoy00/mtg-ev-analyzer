@@ -24,8 +24,9 @@ test('campaign publish workflow preserves protected-main publication',()=>{
   assert.ok(!publishWorkflow.includes('HEAD:refs/heads/main'));
   assert.ok(!publishWorkflow.includes('HEAD:main'));
   assert.ok(publishWorkflow.includes('gh pr create'));
-  assert.ok(publishWorkflow.includes('gh workflow run test.yml --ref "$BRANCH"'));
-  assert.ok(publishWorkflow.includes('gh workflow run e2e.yml --ref "$BRANCH"'));
+  assert.ok(publishWorkflow.includes("node .github/scripts/publication-pr-checks.mjs"));
+  assert.ok(publishWorkflow.includes("environment: pack-one-mobile-release"));
+  assert.ok(publishWorkflow.includes('--match-head-commit "$HEAD_SHA"'));
   assert.ok(publishWorkflow.includes('gh pr merge "$PR_URL" --squash --delete-branch'));
   assert.ok(publishWorkflow.includes('repos/${GITHUB_REPOSITORY}/pages/builds'));
   assert.match(publishWorkflow,/timeout-minutes: 60/);
