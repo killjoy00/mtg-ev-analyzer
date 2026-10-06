@@ -74,6 +74,12 @@ jobs:
       - name: Set RC build number
         shell: bash
         run: echo "PACKONE_IOS_BUILD_NUMBER=$((300000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+      - name: Set intended iOS marketing version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.appStoreVersion)')"
+          echo "PACKONE_IOS_MARKETING_VERSION=$version" >> "$GITHUB_ENV"
       - name: Generate production iOS project
         env:
           CI: '1'
