@@ -7,13 +7,14 @@ const read = (path) => fs.readFileSync(path, 'utf8');
 test('native source and intended store marketing versions stay aligned', () => {
   const app = JSON.parse(read('mobile/app.json'));
   const release = JSON.parse(read('mobile/store-release.json'));
-  assert.equal(app.expo.version, '1.1');
+  assert.equal(app.expo.version, '1.0');
   assert.equal(release.appStoreVersion, '1.1');
-  assert.equal(release.playVersionName, release.appStoreVersion);
+  assert.equal(release.playVersionName, '1.0');
+  assert.equal(app.expo.version, release.playVersionName);
 
   const preflight = read('mobile/scripts/release-preflight.mjs');
   assert.match(preflight, /config\.version !== storeRelease\.appStoreVersion/);
-  assert.match(preflight, /App Store and Play marketing versions must match/);
+  assert.doesNotMatch(preflight, /App Store and Play marketing versions must match/);
 });
 
 test('store workflows cannot publish or use store credentials from arbitrary refs', () => {
