@@ -166,6 +166,7 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0051_exact_pick_draw_index.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0052_decision_reports.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0053_creator_challenges.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0054_creator_event_idempotency.sql
           node scripts/verify-neon-schema.mjs
           PACK1_RELEASE_COMMIT="$GITHUB_SHA" node scripts/warm-practice-cache.mjs
           node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$GITHUB_SHA"
