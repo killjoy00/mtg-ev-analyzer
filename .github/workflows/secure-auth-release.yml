@@ -125,6 +125,7 @@ jobs:
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0051_exact_pick_draw_index.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0052_decision_reports.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0053_creator_challenges.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0054_creator_event_idempotency.sql
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
 
@@ -197,6 +198,7 @@ jobs:
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0051_exact_pick_draw_index.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0052_decision_reports.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0053_creator_challenges.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0054_creator_event_idempotency.sql
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
 
