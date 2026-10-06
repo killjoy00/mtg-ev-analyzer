@@ -56,3 +56,74 @@ test('a genuine PR check failure stops publication without replacing its outcome
       :Response.json({workflow_runs:runs().map(run=>({...run,conclusion:'failure'}))});
   await assert.rejects(waitForPublicationChecks({...expected,token:'read',approvalToken:'approve',fetcher}),/Required PR check failed/);
 });
+
+const greenRuns=()=>({workflow_runs:runs().map(run=>({...run,conclusion:'success'}))});
+const healthyRead=url=>new URL(url).pathname.endsWith('/files')?Response.json(files)
+  :new URL(url).pathname.endsWith('/pulls/123')?Response.json(pr()):Response.json(greenRuns());
+
+for(const failure of [500,503,429,'network','timeout']){
+  test(`transient GitHub read ${failure} recovers without approving or weakening checks`,async()=>{
+    let reads=0,approvals=0;const delays=[];
+    const fetcher=async(url,options)=>{
+      assert.equal(options.headers.authorization,'Bearer read');
+      if(options.method==='POST'){approvals++;throw Error('No approval expected');}
+      if(new URL(url).pathname.endsWith('/actions/runs')&&++reads===1){
+        if(failure==='network')throw new TypeError('fetch failed');
+        if(failure==='timeout')throw new DOMException('read timed out','TimeoutError');
+        return new Response('Temporary failure',{status:failure,headers:failure===429?{'retry-after':'2'}:{}});
+      }
+      return healthyRead(url);
+    };
+    const result=await waitForPublicationChecks({...expected,token:'read',approvalToken:'approve',fetcher,sleep:async ms=>{delays.push(ms);}});
+    assert.equal(result.length,2);assert.equal(reads,2);assert.equal(approvals,0);
+    assert.deepEqual(delays,[failure===429?2000:1000]);
+  });
+}
+
+test('persistent outages are bounded and authorization failures are not retried',async()=>{
+  for(const status of [500,403]){
+    let reads=0,approvals=0;const delays=[];
+    const fetcher=async(url,options)=>{
+      if(options.method==='POST')approvals++;
+      reads++;return new Response('Failure',{status});
+    };
+    await assert.rejects(waitForPublicationChecks({...expected,token:'read',approvalToken:'approve',fetcher,sleep:async ms=>{delays.push(ms);}}),new RegExp('GitHub read HTTP '+status));
+    assert.equal(reads,status===500?5:1);assert.equal(approvals,0);
+    assert.deepEqual(delays,status===500?[1000,2000,4000,8000]:[]);
+  }
+});
+
+test('invalid JSON and ambiguous approval failures are never blindly retried',async()=>{
+  let reads=0;
+  await assert.rejects(waitForPublicationChecks({...expected,token:'read',approvalToken:'approve',
+    fetcher:async()=>{reads++;return new Response('invalid JSON');},sleep:async()=>{throw Error('No retry expected');}}),SyntaxError);
+  assert.equal(reads,1);
+  let approvals=0;
+  const fetcher=async(url,options)=>{
+    if(options.method==='POST'){approvals++;return new Response('Temporary failure',{status:500});}
+    if(new URL(url).pathname.endsWith('/actions/runs'))return Response.json({workflow_runs:runs()});
+    return healthyRead(url);
+  };
+  await assert.rejects(waitForPublicationChecks({...expected,token:'read',approvalToken:'approve',fetcher,sleep:async()=>{throw Error('No retry expected');}}),/GitHub approval HTTP 500/);
+  assert.equal(approvals,1);
+});
+
+test('read retries cannot outlive the overall publication deadline',async()=>{
+  let reads=0,sleeps=0;
+  await assert.rejects(waitForPublicationChecks({...expected,token:'read',approvalToken:'approve',timeoutMs:500,now:()=>0,
+    fetcher:async()=>{reads++;return new Response('Failure',{status:503});},sleep:async()=>{sleeps++;}}),/Timed out waiting/);
+  assert.equal(reads,1);assert.equal(sleeps,0);
+});
+
+test('a PR head changed during a read retry cannot use the old green runs',async()=>{
+  let moved=false,reads=0,approvals=0;
+  const fetcher=async(url,options)=>{
+    const path=new URL(url).pathname;
+    if(options.method==='POST'){approvals++;throw Error('No approval expected');}
+    if(path.endsWith('/actions/runs')&&++reads===1)return new Response('Temporary failure',{status:500});
+    if(path.endsWith('/pulls/123')&&moved)return Response.json({...pr(),head:{...pr().head,sha:'b'.repeat(40)}});
+    return healthyRead(url);
+  };
+  await assert.rejects(waitForPublicationChecks({...expected,token:'read',approvalToken:'approve',fetcher,sleep:async()=>{moved=true;}}),/publication head changed/);
+  assert.equal(approvals,0);
+});

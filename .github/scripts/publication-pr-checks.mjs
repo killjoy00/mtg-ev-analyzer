@@ -30,24 +30,41 @@ export function requiredPublicationRuns(runs,{repo,branch,headSha,prNumber}) {
 
 export async function waitForPublicationChecks({repo,branch,headSha,slug,kind,prNumber,
   token,approvalToken,fetcher=fetch,sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),
-  timeoutMs=20*60*1000}) {
+  timeoutMs=30*60*1000,now=Date.now}) {
   assert.match(repo,/^[\w.-]+\/[\w.-]+$/);
   assert.match(headSha,/^[a-f0-9]{40}$/);
   assert.ok(Number.isSafeInteger(prNumber)&&prNumber>0);
   assert.ok(token&&approvalToken,'Protected publication requires the existing Actions-write approval token.');
+  const deadline=now()+timeoutMs;
   const api=async(path,{approve=false}={})=>{
-    const response=await fetcher('https://api.github.com/repos/'+repo+path,{
-      method:approve?'POST':'GET',
-      headers:{authorization:'Bearer '+(approve?approvalToken:token),accept:'application/vnd.github+json',
-        'x-github-api-version':'2026-03-10'},signal:AbortSignal.timeout(30000),
-    });
-    assert.ok(response.ok,'GitHub '+(approve?'approval':'read')+' HTTP '+response.status+' for '+path);
-    return approve||response.status===204?null:response.json();
+    for(let attempt=0;attempt<5;attempt++){
+      assert.ok(now()<deadline,'Timed out waiting for required pull_request test/browser checks.');
+      let response,transportError;
+      try{
+        response=await fetcher('https://api.github.com/repos/'+repo+path,{
+          method:approve?'POST':'GET',
+          headers:{authorization:'Bearer '+(approve?approvalToken:token),accept:'application/vnd.github+json',
+            'x-github-api-version':'2026-03-10'},signal:AbortSignal.timeout(Math.max(1,Math.min(30000,deadline-now()))),
+        });
+      }catch(error){
+        if(approve||!(error instanceof TypeError||['TimeoutError','AbortError'].includes(error.name)))throw error;
+        transportError=error;
+      }
+      if(response?.ok)return approve||response.status===204?null:response.json();
+      const retryable=!approve&&(transportError||response.status===429||response.status>=500&&response.status<=599);
+      const failure='GitHub '+(approve?'approval':'read')+' '+(transportError?.name||'HTTP '+response.status)+' for '+path;
+      assert.ok(retryable&&attempt<4,failure);
+      const retryAfter=Number(response?.headers.get('retry-after'));
+      const delay=Math.max(1000*2**attempt,Number.isFinite(retryAfter)?Math.min(60000,Math.max(0,retryAfter*1000)):0);
+      assert.ok(now()+delay<deadline,'Timed out waiting for required pull_request test/browser checks.');
+      if(response?.body)await response.body.cancel().catch(()=>{});
+      console.log(failure+'; retrying read ('+(attempt+2)+'/5).');
+      await sleep(delay);
+    }
   };
   const files=await api('/pulls/'+prNumber+'/files?per_page=100');
   const approved=new Set();
-  const deadline=Date.now()+timeoutMs;
-  while(Date.now()<deadline){
+  while(now()<deadline){
     validatePublicationPr(await api('/pulls/'+prNumber),files,{repo,branch,headSha,slug,kind});
     let runs=[];
     for(let page=1;page<=3;page++){
@@ -56,10 +73,14 @@ export async function waitForPublicationChecks({repo,branch,headSha,slug,kind,pr
       if(data.workflow_runs.length<100)break;
     }
     const required=requiredPublicationRuns(runs,{repo,branch,headSha,prNumber});
-    if(required.every(run=>run?.status==='completed'&&run.conclusion==='success'))return required;
+    if(required.every(run=>run?.status==='completed'&&run.conclusion==='success')){
+      validatePublicationPr(await api('/pulls/'+prNumber),files,{repo,branch,headSha,slug,kind});
+      return required;
+    }
     for(const run of required.filter(Boolean)){
       if(run.conclusion==='action_required'){
         if(!approved.has(run.id)){
+          validatePublicationPr(await api('/pulls/'+prNumber),files,{repo,branch,headSha,slug,kind});
           await api('/actions/runs/'+run.id+'/approve',{approve:true});
           approved.add(run.id);
           console.log('Approved required PR check: '+run.html_url);
