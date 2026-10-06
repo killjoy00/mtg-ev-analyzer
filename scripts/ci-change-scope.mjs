@@ -115,7 +115,7 @@ function heavyPath(p) {
     || /^(?:path-model|scoring|draft-run-difficulty|draft-run-policy|daily-selection)\.mjs$/.test(p)
     || p==='worker/path-model.mjs'
     || /^tests\/(?:consensus-audit|path-model-distribution|scoring-distribution)\.test\.mjs$/.test(p)
-    || p.endsWith('.py');
+    || /^tests\/test_.*(?:replay|path_model|model|scoring|dataset|data_health|corpus|outcome|frozen|trophy).*\.py$/.test(p);
 }
 function staticPath(p) {
   if(p.startsWith('creator/')||p.startsWith('go/'))return false;
@@ -131,6 +131,31 @@ function appPath(p) {
     || /\.(?:mjs|js|json)$/.test(p);
 }
 
+function browserGroupsForPath(p) {
+  const groups=new Set();
+  const add=(...values)=>values.forEach(value=>groups.add(value));
+  if(/^tests\/(?:e2e|home-today-e2e|home-auth-hydration-e2e)\.mjs$/.test(p))add('core');
+  if(/^tests\/(?:sets|practice|practice-hub|practice-access|profile|draft-run)-e2e\.mjs$/.test(p))add('gameplay');
+  if(/^tests\/(?:account|auth-context|email-verification|patreon-activation|password-recovery|credential-management|account-deletion)-e2e\.mjs$/.test(p))add('account');
+  if(p==='tests/ads-e2e.mjs')add('ads');
+  if(p==='tests/admin-e2e.mjs')add('admin');
+  if(p==='tests/corpus-readiness-e2e.mjs')add('corpus');
+  if(groups.size)return groups;
+
+  if(p.startsWith('admin/')||/(?:^|\/)(?:user-admin|admin-|campaign-link)/.test(p))add('admin');
+  if(/(?:^|\/)(?:ads?|monetization)(?:[.-]|$)/.test(p))add('ads','core');
+  if(/(?:account|auth|credential|password|patreon|membership|subscription|identity|growth)/.test(p))add('account','core');
+  if(/(?:creator|campaign)/.test(p))add('gameplay','admin','core');
+  if(/(?:draft-run|practice|cube|daily|gameplay|scoring|leaderboard|profile|share|today|home|sets|product)/.test(p))add('gameplay','core');
+  if(/(?:corpus|snapshot|serving|source-|trophy)/.test(p))add('corpus','gameplay');
+
+  if(groups.size)return groups;
+  if(p.startsWith('scripts/')||p.startsWith('tests/'))return groups;
+  if(backendPath(p))return new Set(['*']);
+  if(/\.(?:mjs|js|json)$/.test(p))return new Set(['*']);
+  return groups;
+}
+
 export function classifyChangedPaths(paths,{publication=null,forceProfile=null}={}) {
   const changed=[...new Set(paths.map(cleanPath).filter(Boolean))];
   if(forceProfile) {
@@ -142,7 +167,7 @@ export function classifyChangedPaths(paths,{publication=null,forceProfile=null}=
   if(publication&&exactChangedPaths(changed,publication.allowedPaths))
     return scopeFromProfile('publication',{reason:'exact validated '+publication.kind+' '+publication.action,publication});
 
-  const flags={docs:false,mobile:false,ci:false,static:false,app:false,backend:false,heavy:false,unknown:false,ciSelection:false};
+  const flags={docs:false,mobile:false,ci:false,static:false,app:false,backend:false,heavy:false,unknown:false,ciSelection:false,browserGroups:new Set()};
   for(const p of changed) {
     if(CI_SELECTION_PATHS.has(p)){flags.ciSelection=true;continue;}
     if(mobilePath(p)){flags.mobile=true;continue;}
@@ -150,8 +175,8 @@ export function classifyChangedPaths(paths,{publication=null,forceProfile=null}=
     if(docsPath(p)){flags.docs=true;continue;}
     if(staticPath(p)){flags.static=true;continue;}
     if(ciPath(p)){flags.ci=true;continue;}
-    if(backendPath(p)){flags.backend=true;flags.app=true;continue;}
-    if(appPath(p)){flags.app=true;continue;}
+    if(backendPath(p)){flags.backend=true;flags.app=true;for(const group of browserGroupsForPath(p))flags.browserGroups.add(group);continue;}
+    if(appPath(p)){flags.app=true;for(const group of browserGroupsForPath(p))flags.browserGroups.add(group);continue;}
     if(p==='.gitignore'){flags.docs=true;continue;}
     if(p==='package.json'||/^package-lock\.json$/.test(p)){flags.ciSelection=true;continue;}
     flags.unknown=true;
@@ -178,6 +203,8 @@ export function classifyChangedPaths(paths,{publication=null,forceProfile=null}=
 
 function scopeFromProfile(profile,{reason='',publication=null,flags={}}={}) {
   const broad=profile==='broad',heavy=profile==='heavy';
+  const browserGroups=flags.browserGroups instanceof Set?[...flags.browserGroups].sort():[];
+  const selectedFull=browserGroups.includes('*');
   return {
     profile,reason,
     publication_kind:publication?.kind||'',
@@ -186,8 +213,10 @@ function scopeFromProfile(profile,{reason='',publication=null,flags={}}={}) {
     hydrate_replays:broad||heavy,
     audit_datasets:broad||heavy,
     build_bundles:broad||heavy||Boolean(flags.backend),
+    browser_groups:selectedFull?'*':browserGroups.join(','),
     browser_mode:profile==='publication'?'publication':profile==='static'?'core':
-      ['standard','heavy','broad'].includes(profile)?'full':'none',
+      ['heavy','broad'].includes(profile)||selectedFull?'full':
+      profile==='standard'&&browserGroups.length?'selected':'none',
   };
 }
 
