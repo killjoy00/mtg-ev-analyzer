@@ -245,7 +245,7 @@ try {
   assert.equal(persisted[0].outcome,replay.comparison.outcome);
   assert.ok(persisted[0].is_daily===false||persisted[0].is_daily==='f','saved creator result must be unranked');
   assert.equal(persisted[0].opponent_name,'Runtime Creator');
-  const runtimeStats=await creatorChallengeById(query,runtimeChallenge);
+  const runtimeStats=await creatorChallengeById(query,runtimeChallenge,{includeStats:true});
   assert.equal(runtimeStats.attempts,1);
   assert.equal(runtimeStats.wins+runtimeStats.ties+runtimeStats.losses,1);
   assert.equal((await directCall(runApi,'/v1/runs',{daily:true},replayGuest.token)).id,realDaily.id);
