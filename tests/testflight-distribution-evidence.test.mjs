@@ -91,20 +91,21 @@ for (const available of [true, false]) {
       console.log('TEST_WRITES ' + JSON.stringify(writes));
     `;
     const run = spawnSync(process.execPath, ['--input-type=module', '-e', script], { cwd: new URL('..', import.meta.url), encoding: 'utf8' });
+    if (!available) {
+      assert.notEqual(run.status, 0, 'an unverifiable TestFlight availability read must fail finalization');
+      assert.match(run.stderr, /Unable to verify TestFlight availability for build 999999:.*503/s);
+      assert.doesNotMatch(run.stdout, /TEST_WRITES /);
+      return;
+    }
     assert.equal(run.status, 0, run.stderr);
     const output = run.stdout.slice(run.stdout.indexOf('{\n'), run.stdout.indexOf('TEST_WRITES ')).trim();
     const result = JSON.parse(output);
     assert.equal(result.attached, true);
     assert.equal(result.reviewSubmissionCreated, false);
-    assert.equal(result.testFlight.verified, available);
+    assert.equal(result.testFlight.verified, true);
     assert.equal(result.testFlight.testersOrGroupsChanged, false);
-    if (available) {
-      assert.equal(result.testFlight.internalBuildState, 'IN_BETA_TESTING');
-      assert.deepEqual(result.testFlight.groups, [{ id: 'existing', isInternalGroup: true, hasAccessToAllBuilds: true }]);
-    } else {
-      assert.match(result.testFlight.reason, /503/);
-      assert.equal(result.testFlight.internalBuildState, undefined);
-    }
+    assert.equal(result.testFlight.internalBuildState, 'IN_BETA_TESTING');
+    assert.deepEqual(result.testFlight.groups, [{ id: 'existing', isInternalGroup: true, hasAccessToAllBuilds: true }]);
     assert.deepEqual(JSON.parse(run.stdout.split('TEST_WRITES ')[1]), [{ path: '/v1/appStoreVersions/version/relationships/build', method: 'PATCH' }]);
   });
 }
