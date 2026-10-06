@@ -9,12 +9,29 @@ import {
   eligiblePickForRound,
   calibratedSupports,
   gradeDraftRunPick,
+  gradeDraftRunPickForVersion,
+  DRAFT_RUN_REPLAY_SCORING_VERSIONS,
   publicDraftRunPuzzle,
   SCORE_EXPONENT,
   SUPPORT_SHARPENING,
   supportSharpening,
   summarizeDraftRun,
 } from '../draft-run.mjs';
+
+test('replay scoring keeps v2 and v3 pinned while rejecting unimplemented versions',()=>{
+  const p={historical_pick_id:'b',candidates:[
+    {id:'a',name:'A',model_probability:.55},
+    {id:'b',name:'B',model_probability:.30},
+    {id:'c',name:'C',model_probability:.10},
+    {id:'d',name:'D',model_probability:.05},
+  ]};
+  assert.deepEqual(DRAFT_RUN_REPLAY_SCORING_VERSIONS,['trophy-consensus-v2','trophy-consensus-v3']);
+  for(const id of ['a','b','c','d']) {
+    assert.deepEqual(gradeDraftRunPickForVersion(p,id,'trophy-consensus-v2'),gradeDraftRunPick(p,id));
+    assert.deepEqual(gradeDraftRunPickForVersion(p,id,'trophy-consensus-v3'),gradeDraftRunPick(p,id));
+  }
+  assert.throws(()=>gradeDraftRunPickForVersion(p,'a','trophy-consensus-v4'),/Unsupported Draft Run scoring version/);
+});
 
 function card(id, support) {
   return { id, name: id.toUpperCase(), model_probability: support };
