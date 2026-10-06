@@ -1,4 +1,4 @@
 {
   "operation": "configure-app-store-safe-submission-metadata",
-  "reason": "Apply only the live-audit-confirmed safe App Store metadata for Pack One 1.0: change releaseType from AFTER_APPROVAL to MANUAL and set the missing Privacy Choices URL to https://packone.pro/privacy/#delete-account. Do not change age rating, submit for review, attach a build, create review details, release the version, or alter subscription configuration."
+  "reason": "Repair the App Review metadata rejection for Pack One iOS 1.0: add the standard Apple Terms of Use (EULA) URL plus explicit Pack One Terms and Privacy Policy links to the App Store description, preserve MANUAL release, and preserve the Privacy Choices URL. Do not submit for review, attach or change a build, create review details, release the version, alter subscription configuration, or modify age rating."
 }
