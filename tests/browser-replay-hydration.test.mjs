@@ -5,9 +5,9 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 
-const script = new URL('../scripts/hydrate-browser-replays.sh', import.meta.url).pathname;
+const script = new URL('../scripts/hydrate-replay-shards.sh', import.meta.url).pathname;
 function run(failures, message) {
-  const root = mkdtempSync(path.join(tmpdir(), 'browser-replay-'));
+  const root = mkdtempSync(path.join(tmpdir(), 'replay-hydration-'));
   try {
     mkdirSync(path.join(root, 'scripts'));
     mkdirSync(path.join(root, 'bin'));
@@ -24,7 +24,7 @@ echo 'hydrated'
   } finally { rmSync(root, { recursive: true, force: true }); }
 }
 const throttle = 'An error occurred (ServiceUnavailable): Reduce your rate of simultaneous reads on the same object.';
-test('browser hydration limits classic S3 downloads and resumes throttled sync', () => {
+test('protected hydration serializes S3 downloads and resumes throttled sync', () => {
   const result = run(2, throttle);
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.count, 3);
@@ -42,4 +42,11 @@ test('other storage errors fail immediately', () => {
   assert.equal(result.status, 7);
   assert.equal(result.count, 1);
   assert.doesNotMatch(result.calls, /sleep/);
+});
+test('required test and browser gates use protected replay hydration', () => {
+  for (const workflowName of ['test.yml', 'e2e.yml']) {
+    const workflow = readFileSync(new URL(`../.github/workflows/${workflowName}`, import.meta.url), 'utf8');
+    assert.match(workflow, /run: bash scripts\/hydrate-replay-shards\.sh/);
+    assert.doesNotMatch(workflow, /run: bash scripts\/r2_replay_shards\.sh hydrate/);
+  }
 });
