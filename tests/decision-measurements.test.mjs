@@ -25,6 +25,11 @@ test('reports reject malformed dates and filters and bound the query range',()=>
   assert.equal(filters.corpus_version,DRAFT_RUN_CORPUS_VERSION);
   assert.equal(filters.params.at(-1),DRAFT_RUN_CORPUS_VERSION);
 });
+test('admin report defaults stay on the Pack One Pacific day across the UTC boundary',()=>{
+  const filters=reportFilters(new URL('https://test/'),new Date('2026-10-07T01:30:00Z'));
+  assert.equal(filters.end,'2026-10-06');
+  assert.equal(filters.start,'2026-09-07');
+});
 test('admin reports never accept a guest player token and deny ordinary accounts',async()=>{
   let reads=0;
   await assert.rejects(handleAdmin(new Request('https://test/v1/admin/measurements',{headers:{authorization:'Bearer guest'}}),async()=>{reads++;},()=>{}),e=>e.status===401);
