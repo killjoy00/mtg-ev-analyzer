@@ -74,6 +74,12 @@ jobs:
       - name: Set RC build number
         shell: bash
         run: echo "PACKONE_IOS_BUILD_NUMBER=$((300000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+      - name: Set intended iOS marketing version
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.appStoreVersion)')"
+          echo "PACKONE_IOS_MARKETING_VERSION=$version" >> "$GITHUB_ENV"
       - name: Generate production iOS project
         env:
           CI: '1'
@@ -85,10 +91,10 @@ jobs:
           set -euo pipefail
           workspace="$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)"
           test -n "$workspace"
-          xcodebuild -workspace "$workspace" -scheme PackOne -configuration Release -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/PackOne.xcarchive" CURRENT_PROJECT_VERSION="$PACKONE_IOS_BUILD_NUMBER" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO archive
+          expected_version="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.appStoreVersion)')"
+          xcodebuild -workspace "$workspace" -scheme PackOne -configuration Release -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/PackOne.xcarchive" CURRENT_PROJECT_VERSION="$PACKONE_IOS_BUILD_NUMBER" MARKETING_VERSION="$expected_version" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO archive
           plist="$RUNNER_TEMP/PackOne.xcarchive/Products/Applications/PackOne.app/Info.plist"
           test -f "$plist"
-          expected_version="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.appStoreVersion)')"
           [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist")" == "$expected_version" ]]
           [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")" == "$PACKONE_IOS_BUILD_NUMBER" ]]
           python3 -c 'import plistlib,sys; data=plistlib.load(open(sys.argv[1], "rb")); assert data.get("ITSAppUsesNonExemptEncryption") is False' "$plist"

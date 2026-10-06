@@ -38,10 +38,6 @@ for (const [name, value] of Object.entries({
     throw new Error(`Pack One production preflight failed. ${name} must be a dotted numeric marketing version.`);
   }
 }
-if (storeRelease.appStoreVersion !== storeRelease.playVersionName) {
-  throw new Error('Pack One production preflight failed. App Store and Play marketing versions must match.');
-}
-
 if (!existsSync(icon)) {
   throw new Error('Pack One production preflight failed. Missing mobile/assets/images/icon.png.');
 }
@@ -119,8 +115,8 @@ if (result.status !== 0) {
 }
 
 const config = JSON.parse(result.stdout);
-if (config.version !== storeRelease.appStoreVersion) {
-  throw new Error(`Production marketing version ${config.version ?? 'missing'} does not match intended store version ${storeRelease.appStoreVersion}.`);
+if (config.version !== storeRelease.playVersionName) {
+  throw new Error(`Production base marketing version ${config.version ?? 'missing'} does not match intended Play version ${storeRelease.playVersionName}.`);
 }
 if (config.ios?.bundleIdentifier !== 'pro.packone.app') {
   throw new Error('Production iOS bundle identifier must remain pro.packone.app.');
