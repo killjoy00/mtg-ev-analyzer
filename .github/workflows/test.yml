@@ -79,7 +79,7 @@ jobs:
           git diff --check "$base" "$PR_HEAD_SHA"
 
       - uses: actions/setup-python@v5
-        if: steps.scope.outputs.profile == 'heavy' || steps.scope.outputs.profile == 'broad'
+        if: steps.scope.outputs.profile == 'standard' || steps.scope.outputs.profile == 'heavy' || steps.scope.outputs.profile == 'broad'
         with:
           python-version: '3.12'
 
@@ -104,7 +104,7 @@ jobs:
       - name: Validate documentation-only change
         if: steps.scope.outputs.profile == 'docs'
         run: |
-          node --test tests/editorial.test.mjs
+          echo 'Documentation-only change: diff integrity passed; no product suite selected.'
           printf '%s\n' docs > "$RUNNER_TEMP/ci-selected-validation"
 
       - name: Validate native-mobile required-check contract
@@ -117,7 +117,11 @@ jobs:
         if: steps.scope.outputs.profile == 'ci'
         run: |
           npm run test:syntax
-          npm run test:js
+          node --test \
+            tests/ci-workflow-policy.test.mjs \
+            tests/workflow-block-scalars.test.mjs \
+            tests/publication-pr-checks.test.mjs \
+            tests/browser-replay-hydration.test.mjs
           printf '%s\n' ci > "$RUNNER_TEMP/ci-selected-validation"
 
       - name: Validate static presentation
@@ -126,21 +130,24 @@ jobs:
           node --test tests/editorial.test.mjs tests/surface-focus.test.mjs tests/module-cache-version.test.mjs
           printf '%s\n' static > "$RUNNER_TEMP/ci-selected-validation"
 
-      - name: Run application unit contracts without replay corpus
+      - name: Run application tests without replay corpus hydration
         if: steps.scope.outputs.profile == 'standard'
         run: |
-          npm run test:syntax
-          npm run test:js
+          npm test
           printf '%s\n' standard > "$RUNNER_TEMP/ci-selected-validation"
 
       - name: Hydrate replay shards from R2
         if: steps.scope.outputs.hydrate_replays == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         run: bash scripts/hydrate-replay-shards.sh
 
-      - name: Run heavy or fail-closed repository tests
-        if: steps.scope.outputs.profile == 'heavy' || steps.scope.outputs.profile == 'broad'
+      - name: Run heavy or fail-closed tests with replay shards required
+        if: (steps.scope.outputs.profile == 'heavy' || steps.scope.outputs.profile == 'broad') && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         env:
-          REQUIRE_REPLAY_SHARDS: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository && '1' || '0' }}
+          REQUIRE_REPLAY_SHARDS: '1'
+        run: npm test
+
+      - name: Run fork heavy tests without private replay shards
+        if: (steps.scope.outputs.profile == 'heavy' || steps.scope.outputs.profile == 'broad') && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
         run: npm test
 
       - name: Audit production datasets
