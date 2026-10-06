@@ -115,7 +115,7 @@ async function createFreshPracticeSource() {
     body:{environment:'mixed'},player,token,status:[200,201],
   })).data;
   practiceFixture.sessionId=run.id;
-  report.fixtures={practice:{player_id:playerId,source_session_id:run.id}};
+  report.fixtures={practice:{player_id:playerId,source_session_id:run.id,display_name:name}};
   assert.equal(run.day,null);
   assert.equal(run.answers.length,0);
   while(!run.complete) {
@@ -146,11 +146,22 @@ async function createFreshPracticeSource() {
 async function cleanupFreshPracticeSource() {
   const fixture=practiceFixture;
   if(!fixture)return;
-  const clean=await requestCreatorPrivacyRetirement(query,fixture.playerId,{
-    reason:'release_canary_cleanup',today:gameDateKey(),
-    env:{PACK1_LAUNCH_WATCHER_GITHUB_TOKEN:process.env.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN},
-    fetcher:fetch,
-  });
+  const deadline=Date.now()+45*60*1000;
+  let clean=false;
+  while(Date.now()<deadline){
+    const owned=(await query('SELECT id::text id,status,publication_detail FROM creator_challenges WHERE source_owner_player_id=$1::uuid',[fixture.playerId])).rows;
+    const expectedIds=createdChallenges.filter(challenge=>challenge.owner===fixture.playerId).map(challenge=>challenge.id);
+    // Recovery independently validates this exact fixture before reaching here.
+    const unsafe=owned.filter(row=>!expectedIds.includes(row.id)&&row.id!==fixture.challengeId&&!(row.status==='retired'&&parseJson(row.publication_detail)?.live_verified===true));
+    assert.equal(unsafe.length,0,'Owned Practice fixture acquired unrelated creator work; refusing broad cleanup.');
+    clean=await requestCreatorPrivacyRetirement(query,fixture.playerId,{
+      reason:'release_canary_cleanup',today:gameDateKey(),
+      env:{PACK1_LAUNCH_WATCHER_GITHUB_TOKEN:process.env.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN},
+      fetcher:fetch,
+    });
+    if(clean)break;
+    await sleep(10000);
+  }
   assert.equal(clean,true,'Owned Practice fixture still has pending static retirement.');
   await query('UPDATE draft_run_sessions SET measurement_qa=true WHERE player_id=$1::uuid',[fixture.playerId]);
   await query(`DELETE FROM analytics_events WHERE player_id=$1::uuid`,[fixture.playerId]);

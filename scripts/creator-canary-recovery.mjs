@@ -8,7 +8,8 @@ export function practiceCanaryIdentity(tag) {
   return {name,email:'qa-creator-source-'+tag+'@example.invalid'};
 }
 
-// Exact owned fixtures from acceptance artifact 11383024951, run 37395491593.
+// Exact owned fixtures from acceptance artifacts 11383024951 / 11385218108,
+// runs 37395491593 / 37399314701.
 // Recovery never discovers candidates or falls back to customer identities.
 export const recoveryFixtures=[
   {type:'practice',challengeId:'e10286c0-580f-4e08-926c-df444916b65e',
@@ -16,6 +17,11 @@ export const recoveryFixtures=[
     shareId:'159018d878c84de48af28076',slug:'canary-practice-1a144cc5',displayName:'Creator Canary Source 42'},
   {type:'daily',challengeId:'4367a0f4-e706-4037-b436-c8da2cd012ba',
     sessionId:'0d096acd-7f45-47dd-9a4c-c8ec2ff959db',slug:'canary-daily-1a144cc5'},
+  {type:'practice',challengeId:'ffc7091d-3f08-4376-8d05-c1e29f678a50',
+    sessionId:'aee5f67c-d756-43b9-b7b1-ac9a2cbc9687',playerId:'54998c25-d187-43c2-b1d3-9ac9da4d9520',
+    shareId:'c934430b73c44511ae340764',slug:'canary-practice-269df3bf',identityStyle:'short'},
+  {type:'daily',challengeId:'f295e269-6f34-4fb1-830b-362b29a9f770',
+    sessionId:'70c80d01-ed10-4692-a718-c4ab8e44cba1',slug:'canary-daily-269df3bf'},
 ];
 
 export function validateRecoveryFixture(row,fixture) {
@@ -34,11 +40,12 @@ export function validateRecoveryFixture(row,fixture) {
     assert.equal(row.player_id,fixture.playerId);
     assert.ok(row.source_share_id===fixture.shareId||(!row.auth_id&&row.source_share_id===null),'owned share identity changed');
     assert.equal(row.source_day,null);
-    assert.equal(row.display_name,fixture.displayName,'recorded canary player name changed');
+    if(fixture.identityStyle==='short')assert.match(row.display_name,/^Creator Source [0-9a-f]{8}$/);
+    else assert.equal(row.display_name,fixture.displayName,'recorded canary player name changed');
     if(row.auth_id){
       const tag=String(row.auth_email).match(/^qa-creator-source-([0-9a-f]{8})@example\.invalid$/)?.[1];
       assert.ok(tag,'owned account email must retain the full canary tag');
-      assert.equal(row.auth_name,'Creator Canary Source '+tag);
+      assert.equal(row.auth_name,fixture.identityStyle==='short'?practiceCanaryIdentity(tag).name:'Creator Canary Source '+tag);
       assert.equal(row.display_name,normalizeDisplayName(row.auth_name));
     }else{
       assert.equal(row.measurement_qa,true,'missing owned auth is valid only after QA cleanup');
@@ -68,7 +75,7 @@ export async function recoverKnownCanaryFixtures(query,{retire,cleanPractice,ver
     await verifyRetired({id:fixture.challengeId,slug:fixture.slug});
     if(fixture.type==='practice'&&row.auth_id)await cleanPractice({
       authId:row.auth_id,email:row.auth_email,name:row.auth_name,playerId:row.player_id,
-      sessionId:fixture.sessionId,shareId:fixture.shareId,
+      sessionId:fixture.sessionId,shareId:fixture.shareId,challengeId:fixture.challengeId,
     });
     record({challenge_id:fixture.challengeId,source_session_id:fixture.sessionId,type:fixture.type,cleaned:true});
   }

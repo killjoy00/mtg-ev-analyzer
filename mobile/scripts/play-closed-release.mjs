@@ -51,20 +51,8 @@ try {
   }
 
   const trackNames = (tracks?.tracks || []).map((item) => String(item.track));
-  let createdTrack = false;
   if (!trackNames.includes(track)) {
-    await request(
-      `${apiBase}/edits/${encodeURIComponent(editId)}/tracks`,
-      {
-        method: 'POST',
-        body: JSON.stringify({
-          track,
-          type: 'CLOSED_TESTING',
-          formFactor: 'DEFAULT',
-        }),
-      },
-    );
-    createdTrack = true;
+    throw new Error(`Reviewed closed-testing track ${track} does not exist; refusing to create a track.`);
   }
 
   const releaseName = `Pack One closed ${process.env.GITHUB_SHA?.slice(0, 7) || versionCode}`;
@@ -119,8 +107,8 @@ try {
     releaseStatus,
     requiresConsoleRollout,
     committed: true,
-    availableTracks: createdTrack ? [...trackNames, track] : trackNames,
-    createdTrack,
+    availableTracks: trackNames,
+    createdTrack: false,
   }));
 } finally {
   if (editId && !committed) {
