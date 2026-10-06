@@ -127,7 +127,7 @@ jobs:
           node-version: 24
 
       - uses: actions/setup-python@v5
-        if: inputs.kind == 'creator' && inputs.creator_action == 'publish'
+        if: inputs.kind == 'creator'
         with:
           python-version: '3.12'
 
@@ -159,9 +159,15 @@ jobs:
 
       - name: Validate generated source
         run: |
+          set -euo pipefail
           node scripts/generate-campaign-links.mjs --check
           node scripts/check-creator-challenges.mjs
-          npm test
+          if [[ "$PUBLISH_KIND" == "creator" ]]; then
+            python3 scripts/check-creator-social-card.py --slug "$CAMPAIGN_SLUG"
+            node --test tests/campaign-links.test.mjs tests/campaign-link-publish.test.mjs tests/creator-challenges.test.mjs tests/publication-pr-checks.test.mjs tests/public-identity-safety.test.mjs tests/account-deletion.test.mjs
+          else
+            node --test tests/campaign-links.test.mjs tests/campaign-link-publish.test.mjs tests/publication-pr-checks.test.mjs
+          fi
 
       - name: Publish automation branch
         id: branch
@@ -175,6 +181,7 @@ jobs:
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          base_sha="$(git rev-parse HEAD)"
           if [[ "$PUBLISH_KIND" == "creator" ]]; then
             git add creator-challenges.json "creator/${CAMPAIGN_SLUG}"
           else
@@ -191,8 +198,10 @@ jobs:
             git commit -m "Publish campaign link: ${CAMPAIGN_SLUG}"
           fi
           head_sha="$(git rev-parse HEAD)"
+          node scripts/ci-publication-validate.mjs --base "$base_sha" --head "$head_sha"
           git push --force origin "HEAD:refs/heads/${branch}"
           echo "branch=${branch}" >> "$GITHUB_OUTPUT"
+          echo "base_sha=${base_sha}" >> "$GITHUB_OUTPUT"
           echo "head_sha=${head_sha}" >> "$GITHUB_OUTPUT"
           echo "already_published=false" >> "$GITHUB_OUTPUT"
 
@@ -227,6 +236,7 @@ jobs:
         shell: bash
         env:
           BRANCH: ${{ steps.branch.outputs.branch }}
+          BASE_SHA: ${{ steps.branch.outputs.base_sha }}
           HEAD_SHA: ${{ steps.branch.outputs.head_sha }}
           PR_URL: ${{ steps.pr.outputs.url }}
           PUBLICATION_APPROVAL_TOKEN: ${{ secrets.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN }}
@@ -237,9 +247,21 @@ jobs:
         shell: bash
         env:
           PR_URL: ${{ steps.pr.outputs.url }}
+          BASE_SHA: ${{ steps.branch.outputs.base_sha }}
           HEAD_SHA: ${{ steps.branch.outputs.head_sha }}
         run: |
           set -euo pipefail
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          current_main="$(git rev-parse refs/remotes/origin/main)"
+          [[ "$current_main" == "$BASE_SHA" ]] || {
+            echo "::error::Protected publication base moved from $BASE_SHA to $current_main; regenerate from current main."
+            exit 1
+          }
+          pr_base="$(gh pr view "$PR_URL" --json baseRefOid --jq .baseRefOid)"
+          [[ "$pr_base" == "$BASE_SHA" ]] || {
+            echo "::error::Publication PR base changed from reviewed $BASE_SHA to $pr_base."
+            exit 1
+          }
           gh pr merge "$PR_URL" --squash --delete-branch --match-head-commit "$HEAD_SHA"
           echo "Merged campaign publication PR: $PR_URL" >> "$GITHUB_STEP_SUMMARY"
 

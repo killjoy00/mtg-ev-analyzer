@@ -2,6 +2,8 @@ name: e2e
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '41 9 * * *'
   pull_request:
     types: [opened, synchronize, reopened]
   push:
@@ -19,165 +21,165 @@ jobs:
   browser:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-      R2_BUCKET: ${{ secrets.R2_BUCKET }}
-      AWS_DEFAULT_REGION: auto
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Detect required-suite scope
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Classify complete change set
         id: scope
         shell: bash
         env:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
         run: |
           set -euo pipefail
-          run_full=true
+          head_sha="$GITHUB_SHA"
+          base_sha=''
+          force_full=false
+          changed_files=()
           if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            head_sha="$PR_HEAD_SHA"
             if ! git fetch --no-tags origin main:refs/remotes/origin/main; then
-              echo '::warning::Unable to fetch origin/main; running full validation.'
-            elif ! stack_base_sha="$(git merge-base origin/main "$PR_HEAD_SHA")"; then
-              echo '::warning::Unable to compute merge base against origin/main; running full validation.'
+              echo '::warning::Unable to fetch origin/main; forcing broad validation.'
+              force_full=true
+            elif ! base_sha="$(git merge-base origin/main "$head_sha")"; then
+              echo '::warning::Unable to compute merge base; forcing broad validation.'
+              force_full=true
             else
-              run_full=false
-              mapfile -t changed_files < <(git diff --name-only "$stack_base_sha" "$PR_HEAD_SHA")
-              if (( ${#changed_files[@]} == 0 )); then
-                run_full=true
-              else
-                printf 'Changed files:\n'
-                printf ' - %s\n' "${changed_files[@]}"
-                for path in "${changed_files[@]}"; do
-                  case "$path" in
-                    mobile/*|docs/mobile-*|docs/android-*|docs/parity.md|.github/workflows/mobile*.yml|.github/workflows/android-*.yml|.github/workflows/ios-*.yml|.github/workflows/google-play-access.yml|.github/android-*.txt|.github/ios-*.txt|.github/app-store-*.txt|.github/scripts/app-store-*.mjs|.gitignore)
-                      ;;
-                    *)
-                      run_full=true
-                      break
-                      ;;
-                  esac
-                done
-              fi
+              mapfile -t changed_files < <(git diff --name-only "$base_sha" "$head_sha")
+            fi
+          elif [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            if [[ ! "$PUSH_BEFORE_SHA" =~ ^[a-f0-9]{40}$ || "$PUSH_BEFORE_SHA" == 0000000000000000000000000000000000000000 ]]; then
+              force_full=true
+            else
+              base_sha="$PUSH_BEFORE_SHA"
+              if ! git cat-file -e "$base_sha^{commit}" 2>/dev/null; then git fetch --no-tags origin "$base_sha" || force_full=true; fi
+              if [[ "$force_full" == false ]]; then mapfile -t changed_files < <(git diff --name-only "$base_sha" "$head_sha"); fi
+            fi
+          else
+            force_full=true
+          fi
+          fallback_full() {
+            {
+              echo 'plan=full'
+              echo 'unit_plan=full'
+              echo 'browser_plan=full'
+              echo 'hydrate_replays=true'
+              echo 'dataset_audit=true'
+              echo 'build_bundles=true'
+              echo 'ci_contracts=true'
+              echo 'publication_kind='
+              echo 'publication_slug='
+              echo 'browser_groups='
+              echo 'reason=classifier failure; broad validation'
+            } >> "$GITHUB_OUTPUT"
+          }
+          if [[ "$force_full" == true ]]; then
+            if ! node scripts/ci-change-classifier.mjs --full --github-output; then
+              echo '::warning::Classifier failed while selecting broad validation; using shell fail-closed outputs.'
+              fallback_full
+            fi
+          else
+            printf 'Changed files from %s to %s:\n' "$base_sha" "$head_sha"
+            printf ' - %s\n' "${changed_files[@]}"
+            if ! node scripts/ci-change-classifier.mjs --github-output "${changed_files[@]}"; then
+              echo '::warning::Classifier failed; forcing broad validation.'
+              fallback_full
             fi
           fi
-          echo "run_full=$run_full" >> "$GITHUB_OUTPUT"
-          if [[ "$run_full" == "true" ]]; then
-            echo 'Running the full repository gate.'
-          else
-            echo 'Native-mobile/release-only PR: full web/backend gate is not required.'
-          fi
-      - name: Phase 3 done-check greps
-        if: steps.scope.outputs.run_full == 'true'
+          echo "base_sha=$base_sha" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$head_sha" >> "$GITHUB_OUTPUT"
+      - name: Summarize selected browser validation
+        env:
+          PLAN: ${{ steps.scope.outputs.browser_plan }}
+          GROUPS: ${{ steps.scope.outputs.browser_groups }}
+          REASON: ${{ steps.scope.outputs.reason }}
         run: |
-          git grep -n "Sign In With Google" -- '*.mjs' '*.html' tests/ || true
-          git grep -n "account-columns" -- growth.mjs || true
-          git grep -n "renderMyProfile" -- growth.mjs || true
-          git grep -n "account-signin .form-error" -- growth.mjs || true
-          git grep -n "source" -- draft-run-product.mjs | grep run-career || true
-      - uses: actions/setup-node@v4
-        if: steps.scope.outputs.run_full == 'true'
-        with:
-          node-version: 24
-      - uses: actions/setup-python@v5
-        if: steps.scope.outputs.run_full == 'true'
-        with:
-          python-version: '3.12'
+          echo "Browser plan: $PLAN ($REASON)" >> "$GITHUB_STEP_SUMMARY"
+          [[ -z "$GROUPS" ]] || echo "Browser groups: $GROUPS" >> "$GITHUB_STEP_SUMMARY"
+      - name: Validate publication diff and generated outputs
+        id: publication
+        if: steps.scope.outputs.plan == 'publication'
+        env:
+          CI_BASE_SHA: ${{ steps.scope.outputs.base_sha }}
+          CI_HEAD_SHA: ${{ steps.scope.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          node scripts/ci-publication-validate.mjs --base "$CI_BASE_SHA" --head "$CI_HEAD_SHA" --github-output
+          node scripts/generate-campaign-links.mjs --check
+          node scripts/check-creator-challenges.mjs
       - name: Install browser test dependency
-        if: steps.scope.outputs.run_full == 'true'
+        if: steps.scope.outputs.browser_plan != 'none'
+        env:
+          BROWSER_PLAN: ${{ steps.scope.outputs.browser_plan }}
+          BROWSER_GROUPS: ${{ steps.scope.outputs.browser_groups }}
         run: |
           npm install --no-save playwright@1.63.0
-          npx playwright install --with-deps chromium webkit
-      - name: Hydrate replay shards from R2 for local browser tests
-        if: steps.scope.outputs.run_full == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        run: bash scripts/hydrate-replay-shards.sh
+          if [[ "$BROWSER_PLAN" == full || ",$BROWSER_GROUPS," == *,account,* ]]; then
+            npx playwright install --with-deps chromium webkit
+          else
+            npx playwright install --with-deps chromium
+          fi
       - name: Start static site
-        if: steps.scope.outputs.run_full == 'true'
+        if: steps.scope.outputs.browser_plan != 'none'
         run: |
           nohup python -m http.server 4173 >/tmp/pack1-http.log 2>&1 &
           echo $! > /tmp/pack1-http.pid
           curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 http://127.0.0.1:4173/ -o /dev/null
-      # Every browser test preloads tests/e2e-production-guard.mjs so it cannot reach the
-      # production API (#803). GitHub refuses NODE_OPTIONS from GITHUB_ENV, hence the flag.
-      - name: Run browser regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/e2e.mjs
-      - name: Run set archive regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/sets-e2e.mjs
-      - name: Run Daily / Set Practice regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/practice-e2e.mjs
-      - name: Run dedicated Practice hub regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/practice-hub-e2e.mjs
-      - name: Run account practice and custom corpus regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/practice-access-e2e.mjs
-      - name: Run Player Profile / Progression regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/profile-e2e.mjs
-      - name: Run Today refresh and Pacific rollover regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/home-today-e2e.mjs
-      - name: Run homepage auth hydration regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/home-auth-hydration-e2e.mjs
-      - name: Run eight-decision Draft Run regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
-      - name: Run Powered Cube eight-decision regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: PACK1_TEST_ENVIRONMENT=powered-cube node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
-      - name: Run fixed Daily sharing regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: PACK1_TEST_DAILY=1 node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
-      - name: Run fixed Cube Daily sharing regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: PACK1_TEST_DAILY=1 PACK1_TEST_ENVIRONMENT=powered-cube node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
-      - name: Run historical ten-decision compatibility regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: PACK1_TEST_SELECTION_VERSION=first-pack-v2 node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
-      - name: Run account browser contract
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/account-e2e.mjs
-      - name: Run auth simplification and Daily return contract
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/auth-context-e2e.mjs
-      - name: Run email verification Chromium/WebKit mobile contract
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/email-verification-e2e.mjs
-      - name: Run Patreon activation mobile contract
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/patreon-activation-e2e.mjs
-      - name: Run password recovery Chromium/WebKit mobile contract
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/password-recovery-e2e.mjs
-      - name: Run credential management Chromium/WebKit mobile contract
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/credential-management-e2e.mjs
-      - name: Run account deletion Chromium/WebKit mobile contract
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/account-deletion-e2e.mjs
-      - name: Verify display-ad membership suppression with intercepted requests
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/ads-e2e.mjs
-      - name: Run admin reporting browser contract
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/admin-e2e.mjs
-      - name: Run corpus readiness browser contract
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/corpus-readiness-e2e.mjs
+      - name: Run focused publication browser smoke
+        if: steps.scope.outputs.browser_plan == 'publication'
+        env:
+          CI_PUBLICATION_KIND: ${{ steps.publication.outputs.kind }}
+          CI_PUBLICATION_SLUG: ${{ steps.publication.outputs.slug }}
+          CI_PUBLICATION_ACTION: ${{ steps.publication.outputs.action }}
+        run: |
+          set -euo pipefail
+          node --import ./tests/e2e-production-guard.mjs tests/publication-route-e2e.mjs
+          touch "$RUNNER_TEMP/browser-validation-complete"
+      - name: Run static presentation browser smoke
+        if: steps.scope.outputs.browser_plan == 'presentation'
+        run: |
+          set -euo pipefail
+          node scripts/run-browser-tests.mjs --presentation
+          touch "$RUNNER_TEMP/browser-validation-complete"
+      - name: Run scoped application browser groups
+        if: steps.scope.outputs.browser_plan == 'groups'
+        env:
+          BROWSER_GROUPS: ${{ steps.scope.outputs.browser_groups }}
+        run: |
+          set -euo pipefail
+          test -n "$BROWSER_GROUPS"
+          node scripts/run-browser-tests.mjs --groups "$BROWSER_GROUPS"
+          touch "$RUNNER_TEMP/browser-validation-complete"
+      - name: Run full browser regression
+        if: steps.scope.outputs.browser_plan == 'full'
+        run: |
+          set -euo pipefail
+          node scripts/run-browser-tests.mjs --full
+          touch "$RUNNER_TEMP/browser-validation-complete"
+      - name: Confirm no browser suite is required
+        if: steps.scope.outputs.browser_plan == 'none'
+        run: |
+          echo 'No browser behavior is affected by this change set.'
+          touch "$RUNNER_TEMP/browser-validation-complete"
       - name: Upload UI screenshots
-        if: always() && steps.scope.outputs.run_full == 'true'
+        if: always() && (steps.scope.outputs.browser_plan == 'full' || steps.scope.outputs.browser_plan == 'groups' || steps.scope.outputs.browser_plan == 'presentation')
         uses: actions/upload-artifact@v4
         with:
           name: pack1-ui-screenshots
           path: artifacts/*.png
           if-no-files-found: ignore
       - name: Stop static site
-        if: always() && steps.scope.outputs.run_full == 'true'
+        if: always() && steps.scope.outputs.browser_plan != 'none'
         run: |
           if [ -f /tmp/pack1-http.pid ]; then kill "$(cat /tmp/pack1-http.pid)" || true; fi
+      - name: Verify selected browser validation completed
+        if: always()
+        run: |
+          test -f "$RUNNER_TEMP/browser-validation-complete" || { echo '::error::Selected browser validation did not complete successfully.'; exit 1; }

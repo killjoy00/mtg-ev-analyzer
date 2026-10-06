@@ -19,11 +19,22 @@ test('every API host the site config can select is blocked for browser e2e tests
     assert.doesNotMatch(host,PRODUCTION_API_HOST,`${host} stays reachable`);
 });
 
-test('every browser test step in the e2e job preloads the guard',()=>{
+test('every selected browser invocation preloads the production guard',async()=>{
   const workflow=read('.github/workflows/e2e.yml');
-  const runs=[...workflow.matchAll(/^\s+run: (.*\bnode\b.*tests\/.*\.mjs.*)$/gm)].map(match=>match[1]);
-  assert.ok(runs.length>=20);
-  for(const run of runs)assert.match(run,/(^|\s)node --import \.\/tests\/e2e-production-guard\.mjs tests\/[\w-]+\.mjs$/,run);
+  const runner=read('scripts/run-browser-tests.mjs');
+  const {selectedBrowserTests}=await import('../scripts/run-browser-tests.mjs');
+
+  assert.ok(selectedBrowserTests({full:true}).length>=20,'full browser coverage remains comprehensive');
+  assert.match(runner,/const guard='\.\/tests\/e2e-production-guard\.mjs'/);
+  assert.match(runner,/spawn\(process\.execPath,\['--import',guard,test\.file\]/);
+  assert.match(workflow,/node scripts\/run-browser-tests\.mjs --full/);
+  assert.match(workflow,/node scripts\/run-browser-tests\.mjs --presentation/);
+  assert.match(workflow,/node scripts\/run-browser-tests\.mjs --groups "\$BROWSER_GROUPS"/);
+
+  const direct=[...workflow.matchAll(/^\s+node --import \.\/tests\/e2e-production-guard\.mjs tests\/[\w-]+\.mjs$/gm)];
+  assert.equal(direct.length,1,'only the focused publication smoke runs directly from workflow YAML');
+  assert.match(direct[0][0],/tests\/publication-route-e2e\.mjs/);
+
   // GitHub rejects NODE_OPTIONS written to GITHUB_ENV, which silently left the guard off.
   assert.doesNotMatch(workflow,/NODE_OPTIONS=.*GITHUB_ENV/);
   assert.match(read('tests/e2e-production-guard.mjs'),/from '\.\/e2e-production-hosts\.mjs'/);

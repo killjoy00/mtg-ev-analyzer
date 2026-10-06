@@ -25,7 +25,14 @@ test('campaign publish workflow preserves protected-main publication',()=>{
   assert.ok(!publishWorkflow.includes('HEAD:main'));
   assert.ok(publishWorkflow.includes('gh pr create'));
   assert.ok(publishWorkflow.includes("node .github/scripts/publication-pr-checks.mjs"));
+  assert.ok(publishWorkflow.includes("node scripts/ci-publication-validate.mjs"));
+  assert.ok(publishWorkflow.includes("python3 scripts/check-creator-social-card.py"));
+  assert.ok(!publishWorkflow.includes("\n          npm test\n"),'generated publication preflight must stay focused');
   assert.ok(publishWorkflow.includes("environment: pack-one-mobile-release"));
+  assert.ok(publishWorkflow.includes('echo "base_sha=${base_sha}" >> "$GITHUB_OUTPUT"'));
+  assert.ok(publishWorkflow.includes('BASE_SHA: ${{ steps.branch.outputs.base_sha }}'));
+  assert.ok(publishWorkflow.includes('Protected publication base moved from $BASE_SHA to $current_main'));
+  assert.ok(publishWorkflow.includes('pr view "$PR_URL" --json baseRefOid'));
   assert.ok(publishWorkflow.includes('--match-head-commit "$HEAD_SHA"'));
   assert.ok(publishWorkflow.includes('gh pr merge "$PR_URL" --squash --delete-branch'));
   assert.ok(publishWorkflow.includes('repos/${GITHUB_REPOSITORY}/pages/builds'));
