@@ -1,11 +1,19 @@
 import assert from 'node:assert/strict';
+import {normalizeDisplayName} from '../worker/username.mjs';
+
+export function practiceCanaryIdentity(tag) {
+  assert.match(tag,/^[0-9a-f]{8}$/);
+  const name='Creator Source '+tag;
+  assert.equal(normalizeDisplayName(name),name,'owned fixture name must survive product normalization');
+  return {name,email:'qa-creator-source-'+tag+'@example.invalid'};
+}
 
 // Exact owned fixtures from acceptance artifact 11383024951, run 37395491593.
 // Recovery never discovers candidates or falls back to customer identities.
 export const recoveryFixtures=[
   {type:'practice',challengeId:'e10286c0-580f-4e08-926c-df444916b65e',
     sessionId:'3615c3db-4000-489c-a897-e9b35960e321',playerId:'6f736b49-c8f6-4986-a15f-1bd8ff84a141',
-    shareId:'159018d878c84de48af28076',slug:'canary-practice-1a144cc5'},
+    shareId:'159018d878c84de48af28076',slug:'canary-practice-1a144cc5',displayName:'Creator Canary Source 42'},
   {type:'daily',challengeId:'4367a0f4-e706-4037-b436-c8da2cd012ba',
     sessionId:'0d096acd-7f45-47dd-9a4c-c8ec2ff959db',slug:'canary-daily-1a144cc5'},
 ];
@@ -26,11 +34,12 @@ export function validateRecoveryFixture(row,fixture) {
     assert.equal(row.player_id,fixture.playerId);
     assert.ok(row.source_share_id===fixture.shareId||(!row.auth_id&&row.source_share_id===null),'owned share identity changed');
     assert.equal(row.source_day,null);
-    assert.match(row.display_name,/^Creator Canary Source [0-9a-f]{8}$/);
+    assert.equal(row.display_name,fixture.displayName,'recorded canary player name changed');
     if(row.auth_id){
-      const tag=row.display_name.slice('Creator Canary Source '.length);
-      assert.equal(row.auth_email,'qa-creator-source-'+tag+'@example.invalid');
-      assert.equal(row.auth_name,row.display_name);
+      const tag=String(row.auth_email).match(/^qa-creator-source-([0-9a-f]{8})@example\.invalid$/)?.[1];
+      assert.ok(tag,'owned account email must retain the full canary tag');
+      assert.equal(row.auth_name,'Creator Canary Source '+tag);
+      assert.equal(row.display_name,normalizeDisplayName(row.auth_name));
     }else{
       assert.equal(row.measurement_qa,true,'missing owned auth is valid only after QA cleanup');
       assert.equal(row.profile_public,false);

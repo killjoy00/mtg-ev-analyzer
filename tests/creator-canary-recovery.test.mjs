@@ -1,12 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {recoveryFixtures,validateRecoveryFixture,recoverKnownCanaryFixtures} from '../scripts/creator-canary-recovery.mjs';
+import {recoveryFixtures,validateRecoveryFixture,recoverKnownCanaryFixtures,practiceCanaryIdentity} from '../scripts/creator-canary-recovery.mjs';
+import {normalizeDisplayName} from '../worker/username.mjs';
 
 const rowFor=fixture=>({challenge_id:fixture.challengeId,session_id:fixture.sessionId,slug:fixture.slug,
   source_type:fixture.type,player_id:fixture.playerId||'daily-owned-fixture',source_owner_player_id:fixture.playerId||'daily-owned-fixture',
   source_share_id:fixture.shareId,source_day:fixture.type==='daily'?'2026-10-01':null,measurement_qa:fixture.type==='daily',profile_public:false,
-  display_name:fixture.type==='daily'?'QA release abc1234':'Creator Canary Source abc12345',
-  auth_id:fixture.type==='daily'?null:'owned-auth',auth_email:'qa-creator-source-abc12345@example.invalid',auth_name:'Creator Canary Source abc12345'});
+  display_name:fixture.type==='daily'?'QA release abc1234':normalizeDisplayName('Creator Canary Source 42c12345'),
+  auth_id:fixture.type==='daily'?null:'owned-auth',auth_email:'qa-creator-source-42c12345@example.invalid',auth_name:'Creator Canary Source 42c12345'});
+
+test('fresh fixture identity survives the production player-name normalizer without losing its tag',()=>{
+  for(const tag of ['00000000','ffffffff','42c12345']){
+    const identity=practiceCanaryIdentity(tag);
+    assert.equal(normalizeDisplayName(identity.name),identity.name);
+    assert.ok(identity.name.endsWith(tag));
+    assert.equal(identity.email,'qa-creator-source-'+tag+'@example.invalid');
+  }
+  assert.throws(()=>practiceCanaryIdentity('invalid'));
+});
 
 test('recovery requires exact recorded source/challenge identities and owned fixture naming',()=>{
   for(const fixture of recoveryFixtures){
@@ -16,6 +27,7 @@ test('recovery requires exact recorded source/challenge identities and owned fix
       assert.throws(()=>validateRecoveryFixture({...row,...replacement},fixture));
   }
   assert.throws(()=>validateRecoveryFixture({...rowFor(recoveryFixtures[0]),auth_email:'customer@example.com'},recoveryFixtures[0]));
+  assert.throws(()=>validateRecoveryFixture({...rowFor(recoveryFixtures[0]),auth_name:'Creator Canary Source 99c12345'},recoveryFixtures[0]));
   assert.throws(()=>validateRecoveryFixture({...rowFor(recoveryFixtures[1]),auth_id:'customer-account'},recoveryFixtures[1]));
   validateRecoveryFixture({...rowFor(recoveryFixtures[0]),auth_id:null,source_share_id:null,measurement_qa:true,profile_public:false},recoveryFixtures[0]);
 });
