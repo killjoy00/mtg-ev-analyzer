@@ -1,6 +1,6 @@
 {
   "operation": "promote-android-closed",
-  "reason": "Promote the exact signed Pack One 1.0 bundle 100520, accepted and committed to Internal draft in successful run 37318753723 from main c9da3f2657530a94943ae287f7f2a0e5fec3fee5 (#980). It supersedes 100517 with app icons redrawn to match the website brand mark (white Barlow Condensed P with superscript 1 on #1E4D7A); main c9da3f26 passed test, e2e, mobile, production smoke and exact-main RC smoke 37318753854. iOS 100535 from the same commit is separately verified VALID in TestFlight. Use only the existing production-access Closed Testing track and preserve testers, countries and qualification continuity. Do not rebuild, create a new track, alter tester configuration, submit to Production or release publicly; physical/provider/owner gates remain open.",
-  "version_code": "100520",
+  "reason": "Promote the exact existing Pack One 1.0 Google Play AAB version code 100623 from successful Internal upload run 37496158470 to the existing production-access Closed Testing track without rebuilding. Preserve the existing track, testers, countries, and qualification continuity. Treat any draft/requiresConsoleRollout result as incomplete delivery rather than success. Do not create a new track, alter tester/country configuration, release to Production, or publish publicly; Issue #575 physical-device/provider/owner/tester-duration/App Review/public-store gates remain open.",
+  "version_code": "100623",
   "track": "production-access"
 }
