@@ -77,6 +77,10 @@ def svg(adaptive=False):
 
 OUT.mkdir(parents=True, exist_ok=True)
 (OUT / 'brand-mark.svg').write_text(svg() + '\n')
+header = (f'<svg xmlns="http://www.w3.org/2000/svg" width="360" height="400" viewBox="2 0 {width:g} {height:g}">'
+          f'<rect x="2" width="{width:g}" height="{height:g}" rx="{px(mark["border-radius"]):g}" fill="{background}"/>'
+          f'<g fill="#fff">{art}</g></svg>')
+(OUT / 'header-mark.png').write_bytes(cairosvg.svg2png(bytestring=header.encode()))
 for filename, adaptive in [('icon.png', False), ('adaptive-icon-foreground.png', True), ('adaptive-icon-monochrome.png', True)]:
     png = cairosvg.svg2png(bytestring=svg(adaptive).encode(), output_width=4096, output_height=4096)
     image = Image.open(BytesIO(png)).resize((1024, 1024), Image.Resampling.LANCZOS)

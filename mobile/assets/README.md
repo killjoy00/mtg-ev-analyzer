@@ -4,6 +4,7 @@ The production app/store icon is committed at:
 
 - `images/icon.png` — 1024×1024 PNG using the Pack One P¹ mark
 - `images/brand-mark.svg` — vector outlines from the website's actual header fonts and CSS layout
+- `images/header-mark.png` — the website's 36×40 blue header badge, used directly on native Home instead of a Unicode monogram
 - `images/adaptive-icon-foreground.png` and `images/adaptive-icon-monochrome.png` — the same mark inside Android's circular safe zone
 
 Expo app config uses this image for production builds.
