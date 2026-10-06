@@ -161,7 +161,12 @@ jobs:
         run: |
           node scripts/generate-campaign-links.mjs --check
           node scripts/check-creator-challenges.mjs
-          npm test
+          node --test \
+            tests/ci-change-scope.test.mjs \
+            tests/campaign-links.test.mjs \
+            tests/campaign-link-publish.test.mjs \
+            tests/creator-challenges.test.mjs \
+            tests/publication-pr-checks.test.mjs
 
       - name: Publish automation branch
         id: branch
