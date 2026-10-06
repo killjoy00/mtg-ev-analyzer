@@ -164,6 +164,7 @@ function mobileSessionRoute(service,path,method) {
       '/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete/apple/start','/v1/mobile/account/delete/apple/finish','/v1/mobile/account/delete',
     ].includes(path))return true;
     if(method==='PATCH'&&path==='/v1/mobile/profile')return true;
+    if(method==='POST'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}\/(report|block)$/.test(path))return true;
     if(method==='GET'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}$/.test(path))return true;
     return method==='GET'&&['/v1/mobile/account/session','/v1/mobile/profile/me','/v1/mobile/profile/history'].includes(path);
   }
@@ -173,13 +174,14 @@ function mobileSessionRoute(service,path,method) {
   if(method==='GET'&&/^\/v1\/runs\/[a-f0-9-]+$/.test(path))return true;
   if(method==='GET'&&/^\/v1\/shared-runs\/[a-f0-9]{24}$/.test(path))return true;
   if(method==='GET'&&/^\/v1\/creator-challenges\/[a-z0-9-]{1,64}$/.test(path))return true;
-  return method==='GET'&&['/v1/daily-status','/v1/capabilities','/v1/practice-sets','/v1/set-catalog'].includes(path);
+  return method==='GET'&&['/v1/leaderboard','/v1/daily-status','/v1/capabilities','/v1/practice-sets','/v1/set-catalog'].includes(path);
 }
 function mobileAccountRoute(service,path,method) {
   if(service==='growth'&&(nativePatreonAction(path,method)||nativeAppleSubscriptionAction(path,method)))return true;
   if(service==='growth') {
     if(method==='POST'&&['/v1/mobile/account/link','/v1/mobile/account/signout','/v1/mobile/account/password-change','/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete/apple/start','/v1/mobile/account/delete/apple/finish','/v1/mobile/account/delete'].includes(path))return true;
     if(method==='PATCH'&&path==='/v1/mobile/profile')return true;
+    if(method==='POST'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}\/(report|block)$/.test(path))return true;
     if(method==='GET'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}$/.test(path))return true;
     return method==='GET'&&['/v1/mobile/account/session','/v1/mobile/profile/me','/v1/mobile/profile/history'].includes(path);
   }
@@ -189,7 +191,7 @@ function mobileAccountRoute(service,path,method) {
   if(method==='GET'&&/^\/v1\/runs\/[a-f0-9-]+$/.test(path))return true;
   if(method==='GET'&&/^\/v1\/shared-runs\/[a-f0-9]{24}$/.test(path))return true;
   if(method==='GET'&&/^\/v1\/creator-challenges\/[a-z0-9-]{1,64}$/.test(path))return true;
-  return method==='GET'&&['/v1/daily-status','/v1/capabilities','/v1/practice-sets','/v1/set-catalog'].includes(path);
+  return method==='GET'&&['/v1/leaderboard','/v1/daily-status','/v1/capabilities','/v1/practice-sets','/v1/set-catalog'].includes(path);
 }
 function safeRedirect(value,{mobileOAuth=false}={}) {
   try {
@@ -253,7 +255,7 @@ export function routeFamily(path) {
 }
 export async function gateway(request,env,fetcher=fetch) {
   const url=new URL(request.url),origin=request.headers.get('origin'),mode=env.MODE;
-  const started=performance.now(),metric={event:'gateway_request',route:routeFamily(url.pathname),method:['GET','POST','PATCH','OPTIONS'].includes(request.method)?request.method:'other',
+  const started=performance.now(),metric={event:'gateway_request',route:routeFamily(url.pathname),method:['GET','POST','PATCH','DELETE','OPTIONS'].includes(request.method)?request.method:'other',
     release:/^[a-f0-9]{40}$/.test(env.RELEASE_COMMIT||'')?env.RELEASE_COMMIT:'unknown',quota_ms:0,upstream_ms:0,upstream_calls:0,upstream_status:null,quota_scope:null,error:null};
   const upstreamFetch=async(...args)=>{
     const began=performance.now();metric.upstream_calls++;
@@ -312,7 +314,7 @@ export async function gateway(request,env,fetcher=fetch) {
       const allowed=['authorization','content-type','x-pack1-auth-session','x-pack1-player-session','x-pack1-csrf','x-pack1-mobile-session','x-pack1-mobile-account','x-idempotency-key','x-pack1-preview-key'];
       if(!origin||requested.some(x=>!allowed.includes(x)))return finish(response(403,'Preflight not allowed.'));
       return finish(new Response(null,{status:204,headers:{
-        'access-control-allow-methods':'GET,POST,PATCH,OPTIONS',
+        'access-control-allow-methods':'GET,POST,PATCH,DELETE,OPTIONS',
         'access-control-allow-headers':allowed.join(','),
         'access-control-max-age':'300',
       }}));
