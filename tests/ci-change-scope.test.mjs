@@ -73,8 +73,16 @@ test('documentation, mobile, workflow helpers, static presentation, and applicat
   assert.equal(classifyChangedPaths(['mobile/src/app.tsx','docs/mobile-release.md']).profile,'mobile');
   assert.equal(classifyChangedPaths(['.github/workflows/cloudflare-audit.yml']).profile,'ci');
   assert.equal(classifyChangedPaths(['about/index.html','editorial.css']).profile,'static');
-  assert.equal(classifyChangedPaths(['draft-run-product.mjs']).profile,'standard');
-  assert.equal(classifyChangedPaths(['worker/creator-challenges.mjs']).profile,'standard');
+  const gameplay=classifyChangedPaths(['draft-run-product.mjs']);
+  assert.equal(gameplay.profile,'standard');
+  assert.equal(gameplay.browser_mode,'selected');
+  assert.match(gameplay.browser_groups,/gameplay/);
+  assert.doesNotMatch(gameplay.browser_groups,/account/);
+  const creator=classifyChangedPaths(['worker/creator-challenges.mjs']);
+  assert.equal(creator.profile,'standard');
+  assert.equal(creator.browser_mode,'selected');
+  assert.match(creator.browser_groups,/admin/);
+  assert.match(creator.browser_groups,/gameplay/);
 });
 
 test('model, replay, scoring, and data changes retain hydrated heavy validation',()=>{
@@ -114,8 +122,26 @@ test('mixed diffs receive a conservative union instead of a publication shortcut
   const paths=['creator-challenges.json','creator/lola-rft/index.html','creator/lola-rft/creator-card.png','README.md'];
   const pub=publication(paths,{creatorAfter:[creatorPublished]});
   assert.equal(pub,null,'extra files disqualify the publication fast path');
-  assert.equal(classifyChangedPaths(paths).profile,'standard');
+  assert.equal(classifyChangedPaths(paths).profile,'broad');
 
   assert.equal(classifyChangedPaths(['docs/guide.md','about/index.html']).profile,'static');
   assert.equal(classifyChangedPaths(['.github/workflows/cloudflare-audit.yml','about/index.html']).profile,'standard');
+});
+
+
+test('standard mixed application changes union browser domains while shared infrastructure escalates',()=>{
+  const mixed=classifyChangedPaths(['draft-run-product.mjs','worker/account-session.mjs']);
+  assert.equal(mixed.profile,'standard');
+  assert.equal(mixed.browser_mode,'selected');
+  for(const group of ['account','core','gameplay'])assert.match(mixed.browser_groups,new RegExp(group));
+  const shared=classifyChangedPaths(['render-lifecycle.mjs']);
+  assert.equal(shared.profile,'standard');
+  assert.equal(shared.browser_mode,'full');
+  assert.equal(shared.browser_groups,'*');
+});
+
+test('ordinary Python helpers are standard while data/model Python remains heavy',()=>{
+  assert.equal(classifyChangedPaths(['scripts/generate-creator-social-card.py']).profile,'standard');
+  assert.equal(classifyChangedPaths(['tests/test_card_metadata.py']).profile,'standard');
+  assert.equal(classifyChangedPaths(['tests/test_build_path_model.py']).profile,'heavy');
 });
