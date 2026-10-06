@@ -2,6 +2,8 @@ name: e2e
 
 on:
   workflow_dispatch:
+  schedule:
+    - cron: '47 9 * * *'
   pull_request:
     types: [opened, synchronize, reopened]
   push:
@@ -19,165 +21,154 @@ jobs:
   browser:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-      R2_BUCKET: ${{ secrets.R2_BUCKET }}
-      AWS_DEFAULT_REGION: auto
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
           fetch-depth: 0
-      - name: Detect required-suite scope
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Classify changed files
         id: scope
         shell: bash
         env:
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PUSH_BEFORE: ${{ github.event.before }}
         run: |
           set -euo pipefail
-          run_full=true
+          output="$GITHUB_OUTPUT"
+          if [[ "$GITHUB_EVENT_NAME" == "schedule" || "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            node scripts/ci-change-scope.mjs --force broad --github-output "$output"
+            exit 0
+          fi
           if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
             if ! git fetch --no-tags origin main:refs/remotes/origin/main; then
-              echo '::warning::Unable to fetch origin/main; running full validation.'
-            elif ! stack_base_sha="$(git merge-base origin/main "$PR_HEAD_SHA")"; then
-              echo '::warning::Unable to compute merge base against origin/main; running full validation.'
-            else
-              run_full=false
-              mapfile -t changed_files < <(git diff --name-only "$stack_base_sha" "$PR_HEAD_SHA")
-              if (( ${#changed_files[@]} == 0 )); then
-                run_full=true
-              else
-                printf 'Changed files:\n'
-                printf ' - %s\n' "${changed_files[@]}"
-                for path in "${changed_files[@]}"; do
-                  case "$path" in
-                    mobile/*|docs/mobile-*|docs/android-*|docs/parity.md|.github/workflows/mobile*.yml|.github/workflows/android-*.yml|.github/workflows/ios-*.yml|.github/workflows/google-play-access.yml|.github/android-*.txt|.github/ios-*.txt|.github/app-store-*.txt|.github/scripts/app-store-*.mjs|.gitignore)
-                      ;;
-                    *)
-                      run_full=true
-                      break
-                      ;;
-                  esac
-                done
-              fi
+              echo '::warning::Unable to fetch origin/main; running broad validation.'
+              node scripts/ci-change-scope.mjs --force broad --github-output "$output"
+              exit 0
             fi
+            if ! base="$(git merge-base origin/main "$PR_HEAD_SHA")"; then
+              echo '::warning::Unable to compute merge base; running broad validation.'
+              node scripts/ci-change-scope.mjs --force broad --github-output "$output"
+              exit 0
+            fi
+            node scripts/ci-change-scope.mjs --base "$base" --head "$PR_HEAD_SHA" --github-output "$output"
+            exit 0
           fi
-          echo "run_full=$run_full" >> "$GITHUB_OUTPUT"
-          if [[ "$run_full" == "true" ]]; then
-            echo 'Running the full repository gate.'
+          if [[ "$PUSH_BEFORE" =~ ^[a-f0-9]{40}$ && "$PUSH_BEFORE" != 0000000000000000000000000000000000000000 ]]; then
+            node scripts/ci-change-scope.mjs --base "$PUSH_BEFORE" --head "$GITHUB_SHA" --github-output "$output"
           else
-            echo 'Native-mobile/release-only PR: full web/backend gate is not required.'
+            echo '::warning::Push base is unavailable; running broad validation.'
+            node scripts/ci-change-scope.mjs --force broad --github-output "$output"
           fi
-      - name: Phase 3 done-check greps
-        if: steps.scope.outputs.run_full == 'true'
+
+      - name: Confirm browser validation not required
+        if: steps.scope.outputs.browser_mode == 'none'
+        shell: bash
         run: |
-          git grep -n "Sign In With Google" -- '*.mjs' '*.html' tests/ || true
-          git grep -n "account-columns" -- growth.mjs || true
-          git grep -n "renderMyProfile" -- growth.mjs || true
-          git grep -n "account-signin .form-error" -- growth.mjs || true
-          git grep -n "source" -- draft-run-product.mjs | grep run-career || true
-      - uses: actions/setup-node@v4
-        if: steps.scope.outputs.run_full == 'true'
-        with:
-          node-version: 24
+          echo "No browser suite is relevant for CI profile ${{ steps.scope.outputs.profile }}."
+          printf '%s\n' "${{ steps.scope.outputs.profile }}" > "$RUNNER_TEMP/ci-selected-browser-validation"
+
       - uses: actions/setup-python@v5
-        if: steps.scope.outputs.run_full == 'true'
+        if: steps.scope.outputs.browser_mode == 'core' || steps.scope.outputs.browser_mode == 'full'
         with:
           python-version: '3.12'
-      - name: Install browser test dependency
-        if: steps.scope.outputs.run_full == 'true'
+
+      - name: Install focused browser dependency
+        if: steps.scope.outputs.browser_mode == 'publication' || steps.scope.outputs.browser_mode == 'core'
+        run: |
+          npm install --no-save playwright@1.63.0
+          npx playwright install --with-deps chromium
+
+      - name: Install full browser dependencies
+        if: steps.scope.outputs.browser_mode == 'full'
         run: |
           npm install --no-save playwright@1.63.0
           npx playwright install --with-deps chromium webkit
-      - name: Hydrate replay shards from R2 for local browser tests
-        if: steps.scope.outputs.run_full == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        run: bash scripts/hydrate-replay-shards.sh
+
+      - name: Run focused publication browser smoke
+        if: steps.scope.outputs.browser_mode == 'publication'
+        env:
+          PUBLICATION_KIND: ${{ steps.scope.outputs.publication_kind }}
+          PUBLICATION_SLUG: ${{ steps.scope.outputs.publication_slug }}
+          PUBLICATION_ACTION: ${{ steps.scope.outputs.publication_action }}
+        run: |
+          node --import ./tests/e2e-production-guard.mjs tests/publication-route-e2e.mjs
+          printf '%s\n' publication > "$RUNNER_TEMP/ci-selected-browser-validation"
+
       - name: Start static site
-        if: steps.scope.outputs.run_full == 'true'
+        if: steps.scope.outputs.browser_mode == 'core' || steps.scope.outputs.browser_mode == 'full'
         run: |
           nohup python -m http.server 4173 >/tmp/pack1-http.log 2>&1 &
           echo $! > /tmp/pack1-http.pid
           curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 http://127.0.0.1:4173/ -o /dev/null
-      # Every browser test preloads tests/e2e-production-guard.mjs so it cannot reach the
-      # production API (#803). GitHub refuses NODE_OPTIONS from GITHUB_ENV, hence the flag.
-      - name: Run browser regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/e2e.mjs
-      - name: Run set archive regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/sets-e2e.mjs
-      - name: Run Daily / Set Practice regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/practice-e2e.mjs
-      - name: Run dedicated Practice hub regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/practice-hub-e2e.mjs
-      - name: Run account practice and custom corpus regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/practice-access-e2e.mjs
-      - name: Run Player Profile / Progression regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/profile-e2e.mjs
-      - name: Run Today refresh and Pacific rollover regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/home-today-e2e.mjs
-      - name: Run homepage auth hydration regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/home-auth-hydration-e2e.mjs
-      - name: Run eight-decision Draft Run regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
-      - name: Run Powered Cube eight-decision regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: PACK1_TEST_ENVIRONMENT=powered-cube node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
-      - name: Run fixed Daily sharing regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: PACK1_TEST_DAILY=1 node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
-      - name: Run fixed Cube Daily sharing regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: PACK1_TEST_DAILY=1 PACK1_TEST_ENVIRONMENT=powered-cube node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
-      - name: Run historical ten-decision compatibility regression
-        if: steps.scope.outputs.run_full == 'true'
-        run: PACK1_TEST_SELECTION_VERSION=first-pack-v2 node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
-      - name: Run account browser contract
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/account-e2e.mjs
-      - name: Run auth simplification and Daily return contract
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/auth-context-e2e.mjs
-      - name: Run email verification Chromium/WebKit mobile contract
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/email-verification-e2e.mjs
-      - name: Run Patreon activation mobile contract
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/patreon-activation-e2e.mjs
-      - name: Run password recovery Chromium/WebKit mobile contract
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/password-recovery-e2e.mjs
-      - name: Run credential management Chromium/WebKit mobile contract
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/credential-management-e2e.mjs
-      - name: Run account deletion Chromium/WebKit mobile contract
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/account-deletion-e2e.mjs
-      - name: Verify display-ad membership suppression with intercepted requests
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/ads-e2e.mjs
-      - name: Run admin reporting browser contract
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/admin-e2e.mjs
-      - name: Run corpus readiness browser contract
-        if: steps.scope.outputs.run_full == 'true'
-        run: node --import ./tests/e2e-production-guard.mjs tests/corpus-readiness-e2e.mjs
+
+      - name: Run lightweight static browser regression
+        if: steps.scope.outputs.browser_mode == 'core'
+        run: |
+          node --import ./tests/e2e-production-guard.mjs tests/e2e.mjs
+          printf '%s\n' static > "$RUNNER_TEMP/ci-selected-browser-validation"
+
+      - name: Run full affected browser regression
+        if: steps.scope.outputs.browser_mode == 'full'
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --import ./tests/e2e-production-guard.mjs tests/e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/sets-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/practice-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/practice-hub-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/practice-access-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/profile-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/home-today-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/home-auth-hydration-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
+          PACK1_TEST_ENVIRONMENT=powered-cube node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
+          PACK1_TEST_DAILY=1 node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
+          PACK1_TEST_DAILY=1 PACK1_TEST_ENVIRONMENT=powered-cube node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
+          PACK1_TEST_SELECTION_VERSION=first-pack-v2 node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/account-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/auth-context-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/email-verification-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/patreon-activation-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/password-recovery-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/credential-management-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/account-deletion-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/ads-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/admin-e2e.mjs
+          node --import ./tests/e2e-production-guard.mjs tests/corpus-readiness-e2e.mjs
+          printf '%s\n' "${{ steps.scope.outputs.profile }}" > "$RUNNER_TEMP/ci-selected-browser-validation"
+
       - name: Upload UI screenshots
-        if: always() && steps.scope.outputs.run_full == 'true'
+        if: always() && (steps.scope.outputs.browser_mode == 'core' || steps.scope.outputs.browser_mode == 'full')
         uses: actions/upload-artifact@v4
         with:
           name: pack1-ui-screenshots
           path: artifacts/*.png
           if-no-files-found: ignore
+
       - name: Stop static site
-        if: always() && steps.scope.outputs.run_full == 'true'
+        if: always()
         run: |
           if [ -f /tmp/pack1-http.pid ]; then kill "$(cat /tmp/pack1-http.pid)" || true; fi
+
+      - name: Verify selected browser validation completed
+        if: always()
+        shell: bash
+        env:
+          EXPECTED_PROFILE: ${{ steps.scope.outputs.profile }}
+        run: |
+          set -euo pipefail
+          test -s "$RUNNER_TEMP/ci-selected-browser-validation" || {
+            echo "::error::No selected browser validation path completed for profile $EXPECTED_PROFILE."
+            exit 1
+          }
+          actual="$(cat "$RUNNER_TEMP/ci-selected-browser-validation")"
+          [[ "$actual" == "$EXPECTED_PROFILE" ]] || {
+            echo "::error::Completed browser validation '$actual' does not match selected profile '$EXPECTED_PROFILE'."
+            exit 1
+          }
+          echo "Selected browser validation passed: $EXPECTED_PROFILE"
