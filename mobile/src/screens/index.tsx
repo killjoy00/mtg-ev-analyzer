@@ -23,6 +23,7 @@ import { tcgplayerMagicUrl } from '@/src/tcgplayer';
 import { colors, spacing } from '@/src/theme';
 
 const dailyEnvironments: DailyEnvironment[] = ['mixed', 'powered-cube', 'latest'];
+const brandMarkImage = require('../../assets/images/header-mark.png');
 
 function recordBrandLayout(label: string, event: LayoutChangeEvent) {
   if (config.screenshots.fixtures) console.info('PACKONE_BRAND', JSON.stringify({ label, ...event.nativeEvent.layout }));
@@ -32,7 +33,7 @@ function Brand() {
   return (
     <View style={styles.brand} onLayout={event => recordBrandLayout('brand', event)}>
       <View accessible={false} accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.brandMark} onLayout={event => recordBrandLayout('mark', event)}>
-        <Image source={require('../../assets/images/header-mark.png')} contentFit="contain" style={styles.brandMarkImage} />
+        <Image source={brandMarkImage} contentFit="contain" style={styles.brandMarkImage} />
       </View>
       <Text style={styles.brandName} onLayout={event => recordBrandLayout('name', event)}>Pack One</Text>
     </View>
