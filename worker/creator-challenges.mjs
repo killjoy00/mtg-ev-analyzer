@@ -8,6 +8,7 @@ const SHARE=/^[a-f0-9]{24}$/;
 const PACK_ONE_HOSTS=new Set(['packone.pro','www.packone.pro']);
 const SOURCE_TYPES=new Set(['practice','daily']);
 const SOURCE_ENVIRONMENTS=new Set(['mixed','powered-cube','latest']);
+export const CREATOR_REPLAY_SCORING_VERSIONS=Object.freeze(['trophy-consensus-v2','trophy-consensus-v3']);
 const ALLOWED_PRACTICE_URL_PARAMS=new Set(['game','shared','challenge','set','utm_source','utm_campaign','utm_medium','ref']);
 const bool=value=>value===true||value==='t'||value==='true';
 const parse=value=>typeof value==='string'?JSON.parse(value):value;
@@ -64,7 +65,7 @@ function decodeSource(row) {
 async function validateHistoricalPuzzles(query,source) {
   if(!Array.isArray(source.puzzle_ids)||source.puzzle_ids.length!==8)fail('Creator source must contain exactly eight decisions.',409,'CREATOR_SOURCE_INELIGIBLE');
   if(!Array.isArray(source.answers)||source.answers.length!==8||source.score==null)fail('Creator source run is not complete.',409,'CREATOR_SOURCE_INELIGIBLE');
-  if(source.scoring_version!==DRAFT_RUN_SCORING_VERSION)
+  if(!CREATOR_REPLAY_SCORING_VERSIONS.includes(source.scoring_version))
     fail('This source uses a historical scoring version that the current replay engine cannot reproduce.',409,'CREATOR_SOURCE_SCORING_VERSION');
   let scoreTotal=0;
   for(let index=0;index<8;index++) {
