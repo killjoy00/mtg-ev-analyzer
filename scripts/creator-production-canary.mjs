@@ -4,6 +4,7 @@ import {createHash,createHmac,randomBytes,randomUUID} from 'node:crypto';
 import {corpusDatabase} from './neon-corpus-db.mjs';
 import {gameDateKey} from '../game-date.mjs';
 import {requestCreatorPrivacyRetirement} from '../worker/creator-challenge-publish.mjs';
+import {recoverKnownCanaryFixtures} from './creator-canary-recovery.mjs';
 
 const [connectionFile,expectedRelease]=process.argv.slice(2);
 assert.ok(connectionFile);
@@ -428,6 +429,34 @@ async function bestEffortRetire() {
 
 try{
   await markerCheck();
+  report.recovered_fixtures=[];
+  await recoverKnownCanaryFixtures(query,{
+    retire:async(owner,assertOwnerScope)=>{
+      const deadline=Date.now()+45*60*1000;
+      while(Date.now()<deadline){
+        await assertOwnerScope();
+        if(await requestCreatorPrivacyRetirement(query,owner,{
+          reason:'release_canary_recovery',today:gameDateKey(),
+          env:{PACK1_LAUNCH_WATCHER_GITHUB_TOKEN:process.env.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN},fetcher:fetch,
+        }))return;
+        await sleep(10000);
+      }
+      throw Error('Known prior canary fixture still has pending protected retirement.');
+    },
+    verifyRetired:async(challenge)=>{
+      await verifyRetiredApi(challenge);
+      const route='https://packone.pro/creator/'+challenge.slug+'/';
+      const response=await fetch(route,{cache:'no-store',signal:AbortSignal.timeout(30000)});
+      assert.ok([200,404,410].includes(response.status));
+      const html=await response.text();
+      assert.equal(html.includes('Pack One Canary'),false);
+      const card=await fetch(route+'creator-card.png',{cache:'no-store',signal:AbortSignal.timeout(30000)});
+      assert.ok([404,410].includes(card.status),'prior canary personalized card must be unavailable');
+    },
+    cleanPractice:async(fixture)=>{practiceFixture=fixture;await cleanupFreshPracticeSource();practiceFixture=null;},
+    record:row=>report.recovered_fixtures.push(row),
+  });
+  report.cleanup.previous_canary=true;
   admin=await createAdminFixture();
   const pools=await candidatePools();
   const practice=await resolveCandidate('practice',pools.practice);
