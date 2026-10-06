@@ -57,6 +57,7 @@ export async function waitForPublicationChecks({repo,branch,headSha,slug,kind,pr
       const retryAfter=Number(response?.headers.get('retry-after'));
       const delay=Math.max(1000*2**attempt,Number.isFinite(retryAfter)?Math.min(60000,Math.max(0,retryAfter*1000)):0);
       assert.ok(now()+delay<deadline,'Timed out waiting for required pull_request test/browser checks.');
+      if(response?.body)await response.body.cancel().catch(()=>{});
       console.log(failure+'; retrying read ('+(attempt+2)+'/5).');
       await sleep(delay);
     }

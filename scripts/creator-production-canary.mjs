@@ -6,6 +6,7 @@ import {gameDateKey} from '../game-date.mjs';
 import {requestCreatorPrivacyRetirement} from '../worker/creator-challenge-publish.mjs';
 import {recoverKnownCanaryFixtures,practiceCanaryIdentity} from './creator-canary-recovery.mjs';
 import {normalizeDisplayName} from '../worker/username.mjs';
+import {fetchCanaryHttp} from './creator-canary-http.mjs';
 
 const [connectionFile,expectedRelease]=process.argv.slice(2);
 assert.ok(connectionFile);
@@ -37,7 +38,7 @@ async function call(path,{method,body,token,player,status=[200]}={}) {
     if((method||'POST')!=='GET')headers['x-pack1-csrf']=token.csrf;
   }
   if(player)headers['x-pack1-mobile-session']=player;
-  const response=await fetch(api+path,{
+  const response=await fetchCanaryHttp(api+path,{
     method:method||(body===undefined?'GET':'POST'),
     headers,
     body:body===undefined?undefined:JSON.stringify(body),
@@ -157,7 +158,7 @@ async function cleanupFreshPracticeSource() {
     clean=await requestCreatorPrivacyRetirement(query,fixture.playerId,{
       reason:'release_canary_cleanup',today:gameDateKey(),
       env:{PACK1_LAUNCH_WATCHER_GITHUB_TOKEN:process.env.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN},
-      fetcher:fetch,
+      fetcher:fetchCanaryHttp,
     });
     if(clean)break;
     await sleep(10000);
@@ -299,13 +300,13 @@ async function publication(challenge,action,{timeoutMs=45*60*1000}={}) {
 
 async function staticState(challenge,status) {
   const route='https://packone.pro/creator/'+challenge.slug+'/';
-  const htmlResponse=await fetch(route,{headers:{'cache-control':'no-cache'},redirect:'error',signal:AbortSignal.timeout(30000)});
+  const htmlResponse=await fetchCanaryHttp(route,{headers:{'cache-control':'no-cache'},redirect:'error',signal:AbortSignal.timeout(30000)});
   const html=await htmlResponse.text();
   assert.equal(htmlResponse.status,200);
   assert.ok(html.includes('data-creator-challenge-id="'+challenge.id+'"'));
   assert.ok(html.includes('data-creator-challenge-status="'+status+'"'));
   assert.equal(html.includes(creatorNote),false,'post-run note must not enter public route metadata');
-  const card=await fetch(route+'creator-card.png',{headers:{'cache-control':'no-cache'},redirect:'error',signal:AbortSignal.timeout(30000)});
+  const card=await fetchCanaryHttp(route+'creator-card.png',{headers:{'cache-control':'no-cache'},redirect:'error',signal:AbortSignal.timeout(30000)});
   if(status==='published')assert.ok(card.ok&&String(card.headers.get('content-type')||'').includes('image/'));
   else assert.ok([404,410].includes(card.status),'retired personalized card must be unavailable');
   if(status==='retired')assert.equal(html.includes('Pack One Canary'),false,'retired HTML must scrub the canary identity');
@@ -406,7 +407,7 @@ async function privacyRetire(challenge,owner) {
       reason:'release_canary',
       today:gameDateKey(),
       env:{PACK1_LAUNCH_WATCHER_GITHUB_TOKEN:process.env.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN},
-      fetcher:fetch,
+      fetcher:fetchCanaryHttp,
     }))return;
     await sleep(10000);
   }
@@ -450,7 +451,7 @@ try{
         await assertOwnerScope();
         if(await requestCreatorPrivacyRetirement(query,owner,{
           reason:'release_canary_recovery',today:gameDateKey(),
-          env:{PACK1_LAUNCH_WATCHER_GITHUB_TOKEN:process.env.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN},fetcher:fetch,
+          env:{PACK1_LAUNCH_WATCHER_GITHUB_TOKEN:process.env.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN},fetcher:fetchCanaryHttp,
         }))return;
         await sleep(10000);
       }
@@ -459,11 +460,11 @@ try{
     verifyRetired:async(challenge)=>{
       await verifyRetiredApi(challenge);
       const route='https://packone.pro/creator/'+challenge.slug+'/';
-      const response=await fetch(route,{cache:'no-store',signal:AbortSignal.timeout(30000)});
+      const response=await fetchCanaryHttp(route,{cache:'no-store',signal:AbortSignal.timeout(30000)});
       assert.ok([200,404,410].includes(response.status));
       const html=await response.text();
       assert.equal(html.includes('Pack One Canary'),false);
-      const card=await fetch(route+'creator-card.png',{cache:'no-store',signal:AbortSignal.timeout(30000)});
+      const card=await fetchCanaryHttp(route+'creator-card.png',{cache:'no-store',signal:AbortSignal.timeout(30000)});
       assert.ok([404,410].includes(card.status),'prior canary personalized card must be unavailable');
     },
     cleanPractice:async(fixture)=>{practiceFixture=fixture;await cleanupFreshPracticeSource();practiceFixture=null;},

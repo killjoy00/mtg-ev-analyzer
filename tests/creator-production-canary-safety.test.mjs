@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {adminPath,adminGrowthPath} from '../edge/gateway.mjs';
 import {normalizeDisplayName} from '../worker/username.mjs';
+import {fetchCanaryHttp} from '../scripts/creator-canary-http.mjs';
 
 const script=fs.readFileSync('scripts/creator-production-canary.mjs','utf8');
 const workflow=fs.readFileSync('.github/workflows/creator-production-canary.yml','utf8');
@@ -11,19 +12,19 @@ const request=JSON.parse(fs.readFileSync('.github/creator-production-canary-requ
 
 test('owned Practice cleanup waits for static retirement before deleting its account',async()=>{
   const block=script.slice(script.indexOf('async function cleanupFreshPracticeSource()'),script.indexOf('async function borrowSource'));
-  const execute=new Function('practiceFixture','createdChallenges','query','requestCreatorPrivacyRetirement','gameDateKey','parseJson','sleep','assert','normalizeDisplayName',block+';return cleanupFreshPracticeSource();');
+  const execute=new Function('practiceFixture','createdChallenges','query','requestCreatorPrivacyRetirement','gameDateKey','parseJson','sleep','assert','normalizeDisplayName','fetchCanaryHttp',block+';return cleanupFreshPracticeSource();');
   const fixture={playerId:'owned-player',sessionId:'owned-run',shareId:'owned-share',authId:'owned-auth',name:'Creator Source 1234abcd',email:'qa-creator-source-1234abcd@example.invalid'};
   const events=[];let attempts=0;
   await execute(fixture,[{id:'owned-challenge',owner:fixture.playerId}],async(sql,params)=>{
     assert.equal(params[0],sql.startsWith('DELETE FROM account')||sql.startsWith('DELETE FROM neon_auth')?fixture.authId:sql.startsWith('DELETE FROM draft_run_shares')?fixture.shareId:fixture.playerId);
     if(sql.startsWith('SELECT'))return {rows:[{id:'owned-challenge',status:'retired',publication_detail:{live_verified:false}}]};
     events.push('cleanup');return {rows:[]};
-  },async()=>{events.push('retirement');return ++attempts===2;},()=> '2026-10-05',x=>x,async()=>{events.push('wait');},assert,normalizeDisplayName);
+  },async()=>{events.push('retirement');return ++attempts===2;},()=> '2026-10-05',x=>x,async()=>{events.push('wait');},assert,normalizeDisplayName,fetchCanaryHttp);
   assert.equal(attempts,2);
   assert.deepEqual(events.slice(0,3),['retirement','wait','retirement']);
   assert.ok(events.indexOf('cleanup')>2);
   let mutation=false;
-  await assert.rejects(execute(fixture,[],async()=>({rows:[{id:'unrelated',status:'published'}]}),async()=>{mutation=true;},()=> '2026-10-05',x=>x,async()=>{},assert,normalizeDisplayName),/unrelated creator work/);
+  await assert.rejects(execute(fixture,[],async()=>({rows:[{id:'unrelated',status:'published'}]}),async()=>{mutation=true;},()=> '2026-10-05',x=>x,async()=>{},assert,normalizeDisplayName,fetchCanaryHttp),/unrelated creator work/);
   assert.equal(mutation,false);
 });
 
