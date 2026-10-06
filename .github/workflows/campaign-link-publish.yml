@@ -244,7 +244,8 @@ jobs:
           echo "Merged campaign publication PR: $PR_URL" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Request Pages build from merged main
-        if: steps.branch.outputs.already_published != 'true'
+        # A retry may find its route already committed after an earlier Pages
+        # build failed. Rebuild that reviewed state before verifying the URL.
         shell: bash
         run: |
           set -euo pipefail
