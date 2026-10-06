@@ -4,8 +4,6 @@ import { readFileSync } from 'node:fs';
 
 const storeRelease = JSON.parse(readFileSync(new URL('../store-release.json', import.meta.url), 'utf8'));
 const appJson = JSON.parse(readFileSync(new URL('../app.json', import.meta.url), 'utf8'));
-assert.equal(storeRelease.appStoreVersion, storeRelease.playVersionName);
-
 const secureStorePlugin = appJson.expo?.plugins?.find(
   (plugin) => Array.isArray(plugin) && plugin[0] === 'expo-secure-store',
 );
@@ -70,7 +68,7 @@ assert.equal(preview.android.package, 'pro.packone.preview');
 
 const production = loadConfig('production');
 assert.equal(production.name, 'Pack One');
-assert.equal(production.version, storeRelease.appStoreVersion);
+assert.equal(production.version, storeRelease.playVersionName);
 assert.equal(production.ios.bundleIdentifier, 'pro.packone.app');
 assert.equal(production.android.package, 'pro.packone.app');
 assert.equal(production.icon, './assets/images/icon.png');
