@@ -8,8 +8,8 @@ export function practiceCanaryIdentity(tag) {
   return {name,email:'qa-creator-source-'+tag+'@example.invalid'};
 }
 
-// Exact owned fixtures from acceptance artifacts 11383024951 / 11385218108,
-// runs 37395491593 / 37399314701.
+// Exact owned fixtures from acceptance artifacts 11383024951 / 11385218108 / 11387058492,
+// runs 37395491593 / 37399314701 / 37404898908.
 // Recovery never discovers candidates or falls back to customer identities.
 export const recoveryFixtures=[
   {type:'practice',challengeId:'e10286c0-580f-4e08-926c-df444916b65e',
@@ -22,6 +22,11 @@ export const recoveryFixtures=[
     shareId:'c934430b73c44511ae340764',slug:'canary-practice-269df3bf',identityStyle:'short'},
   {type:'daily',challengeId:'f295e269-6f34-4fb1-830b-362b29a9f770',
     sessionId:'70c80d01-ed10-4692-a718-c4ab8e44cba1',slug:'canary-daily-269df3bf'},
+  {type:'practice',challengeId:'a1d8a04f-c4d5-4761-9191-a847fc89adb6',
+    sessionId:'3b086aed-5035-4896-bdbf-ab531f9e86b8',playerId:'4c052e53-e9a8-4193-945c-ed4fe35eb255',
+    shareId:'a6dff30401e64f2d87e5b97f',slug:'canary-practice-47a17637',identityStyle:'short'},
+  {type:'daily',challengeId:'536e6084-b07d-4d64-a999-ae5c58113069',
+    sessionId:'092dde8d-7b77-41a7-9608-39f621326351',slug:'canary-daily-47a17637'},
 ];
 
 export function validateRecoveryFixture(row,fixture) {
