@@ -632,3 +632,15 @@ test('creator funnel events have database-backed concurrency idempotency',async(
   assert.ok(start>0&&end>start);
   assert.match(runtime.slice(start,end),/ON CONFLICT DO NOTHING/);
 });
+
+
+test('creator admin list batches stats instead of issuing one detail query per challenge',async()=>{
+  const source=await readFile('worker/creator-challenges.mjs','utf8');
+  const start=source.indexOf('export async function listCreatorChallenges');
+  const end=source.indexOf('export async function handleCreatorChallengeAdmin',start);
+  assert.ok(start>0&&end>start);
+  const list=source.slice(start,end);
+  assert.match(list,/creatorChallengeSelect\(\{includeStats:true\}\)/);
+  assert.match(list,/return result\.rows\.map\(challengeRow\)/);
+  assert.doesNotMatch(list,/creatorChallengeById/);
+});
