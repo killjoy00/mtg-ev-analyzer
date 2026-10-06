@@ -243,7 +243,7 @@ try {
   assert.equal(persisted[0].creator_challenge_id,runtimeChallenge);
   assert.equal(Number(persisted[0].score),Number(replay.score));
   assert.equal(persisted[0].outcome,replay.comparison.outcome);
-  assert.equal(persisted[0].is_daily,false);
+  assert.ok(persisted[0].is_daily===false||persisted[0].is_daily==='f','saved creator result must be unranked');
   assert.equal(persisted[0].opponent_name,'Runtime Creator');
   const runtimeStats=await creatorChallengeById(query,runtimeChallenge);
   assert.equal(runtimeStats.attempts,1);
