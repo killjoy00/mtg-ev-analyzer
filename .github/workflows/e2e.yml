@@ -92,7 +92,7 @@ jobs:
           npx playwright install --with-deps chromium webkit
       - name: Hydrate replay shards from R2 for local browser tests
         if: steps.scope.outputs.run_full == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        run: bash scripts/r2_replay_shards.sh hydrate
+        run: bash scripts/hydrate-browser-replays.sh
       - name: Start static site
         if: steps.scope.outputs.run_full == 'true'
         run: |
