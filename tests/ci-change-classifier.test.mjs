@@ -46,3 +46,15 @@ test('selection, execution infrastructure and dependencies fail to broad validat
 });
 
 test('unknown paths fail closed to broad validation',()=>{plan(['future/new-surface.xyz'],'full');});
+
+test('worker model, selection, corpus and import paths require heavy validation',()=>{
+  for(const path of ['worker/path-model.mjs','worker/draft-run-selection.mjs','worker/corpus-components.mjs',
+    'worker/corpus-admin.mjs','worker/corpus-readiness.mjs','worker/trophy-import.mjs']){
+    const result=classifyChanges([path]);
+    assert.equal(result.plan,'heavy',path);assert.equal(result.hydrate,true,path);
+    assert.equal(result.dataset,true,path);assert.equal(result.browser,'full',path);
+  }
+  const mixed=classifyChanges(['worker/path-model.mjs','.github/workflows/cloudflare-audit.yml']);
+  assert.equal(mixed.plan,'heavy');assert.equal(mixed.ciContracts,true);
+  assert.equal(classifyChanges(['worker/account-session.mjs']).hydrate,false,'ordinary account changes stay lightweight');
+});

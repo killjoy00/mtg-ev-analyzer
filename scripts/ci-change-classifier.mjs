@@ -50,7 +50,7 @@ const heavyRoot=new Set([
 ]);
 const heavyToken=/(?:replay|scor|model|corpus|dataset|troph|traditional|holdout|pick_value|contextual_value|grading_curve|selection|v5[_-])/i;
 const isHeavy=path=>heavyRoot.has(path)||/^(?:data|corpus|scoring|research)\//.test(path)
-  ||(/^scripts\//.test(path)&&heavyToken.test(path))||(/^tests\//.test(path)&&heavyToken.test(path));
+  ||(/^(?:worker|scripts|tests)\//.test(path)&&heavyToken.test(path));
 const isWorkflow=path=>/^\.github\/(?:workflows\/|scripts\/|.+-request\.(?:json|txt)$)/.test(path);
 const isKnownApp=path=>/\.(?:mjs|js|cjs|py|sql|sh|json)$/i.test(path)
   ||/^(?:worker|scripts|tests|migrations|admin|analytics|edge|open|results)\//.test(path);

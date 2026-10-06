@@ -1,6 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { classifyChanges } from '../scripts/ci-change-classifier.mjs';
 
 const unit = readFileSync('.github/workflows/test.yml','utf8');
 const browser = readFileSync('.github/workflows/e2e.yml','utf8');
@@ -47,14 +51,45 @@ test('required checks cannot pass by silently skipping their selected validation
   assert.match(browser,/Run focused publication browser smoke/);
 });
 
-test('workflow/helper-only validation is affected-contract scoped, not blanket product testing', () => {
+const ciContractStep=unit.split('      - name: Verify CI selection contracts')[1]?.split('      - name: Validate publication diff and generated outputs')[0]||'';
+
+test('workflow/helper validation runs independently of the selected product test plan', () => {
+  assert.match(ciContractStep,/if: steps\.scope\.outputs\.ci_contracts == 'true'/);
+  assert.match(ciContractStep,/changed_ci/);
+  assert.match(ciContractStep,/node --check "\$changed"/);
+  assert.match(ciContractStep,/grep -lF/);
+  assert.match(ciContractStep,/tests\/ci-workflow-policy\.test\.mjs/);
+  assert.match(ciContractStep,/tests\/workflow-block-scalars\.test\.mjs/);
+  assert.doesNotMatch(ciContractStep,/npm test/);
   const ciCase=unit.split('            ci)')[1]?.split('            full)')[0]||'';
-  assert.match(ciCase,/changed_ci/);
-  assert.match(ciCase,/node --check "\$changed"/);
-  assert.match(ciCase,/grep -lF/);
-  assert.match(ciCase,/tests\/ci-workflow-policy\.test\.mjs/);
-  assert.match(ciCase,/tests\/workflow-block-scalars\.test\.mjs/);
+  assert.match(ciCase,/ci-contracts-complete/);
   assert.doesNotMatch(ciCase,/npm test/);
+});
+
+test('presentation/workflow mixed diff executes the affected helper contracts', t => {
+  const helper='.github/scripts/review-helper.mjs';
+  const selection=classifyChanges(['editorial.css',helper]);
+  assert.equal(selection.plan,'presentation');assert.equal(selection.ciContracts,true);
+  const root=mkdtempSync(path.join(tmpdir(),'ci-mixed-contract-'));
+  t.after(()=>rmSync(root,{recursive:true,force:true}));
+  const git=(...args)=>execFileSync('git',args,{cwd:root,encoding:'utf8',stdio:['ignore','pipe','pipe']}).trim();
+  git('init','-q');git('config','user.email','ci@example.test');git('config','user.name','CI');
+  mkdirSync(path.join(root,'.github/scripts'),{recursive:true});mkdirSync(path.join(root,'tests'));mkdirSync(path.join(root,'bin'));
+  writeFileSync(path.join(root,helper),'export const value=1;\n');
+  writeFileSync(path.join(root,'tests/review-helper.test.mjs'),`// ${helper}\n`);
+  git('add','.');git('commit','-qm','base');const base=git('rev-parse','HEAD');
+  writeFileSync(path.join(root,helper),'export const value=2;\n');writeFileSync(path.join(root,'editorial.css'),'body {}\n');
+  git('add','.');git('commit','-qm','mixed');const head=git('rev-parse','HEAD');
+  const log=path.join(root,'node-calls.log');
+  writeFileSync(path.join(root,'bin/node'),'#!/usr/bin/env bash\nprintf "%s\\n" "$*" >> "$CI_NODE_CALLS"\n',{mode:0o755});
+  const shell=ciContractStep.split('        run: |\n')[1].split('\n').map(line=>line.replace(/^          /,'')).join('\n');
+  const execution=spawnSync('bash',['-c',shell],{cwd:root,encoding:'utf8',env:{...process.env,PATH:path.join(root,'bin')+path.delimiter+process.env.PATH,
+    CI_BASE_SHA:base,CI_HEAD_SHA:head,RUNNER_TEMP:root,CI_NODE_CALLS:log}});
+  assert.equal(execution.status,0,execution.stderr);
+  const calls=readFileSync(log,'utf8');
+  assert.match(calls,/--check \.github\/scripts\/review-helper\.mjs/);
+  assert.match(calls,/--test .*tests\/review-helper\.test\.mjs/);
+  assert.equal(calls.match(/tests\/review-helper\.test\.mjs/g).length,1,'affected tests are deduplicated');
 });
 
 test('signed and publishing mobile jobs remain unreachable from pull-request execution and never touch the unsigned Gradle cache', () => {

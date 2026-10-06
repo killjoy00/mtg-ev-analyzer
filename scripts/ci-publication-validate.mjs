@@ -27,8 +27,16 @@ function statusMap(changes){return new Map(changes.map(change=>[change.path,chan
 export function validatePublicationDiff({base,head,cwd=process.cwd()}={}){
   assert.match(String(base||''),/^[a-f0-9]{40}$/,'base SHA is required');
   assert.match(String(head||''),/^[a-f0-9]{40}$/,'head SHA is required');
-  assert.equal(git(['rev-parse','HEAD'],{cwd}),head,'publication validator must inspect the exact checked-out head');
   execFileSync('git',['merge-base','--is-ancestor',base,head],{cwd,stdio:'ignore'});
+  const checkout=git(['rev-parse','HEAD'],{cwd});
+  if(checkout!==head){
+    // pull_request jobs check out GitHub's synthetic merge. Accept it only
+    // when it merges this exact base/head and contains the unchanged head tree.
+    assert.deepEqual(git(['show','-s','--format=%P',checkout],{cwd}).split(' '),[base,head],
+      'publication checkout must be the exact head or its reviewed base/head merge');
+    assert.equal(git(['rev-parse',`${checkout}^{tree}`],{cwd}),git(['rev-parse',`${head}^{tree}`],{cwd}),
+      'publication merge checkout must contain the exact publication head tree');
+  }
   const changes=parseNameStatus(git(['diff','--name-status','--find-renames',base,head],{cwd}));
   assert.ok(changes.length>0,'publication diff is empty');
   const statuses=statusMap(changes),paths=changes.map(change=>change.path).sort();
