@@ -137,7 +137,6 @@ function gradeTrophyConsensusV2V3Pick(puzzle, selectedId) {
     pickNumber: Number(puzzle.pick_number || puzzle.pickNumber || 1),
   };
 }
-}
 
 export function gradeDraftRunPickForVersion(puzzle,selectedId,scoringVersion) {
   if(!DRAFT_RUN_REPLAY_SCORING_VERSIONS.includes(scoringVersion))throw new Error(`Unsupported Draft Run scoring version: ${scoringVersion}`);
