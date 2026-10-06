@@ -25,9 +25,12 @@ assert.deepEqual(
 const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 
 function loadConfig(profile, extraEnv = {}) {
+  const env = { ...process.env, PACKONE_BUILD_PROFILE: profile };
+  delete env.PACKONE_IOS_MARKETING_VERSION;
+  Object.assign(env, extraEnv);
   const result = spawnSync(npx, ['expo', 'config', '--type', 'public', '--json'], {
     cwd: new URL('..', import.meta.url),
-    env: { ...process.env, ...extraEnv, PACKONE_BUILD_PROFILE: profile },
+    env,
     encoding: 'utf8',
   });
   if (result.status !== 0) {
@@ -98,4 +101,10 @@ const numberedProduction = loadConfig('production', {
 assert.equal(numberedProduction.ios.buildNumber, '100123');
 assert.equal(numberedProduction.android.versionCode, 100123);
 
-console.log('Expo native release config checks passed with iOS-only IAP autolinking and without EAS project linkage.');
+const iosProduction = loadConfig('production', {
+  PACKONE_IOS_MARKETING_VERSION: storeRelease.appStoreVersion,
+});
+assert.equal(iosProduction.version, storeRelease.appStoreVersion);
+assert.equal(production.version, storeRelease.playVersionName);
+
+console.log('Expo native release config checks passed with platform-specific store marketing versions, iOS-only IAP autolinking and without EAS project linkage.');
