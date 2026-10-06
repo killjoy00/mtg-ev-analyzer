@@ -7,7 +7,7 @@ process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 
 const {default:growth,query}=await import('../worker/growth-function.js');
 const {default:runApi}=await import('../worker/draft-run-function.mjs');
-const {creatorChallengeById}=await import('../worker/creator-challenges.mjs');
+const {creatorChallengeById,createCreatorChallenge}=await import('../worker/creator-challenges.mjs');
 const {
   beginCreatorPublicationOperation,
   dispatchCreatorPublicationAttempt,
@@ -138,6 +138,27 @@ try {
   assert.equal(creatorIdentity.profile_public===true||creatorIdentity.profile_public==='t',true);
   assert.equal(creatorIdentity.username_owned===true||creatorIdentity.username_owned==='t',true);
   assert.equal(creatorIdentity.public_identity_hidden_at,null);
+
+  // Exercise the production creation/audit SQL, rather than inserting the
+  // challenge fixture directly. Polymorphic jsonb_build_object parameters must
+  // be typed under PostgreSQL's prepared-statement protocol.
+  const creationShare=await directCall(runApi,`/v1/runs/${template.id}/share`,{},creator.token);
+  const creation=await createCreatorChallenge(query,{
+    source_type:'practice',share:creationShare.id,slug:`creation-${tag}`,
+    creator_public_name:'Creation Creator',acquisition_source:'creator',
+    acquisition_campaign:'creation-smoke',
+  },creatorAuth);
+  assert.equal(creation.source_session_id,template.id);
+  assert.equal(creation.status,'draft');
+  const creationAudit=(await query(`SELECT detail FROM creator_challenge_audit
+    WHERE creator_challenge_id=$1::uuid AND action='created'`,[creation.id])).rows;
+  assert.equal(creationAudit.length,1);
+  const auditDetail=typeof creationAudit[0].detail==='string'
+    ?JSON.parse(creationAudit[0].detail):creationAudit[0].detail;
+  assert.equal(auditDetail.source_type,'practice');
+  assert.equal(auditDetail.source_session_id,template.id);
+  console.log('Creator challenge creation and audit persistence verified against real PostgreSQL.');
+
 
   // Route-level creator behavior: standard campaigns remain guest-playable,
   // source owners open the original run, creator answers reveal only after a
