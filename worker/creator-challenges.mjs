@@ -1,6 +1,6 @@
 import {buildCampaignTrackingUrl,normalizeAcquisitionValue,normalizeCampaignSlug} from '../campaign-links.mjs';
 import {componentBelongsTo} from './corpus-components.mjs';
-import {DRAFT_RUN_SCORING_VERSION,gradeDraftRunPick,validateDraftRunPuzzle} from '../draft-run.mjs';
+import {DRAFT_RUN_REPLAY_SCORING_VERSIONS,gradeDraftRunPickForVersion,validateDraftRunPuzzle} from '../draft-run.mjs';
 import {gameDateKey} from '../game-date.mjs';
 
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
@@ -8,7 +8,7 @@ const SHARE=/^[a-f0-9]{24}$/;
 const PACK_ONE_HOSTS=new Set(['packone.pro','www.packone.pro']);
 const SOURCE_TYPES=new Set(['practice','daily']);
 const SOURCE_ENVIRONMENTS=new Set(['mixed','powered-cube','latest']);
-export const CREATOR_REPLAY_SCORING_VERSIONS=Object.freeze(['trophy-consensus-v2','trophy-consensus-v3']);
+export const CREATOR_REPLAY_SCORING_VERSIONS=DRAFT_RUN_REPLAY_SCORING_VERSIONS;
 const ALLOWED_PRACTICE_URL_PARAMS=new Set(['game','shared','challenge','set','utm_source','utm_campaign','utm_medium','ref']);
 const bool=value=>value===true||value==='t'||value==='true';
 const parse=value=>typeof value==='string'?JSON.parse(value):value;
@@ -77,7 +77,7 @@ async function validateHistoricalPuzzles(query,source) {
       fail('This source uses historical puzzle data that Pack One can no longer serve safely.',409,'CREATOR_SOURCE_UNAVAILABLE');
     if(!puzzle.candidates.some(card=>card.id===answer.selectedId))
       fail('A creator selection is not part of its authoritative historical pack.',409,'CREATOR_SOURCE_INELIGIBLE');
-    const reproduced=gradeDraftRunPick(puzzle,answer.selectedId).score;
+    const reproduced=gradeDraftRunPickForVersion(puzzle,answer.selectedId,source.scoring_version).score;
     if(Number(answer.score)!==Number(reproduced))
       fail('This source cannot be reproduced exactly by the current scoring engine.',409,'CREATOR_SOURCE_SCORING_VERSION');
     scoreTotal+=Number(reproduced);
