@@ -1,0 +1,11 @@
+name: Android fixture validation
+on:
+  push:
+    branches: ['ci/android-fixture-*']
+permissions:
+  contents: read
+jobs:
+  capture:
+    uses: ./.github/workflows/mobile-store-screenshots.yml
+    with:
+      android_only: true

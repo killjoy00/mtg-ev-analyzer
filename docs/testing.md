@@ -84,6 +84,22 @@ and share one React setup and compiler helper. Test/documentation-only PRs skip
 native screenshot capture; screen, configuration, dependency and unknown mobile
 changes retain it. Unreadable diffs retain full screenshot coverage.
 
+Android screenshot CI prepares the SDK before app compilation. Its reviewed
+`mobile/android-toolchain.json` pins match React Native's installed version
+catalog. NDK downloads must match Android's published archive size and checksum,
+pass ZIP integrity checks, and provide a working compiler before installation.
+Verified SDK packages and unsigned Gradle dependencies/build state are cached.
+Dependency setup can recover once from corrupt bytes or transient HTTP failures;
+compiler errors, app builds and screenshot assertions are never blindly retried.
+`artifacts/native-build/` records the toolchain phase, expected/received bytes,
+dependency-resolution attempts and build logs. When a build fails before capture,
+missing screenshot uploads do not add misleading secondary errors. Successful
+capture still requires its expected artifacts.
+
+A push to `ci/android-fixture-*` runs mobile validation and the complete Android
+screenshot/acceptance journey, without an iOS capture or store upload. This lets
+toolchain fixes be verified on a real hosted runner before restarting PR gates.
+
 ## Reading failures
 
 `artifacts/tests/js-*.json` records selected/excluded files, case counts,
