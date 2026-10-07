@@ -12,6 +12,7 @@ const LOAD_SENSITIVE_PATHS=[
   path=>path==='scripts/edge-control.mjs',
   path=>path==='scripts/create-ci-neon-branch.mjs',
   path=>path==='scripts/control-read.mjs',
+  path=>path==='.github/preview-dns-recovery.json',
 ];
 const PRACTICE_PERFORMANCE_PATHS=new Set([
   'scripts/practice-performance.mjs',

@@ -103,14 +103,62 @@ export async function recoverablePreviewDomain({request,zone}={}) {
     {allow404:true});
   return verified?ownedDomain(verified.result,zone):null;
 }
-export async function attachPreviewDomain({request,readContext,sleep=ms=>new Promise(r=>setTimeout(r,ms))}={}) {
+export function recoveryRecordMatches(records,receipt,now=Date.now()) {
+  if(!receipt||receipt.hostname!==HOST||receipt.worker!==WORKER||receipt.type!=='AAAA'||receipt.content!=='100::'||
+    receipt.proxied!==true||!/^[a-f0-9]{32}$/.test(receipt.record_id||'')||
+    !/^[a-f0-9]{40}$/.test(receipt.source_revision||'')||!/^br-[a-z0-9-]+$/.test(receipt.source_branch||'')||
+    ['br-orange-feather-ayps8kep','br-twilight-hill-ayffyd2b'].includes(receipt.source_branch)||
+    !Number.isFinite(Date.parse(receipt.not_after))||now>Date.parse(receipt.not_after)||
+    !Number.isFinite(Date.parse(receipt.created_on))||Date.parse(receipt.not_after)<=Date.parse(receipt.created_on)||
+    Date.parse(receipt.not_after)-Date.parse(receipt.created_on)>86400000||
+    !Array.isArray(records)||records.length!==1)return false;
+  const r=records[0];
+  return r.id===receipt.record_id&&r.name===HOST&&r.type===receipt.type&&r.content===receipt.content&&
+    r.proxied===true&&r.created_on===receipt.created_on&&r.modified_on===receipt.modified_on;
+}
+export async function reviewedPreviewRecovery({request,zone,records,settings,receipt,now=Date.now()}={}) {
+  if(!recoveryRecordMatches(records,receipt,now))return null;
+  const bindings=settings?.result?.bindings;
+  const binding=name=>bindings?.find(b=>b.name===name&&b.type==='plain_text')?.text;
+  const original=binding('RELEASE_COMMIT')===receipt.source_revision&&binding('NEON_BRANCH_ID')===receipt.source_branch;
+  const resumed=binding('PREVIEW_DNS_RECOVERY_ID')===receipt.record_id&&
+    binding('PREVIEW_DNS_RECOVERY_SOURCE_REVISION')===receipt.source_revision&&
+    /^[a-f0-9]{40}$/.test(binding('RELEASE_COMMIT')||'')&&/^br-[a-z0-9-]+$/.test(binding('NEON_BRANCH_ID')||'')&&
+    !['br-orange-feather-ayps8kep','br-twilight-hill-ayffyd2b'].includes(binding('NEON_BRANCH_ID'));
+  if(binding('MODE')!=='preview'||(!original&&!resumed))return null;
+  await verifyRecoveryConflict({request,zone,receipt});
+  return receipt;
+}
+async function verifyRecoveryConflict({request,zone,receipt}) {
+  const changes=(await request(`/accounts/${zone.account.id}/workers/scripts/${WORKER}/domains/changeset?replace_state=false`,
+    {method:'POST',body:[{hostname:HOST,zone_id:zone.id}]}))?.result;
+  if(!changes||!Array.isArray(changes.conflicting)||changes.conflicting.length!==1||
+    changes.conflicting[0].hostname!==HOST||changes.conflicting[0].external_dns_record_id!==receipt.record_id||
+    (changes.conflicting[0].service&&changes.conflicting[0].service!==WORKER)||
+    !Array.isArray(changes.updated)||changes.updated.some(d=>d.hostname===HOST&&d.service!==WORKER)||
+    !Array.isArray(changes.removed)||changes.removed.length)
+    throw Error('Preview DNS recovery does not match the reviewed conflict; refusing to replace it.');
+}
+async function previewDns(zone) {
+  const dns=await cf(`/zones/${zone.id}/dns_records?name=${HOST}&per_page=100`);
+  if(!Array.isArray(dns.result)||(dns.result_info?.total_pages||1)>1)throw Error('Cannot verify the full preview DNS inventory.');
+  return dns.result;
+}
+function recoveryReceipt() {
+  const file='.github/preview-dns-recovery.json';
+  return fs.existsSync(file)?JSON.parse(fs.readFileSync(file,'utf8')):null;
+}
+export async function attachPreviewDomain({request,readContext,revalidateRecovery,
+  sleep=ms=>new Promise(r=>setTimeout(r,ms))}={}) {
   for(let attempt=0;attempt<4;attempt++) {
-    const {zone}=await readContext();
+    const {zone,domain}=await readContext();
+    const overrideDns=!domain&&revalidateRecovery?await revalidateRecovery(zone):false;
     try {
       // Same fixed origin set on every attempt; do not override somebody else's
-      // origin or DNS. Unlike Wrangler's CI defaults, all override flags are false.
+      // origin. DNS replacement is permitted only for the single reviewed
+      // failed-operation record, revalidated immediately before this write.
       await request(`/accounts/${zone.account.id}/workers/scripts/${WORKER}/domains/records`,{method:'PUT',
-        body:{override_scope:false,override_existing_origin:false,override_existing_dns_record:false,
+        body:{override_scope:false,override_existing_origin:false,override_existing_dns_record:overrideDns,
           origins:[{hostname:HOST,zone_id:zone.id}]}});
       const current=await readContext();
       if(!current.domain)throw Error('Preview hostname attachment was not present after installation.');
@@ -176,21 +224,26 @@ async function main(action) {
   if(!process.env.CLOUDFLARE_EDGE_TOKEN)throw Error('Add repository Actions secret CLOUDFLARE_EDGE_TOKEN; see docs/EDGE-OPERATIONS.md.');
   const {zone,domain}=await context();
   if(action==='preflight') {
-    const dns=await cf(`/zones/${zone.id}/dns_records?name=${HOST}&per_page=100`);
-    if(!Array.isArray(dns.result)||(dns.result_info?.total_pages||1)>1)throw Error('Cannot verify the full preview DNS inventory.');
+    const records=await previewDns(zone);
     const settings=await cf(`/accounts/${zone.account.id}/workers/scripts/${WORKER}/settings`,{allow404:true});
     if(settings&&!settings.result.bindings?.some(b=>b.name==='MODE'&&b.type==='plain_text'&&b.text==='preview'))throw Error('Existing Worker is not marked as our preview; refusing to overwrite it.');
-    if(!domain&&dns.result.length) {
+    if(!domain&&records.length) {
       const recovered=settings?await recoverablePreviewDomain({request:cf,zone}):null;
-      if(!recovered) {
-        console.log(JSON.stringify({event:'preview_dns_ownership_unproven',records:dns.result.map(r=>({
+      const reviewed=recovered?null:await reviewedPreviewRecovery({request:cf,zone,records,settings,receipt:recoveryReceipt()});
+      if(!recovered&&!reviewed) {
+        const binding=name=>settings?.result?.bindings?.find(b=>b.name===name&&b.type==='plain_text')?.text;
+        console.log(JSON.stringify({event:'preview_dns_ownership_unproven',
+          worker_revision:/^[a-f0-9]{40}$/.test(binding('RELEASE_COMMIT')||'')?binding('RELEASE_COMMIT'):null,
+          worker_branch:/^br-[a-z0-9-]+$/.test(binding('NEON_BRANCH_ID')||'')?binding('NEON_BRANCH_ID'):null,
+          records:records.map(r=>({
           id:/^[a-f0-9]{32}$/.test(r.id||'')?r.id:null,type:r.type,proxied:r.proxied,
           created_on:r.created_on,modified_on:r.modified_on,
           placeholder:(r.type==='AAAA'&&r.content==='100::')||(r.type==='A'&&r.content==='192.0.2.0'),
         }))}));
         throw Error('Preview DNS already exists without our Worker mapping; refusing to replace it.');
       }
-      console.log('Preview domain ownership verified through the current Worker domain record.');
+      console.log(recovered?'Preview domain ownership verified through the current Worker domain record.':
+        'Preview DNS matches the reviewed failed-operation recovery receipt; no preflight write was performed.');
     }
     variable('CLOUDFLARE_ACCOUNT_ID',zone.account.id);
     console.log('Scoped Cloudflare access and preview hostname ownership verified.');return;
@@ -204,6 +257,21 @@ async function main(action) {
   const branch=process.env.PREVIEW_BRANCH,commit=process.env.GITHUB_SHA;
   checkBranch(branch);
   if(process.env.PREVIEW_CREATED!=='true'||!/^[a-f0-9]{40}$/.test(commit||''))throw Error('Require a newly created isolated branch and exact release revision.');
+  // Establish recovery ownership before overwriting this Worker's revision
+  // bindings. Re-check the exact DNS fingerprint and provider conflict after
+  // the fresh protected origins are installed, immediately before attachment.
+  let recovery=null;
+  if(!domain) {
+    const records=await previewDns(zone);
+    if(records.length) {
+      const settings=await cf(`/accounts/${zone.account.id}/workers/scripts/${WORKER}/settings`,{allow404:true});
+      const recovered=settings?await recoverablePreviewDomain({request:cf,zone}):null;
+      if(!recovered) {
+        recovery=await reviewedPreviewRecovery({request:cf,zone,records,settings,receipt:recoveryReceipt()});
+        if(!recovery)throw Error('Preview DNS already exists without our Worker mapping; refusing to replace it.');
+      }
+    }
+  }
   const origin=randomBytes(32).toString('hex'),preview=randomBytes(32).toString('hex'),quota=randomBytes(32).toString('hex');
   for(const value of [origin,preview,quota])console.log(`::add-mask::${value}`);
   const bin=name=>path.join(process.env.EDGE_TOOLS_DIR,'node_modules/.bin',name);
@@ -242,11 +310,16 @@ async function main(action) {
   const config=JSON.parse(fs.readFileSync('edge/wrangler.json','utf8'));
   config.main=path.resolve('edge/gateway.mjs');config.account_id=zone.account.id;
   config.vars={...config.vars,NEON_BRANCH_ID:branch,RELEASE_COMMIT:commit};
+  if(recovery)config.vars={...config.vars,PREVIEW_DNS_RECOVERY_ID:recovery.record_id,
+    PREVIEW_DNS_RECOVERY_SOURCE_REVISION:recovery.source_revision};
   const configPath=path.join(process.env.RUNNER_TEMP,'edge-wrangler.json');
   fs.writeFileSync(configPath,JSON.stringify(config),{mode:0o600});
   run('wrangler',['deploy','--config',configPath]);
   run('wrangler',['secret','bulk','--config',configPath],JSON.stringify({ORIGIN_SECRET:origin,PREVIEW_KEY:preview,QUOTA_KEY:quota}));
-  await attachPreviewDomain({request:cf,readContext:context});
+  await attachPreviewDomain({request:cf,readContext:context,revalidateRecovery:recovery?async zone=>{
+    if(!recoveryRecordMatches(await previewDns(zone),recovery))throw Error('Preview DNS changed after recovery validation; refusing to replace it.');
+    await verifyRecoveryConflict({request:cf,zone,receipt:recovery});return true;
+  }:undefined});
   // A newly attached hostname or Worker version can lag the control-plane
   // response. Require sustained exact-revision health from fresh TLS
   // connections so one warm edge connection cannot declare propagation done.

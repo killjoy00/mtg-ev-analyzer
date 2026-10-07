@@ -49,6 +49,7 @@ test('capacity-sensitive application and harness paths always require the load r
     'scripts/edge-control.mjs',
     'scripts/create-ci-neon-branch.mjs',
     'scripts/control-read.mjs',
+    '.github/preview-dns-recovery.json',
     'scripts/launch-distributed-run.mjs',
     'scripts/launch-distributed-policy.json',
   ])assert.equal(classifyLaunchChange({files:[file]}).runLoad,true,file);

@@ -1,7 +1,7 @@
 name: isolated launch NAT acceptance
 on:
   pull_request:
-    paths: ['scripts/create-ci-neon-branch.mjs', 'scripts/control-read.mjs', 'scripts/edge-control.mjs', 'tests/ci-provisioning.test.mjs', 'scripts/launch-load*', 'scripts/launch-practice-browser.mjs', '.github/workflows/launch-load.yml']
+    paths: ['.github/preview-dns-recovery.json', 'scripts/create-ci-neon-branch.mjs', 'scripts/control-read.mjs', 'scripts/edge-control.mjs', 'tests/ci-provisioning.test.mjs', 'scripts/launch-load*', 'scripts/launch-practice-browser.mjs', '.github/workflows/launch-load.yml']
   workflow_dispatch:
 permissions:
   contents: read

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {controlRequest} from '../scripts/control-read.mjs';
 import {createCiBranch} from '../scripts/create-ci-neon-branch.mjs';
-import {attachPreviewDomain,detachPreviewDomain,recoverablePreviewDomain} from '../scripts/edge-control.mjs';
+import {attachPreviewDomain,detachPreviewDomain,recoverablePreviewDomain,recoveryRecordMatches,reviewedPreviewRecovery} from '../scripts/edge-control.mjs';
 
 const sleep=async()=>{};
 test('control reads retry transient failures with sanitized errors, writes do not retry blindly',async()=>{
@@ -141,4 +141,49 @@ test('all isolated branch workflows use the bounded provisioner and preserve cle
     assert.match(workflow,/steps\.neon\.outputs\.branch_id/);
     assert.match(workflow,/delete-branch-action/);
   }
+});
+const receipt=JSON.parse(fs.readFileSync('.github/preview-dns-recovery.json','utf8'));
+const record={id:receipt.record_id,name:receipt.hostname,type:receipt.type,content:receipt.content,
+  proxied:receipt.proxied,created_on:receipt.created_on,modified_on:receipt.modified_on};
+const originalSettings={result:{bindings:Object.entries({MODE:'preview',RELEASE_COMMIT:receipt.source_revision,
+  NEON_BRANCH_ID:receipt.source_branch}).map(([name,text])=>({name,type:'plain_text',text}))}};
+const conflict={added:[],removed:[],updated:[],conflicting:[{hostname:receipt.hostname,service:receipt.worker,
+  external_dns_record_id:receipt.record_id}]};
+const recoveryNow=Date.parse(receipt.created_on)+60000;
+test('reviewed recovery pins the record, both timestamps, value, expiry and original Worker revision',async()=>{
+  assert.equal(recoveryRecordMatches([record],receipt,recoveryNow),true);
+  for(const records of [[],[record,record],...[['id','different'],['type','A'],['content','192.0.2.5'],
+    ['proxied',false],['created_on','2026-10-07T05:00:00Z'],['modified_on','2026-10-07T05:00:00Z']]
+    .map(([key,value])=>[{...record,[key]:value}])]) {
+    assert.equal(recoveryRecordMatches(records,receipt,recoveryNow),false);
+  }
+  assert.equal(recoveryRecordMatches([record],receipt,Date.parse(receipt.not_after)+1),false);
+  let writes=0;
+  assert.deepEqual(await reviewedPreviewRecovery({records:[record],receipt,settings:originalSettings,zone,now:recoveryNow,
+    request:async(_route,options)=>{assert.equal(options.method,'POST');writes++;return {result:conflict};}}),receipt);
+  assert.equal(writes,1);
+  assert.equal(await reviewedPreviewRecovery({records:[record],receipt,settings:{result:{bindings:[]}},zone,now:recoveryNow,
+    request:async()=>{assert.fail('unproven Worker must not even evaluate a recovery changeset');}}),null);
+  await assert.rejects(reviewedPreviewRecovery({records:[record],receipt,settings:originalSettings,zone,now:recoveryNow,
+    request:async()=>({result:{...conflict,conflicting:[{...conflict.conflicting[0],external_dns_record_id:'other'}]}})}),/reviewed conflict/);
+});
+test('reviewed recovery can resume only the marked operation on another isolated preview revision',async()=>{
+  const settings={result:{bindings:Object.entries({MODE:'preview',RELEASE_COMMIT:'b'.repeat(40),NEON_BRANCH_ID:'br-new-preview',
+    PREVIEW_DNS_RECOVERY_ID:receipt.record_id,PREVIEW_DNS_RECOVERY_SOURCE_REVISION:receipt.source_revision})
+    .map(([name,text])=>({name,type:'plain_text',text}))}};
+  assert.deepEqual(await reviewedPreviewRecovery({records:[record],receipt,settings,zone,now:recoveryNow,
+    request:async()=>({result:conflict})}),receipt);
+  const production={result:{bindings:settings.result.bindings.map(b=>b.name==='NEON_BRANCH_ID'?{...b,text:parent}:b)}};
+  assert.equal(await reviewedPreviewRecovery({records:[record],receipt,settings:production,zone,now:recoveryNow,
+    request:async()=>{assert.fail('must reject the production branch');}}),null);
+});
+test('DNS override is limited to a receipt revalidated immediately before attachment',async()=>{
+  let installed=false;const events=[];
+  await attachPreviewDomain({sleep,readContext:async()=>({zone,domain:installed?domain:null}),
+    revalidateRecovery:async()=>{events.push('fingerprint-and-conflict');return true;},
+    request:async(_route,o)=>{assert.equal(o.body.override_existing_origin,false);
+      assert.equal(o.body.override_existing_dns_record,true);events.push('write');installed=true;}});
+  assert.deepEqual(events,['fingerprint-and-conflict','write']);
+  await assert.rejects(attachPreviewDomain({sleep,readContext:async()=>({zone,domain:null}),
+    revalidateRecovery:async()=>{throw Error('DNS changed');},request:async()=>assert.fail('changed DNS must never be overwritten')}),/DNS changed/);
 });
