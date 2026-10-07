@@ -249,6 +249,7 @@ export default function CareerScreen() {
           </Pressable>
         </>}
       </View>
+      <View style={styles.stateFooter}><AboutLink /></View>
     </SafeAreaView>
   );
 
@@ -344,4 +345,5 @@ const styles = StyleSheet.create({
   refreshing: { color: colors.muted, fontSize: 12, fontWeight: '700' },
   empty: { color: colors.muted, fontSize: 15, textAlign: 'center', padding: spacing.xl },
   footer: { padding: spacing.lg, gap: spacing.md },
+  stateFooter: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
 });
