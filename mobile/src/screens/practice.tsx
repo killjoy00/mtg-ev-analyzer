@@ -88,6 +88,7 @@ export default function PracticeScreen() {
           <ActivityIndicator color={colors.accent} />
           <Text style={styles.centerBody}>Loading practice options…</Text>
         </View>
+        <View style={styles.stateFooter}><AboutLink /></View>
       </SafeAreaView>
     );
   }
@@ -107,6 +108,7 @@ export default function PracticeScreen() {
             <Text style={styles.primaryButtonText}>Sign in or create an account</Text>
           </Pressable>
         </View>
+        <View style={styles.stateFooter}><AboutLink /></View>
       </SafeAreaView>
     );
   }
@@ -121,6 +123,7 @@ export default function PracticeScreen() {
             <Text style={styles.primaryButtonText}>Try again</Text>
           </Pressable>
         </View>
+        <View style={styles.stateFooter}><AboutLink /></View>
       </SafeAreaView>
     );
   }
