@@ -291,7 +291,7 @@ export async function gateway(request,env,fetcher=fetch) {
     }
     if(mode==='preview'&&previewNetwork&&url.pathname==='/draft/health')headers.set('x-pack1-preview-network',previewNetwork);
     if(mode==='preview'&&request.method==='POST'&&
-      (url.pathname==='/draft/v1/runs'||/^\/draft\/v1\/runs\/[a-f0-9-]+\/reroll$/.test(url.pathname))&&metric.upstream_calls===1)
+      (url.pathname==='/draft/v1/runs'||/^\/draft\/v1\/runs\/[a-f0-9-]+\/(?:reroll|view)$/.test(url.pathname))&&metric.upstream_calls===1)
       headers.set('x-pack1-gateway-timing',JSON.stringify({duration_ms:duration,quota_ms:quota,upstream_ms:upstream}));
     headers.set('x-pack1-admin-api-version',String(ADMIN_API_VERSION));
     headers.set('x-content-type-options','nosniff');
@@ -417,7 +417,8 @@ export async function gateway(request,env,fetcher=fetch) {
     for(const name of ['content-type','retry-after'])if(result.headers.has(name))publicHeaders.set(name,result.headers.get(name));
     if(preview&&match[1]==='draft'&&method==='POST') {
       const timingHeader=match[2]==='/v1/runs'?'x-pack1-start-timing':
-        /^\/v1\/runs\/[a-f0-9-]+\/reroll$/.test(match[2])?'x-pack1-reroll-timing':null;
+        /^\/v1\/runs\/[a-f0-9-]+\/reroll$/.test(match[2])?'x-pack1-reroll-timing':
+        /^\/v1\/runs\/[a-f0-9-]+\/view$/.test(match[2])?'x-pack1-view-timing':null;
       const timing=timingHeader&&result.headers.get(timingHeader);
       if(timing&&timing.length<=1200)publicHeaders.set(timingHeader,timing);
     }

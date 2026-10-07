@@ -58,7 +58,8 @@
     "0051_exact_pick_draw_index.sql",
     "0052_decision_reports.sql",
     "0053_creator_challenges.sql",
-    "0054_creator_event_idempotency.sql"
+    "0054_creator_event_idempotency.sql",
+    "0055_creator_event_write_safety.sql"
   ],
   "same_prefix_order": {
     "0037": [
@@ -164,7 +165,8 @@
         "0051_exact_pick_draw_index.sql",
         "0052_decision_reports.sql",
         "0053_creator_challenges.sql",
-        "0054_creator_event_idempotency.sql"
+        "0054_creator_event_idempotency.sql",
+        "0055_creator_event_write_safety.sql"
       ]
     },
     "daily-calendar": {
@@ -213,7 +215,8 @@
         "0051_exact_pick_draw_index.sql",
         "0052_decision_reports.sql",
         "0053_creator_challenges.sql",
-        "0054_creator_event_idempotency.sql"
+        "0054_creator_event_idempotency.sql",
+        "0055_creator_event_write_safety.sql"
       ]
     },
     "launch-load": {
@@ -237,7 +240,8 @@
         "0051_exact_pick_draw_index.sql",
         "0052_decision_reports.sql",
         "0053_creator_challenges.sql",
-        "0054_creator_event_idempotency.sql"
+        "0054_creator_event_idempotency.sql",
+        "0055_creator_event_write_safety.sql"
       ]
     },
     "launch-distributed": {
@@ -263,7 +267,8 @@
         "0051_exact_pick_draw_index.sql",
         "0052_decision_reports.sql",
         "0053_creator_challenges.sql",
-        "0054_creator_event_idempotency.sql"
+        "0054_creator_event_idempotency.sql",
+        "0055_creator_event_write_safety.sql"
       ]
     }
   }

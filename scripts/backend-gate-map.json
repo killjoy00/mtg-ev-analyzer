@@ -20,7 +20,10 @@
     "worker/origin-telemetry.mjs",
     "game-date.mjs",
     "scripts/verify-neon-schema.mjs",
-    "scripts/load_verified_draft_run.mjs"
+    "scripts/load_verified_draft_run.mjs",
+    "worker/database-retry.mjs",
+    "scripts/creator-event-schema.mjs",
+    ".github/scripts/apply-identity-migration.sh"
   ],
   "domains": {
     "account": {
@@ -73,6 +76,7 @@
         "tests/measurement-report-math.mjs",
         "tests/eight-pick-backend-smoke.mjs",
         "tests/creator-event-migration-rollout.mjs",
+        "tests/creator-event-write-safety.mjs",
         "tests/creator-challenge-backend-smoke.mjs"
       ]
     },

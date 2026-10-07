@@ -1,4 +1,5 @@
 import {createHmac} from 'node:crypto';
+import {retryRolledBackQuery} from './database-retry.mjs';
 import {releaseMetadata} from './release.mjs';
 import {guardIngress} from './ingress-auth.mjs';
 import {classifyRejectedOrigin} from './origin-telemetry.mjs';
@@ -81,23 +82,25 @@ function dbUrl() {
 }
 
 async function query(sql, params = []) {
-  const response = await fetch(dbUrl(), {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'Neon-Connection-String': process.env.DATABASE_URL,
-      'Neon-Raw-Text-Output': 'true',
-      'Neon-Array-Mode': 'true',
-    },
-    body: JSON.stringify({ query: sql, params: params.map((value) => (value == null ? null : String(value))) }),
+  return retryRolledBackQuery(async()=>{
+    const response = await fetch(dbUrl(), {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'Neon-Connection-String': process.env.DATABASE_URL,
+        'Neon-Raw-Text-Output': 'true',
+        'Neon-Array-Mode': 'true',
+      },
+      body: JSON.stringify({ query: sql, params: params.map((value) => (value == null ? null : String(value))) }),
+    });
+    if (!response.ok) throw dbError(response.status, await response.text());
+    const data = await response.json();
+    const names = (data.fields || []).map((field) => field.name);
+    return {
+      rows: (data.rows || []).map((row) => Object.fromEntries(row.map((value, index) => [names[index], value]))),
+      rowCount: Number(data.rowCount || 0),
+    };
   });
-  if (!response.ok) throw dbError(response.status, await response.text());
-  const data = await response.json();
-  const names = (data.fields || []).map((field) => field.name);
-  return {
-    rows: (data.rows || []).map((row) => Object.fromEntries(row.map((value, index) => [names[index], value]))),
-    rowCount: Number(data.rowCount || 0),
-  };
 }
 
 // Constraint violations are part of the contract, not just a failure: callers

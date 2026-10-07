@@ -20,14 +20,14 @@ export function parseStartDiagnostics(headers,route='start') {
   const bounded=(input,keys)=>Object.fromEntries(keys.map(key=>[key,number(input?.[key])]).filter(([,value])=>value!==null));
   let gateway,origin;
   try {gateway=JSON.parse(headers.get('x-pack1-gateway-timing')||'null');}catch{}
-  try {origin=JSON.parse(headers.get(route==='reroll'?'x-pack1-reroll-timing':'x-pack1-start-timing')||'null');}catch{}
+  try {origin=JSON.parse(headers.get(route==='view'?'x-pack1-view-timing':route==='reroll'?'x-pack1-reroll-timing':'x-pack1-start-timing')||'null');}catch{}
   const result={};
   if(gateway)result.gateway=bounded(gateway,['duration_ms','quota_ms','upstream_ms']);
   if(origin?.v===1) {
-    const phases=bounded(origin.phases,route==='reroll'?['player','body','session','metadata','selection','update','response']:
+    const phases=bounded(origin.phases,route==='view'?['player','body','observation']:route==='reroll'?['player','body','session','metadata','selection','update','response']:
       ['player','body','identity','capability','idempotency','quota','selection','session_insert','analytics_insert','response','first_puzzle']);
     const selector={};
-    for(const key of route==='reroll'?['metadata','reroll','other']:['snapshot','candidate','revision','other']) {
+    for(const key of route==='view'?[]:route==='reroll'?['metadata','reroll','other']:['snapshot','candidate','revision','other']) {
       const values=bounded(origin.selector?.[key],['count','sum_ms','max_ms']);
       if(Object.keys(values).length===3&&Number.isInteger(values.count)&&values.count<=20)selector[key]=values;
     }
@@ -71,7 +71,7 @@ export function requestClient({fixture,policy,budget,now,signal,fetcher=fetch,tr
       if(actor)for(const value of (r.headers.getSetCookie?.()||[r.headers.get('set-cookie')||'']).flatMap(s=>s.split(/,\s*(?=__(?:Host|Secure)-pack1_)/))) {
         const [pair]=value.split(';'),eq=pair.indexOf('=');if(eq>0)actor.cookies.set(pair.slice(0,eq),pair.slice(eq+1));
       }
-      return {data,network:r.headers.get('x-pack1-preview-network')};
+      return {data,network:r.headers.get('x-pack1-preview-network'),request_index};
     } catch(error) {
       if(record.status===0) {
         const evidence=transportFailureEvidence(error,transport,{cohortAborted:signal.aborted,elapsedMs:performance.now()-start});record.transport=evidence;
@@ -90,15 +90,18 @@ export async function runPlayerStage({fixture,policy,scope,stage,shard,start_at,
   const report={schema:2,scope,stage,shard,start_at,network,started:0,initial_completed:0,correctness_failures:0,failures:[],root_failure:null,arrival_delay_ms:[],actors:[],requests:[],daily:{},windows};
   const call=async(actor,route,path,body)=>{
     try {
-      const result=(await client(actor,route,path,body,{report,windows})).data;
+      const result=await client(actor,route,path,body,{report,windows});
       // Conservative live abort: a sufficiently populated per-runner route
       // window must also fit the predeclared budgets, not just the final merge.
       const rows=report.requests.filter(r=>r.route===route&&r.ms>0).slice(-200),limit=policy.route_budgets_ms[route];
       if(rows.length>=policy.minimum_rolling_route_samples) {
         const q=quantiles(rows.map(r=>r.ms));
-        if(q.p95_ms>limit.p95||q.p99_ms>limit.p99)throw Object.assign(Error('rolling_route_latency'),{category:'application'});
+        if(q.p95_ms>limit.p95||q.p99_ms>limit.p99)throw Object.assign(Error('rolling_route_latency'),{
+          category:'application',request_index:result.request_index,
+          latency:{route,samples:rows.length,...q,limit_p95_ms:limit.p95,limit_p99_ms:limit.p99},
+        });
       }
-      return result;
+      return result.data;
     } catch(e) {e.category||='application';throw e;}
   };
   const until=async at=>{while(now()<at)await wait(Math.min(1000,at-now()),signal);};
@@ -107,6 +110,7 @@ export async function runPlayerStage({fixture,policy,scope,stage,shard,start_at,
     if(category==='correctness')report.correctness_failures++;
     const reason=/^[a-z0-9_]{1,80}$/.test(e.message)?e.message:category==='correctness'?'assertion_failed':'request_or_generator_failure';
     const failure={category,reason};if(Number.isInteger(e.request_index))failure.request_index=e.request_index;if(e.transport?.label)failure.transport=e.transport.label;
+    if(e.latency)failure.latency=e.latency;
     const request=Number.isInteger(e.request_index)?report.requests[e.request_index]:null;
     if(request?.transport) {
       request.transport.role=request.transport.label==='abort_fallout'?'abort_fallout':report.root_failure?'coincident':'root';
