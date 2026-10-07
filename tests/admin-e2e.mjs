@@ -29,6 +29,7 @@ try {
   let renamedPublicUsername='Test Member',deletionFixture=null,deletionStatusFailure=false;
   let holdDeletionStatus=false,releaseDeletionStatus=null,failDeleteAfterCommit=false;
   let holdHabitReport=true,releaseHabitReport=null,holdStaleCore=false,releaseStaleCore=null;
+  let markStaleCoreHeld;const staleCoreHeld=new Promise(resolve=>{markStaleCoreHeld=resolve;});
   await page.route(/\/health\?quick=1$/,route=>route.fulfill({headers:{'x-pack1-admin-api-version':String(ADMIN_API_VERSION)},json:{ok:true,admin_api_version:ADMIN_API_VERSION,campaign_link_publish_configured:true}}));
   await page.route(/^https:\/\/packone\.pro\/creator\/[^/]+\/creator-card\.png(?:\?.*)?$/,route=>{
     creatorImageRequests+=1;
@@ -109,7 +110,7 @@ try {
     if(path==='/v1/admin/measurements/habits'&&holdHabitReport)await new Promise(resolve=>{releaseHabitReport=resolve;});
     if(path==='/v1/admin/measurements') {
       const band=requestUrl.searchParams.get('difficulty');
-      if(band==='medium'&&holdStaleCore)await new Promise(resolve=>{releaseStaleCore=resolve;});
+      if(band==='medium'&&holdStaleCore)await new Promise(resolve=>{releaseStaleCore=resolve;markStaleCoreHeld();});
       if(band==='hard')await new Promise(resolve=>setTimeout(resolve,25));
       if(band==='medium'||band==='hard')return route.fulfill({json:{...fixture,filters:{...fixture.filters,band},groups:fixture.groups.map((group,index)=>index===0?{...group,label:band==='hard'?'fresh-hard':'stale-medium'}:group)}});
     }
@@ -145,6 +146,7 @@ try {
   const staleRequest=page.waitForRequest(request=>{const u=new URL(request.url());return u.pathname==='/v1/admin/measurements'&&u.searchParams.get('difficulty')==='medium';});
   await page.getByRole('button',{name:'Refresh',exact:true}).click();
   await staleRequest;
+  await staleCoreHeld;
   assert.equal(typeof releaseStaleCore,'function','medium core request must be held before the newer refresh starts');
   await page.getByLabel('Difficulty',{exact:true}).selectOption('hard');
   const freshRequest=page.waitForRequest(request=>{const u=new URL(request.url());return u.pathname==='/v1/admin/measurements'&&u.searchParams.get('difficulty')==='hard';});
