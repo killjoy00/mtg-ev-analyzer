@@ -1,55 +1,5 @@
 [
   {
-    "id": "f295e269-6f34-4fb1-830b-362b29a9f770",
-    "slug": "canary-daily-269df3bf",
-    "status": "retired"
-  },
-  {
-    "id": "cfcd8160-0ed6-4ab7-baca-be4428f007e1",
-    "slug": "canary-daily-3ebce7e9",
-    "status": "retired"
-  },
-  {
-    "id": "f4cddc81-1b93-4cf7-8764-bcc9d0c1a6ec",
-    "slug": "canary-daily-88ac6d76",
-    "status": "retired"
-  },
-  {
-    "id": "7abb53e0-e069-446d-9e6d-3c0643b3dfab",
-    "slug": "canary-practice-04236c86",
-    "status": "retired"
-  },
-  {
-    "id": "e10286c0-580f-4e08-926c-df444916b65e",
-    "slug": "canary-practice-1a144cc5",
-    "status": "retired"
-  },
-  {
-    "id": "ffc7091d-3f08-4376-8d05-c1e29f678a50",
-    "slug": "canary-practice-269df3bf",
-    "status": "retired"
-  },
-  {
-    "id": "61db13e0-4dbe-40e3-9ada-34e8063b1844",
-    "slug": "canary-practice-3ebce7e9",
-    "status": "retired"
-  },
-  {
-    "id": "a1d8a04f-c4d5-4761-9191-a847fc89adb6",
-    "slug": "canary-practice-47a17637",
-    "status": "retired"
-  },
-  {
-    "id": "a7471e62-21cf-4550-a6dc-2b2968e3319c",
-    "slug": "canary-practice-6d03b879",
-    "status": "retired"
-  },
-  {
-    "id": "42d1f9af-b63c-4e6b-90cd-f11940b159cb",
-    "slug": "canary-practice-88ac6d76",
-    "status": "retired"
-  },
-  {
     "id": "d4d2cad1-f48a-4f6c-a44b-d8b042487ff8",
     "slug": "cuberun",
     "status": "published",

@@ -161,15 +161,15 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
     <section data-panel="creator" hidden>
       <p class="muted">Promote one authentic completed Pack One run. The source session remains the gameplay authority; creator score, answers, and serving versions are never entered here.</p>
       <form id="creator-source-form" class="campaign-form">
-        <fieldset><legend>Source run</legend>
+        <fieldset class="creator-source-kind"><legend>Source run</legend>
           <label><input type="radio" name="source_type" value="practice" checked> Shared Practice Run</label>
           <label><input type="radio" name="source_type" value="daily"> Completed Daily</label>
         </fieldset>
-        <div data-creator-source="practice">
+        <div class="creator-source-input" data-creator-source="practice">
           <label>Pack One shared-run URL or ID<input name="share" autocomplete="off" spellcheck="false" placeholder="https://packone.pro/?game=draft-run&shared=…"></label>
           <button type="button" id="resolve-practice">Resolve source</button>
         </div>
-        <div data-creator-source="daily" hidden>
+        <div class="creator-source-input" data-creator-source="daily" hidden>
           <label>Find creator<input name="creator_search" autocomplete="off" placeholder="Display name"></label>
           <button type="button" id="find-creator">Find creator</button>
           <div id="creator-search-results"></div>
@@ -433,13 +433,24 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
   async function loadCreatorChallenges() {
     try {
       const data=await draftRequest('/v1/admin/creator-challenges?limit=100');
+      data.challenges=await Promise.all(data.challenges.map(async challenge=>{
+        const pending=challenge.status==='publishing'
+          ||(challenge.status==='retired'&&challenge.publication_operation_ref&&challenge.publication_detail?.live_verified!==true);
+        if(!pending)return challenge;
+        try {
+          const current=await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/publication`);
+          return current.challenge||challenge;
+        } catch {
+          return challenge;
+        }
+      }));
       creatorSlugs=new Set(data.challenges.map(challenge=>challenge.slug));
       creatorExistingStatus.textContent=data.challenges.length?`${data.challenges.length} creator challenge(s).`:'No creator challenges yet.';
       creatorExisting.replaceChildren(...data.challenges.map(challenge=>{
         const item=document.createElement('article');item.className='note';
         const publicUrl=`https://packone.pro/creator/${challenge.slug}/`,trackedUrl=creatorTrackedUrl(challenge);
         const retiredVerified=challenge.status==='retired'&&challenge.publication_detail?.live_verified===true;
-        item.innerHTML=`<strong>${esc(challenge.creator_public_name)}</strong> · ${esc(challenge.slug)}<br>${esc(challenge.source_type==='daily'?`Daily · ${dateLabel(challenge.source_day)}`:'Practice')} · ${esc(environmentLabel(challenge.source_environment))} · ${Number(challenge.source_score)}/100<br>Status: <strong>${esc(challenge.status)}</strong>${challenge.status==='retired'&&!retiredVerified?' · retired page not yet verified':''} · Opens: ${Number(challenge.opens||0)} · Starts: ${Number(challenge.starts||0)} · Completions: ${Number(challenge.completions||challenge.attempts||0)}<br>Attempts: ${Number(challenge.attempts||0)} · Beat rate: ${challenge.beat_percentage==null?'—':Number(challenge.beat_percentage)+'%'} · Avg challenger: ${challenge.average_score==null?'—':Number(challenge.average_score)+'/100'} · W/T/L: ${Number(challenge.wins||0)}/${Number(challenge.ties||0)}/${Number(challenge.losses||0)}<br><small>${esc(publicUrl)} · created ${esc(dateLabel(String(challenge.created_at||'').slice(0,10)))}${challenge.published_at?` · published ${esc(dateLabel(String(challenge.published_at).slice(0,10))) }`:''}</small><div class="actions">${['draft','failed','publishing'].includes(challenge.status)?'<button type="button" class="secondary" data-resume-publish>Publish / resume</button>':''}${challenge.status==='retired'&&!retiredVerified?'<button type="button" class="secondary" data-resume-retire>Resume retirement</button>':''}<button type="button" class="secondary" data-copy-public>Copy public URL</button><button type="button" class="secondary" data-copy-tracked>Copy tracked URL</button>${challenge.status==='published'?'<button type="button" class="secondary" data-show-kit>Creator kit</button><a class="button secondary" target="_blank" rel="noopener" href="'+esc(publicUrl)+'">Open challenge</a>':''}${challenge.status!=='retired'?'<button type="button" class="secondary" data-retire>Retire challenge</button>':''}</div><section class="note" data-existing-creator-kit hidden></section>`;
+        item.innerHTML=`<strong>${esc(challenge.creator_public_name)}</strong> · ${esc(challenge.slug)}<br>${esc(challenge.source_type==='daily'?`Daily · ${dateLabel(challenge.source_day)}`:'Practice')} · ${esc(environmentLabel(challenge.source_environment))} · ${Number(challenge.source_score)}/100<br>Status: <strong>${esc(challenge.status)}</strong>${challenge.status==='retired'&&!retiredVerified?' · retired page not yet verified':''} · Opens: ${Number(challenge.opens||0)} · Starts: ${Number(challenge.starts||0)} · Completions: ${Number(challenge.completions||challenge.attempts||0)}<br>Attempts: ${Number(challenge.attempts||0)} · Beat rate: ${challenge.beat_percentage==null?'—':Number(challenge.beat_percentage)+'%'} · Avg challenger: ${challenge.average_score==null?'—':Number(challenge.average_score)+'/100'} · W/T/L: ${Number(challenge.wins||0)}/${Number(challenge.ties||0)}/${Number(challenge.losses||0)}<br><small>${esc(publicUrl)} · created ${esc(dateLabel(String(challenge.created_at||'').slice(0,10)))}${challenge.published_at?` · published ${esc(dateLabel(String(challenge.published_at).slice(0,10))) }`:''}</small><div class="actions">${['draft','failed','publishing'].includes(challenge.status)?'<button type="button" class="secondary" data-resume-publish>Publish / resume</button>':''}${challenge.status==='retired'&&!retiredVerified?'<button type="button" class="secondary" data-resume-retire>Finish delete</button>':''}<button type="button" class="secondary" data-copy-public>Copy public URL</button><button type="button" class="secondary" data-copy-tracked>Copy tracked URL</button>${challenge.status==='published'?'<button type="button" class="secondary" data-show-kit>Creator kit</button><a class="button secondary" target="_blank" rel="noopener" href="'+esc(publicUrl)+'">Open challenge</a>':''}${challenge.status!=='retired'?'<button type="button" class="secondary" data-retire>Delete</button>':''}</div><section class="note" data-existing-creator-kit hidden></section>`;
         item.querySelector('[data-copy-public]').onclick=()=>copy(publicUrl,creatorExistingStatus);
         item.querySelector('[data-copy-tracked]').onclick=()=>copy(trackedUrl,creatorExistingStatus);
         item.querySelector('[data-show-kit]')?.addEventListener('click',()=>{
@@ -458,22 +469,22 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
           } catch(error){creatorExistingStatus.textContent=error.message||'Could not publish challenge.';}
         });
         item.querySelector('[data-resume-retire]')?.addEventListener('click',async()=>{
-          creatorExistingStatus.textContent='Resuming privacy-safe retirement publication…';
+          creatorExistingStatus.textContent='Finishing delete…';
           try {
             await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/publication`,{action:'retire'});
             await waitForCreatorPublication(challenge,'retired');
-            creatorExistingStatus.textContent='Retired page verified live.';
+            creatorExistingStatus.textContent='Delete finished.';
             await loadCreatorChallenges();
-          } catch(error){creatorExistingStatus.textContent=error.message||'Could not finish retiring challenge.';}
+          } catch(error){creatorExistingStatus.textContent=error.message||'Could not finish deleting challenge.';}
         });
         item.querySelector('[data-retire]')?.addEventListener('click',async()=>{
-          if(!confirm(`Retire ${challenge.creator_public_name} / ${challenge.slug}? The URL will no longer start new challenge attempts.`))return;
+          if(!confirm(`Delete ${challenge.creator_public_name} / ${challenge.slug}? New challenge attempts will stop and any published URL will show an unavailable page.`))return;
           try {
             await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/publication`,{action:'retire'});
-            creatorExistingStatus.textContent='Challenge retired. Publishing the privacy-safe retired route…';
+            creatorExistingStatus.textContent='Deleting challenge. Publishing its unavailable page…';
             await waitForCreatorPublication(challenge,'retired');
             await loadCreatorChallenges();
-          } catch(error){creatorExistingStatus.textContent=error.message||'Could not retire challenge.';}
+          } catch(error){creatorExistingStatus.textContent=error.message||'Could not delete challenge.';}
         });
         return item;
       }));
