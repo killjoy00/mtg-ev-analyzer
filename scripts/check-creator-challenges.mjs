@@ -20,10 +20,11 @@ export async function checkCreatorChallenges({root=process.cwd()}={}) {
     const expected=renderCreatorChallengePage(entry);
     if(current===null)problems.push(`missing creator page: creator/${entry.slug}/index.html`);
     else if(current!==expected)problems.push(`stale creator page: creator/${entry.slug}/index.html`);
-    const card=path.join(root,'creator',entry.slug,'creator-card.png');
-    const hasCard=await exists(card);
-    if(entry.status==='published'&&!hasCard)problems.push(`missing creator social card: creator/${entry.slug}/creator-card.png`);
-    if(entry.status==='retired'&&hasCard)problems.push(`retired creator route retains social card: creator/${entry.slug}/creator-card.png`);
+    for(const asset of ['creator-card.png','creator-card-square.png']) {
+      const card=path.join(root,'creator',entry.slug,asset),hasCard=await exists(card);
+      if(entry.status==='published'&&!hasCard)problems.push(`missing creator social card: creator/${entry.slug}/${asset}`);
+      if(entry.status==='retired'&&hasCard)problems.push(`retired creator route retains social card: creator/${entry.slug}/${asset}`);
+    }
   }
   const expected=new Set(creator.map(entry=>entry.slug));
   const routeRoot=path.join(root,'creator');
