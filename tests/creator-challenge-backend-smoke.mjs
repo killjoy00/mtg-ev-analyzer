@@ -110,9 +110,13 @@ function mergeFunctionSql(path) {
   const source=fs.readFileSync(path,'utf8');
   const signature='CREATE OR REPLACE FUNCTION merge_pack1_player(source_player uuid, target_player uuid)';
   const start=source.indexOf(signature);
-  const end=source.indexOf('\n'+'
-  assert.ok(start>=0&&end>start,'merge function missing from '+path);
-  return source.slice(start,end+4);
+  const boundary=path.endsWith('0054_creator_event_idempotency.sql')
+    ?source.indexOf('\nCOMMIT;',start)
+    :source.length;
+  const bodyEnd=source.lastIndexOf('END;',boundary);
+  const terminatorEnd=source.indexOf(';',bodyEnd+4);
+  assert.ok(start>=0&&bodyEnd>start&&terminatorEnd>bodyEnd,'merge function missing from '+path);
+  return source.slice(start,terminatorEnd+1);
 }
 
 const tag=crypto.randomUUID().slice(0,8);
