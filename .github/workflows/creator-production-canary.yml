@@ -110,14 +110,17 @@ jobs:
           git push --force origin "HEAD:refs/heads/${branch}"
           pr_url="$(gh pr create --base main --head "$branch" --title "Clean retired creator canary static artifacts" --body "Automated cleanup after the production creator canary verified its privacy-safe retired routes. Removes only creator/canary-* static routes and matching registry entries.")"
           echo "Cleanup PR: $pr_url" >> "$GITHUB_STEP_SUMMARY"
-          check_count=0
+          test_run=""
+          e2e_run=""
           for attempt in $(seq 1 60); do
-            check_count="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${head_sha}/check-runs" --jq '.total_count')"
-            if [[ "$check_count" -gt 0 ]]; then break; fi
+            runs="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?event=pull_request&head_sha=${head_sha}&per_page=100")"
+            test_run="$(jq -r '.workflow_runs[] | select(.path==".github/workflows/test.yml") | .id' <<<"$runs" | head -1)"
+            e2e_run="$(jq -r '.workflow_runs[] | select(.path==".github/workflows/e2e.yml") | .id' <<<"$runs" | head -1)"
+            if [[ -n "$test_run" && -n "$e2e_run" ]]; then break; fi
             sleep 2
           done
-          [[ "$check_count" -gt 0 ]] || {
-            echo "::error::Cleanup PR checks never registered; refusing to merge."
+          [[ -n "$test_run" && -n "$e2e_run" ]] || {
+            echo "::error::Cleanup PR test/e2e workflows never registered; refusing to merge."
             exit 1
           }
           gh pr checks "$pr_url" --watch --fail-fast --interval 10
