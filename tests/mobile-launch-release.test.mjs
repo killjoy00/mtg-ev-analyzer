@@ -319,7 +319,7 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
 
 test('privacy page exposes the stable Play deletion resource and fallback request path', () => {
   const privacy = read('privacy/index.html');
-  assert.match(privacy, /<h2 id="delete-account">Deleting your account<\/h2>/);
+  assert.match(privacy, /<h2 id="delete-account">Retention and deleting your account<\/h2>/);
   assert.match(privacy, /mailto:admin@packone\.pro/);
   assert.match(privacy, />admin@packone\.pro<\/a>/);
 

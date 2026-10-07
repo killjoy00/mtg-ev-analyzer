@@ -227,29 +227,29 @@ try {
   assert.equal((await page.locator('.profile-toggle small').textContent())?.trim(),'Let players view your Pack One record from leaderboards and shared links.');
   const toggleBox=await page.locator('.profile-toggle').boundingBox();
   assert.ok(toggleBox&&toggleBox.height>=43.5,'public profile row is a full touch target');
-  const topSave=page.locator('button[form="profile-settings-form"][type="submit"]');
-  assert.equal(await topSave.count(),1,'Save profile is visible in the editor heading');
-  assert.equal(await page.locator('.profile-settings-heading-row').getByRole('link',{name:'Change name'}).count(),1);
+  const saveProfile=page.locator('#profile-settings-form button[type="submit"]');
+  assert.equal(await saveProfile.count(),1,'Save profile is available with the profile fields');
+  assert.equal(await page.locator('.profile-settings-heading-row').getByRole('link',{name:'Change name'}).count(),0,'Account settings do not duplicate the display-name action');
 
   updateMode='success';
   await page.locator('input[name="displayName"]').fill('Leaderboard Ace');
   await page.locator('select[name="favoriteSetId"]').selectOption('ktk');
   await page.locator('select[name="showcaseAchievement"]').selectOption('top10');
-  await topSave.click();
+  await saveProfile.click();
   await page.getByText('Profile saved.',{exact:true}).waitFor();
   assert.deepEqual(updatePayload, { displayName:'Leaderboard Ace', profilePublic:true, favoriteSetId:'ktk', showcaseAchievement:'top10', acceptPublicIdentityTerms:true });
   await page.waitForFunction(() => localStorage.getItem('pack1-player-name-v1') === 'Leaderboard Ace');
 
   updateMode='taken';
   await page.locator('input[name="displayName"]').fill('Taken Name');
-  await topSave.click();
+  await saveProfile.click();
   await page.getByText('That display name is already taken.',{exact:true}).waitFor();
   assert.equal(await page.locator('input[name="displayName"]').inputValue(),'Taken Name');
   assert.match((await page.locator('#profile-save-status').textContent())||'',/Profile not saved/);
 
   updateMode='not_allowed';
   await page.locator('input[name="displayName"]').fill('Pack One Support');
-  await topSave.click();
+  await saveProfile.click();
   await page.getByText('That display name is not allowed.',{exact:true}).waitFor();
   assert.equal(await page.locator('input[name="displayName"]').inputValue(),'Pack One Support');
   assert.match((await page.locator('#profile-save-status').textContent())||'',/Profile not saved/);
@@ -257,7 +257,7 @@ try {
   updateMode='network';
   await page.locator('input[name="displayName"]').fill('Unsaved Edit');
   await page.locator('select[name="favoriteSetId"]').selectOption('neo');
-  await topSave.click();
+  await saveProfile.click();
   await page.getByText(/Your edits are still here\./).waitFor();
   assert.equal(await page.locator('input[name="displayName"]').inputValue(),'Unsaved Edit');
   assert.equal(await page.locator('select[name="favoriteSetId"]').inputValue(),'neo');
@@ -265,7 +265,7 @@ try {
   updateMode='placeholder';
   await page.locator('input[name="displayName"]').fill('Pack Player');
   await page.locator('input[name="profilePublic"]').uncheck();
-  await topSave.click();
+  await saveProfile.click();
   await page.getByText('Profile saved.',{exact:true}).waitFor();
   assert.equal(await page.locator('#profile-display-name-error').textContent(),'Choose a display name to join Daily leaderboards.');
   assert.deepEqual(updatePayload, {

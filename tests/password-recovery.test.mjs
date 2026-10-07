@@ -23,7 +23,7 @@ function dbResponse(fields=[],rows=[],rowCount=0) {
   return Response.json({fields:fields.map(name=>({name})),rows,rowCount});
 }
 
-function installFetch({providerStatus=200,verificationStatus=200,attempts=1,recovery='valid'}={}) {
+function installFetch({providerStatus=200,verificationStatus=200,providerRetryAfter=null,attempts=1,recovery='valid'}={}) {
   const calls=[];
   globalThis.fetch=async(url,options={})=>{
     const target=String(url),body=options.body?JSON.parse(options.body):null;
@@ -51,7 +51,9 @@ function installFetch({providerStatus=200,verificationStatus=200,attempts=1,reco
       if(target.endsWith('/admin/update-user'))
         return verificationStatus===200?Response.json({status:true}):Response.json({message:'verification update failed'},{status:verificationStatus});
       if(target.endsWith('/sign-out'))return Response.json({status:true});
-      return providerStatus===200?Response.json({status:true}):Response.json({message:'provider rejected'},{status:providerStatus});
+      return providerStatus===200
+        ? Response.json({status:true})
+        : Response.json({message:'provider rejected'},{status:providerStatus,headers:providerRetryAfter?{'retry-after':String(providerRetryAfter)}:{}});
     }
     throw Error('Unexpected fetch '+target);
   };
@@ -116,11 +118,26 @@ test('verification resend ignores browser callback input, is enumeration-safe, a
   assert.ok(unknownCalls.some(x=>x.kind==='provider'));
 });
 
-test('verification resend rate limit blocks provider delivery',async()=>{
+test('verification resend rate limit blocks provider delivery and exposes cooldown metadata',async()=>{
   const calls=installFetch({attempts:6});
   const response=await growth.fetch(request('/v1/account/send-verification-email',{email:'verify@example.com'}));
+  const body=await response.json();
   assert.equal(response.status,429);
+  assert.equal(body.code,'VERIFICATION_COOLDOWN');
+  assert.ok(Number(body.retryAfter)>=1);
+  assert.ok(Number(response.headers.get('retry-after'))>=1);
   assert.equal(calls.some(x=>x.kind==='provider'),false);
+});
+
+test('verification resend preserves provider cooldown instead of reporting a false success',async()=>{
+  const calls=installFetch({providerStatus:429,providerRetryAfter:90});
+  const response=await growth.fetch(request('/v1/account/send-verification-email',{email:'verify@example.com'}));
+  const body=await response.json();
+  assert.equal(response.status,429);
+  assert.equal(body.code,'VERIFICATION_COOLDOWN');
+  assert.equal(body.retryAfter,90);
+  assert.equal(response.headers.get('retry-after'),'90');
+  assert.ok(calls.some(x=>x.kind==='provider'&&x.url.endsWith('/send-verification-email')));
 });
 
 test('reset request ignores hostile redirect inputs and sends only the exact server destination',async()=>{

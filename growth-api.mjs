@@ -63,7 +63,15 @@ async function raw(path,{method='GET',body,headers=new Headers(),credentials=fir
     keepalive,
   });
   const data=await response.json().catch(()=>({}));
-  if(!response.ok)throw Object.assign(new Error(data.error||data.message||`Pack 1 API failed (${response.status}).`),{status:response.status,code:data.code||null});
+  if(!response.ok) {
+    const retryHeader=response.headers.get('retry-after');
+    const parsedRetry=Number(retryHeader);
+    throw Object.assign(new Error(data.error||data.message||`Pack 1 API failed (${response.status}).`),{
+      status:response.status,
+      code:data.code||null,
+      retryAfter:Number(data.retryAfter)>0?Math.ceil(Number(data.retryAfter)):(Number.isFinite(parsedRetry)&&parsedRetry>0?Math.ceil(parsedRetry):null),
+    });
+  }
   return data;
 }
 

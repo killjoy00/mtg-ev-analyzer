@@ -19,6 +19,7 @@ let nextLinkNewlyClaimed=false;
 let nextLinkRankingReason=null;
 let linkBodies=[];
 let resendBodies=[];
+let resendCooldown=false;
 
 const accountUser={id:'22222222-2222-4222-8222-222222222222',email:'qa@example.invalid',name:'QA Player'};
 const completedRun={
@@ -71,7 +72,12 @@ await page.route('https://api.packone.pro/growth/**',async route=>{
     }
   } else if(path==='/v1/account/send-verification-email') {
     resendBodies.push(route.request().postDataJSON());
-    body={ok:true,message:"If an unverified account exists for that email, we've sent a verification link."};
+    if(resendCooldown) {
+      status=429;
+      body={error:'Please wait before requesting another verification link.',code:'VERIFICATION_COOLDOWN',retryAfter:90};
+      return route.fulfill({status,headers:{'retry-after':'90'},contentType:'application/json',body:JSON.stringify(body)});
+    }
+    body={ok:true,message:"Request accepted. If that address belongs to an unverified Pack One account, a new verification link will be sent."};
   } else if(path==='/v1/account/link-browser') {
     const input=route.request().postDataJSON();
     linkBodies.push(input);
@@ -122,7 +128,7 @@ await page.route('https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.ne
 });
 
 async function fresh({source='nav',validateDailyRunId=null,intent=null,width=390}={}) {
-  signed=false;verificationRequired=false;delaySignup=false;delaySignin=false;delayGoogle=false;googleStartFails=false;unverifiedSignin=false;nextLinkNewlyClaimed=false;nextLinkRankingReason=null;linkBodies=[];resendBodies=[];
+  signed=false;verificationRequired=false;delaySignup=false;delaySignin=false;delayGoogle=false;googleStartFails=false;unverifiedSignin=false;nextLinkNewlyClaimed=false;nextLinkRankingReason=null;linkBodies=[];resendBodies=[];resendCooldown=false;
   await page.setViewportSize({width,height:width<700?844:900});
   await page.goto(base+'/tests/auth-context-harness.html');
   await page.waitForFunction(()=>Boolean(window.__renderAccount));
@@ -325,8 +331,12 @@ try {
   await unverified.getByRole('button',{name:'Sign in',exact:true}).click();
   await page.getByText('Verify your email to finish creating your account. Check your inbox or send a new link.',{exact:true}).waitFor();
   await page.getByRole('button',{name:'Send a new verification link',exact:true}).click();
-  await page.getByText("If an unverified account exists for that email, we've sent a verification link.",{exact:true}).waitFor();
+  await page.getByText("Request accepted. If that address belongs to an unverified Pack One account, a new verification link will be sent.",{exact:true}).waitFor();
   assert.deepEqual(resendBodies.at(-1),{email:'qa@example.invalid'});
+  resendCooldown=true;
+  await page.getByRole('button',{name:'Send a new verification link',exact:true}).click();
+  await page.getByText('Cooldown active. Try again in about 2 minutes.',{exact:true}).waitFor();
+  assert.equal(await page.locator('[data-state="cooldown"]').count(),1);
 
   // A first account claim routes through the compact account-ready step.
   await fresh({source:'nav'});
