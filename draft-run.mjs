@@ -111,10 +111,21 @@ function replayRankCandidates(candidates) {
     return String(a.name).localeCompare(String(b.name));
   });
 }
+const REPLAY_COLOUR_STAGE_COMPONENTS=new Set([
+  'traditional-premier-v3-v1',
+  'traditional-premier-v3-phase2-v1',
+  'traditional-cube-p2p7-v3-v1',
+  'traditional-premier-v4-phase2-v1',
+  'traditional-cube-p2p7-v4-v1',
+  'traditional-premier-v5-phase2-v1',
+  'traditional-cube-p2p7-v5-v1',
+]);
 function replaySupportSharpening(corpusVersion) {
-  // Frozen from the direct-ratio v3 implementation at 26039b7. Traditional
-  // component support was added later and must not retroactively change replay.
-  return String(corpusVersion).includes('-colour-stage-')?1.75:2;
+  // Freeze the component inventory that uses colour-stage display calibration.
+  // Adding a future component must require a scoring-profile decision rather
+  // than silently changing supports on already-recorded v3 sessions.
+  return String(corpusVersion).includes('-colour-stage-')
+    ||REPLAY_COLOUR_STAGE_COMPONENTS.has(String(corpusVersion))?1.75:2;
 }
 function replayCalibratedSupports(candidates,exponent) {
   if(!Number.isFinite(exponent)||exponent<=0)throw Error('Invalid support calibration.');
