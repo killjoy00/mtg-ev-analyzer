@@ -1,6 +1,6 @@
 {
   "operation": "deploy-gateway",
-  "source_sha": "effcde36bfd5c4e4f9d137ea0a574a08f6f7e43b",
-  "production_run_id": "37247837110",
-  "reason": "Promote the gateway matching the accepted admin current-corpus and progressive-report release from PR #962. Production Functions for this exact source passed Daily and account-linked Practice acceptance on deploy run 37247837110. Publish admin API contract v2 and the matching admin routes while preserving production quota identity, corpus pointers, and serving state."
+  "source_sha": "0875c5b15de7110181a327759b12f753bb7b2d0f",
+  "production_run_id": "37659073903",
+  "reason": "Promote the gateway from PR #1052. NetworkQuota now keeps all of a network's buckets in one Durable Object row and arms its cleanup alarm once per active network, which cuts billed row writes per admitted request from three to one. Limits, 429 bodies and Retry-After are unchanged. Counters stored under the previous per-bucket layout are still read, so quota identity and live windows survive the deploy. Production Functions for this exact source passed Daily and account-linked Practice acceptance on deploy run 37659073903. Admin API contract stays at v3."
 }
