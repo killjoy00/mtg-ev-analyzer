@@ -10,6 +10,7 @@ import {
 import { Text } from '@/src/components/Text';
 
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
+import { AboutLink } from '@/src/components/AboutLink';
 
 import {
   loadPracticeCapabilities,
@@ -249,6 +250,7 @@ export default function PracticeScreen() {
           </Text>
           <Pressable accessibilityRole="button" onPress={() => router.push('/membership')} style={styles.secondaryButton}><Text style={styles.cardAction}>Membership & access →</Text></Pressable>
         </View>
+        <AboutLink />
       </ScrollView>
     </SafeAreaView>
   );
