@@ -35,11 +35,49 @@ const result=await query(`SELECT
   (SELECT count(*)=2 FROM information_schema.columns WHERE table_name='draft_run_sessions' AND column_name IN ('creator_challenge_id','creator_participant_auth_user_id')) creator_challenge_session_columns,
   EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='draft_run_creator_challenge_participant_uq') creator_challenge_participant_idempotency,
   to_regprocedure('pack1_creator_event_player_lock(uuid)') IS NOT NULL creator_challenge_event_player_lock,
-  to_regprocedure('pack1_creator_event_insert_guard()') IS NOT NULL creator_challenge_event_insert_guard_function,
-  EXISTS(SELECT 1 FROM pg_trigger WHERE tgname='creator_challenge_event_insert_guard' AND NOT tgisinternal) creator_challenge_event_insert_guard_trigger,
-  EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='analytics_creator_challenge_event_uq') creator_challenge_event_idempotency,
-  EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='analytics_creator_challenge_funnel_idx') creator_challenge_funnel_index,
-  position('pack1_creator_event_player_lock' in pg_get_functiondef('merge_pack1_player(uuid,uuid)'::regprocedure))>0 creator_challenge_merge_event_dedupe,
+  to_regprocedure('pack1_creator_event_write_guard()') IS NOT NULL creator_challenge_event_write_guard_function,
+  to_regprocedure('pack1_creator_event_update_dedupe()') IS NOT NULL creator_challenge_event_update_dedupe_function,
+  EXISTS(
+    SELECT 1 FROM pg_trigger t
+    WHERE t.tgname='creator_challenge_event_insert_guard'
+      AND t.tgrelid='analytics_events'::regclass
+      AND t.tgenabled IN ('O','A')
+      AND t.tgfoid='pack1_creator_event_write_guard()'::regprocedure
+  ) creator_challenge_event_insert_guard_trigger,
+  EXISTS(
+    SELECT 1 FROM pg_trigger t
+    WHERE t.tgname='creator_challenge_event_update_guard'
+      AND t.tgrelid='analytics_events'::regclass
+      AND t.tgenabled IN ('O','A')
+      AND t.tgfoid='pack1_creator_event_write_guard()'::regprocedure
+  ) creator_challenge_event_update_guard_trigger,
+  EXISTS(
+    SELECT 1 FROM pg_trigger t
+    WHERE t.tgname='creator_challenge_event_update_dedupe'
+      AND t.tgrelid='analytics_events'::regclass
+      AND t.tgenabled IN ('O','A')
+      AND t.tgfoid='pack1_creator_event_update_dedupe()'::regprocedure
+  ) creator_challenge_event_update_dedupe_trigger,
+  to_regclass('analytics_creator_challenge_event_uq') IS NULL creator_challenge_event_no_merge_hostile_unique_index,
+  EXISTS(
+    SELECT 1 FROM pg_class idx
+    JOIN pg_index i ON i.indexrelid=idx.oid
+    WHERE idx.relname='analytics_creator_challenge_event_lookup_idx'
+      AND i.indrelid='analytics_events'::regclass
+      AND i.indisvalid
+      AND NOT i.indisunique
+      AND pg_get_expr(i.indpred,i.indrelid) LIKE '%creator_challenge_id%'
+  ) creator_challenge_event_lookup_index,
+  EXISTS(
+    SELECT 1 FROM pg_class idx
+    JOIN pg_index i ON i.indexrelid=idx.oid
+    WHERE idx.relname='analytics_creator_challenge_funnel_idx'
+      AND i.indrelid='analytics_events'::regclass
+      AND i.indisvalid
+      AND pg_get_expr(i.indpred,i.indrelid) LIKE '%creator_challenge_id%'
+  ) creator_challenge_funnel_index,
+  position('pack1_creator_event_player_lock' in pg_get_functiondef('merge_pack1_player(uuid,uuid)'::regprocedure))>0
+    AND position('creator_funnel_ranked' in pg_get_functiondef('merge_pack1_player(uuid,uuid)'::regprocedure))>0 creator_challenge_merge_event_dedupe,
   EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='game_results' AND column_name='creator_challenge_id') creator_challenge_result_attribution,
   to_regprocedure('pack1_fill_creator_challenge_result()') IS NOT NULL creator_challenge_result_fill_function,
   to_regprocedure('pack1_prepare_creator_challenge_player_merge()') IS NOT NULL creator_challenge_merge_guard_function,
