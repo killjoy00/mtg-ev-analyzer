@@ -60,6 +60,16 @@ export function creatorChallengeDescription(entry) {
   return `${valid.creator_name} scored ${valid.score}/100 on a Pack One ${environment} Practice run. Play the same eight decisions.`;
 }
 
+export function creatorChallengeImageAlt(entry) {
+  const valid=validateCreatorPageEntries([entry])[0];
+  if(valid.status!=='published')return 'Pack One creator challenge unavailable.';
+  const environment=envLabel(valid.environment);
+  const run=valid.source_type==='daily'
+    ? `${environment} Daily, ${dayLabel(valid.source_day)}`
+    : `${environment} Practice`;
+  return `Pack One Beat the Creator challenge for ${valid.creator_name}: creator score ${valid.score} out of 100, ${run}. Play the same eight draft decisions.`;
+}
+
 export function creatorChallengeTrackedUrl(entry) {
   const valid=validateCreatorPageEntries([entry])[0];
   if(valid.status!=='published')throw Error('Retired creator challenges do not have a tracked play URL.');
@@ -81,7 +91,7 @@ export function renderCreatorChallengePage(entry) {
 <body data-creator-challenge-id="${valid.id}" data-creator-challenge-status="retired"><main><h1>This creator challenge is no longer available.</h1><p><a href="https://packone.pro/">Back to Pack One</a></p></main></body></html>
 `;
   const description=creatorChallengeDescription(valid),tracked=creatorChallengeTrackedUrl(valid);
-  const image=`${canonical}creator-card.png`;
+  const imageAlt=creatorChallengeImageAlt(valid),image=`${canonical}creator-card.png`;
   return `${GENERATED_CREATOR_MARKER}
 <!doctype html>
 <html lang="en">
@@ -97,12 +107,12 @@ export function renderCreatorChallengePage(entry) {
   <meta property="og:image" content="${image}" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta property="og:image:alt" content="${html(valid.headline)}" />
+  <meta property="og:image:alt" content="${html(imageAlt)}" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${html(valid.headline)}" />
   <meta name="twitter:description" content="${html(description)}" />
   <meta name="twitter:image" content="${image}" />
-  <meta name="twitter:image:alt" content="${html(valid.headline)}" />
+  <meta name="twitter:image:alt" content="${html(imageAlt)}" />
   <link rel="canonical" href="${canonical}" />
   <title>${html(valid.headline)} · Pack One</title>
   <script>location.replace(${JSON.stringify(tracked)});</script>
