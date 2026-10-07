@@ -1,20 +1,25 @@
 import { useState } from 'react';
+import { useLocalSearchParams } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ArticleScreen } from '@/src/components/ArticleScreen';
 import { Text } from '@/src/components/Text';
 import { fontLicenses } from '@/src/fontLicenses';
+import { config } from '@/src/config';
 import { termsSections } from '@/src/nativeEditorial';
 import { colors, spacing } from '@/src/theme';
 
 export default function TermsScreen() {
-  const [licensesOpen, setLicensesOpen] = useState(false);
+  const params = useLocalSearchParams<{ licenses?: string }>();
+  const previewLicensesOpen = config.screenshots.fixtures && params.licenses === '1';
+  const [licensesOpen, setLicensesOpen] = useState(previewLicensesOpen);
   return (
     <ArticleScreen
       kicker="Policy"
       title="Terms"
       deck="Terms for using Pack One, including scoring limitations, licensing and attribution, advertising and affiliate disclosures, external links, and independence."
       sections={termsSections}
+      scrollToEnd={previewLicensesOpen}
       footer={(
         <View style={styles.licenses}>
           <Text style={styles.title}>Font licenses</Text>
