@@ -14,6 +14,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Exercise settlement and safe diagnostics regressions at the reviewed source
+        run: node --test tests/launch-distributed-capacity.test.mjs
       - uses: actions/download-artifact@v4
         with:
           name: launch-load-37577080040
