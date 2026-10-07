@@ -9,6 +9,11 @@ const {default:growth,query}=await import('../worker/growth-function.js');
 const {default:runApi}=await import('../worker/draft-run-function.mjs');
 const {creatorChallengeById,createCreatorChallenge}=await import('../worker/creator-challenges.mjs');
 const {
+  DRAFT_RUN_SCORING_V3_LEGACY_PROFILE,
+  DRAFT_RUN_SCORING_V3_LINEAR_PROFILE,
+  gradeDraftRunPickForVersion,
+}=await import('../draft-run.mjs');
+const {
   beginCreatorPublicationOperation,
   dispatchCreatorPublicationAttempt,
   requestCreatorPrivacyRetirement,
@@ -108,6 +113,7 @@ const guestCompleted=await call(growth,'/v1/session',{displayName:'Merge Guest C
 const guestPartial=await call(growth,'/v1/session',{displayName:'Merge Guest Partial '+tag});
 const replayGuest=await call(growth,'/v1/session',{displayName:'Creator Replay Guest '+tag});
 const concurrentGuest=await call(growth,'/v1/session',{displayName:'Creator Concurrent Guest '+tag});
+const legacyReplayGuest=await call(growth,'/v1/session',{displayName:'Creator Legacy Replay Guest '+tag});
 const dailyFirstGuest=await call(growth,'/v1/session',{displayName:'Creator Daily First '+tag});
 const paidModeGuest=await call(growth,'/v1/session',{displayName:'Creator Paid Mode Guest '+tag});
 const targetAuth=crypto.randomUUID(),creatorAuth=crypto.randomUUID(),creatorAccountToken=crypto.randomUUID()+crypto.randomUUID();
@@ -190,7 +196,92 @@ try {
     concurrentGuest.playerId,runtimeChallenge,
   ])).rows[0].n),1,'database insert guard serializes concurrent creator opens');
 
-  const publicOne=await directCall(runApi,`/v1/creator-challenges/${runtimeSlug}`,undefined,replayGuest.token);
+  // A creator source recorded under the first v3 implementation must start a
+  // challenger session with the resolved historical scoring profile, not the
+  // current global scorer. Build one valid synthetic decision from an existing
+  // verified puzzle so the two v3 floating-point paths differ by one point.
+  const templatePuzzleIds=template.answers.map(answer=>answer.puzzle.puzzle_id);
+  const templatePuzzleRows=await query(
+    'SELECT puzzle_id,payload FROM draft_run_verified_puzzles WHERE puzzle_id=ANY($1::text[])',
+    ['{'+templatePuzzleIds.join(',')+'}'],
+  );
+  const payloadById=new Map(templatePuzzleRows.rows.map(row=>[
+    row.puzzle_id,
+    typeof row.payload==='string'?JSON.parse(row.payload):structuredClone(row.payload),
+  ]));
+  const firstPayload=structuredClone(payloadById.get(templatePuzzleIds[0]));
+  assert.ok(firstPayload&&firstPayload.candidates.length>=4,'legacy scoring fixture needs one verified pack');
+  const [leader,selected,third,historical]=firstPayload.candidates;
+  leader.model_probability=.19;
+  selected.model_probability=.027;
+  third.model_probability=.0135;
+  historical.model_probability=.00675;
+  for(const card of firstPayload.candidates.slice(4))card.model_probability=.001;
+  firstPayload.historical_pick_id=historical.id;
+  const syntheticPuzzleId=crypto.randomUUID().replaceAll('-','');
+  firstPayload.puzzle_id=syntheticPuzzleId;
+  assert.equal(gradeDraftRunPickForVersion(firstPayload,selected.id,DRAFT_RUN_SCORING_V3_LEGACY_PROFILE).score,13);
+  assert.equal(gradeDraftRunPickForVersion(firstPayload,selected.id,DRAFT_RUN_SCORING_V3_LINEAR_PROFILE).score,14);
+  await query(`INSERT INTO draft_run_verified_puzzles
+    SELECT (jsonb_populate_record(NULL::draft_run_verified_puzzles,
+      to_jsonb(source)||jsonb_build_object('puzzle_id',$2::text,'payload',$3::jsonb)
+    )).*
+    FROM draft_run_verified_puzzles source
+    WHERE source.puzzle_id=$1`,[
+    templatePuzzleIds[0],syntheticPuzzleId,JSON.stringify(firstPayload),
+  ]);
+
+  const legacySourceId=crypto.randomUUID();
+  const legacyPuzzleIds=[syntheticPuzzleId,...templatePuzzleIds.slice(1)];
+  const legacyPayloads=[firstPayload,...templatePuzzleIds.slice(1).map(id=>payloadById.get(id))];
+  const legacyAnswers=legacyPayloads.map((puzzle,index)=>{
+    const selectedId=index===0?selected.id:puzzle.historical_pick_id;
+    const grade=gradeDraftRunPickForVersion(puzzle,selectedId,DRAFT_RUN_SCORING_V3_LEGACY_PROFILE);
+    return {...grade,puzzle:{puzzle_id:puzzle.puzzle_id,set_id:puzzle.set_id,pick_number:puzzle.pick_number}};
+  });
+  const legacyScore=Math.round(legacyAnswers.reduce((sum,answer)=>sum+answer.score,0)/legacyAnswers.length);
+  await query(`INSERT INTO draft_run_sessions
+    SELECT (jsonb_populate_record(NULL::draft_run_sessions,
+      to_jsonb(source)||jsonb_build_object(
+        'id',$2::text,
+        'seed','legacy-creator-'||$2::text,
+        'scoring_version','trophy-consensus-v3',
+        'puzzle_ids',$3::jsonb,
+        'answers',$4::jsonb,
+        'score',$5::int,
+        'created_at','2026-09-16T00:00:00Z',
+        'updated_at','2026-09-16T00:00:00Z',
+        'result_persisted_at',NULL
+      )
+    )).*
+    FROM draft_run_sessions source
+    WHERE source.id=$1::uuid`,[
+    template.id,legacySourceId,JSON.stringify(legacyPuzzleIds),JSON.stringify(legacyAnswers),legacyScore,
+  ]);
+  const legacyChallenge=crypto.randomUUID(),legacySlug=`legacy-score-${tag}`;
+  await query(`INSERT INTO creator_challenges(
+      id,slug,source_session_id,source_owner_player_id,source_type,source_day,source_environment,
+      creator_public_name,headline,acquisition_source,acquisition_campaign,status,
+      created_by_admin_auth_user_id,published_at,publication_detail
+    ) VALUES($1::uuid,$2,$3::uuid,$4::uuid,'practice',NULL,'mixed',
+      'Legacy Score Creator','Legacy scoring replay','creator',$2,'published',
+      $5::uuid,now(),'{"live_verified":true}'::jsonb)`,[
+    legacyChallenge,legacySlug,legacySourceId,creator.playerId,targetAuth,
+  ]);
+  let legacyReplay=await directCall(runApi,'/v1/runs',{creatorChallenge:legacyChallenge},legacyReplayGuest.token);
+  assert.equal(legacyReplay.scoring_version,DRAFT_RUN_SCORING_V3_LEGACY_PROFILE,
+    'creator start persists the resolved historical scoring profile');
+  assert.equal(legacyReplay.current.puzzle_id,syntheticPuzzleId);
+  legacyReplay=await directCall(runApi,`/v1/runs/${legacyReplay.id}/pick`,{
+    revision:legacyReplay.revision,
+    round:0,
+    puzzleId:syntheticPuzzleId,
+    cardId:selected.id,
+  },legacyReplayGuest.token);
+  assert.equal(legacyReplay.answers[0].score,13,
+    'creator gameplay dispatches through the session-pinned historical scorer');
+
+    const publicOne=await directCall(runApi,`/v1/creator-challenges/${runtimeSlug}`,undefined,replayGuest.token);
   const publicTwo=await directCall(runApi,`/v1/creator-challenges/${runtimeSlug}`,undefined,replayGuest.token);
   assert.equal(publicOne.id,runtimeChallenge);assert.equal(publicTwo.id,runtimeChallenge);
   assert.equal('answers' in publicOne,false,'public challenge metadata never serializes creator decisions');
