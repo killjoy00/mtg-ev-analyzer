@@ -9,6 +9,7 @@ permissions:
 concurrency:
   group: pack1-gateway-preview
   cancel-in-progress: false
+  queue: max
 jobs:
   operate:
     if: github.ref == 'refs/heads/main'

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {controlRequest} from '../scripts/control-read.mjs';
 import {createCiBranch} from '../scripts/create-ci-neon-branch.mjs';
-import {attachPreviewDomain,detachPreviewDomain,recoverablePreviewDomain,recoveryRecordMatches,reviewedPreviewRecovery} from '../scripts/edge-control.mjs';
+import {attachPreviewDomain,detachPreviewDomain,recoverablePreviewDomain,recoveryRecordMatches,reviewedPreviewRecovery,verifyRecoveryConflict} from '../scripts/edge-control.mjs';
 
 const sleep=async()=>{};
 test('control reads retry transient failures with sanitized errors, writes do not retry blindly',async()=>{
@@ -177,6 +177,12 @@ test('reviewed recovery can resume only the marked operation on another isolated
   assert.equal(await reviewedPreviewRecovery({records:[record],receipt,settings:production,zone,now:recoveryNow,
     request:async()=>{assert.fail('must reject the production branch');}}),null);
 });
+test('provider-managed recovery does not enable DNS replacement when there is no external conflict',async()=>{
+  const request=async()=>({result:{...conflict,conflicting:[]}});
+  assert.equal(await verifyRecoveryConflict({request,zone,receipt}),false);
+  assert.deepEqual(await reviewedPreviewRecovery({records:[record],receipt,settings:originalSettings,zone,now:recoveryNow,request}),receipt);
+  assert.equal(await verifyRecoveryConflict({zone,receipt,request:async()=>({result:conflict})}),true);
+});
 test('DNS override is limited to a receipt revalidated immediately before attachment',async()=>{
   let installed=false;const events=[];
   await attachPreviewDomain({sleep,readContext:async()=>({zone,domain:installed?domain:null}),
@@ -186,4 +192,13 @@ test('DNS override is limited to a receipt revalidated immediately before attach
   assert.deepEqual(events,['fingerprint-and-conflict','write']);
   await assert.rejects(attachPreviewDomain({sleep,readContext:async()=>({zone,domain:null}),
     revalidateRecovery:async()=>{throw Error('DNS changed');},request:async()=>assert.fail('changed DNS must never be overwritten')}),/DNS changed/);
+});
+test('shared preview workflows queue both acceptance jobs while preserving exclusive access',()=>{
+  for(const name of ['launch-load','launch-distributed','edge-preview','capacity-dispatch-once']) {
+    const flow=fs.readFileSync(`.github/workflows/${name}.yml`,'utf8');
+    const concurrency=flow.split('concurrency:\n')[1].split(/\n(?:jobs:|\n)/)[0];
+    assert.match(concurrency,/group: pack1-gateway-preview/);
+    assert.match(concurrency,/cancel-in-progress: false/);
+    assert.match(concurrency,/queue: max/);
+  }
 });

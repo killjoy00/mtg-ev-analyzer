@@ -129,15 +129,28 @@ export async function reviewedPreviewRecovery({request,zone,records,settings,rec
   await verifyRecoveryConflict({request,zone,receipt});
   return receipt;
 }
-async function verifyRecoveryConflict({request,zone,receipt}) {
+export async function verifyRecoveryConflict({request,zone,receipt}) {
   const changes=(await request(`/accounts/${zone.account.id}/workers/scripts/${WORKER}/domains/changeset?replace_state=false`,
     {method:'POST',body:[{hostname:HOST,zone_id:zone.id}]}))?.result;
-  if(!changes||!Array.isArray(changes.conflicting)||changes.conflicting.length!==1||
-    changes.conflicting[0].hostname!==HOST||changes.conflicting[0].external_dns_record_id!==receipt.record_id||
-    (changes.conflicting[0].service&&changes.conflicting[0].service!==WORKER)||
-    !Array.isArray(changes.updated)||changes.updated.some(d=>d.hostname===HOST&&d.service!==WORKER)||
+  console.log(JSON.stringify({event:'preview_dns_recovery_changeset',counts:Object.fromEntries(
+    ['added','removed','updated','conflicting'].map(k=>[k,Array.isArray(changes?.[k])?changes[k].length:null]))}));
+  if(!changes||!Array.isArray(changes.conflicting)||
+    !Array.isArray(changes.updated)||changes.updated.some(d=>d.hostname===HOST&&d.service&&d.service!==WORKER)||
     !Array.isArray(changes.removed)||changes.removed.length)
     throw Error('Preview DNS recovery does not match the reviewed conflict; refusing to replace it.');
+  // A provider-managed orphan may already be reusable without an external DNS
+  // conflict. In that case keep DNS override disabled; receipt acceptance is
+  // not permission to force replacement.
+  if(!changes.conflicting.length)return false;
+  if(changes.conflicting.length===1&&changes.conflicting[0].hostname===HOST&&
+    changes.conflicting[0].external_dns_record_id===receipt.record_id&&
+    (!changes.conflicting[0].service||changes.conflicting[0].service===WORKER))return true;
+  console.log(JSON.stringify({event:'preview_recovery_conflict_mismatch',conflicts:changes.conflicting.length,
+    matching_hostname:changes.conflicting.filter(d=>d.hostname===HOST).map(d=>({
+      dns_id:/^[a-f0-9]{32}$/.test(d.external_dns_record_id||'')?d.external_dns_record_id:null,
+      foreign_service:Boolean(d.service&&d.service!==WORKER),
+    }))}));
+  throw Error('Preview DNS recovery does not match the reviewed conflict; refusing to replace it.');
 }
 async function previewDns(zone) {
   const dns=await cf(`/zones/${zone.id}/dns_records?name=${HOST}&per_page=100`);
@@ -318,7 +331,7 @@ async function main(action) {
   run('wrangler',['secret','bulk','--config',configPath],JSON.stringify({ORIGIN_SECRET:origin,PREVIEW_KEY:preview,QUOTA_KEY:quota}));
   await attachPreviewDomain({request:cf,readContext:context,revalidateRecovery:recovery?async zone=>{
     if(!recoveryRecordMatches(await previewDns(zone),recovery))throw Error('Preview DNS changed after recovery validation; refusing to replace it.');
-    await verifyRecoveryConflict({request:cf,zone,receipt:recovery});return true;
+    return await verifyRecoveryConflict({request:cf,zone,receipt:recovery});
   }:undefined});
   // A newly attached hostname or Worker version can lag the control-plane
   // response. Require sustained exact-revision health from fresh TLS
