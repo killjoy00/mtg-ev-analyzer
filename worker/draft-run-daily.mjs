@@ -8,7 +8,7 @@ export const DAILY_SCHEDULE_SELECT='SELECT puzzle_ids,corpus_version,scoring_ver
 
 const unavailable=message=>Object.assign(new Error(message),{status:503});
 
-export async function ensureDailySchedule(query,day,environment) {
+async function buildDailySchedule(query,day,environment) {
   let schedule=(await query(DAILY_SCHEDULE_SELECT,[day,environment])).rows[0];
   if(schedule)return {schedule,created:false};
   let featuredSets=environment!=='powered-cube'
@@ -29,4 +29,33 @@ export async function ensureDailySchedule(query,day,environment) {
   schedule=(await query(DAILY_SCHEDULE_SELECT,[day,environment])).rows[0];
   if(!schedule)throw unavailable('Daily schedule unavailable.');
   return {schedule,created:Boolean(inserted.rows.length)};
+}
+
+// Coalesce only overlapping work on the same database adapter. The database
+// (day, environment) key remains authoritative across processes; completed
+// requests are never cached, and each caller receives its own schedule object.
+export function createDailyScheduleEnsurer(build=buildDailySchedule) {
+  const adapters=new WeakMap();
+  return async function ensure(query,day,environment) {
+    let pending=adapters.get(query);
+    if(!pending){pending=new Map();adapters.set(query,pending);}
+    const key=JSON.stringify([day,environment]),existing=pending.get(key);
+    if(existing) {
+      const result=await existing;
+      return {schedule:structuredClone(result.schedule),created:false};
+    }
+    const work=Promise.resolve().then(()=>build(query,day,environment));
+    pending.set(key,work);
+    try {
+      const result=await work;
+      return {schedule:structuredClone(result.schedule),created:result.created};
+    } finally {
+      if(pending.get(key)===work)pending.delete(key);
+      if(!pending.size)adapters.delete(query);
+    }
+  };
+}
+const sharedDailyScheduleEnsurer=createDailyScheduleEnsurer();
+export async function ensureDailySchedule(query,day,environment) {
+  return sharedDailyScheduleEnsurer(query,day,environment);
 }

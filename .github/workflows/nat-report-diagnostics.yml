@@ -1,12 +1,11 @@
-name: inspect distributed rolling latency failure
+name: daily concurrency regression
 on:
   push:
     branches: ['diagnostics/1051-nat-report']
 permissions:
   contents: read
-  actions: read
 jobs:
-  report:
+  test:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -14,69 +13,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: distributed-capacity-1-runner-*
-          path: failed-report
-          github-token: ${{ github.token }}
-          repository: ${{ github.repository }}
-          run-id: 37581124840
-      - name: Print sanitized route and selector evidence for failed stage 50
-        run: |
-          node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          import path from 'node:path';
-          import {quantiles} from './scripts/launch-distributed-core.mjs';
-          const root='failed-report',files=fs.readdirSync(root,{recursive:true}),reports=[];
-          const safe=q=>q&&({index:q.index,route:q.route,endpoint:q.endpoint,period:q.endpoint==='leaderboard'?['daily','week','season','all'][q.actor%4]:undefined,phase:q.phase,status:q.status,at:q.at,ms:q.ms,diagnostics:q.diagnostics,transport:q.transport});
-          for(const file of files) {
-            if(!/^distributed-1-\d\.json$/.test(path.basename(file)))continue;
-            const r=JSON.parse(fs.readFileSync(path.join(root,file),'utf8'));reports.push(r);
-            const f=r.root_failure;
-            console.log(JSON.stringify({shard:r.shard,root_failure:f&&{category:f.category,reason:f.reason,request_index:f.request_index,latency:f.latency,transport:f.transport},
-              triggering_request:safe(r.requests.find(q=>q.index===f?.request_index)),
-              requests:r.requests.length,failures:r.failures,correctness_failures:r.correctness_failures,
-              slowest:r.requests.slice().sort((a,b)=>b.ms-a.ms).slice(0,10).map(safe)},null,2));
-          }
-          const requests=reports.flatMap(r=>r.requests);
-          for(const route of [...new Set(requests.map(q=>q.route))])console.log(JSON.stringify({route,...quantiles(requests.filter(q=>q.route===route).map(q=>q.ms))}));
-          NODE
-      - name: Read retained timing for the exact slow requests
-        env:
-          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
-        run: |
-          node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          import path from 'node:path';
-          import assert from 'node:assert/strict';
-          import {previewAccount,queryPreviewEvents,previewTelemetryFailure} from './scripts/launch-distributed-telemetry.mjs';
-          const root='failed-report',files=fs.readdirSync(root,{recursive:true}).filter(f=>/^distributed-1-\d\.json$/.test(path.basename(f)));
-          const reports=files.map(f=>JSON.parse(fs.readFileSync(path.join(root,f),'utf8'))),sha=reports[0].scope.sha;
-          assert.match(sha,/^[a-f0-9]{40}$/);
-          const slow=reports.flatMap(r=>r.requests).filter(q=>q.route==='read'&&q.ms>=3000);
-          const from=Math.floor(Math.min(...slow.map(q=>q.at)))-5000,to=Math.ceil(Math.max(...slow.map(q=>q.at+q.ms)))+5000;
-          const retained=[];
-          const fetcher=async(...args)=>{
-            const response=await fetch(...args);
-            if(String(args[0]).includes('/telemetry/query')) {
-              const data=await response.clone().json().catch(()=>null);
-              for(const row of data?.result?.events?.events||[]) {
-                let p=row.source;
-                if(typeof p==='string')try{p=JSON.parse(p);}catch{continue;}
-                if(!p||typeof p!=='object')try{p=JSON.parse(row?.$metadata?.message);}catch{continue;}
-                if(p?.event!=='gateway_request'||p.release!==sha||p.duration_ms<3000)continue;
-                const number=v=>Number.isFinite(v)&&v>=0?v:null;
-                retained.push({route:/^[a-z_]{1,40}$/.test(p.route)?p.route:'other',status:number(p.status),
-                  duration_ms:number(p.duration_ms),quota_ms:number(p.quota_ms),upstream_ms:number(p.upstream_ms),
-                  upstream_calls:number(p.upstream_calls),upstream_status:number(p.upstream_status),
-                  error:['timeout','invalid_body','gateway_failure'].includes(p.error)?p.error:null});
-              }
-            }
-            return response;
-          };
-          try {
-            const account=await previewAccount({fetcher});
-            await queryPreviewEvents(fetcher,process.env.CLOUDFLARE_EDGE_TOKEN,account,from,to);
-            console.log(JSON.stringify({slow_retained_requests:retained}));
-          } catch(error) {console.log(JSON.stringify({retained_read_failed:previewTelemetryFailure(error)}));process.exitCode=1;}
-          NODE
+      - name: Exercise overlapping Daily generation
+        run: node --test tests/daily-schedule-concurrency.test.mjs
