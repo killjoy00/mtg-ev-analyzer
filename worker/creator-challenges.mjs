@@ -90,9 +90,16 @@ async function validateHistoricalPuzzles(query,source) {
     // retain the per-candidate ranking scores that were shown for that exact
     // historical pack. Use all available recorded scores to identify the
     // implementation instead of guessing from a commit/deploy timestamp.
-    const recordedScores=new Map([[answer.selectedId,Number(answer.score)]]);
+    const selectedScore=Number(answer.score);
+    if(!Number.isFinite(selectedScore))
+      fail('Creator source answer score is invalid.',409,'CREATOR_SOURCE_SCORING_VERSION');
+    const recordedScores=new Map([[answer.selectedId,selectedScore]]);
     if(Array.isArray(answer.ranking))for(const item of answer.ranking) {
-      if(item?.id&&Number.isFinite(Number(item.score)))recordedScores.set(item.id,Number(item.score));
+      if(!item?.id||!Number.isFinite(Number(item.score)))continue;
+      const recorded=Number(item.score);
+      if(recordedScores.has(item.id)&&recordedScores.get(item.id)!==recorded)
+        fail('Creator source contains conflicting historical scoring evidence.',409,'CREATOR_SOURCE_SCORING_VERSION');
+      recordedScores.set(item.id,recorded);
     }
     matchingProfiles=matchingProfiles.filter(profile=>
       [...recordedScores].every(([cardId,recorded])=>
@@ -257,6 +264,7 @@ const CREATOR_STATS_JOINS=`
       FROM analytics_events e
       JOIN players ep ON ep.id=e.player_id
       WHERE e.event_name IN ('creator_challenge_open','creator_challenge_started')
+        AND e.event_props ? 'creator_challenge_id'
         AND e.event_props->>'creator_challenge_id'=c.id::text
         AND NOT coalesce(ep.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
         AND NOT EXISTS (
