@@ -299,6 +299,9 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   assert.ok(androidStatusRequest.reason.trim().length > 0);
 
   assert.match(ios, /CFBundleShortVersionString/);
+  assert.match(ios, /MARKETING_VERSION="\$expected_marketing_version"/);
+  assert.match(ios, /config\.version !== process\.argv\[4\]/);
+  assert.doesNotMatch(ios, /'marketing version': rf'MARKETING_VERSION/);
   assert.match(ios, /testFlightInternalTestingOnly[\s\S]*<false\/>/);
   assert.match(ios, /app-store-finalize-release-candidate\.mjs/);
   const iosFinalize = read('.github/scripts/app-store-finalize-release-candidate.mjs');

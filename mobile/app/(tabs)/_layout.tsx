@@ -1,5 +1,5 @@
-import { Tabs, router } from 'expo-router';
-import { Pressable, StyleSheet, View, useWindowDimensions, type ColorValue, type LayoutChangeEvent } from 'react-native';
+import { Tabs } from 'expo-router';
+import { StyleSheet, View, useWindowDimensions, type ColorValue, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/src/components/Text';
@@ -22,8 +22,6 @@ export default function TabLayout() {
       header: ({ options }) => <View style={{ backgroundColor: colors.surface, paddingTop: insets.top, paddingLeft: Math.max(insets.left, 16), paddingRight: Math.max(insets.right, 16) }}>
         <View style={styles.headerRow} onLayout={event => recordHeader('row', options.title, event)}>
           <Text accessibilityRole="header" style={styles.headerTitle} onLayout={event => recordHeader('title', options.title, event)}>{options.title}</Text>
-          <Pressable accessibilityRole="button" accessibilityLabel="Help and information" onPress={() => router.push('/help')}
-            onLayout={event => recordHeader('help', options.title, event)} style={styles.help}><Text style={styles.noticeText}>Help</Text></Pressable>
         </View>
       </View>,
       tabBarActiveTintColor: colors.accentDark, tabBarInactiveTintColor: colors.muted,
@@ -49,8 +47,5 @@ const styles = StyleSheet.create({
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 8, minHeight: 56 },
   headerTitle: { color: colors.ink, fontSize: 24, fontWeight: '700', flex: 1, minWidth: 0 },
   shell: { flex: 1, backgroundColor: colors.page },
-  notice: { padding: 12, backgroundColor: colors.accentSoft },
-  noticeText: { color: colors.accentDark, fontSize: 14, fontWeight: '600' },
   checking: { color: colors.muted, padding: 8, fontSize: 14 },
-  help: { minWidth: 48, minHeight: 44, justifyContent: 'center', paddingHorizontal: 4 },
 });

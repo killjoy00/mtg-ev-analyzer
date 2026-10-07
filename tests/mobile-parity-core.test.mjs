@@ -17,6 +17,7 @@ const [
   accountStateHook,
   accountLayout,
   homeScreen,
+  careerScreen,
   publicProfileScreen,
   webHowTo,
   webScoring,
@@ -35,6 +36,7 @@ const [
   readFile(new URL('../mobile/src/hooks/useAccountState.ts', import.meta.url), 'utf8'),
   readFile(new URL('../mobile/app/_layout.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../mobile/src/screens/index.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/src/screens/career.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../mobile/app/profile.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../how-it-works/index.html', import.meta.url), 'utf8'),
   readFile(new URL('../scoring/index.html', import.meta.url), 'utf8'),
@@ -59,8 +61,10 @@ test('native Draft Run keeps web feedback and result-review parity', () => {
   assert.match(draftScreen, /Thanks \\u2014 report sent\./);
   assert.match(draftApi, /Application\.nativeApplicationVersion/);
   assert.match(draftApi, /Application\.nativeBuildVersion/);
-  assert.match(draftApi, /native\.Platform\.OS === 'ios'/);
-  assert.match(draftApi, /import\('expo-application'\)/);
+  assert.match(draftApi, /import \* as Application from 'expo-application'/);
+  assert.match(draftApi, /import \{ Platform \} from 'react-native'/);
+  assert.match(draftApi, /Platform\.OS === 'ios'/);
+  assert.doesNotMatch(draftApi, /import\('expo-application'\)|import\('react-native'\)/);
   assert.match(draftScreen, /Model&apos;s strongest choice/);
   assert.match(draftScreen, /Compare all/);
   assert.match(draftScreen, /Your \{run\.run_length\} picks/);
@@ -111,6 +115,13 @@ test('native instructional copy preserves current web Daily eligibility semantic
 });
 
 
+test('My Pack One exposes Stats and Account settings at the top', () => {
+  assert.match(careerScreen, />Stats<\/Text>/);
+  assert.match(careerScreen, />Account settings<\/Text>/);
+  assert.match(careerScreen, /accessibilityRole="tab"/);
+  assert.match(careerScreen, /router\.push\('\/account'\)/);
+});
+
 test('native Account keeps auth on /account and splits signed-in management into flat routes', () => {
   assert.match(accountScreen, /Profile &amp; visibility/);
   assert.match(accountScreen, /router\.push\('\/account-profile'\)/);
@@ -128,6 +139,12 @@ test('native Account keeps auth on /account and splits signed-in management into
   assert.match(homeScreen, /name_not_allowed/);
   assert.match(homeScreen, /That display name is not allowed\. Choose another to join Daily leaderboards\./);
   assert.match(homeScreen, /Choose a different display name\. That one is already taken\./);
+  assert.match(homeScreen, /\{isComplete \? 'View result' : 'Play now'\}/);
+  assert.match(homeScreen, /isComplete \? styles\.secondaryButton : styles\.primaryButton/);
+  assert.match(homeScreen, /minHeight: 50/);
+  assert.doesNotMatch(homeScreen, /View Leaders/);
+  assert.doesNotMatch(homeScreen, /Explore Practice/);
+  assert.doesNotMatch(homeScreen, /\/3 complete/);
   assert.match(accountProfileScreen, /if \(!account \|\| !profile\)/);
   assert.match(accountSecurityScreen, /if \(!account\)/);
   assert.match(accountDeleteScreen, /if \(!account\)/);

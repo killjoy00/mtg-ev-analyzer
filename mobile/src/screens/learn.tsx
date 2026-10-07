@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/src/components/Text';
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
+import { AboutLink } from '@/src/components/AboutLink';
 
 import { useNavigationSession } from '@/src/navigation/session';
 import HowToScreen from '@/src/screens/how-to';
@@ -75,6 +76,7 @@ export default function LearnScreen() {
         <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/draft-run', params: { environment: 'mixed' } })} style={styles.playButton}>
           <Text style={styles.playText}>Play Daily Draft Run</Text>
         </Pressable>
+        <AboutLink />
       </ScrollView>
     </SafeAreaView>
   );

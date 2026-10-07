@@ -51,6 +51,7 @@ async function fixture(t, options = {}) {
   let params = { key: options.key ?? KEY_A }; let focus; let resume; let locked = false;
   const priorFetch = globalThis.fetch;
   const mocks = {
+    'expo-application': { nativeApplicationVersion: '1.0', nativeBuildVersion: '1' },
     'expo-router': {
       router: { push(value) { pushes.push(value); }, back() { backs += 1; } }, useLocalSearchParams: () => params,
       useFocusEffect(callback) { React.useEffect(() => { focus = callback; const cleanup = callback(); return () => { if (focus === callback) focus = null; cleanup?.(); }; }, [callback]); },
