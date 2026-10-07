@@ -16,6 +16,7 @@ import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 import { AboutLink } from '@/src/components/AboutLink';
 
 import { ApiError } from '@/src/api/client';
+import { config } from '@/src/config';
 import {
   finishAppleSignIn,
   finishGoogleSignIn,
@@ -414,7 +415,15 @@ export default function AccountScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive">
+      <ScrollView
+        onLayout={() => {
+          if (config.screenshots.fixtures) console.info('PACKONE_ACCOUNT_READY');
+        }}
+        contentContainerStyle={styles.page}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="interactive"
+      >
         <Text style={styles.eyebrow}>PACK ONE ACCOUNT</Text>
 
         {busy && !session ? <ActivityIndicator color={colors.accent} /> : null}
