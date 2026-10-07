@@ -1,0 +1,25 @@
+name: Isolated capacity repair validation
+on:
+  push:
+    branches: ['ci/capacity-repair-1054']
+permissions:
+  contents: read
+  checks: read
+  pull-requests: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node --test tests/network-quota-recovery.test.mjs tests/network-quota-policy.test.mjs tests/ingress.test.mjs tests/launch-distributed-capacity.test.mjs
+  capacity:
+    needs: regression
+    uses: ./.github/workflows/launch-distributed-preview.yml
+    with:
+      require_performance: 'false'
+      capacity_target: '25'
+    secrets: inherit
