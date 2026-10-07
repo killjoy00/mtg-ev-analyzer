@@ -3,10 +3,12 @@ import assert from 'node:assert/strict';
 import {checkBranch} from './edge-control.mjs';
 import {summarize} from './practice-performance.mjs';
 import {seededRandom} from '../gameplay.mjs';
+import {selectNatPolicy} from './launch-load-core.mjs';
+import {parseStartDiagnostics} from './launch-distributed-player.mjs';
 
 async function main() {
 
-const policy=JSON.parse(fs.readFileSync('scripts/launch-load-policy.json','utf8'));
+const policy=selectNatPolicy(JSON.parse(fs.readFileSync('scripts/launch-load-policy.json','utf8')),process.env.PACK1_CAPACITY_TARGET??'25');
 const fixture=JSON.parse(fs.readFileSync(process.env.LOAD_FIXTURE_FILE,'utf8'));
 checkBranch(fixture.branch);
 assert.equal(fixture.branch,process.env.PREVIEW_BRANCH);
@@ -35,10 +37,13 @@ for(const population of policy.nat_stages) {
     if(actor.cookies.size)headers.cookie=[...actor.cookies].map(([k,v])=>k+'='+v).join('; ');
     if(actor.csrf)headers['x-pack1-csrf']=actor.csrf;
     if(path==='/draft/v1/runs'&&!body.daily)headers['x-idempotency-key']=crypto.randomUUID();
-    const record={route,status:0,ms:0};stage.requests.push(record);
+    const record={route,actor:actor.index,status:0,ms:0};
+    if(route==='start')record.start={daily:body.daily===true,environment:body.environment};
+    stage.requests.push(record);
     try {
       const r=await fetch(base+path,{method:body===undefined?'GET':'POST',headers,body:body===undefined?undefined:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(Math.max(1,Math.min(30000,deadline-Date.now())))});
       record.status=r.status;
+      const diagnostics=parseStartDiagnostics(r.headers,route);if(diagnostics)record.diagnostics=diagnostics;
       const data=await r.json();
       if(r.status===429){record.scopes=data.scopes||[];record.retry_after=Number(r.headers.get('retry-after'));}
       for(const value of (r.headers.getSetCookie?.()||[r.headers.get('set-cookie')||'']).flatMap(s=>s.split(/,\s*(?=__(?:Host|Secure)-pack1_)/))) {
@@ -59,7 +64,7 @@ for(const population of policy.nat_stages) {
     if(stopped)return;
     stage.arrival_delay_ms.push(Date.now()-scheduled);stage.started++;
     const user=fixture.users[(population+index)%fixture.users.length],guest=index%10<5,practice=index%10>=8;
-    const actor={cookies:new Map(),csrf:null};
+    const actor={index,cookies:new Map(),csrf:null};
     const attach=()=>{actor.cookies.set('__Host-pack1_account',user.account);actor.cookies.set('__Secure-pack1_csrf',user.csrf);actor.csrf=user.csrf;};
     if(!guest){actor.cookies.set('__Host-pack1_player',user.token);attach();}
     try {

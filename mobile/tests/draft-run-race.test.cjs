@@ -1,9 +1,6 @@
+const { compileModule } = require('./support/compile-module.cjs');
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const fs = require('node:fs');
-const path = require('node:path');
-const Module = require('node:module');
-const ts = require('typescript');
 const React = require('react');
 const TestRenderer = require('react-test-renderer');
 
@@ -39,38 +36,10 @@ function renderedText(node) {
 }
 
 function compileDraftRunScreen(mocks) {
-  const filename = path.join(process.cwd(), 'app', 'draft-run.tsx');
-  const source = fs.readFileSync(filename, 'utf8');
-  const output = ts.transpileModule(source, {
-    compilerOptions: {
-      target: ts.ScriptTarget.ES2022,
-      module: ts.ModuleKind.CommonJS,
-      jsx: ts.JsxEmit.ReactJSX,
-      esModuleInterop: true,
-    },
-    fileName: filename,
-  }).outputText;
-
-  const compiled = new Module(filename, module);
-  compiled.filename = filename;
-  compiled.paths = Module._nodeModulePaths(path.dirname(filename));
-
-  const priorLoad = Module._load;
-  Module._load = function load(request, parent, isMain) {
-    if (request === '@/src/components/Text') return { Text: mocks['react-native'].Text };
-    if (request === '@/src/components/ScreenArea') return { ScreenArea: mocks['react-native-safe-area-context'].SafeAreaView };
-
+  return compileModule('app/draft-run.tsx', mocks, { resolve: (request) => {
     if (request === '@/src/storage/session' && !mocks[request]) return { readSession: mocks['@/src/api/guest'].ensureGuestSession, subscribeSession: () => () => {} };
     if (request === '@/src/config') return { config: { screenshots: { fixtures: false } } };
-    if (Object.prototype.hasOwnProperty.call(mocks, request)) return mocks[request];
-    return priorLoad.call(this, request, parent, isMain);
-  };
-  try {
-    compiled._compile(output, filename);
-  } finally {
-    Module._load = priorLoad;
-  }
-  return compiled.exports.default;
+  } }).default;
 }
 
 function card(id, name) {

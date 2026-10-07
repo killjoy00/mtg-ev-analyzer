@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - 'mobile/**'
+      - '.github/actions/mobile-validate/**'
       - '.github/scripts/app-store-*.mjs'
       - '.github/workflows/ios-testflight.yml'
   push:
@@ -90,7 +91,7 @@ jobs:
         shell: bash
         run: echo "PACKONE_IOS_BUILD_NUMBER=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
       - name: Validate production mobile config
-        run: npm test
+        uses: ./.github/actions/mobile-validate
       - name: Set intended iOS marketing version
         shell: bash
         run: |

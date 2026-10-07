@@ -1,8 +1,17 @@
 name: isolated launch NAT acceptance
 on:
   pull_request:
-    paths: ['.github/preview-dns-recovery.json', 'scripts/create-ci-neon-branch.mjs', 'scripts/control-read.mjs', 'scripts/edge-control.mjs', 'tests/ci-provisioning.test.mjs', 'scripts/launch-load*', 'scripts/launch-practice-browser.mjs', '.github/workflows/launch-load.yml']
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths: ['.github/preview-dns-recovery.json', 'scripts/create-ci-neon-branch.mjs', 'scripts/control-read.mjs', 'scripts/edge-control.mjs', 'scripts/preview-resource-ownership.mjs', 'tests/preview-resource-ownership.test.mjs', 'tests/ci-provisioning.test.mjs', 'scripts/launch-load*', 'scripts/launch-practice-browser.mjs', '.github/workflows/launch-load.yml']
   workflow_dispatch:
+    inputs:
+      capacity_target:
+        description: Required 25-player check or optional 50-player experiment
+        type: choice
+        options: ['25', '50']
+        default: '25'
+env:
+  PACK1_CAPACITY_TARGET: ${{ inputs.capacity_target || '25' }}
 permissions:
   contents: read
 concurrency:
@@ -19,6 +28,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Validate and declare NAT target before provisioning
+        run: |
+          node --input-type=module -e "import fs from 'node:fs'; import {selectNatPolicy} from './scripts/launch-load-core.mjs'; console.log(JSON.stringify(selectNatPolicy(JSON.parse(fs.readFileSync('scripts/launch-load-policy.json','utf8')),process.env.PACK1_CAPACITY_TARGET)));"
+          echo "Required NAT target: $PACK1_CAPACITY_TARGET players; browser acceptance remains independently required." >> "$GITHUB_STEP_SUMMARY"
       - name: Reject a stale queued PR before provisioning
         if: github.event_name == 'pull_request'
         env:
@@ -63,27 +76,10 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y postgresql-client
           fi
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0037_mobile_oauth_handoffs.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0038_mobile_practice_idempotency.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0039_practice_serving_cache.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0040_mobile_minimum_version.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0040_practice_reroll_index.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0041_corpus_source_snapshots.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0041_apple_auth.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0042_serving_revision_snapshot_staging.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0043_corpus_activation_readiness.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0044_snapshot_scoped_puzzle_uniqueness.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0046_public_identity_safety.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0047_admin_user_account_controls.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0048_uncapped_v5_components.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0049_cross_version_corpus_cutover.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0050_practice_recency_bias.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0051_exact_pick_draw_index.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0052_decision_reports.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0053_creator_challenges.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0054_creator_event_idempotency.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0055_creator_event_write_safety.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0056_snapshot_aware_reroll_covering_index.sql
+          node scripts/ci-migration-plan.mjs launch-load > "$RUNNER_TEMP/pack1-migrations.txt"
+          while IFS= read -r migration; do
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+          done < "$RUNNER_TEMP/pack1-migrations.txt"
           node scripts/verify-neon-schema.mjs
           PACK1_RELEASE_COMMIT="$GITHUB_SHA" node scripts/warm-practice-cache.mjs
           node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$GITHUB_SHA"
@@ -133,12 +129,16 @@ jobs:
         if: always()
         with:
           name: launch-load-${{ github.run_id }}
-          path: artifacts/launch-load
+          path: |
+            artifacts/launch-load
+            artifacts/ci-resources
           retention-days: 30
       - name: Remove this private preview route
         if: always() && (steps.deploy.outcome == 'success' || steps.deploy.outcome == 'failure')
         env:
           CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+          PACK1_ENFORCE_PREVIEW_OWNER: '1'
+          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
         run: node scripts/edge-control.mjs disable
       - name: Delete the disposable branch
         if: always() && steps.neon.outputs.created == 'true'

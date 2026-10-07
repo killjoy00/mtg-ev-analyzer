@@ -50,7 +50,7 @@ jobs:
         run: bash scripts/r2_replay_shards.sh hydrate
 
       - name: Run regression tests
-        run: npm test
+        run: REQUIRE_REPLAY_SHARDS=1 npm test
 
       - name: Backfill legacy Premier Draft sets
         id: backfill

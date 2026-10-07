@@ -4,6 +4,17 @@ import {classifyChanges} from '../scripts/ci-change-classifier.mjs';
 
 const plan=(paths,expected)=>assert.equal(classifyChanges(paths).plan,expected,paths.join(', '));
 
+test('application HTML selects its behavioral journey rather than presentation smoke',()=>{
+  for(const [path,group] of [['admin/index.html','admin'],['reset-password/index.html','account']]) {
+    const result=classifyChanges([path]);
+    assert.equal(result.plan,'app');
+    assert.equal(result.browser,'groups');
+    assert.deepEqual(result.browserGroups,[group]);
+  }
+  assert.equal(classifyChanges(['index.html']).browser,'full');
+  assert.equal(classifyChanges(['admin/index.html','editorial.css']).browser,'full');
+});
+
 test('creator and ordinary campaign generated diffs take the publication fast path',()=>{
   let result=classifyChanges(['creator-challenges.json','creator/lola/index.html','creator/lola/creator-card.png']);
   assert.equal(result.plan,'publication');assert.deepEqual(result.publication,{kind:'creator',slug:'lola'});assert.equal(result.hydrate,false);

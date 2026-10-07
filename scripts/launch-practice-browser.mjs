@@ -78,6 +78,11 @@ async function main() {
     page.on('request',onRequest);
     const response=page.waitForResponse(r=>new URL(r.url()).pathname==='/draft/v1/runs'&&r.request().method()==='POST');
     await click.click();const r=await response;await r.finished();apiMs=performance.now()-apiStart;
+    if(r.status()!==200) {
+      let data;try {data=await r.json();}catch{}
+      report.request_failure={case:configuration.name,phase,status:r.status(),api_ms:Math.round(apiMs),
+        code:typeof data?.error==='string'&&/^[a-z0-9_]{1,64}$/.test(data.error)?data.error:null};
+    }
     assert.equal(r.status(),200);assert.equal((await r.json()).run_length,8);
     await page.locator('.run-cards').waitFor({state:'visible'});
     // DOM-ready and fully decoded cards are separate measurements.
@@ -142,7 +147,8 @@ async function main() {
       (process.env.PACK1_BROWSER_SMOKE==='1'||Object.values(report.summary).every(s=>s.api.p95_ms<=2000&&s.click.p95_ms<=3000));
     await page.screenshot({path:directory+'/practice-mobile.png',fullPage:true});
   } catch(error) {
-    report.failure={code:error.code||error.name||'unknown',line:String(error.stack).match(/launch-practice-browser.mjs:(\d+)/)?.[1]||null};
+    report.failure={code:error.code||error.name||'unknown',line:String(error.stack).match(/launch-practice-browser.mjs:(\d+)/)?.[1]||null,
+      expected:typeof error.expected==='number'?error.expected:null,actual:typeof error.actual==='number'?error.actual:null};
     await page.screenshot({path:directory+'/practice-failure.png',fullPage:true});
     throw error;
   } finally {

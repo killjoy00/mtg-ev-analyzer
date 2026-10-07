@@ -6,11 +6,15 @@ import { createHash } from 'node:crypto';
 import {rateDraftRunPuzzle} from '../draft-run-difficulty.mjs';
 import {validateDraftRunPuzzle,interestingDraftRunPuzzle,gradeDraftRunPick,selectDraftRun,selectDraftRunReroll,eligiblePickForRound,publicDraftRunPuzzle,summarizeDraftRun,poolForEnvironment} from '../draft-run.mjs';
 
-const catalog=JSON.parse(fs.readFileSync(new URL('../corpus/draft-run/catalog.json',import.meta.url)));
+const exhaustive=process.env.PACK1_TEST_DATA_MODE==='full';
+const corpusRoot=exhaustive?'../corpus/draft-run':'./fixtures/draft-run';
+const catalog=JSON.parse(fs.readFileSync(new URL(`${corpusRoot}/catalog.json`,import.meta.url)));
 const all=catalog.sets.flatMap(s=>{
-  const evidence=fs.readFileSync(new URL(`../corpus/draft-run/evidence/${s.id}.json.gz`,import.meta.url));
-  assert.equal(createHash('sha256').update(evidence).digest('hex'),s.evidence_sha256);
-  const bytes=fs.readFileSync(new URL(`../corpus/draft-run/${s.id}.json.gz`,import.meta.url));
+  if(exhaustive) {
+    const evidence=fs.readFileSync(new URL(`../corpus/draft-run/evidence/${s.id}.json.gz`,import.meta.url));
+    assert.equal(createHash('sha256').update(evidence).digest('hex'),s.evidence_sha256);
+  }
+  const bytes=fs.readFileSync(new URL(`${corpusRoot}/${s.id}.json.gz`,import.meta.url));
   assert.equal(createHash('sha256').update(bytes).digest('hex'),s.sha256);
   return JSON.parse(gunzipSync(bytes));
 });
@@ -19,7 +23,7 @@ const registry=JSON.parse(fs.readFileSync(new URL('../data/catalog.json',import.
 
 
 test('every playable decision has trophy, skill, complete history and valid scoring evidence',()=>{
-  assert.ok(all.length>=5000);
+  assert.ok(all.length>=(exhaustive?5000:1000));
   for(const p of all){assert.ok(validateDraftRunPuzzle(p),p.puzzle_id);assert.equal(gradeDraftRunPick(p,p.historical_pick_id).score,100);for(const c of [...p.candidates,...p.prior_picks])assert.match(c.image_url,/^https:\/\//,c.name);}
   for(const patch of [{event_match_wins:6},{player_games_lower_bound:99},{player_win_rate_bucket:.55},{prior_picks:[{id:'extra',name:'Extra'}]},{historical_pick_id:'missing'}]) assert.equal(validateDraftRunPuzzle({...all.find(p=>p.pick_number===1),...patch}),false);
 });
@@ -30,7 +34,7 @@ test('unanswered payloads contain neither the answer nor model rankings, support
   assert.deepEqual(Object.keys(visible).sort(),['candidates','pack_number','pick_number','prior_picks','puzzle_id','set_id']);
 });
 test('seeded runs and preserved legacy rerolls obey early picks, buckets and source exclusions',()=>{
-  for(let i=0;i<40;i++){
+  for(let i=0;i<(exhaustive?40:4);i++){
     const seed='corpus-check-'+i,options={selectionVersion:'first-pack-v2'},run=selectDraftRun(pool,seed,'mixed',options);
     assert.deepEqual(selectDraftRun(pool,seed,'mixed',options),run);
     assert.equal(run.length,10);assert.equal(new Set(run.map(p=>p.source_draft_hash)).size,10);
@@ -47,7 +51,7 @@ test('seeded runs and preserved legacy rerolls obey early picks, buckets and sou
 });
 test('score calibration separates uninformed choices, weak choices and strong alternatives across complete runs',()=>{
   let random=0,worst=0,second=0,n=0;
-  for(let i=0;i<120;i++)for(const p of selectDraftRun(pool,'score-audit-'+i)){
+  for(let i=0;i<(exhaustive?120:12);i++)for(const p of selectDraftRun(pool,'score-audit-'+i)){
     const ranked=[...p.candidates].sort((a,b)=>b.model_probability-a.model_probability);
     const score=c=>gradeDraftRunPick(p,c.id).score;
     random+=ranked.reduce((s,c)=>s+score(c),0)/ranked.length;
@@ -84,7 +88,7 @@ test('trophy coverage matches every loaded environment and preserves true openin
 });
 
 test('Cube has eight independent trophy decisions and two sequential pack replacements without expansion leakage',()=>{
-  for(let i=0;i<30;i++){
+  for(let i=0;i<(exhaustive?30:3);i++){
     const seed='cube-'+i,environment='powered-cube',run=selectDraftRun(pool,seed,environment);
     assert.equal(run.length,8);assert.equal(new Set(run.map(p=>p.source_draft_hash)).size,8);
     assert.equal(run[0].pick_number,2);assert.equal(run[1].pick_number,3);

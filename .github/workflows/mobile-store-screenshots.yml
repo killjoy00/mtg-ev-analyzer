@@ -6,8 +6,18 @@ on:
     paths:
       - '.github/store-screenshot-request.json'
   workflow_dispatch:
+    inputs:
+      android_only:
+        description: Run Android capture without repeating iOS
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      android_only:
+        type: boolean
+        default: false
   pull_request:
-    paths: ['mobile/**', '.github/workflows/mobile-store-screenshots.yml']
+    paths: ['mobile/**', '.github/actions/mobile-validate/**', '.github/workflows/mobile-store-screenshots.yml']
 
 permissions:
   contents: read
@@ -19,14 +29,34 @@ concurrency:
 jobs:
   validate:
     name: validate screenshot fixture build
+    timeout-minutes: 10
+    outputs:
+      capture_required: ${{ steps.capture.outputs.capture_required }}
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: mobile
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Select native screenshot coverage
+        id: capture
+        shell: bash
+        working-directory: .
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            base="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
+            node mobile/scripts/screenshot-ci-scope.mjs "$base" "$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          else
+            echo 'capture_required=true' >> "$GITHUB_OUTPUT"
+          fi
       - name: Resolve reviewed screenshot request
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: bash
         working-directory: .
         run: |
@@ -44,7 +74,7 @@ jobs:
           print('Reviewed store screenshot request:', request['reason'])
           PY
       - name: Require current main for generated store evidence
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: bash
         working-directory: .
         run: |
@@ -61,11 +91,13 @@ jobs:
           node ./scripts/check-build-toolchain.mjs
           npm ci --no-audit --no-fund
       - name: Validate mobile project with screenshot fixtures enabled
-        run: npm test
+        uses: ./.github/actions/mobile-validate
 
   ios:
     name: capture iPhone and iPad
     needs: validate
+    if: needs.validate.outputs.capture_required == 'true' && !inputs.android_only
+    timeout-minutes: 45
     runs-on: macos-latest
     env:
       EXPO_PUBLIC_PACKONE_ENV: preview
@@ -233,6 +265,8 @@ jobs:
   android:
     name: capture Android phone
     needs: validate
+    if: needs.validate.outputs.capture_required == 'true'
+    timeout-minutes: 45
     runs-on: ubuntu-latest
     env:
       EXPO_PUBLIC_PACKONE_ENV: preview
@@ -274,9 +308,70 @@ jobs:
         env:
           CI: '1'
         run: npx expo prebuild --platform android --clean
-      - name: Build installable preview APK
+      - name: Resolve exact Android toolchain cache inputs
+        id: toolchain-inputs
+        run: python3 scripts/prepare-android-toolchain.py --outputs
+      - name: Restore verified Android SDK packages
+        id: sdk-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ${{ steps.toolchain-inputs.outputs.sdk_root }}/ndk/${{ steps.toolchain-inputs.outputs.ndk_version }}
+            ${{ steps.toolchain-inputs.outputs.sdk_root }}/cmake/3.22.1
+            ${{ steps.toolchain-inputs.outputs.sdk_root }}/platforms/android-36
+            ${{ steps.toolchain-inputs.outputs.sdk_root }}/build-tools/36.0.0
+          key: ${{ steps.toolchain-inputs.outputs.cache_key }}-${{ runner.os }}-${{ runner.arch }}
+      - name: Verify and prepare SDK dependencies before the app build
+        id: prepare-toolchain
+        timeout-minutes: 12
+        run: python3 scripts/prepare-android-toolchain.py
+      - name: Save only verified SDK packages
+        if: steps.sdk-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ${{ steps.toolchain-inputs.outputs.sdk_root }}/ndk/${{ steps.toolchain-inputs.outputs.ndk_version }}
+            ${{ steps.toolchain-inputs.outputs.sdk_root }}/cmake/3.22.1
+            ${{ steps.toolchain-inputs.outputs.sdk_root }}/platforms/android-36
+            ${{ steps.toolchain-inputs.outputs.sdk_root }}/build-tools/36.0.0
+          key: ${{ steps.toolchain-inputs.outputs.cache_key }}-${{ runner.os }}-${{ runner.arch }}
+      - name: Compute unsigned Gradle cache key
+        id: gradle-cache
+        env:
+          PACKONE_GRADLE_CACHE_JAVA: '17'
+        run: node scripts/gradle-cache-key.mjs
+      - name: Restore shared unsigned Gradle dependencies and build state
+        id: gradle-restore
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            mobile/node_modules/**/.cxx
+          key: ${{ steps.gradle-cache.outputs.key }}
+          restore-keys: |
+            ${{ steps.gradle-cache.outputs.restore_key }}
+      - name: Resolve Gradle plugin dependencies with bounded HTTP recovery
         working-directory: mobile/android
-        run: ./gradlew :app:assembleRelease --no-daemon -PreactNativeArchitectures=x86_64
+        timeout-minutes: 9
+        run: node ../scripts/prepare-gradle-dependencies.mjs
+      - name: Build installable preview APK
+        id: apk-build
+        working-directory: mobile/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ../../artifacts/native-build
+          ./gradlew :app:assembleRelease --no-daemon --build-cache -PreactNativeArchitectures=x86_64 2>&1 | tee ../../artifacts/native-build/gradle.log
+      - name: Save successful unsigned Gradle build state
+        if: steps.gradle-restore.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            mobile/node_modules/**/.cxx
+          key: ${{ steps.gradle-cache.outputs.key }}
       - name: Locate preview APK
         shell: bash
         run: |
@@ -301,6 +396,7 @@ jobs:
             echo "No /dev/kvm exposed on this hosted runner; emulator action may fall back to software acceleration."
           fi
       - name: Capture Android screenshots
+        id: android-capture
         uses: reactivecircus/android-emulator-runner@v2
         # The action runs each script line through /bin/sh. Keep the Bash
         # program in one environment value and explicitly invoke Bash once.
@@ -349,12 +445,20 @@ jobs:
         with:
           name: pack-one-android-native-acceptance
           path: native-acceptance
-          if-no-files-found: error
+          if-no-files-found: ${{ steps.android-capture.outcome == 'success' && 'error' || 'ignore' }}
           retention-days: 30
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: pack-one-android-store-screenshots
           path: store-screenshots
-          if-no-files-found: error
+          if-no-files-found: ${{ steps.android-capture.outcome == 'success' && 'error' || 'ignore' }}
+          retention-days: 30
+      - name: Preserve Android dependency and build failure diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-android-build-diagnostics-${{ github.run_attempt }}
+          path: artifacts/native-build
+          if-no-files-found: ignore
           retention-days: 30

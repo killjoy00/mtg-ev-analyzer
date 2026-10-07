@@ -1,7 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {selectNatPolicy} from '../scripts/launch-load-core.mjs';
 import {quotaSecretUpdate} from '../scripts/edge-production-control.mjs';
 import {gateway,routeFamily} from '../edge/gateway.mjs';
+
+test('NAT defaults to 25 players and requires explicit 50-player selection without changing budgets',()=>{
+  const envelope=JSON.parse(fs.readFileSync(new URL('../scripts/launch-load-policy.json',import.meta.url),'utf8'));
+  const required=selectNatPolicy(envelope);
+  assert.deepEqual(required.nat_stages,[25]);assert.deepEqual(selectNatPolicy(envelope,'50'),envelope);
+  assert.deepEqual({...required,nat_stages:envelope.nat_stages},envelope);
+  for(const target of ['', '100', 'skip', 25, null])assert.throws(()=>selectNatPolicy(envelope,target));
+  assert.throws(()=>selectNatPolicy({...envelope,nat_stages:[25,50,100]},'50'));
+  const workflow=fs.readFileSync(new URL('../.github/workflows/launch-load.yml',import.meta.url),'utf8');
+  assert.match(workflow,/options: \['25', '50'\]/);
+  assert.match(workflow,/PACK1_CAPACITY_TARGET: \$\{\{ inputs\.capacity_target \|\| '25' \}\}/);
+  assert.ok(workflow.indexOf('Validate and declare NAT target')<workflow.indexOf('Create disposable production-sized branch'));
+});
 
 test('routine uploads preserve quota identity and only first install generates a secret',()=>{
   let calls=0;const generate=()=>{calls++;return 'a'.repeat(64);};

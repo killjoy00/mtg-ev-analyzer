@@ -294,4 +294,3 @@ test('a validated update-required foreground decision blocks with the supplied s
 });
 
 // Additional mounted screen regressions share the lifecycle test entrypoint.
-require('./review-refresh-races.test.cjs');

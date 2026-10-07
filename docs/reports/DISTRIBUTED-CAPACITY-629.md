@@ -1,5 +1,35 @@
 # Next distributed capacity evidence (#629)
 
+## Required check update — 2026-10-07
+
+The owner chose to defer the 50-player experiment. Ordinary PRs and manual
+dispatches now default to the supported 25-player level; selecting
+`capacity_target=50` manually retains the original 25→50 experiment and its
+600-second final hold. The full envelope remains in
+`scripts/launch-distributed-policy.json`; `selectCapacityPolicy` selects and
+validates the required stages before provisioning. The selected policy's
+fingerprint binds all setup, generator and collector evidence. All five
+cohorts must complete, with unchanged latency, zero-error, correctness,
+telemetry, resource and cleanup gates. Current 50-player capacity remains
+unqualified.
+
+The separate NAT workflow uses the same default-25/manual-50 choice. Run
+37664468633 passed NAT at 25 but failed the optional 50 stage (reroll p95
+2,381.45 ms against 2,000 ms) and independently failed browser run-start
+acceptance; it remains failed. Distributed run 37664468834 used 25 correctly
+but aborted after actor 1's pick connection timed out at 503.76 ms before
+headers or body were sent. Cleanup passed. The runner now gives each connection
+address one second rather than Node's default 250 ms, without retrying picks
+or changing measured route budgets. Fresh acceptance is required.
+
+Run [37647716245](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/37647716245),
+attempt 2, passed the complete 25-player stage: 1,541 requests, all HTTP
+200/201, 25 initial completions, 30 hold completions, zero correctness failures,
+positive telemetry and usage gates. It later aborted the 50-player stage on
+`coordinator_or_clock_failed`. Preview removal and branch GET 404 passed.
+That run remains a failed full-ladder run; the new 25-only policy requires
+fresh acceptance and does not retroactively relabel it.
+
 ## Policy update — 2026-10-02
 
 100-player stages were removed on 2026-10-02 (owner decision); earlier results are in git history.

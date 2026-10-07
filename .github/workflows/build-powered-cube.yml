@@ -195,7 +195,7 @@ jobs:
 
       - name: Run unit tests
         if: steps.cube_gate.outputs.should_build == 'true'
-        run: npm test
+        run: REQUIRE_REPLAY_SHARDS=1 npm test
 
       - name: Build and validate Powered Cube
         id: cube_builder

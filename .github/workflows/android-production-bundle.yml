@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - 'mobile/**'
+      - '.github/actions/mobile-validate/**'
       - 'scripts/audit-android-manifest.py'
       - '.github/workflows/android-production-bundle.yml'
   push:
@@ -92,7 +93,7 @@ jobs:
         shell: bash
         run: echo "PACKONE_ANDROID_VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
       - name: Validate production mobile config
-        run: npm test
+        uses: ./.github/actions/mobile-validate
       - name: Fast-path production Metro export for Android
         if: env.NATIVE_FULL == 'false'
         env:

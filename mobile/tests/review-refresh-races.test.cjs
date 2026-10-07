@@ -1,9 +1,8 @@
-const test = require('node:test');
-const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const Module = require('node:module');
-const ts = require('typescript');
+const { compileModule: compileNativeModule } = require('./support/compile-module.cjs');
+const test = require('node:test');
+const assert = require('node:assert/strict');
 const React = require('react');
 const TestRenderer = require('react-test-renderer');
 
@@ -31,47 +30,10 @@ const ScrollView = React.forwardRef(function ScrollViewHost(props, ref) {
 });
 
 function compileModule(relativePath, mocks) {
-  const filename = path.join(process.cwd(), relativePath);
-  const source = fs.readFileSync(filename, 'utf8');
-  const output = ts.transpileModule(source, {
-    compilerOptions: {
-      target: ts.ScriptTarget.ES2022,
-      module: ts.ModuleKind.CommonJS,
-      jsx: ts.JsxEmit.ReactJSX,
-      esModuleInterop: true,
-    },
-    fileName: filename,
-  }).outputText;
-  const compiled = new Module(filename, module);
-  compiled.filename = filename;
-  compiled.paths = Module._nodeModulePaths(path.dirname(filename));
-  const priorLoad = Module._load;
-  Module._load = function load(request, parent, isMain) {
-    if (request.endsWith('.png')) {
-      const asset = path.resolve(path.dirname(parent.filename), request);
-      const bytes = fs.readFileSync(asset);
-      assert.equal(bytes.subarray(0, 8).toString('hex'), '89504e470d0a1a0a', 'native image asset must be a real PNG');
-      return { uri: asset };
-    }
-    if (request === '@/src/components/Text') return { Text: mocks['react-native'].Text };
-    if (request === '@/src/components/ScreenArea') return { ScreenArea: mocks['react-native-safe-area-context'].SafeAreaView };
-
-    if (Object.prototype.hasOwnProperty.call(mocks, request)) return request === '@/src/storage/session' ? { subscribeSession: () => () => {}, ...mocks[request] } : mocks[request];
-    if (request === '@/src/storage/session') return { readSession: () => mocks['@/src/api/guest'].ensureGuestSession(), subscribeSession: () => () => {} };
-    if (request === '@/src/navigation/session') return { useNavigationSession: () => ({ session: { accountToken: 'member' } }) };
-    if (request.startsWith('@/')) {
-      const base = request.slice(2);
-      const target = [base + '.ts', base + '.tsx'].find(file => fs.existsSync(file));
-      if (target) return compileModule(target, mocks);
-    }
-    return priorLoad.call(this, request, parent, isMain);
-  };
-  try {
-    compiled._compile(output, filename);
-  } finally {
-    Module._load = priorLoad;
-  }
-  return compiled.exports;
+  return compileNativeModule(relativePath, mocks, { resolve: (request) => {
+    if (request === '@/src/storage/session') return { readSession: () => mocks['@/src/api/guest'].ensureGuestSession(), subscribeSession: () => () => {}, ...mocks[request] };
+    if (request === '@/src/navigation/session' && !mocks[request]) return { useNavigationSession: () => ({ session: { accountToken: 'member' } }) };
+  } });
 }
 
 function compileScreen(relativePath, mocks) {
@@ -792,15 +754,7 @@ test('published set archive keeps the analysis mounted when affiliate browser ha
 });
 
 test('published set web URLs rewrite only the four reviewed archives into native detail routes', () => {
-  const filename = path.join(process.cwd(), 'src', 'linking.ts');
-  const output = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
-    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
-    fileName: filename,
-  }).outputText;
-  const compiled = new Module(filename, module);
-  compiled.filename = filename;
-  compiled.paths = Module._nodeModulePaths(path.dirname(filename));
-  compiled._compile(output, filename);
+  const compiled = { exports: compileNativeModule('src/linking.ts', {}) };
   for (const setId of ['msh', 'ecl', 'tmt', 'sos']) {
     assert.equal(compiled.exports.rewriteIncomingPath(`https://packone.pro/sets/${setId}/`), `/set-archive?setId=${setId}`);
   }

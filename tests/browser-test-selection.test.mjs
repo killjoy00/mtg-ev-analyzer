@@ -25,3 +25,12 @@ test('full and presentation selections are explicit and nonempty',()=>{
   assert.deepEqual(selectedBrowserTests({presentation:true}),PRESENTATION_BROWSER);
   assert.ok(Object.keys(BROWSER_GROUPS).length>=7);
 });
+
+test('full and daily plans complete every current Daily environment',()=>{
+  for(const selection of [{full:true},{groups:['daily']}]) {
+    const daily=selectedBrowserTests(selection).filter(x=>x.file==='tests/draft-run-e2e.mjs'&&x.env.PACK1_TEST_DAILY==='1');
+    assert.deepEqual(daily.map(x=>x.env.PACK1_TEST_ENVIRONMENT||'mixed').sort(),['latest','mixed','powered-cube']);
+    assert.ok(daily.every(x=>!x.env.PACK1_TEST_SELECTION_VERSION||x.env.PACK1_TEST_SELECTION_VERSION==='eight-pick-v4'));
+  }
+  assert.ok(selectedBrowserTests({full:true}).some(x=>x.env.PACK1_TEST_SELECTION_VERSION==='first-pack-v2'));
+});

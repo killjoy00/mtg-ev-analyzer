@@ -122,7 +122,7 @@ jobs:
           PY
 
       - name: Run pre-rebuild tests
-        run: npm test
+        run: REQUIRE_REPLAY_SHARDS=1 npm test
 
       - name: Create durable rollout branch
         env:
@@ -551,7 +551,7 @@ jobs:
           PY
 
       - name: Validate the complete candidate
-        run: npm test
+        run: REQUIRE_REPLAY_SHARDS=1 npm test
 
       - name: Publish versioned v4 replay shards
         run: |

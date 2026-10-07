@@ -133,7 +133,7 @@ test('DNS orphan recovery requires a matching current domain record, not a place
   }
 });
 test('all isolated branch workflows use the bounded provisioner and preserve cleanup output contracts',()=>{
-  for(const name of ['backend-gate','launch-load','launch-distributed','edge-preview']) {
+  for(const name of ['backend-gate','launch-load','launch-distributed-preview','edge-preview']) {
     const workflow=fs.readFileSync(`.github/workflows/${name}.yml`,'utf8');
     assert.match(workflow,/run: node scripts\/create-ci-neon-branch\.mjs/);
     assert.doesNotMatch(workflow,/create-branch-action/);
@@ -194,7 +194,7 @@ test('DNS override is limited to a receipt revalidated immediately before attach
     revalidateRecovery:async()=>{throw Error('DNS changed');},request:async()=>assert.fail('changed DNS must never be overwritten')}),/DNS changed/);
 });
 test('shared preview workflows queue both acceptance jobs while preserving exclusive access',()=>{
-  for(const name of ['launch-load','launch-distributed','edge-preview','capacity-dispatch-once']) {
+  for(const name of ['launch-load','launch-distributed-preview','edge-preview','capacity-dispatch-once']) {
     const flow=fs.readFileSync(`.github/workflows/${name}.yml`,'utf8');
     const concurrency=flow.split('concurrency:\n')[1].split(/\n(?:jobs:|\n)/)[0];
     assert.match(concurrency,/group: pack1-gateway-preview/);

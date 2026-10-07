@@ -213,7 +213,7 @@ jobs:
         run: bash scripts/r2_replay_shards.sh hydrate
 
       - name: Run unit tests
-        run: npm test
+        run: REQUIRE_REPLAY_SHARDS=1 npm test
 
       - name: Repair published metadata warnings
         id: metadata_repair

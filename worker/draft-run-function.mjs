@@ -267,7 +267,7 @@ async function start(request) {
   }
   const day=daily?gameDateKey():null;
   if(day) {
-    const old=await query('SELECT * FROM draft_run_sessions WHERE (player_id=$1::uuid OR daily_account_id=$4::uuid) AND day=$2::date AND environment=$3 ORDER BY daily_account_id NULLS LAST,created_at LIMIT 1',[owner,day,environment,account?.auth_user_id||null]);
+    const old=await timing.step('daily_session',()=>query('SELECT * FROM draft_run_sessions WHERE (player_id=$1::uuid OR daily_account_id=$4::uuid) AND day=$2::date AND environment=$3 ORDER BY daily_account_id NULLS LAST,created_at LIMIT 1',[owner,day,environment,account?.auth_user_id||null]));
     if(old.rows[0]) {
       if(account&&!old.rows[0].daily_account_id)await query(`WITH identity_allowed AS MATERIALIZED (
       SELECT 1 WHERE pack1_identity_attachment_allowed($2::uuid)
@@ -295,7 +295,7 @@ async function start(request) {
     if(creatorState)ids=creatorState.source.puzzle_ids;
     else if(source)ids=source.puzzle_ids;
     else if(day) {
-      const {schedule}=await ensureDailySchedule(day,environment);
+      const {schedule}=await timing.step('daily_schedule',()=>ensureDailySchedule(day,environment));
       corpusVersion=schedule.corpus_version;scoringVersion=schedule.scoring_version;servingPolicy=schedule.serving_policy_version||LEGACY_SERVING_POLICY_VERSION;
       ids=parse(schedule.puzzle_ids);difficultyVersion=schedule.difficulty_version||LEGACY_DIFFICULTY_VERSION;
       selectionVersion=schedule.selection_version||PREVIOUS_SELECTION_VERSION;
@@ -305,7 +305,7 @@ async function start(request) {
       practiceChoices=await timing.step('selection',()=>selectCachedDatabaseRun(timing.selectionQuery(query),DRAFT_RUN_CORPUS_VERSION,seed,environment,{setIds}));
       ids=practiceChoices.map(item=>item.puzzle_id);
     }
-    const choices=practiceChoices||await loadPuzzleMetadata(query,corpusVersion,ids);
+    const choices=practiceChoices||await timing.step('metadata',()=>loadPuzzleMetadata(query,corpusVersion,ids));
     if(choices.some(item=>!item || (environment==='powered-cube')!==(item.set_id==='powered-cube')))fail('This run uses an unavailable corpus.',409);
     const sources=choices.map(item=>item.source_draft_hash),anchors=choices.map(publicDifficulty);
     const rerolls=day||source||creatorState?{set:0,pack:0}:environment==='powered-cube'||setIds.length?{set:0,pack:2}:{set:1,pack:1};

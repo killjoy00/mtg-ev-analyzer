@@ -84,7 +84,7 @@ jobs:
           if-no-files-found: error
       - name: Hydrate historical replay shards for the normal repository suite
         run: bash scripts/r2_replay_shards.sh hydrate
-      - run: npm test
+      - run: REQUIRE_REPLAY_SHARDS=1 npm test
       - name: Check Python fixtures against the future serving version before expensive work
         run: |
           python - <<'PY'
@@ -221,7 +221,7 @@ jobs:
           python scripts/audit_datasets.py --fail-on-error
           node scripts/load_all_trophies.mjs unused generated/v5-trophy-import --validate-only
           node scripts/load-traditional-components.mjs unused generated/v5-traditional --validate-only > generated/v5-traditional-health.json
-          npm test
+          REQUIRE_REPLAY_SHARDS=1 npm test
       - name: Verify every new replay byte against versioned R2
         run: |
           export REPLAY_MODEL_VERSION=strong-player-colour-stage-v5

@@ -43,11 +43,16 @@ test('other storage errors fail immediately', () => {
   assert.equal(result.count, 1);
   assert.doesNotMatch(result.calls, /sleep/);
 });
-test('only the required unit gate hydrates replay data, and it uses the protected helper', () => {
+test('only the selected full-data lane hydrates replay data with the protected helper', () => {
   const unit = readFileSync(new URL('../.github/workflows/test.yml', import.meta.url), 'utf8');
   const browser = readFileSync(new URL('../.github/workflows/e2e.yml', import.meta.url), 'utf8');
   assert.match(unit, /run: bash scripts\/hydrate-replay-shards\.sh/);
-  assert.match(unit, /hydrate_replays == 'true'/);
+  const fast=unit.split('  fast:')[1].split('  data:')[0];
+  const data=unit.split('  data:')[1].split('  test:')[0];
+  assert.doesNotMatch(fast,/run: bash scripts\/hydrate-replay-shards\.sh/);
+  assert.match(data,/needs\.fast\.outputs\.dataset_audit == 'true'/);
+  assert.match(data,/npm run test:data/);
+  assert.match(unit,/test "\$DATA_RESULT" = success/);
   assert.doesNotMatch(unit, /run: bash scripts\/r2_replay_shards\.sh hydrate/);
   assert.doesNotMatch(browser, /hydrate-replay-shards|r2_replay_shards\.sh hydrate/);
 });

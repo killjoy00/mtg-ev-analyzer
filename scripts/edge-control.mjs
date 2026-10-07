@@ -8,6 +8,7 @@ import {request as httpsRequest} from 'node:https';
 import {pathToFileURL} from 'node:url';
 import {deployPreviewFunction} from './edge-neon-deploy.mjs';
 import {controlRequest,transientControlStatus} from './control-read.mjs';
+import {assertPreviewOwner,resourceReceipt,writeResourceReceipt,cleanupOwnedDns,ownedReceiptRecords} from './preview-resource-ownership.mjs';
 const HOST='api-preview.packone.pro',WORKER='pack1-gateway-preview';
 const READINESS_CONSECUTIVE=20,READINESS_INTERVAL_MS=2000,READINESS_DEADLINE_MS=180000;
 export function parseRequest(value) {
@@ -262,8 +263,27 @@ async function main(action) {
     console.log('Scoped Cloudflare access and preview hostname ownership verified.');return;
   }
   if(action==='disable') {
+    const enforce=process.env.PACK1_ENFORCE_PREVIEW_OWNER==='1';
+    const owner={runId:process.env.GITHUB_RUN_ID,attempt:process.env.GITHUB_RUN_ATTEMPT,branch:process.env.PREVIEW_BRANCH,sha:process.env.GITHUB_SHA};
+    const verifyOwner=async()=>assertPreviewOwner(await cf(`/accounts/${zone.account.id}/workers/scripts/${WORKER}/settings`),owner);
+    let records=[];
+    if(enforce)records=await previewDns(zone);
+    if(enforce&&(domain||records.length)) {
+      await verifyOwner();
+      if(!domain) {
+        let receipt;
+        try {receipt=JSON.parse(fs.readFileSync(process.env.PACK1_RESOURCE_RECEIPT_FILE||'artifacts/ci-resources/preview.json','utf8'));}catch{}
+        records=ownedReceiptRecords(receipt,owner,records);
+      }
+      writeResourceReceipt(resourceReceipt({...owner,expires:process.env.CI_RESOURCE_EXPIRES,phase:'cleanup-started',domainId:domain?.id||null,records}));
+    }
     await detachPreviewDomain({request:cf,readContext:context});
     const remaining=await context();if(remaining.domain)throw Error('Preview hostname remains attached after deletion.');
+    if(enforce&&(domain||records.length)) {
+      await cleanupOwnedDns({records,readRecords:()=>previewDns(zone),assertOwner:verifyOwner,
+        remove:id=>cf(`/zones/${zone.id}/dns_records/${id}`,{method:'DELETE',allow404:true})});
+      writeResourceReceipt(resourceReceipt({...owner,expires:process.env.CI_RESOURCE_EXPIRES,phase:'preview-removed'}));
+    }
     console.log('Preview custom domain disabled. Backend guards remain enabled; the isolated branch expires automatically.');return;
   }
   if(action!=='deploy')throw Error('Unknown preview operation.');
@@ -322,7 +342,8 @@ async function main(action) {
   if(installed.length!==expected.size||installed.some(slug=>!expected.has(slug)))throw Error('Unexpected inherited function inventory after deployment.');
   const config=JSON.parse(fs.readFileSync('edge/wrangler.json','utf8'));
   config.main=path.resolve('edge/gateway.mjs');config.account_id=zone.account.id;
-  config.vars={...config.vars,NEON_BRANCH_ID:branch,RELEASE_COMMIT:commit};
+  config.vars={...config.vars,NEON_BRANCH_ID:branch,RELEASE_COMMIT:commit,
+    CI_PREVIEW_RUN:process.env.GITHUB_RUN_ID,CI_PREVIEW_ATTEMPT:process.env.GITHUB_RUN_ATTEMPT,CI_PREVIEW_EXPIRES:process.env.CI_RESOURCE_EXPIRES};
   if(recovery)config.vars={...config.vars,PREVIEW_DNS_RECOVERY_ID:recovery.record_id,
     PREVIEW_DNS_RECOVERY_SOURCE_REVISION:recovery.source_revision};
   const configPath=path.join(process.env.RUNNER_TEMP,'edge-wrangler.json');
@@ -333,6 +354,9 @@ async function main(action) {
     if(!recoveryRecordMatches(await previewDns(zone),recovery))throw Error('Preview DNS changed after recovery validation; refusing to replace it.');
     return await verifyRecoveryConflict({request:cf,zone,receipt:recovery});
   }:undefined});
+  const installedDomain=(await context()).domain;
+  writeResourceReceipt(resourceReceipt({branch,sha:commit,runId:process.env.GITHUB_RUN_ID,attempt:process.env.GITHUB_RUN_ATTEMPT,
+    expires:process.env.CI_RESOURCE_EXPIRES,phase:'attached',domainId:installedDomain.id,records:await previewDns(zone)}));
   // A newly attached hostname or Worker version can lag the control-plane
   // response. Require sustained exact-revision health from fresh TLS
   // connections so one warm edge connection cannot declare propagation done.

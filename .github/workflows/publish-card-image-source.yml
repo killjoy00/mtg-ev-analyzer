@@ -50,7 +50,7 @@ jobs:
 
       - name: Validate regenerated corpus
         run: |
-          npm test
+          REQUIRE_REPLAY_SHARDS=1 npm test
           python scripts/audit_datasets.py --fail-on-error
 
       - name: Publish source-of-truth branch

@@ -249,7 +249,7 @@
       ]
     },
     "launch-distributed": {
-      "workflow": ".github/workflows/launch-distributed.yml",
+      "workflow": ".github/workflows/launch-distributed-preview.yml",
       "migrations": [
         "0037_mobile_oauth_handoffs.sql",
         "0038_mobile_practice_idempotency.sql",
