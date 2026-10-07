@@ -1,0 +1,80 @@
+name: inspect isolated NAT failure
+on:
+  push:
+    branches: ['diagnostics/1051-nat-report']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          name: launch-load-37577080040
+          path: failed-report
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 37577080040
+      - name: Print rejected request aggregates without identities or credentials
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          const root='failed-report',files=fs.readdirSync(root,{recursive:true});
+          console.log(JSON.stringify({files:files.filter(f=>f.endsWith('.json')).map(f=>path.basename(f))}));
+          for(const file of files) {
+            if(path.basename(file)!=='nat-report.json')continue;
+            const r=JSON.parse(fs.readFileSync(path.join(root,file),'utf8'));
+            console.log(JSON.stringify({sha:r.sha,started_at:r.started_at,finished_at:r.finished_at,passed:r.passed,
+              stages:r.stages.map(s=>({population:s.population,started:s.started,completed:s.completed,passed:s.passed,
+                failures:s.failures,correctness_failures:s.correctness_failures,
+                rejected_requests:s.requests.filter(q=>q.status<200||q.status>=400).map(q=>({route:q.route,status:q.status,ms:q.ms,diagnostics:q.diagnostics})),
+                routes:s.routes}))},null,2));
+          }
+          NODE
+      - name: Read only retained errors for the exact failed preview revision and interval
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import assert from 'node:assert/strict';
+          import {previewAccount,queryPreviewEvents,previewTelemetryFailure} from './scripts/launch-distributed-telemetry.mjs';
+          const root='failed-report',file=fs.readdirSync(root,{recursive:true}).find(f=>path.basename(f)==='nat-report.json');
+          assert.ok(file);
+          const report=JSON.parse(fs.readFileSync(path.join(root,file),'utf8'));
+          assert.equal(report.sha,'fd2d0d1d0532a62f260d2969a8bcc52bbeb9525a');
+          const from=Date.parse(report.started_at),to=Date.parse(report.finished_at);
+          assert.ok(Number.isFinite(from)&&Number.isFinite(to)&&to>from&&to-from<30*60000);
+          const retained=[];
+          const fetcher=async(...args)=>{
+            const response=await fetch(...args);
+            if(String(args[0]).includes('/telemetry/query')) {
+              const data=await response.clone().json().catch(()=>null);
+              for(const row of data?.result?.events?.events||[]) {
+                let p=row.source;
+                if(typeof p==='string')try{p=JSON.parse(p);}catch{continue;}
+                if(!p||typeof p!=='object')try{p=JSON.parse(row?.$metadata?.message);}catch{continue;}
+                if(p?.event!=='gateway_request'||p.release!==report.sha||p.status<500)continue;
+                const number=v=>Number.isFinite(v)&&v>=0?v:null;
+                retained.push({route:/^[a-z_]{1,40}$/.test(p.route)?p.route:'other',status:number(p.status),
+                  duration_ms:number(p.duration_ms),quota_ms:number(p.quota_ms),upstream_ms:number(p.upstream_ms),
+                  upstream_calls:number(p.upstream_calls),upstream_status:number(p.upstream_status),
+                  error:['timeout','invalid_body','gateway_failure'].includes(p.error)?p.error:null});
+              }
+            }
+            return response;
+          };
+          try {
+            const account=await previewAccount({fetcher});
+            await queryPreviewEvents(fetcher,process.env.CLOUDFLARE_EDGE_TOKEN,account,from,to);
+            console.log(JSON.stringify({retained_errors:retained}));
+          } catch(error) {console.log(JSON.stringify({retained_read_failed:previewTelemetryFailure(error)}));process.exitCode=1;}
+          NODE
