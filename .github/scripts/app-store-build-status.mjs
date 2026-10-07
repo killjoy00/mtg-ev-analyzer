@@ -85,9 +85,82 @@ const ascRead = async (path) => {
   return JSON.parse(body);
 };
 const testFlight = await readTestFlightDistribution(ascRead, latest.id);
-const result = { appId, sourceSha: process.env.GITHUB_SHA ?? null, requestedBuild: requestedBuild ?? null, latest, builds, testFlight };
+const crashParams = new URLSearchParams({
+  'filter[build]': latest.id,
+  sort: '-createdDate',
+  limit: '50',
+  'fields[betaFeedbackCrashSubmissions]': [
+    'createdDate','deviceModel','osVersion','locale','timeZone','architecture',
+    'connectionType','pairedAppleWatch','appUptimeInMilliseconds',
+    'diskBytesAvailable','diskBytesTotal','batteryPercentage',
+    'screenWidthInPoints','screenHeightInPoints','appPlatform','devicePlatform',
+    'deviceFamily','buildBundleId','crashLog','build',
+  ].join(','),
+});
+let crashEvidence;
+try {
+  const submissionsResponse = await ascRead(
+    `/v1/apps/${encodeURIComponent(appId)}/betaFeedbackCrashSubmissions?${crashParams.toString()}`,
+  );
+  const submissions = [];
+  for (const submission of submissionsResponse?.data || []) {
+    let crashLog = null;
+    let crashLogError = null;
+    try {
+      crashLog = await ascRead(
+        `/v1/betaFeedbackCrashSubmissions/${encodeURIComponent(submission.id)}/crashLog`,
+      );
+    } catch (error) {
+      crashLogError = error instanceof Error ? error.message : 'Crash log read failed.';
+    }
+    submissions.push({
+      id: submission.id,
+      attributes: submission.attributes ?? {},
+      crashLog,
+      crashLogError,
+    });
+  }
+  crashEvidence = { available: true, count: submissions.length, submissions };
+} catch (error) {
+  crashEvidence = {
+    available: false,
+    count: null,
+    reason: error instanceof Error ? error.message : 'Crash submissions read failed.',
+    submissions: [],
+  };
+}
+const testFlightCrashes = {
+  available: crashEvidence.available,
+  count: crashEvidence.count,
+  reason: crashEvidence.reason ?? null,
+  submissions: crashEvidence.submissions.map(({ id, attributes, crashLog, crashLogError }) => ({
+    id,
+    createdDate: attributes?.createdDate ?? null,
+    deviceModel: attributes?.deviceModel ?? null,
+    osVersion: attributes?.osVersion ?? null,
+    architecture: attributes?.architecture ?? null,
+    deviceFamily: attributes?.deviceFamily ?? null,
+    appUptimeInMilliseconds: attributes?.appUptimeInMilliseconds ?? null,
+    crashLogAvailable: Boolean(crashLog?.data),
+    crashLogError,
+  })),
+};
+const result = {
+  appId,
+  sourceSha: process.env.GITHUB_SHA ?? null,
+  requestedBuild: requestedBuild ?? null,
+  latest,
+  builds,
+  testFlight,
+  testFlightCrashes,
+};
 console.log(JSON.stringify(result, null, 2));
-if (process.env.PACKONE_STATUS_OUTPUT) writeFileSync(process.env.PACKONE_STATUS_OUTPUT, JSON.stringify(result, null, 2) + '\n');
+if (process.env.PACKONE_STATUS_OUTPUT) {
+  writeFileSync(
+    process.env.PACKONE_STATUS_OUTPUT,
+    JSON.stringify({ ...result, testFlightCrashes: crashEvidence }, null, 2) + '\n',
+  );
+}
 
 const summaryPath = process.env.GITHUB_STEP_SUMMARY;
 if (summaryPath) {
@@ -110,6 +183,11 @@ if (summaryPath) {
       `- Uploaded: \`${latest.uploadedDate ?? 'unknown'}\``,
       `- Audience type: \`${latest.buildAudienceType ?? 'unknown'}\``,
       `- Uses non-exempt encryption: \`${compliance}\``,
+      '',
+      '## TestFlight crash evidence',
+      `- Crash API read: ${testFlightCrashes.available ? 'available' : 'unavailable'}`,
+      `- Crash submissions for exact build: ${testFlightCrashes.count ?? 'unknown'}`,
+      ...(testFlightCrashes.reason ? [`- Crash read reason: \`${testFlightCrashes.reason}\``] : []),
       '',
     ].join('\n'),
   );
