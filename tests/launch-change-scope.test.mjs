@@ -47,6 +47,8 @@ test('capacity-sensitive application and harness paths always require the load r
     'migrations/0045_batched_practice_selector.sql',
     'migrations/0050_practice_recency_bias.sql',
     'scripts/edge-control.mjs',
+    'scripts/create-ci-neon-branch.mjs',
+    'scripts/control-read.mjs',
     'scripts/launch-distributed-run.mjs',
     'scripts/launch-distributed-policy.json',
   ])assert.equal(classifyLaunchChange({files:[file]}).runLoad,true,file);

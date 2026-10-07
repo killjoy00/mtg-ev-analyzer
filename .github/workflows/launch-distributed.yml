@@ -2,7 +2,7 @@ name: isolated distributed launch acceptance
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths: ['scripts/launch-distributed*', 'scripts/launch-change-scope.mjs', 'tests/launch-change-scope.test.mjs', 'tests/launch-distributed-capacity.test.mjs', 'tests/draft-start-timing.test.mjs', 'tests/ingress.test.mjs', 'worker/draft-start-timing.mjs', 'worker/draft-run-function.mjs', 'worker/draft-run-selection.mjs', 'migrations/0045_batched_practice_selector.sql', 'migrations/0050_practice_recency_bias.sql', 'migrations/0051_exact_pick_draw_index.sql', 'edge/gateway.mjs', 'scripts/edge-control.mjs', '.github/workflows/launch-distributed.yml']
+    paths: ['scripts/create-ci-neon-branch.mjs', 'scripts/control-read.mjs', 'scripts/edge-control.mjs', 'tests/ci-provisioning.test.mjs', 'scripts/launch-distributed*', 'scripts/launch-change-scope.mjs', 'tests/launch-change-scope.test.mjs', 'tests/launch-distributed-capacity.test.mjs', 'tests/draft-start-timing.test.mjs', 'tests/ingress.test.mjs', 'worker/draft-start-timing.mjs', 'worker/draft-run-function.mjs', 'worker/draft-run-selection.mjs', 'migrations/0045_batched_practice_selector.sql', 'migrations/0050_practice_recency_bias.sql', 'migrations/0051_exact_pick_draw_index.sql', 'edge/gateway.mjs', '.github/workflows/launch-distributed.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -113,8 +113,22 @@ jobs:
           assert.ok(accepted,'required CI did not finish within the source gate');
           console.log('Unchanged source passed '+requiredNames.join(', ')+' acceptance.');
           NODE
+  preview-control:
+    needs: scope
+    if: needs.scope.outputs.run_load == 'true' && (github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.draft == false))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check preview ownership before waiting for source validation
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+        run: node scripts/edge-control.mjs preflight
   setup:
-    needs: [scope, regression, checked-source]
+    needs: [scope, regression, checked-source, preview-control]
     if: needs.scope.outputs.run_load == 'true' && (github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.draft == false))
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -139,16 +153,13 @@ jobs:
         run: node scripts/launch-distributed-setup.mjs budget
       - name: Create disposable production-sized branch
         id: neon
-        uses: neondatabase/create-branch-action@v6
-        with:
-          project_id: patient-shadow-91417882
-          parent_branch: br-orange-feather-ayps8kep
-          api_key: ${{ secrets.NEON_API_KEY }}
-          branch_name: launch-load-${{ github.run_id }}-${{ github.run_attempt }}
-          database: pack1
-          role: pack1_owner
-          suspend_timeout: 300
-          expires_at: ${{ steps.expiry.outputs.expires_at }}
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          CI_BRANCH_PREFIX: launch-load-${{ github.run_id }}-${{ github.run_attempt }}
+          CI_BRANCH_PARENT: br-orange-feather-ayps8kep
+          CI_BRANCH_EXPIRES: ${{ steps.expiry.outputs.expires_at }}
+          CI_BRANCH_SUSPEND: 300
+        run: node scripts/create-ci-neon-branch.mjs
       - name: Install pinned deployment tools
         run: node .github/scripts/install-wrangler-tool.mjs "$RUNNER_TEMP/edge-tools" neon@4.17.4 esbuild@0.28.2
       - name: Prepare isolated schema and exact revision

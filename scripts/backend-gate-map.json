@@ -23,7 +23,9 @@
     "scripts/load_verified_draft_run.mjs",
     "worker/database-retry.mjs",
     "scripts/creator-event-schema.mjs",
-    ".github/scripts/apply-identity-migration.sh"
+    ".github/scripts/apply-identity-migration.sh",
+    "scripts/create-ci-neon-branch.mjs",
+    "scripts/control-read.mjs"
   ],
   "domains": {
     "account": {

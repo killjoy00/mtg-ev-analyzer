@@ -7,6 +7,7 @@ import {execFileSync} from 'node:child_process';
 import {request as httpsRequest} from 'node:https';
 import {pathToFileURL} from 'node:url';
 import {deployPreviewFunction} from './edge-neon-deploy.mjs';
+import {controlRequest,transientControlStatus} from './control-read.mjs';
 const HOST='api-preview.packone.pro',WORKER='pack1-gateway-preview';
 const READINESS_CONSECUTIVE=20,READINESS_INTERVAL_MS=2000,READINESS_DEADLINE_MS=180000;
 export function parseRequest(value) {
@@ -73,16 +74,79 @@ export async function waitForPreviewReadiness({probe,commit,clock=Date.now,sleep
   }
   return {ready:false,attempts,consecutive,last};
 }
-async function cf(route,{method='GET',body,allow404=false}={}) {
-  let r;
-  try {r=await fetch('https://api.cloudflare.com/client/v4'+route,{method,redirect:'error',headers:{authorization:`Bearer ${process.env.CLOUDFLARE_EDGE_TOKEN}`,'content-type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(30000)});}catch{throw Error('Cloudflare control request failed.');}
-  if(allow404&&r.status===404)return null;
-  if(!r.ok)throw Error(`Cloudflare control HTTP ${r.status}; check the scoped deployment token.`);
-  const bodyText=await r.text();
-  if(method==='DELETE'&&!bodyText.trim())return {success:true};
-  let result;try{result=JSON.parse(bodyText);}catch{throw Error('Cloudflare control returned invalid JSON.');}
+async function cf(route,options={}) {
+  const result=await controlRequest('https://api.cloudflare.com/client/v4'+route,
+    {provider:'Cloudflare',token:process.env.CLOUDFLARE_EDGE_TOKEN,...options});
+  if(result===null&&(options.allow404||options.method==='DELETE'))return result;
   if(!result?.success)throw Error('Cloudflare rejected the control request.');
   return result;
+}
+function ownedDomain(domain,zone) {
+  if(domain?.hostname!==HOST||domain.service!==WORKER||domain.zone_id!==zone.id||
+    !/^[A-Za-z0-9_-]{1,128}$/.test(domain.id||''))throw Error('Preview hostname belongs to another service; refusing to replace it.');
+  return domain;
+}
+export async function recoverablePreviewDomain({request,zone}={}) {
+  // The current Wrangler control plane can retain a domain record that is not
+  // in the older active-domain inventory. A changeset is a read-only dry run.
+  // DNS alone (including a placeholder AAAA record) is never ownership proof.
+  const worker=`/accounts/${zone.account.id}/workers/scripts/${WORKER}`;
+  const result=await request(worker+'/domains/changeset?replace_state=false',{method:'POST',
+    body:[{hostname:HOST,zone_id:zone.id}]});
+  const changes=result?.result;
+  if(!changes||!['added','removed','updated','conflicting'].every(k=>Array.isArray(changes[k])))
+    throw Error('Cannot verify the preview domain changeset.');
+  const matches=[...changes.added,...changes.updated,...changes.conflicting].filter(d=>d.hostname===HOST&&d.service===WORKER&&d.id);
+  if(matches.length!==1)return null;
+  const domain=ownedDomain(matches[0],zone);
+  const verified=await request(`/accounts/${zone.account.id}/workers/domains/records/${encodeURIComponent(domain.id)}`,
+    {allow404:true});
+  return verified?ownedDomain(verified.result,zone):null;
+}
+export async function attachPreviewDomain({request,readContext,sleep=ms=>new Promise(r=>setTimeout(r,ms))}={}) {
+  for(let attempt=0;attempt<4;attempt++) {
+    const {zone}=await readContext();
+    try {
+      // Same fixed origin set on every attempt; do not override somebody else's
+      // origin or DNS. Unlike Wrangler's CI defaults, all override flags are false.
+      await request(`/accounts/${zone.account.id}/workers/scripts/${WORKER}/domains/records`,{method:'PUT',
+        body:{override_scope:false,override_existing_origin:false,override_existing_dns_record:false,
+          origins:[{hostname:HOST,zone_id:zone.id}]}});
+      const current=await readContext();
+      if(!current.domain)throw Error('Preview hostname attachment was not present after installation.');
+      return;
+    } catch(error) {
+      if(error.status&&!transientControlStatus(error.status))throw error;
+      // A 500/timeout can still have installed the origin. Reconcile first;
+      // ownership mismatches throw before any further write is attempted.
+      const current=await readContext();
+      if(current.domain)return;
+      if(attempt===3)throw error;
+      await sleep(1000*2**attempt);
+    }
+  }
+}
+export async function detachPreviewDomain({request,readContext,sleep=ms=>new Promise(r=>setTimeout(r,ms))}={}) {
+  const initial=await readContext();
+  if(!initial.domain)return;
+  const domain=ownedDomain(initial.domain,initial.zone);
+  for(let attempt=0;attempt<4;attempt++) {
+    try {
+      await request(`/accounts/${initial.zone.account.id}/workers/domains/${encodeURIComponent(domain.id)}`,
+        {method:'DELETE',allow404:true});
+    } catch(error) {
+      if(error.status&&!transientControlStatus(error.status))throw error;
+      const remaining=await readContext();
+      if(!remaining.domain)return;
+      if(remaining.domain.id!==domain.id)throw Error('Preview hostname attachment changed during cleanup; refusing to delete it.');
+      if(attempt===3)throw error;
+    }
+    const remaining=await readContext();
+    if(!remaining.domain)return;
+    if(remaining.domain.id!==domain.id)throw Error('Preview hostname attachment changed during cleanup; refusing to delete it.');
+    if(attempt===3)throw Error('Preview hostname remains attached after deletion.');
+    await sleep(1000*2**attempt);
+  }
 }
 async function context() {
   const zones=(await cf('/zones?name=packone.pro&per_page=50')).result;
@@ -93,7 +157,7 @@ async function context() {
   if(!Array.isArray(result.result)||(result.result_info?.total_pages||1)>1)throw Error('Cannot verify the full custom-domain inventory.');
   const matches=result.result.filter(d=>d.hostname===HOST);
   if(matches.length>1||matches.some(d=>d.service!==WORKER||d.zone_id!==zone.id))throw Error('Preview hostname belongs to another service; refusing to replace it.');
-  return {zone,domain:matches[0]};
+  return {zone,domain:matches[0]?ownedDomain(matches[0],zone):null};
 }
 async function main(action) {
   if(action==='request') {
@@ -113,17 +177,26 @@ async function main(action) {
   const {zone,domain}=await context();
   if(action==='preflight') {
     const dns=await cf(`/zones/${zone.id}/dns_records?name=${HOST}&per_page=100`);
-    if((dns.result_info?.total_pages||1)>1||(!domain&&dns.result.length))throw Error('Preview DNS already exists without our Worker mapping; refusing to replace it.');
+    if(!Array.isArray(dns.result)||(dns.result_info?.total_pages||1)>1)throw Error('Cannot verify the full preview DNS inventory.');
     const settings=await cf(`/accounts/${zone.account.id}/workers/scripts/${WORKER}/settings`,{allow404:true});
     if(settings&&!settings.result.bindings?.some(b=>b.name==='MODE'&&b.type==='plain_text'&&b.text==='preview'))throw Error('Existing Worker is not marked as our preview; refusing to overwrite it.');
+    if(!domain&&dns.result.length) {
+      const recovered=settings?await recoverablePreviewDomain({request:cf,zone}):null;
+      if(!recovered) {
+        console.log(JSON.stringify({event:'preview_dns_ownership_unproven',records:dns.result.map(r=>({
+          id:/^[a-f0-9]{32}$/.test(r.id||'')?r.id:null,type:r.type,proxied:r.proxied,
+          created_on:r.created_on,modified_on:r.modified_on,
+          placeholder:(r.type==='AAAA'&&r.content==='100::')||(r.type==='A'&&r.content==='192.0.2.0'),
+        }))}));
+        throw Error('Preview DNS already exists without our Worker mapping; refusing to replace it.');
+      }
+      console.log('Preview domain ownership verified through the current Worker domain record.');
+    }
     variable('CLOUDFLARE_ACCOUNT_ID',zone.account.id);
     console.log('Scoped Cloudflare access and preview hostname ownership verified.');return;
   }
   if(action==='disable') {
-    if(domain) {
-      if(!/^[A-Za-z0-9_-]{1,128}$/.test(domain.id))throw Error('Unexpected custom-domain identifier.');
-      await cf(`/accounts/${zone.account.id}/workers/domains/${encodeURIComponent(domain.id)}`,{method:'DELETE'});
-    }
+    await detachPreviewDomain({request:cf,readContext:context});
     const remaining=await context();if(remaining.domain)throw Error('Preview hostname remains attached after deletion.');
     console.log('Preview custom domain disabled. Backend guards remain enabled; the isolated branch expires automatically.');return;
   }
@@ -173,7 +246,7 @@ async function main(action) {
   fs.writeFileSync(configPath,JSON.stringify(config),{mode:0o600});
   run('wrangler',['deploy','--config',configPath]);
   run('wrangler',['secret','bulk','--config',configPath],JSON.stringify({ORIGIN_SECRET:origin,PREVIEW_KEY:preview,QUOTA_KEY:quota}));
-  await cf(`/accounts/${zone.account.id}/workers/domains`,{method:'PUT',body:{hostname:HOST,service:WORKER,zone_id:zone.id}});
+  await attachPreviewDomain({request:cf,readContext:context});
   // A newly attached hostname or Worker version can lag the control-plane
   // response. Require sustained exact-revision health from fresh TLS
   // connections so one warm edge connection cannot declare propagation done.

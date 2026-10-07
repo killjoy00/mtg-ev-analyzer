@@ -19,6 +19,8 @@ test('gate infrastructure, migrations, shared core, unmapped files, and empty di
     ['.github/workflows/prepare-rebuild.yml'],
     ['scripts/backend-gate-scope.mjs'],
     ['scripts/backend-gate-map.json'],
+    ['scripts/create-ci-neon-branch.mjs'],
+    ['scripts/control-read.mjs'],
     ['tests/backend-gate-scope.test.mjs'],
     ['migrations/9999_probe.sql'],
     ['worker/schema.sql'],

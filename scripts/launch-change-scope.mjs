@@ -10,6 +10,8 @@ const LOAD_SENSITIVE_PATHS=[
   path=>path==='migrations/0050_practice_recency_bias.sql',
   path=>path==='migrations/0051_exact_pick_draw_index.sql',
   path=>path==='scripts/edge-control.mjs',
+  path=>path==='scripts/create-ci-neon-branch.mjs',
+  path=>path==='scripts/control-read.mjs',
 ];
 const PRACTICE_PERFORMANCE_PATHS=new Set([
   'scripts/practice-performance.mjs',
