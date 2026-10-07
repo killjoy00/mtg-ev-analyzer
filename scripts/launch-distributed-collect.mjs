@@ -3,7 +3,7 @@ import path from 'node:path';
 import assert from 'node:assert/strict';
 import {unseal} from './launch-distributed-bundle.mjs';
 import {policy} from './launch-distributed-control.mjs';
-import {evaluateStage,fingerprint} from './launch-distributed-core.mjs';
+import {evaluateStage,fingerprint,stageFailureEvidence} from './launch-distributed-core.mjs';
 const root='artifacts/distributed-results',files=fs.existsSync(root)?fs.readdirSync(root,{recursive:true}):[];
 const named=pattern=>files.filter(f=>pattern.test(path.basename(f))).map(f=>JSON.parse(fs.readFileSync(path.join(root,f),'utf8')));
 const declarations=named(/^experiment-declaration\.json$/),preflights=named(/^telemetry-preflight\.json$/),cohorts=named(/^cohort-\d\.json$/),summaries=named(/^distributed-stage-\d+\.json$/),reasons=[];
@@ -30,5 +30,7 @@ const report={scope,policy,verified:declaration?.verified,budget,stages,reasons,
   historical_supported_distributed_players:25,candidate_distributed_players:!reasons.length?policy.proposed_target:null,
   capacity_claim:'Not promoted until private ingress removal and disposable branch deletion are separately verified. Five-network finite mixed-lifecycle evidence only; not universal backend capacity or indefinite endurance.'};
 fs.mkdirSync('artifacts/launch-load',{recursive:true});fs.writeFileSync('artifacts/launch-load/distributed-acceptance.json',JSON.stringify(report,null,2));
-console.log(JSON.stringify({passed:report.passed,reasons,budget,passed_stages:stages.map(s=>s.target)}));
+console.log(JSON.stringify({passed:report.passed,reasons,budget,passed_stages:stages.map(s=>s.target),
+  failed_stages:summaries.filter(s=>!s.passed).map(stageFailureEvidence),
+  cohort_failures:cohorts.filter(c=>c.failure).map(c=>({shard:c.shard,category:c.failure.category,reason:c.failure.reason}))}));
 if(!report.passed)process.exitCode=1;

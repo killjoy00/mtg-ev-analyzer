@@ -40,8 +40,12 @@ export async function queryPreviewEvents(fetcher,token,account,from,to) {
 
 export function previewTelemetryFailure(error) {
   const message=String(error?.message||'');
-  return /^(?:preview_telemetry_http_[1-5]\d\d|preview_telemetry_api_error|invalid_preview_log_schema|invalid_preview_log_cursor|invalid_retained_preview_event|preview_telemetry_page_limit)$/.test(message)
-    ?message:'preview_telemetry_unclassified';
+  if(/^(?:preview_telemetry_http_[1-5]\d\d|preview_telemetry_api_error|invalid_preview_log_schema|invalid_preview_log_cursor|invalid_retained_preview_event|preview_telemetry_page_limit|telemetry_not_settled)$/.test(message))return message;
+  if(error?.name==='TimeoutError')return 'preview_telemetry_timeout';
+  if(error?.name==='AbortError'||message==='cohort_aborted')return 'preview_telemetry_aborted';
+  const code=error?.cause?.code||error?.code;
+  if(['UND_ERR_CONNECT_TIMEOUT','UND_ERR_SOCKET','ECONNRESET','ETIMEDOUT','EAI_AGAIN','ENOTFOUND'].includes(code))return 'preview_telemetry_transport_'+code.toLowerCase();
+  return 'preview_telemetry_unclassified';
 }
 
 // Use only retained preview evidence; never production probes, usage mutation or
@@ -93,6 +97,12 @@ export async function inspectPreviewTelemetry({reports,sha,from,to,policy,accoun
 export async function settlePreviewTelemetry({reports,sha,from,to,policy,account,token=process.env.CLOUDFLARE_EDGE_TOKEN,fetcher=fetch,
   clock=Date.now,sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms))}) {
   const deadline=to+policy.telemetry_timeout_seconds*1000,checks=[];
+  const settledAt=to+policy.telemetry_settlement_seconds*1000;
+  // Timers can wake before their requested wall-clock boundary. Recheck the
+  // same clock used by inspection before querying retained evidence; do not
+  // extend the fixed evidence deadline or weaken any coverage requirement.
+  for(let remaining=settledAt-clock();remaining>0;remaining=settledAt-clock())
+    await sleep(Math.max(1,remaining));
   for(;;) {
     const queriedAt=clock(),inspection=await inspectPreviewTelemetry({reports,sha,from,to,policy,account,token,fetcher,clock});
     const missing=inspection.bins.filter(bin=>bin.failures.includes('missing_or_sparse_retained_telemetry'))
