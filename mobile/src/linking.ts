@@ -10,7 +10,6 @@ const NATIVE_PATHS = new Set([
   '/support',
   '/privacy',
   '/terms',
-  '/help',
   '/sign-in',
   '/resume-shared-run',
   '/draft-run',
@@ -38,6 +37,7 @@ function directArticlePath(pathname: string) {
   if (normalized === '/how-it-works') return '/how-to';
   if (normalized === '/methodology') return '/method';
   if (normalized === '/about') return '/about';
+  if (normalized === '/help') return '/about';
   if (normalized === '/contact') return '/support';
   if (normalized === '/privacy') return '/privacy';
   if (normalized === '/terms') return '/terms';
