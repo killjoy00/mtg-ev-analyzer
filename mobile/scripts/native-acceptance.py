@@ -216,11 +216,11 @@ def measure_header(logs):
             raw = line.split('PACKONE_HEADER', 1)[1]
             record = json.loads(raw[raw.find('{'):raw.rfind('}')+1])
             boxes[record['label']] = record
-    for label in ['title', 'help']:
-        require(label in boxes and 'row' in boxes, f'Missing native header measurement: {label}')
-        box, row = boxes[label], boxes['row']
-        require(box['x'] >= -1 and box['x']+box['width'] <= row['width']+1, f'Header {label} overflows horizontally')
-        require(box['y'] >= -1 and box['y']+box['height'] <= row['height']+1, f'Header {label} overflows vertically')
+    require('row' in boxes and 'title' in boxes, 'Missing native tab header row/title measurement')
+    require('help' not in boxes, 'Legacy Help control is still present in the native tab header')
+    box, row = boxes['title'], boxes['row']
+    require(box['x'] >= -1 and box['x']+box['width'] <= row['width']+1, 'Header title overflows horizontally')
+    require(box['y'] >= -1 and box['y']+box['height'] <= row['height']+1, 'Header title overflows vertically')
     return boxes
 
 
@@ -231,7 +231,8 @@ def measure_brand(logs):
             raw = line.split('PACKONE_BRAND', 1)[1]
             record = json.loads(raw[raw.find('{'):raw.rfind('}')+1])
             boxes[record['label']] = record
-    for child, parent in [('brand', 'row'), ('help', 'row'), ('mark', 'brand'), ('name', 'brand')]:
+    require('help' not in boxes, 'Legacy Help control is still present in the Home brand row')
+    for child, parent in [('brand', 'row'), ('mark', 'brand'), ('name', 'brand')]:
         require(child in boxes and parent in boxes, f'Missing native brand layout: {child}/{parent}')
         box, container = boxes[child], boxes[parent]
         require(box['x'] >= -1 and box['x']+box['width'] <= container['width']+1,
