@@ -147,6 +147,8 @@ test('Help is removed from tab headers and About is at the bottom of tab content
 
 test('public editorial URLs resolve to native routes', () => {
   assert.match(linking, /if \(normalized === '\/about'\) return '\/about'/);
+  assert.match(linking, /if \(normalized === '\/help'\) return '\/about'/);
+  assert.doesNotMatch(linking, /['"]\/help['"],/);
   assert.match(linking, /if \(normalized === '\/contact'\) return '\/support'/);
   assert.match(linking, /if \(normalized === '\/privacy'\) return '\/privacy'/);
   assert.match(linking, /if \(normalized === '\/terms'\) return '\/terms'/);
