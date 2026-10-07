@@ -7,6 +7,7 @@ import {
 import { Text } from '@/src/components/Text';
 
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
+import { config } from '@/src/config';
 
 import { colors, spacing } from '@/src/theme';
 
@@ -34,7 +35,12 @@ export function ArticleScreen({
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.page}>
-        <View style={styles.header}>
+        <View
+          onLayout={() => {
+            if (config.screenshots.fixtures) console.info('PACKONE_ARTICLE_READY', JSON.stringify({ title }));
+          }}
+          style={styles.header}
+        >
           <Text style={styles.kicker}>{kicker.toUpperCase()}</Text>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.deck}>{deck}</Text>
