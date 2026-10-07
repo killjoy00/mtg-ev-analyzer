@@ -137,8 +137,8 @@ function renderCreatorKit(target,challenge,status) {
   target.hidden=false;target.classList.add('creator-kit');
   target.innerHTML=`<header class="creator-kit-heading"><div><p class="eyebrow">BEAT THE CREATOR</p><h3>Creator kit</h3></div><a class="button secondary" target="_blank" rel="noopener" href="${esc(publicUrl)}">Open challenge</a></header>
     <div class="creator-kit-links">
-      <label>Public link<input readonly value="${esc(publicUrl)}"><button type="button" class="secondary" data-copy-creator-link>Copy public link</button></label>
-      <label>Tracked link<input readonly value="${esc(trackedUrl)}"><button type="button" class="secondary" data-copy-creator-tracked>Copy tracked link</button></label>
+      <div><label>Public link<input readonly value="${esc(publicUrl)}"></label><button type="button" class="secondary" data-copy-creator-link>Copy public link</button></div>
+      <div><label>Tracked link<input readonly value="${esc(trackedUrl)}"></label><button type="button" class="secondary" data-copy-creator-tracked>Copy tracked link</button></div>
     </div>
     <div class="creator-kit-assets">
       <article class="creator-kit-asset" data-creator-format="og">
@@ -157,9 +157,9 @@ function renderCreatorKit(target,challenge,status) {
       </article>
     </div>
     <div class="creator-kit-copy">
-      <label>Image alt text<textarea readonly rows="2">${esc(alt)}</textarea><button type="button" class="secondary" data-copy-creator-alt>Copy alt text</button></label>
-      <label>Ready-to-post caption<textarea readonly rows="3">${esc(postCopy)}</textarea><button type="button" class="secondary" data-copy-creator-copy>Copy caption</button></label>
-      <label>Short social caption<textarea readonly rows="2">${esc(shortCopy)}</textarea><button type="button" class="secondary" data-copy-creator-short>Copy short caption</button></label>
+      <div><label>Image alt text<textarea readonly rows="2">${esc(alt)}</textarea></label><button type="button" class="secondary" data-copy-creator-alt>Copy alt text</button></div>
+      <div><label>Ready-to-post caption<textarea readonly rows="3">${esc(postCopy)}</textarea></label><button type="button" class="secondary" data-copy-creator-copy>Copy caption</button></div>
+      <div><label>Short social caption<textarea readonly rows="2">${esc(shortCopy)}</textarea></label><button type="button" class="secondary" data-copy-creator-short>Copy short caption</button></div>
     </div>`;
 
   const previews=[
