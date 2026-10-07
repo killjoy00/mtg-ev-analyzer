@@ -160,7 +160,10 @@ jobs:
           path: artifacts/load-private
       - run: node scripts/launch-distributed-bundle.mjs unpack
       - name: Persistent real-egress cohort and selected capacity hold
-        run: node scripts/launch-distributed-run.mjs
+        # Node otherwise gives each fallback address only 250 ms. A new-socket
+        # connection failed before sending a pick at 503 ms on 37664468834.
+        # This changes connection establishment, not route budgets or retries.
+        run: node --network-family-autoselection-attempt-timeout=1000 scripts/launch-distributed-run.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -3,10 +3,11 @@ import assert from 'node:assert/strict';
 import {checkBranch} from './edge-control.mjs';
 import {summarize} from './practice-performance.mjs';
 import {seededRandom} from '../gameplay.mjs';
+import {selectNatPolicy} from './launch-load-core.mjs';
 
 async function main() {
 
-const policy=JSON.parse(fs.readFileSync('scripts/launch-load-policy.json','utf8'));
+const policy=selectNatPolicy(JSON.parse(fs.readFileSync('scripts/launch-load-policy.json','utf8')),process.env.PACK1_CAPACITY_TARGET??'25');
 const fixture=JSON.parse(fs.readFileSync(process.env.LOAD_FIXTURE_FILE,'utf8'));
 checkBranch(fixture.branch);
 assert.equal(fixture.branch,process.env.PREVIEW_BRANCH);

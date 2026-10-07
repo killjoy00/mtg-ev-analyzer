@@ -4,6 +4,14 @@ on:
     types: [opened, synchronize, reopened, ready_for_review]
     paths: ['.github/preview-dns-recovery.json', 'scripts/create-ci-neon-branch.mjs', 'scripts/control-read.mjs', 'scripts/edge-control.mjs', 'scripts/preview-resource-ownership.mjs', 'tests/preview-resource-ownership.test.mjs', 'tests/ci-provisioning.test.mjs', 'scripts/launch-load*', 'scripts/launch-practice-browser.mjs', '.github/workflows/launch-load.yml']
   workflow_dispatch:
+    inputs:
+      capacity_target:
+        description: Required 25-player check or optional 50-player experiment
+        type: choice
+        options: ['25', '50']
+        default: '25'
+env:
+  PACK1_CAPACITY_TARGET: ${{ inputs.capacity_target || '25' }}
 permissions:
   contents: read
 concurrency:
@@ -20,6 +28,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Validate and declare NAT target before provisioning
+        run: |
+          node --input-type=module -e "import fs from 'node:fs'; import {selectNatPolicy} from './scripts/launch-load-core.mjs'; console.log(JSON.stringify(selectNatPolicy(JSON.parse(fs.readFileSync('scripts/launch-load-policy.json','utf8')),process.env.PACK1_CAPACITY_TARGET)));"
+          echo "Required NAT target: $PACK1_CAPACITY_TARGET players; browser acceptance remains independently required." >> "$GITHUB_STEP_SUMMARY"
       - name: Reject a stale queued PR before provisioning
         if: github.event_name == 'pull_request'
         env:
