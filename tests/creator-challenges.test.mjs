@@ -119,6 +119,7 @@ test('completed Daily remains previewable but cannot publish/start until the Pac
       selectedId,
       selectedName:p.candidates.find(card=>card.id===selectedId)?.name||'Trophy pick',
       score:graded.score,
+      ranking:p.candidates.map(card=>({id:card.id,score:gradeDraftRunPick(p,card.id).score})),
     };
   });
   const score=Math.round(answers.reduce((sum,answer)=>sum+answer.score,0)/answers.length);
