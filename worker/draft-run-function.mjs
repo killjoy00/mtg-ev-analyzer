@@ -466,8 +466,6 @@ async function createShare(request,id) {
   const key=crypto.randomUUID().replaceAll('-','').slice(0,24);
   const r=await query(`INSERT INTO draft_run_shares(id,session_id,display_name,score,puzzle_ids) VALUES($1,$2::uuid,$3,$4::int,$5::jsonb) ON CONFLICT(session_id) DO UPDATE SET session_id=EXCLUDED.session_id RETURNING id`,[key,id,name,s.score,JSON.stringify(s.puzzle_ids)]);
   const shareId=r.rows[0].id;
-  const persisted=await share(shareId);
-  if(persisted.session_id!==s.id)fail('Could not verify the shared run.',503);
   return json({id:shareId,url:`/?game=draft-run&shared=${shareId}`});
 }
 
