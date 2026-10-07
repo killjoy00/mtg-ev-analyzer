@@ -578,13 +578,9 @@ async function route(request) {
     const viewer=await player(request,false);
     if(viewer) {
       const acquisition=creatorAcquisitionProps(challenge);
-      await query(`WITH locked AS MATERIALIZED (
-          SELECT pack1_lock_creator_challenge_events($1::uuid,$5::uuid)
-        )
-        INSERT INTO analytics_events(player_id,event_name,event_props)
+      await query(`INSERT INTO analytics_events(player_id,event_name,event_props)
         SELECT $1::uuid,event_name,event_props
-        FROM locked
-        CROSS JOIN players p
+        FROM players p
         CROSS JOIN (VALUES
           ('creator_challenge_open',$2::jsonb),
           ('acquisition_touch',$3::jsonb)
@@ -602,7 +598,8 @@ async function route(request) {
             WHERE existing.player_id=$1::uuid
               AND existing.event_name=event.event_name
               AND existing.event_props->>'creator_challenge_id'=$5
-          )`,[
+          )
+        ON CONFLICT DO NOTHING`,[
         viewer,
         JSON.stringify({creator_challenge_id:challenge.id,creator_challenge_slug:challenge.slug,creator_source_type:challenge.source_type}),
         JSON.stringify(acquisition),
