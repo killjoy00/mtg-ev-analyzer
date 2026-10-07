@@ -29,7 +29,7 @@ export function parseStartDiagnostics(headers,route='start') {
   }
   if(origin?.v===1) {
     const phases=bounded(origin.phases,route==='view'?['player','body','observation']:route==='reroll'?['player','body','session','metadata','selection','update','response']:
-      ['player','body','identity','capability','idempotency','quota','selection','session_insert','analytics_insert','response','first_puzzle']);
+      ['player','body','identity','capability','idempotency','daily_session','daily_schedule','quota','selection','metadata','session_insert','analytics_insert','response','first_puzzle']);
     const selector={};
     for(const key of route==='view'?[]:route==='reroll'?['metadata','reroll','other']:['snapshot','candidate','revision','other']) {
       const values=bounded(origin.selector?.[key],['count','sum_ms','max_ms']);
