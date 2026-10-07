@@ -1,0 +1,25 @@
+name: Read retained capacity failure evidence
+on:
+  push:
+    branches: ['ci/capacity-evidence-1054']
+permissions:
+  contents: read
+jobs:
+  retained-preview-logs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Read the two failed preview windows without provisioning or gameplay
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+        run: node scripts/capacity-failure-evidence.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: retained-capacity-evidence
+          path: artifacts/capacity-evidence
+          retention-days: 14
