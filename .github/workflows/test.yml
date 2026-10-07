@@ -15,14 +15,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test:
+  fast:
+    name: fast-core
+    timeout-minutes: 8
+    outputs:
+      dataset_audit: ${{ steps.scope.outputs.dataset_audit }}
     runs-on: ubuntu-latest
-    env:
-      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-      R2_BUCKET: ${{ secrets.R2_BUCKET }}
-      AWS_DEFAULT_REGION: auto
     steps:
       - uses: actions/checkout@v4
         with:
@@ -169,9 +167,6 @@ jobs:
           set -euo pipefail
           npm install --prefix "$RUNNER_TEMP/release-tools" --no-audit --no-fund esbuild@0.28.2
           ESBUILD_BIN="$RUNNER_TEMP/release-tools/node_modules/.bin/esbuild" node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$GITHUB_SHA"
-      - name: Hydrate replay shards from R2
-        if: steps.scope.outputs.hydrate_replays == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        run: bash scripts/hydrate-replay-shards.sh
       - name: Run selected test validation
         id: selected_test
         shell: bash
@@ -202,11 +197,7 @@ jobs:
               test -f "$RUNNER_TEMP/ci-contracts-complete"
               ;;
             full)
-              if [[ "$HYDRATE_REPLAYS" == true && "$SAME_REPO_PR" == true ]]; then
-                REQUIRE_REPLAY_SHARDS=1 npm test
-              else
-                npm test
-              fi
+              npm run test:fast
               ;;
             mobile|docs)
               node --test tests/ci-change-classifier.test.mjs
@@ -217,10 +208,70 @@ jobs:
               ;;
           esac
           touch "$RUNNER_TEMP/test-validation-complete"
-      - name: Audit production datasets
-        if: steps.scope.outputs.dataset_audit == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
-        run: python scripts/audit_datasets.py --fail-on-error
       - name: Verify selected test validation completed
         if: always()
         run: |
           test -f "$RUNNER_TEMP/test-validation-complete" || { echo '::error::Selected test validation did not complete successfully.'; exit 1; }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: fast-test-results
+          path: artifacts/tests
+          if-no-files-found: ignore
+
+  data:
+    name: full-data-audit
+    needs: fast
+    if: needs.fast.outputs.dataset_audit == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      AWS_DEFAULT_REGION: auto
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/cache@v4
+        with:
+          path: data/*/shards
+          key: replay-shards-${{ runner.os }}-${{ hashFiles('data/catalog.json', 'data/*/manifest.json', 'model-versions.json') }}
+      - name: Hydrate replay shards from R2
+        run: bash scripts/hydrate-replay-shards.sh
+      - name: Run exhaustive replay and corpus validation
+        run: npm run test:data
+      - name: Audit production datasets
+        run: python scripts/audit_datasets.py --fail-on-error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: data-test-results
+          path: artifacts/tests
+          if-no-files-found: ignore
+
+  test:
+    name: test
+    needs: [fast, data]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require every selected validation lane
+        env:
+          FAST_RESULT: ${{ needs.fast.result }}
+          DATA_RESULT: ${{ needs.data.result }}
+          DATA_REQUIRED: ${{ needs.fast.outputs.dataset_audit == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
+        run: |
+          test "$FAST_RESULT" = success || { echo '::error::Fast validation failed or did not execute.'; exit 1; }
+          if [[ "$DATA_REQUIRED" == true ]]; then
+            test "$DATA_RESULT" = success || { echo '::error::Selected full-data validation failed or did not execute.'; exit 1; }
+          else
+            test "$DATA_RESULT" = skipped || { echo '::error::Unexpected full-data lane result.'; exit 1; }
+          fi

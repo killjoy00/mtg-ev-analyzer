@@ -13,6 +13,13 @@ on:
       - 'data/selection-policy.json'
       - 'game-date.mjs'
       - 'tests/*backend-smoke.mjs'
+      - 'tests/creator-event-*.mjs'
+      - 'tests/measurement-report-math.mjs'
+      - 'scripts/ci-migration-plan.mjs'
+      - 'scripts/prepare-test-database.mjs'
+      - 'tests/support/**'
+      - 'tests/fixtures/**'
+      - 'tests/postgres-client-contract.mjs'
       - 'scripts/verify-neon-schema.mjs'
       - 'scripts/create-ci-neon-branch.mjs'
       - 'scripts/control-read.mjs'
@@ -34,6 +41,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  postgres-contract:
+    name: postgres-contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_DB: pack1_ci
+          POSTGRES_USER: pack1_ci
+          POSTGRES_PASSWORD: fixture-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U pack1_ci -d pack1_ci"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PACK1_TEST_DATABASE_URL: postgresql://pack1_ci:fixture-only@127.0.0.1:5432/pack1_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Apply real migrations and verify the small immutable corpus
+        run: node scripts/prepare-test-database.mjs
+      - name: Exercise the actual client, gateway, worker and PostgreSQL
+        run: node tests/postgres-client-contract.mjs
+      - name: Check migration rollout, concurrent writes and rollback safety
+        run: |
+          printf '%s' "$PACK1_TEST_DATABASE_URL" > "$RUNNER_TEMP/pack1-postgres.connection"
+          node tests/creator-event-migration-rollout.mjs "$RUNNER_TEMP/pack1-postgres.connection" --dev-fixtures
+          node tests/creator-event-write-safety.mjs "$RUNNER_TEMP/pack1-postgres.connection" --dev-fixtures
+
   precheck:
     name: backend schema gate precheck
     runs-on: ubuntu-latest
@@ -94,6 +135,7 @@ jobs:
     if: ${{ !cancelled() && github.event.pull_request.head.repo.full_name == github.repository && (needs.precheck.result != 'success' || needs.precheck.outputs.needs_neon != 'false') }}
     strategy:
       fail-fast: false
+      max-parallel: 3
       matrix:
         domain: ${{ fromJSON(needs.precheck.outputs.domains_json || '["account","subscriptions","draft_run","daily","corpus","seasons"]') }}
     runs-on: ubuntu-latest
@@ -162,30 +204,8 @@ jobs:
           stack_base_sha="$(git merge-base origin/main "$HEAD_SHA")"
           echo "STACK_BASE_SHA=$stack_base_sha" >> "$GITHUB_ENV"
 
-          mapfile -t migration_changes < <(git diff --name-status "$stack_base_sha" "$HEAD_SHA" -- 'migrations/*.sql')
-          for change in "${migration_changes[@]}"; do
-            status="${change%%$'\t'*}"
-            path="${change#*$'\t'}"
-            if [[ "$status" != 'A' ]]; then
-              echo "::error file=$path::Existing migration files are immutable in backend-gated PRs; add a new migration instead (status $status)."
-              exit 1
-            fi
-          done
-
-          # Disposable CI branches are cloned from the deployed Neon default branch,
-          # which can lag Git main. Replay the known additive/repeatable mobile release
-          # backlog until those migrations are promoted, then add migrations introduced
-          # by this PR. This keeps merged-but-not-deployed schema prerequisites available
-          # without blindly replaying historical migrations.
-          release_backlog=(migrations/0037_mobile_oauth_handoffs.sql migrations/0038_mobile_practice_idempotency.sql migrations/0039_practice_serving_cache.sql migrations/0040_mobile_minimum_version.sql migrations/0040_practice_reroll_index.sql migrations/0041_corpus_source_snapshots.sql migrations/0041_apple_auth.sql migrations/0042_serving_revision_snapshot_staging.sql migrations/0043_corpus_activation_readiness.sql migrations/0044_snapshot_scoped_puzzle_uniqueness.sql migrations/0045_apple_subscriptions.sql migrations/0046_public_identity_safety.sql migrations/0047_admin_user_account_controls.sql)
-          mapfile -t pending < <(
-            {
-              for migration in "${release_backlog[@]}" migrations/0048_uncapped_v5_components.sql migrations/0049_cross_version_corpus_cutover.sql migrations/0050_practice_recency_bias.sql migrations/0051_exact_pick_draw_index.sql migrations/0052_decision_reports.sql migrations/0053_creator_challenges.sql migrations/0054_creator_event_idempotency.sql migrations/0055_creator_event_write_safety.sql migrations/0056_snapshot_aware_reroll_covering_index.sql; do
-                [[ -f "$migration" ]] && printf '%s\n' "$migration"
-              done
-              printf '%s\n' "${migration_changes[@]}" | awk -F '\t' '$1 == "A" { print $2 }'
-            } | sort -u
-          )
+          node scripts/ci-migration-plan.mjs backend-gate-backlog "$stack_base_sha" "$HEAD_SHA" > "$RUNNER_TEMP/pack1-migrations.txt"
+          mapfile -t pending < "$RUNNER_TEMP/pack1-migrations.txt"
           if (( ${#pending[@]} == 0 )); then
             echo 'No pending migrations in this PR.'
           else
@@ -319,7 +339,7 @@ jobs:
 
   backend-gate:
     name: backend-gate
-    needs: [precheck, backend-domain]
+    needs: [precheck, backend-domain, postgres-contract]
     if: ${{ !cancelled() && github.event.pull_request.head.repo.full_name == github.repository && (needs.precheck.result != 'success' || needs.precheck.outputs.needs_neon != 'false') }}
     runs-on: ubuntu-latest
     steps:
@@ -328,10 +348,12 @@ jobs:
         env:
           PRECHECK_RESULT: ${{ needs.precheck.result }}
           DOMAIN_RESULT: ${{ needs.backend-domain.result }}
+          POSTGRES_RESULT: ${{ needs.postgres-contract.result }}
           BACKEND_FULL: ${{ needs.precheck.result != 'success' || needs.precheck.outputs.full_suite != 'false' }}
           DOMAINS_JSON: ${{ needs.precheck.outputs.domains_json }}
         run: |
           set -euo pipefail
+          test "$POSTGRES_RESULT" = success || { echo '::error::Real PostgreSQL fixture gate failed.'; exit 1; }
           if [[ "$DOMAIN_RESULT" != 'success' ]]; then
             echo "::error::At least one required isolated backend domain was skipped, cancelled, or failed (aggregate result: $DOMAIN_RESULT)."
             exit 1

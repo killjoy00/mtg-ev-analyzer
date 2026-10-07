@@ -1,0 +1,27 @@
+name: Validate shared mobile inputs
+description: Reuse successful validation for identical inputs while checking this job's release configuration freshly
+runs:
+  using: composite
+  steps:
+    - uses: actions/cache@v4
+      id: validation
+      with:
+        path: mobile/.validation-receipt
+        key: mobile-validation-v1-${{ runner.os }}-${{ hashFiles('**', '!**/node_modules/**', '!**/.git/**', '!artifacts/**', '!mobile/.validation-receipt/**', '!mobile/android/**', '!mobile/ios/**', '!mobile/.expo/**', '!mobile/dist/**') }}
+    - name: Run shared validation once for these exact inputs
+      if: steps.validation.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: mobile
+      run: |
+        set -euo pipefail
+        npm run test:shared
+        mkdir -p .validation-receipt
+        printf '%s\n' 'mobile-validation-v1 passed' > .validation-receipt/passed
+    - name: Require a successful receipt and check the current build configuration
+      shell: bash
+      working-directory: mobile
+      run: |
+        set -euo pipefail
+        test "$(cat .validation-receipt/passed)" = 'mobile-validation-v1 passed'
+        npm run config:check
+        npm run release:check

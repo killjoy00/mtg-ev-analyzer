@@ -162,7 +162,7 @@ test('backend full path fans out by domain and aggregates fail closed', () => {
   const backend = readFileSync('.github/workflows/backend-gate.yml', 'utf8');
   assert.match(backend, /backend-domain:\n[\s\S]*?fail-fast: false[\s\S]*?matrix:/);
   assert.match(backend, /CI_BRANCH_PREFIX: ci-pr-.*matrix\.domain/);
-  assert.match(backend, /name: backend-gate\n    needs: \[precheck, backend-domain\]/);
+  assert.match(backend, /name: backend-gate\n    needs: \[precheck, backend-domain, postgres-contract\]/);
   assert.match(backend, /DOMAIN_RESULT: \$\{\{ needs\.backend-domain\.result \}\}/);
   assert.match(backend, /At least one required isolated backend domain was skipped, cancelled, or failed/);
   assert.match(backend, /if: always\(\) && steps\.neon\.outputs\.branch_id != ''/);

@@ -7,7 +7,7 @@ on:
       - '.github/store-screenshot-request.json'
   workflow_dispatch:
   pull_request:
-    paths: ['mobile/**', '.github/workflows/mobile-store-screenshots.yml']
+    paths: ['mobile/**', '.github/actions/mobile-validate/**', '.github/workflows/mobile-store-screenshots.yml']
 
 permissions:
   contents: read
@@ -61,7 +61,7 @@ jobs:
           node ./scripts/check-build-toolchain.mjs
           npm ci --no-audit --no-fund
       - name: Validate mobile project with screenshot fixtures enabled
-        run: npm test
+        uses: ./.github/actions/mobile-validate
 
   ios:
     name: capture iPhone and iPad

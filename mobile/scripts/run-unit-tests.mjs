@@ -1,0 +1,10 @@
+import fs from 'node:fs';
+import {spawnSync} from 'node:child_process';
+const files=fs.readdirSync('tests').filter(name=>/\.test\.(?:cjs|mjs)$/.test(name)).sort();
+if(!files.length)throw Error('Mobile test discovery is empty');
+console.log(`Mobile unit inventory: ${files.length} files; every discovered file runs once.`);
+const started=Date.now();
+const result=spawnSync(process.execPath,['--require','./tests/setup.cjs','--test',...files.map(name=>'tests/'+name)],{stdio:'inherit',timeout:180000});
+fs.mkdirSync('../artifacts/tests',{recursive:true});
+fs.writeFileSync('../artifacts/tests/mobile-unit.json',JSON.stringify({source_sha:process.env.GITHUB_SHA||null,files,selected:files.length,excluded:0,status:result.status===0?'passed':'failed',duration_ms:Date.now()-started,signal:result.signal||null},null,2)+'\n');
+process.exit(result.status??1);

@@ -50,6 +50,7 @@ test('counterfactual path model changes later decisions without rewriting the hi
     try {
       await access(join('data', setId, 'path-model.json'));
     } catch {
+      if(process.env.PACK1_TEST_DATA_MODE==='full')assert.fail(`Required path-model artifact is missing: ${setId}`);
       t.skip('Generated path-model artifacts are not present on this branch yet.');
       return;
     }

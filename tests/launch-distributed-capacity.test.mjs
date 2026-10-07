@@ -270,10 +270,13 @@ test('draft PRs cannot provision preview resources and ready-for-review can trig
  const workflow=fs.readFileSync(new URL('../.github/workflows/launch-distributed.yml',import.meta.url),'utf8');
  assert.match(workflow,/require_performance: \$\{\{ steps\.scope\.outputs\.require_performance \}\}/);
  assert.match(workflow,/REQUIRE_PERFORMANCE: \$\{\{ needs\.scope\.outputs\.require_performance \}\}/);
- assert.match(workflow,/REQUIRE_PERFORMANCE==='true'\?\['test','browser','baseline'\]:\['test','browser'\]/);
+ assert.match(workflow,/node scripts\/require-ci-source.mjs/);
+ const sourceGate=fs.readFileSync('scripts/require-ci-source.mjs','utf8');
+ assert.match(sourceGate,/requirePerformance\?\['test','browser','baseline'\]:\['test','browser'\]/);
  assert.match(workflow,/pull_request:\n\s+types: \[opened, synchronize, reopened, ready_for_review\]/);
  assert.match(workflow,/github\.event\.pull_request\.draft == false/);
- const artifactLines=workflow.split('\n').filter(line=>/name: (?:isolated-encrypted-fixtures|distributed-capacity-)|pattern: distributed-capacity-/.test(line));
+ const preview=fs.readFileSync('.github/workflows/launch-distributed-preview.yml','utf8');
+ const artifactLines=preview.split('\n').filter(line=>/name: (?:isolated-encrypted-fixtures|distributed-capacity-)|pattern: distributed-capacity-/.test(line));
  assert.ok(artifactLines.length>=6);for(const line of artifactLines)assert.match(line,/github\.run_attempt/);
 });
 

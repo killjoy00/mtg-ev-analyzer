@@ -40,6 +40,8 @@ const isDependency=path=>/^(?:package(?:-lock)?\.json|requirements(?:-[^/]+)?\.t
 const isDocs=path=>path==='README.md'||path==='MONETIZATION.md'||path.startsWith('docs/')||/\.md$/i.test(path);
 const isPresentation=path=>{
   if(/^creator\//.test(path)||/^go\//.test(path))return false;
+  // HTML contains application behavior and must reach the owning browser group.
+  if(path==='index.html'||/^(?:admin|account|reset-password|profile|practice|daily|open|results|draft-run)\/.*\.html$/i.test(path))return false;
   if(/\.(?:html|css|png|jpe?g|svg|ico|webp)$/i.test(path))return true;
   return /^(?:about|contact|privacy|terms|how-it-works|learn|sets|methodology|disclosure|\.well-known)\//.test(path)
     ||['CNAME','_config.yml','robots.txt','sitemap.xml','ads.txt','ads.txt.example'].includes(path);
@@ -52,8 +54,8 @@ const heavyToken=/(?:replay|scor|model|corpus|dataset|troph|traditional|holdout|
 const isHeavy=path=>heavyRoot.has(path)||/^(?:data|corpus|scoring|research)\//.test(path)
   ||(/^(?:worker|scripts|tests)\//.test(path)&&heavyToken.test(path));
 const isWorkflow=path=>/^\.github\/(?:workflows\/|scripts\/|.+-request\.(?:json|txt)$)/.test(path);
-const isKnownApp=path=>/\.(?:mjs|js|cjs|py|sql|sh|json)$/i.test(path)
-  ||/^(?:worker|scripts|tests|migrations|admin|analytics|edge|open|results)\//.test(path);
+const isKnownApp=path=>!/^creator\/|^go\//.test(path)&&(/\.(?:mjs|js|cjs|py|sql|sh|json|html)$/i.test(path)
+  ||/^(?:worker|scripts|tests|migrations|admin|analytics|edge|open|results)\//.test(path));
 const browserGroupForPath=path=>{
   if(/(?:^|\/)(?:account|auth|credential|password|reset-password|membership|patreon|apple)/i.test(path))return 'account';
   if(/(?:^|\/)(?:practice|custom-coverage)/i.test(path))return 'practice';

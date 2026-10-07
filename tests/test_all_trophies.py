@@ -364,7 +364,7 @@ class CorpusVersionTests(unittest.TestCase):
         text = (root/'.github/workflows/regenerate-draft-run-corpus.yml').read_text(encoding='utf-8')
         declare = text.index('--set-corpus-version')
         rebuild = text.index('python scripts/build_verified_trophy_corpus.py')
-        tests = text.index('run: npm test')
+        tests = text.index('run: REQUIRE_REPLAY_SHARDS=1 npm test')
         commit = text.index('git commit -m')
         self.assertLess(declare, rebuild, 'the version must be declared before the rebuild reads it')
         self.assertLess(rebuild, tests, 'the suite must run against the regenerated corpus')

@@ -1,8 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ALWAYS_STEPS, classifyBackendChanges, filterBackendChangedPaths, loadBackendMap } from '../scripts/backend-gate-scope.mjs';
+import {readFileSync} from 'node:fs';
+import { ALWAYS_STEPS, classifyBackendChanges, filterBackendChangedPaths, loadBackendMap, matchesGlob } from '../scripts/backend-gate-scope.mjs';
 
 const map = loadBackendMap();
+
+test('every registered integration suite selects itself and is reachable from the workflow trigger',()=>{
+  const flow=loadBackendMap();
+  const triggers=[...readFileSync('.github/workflows/backend-gate.yml','utf8').matchAll(/^      - '([^']+)'$/gm)].map(m=>m[1]);
+  for(const [domain,config] of Object.entries(flow.domains))for(const suite of config.suites) {
+    const result=classifyBackendChanges([suite],{map:flow});
+    assert.ok(result.suites.includes(suite),suite);
+    assert.ok(result.domains.includes(domain),suite);
+    assert.ok(triggers.some(glob=>matchesGlob(suite,glob)),`Workflow cannot be triggered by ${suite}`);
+  }
+});
 
 test('account backend-smoke change selects account suites plus the always-run foundation', () => {
   const result = classifyBackendChanges(['tests/account-deletion-backend-smoke.mjs'], { map });

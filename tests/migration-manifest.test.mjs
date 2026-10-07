@@ -58,6 +58,12 @@ test('release workflows match their registered migration plans and order',()=>{
   for(const [name,plan] of Object.entries(releasePaths)) {
     assert.ok(plan.workflow&&Array.isArray(plan.migrations)&&plan.migrations.length,`invalid release path: ${name}`);
     const workflow=fs.readFileSync(plan.workflow,'utf8');
+    if(workflow.includes(`node scripts/ci-migration-plan.mjs ${name}`)) {
+      assert.ok(workflow.includes('ON_ERROR_STOP=1 -f "$migration"'));
+      const orderedPlan=ordered.filter(migration=>plan.migrations.includes(migration));
+      assert.deepEqual(plan.migrations,orderedPlan,`${name} must follow authoritative dependency order`);
+      continue;
+    }
     const refs=[...workflow.matchAll(/migrations\/([A-Za-z0-9_.-]+\.sql)/g)].map(match=>match[1]);
     const unique=[...new Set(refs)];
     assert.deepEqual(

@@ -91,7 +91,7 @@ jobs:
         run: python scripts/refresh_card_images.py
 
       - name: Run full test suite
-        run: npm test
+        run: REQUIRE_REPLAY_SHARDS=1 npm test
 
       - name: Audit all production datasets
         run: python scripts/audit_datasets.py --fail-on-error
@@ -215,7 +215,7 @@ jobs:
           printf 'REPLAY_SETS=%s\n' "$replay_sets" >> "$GITHUB_ENV"
 
       - name: Run full test suite
-        run: npm test
+        run: REQUIRE_REPLAY_SHARDS=1 npm test
 
       - name: Audit all production datasets
         run: python scripts/audit_datasets.py --fail-on-error

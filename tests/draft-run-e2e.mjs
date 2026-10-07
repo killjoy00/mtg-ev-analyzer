@@ -8,14 +8,14 @@ import {rateDraftRunPuzzle} from '../draft-run-difficulty.mjs';
 const base=process.env.PACK1_E2E_URL||'http://127.0.0.1:4173';
 const corpus=fs.readdirSync('corpus/draft-run').filter(f=>f.endsWith('.gz')).flatMap(f=>JSON.parse(gunzipSync(fs.readFileSync('corpus/draft-run/'+f)))).filter(interestingDraftRunPuzzle);
 const environment=process.env.PACK1_TEST_ENVIRONMENT||'mixed',cube=environment==='powered-cube';
-const selectionVersion=process.env.PACK1_TEST_SELECTION_VERSION||'eight-pick-v3';
+const selectionVersion=process.env.PACK1_TEST_SELECTION_VERSION||'eight-pick-v4';
 const daily=process.env.PACK1_TEST_DAILY==='1';
 let shareCalls=0,eliteAccess=false,seasonAvailable=true,adGoogle=0,adMembership=0,runStarts=[];
-let puzzles=selectDraftRun(corpus,'browser-contract',environment,{selectionVersion}),answers=[],revision=0,rerolls=cube?{set:0,pack:2}:{set:1,pack:1};
+let puzzles=selectDraftRun(corpus,'browser-contract',environment,{selectionVersion,daily,day:'2026-10-07'}),answers=[],revision=0,rerolls=cube?{set:0,pack:2}:{set:1,pack:1};
 const sources=puzzles.map(p=>p.source_draft_hash),errors=[],events=[],views=[];
 const id='11111111-1111-4111-8111-111111111111',shareId='1234567890abcdef12345678';
-const snapshot=()=>({id,environment,leaderboard_eligible:daily,ranked_name:daily?'QA ranked player':null,run_length:puzzles.length,set_reroll_allowed:!daily,day:daily?'2026-09-10':null,revision,round:answers.length+1,answers,rerolls,complete:answers.length===puzzles.length,score:answers.length===puzzles.length?Math.round(answers.reduce((n,a)=>n+a.score,0)/puzzles.length):null,current:answers.length===puzzles.length?null:publicDraftRunPuzzle(puzzles[answers.length]),standing:answers.length===puzzles.length?{rank:1,total:20,percentile:5,final:false}:null});
-const browser=await chromium.launch(process.env.CI?{headless:true,channel:'chrome'}:{headless:true});
+const snapshot=()=>({id,environment,leaderboard_eligible:daily,ranked_name:daily?'QA ranked player':null,run_length:puzzles.length,set_reroll_allowed:!daily,day:daily?'2026-10-07':null,revision,round:answers.length+1,answers,rerolls,complete:answers.length===puzzles.length,score:answers.length===puzzles.length?Math.round(answers.reduce((n,a)=>n+a.score,0)/puzzles.length):null,current:answers.length===puzzles.length?null:publicDraftRunPuzzle(puzzles[answers.length]),standing:answers.length===puzzles.length?{rank:1,total:20,percentile:5,final:false}:null});
+const browser=await chromium.launch({headless:true});
 const page=await browser.newPage({viewport:{width:390,height:844}});
 page.on('pageerror',e=>errors.push(e.message));
 await page.addInitScript(()=>{Object.defineProperty(navigator,'share',{configurable:true,value:async value=>{window.__runShare=value;}});Object.defineProperty(navigator,'canShare',{configurable:true,value:()=>false});});
@@ -89,7 +89,7 @@ try{
   await page.route('https://pagead2.googlesyndication.com/**',route=>{adGoogle++;return route.fulfill({contentType:'text/javascript',body:''});});
   for(const host of ['googleads.g.doubleclick.net','tpc.googlesyndication.com','fundingchoicesmessages.google.com'])await page.route('https://'+host+'/**',route=>{adGoogle++;return route.abort();});
   if(daily)await page.locator(`[data-environment="${environment}"] a`).click();
-  else await page.goto(base+'/?game=draft-run'+(cube?'&set=powered-cube':''));
+  else await page.goto(base+'/?game=draft-run'+(environment!=='mixed'?'&set='+environment:''));
   await page.locator('.run-cards').waitFor();
   assert.equal(await page.locator('[data-ad-slot="home"]').count(),1,'game shell retains the dormant static slot');
   assert.equal(await page.locator('[data-ad-slot="home"]:visible').count(),0,'game view never exposes the home ad slot');
@@ -228,7 +228,7 @@ try{
   assert.equal((await page.locator('#run-share-status').textContent())?.trim(),'');
   const shared=await page.evaluate(()=>window.__runShare);const expectedSquares=answers.map(a=>a.historicalMatch?'🟩':a.score>=85?'🟦':a.score>=60?'🟨':a.score>=25?'🟧':'⬛').join('');assert.ok(shared.text.includes(expectedSquares),'share text reflects the answers exercised by this browser run');assert.equal(shared.files,undefined);assert.doesNotMatch(shared.url,/profile|token/);
   if(daily){
-    assert.match(shared.text,/I scored \d+\/100 on today’s Pack One [^.]+\. Can you beat it\?/);assert.match(shared.text,/Daily 2026-09-10/);
+    assert.match(shared.text,/I scored \d+\/100 on today’s Pack One [^.]+\. Can you beat it\?/);assert.match(shared.text,/Daily 2026-10-07/);
     const sharedUrl=new URL(shared.url);assert.equal(sharedUrl.pathname,'/share/daily/v2/');assert.equal(sharedUrl.searchParams.get('environment'),environment);assert.equal(sharedUrl.searchParams.get('ref'),'result_share');assert.doesNotMatch(shared.url,/challenge=/);assert.equal(shareCalls,0);
     assert.equal(await page.locator('#run-challenge').count(),0);
     await page.goto(shared.url);

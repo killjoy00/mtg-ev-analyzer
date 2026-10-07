@@ -39,7 +39,7 @@ jobs:
           node-version: 24
       - name: Hydrate replay shards from R2
         run: bash scripts/r2_replay_shards.sh hydrate
-      - run: npm test
+      - run: REQUIRE_REPLAY_SHARDS=1 npm test
       - name: Require a reviewed main revision
         run: test "$GITHUB_REF" = refs/heads/main
       - uses: actions/cache/restore@v4

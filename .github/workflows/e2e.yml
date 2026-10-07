@@ -120,7 +120,7 @@ jobs:
           BROWSER_PLAN: ${{ steps.scope.outputs.browser_plan }}
           BROWSER_GROUPS: ${{ steps.scope.outputs.browser_groups }}
         run: |
-          npm install --no-save playwright@1.63.0
+          npm ci --no-audit --no-fund
           if [[ "$BROWSER_PLAN" == full || ",$BROWSER_GROUPS," == *,account,* ]]; then
             npx playwright install --with-deps chromium webkit
           else
@@ -173,7 +173,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: pack1-ui-screenshots
-          path: artifacts/*.png
+          path: artifacts/
           if-no-files-found: ignore
       - name: Stop static site
         if: always() && steps.scope.outputs.browser_plan != 'none'

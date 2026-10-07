@@ -39,14 +39,15 @@ function normalizeChangedPaths(paths) {
   return [...new Set(paths.map((path) => String(path ?? '').trim().replaceAll('\\', '/')).filter(Boolean))];
 }
 
-export function filterBackendChangedPaths(paths) {
+export function filterBackendChangedPaths(paths, map = loadBackendMap()) {
+  const registered = new Set(allSuites(map));
   return normalizeChangedPaths(paths).filter((path) => {
     if (path.startsWith('mobile/') || path.startsWith('docs/') || /^[^/]+\.md$/.test(path)) return false;
     if (path.startsWith('.github/')) {
       return path === '.github/workflows/backend-gate.yml' || path === '.github/workflows/prepare-rebuild.yml' || path === '.github/scripts/maintain-serving-indexes.sql';
     }
     if (path.startsWith('tests/')) {
-      return /^tests\/[^/]*backend-smoke\.mjs$/.test(path) || path === 'tests/backend-gate-scope.test.mjs';
+      return registered.has(path) || /^tests\/[^/]*backend-smoke\.mjs$/.test(path) || path === 'tests/backend-gate-scope.test.mjs';
     }
     return true;
   });
@@ -165,7 +166,7 @@ export function classifyBackendChanges(paths, { repoRoot = process.cwd(), map = 
     };
   }
 
-  const changed = filterBackendChangedPaths(input);
+  const changed = filterBackendChangedPaths(input, map);
   if (changed.length === 0) {
     return {
       needsNeon: true,

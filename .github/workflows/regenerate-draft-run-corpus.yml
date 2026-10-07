@@ -99,7 +99,7 @@ jobs:
         run: python scripts/build_verified_trophy_corpus.py
 
       - name: The full suite must pass on the regenerated corpus
-        run: npm test
+        run: REQUIRE_REPLAY_SHARDS=1 npm test
 
       - name: Report what changed
         shell: bash

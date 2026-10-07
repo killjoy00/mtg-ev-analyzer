@@ -92,21 +92,19 @@ test('distributed load waits for practice baseline only when that workflow is ac
 
 
 test('production-like load harnesses replay current serving schema before verification',()=>{
-  for(const path of ['.github/workflows/launch-load.yml','.github/workflows/launch-distributed.yml']){
+  for(const path of ['.github/workflows/launch-load.yml','.github/workflows/launch-distributed-preview.yml']){
     const workflow=fs.readFileSync(path,'utf8');
-    const i42=workflow.indexOf('migrations/0042_serving_revision_snapshot_staging.sql');
-    const i43=workflow.indexOf('migrations/0043_corpus_activation_readiness.sql');
-    const i44=workflow.indexOf('migrations/0044_snapshot_scoped_puzzle_uniqueness.sql');
-    const i48=workflow.indexOf('migrations/0048_uncapped_v5_components.sql');
-    const i49=workflow.indexOf('migrations/0049_cross_version_corpus_cutover.sql');
-    const verify=workflow.indexOf('node scripts/verify-neon-schema.mjs');
-    assert.ok(i42>=0&&i43>i42&&i44>i43&&i48>i44&&i49>i48&&verify>i49,path);
+    const manifest=JSON.parse(fs.readFileSync('migrations/manifest.json','utf8'));
+    const plan=path.includes('distributed')?'launch-distributed':'launch-load';
+    const paths=manifest.release_paths[plan].migrations;
+    for(const migration of ['0042_serving_revision_snapshot_staging.sql','0043_corpus_activation_readiness.sql','0044_snapshot_scoped_puzzle_uniqueness.sql','0048_uncapped_v5_components.sql','0049_cross_version_corpus_cutover.sql'])assert.ok(paths.includes(migration),path);
+    assert.ok(workflow.indexOf(`node scripts/ci-migration-plan.mjs ${plan}`)<workflow.indexOf('node scripts/verify-neon-schema.mjs'),path);
   }
 });
 
 
 test('production-like load harnesses warm readiness before fixture generation',()=>{
-  for(const path of ['.github/workflows/launch-load.yml','.github/workflows/launch-distributed.yml']){
+  for(const path of ['.github/workflows/launch-load.yml','.github/workflows/launch-distributed-preview.yml']){
     const workflow=fs.readFileSync(path,'utf8');
     const verify=workflow.indexOf('node scripts/verify-neon-schema.mjs');
     const warm=workflow.indexOf('node scripts/warm-practice-cache.mjs');

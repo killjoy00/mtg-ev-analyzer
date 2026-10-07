@@ -342,8 +342,11 @@ test('v1 cold-start gate keeps navigation mounted across foreground revalidation
   assert.match(layout, /<VersionGate>/);
   assert.equal(pkg.dependencies['expo-application'], '~57.0.3');
   assert.equal(pkg.devDependencies['react-test-renderer'], '19.2.3');
-  assert.match(pkg.scripts['test:lifecycle'], /node --test/);
-  assert.match(pkg.scripts.test, /test:lifecycle/);
+  assert.match(pkg.scripts['test:lifecycle'], /node .*--test/);
+  assert.match(pkg.scripts.test, /test:shared/);
+  assert.match(pkg.scripts['test:shared'], /test:unit/);
+  const discovered=fs.readdirSync('mobile/tests').filter(name=>/\.test\.(cjs|mjs)$/.test(name));
+  assert.ok(discovered.includes('version-gate-lifecycle.test.cjs')&&discovered.includes('review-refresh-races.test.cjs'));
   assert.match(gate, /Application\.nativeApplicationVersion/);
   assert.match(gate, /Application\.nativeBuildVersion/);
   assert.match(gate, /VersionGateBoundary/);

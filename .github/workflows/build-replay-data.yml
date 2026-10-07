@@ -73,7 +73,7 @@ jobs:
       - name: Hydrate replay shards from R2
         run: bash scripts/r2_replay_shards.sh hydrate
       - name: Run unit tests
-        run: npm test
+        run: REQUIRE_REPLAY_SHARDS=1 npm test
       - name: Download public draft data
         env:
           EXPANSION: ${{ inputs.expansion }}

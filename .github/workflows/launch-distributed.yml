@@ -2,16 +2,12 @@ name: isolated distributed launch acceptance
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths: ['.github/scripts/maintain-serving-indexes.sql', '.github/preview-dns-recovery.json', 'scripts/create-ci-neon-branch.mjs', 'scripts/control-read.mjs', 'scripts/edge-control.mjs', 'tests/ci-provisioning.test.mjs', 'scripts/launch-distributed*', 'scripts/launch-change-scope.mjs', 'tests/launch-change-scope.test.mjs', 'tests/launch-distributed-capacity.test.mjs', 'tests/draft-start-timing.test.mjs', 'tests/ingress.test.mjs', 'worker/draft-start-timing.mjs', 'worker/draft-run-function.mjs', 'worker/draft-run-selection.mjs', 'migrations/0045_batched_practice_selector.sql', 'migrations/0050_practice_recency_bias.sql', 'migrations/0051_exact_pick_draw_index.sql', 'migrations/0056_snapshot_aware_reroll_covering_index.sql', 'edge/gateway.mjs', '.github/workflows/launch-distributed.yml']
+    paths: ['.github/scripts/maintain-serving-indexes.sql', '.github/preview-dns-recovery.json', 'scripts/create-ci-neon-branch.mjs', 'scripts/control-read.mjs', 'scripts/edge-control.mjs', 'tests/ci-provisioning.test.mjs', 'scripts/launch-distributed*', 'scripts/launch-change-scope.mjs', 'tests/launch-change-scope.test.mjs', 'tests/launch-distributed-capacity.test.mjs', 'tests/draft-start-timing.test.mjs', 'tests/ingress.test.mjs', 'worker/draft-start-timing.mjs', 'worker/draft-run-function.mjs', 'worker/draft-run-selection.mjs', 'migrations/0045_batched_practice_selector.sql', 'migrations/0050_practice_recency_bias.sql', 'migrations/0051_exact_pick_draw_index.sql', 'migrations/0056_snapshot_aware_reroll_covering_index.sql', 'edge/gateway.mjs', 'scripts/ci-migration-plan.mjs', 'scripts/require-ci-source.mjs', 'tests/ci-source-gate.test.mjs', '.github/workflows/launch-distributed-preview.yml', '.github/workflows/launch-distributed.yml']
   workflow_dispatch:
 permissions:
   contents: read
   checks: read
   pull-requests: read
-concurrency:
-  group: pack1-gateway-preview
-  cancel-in-progress: false
-  queue: max
 jobs:
   scope:
     runs-on: ubuntu-latest
@@ -55,13 +51,16 @@ jobs:
       - name: Behavior, safety and monitoring regressions before provisioning
         run: |
           node --test tests/launch-distributed-capacity.test.mjs tests/launch-alert.test.mjs tests/launch-controls.test.mjs
-          npm run test:js
   checked-source:
     needs: scope
-    if: needs.scope.outputs.run_load == 'true' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    if: needs.scope.outputs.run_load == 'true' && (github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.draft == false))
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
       - name: Require CI and exact selector/performance acceptance before provisioning load
         if: github.event_name == 'pull_request'
         env:
@@ -69,252 +68,11 @@ jobs:
           REVIEWED_HEAD: ${{ github.event.pull_request.head.sha }}
           REVIEWED_PR: ${{ github.event.pull_request.number }}
           REQUIRE_PERFORMANCE: ${{ needs.scope.outputs.require_performance }}
-        run: |
-          node --input-type=module <<'NODE'
-          import assert from 'node:assert/strict';
-          const {GITHUB_REPOSITORY:repo,GH_TOKEN:token,REVIEWED_HEAD:head,REVIEWED_PR:pr,REQUIRE_PERFORMANCE}=process.env;
-          const requiredNames=REQUIRE_PERFORMANCE==='true'?['test','browser','baseline']:['test','browser'];
-          const headers={authorization:'Bearer '+token,accept:'application/vnd.github+json'};
-          async function get(path) {
-            const transient=new Set([429,500,502,503,504]);
-            let lastError;
-            for(let attempt=0;attempt<5;attempt++) {
-              let response;
-              try {
-                response=await fetch('https://api.github.com/repos/'+repo+path,{
-                  headers,redirect:'error',signal:AbortSignal.timeout(30000)
-                });
-              } catch(error) {
-                lastError=error;
-              }
-              if(response) {
-                if(response.status===200)return response.json();
-                if(!transient.has(response.status))
-                  throw new Error('GitHub CI gate read failed HTTP '+response.status);
-                lastError=new Error('GitHub CI gate transient HTTP '+response.status);
-              }
-              if(attempt<4)await new Promise(resolve=>setTimeout(resolve,1000*(attempt+1)));
-            }
-            throw lastError||new Error('GitHub CI gate read failed');
-          }
-          let accepted=false;
-          for(let attempt=0;attempt<180;attempt++) {
-            const [pull,checks]=await Promise.all([get('/pulls/'+pr),get('/commits/'+head+'/check-runs?per_page=100')]);
-            assert.equal(pull.head.sha,head,'reviewed source head must remain unchanged');
-            assert.equal(pull.state,'open','load acceptance is for the open reviewed PR');
-            const latest=new Map();
-            for(const check of checks.check_runs) {
-              if(check.head_sha===head&&check.app?.slug==='github-actions'&&requiredNames.includes(check.name)&&!latest.has(check.name))latest.set(check.name,check);
-            }
-            const required=requiredNames.map(name=>latest.get(name));
-            if(required.every(check=>check?.status==='completed'&&check.conclusion==='success')) {accepted=true;break;}
-            assert.ok(!required.some(check=>check?.status==='completed'&&check.conclusion!=='success'),'required CI must pass before disposable database writes');
-            await new Promise(resolve=>setTimeout(resolve,10000));
-          }
-          assert.ok(accepted,'required CI did not finish within the source gate');
-          console.log('Unchanged source passed '+requiredNames.join(', ')+' acceptance.');
-          NODE
-  preview-control:
-    needs: scope
+        run: node scripts/require-ci-source.mjs
+  capacity:
+    needs: [scope, regression, checked-source]
     if: needs.scope.outputs.run_load == 'true' && (github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.draft == false))
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - name: Check preview ownership before waiting for source validation
-        env:
-          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
-        run: node scripts/edge-control.mjs preflight
-  setup:
-    needs: [scope, regression, checked-source, preview-control]
-    if: needs.scope.outputs.run_load == 'true' && (github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.draft == false))
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    outputs:
-      branch: ${{ steps.neon.outputs.branch_id }}
-      created: ${{ steps.neon.outputs.created }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - name: Verify scoped Cloudflare access
-        env:
-          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
-        run: node scripts/edge-control.mjs preflight
-      - name: Set emergency expiry
-        id: expiry
-        run: echo "expires_at=$(date -u --date '+75 minutes' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
-      - name: Record pre-provisioning whole-project usage baseline
-        env:
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-        run: node scripts/launch-distributed-setup.mjs budget
-      - name: Create disposable production-sized branch
-        id: neon
-        env:
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          CI_BRANCH_PREFIX: launch-load-${{ github.run_id }}-${{ github.run_attempt }}
-          CI_BRANCH_PARENT: br-orange-feather-ayps8kep
-          CI_BRANCH_EXPIRES: ${{ steps.expiry.outputs.expires_at }}
-          CI_BRANCH_SUSPEND: 300
-        run: node scripts/create-ci-neon-branch.mjs
-      - name: Install pinned deployment tools
-        run: node .github/scripts/install-wrangler-tool.mjs "$RUNNER_TEMP/edge-tools" neon@4.17.4 esbuild@0.28.2
-      - name: Prepare isolated schema and exact revision
-        env:
-          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
-          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
-          PREVIEW_CREATED: ${{ steps.neon.outputs.created }}
-          ESBUILD_BIN: ${{ runner.temp }}/edge-tools/node_modules/.bin/esbuild
-        run: |
-          node --input-type=module -e "import {checkBranch} from './scripts/edge-control.mjs';checkBranch(process.env.PREVIEW_BRANCH);if(process.env.PREVIEW_CREATED!=='true')throw Error('Fresh isolated branch required');"
-          if ! command -v psql >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y postgresql-client
-          fi
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0037_mobile_oauth_handoffs.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0038_mobile_practice_idempotency.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0039_practice_serving_cache.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0040_mobile_minimum_version.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0040_practice_reroll_index.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0041_corpus_source_snapshots.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0041_apple_auth.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0042_serving_revision_snapshot_staging.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0043_corpus_activation_readiness.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0044_snapshot_scoped_puzzle_uniqueness.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0045_batched_practice_selector.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0045_apple_subscriptions.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0046_public_identity_safety.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0047_admin_user_account_controls.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0048_uncapped_v5_components.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0049_cross_version_corpus_cutover.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0050_practice_recency_bias.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0051_exact_pick_draw_index.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0052_decision_reports.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0053_creator_challenges.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0054_creator_event_idempotency.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0055_creator_event_write_safety.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0056_snapshot_aware_reroll_covering_index.sql
-          node scripts/verify-neon-schema.mjs
-          PACK1_RELEASE_COMMIT="$GITHUB_SHA" node scripts/warm-practice-cache.mjs
-          node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$GITHUB_SHA"
-      - name: Prepare accounts, entitlements, score history and query plans
-        env:
-          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
-          PREVIEW_CREATED: ${{ steps.neon.outputs.created }}
-          LOAD_FIXTURE_FILE: /tmp/pack1-launch-fixtures.json
-        run: node scripts/launch-distributed-fixtures.mjs
-      - name: Deploy isolated Functions and private gateway
-        id: deploy
-        env:
-          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
-          PREVIEW_CREATED: ${{ steps.neon.outputs.created }}
-          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
-        run: node scripts/edge-control.mjs deploy
-      - name: Prove retained private-preview telemetry before gameplay
-        env:
-          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
-        run: node scripts/launch-distributed-setup.mjs telemetry
-      - name: Initialize exact-run isolated coordinator and resource guards
-        env:
-          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
-          PREVIEW_CREATED: ${{ steps.neon.outputs.created }}
-          LOAD_FIXTURE_FILE: /tmp/pack1-launch-fixtures.json
-        run: node scripts/launch-distributed-control.mjs
-      - name: Encrypt isolated fixture credentials for the generator jobs
-        env:
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          LOAD_FIXTURE_FILE: /tmp/pack1-launch-fixtures.json
-        run: node scripts/launch-distributed-bundle.mjs pack
-      - uses: actions/upload-artifact@v4
-        with:
-          name: isolated-encrypted-fixtures-${{ github.run_attempt }}
-          path: artifacts/load-private
-          retention-days: 1
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: distributed-capacity-${{ github.run_attempt }}-setup
-          path: artifacts/launch-load
-          retention-days: 30
-  cohort:
-    needs: setup
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    strategy:
-      fail-fast: false
-      max-parallel: 5
-      matrix:
-        shard: [0, 1, 2, 3, 4]
-    env:
-      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-      CLOUDFLARE_EDGE_TOKEN: ${{ matrix.shard == 0 && secrets.CLOUDFLARE_EDGE_TOKEN || '' }}
-      PREVIEW_BRANCH: ${{ needs.setup.outputs.branch }}
-      LOAD_FIXTURE_FILE: /tmp/pack1-launch-fixtures.json
-      LOAD_SHARD: ${{ matrix.shard }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - uses: actions/download-artifact@v4
-        with:
-          name: isolated-encrypted-fixtures-${{ github.run_attempt }}
-          path: artifacts/load-private
-      - run: node scripts/launch-distributed-bundle.mjs unpack
-      - name: Persistent real-egress cohort, live barriers, gated 25/50 holds
-        run: node scripts/launch-distributed-run.mjs
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: distributed-capacity-${{ github.run_attempt }}-runner-${{ matrix.shard }}
-          path: artifacts/launch-load
-          retention-days: 30
-  collect_cleanup:
-    needs: [setup, cohort]
-    if: always() && needs.setup.outputs.created == 'true'
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    env:
-      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-      CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
-      PREVIEW_BRANCH: ${{ needs.setup.outputs.branch }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: distributed-capacity-${{ github.run_attempt }}-*
-          path: artifacts/distributed-results
-      - name: Independently recompute cohort and complete-stage acceptance
-        run: node scripts/launch-distributed-collect.mjs
-      - name: Disable the private preview route even after a failed gate
-        if: always()
-        run: node scripts/edge-control.mjs disable
-      - name: Delete the disposable branch even after failed collection or disable
-        if: always()
-        uses: neondatabase/delete-branch-action@v3
-        with:
-          project_id: patient-shadow-91417882
-          api_key: ${{ secrets.NEON_API_KEY }}
-          branch: ${{ needs.setup.outputs.branch }}
-      - name: Verify preview mapping absence and branch GET 404
-        if: always()
-        run: node scripts/launch-distributed-setup.mjs cleanup
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: distributed-capacity-${{ github.run_attempt }}-final
-          path: artifacts/launch-load
-          retention-days: 30
+    uses: ./.github/workflows/launch-distributed-preview.yml
+    with:
+      require_performance: ${{ needs.scope.outputs.require_performance }}
+    secrets: inherit

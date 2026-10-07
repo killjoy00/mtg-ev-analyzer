@@ -3,6 +3,9 @@ import {pathToFileURL} from 'node:url';
 
 const LOAD_SENSITIVE_PATHS=[
   path=>path==='.github/scripts/maintain-serving-indexes.sql',
+  path=>path==='scripts/ci-migration-plan.mjs',
+  path=>path==='scripts/require-ci-source.mjs',
+  path=>path==='.github/workflows/launch-distributed-preview.yml',
   path=>path.startsWith('scripts/launch-distributed'),
   path=>path==='worker/draft-start-timing.mjs',
   path=>path==='worker/draft-run-function.mjs',
