@@ -10,6 +10,7 @@ import {
 import { Text } from '@/src/components/Text';
 
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
+import { AboutLink } from '@/src/components/AboutLink';
 
 import {
   DAILY_ENVIRONMENTS,
@@ -291,6 +292,7 @@ export default function LeaderboardScreen() {
             No ranked {DAILY_ENVIRONMENT_META[environment].title} scores in this view yet.
           </Text>
         )}
+        ListFooterComponent={<View style={styles.footer}><AboutLink /></View>}
         contentContainerStyle={styles.list}
         refreshing={refreshing}
         onRefresh={refresh}
@@ -355,4 +357,5 @@ const styles = StyleSheet.create({
   retryButton: { minHeight: 48, backgroundColor: colors.accent, paddingHorizontal: spacing.xl, alignItems: 'center', justifyContent: 'center' },
   retryText: { color: colors.surface, fontSize: 15, fontWeight: '800' },
   empty: { color: colors.muted, fontSize: 15, textAlign: 'center', padding: spacing.xl },
+  footer: { padding: spacing.lg },
 });
