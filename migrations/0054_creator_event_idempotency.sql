@@ -1,15 +1,25 @@
 -- Creator challenge open/acquisition idempotency.
 --
--- The uniqueness invariant is installed while writes are excluded, and the
--- identity merge is made aware of that invariant before the lock is released.
--- A BEFORE INSERT guard uses the same advisory lock as the merge so workers
--- from either side of a rolling deploy cannot recreate the race.
+-- Rollout must stay safe for workers and account merges that started before
+-- this migration committed. Do not use a player-scoped unique index here:
+-- an already-running pre-0054 merge would otherwise resume into a 23505.
+--
+-- Instead, the database serializes creator-event inserts/identity moves with
+-- advisory locks and dedupes player-id updates after the statement completes.
+-- That makes old workers and the pre-0054 merge body compatible with the new
+-- invariant throughout a rolling deploy.
 BEGIN;
 SET LOCAL lock_timeout='10s';
 
 LOCK TABLE analytics_events IN SHARE ROW EXCLUSIVE MODE;
 
+DROP INDEX IF EXISTS analytics_creator_challenge_event_uq;
+DROP INDEX IF EXISTS analytics_creator_challenge_dedup_lookup_idx;
+DROP TRIGGER IF EXISTS creator_challenge_event_insert_guard ON analytics_events;
+DROP TRIGGER IF EXISTS creator_challenge_event_update_guard ON analytics_events;
+DROP TRIGGER IF EXISTS creator_challenge_event_update_dedupe ON analytics_events;
 DROP FUNCTION IF EXISTS pack1_lock_creator_challenge_events(uuid,uuid);
+DROP FUNCTION IF EXISTS pack1_creator_event_insert_guard();
 
 CREATE OR REPLACE FUNCTION pack1_creator_event_player_lock(target_player uuid)
 RETURNS bigint
@@ -20,10 +30,10 @@ AS $creator_event_player_lock$
   SELECT hashtextextended('pack1:creator-event-player:'||target_player::text,0);
 $creator_event_player_lock$;
 
-CREATE OR REPLACE FUNCTION pack1_creator_event_insert_guard()
+CREATE OR REPLACE FUNCTION pack1_creator_event_write_guard()
 RETURNS trigger
 LANGUAGE plpgsql
-AS $creator_event_insert_guard$
+AS $creator_event_write_guard$
 DECLARE
   challenge_id text;
 BEGIN
@@ -34,9 +44,12 @@ BEGIN
     RETURN NEW;
   END IF;
 
+  -- Inserts and player-id moves for one identity share the same lock. An old
+  -- worker that does not know about 0054 therefore serializes with a merge as
+  -- soon as PostgreSQL reaches this trigger.
   PERFORM pg_advisory_xact_lock(pack1_creator_event_player_lock(NEW.player_id));
 
-  IF EXISTS (
+  IF TG_OP='INSERT' AND EXISTS (
     SELECT 1
     FROM analytics_events existing
     WHERE existing.player_id=NEW.player_id
@@ -48,12 +61,55 @@ BEGIN
 
   RETURN NEW;
 END;
-$creator_event_insert_guard$;
+$creator_event_write_guard$;
 
-DROP TRIGGER IF EXISTS creator_challenge_event_insert_guard ON analytics_events;
+CREATE OR REPLACE FUNCTION pack1_creator_event_update_dedupe()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $creator_event_update_dedupe$
+BEGIN
+  -- Run once after the whole UPDATE statement so an old merge can move every
+  -- source row first. Then collapse only keys touched by that statement,
+  -- preserving the earliest full event row and its acquisition properties.
+  WITH touched AS (
+    SELECT DISTINCT player_id,event_name,event_props->>'creator_challenge_id' challenge_id
+    FROM creator_event_updates
+    WHERE player_id IS NOT NULL
+      AND event_name IN ('creator_challenge_open','acquisition_touch')
+      AND event_props ? 'creator_challenge_id'
+  ), ranked AS (
+    SELECT e.id,
+      row_number() OVER (
+        PARTITION BY e.player_id,e.event_name,(e.event_props->>'creator_challenge_id')
+        ORDER BY e.created_at,e.id
+      ) duplicate_number
+    FROM analytics_events e
+    JOIN touched t
+      ON t.player_id=e.player_id
+     AND t.event_name=e.event_name
+     AND t.challenge_id=e.event_props->>'creator_challenge_id'
+  )
+  DELETE FROM analytics_events event
+  USING ranked
+  WHERE event.id=ranked.id
+    AND ranked.duplicate_number>1;
+
+  RETURN NULL;
+END;
+$creator_event_update_dedupe$;
+
 CREATE TRIGGER creator_challenge_event_insert_guard
 BEFORE INSERT ON analytics_events
-FOR EACH ROW EXECUTE FUNCTION pack1_creator_event_insert_guard();
+FOR EACH ROW EXECUTE FUNCTION pack1_creator_event_write_guard();
+
+CREATE TRIGGER creator_challenge_event_update_guard
+BEFORE UPDATE OF player_id,event_name,event_props ON analytics_events
+FOR EACH ROW EXECUTE FUNCTION pack1_creator_event_write_guard();
+
+CREATE TRIGGER creator_challenge_event_update_dedupe
+AFTER UPDATE ON analytics_events
+REFERENCING NEW TABLE AS creator_event_updates
+FOR EACH STATEMENT EXECUTE FUNCTION pack1_creator_event_update_dedupe();
 
 WITH ranked AS (
   SELECT id,
@@ -71,9 +127,8 @@ USING ranked
 WHERE event.id=ranked.id
   AND ranked.duplicate_number>1;
 
-DROP INDEX IF EXISTS analytics_creator_challenge_dedup_lookup_idx;
-CREATE UNIQUE INDEX IF NOT EXISTS analytics_creator_challenge_event_uq
-  ON analytics_events(player_id,event_name,(event_props->>'creator_challenge_id'))
+CREATE INDEX IF NOT EXISTS analytics_creator_challenge_event_lookup_idx
+  ON analytics_events(player_id,event_name,(event_props->>'creator_challenge_id'),created_at,id)
   WHERE player_id IS NOT NULL
     AND event_name IN ('creator_challenge_open','acquisition_touch')
     AND event_props ? 'creator_challenge_id';
