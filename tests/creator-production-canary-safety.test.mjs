@@ -79,19 +79,21 @@ test('borrowed closed Daily eligibility is restored and canary is protected',()=
   assert.doesNotMatch(workflow,/workflow_dispatch:/);
 });
 
-test('creator canary static cleanup waits for registered green PR checks before merge',()=>{
+test('creator canary static cleanup dispatches exact-head green CI before merge',()=>{
   assert.match(workflow,/cleanup-creator-canary-static\.mjs/);
-  assert.match(workflow,/actions\/runs\?event=pull_request&head_sha=\$\{head_sha\}/);
-  assert.match(workflow,/\.github\/workflows\/test\.yml/);
-  assert.match(workflow,/\.github\/workflows\/e2e\.yml/);
-  assert.match(workflow,/Cleanup PR test\/e2e workflows never registered; refusing to merge/);
-  assert.match(workflow,/gh pr checks "\$pr_url" --watch --fail-fast/);
+  assert.match(workflow,/gh workflow run test\.yml --ref "\$branch"/);
+  assert.match(workflow,/gh workflow run e2e\.yml --ref "\$branch"/);
+  assert.match(workflow,/actions\/runs\?event=workflow_dispatch&head_sha=\$\{head_sha\}/);
+  assert.match(workflow,/Cleanup exact-head test\/e2e dispatches never registered; refusing to merge/);
+  assert.match(workflow,/gh run watch "\$test_run" --exit-status/);
+  assert.match(workflow,/gh run watch "\$e2e_run" --exit-status/);
   assert.match(workflow,/gh pr merge "\$pr_url" --squash --delete-branch --match-head-commit "\$head_sha"/);
-  const register=workflow.indexOf('actions/runs?event=pull_request');
-  const watch=workflow.indexOf('gh pr checks');
+  const dispatch=workflow.indexOf('gh workflow run test.yml');
+  const register=workflow.indexOf('actions/runs?event=workflow_dispatch');
+  const watch=workflow.indexOf('gh run watch "$test_run"');
   const merge=workflow.indexOf('gh pr merge');
-  assert.ok(register>=0&&register<watch&&watch<merge,'cleanup must observe registered checks, wait for them, then merge');
-  assert.match(workflow,/permissions:\n  contents: write\n  pull-requests: write\n  actions: read\n  checks: read/);
+  assert.ok(dispatch>=0&&dispatch<register&&register<watch&&watch<merge,'cleanup must dispatch exact-head CI, observe it, wait for it, then merge');
+  assert.match(workflow,/permissions:\n  contents: write\n  pull-requests: write\n  actions: write\n  checks: read/);
   assert.match(workflow,/GH_TOKEN: \$\{\{ github\.token \}\}/);
   assert.doesNotMatch(workflow,/token: \$\{\{ secrets\.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN \}\}/);
 });
