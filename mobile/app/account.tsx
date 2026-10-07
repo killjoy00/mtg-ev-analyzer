@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 import { Text } from '@/src/components/Text';
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
+import { AboutLink } from '@/src/components/AboutLink';
 
 import { ApiError } from '@/src/api/client';
 import {
@@ -619,7 +620,7 @@ export default function AccountScreen() {
 
         {message || routeNotice ? <Text accessibilityRole="alert" style={styles.message}>{message || routeNotice}</Text> : null}
         {enrichmentWarning ? <Text accessibilityRole="alert" style={styles.enrichmentWarning}>{enrichmentWarning}</Text> : null}
-        <Pressable accessibilityRole="button" onPress={() => router.push('/help')} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Help & information</Text></Pressable>
+        <AboutLink />
       </ScrollView>
     </SafeAreaView>
   );
