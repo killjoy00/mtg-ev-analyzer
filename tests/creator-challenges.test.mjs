@@ -308,13 +308,14 @@ test('creator canary static cleanup removes only canary routes and registry entr
   };
   const canary={...normal,id:'33333333-3333-4333-8333-333333333333',slug:'canary-practice-deadbeef',creator_name:'Pack One Canary'};
   await prepareCreatorChallengePublish({root,action:'publish',entry:normal});
+  await prepareCreatorChallengePublish({root,action:'retire',entry:normal});
   await prepareCreatorChallengePublish({root,action:'publish',entry:canary});
   await prepareCreatorChallengePublish({root,action:'retire',entry:canary});
   const result=await cleanupCreatorCanaryStatic({root});
   assert.deepEqual(result,{removedRegistry:1,removedRoutes:1});
   const registry=JSON.parse(await readFile(path.join(root,'creator-challenges.json'),'utf8'));
   assert.deepEqual(registry.map(entry=>entry.slug),['real-creator']);
-  assert.match(await readFile(path.join(root,'creator','real-creator','index.html'),'utf8'),/Real Creator/);
+  assert.match(await readFile(path.join(root,'creator','real-creator','index.html'),'utf8'),/creator challenge is no longer available/i);
   await assert.rejects(readFile(path.join(root,'creator','canary-practice-deadbeef','index.html'),'utf8'),error=>error?.code==='ENOENT');
   await checkCreatorChallenges({root});
 });
