@@ -100,9 +100,34 @@ export const DRAFT_RUN_REPLAY_SCORING_VERSIONS=Object.freeze([
   DRAFT_RUN_SCORING_V3_LINEAR_PROFILE,
 ]);
 
+// Replay profiles are immutable compatibility code. Keep copies of the ranking,
+// epsilon, support calibration, and corpus-calibration rules that produced the
+// stored v2/v3 scores instead of depending on mutable current helpers.
+const REPLAY_SCORING_EPSILON=1e-9;
+function replayRankCandidates(candidates) {
+  return [...(candidates||[])].sort((a,b)=>{
+    const delta=Number(b.model_probability||0)-Number(a.model_probability||0);
+    if(Math.abs(delta)>REPLAY_SCORING_EPSILON)return delta;
+    return String(a.name).localeCompare(String(b.name));
+  });
+}
+function replaySupportSharpening(corpusVersion) {
+  return supportedComponent(corpusVersion)||String(corpusVersion).includes('-colour-stage-')?1.75:2;
+}
+function replayCalibratedSupports(candidates,exponent) {
+  if(!Number.isFinite(exponent)||exponent<=0)throw Error('Invalid support calibration.');
+  const raw=(candidates||[]).map(card=>Math.max(0,Number(card.model_probability||0)));
+  const sharpened=raw.map(value=>value**exponent);
+  const total=sharpened.reduce((sum,value)=>sum+value,0);
+  const share=total>REPLAY_SCORING_EPSILON
+    ?sharpened.map(value=>value/total)
+    :raw.map(()=>1/Math.max(1,raw.length));
+  return new Map((candidates||[]).map((card,index)=>[card.id,share[index]]));
+}
+
 function draftRunScoringEvidence(puzzle,selectedId) {
   const candidates=puzzle?.candidates||puzzle?.pack||[];
-  const ranked=rankCandidates(candidates);
+  const ranked=replayRankCandidates(candidates);
   if(!ranked.length)throw new Error('Draft Run puzzle has no candidates.');
   const selected=ranked.find(card=>card.id===selectedId);
   if(!selected)throw new Error(`Selected card ${selectedId} is not in this Draft Run puzzle.`);
@@ -110,7 +135,7 @@ function draftRunScoringEvidence(puzzle,selectedId) {
   const historical=ranked.find(card=>card.id===historicalId)||null;
   if(!historical||new Set(ranked.map(card=>card.id)).size!==ranked.length||
       ranked.some(card=>!Number.isFinite(Number(card.model_probability))||Number(card.model_probability)<0)||
-      !ranked.some(card=>Number(card.model_probability)>EPSILON))
+      !ranked.some(card=>Number(card.model_probability)>REPLAY_SCORING_EPSILON))
     throw new Error('Draft Run puzzle has invalid scoring evidence.');
   return {
     ranked,selected,historicalId,historical,
@@ -135,7 +160,7 @@ function scoredDraftRunPick(puzzle,selectedId,profile) {
     // Frozen first v3 implementation from 40aebee. Although algebraically
     // equivalent to the linear ratio, its sharpen-then-root floating-point
     // path has observable rounding boundaries and therefore is replay data.
-    const calibrated=calibratedSupports(ranked,2);
+    const calibrated=replayCalibratedSupports(ranked,2);
     selectedSupport=calibrated.get(selected.id)||0;
     leaderSupport=calibrated.get(leader.id)||0;
     supportRatio=Math.max(0,Math.min(1,selectedSupport/leaderSupport));
@@ -143,7 +168,7 @@ function scoredDraftRunPick(puzzle,selectedId,profile) {
   } else if(profile===DRAFT_RUN_SCORING_V3_LINEAR_PROFILE) {
     // Current v3 implementation from 26039b7 onward: display calibration stays
     // corpus-pinned, while awards use the raw ratio to avoid round-trip drift.
-    const calibrated=calibratedSupports(ranked,supportSharpening(puzzle.corpus_version));
+    const calibrated=replayCalibratedSupports(ranked,replaySupportSharpening(puzzle.corpus_version));
     selectedSupport=calibrated.get(selected.id)||0;
     leaderSupport=calibrated.get(leader.id)||0;
     supportRatio=Math.max(0,Math.min(1,selectedSupport/leaderSupport));
