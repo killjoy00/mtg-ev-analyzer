@@ -7,11 +7,7 @@ on:
       - '.github/creator-production-canary-request.json'
 
 permissions:
-  contents: write
-  pull-requests: write
-  actions: write
-  checks: read
-  pages: write
+  contents: read
 
 concurrency:
   group: pack1-creator-production-canary
@@ -87,96 +83,6 @@ jobs:
           PACK1_CREATOR_CANARY: '1'
           PACK1_LAUNCH_WATCHER_GITHUB_TOKEN: ${{ secrets.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN }}
         run: node scripts/creator-production-canary.mjs "$RUNNER_TEMP/creator-canary.connection" "${{ steps.request.outputs.expected_release }}"
-
-      - name: Remove retired creator canary static artifacts
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          git fetch --no-tags origin main
-          base_sha="$(git rev-parse origin/main)"
-          branch="automation/creator-canary-cleanup-${GITHUB_RUN_ID}"
-          git checkout -B "$branch" origin/main
-          mapfile -t canary_routes < <(
-            {
-              find creator -mindepth 1 -maxdepth 1 -type d -name 'canary-*' -printf '%f\n'
-              jq -r '.[] | select(.slug | startswith("canary-")) | .slug' creator-challenges.json
-            } | sort -u
-          )
-          node scripts/cleanup-creator-canary-static.mjs
-          if git diff --quiet -- creator-challenges.json creator; then
-            echo "No creator canary static artifacts remain." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          node scripts/check-creator-challenges.mjs
-          node --test tests/creator-challenges.test.mjs tests/creator-production-canary-safety.test.mjs
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A creator-challenges.json creator
-          git commit -m "Clean retired creator canary static artifacts"
-          head_sha="$(git rev-parse HEAD)"
-          git push --force origin "HEAD:refs/heads/${branch}"
-          pr_url="$(gh pr create --base main --head "$branch" --title "Clean retired creator canary static artifacts" --body "Automated cleanup after the production creator canary verified its privacy-safe retired routes. Removes only creator/canary-* static routes and matching registry entries.")"
-          echo "Cleanup PR: $pr_url" >> "$GITHUB_STEP_SUMMARY"
-          gh workflow run test.yml --ref "$branch"
-          gh workflow run e2e.yml --ref "$branch"
-          test_run=""
-          e2e_run=""
-          for attempt in $(seq 1 60); do
-            runs="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?event=workflow_dispatch&head_sha=${head_sha}&per_page=100")"
-            test_run="$(jq -r --arg branch "$branch" '.workflow_runs[] | select(.path==".github/workflows/test.yml" and .head_branch==$branch) | .id' <<<"$runs" | head -1)"
-            e2e_run="$(jq -r --arg branch "$branch" '.workflow_runs[] | select(.path==".github/workflows/e2e.yml" and .head_branch==$branch) | .id' <<<"$runs" | head -1)"
-            if [[ -n "$test_run" && -n "$e2e_run" ]]; then break; fi
-            sleep 2
-          done
-          [[ -n "$test_run" && -n "$e2e_run" ]] || {
-            echo "::error::Cleanup exact-head test/e2e dispatches never registered; refusing to merge."
-            exit 1
-          }
-          gh run watch "$test_run" --exit-status --interval 10
-          gh run watch "$e2e_run" --exit-status --interval 10
-          git fetch --no-tags origin main:refs/remotes/origin/main
-          current_main="$(git rev-parse refs/remotes/origin/main)"
-          [[ "$current_main" == "$base_sha" ]] || {
-            echo "::error::Creator canary cleanup base moved from $base_sha to $current_main; refusing an untested merge."
-            exit 1
-          }
-          pr_base="$(gh pr view "$pr_url" --json baseRefOid --jq .baseRefOid)"
-          [[ "$pr_base" == "$base_sha" ]] || {
-            echo "::error::Creator canary cleanup PR base changed from $base_sha to $pr_base."
-            exit 1
-          }
-          gh pr merge "$pr_url" --squash --delete-branch --match-head-commit "$head_sha"
-
-          gh api --method POST "repos/${GITHUB_REPOSITORY}/pages/builds" >/tmp/creator-canary-pages-build.json
-          for attempt in $(seq 1 120); do
-            pages_status="$(gh api "repos/${GITHUB_REPOSITORY}/pages/builds/latest" --jq '.status')"
-            if [[ "$pages_status" == built ]]; then break; fi
-            if [[ "$pages_status" == errored ]]; then
-              echo "::error::Pages build failed after creator canary cleanup."
-              exit 1
-            fi
-            sleep 5
-          done
-          [[ "$pages_status" == built ]] || {
-            echo "::error::Timed out waiting for Pages build after creator canary cleanup."
-            exit 1
-          }
-
-          live_registry="$(curl --fail --silent --show-error -H 'cache-control: no-cache' "https://packone.pro/creator-challenges.json?cleanup=${head_sha}")"
-          jq -e 'all(.[]; ((.slug | startswith("canary-")) | not))' <<<"$live_registry" >/dev/null || {
-            echo "::error::Live creator registry still contains a canary entry after cleanup."
-            exit 1
-          }
-          for slug in "${canary_routes[@]}"; do
-            code="$(curl --silent --show-error -H 'cache-control: no-cache' -o /tmp/creator-canary-cleanup-route.html -w '%{http_code}' "https://packone.pro/creator/${slug}/?cleanup=${head_sha}")"
-            [[ "$code" == 404 || "$code" == 410 ]] || {
-              echo "::error::Live canary route still exists after cleanup: ${slug} (HTTP ${code})"
-              exit 1
-            }
-          done
-          echo "Creator canary static cleanup is deployed and verified live." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload creator canary evidence
         if: always()
