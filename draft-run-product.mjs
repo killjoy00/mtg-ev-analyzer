@@ -323,7 +323,9 @@ async function shareResult() {
       ? `${location.origin}/share/daily/v2/?environment=${encodeURIComponent(run.environment||environment)}&ref=result_share`
       : share?.creator&&share.url
         ? new URL(share.url,location.origin).toString()
-        : `${location.origin}${location.pathname}${gameUrl('shared='+share.id)}`;
+        : share?.url
+          ? new URL(share.url,location.origin).toString()
+          : `${location.origin}${location.pathname}${gameUrl('shared='+share.id)}`;
     trackEvent('share_click',{surface:'draft_run_result'});
     const result=await shareDraftRunCard(run,url);
     const status=document.querySelector('#run-share-status');
