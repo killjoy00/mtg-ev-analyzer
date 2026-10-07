@@ -19,12 +19,32 @@ concurrency:
 jobs:
   validate:
     name: validate screenshot fixture build
+    timeout-minutes: 10
+    outputs:
+      capture_required: ${{ steps.capture.outputs.capture_required }}
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: mobile
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Select native screenshot coverage
+        id: capture
+        shell: bash
+        working-directory: .
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == pull_request ]]; then
+            base="$(git merge-base "$BASE_SHA" "$HEAD_SHA")"
+            node mobile/scripts/screenshot-ci-scope.mjs "$base" "$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          else
+            echo 'capture_required=true' >> "$GITHUB_OUTPUT"
+          fi
       - name: Resolve reviewed screenshot request
         if: github.event_name == 'push'
         shell: bash
@@ -66,6 +86,8 @@ jobs:
   ios:
     name: capture iPhone and iPad
     needs: validate
+    if: needs.validate.outputs.capture_required == 'true'
+    timeout-minutes: 45
     runs-on: macos-latest
     env:
       EXPO_PUBLIC_PACKONE_ENV: preview
@@ -233,6 +255,8 @@ jobs:
   android:
     name: capture Android phone
     needs: validate
+    if: needs.validate.outputs.capture_required == 'true'
+    timeout-minutes: 45
     runs-on: ubuntu-latest
     env:
       EXPO_PUBLIC_PACKONE_ENV: preview

@@ -20,6 +20,7 @@ jobs:
     outputs:
       branch: ${{ steps.neon.outputs.branch_id }}
       created: ${{ steps.neon.outputs.created }}
+      expires: ${{ steps.expiry.outputs.expires_at }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -117,7 +118,9 @@ jobs:
         if: always()
         with:
           name: distributed-capacity-${{ github.run_attempt }}-setup
-          path: artifacts/launch-load
+          path: |
+            artifacts/launch-load
+            artifacts/ci-resources
           retention-days: 30
   cohort:
     needs: setup
@@ -132,6 +135,8 @@ jobs:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
       CLOUDFLARE_EDGE_TOKEN: ${{ matrix.shard == 0 && secrets.CLOUDFLARE_EDGE_TOKEN || '' }}
       PREVIEW_BRANCH: ${{ needs.setup.outputs.branch }}
+      PACK1_ENFORCE_PREVIEW_OWNER: '1'
+      CI_RESOURCE_EXPIRES: ${{ needs.setup.outputs.expires }}
       LOAD_FIXTURE_FILE: /tmp/pack1-launch-fixtures.json
       LOAD_SHARD: ${{ matrix.shard }}
     steps:
@@ -150,7 +155,9 @@ jobs:
         if: always()
         with:
           name: distributed-capacity-${{ github.run_attempt }}-runner-${{ matrix.shard }}
-          path: artifacts/launch-load
+          path: |
+            artifacts/launch-load
+            artifacts/ci-resources
           retention-days: 30
   collect_cleanup:
     needs: [setup, cohort]
@@ -161,6 +168,8 @@ jobs:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
       CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
       PREVIEW_BRANCH: ${{ needs.setup.outputs.branch }}
+      PACK1_ENFORCE_PREVIEW_OWNER: '1'
+      CI_RESOURCE_EXPIRES: ${{ needs.setup.outputs.expires }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -189,5 +198,7 @@ jobs:
         if: always()
         with:
           name: distributed-capacity-${{ github.run_attempt }}-final
-          path: artifacts/launch-load
+          path: |
+            artifacts/launch-load
+            artifacts/ci-resources
           retention-days: 30

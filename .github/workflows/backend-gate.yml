@@ -1,6 +1,9 @@
 name: backend schema gate
 
 on:
+  workflow_dispatch:
+  push:
+    branches: ['ci/test-fixture-*']
   pull_request:
     paths:
       - 'worker/**'
@@ -76,6 +79,7 @@ jobs:
           node tests/creator-event-write-safety.mjs "$RUNNER_TEMP/pack1-postgres.connection" --dev-fixtures
 
   precheck:
+    if: github.event_name == 'pull_request'
     name: backend schema gate precheck
     runs-on: ubuntu-latest
     outputs:
@@ -325,7 +329,9 @@ jobs:
         if: always()
         with:
           name: corpus-readiness-isolated-${{ github.run_id }}-${{ matrix.domain }}
-          path: artifacts/corpus-readiness
+          path: |
+            artifacts/corpus-readiness
+            artifacts/ci-resources
           if-no-files-found: ignore
           retention-days: 30
 

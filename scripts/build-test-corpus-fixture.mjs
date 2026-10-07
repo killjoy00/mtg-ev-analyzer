@@ -30,7 +30,9 @@ for(const set of catalog.sets) {
   sets.push({...set,puzzles:selected.length,trophy_drafts:sources.length,sha256:sha(bytes),source_sha256:set.sha256});
 }
 fs.writeFileSync(`${root}/catalog.json`,JSON.stringify({...catalog,fixture_version:1,source_catalog_sha256:sha(catalogBytes),sets},null,2)+'\n');
-const opening=JSON.parse(gunzipSync(fs.readFileSync(`${root}/msh.json.gz`))).find(p=>p.pick_number===1);
-// Freeze accepted scores once rather than manufacturing expectations at test time.
-fs.writeFileSync(`${root}/scoring-golden.json`,JSON.stringify({puzzle:opening,expected:opening.candidates.map(c=>({id:c.id,score:gradeDraftRunPick(opening,c.id).score}))},null,2)+'\n');
+if(process.argv.includes('--refresh-golden')) {
+  const opening=JSON.parse(gunzipSync(fs.readFileSync(`${root}/msh.json.gz`))).find(p=>p.pick_number===1);
+  // Explicit review step; ordinary fixture refreshes preserve accepted scores.
+  fs.writeFileSync(`${root}/scoring-golden.json`,JSON.stringify({puzzle:opening,expected:opening.candidates.map(c=>({id:c.id,score:gradeDraftRunPick(opening,c.id).score}))},null,2)+'\n');
+}
 console.log(`Created ${sets.length} fixture environments; ${sets.reduce((n,s)=>n+s.puzzles,0)} decisions.`);

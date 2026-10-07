@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import {randomBytes} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {controlRequest,transientControlStatus} from './control-read.mjs';
+import {resourceReceipt,writeResourceReceipt} from './preview-resource-ownership.mjs';
 
 const PROJECT='patient-shadow-91417882',BASE=`https://console.neon.tech/api/v2/projects/${PROJECT}`;
 const PARENTS=['br-orange-feather-ayps8kep','br-twilight-hill-ayffyd2b'];
@@ -53,13 +54,19 @@ export async function createCiBranch({prefix,parent,expires,suspend=300,token,
   return {branch_id:branch.id,created:'true'};
 }
 if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url) {
+  let createdBranch;
   createCiBranch({prefix:process.env.CI_BRANCH_PREFIX,parent:process.env.CI_BRANCH_PARENT,
     expires:process.env.CI_BRANCH_EXPIRES,suspend:Number(process.env.CI_BRANCH_SUSPEND||300),token:process.env.NEON_API_KEY,
     output:(name,value)=>{
+      if(name==='branch_id')createdBranch=value;
       if(name==='db_url') {
         const mask=value=>console.log('::add-mask::'+value.replaceAll('%','%25').replaceAll('\r','%0D').replaceAll('\n','%0A'));
         mask(decodeURIComponent(new URL(value).password));mask(value);
       }
       fs.appendFileSync(process.env.GITHUB_OUTPUT,`${name}=${value}\n`);
+      if(name==='created') {
+        fs.appendFileSync(process.env.GITHUB_ENV,`CI_RESOURCE_EXPIRES=${process.env.CI_BRANCH_EXPIRES}\n`);
+        writeResourceReceipt(resourceReceipt({branch:createdBranch,sha:process.env.GITHUB_SHA,runId:process.env.GITHUB_RUN_ID,attempt:process.env.GITHUB_RUN_ATTEMPT,expires:process.env.CI_BRANCH_EXPIRES,phase:'branch-created'}));
+      }
     }}).catch(error=>{console.error(error.message);process.exitCode=1;});
 }

@@ -116,12 +116,16 @@ jobs:
         if: always()
         with:
           name: launch-load-${{ github.run_id }}
-          path: artifacts/launch-load
+          path: |
+            artifacts/launch-load
+            artifacts/ci-resources
           retention-days: 30
       - name: Remove this private preview route
         if: always() && (steps.deploy.outcome == 'success' || steps.deploy.outcome == 'failure')
         env:
           CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+          PACK1_ENFORCE_PREVIEW_OWNER: '1'
+          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
         run: node scripts/edge-control.mjs disable
       - name: Delete the disposable branch
         if: always() && steps.neon.outputs.created == 'true'

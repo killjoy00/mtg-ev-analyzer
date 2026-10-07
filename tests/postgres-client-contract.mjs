@@ -56,7 +56,7 @@ try {
       assert.equal(first.revision,retry.revision,'Concurrent retry must converge');run=first;
       await request(`/v1/runs/${run.id}/pick`,{...body,cardId:other},409);
     }
-    assert.equal(run.complete,true);assert.ok(run.summary);
+    assert.equal(run.complete,true);assert.equal(run.answers.length,8);assert.ok(Number.isFinite(run.score));
     await request(`/v1/runs/${run.id}`);
     const result=await pool.query({text:'SELECT count(*)::text n FROM game_results WHERE player_id=$1::uuid AND client_result_id=$2',values:[player.playerId,'draft-run:'+run.id],types:textTypes});
     assert.equal(result.rows[0].n,'1','Completion and retry must persist exactly one result');
