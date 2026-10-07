@@ -41,7 +41,7 @@ const isDocs=path=>path==='README.md'||path==='MONETIZATION.md'||path.startsWith
 const isPresentation=path=>{
   if(/^creator\//.test(path)||/^go\//.test(path))return false;
   // HTML contains application behavior and must reach the owning browser group.
-  if(path==='index.html'||/^(?:admin|account|reset-password|profile|practice|daily|open|results|draft-run)\/.*\.html$/i.test(path))return false;
+  if(path==='index.html'||/^(?:admin|account|reset-password|profile|practice|daily|open|results|draft-run|patreon)\/.*\.html$/i.test(path))return false;
   if(/\.(?:html|css|png|jpe?g|svg|ico|webp)$/i.test(path))return true;
   return /^(?:about|contact|privacy|terms|how-it-works|learn|sets|methodology|disclosure|\.well-known)\//.test(path)
     ||['CNAME','_config.yml','robots.txt','sitemap.xml','ads.txt','ads.txt.example'].includes(path);
