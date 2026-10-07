@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -13,6 +13,9 @@ export default function TermsScreen() {
   const params = useLocalSearchParams<{ licenses?: string }>();
   const previewLicensesOpen = config.screenshots.fixtures && params.licenses === '1';
   const [licensesOpen, setLicensesOpen] = useState(previewLicensesOpen);
+  useEffect(() => {
+    if (previewLicensesOpen) setLicensesOpen(true);
+  }, [previewLicensesOpen]);
   return (
     <ArticleScreen
       kicker="Policy"
