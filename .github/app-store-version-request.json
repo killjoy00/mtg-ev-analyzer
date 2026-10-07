@@ -1,0 +1,5 @@
+{
+  "operation": "ensure-app-store-version",
+  "reason": "Issue #984 requires a real iOS marketing-version 1.1 delivery. Ensure the App Store Connect iOS version record 1.1 exists and is safely editable with MANUAL release before the guarded TestFlight upload. Do not submit App Review, withdraw or alter the existing 1.0 review state, create a public release, or change tester/group configuration. If Apple refuses creation because the current version state does not permit a new version, fail with retained provider evidence instead of mutating 1.0.",
+  "version": "1.1"
+}
