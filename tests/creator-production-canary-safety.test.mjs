@@ -87,6 +87,8 @@ test('creator canary static cleanup dispatches exact-head green CI before merge'
   assert.match(workflow,/Cleanup exact-head test\/e2e dispatches never registered; refusing to merge/);
   assert.match(workflow,/gh run watch "\$test_run" --exit-status/);
   assert.match(workflow,/gh run watch "\$e2e_run" --exit-status/);
+  assert.match(workflow,/Creator canary cleanup base moved from \$base_sha to \$current_main; refusing an untested merge/);
+  assert.match(workflow,/gh pr view "\$pr_url" --json baseRefOid/);
   assert.match(workflow,/gh pr merge "\$pr_url" --squash --delete-branch --match-head-commit "\$head_sha"/);
   assert.match(workflow,/pages\/builds/);
   assert.match(workflow,/Live creator registry still contains a canary entry after cleanup/);
@@ -94,8 +96,9 @@ test('creator canary static cleanup dispatches exact-head green CI before merge'
   const dispatch=workflow.indexOf('gh workflow run test.yml');
   const register=workflow.indexOf('actions/runs?event=workflow_dispatch');
   const watch=workflow.indexOf('gh run watch "$test_run"');
+  const baseGuard=workflow.indexOf('Creator canary cleanup base moved');
   const merge=workflow.indexOf('gh pr merge');
-  assert.ok(dispatch>=0&&dispatch<register&&register<watch&&watch<merge,'cleanup must dispatch exact-head CI, observe it, wait for it, then merge');
+  assert.ok(dispatch>=0&&dispatch<register&&register<watch&&watch<baseGuard&&baseGuard<merge,'cleanup must dispatch exact-head CI, observe it, wait, revalidate the base, then merge');
   assert.match(workflow,/permissions:\n  contents: write\n  pull-requests: write\n  actions: write\n  checks: read\n  pages: write/);
   assert.match(workflow,/GH_TOKEN: \$\{\{ github\.token \}\}/);
   assert.doesNotMatch(workflow,/token: \$\{\{ secrets\.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN \}\}/);
