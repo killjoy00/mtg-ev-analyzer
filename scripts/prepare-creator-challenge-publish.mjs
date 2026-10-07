@@ -27,7 +27,10 @@ export async function prepareCreatorChallengePublish({root=process.cwd(),action=
   const routeDir=path.join(root,'creator',incoming.slug);
   await mkdir(routeDir,{recursive:true});
   await writeFile(path.join(routeDir,'index.html'),renderCreatorChallengePage(incoming),'utf8');
-  if(action==='retire')await rm(path.join(routeDir,'creator-card.png'),{force:true});
+  if(action==='retire')await Promise.all([
+    rm(path.join(routeDir,'creator-card.png'),{force:true}),
+    rm(path.join(routeDir,'creator-card-square.png'),{force:true}),
+  ]);
   return {entry:incoming,created:!slugMatch,retired:action==='retire'};
 }
 
