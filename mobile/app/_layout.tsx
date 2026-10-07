@@ -91,7 +91,11 @@ export default function RootLayout() {
           <Stack.Screen name="set-archive" options={{ title: 'Set Archive' }} />
           <Stack.Screen name="account" options={{ title: 'Account settings' }} />
           <Stack.Screen name="account-profile" options={{ title: 'Profile & visibility' }} />
-          <Stack.Screen name="help" options={{ title: 'Help & information' }} />
+          <Stack.Screen name="about" options={{ title: 'About' }} />
+          <Stack.Screen name="support" options={{ title: 'Support & contact' }} />
+          <Stack.Screen name="privacy" options={{ title: 'Privacy' }} />
+          <Stack.Screen name="terms" options={{ title: 'Terms' }} />
+          <Stack.Screen name="help" options={{ title: 'About' }} />
           <Stack.Screen name="membership" options={{ title: 'Membership' }} />
           <Stack.Screen name="account-security" options={{ title: 'Sign-in & security' }} />
           <Stack.Screen name="account-delete" options={{ title: 'Delete account' }} />
