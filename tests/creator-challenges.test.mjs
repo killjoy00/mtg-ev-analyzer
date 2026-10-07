@@ -156,11 +156,21 @@ test('completed Daily remains previewable but cannot publish/start until the Pac
   assert.equal(resolved.id,sessionId);
   assert.equal(resolved.answers.length,8);
 
+  const originalVersion=source.scoring_version;
+  const originalRanking=source.answers[0].ranking;
+  source.answers[0].ranking=[{id:source.answers[0].selectedId,score:Number(source.answers[0].score)-1}];
+  await assert.rejects(
+    validateCreatorChallengeSource(query,challenge,{today:'2026-10-06',requireClosed:true}),
+    error=>error?.code==='CREATOR_SOURCE_SCORING_VERSION',
+    'conflicting selected-card score evidence must fail closed',
+  );
+  source.answers[0].ranking=originalRanking;
   source.scoring_version='historical-unsupported';
   await assert.rejects(
     validateCreatorChallengeSource(query,challenge,{today:'2026-10-06',requireClosed:true}),
     error=>error?.code==='CREATOR_SOURCE_SCORING_VERSION',
   );
+  source.scoring_version=originalVersion;
 });
 
 test('creator public payload uses existing acquisition tracking without weakening normal campaign destinations',()=>{
@@ -621,12 +631,14 @@ test('creator privacy cleanup scrubs retained challenger labels and creator auth
 });
 
 
-test('creator funnel migration installs a merge-safe database invariant',async()=>{
+test('creator funnel migration installs a rollout-safe database invariant',async()=>{
   const migration=await readFile('migrations/0054_creator_event_idempotency.sql','utf8');
   assert.match(migration,/LOCK TABLE analytics_events IN SHARE ROW EXCLUSIVE MODE/);
-  assert.match(migration,/CREATE UNIQUE INDEX IF NOT EXISTS analytics_creator_challenge_event_uq/);
-  assert.match(migration,/pack1_creator_event_insert_guard/);
-  assert.match(migration,/creator_funnel_ranked/);
+  assert.match(migration,/pack1_creator_event_write_guard/);
+  assert.match(migration,/pack1_creator_event_update_dedupe/);
+  assert.match(migration,/REFERENCING NEW TABLE AS creator_event_updates/);
+  assert.match(migration,/DROP INDEX IF EXISTS analytics_creator_challenge_event_uq/);
+  assert.doesNotMatch(migration,/CREATE UNIQUE INDEX IF NOT EXISTS analytics_creator_challenge_event_uq/);
   assert.match(migration,/ORDER BY created_at,id/);
   const runtime=await readFile('worker/draft-run-function.mjs','utf8');
   const start=runtime.indexOf("('creator_challenge_open',$2::jsonb)");
