@@ -17,6 +17,7 @@ const [
   accountStateHook,
   accountLayout,
   homeScreen,
+  careerScreen,
   publicProfileScreen,
   webHowTo,
   webScoring,
@@ -35,6 +36,7 @@ const [
   readFile(new URL('../mobile/src/hooks/useAccountState.ts', import.meta.url), 'utf8'),
   readFile(new URL('../mobile/app/_layout.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../mobile/src/screens/index.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/src/screens/career.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../mobile/app/profile.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../how-it-works/index.html', import.meta.url), 'utf8'),
   readFile(new URL('../scoring/index.html', import.meta.url), 'utf8'),
@@ -112,6 +114,13 @@ test('native instructional copy preserves current web Daily eligibility semantic
   assert.match(accountScreen, /web, iPhone, iPad, and Android/);
 });
 
+
+test('My Pack One exposes Stats and Account settings at the top', () => {
+  assert.match(careerScreen, />Stats<\/Text>/);
+  assert.match(careerScreen, />Account settings<\/Text>/);
+  assert.match(careerScreen, /accessibilityRole="tab"/);
+  assert.match(careerScreen, /router\.push\('\/account'\)/);
+});
 
 test('native Account keeps auth on /account and splits signed-in management into flat routes', () => {
   assert.match(accountScreen, /Profile &amp; visibility/);
