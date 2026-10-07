@@ -81,11 +81,13 @@ test('borrowed closed Daily eligibility is restored and canary is protected',()=
 
 test('creator canary static cleanup waits for registered green PR checks before merge',()=>{
   assert.match(workflow,/cleanup-creator-canary-static\.mjs/);
-  assert.match(workflow,/commits\/\$\{head_sha\}\/check-runs/);
-  assert.match(workflow,/Cleanup PR checks never registered; refusing to merge/);
+  assert.match(workflow,/actions\/runs\?event=pull_request&head_sha=\$\{head_sha\}/);
+  assert.match(workflow,/\.github\/workflows\/test\.yml/);
+  assert.match(workflow,/\.github\/workflows\/e2e\.yml/);
+  assert.match(workflow,/Cleanup PR test\/e2e workflows never registered; refusing to merge/);
   assert.match(workflow,/gh pr checks "\$pr_url" --watch --fail-fast/);
   assert.match(workflow,/gh pr merge "\$pr_url" --squash --delete-branch --match-head-commit "\$head_sha"/);
-  const register=workflow.indexOf('/check-runs');
+  const register=workflow.indexOf('actions/runs?event=pull_request');
   const watch=workflow.indexOf('gh pr checks');
   const merge=workflow.indexOf('gh pr merge');
   assert.ok(register>=0&&register<watch&&watch<merge,'cleanup must observe registered checks, wait for them, then merge');
