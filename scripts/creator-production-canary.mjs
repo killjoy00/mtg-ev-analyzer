@@ -430,6 +430,16 @@ async function cleanupGuest(guestId,challengeIds) {
     WHERE id=$1::uuid AND NOT EXISTS(SELECT 1 FROM account_links WHERE player_id=$1::uuid)`,[guestId]);
 }
 
+async function purgeVerifiedCanaryChallenges() {
+  const ids=createdChallenges.map(challenge=>challenge.id);
+  if(!ids.length)return;
+  const ready=(await query(`SELECT id::text id FROM creator_challenges
+    WHERE id=ANY($1::uuid[]) AND status='retired'
+      AND COALESCE(publication_detail->>'live_verified','false')='true'`,[ids])).rows;
+  if(ready.length!==ids.length)return;
+  await query('DELETE FROM creator_challenges WHERE id=ANY($1::uuid[])',[ids]);
+}
+
 async function bestEffortRetire() {
   if(!admin)return;
   for(const challenge of createdChallenges){
@@ -528,6 +538,7 @@ try{
   try{if(guest)await cleanupGuest(guest.id,createdChallenges.map(row=>row.id));}catch(error){report.cleanup.guest_error=error.message;process.exitCode=1;}
   try{await restoreBorrowedSources();report.cleanup.borrowed_sources=true;}catch(error){report.cleanup.borrowed_source_error=error.message;process.exitCode=1;}
   try{await cleanupFreshPracticeSource();report.cleanup.fresh_practice=true;}catch(error){report.cleanup.fresh_practice_error=error.message;process.exitCode=1;}
+  try{await purgeVerifiedCanaryChallenges();report.cleanup.creator_challenges=true;}catch(error){report.cleanup.creator_challenge_error=error.message;process.exitCode=1;}
   try{await deleteAdminFixture(admin);report.cleanup.admin=true;}catch(error){report.cleanup.admin_error=error.message;process.exitCode=1;}
   if(process.exitCode)report.passed=false;
   report.finished_at=new Date().toISOString();
