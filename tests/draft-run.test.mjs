@@ -41,6 +41,13 @@ test('historical replay scoring pins recorded v2 and both v3 floating-point path
     'coarse current v3 remains the linear implementation; creator validation resolves legacy sources to an explicit profile');
   assert.equal(gradeDraftRunPickForVersion(p,'d',DRAFT_RUN_SCORING_V3_LEGACY_PROFILE).score,100);
   assert.throws(()=>gradeDraftRunPickForVersion(p,'a','trophy-consensus-v4'),/Unsupported Draft Run scoring version/);
+
+  const component={...p,corpus_version:'traditional-premier-v5-phase2-v1'};
+  const replay=gradeDraftRunPickForVersion(component,'b',DRAFT_RUN_SCORING_V3_LINEAR_PROFILE);
+  const currentSupports=calibratedSupports(component.candidates,supportSharpening(component.corpus_version));
+  assert.equal(replay.selectedSupport,currentSupports.get('b'),
+    'frozen linear-v3 replay retains current traditional-component display calibration');
+  assert.equal(replay.consensusSupport,currentSupports.get('a'));
 });
 
 function card(id, support) {
