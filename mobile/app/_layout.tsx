@@ -95,7 +95,6 @@ export default function RootLayout() {
           <Stack.Screen name="support" options={{ title: 'Support & contact' }} />
           <Stack.Screen name="privacy" options={{ title: 'Privacy' }} />
           <Stack.Screen name="terms" options={{ title: 'Terms' }} />
-          <Stack.Screen name="help" options={{ title: 'About' }} />
           <Stack.Screen name="membership" options={{ title: 'Membership' }} />
           <Stack.Screen name="account-security" options={{ title: 'Sign-in & security' }} />
           <Stack.Screen name="account-delete" options={{ title: 'Delete account' }} />
