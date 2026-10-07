@@ -25,7 +25,8 @@
     "scripts/creator-event-schema.mjs",
     ".github/scripts/apply-identity-migration.sh",
     "scripts/create-ci-neon-branch.mjs",
-    "scripts/control-read.mjs"
+    "scripts/control-read.mjs",
+    "scripts/reroll-index-schema.mjs"
   ],
   "domains": {
     "account": {

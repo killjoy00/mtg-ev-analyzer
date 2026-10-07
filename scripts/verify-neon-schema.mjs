@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import {query} from '../worker/growth-function.js';
 import {verifyCreatorEventSchema} from './creator-event-schema.mjs';
+import {verifyRerollIndexSchema} from './reroll-index-schema.mjs';
 import {verifyServingStatistics} from '../worker/serving-statistics.mjs';
 const result=await query(`SELECT
   EXISTS(SELECT 1 FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid WHERE c.relname='draft_run_reroll_set_window_idx' AND i.indisvalid) reroll_set_window,
@@ -122,5 +123,6 @@ const result=await query(`SELECT
 // session and profile paths, so 0033 has to land before the code that reads it.
 for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0047 and this release's registered migrations first.`);
 await verifyCreatorEventSchema(query);
+await verifyRerollIndexSchema(query);
 await verifyServingStatistics(query);
 console.log('Neon schema and serving-statistics prerequisites verified.');

@@ -59,7 +59,8 @@
     "0052_decision_reports.sql",
     "0053_creator_challenges.sql",
     "0054_creator_event_idempotency.sql",
-    "0055_creator_event_write_safety.sql"
+    "0055_creator_event_write_safety.sql",
+    "0056_snapshot_aware_reroll_covering_index.sql"
   ],
   "same_prefix_order": {
     "0037": [
@@ -166,7 +167,8 @@
         "0052_decision_reports.sql",
         "0053_creator_challenges.sql",
         "0054_creator_event_idempotency.sql",
-        "0055_creator_event_write_safety.sql"
+        "0055_creator_event_write_safety.sql",
+        "0056_snapshot_aware_reroll_covering_index.sql"
       ]
     },
     "daily-calendar": {
@@ -216,7 +218,8 @@
         "0052_decision_reports.sql",
         "0053_creator_challenges.sql",
         "0054_creator_event_idempotency.sql",
-        "0055_creator_event_write_safety.sql"
+        "0055_creator_event_write_safety.sql",
+        "0056_snapshot_aware_reroll_covering_index.sql"
       ]
     },
     "launch-load": {
@@ -241,7 +244,8 @@
         "0052_decision_reports.sql",
         "0053_creator_challenges.sql",
         "0054_creator_event_idempotency.sql",
-        "0055_creator_event_write_safety.sql"
+        "0055_creator_event_write_safety.sql",
+        "0056_snapshot_aware_reroll_covering_index.sql"
       ]
     },
     "launch-distributed": {
@@ -268,7 +272,8 @@
         "0052_decision_reports.sql",
         "0053_creator_challenges.sql",
         "0054_creator_event_idempotency.sql",
-        "0055_creator_event_write_safety.sql"
+        "0055_creator_event_write_safety.sql",
+        "0056_snapshot_aware_reroll_covering_index.sql"
       ]
     }
   }

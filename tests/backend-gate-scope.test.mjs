@@ -21,6 +21,7 @@ test('gate infrastructure, migrations, shared core, unmapped files, and empty di
     ['scripts/backend-gate-map.json'],
     ['scripts/create-ci-neon-branch.mjs'],
     ['scripts/control-read.mjs'],
+    ['scripts/reroll-index-schema.mjs'],
     ['tests/backend-gate-scope.test.mjs'],
     ['migrations/9999_probe.sql'],
     ['worker/schema.sql'],

@@ -2,7 +2,7 @@ name: isolated distributed launch acceptance
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths: ['.github/preview-dns-recovery.json', 'scripts/create-ci-neon-branch.mjs', 'scripts/control-read.mjs', 'scripts/edge-control.mjs', 'tests/ci-provisioning.test.mjs', 'scripts/launch-distributed*', 'scripts/launch-change-scope.mjs', 'tests/launch-change-scope.test.mjs', 'tests/launch-distributed-capacity.test.mjs', 'tests/draft-start-timing.test.mjs', 'tests/ingress.test.mjs', 'worker/draft-start-timing.mjs', 'worker/draft-run-function.mjs', 'worker/draft-run-selection.mjs', 'migrations/0045_batched_practice_selector.sql', 'migrations/0050_practice_recency_bias.sql', 'migrations/0051_exact_pick_draw_index.sql', 'edge/gateway.mjs', '.github/workflows/launch-distributed.yml']
+    paths: ['.github/preview-dns-recovery.json', 'scripts/create-ci-neon-branch.mjs', 'scripts/control-read.mjs', 'scripts/edge-control.mjs', 'tests/ci-provisioning.test.mjs', 'scripts/launch-distributed*', 'scripts/launch-change-scope.mjs', 'tests/launch-change-scope.test.mjs', 'tests/launch-distributed-capacity.test.mjs', 'tests/draft-start-timing.test.mjs', 'tests/ingress.test.mjs', 'worker/draft-start-timing.mjs', 'worker/draft-run-function.mjs', 'worker/draft-run-selection.mjs', 'migrations/0045_batched_practice_selector.sql', 'migrations/0050_practice_recency_bias.sql', 'migrations/0051_exact_pick_draw_index.sql', 'migrations/0056_snapshot_aware_reroll_covering_index.sql', 'edge/gateway.mjs', '.github/workflows/launch-distributed.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -197,6 +197,7 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0053_creator_challenges.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0054_creator_event_idempotency.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0055_creator_event_write_safety.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0056_snapshot_aware_reroll_covering_index.sql
           node scripts/verify-neon-schema.mjs
           PACK1_RELEASE_COMMIT="$GITHUB_SHA" node scripts/warm-practice-cache.mjs
           node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$GITHUB_SHA"
