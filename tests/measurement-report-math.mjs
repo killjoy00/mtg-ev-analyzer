@@ -95,7 +95,7 @@ try {
  // Admin timestamp windows are Pacific midnights, not database-session
  // midnights. 18:30 Pacific is already the following UTC date during DST but
  // must remain inside the report for its Pacific calendar day.
- const boundaryPlayer=await addPlayer('Pacific report boundary '+tag);
+ const boundaryPlayer=await addPlayer('Pacific edge '+tag);
  const boundaryUrl=`https://packone.pro/v1/admin/measurements?from=${crossDay}&to=${crossDay}`;
  const boundaryBefore=await handleAdmin(new Request(boundaryUrl,{headers:{'x-pack1-auth-session':token}}),query,readJson);
  await query(`INSERT INTO analytics_events(player_id,event_name,event_props,created_at)
