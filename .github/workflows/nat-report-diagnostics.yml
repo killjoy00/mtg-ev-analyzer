@@ -1,50 +1,42 @@
-name: profile cold reroll visibility cost
+name: inspect recorded distributed latency failures
 on:
   push:
     branches: ['diagnostics/1051-nat-report']
 permissions:
   contents: read
+  actions: read
 jobs:
-  profile:
+  inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/download-artifact@v4
         with:
-          node-version: 24
-      - name: Bound disposable branch expiry
-        id: expiry
-        run: echo "expires_at=$(date -u --date '+45 minutes' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
-      - name: Create disposable profiling clone
-        id: neon
-        env:
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          CI_BRANCH_PREFIX: ci-pr-1051-${{ github.run_id }}-${{ github.run_attempt }}-reroll_profile
-          CI_BRANCH_PARENT: br-orange-feather-ayps8kep
-          CI_BRANCH_EXPIRES: ${{ steps.expiry.outputs.expires_at }}
-          CI_BRANCH_SUSPEND: 300
-        run: node scripts/create-ci-neon-branch.mjs
-      - name: Install reviewed reroll index on the disposable clone
-        env:
-          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+          repository: killjoy00/mtg-ev-analyzer
+          run-id: 37588116932
+          github-token: ${{ github.token }}
+          pattern: distributed-capacity-1-runner-*
+          path: reports
+      - name: Print bounded latency and phase evidence from recorded reports
         run: |
-          set -euo pipefail
-          if ! command -v psql >/dev/null 2>&1; then
-            sudo apt-get update
-            sudo apt-get install -y postgresql-client
-          fi
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0056_snapshot_aware_reroll_covering_index.sql
-      - name: Measure cold SQL before and after owned-clone maintenance
-        env:
-          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
-          PROFILE_BRANCH: ${{ steps.neon.outputs.branch_id }}
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-        run: node scripts/diagnostics-reroll-plan.mjs
-      - name: Delete owned profiling clone
-        if: always() && steps.neon.outputs.branch_id != ''
-        uses: neondatabase/delete-branch-action@v3
-        with:
-          project_id: patient-shadow-91417882
-          api_key: ${{ secrets.NEON_API_KEY }}
-          branch: ${{ steps.neon.outputs.branch_id }}
+          python3 - <<'PY'
+          import json, pathlib
+          def inspect(obj, file):
+            if isinstance(obj, dict):
+              if 'root_failure' in obj:
+                root=obj.get('root_failure') or {}
+                print(json.dumps({'kind':'root_failure','file':file,'stage':obj.get('stage'),'shard':obj.get('shard'),'category':root.get('category'),'reason':root.get('reason'),'latency':root.get('latency')}))
+              requests=obj.get('requests')
+              if isinstance(requests,list):
+                for route in ['start','reroll','read','view','pick']:
+                  rows=sorted([r for r in requests if isinstance(r,dict) and r.get('route')==route and isinstance(r.get('ms'),(int,float))],key=lambda r:r['ms'],reverse=True)[:3]
+                  for row in rows:
+                    print(json.dumps({'kind':'slow_request','file':file,'stage':obj.get('stage'),'shard':obj.get('shard'),'route':route,'ms':row.get('ms'),'status':row.get('status'),'endpoint':row.get('endpoint'),'diagnostics':row.get('diagnostics')}))
+              for key,value in obj.items():
+                if key != 'requests': inspect(value,file)
+            elif isinstance(obj,list):
+              for value in obj: inspect(value,file)
+          for path in pathlib.Path('reports').rglob('*.json'):
+            try: inspect(json.loads(path.read_text()),path.name)
+            except (ValueError,UnicodeError): pass
+          PY
