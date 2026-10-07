@@ -11,8 +11,8 @@ const exactPublication = paths => {
     const routes=normalized.filter(path=>/^creator\/[^/]+\/index\.html$/.test(path));
     if(routes.length===1) {
       const slug=routes[0].split('/')[1];
-      const allowed=new Set(['creator-challenges.json',`creator/${slug}/index.html`,`creator/${slug}/creator-card.png`]);
-      if(normalized.length>=2&&normalized.length<=3&&normalized.every(path=>allowed.has(path))) return {kind:'creator',slug};
+      const allowed=new Set(['creator-challenges.json',`creator/${slug}/index.html`,`creator/${slug}/creator-card.png`,`creator/${slug}/creator-card-square.png`]);
+      if(normalized.length>=2&&normalized.length<=4&&normalized.every(path=>allowed.has(path))) return {kind:'creator',slug};
     }
   }
   return null;

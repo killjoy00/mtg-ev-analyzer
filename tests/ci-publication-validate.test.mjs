@@ -31,12 +31,12 @@ test('creator publish and privacy retirement require the deterministic card life
   const f=fixture();t.after(()=>rmSync(f.root,{recursive:true,force:true}));
   const entry={id:'11111111-1111-4111-8111-111111111111',slug:'lola',status:'published',creator_name:'Lola'};
   writeFileSync(path.join(f.root,'creator-challenges.json'),JSON.stringify([entry],null,2)+'\n');
-  mkdirSync(path.join(f.root,'creator/lola'),{recursive:true});writeFileSync(path.join(f.root,'creator/lola/index.html'),'published');writeFileSync(path.join(f.root,'creator/lola/creator-card.png'),'card');
+  mkdirSync(path.join(f.root,'creator/lola'),{recursive:true});writeFileSync(path.join(f.root,'creator/lola/index.html'),'published');writeFileSync(path.join(f.root,'creator/lola/creator-card.png'),'card');writeFileSync(path.join(f.root,'creator/lola/creator-card-square.png'),'square');
   const published=f.commit('publish creator');assert.equal(validatePublicationDiff({base:f.base,head:published,cwd:f.root}).action,'publish');
   writeFileSync(path.join(f.root,'creator-challenges.json'),JSON.stringify([{id:entry.id,slug:'lola',status:'retired'}],null,2)+'\n');
-  writeFileSync(path.join(f.root,'creator/lola/index.html'),'retired');rmSync(path.join(f.root,'creator/lola/creator-card.png'));
+  writeFileSync(path.join(f.root,'creator/lola/index.html'),'retired');rmSync(path.join(f.root,'creator/lola/creator-card.png'));rmSync(path.join(f.root,'creator/lola/creator-card-square.png'));
   const retired=f.commit('retire creator');const result=validatePublicationDiff({base:published,head:retired,cwd:f.root});
-  assert.equal(result.action,'retire');assert.equal(existsSync(path.join(f.root,'creator/lola/creator-card.png')),false);
+  assert.equal(result.action,'retire');assert.equal(existsSync(path.join(f.root,'creator/lola/creator-card.png')),false);assert.equal(existsSync(path.join(f.root,'creator/lola/creator-card-square.png')),false);
 });
 
 test('privacy can create a scrubbed retired route without ever publishing a card',t=>{

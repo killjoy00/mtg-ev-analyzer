@@ -157,9 +157,24 @@ jobs:
         if: steps.scope.outputs.unit_plan == 'full' || steps.scope.outputs.unit_plan == 'ci' || steps.scope.outputs.dataset_audit == 'true' || (steps.scope.outputs.plan == 'publication' && steps.publication.outputs.kind == 'creator' && steps.publication.outputs.action == 'publish')
         with:
           python-version: '3.12'
-      - name: Install creator card verification dependency
-        if: steps.scope.outputs.plan == 'publication' && steps.publication.outputs.kind == 'creator' && steps.publication.outputs.action == 'publish'
-        run: python3 -m pip install --quiet 'Pillow==11.3.0'
+      - name: Install creator card renderer dependencies
+        if: steps.scope.outputs.unit_plan == 'full' || (steps.scope.outputs.plan == 'publication' && steps.publication.outputs.kind == 'creator' && steps.publication.outputs.action == 'publish')
+        run: python3 -m pip install --quiet 'Pillow==11.3.0' 'fonttools[woff]==4.60.1'
+
+      # Temporary branch-only visual handoff for this migration; removed before merge.
+      - name: Emit creator card visual fixtures
+        if: github.event_name == 'pull_request' && github.head_ref == 'feat/creator-kit-pack-one-scorecards-20261007'
+        env:
+          PACK1_CREATOR_FIXTURE_DIR: ${{ runner.temp }}/creator-card-fixtures
+        run: |
+          set -euo pipefail
+          python3 tests/test_creator_social_card.py
+          for image in "$PACK1_CREATOR_FIXTURE_DIR"/*.png; do
+            name="$(basename "$image")"
+            echo "PACK1_CREATOR_FIXTURE_BEGIN $name"
+            base64 -w0 "$image" | fold -w 60000 | sed "s/^/PACK1_CREATOR_FIXTURE_CHUNK $name /"
+            echo "PACK1_CREATOR_FIXTURE_END $name"
+          done
       - name: Verify deployment bundles and embedded revisions
         if: steps.scope.outputs.build_bundles == 'true'
         shell: bash

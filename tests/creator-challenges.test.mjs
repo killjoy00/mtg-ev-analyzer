@@ -16,6 +16,7 @@ import {
 } from '../worker/creator-challenges.mjs';
 import {
   creatorChallengeDescription,
+  creatorChallengeImageAlt,
   creatorChallengeTrackedUrl,
   renderCreatorChallengePage,
   validateCreatorPageEntries,
@@ -223,6 +224,7 @@ test('published creator page has creator social metadata but no gameplay answers
   };
   assert.deepEqual(validateCreatorPageEntries([entry]),[entry]);
   assert.match(creatorChallengeDescription(entry),/Lola scored 87\/100/);
+  assert.match(creatorChallengeImageAlt(entry),/Lola[\s\S]*87 out of 100[\s\S]*Latest Set Daily[\s\S]*October 8, 2026/);
   assert.equal(
     creatorChallengeTrackedUrl(entry),
     `https://packone.pro/?game=draft-run&creator=${CHALLENGE}&utm_source=creator&utm_campaign=beat-the-creator&utm_medium=creator`,
@@ -230,6 +232,7 @@ test('published creator page has creator social metadata but no gameplay answers
   const html=renderCreatorChallengePage(entry);
   assert.match(html,/property="og:title" content="Can you beat Lola\?"/);
   assert.match(html,/creator-card\.png/);
+  assert.match(html,/og:image:alt" content="Pack One Beat the Creator challenge for Lola:/);
   assert.match(html,new RegExp(`game=draft-run&creator=${CHALLENGE}`));
   for(const forbidden of ['selectedId','creatorId','puzzle_ids','answers'])assert.doesNotMatch(html,new RegExp(forbidden));
 
@@ -325,6 +328,9 @@ test('protected campaign publication workflow has a creator path without direct 
   assert.match(workflow,/inputs\.kind == 'creator'/);
   assert.match(workflow,/prepare-creator-challenge-publish\.mjs/);
   assert.match(workflow,/generate-creator-social-card\.py/);
+  assert.match(workflow,/--square-output "creator\/\$\{CAMPAIGN_SLUG\}\/creator-card-square\.png"/);
+  assert.match(workflow,/--headline "\$CREATOR_HEADLINE"/);
+  assert.match(workflow,/fonttools\[woff\]==4\.60\.1/);
   assert.match(workflow,/check-creator-challenges\.mjs/);
   assert.match(workflow,/node scripts\/ci-publication-validate\.mjs/);
   assert.match(workflow,/python3 scripts\/check-creator-social-card\.py/);
@@ -620,26 +626,33 @@ test('retirement never reuses a verified publish as verified static cleanup',asy
   assert.equal(state.publication_detail.superseded_publish.operation,publishOperation);
 });
 
-test('privacy retirement is not live-verified while the old personalized social image still resolves',async()=>{
+test('privacy retirement is not live-verified while either personalized social image still resolves',async()=>{
   const row={id:CHALLENGE,slug:'lola-rft'};
   const retiredHtml=`<!doctype html><body data-creator-challenge-id="${CHALLENGE}" data-creator-challenge-status="retired"></body>`;
-  const stale=await verifyCreatorPublicationLive(row,'retire',{
-    fetcher:async url=>String(url).endsWith('creator-card.png')
-      ? new Response('old personalized card',{status:200,headers:{'content-type':'image/png'}})
-      : new Response(retiredHtml,{status:200,headers:{'content-type':'text/html'}}),
-  });
-  assert.equal(stale.html_verified,true);
-  assert.equal(stale.image_verified,false);
-  assert.equal(stale.image_status,200);
-  assert.equal(stale.ok,false);
+  const responseFor=(url,{og=404,square=404}={})=>{
+    const value=String(url);
+    if(value.endsWith('creator-card.png'))return new Response(og===200?'old personalized card':null,{status:og,headers:{'content-type':'image/png'}});
+    if(value.endsWith('creator-card-square.png'))return new Response(square===200?'old personalized square':null,{status:square,headers:{'content-type':'image/png'}});
+    return new Response(retiredHtml,{status:200,headers:{'content-type':'text/html'}});
+  };
+  const staleOg=await verifyCreatorPublicationLive(row,'retire',{fetcher:url=>responseFor(url,{og:200})});
+  assert.equal(staleOg.html_verified,true);
+  assert.equal(staleOg.image_verified,false);
+  assert.equal(staleOg.image_status,200);
+  assert.equal(staleOg.square_image_status,404);
+  assert.equal(staleOg.ok,false);
 
-  const scrubbed=await verifyCreatorPublicationLive(row,'retire',{
-    fetcher:async url=>String(url).endsWith('creator-card.png')
-      ? new Response(null,{status:404})
-      : new Response(retiredHtml,{status:200,headers:{'content-type':'text/html'}}),
-  });
+  const staleSquare=await verifyCreatorPublicationLive(row,'retire',{fetcher:url=>responseFor(url,{square:200})});
+  assert.equal(staleSquare.image_verified,false);
+  assert.equal(staleSquare.image_status,404);
+  assert.equal(staleSquare.square_image_status,200);
+  assert.equal(staleSquare.ok,false);
+
+  const scrubbed=await verifyCreatorPublicationLive(row,'retire',{fetcher:url=>responseFor(url)});
   assert.equal(scrubbed.ok,true);
   assert.equal(scrubbed.image_verified,true);
+  assert.equal(scrubbed.image_status,404);
+  assert.equal(scrubbed.square_image_status,404);
 });
 
 

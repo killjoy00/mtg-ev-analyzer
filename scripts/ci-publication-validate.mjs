@@ -59,9 +59,9 @@ export function validatePublicationDiff({base,head,cwd=process.cwd()}={}){
   assert.ok(paths.includes('creator-challenges.json'),'publication diff must contain exactly one known registry');
   const routes=paths.filter(path=>/^creator\/[^/]+\/index\.html$/.test(path));
   assert.equal(routes.length,1,'creator publication must change exactly one generated route');
-  const slug=routes[0].split('/')[1],card=`creator/${slug}/creator-card.png`;
-  const allowed=new Set(['creator-challenges.json',routes[0],card]);
-  assert.ok(paths.length>=2&&paths.length<=3&&paths.every(path=>allowed.has(path)),'creator publication contains an unexpected path');
+  const slug=routes[0].split('/')[1],card=`creator/${slug}/creator-card.png`,square=`creator/${slug}/creator-card-square.png`;
+  const allowed=new Set(['creator-challenges.json',routes[0],card,square]);
+  assert.ok(paths.length>=2&&paths.length<=4&&paths.every(path=>allowed.has(path)),'creator publication contains an unexpected path');
   const delta=changedRegistryEntries(readBaseJson(base,'creator-challenges.json',{cwd}),JSON.parse(readFileSync(`${cwd}/creator-challenges.json`,'utf8')));
   assert.equal(delta.length,1,'creator publication must change exactly one registry entry');
   assert.equal(delta[0].slug,slug,'creator registry delta must match the generated route slug');
@@ -70,10 +70,18 @@ export function validatePublicationDiff({base,head,cwd=process.cwd()}={}){
   assert.ok(existsSync(`${cwd}/${routes[0]}`),'creator route must exist after publication/retirement');
   let action;
   if(!change.before&&change.after.status==='published'){
-    action='publish';assert.equal(statuses.get(routes[0]),'A','new creator route must be added');assert.equal(statuses.get(card),'A','published creator route must add its deterministic card');assert.ok(existsSync(`${cwd}/${card}`),'published creator card is missing');
+    action='publish';
+    assert.equal(statuses.get(routes[0]),'A','new creator route must be added');
+    for(const [asset,label] of [[card,'Open Graph'],[square,'square']]){
+      assert.equal(statuses.get(asset),'A',`published creator route must add its deterministic ${label} card`);
+      assert.ok(existsSync(`${cwd}/${asset}`),`published creator ${label} card is missing`);
+    }
   }else if(change.after.status==='retired'&&(!change.before||change.before.status==='published')){
-    action='retire';assert.equal(existsSync(`${cwd}/${card}`),false,'retired creator route must not retain a social card');
-    if(change.before?.status==='published')assert.equal(statuses.get(card),'D','published creator retirement must delete the social card');
+    action='retire';
+    for(const [asset,label] of [[card,'Open Graph'],[square,'square']]){
+      assert.equal(existsSync(`${cwd}/${asset}`),false,`retired creator route must not retain its ${label} social card`);
+      if(change.before?.status==='published')assert.equal(statuses.get(asset),'D',`published creator retirement must delete its ${label} social card`);
+    }
   }else throw new Error('creator fast path only accepts a new publication or a transition to retired');
   return {kind:'creator',slug,action,paths};
 }

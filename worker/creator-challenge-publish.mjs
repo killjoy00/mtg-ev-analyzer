@@ -184,18 +184,30 @@ export async function verifyCreatorPublicationLive(row,action,{fetcher}) {
     &&text.includes(`data-creator-challenge-id="${row.id}"`)
     &&text.includes(`data-creator-challenge-status="${action==='retire'?'retired':'published'}"`);
   if(!htmlVerified)return {ok:false,html_verified:false,image_verified:false};
-  let card;
+  const responses={};
   try {
-    card=await fetcher(url+'creator-card.png',{
-      headers:{'cache-control':'no-cache'},redirect:'error',signal:AbortSignal.timeout(15000),
-    });
+    for(const asset of ['creator-card.png','creator-card-square.png']) {
+      responses[asset]=await fetcher(url+asset,{
+        headers:{'cache-control':'no-cache'},redirect:'error',signal:AbortSignal.timeout(15000),
+      });
+    }
   } catch {
     return {ok:false,html_verified:true,image_verified:false};
   }
-  const imageVerified=action==='publish'
-    ? card.ok&&String(card.headers.get('content-type')||'').toLowerCase().includes('image/')
-    : card.status===404||card.status===410;
-  return {ok:htmlVerified&&imageVerified,html_verified:htmlVerified,image_verified:imageVerified,image_status:card.status};
+  const verifies=asset=>{
+    const image=responses[asset];
+    return action==='publish'
+      ? image.ok&&String(image.headers.get('content-type')||'').toLowerCase().includes('image/')
+      : image.status===404||image.status===410;
+  };
+  const imageVerified=verifies('creator-card.png')&&verifies('creator-card-square.png');
+  return {
+    ok:htmlVerified&&imageVerified,
+    html_verified:htmlVerified,
+    image_verified:imageVerified,
+    image_status:responses['creator-card.png'].status,
+    square_image_status:responses['creator-card-square.png'].status,
+  };
 }
 
 async function updatePublishFailure(query,row,operation,error) {

@@ -16,7 +16,7 @@ test('application HTML selects its behavioral journey rather than presentation s
 });
 
 test('creator and ordinary campaign generated diffs take the publication fast path',()=>{
-  let result=classifyChanges(['creator-challenges.json','creator/lola/index.html','creator/lola/creator-card.png']);
+  let result=classifyChanges(['creator-challenges.json','creator/lola/index.html','creator/lola/creator-card.png','creator/lola/creator-card-square.png']);
   assert.equal(result.plan,'publication');assert.deepEqual(result.publication,{kind:'creator',slug:'lola'});assert.equal(result.hydrate,false);
   result=classifyChanges(['creator-challenges.json','creator/lola/index.html']);
   assert.equal(result.plan,'publication','creator retirement without a card stays publication-only');

@@ -5,7 +5,7 @@ import {validatePublicationPr,requiredPublicationRuns,validatePublicationRunJobs
 const expected={repo:'owner/repo',branch:'automation/creator-challenge-fixture-op',headSha:'a'.repeat(40),baseSha:'b'.repeat(40),slug:'fixture',kind:'creator',prNumber:123};
 const pr=()=>({number:123,state:'open',base:{ref:'main',sha:expected.baseSha,repo:{full_name:expected.repo}},
   head:{ref:expected.branch,sha:expected.headSha,repo:{full_name:expected.repo}},user:{login:'github-actions[bot]'}});
-const files=[{filename:'creator-challenges.json'},{filename:'creator/fixture/index.html'},{filename:'creator/fixture/creator-card.png'}];
+const files=[{filename:'creator-challenges.json'},{filename:'creator/fixture/index.html'},{filename:'creator/fixture/creator-card.png'},{filename:'creator/fixture/creator-card-square.png'}];
 const runs=()=>['test','e2e'].map((name,index)=>({id:index+1,path:'.github/workflows/'+name+'.yml',
   event:'pull_request',head_sha:expected.headSha,head_branch:expected.branch,head_repository:{full_name:expected.repo},
   pull_requests:[{number:123}],status:'completed',conclusion:'action_required',html_url:'https://github.com/owner/repo/actions/runs/'+(index+1)}));
@@ -24,6 +24,7 @@ test('publication approval is confined to the generated same-repo static diff an
     assert.throws(()=>validatePublicationPr(wrong,files,expected));
   assert.throws(()=>validatePublicationPr(pr(),[{filename:'worker/index.js'}],expected));
   assert.throws(()=>validatePublicationPr(pr(),[{filename:'creator/other/index.html'}],expected));
+  assert.throws(()=>validatePublicationPr(pr(),[...files,{filename:'creator/fixture/extra.png'}],expected));
 });
 
 test('manual-dispatch green checks and unrelated PR runs cannot authorize publication',()=>{
