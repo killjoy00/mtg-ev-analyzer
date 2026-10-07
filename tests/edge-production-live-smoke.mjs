@@ -25,6 +25,10 @@ async function exactRelease(service) {
   assert.equal(last,commit,service+' exact release');
 }
 for(const service of ['legacy','growth','draft'])await exactRelease(service);
+const mobileLeaderboardToken='p1_00000000-0000-4000-8000-000000000000.'+'A'.repeat(43);
+await call('/draft/v1/leaderboard?period=daily&environment=mixed',{
+  headers:{'x-pack1-mobile-session':mobileLeaderboardToken},
+});
 const origin='https://packone.pro';
 const created=await call('/growth/v1/player/session',{
   method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({displayName:'QA secure auth release'}),expected:201,
@@ -68,4 +72,4 @@ const rejected=await fetch(base+'/growth/v1/player/session',{
   signal:AbortSignal.timeout(30000),
 });
 assert.equal(rejected.status,403);
-console.log('Production first-party gateway, player cookie, credentialed CORS and browser-origin Google OAuth start passed.');
+console.log('Production first-party gateway, mobile leaderboard, player cookie, credentialed CORS and browser-origin Google OAuth start passed.');
