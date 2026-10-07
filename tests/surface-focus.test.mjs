@@ -91,6 +91,16 @@ test('Draft Run previous-card context stays visible and visually distinct', asyn
   assert.match(css, /\.run-pool-cards button\{[^}]*background:transparent/);
 });
 
+test('practice share verification uses the public recipient path without owner credentials', async () => {
+  const source = await readFile('draft-run-product.mjs', 'utf8');
+  const helper = source.slice(source.indexOf('async function publicApi'), source.indexOf('function image'));
+  const share = source.slice(source.indexOf('async function shareResult'), source.indexOf('async function showBoard'));
+  assert.match(helper, /credentials:'omit'/);
+  assert.match(helper, /method:'GET'/);
+  assert.match(share, /publicApi\('\/v1\/shared-runs\/'\+encodeURIComponent\(share\.id\)\)/);
+  assert.match(share, /Pack One could not verify this share link\. Try Share again\./);
+});
+
 test('Draft Run result footnote keeps its muted spacing', async () => {
   const css = await readFile('draft-run.css', 'utf8');
   assert.match(css, /\.run-result-page \.run-note\{color:var\(--muted\);line-height:1\.6;margin:24px 0\}/);
