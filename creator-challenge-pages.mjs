@@ -57,7 +57,7 @@ export function creatorChallengeDescription(entry) {
   if(valid.status!=='published')return 'This Pack One creator challenge is no longer available.';
   const environment=envLabel(valid.environment);
   if(valid.source_type==='daily')return `${valid.creator_name} scored ${valid.score}/100 on the ${dayLabel(valid.source_day)} ${environment} Daily. Play the same eight decisions.`;
-  return `${valid.creator_name} scored ${valid.score}/100 on a Pack One ${environment} Practice run. Play the same eight decisions.`;
+  return `${valid.creator_name} scored ${valid.score}/100 in Pack One ${environment} practice. Play the same eight decisions.`;
 }
 
 export function creatorChallengeImageAlt(entry) {
