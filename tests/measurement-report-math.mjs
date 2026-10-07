@@ -91,6 +91,21 @@ try {
  const beforeDirectNone=beforeCohorts.filter(r=>r.source==='direct'&&r.campaign==='(none)').reduce((n,r)=>n+Number(r.cohort_people||0),0);
  const tag=crypto.randomUUID().replaceAll('-','').slice(0,8);
 
+ // Admin timestamp windows are Pacific midnights, not database-session
+ // midnights. 18:30 Pacific is already the following UTC date during DST but
+ // must remain inside the report for its Pacific calendar day.
+ const boundaryPlayer=await addPlayer('Pacific report boundary '+tag);
+ const boundaryUrl=`https://packone.pro/v1/admin/measurements?from=${crossDay}&to=${crossDay}`;
+ const boundaryBefore=await handleAdmin(new Request(boundaryUrl,{headers:{'x-pack1-auth-session':token}}),query,readJson);
+ await query(`INSERT INTO analytics_events(player_id,event_name,event_props,created_at)
+   VALUES($1::uuid,'daily_share_arrival','{"set":"mixed"}'::jsonb,
+     (($2::date + time '18:30') AT TIME ZONE 'America/Los_Angeles'))`,[
+   boundaryPlayer.player,crossDay,
+ ]);
+ const boundaryAfter=await handleAdmin(new Request(boundaryUrl,{headers:{'x-pack1-auth-session':token}}),query,readJson);
+ assert.equal(Number(boundaryAfter.share_funnel.arrivals),Number(boundaryBefore.share_funnel.arrivals)+1,
+   'Pacific-evening arrival remains inside the same Pacific report date after UTC rollover');
+
  // An untagged direct first touch remains authoritative even after a later
  // tagged visit.
  const direct=await addPlayer('Habit direct '+tag);
