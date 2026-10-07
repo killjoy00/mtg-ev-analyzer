@@ -71,7 +71,7 @@ function creatorShareContext(challenge) {
   return {
     environment,
     day,
-    long:challenge.source_type==='daily'?`the ${day} Pack One ${environment} Daily`:`a Pack One ${environment} Practice run`,
+    long:challenge.source_type==='daily'?`on the ${day} Pack One ${environment} Daily`:`in Pack One ${environment} practice`,
     short:challenge.source_type==='daily'?`Pack One ${environment} Daily · ${day}`:`Pack One ${environment} Practice`,
   };
 }
@@ -80,7 +80,7 @@ function creatorShareCopy(challenge) {
   const score=Number(challenge.source_score),name=String(challenge.creator_public_name||'').trim();
   const context=creatorShareContext(challenge);
   const url=challenge.public_url||`https://packone.pro/creator/${challenge.slug}/`;
-  return `I'm ${name}. I scored ${score}/100 on ${context.long}. Play the same 8 draft decisions and see if you can beat my score: ${url}`;
+  return `I'm ${name}. I scored ${score}/100 ${context.long}. Play the same 8 draft decisions and see if you can beat my score: ${url}`;
 }
 
 function creatorShortCopy(challenge) {
