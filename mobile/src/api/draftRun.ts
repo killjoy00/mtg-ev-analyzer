@@ -1,3 +1,5 @@
+import * as Application from 'expo-application';
+import { Platform } from 'react-native';
 import { requestJson } from '@/src/api/client';
 import type { MobileSession } from '@/src/storage/session';
 
@@ -347,10 +349,6 @@ export async function submitDraftRunDecisionReport(
 ) {
   const answer = run.answers[round];
   if (!answer) throw new Error('Choose a revealed decision to report.');
-  const [Application, native] = await Promise.all([
-    import('expo-application'),
-    import('react-native'),
-  ]);
   return requestJson<{ ok: true; id: string }>(`/draft/v1/runs/${encodeURIComponent(run.id)}/report`, {
     method: 'POST',
     mobileSessionToken: session.playerToken,
@@ -361,7 +359,7 @@ export async function submitDraftRunDecisionReport(
       reason,
       comment: comment.trim() || null,
       client: {
-        platform: native.Platform.OS === 'ios' ? 'ios' : native.Platform.OS === 'android' ? 'android' : 'unknown',
+        platform: Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'unknown',
         version: Application.nativeApplicationVersion ?? null,
         build: Application.nativeBuildVersion ?? null,
       },
