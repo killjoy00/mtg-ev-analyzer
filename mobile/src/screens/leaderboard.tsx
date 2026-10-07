@@ -261,6 +261,7 @@ export default function LeaderboardScreen() {
           <ActivityIndicator accessibilityLabel="Loading leaderboard" color={colors.accent} />
           <Text style={styles.body}>Loading rankings…</Text>
         </View>
+        <View style={styles.stateFooter}><AboutLink /></View>
       </SafeAreaView>
     );
   }
@@ -276,6 +277,7 @@ export default function LeaderboardScreen() {
             <Text style={styles.retryText}>Try again</Text>
           </Pressable>
         </View>
+        <View style={styles.stateFooter}><AboutLink /></View>
       </SafeAreaView>
     );
   }
@@ -358,4 +360,5 @@ const styles = StyleSheet.create({
   retryText: { color: colors.surface, fontSize: 15, fontWeight: '800' },
   empty: { color: colors.muted, fontSize: 15, textAlign: 'center', padding: spacing.xl },
   footer: { padding: spacing.lg },
+  stateFooter: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
 });
