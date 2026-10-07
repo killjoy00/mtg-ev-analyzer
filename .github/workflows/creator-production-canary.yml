@@ -7,7 +7,10 @@ on:
       - '.github/creator-production-canary-request.json'
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
+  actions: read
+  checks: read
 
 concurrency:
   group: pack1-creator-production-canary
@@ -27,7 +30,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN }}
 
       - uses: actions/setup-node@v4
         with:
@@ -88,7 +90,7 @@ jobs:
       - name: Remove retired creator canary static artifacts
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git fetch --no-tags origin main
