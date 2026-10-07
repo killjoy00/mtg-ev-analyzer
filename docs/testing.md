@@ -73,7 +73,7 @@ before provisioning. Preview cleanup verifies branch, SHA, run and attempt,
 and deletes only matching DNS records. Ambiguous writes are reconciled by
 reading provider state. Sanitized ownership receipts are uploaded from
 `artifacts/ci-resources/`; branch expiry remains a backstop. An ownership
-mismatch fails cleanup rather than removing another run's resources. Existing
+mismatch fails cleanup rather than removing another run's resources. Distributed
 latency, correctness, telemetry, resource and cleanup budgets remain unchanged.
 
 Distributed capacity rehearsals are opt-in. PRs run the fast regressions and
@@ -88,6 +88,12 @@ selected policy; its fingerprint binds fixtures and reports, and the collector s
 requires all five cohorts to complete and every selected stage to pass.
 Skipping 50 does not establish current 50-player capacity. A policy change
 requires a fresh run; earlier failed runs remain failed.
+
+NAT reroll acceptance allows p95 of 3 seconds and p99 of 5 seconds. The 25-player
+scenario produces four rerolls, so one slow request determines its p95. All other
+NAT route budgets, the independent browser gate and distributed route budgets
+retain their existing limits. Correctness, request-error and cleanup checks remain
+required.
 
 The distributed runner allows one second for each address during Node's
 connection-family selection. Request deadlines and measured route latency
