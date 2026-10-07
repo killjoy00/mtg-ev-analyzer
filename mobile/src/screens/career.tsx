@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Share, StyleSheet, View } from 'react-native';
 import { Text } from '@/src/components/Text';
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
+import { AboutLink } from '@/src/components/AboutLink';
 
 import { loadMobileCareer, loadMobileCareerHistory, type CareerHistoryRow, type CareerProfile } from '@/src/api/career';
 import { ApiError } from '@/src/api/client';
@@ -290,6 +291,7 @@ export default function CareerScreen() {
         onPress={() => void loadMore()} style={styles.secondaryButton}>
         <Text style={styles.secondaryButtonText}>{pageError ? 'Retry history' : 'Load more games'}</Text>
       </Pressable> : null}
+      <AboutLink />
     </View>
   );
   return (
