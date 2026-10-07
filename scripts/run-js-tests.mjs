@@ -1,6 +1,6 @@
 import {spawnSync} from 'node:child_process';
 import {readdir,readFile,access} from 'node:fs/promises';
-import {mkdirSync,writeFileSync,appendFileSync} from 'node:fs';
+import {mkdirSync,writeFileSync,appendFileSync,readFileSync} from 'node:fs';
 import {join,dirname} from 'node:path';
 import {pathToFileURL} from 'node:url';
 
@@ -40,12 +40,14 @@ async function main() {
   const available=new Map();
   if(lane!=='fast')for(const ids of SHARD_REQUIREMENTS.values())for(const id of ids)if(!available.has(id))available.set(id,await shardsComplete(id));
   const started=Date.now(),summaryFile=process.env.PACK1_TEST_REPORT||`artifacts/tests/js-${lane}.json`;
+  const junitFile=`artifacts/tests/js-${lane}.xml`;
+  mkdirSync(dirname(junitFile),{recursive:true});
   let plan,result;
   try {
     plan=planJsTests(inventory,{lane,available,requireShards});
     console.log(`JS lane ${lane}: selected ${plan.selected.length}/${plan.inventory.length} files; excluded ${plan.excluded.length}.`);
     if(plan.excluded.length)console.log('Other lane or unavailable inputs: '+plan.excluded.join(', '));
-    result=spawnSync(process.execPath,[...(lane==='fast'?['--import','./tests/offline-network-guard.mjs']:[]),'--test',...plan.selected.map(name=>join('tests',name))],{
+    result=spawnSync(process.execPath,[...(lane==='fast'?['--import','./tests/offline-network-guard.mjs']:[]),'--test','--test-reporter=spec','--test-reporter-destination=stdout','--test-reporter=junit',`--test-reporter-destination=${junitFile}`,...plan.selected.map(name=>join('tests',name))],{
       stdio:'inherit',env:{...process.env,PACK1_TEST_DATA_MODE:['data','full'].includes(lane)||requireShards||(lane==='auto'&&['msh','sos','tmt','ecl'].every(id=>available.get(id)))?'full':'fast'},timeout:lane==='fast'?180000:900000,
     });
     if(result.error)console.error('Test process failed: '+result.error.code);
@@ -55,8 +57,10 @@ async function main() {
     throw error;
   }
   const status=result.status===0?'passed':'failed';
+  let cases=null;
+  try {const xml=readFileSync(junitFile,'utf8');cases={executed:(xml.match(/<testcase(?:\s|>)/g)||[]).length,failed:(xml.match(/<failure(?:\s|>)/g)||[]).length,skipped:(xml.match(/<skipped(?:\s|\/|>)/g)||[]).length};}catch{}
   mkdirSync(dirname(summaryFile),{recursive:true});
-  writeFileSync(summaryFile,JSON.stringify({...plan,status,phase:'assertions',source_sha:process.env.GITHUB_SHA||null,duration_ms:Date.now()-started,signal:result.signal||null},null,2));
+  writeFileSync(summaryFile,JSON.stringify({...plan,status,phase:result.error||result.signal?'execution':'assertions',cases,junit:junitFile,error_code:result.error?.code||null,source_sha:process.env.GITHUB_SHA||null,duration_ms:Date.now()-started,signal:result.signal||null},null,2));
   if(process.env.GITHUB_STEP_SUMMARY)appendFileSync(process.env.GITHUB_STEP_SUMMARY,`\nJavaScript ${lane}: ${status}; ${plan.selected.length}/${plan.inventory.length} files executed; ${plan.excluded.length} assigned elsewhere or unavailable. ${(Date.now()-started)/1000}s.\n`);
   process.exit(result.status??1);
 }

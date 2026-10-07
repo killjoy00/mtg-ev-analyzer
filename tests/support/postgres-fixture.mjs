@@ -1,10 +1,10 @@
 // Test-only wire adapter. Production workers still use their actual SQL HTTP
 // protocol; the fixture executes those SQL statements on a real local server.
 import pg from 'pg';
-export const SQL_CONNECTION='postgresql://fixture:fixture@ep-ci.us-east-2.aws.neon.tech/pack1_ci';
+export const SQL_CONNECTION='postgresql://fixture:fixture@ep-ci.us-east-2.aws.neon.tech/pack1';
 export function fixturePool(connection=process.env.PACK1_TEST_DATABASE_URL) {
   const db=new URL(connection);
-  if(!['postgres:','postgresql:'].includes(db.protocol)||!['localhost','127.0.0.1','[::1]'].includes(db.hostname)||db.pathname!=='/pack1_ci')throw Error('Database fixtures require a local pack1_ci database');
+  if(!['postgres:','postgresql:'].includes(db.protocol)||!['localhost','127.0.0.1','[::1]'].includes(db.hostname)||db.pathname!=='/pack1'||db.username!=='pack1_ci')throw Error('Database fixtures require a local pack1 database owned by the pack1_ci test role');
   return new pg.Pool({connectionString:connection,max:8,connectionTimeoutMillis:5000,statement_timeout:30000});
 }
 export const textTypes={getTypeParser:()=>value=>value};
