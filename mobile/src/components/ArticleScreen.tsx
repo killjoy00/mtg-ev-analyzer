@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -24,6 +24,7 @@ export function ArticleScreen({
   sections,
   footer,
   intro,
+  scrollToEnd = false,
 }: {
   kicker: string;
   title: string;
@@ -31,10 +32,18 @@ export function ArticleScreen({
   sections: ArticleSection[];
   footer?: ReactNode;
   intro?: ReactNode;
+  scrollToEnd?: boolean;
 }) {
+  const scrollRef = useRef<ScrollView>(null);
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.page}>
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.page}
+        onContentSizeChange={() => {
+          if (scrollToEnd) scrollRef.current?.scrollToEnd({ animated: false });
+        }}
+      >
         <View
           onLayout={() => {
             if (config.screenshots.fixtures) console.info('PACKONE_ARTICLE_READY', JSON.stringify({ title }));
