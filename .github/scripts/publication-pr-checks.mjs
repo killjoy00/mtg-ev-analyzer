@@ -11,7 +11,7 @@ export function validatePublicationPr(pr,files,{repo,branch,headSha,baseSha,slug
   assert.equal(pr.state,'open');assert.equal(pr.base?.ref,'main');assert.equal(pr.base?.repo?.full_name,repo);assert.equal(pr.base?.sha,baseSha,'publication base changed');
   assert.equal(pr.head?.repo?.full_name,repo,'never approve a fork');assert.equal(pr.head?.ref,branch);assert.equal(pr.head?.sha,headSha,'publication head changed');
   assert.equal(pr.user?.login,'github-actions[bot]');assert.match(slug,/^[a-z0-9]+(?:-[a-z0-9]+)*$/);assert.ok(['creator','campaign'].includes(kind));
-  const allowed=kind==='creator'?['creator-challenges.json','creator/'+slug+'/index.html','creator/'+slug+'/creator-card.png']:['campaign-links.json','go/'+slug+'/index.html'];
+  const allowed=kind==='creator'?['creator-challenges.json','creator/'+slug+'/index.html','creator/'+slug+'/creator-card.png','creator/'+slug+'/creator-card-square.png']:['campaign-links.json','go/'+slug+'/index.html'];
   assert.ok(files.length>0&&files.length<=allowed.length);for(const file of files)assert.ok(allowed.includes(file.filename),'unexpected publication file: '+file.filename);
 }
 export function requiredPublicationRuns(runs,{repo,branch,headSha,prNumber}){
