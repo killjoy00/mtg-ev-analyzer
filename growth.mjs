@@ -87,7 +87,7 @@ export async function renderPatreonActivation(options={}) {
 }
 
 function formMarkup(kind) {
-  return `<form class="account-form" id="account-${kind}"><label>Email<input required type="email" name="email" autocomplete="username"></label><label>Password<input required type="password" name="password" minlength="8" maxlength="128" autocomplete="${kind==='signup'?'new-password':'current-password'}"></label><button class="button primary" type="submit">${kind==='signup'?'Create account':'Sign in'}</button>${kind==='signin'?'<button class="text-button" id="account-forgot" type="button">Forgot password?</button>':''}<p class="form-error" aria-live="polite"></p></form>`;
+  return `<form class="account-form" id="account-${kind}"><label>Email<input required type="email" name="email" autocomplete="username"></label><label>Password<input required type="password" name="password" minlength="8" maxlength="128" autocomplete="${kind==='signup'?'new-password':'current-password'}"></label><button class="button primary" type="submit">${kind==='signup'?'Create account':'Sign in'}</button>${kind==='signin'?'<button class="text-button" id="account-forgot" type="button">Forgot password?</button>':''}<p id="account-${kind}-status" class="form-error" aria-live="polite"></p></form>`;
 }
 
 async function openEliteLanding(source='account') {
@@ -423,7 +423,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
   const signup=document.querySelector('#account-signup');
   signup?.addEventListener('submit',async e=>{
     e.preventDefault();
-    const form=e.currentTarget,err=form.querySelector('.form-error');
+    const form=e.currentTarget,err=form.querySelector('#account-signup-status');
     if(!setFormPending(form,true,'Creating account…'))return;
     err.textContent='';
     try {
@@ -469,8 +469,10 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
   const signin=document.querySelector('#account-signin');
   signin?.addEventListener('submit',async e=>{
     e.preventDefault();
-    const form=e.currentTarget,err=form.querySelector('.form-error');
+    const form=e.currentTarget,err=form.querySelector('#account-signin-status');
     if(!setFormPending(form,true,'Signing in…'))return;
+    err.className='form-error';
+    delete err.dataset.state;
     err.textContent='';
     try {
       const data=Object.fromEntries(new FormData(form));
