@@ -160,7 +160,7 @@ export const termsSections: ArticleSection[] = [
   {
     title: 'TCGplayer affiliate relationship',
     body: [
-      'Pack One participates in TCGplayer's affiliate program through Impact. TCGplayer links and the Daily-home TCGplayer promotion are sponsored/affiliate links, and Pack One may earn a commission from eligible purchases. The price a buyer pays is not increased by Pack One's commission. The Daily-home promotion includes an adjacent commission disclosure and is excluded for visitors whose verified membership is ad-free.',
+      "Pack One participates in TCGplayer's affiliate program through Impact. TCGplayer links and the Daily-home TCGplayer promotion are sponsored/affiliate links, and Pack One may earn a commission from eligible purchases. The price a buyer pays is not increased by Pack One's commission. The Daily-home promotion includes an adjacent commission disclosure and is excluded for visitors whose verified membership is ad-free.",
     ],
   },
   {
@@ -179,7 +179,7 @@ export const termsSections: ArticleSection[] = [
     title: 'Apple subscriptions',
     body: [
       'Pack One Elite may be offered in the iOS app as an auto-renewable subscription purchased through Apple. The App Store displays the price and billing period before purchase. Payment is charged to the Apple Account used for the purchase. The subscription renews automatically unless it is canceled through Apple; canceling stops future renewals but does not normally remove access before the end of the paid period. Restore Purchases can be used in the iOS app for an eligible subscription associated with the Apple Account and the same Pack One account binding.',
-      'Apple manages subscription billing, cancellation, refunds, and payment methods. Deleting a Pack One account does not cancel an Apple subscription. Manage or cancel the subscription through Apple's subscription settings before or after deleting the Pack One account as appropriate.',
+      "Apple manages subscription billing, cancellation, refunds, and payment methods. Deleting a Pack One account does not cancel an Apple subscription. Manage or cancel the subscription through Apple's subscription settings before or after deleting the Pack One account as appropriate.",
     ],
   },
   {
