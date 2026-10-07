@@ -119,7 +119,15 @@ jobs:
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0044_snapshot_scoped_puzzle_uniqueness.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0045_batched_practice_selector.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0045_apple_subscriptions.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0046_public_identity_safety.sql
+          if [[ "$(psql "$connection" -tAc "SELECT to_regprocedure('pack1_creator_event_update_dedupe()') IS NOT NULL")" == "t" ]]; then
+            echo "Skipping 0046 replay because creator-event merge hardening is already installed."
+          else
+            if [[ "$(psql "$connection" -tAc "SELECT to_regprocedure('pack1_creator_event_update_dedupe()') IS NOT NULL")" == "t" ]]; then
+            echo "Skipping 0046 replay because creator-event merge hardening is already installed."
+          else
+            psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0046_public_identity_safety.sql
+          fi
+          fi
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0047_admin_user_account_controls.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0050_practice_recency_bias.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0051_exact_pick_draw_index.sql
