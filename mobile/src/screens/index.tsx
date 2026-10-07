@@ -1,11 +1,12 @@
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { Text } from '@/src/components/Text';
 import { config } from '@/src/config';
 
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
+import { AboutLink } from '@/src/components/AboutLink';
 
 import {
   DAILY_ENVIRONMENT_META,
@@ -49,7 +50,6 @@ function completed(status: DailyStatus | null, environment: DailyEnvironment) {
 
 export default function HomeScreen() {
   const accountState = useNavigationSession();
-  const { fontScale } = useWindowDimensions();
   const [status, setStatus] = useState<DailyStatus | null>(null);
   const [promotionAllowed, setPromotionAllowed] = useState<boolean | null>(null);
   const [promotionError, setPromotionError] = useState<string | null>(null);
@@ -138,9 +138,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.page}>
-        <View onLayout={event => recordBrandLayout('row', event)} style={[styles.brandRow, fontScale > 1.5 && styles.brandRowStacked]}><Brand />
-          <Pressable accessibilityRole="button" accessibilityLabel="Help and information" onLayout={event => recordBrandLayout('help', event)} onPress={() => router.push('/help')} style={styles.helpLink}><Text style={styles.cardAction}>Help</Text></Pressable>
-        </View>
+        <View onLayout={event => recordBrandLayout('row', event)} style={styles.brandRow}><Brand /></View>
 
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>THE DAILY DRAFT</Text>
@@ -271,6 +269,7 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
+        <AboutLink />
       </ScrollView>
     </SafeAreaView>
   );
@@ -278,7 +277,6 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
-  brandRowStacked: { flexDirection: 'column', alignItems: 'flex-start' },
   helpLink: { minHeight: 44, justifyContent: 'center' },
   statusStrip: { padding: spacing.md, backgroundColor: colors.accentSoft, flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.md, rowGap: spacing.xs },
   statusText: { color: colors.muted, fontSize: 14, lineHeight: 20 },
