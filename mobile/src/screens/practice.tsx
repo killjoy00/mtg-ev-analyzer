@@ -264,6 +264,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.lg, alignSelf: 'center', width: '100%', maxWidth: 860 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
+  stateFooter: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
   hero: { gap: spacing.sm, paddingTop: spacing.sm },
   eyebrow: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.4 },
   title: { color: colors.ink, fontSize: 34, lineHeight: 38, fontWeight: '800', letterSpacing: -0.8 },
