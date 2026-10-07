@@ -126,12 +126,6 @@ export const termsSections: ArticleSection[] = [
     ],
   },
   {
-    title: 'Age requirement',
-    body: [
-      'Pack One is intended for people 13 and older. You must be at least 13 years old to use Pack One or create a Pack One account.',
-    ],
-  },
-  {
     title: 'Public identity and community rules',
     body: [
       'Account-owned leaderboard names, public profiles, and the identity attached to shared Pack One activity are user-provided public content. Leaderboards are for signed-in accounts. By signing in, or by saving a leaderboard name or public profile, you agree to these Public Identity rules.',
@@ -186,6 +180,12 @@ export const termsSections: ArticleSection[] = [
     title: 'External links',
     body: [
       'Pack One may link to marketplaces and other external resources. Those destinations control their own products, pricing, availability, terms, and privacy practices. Affiliate relationships do not change Pack One scores or model outputs.',
+    ],
+  },
+  {
+    title: 'Account age requirement',
+    body: [
+      'You must be at least 13 years old to create a Pack One account. Pack One’s public, non-account features may be used without creating an account.',
     ],
   },
   {
