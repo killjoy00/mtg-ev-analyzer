@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  GATEWAY_MAX_PAGES,GATEWAY_PAGE_SIZE,MAX_CONTINUATION_DEPTH,evaluate,inspectGatewayCoverage,parseGatewayEvent,parseNeonUsage,queryEvents,routeAlert,scheduleCoverageContinuation,
+  GATEWAY_MAX_PAGES,GATEWAY_PAGE_SIZE,MAX_CONTINUATION_DEPTH,evaluate,inspectGatewayCoverage,parseGatewayEvent,parseNeonUsage,probeGateway,queryEvents,routeAlert,scheduleCoverageContinuation,
 } from '../scripts/launch-alert.mjs';
 import {
   WINDOW_MS,coverageTarget,mergeCoverageState,parseCoverageState,renderCoverageState,
@@ -346,3 +346,29 @@ test('recoverable coverage issue stays open when coverage persistence is unavail
  assert.equal(patches,0,'missing coverage evidence must not auto-close the pending incident');
 });
 
+
+const probeFetcher=responses=>{
+ const calls=[];
+ return {calls,fetcher:async url=>{
+  calls.push(url);
+  const next=responses.shift()??{status:200,body:{ok:true}};
+  if(next instanceof Error)throw next;
+  return new Response(JSON.stringify(next.body),{status:next.status});
+ }};
+};
+test('gateway probe sends one request when production is healthy',async()=>{
+ const {calls,fetcher}=probeFetcher([]),sleeps=[];
+ assert.deepEqual(await probeGateway(fetcher,{sleep:async ms=>sleeps.push(ms)}),{status:200,ok:true,attempts:1});
+ assert.deepEqual(calls,['https://api.packone.pro/draft/health?quick=1']);assert.deepEqual(sleeps,[]);
+});
+test('a single failed probe is retried once and does not alert',async()=>{
+ const {fetcher}=probeFetcher([{status:503,body:{error:'Gateway unavailable.'}}]),sleeps=[];
+ assert.deepEqual(await probeGateway(fetcher,{retryMs:5000,sleep:async ms=>sleeps.push(ms)}),{status:200,ok:true,attempts:2});
+ assert.deepEqual(sleeps,[5000]);
+});
+test('a persistent outage fails the probe after two attempts',async()=>{
+ const down={status:503,body:{error:'Gateway unavailable.'}};
+ assert.deepEqual(await probeGateway(probeFetcher([down,down]).fetcher,{sleep:async()=>{}}),{status:503,ok:false,attempts:2});
+ assert.deepEqual(await probeGateway(probeFetcher([new TypeError('fetch failed'),new TypeError('fetch failed')]).fetcher,{sleep:async()=>{}}),{status:0,ok:false,attempts:2,error:'network'});
+ assert.deepEqual(await probeGateway(probeFetcher([{status:200,body:{ok:false}},{status:200,body:{ok:false}}]).fetcher,{sleep:async()=>{}}),{status:200,ok:false,attempts:2});
+});
