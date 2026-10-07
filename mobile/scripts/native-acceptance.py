@@ -357,6 +357,27 @@ if platform == 'android':
 
     attempt('member-tabs-profile-settings-and-hardware-back', member_navigation)
 
+    def editorial_navigation():
+        launch('guest', 'about')
+        xml, _ = snapshot('about')
+        require('About Pack One' in xml, 'Native About page did not render')
+        tap('Support & contact', exact=True)
+        xml, _ = snapshot('support')
+        require('Contact Pack One' in xml and 'Email product support' in xml, 'Native Support page did not render')
+        adb('shell', 'input', 'keyevent', '4')
+        tap('Privacy', exact=True)
+        xml, _ = snapshot('privacy')
+        require('What Pack One stores' in xml, 'Native Privacy page did not render')
+        adb('shell', 'input', 'keyevent', '4')
+        tap('Terms', exact=True)
+        xml, _ = snapshot('terms')
+        require('Use of the site' in xml, 'Native Terms page did not render')
+        tap('Show font licenses', exact=True)
+        xml, _ = snapshot('terms-font-licenses')
+        require('Barlow Condensed' in xml and 'Source Sans 3' in xml, 'Expanded font licenses are not visible in native Terms')
+
+    attempt('native-about-support-privacy-terms-and-font-licenses', editorial_navigation)
+
     def archive_return():
         launch('member')
         adb('shell', f"am start -W -a android.intent.action.VIEW -d 'packone://set-archive?setId=msh' -p '{PACKAGE}'")
@@ -452,8 +473,15 @@ elif platform == 'ios':
         ios_metrics = {}
         for setting in ['large', 'accessibility-extra-extra-extra-large']:
             command('xcrun', 'simctl', 'ui', udid, 'content_size', setting)
-            for scenario, screen in [('guest','home'), ('guest','learn'), ('member','learn'), ('member-new','career'),
-                                     ('member-long','feedback'), ('member-match','feedback'), ('member-zero','feedback')]:
+            scenes = [('guest','home'), ('guest','learn'), ('member','learn'), ('member-new','career'),
+                      ('member-long','feedback'), ('member-match','feedback'), ('member-zero','feedback')]
+            if setting == 'large':
+                scenes += [
+                    ('member','home'), ('guest','how-to'), ('member','leaders'), ('member','account'),
+                    ('guest','about'), ('guest','support'), ('guest','privacy'), ('guest','terms'),
+                    ('guest','terms-licenses'),
+                ]
+            for scenario, screen in scenes:
                 name = f'{label}-{scenario}-{screen}-{setting}'
                 def ios_scene():
                     command('xcrun', 'simctl', 'terminate', udid, PACKAGE, check=False)
@@ -470,7 +498,10 @@ elif platform == 'ios':
                                           and f'"destination":"{screen}"' in line for line in logs.splitlines())
                         layout_ready = ('"label":"choice"' in logs if screen == 'feedback' else
                                         'PACKONE_BRAND' in logs if screen == 'home' else
-                                        'PACKONE_CAREER_READY' in logs if screen == 'career' else 'PACKONE_HEADER' in logs)
+                                        'PACKONE_CAREER_READY' in logs if screen == 'career' else
+                                        'PACKONE_ACCOUNT_READY' in logs if screen == 'account' else
+                                        'PACKONE_ARTICLE_READY' in logs if screen in ['how-to','about','support','privacy','terms','terms-licenses']
+                                        else 'PACKONE_HEADER' in logs)
                         if screen != 'feedback' and setting != 'large':
                             layout_ready = layout_ready and '"kind":"bar"' in logs
                         ready = scene_ready and 'PACKONE_FONTS' in logs and layout_ready
