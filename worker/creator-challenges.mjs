@@ -2,7 +2,6 @@ import {buildCampaignTrackingUrl,normalizeAcquisitionValue,normalizeCampaignSlug
 import {componentBelongsTo} from './corpus-components.mjs';
 import {
   DRAFT_RUN_REPLAY_SCORING_VERSIONS,
-  DRAFT_RUN_SCORING_V3_LEGACY_PROFILE,
   DRAFT_RUN_SCORING_V3_LINEAR_PROFILE,
   gradeDraftRunPickForVersion,
   replayScoringProfilesForVersion,
