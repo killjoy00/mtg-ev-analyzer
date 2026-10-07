@@ -28,7 +28,7 @@ jobs:
           import path from 'node:path';
           import {quantiles} from './scripts/launch-distributed-core.mjs';
           const root='failed-report',files=fs.readdirSync(root,{recursive:true}),reports=[];
-          const safe=q=>q&&({index:q.index,route:q.route,endpoint:q.endpoint,phase:q.phase,status:q.status,at:q.at,ms:q.ms,diagnostics:q.diagnostics,transport:q.transport});
+          const safe=q=>q&&({index:q.index,route:q.route,endpoint:q.endpoint,period:q.endpoint==='leaderboard'?['daily','week','season','all'][q.actor%4]:undefined,phase:q.phase,status:q.status,at:q.at,ms:q.ms,diagnostics:q.diagnostics,transport:q.transport});
           for(const file of files) {
             if(!/^distributed-1-\d\.json$/.test(path.basename(file)))continue;
             const r=JSON.parse(fs.readFileSync(path.join(root,file),'utf8'));reports.push(r);
