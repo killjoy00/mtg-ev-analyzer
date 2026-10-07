@@ -7,3 +7,8 @@ CREATE INDEX CONCURRENTLY IF NOT EXISTS draft_run_reroll_covering_idx
 ON draft_run_verified_puzzles(set_id,pick_number,corpus_version,puzzle_id)
 INCLUDE(source_draft_hash,candidate_count,consensus_top_gap,support_entropy,pack_number,source_snapshot_id)
 WHERE interesting AND pack_number=1;
+
+-- Building an index does not make recently imported heap pages all-visible.
+-- Repeat bounded maintenance even when the index already exists. All callers
+-- already run this concurrent-index migration without --single-transaction.
+\ir ../.github/scripts/maintain-serving-indexes.sql

@@ -225,6 +225,17 @@ jobs:
           },null,2)+'\n');
           NODE
 
+      - name: Restore serving index visibility after committed bulk writes
+        if: inputs.action == 'stage'
+        run: |
+          set -euo pipefail
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+          connection=$(cat "$RUNNER_TEMP/target.connection")
+          git show "$GITHUB_SHA:.github/scripts/maintain-serving-indexes.sql" > "$RUNNER_TEMP/maintain-serving-indexes.sql"
+          psql "$connection" -X -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/maintain-serving-indexes.sql"
       - name: Require exact bridge revision before pointer mutation
         if: inputs.action != 'stage'
         run: node tests/release-functions-smoke.mjs "$TARGET_BRANCH" "$BRIDGE_COMMIT"
