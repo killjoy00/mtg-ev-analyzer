@@ -1,5 +1,5 @@
 {
   "operation": "read-pack-one-testflight-status",
-  "reason": "Read-only owner-authorized TestFlight crash investigation for the physical iOS Report this decision app-close issue. Query exact build 100505, retain any Apple beta crash submissions and crash logs as protected workflow evidence, and do not change testers, groups, review state, metadata, or release state.",
-  "build_number": "100505"
+  "reason": "Read-only owner-authorized TestFlight crash investigation for the physical iOS Report this decision app-close issue. Query exact build 100638, retain any Apple beta crash submissions and crash logs as protected workflow evidence, and do not change testers, groups, review state, metadata, or release state.",
+  "build_number": "100638"
 }
