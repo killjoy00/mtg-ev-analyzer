@@ -79,6 +79,31 @@ test('borrowed closed Daily eligibility is restored and canary is protected',()=
   assert.doesNotMatch(workflow,/workflow_dispatch:/);
 });
 
+test('creator canary static cleanup dispatches exact-head green CI before merge',()=>{
+  assert.match(workflow,/cleanup-creator-canary-static\.mjs/);
+  assert.match(workflow,/gh workflow run test\.yml --ref "\$branch"/);
+  assert.match(workflow,/gh workflow run e2e\.yml --ref "\$branch"/);
+  assert.match(workflow,/actions\/runs\?event=workflow_dispatch&head_sha=\$\{head_sha\}/);
+  assert.match(workflow,/Cleanup exact-head test\/e2e dispatches never registered; refusing to merge/);
+  assert.match(workflow,/gh run watch "\$test_run" --exit-status/);
+  assert.match(workflow,/gh run watch "\$e2e_run" --exit-status/);
+  assert.match(workflow,/Creator canary cleanup base moved from \$base_sha to \$current_main; refusing an untested merge/);
+  assert.match(workflow,/gh pr view "\$pr_url" --json baseRefOid/);
+  assert.match(workflow,/gh pr merge "\$pr_url" --squash --delete-branch --match-head-commit "\$head_sha"/);
+  assert.match(workflow,/pages\/builds/);
+  assert.match(workflow,/Live creator registry still contains a canary entry after cleanup/);
+  assert.match(workflow,/Live canary route still exists after cleanup/);
+  const dispatch=workflow.indexOf('gh workflow run test.yml');
+  const register=workflow.indexOf('actions/runs?event=workflow_dispatch');
+  const watch=workflow.indexOf('gh run watch "$test_run"');
+  const baseGuard=workflow.indexOf('Creator canary cleanup base moved');
+  const merge=workflow.indexOf('gh pr merge');
+  assert.ok(dispatch>=0&&dispatch<register&&register<watch&&watch<baseGuard&&baseGuard<merge,'cleanup must dispatch exact-head CI, observe it, wait, revalidate the base, then merge');
+  assert.match(workflow,/permissions:\n  contents: write\n  pull-requests: write\n  actions: write\n  checks: read\n  pages: write/);
+  assert.match(workflow,/GH_TOKEN: \$\{\{ github\.token \}\}/);
+  assert.doesNotMatch(workflow,/token: \$\{\{ secrets\.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN \}\}/);
+});
+
 test('reviewed retry request explicitly forbids customer rows',()=>{
   assert.equal(request.operation,'run-creator-production-canary');
   // The request pins the corrected protected release; live markerCheck enforces it.

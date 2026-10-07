@@ -44,6 +44,27 @@ function creatorTrackedUrl(challenge) {
   },{allowCreator:true});
 }
 
+export function mergeCreatorChallengeState(listed,current) {
+  return current?{...listed,...current}:listed;
+}
+
+export function creatorChallengesForDisplay(challenges,{showDeleted=false}={}) {
+  const all=Array.isArray(challenges)?challenges:[];
+  const deleted=all.filter(challenge=>challenge.status==='retired'&&challenge.publication_detail?.live_verified===true);
+  return {
+    deleted:deleted.length,
+    visible:showDeleted?all:all.filter(challenge=>!(challenge.status==='retired'&&challenge.publication_detail?.live_verified===true)),
+  };
+}
+
+export function creatorPublicationProgressText(expected='published',attempt=0) {
+  const elapsed=Math.max(0,Number(attempt)||0)*6;
+  const minutes=Math.floor(elapsed/60),seconds=elapsed%60;
+  const elapsedLabel=elapsed?' ('+(minutes?minutes+'m ':'')+String(seconds).padStart(minutes?2:1,'0')+'s elapsed)':'';
+  return expected==='retired'
+    ? 'Deleting challenge safely… the unavailable page is still publishing'+elapsedLabel+'.'
+    : 'Publishing protected vanity route… checks and Pages deployment are still running'+elapsedLabel+'.';
+}
 function creatorShareCopy(challenge) {
   const score=Number(challenge.source_score);
   const environment=environmentLabel(challenge.source_environment);
@@ -197,7 +218,10 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
       <section id="creator-kit" class="note" hidden></section>
 
       <h2>Existing creator challenges</h2>
-      <p id="creator-existing-status" class="muted">Loading creator challenges…</p>
+      <div class="campaign-publish-actions">
+        <p id="creator-existing-status" class="muted">Loading creator challenges…</p>
+        <button type="button" id="creator-show-deleted" class="secondary" hidden>Show deleted</button>
+      </div>
       <div id="creator-existing"></div>
     </section>
   </section>`;
@@ -324,7 +348,8 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
   const creatorPreview=root.querySelector('#creator-publish-preview'),creatorPublish=root.querySelector('#publish-creator');
   const creatorPublishStatus=root.querySelector('#creator-publish-status'),creatorKit=root.querySelector('#creator-kit');
   const creatorExisting=root.querySelector('#creator-existing'),creatorExistingStatus=root.querySelector('#creator-existing-status');
-  let creatorSource=null,creatorBusy=false,creatorDraft=null,creatorSlugs=new Set();
+  const creatorShowDeleted=root.querySelector('#creator-show-deleted');
+  let creatorSource=null,creatorBusy=false,creatorDraft=null,creatorSlugs=new Set(),creatorShowDeletedRows=false;
 
   function setCreatorSource(next) {
     creatorSource=next;creatorDraft=null;
@@ -398,12 +423,13 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
     }catch(error){target.textContent=error.message||'Creator search failed.';}
   });
 
-  async function waitForCreatorPublication(challenge,expected='published') {
+  async function waitForCreatorPublication(challenge,expected='published',statusTarget=null) {
     for(let attempt=0;attempt<100;attempt++) {
       const status=await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/publication`);
       if(expected==='published'&&status.state==='published'&&status.live_verified!==false)return status.challenge;
       if(expected==='retired'&&status.state==='retired'&&status.live_verified===true)return status.challenge;
       if(status.state==='failed')throw new Error(status.challenge?.publication_error||'Creator challenge publication failed.');
+      if(statusTarget)statusTarget.textContent=creatorPublicationProgressText(expected,attempt);
       await new Promise(resolve=>setTimeout(resolve,6000));
     }
     throw new Error('Publication is still running. Reload Admin to reconcile the existing operation before distributing the URL.');
@@ -420,7 +446,7 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
       const challenge=creatorDraft;
       creatorPublishStatus.textContent='Starting protected vanity publication…';
       const requested=await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/publication`,{action:'publish'});
-      const published=requested.already_published?requested.challenge:await waitForCreatorPublication(challenge,'published');
+      const published=requested.already_published?requested.challenge:await waitForCreatorPublication(challenge,'published',creatorPublishStatus);
       const publicUrl=`https://packone.pro/creator/${published.slug}/`;
       creatorPublishStatus.textContent=`Published: ${publicUrl}`;
       renderCreatorKit(creatorKit,published,creatorPublishStatus);
@@ -439,14 +465,19 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
         if(!pending)return challenge;
         try {
           const current=await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/publication`);
-          return current.challenge||challenge;
+          return mergeCreatorChallengeState(challenge,current.challenge);
         } catch {
           return challenge;
         }
       }));
       creatorSlugs=new Set(data.challenges.map(challenge=>challenge.slug));
-      creatorExistingStatus.textContent=data.challenges.length?`${data.challenges.length} creator challenge(s).`:'No creator challenges yet.';
-      creatorExisting.replaceChildren(...data.challenges.map(challenge=>{
+      const display=creatorChallengesForDisplay(data.challenges,{showDeleted:creatorShowDeletedRows});
+      creatorShowDeleted.hidden=display.deleted===0;
+      creatorShowDeleted.textContent=creatorShowDeletedRows?`Hide deleted (${display.deleted})`:`Show deleted (${display.deleted})`;
+      creatorExistingStatus.textContent=display.visible.length
+        ? `${display.visible.length} creator challenge(s).${!creatorShowDeletedRows&&display.deleted?` ${display.deleted} deleted hidden.`:''}`
+        : display.deleted?'No active creator challenges. '+display.deleted+' deleted hidden.':'No creator challenges yet.';
+      creatorExisting.replaceChildren(...display.visible.map(challenge=>{
         const item=document.createElement('article');item.className='note';
         const publicUrl=`https://packone.pro/creator/${challenge.slug}/`,trackedUrl=creatorTrackedUrl(challenge);
         const retiredVerified=challenge.status==='retired'&&challenge.publication_detail?.live_verified===true;
@@ -463,7 +494,7 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
           try {
             const current=await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/publication`);
             if(current.state!=='publishing')await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/publication`,{action:'publish'});
-            await waitForCreatorPublication(challenge,'published');
+            await waitForCreatorPublication(challenge,'published',creatorExistingStatus);
             creatorExistingStatus.textContent='Creator challenge published.';
             await loadCreatorChallenges();
           } catch(error){creatorExistingStatus.textContent=error.message||'Could not publish challenge.';}
@@ -472,7 +503,7 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
           creatorExistingStatus.textContent='Finishing delete…';
           try {
             await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/publication`,{action:'retire'});
-            await waitForCreatorPublication(challenge,'retired');
+            await waitForCreatorPublication(challenge,'retired',creatorExistingStatus);
             creatorExistingStatus.textContent='Delete finished.';
             await loadCreatorChallenges();
           } catch(error){creatorExistingStatus.textContent=error.message||'Could not finish deleting challenge.';}
@@ -482,7 +513,7 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
           try {
             await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/publication`,{action:'retire'});
             creatorExistingStatus.textContent='Deleting challenge. Publishing its unavailable page…';
-            await waitForCreatorPublication(challenge,'retired');
+            await waitForCreatorPublication(challenge,'retired',creatorExistingStatus);
             await loadCreatorChallenges();
           } catch(error){creatorExistingStatus.textContent=error.message||'Could not delete challenge.';}
         });
@@ -490,6 +521,11 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
       }));
     }catch(error){creatorExistingStatus.textContent=error.message||'Creator challenges could not be loaded.';}
   }
+
+  creatorShowDeleted.addEventListener('click',()=>{
+    creatorShowDeletedRows=!creatorShowDeletedRows;
+    void loadCreatorChallenges();
+  });
 
   update();
   await Promise.all([loadExisting(),loadPublishAvailability(),typeof draftRequest==='function'?loadCreatorChallenges():Promise.resolve()]);
