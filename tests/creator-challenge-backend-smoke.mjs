@@ -106,6 +106,15 @@ async function insertCreatorStart(playerId,runId,challengeId) {
   ]);
 }
 
+function mergeFunctionSql(path) {
+  const source=fs.readFileSync(path,'utf8');
+  const signature='CREATE OR REPLACE FUNCTION merge_pack1_player(source_player uuid, target_player uuid)';
+  const start=source.indexOf(signature);
+  const end=source.indexOf('\n$;',start);
+  assert.ok(start>=0&&end>start,'merge function missing from '+path);
+  return source.slice(start,end+4);
+}
+
 const tag=crypto.randomUUID().slice(0,8);
 const creator=await call(growth,'/v1/session',{displayName:'Merge Creator '+tag});
 const target=await call(growth,'/v1/session',{displayName:'Merge Account '+tag});
@@ -434,7 +443,11 @@ try {
     guestCompleted.playerId,target.playerId,challengeCompletedGuest,
   ]);
 
+  // Simulate a subsequent secure-auth release replaying 0046 after 0054.
+  // The database trigger invariant must keep the pre-0054 merge body safe.
+  await query(mergeFunctionSql('migrations/0046_public_identity_safety.sql'));
   await query('SELECT merge_pack1_player($1::uuid,$2::uuid)',[guestCompleted.playerId,target.playerId]);
+  await query(mergeFunctionSql('migrations/0054_creator_event_idempotency.sql'));
 
   const mergedCompleted=(await query(`SELECT player_id,creator_challenge_id,creator_participant_auth_user_id,
       start_idempotency_hash,start_request_hash,score
