@@ -8,6 +8,19 @@ const appId = '6814318676';
 const bundleId = 'pro.packone.app';
 const versionString = process.argv[2]?.trim();
 
+const outputPath = process.env.PACKONE_ASC_VERSION_OUTPUT?.trim();
+let versionsBefore = [];
+let version = null;
+let created = false;
+let creationAttempted = false;
+let versionDoc = null;
+let state = null;
+
+function persistEvidence(value) {
+  if (outputPath) writeFileSync(outputPath, JSON.stringify(value, null, 2) + '\n');
+}
+
+try {
 if (!issuerId || !keyId || !privateKeyText) throw new Error('App Store Connect credentials are required.');
 if (versionString !== '1.1') throw new Error('This guarded operation is pinned to App Store version 1.1.');
 
@@ -57,7 +70,7 @@ if (app.data?.attributes?.bundleId !== bundleId) throw new Error('Unexpected App
 
 const listPath = `/v1/apps/${appId}/appStoreVersions?filter%5Bplatform%5D=IOS&fields%5BappStoreVersions%5D=platform,versionString,appVersionState,releaseType,createdDate&limit=200`;
 const initial = await asc(listPath);
-const versionsBefore = (initial?.data || []).map((version) => ({
+versionsBefore = (initial?.data || []).map((version) => ({
   id: version.id,
   platform: version.attributes?.platform ?? null,
   versionString: version.attributes?.versionString ?? null,
@@ -66,55 +79,40 @@ const versionsBefore = (initial?.data || []).map((version) => ({
   createdDate: version.attributes?.createdDate ?? null,
 }));
 
-let version = (initial?.data || []).find(
+version = (initial?.data || []).find(
   (candidate) => candidate.attributes?.platform === 'IOS' && candidate.attributes?.versionString === versionString,
 );
-let created = false;
 
 if (!version) {
-  try {
-    const createdDoc = await asc('/v1/appStoreVersions', {
-      method: 'POST',
-      body: {
-        data: {
-          type: 'appStoreVersions',
-          attributes: {
-            platform: 'IOS',
-            versionString,
-          },
-          relationships: {
-            app: {
-              data: {
-                type: 'apps',
-                id: appId,
-              },
+  creationAttempted = true;
+  const createdDoc = await asc('/v1/appStoreVersions', {
+    method: 'POST',
+    body: {
+      data: {
+        type: 'appStoreVersions',
+        attributes: {
+          platform: 'IOS',
+          versionString,
+        },
+        relationships: {
+          app: {
+            data: {
+              type: 'apps',
+              id: appId,
             },
           },
         },
       },
-    });
-    version = createdDoc?.data;
-    created = true;
-  } catch (error) {
-    console.error(JSON.stringify({
-      appId,
-      bundleId,
-      requestedVersion: versionString,
-      created: false,
-      versionsBefore,
-      providerStatus: error.status ?? null,
-      providerError: error.provider ?? null,
-      reviewSubmissionCreated: false,
-      publicReleaseCreated: false,
-    }, null, 2));
-    throw error;
-  }
+    },
+  });
+  version = createdDoc?.data;
+  created = true;
 }
 
 if (!version?.id) throw new Error(`App Store version ${versionString} is missing after ensure operation.`);
 
-let versionDoc = await asc(`/v1/appStoreVersions/${encodeURIComponent(version.id)}`);
-let state = versionDoc.data?.attributes?.appVersionState ?? versionDoc.data?.attributes?.appStoreState ?? null;
+versionDoc = await asc(`/v1/appStoreVersions/${encodeURIComponent(version.id)}`);
+state = versionDoc.data?.attributes?.appVersionState ?? versionDoc.data?.attributes?.appStoreState ?? null;
 if (!['PREPARE_FOR_SUBMISSION', 'READY_FOR_REVIEW'].includes(state)) {
   throw new Error(`App Store version ${versionString} is not safely editable: ${state}`);
 }
@@ -157,6 +155,24 @@ const result = {
 };
 
 console.log(JSON.stringify(result, null, 2));
-if (process.env.PACKONE_ASC_VERSION_OUTPUT) {
-  writeFileSync(process.env.PACKONE_ASC_VERSION_OUTPUT, JSON.stringify(result, null, 2) + '\n');
+persistEvidence(result);
+} catch (error) {
+  const failure = {
+    appId,
+    bundleId,
+    requestedVersion: versionString ?? null,
+    versionId: version?.id ?? versionDoc?.data?.id ?? null,
+    created: created ? true : creationAttempted ? null : false,
+    appVersionState: state,
+    releaseType: versionDoc?.data?.attributes?.releaseType ?? version?.attributes?.releaseType ?? null,
+    versionsBefore,
+    providerStatus: error && typeof error === 'object' && 'status' in error ? error.status : null,
+    providerError: error && typeof error === 'object' && 'provider' in error ? error.provider : null,
+    error: error instanceof Error ? error.message : String(error),
+    reviewSubmissionCreated: false,
+    publicReleaseCreated: false,
+  };
+  console.error(JSON.stringify(failure, null, 2));
+  persistEvidence(failure);
+  throw error;
 }

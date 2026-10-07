@@ -24,4 +24,9 @@ test('App Store 1.1 version creation is guarded and cannot submit review or rele
   assert.match(workflow, /pack-one-mobile-release/);
   assert.match(workflow, /Require current approved main revision/);
   assert.match(workflow, /app-store-ensure-version\.mjs/);
+  assert.match(helper, /persistEvidence\(failure\)/);
+  assert.match(helper, /created: created \? true : creationAttempted \? null : false/);
+  assert.match(helper, /providerStatus:/);
+  assert.match(helper, /providerError:/);
+  assert.match(workflow, /if-no-files-found: error/);
 });
