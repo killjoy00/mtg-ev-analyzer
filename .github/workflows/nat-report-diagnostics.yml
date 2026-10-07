@@ -1,0 +1,49 @@
+name: profile default reroll query plans
+on:
+  push:
+    branches: ['diagnostics/1051-nat-report']
+permissions:
+  contents: read
+jobs:
+  profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Bound disposable branch expiry
+        id: expiry
+        run: echo "expires_at=$(date -u --date '+45 minutes' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+      - name: Create disposable profiling clone
+        id: neon
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          CI_BRANCH_PREFIX: ci-pr-1051-${{ github.run_id }}-${{ github.run_attempt }}-reroll_profile
+          CI_BRANCH_PARENT: br-orange-feather-ayps8kep
+          CI_BRANCH_EXPIRES: ${{ steps.expiry.outputs.expires_at }}
+          CI_BRANCH_SUSPEND: 300
+        run: node scripts/create-ci-neon-branch.mjs
+      - name: Install reviewed reroll index on the disposable clone
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+        run: |
+          set -euo pipefail
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0056_snapshot_aware_reroll_covering_index.sql
+      - name: Measure production SQL with default planner settings
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+          PROFILE_BRANCH: ${{ steps.neon.outputs.branch_id }}
+        run: node scripts/diagnostics-reroll-plan.mjs
+      - name: Delete owned profiling clone
+        if: always() && steps.neon.outputs.branch_id != ''
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: patient-shadow-91417882
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch: ${{ steps.neon.outputs.branch_id }}
