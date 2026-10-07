@@ -133,6 +133,13 @@ The current #629 protocol uses five persistent runners across 25/50 stages; its
 exact result and release interpretation are authoritative in
 `reports/DISTRIBUTED-CAPACITY-629.md`.
 
+The distributed rehearsal is opt-in. Pull requests run only its fast
+regressions, and the step summary reports whether the change is
+load-sensitive. To run the rehearsal, use Actions > Run workflow on the
+branch. It takes about 40 minutes and shares the Cloudflare account's
+Durable Object allowance with production. The NAT rehearsal still runs
+automatically.
+
 The distributed workflow uses five independent runners and real outbound
 addresses. Private preview health responses attest the Cloudflare-observed
 network with the preview-only HMAC; production never returns this field. The

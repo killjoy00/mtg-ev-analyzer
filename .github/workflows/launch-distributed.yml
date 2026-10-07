@@ -38,11 +38,17 @@ jobs:
             echo "reason=manual_dispatch" >> "$GITHUB_OUTPUT"
             echo "require_performance=false" >> "$GITHUB_OUTPUT"
           else
-            node scripts/launch-change-scope.mjs "$BASE_SHA" "$HEAD_SHA" >> "$GITHUB_OUTPUT"
+            # The capacity rehearsal is opt-in. It shares the account's Durable
+            # Object allowance with production and takes about 40 minutes, so a
+            # PR only runs the fast regressions and reports whether its change
+            # is load-sensitive. Start the rehearsal with Actions > Run workflow
+            # on the PR branch when that matters.
+            node scripts/launch-change-scope.mjs "$BASE_SHA" "$HEAD_SHA" | grep -v '^run_load=' >> "$GITHUB_OUTPUT"
+            echo "run_load=false" >> "$GITHUB_OUTPUT"
           fi
       - name: Explain skipped load rehearsal
         if: steps.scope.outputs.run_load != 'true'
-        run: echo "Production-like load rehearsal skipped; scope=${{ steps.scope.outputs.reason }}. Fast regressions still run." >> "$GITHUB_STEP_SUMMARY"
+        run: echo "Production-like load rehearsal not run automatically; scope=${{ steps.scope.outputs.reason }}. Fast regressions still run. For a load-sensitive change, start it with Actions > Run workflow on this branch." >> "$GITHUB_STEP_SUMMARY"
   regression:
     needs: scope
     runs-on: ubuntu-latest
