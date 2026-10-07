@@ -22,10 +22,14 @@ export function parseStartDiagnostics(headers,route='start') {
   try {gateway=JSON.parse(headers.get('x-pack1-gateway-timing')||'null');}catch{}
   try {origin=JSON.parse(headers.get(route==='view'?'x-pack1-view-timing':route==='reroll'?'x-pack1-reroll-timing':'x-pack1-start-timing')||'null');}catch{}
   const result={};
-  if(gateway)result.gateway=bounded(gateway,['duration_ms','quota_ms','upstream_ms']);
+  if(gateway) {
+    result.gateway=bounded(gateway,['duration_ms','quota_ms','upstream_ms','quota_attempts','upstream_calls','upstream_status']);
+    for(const key of ['quota_retryable','quota_overloaded','quota_remote'])if(typeof gateway[key]==='boolean')result.gateway[key]=gateway[key];
+    if(['timeout','invalid_body','gateway_failure'].includes(gateway.error))result.gateway.error=gateway.error;
+  }
   if(origin?.v===1) {
     const phases=bounded(origin.phases,route==='view'?['player','body','observation']:route==='reroll'?['player','body','session','metadata','selection','update','response']:
-      ['player','body','identity','capability','idempotency','quota','selection','session_insert','analytics_insert','response','first_puzzle']);
+      ['player','body','identity','capability','idempotency','daily_session','daily_schedule','quota','selection','metadata','session_insert','analytics_insert','response','first_puzzle']);
     const selector={};
     for(const key of route==='view'?[]:route==='reroll'?['metadata','reroll','other']:['snapshot','candidate','revision','other']) {
       const values=bounded(origin.selector?.[key],['count','sum_ms','max_ms']);

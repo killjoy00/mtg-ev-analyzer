@@ -235,6 +235,23 @@ export class NetworkQuota {
   async alarm() {await this.storage.deleteAll();}
 }
 
+// A transient infrastructure exception can leave a Durable Object stub broken.
+// Retry its quota debit once using a new stub, before any application request.
+// A committed-but-unacknowledged debit may be charged again: conservatively
+// overcounting preserves limits. Never retry overload, HTTP denial or a timeout.
+export async function chargeNetworkQuota(namespace,id,kind,{signal=AbortSignal.timeout(5000),
+  sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),onAttempt=()=>{},onFailure=()=>{}}={}) {
+  for(let attempt=0;attempt<2;attempt++) {
+    signal.throwIfAborted();onAttempt();
+    try {return await namespace.get(id).fetch(new Request('https://quota/'+kind,{method:'POST',signal}));}
+    catch(error) {
+      onFailure({retryable:error?.retryable===true,overloaded:error?.overloaded===true,remote:error?.remote===true});
+      if(attempt!==0||error?.retryable!==true||error?.overloaded===true||['TimeoutError','AbortError'].includes(error?.name)||signal.aborted)throw error;
+      await sleep(50+Math.floor(Math.random()*50));
+    }
+  }
+}
+
 export function routeFamily(path) {
   if(/^\/(?:growth|draft)\/v1\/admin\/users(?:\/|$)/.test(path))return 'admin_users';
   if(/^\/growth\/v1\/patreon\/mobile\/(status|connect|refresh|disconnect)$/.test(path))return 'patreon_mobile_'+path.split('/').at(-1);
@@ -258,16 +275,20 @@ export function routeFamily(path) {
 export async function gateway(request,env,fetcher=fetch) {
   const url=new URL(request.url),origin=request.headers.get('origin'),mode=env.MODE;
   const started=performance.now(),metric={event:'gateway_request',route:routeFamily(url.pathname),method:['GET','POST','PATCH','DELETE','OPTIONS'].includes(request.method)?request.method:'other',
-    release:/^[a-f0-9]{40}$/.test(env.RELEASE_COMMIT||'')?env.RELEASE_COMMIT:'unknown',quota_ms:0,upstream_ms:0,upstream_calls:0,upstream_status:null,quota_scope:null,error:null};
+    release:/^[a-f0-9]{40}$/.test(env.RELEASE_COMMIT||'')?env.RELEASE_COMMIT:'unknown',quota_ms:0,quota_attempts:0,quota_retryable:false,quota_overloaded:false,quota_remote:false,upstream_ms:0,upstream_calls:0,upstream_status:null,quota_scope:null,error:null};
   const upstreamFetch=async(...args)=>{
     const began=performance.now();metric.upstream_calls++;
     try {const result=await fetcher(...args);metric.upstream_status=result.status;return result;}
     finally {metric.upstream_ms+=performance.now()-began;}
   };
-  const quotaFetch=async(quota,kind)=>{
+  const quotaFetch=async(quotaId,kind)=>{
     const began=performance.now();
     try {
-      const result=await quota.fetch(new Request('https://quota/'+kind,{method:'POST',signal:AbortSignal.timeout(5000)}));
+      const result=await chargeNetworkQuota(env.NETWORK_QUOTA,quotaId,kind,{
+        onAttempt:()=>metric.quota_attempts++,onFailure:failure=>{
+          metric.quota_retryable ||= failure.retryable;metric.quota_overloaded ||= failure.overloaded;metric.quota_remote ||= failure.remote;
+        },
+      });
       if(result.status===429) {
         const data=await result.clone().json();
         metric.quota_scope=(data.scopes||[]).filter(s=>s==='request'||s==='session').join(',')||'unknown';
@@ -293,6 +314,10 @@ export async function gateway(request,env,fetcher=fetch) {
     if(mode==='preview'&&request.method==='POST'&&
       (url.pathname==='/draft/v1/runs'||/^\/draft\/v1\/runs\/[a-f0-9-]+\/(?:reroll|view)$/.test(url.pathname))&&metric.upstream_calls===1)
       headers.set('x-pack1-gateway-timing',JSON.stringify({duration_ms:duration,quota_ms:quota,upstream_ms:upstream}));
+    if(mode==='preview'&&previewNetwork&&result.status>=500)
+      headers.set('x-pack1-gateway-timing',JSON.stringify({duration_ms:duration,quota_ms:quota,upstream_ms:upstream,
+        quota_attempts:metric.quota_attempts,quota_retryable:metric.quota_retryable,quota_overloaded:metric.quota_overloaded,quota_remote:metric.quota_remote,
+        upstream_calls:metric.upstream_calls,upstream_status:metric.upstream_status,error:metric.error}));
     headers.set('x-pack1-admin-api-version',String(ADMIN_API_VERSION));
     headers.set('x-content-type-options','nosniff');
     return new Response(result.body,{status:result.status,headers});
@@ -350,8 +375,8 @@ export async function gateway(request,env,fetcher=fetch) {
     const key=await crypto.subtle.importKey('raw',encode.encode(env.QUOTA_KEY),{name:'HMAC',hash:'SHA-256'},false,['sign']);
     const digest=Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',key,encode.encode(network)))).map(x=>x.toString(16).padStart(2,'0')).join('');
     if(preview)previewNetwork=digest;
-    const quota=env.NETWORK_QUOTA.get(env.NETWORK_QUOTA.idFromName(digest));
-    const limited=await quotaFetch(quota,sessionCreation?'session':'request');
+    const quotaId=env.NETWORK_QUOTA.idFromName(digest);
+    const limited=await quotaFetch(quotaId,sessionCreation?'session':'request');
     if(limited.status!==204)return finish(limited.status===429?limited:response(503,'Gateway unavailable.'));
 
     const headers=new Headers({'accept':'application/json'});
@@ -405,7 +430,7 @@ export async function gateway(request,env,fetcher=fetch) {
     let result=await upstreamFetch(upstream,{method,headers,body,redirect:'manual',signal});
     if(refresh&&result.status===401&&result.headers.get('x-pack1-session-state')==='missing') {
       await result.body?.cancel();
-      const creationLimit=await quotaFetch(quota,'session-only');
+      const creationLimit=await quotaFetch(quotaId,'session-only');
       if(creationLimit.status!==204)return finish(creationLimit.status===429?creationLimit:response(503,'Gateway unavailable.'));
       // One creation attempt, after the missing-session proof and quota charge.
       // A timeout or any other upstream error never authorizes a retry/create.

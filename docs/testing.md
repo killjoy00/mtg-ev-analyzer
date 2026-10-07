@@ -94,6 +94,14 @@ still include connection time; no application request is retried. Browser
 run-start failures record the actual status and a bounded error code, keeping
 network/HTTP failures visible independently of load-stage selection.
 
+Gateway quota checks allow one fresh-stub retry only for an explicitly retryable
+provider exception, excluding overload, timeout and abort. HTTP denials are never
+retried. A lost acknowledgement can conservatively debit quota twice; application
+requests are not replayed by this recovery. Protected preview error diagnostics
+record bounded exception flags and whether upstream was called. NAT start records
+retain anonymous actor/environment context and gateway/origin phase timings,
+including Daily lookup, schedule, quota, metadata and selection.
+
 Mobile jobs can reuse a successful shared-validation receipt for identical
 repository inputs and runner OS. Every job still validates its current build
 and release configuration. Concurrent first runs can both miss the cache;
