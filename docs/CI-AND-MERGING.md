@@ -30,7 +30,7 @@ The publication `test` path runs deterministic campaign/creator generator checks
 
 ## Replay hydration
 
-Replay hydration is an explicit heavy-test capability, not a prerequisite for ordinary tests. `scripts/run-js-tests.mjs` already identifies the shard-dependent distribution suites and skips only those when shards are unavailable. Normal application CI therefore runs broad tests without downloading the replay corpus. Replay/model/scoring/selection/data changes and forced broad validation set `REQUIRE_REPLAY_SHARDS=1` after running `scripts/hydrate-replay-shards.sh`.
+Replay hydration is an explicit heavy-test capability, not a prerequisite for ordinary tests. The `fast-core` job runs offline broad tests against reviewed real-decision fixtures without replay downloads. Selected replay/model/scoring/selection/data changes and forced broad validation run a separate `full-data-audit` job after the fast job succeeds. That job restores manifest-keyed replay caches, hydrates missing inputs through `scripts/hydrate-replay-shards.sh`, and runs strict `npm run test:data` plus dataset audits. The stable `test` aggregate requires every selected job to succeed. Release/corpus workflows retain strict `REQUIRE_REPLAY_SHARDS=1` validation. See [Testing Pack One](testing.md) for local commands, fixture provenance and diagnostic artifacts.
 
 The hydration helper introduced by #1025 remains the only required-gate hydration entry point. It serializes S3 reads within a runner and retries only the known bounded R2 simultaneous-read throttle. Credential errors, missing objects and unrelated failures remain fatal. Browser CI no longer hydrates replay shards because its current suites do not consume them.
 

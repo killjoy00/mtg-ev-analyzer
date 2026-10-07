@@ -15,6 +15,7 @@ const LOAD_SENSITIVE_PATHS=[
   path=>path==='migrations/0051_exact_pick_draw_index.sql',
   path=>path==='migrations/0056_snapshot_aware_reroll_covering_index.sql',
   path=>path==='scripts/edge-control.mjs',
+  path=>path==='scripts/preview-resource-ownership.mjs',
   path=>path==='scripts/create-ci-neon-branch.mjs',
   path=>path==='scripts/control-read.mjs',
   path=>path==='.github/preview-dns-recovery.json',
