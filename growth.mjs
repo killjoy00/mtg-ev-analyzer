@@ -146,23 +146,42 @@ export async function renderForgotPassword() {
 export async function renderVerificationRecovery(message='This verification link has expired or is no longer valid. Request a new link.') {
   document.body.classList.remove('is-game');
   const app=document.querySelector('#app');if(!app)return;
-  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Email verification</p><h1>Get a new verification link.</h1><p>${esc(message)}</p><p>Verification links expire after 15 minutes.</p></header><div class="account-columns"><div><form class="account-form" id="account-verification-resend-form"><label>Email<input required type="email" name="email" autocomplete="email"></label><button class="button primary" type="submit">Send a new verification link</button><p class="form-error" aria-live="polite"></p></form></div></div><div class="account-actions"><button class="button secondary" id="account-verification-back" type="button">Back to sign in</button></div></section>`;
+  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Email verification</p><h1>Get a new verification link.</h1><p>${esc(message)}</p><p>Verification links expire after 15 minutes.</p></header><div class="account-columns"><div><form class="account-form" id="account-verification-resend-form"><label>Email<input required type="email" name="email" autocomplete="email"></label><button class="button primary" type="submit">Send a new verification link</button><p class="form-error" id="account-verification-recovery-status" aria-live="polite"></p></form></div></div><div class="account-actions"><button class="button secondary" id="account-verification-back" type="button">Back to sign in</button></div></section>`;
   document.querySelector('#account-verification-back')?.addEventListener('click',()=>void renderAccount({mode:'signin'}));
   document.querySelector('#account-verification-resend-form')?.addEventListener('submit',async e=>{
-    e.preventDefault();const form=e.currentTarget,status=form.querySelector('.form-error');
+    e.preventDefault();const form=e.currentTarget,status=form.querySelector('#account-verification-recovery-status');
     if(!setFormPending(form,true,'Sending…'))return;
-    status.textContent='';
+    if(status){status.textContent='';status.className='form-error';delete status.dataset.state;}
     try {
       const {email}=Object.fromEntries(new FormData(form));
       const result=await requestVerificationEmail(email);
-      form.innerHTML=`<p class="form-success" role="status">${esc(result?.message||"If an unverified account exists for that email, we've sent a verification link.")}</p>`;
+      setVerificationRequestStatus(status,{message:result?.message});
     } catch(error) {
-      status.textContent=error?.message||'Email verification is temporarily unavailable.';
+      setVerificationRequestStatus(status,{error});
+    } finally {
       setFormPending(form,false);
     }
   });
 }
 
+function verificationCooldownMessage(error) {
+  const retryAfter=Number(error?.retryAfter||0);
+  if(Number.isFinite(retryAfter)&&retryAfter>0) {
+    const amount=retryAfter>=60?Math.ceil(retryAfter/60):Math.ceil(retryAfter);
+    const unit=retryAfter>=60?'minute':'second';
+    return `Cooldown active. Try again in about ${amount} ${unit}${amount===1?'':'s'}.`;
+  }
+  return 'Cooldown active. Please wait before requesting another verification link.';
+}
+function setVerificationRequestStatus(target,{message=null,error=null}={}) {
+  if(!target)return;
+  const cooldown=Boolean(error&&(error.status===429||error.code==='VERIFICATION_COOLDOWN'));
+  target.dataset.state=error?(cooldown?'cooldown':'failed'):'accepted';
+  target.className=error?(cooldown?'form-cooldown':'form-error'):'form-success';
+  target.textContent=error
+    ? (cooldown?verificationCooldownMessage(error):(error?.message||'Email verification is temporarily unavailable.'))
+    : (message||'Request accepted. If that address belongs to an unverified Pack One account, a new verification link will be sent.');
+}
 function googleError(message='') {
   const target=document.querySelector('#account-google-error');
   if(target)target.textContent=message;
@@ -417,12 +436,12 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
         if(card)card.innerHTML=`<div class="form-success account-verification-success" role="status"><h2>Check your email</h2><p>We sent a verification link to ${esc(data.email)}. Open it to finish creating your Pack One account.</p><p>Verification links expire after 15 minutes.</p></div><button class="button secondary" id="account-verification-resend" type="button">Send a new verification link</button><button class="button secondary" id="account-verification-signin" type="button">Back to sign in</button><p id="account-verification-status" aria-live="polite"></p>`;
         document.querySelector('#account-verification-resend')?.addEventListener('click',async e=>{
           const button=e.currentTarget,status=document.querySelector('#account-verification-status');
-          button.disabled=true;if(status){status.className='';status.textContent='';}
+          button.disabled=true;if(status){status.className='';status.textContent='';delete status.dataset.state;}
           try {
             const result=await requestVerificationEmail(data.email);
-            if(status){status.className='form-success';status.textContent=result?.message||"If an unverified account exists for that email, we've sent a verification link.";}
+            setVerificationRequestStatus(status,{message:result?.message});
           } catch(error) {
-            if(status){status.className='form-error';status.textContent=error?.message||'Email verification is temporarily unavailable.';}
+            setVerificationRequestStatus(status,{error});
           } finally {button.disabled=false;}
         });
         document.querySelector('#account-verification-signin')?.addEventListener('click',()=>void renderAccount({validateDailyRunId:pendingDailyRunValidation,intent,source,mode:'signin'}));
@@ -486,9 +505,9 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
             resend.disabled=true;
             try {
               const result=await requestVerificationEmail(String(new FormData(form).get('email')||''));
-              err.textContent=result?.message||"If an unverified account exists for that email, we've sent a verification link.";
+              setVerificationRequestStatus(err,{message:result?.message});
             } catch(resendError) {
-              err.textContent=resendError?.message||'Email verification is temporarily unavailable.';
+              setVerificationRequestStatus(err,{error:resendError});
             } finally {resend.disabled=false;}
           });
         }
