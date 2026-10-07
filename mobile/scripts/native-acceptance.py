@@ -373,8 +373,11 @@ if platform == 'android':
         xml, _ = snapshot('terms')
         require('Use of the site' in xml, 'Native Terms page did not render')
         tap('Show font licenses', exact=True)
-        xml, _ = snapshot('terms-font-licenses')
-        require('Barlow Condensed' in xml and 'Source Sans 3' in xml, 'Expanded font licenses are not visible in native Terms')
+        xml, _ = snapshot('terms-font-licenses-barlow')
+        require('Barlow Condensed' in xml, 'Barlow Condensed license is not visible in native Terms')
+        tap('Source Sans 3', exact=True)
+        xml, _ = snapshot('terms-font-licenses-source-sans')
+        require('Source Sans 3' in xml, 'Source Sans 3 license is not visible in native Terms')
 
     attempt('native-about-support-privacy-terms-and-font-licenses', editorial_navigation)
 
