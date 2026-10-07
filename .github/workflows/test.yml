@@ -163,7 +163,7 @@ jobs:
 
       # Temporary branch-only visual handoff for this migration; removed before merge.
       - name: Emit creator card visual fixtures
-        if: github.event_name == 'pull_request' && github.head_ref == 'feat/creator-kit-pack-one-scorecards-20261007'
+        if: github.event_name == 'pull_request' && github.head_ref == 'fix/creator-card-long-headlines-20261007'
         env:
           PACK1_CREATOR_FIXTURE_DIR: ${{ runner.temp }}/creator-card-fixtures
         run: |
@@ -212,6 +212,7 @@ jobs:
               test -f "$RUNNER_TEMP/ci-contracts-complete"
               ;;
             full)
+              python3 tests/test_creator_social_card.py
               npm run test:fast
               ;;
             mobile|docs)
