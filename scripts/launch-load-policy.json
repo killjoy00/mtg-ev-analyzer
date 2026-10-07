@@ -5,7 +5,7 @@
   "ramp_seconds": 15,
   "think_time_ms": [3000, 8000],
   "stage_deadline_seconds": 180,
-  "maximum_requests": 50000,
+  "maximum_requests": 5000,
   "maximum_test_minutes": 20,
   "maximum_compute_cu": 8,
   "maximum_error_fraction": 0.01,

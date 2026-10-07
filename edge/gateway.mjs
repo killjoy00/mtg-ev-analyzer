@@ -204,6 +204,11 @@ function safeRedirect(value,{mobileOAuth=false}={}) {
   } catch{return null;}
 }
 
+// Every put() and setAlarm() is a billed SQLite row write, and preview load
+// tests share the account's Durable Object allowance with production. All
+// buckets therefore live in one row, and the cleanup alarm is armed once per
+// active network instead of on every request.
+const QUOTA_STATE='buckets',LEGACY_QUOTA_KEYS=['request','request_burst','session'],QUOTA_CLEANUP_MS=660000;
 export class NetworkQuota {
   constructor(state) {this.storage=state.storage;}
   async fetch(request) {
@@ -217,22 +222,31 @@ export class NetworkQuota {
     // sustained load. Session creation remains independently limited.
     const limits=[...(kind!=='/session-only'?[['request',3600,60000],['request_burst',600,10000]]:[]),...(kind!=='/request'?[['session',120,600000]]:[])];
     const {retry,scopes}=await this.storage.transaction(async tx=>{
-      const pending=[],scopes=[];let retry=0;
+      // Counters persisted under the earlier one-row-per-bucket layout stay
+      // authoritative until this network's first write in the single row.
+      const stored=await tx.get(QUOTA_STATE)||Object.fromEntries(await tx.get(LEGACY_QUOTA_KEYS));
+      const next={...stored},scopes=[];let retry=0;
       for(const [key,limit,period] of limits) {
-        let row=await tx.get(key);
+        let row=stored[key];
         if(!row||now>=row.until)row={count:0,until:now+period};
         if(row.count>=limit){retry=Math.max(retry,Math.ceil((row.until-now)/1000));if(!scopes.includes(key==='request_burst'?'request':key))scopes.push(key==='request_burst'?'request':key);}
-        pending.push([key,{...row,count:row.count+1}]);
+        next[key]={...row,count:row.count+1};
       }
       if(retry)return {retry,scopes};
-      for(const [key,row] of pending)await tx.put(key,row);
-      await tx.setAlarm(now+660000);
+      await tx.put(QUOTA_STATE,next);
+      if(await tx.getAlarm()===null)await tx.setAlarm(now+QUOTA_CLEANUP_MS);
       return {retry:0,scopes};
     });
     return retry?Response.json({error:'Too many requests.',code:'network_rate_limited',scopes},
       {status:429,headers:{'cache-control':'no-store','retry-after':String(retry)}}):new Response(null,{status:204});
   }
-  async alarm() {await this.storage.deleteAll();}
+  // The alarm is armed at a network's first request, not its last, so a window
+  // may still be open when it fires. Deleting an open window would reset it.
+  async alarm() {
+    const now=Date.now(),state=await this.storage.get(QUOTA_STATE)||{};
+    if(Object.values(state).some(row=>row.until>now))await this.storage.setAlarm(now+QUOTA_CLEANUP_MS);
+    else await this.storage.deleteAll();
+  }
 }
 
 export function routeFamily(path) {

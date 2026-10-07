@@ -118,8 +118,12 @@ No egress spoofing or between-stage quota-key rotation is permitted. Fixture
 credentials remain in a mode-0600 runner file and disappear with the branch.
 
 `launch-load-policy.json` declares route p95/p99, zero legitimate 429s and zero
-correctness failures, a 1% overall request-error ceiling, 50,000-request maximum,
-20-minute test budget and 8-CU compute cap. The workflow has a 50-minute overall
+correctness failures, a 1% overall request-error ceiling, 5,000-request maximum,
+20-minute test budget and 8-CU compute cap. The private preview gateway shares
+the Cloudflare account's Durable Object allowance with production, so request
+ceilings sit near measured use (about 1,600 requests per NAT run and 11,800 per
+distributed run on 2026-10-07; the distributed ceiling is 30,000) rather than
+far above it. The workflow has a 50-minute overall
 limit and a two-hour branch expiry. Confirmed-idle browser timing is a separate
 acceptance record; a warm-up is not labeled a cold start. Twenty warm browser samples per case retain every observation, with p95/p99 and raw samples. Four isolated fixture accounts keep each case below the unchanged 30-starts/10-minute per-player limit. One confirmed-idle sample per case remains a cold regression check, not a stable population p95.
 
