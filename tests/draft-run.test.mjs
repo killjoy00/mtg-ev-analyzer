@@ -22,7 +22,6 @@ import {
 
 test('historical replay scoring pins recorded v2 and both v3 floating-point paths',()=>{
   const p={
-    corpus_version:'elite-trophy-verified-v6',
     historical_pick_id:'d',
     candidates:[
       {id:'a',name:'A',model_probability:.19},
