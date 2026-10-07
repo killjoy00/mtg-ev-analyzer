@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {assertPreviewOwner,cleanupOwnedDns,resourceReceipt} from '../scripts/preview-resource-ownership.mjs';
+import {assertPreviewOwner,cleanupOwnedDns,resourceReceipt,ownedReceiptRecords} from '../scripts/preview-resource-ownership.mjs';
 const owner={runId:123,attempt:2,branch:'br-ci-owned',sha:'a'.repeat(40)},record={id:'b'.repeat(32),name:'api-preview.packone.pro',type:'CNAME',content:'owned.example',proxied:true,created_on:'2026-10-07T12:00:00Z',modified_on:'2026-10-07T12:00:00Z'};
 const settings={result:{bindings:Object.entries({MODE:'preview',NEON_BRANCH_ID:owner.branch,RELEASE_COMMIT:owner.sha,CI_PREVIEW_RUN:'123',CI_PREVIEW_ATTEMPT:'2'}).map(([name,text])=>({name,text,type:'plain_text'}))}};
 test('cleanup identity requires the exact run, attempt, isolated branch and revision',()=>{
@@ -18,4 +18,11 @@ test('DNS cleanup reconciles an unknown delete and refuses changed ownership or 
   await assert.rejects(cleanupOwnedDns({records:[record],readRecords:async()=>current,assertOwner:async()=>{},remove:async()=>assert.fail('changed DNS must survive')}),/changed/);
   current=[record];
   await assert.rejects(cleanupOwnedDns({records:[record],readRecords:async()=>current,assertOwner:async()=>assertPreviewOwner(settings,{...owner,runId:999}),remove:async()=>assert.fail('another run must survive')}),/owner changed/);
+});
+test('a detached hostname only permits orphan DNS cleanup with the original exact-run receipt',()=>{
+  const receipt=resourceReceipt({...owner,expires:'2026-10-07T14:00:00Z',phase:'attached',records:[record]});
+  assert.deepEqual(ownedReceiptRecords(receipt,owner,[record]),[record]);
+  for(const changed of [null,{...receipt,run_id:'999'},{...receipt,phase:'branch-created'},{...receipt,dns:[]}])
+    assert.throws(()=>ownedReceiptRecords(changed,owner,[record]),/original matching/);
+  assert.throws(()=>ownedReceiptRecords(receipt,owner,[{...record,content:'replaced.example'}]),/original matching/);
 });

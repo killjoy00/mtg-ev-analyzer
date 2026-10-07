@@ -19,6 +19,15 @@ export function resourceReceipt({branch,sha,runId,attempt,expires,phase,domainId
 export function writeResourceReceipt(receipt,file='artifacts/ci-resources/preview.json') {
   fs.mkdirSync('artifacts/ci-resources',{recursive:true});fs.writeFileSync(file,JSON.stringify(receipt,null,2)+'\n');
 }
+export function ownedReceiptRecords(receipt,{branch,sha,runId,attempt},records) {
+  if(receipt?.version!==1||receipt.hostname!==HOST||receipt.branch!==branch||receipt.sha!==sha||
+    receipt.run_id!==String(runId)||receipt.attempt!==String(attempt)||
+    !['attached','cleanup-started'].includes(receipt.phase)||!Array.isArray(receipt.dns)||
+    receipt.dns.length!==records.length||records.length>1||
+    records.some(record=>record.name!==HOST||!receipt.dns.some(saved=>saved.id===record.id&&saved.fingerprint===dnsFingerprint(record))))
+    throw Error('Preview cleanup requires the original matching DNS ownership receipt');
+  return records;
+}
 export async function cleanupOwnedDns({records,readRecords,remove,assertOwner}) {
   if(records.length>1||records.some(record=>record.name!==HOST||!/^[a-f0-9]{32}$/.test(record.id)))throw Error('Unexpected preview DNS inventory; refusing cleanup');
   for(const record of records) {

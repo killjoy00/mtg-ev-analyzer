@@ -137,6 +137,7 @@ jobs:
       PREVIEW_BRANCH: ${{ needs.setup.outputs.branch }}
       PACK1_ENFORCE_PREVIEW_OWNER: '1'
       CI_RESOURCE_EXPIRES: ${{ needs.setup.outputs.expires }}
+      PACK1_RESOURCE_RECEIPT_FILE: artifacts/distributed-results/distributed-capacity-${{ github.run_attempt }}-setup/ci-resources/preview.json
       LOAD_FIXTURE_FILE: /tmp/pack1-launch-fixtures.json
       LOAD_SHARD: ${{ matrix.shard }}
     steps:
