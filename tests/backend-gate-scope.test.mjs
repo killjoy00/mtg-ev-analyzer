@@ -5,15 +5,49 @@ import { ALWAYS_STEPS, classifyBackendChanges, filterBackendChangedPaths, loadBa
 
 const map = loadBackendMap();
 
+const workflowTriggers=[...readFileSync('.github/workflows/backend-gate.yml','utf8').matchAll(/^      - '([^']+)'$/gm)].map(match=>match[1]);
+
+function fullPathExample(glob) {
+  if(!glob.includes('*')) return glob;
+  if(glob==='migrations/**') return 'migrations/9999_probe.sql';
+  throw new Error('Add a representative full-path example for '+glob);
+}
+
 test('every registered integration suite selects itself and is reachable from the workflow trigger',()=>{
   const flow=loadBackendMap();
-  const triggers=[...readFileSync('.github/workflows/backend-gate.yml','utf8').matchAll(/^      - '([^']+)'$/gm)].map(m=>m[1]);
   for(const [domain,config] of Object.entries(flow.domains))for(const suite of config.suites) {
     const result=classifyBackendChanges([suite],{map:flow});
     assert.ok(result.suites.includes(suite),suite);
     assert.ok(result.domains.includes(domain),suite);
-    assert.ok(triggers.some(glob=>matchesGlob(suite,glob)),`Workflow cannot be triggered by ${suite}`);
+    assert.ok(workflowTriggers.some(glob=>matchesGlob(suite,glob)),`Workflow cannot be triggered by ${suite}`);
   }
+});
+
+test('every declared full path triggers the workflow, survives filtering, and stays full when mixed with a narrow domain',()=>{
+  const narrow='worker/draft-run-pool.mjs';
+  for(const glob of map.full_paths) {
+    const path=fullPathExample(glob);
+    assert.ok(workflowTriggers.some(trigger=>matchesGlob(path,trigger)),`Workflow cannot be triggered by full path ${path}`);
+    assert.deepEqual(filterBackendChangedPaths([path],map),[path],`Full path was filtered out: ${path}`);
+    for(const paths of [[path],[path,narrow]]) {
+      const result=classifyBackendChanges(paths,{map});
+      assert.equal(result.needsNeon,true,path);
+      assert.equal(result.fullSuite,true,path);
+      assert.deepEqual(result.domains,Object.keys(map.domains),path);
+      assert.ok(result.reasons.includes(`full-path: ${path}`),path);
+    }
+  }
+});
+
+test('mixed narrow domains retain every required domain without broadening to full',()=>{
+  const result=classifyBackendChanges([
+    'worker/draft-run-pool.mjs',
+    'tests/apple-subscription-backend-smoke.mjs',
+  ],{map});
+  assert.equal(result.fullSuite,false);
+  assert.deepEqual(result.domains,['draft_run','subscriptions']);
+  assert.ok(result.suites.includes('tests/draft-run-backend-smoke.mjs'));
+  assert.ok(result.suites.includes('tests/apple-subscription-backend-smoke.mjs'));
 });
 
 test('account backend-smoke change selects account suites plus the always-run foundation', () => {
