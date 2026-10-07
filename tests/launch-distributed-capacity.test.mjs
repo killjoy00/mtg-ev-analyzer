@@ -29,7 +29,7 @@ test('committed policy is bounded and cannot silently claim 100 or launch 500 pl
  const nat=JSON.parse(fs.readFileSync(new URL('../scripts/launch-load-policy.json',import.meta.url),'utf8'));
  assert.deepEqual(nat.nat_stages,[25,50]);assert.equal('distributed_stages' in nat,false);
  assert.deepEqual(policy.route_budgets_ms.start,{p95:3000,p99:8000});
- for(const patch of [{supported_launch_target:25},{supported_launch_target:100},{generators:20},{maximum_compute_cu:9},{maximum_error_fraction:.01},{maximum_branch_lifetime_minutes:120},{telemetry_preflight_requests:101}])assert.throws(()=>validatePolicy({...policy,...patch}));
+ for(const patch of [{supported_launch_target:25},{supported_launch_target:100},{generators:20},{maximum_compute_cu:9},{maximum_error_fraction:.01},{maximum_branch_lifetime_minutes:120},{telemetry_preflight_requests:101},{maximum_requests:30001}])assert.throws(()=>validatePolicy({...policy,...patch}));
  assert.throws(()=>validatePolicy({...policy,stages:[...policy.stages,{players:500,hold_seconds:600}]}));
  assert.throws(()=>initialControl({...scope,branch:'br-orange-feather-ayps8kep'},start,policy));
 });

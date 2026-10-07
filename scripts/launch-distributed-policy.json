@@ -32,7 +32,7 @@
   "maximum_compute_cu": 8,
   "emergency_compute_ceiling_cu_hours": 10,
   "maximum_runner_minutes": 270,
-  "maximum_requests": 50000,
+  "maximum_requests": 30000,
   "maximum_response_bytes": 268435456,
   "maximum_project_reported_egress_delta_bytes": 1073741824,
   "maximum_error_fraction": 0,
