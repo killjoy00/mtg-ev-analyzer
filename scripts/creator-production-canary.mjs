@@ -306,11 +306,15 @@ async function staticState(challenge,status) {
   assert.ok(html.includes('data-creator-challenge-id="'+challenge.id+'"'));
   assert.ok(html.includes('data-creator-challenge-status="'+status+'"'));
   assert.equal(html.includes(creatorNote),false,'post-run note must not enter public route metadata');
-  const card=await fetchCanaryHttp(route+'creator-card.png',{headers:{'cache-control':'no-cache'},redirect:'error',signal:AbortSignal.timeout(30000)});
-  if(status==='published')assert.ok(card.ok&&String(card.headers.get('content-type')||'').includes('image/'));
-  else assert.ok([404,410].includes(card.status),'retired personalized card must be unavailable');
+  const assets={};
+  for(const name of ['creator-card.png','creator-card-square.png']) {
+    const response=await fetchCanaryHttp(route+name,{headers:{'cache-control':'no-cache'},redirect:'error',signal:AbortSignal.timeout(30000)});
+    assets[name]=response.status;
+    if(status==='published')assert.ok(response.ok&&String(response.headers.get('content-type')||'').includes('image/'),name+' must be a live image');
+    else assert.ok([404,410].includes(response.status),'retired personalized '+name+' must be unavailable');
+  }
   if(status==='retired')assert.equal(html.includes('Pack One Canary'),false,'retired HTML must scrub the canary identity');
-  return {html,card_status:card.status};
+  return {html,card_status:assets['creator-card.png'],square_card_status:assets['creator-card-square.png']};
 }
 
 async function publicMetadata(challenge,token) {
@@ -474,8 +478,10 @@ try{
       assert.ok([200,404,410].includes(response.status));
       const html=await response.text();
       assert.equal(html.includes('Pack One Canary'),false);
-      const card=await fetchCanaryHttp(route+'creator-card.png',{cache:'no-store',signal:AbortSignal.timeout(30000)});
-      assert.ok([404,410].includes(card.status),'prior canary personalized card must be unavailable');
+      for(const name of ['creator-card.png','creator-card-square.png']) {
+        const card=await fetchCanaryHttp(route+name,{cache:'no-store',signal:AbortSignal.timeout(30000)});
+        assert.ok([404,410].includes(card.status),'prior canary personalized '+name+' must be unavailable');
+      }
     },
     cleanPractice:async(fixture)=>{practiceFixture=fixture;await cleanupFreshPracticeSource();practiceFixture=null;},
     record:row=>report.recovered_fixtures.push(row),
@@ -499,7 +505,7 @@ try{
     await publication(challenge,'publish');
     await staticState(challenge,'published');
   }
-  report.checks.push('Practice and Daily creator routes published through protected publication workflow with live cards');
+  report.checks.push('Practice and Daily creator routes published through protected publication workflow with live Open Graph and square cards');
 
   const practiceRun=await playChallenge({...practiceChallenge,type:'practice'},practice,guest.token,guest.id);
   const dailyRun=await playChallenge({...dailyChallenge,type:'daily'},daily,guest.token,guest.id);
@@ -510,7 +516,7 @@ try{
   await publication(practiceChallenge,'retire');
   await staticState(practiceChallenge,'retired');
   await verifyRetiredApi(practiceChallenge,guest.token);
-  report.checks.push('normal Admin retirement replaced Practice route and removed personalized PNG');
+  report.checks.push('normal Admin retirement replaced Practice route and removed both personalized PNGs');
 
   await privacyRetire(dailyChallenge,daily.player_id);
   await staticState(dailyChallenge,'retired');
@@ -526,7 +532,7 @@ try{
   assert.equal(privacy.source_owner_auth_user_id,null);
   assert.ok(privacy.privacy_removed_at);
   assert.equal(parseJson(privacy.publication_detail)?.live_verified,true);
-  report.checks.push('privacy retirement scrubbed dynamic identity and live static route/image before reporting complete');
+  report.checks.push('privacy retirement scrubbed dynamic identity and both live static images before reporting complete');
 
   report.passed=true;
 }catch(error){
