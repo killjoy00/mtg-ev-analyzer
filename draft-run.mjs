@@ -91,59 +91,103 @@ export function calibratedSupports(candidates, exponent=SUPPORT_SHARPENING) {
   return new Map((candidates || []).map((c, index) => [c.id, share[index]]));
 }
 
-export const DRAFT_RUN_REPLAY_SCORING_VERSIONS=Object.freeze(['trophy-consensus-v2','trophy-consensus-v3']);
+export const DRAFT_RUN_SCORING_V3_LEGACY_PROFILE='trophy-consensus-v3-calibrated-v1';
+export const DRAFT_RUN_SCORING_V3_LINEAR_PROFILE='trophy-consensus-v3-linear-v2';
+export const DRAFT_RUN_REPLAY_SCORING_VERSIONS=Object.freeze([
+  'trophy-consensus-v2',
+  'trophy-consensus-v3',
+  DRAFT_RUN_SCORING_V3_LEGACY_PROFILE,
+  DRAFT_RUN_SCORING_V3_LINEAR_PROFILE,
+]);
 
-function gradeTrophyConsensusV2V3Pick(puzzle, selectedId) {
-  const candidates = puzzle?.candidates || puzzle?.pack || [];
-  const ranked = rankCandidates(candidates);
-  if (!ranked.length) throw new Error('Draft Run puzzle has no candidates.');
-  const selected = ranked.find((card) => card.id === selectedId);
-  if (!selected) throw new Error(`Selected card ${selectedId} is not in this Draft Run puzzle.`);
-
-  const historicalId = puzzle.historical_pick_id || puzzle.historicalPickId;
-  const historical = ranked.find((card) => card.id === historicalId) || null;
-  if (!historical || new Set(ranked.map(c => c.id)).size !== ranked.length ||
-      ranked.some(c => !Number.isFinite(Number(c.model_probability)) || Number(c.model_probability) < 0) ||
-      !ranked.some(c => Number(c.model_probability) > EPSILON)) {
+function draftRunScoringEvidence(puzzle,selectedId) {
+  const candidates=puzzle?.candidates||puzzle?.pack||[];
+  const ranked=rankCandidates(candidates);
+  if(!ranked.length)throw new Error('Draft Run puzzle has no candidates.');
+  const selected=ranked.find(card=>card.id===selectedId);
+  if(!selected)throw new Error(`Selected card ${selectedId} is not in this Draft Run puzzle.`);
+  const historicalId=puzzle.historical_pick_id||puzzle.historicalPickId;
+  const historical=ranked.find(card=>card.id===historicalId)||null;
+  if(!historical||new Set(ranked.map(card=>card.id)).size!==ranked.length||
+      ranked.some(card=>!Number.isFinite(Number(card.model_probability))||Number(card.model_probability)<0)||
+      !ranked.some(card=>Number(card.model_probability)>EPSILON))
     throw new Error('Draft Run puzzle has invalid scoring evidence.');
-  }
-  const leader = ranked[0];
-  const rank = ranked.findIndex((card) => card.id === selected.id) + 1;
-  const calibrated = calibratedSupports(ranked,supportSharpening(puzzle.corpus_version));
-  const selectedSupport = calibrated.get(selected.id) || 0;
-  const leaderSupport = calibrated.get(leader.id) || 0;
-  const supportRatio = Math.max(0, Math.min(1, selectedSupport / leaderSupport));
-  const rawRatio = Math.max(0,Math.min(1,Number(selected.model_probability)/Number(leader.model_probability)));
-  const consensusCap = draftRunConsensusCap(puzzle.pick_number || puzzle.pickNumber);
-  const historicalMatch = Boolean(historicalId && selected.id === historicalId);
-  const score = historicalMatch
-    ? 100
-    : Math.round(consensusCap * rawRatio);
-
   return {
-    score,
-    selectedId: selected.id,
-    selectedName: selected.name,
-    selectedSupport,
-    historicalId: historical?.id || historicalId || null,
-    historicalName: historical?.name || puzzle.historical_pick_name || null,
-    historicalMatch,
-    consensusId: leader.id,
-    consensusName: leader.name,
-    consensusSupport: leaderSupport,
-    consensusRank: rank,
-    consensusCap,
-    supportRatio,
-    pickNumber: Number(puzzle.pick_number || puzzle.pickNumber || 1),
+    ranked,selected,historicalId,historical,
+    leader:ranked[0],
+    rank:ranked.findIndex(card=>card.id===selected.id)+1,
   };
 }
 
-export function gradeDraftRunPickForVersion(puzzle,selectedId,scoringVersion) {
-  if(!DRAFT_RUN_REPLAY_SCORING_VERSIONS.includes(scoringVersion))throw new Error(`Unsupported Draft Run scoring version: ${scoringVersion}`);
-  return gradeTrophyConsensusV2V3Pick(puzzle,selectedId);
+function scoredDraftRunPick(puzzle,selectedId,profile) {
+  const {ranked,selected,historicalId,historical,leader,rank}=draftRunScoringEvidence(puzzle,selectedId);
+  const historicalMatch=Boolean(historicalId&&selected.id===historicalId);
+  let selectedSupport,leaderSupport,supportRatio,score;
+
+  if(profile==='trophy-consensus-v2') {
+    // Frozen v2 implementation from before 40aebee: raw supports and a literal
+    // 95-point alternative cap. Do not route through mutable current helpers.
+    selectedSupport=Math.max(0,Number(selected.model_probability||0));
+    leaderSupport=Math.max(0,Number(leader.model_probability||0));
+    supportRatio=Math.max(0,Math.min(1,selectedSupport/leaderSupport));
+    score=historicalMatch?100:Math.round(95*supportRatio);
+  } else if(profile===DRAFT_RUN_SCORING_V3_LEGACY_PROFILE) {
+    // Frozen first v3 implementation from 40aebee. Although algebraically
+    // equivalent to the linear ratio, its sharpen-then-root floating-point
+    // path has observable rounding boundaries and therefore is replay data.
+    const calibrated=calibratedSupports(ranked,2);
+    selectedSupport=calibrated.get(selected.id)||0;
+    leaderSupport=calibrated.get(leader.id)||0;
+    supportRatio=Math.max(0,Math.min(1,selectedSupport/leaderSupport));
+    score=historicalMatch?100:Math.round(95*supportRatio**0.5);
+  } else if(profile===DRAFT_RUN_SCORING_V3_LINEAR_PROFILE) {
+    // Current v3 implementation from 26039b7 onward: display calibration stays
+    // corpus-pinned, while awards use the raw ratio to avoid round-trip drift.
+    const calibrated=calibratedSupports(ranked,supportSharpening(puzzle.corpus_version));
+    selectedSupport=calibrated.get(selected.id)||0;
+    leaderSupport=calibrated.get(leader.id)||0;
+    supportRatio=Math.max(0,Math.min(1,selectedSupport/leaderSupport));
+    const rawRatio=Math.max(0,Math.min(1,Number(selected.model_probability)/Number(leader.model_probability)));
+    score=historicalMatch?100:Math.round(95*rawRatio);
+  } else {
+    throw new Error(`Unsupported Draft Run scoring version: ${profile}`);
+  }
+
+  return {
+    score,
+    selectedId:selected.id,
+    selectedName:selected.name,
+    selectedSupport,
+    historicalId:historical?.id||historicalId||null,
+    historicalName:historical?.name||puzzle.historical_pick_name||null,
+    historicalMatch,
+    consensusId:leader.id,
+    consensusName:leader.name,
+    consensusSupport:leaderSupport,
+    consensusRank:rank,
+    consensusCap:95,
+    supportRatio,
+    pickNumber:Number(puzzle.pick_number||puzzle.pickNumber||1),
+  };
 }
 
-export function gradeDraftRunPick(puzzle, selectedId) {
+export function replayScoringProfilesForVersion(scoringVersion) {
+  if(scoringVersion==='trophy-consensus-v2')return ['trophy-consensus-v2'];
+  if(scoringVersion==='trophy-consensus-v3')
+    return [DRAFT_RUN_SCORING_V3_LEGACY_PROFILE,DRAFT_RUN_SCORING_V3_LINEAR_PROFILE];
+  if([DRAFT_RUN_SCORING_V3_LEGACY_PROFILE,DRAFT_RUN_SCORING_V3_LINEAR_PROFILE].includes(scoringVersion))
+    return [scoringVersion];
+  return [];
+}
+
+export function gradeDraftRunPickForVersion(puzzle,selectedId,scoringVersion) {
+  const profile=scoringVersion==='trophy-consensus-v3'
+    ?DRAFT_RUN_SCORING_V3_LINEAR_PROFILE
+    :scoringVersion;
+  return scoredDraftRunPick(puzzle,selectedId,profile);
+}
+
+export function gradeDraftRunPick(puzzle,selectedId) {
   return gradeDraftRunPickForVersion(puzzle,selectedId,DRAFT_RUN_SCORING_VERSION);
 }
 
