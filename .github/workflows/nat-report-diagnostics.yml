@@ -1,0 +1,62 @@
+name: inspect NAT reroll latency
+on:
+  push:
+    branches: ['diagnostics/1051-nat-report']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          name: launch-load-37587381155
+          path: failed-report
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 37587381155
+      - name: Inspect scoped retained reroll timing
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import assert from 'node:assert/strict';
+          import {previewAccount,queryPreviewEvents,previewTelemetryFailure} from './scripts/launch-distributed-telemetry.mjs';
+          const files=fs.readdirSync('failed-report',{recursive:true});
+          const file=files.find(f=>path.basename(f)==='nat-report.json');
+          assert.ok(file);
+          const report=JSON.parse(fs.readFileSync(path.join('failed-report',file),'utf8'));
+          assert.match(report.sha,/^[a-f0-9]{40}$/);
+          console.log(JSON.stringify({rerolls:report.stages.map(s=>({population:s.population,passed:s.passed,
+            requests:s.requests.filter(q=>q.route==='reroll').map(q=>({status:q.status,ms:q.ms}))}))}));
+          const from=Date.parse(report.started_at)-1000,to=Date.parse(report.finished_at)+1000,retained=[];
+          const fetcher=async(...args)=>{
+            const response=await fetch(...args);
+            if(String(args[0]).includes('/telemetry/query')) {
+              const data=await response.clone().json().catch(()=>null);
+              for(const row of data?.result?.events?.events||[]) {
+                let p=row.source;
+                if(typeof p==='string')try{p=JSON.parse(p);}catch{continue;}
+                if(!p||typeof p!=='object')try{p=JSON.parse(row?.$metadata?.message);}catch{continue;}
+                if(p?.event!=='gateway_request'||p.release!==report.sha||p.route!=='draft_reroll')continue;
+                const number=v=>Number.isFinite(v)&&v>=0?v:null;
+                retained.push({status:number(p.status),duration_ms:number(p.duration_ms),quota_ms:number(p.quota_ms),
+                  upstream_ms:number(p.upstream_ms),upstream_calls:number(p.upstream_calls),upstream_status:number(p.upstream_status)});
+              }
+            }
+            return response;
+          };
+          try {
+            const account=await previewAccount({fetcher});
+            await queryPreviewEvents(fetcher,process.env.CLOUDFLARE_EDGE_TOKEN,account,from,to);
+            console.log(JSON.stringify({retained_rerolls:retained}));
+          } catch(error){console.log(JSON.stringify({read_failed:previewTelemetryFailure(error)}));process.exitCode=1;}
+          NODE
