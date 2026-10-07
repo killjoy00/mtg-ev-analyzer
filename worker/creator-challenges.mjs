@@ -1,6 +1,13 @@
 import {buildCampaignTrackingUrl,normalizeAcquisitionValue,normalizeCampaignSlug} from '../campaign-links.mjs';
 import {componentBelongsTo} from './corpus-components.mjs';
-import {DRAFT_RUN_REPLAY_SCORING_VERSIONS,gradeDraftRunPickForVersion,validateDraftRunPuzzle} from '../draft-run.mjs';
+import {
+  DRAFT_RUN_REPLAY_SCORING_VERSIONS,
+  DRAFT_RUN_SCORING_V3_LEGACY_PROFILE,
+  DRAFT_RUN_SCORING_V3_LINEAR_PROFILE,
+  gradeDraftRunPickForVersion,
+  replayScoringProfilesForVersion,
+  validateDraftRunPuzzle,
+} from '../draft-run.mjs';
 import {gameDateKey} from '../game-date.mjs';
 
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
@@ -62,10 +69,32 @@ function decodeSource(row) {
   };
 }
 
+function creatorReplayProfile(source,matchingProfiles) {
+  if(matchingProfiles.length===1)return matchingProfiles[0];
+  if(source.scoring_version!=='trophy-consensus-v3')
+    return matchingProfiles[0]||null;
+  // Colour-stage corpora were built after the direct-ratio v3 implementation
+  // landed. For the older v6 corpus, created_at resolves the rare case where
+  // the source's selected cards happen to score identically under both v3
+  // floating-point paths.
+  if(String(source.corpus_version||'').includes('-colour-stage-')
+      &&matchingProfiles.includes(DRAFT_RUN_SCORING_V3_LINEAR_PROFILE))
+    return DRAFT_RUN_SCORING_V3_LINEAR_PROFILE;
+  const createdAt=Date.parse(source.created_at||'');
+  const linearCutover=Date.parse('2026-09-17T23:29:51Z');
+  if(Number.isFinite(createdAt)&&createdAt>=linearCutover
+      &&matchingProfiles.includes(DRAFT_RUN_SCORING_V3_LINEAR_PROFILE))
+    return DRAFT_RUN_SCORING_V3_LINEAR_PROFILE;
+  if(matchingProfiles.includes(DRAFT_RUN_SCORING_V3_LEGACY_PROFILE))
+    return DRAFT_RUN_SCORING_V3_LEGACY_PROFILE;
+  return matchingProfiles[0]||null;
+}
+
 async function validateHistoricalPuzzles(query,source) {
   if(!Array.isArray(source.puzzle_ids)||source.puzzle_ids.length!==8)fail('Creator source must contain exactly eight decisions.',409,'CREATOR_SOURCE_INELIGIBLE');
   if(!Array.isArray(source.answers)||source.answers.length!==8||source.score==null)fail('Creator source run is not complete.',409,'CREATOR_SOURCE_INELIGIBLE');
-  if(!CREATOR_REPLAY_SCORING_VERSIONS.includes(source.scoring_version))
+  let matchingProfiles=replayScoringProfilesForVersion(source.scoring_version);
+  if(!matchingProfiles.length)
     fail('This source uses a historical scoring version that the current replay engine cannot reproduce.',409,'CREATOR_SOURCE_SCORING_VERSION');
   let scoreTotal=0;
   for(let index=0;index<8;index++) {
@@ -77,13 +106,17 @@ async function validateHistoricalPuzzles(query,source) {
       fail('This source uses historical puzzle data that Pack One can no longer serve safely.',409,'CREATOR_SOURCE_UNAVAILABLE');
     if(!puzzle.candidates.some(card=>card.id===answer.selectedId))
       fail('A creator selection is not part of its authoritative historical pack.',409,'CREATOR_SOURCE_INELIGIBLE');
-    const reproduced=gradeDraftRunPickForVersion(puzzle,answer.selectedId,source.scoring_version).score;
-    if(Number(answer.score)!==Number(reproduced))
+    matchingProfiles=matchingProfiles.filter(profile=>
+      Number(answer.score)===Number(gradeDraftRunPickForVersion(puzzle,answer.selectedId,profile).score));
+    if(!matchingProfiles.length)
       fail('This source cannot be reproduced exactly by the current scoring engine.',409,'CREATOR_SOURCE_SCORING_VERSION');
-    scoreTotal+=Number(reproduced);
+    scoreTotal+=Number(answer.score);
   }
   if(Math.round(scoreTotal/8)!==Number(source.score))
     fail('This source score cannot be reproduced exactly by the current scoring engine.',409,'CREATOR_SOURCE_SCORING_VERSION');
+  const profile=creatorReplayProfile(source,matchingProfiles);
+  if(!profile)fail('This source scoring profile is ambiguous and cannot be replayed safely.',409,'CREATOR_SOURCE_SCORING_VERSION');
+  return profile;
 }
 
 async function sourceSession(query,id,{expectedPlayerId=null,expectedType=null,shareId=null,validatePuzzles=true}={}) {
@@ -108,7 +141,7 @@ async function sourceSession(query,id,{expectedPlayerId=null,expectedType=null,s
     const linked=await query('SELECT 1 FROM draft_run_shares WHERE id=$1 AND session_id=$2::uuid',[shareId,source.id]);
     if(!linked.rows[0])fail('Shared Practice source no longer matches its authoritative run.',409,'CREATOR_SOURCE_MISMATCH');
   }
-  if(validatePuzzles)await validateHistoricalPuzzles(query,source);
+  if(validatePuzzles)source.replay_scoring_version=await validateHistoricalPuzzles(query,source);
   return source;
 }
 
@@ -141,6 +174,7 @@ function sourceSummary(source,{shareId=null}={}) {
     share_id:shareId,
     corpus_version:source.corpus_version,
     scoring_version:source.scoring_version,
+    replay_scoring_version:source.replay_scoring_version||source.scoring_version,
     difficulty_version:source.difficulty_version,
     selection_version:source.selection_version,
     serving_policy_version:source.serving_policy_version,
