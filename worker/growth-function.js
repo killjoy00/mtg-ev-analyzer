@@ -2550,6 +2550,7 @@ export default {
       const response=json({
         error: status===500?'Request failed. Please try again.':error.message,
         ...(error?.code?{code:String(error.code)}:{}),
+        ...(Number(error?.retryAfter)>0?{retryAfter:Math.ceil(Number(error.retryAfter))}:{}),
         ...(error?.deletionCommitted&&error?.deletion?{
           deletionCommitted:true,
           operationId:error.operationId||error.deletion.operation_id||null,
