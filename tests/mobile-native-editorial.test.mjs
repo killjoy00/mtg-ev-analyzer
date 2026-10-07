@@ -51,7 +51,7 @@ function decodeText(value) {
     .replace(/&rsquo;/g, '’')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
-    .replace(/s+/g, ' ')
+    .replace(/\s+/g, ' ')
     .trim();
 }
 
