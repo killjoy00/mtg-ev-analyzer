@@ -63,6 +63,81 @@ test('campaign attribution mutation does not qualify as publication fast path',t
   const changed=f.commit('mutated');assert.throws(()=>validatePublicationDiff({base:published,head:changed,cwd:f.root}),/not attribution mutation/);
 });
 
+
+test('ordinary campaign publication remains valid when creator entries already exist',t=>{
+  const f=fixture();t.after(()=>rmSync(f.root,{recursive:true,force:true}));
+  const creator={id:'22222222-2222-4222-8222-222222222222',slug:'existing-creator',status:'retired'};
+  writeFileSync(path.join(f.root,'creator-challenges.json'),JSON.stringify([creator],null,2)+'\n');
+  mkdirSync(path.join(f.root,'creator/existing-creator'),{recursive:true});
+  writeFileSync(path.join(f.root,'creator/existing-creator/index.html'),'retired creator tombstone');
+  const creatorBase=f.commit('existing creator baseline');
+
+  const entry={slug:'newsletter',destination:'/',source:'news',campaign:'launch'};
+  writeFileSync(path.join(f.root,'campaign-links.json'),JSON.stringify([entry],null,2)+'\n');
+  mkdirSync(path.join(f.root,'go/newsletter'),{recursive:true});
+  writeFileSync(path.join(f.root,'go/newsletter/index.html'),'generated');
+  const published=f.commit('publish ordinary campaign');
+  assert.deepEqual(
+    validatePublicationDiff({base:creatorBase,head:published,cwd:f.root}),
+    {kind:'campaign',slug:'newsletter',action:'publish',paths:['campaign-links.json','go/newsletter/index.html']},
+  );
+});
+
+test('creator retirement deletes only the historical social assets that existed at the base',t=>{
+  const f=fixture();t.after(()=>rmSync(f.root,{recursive:true,force:true}));
+  const published={id:'33333333-3333-4333-8333-333333333333',slug:'legacy',status:'published',creator_name:'Legacy'};
+  writeFileSync(path.join(f.root,'creator-challenges.json'),JSON.stringify([published],null,2)+'\n');
+  mkdirSync(path.join(f.root,'creator/legacy'),{recursive:true});
+  writeFileSync(path.join(f.root,'creator/legacy/index.html'),'published');
+  writeFileSync(path.join(f.root,'creator/legacy/creator-card.png'),'legacy one-card asset');
+  const publishedBase=f.commit('historical one-card creator');
+
+  writeFileSync(path.join(f.root,'creator-challenges.json'),JSON.stringify([{id:published.id,slug:'legacy',status:'retired'}],null,2)+'\n');
+  writeFileSync(path.join(f.root,'creator/legacy/index.html'),'retired');
+  rmSync(path.join(f.root,'creator/legacy/creator-card.png'));
+  const retired=f.commit('retire historical creator');
+  assert.deepEqual(
+    validatePublicationDiff({base:publishedBase,head:retired,cwd:f.root}),
+    {
+      kind:'creator',
+      slug:'legacy',
+      action:'retire',
+      paths:['creator-challenges.json','creator/legacy/creator-card.png','creator/legacy/index.html'],
+    },
+  );
+  assert.equal(existsSync(path.join(f.root,'creator/legacy/creator-card-square.png')),false);
+});
+
+test('partial creator retirement fails closed and a clean retry removes both current assets',t=>{
+  const f=fixture();t.after(()=>rmSync(f.root,{recursive:true,force:true}));
+  const published={id:'44444444-4444-4444-8444-444444444444',slug:'retry',status:'published',creator_name:'Retry'};
+  writeFileSync(path.join(f.root,'creator-challenges.json'),JSON.stringify([published],null,2)+'\n');
+  mkdirSync(path.join(f.root,'creator/retry'),{recursive:true});
+  writeFileSync(path.join(f.root,'creator/retry/index.html'),'published');
+  writeFileSync(path.join(f.root,'creator/retry/creator-card.png'),'og');
+  writeFileSync(path.join(f.root,'creator/retry/creator-card-square.png'),'square');
+  const publishedBase=f.commit('current two-card creator');
+
+  const retire=()=>{
+    writeFileSync(path.join(f.root,'creator-challenges.json'),JSON.stringify([{id:published.id,slug:'retry',status:'retired'}],null,2)+'\n');
+    writeFileSync(path.join(f.root,'creator/retry/index.html'),'retired');
+  };
+  retire();
+  rmSync(path.join(f.root,'creator/retry/creator-card.png'));
+  const partial=f.commit('partial retirement');
+  assert.throws(
+    ()=>validatePublicationDiff({base:publishedBase,head:partial,cwd:f.root}),
+    /must not retain its square social card/,
+  );
+
+  run(f.root,'reset','--hard',publishedBase);
+  retire();
+  rmSync(path.join(f.root,'creator/retry/creator-card.png'));
+  rmSync(path.join(f.root,'creator/retry/creator-card-square.png'));
+  const retried=f.commit('retry retirement from reviewed base');
+  assert.equal(validatePublicationDiff({base:publishedBase,head:retried,cwd:f.root}).action,'retire');
+});
+
 function publicationMergeFixture(t){
   const f=fixture();t.after(()=>rmSync(f.root,{recursive:true,force:true}));
   run(f.root,'checkout','-qb','publication');
