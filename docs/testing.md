@@ -74,7 +74,17 @@ and deletes only matching DNS records. Ambiguous writes are reconciled by
 reading provider state. Sanitized ownership receipts are uploaded from
 `artifacts/ci-resources/`; branch expiry remains a backstop. An ownership
 mismatch fails cleanup rather than removing another run's resources. Existing
-capacity and latency budgets remain unchanged.
+latency, correctness, telemetry, resource and cleanup budgets remain unchanged.
+
+PR capacity acceptance now requalifies 25 players on five independent egress
+networks, including the complete 120-second hold, drain and recovery. The
+50-player stage is optional: manually dispatch `launch-distributed.yml` with
+`capacity_target=50` to run the original 25→50 ladder and 600-second hold.
+Ordinary PRs and dispatches default to 25. Every job uses the same selected
+policy; its fingerprint binds fixtures and reports, and the collector still
+requires all five cohorts to complete and every selected stage to pass.
+Skipping 50 does not establish current 50-player capacity. A policy change
+requires a fresh run; earlier failed runs remain failed.
 
 Mobile jobs can reuse a successful shared-validation receipt for identical
 repository inputs and runner OS. Every job still validates its current build

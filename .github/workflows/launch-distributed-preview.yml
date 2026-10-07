@@ -5,6 +5,11 @@ on:
       require_performance:
         type: string
         required: true
+      capacity_target:
+        type: string
+        default: '25'
+env:
+  PACK1_CAPACITY_TARGET: ${{ inputs.capacity_target }}
 permissions:
   contents: read
   checks: read
@@ -26,6 +31,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Validate and declare capacity target before provisioning
+        run: |
+          node --input-type=module -e "import {policy} from './scripts/launch-distributed-control.mjs'; console.log(JSON.stringify({capacity_target:policy.proposed_target,stages:policy.stages}));"
+          echo "Required capacity target: $PACK1_CAPACITY_TARGET players. Only completed, independently verified stages can pass." >> "$GITHUB_STEP_SUMMARY"
       - name: Recheck unchanged source after waiting for exclusive preview access
         if: github.event_name == 'pull_request'
         env:
@@ -150,7 +159,7 @@ jobs:
           name: isolated-encrypted-fixtures-${{ github.run_attempt }}
           path: artifacts/load-private
       - run: node scripts/launch-distributed-bundle.mjs unpack
-      - name: Persistent real-egress cohort, live barriers, gated 25/50 holds
+      - name: Persistent real-egress cohort and selected capacity hold
         run: node scripts/launch-distributed-run.mjs
       - uses: actions/upload-artifact@v4
         if: always()

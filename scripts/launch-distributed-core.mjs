@@ -11,10 +11,11 @@ export const quantiles=values=>{
 };
 export function validatePolicy(p) {
   assert.equal(p.version,3);assert.equal(p.generators,5);
-  assert.deepEqual(p.stages.map(s=>s.players),[25,50]);
-  assert.equal(p.supported_launch_target,50);assert.equal(p.proposed_target,p.stages.at(-1).players);
+  assert.ok([25,50].includes(p.proposed_target),'capacity_target');
+  assert.deepEqual(p.stages.map(s=>s.players),p.proposed_target===25?[25]:[25,50]);
+  assert.equal(p.supported_launch_target,p.proposed_target);
   assert.ok(p.stages.every(s=>s.hold_seconds>=120&&s.players%p.generators===0));
-  assert.ok(p.stages.at(-1).hold_seconds>=600&&p.recovery_seconds>=60);
+  assert.ok((p.proposed_target===25||p.stages.at(-1).hold_seconds>=600)&&p.recovery_seconds>=60);
   assert.ok(p.initial_seconds>=90&&p.drain_seconds>=60&&p.recovery_players===5);
   for(const k of ['ramp_seconds','heartbeat_seconds','lease_seconds','cohort_timeout_seconds','arm_seconds','ack_margin_seconds','maximum_start_lateness_ms','maximum_arrival_lateness_ms','telemetry_bin_seconds','telemetry_settlement_seconds','telemetry_timeout_seconds','telemetry_preflight_requests','maximum_experiment_minutes','maximum_branch_lifetime_minutes','maximum_compute_cu','maximum_requests','maximum_response_bytes','maximum_project_reported_egress_delta_bytes'])assert.ok(Number.isSafeInteger(p[k])&&p[k]>0,k);
   assert.ok(p.lease_seconds>=3*p.heartbeat_seconds&&p.arm_seconds>p.ack_margin_seconds+p.lease_seconds);
@@ -25,6 +26,16 @@ export function validatePolicy(p) {
   assert.deepEqual(Object.keys(p.route_budgets_ms).sort(),['pick','read','reroll','session','start','view']);
   for(const [route,b] of Object.entries(p.route_budgets_ms))assert.ok(b.p95>0&&b.p99>=b.p95&&p.minimum_route_samples[route]>0);
   return p;
+}
+// Ordinary PRs requalify the supported 25-player level. The longer 50-player
+// experiment requires an explicit selection and keeps its original gates.
+export function selectCapacityPolicy(p,target='25') {
+  validatePolicy(p);
+  assert.ok(target==='25'||target==='50','capacity_target_must_be_25_or_50');
+  const selected=structuredClone(p),players=Number(target);
+  selected.stages=selected.stages.filter(s=>s.players<=players);
+  selected.supported_launch_target=players;selected.proposed_target=players;
+  return validatePolicy(selected);
 }
 export function initialControl(scope,now,p) {
   validatePolicy(p);

@@ -5,8 +5,8 @@ import assert from 'node:assert/strict';
 import {pathToFileURL} from 'node:url';
 import {verifyTarget} from './practice-performance.mjs';
 import {PROJECT,projectSnapshot,compareSnapshots} from './neon-egress-evidence.mjs';
-import {fingerprint,initialControl,transition,validatePolicy} from './launch-distributed-core.mjs';
-export const policy=validatePolicy(JSON.parse(fs.readFileSync(new URL('./launch-distributed-policy.json',import.meta.url),'utf8')));
+import {fingerprint,initialControl,transition,selectCapacityPolicy} from './launch-distributed-core.mjs';
+export const policy=selectCapacityPolicy(JSON.parse(fs.readFileSync(new URL('./launch-distributed-policy.json',import.meta.url),'utf8')),process.env.PACK1_CAPACITY_TARGET??'25');
 const api='https://console.neon.tech/api/v2/projects/'+PROJECT;
 export async function metadata(suffix='',{key=process.env.NEON_API_KEY,fetcher=fetch}={}) {
   assert.ok(key,'missing_metadata_credential');

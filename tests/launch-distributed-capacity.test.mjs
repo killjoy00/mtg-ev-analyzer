@@ -2,13 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
-import {fingerprint,initialControl,transition,evaluateStage,timing,permittedRequest,quantiles,validatePolicy,stageFailureEvidence} from '../scripts/launch-distributed-core.mjs';
-import {policy,heartbeat,coordinatorSQL} from '../scripts/launch-distributed-control.mjs';
+import {fingerprint,initialControl,transition,evaluateStage,timing,permittedRequest,quantiles,validatePolicy,selectCapacityPolicy,stageFailureEvidence} from '../scripts/launch-distributed-core.mjs';
+import {heartbeat,coordinatorSQL} from '../scripts/launch-distributed-control.mjs';
 import {inspectBin,inspectPreviewTelemetry,settlePreviewTelemetry,previewTelemetryFailure,queryPreviewEvents} from '../scripts/launch-distributed-telemetry.mjs';
 import {parseStartDiagnostics,requestClient} from '../scripts/launch-distributed-player.mjs';
 import {transportFailureEvidence,undiciTransportObserver} from '../scripts/launch-distributed-transport.mjs';
 import {inspectPreflightEvents,preflightTelemetry} from '../scripts/launch-distributed-setup.mjs';
 import {waitForPreviewReadiness} from '../scripts/edge-control.mjs';
+const policy=selectCapacityPolicy(JSON.parse(fs.readFileSync(new URL('../scripts/launch-distributed-policy.json',import.meta.url),'utf8')),'50');
 const start=1_000_000,scope={sha:'a'.repeat(40),branch:'br-capacity-fixture',run_id:'123',attempt:'2',policy_hash:fingerprint(policy)};
 const msg=(shard,extra={})=>({scope,shard,nonce:`00000000-0000-4000-8000-${String(shard).padStart(12,'0')}`,network:String(shard+1).repeat(64),ready:0,ack:null,done:null,...extra});
 const formed=()=>{let s=initialControl(scope,start,policy);for(let i=0;i<5;i++)s=transition(s,msg(i),start+100,policy);return s;};
@@ -32,6 +33,37 @@ test('committed policy is bounded and cannot silently claim 100 or launch 500 pl
  for(const patch of [{supported_launch_target:25},{supported_launch_target:100},{generators:20},{maximum_compute_cu:9},{maximum_error_fraction:.01},{maximum_branch_lifetime_minutes:120},{telemetry_preflight_requests:101}])assert.throws(()=>validatePolicy({...policy,...patch}));
  assert.throws(()=>validatePolicy({...policy,stages:[...policy.stages,{players:500,hold_seconds:600}]}));
  assert.throws(()=>initialControl({...scope,branch:'br-orange-feather-ayps8kep'},start,policy));
+});
+test('default capacity stops at 25 and preserves every acceptance budget',()=>{
+ const required=selectCapacityPolicy(policy);
+ assert.deepEqual(required.stages,[{players:25,hold_seconds:120}]);
+ assert.equal(required.supported_launch_target,25);assert.equal(required.proposed_target,25);
+ const {stages,supported_launch_target,proposed_target,...budgets}=required;
+ const {stages:extendedStages,supported_launch_target:extendedSupported,proposed_target:extendedTarget,...extendedBudgets}=policy;
+ assert.deepEqual(budgets,extendedBudgets);assert.notEqual(fingerprint(required),fingerprint(policy));
+ assert.deepEqual(selectCapacityPolicy(policy,'50'),policy);
+ for(const target of ['', '100', 'skip', 25, null])assert.throws(()=>selectCapacityPolicy(policy,target));
+ assert.throws(()=>selectCapacityPolicy(required,'50'),'a missing 50-player stage cannot be promoted');
+});
+test('25-player profile completes only after positive application, telemetry and usage gates',()=>{
+ const required=selectCapacityPolicy(policy);
+ let s=initialControl(scope,start,required);
+ for(let i=0;i<5;i++)s=transition(s,msg(i),start+100,required);
+ for(let i=0;i<5;i++)s=transition(s,msg(i,{ack:0}),start+200,required);
+ for(let i=0;i<5;i++)s=transition(s,msg(i,{ack:0,done:0}),start+300,required);
+ assert.equal(s.phase,'checking');
+ const decision={stage:0,passed:true,telemetry_passed:true,usage_passed:true};
+ for(const patch of [{passed:false},{telemetry_passed:false},{usage_passed:false}])assert.equal(transition(s,msg(0,{done:0,decision:{...decision,...patch}}),start+400,required).phase,'aborted');
+ const complete=transition(s,msg(0,{done:0,decision}),start+400,required);
+ assert.equal(complete.phase,'complete');assert.equal(complete.stage,1);assert.equal(complete.history.length,1);
+});
+test('manual 50-player selection is shared by setup, generators and collection',()=>{
+ const parent=fs.readFileSync(new URL('../.github/workflows/launch-distributed.yml',import.meta.url),'utf8');
+ const child=fs.readFileSync(new URL('../.github/workflows/launch-distributed-preview.yml',import.meta.url),'utf8');
+ assert.match(parent,/options: \['25', '50'\]/);
+ assert.match(parent,/capacity_target: \$\{\{ inputs\.capacity_target \|\| '25' \}\}/);
+ assert.match(child,/env:\n  PACK1_CAPACITY_TARGET: \$\{\{ inputs\.capacity_target \}\}/);
+ assert.ok(child.indexOf('Validate and declare capacity target')<child.indexOf('Create disposable production-sized branch'));
 });
 test('a late fifth runner cannot miss a pre-scheduled start: no start exists until all are ready',()=>{
  let s=initialControl(scope,start,policy);
