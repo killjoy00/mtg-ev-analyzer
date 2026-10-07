@@ -20,7 +20,8 @@ try {
  SELECT id,player,id::text,$2,$3,$4::jsonb,'[]'::jsonb,'mixed','support-ratio-v1',$5 FROM data RETURNING id)
  INSERT INTO draft_run_decision_observations(session_id,revision,round,puzzle_id,observed,outcome,answered_at,selected_id,score,trophy_match,active_ms)
  SELECT d.id,0,1,$6,true,'pick',now(),d.selected,d.score,d.match,d.ms FROM data d JOIN sessions_added s ON s.id=d.id`,[JSON.stringify(data),DRAFT_RUN_CORPUS_VERSION,source.scoring_version,source.puzzle_ids,version,puzzleIds[0]]);
- const today=new Date().toISOString().slice(0,10),funnelUrl='https://packone.pro/v1/admin/measurements?from='+today+'&to='+today+'&environment=mixed';
+ const today=(await query("SELECT (now() AT TIME ZONE 'America/Los_Angeles')::date::text AS day")).rows[0].day,
+   funnelUrl='https://packone.pro/v1/admin/measurements?from='+today+'&to='+today+'&environment=mixed';
  const beforeFunnel=(await handleAdmin(new Request(funnelUrl,{headers:{'x-pack1-auth-session':token}}),query,readJson)).share_funnel;
  await query(`INSERT INTO analytics_events(player_id,event_name,event_props) VALUES
    ($1::uuid,'daily_share_arrival',jsonb_build_object('source','result_share','daily',true,'session_id','math-share')),
@@ -41,7 +42,7 @@ try {
  // Launch habit metrics: authoritative Daily sessions, shared exclusions, person
  // collapsing, first-touch attribution, Pacific day bucketing and maturity.
  const isoDay=(value,offset=0)=>{const d=new Date(value+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+offset);return d.toISOString().slice(0,10);};
- const pacificToday=(await query("SELECT (now() AT TIME ZONE 'America/Los_Angeles')::date::text AS day")).rows[0].day;
+ const pacificToday=today;
  const firstDay=isoDay(pacificToday,-20),nextDay=isoDay(firstDay,1),sixthDay=isoDay(firstDay,6),crossDay=isoDay(pacificToday,-1);
  let trackingStart=(await query("SELECT min(created_at) started_at FROM analytics_events WHERE event_name='acquisition_touch'")).rows[0].started_at;
  const addPlayer=async(name,{linked=false,admin=false}={})=>{
