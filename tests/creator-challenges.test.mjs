@@ -645,6 +645,9 @@ test('creator funnel migration installs a rollout-safe database invariant',async
   const finish=runtime.indexOf('return json(publicCreatorChallenge(challenge));',start);
   assert.ok(start>0&&finish>start);
   assert.match(runtime.slice(start,finish),/ON CONFLICT DO NOTHING/);
+  const secureRelease=await readFile('.github/workflows/secure-auth-release.yml','utf8');
+  assert.match(secureRelease,/pack1_creator_event_update_dedupe/);
+  assert.match(secureRelease,/Skipping 0046 replay because creator-event merge hardening is already installed/);
 });
 
 test('creator admin list bounds the page before running correlated stats',async()=>{
@@ -658,4 +661,6 @@ test('creator admin list bounds the page before running correlated stats',async(
   assert.match(list,/creatorChallengeSelect\(\{includeStats:true,paged:true\}\)/);
   assert.match(list,/return result\.rows\.map\(challengeRow\)/);
   assert.doesNotMatch(list,/creatorChallengeById/);
+  assert.match(source,/e\.event_props \? 'creator_challenge_id'/,
+    'funnel lookup must carry the partial-index predicate explicitly');
 });
