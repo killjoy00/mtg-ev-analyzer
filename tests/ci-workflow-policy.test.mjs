@@ -37,6 +37,17 @@ test('generic test gate no longer blocks unrelated PRs on release-secret provisi
   assert.match(secureAuth,/APPLE_TOKEN_ENCRYPTION_KEY_V1/);
 });
 
+test('scoped presentation validation preserves native editorial parity for canonical web and legal inputs', () => {
+  const presentationCase=unit.split('            presentation)')[1]?.split('            ci)')[0]||'';
+  assert.match(presentationCase,/tests\/editorial\.test\.mjs/);
+  assert.match(presentationCase,/tests\/mobile-native-editorial\.test\.mjs/);
+  for(const path of ['about/index.html','contact/index.html','privacy/index.html','terms/index.html']) {
+    const selection=classifyChanges([path]);
+    assert.equal(selection.plan,'presentation',path);
+    assert.equal(selection.unit,'presentation',path);
+  }
+});
+
 test('scoped account browser validation installs WebKit for dual-engine contracts', () => {
   assert.match(browser,/BROWSER_GROUPS/);
   assert.match(browser,/\*,account,\*/);
