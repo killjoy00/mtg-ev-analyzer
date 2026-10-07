@@ -124,6 +124,7 @@ test('verification resend rate limit blocks provider delivery and exposes cooldo
   const body=await response.json();
   assert.equal(response.status,429);
   assert.equal(body.code,'VERIFICATION_COOLDOWN');
+  assert.ok(Number(body.retryAfter)>=1);
   assert.ok(Number(response.headers.get('retry-after'))>=1);
   assert.equal(calls.some(x=>x.kind==='provider'),false);
 });
@@ -134,6 +135,7 @@ test('verification resend preserves provider cooldown instead of reporting a fal
   const body=await response.json();
   assert.equal(response.status,429);
   assert.equal(body.code,'VERIFICATION_COOLDOWN');
+  assert.equal(body.retryAfter,90);
   assert.equal(response.headers.get('retry-after'),'90');
   assert.ok(calls.some(x=>x.kind==='provider'&&x.url.endsWith('/send-verification-email')));
 });
