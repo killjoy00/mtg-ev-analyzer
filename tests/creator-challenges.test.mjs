@@ -620,19 +620,19 @@ test('creator privacy cleanup scrubs retained challenger labels and creator auth
 });
 
 
-test('creator funnel events have database-backed concurrency idempotency',async()=>{
+test('creator funnel migration installs a merge-safe database invariant',async()=>{
   const migration=await readFile('migrations/0054_creator_event_idempotency.sql','utf8');
-  assert.match(migration,/row_number\(\) OVER/);
+  assert.match(migration,/LOCK TABLE analytics_events IN SHARE ROW EXCLUSIVE MODE/);
   assert.match(migration,/CREATE UNIQUE INDEX IF NOT EXISTS analytics_creator_challenge_event_uq/);
-  assert.match(migration,/event_name IN \('creator_challenge_open','acquisition_touch'\)/);
-  assert.match(migration,/event_props \? 'creator_challenge_id'/);
+  assert.match(migration,/pack1_creator_event_insert_guard/);
+  assert.match(migration,/creator_funnel_ranked/);
+  assert.match(migration,/ORDER BY created_at,id/);
   const runtime=await readFile('worker/draft-run-function.mjs','utf8');
   const start=runtime.indexOf("('creator_challenge_open',$2::jsonb)");
-  const end=runtime.indexOf('return json(publicCreatorChallenge(challenge));',start);
-  assert.ok(start>0&&end>start);
-  assert.match(runtime.slice(start,end),/ON CONFLICT DO NOTHING/);
+  const finish=runtime.indexOf('return json(publicCreatorChallenge(challenge));',start);
+  assert.ok(start>0&&finish>start);
+  assert.match(runtime.slice(start,finish),/ON CONFLICT DO NOTHING/);
 });
-
 
 test('creator admin list batches stats instead of issuing one detail query per challenge',async()=>{
   const source=await readFile('worker/creator-challenges.mjs','utf8');
