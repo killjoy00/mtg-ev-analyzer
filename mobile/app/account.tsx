@@ -445,7 +445,7 @@ export default function AccountScreen() {
               ) : null}
               <View style={styles.termsBox}>
                 <Text style={styles.fieldHelp}>Display names and public profiles follow the Pack One Public Identity rules.</Text>
-                <Pressable accessibilityRole="link" onPress={() => void WebBrowser.openBrowserAsync('https://packone.pro/terms/#public-identity-rules')}>
+                <Pressable accessibilityRole="link" onPress={() => router.push('/terms')}>
                   <Text style={styles.linkText}>Public Identity rules</Text>
                 </Pressable>
               </View>
@@ -550,7 +550,7 @@ export default function AccountScreen() {
               {mode === 'signup' ? (
                 <View style={styles.termsBox}>
                   <Text style={styles.fieldHelp}>By creating an account, you agree to the Pack One Terms.</Text>
-                  <Pressable accessibilityRole="link" onPress={() => void WebBrowser.openBrowserAsync('https://packone.pro/terms/')}>
+                  <Pressable accessibilityRole="link" onPress={() => router.push('/terms')}>
                     <Text style={styles.linkText}>Pack One Terms</Text>
                   </Pressable>
                 </View>
