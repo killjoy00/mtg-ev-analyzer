@@ -35,7 +35,9 @@ globalThis.fetch=async(url,options={})=>{
 };
 async function request(path,body,status=200) {
   const response=await fetch('https://api-preview.packone.pro/draft'+path,{method:body===undefined?'GET':'POST',headers:{'content-type':'application/json'},body:body===undefined?undefined:JSON.stringify(body)});
-  const result=await response.json();assert.equal(response.status,status,`${path}: ${JSON.stringify(result)}`);return result;
+  const result=await response.json();
+  if(Array.isArray(status)){assert.ok(status.includes(response.status),`${path}: ${response.status} ${JSON.stringify(result)}`);return {status:response.status,body:result};}
+  assert.equal(response.status,status,`${path}: ${JSON.stringify(result)}`);return result;
 }
 try {
   const client=await import('../growth-api.mjs');
@@ -52,8 +54,14 @@ try {
     for(let round=0;round<8;round++) {
       const body={revision:run.revision,round,puzzleId:run.current.puzzle_id,cardId:run.current.candidates[0].id};
       const other=run.current.candidates[1].id;
-      const [first,retry]=await Promise.all([request(`/v1/runs/${run.id}/pick`,body),request(`/v1/runs/${run.id}/pick`,body)]);
-      assert.equal(first.revision,retry.revision,'Concurrent retry must converge');run=first;
+      // The API uses optimistic concurrency: an overlapping write may return
+      // 409, while retrying an already persisted identical pick is idempotent.
+      const outcomes=await Promise.all([request(`/v1/runs/${run.id}/pick`,body,[200,409]),request(`/v1/runs/${run.id}/pick`,body,[200,409])]);
+      const accepted=outcomes.filter(result=>result.status===200);assert.ok(accepted.length>=1);
+      assert.equal(accepted[0].body.revision,body.revision+1,'Exactly one revision must be persisted');
+      for(const result of accepted)assert.equal(result.body.revision,accepted[0].body.revision);
+      run=await request(`/v1/runs/${run.id}`);assert.equal(run.revision,accepted[0].body.revision);
+      assert.equal((await request(`/v1/runs/${run.id}/pick`,body)).revision,run.revision,'An identical persisted pick must be retryable');
       await request(`/v1/runs/${run.id}/pick`,{...body,cardId:other},409);
     }
     assert.equal(run.complete,true);assert.equal(run.answers.length,8);assert.ok(Number.isFinite(run.score));
