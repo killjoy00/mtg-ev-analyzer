@@ -1,4 +1,4 @@
-name: profile recorded slow reroll query
+name: profile cold reroll visibility cost
 on:
   push:
     branches: ['diagnostics/1051-nat-report']
@@ -7,7 +7,7 @@ permissions:
 jobs:
   profile:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -35,10 +35,11 @@ jobs:
             sudo apt-get install -y postgresql-client
           fi
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0056_snapshot_aware_reroll_covering_index.sql
-      - name: Measure production SQL with default planner settings
+      - name: Measure cold SQL before and after owned-clone maintenance
         env:
           DATABASE_URL: ${{ steps.neon.outputs.db_url }}
           PROFILE_BRANCH: ${{ steps.neon.outputs.branch_id }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
         run: node scripts/diagnostics-reroll-plan.mjs
       - name: Delete owned profiling clone
         if: always() && steps.neon.outputs.branch_id != ''
