@@ -9,7 +9,7 @@ const databaseUrl=fs.readFileSync(connectionFile,'utf8').trim();
 if(!databaseUrl)throw Error('Missing isolated database connection.');
 
 function runPsql({sql=null,file=null}={}) {
-  const args=[databaseUrl,'-X','-v','ON_ERROR_STOP=1'];
+  const args=[databaseUrl,'-X','-qAt','-v','ON_ERROR_STOP=1'];
   if(file)args.push('-f',file);
   else args.push('-c',sql);
   const result=spawnSync('psql',args,{encoding:'utf8'});
