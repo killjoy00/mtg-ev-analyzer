@@ -80,7 +80,7 @@ class CreatorSocialCardTests(unittest.TestCase):
                 BLUE,
             ),
         )
-        fixture_dir = os.environ.get("PACK1_CREATOR_FIXTURE_DIR")
+        fixture_dir = os.environ.get("PACK1_CREATOR_FIXTURE_DIR") or (str(ROOT / "artifacts/tests/creator-fixtures") if os.environ.get("GITHUB_ACTIONS") == "true" else None)
         temp = None
         if fixture_dir:
             root = Path(fixture_dir)
