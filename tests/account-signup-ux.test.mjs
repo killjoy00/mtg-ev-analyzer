@@ -73,7 +73,7 @@ test('create-account provider labels and consent are mode-specific across web an
   assert.match(mobileScreen,/mode === 'signup' \? 'Create with Google' : 'Sign in with Google'/);
   assert.match(mobileScreen,/mode === 'signup' \? 'Create with Apple' : 'Sign in with Apple'/);
   assert.match(mobileScreen,/By creating an account, you agree to the Pack One Terms\./);
-  assert.match(mobileScreen,/https:\/\/packone\.pro\/terms\//);
+  assert.match(mobileScreen,/router\.push\('\/terms'\)/);
   assert.doesNotMatch(mobileScreen,/By continuing, you agree to the Pack One Terms/);
 });
 
