@@ -27,6 +27,13 @@ export default function NativeAcceptanceScreen() {
       else if (screen === 'practice') router.dismissTo('/practice');
       else if (screen === 'learn') router.dismissTo('/learn');
       else if (screen === 'career') router.dismissTo('/career');
+      else if (screen === 'leaders') router.dismissTo('/leaderboard');
+      else if (screen === 'account') router.replace('/account');
+      else if (screen === 'how-to') router.replace('/how-to');
+      else if (screen === 'about') router.replace('/about');
+      else if (screen === 'support') router.replace('/support');
+      else if (screen === 'privacy') router.replace('/privacy');
+      else if (screen === 'terms') router.replace('/terms');
       else router.dismissTo('/');
     })();
     return () => { active = false; };
