@@ -219,16 +219,20 @@ try {
   for(const card of firstPayload.candidates.slice(4))card.model_probability=.001;
   firstPayload.historical_pick_id=historical.id;
   const syntheticPuzzleId=crypto.randomUUID().replaceAll('-','');
+  const syntheticSourceHash=crypto.randomUUID().replaceAll('-','');
   firstPayload.puzzle_id=syntheticPuzzleId;
+  firstPayload.source_draft_hash=syntheticSourceHash;
   assert.equal(gradeDraftRunPickForVersion(firstPayload,selected.id,DRAFT_RUN_SCORING_V3_LEGACY_PROFILE).score,13);
   assert.equal(gradeDraftRunPickForVersion(firstPayload,selected.id,DRAFT_RUN_SCORING_V3_LINEAR_PROFILE).score,14);
   await query(`INSERT INTO draft_run_verified_puzzles
     SELECT (jsonb_populate_record(NULL::draft_run_verified_puzzles,
-      to_jsonb(source)||jsonb_build_object('puzzle_id',$2::text,'payload',$3::jsonb)
+      to_jsonb(source)||jsonb_build_object(
+        'puzzle_id',$2::text,'source_draft_hash',$3::text,'payload',$4::jsonb
+      )
     )).*
     FROM draft_run_verified_puzzles source
     WHERE source.puzzle_id=$1`,[
-    templatePuzzleIds[0],syntheticPuzzleId,JSON.stringify(firstPayload),
+    templatePuzzleIds[0],syntheticPuzzleId,syntheticSourceHash,JSON.stringify(firstPayload),
   ]);
 
   const legacySourceId=crypto.randomUUID();
