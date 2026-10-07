@@ -1,6 +1,6 @@
 {
   "operation": "promote-android-closed",
-  "reason": "Promote the exact existing Pack One 1.0 Google Play AAB version code 100623 from successful Internal upload run 37496158470 to the existing production-access Closed Testing track without rebuilding. Preserve the existing track, testers, countries, and qualification continuity. Treat any draft/requiresConsoleRollout result as incomplete delivery rather than success. Do not create a new track, alter tester/country configuration, release to Production, or publish publicly; Issue #575 physical-device/provider/owner/tester-duration/App Review/public-store gates remain open.",
-  "version_code": "100623",
+  "reason": "Owner-authorized promotion of the exact Pack One Android candidate accepted by Google Play Internal Testing in run 37681388402. Promote existing version code 100698 unchanged to the existing production-access Closed Testing track without rebuilding. Preserve the existing track, testers, groups, countries, and qualification continuity. Treat any draft/requiresConsoleRollout result as incomplete delivery rather than success. Do not create a new track, alter tester/group/country configuration, release to Production, or publish publicly.",
+  "version_code": "100698",
   "track": "production-access"
 }
