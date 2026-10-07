@@ -1,158 +1,47 @@
-name: NAT reroll phase diagnostic
+name: profile recorded slow reroll query
 on:
   push:
     branches: ['diagnostics/1051-nat-report']
 permissions:
   contents: read
-concurrency:
-  group: pack1-gateway-preview
-  cancel-in-progress: false
-  queue: max
 jobs:
-  nat:
-    if: github.ref_name == 'diagnostics/1051-nat-report'
+  profile:
     runs-on: ubuntu-latest
-    timeout-minutes: 50
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Require the same open review head before diagnostic provisioning
-        env:
-          REVIEWED_BRANCH: fix/1049-post-merge-hardening
-          REVIEWED_SOURCE_SHA: c080aae332c80a85d01ec5188d86f4468f254668
-        run: |
-          set -euo pipefail
-          current_head="$(timeout 30s git ls-remote --exit-code origin "refs/heads/$REVIEWED_BRANCH" | awk 'NR==1 { print $1 }')"
-          test "$current_head" = "$REVIEWED_SOURCE_SHA" || {
-            echo '::error::Queued NAT source is stale; no preview resources were provisioned.'
-            exit 1
-          }
-      - name: Verify scoped Cloudflare access
-        env:
-          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
-        run: node scripts/edge-control.mjs preflight
-      - name: Set emergency expiry
+      - name: Bound disposable branch expiry
         id: expiry
-        run: echo "expires_at=$(date -u --date '+2 hours' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
-      - name: Create disposable production-sized branch
+        run: echo "expires_at=$(date -u --date '+45 minutes' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+      - name: Create disposable profiling clone
         id: neon
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          CI_BRANCH_PREFIX: launch-load-${{ github.run_id }}-${{ github.run_attempt }}
+          CI_BRANCH_PREFIX: ci-pr-1051-${{ github.run_id }}-${{ github.run_attempt }}-reroll_profile
           CI_BRANCH_PARENT: br-orange-feather-ayps8kep
           CI_BRANCH_EXPIRES: ${{ steps.expiry.outputs.expires_at }}
           CI_BRANCH_SUSPEND: 300
         run: node scripts/create-ci-neon-branch.mjs
-      - name: Install pinned deployment tools
-        run: node .github/scripts/install-wrangler-tool.mjs "$RUNNER_TEMP/edge-tools" neon@4.17.4 esbuild@0.28.2
-      - name: Install pinned browser driver
-        run: npm install --no-save --no-audit --no-fund playwright@1.63.0
-      - name: Prepare isolated schema and exact revision
+      - name: Install reviewed reroll index on the disposable clone
         env:
           DATABASE_URL: ${{ steps.neon.outputs.db_url }}
-          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
-          PREVIEW_CREATED: ${{ steps.neon.outputs.created }}
-          ESBUILD_BIN: ${{ runner.temp }}/edge-tools/node_modules/.bin/esbuild
         run: |
-          node --input-type=module -e "import {checkBranch} from './scripts/edge-control.mjs';checkBranch(process.env.PREVIEW_BRANCH);if(process.env.PREVIEW_CREATED!=='true')throw Error('Fresh isolated branch required');"
+          set -euo pipefail
           if ! command -v psql >/dev/null 2>&1; then
             sudo apt-get update
             sudo apt-get install -y postgresql-client
           fi
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0037_mobile_oauth_handoffs.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0038_mobile_practice_idempotency.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0039_practice_serving_cache.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0040_mobile_minimum_version.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0040_practice_reroll_index.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0041_corpus_source_snapshots.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0041_apple_auth.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0042_serving_revision_snapshot_staging.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0043_corpus_activation_readiness.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0044_snapshot_scoped_puzzle_uniqueness.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0046_public_identity_safety.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0047_admin_user_account_controls.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0048_uncapped_v5_components.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0049_cross_version_corpus_cutover.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0050_practice_recency_bias.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0051_exact_pick_draw_index.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0052_decision_reports.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0053_creator_challenges.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0054_creator_event_idempotency.sql
-          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0055_creator_event_write_safety.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0056_snapshot_aware_reroll_covering_index.sql
-          node scripts/verify-neon-schema.mjs
-          PACK1_RELEASE_COMMIT="$GITHUB_SHA" node scripts/warm-practice-cache.mjs
-          node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$GITHUB_SHA"
-      - name: Prepare accounts, entitlements, score history and query plans
+      - name: Measure production SQL with default planner settings
         env:
           DATABASE_URL: ${{ steps.neon.outputs.db_url }}
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
-          PREVIEW_CREATED: ${{ steps.neon.outputs.created }}
-          LOAD_FIXTURE_FILE: ${{ runner.temp }}/launch-load-fixtures.json
-        run: node scripts/launch-load-fixtures.mjs
-      - name: Deploy isolated Functions and private gateway
-        id: deploy
-        env:
-          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
-          PREVIEW_CREATED: ${{ steps.neon.outputs.created }}
-          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
-        run: node scripts/edge-control.mjs deploy
-      - name: Verify browser interception before idle measurements
-        env:
-          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
-          LOAD_FIXTURE_FILE: ${{ runner.temp }}/launch-load-fixtures.json
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          PACK1_BROWSER_SMOKE: '1'
-        run: node scripts/launch-practice-browser.mjs
-      - name: Measure confirmed-idle and warm practice in the browser
-        id: browser
-        continue-on-error: true
-        env:
-          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
-          LOAD_FIXTURE_FILE: ${{ runner.temp }}/launch-load-fixtures.json
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-        run: node scripts/launch-practice-browser.mjs
-      - name: Allow the browser request window to expire before NAT measurement
-        run: node --input-type=module -e "await new Promise(r=>setTimeout(r,65000))"
-      - name: Record bounded anonymous reroll phase timing in the diagnostic harness
-        run: |
-          node --input-type=module <<'NODE'
-          import fs from 'node:fs';
-          import assert from 'node:assert/strict';
-          const file='scripts/launch-load.mjs';let source=fs.readFileSync(file,'utf8');
-          assert.ok(source.includes("record.status=r.status;"));
-          assert.ok(source.includes("} finally {record.ms=Math.round((performance.now()-started)*100)/100;}"));
-          source="import {parseStartDiagnostics} from './launch-distributed-player.mjs';\n"+source;
-          source=source.replace("record.status=r.status;","record.status=r.status;if(route==='reroll')record.diagnostics=parseStartDiagnostics(r.headers,route);");
-          source=source.replace("} finally {record.ms=Math.round((performance.now()-started)*100)/100;}","} finally {record.ms=Math.round((performance.now()-started)*100)/100;if(route==='reroll')console.log(JSON.stringify({event:'nat_reroll_phase',status:record.status,ms:record.ms,diagnostics:record.diagnostics}));}");
-          fs.writeFileSync(file,source);
-          NODE
-      - name: Run declared shared-network stages until the first failed gate
-        env:
-          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
-          LOAD_FIXTURE_FILE: ${{ runner.temp }}/launch-load-fixtures.json
-        run: node scripts/launch-load.mjs
-      - name: Enforce the independent browser gate
-        if: steps.browser.outcome == 'failure'
-        run: exit 1
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: launch-load-${{ github.run_id }}
-          path: artifacts/launch-load
-          retention-days: 30
-      - name: Remove this private preview route
-        if: always() && (steps.deploy.outcome == 'success' || steps.deploy.outcome == 'failure')
-        env:
-          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
-        run: node scripts/edge-control.mjs disable
-      - name: Delete the disposable branch
-        if: always() && steps.neon.outputs.created == 'true'
+          PROFILE_BRANCH: ${{ steps.neon.outputs.branch_id }}
+        run: node scripts/diagnostics-reroll-plan.mjs
+      - name: Delete owned profiling clone
+        if: always() && steps.neon.outputs.branch_id != ''
         uses: neondatabase/delete-branch-action@v3
         with:
           project_id: patient-shadow-91417882
