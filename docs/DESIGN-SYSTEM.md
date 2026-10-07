@@ -1,5 +1,7 @@
 # Pack One: light tournament direction
 
+For canonical logo/mark files, repo-owned fonts, production colors, social/store assets, and generator guidance, use the [Pack One brand and marketing asset guide](../assets/brand/README.md). This document remains the concise product visual-direction rationale.
+
 The visual identity follows a printed tournament scorecard: clear numbering,
 compact display type, readable labels, fine rules, and three decisive play actions.
 Homepage and editorial decoration use restrained Pack One / P¹ brand marks rather
