@@ -69,7 +69,7 @@ async function raw(path,{method='GET',body,headers=new Headers(),credentials=fir
     throw Object.assign(new Error(data.error||data.message||`Pack 1 API failed (${response.status}).`),{
       status:response.status,
       code:data.code||null,
-      retryAfter:Number.isFinite(parsedRetry)&&parsedRetry>0?Math.ceil(parsedRetry):null,
+      retryAfter:Number(data.retryAfter)>0?Math.ceil(Number(data.retryAfter)):(Number.isFinite(parsedRetry)&&parsedRetry>0?Math.ceil(parsedRetry):null),
     });
   }
   return data;
