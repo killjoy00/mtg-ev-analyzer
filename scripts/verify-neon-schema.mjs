@@ -34,6 +34,9 @@ const result=await query(`SELECT
   to_regclass('creator_challenge_audit') IS NOT NULL creator_challenge_audit,
   (SELECT count(*)=2 FROM information_schema.columns WHERE table_name='draft_run_sessions' AND column_name IN ('creator_challenge_id','creator_participant_auth_user_id')) creator_challenge_session_columns,
   EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='draft_run_creator_challenge_participant_uq') creator_challenge_participant_idempotency,
+  to_regprocedure('pack1_lock_creator_challenge_events(uuid,uuid)') IS NOT NULL creator_challenge_event_lock,
+  EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='analytics_creator_challenge_dedup_lookup_idx') creator_challenge_event_lookup,
+  EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='analytics_creator_challenge_funnel_idx') creator_challenge_funnel_index,
   EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='game_results' AND column_name='creator_challenge_id') creator_challenge_result_attribution,
   to_regprocedure('pack1_fill_creator_challenge_result()') IS NOT NULL creator_challenge_result_fill_function,
   to_regprocedure('pack1_prepare_creator_challenge_player_merge()') IS NOT NULL creator_challenge_merge_guard_function,
@@ -119,6 +122,6 @@ const result=await query(`SELECT
   position('America/New_York' in pg_get_viewdef('analytics_daily_next_day_retention'::regclass))=0 daily_retention_not_eastern`);
 // Worker SQL references `username_owned` and `pack1_username_key` on the
 // session and profile paths, so 0033 has to land before the code that reads it.
-for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0047 first.`);
+for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations for this release first.`);
 await verifyServingStatistics(query);
 console.log('Neon schema and serving-statistics prerequisites verified.');
