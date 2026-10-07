@@ -69,27 +69,6 @@ function decodeSource(row) {
   };
 }
 
-function creatorReplayProfile(source,matchingProfiles) {
-  if(matchingProfiles.length===1)return matchingProfiles[0];
-  if(source.scoring_version!=='trophy-consensus-v3')
-    return matchingProfiles[0]||null;
-  // Colour-stage corpora were built after the direct-ratio v3 implementation
-  // landed. For the older v6 corpus, created_at resolves the rare case where
-  // the source's selected cards happen to score identically under both v3
-  // floating-point paths.
-  if(String(source.corpus_version||'').includes('-colour-stage-')
-      &&matchingProfiles.includes(DRAFT_RUN_SCORING_V3_LINEAR_PROFILE))
-    return DRAFT_RUN_SCORING_V3_LINEAR_PROFILE;
-  const createdAt=Date.parse(source.created_at||'');
-  const linearCutover=Date.parse('2026-09-17T23:29:51Z');
-  if(Number.isFinite(createdAt)&&createdAt>=linearCutover
-      &&matchingProfiles.includes(DRAFT_RUN_SCORING_V3_LINEAR_PROFILE))
-    return DRAFT_RUN_SCORING_V3_LINEAR_PROFILE;
-  if(matchingProfiles.includes(DRAFT_RUN_SCORING_V3_LEGACY_PROFILE))
-    return DRAFT_RUN_SCORING_V3_LEGACY_PROFILE;
-  return matchingProfiles[0]||null;
-}
-
 async function validateHistoricalPuzzles(query,source) {
   if(!Array.isArray(source.puzzle_ids)||source.puzzle_ids.length!==8)fail('Creator source must contain exactly eight decisions.',409,'CREATOR_SOURCE_INELIGIBLE');
   if(!Array.isArray(source.answers)||source.answers.length!==8||source.score==null)fail('Creator source run is not complete.',409,'CREATOR_SOURCE_INELIGIBLE');
@@ -97,6 +76,7 @@ async function validateHistoricalPuzzles(query,source) {
   if(!matchingProfiles.length)
     fail('This source uses a historical scoring version that the current replay engine cannot reproduce.',409,'CREATOR_SOURCE_SCORING_VERSION');
   let scoreTotal=0;
+  const validatedPuzzles=[];
   for(let index=0;index<8;index++) {
     const id=source.puzzle_ids[index],answer=source.answers[index];
     if(!answer||answer?.puzzle?.puzzle_id!==id||!answer.selectedId)fail('Creator source answers do not match the authoritative decision order.',409,'CREATOR_SOURCE_INELIGIBLE');
@@ -106,17 +86,41 @@ async function validateHistoricalPuzzles(query,source) {
       fail('This source uses historical puzzle data that Pack One can no longer serve safely.',409,'CREATOR_SOURCE_UNAVAILABLE');
     if(!puzzle.candidates.some(card=>card.id===answer.selectedId))
       fail('A creator selection is not part of its authoritative historical pack.',409,'CREATOR_SOURCE_INELIGIBLE');
+
+    // The selected score is authoritative evidence, and Draft Run answers also
+    // retain the per-candidate ranking scores that were shown for that exact
+    // historical pack. Use all available recorded scores to identify the
+    // implementation instead of guessing from a commit/deploy timestamp.
+    const recordedScores=new Map([[answer.selectedId,Number(answer.score)]]);
+    if(Array.isArray(answer.ranking))for(const item of answer.ranking) {
+      if(item?.id&&Number.isFinite(Number(item.score)))recordedScores.set(item.id,Number(item.score));
+    }
     matchingProfiles=matchingProfiles.filter(profile=>
-      Number(answer.score)===Number(gradeDraftRunPickForVersion(puzzle,answer.selectedId,profile).score));
+      [...recordedScores].every(([cardId,recorded])=>
+        puzzle.candidates.some(card=>card.id===cardId)
+        &&Number(gradeDraftRunPickForVersion(puzzle,cardId,profile).score)===recorded));
     if(!matchingProfiles.length)
       fail('This source cannot be reproduced exactly by the current scoring engine.',409,'CREATOR_SOURCE_SCORING_VERSION');
     scoreTotal+=Number(answer.score);
+    validatedPuzzles.push(puzzle);
   }
   if(Math.round(scoreTotal/8)!==Number(source.score))
     fail('This source score cannot be reproduced exactly by the current scoring engine.',409,'CREATOR_SOURCE_SCORING_VERSION');
-  const profile=creatorReplayProfile(source,matchingProfiles);
-  if(!profile)fail('This source scoring profile is ambiguous and cannot be replayed safely.',409,'CREATOR_SOURCE_SCORING_VERSION');
-  return profile;
+
+  if(matchingProfiles.length>1) {
+    const equivalent=validatedPuzzles.every(puzzle=>puzzle.candidates.every(card=>{
+      const scores=matchingProfiles.map(profile=>gradeDraftRunPickForVersion(puzzle,card.id,profile).score);
+      return scores.every(score=>score===scores[0]);
+    }));
+    if(!equivalent)
+      fail('This source scoring profile is ambiguous and cannot be replayed safely.',409,'CREATOR_SOURCE_SCORING_VERSION');
+  }
+
+  // If multiple implementations are observationally identical for every card
+  // in these eight fixed packs, either yields the same challenge outcome.
+  return matchingProfiles.includes(DRAFT_RUN_SCORING_V3_LINEAR_PROFILE)
+    ?DRAFT_RUN_SCORING_V3_LINEAR_PROFILE
+    :matchingProfiles[0];
 }
 
 async function sourceSession(query,id,{expectedPlayerId=null,expectedType=null,shareId=null,validatePuzzles=true}={}) {
