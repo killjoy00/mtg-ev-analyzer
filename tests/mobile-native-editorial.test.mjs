@@ -120,7 +120,9 @@ test('Support uses working native email actions', () => {
 test('legacy Help redirects to About and font licenses live only at the end of Terms', () => {
   assert.match(helpScreen, /<Redirect href="\/about" \/>/);
   assert.doesNotMatch(helpScreen, /fontLicenses|WebBrowser|Font licenses/);
-  assert.match(termsScreen, /const \[licensesOpen, setLicensesOpen\] = useState\(false\)/);
+  assert.match(termsScreen, /config\.screenshots\.fixtures && params\.licenses === '1'/);
+  assert.match(termsScreen, /const \[licensesOpen, setLicensesOpen\] = useState\(previewLicensesOpen\)/);
+  assert.match(termsScreen, /scrollToEnd=\{previewLicensesOpen\}/);
   assert.match(termsScreen, /title}>Font licenses<\/Text>/);
   assert.match(termsScreen, /fontLicenses\.map/);
   assert.doesNotMatch(privacyScreen, /fontLicenses/);
