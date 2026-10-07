@@ -133,15 +133,15 @@ test('Help is removed from tab headers and About is at the bottom of tab content
   assert.doesNotMatch(tabLayout, /Help and information|router\.push\('\/help'\)|>Help</);
   for (const [name, source] of [
     ['Home', homeScreen],
-    ['Practice', practiceScreen],
-    ['Leaders', leaderboardScreen],
     ['Learn', learnScreen],
     ['How to Play', howToScreen],
-    ['My Pack One', careerScreen],
     ['Account/Sign in', accountScreen],
   ]) {
     assert.match(source, /<AboutLink \/>/, `${name} should expose About at the bottom of its content`);
   }
+  assert.equal((practiceScreen.match(/<AboutLink \/>/g) || []).length, 4, 'Practice keeps About in loading, signed-out, error, and ready states');
+  assert.equal((leaderboardScreen.match(/<AboutLink \/>/g) || []).length, 3, 'Leaders keeps About in loading, error, and ready states');
+  assert.equal((careerScreen.match(/<AboutLink \/>/g) || []).length, 2, 'My Pack One keeps About in signed-out/error/loading and ready states');
   assert.doesNotMatch(accountScreen, /Help & information|router\.push\('\/help'\)/);
 });
 
