@@ -352,6 +352,12 @@ test('native leaderboard and public-identity actions match the gateway credentia
       headers:{'content-type':'application/json','x-pack1-mobile-session':token,'x-pack1-mobile-account':account},
       body:'{}',
     },
+    {
+      path:'/growth/v1/mobile/profile/'+profileKey+'/block',
+      method:'DELETE',
+      headers:{'x-pack1-mobile-session':token,'x-pack1-mobile-account':account},
+      body:undefined,
+    },
   ];
   for(const item of cases) {
     let forwarded=null;
