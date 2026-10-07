@@ -91,7 +91,9 @@ test('creator canary static cleanup waits for registered green PR checks before 
   const watch=workflow.indexOf('gh pr checks');
   const merge=workflow.indexOf('gh pr merge');
   assert.ok(register>=0&&register<watch&&watch<merge,'cleanup must observe registered checks, wait for them, then merge');
-  assert.match(workflow,/token: \$\{\{ secrets\.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN \}\}/);
+  assert.match(workflow,/permissions:\n  contents: write\n  pull-requests: write\n  actions: read\n  checks: read/);
+  assert.match(workflow,/GH_TOKEN: \$\{\{ github\.token \}\}/);
+  assert.doesNotMatch(workflow,/token: \$\{\{ secrets\.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN \}\}/);
 });
 
 test('reviewed retry request explicitly forbids customer rows',()=>{
