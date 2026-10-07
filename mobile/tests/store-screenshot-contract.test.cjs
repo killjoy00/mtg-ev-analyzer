@@ -49,6 +49,8 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   const screenshotFeedbackRoute = read('mobile/app/store-screenshot-feedback.tsx');
   const iosCapture = read('mobile/scripts/capture-store-screenshots-ios.sh');
   const androidCapture = read('mobile/scripts/capture-store-screenshots-android.sh');
+  const nativeAcceptance = read('mobile/scripts/native-acceptance.py');
+  const nativeAcceptanceRoute = read('mobile/app/native-acceptance.tsx');
   assert.match(androidCapture, /adb shell "am start -W -a android\.intent\.action\.VIEW -d '\$url' -p '\$package_name'"/);
   assert.doesNotMatch(androidCapture, /adb shell am start -W -a android\.intent\.action\.VIEW -d "\$url"/);
   assert.match(androidCapture, /capture "02-reveal-comparison" "packone:\/\/store-screenshot-feedback"/);
@@ -93,6 +95,15 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   assert.match(workflow, /adb shell service check package/);
   assert.match(workflow, /for attempt in 1 2 3; do/);
   assert.match(workflow, /adb kill-server/);
+  for (const destination of ['about', 'support', 'privacy', 'terms', 'terms-licenses', 'how-to', 'account', 'leaders']) {
+    assert.match(nativeAcceptanceRoute, new RegExp(`screen === '${destination}'`));
+  }
+  assert.match(nativeAcceptance, /native-about-support-privacy-terms-and-font-licenses/);
+  assert.match(nativeAcceptance, /Show font licenses/);
+  assert.match(nativeAcceptance, /'member','home'/);
+  assert.match(nativeAcceptance, /'member','leaders'/);
+  assert.match(nativeAcceptance, /'member','account'/);
+  assert.match(nativeAcceptance, /'guest','terms-licenses'/);
 });
 
 test('store screenshot and App Store configuration encode reviewed release decisions', () => {
