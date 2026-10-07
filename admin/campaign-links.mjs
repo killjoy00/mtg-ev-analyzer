@@ -44,6 +44,27 @@ function creatorTrackedUrl(challenge) {
   },{allowCreator:true});
 }
 
+export function mergeCreatorChallengeState(listed,current) {
+  return current?{...listed,...current}:listed;
+}
+
+export function creatorChallengesForDisplay(challenges,{showDeleted=false}={}) {
+  const all=Array.isArray(challenges)?challenges:[];
+  const deleted=all.filter(challenge=>challenge.status==='retired'&&challenge.publication_detail?.live_verified===true);
+  return {
+    deleted:deleted.length,
+    visible:showDeleted?all:all.filter(challenge=>!(challenge.status==='retired'&&challenge.publication_detail?.live_verified===true)),
+  };
+}
+
+export function creatorPublicationProgressText(expected='published',attempt=0) {
+  const elapsed=Math.max(0,Number(attempt)||0)*6;
+  const minutes=Math.floor(elapsed/60),seconds=elapsed%60;
+  const elapsedLabel=elapsed?' ('+(minutes?minutes+'m ':'')+String(seconds).padStart(minutes?2:1,'0')+'s elapsed)':'';
+  return expected==='retired'
+    ? 'Deleting challenge safely… the unavailable page is still publishing'+elapsedLabel+'.'
+    : 'Publishing protected vanity route… checks and Pages deployment are still running'+elapsedLabel+'.';
+}
 function creatorShareCopy(challenge) {
   const score=Number(challenge.source_score);
   const environment=environmentLabel(challenge.source_environment);
@@ -197,7 +218,10 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
       <section id="creator-kit" class="note" hidden></section>
 
       <h2>Existing creator challenges</h2>
-      <p id="creator-existing-status" class="muted">Loading creator challenges…</p>
+      <div class="campaign-publish-actions">
+        <p id="creator-existing-status" class="muted">Loading creator challenges…</p>
+        <button type="button" id="creator-show-deleted" class="secondary" hidden>Show deleted</button>
+      </div>
       <div id="creator-existing"></div>
     </section>
   </section>`;
@@ -324,7 +348,8 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
   const creatorPreview=root.querySelector('#creator-publish-preview'),creatorPublish=root.querySelector('#publish-creator');
   const creatorPublishStatus=root.querySelector('#creator-publish-status'),creatorKit=root.querySelector('#creator-kit');
   const creatorExisting=root.querySelector('#creator-existing'),creatorExistingStatus=root.querySelector('#creator-existing-status');
-  let creatorSource=null,creatorBusy=false,creatorDraft=null,creatorSlugs=new Set();
+  const creatorShowDeleted=root.querySelector('#creator-show-deleted');
+  let creatorSource=null,creatorBusy=false,creatorDraft=null,creatorSlugs=new Set(),creatorShowDeletedRows=false;
 
   function setCreatorSource(next) {
     creatorSource=next;creatorDraft=null;
