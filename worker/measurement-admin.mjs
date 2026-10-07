@@ -26,7 +26,9 @@ export function reportFilters(url,now=new Date()) {
   if(!['all','easy','medium','hard'].includes(band)||!['all',...Array.from({length:12},(_,i)=>String(i+1))].includes(pick))fail('Invalid difficulty or pick filter.');
   return {start,end,environment,type,set,version,band,pick,corpus_version:DRAFT_RUN_CORPUS_VERSION,params:[start,end,environment,type,set,version,band,pick,DRAFT_RUN_CORPUS_VERSION]};
 }
-const SCOPE=`FROM draft_run_source_measurements WHERE first_seen_at >= $1::date AND first_seen_at < $2::date+interval '1 day'
+const PACIFIC_RANGE_START="($1::date::timestamp AT TIME ZONE 'America/Los_Angeles')";
+const PACIFIC_RANGE_END="(($2::date + 1)::timestamp AT TIME ZONE 'America/Los_Angeles')";
+const SCOPE=`FROM draft_run_source_measurements WHERE first_seen_at >= ${PACIFIC_RANGE_START} AND first_seen_at < ${PACIFIC_RANGE_END}
   AND ($3='all' OR environment=$3) AND ($4='all' OR run_type=$4) AND ($5='all' OR set_id=$5)
   AND ($6='all' OR selection_version=$6) AND ($7='all' OR band=$7) AND ($8='all' OR pick_number::text=$8)
   AND corpus_version=$9`;
@@ -221,7 +223,7 @@ export async function handleAdmin(request,query,readJson) {
           SELECT e.player_id,e.created_at
           FROM analytics_events e JOIN players p ON p.id=e.player_id CROSS JOIN corpus_epoch epoch
           WHERE e.event_name='daily_share_arrival'
-            AND e.created_at >= $1::date AND e.created_at < $2::date+interval '1 day'
+            AND e.created_at >= ${PACIFIC_RANGE_START} AND e.created_at < ${PACIFIC_RANGE_END}
             AND epoch.started_at IS NOT NULL AND e.created_at>=epoch.started_at
             AND ($3='all' OR coalesce(e.event_props->>'set','mixed')=$3)
             AND NOT coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
@@ -230,7 +232,7 @@ export async function handleAdmin(request,query,readJson) {
           FROM analytics_events e
           JOIN draft_run_sessions s ON s.id::text=e.event_props->>'run_id'
           WHERE e.event_name='daily_started' AND e.event_props->>'source'='result_share'
-            AND e.created_at >= $1::date AND e.created_at < $2::date+interval '1 day'
+            AND e.created_at >= ${PACIFIC_RANGE_START} AND e.created_at < ${PACIFIC_RANGE_END}
             AND ($3='all' OR e.event_props->>'set_id'=$3)
             AND s.corpus_version=$4
             AND NOT s.measurement_qa
