@@ -4,7 +4,7 @@ const valueOf=(form,name)=>form.elements.namedItem(name)?.value??'';
 const show=value=>value||'—';
 const esc=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 const creatorDefaults=()=>({source:'creator',campaign:'beat-the-creator',medium:'creator'});
-const environmentLabel=value=>value==='latest'?'Latest Set':value==='powered-cube'?'Powered Cube':'Mixed';
+const environmentLabel=value=>value==='latest'?'Latest Set':value==='powered-cube'?'Powered Cube':'Draft Run';
 const dateLabel=value=>value?new Date(value+'T12:00:00Z').toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):'';
 
 function setError(form,name,message) {
@@ -65,75 +65,128 @@ export function creatorPublicationProgressText(expected='published',attempt=0) {
     ? 'Deleting challenge safely… the unavailable page is still publishing'+elapsedLabel+'.'
     : 'Publishing protected vanity route… checks and Pages deployment are still running'+elapsedLabel+'.';
 }
-function creatorShareCopy(challenge) {
-  const score=Number(challenge.source_score);
+function creatorShareContext(challenge) {
   const environment=environmentLabel(challenge.source_environment);
-  const context=challenge.source_type==='daily'
-    ? `the ${dateLabel(challenge.source_day)} Pack One ${environment} Daily`
-    : `this Pack One ${environment} Practice run`;
-  return `I scored ${score}/100 on ${context}. Think you can beat me? ${challenge.public_url||`https://packone.pro/creator/${challenge.slug}/`}`;
+  const day=challenge.source_type==='daily'?dateLabel(challenge.source_day):'';
+  return {
+    environment,
+    day,
+    long:challenge.source_type==='daily'?`the ${day} Pack One ${environment} Daily`:`a Pack One ${environment} Practice run`,
+    short:challenge.source_type==='daily'?`Pack One ${environment} Daily · ${day}`:`Pack One ${environment} Practice`,
+  };
 }
 
+function creatorShareCopy(challenge) {
+  const score=Number(challenge.source_score),name=String(challenge.creator_public_name||'').trim();
+  const context=creatorShareContext(challenge);
+  const url=challenge.public_url||`https://packone.pro/creator/${challenge.slug}/`;
+  return `I'm ${name}. I scored ${score}/100 on ${context.long}. Play the same 8 draft decisions and see if you can beat my score: ${url}`;
+}
+
+function creatorShortCopy(challenge) {
+  const score=Number(challenge.source_score),name=String(challenge.creator_public_name||'').trim();
+  const context=creatorShareContext(challenge);
+  const url=challenge.public_url||`https://packone.pro/creator/${challenge.slug}/`;
+  return `Beat ${name}'s ${score}/100 — ${context.short}. Same 8 decisions: ${url}`;
+}
+
+function creatorImageAlt(challenge) {
+  const score=Number(challenge.source_score),name=String(challenge.creator_public_name||'').trim();
+  const context=creatorShareContext(challenge);
+  const run=challenge.source_type==='daily'?`${context.environment} Daily, ${context.day}`:`${context.environment} Practice`;
+  return `Pack One Beat the Creator challenge for ${name}: creator score ${score} out of 100, ${run}. Play the same 8 draft decisions.`;
+}
 
 function creatorKitValues(challenge) {
   const publicUrl=`https://packone.pro/creator/${challenge.slug}/`;
+  const withUrl={...challenge,public_url:publicUrl};
   return {
     publicUrl,
     trackedUrl:creatorTrackedUrl(challenge),
     socialImage:publicUrl+'creator-card.png',
-    copy:creatorShareCopy({...challenge,public_url:publicUrl}),
+    squareImage:publicUrl+'creator-card-square.png',
+    alt:creatorImageAlt(withUrl),
+    copy:creatorShareCopy(withUrl),
+    shortCopy:creatorShortCopy(withUrl),
   };
 }
 
-async function downloadCreatorImage(challenge,status) {
-  const {socialImage}=creatorKitValues(challenge);
-  status.textContent='Downloading social image…';
+async function downloadCreatorImage(challenge,variant,status) {
+  const values=creatorKitValues(challenge);
+  const square=variant==='square';
+  const imageUrl=square?values.squareImage:values.socialImage;
+  const label=square?'Square image':'Open Graph image';
+  status.textContent=`Downloading ${label.toLowerCase()}…`;
   try {
-    const response=await fetch(socialImage,{cache:'no-store'});
+    const response=await fetch(imageUrl,{cache:'no-store'});
     if(!response.ok)throw new Error(`HTTP ${response.status}`);
     const blob=await response.blob();
     if(!String(blob.type||'').startsWith('image/'))throw new Error('Published social asset is not an image.');
     const url=URL.createObjectURL(blob),anchor=document.createElement('a');
-    anchor.href=url;anchor.download=`pack-one-${challenge.slug}-creator.png`;
+    anchor.href=url;anchor.download=square?`pack-one-${challenge.slug}-creator-square.png`:`pack-one-${challenge.slug}-creator.png`;
     document.body.append(anchor);anchor.click();anchor.remove();
     setTimeout(()=>URL.revokeObjectURL(url),0);
-    status.textContent='Social image downloaded.';
+    status.textContent=`${label} downloaded.`;
   } catch {
-    status.textContent='Social image download failed. Retry after publication finishes.';
+    status.textContent=`${label} download failed. Retry after publication finishes.`;
   }
 }
 
 function renderCreatorKit(target,challenge,status) {
-  const {publicUrl,trackedUrl,socialImage,copy:postCopy}=creatorKitValues(challenge);
-  target.hidden=false;
-  target.innerHTML=`<h3>Creator kit</h3>
-    <label>Public link<input readonly value="${esc(publicUrl)}"></label>
-    <label>Tracked link<input readonly value="${esc(trackedUrl)}"></label>
-    <label>Social image<input readonly value="${esc(socialImage)}"></label>
-    <p data-creator-image-status class="muted">Loading published social image…</p>
-    <img data-creator-kit-image src="${esc(socialImage)}" alt="${esc(challenge.headline||`Can you beat ${challenge.creator_public_name}?`)}" style="max-width:100%;height:auto">
-    <label>Ready-to-send copy<textarea readonly rows="3">${esc(postCopy)}</textarea></label>
-    <button type="button" class="secondary" data-copy-creator-link>Copy public link</button>
-    <button type="button" class="secondary" data-copy-creator-tracked>Copy tracked link</button>
-    <button type="button" class="secondary" data-copy-creator-image>Copy image URL</button>
-    <button type="button" class="secondary" data-download-creator-image>Download social image</button>
-    <button type="button" class="secondary" data-retry-creator-image hidden>Retry image preview</button>
-    <button type="button" class="secondary" data-copy-creator-copy>Copy post copy</button>`;
-  const image=target.querySelector('[data-creator-kit-image]');
-  const imageStatus=target.querySelector('[data-creator-image-status]');
-  const retry=target.querySelector('[data-retry-creator-image]');
-  const reloadImage=()=>{
-    retry.hidden=true;imageStatus.textContent='Loading published social image…';
-    image.src=socialImage+(socialImage.includes('?')?'&':'?')+'v='+Date.now();
-  };
-  image.onload=()=>{imageStatus.textContent='Published social image ready.';retry.hidden=true;};
-  image.onerror=()=>{imageStatus.textContent='Social image is not available yet.';retry.hidden=false;};
-  retry.onclick=reloadImage;
+  const {publicUrl,trackedUrl,socialImage,squareImage,alt,copy:postCopy,shortCopy}=creatorKitValues(challenge);
+  target.hidden=false;target.classList.add('creator-kit');
+  target.innerHTML=`<header class="creator-kit-heading"><div><p class="eyebrow">BEAT THE CREATOR</p><h3>Creator kit</h3></div><a class="button secondary" target="_blank" rel="noopener" href="${esc(publicUrl)}">Open challenge</a></header>
+    <div class="creator-kit-links">
+      <label>Public link<input readonly value="${esc(publicUrl)}"><button type="button" class="secondary" data-copy-creator-link>Copy public link</button></label>
+      <label>Tracked link<input readonly value="${esc(trackedUrl)}"><button type="button" class="secondary" data-copy-creator-tracked>Copy tracked link</button></label>
+    </div>
+    <div class="creator-kit-assets">
+      <article class="creator-kit-asset" data-creator-format="og">
+        <div><strong>Open Graph image</strong><span>1200 × 630</span></div>
+        <p data-creator-image-status="og" class="muted">Loading Open Graph image…</p>
+        <img data-creator-kit-image="og" src="${esc(socialImage)}" alt="${esc(alt)}">
+        <label>Open Graph image URL<input readonly value="${esc(socialImage)}"></label>
+        <div class="actions"><button type="button" class="secondary" data-copy-creator-image="og">Copy image URL</button><button type="button" class="secondary" data-download-creator-image="og">Download Open Graph image</button><button type="button" class="secondary" data-retry-creator-image="og" hidden>Retry Open Graph preview</button></div>
+      </article>
+      <article class="creator-kit-asset" data-creator-format="square">
+        <div><strong>Square image</strong><span>1080 × 1080</span></div>
+        <p data-creator-image-status="square" class="muted">Loading square image…</p>
+        <img data-creator-kit-image="square" src="${esc(squareImage)}" alt="${esc(alt)}">
+        <label>Square image URL<input readonly value="${esc(squareImage)}"></label>
+        <div class="actions"><button type="button" class="secondary" data-copy-creator-image="square">Copy image URL</button><button type="button" class="secondary" data-download-creator-image="square">Download square image</button><button type="button" class="secondary" data-retry-creator-image="square" hidden>Retry square preview</button></div>
+      </article>
+    </div>
+    <div class="creator-kit-copy">
+      <label>Image alt text<textarea readonly rows="2">${esc(alt)}</textarea><button type="button" class="secondary" data-copy-creator-alt>Copy alt text</button></label>
+      <label>Ready-to-post caption<textarea readonly rows="3">${esc(postCopy)}</textarea><button type="button" class="secondary" data-copy-creator-copy>Copy caption</button></label>
+      <label>Short social caption<textarea readonly rows="2">${esc(shortCopy)}</textarea><button type="button" class="secondary" data-copy-creator-short>Copy short caption</button></label>
+    </div>`;
+
+  const previews=[
+    {key:'og',url:socialImage,label:'Open Graph'},
+    {key:'square',url:squareImage,label:'Square'},
+  ];
+  for(const preview of previews) {
+    const image=target.querySelector(`[data-creator-kit-image="${preview.key}"]`);
+    const imageStatus=target.querySelector(`[data-creator-image-status="${preview.key}"]`);
+    const retry=target.querySelector(`[data-retry-creator-image="${preview.key}"]`);
+    const reloadImage=()=>{
+      retry.hidden=true;imageStatus.textContent=`Loading ${preview.label.toLowerCase()} image…`;
+      image.src=preview.url+(preview.url.includes('?')?'&':'?')+'v='+Date.now();
+    };
+    image.onload=()=>{imageStatus.textContent=`${preview.label} image ready.`;retry.hidden=true;};
+    image.onerror=()=>{imageStatus.textContent=`${preview.label} image is not available yet.`;retry.hidden=false;};
+    retry.onclick=reloadImage;
+  }
   target.querySelector('[data-copy-creator-link]').onclick=()=>copy(publicUrl,status);
   target.querySelector('[data-copy-creator-tracked]').onclick=()=>copy(trackedUrl,status);
-  target.querySelector('[data-copy-creator-image]').onclick=()=>copy(socialImage,status);
-  target.querySelector('[data-download-creator-image]').onclick=()=>void downloadCreatorImage(challenge,status);
+  target.querySelector('[data-copy-creator-image="og"]').onclick=()=>copy(socialImage,status);
+  target.querySelector('[data-copy-creator-image="square"]').onclick=()=>copy(squareImage,status);
+  target.querySelector('[data-download-creator-image="og"]').onclick=()=>void downloadCreatorImage(challenge,'og',status);
+  target.querySelector('[data-download-creator-image="square"]').onclick=()=>void downloadCreatorImage(challenge,'square',status);
+  target.querySelector('[data-copy-creator-alt]').onclick=()=>copy(alt,status);
   target.querySelector('[data-copy-creator-copy]').onclick=()=>copy(postCopy,status);
+  target.querySelector('[data-copy-creator-short]').onclick=()=>copy(shortCopy,status);
 }
 
 export async function renderCampaignLinks(root,publishRequest,draftRequest) {
