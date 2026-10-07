@@ -329,3 +329,63 @@ test('mobile Apple deletion re-auth routes require and forward both mobile ident
     assert.equal(forwarded.account,account);
   }
 });
+
+
+test('native leaderboard and public-identity actions match the gateway credential contract',async()=>{
+  const profileKey='0123456789abcdef';
+  const cases=[
+    {
+      path:'/draft/v1/leaderboard?period=daily&environment=mixed',
+      method:'GET',
+      headers:{'x-pack1-mobile-session':token},
+      body:undefined,
+    },
+    {
+      path:'/growth/v1/mobile/profile/'+profileKey+'/report',
+      method:'POST',
+      headers:{'content-type':'application/json','x-pack1-mobile-session':token,'x-pack1-mobile-account':account},
+      body:JSON.stringify({reason:'other'}),
+    },
+    {
+      path:'/growth/v1/mobile/profile/'+profileKey+'/block',
+      method:'POST',
+      headers:{'content-type':'application/json','x-pack1-mobile-session':token,'x-pack1-mobile-account':account},
+      body:'{}',
+    },
+    {
+      path:'/growth/v1/mobile/profile/'+profileKey+'/block',
+      method:'DELETE',
+      headers:{'x-pack1-mobile-session':token,'x-pack1-mobile-account':account},
+      body:undefined,
+    },
+  ];
+  for(const item of cases) {
+    let forwarded=null;
+    const response=await gateway(new Request('https://api.packone.pro'+item.path,{
+      method:item.method,
+      headers:headers(item.headers),
+      ...(item.body===undefined?{}:{body:item.body}),
+    }),env(),async(url,options)=>{
+      const h=new Headers(options.headers);
+      forwarded={url,authorization:h.get('authorization'),account:h.get('x-pack1-mobile-account')};
+      return Response.json({ok:true});
+    });
+    assert.equal(response.status,200,item.path);
+    assert.equal(forwarded.authorization,'Bearer '+token,item.path);
+    if(item.headers['x-pack1-mobile-account'])assert.equal(forwarded.account,account,item.path);
+  }
+});
+
+test('profile block DELETE preflight advertises the method the gateway permits',async()=>{
+  const profileKey='0123456789abcdef';
+  const response=await gateway(new Request('https://api.packone.pro/growth/v1/profile/'+profileKey+'/block',{
+    method:'OPTIONS',
+    headers:headers({
+      origin:'https://packone.pro',
+      'access-control-request-method':'DELETE',
+      'access-control-request-headers':'content-type',
+    }),
+  }),env(),async()=>{throw Error('preflight must not reach upstream')});
+  assert.equal(response.status,204);
+  assert.match(response.headers.get('access-control-allow-methods')||'',/(?:^|,)DELETE(?:,|$)/);
+});

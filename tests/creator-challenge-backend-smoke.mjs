@@ -9,6 +9,11 @@ const {default:growth,query}=await import('../worker/growth-function.js');
 const {default:runApi}=await import('../worker/draft-run-function.mjs');
 const {creatorChallengeById,createCreatorChallenge}=await import('../worker/creator-challenges.mjs');
 const {
+  DRAFT_RUN_SCORING_V3_LEGACY_PROFILE,
+  DRAFT_RUN_SCORING_V3_LINEAR_PROFILE,
+  gradeDraftRunPickForVersion,
+}=await import('../draft-run.mjs');
+const {
   beginCreatorPublicationOperation,
   dispatchCreatorPublicationAttempt,
   requestCreatorPrivacyRetirement,
@@ -101,12 +106,27 @@ async function insertCreatorStart(playerId,runId,challengeId) {
   ]);
 }
 
+function mergeFunctionSql(path) {
+  const source=fs.readFileSync(path,'utf8');
+  const signature='CREATE OR REPLACE FUNCTION merge_pack1_player(source_player uuid, target_player uuid)';
+  const start=source.indexOf(signature);
+  const boundary=path.endsWith('0054_creator_event_idempotency.sql')
+    ?source.indexOf('\nCOMMIT;',start)
+    :source.length;
+  const bodyEnd=source.lastIndexOf('END;',boundary);
+  const terminatorEnd=source.indexOf(';',bodyEnd+4);
+  assert.ok(start>=0&&bodyEnd>start&&terminatorEnd>bodyEnd,'merge function missing from '+path);
+  return source.slice(start,terminatorEnd+1);
+}
+
 const tag=crypto.randomUUID().slice(0,8);
 const creator=await call(growth,'/v1/session',{displayName:'Merge Creator '+tag});
 const target=await call(growth,'/v1/session',{displayName:'Merge Account '+tag});
 const guestCompleted=await call(growth,'/v1/session',{displayName:'Merge Guest Complete '+tag});
 const guestPartial=await call(growth,'/v1/session',{displayName:'Merge Guest Partial '+tag});
 const replayGuest=await call(growth,'/v1/session',{displayName:'Creator Replay Guest '+tag});
+const concurrentGuest=await call(growth,'/v1/session',{displayName:'Creator Concurrent Guest '+tag});
+const legacyReplayGuest=await call(growth,'/v1/session',{displayName:'Creator Legacy Replay Guest '+tag});
 const dailyFirstGuest=await call(growth,'/v1/session',{displayName:'Creator Daily First '+tag});
 const paidModeGuest=await call(growth,'/v1/session',{displayName:'Creator Paid Mode Guest '+tag});
 const targetAuth=crypto.randomUUID(),creatorAuth=crypto.randomUUID(),creatorAccountToken=crypto.randomUUID()+crypto.randomUUID();
@@ -173,6 +193,134 @@ try {
       $5::uuid,now(),'{"live_verified":true}'::jsonb)`,[
     runtimeChallenge,runtimeSlug,template.id,creator.playerId,targetAuth,
   ]);
+
+  // The database invariant must protect callers that do not yet send
+  // ON CONFLICT during a rolling deploy. Concurrent raw inserts for the same
+  // player/challenge/event converge without surfacing a uniqueness error.
+  await Promise.all(Array.from({length:8},()=>query(
+    `INSERT INTO analytics_events(player_id,event_name,event_props)
+     VALUES($1::uuid,'creator_challenge_open',
+       jsonb_build_object('creator_challenge_id',$2::text,'source','raw-concurrency-smoke'))`,
+    [concurrentGuest.playerId,runtimeChallenge],
+  )));
+  assert.equal(Number((await query(`SELECT count(*)::int n FROM analytics_events
+    WHERE player_id=$1::uuid AND event_name='creator_challenge_open'
+      AND event_props->>'creator_challenge_id'=$2`,[
+    concurrentGuest.playerId,runtimeChallenge,
+  ])).rows[0].n),1,'database insert guard serializes concurrent creator opens');
+
+  // A creator source recorded under the first v3 implementation must start a
+  // challenger session with the resolved historical scoring profile, not the
+  // current global scorer. Build one valid synthetic decision from an existing
+  // verified puzzle so the two v3 floating-point paths differ by one point.
+  const templatePuzzleIds=template.answers.map(answer=>answer.puzzle.puzzle_id);
+  const templatePuzzleRows=await query(
+    'SELECT puzzle_id,payload FROM draft_run_verified_puzzles WHERE puzzle_id=ANY($1::text[])',
+    ['{'+templatePuzzleIds.join(',')+'}'],
+  );
+  const payloadById=new Map(templatePuzzleRows.rows.map(row=>[
+    row.puzzle_id,
+    typeof row.payload==='string'?JSON.parse(row.payload):structuredClone(row.payload),
+  ]));
+  const firstPayload=structuredClone(payloadById.get(templatePuzzleIds[0]));
+  assert.ok(firstPayload&&firstPayload.candidates.length>=4,'legacy scoring fixture needs one verified pack');
+  const [leader,selected,third,historical]=firstPayload.candidates;
+  firstPayload.candidates=[leader,selected,third,historical];
+  firstPayload.candidate_count=4;
+  leader.model_probability=.19;
+  selected.model_probability=.027;
+  third.model_probability=.0135;
+  historical.model_probability=.00675;
+  firstPayload.historical_pick_id=historical.id;
+  const syntheticPuzzleId=crypto.randomUUID().replaceAll('-','');
+  const syntheticSourceHash=crypto.randomUUID().replaceAll('-','');
+  firstPayload.puzzle_id=syntheticPuzzleId;
+  firstPayload.source_draft_hash=syntheticSourceHash;
+  assert.equal(gradeDraftRunPickForVersion(firstPayload,selected.id,DRAFT_RUN_SCORING_V3_LEGACY_PROFILE).score,13);
+  assert.equal(gradeDraftRunPickForVersion(firstPayload,selected.id,DRAFT_RUN_SCORING_V3_LINEAR_PROFILE).score,14);
+  await query(`INSERT INTO draft_run_verified_puzzles
+    SELECT (jsonb_populate_record(NULL::draft_run_verified_puzzles,
+      to_jsonb(source)||jsonb_build_object(
+        'puzzle_id',$2::text,'source_draft_hash',$3::text,'candidate_count',4,'payload',$4::jsonb
+      )
+    )).*
+    FROM draft_run_verified_puzzles source
+    WHERE source.puzzle_id=$1`,[
+    templatePuzzleIds[0],syntheticPuzzleId,syntheticSourceHash,JSON.stringify(firstPayload),
+  ]);
+
+  const legacySourceId=crypto.randomUUID();
+  const legacyPuzzleIds=[syntheticPuzzleId,...templatePuzzleIds.slice(1)];
+  const legacyPayloads=[firstPayload,...templatePuzzleIds.slice(1).map(id=>payloadById.get(id))];
+  const legacyAnswers=legacyPayloads.map((puzzle,index)=>{
+    const selectedId=index===0?selected.id:puzzle.historical_pick_id;
+    const grade=gradeDraftRunPickForVersion(puzzle,selectedId,DRAFT_RUN_SCORING_V3_LEGACY_PROFILE);
+    return {...grade,puzzle:{puzzle_id:puzzle.puzzle_id,set_id:puzzle.set_id,pick_number:puzzle.pick_number}};
+  });
+  const legacyScore=Math.round(legacyAnswers.reduce((sum,answer)=>sum+answer.score,0)/legacyAnswers.length);
+  await query(`INSERT INTO draft_run_sessions
+    SELECT (jsonb_populate_record(NULL::draft_run_sessions,
+      to_jsonb(source)||jsonb_build_object(
+        'id',$2::text,
+        'seed','legacy-creator-'||$2::text,
+        'scoring_version','trophy-consensus-v3',
+        'puzzle_ids',$3::jsonb,
+        'answers',$4::jsonb,
+        'score',$5::int,
+        'created_at','2026-09-16T00:00:00Z',
+        'updated_at','2026-09-16T00:00:00Z',
+        'result_persisted_at',NULL
+      )
+    )).*
+    FROM draft_run_sessions source
+    WHERE source.id=$1::uuid`,[
+    template.id,legacySourceId,JSON.stringify(legacyPuzzleIds),JSON.stringify(legacyAnswers),legacyScore,
+  ]);
+  const legacyChallenge=crypto.randomUUID(),legacySlug=`legacy-score-${tag}`;
+  await query(`INSERT INTO creator_challenges(
+      id,slug,source_session_id,source_owner_player_id,source_type,source_day,source_environment,
+      creator_public_name,headline,acquisition_source,acquisition_campaign,status,
+      created_by_admin_auth_user_id,published_at,publication_detail
+    ) VALUES($1::uuid,$2,$3::uuid,$4::uuid,'practice',NULL,'mixed',
+      'Legacy Score Creator','Legacy scoring replay','creator',$2,'published',
+      $5::uuid,now(),'{"live_verified":true}'::jsonb)`,[
+    legacyChallenge,legacySlug,legacySourceId,creator.playerId,targetAuth,
+  ]);
+  let legacyReplay=await directCall(runApi,'/v1/runs',{creatorChallenge:legacyChallenge},legacyReplayGuest.token);
+  assert.equal(legacyReplay.scoring_version,DRAFT_RUN_SCORING_V3_LEGACY_PROFILE,
+    'creator start persists the resolved historical scoring profile');
+  assert.equal(legacyReplay.current.puzzle_id,syntheticPuzzleId);
+  legacyReplay=await directCall(runApi,`/v1/runs/${legacyReplay.id}/pick`,{
+    revision:legacyReplay.revision,
+    round:0,
+    puzzleId:syntheticPuzzleId,
+    cardId:selected.id,
+  },legacyReplayGuest.token);
+  assert.equal(legacyReplay.answers[0].score,13,
+    'creator gameplay dispatches through the session-pinned historical scorer');
+  while(!legacyReplay.complete) {
+    legacyReplay=await directCall(runApi,`/v1/runs/${legacyReplay.id}/pick`,{
+      revision:legacyReplay.revision,
+      round:legacyReplay.answers.length,
+      puzzleId:legacyReplay.current.puzzle_id,
+      cardId:legacyReplay.current.candidates[0].id,
+    },legacyReplayGuest.token);
+  }
+  const legacyReload=await directCall(runApi,`/v1/runs/${legacyReplay.id}`,undefined,legacyReplayGuest.token);
+  assert.equal(legacyReload.complete,true);
+  assert.equal(legacyReload.scoring_version,DRAFT_RUN_SCORING_V3_LEGACY_PROFILE,
+    'historical scoring profile survives completion and reload');
+  const legacyReport=await directCall(runApi,`/v1/runs/${legacyReplay.id}/report`,{
+    round:0,puzzleId:syntheticPuzzleId,reason:'score_recommendation',
+    comment:'historical scoring profile smoke',client:{platform:'web'},
+  },legacyReplayGuest.token);
+  assert.equal(legacyReport.ok,true);
+  const legacyReportRow=(await query(`SELECT scoring_version
+    FROM draft_run_decision_reports WHERE run_id=$1::uuid ORDER BY id DESC LIMIT 1`,[
+    legacyReplay.id,
+  ])).rows[0];
+  assert.equal(legacyReportRow.scoring_version,DRAFT_RUN_SCORING_V3_LEGACY_PROFILE,
+    'decision-report persistence retains the session scoring profile');
 
   const publicOne=await directCall(runApi,`/v1/creator-challenges/${runtimeSlug}`,undefined,replayGuest.token);
   const publicTwo=await directCall(runApi,`/v1/creator-challenges/${runtimeSlug}`,undefined,replayGuest.token);
@@ -304,13 +452,29 @@ try {
   await insertCreatorResult(guestCompleted.playerId,guestCompletedId,challengeCompletedGuest,Number(completed.score));
   await insertCreatorStart(target.playerId,targetPartialId,challengeCompletedGuest);
   await insertCreatorStart(guestCompleted.playerId,guestCompletedId,challengeCompletedGuest);
-  await query(`INSERT INTO analytics_events(player_id,event_name,event_props)
-    VALUES($1::uuid,'acquisition_touch',jsonb_build_object(
-      'source','creator','campaign','merge-first-touch',
-      'creator_challenge_id',$2::text
-    ))`,[guestCompleted.playerId,challengeCompletedGuest]);
+  // Both browser identities may have opened the same creator link before
+  // sign-in. The merge must preserve the earliest attribution/open and must
+  // never fail the creator-event uniqueness invariant.
+  await query(`INSERT INTO analytics_events(player_id,event_name,event_props,created_at)
+    VALUES
+      ($1::uuid,'creator_challenge_open',jsonb_build_object('creator_challenge_id',$3::text),now()-interval '2 minutes'),
+      ($1::uuid,'acquisition_touch',jsonb_build_object(
+        'source','creator','campaign','merge-first-touch',
+        'creator_challenge_id',$3::text
+      ),now()-interval '2 minutes'),
+      ($2::uuid,'creator_challenge_open',jsonb_build_object('creator_challenge_id',$3::text),now()-interval '1 minute'),
+      ($2::uuid,'acquisition_touch',jsonb_build_object(
+        'source','creator','campaign','target-later-touch',
+        'creator_challenge_id',$3::text
+      ),now()-interval '1 minute')`,[
+    guestCompleted.playerId,target.playerId,challengeCompletedGuest,
+  ]);
 
+  // Simulate a subsequent secure-auth release replaying 0046 after 0054.
+  // The database trigger invariant must keep the pre-0054 merge body safe.
+  await query(mergeFunctionSql('migrations/0046_public_identity_safety.sql'));
   await query('SELECT merge_pack1_player($1::uuid,$2::uuid)',[guestCompleted.playerId,target.playerId]);
+  await query(mergeFunctionSql('migrations/0054_creator_event_idempotency.sql'));
 
   const mergedCompleted=(await query(`SELECT player_id,creator_challenge_id,creator_participant_auth_user_id,
       start_idempotency_hash,start_request_hash,score
@@ -335,9 +499,21 @@ try {
     WHERE player_id=$1::uuid AND event_name='creator_challenge_started'
       AND event_props->>'creator_challenge_id'=$2`,[target.playerId,challengeCompletedGuest])).rows[0].n),1);
   assert.equal(Number((await query(`SELECT count(*)::int n FROM analytics_events
+    WHERE player_id=$1::uuid AND event_name='creator_challenge_open'
+      AND event_props->>'creator_challenge_id'=$2`,[
+    target.playerId,challengeCompletedGuest,
+  ])).rows[0].n),1,'overlapping creator opens collapse during identity merge');
+  const mergedAttribution=(await query(`SELECT event_props
+    FROM analytics_events
     WHERE player_id=$1::uuid AND event_name='acquisition_touch'
-      AND event_props->>'campaign'='merge-first-touch'`,[target.playerId])).rows[0].n),1,
-    'creator first-touch attribution follows the guest into the merged account');
+      AND event_props->>'creator_challenge_id'=$2`,[
+    target.playerId,challengeCompletedGuest,
+  ])).rows;
+  assert.equal(mergedAttribution.length,1,'overlapping creator acquisition touches collapse during identity merge');
+  const mergedProps=typeof mergedAttribution[0].event_props==='string'
+    ?JSON.parse(mergedAttribution[0].event_props):mergedAttribution[0].event_props;
+  assert.equal(mergedProps.campaign,'merge-first-touch',
+    'identity merge preserves the earliest creator acquisition attribution');
 
   // Case 2: established account completed, guest only partial.
   const targetCompleteId=crypto.randomUUID(),guestPartialId=crypto.randomUUID();
@@ -495,14 +671,17 @@ try {
   // Exercise later creator privacy cleanup without requiring live publication
   // infrastructure in this isolated database. The merge/result associations
   // must remain internally consistent when creator identity is scrubbed.
+  const creatorOwnedChallenges=[
+    creation.id,runtimeChallenge,legacyChallenge,paidChallenge,challengeCompletedGuest,challengePartialGuest,
+  ];
   await query(`UPDATE creator_challenges
     SET status='draft',published_at=NULL,publication_operation_ref=NULL,publication_detail='{}'::jsonb
-    WHERE id IN ($1::uuid,$2::uuid,$3::uuid,$4::uuid)`,[
-    runtimeChallenge,paidChallenge,challengeCompletedGuest,challengePartialGuest,
+    WHERE id=ANY($1::uuid[])`,[
+    '{'+creatorOwnedChallenges.join(',')+'}',
   ]);
   const privacyReady=await requestCreatorPrivacyRetirement(query,creator.playerId,{reason:'account_deletion'});
   assert.equal(privacyReady,true,'synthetic unpublished fixture challenges require no static cleanup');
-  for(const challengeId of [runtimeChallenge,paidChallenge,challengeCompletedGuest,challengePartialGuest]) {
+  for(const challengeId of creatorOwnedChallenges) {
     const privacy=(await query(`SELECT status,creator_public_name,creator_handle,headline,
         creator_post_run_note,source_owner_auth_user_id,privacy_removed_at
       FROM creator_challenges WHERE id=$1::uuid`,[challengeId])).rows[0];

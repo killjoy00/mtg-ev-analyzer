@@ -1,6 +1,12 @@
 import {buildCampaignTrackingUrl,normalizeAcquisitionValue,normalizeCampaignSlug} from '../campaign-links.mjs';
 import {componentBelongsTo} from './corpus-components.mjs';
-import {DRAFT_RUN_SCORING_VERSION,gradeDraftRunPick,validateDraftRunPuzzle} from '../draft-run.mjs';
+import {
+  DRAFT_RUN_REPLAY_SCORING_VERSIONS,
+  DRAFT_RUN_SCORING_V3_LINEAR_PROFILE,
+  gradeDraftRunPickForVersion,
+  replayScoringProfilesForVersion,
+  validateDraftRunPuzzle,
+} from '../draft-run.mjs';
 import {gameDateKey} from '../game-date.mjs';
 
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i;
@@ -8,6 +14,7 @@ const SHARE=/^[a-f0-9]{24}$/;
 const PACK_ONE_HOSTS=new Set(['packone.pro','www.packone.pro']);
 const SOURCE_TYPES=new Set(['practice','daily']);
 const SOURCE_ENVIRONMENTS=new Set(['mixed','powered-cube','latest']);
+export const CREATOR_REPLAY_SCORING_VERSIONS=DRAFT_RUN_REPLAY_SCORING_VERSIONS;
 const ALLOWED_PRACTICE_URL_PARAMS=new Set(['game','shared','challenge','set','utm_source','utm_campaign','utm_medium','ref']);
 const bool=value=>value===true||value==='t'||value==='true';
 const parse=value=>typeof value==='string'?JSON.parse(value):value;
@@ -64,9 +71,11 @@ function decodeSource(row) {
 async function validateHistoricalPuzzles(query,source) {
   if(!Array.isArray(source.puzzle_ids)||source.puzzle_ids.length!==8)fail('Creator source must contain exactly eight decisions.',409,'CREATOR_SOURCE_INELIGIBLE');
   if(!Array.isArray(source.answers)||source.answers.length!==8||source.score==null)fail('Creator source run is not complete.',409,'CREATOR_SOURCE_INELIGIBLE');
-  if(source.scoring_version!==DRAFT_RUN_SCORING_VERSION)
+  let matchingProfiles=replayScoringProfilesForVersion(source.scoring_version);
+  if(!matchingProfiles.length)
     fail('This source uses a historical scoring version that the current replay engine cannot reproduce.',409,'CREATOR_SOURCE_SCORING_VERSION');
   let scoreTotal=0;
+  const validatedPuzzles=[];
   for(let index=0;index<8;index++) {
     const id=source.puzzle_ids[index],answer=source.answers[index];
     if(!answer||answer?.puzzle?.puzzle_id!==id||!answer.selectedId)fail('Creator source answers do not match the authoritative decision order.',409,'CREATOR_SOURCE_INELIGIBLE');
@@ -76,13 +85,48 @@ async function validateHistoricalPuzzles(query,source) {
       fail('This source uses historical puzzle data that Pack One can no longer serve safely.',409,'CREATOR_SOURCE_UNAVAILABLE');
     if(!puzzle.candidates.some(card=>card.id===answer.selectedId))
       fail('A creator selection is not part of its authoritative historical pack.',409,'CREATOR_SOURCE_INELIGIBLE');
-    const reproduced=gradeDraftRunPick(puzzle,answer.selectedId).score;
-    if(Number(answer.score)!==Number(reproduced))
+
+    // The selected score is authoritative evidence, and Draft Run answers also
+    // retain the per-candidate ranking scores that were shown for that exact
+    // historical pack. Use all available recorded scores to identify the
+    // implementation instead of guessing from a commit/deploy timestamp.
+    const selectedScore=Number(answer.score);
+    if(!Number.isFinite(selectedScore))
+      fail('Creator source answer score is invalid.',409,'CREATOR_SOURCE_SCORING_VERSION');
+    const recordedScores=new Map([[answer.selectedId,selectedScore]]);
+    if(Array.isArray(answer.ranking))for(const item of answer.ranking) {
+      if(!item?.id||!Number.isFinite(Number(item.score)))continue;
+      const recorded=Number(item.score);
+      if(recordedScores.has(item.id)&&recordedScores.get(item.id)!==recorded)
+        fail('Creator source contains conflicting historical scoring evidence.',409,'CREATOR_SOURCE_SCORING_VERSION');
+      recordedScores.set(item.id,recorded);
+    }
+    matchingProfiles=matchingProfiles.filter(profile=>
+      [...recordedScores].every(([cardId,recorded])=>
+        puzzle.candidates.some(card=>card.id===cardId)
+        &&Number(gradeDraftRunPickForVersion(puzzle,cardId,profile).score)===recorded));
+    if(!matchingProfiles.length)
       fail('This source cannot be reproduced exactly by the current scoring engine.',409,'CREATOR_SOURCE_SCORING_VERSION');
-    scoreTotal+=Number(reproduced);
+    scoreTotal+=Number(answer.score);
+    validatedPuzzles.push(puzzle);
   }
   if(Math.round(scoreTotal/8)!==Number(source.score))
     fail('This source score cannot be reproduced exactly by the current scoring engine.',409,'CREATOR_SOURCE_SCORING_VERSION');
+
+  if(matchingProfiles.length>1) {
+    const equivalent=validatedPuzzles.every(puzzle=>puzzle.candidates.every(card=>{
+      const scores=matchingProfiles.map(profile=>gradeDraftRunPickForVersion(puzzle,card.id,profile).score);
+      return scores.every(score=>score===scores[0]);
+    }));
+    if(!equivalent)
+      fail('This source scoring profile is ambiguous and cannot be replayed safely.',409,'CREATOR_SOURCE_SCORING_VERSION');
+  }
+
+  // If multiple implementations are observationally identical for every card
+  // in these eight fixed packs, either yields the same challenge outcome.
+  return matchingProfiles.includes(DRAFT_RUN_SCORING_V3_LINEAR_PROFILE)
+    ?DRAFT_RUN_SCORING_V3_LINEAR_PROFILE
+    :matchingProfiles[0];
 }
 
 async function sourceSession(query,id,{expectedPlayerId=null,expectedType=null,shareId=null,validatePuzzles=true}={}) {
@@ -107,7 +151,7 @@ async function sourceSession(query,id,{expectedPlayerId=null,expectedType=null,s
     const linked=await query('SELECT 1 FROM draft_run_shares WHERE id=$1 AND session_id=$2::uuid',[shareId,source.id]);
     if(!linked.rows[0])fail('Shared Practice source no longer matches its authoritative run.',409,'CREATOR_SOURCE_MISMATCH');
   }
-  if(validatePuzzles)await validateHistoricalPuzzles(query,source);
+  if(validatePuzzles)source.replay_scoring_version=await validateHistoricalPuzzles(query,source);
   return source;
 }
 
@@ -140,6 +184,7 @@ function sourceSummary(source,{shareId=null}={}) {
     share_id:shareId,
     corpus_version:source.corpus_version,
     scoring_version:source.scoring_version,
+    replay_scoring_version:source.replay_scoring_version||source.scoring_version,
     difficulty_version:source.difficulty_version,
     selection_version:source.selection_version,
     serving_policy_version:source.serving_policy_version,
@@ -192,12 +237,8 @@ function challengeRow(row) {
   };
 }
 
-export async function creatorChallengeById(query,id,{forUpdate=false,includeStats=false}={}) {
-  if(!UUID.test(String(id||'')))fail('Invalid creator challenge.');
-  const statSelect=includeStats
-    ? ',stats.attempts,stats.attempts completions,stats.wins,stats.ties,stats.losses,stats.beat_percentage,stats.average_score,funnel.opens,funnel.starts'
-    : '';
-  const statJoins=includeStats ? `
+const CREATOR_STATS_SELECT=',stats.attempts,stats.attempts completions,stats.wins,stats.ties,stats.losses,stats.beat_percentage,stats.average_score,funnel.opens,funnel.starts';
+const CREATOR_STATS_JOINS=`
     LEFT JOIN LATERAL (
       SELECT count(*)::int attempts,
         count(*) FILTER(WHERE x.score>s.score)::int wins,
@@ -223,6 +264,7 @@ export async function creatorChallengeById(query,id,{forUpdate=false,includeStat
       FROM analytics_events e
       JOIN players ep ON ep.id=e.player_id
       WHERE e.event_name IN ('creator_challenge_open','creator_challenge_started')
+        AND e.event_props ? 'creator_challenge_id'
         AND e.event_props->>'creator_challenge_id'=c.id::text
         AND NOT coalesce(ep.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
         AND NOT EXISTS (
@@ -230,14 +272,22 @@ export async function creatorChallengeById(query,id,{forUpdate=false,includeStat
           JOIN pack1_admins admin ON admin.auth_user_id=ea.auth_user_id
           WHERE ea.player_id=e.player_id
         )
-    ) funnel ON true` : '';
-  const result=await query(`SELECT c.*,s.score source_score,s.day authoritative_source_day,s.environment authoritative_environment,
+    ) funnel ON true`;
+
+function creatorChallengeSelect({includeStats=false,paged=false}={}) {
+  const from=paged?'FROM creator_page page JOIN creator_challenges c ON c.id=page.id':'FROM creator_challenges c';
+  return `SELECT c.*,s.score source_score,s.day authoritative_source_day,s.environment authoritative_environment,
       s.player_id authoritative_owner_player_id,s.measurement_qa,
-      p.public_identity_hidden_at,p.profile_public${statSelect}
-    FROM creator_challenges c
+      p.public_identity_hidden_at,p.profile_public${includeStats?CREATOR_STATS_SELECT:''}
+    ${from}
     LEFT JOIN draft_run_sessions s ON s.id=c.source_session_id
     LEFT JOIN players p ON p.id=c.source_owner_player_id
-    ${statJoins}
+    ${includeStats?CREATOR_STATS_JOINS:''}`;
+}
+
+export async function creatorChallengeById(query,id,{forUpdate=false,includeStats=false}={}) {
+  if(!UUID.test(String(id||'')))fail('Invalid creator challenge.');
+  const result=await query(`${creatorChallengeSelect({includeStats})}
     WHERE c.id=$1::uuid${forUpdate?' FOR UPDATE OF c':''}`,[id]);
   return challengeRow(result.rows[0]);
 }
@@ -440,10 +490,14 @@ export async function listCompletedDailies(query,playerId,{limit=20,before=null}
 
 export async function listCreatorChallenges(query,{limit=100}={}) {
   const safeLimit=Math.max(1,Math.min(200,Number(limit)||100));
-  const result=await query(`SELECT c.id FROM creator_challenges c ORDER BY c.created_at DESC LIMIT $1::int`,[safeLimit]);
-  const rows=[];
-  for(const item of result.rows)rows.push(await creatorChallengeById(query,item.id,{includeStats:true}));
-  return rows;
+  const result=await query(`WITH creator_page AS MATERIALIZED (
+      SELECT id FROM creator_challenges
+      ORDER BY created_at DESC,id DESC
+      LIMIT $1::int
+    )
+    ${creatorChallengeSelect({includeStats:true,paged:true})}
+    ORDER BY c.created_at DESC,c.id DESC`,[safeLimit]);
+  return result.rows.map(challengeRow);
 }
 
 export async function handleCreatorChallengeAdmin(request,query,readJson,adminAuthUserId) {

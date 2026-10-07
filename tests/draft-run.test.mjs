@@ -9,12 +9,45 @@ import {
   eligiblePickForRound,
   calibratedSupports,
   gradeDraftRunPick,
+  gradeDraftRunPickForVersion,
+  DRAFT_RUN_REPLAY_SCORING_VERSIONS,
+  DRAFT_RUN_SCORING_V3_LEGACY_PROFILE,
+  DRAFT_RUN_SCORING_V3_LINEAR_PROFILE,
   publicDraftRunPuzzle,
   SCORE_EXPONENT,
   SUPPORT_SHARPENING,
   supportSharpening,
   summarizeDraftRun,
 } from '../draft-run.mjs';
+
+test('historical replay scoring pins recorded v2 and both v3 floating-point paths',()=>{
+  const p={
+    historical_pick_id:'d',
+    candidates:[
+      {id:'a',name:'A',model_probability:.19},
+      {id:'b',name:'B',model_probability:.027},
+      {id:'c',name:'C',model_probability:.0135},
+      {id:'d',name:'D',model_probability:.00675},
+    ],
+  };
+  assert.ok(DRAFT_RUN_REPLAY_SCORING_VERSIONS.includes('trophy-consensus-v2'));
+  assert.ok(DRAFT_RUN_REPLAY_SCORING_VERSIONS.includes(DRAFT_RUN_SCORING_V3_LEGACY_PROFILE));
+  assert.ok(DRAFT_RUN_REPLAY_SCORING_VERSIONS.includes(DRAFT_RUN_SCORING_V3_LINEAR_PROFILE));
+  assert.equal(gradeDraftRunPickForVersion(p,'b','trophy-consensus-v2').score,14);
+  assert.equal(gradeDraftRunPickForVersion(p,'b',DRAFT_RUN_SCORING_V3_LEGACY_PROFILE).score,13);
+  assert.equal(gradeDraftRunPickForVersion(p,'b',DRAFT_RUN_SCORING_V3_LINEAR_PROFILE).score,14);
+  assert.equal(gradeDraftRunPickForVersion(p,'b','trophy-consensus-v3').score,14,
+    'coarse current v3 remains the linear implementation; creator validation resolves legacy sources to an explicit profile');
+  assert.equal(gradeDraftRunPickForVersion(p,'d',DRAFT_RUN_SCORING_V3_LEGACY_PROFILE).score,100);
+  assert.throws(()=>gradeDraftRunPickForVersion(p,'a','trophy-consensus-v4'),/Unsupported Draft Run scoring version/);
+
+  const component={...p,corpus_version:'traditional-premier-v5-phase2-v1'};
+  const replay=gradeDraftRunPickForVersion(component,'b',DRAFT_RUN_SCORING_V3_LINEAR_PROFILE);
+  const currentSupports=calibratedSupports(component.candidates,supportSharpening(component.corpus_version));
+  assert.equal(replay.selectedSupport,currentSupports.get('b'),
+    'frozen linear-v3 replay retains current traditional-component display calibration');
+  assert.equal(replay.consensusSupport,currentSupports.get('a'));
+});
 
 function card(id, support) {
   return { id, name: id.toUpperCase(), model_probability: support };

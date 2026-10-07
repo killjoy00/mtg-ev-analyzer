@@ -20,7 +20,8 @@ try {
  SELECT id,player,id::text,$2,$3,$4::jsonb,'[]'::jsonb,'mixed','support-ratio-v1',$5 FROM data RETURNING id)
  INSERT INTO draft_run_decision_observations(session_id,revision,round,puzzle_id,observed,outcome,answered_at,selected_id,score,trophy_match,active_ms)
  SELECT d.id,0,1,$6,true,'pick',now(),d.selected,d.score,d.match,d.ms FROM data d JOIN sessions_added s ON s.id=d.id`,[JSON.stringify(data),DRAFT_RUN_CORPUS_VERSION,source.scoring_version,source.puzzle_ids,version,puzzleIds[0]]);
- const today=new Date().toISOString().slice(0,10),funnelUrl='https://packone.pro/v1/admin/measurements?from='+today+'&to='+today+'&environment=mixed';
+ const today=(await query("SELECT (now() AT TIME ZONE 'America/Los_Angeles')::date::text AS day")).rows[0].day,
+   funnelUrl='https://packone.pro/v1/admin/measurements?from='+today+'&to='+today+'&environment=mixed';
  const beforeFunnel=(await handleAdmin(new Request(funnelUrl,{headers:{'x-pack1-auth-session':token}}),query,readJson)).share_funnel;
  await query(`INSERT INTO analytics_events(player_id,event_name,event_props) VALUES
    ($1::uuid,'daily_share_arrival',jsonb_build_object('source','result_share','daily',true,'session_id','math-share')),
@@ -41,7 +42,7 @@ try {
  // Launch habit metrics: authoritative Daily sessions, shared exclusions, person
  // collapsing, first-touch attribution, Pacific day bucketing and maturity.
  const isoDay=(value,offset=0)=>{const d=new Date(value+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+offset);return d.toISOString().slice(0,10);};
- const pacificToday=(await query("SELECT (now() AT TIME ZONE 'America/Los_Angeles')::date::text AS day")).rows[0].day;
+ const pacificToday=today;
  const firstDay=isoDay(pacificToday,-20),nextDay=isoDay(firstDay,1),sixthDay=isoDay(firstDay,6),crossDay=isoDay(pacificToday,-1);
  let trackingStart=(await query("SELECT min(created_at) started_at FROM analytics_events WHERE event_name='acquisition_touch'")).rows[0].started_at;
  const addPlayer=async(name,{linked=false,admin=false}={})=>{
@@ -90,6 +91,21 @@ try {
  const beforePre=beforeCohorts.filter(r=>r.source==='pre_tracking').reduce((n,r)=>n+Number(r.cohort_people||0),0);
  const beforeDirectNone=beforeCohorts.filter(r=>r.source==='direct'&&r.campaign==='(none)').reduce((n,r)=>n+Number(r.cohort_people||0),0);
  const tag=crypto.randomUUID().replaceAll('-','').slice(0,8);
+
+ // Admin timestamp windows are Pacific midnights, not database-session
+ // midnights. 18:30 Pacific is already the following UTC date during DST but
+ // must remain inside the report for its Pacific calendar day.
+ const boundaryPlayer=await addPlayer('Pacific edge '+tag);
+ const boundaryUrl=`https://packone.pro/v1/admin/measurements?from=${crossDay}&to=${crossDay}`;
+ const boundaryBefore=await handleAdmin(new Request(boundaryUrl,{headers:{'x-pack1-auth-session':token}}),query,readJson);
+ await query(`INSERT INTO analytics_events(player_id,event_name,event_props,created_at)
+   VALUES($1::uuid,'daily_share_arrival','{"set":"mixed"}'::jsonb,
+     (($2::date + time '18:30') AT TIME ZONE 'America/Los_Angeles'))`,[
+   boundaryPlayer.player,crossDay,
+ ]);
+ const boundaryAfter=await handleAdmin(new Request(boundaryUrl,{headers:{'x-pack1-auth-session':token}}),query,readJson);
+ assert.equal(Number(boundaryAfter.share_funnel.arrivals),Number(boundaryBefore.share_funnel.arrivals)+1,
+   'Pacific-evening arrival remains inside the same Pacific report date after UTC rollover');
 
  // An untagged direct first touch remains authoritative even after a later
  // tagged visit.

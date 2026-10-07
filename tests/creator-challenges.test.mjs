@@ -119,6 +119,7 @@ test('completed Daily remains previewable but cannot publish/start until the Pac
       selectedId,
       selectedName:p.candidates.find(card=>card.id===selectedId)?.name||'Trophy pick',
       score:graded.score,
+      ranking:p.candidates.map(card=>({id:card.id,score:gradeDraftRunPick(p,card.id).score})),
     };
   });
   const score=Math.round(answers.reduce((sum,answer)=>sum+answer.score,0)/answers.length);
@@ -155,11 +156,21 @@ test('completed Daily remains previewable but cannot publish/start until the Pac
   assert.equal(resolved.id,sessionId);
   assert.equal(resolved.answers.length,8);
 
+  const originalVersion=source.scoring_version;
+  const originalRanking=source.answers[0].ranking;
+  source.answers[0].ranking=[{id:source.answers[0].selectedId,score:Number(source.answers[0].score)-1}];
+  await assert.rejects(
+    validateCreatorChallengeSource(query,challenge,{today:'2026-10-06',requireClosed:true}),
+    error=>error?.code==='CREATOR_SOURCE_SCORING_VERSION',
+    'conflicting selected-card score evidence must fail closed',
+  );
+  source.answers[0].ranking=originalRanking;
   source.scoring_version='historical-unsupported';
   await assert.rejects(
     validateCreatorChallengeSource(query,challenge,{today:'2026-10-06',requireClosed:true}),
     error=>error?.code==='CREATOR_SOURCE_SCORING_VERSION',
   );
+  source.scoring_version=originalVersion;
 });
 
 test('creator public payload uses existing acquisition tracking without weakening normal campaign destinations',()=>{
@@ -617,4 +628,39 @@ test('creator privacy cleanup scrubs retained challenger labels and creator auth
   assert.match(deletion,/source_owner_auth_user_id=NULL/);
   assert.match(moderation,/creator_result_scrub/);
   assert.match(moderation,/UPDATE game_results SET opponent_name='A creator'/);
+});
+
+
+test('creator funnel migration installs a rollout-safe database invariant',async()=>{
+  const migration=await readFile('migrations/0054_creator_event_idempotency.sql','utf8');
+  assert.match(migration,/LOCK TABLE analytics_events IN SHARE ROW EXCLUSIVE MODE/);
+  assert.match(migration,/pack1_creator_event_write_guard/);
+  assert.match(migration,/pack1_creator_event_update_dedupe/);
+  assert.match(migration,/REFERENCING NEW TABLE AS creator_event_updates/);
+  assert.match(migration,/DROP INDEX IF EXISTS analytics_creator_challenge_event_uq/);
+  assert.doesNotMatch(migration,/CREATE UNIQUE INDEX IF NOT EXISTS analytics_creator_challenge_event_uq/);
+  assert.match(migration,/ORDER BY created_at,id/);
+  const runtime=await readFile('worker/draft-run-function.mjs','utf8');
+  const start=runtime.indexOf("('creator_challenge_open',$2::jsonb)");
+  const finish=runtime.indexOf('return json(publicCreatorChallenge(challenge));',start);
+  assert.ok(start>0&&finish>start);
+  assert.match(runtime.slice(start,finish),/ON CONFLICT DO NOTHING/);
+  const secureRelease=await readFile('.github/workflows/secure-auth-release.yml','utf8');
+  assert.match(secureRelease,/pack1_creator_event_update_dedupe/);
+  assert.match(secureRelease,/Skipping 0046 replay because creator-event merge hardening is already installed/);
+});
+
+test('creator admin list bounds the page before running correlated stats',async()=>{
+  const source=await readFile('worker/creator-challenges.mjs','utf8');
+  const start=source.indexOf('export async function listCreatorChallenges');
+  const end=source.indexOf('export async function handleCreatorChallengeAdmin',start);
+  assert.ok(start>0&&end>start);
+  const list=source.slice(start,end);
+  assert.match(list,/WITH creator_page AS MATERIALIZED/);
+  assert.match(list,/LIMIT \$1::int/);
+  assert.match(list,/creatorChallengeSelect\(\{includeStats:true,paged:true\}\)/);
+  assert.match(list,/return result\.rows\.map\(challengeRow\)/);
+  assert.doesNotMatch(list,/creatorChallengeById/);
+  assert.match(source,/e\.event_props \? 'creator_challenge_id'/,
+    'funnel lookup must carry the partial-index predicate explicitly');
 });
