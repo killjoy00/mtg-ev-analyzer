@@ -55,6 +55,10 @@ async function api(path,body,auth=true) {
   const r=await fetch(base()+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),credentials:firstPartyAuthEnabled()?'include':'omit',signal:AbortSignal.timeout(30000)});
   const data=await r.json();if(!r.ok) throw Object.assign(new Error(data.error||'Could not reach the game. Try again.'),{status:r.status,capability:data.capability});return data;
 }
+async function publicApi(path) {
+  const r=await fetch(base()+path,{method:'GET',headers:{accept:'application/json'},credentials:'omit',signal:AbortSignal.timeout(30000)});
+  const data=await r.json();if(!r.ok)throw Object.assign(new Error(data.error||'Could not reach the game. Try again.'),{status:r.status});return data;
+}
 function image(card,extra='') {
   const url=/^https:\/\//.test(card.image_url||'')?card.image_url:'';
   return url?`<img src="${esc(url)}" alt="${esc(card.name)}" decoding="async" ${extra}>`:`<span class="run-card-fallback">${esc(card.name)}</span>`;
@@ -140,6 +144,11 @@ function rankingStateMarkup(value=run) {
     return value.complete
       ? `<p class="run-ranking-state" role="alert"><strong>This Daily isn’t ranked yet.</strong> ${fix} You can add this score afterward.</p>`
       : `<p class="run-ranking-state" role="alert"><strong>This Daily isn’t ranked yet.</strong> ${fix} You can add the completed score afterward.</p>`;
+  }
+  if(hasAccountSession()) {
+    return value.complete
+      ? '<p class="run-ranking-state" role="status"><strong>Signed in.</strong> Add this score to today’s leaderboard when you’re ready.</p>'
+      : '<p class="run-ranking-state is-quiet" role="status"><strong>Signed in.</strong> This run stays with your account.</p>';
   }
   return value.complete
     ? '<p class="run-ranking-state" role="status">Playing as guest. Sign in to add this score to the leaderboard.</p>'
@@ -287,7 +296,7 @@ function renderResult() {
     ${rankingStateMarkup(run)}
     ${run.comparison&&run.comparison.kind!=='creator'?`<p class="run-friend">${run.comparison.exact?`You: ${run.score} · ${esc(run.comparison.name)}: ${run.comparison.score}`:'These scores came from different decisions.'}</p>`:''}
     ${creator?.creator_post_run_note?`<blockquote class="run-friend"><strong>${esc(creator.name)} after the run:</strong> “${esc(creator.creator_post_run_note)}”</blockquote>`:''}
-    <div class="run-result-actions"><a class="button primary" href="${repeat.href}">${repeat.label}</a><button class="button secondary" id="run-share">${run.day?'Share result':'Share this run and compare'}</button><a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">${run.day&&!run.leaderboard_eligible?(['username_taken','username_required','name_not_allowed'].includes(run.ranking_identity?.reason)?'Choose display name to add score':'Sign in to add score'):'View your career'}</button></div>
+    <div class="run-result-actions"><a class="button primary" href="${repeat.href}">${repeat.label}</a><button class="button secondary" id="run-share">${run.day?'Share result':'Share this run and compare'}</button><a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">${run.day&&!run.leaderboard_eligible?(['username_taken','username_required','name_not_allowed'].includes(run.ranking_identity?.reason)?'Choose display name to add score':hasAccountSession()?'Add score to leaderboard':'Sign in to add score'):'View your career'}</button></div>
     <h2>Your ${runLength()} picks</h2><ol class="run-review-list">${run.answers.map((a,i)=>`<li><button data-review="${i}"><span>${i+1}</span><div><strong>${esc(setName(a.puzzle.set_id))} · Pick ${a.pickNumber}</strong><small>${esc(a.selectedName)}${a.historicalMatch?' · Trophy match':''}</small></div><b>${a.score}</b></button></li>`).join('')}</ol>
     <p class="run-note">Your final score is the rounded average of ${runLength()} decisions. Trophy picks earn 100; other picks can earn up to 95 based on broader drafting evidence.</p><p id="run-share-status" role="status"></p><p id="run-error" role="alert"></p></section>`;
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render();window.scrollTo({top:0,behavior:'instant'});});
@@ -314,11 +323,22 @@ async function shareResult() {
   const button=document.querySelector('#run-share');button.disabled=true;
   try {
     const share=run.day?null:await api(`/v1/runs/${run.id}/share`,{});
+    if(!run.day&&!share?.creator) {
+      if(!/^[a-f0-9]{24}$/.test(String(share?.id||'')))throw new Error('Pack One could not verify this share link. Try Share again.');
+      try {
+        const verified=await publicApi('/v1/shared-runs/'+encodeURIComponent(share.id));
+        if(verified?.id!==share.id)throw new Error('Share identity mismatch.');
+      } catch {
+        throw new Error('Pack One could not verify this share link. Try Share again.');
+      }
+    }
     const url=run.day
       ? `${location.origin}/share/daily/v2/?environment=${encodeURIComponent(run.environment||environment)}&ref=result_share`
       : share?.creator&&share.url
         ? new URL(share.url,location.origin).toString()
-        : `${location.origin}${location.pathname}${gameUrl('shared='+share.id)}`;
+        : share?.url
+          ? new URL(share.url,location.origin).toString()
+          : `${location.origin}${location.pathname}${gameUrl('shared='+share.id)}`;
     trackEvent('share_click',{surface:'draft_run_result'});
     const result=await shareDraftRunCard(run,url);
     const status=document.querySelector('#run-share-status');

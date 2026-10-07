@@ -76,14 +76,15 @@ reading provider state. Sanitized ownership receipts are uploaded from
 mismatch fails cleanup rather than removing another run's resources. Existing
 latency, correctness, telemetry, resource and cleanup budgets remain unchanged.
 
-PR capacity acceptance now requalifies 25 players on five independent egress
-networks, including the complete 120-second hold, drain and recovery. The
-50-player stage is optional: manually dispatch `launch-distributed.yml` with
-`capacity_target=50` to run the original 25→50 ladder and 600-second hold.
-The separate NAT workflow also defaults to 25 and offers the same manual
-`capacity_target=50` choice. Its independent cold/warm browser check remains
-required. Ordinary PRs and dispatches default to 25. Every job uses the same selected
-policy; its fingerprint binds fixtures and reports, and the collector still
+Distributed capacity rehearsals are opt-in. PRs run the fast regressions and
+report load-sensitive scope; they do not automatically provision the rehearsal.
+Manually dispatch `launch-distributed.yml` on the PR branch to requalify 25 players
+on five independent egress networks, including the complete 120-second hold,
+drain and recovery. Dispatch `capacity_target=50` for the optional original
+25→50 ladder and 600-second hold. The separate NAT PR workflow defaults to 25
+and offers the same manual `capacity_target=50` choice. Its independent cold/warm
+browser check remains required. Dispatches default to 25. Every job uses the same
+selected policy; its fingerprint binds fixtures and reports, and the collector still
 requires all five cohorts to complete and every selected stage to pass.
 Skipping 50 does not establish current 50-player capacity. A policy change
 requires a fresh run; earlier failed runs remain failed.

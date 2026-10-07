@@ -79,6 +79,19 @@ test('borrowed closed Daily eligibility is restored and canary is protected',()=
   assert.doesNotMatch(workflow,/workflow_dispatch:/);
 });
 
+test('production creator canary keeps repository access read-only and does not auto-clean static artifacts',()=>{
+  assert.match(workflow,/permissions:\n  contents: read/);
+  assert.doesNotMatch(workflow,/contents: write/);
+  assert.doesNotMatch(workflow,/pull-requests: write/);
+  assert.doesNotMatch(workflow,/actions: write/);
+  assert.doesNotMatch(workflow,/pages: write/);
+  assert.doesNotMatch(workflow,/Remove retired creator canary static artifacts/);
+  assert.doesNotMatch(workflow,/cleanup-creator-canary-static\.mjs/);
+  assert.doesNotMatch(workflow,/gh pr create/);
+  assert.doesNotMatch(workflow,/gh pr merge/);
+  assert.doesNotMatch(workflow,/pages\/builds/);
+});
+
 test('reviewed retry request explicitly forbids customer rows',()=>{
   assert.equal(request.operation,'run-creator-production-canary');
   // The request pins the corrected protected release; live markerCheck enforces it.

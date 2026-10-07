@@ -1,5 +1,5 @@
 {
   "operation": "read-pack-one-testflight-status",
-  "reason": "Verify actual TestFlight availability and existing group associations for native repair build 100500 after correcting Apple betaGroups one-relationship-filter API restriction. Read-only: no upload, tester/group change, review submission or release.",
-  "build_number": "100500"
+  "reason": "Read-only owner-authorized TestFlight crash investigation for the physical iOS Report this decision app-close issue. Query exact build 100638, retain any Apple beta crash submissions and crash logs as protected workflow evidence, and do not change testers, groups, review state, metadata, or release state.",
+  "build_number": "100638"
 }

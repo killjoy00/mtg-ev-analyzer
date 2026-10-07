@@ -178,22 +178,24 @@ test('accessibility tab bar keeps real navigation events, hidden routes and keyb
 test('Daily preserves loaded completion and zero scores through refresh failure, then retries', async () => {
   const h = await fixture({ daily: status([0, 87, 100]) });
   try {
-    assert.match(h.text(), /3\/3 complete/);
+    assert.doesNotMatch(h.text(), /\d\/3 complete/);
     assert.match(h.text(), /Complete · 0\/100/);
     assert.match(h.text(), /0-day streak/);
     assert.match(h.text(), /Create a free account/);
     const pending = deferred(); h.readDaily(() => pending.promise);
     await h.resume();
-    assert.match(h.text(), /3\/3 complete/);
+    assert.match(h.text(), /Complete · 100\/100/);
+    assert.doesNotMatch(h.text(), /\d\/3 complete/);
     await act(async () => { pending.reject(Error('offline')); await flush(); });
     assert.match(h.text(), /last loaded progress/);
     assert.match(h.text(), /Complete · 100\/100/);
     h.readDaily(async () => status([87]));
     await h.press('Retry');
-    assert.match(h.text(), /1\/3 complete/);
+    assert.match(h.text(), /Complete · 87\/100/);
+    assert.doesNotMatch(h.text(), /\d\/3 complete/);
     assert.doesNotMatch(h.text(), /temporarily unavailable/);
     const dailyCards = h.root.root.findAllByType('Pressable').filter(node => /(?:Play|View) .+ Daily/.test(node.props.accessibilityLabel || ''));
-    assert.deepEqual(dailyCards.map(node => node.props.accessibilityLabel), ['View mixed Daily', 'Play powered-cube Daily', 'Play latest Daily']);
+    assert.deepEqual(dailyCards.map(node => node.props.accessibilityLabel), ['View result for mixed Daily', 'Play powered-cube Daily', 'Play latest Daily']);
   } finally { await h.close(); }
 });
 

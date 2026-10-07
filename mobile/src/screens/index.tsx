@@ -1,11 +1,12 @@
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, View, useWindowDimensions, type LayoutChangeEvent } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { Text } from '@/src/components/Text';
 import { config } from '@/src/config';
 
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
+import { AboutLink } from '@/src/components/AboutLink';
 
 import {
   DAILY_ENVIRONMENT_META,
@@ -49,7 +50,6 @@ function completed(status: DailyStatus | null, environment: DailyEnvironment) {
 
 export default function HomeScreen() {
   const accountState = useNavigationSession();
-  const { fontScale } = useWindowDimensions();
   const [status, setStatus] = useState<DailyStatus | null>(null);
   const [promotionAllowed, setPromotionAllowed] = useState<boolean | null>(null);
   const [promotionError, setPromotionError] = useState<string | null>(null);
@@ -138,9 +138,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.page}>
-        <View onLayout={event => recordBrandLayout('row', event)} style={[styles.brandRow, fontScale > 1.5 && styles.brandRowStacked]}><Brand />
-          <Pressable accessibilityRole="button" accessibilityLabel="Help and information" onLayout={event => recordBrandLayout('help', event)} onPress={() => router.push('/help')} style={styles.helpLink}><Text style={styles.cardAction}>Help</Text></Pressable>
-        </View>
+        <View onLayout={event => recordBrandLayout('row', event)} style={styles.brandRow}><Brand /></View>
 
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>THE DAILY DRAFT</Text>
@@ -148,7 +146,7 @@ export default function HomeScreen() {
           <Text style={styles.lede}>
             Make your pick, then see what the trophy drafter chose and how strong your pick was.
           </Text>
-          <Text style={styles.today}>{dailyDate(pacificDay(now))}’s Daily Runs{completedCount !== null ? ` · ${completedCount}/3 complete` : ''}</Text>
+          <Text style={styles.today}>{dailyDate(pacificDay(now))}’s Daily Runs</Text>
         </View>
 
         {accountState.message ? <Pressable accessibilityRole="button" onPress={() => void accountState.refresh()} style={styles.warning}>
@@ -193,15 +191,11 @@ export default function HomeScreen() {
             const result = currentStatus?.daily_history.find((row) => row.date === currentStatus.day && row.mode === 'draft_run' && row.set_id === environment);
             const startHere = currentStatus && !claimed && completedCount === 0 && environment === 'mixed';
             return (
-              <Pressable
+              <View
                 key={environment}
-                accessibilityRole="button"
-                accessibilityLabel={`${isComplete ? 'View' : currentStatus ? 'Play' : 'Open'} ${meta.title} Daily`}
-                onPress={() => router.push({ pathname: '/draft-run', params: { environment } })}
-                style={({ pressed }) => [
+                style={[
                   index === 0 && !isComplete ? styles.primaryCard : styles.dailyCard,
                   isComplete && styles.completeCard,
-                  pressed && styles.pressed,
                 ]}
               >
                 <View style={styles.cardHeading}>
@@ -210,9 +204,23 @@ export default function HomeScreen() {
                 </View>
                 <Text style={index === 0 && !isComplete ? styles.cardTitle : styles.dailyTitle}>{meta.title}</Text>
                 <Text style={styles.cardBody}>{isComplete ? `Complete · ${result?.score}/100` : meta.description}</Text>
-                <Text style={styles.cardAction}>{isComplete ? 'View result →' : currentStatus ? 'Play now →' : 'Open Daily →'}</Text>
-                {startHere ? <Text style={styles.statusText}>Free · No account required</Text> : null}
-              </Pressable>
+                <View style={styles.dailyAction}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`${isComplete ? 'View result for' : 'Play'} ${meta.title} Daily`}
+                    onPress={() => router.push({ pathname: '/draft-run', params: { environment } })}
+                    style={({ pressed }) => [
+                      isComplete ? styles.secondaryButton : styles.primaryButton,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    <Text style={isComplete ? styles.secondaryButtonText : styles.primaryButtonText}>
+                      {isComplete ? 'View result' : 'Play now'}
+                    </Text>
+                  </Pressable>
+                  {startHere ? <Text style={styles.statusText}>Free · No account required</Text> : null}
+                </View>
+              </View>
             );
           })}
         </View>
@@ -261,10 +269,7 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        {!claimed ? <View style={styles.guestLinks}>
-          <Pressable accessibilityRole="button" onPress={() => router.navigate('/leaderboard')} style={styles.helpLink}><Text style={styles.cardAction}>View Leaders</Text></Pressable>
-          <Pressable accessibilityRole="button" onPress={() => router.navigate('/practice')} style={styles.helpLink}><Text style={styles.cardAction}>Explore Practice</Text></Pressable>
-        </View> : null}
+        <AboutLink />
       </ScrollView>
     </SafeAreaView>
   );
@@ -272,9 +277,7 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
-  brandRowStacked: { flexDirection: 'column', alignItems: 'flex-start' },
   helpLink: { minHeight: 44, justifyContent: 'center' },
-  guestLinks: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.lg },
   statusStrip: { padding: spacing.md, backgroundColor: colors.accentSoft, flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.md, rowGap: spacing.xs },
   statusText: { color: colors.muted, fontSize: 14, lineHeight: 20 },
   safe: { flex: 1, backgroundColor: colors.page },
@@ -357,6 +360,7 @@ const styles = StyleSheet.create({
   dailyTitle: { color: colors.ink, fontSize: 22, fontWeight: '800' },
   cardBody: { color: colors.muted, fontSize: 15, lineHeight: 22 },
   cardAction: { color: colors.accentDark, fontSize: 15, fontWeight: '800', marginTop: spacing.sm },
+  dailyAction: { alignItems: 'stretch', gap: spacing.xs, marginTop: spacing.sm },
   primaryButton: {
     minHeight: 50,
     backgroundColor: colors.accent,
@@ -364,5 +368,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  primaryButtonText: { color: '#fff', fontSize: 15, fontWeight: '800' },
+  primaryButtonText: { color: '#fff', fontSize: 15, lineHeight: 21, fontWeight: '800', textAlign: 'center' },
+  secondaryButton: {
+    minHeight: 50,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryButtonText: { color: colors.accentDark, fontSize: 15, lineHeight: 21, fontWeight: '800', textAlign: 'center' },
 });

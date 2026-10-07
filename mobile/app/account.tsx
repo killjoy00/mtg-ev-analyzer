@@ -13,8 +13,10 @@ import {
 } from 'react-native';
 import { Text } from '@/src/components/Text';
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
+import { AboutLink } from '@/src/components/AboutLink';
 
 import { ApiError } from '@/src/api/client';
+import { config } from '@/src/config';
 import {
   finishAppleSignIn,
   finishGoogleSignIn,
@@ -413,7 +415,15 @@ export default function AccountScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets keyboardDismissMode="interactive">
+      <ScrollView
+        onLayout={() => {
+          if (config.screenshots.fixtures) console.info('PACKONE_ACCOUNT_READY');
+        }}
+        contentContainerStyle={styles.page}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+        keyboardDismissMode="interactive"
+      >
         <Text style={styles.eyebrow}>PACK ONE ACCOUNT</Text>
 
         {busy && !session ? <ActivityIndicator color={colors.accent} /> : null}
@@ -444,7 +454,7 @@ export default function AccountScreen() {
               ) : null}
               <View style={styles.termsBox}>
                 <Text style={styles.fieldHelp}>Display names and public profiles follow the Pack One Public Identity rules.</Text>
-                <Pressable accessibilityRole="link" onPress={() => void WebBrowser.openBrowserAsync('https://packone.pro/terms/#public-identity-rules')}>
+                <Pressable accessibilityRole="link" onPress={() => router.push('/terms')}>
                   <Text style={styles.linkText}>Public Identity rules</Text>
                 </Pressable>
               </View>
@@ -549,7 +559,7 @@ export default function AccountScreen() {
               {mode === 'signup' ? (
                 <View style={styles.termsBox}>
                   <Text style={styles.fieldHelp}>By creating an account, you agree to the Pack One Terms.</Text>
-                  <Pressable accessibilityRole="link" onPress={() => void WebBrowser.openBrowserAsync('https://packone.pro/terms/')}>
+                  <Pressable accessibilityRole="link" onPress={() => router.push('/terms')}>
                     <Text style={styles.linkText}>Pack One Terms</Text>
                   </Pressable>
                 </View>
@@ -619,7 +629,7 @@ export default function AccountScreen() {
 
         {message || routeNotice ? <Text accessibilityRole="alert" style={styles.message}>{message || routeNotice}</Text> : null}
         {enrichmentWarning ? <Text accessibilityRole="alert" style={styles.enrichmentWarning}>{enrichmentWarning}</Text> : null}
-        <Pressable accessibilityRole="button" onPress={() => router.push('/help')} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Help & information</Text></Pressable>
+        <AboutLink />
       </ScrollView>
     </SafeAreaView>
   );

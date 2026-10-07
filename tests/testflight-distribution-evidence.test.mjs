@@ -28,6 +28,10 @@ for (const scenario of ['available', 'wrong-build', 'read-failed']) {
           assert.equal(parsed.searchParams.get('filter[builds]'), 'exact');
           assert.equal(parsed.searchParams.has('filter[app]'), false, 'only one relationship filter');
           data = { data: [{ id: 'existing', attributes: { isInternalGroup: true, hasAccessToAllBuilds: true } }] };
+        } else if (parsed.pathname === '/v1/apps/app/betaFeedbackCrashSubmissions') {
+          assert.equal(parsed.searchParams.get('filter[build]'), 'exact');
+          assert.equal(parsed.searchParams.get('sort'), '-createdDate');
+          data = { data: [] };
         } else throw Error('Unexpected API request');
         return new Response(JSON.stringify(data), { status: 200 });
       };

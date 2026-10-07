@@ -114,3 +114,14 @@ test('production-like load harnesses warm readiness before fixture generation',(
     assert.ok(verify>=0&&warm>verify&&fixture>warm,path);
   }
 });
+
+
+test('the distributed capacity rehearsal is opt-in: pull requests never provision it',()=>{
+  const workflow=fs.readFileSync('.github/workflows/launch-distributed.yml','utf8');
+  const step=workflow.slice(workflow.indexOf('- name: Decide whether the production-like load rehearsal is needed'),workflow.indexOf('- name: Explain skipped load rehearsal'));
+  const [dispatch,pr]=step.split('          else\n');
+  assert.match(dispatch,/workflow_dispatch[\s\S]*run_load=true/);
+  assert.match(pr,/launch-change-scope\.mjs[^\n]*\| grep -v '\^run_load='/);
+  assert.match(pr,/echo "run_load=false"/);
+  assert.doesNotMatch(pr,/run_load=true/);
+});

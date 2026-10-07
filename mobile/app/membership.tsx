@@ -4,7 +4,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
-  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -21,7 +20,6 @@ import {
 } from '@/src/api/apple-subscriptions';
 import type { NativeAppleSubscriptionStatus } from '@/src/api/apple-subscriptions';
 import { connectNativePatreon, loadNativePatreonStatus, mutateNativePatreon } from '@/src/api/patreon';
-import { canonicalContentUrl } from '@/src/contentLinks';
 import { useAppResume } from '@/src/hooks/useAppResume';
 import {
   getAvailableApplePurchases,
@@ -379,11 +377,11 @@ function AppleElitePanel({
       <Text style={styles.help}>Payment is charged to your Apple Account at confirmation. The subscription renews automatically unless canceled through Apple. You can manage or cancel it in Apple subscription settings.</Text>
       <View style={styles.linkRow}>
         <Pressable accessibilityRole="link" accessibilityLabel="Subscription Terms"
-          onPress={() => void Linking.openURL(canonicalContentUrl('terms'))}>
+          onPress={() => router.push('/terms')}>
           <Text style={styles.linkText}>Terms</Text>
         </Pressable>
         <Pressable accessibilityRole="link" accessibilityLabel="Subscription Privacy"
-          onPress={() => void Linking.openURL(canonicalContentUrl('privacy'))}>
+          onPress={() => router.push('/privacy')}>
           <Text style={styles.linkText}>Privacy</Text>
         </Pressable>
       </View>

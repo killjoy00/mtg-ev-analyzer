@@ -25,6 +25,8 @@ test('guest Daily results offer score validation instead of a career action', as
   const source = await readFile('draft-run-product.mjs', 'utf8');
   const result = source.slice(source.indexOf('function renderResult()'), source.indexOf('async function shareResult'));
   assert.match(result, /Sign in to add score/);
+  assert.match(result, /Add score to leaderboard/);
+  assert.match(source, /<strong>Signed in\.<\/strong> Add this score to today’s leaderboard when you’re ready\./);
   assert.match(result, /Choose display name to add score/);
   assert.match(result, /validateDailyRunId:run\.id/);
   assert.match(result, /source:'daily_result'/);
@@ -89,6 +91,16 @@ test('Draft Run previous-card context stays visible and visually distinct', asyn
   assert.match(css, /\.run-pool-cards button\{[^}]*background:transparent/);
 });
 
+test('practice share verification uses the public recipient path without owner credentials', async () => {
+  const source = await readFile('draft-run-product.mjs', 'utf8');
+  const helper = source.slice(source.indexOf('async function publicApi'), source.indexOf('function image'));
+  const share = source.slice(source.indexOf('async function shareResult'), source.indexOf('async function showBoard'));
+  assert.match(helper, /credentials:'omit'/);
+  assert.match(helper, /method:'GET'/);
+  assert.match(share, /publicApi\('\/v1\/shared-runs\/'\+encodeURIComponent\(share\.id\)\)/);
+  assert.match(share, /Pack One could not verify this share link\. Try Share again\./);
+});
+
 test('Draft Run result footnote keeps its muted spacing', async () => {
   const css = await readFile('draft-run.css', 'utf8');
   assert.match(css, /\.run-result-page \.run-note\{color:var\(--muted\);line-height:1\.6;margin:24px 0\}/);
@@ -123,6 +135,22 @@ test('secondary gameplay controls keep mobile-sized targets', async () => {
   assert.match(css, /\.run-lock \.run-tools \.button\{min-height:44px/);
 });
 
+
+test('account settings keep a clear hierarchy and isolate destructive actions', async () => {
+  const [profile,css]=await Promise.all([
+    readFile('profile-product.mjs','utf8'),
+    readFile('profile.css','utf8'),
+  ]);
+  const settings=profile.slice(profile.indexOf('function settingsMarkup'),profile.indexOf('function profileMarkup'));
+  assert.match(settings,/profile-settings-profile/);
+  assert.match(settings,/profile-settings-actions"><button class="button primary" type="submit">Save profile/);
+  assert.doesNotMatch(settings,/Change name<\/a>/);
+  assert.ok(settings.indexOf('Profile &amp; visibility') < settings.indexOf('Membership'));
+  assert.ok(settings.indexOf('Membership') < settings.indexOf('Sign-in &amp; security'));
+  assert.ok(settings.indexOf('Sign-in &amp; security') < settings.indexOf('Delete account'));
+  assert.match(css,/\.my-pack-one-account-panel \.profile-danger\s*\{[^}]*border-color:/);
+  assert.match(css,/@media \(max-width:760px\)[\s\S]*\.my-pack-one-account-panel \.profile-settings-actions \.button \{ width:100%; \}/);
+});
 
 test('profile CSS keeps one base rule for previously layered selectors', async () => {
   const css = await readFile('profile.css', 'utf8');

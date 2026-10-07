@@ -299,6 +299,9 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   assert.ok(androidStatusRequest.reason.trim().length > 0);
 
   assert.match(ios, /CFBundleShortVersionString/);
+  assert.match(ios, /MARKETING_VERSION="\$expected_marketing_version"/);
+  assert.match(ios, /config\.version !== process\.argv\[4\]/);
+  assert.doesNotMatch(ios, /'marketing version': rf'MARKETING_VERSION/);
   assert.match(ios, /testFlightInternalTestingOnly[\s\S]*<false\/>/);
   assert.match(ios, /app-store-finalize-release-candidate\.mjs/);
   const iosFinalize = read('.github/scripts/app-store-finalize-release-candidate.mjs');
@@ -319,7 +322,7 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
 
 test('privacy page exposes the stable Play deletion resource and fallback request path', () => {
   const privacy = read('privacy/index.html');
-  assert.match(privacy, /<h2 id="delete-account">Deleting your account<\/h2>/);
+  assert.match(privacy, /<h2 id="delete-account">Retention and deleting your account<\/h2>/);
   assert.match(privacy, /mailto:admin@packone\.pro/);
   assert.match(privacy, />admin@packone\.pro<\/a>/);
 

@@ -12,6 +12,7 @@ const page = await browser.newPage({ viewport:{ width:390, height:844 } });
 let updatePayload = null;
 let updateMode = 'success';
 let shareCalls = 0;
+let accountMode = 'signed-in';
 
 await page.addInitScript(() => {
   localStorage.setItem('pack1-auth-session-v1','profile-auth-fixture');
@@ -104,7 +105,15 @@ await page.route(`${growthOrigin}/**`, async (route) => {
     body = { token:'p1_00000000-0000-4000-8000-000000000000.e2e', playerId:'00000000-0000-4000-8000-000000000000', displayName:'Profile Tester', profileKey };
   } else if (url.pathname === '/v1/account/session') {
     assert.equal(route.request().headers()['x-pack1-auth-session'],'profile-auth-fixture');
-    body = { session:{ token:'profile-auth-fixture' }, user:{ email:'profile@example.invalid', name:'Profile Tester' } };
+    if(accountMode === 'unavailable') {
+      status = 503;
+      body = { error:'Account unavailable fixture.' };
+    } else if(accountMode === 'signed-out') {
+      status = 401;
+      body = { error:'Account session expired.' };
+    } else {
+      body = { session:{ token:'profile-auth-fixture' }, user:{ email:'profile@example.invalid', name:'Profile Tester' } };
+    }
   } else if (url.pathname === '/v1/account/link') {
     assert.equal(route.request().headers()['x-pack1-auth-session'],'profile-auth-fixture');
     body = { token:'p1_00000000-0000-4000-8000-000000000000.e2e', merged:false };
@@ -204,6 +213,7 @@ try {
 
   await page.locator('#profile-account-tab').click();
   assert.equal(await page.locator('#profile-account-tab').getAttribute('aria-selected'),'true');
+  assert.equal(await page.locator('#profile-account-title').textContent(),'Signed in');
   assert.ok(await page.locator('#profile-account input[name="displayName"]').isVisible(),'Account settings are in the Account tab');
   for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});await noOverflow();await page.locator('#profile-account-panel').screenshot({path:`artifacts/ui-profile-settings-${width}.png`});}
   await page.setViewportSize({width:390,height:844});
@@ -227,29 +237,29 @@ try {
   assert.equal((await page.locator('.profile-toggle small').textContent())?.trim(),'Let players view your Pack One record from leaderboards and shared links.');
   const toggleBox=await page.locator('.profile-toggle').boundingBox();
   assert.ok(toggleBox&&toggleBox.height>=43.5,'public profile row is a full touch target');
-  const topSave=page.locator('button[form="profile-settings-form"][type="submit"]');
-  assert.equal(await topSave.count(),1,'Save profile is visible in the editor heading');
-  assert.equal(await page.locator('.profile-settings-heading-row').getByRole('link',{name:'Change name'}).count(),1);
+  const saveProfile=page.locator('#profile-settings-form button[type="submit"]');
+  assert.equal(await saveProfile.count(),1,'Save profile is available with the profile fields');
+  assert.equal(await page.locator('.profile-settings-heading-row').getByRole('link',{name:'Change name'}).count(),0,'Account settings do not duplicate the display-name action');
 
   updateMode='success';
   await page.locator('input[name="displayName"]').fill('Leaderboard Ace');
   await page.locator('select[name="favoriteSetId"]').selectOption('ktk');
   await page.locator('select[name="showcaseAchievement"]').selectOption('top10');
-  await topSave.click();
+  await saveProfile.click();
   await page.getByText('Profile saved.',{exact:true}).waitFor();
   assert.deepEqual(updatePayload, { displayName:'Leaderboard Ace', profilePublic:true, favoriteSetId:'ktk', showcaseAchievement:'top10', acceptPublicIdentityTerms:true });
   await page.waitForFunction(() => localStorage.getItem('pack1-player-name-v1') === 'Leaderboard Ace');
 
   updateMode='taken';
   await page.locator('input[name="displayName"]').fill('Taken Name');
-  await topSave.click();
+  await saveProfile.click();
   await page.getByText('That display name is already taken.',{exact:true}).waitFor();
   assert.equal(await page.locator('input[name="displayName"]').inputValue(),'Taken Name');
   assert.match((await page.locator('#profile-save-status').textContent())||'',/Profile not saved/);
 
   updateMode='not_allowed';
   await page.locator('input[name="displayName"]').fill('Pack One Support');
-  await topSave.click();
+  await saveProfile.click();
   await page.getByText('That display name is not allowed.',{exact:true}).waitFor();
   assert.equal(await page.locator('input[name="displayName"]').inputValue(),'Pack One Support');
   assert.match((await page.locator('#profile-save-status').textContent())||'',/Profile not saved/);
@@ -257,7 +267,7 @@ try {
   updateMode='network';
   await page.locator('input[name="displayName"]').fill('Unsaved Edit');
   await page.locator('select[name="favoriteSetId"]').selectOption('neo');
-  await topSave.click();
+  await saveProfile.click();
   await page.getByText(/Your edits are still here\./).waitFor();
   assert.equal(await page.locator('input[name="displayName"]').inputValue(),'Unsaved Edit');
   assert.equal(await page.locator('select[name="favoriteSetId"]').inputValue(),'neo');
@@ -265,7 +275,7 @@ try {
   updateMode='placeholder';
   await page.locator('input[name="displayName"]').fill('Pack Player');
   await page.locator('input[name="profilePublic"]').uncheck();
-  await topSave.click();
+  await saveProfile.click();
   await page.getByText('Profile saved.',{exact:true}).waitFor();
   assert.equal(await page.locator('#profile-display-name-error').textContent(),'Choose a display name to join Daily leaderboards.');
   assert.deepEqual(updatePayload, {
@@ -299,6 +309,24 @@ try {
   assert.match((await page.locator('.profile-current-season').textContent()) || '', /Draft Run.*#312/i);
   await noOverflow();
   await page.screenshot({ path:'artifacts/ui-profile-public-mobile.png', fullPage:true });
+
+  // A saved account-owned record can remain accessible when the session expires
+  // or the account service fails. Its settings must report the actual auth state.
+  for(const [mode,label] of [['unavailable','Account unavailable'],['signed-out','Signed out']]) {
+    accountMode = mode;
+    await page.evaluate(async()=>{
+      const profiles=await import('/profile-product.mjs?v=9');
+      await profiles.renderMyProfile();
+    });
+    await page.locator('#profile-account-tab').click();
+    assert.equal(await page.locator('#profile-account-title').textContent(),label);
+    assert.equal(await page.locator('#profile-settings-form').count(),0);
+    if(mode === 'unavailable') {
+      assert.equal(await page.getByRole('button',{name:'Retry account',exact:true}).isVisible(),true);
+    } else {
+      assert.equal(await page.locator('#profile-claim-account').isVisible(),true);
+    }
+  }
 
   console.log('Player profile / progression browser regression passed.');
 } finally {

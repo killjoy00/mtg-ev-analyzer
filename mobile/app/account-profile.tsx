@@ -1,5 +1,4 @@
 import { router } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import { useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -195,7 +194,7 @@ export default function AccountProfileScreen() {
             <View style={styles.termsBox}>
               <Text style={styles.help}>Display names and public profiles follow the Pack One Public Identity rules.</Text>
               <Pressable accessibilityRole="link"
-                onPress={() => void WebBrowser.openBrowserAsync('https://packone.pro/terms/#public-identity-rules')}>
+                onPress={() => router.push('/terms')}>
                 <Text style={styles.link}>Public Identity rules</Text>
               </Pressable>
             </View>

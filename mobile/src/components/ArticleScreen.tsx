@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -7,6 +7,7 @@ import {
 import { Text } from '@/src/components/Text';
 
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
+import { config } from '@/src/config';
 
 import { colors, spacing } from '@/src/theme';
 
@@ -23,6 +24,7 @@ export function ArticleScreen({
   sections,
   footer,
   intro,
+  scrollToEnd = false,
 }: {
   kicker: string;
   title: string;
@@ -30,11 +32,24 @@ export function ArticleScreen({
   sections: ArticleSection[];
   footer?: ReactNode;
   intro?: ReactNode;
+  scrollToEnd?: boolean;
 }) {
+  const scrollRef = useRef<ScrollView>(null);
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.page}>
-        <View style={styles.header}>
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.page}
+        onContentSizeChange={() => {
+          if (scrollToEnd) scrollRef.current?.scrollToEnd({ animated: false });
+        }}
+      >
+        <View
+          onLayout={() => {
+            if (config.screenshots.fixtures) console.info('PACKONE_ARTICLE_READY', JSON.stringify({ title }));
+          }}
+          style={styles.header}
+        >
           <Text style={styles.kicker}>{kicker.toUpperCase()}</Text>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.deck}>{deck}</Text>

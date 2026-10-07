@@ -19,7 +19,7 @@ test('account and profile entry modules use release-versioned imports', async ()
   assert.match(bootstrap, /growth\.mjs\?v=9/);
   assert.match(bootstrap, /daily-home\.mjs\?v=10/);
   assert.match(bootstrap, /profile-product\.mjs\?v=9/);
-  assert.match(bootstrap, /draft-run-product\.mjs\?v=11/);
+  assert.match(bootstrap, /draft-run-product\.mjs\?v=12/);
   assert.match(daily, /growth\.mjs\?v=9/);
   assert.match(growth, /profile-product\.mjs\?v=9/);
   assert.match(growth, /patreon-activation\.mjs\?v=2/);

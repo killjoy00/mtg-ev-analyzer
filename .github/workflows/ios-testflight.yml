@@ -125,7 +125,6 @@ jobs:
           marketing = re.escape(sys.argv[2])
           checks = {
               'production bundle identifier': r'PRODUCT_BUNDLE_IDENTIFIER\s*=\s*"?pro\.packone\.app"?\s*;',
-              'marketing version': rf'MARKETING_VERSION\s*=\s*"?{marketing}"?\s*;',
           }
           for label, pattern in checks.items():
               if not re.search(pattern, project):

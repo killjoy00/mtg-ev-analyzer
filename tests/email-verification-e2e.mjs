@@ -27,7 +27,7 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
     }
     if(path==='/v1/account/send-verification-email') {
       resendBodies.push(route.request().postDataJSON());
-      return route.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,message:"If an unverified account exists for that email, we've sent a verification link."})});
+      return route.fulfill({contentType:'application/json',body:JSON.stringify({ok:true,message:"Request accepted. If that address belongs to an unverified Pack One account, a new verification link will be sent."})});
     }
     if(path==='/v1/account/migrate') {
       signed=true;
@@ -76,7 +76,7 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
   await page.getByRole('heading',{name:'Check your email'}).waitFor();
   await page.getByText('Verification links expire after 15 minutes.').waitFor();
   await page.getByRole('button',{name:'Send a new verification link'}).click();
-  await page.getByText("If an unverified account exists for that email, we've sent a verification link.").waitFor();
+  await page.getByText("Request accepted. If that address belongs to an unverified Pack One account, a new verification link will be sent.").waitFor();
   assert.deepEqual(resendBodies.at(-1),{email:'verify@example.invalid'});
   await page.screenshot({path:`artifacts/ui-email-verification-pending-${name}-mobile.png`,fullPage:true});
 
@@ -94,7 +94,7 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
   const recovery=page.locator('#account-verification-resend-form');
   await recovery.locator('[name="email"]').fill('expired@example.invalid');
   await recovery.getByRole('button',{name:'Send a new verification link'}).click();
-  await page.getByText("If an unverified account exists for that email, we've sent a verification link.").waitFor();
+  await page.getByText("Request accepted. If that address belongs to an unverified Pack One account, a new verification link will be sent.").waitFor();
   assert.deepEqual(resendBodies.at(-1),{email:'expired@example.invalid'});
   await page.screenshot({path:`artifacts/ui-email-verification-expired-${name}-mobile.png`,fullPage:true});
 

@@ -294,6 +294,35 @@ test('decision report stays inside score analysis and preserves the run', async 
   } finally { await screen.close(); }
 });
 
+test('decision report submits successfully without an optional comment', async () => {
+  const reports = [];
+  const completedPick = { ...runZero(), revision: 5, round: 1, answers: [answer(0, 'a', 88)], current: puzzle(1) };
+  const screen = await fixture({
+    submitPick: async () => completedPick,
+    submitReport: async (...args) => { reports.push(args); return { ok: true, id: 'report-id-blank' }; },
+  });
+  try {
+    await screen.chooseAndConfirm();
+    const why = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Why this score?'))[0];
+    await act(async () => why.props.onPress());
+    const report = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Report this decision'))[0];
+    await act(async () => report.props.onPress());
+    const reason = screen.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityRole === 'radio'
+      && renderedText(node).includes('Draft context looks wrong'))[0];
+    assert.ok(reason);
+    await act(async () => reason.props.onPress());
+    const send = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Send report'))[0];
+    await act(async () => { send.props.onPress(); await flush(); });
+    assert.equal(reports.length, 1);
+    assert.equal(reports[0][0].id, completedPick.id);
+    assert.equal(reports[0][1], 0);
+    assert.equal(reports[0][2], 'draft_context');
+    assert.equal(reports[0][3], '');
+    assert.match(screen.text(), /Thanks — report sent\./);
+    assert.match(screen.text(), /Hide score analysis/);
+  } finally { await screen.close(); }
+});
+
 test('revealed-card affiliate link opens the approved card-specific Impact destination', async () => {
   const opened = [];
   const custom = puzzle(0);

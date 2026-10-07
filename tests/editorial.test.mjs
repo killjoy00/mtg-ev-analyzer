@@ -112,6 +112,7 @@ assert.match(learnHub, /<h2>How to Play<\/h2>/);
 assert.match(learnHub, /<h2>Scoring<\/h2>/);
 assert.match(learnHub, /<h2>Method<\/h2>/);
 assert.match(learnHub, /<h2>Sets<\/h2>/);
+assert.ok(learnHub.indexOf('Play today’s Daily') < learnHub.indexOf('Drafting guides'), 'Daily CTA must appear before the guide directory');
 const practiceHub = await readFile('practice/index.html','utf8');
 assert.match(practiceHub, /<title>Practice · Pack One<\/title>/);
 assert.match(practiceHub, /src="\/practice-page\.mjs"/);
@@ -134,6 +135,12 @@ assert.match(bootstrap, /else if \(params\.has\('account'\)\)[\s\S]*?renderAccou
 const about = await readFile('about/index.html','utf8');
 assert.match(about, /Three Dailies, ready to play/);
 assert.match(about, /Daily Draft Run, Daily Powered Cube, and Daily Latest Set/);
+assert.match(about, /Independent project\./);
+assert.match(about, /independent Magic: The Gathering fan project/i);
+assert.match(about, /CC BY 4\.0/);
+assert.match(about, /Not approved\/endorsed by Wizards/);
+assert.match(about, /Terms<\/a> for full source attribution and license details/i);
+assert.doesNotMatch(about, /Magic: The Gathering card names, art, symbols, trademarks/, 'detailed legal attribution belongs in Terms, not About');
 const contact = await readFile('contact/index.html','utf8');
 assert.match(contact, /mailto:partner@packone\.pro/);
 assert.match(contact, /mailto:admin@packone\.pro/);
@@ -206,9 +213,22 @@ const privacy = await readFile('privacy/index.html','utf8');
 assert.match(privacy, /Google advertising is currently disabled, so Pack One does not currently load Google display ads/i);
 assert.match(privacy, /TCGplayer links are routed through Impact/i);
 assert.match(privacy, /records outbound TCGplayer clicks/i);
-assert.match(privacy, /submit a decision-quality report/i);
-assert.match(privacy, /Decision reports do not store email addresses, credentials, or auth tokens/i);
-assert.doesNotMatch(privacy, /may earn a commission|Supporter or Elite membership|membership cannot be verified/i);
+assert.match(privacy, /first-party cookies for player and account sessions and request security/i);
+assert.match(privacy, /Email\/password signup requires email verification/i);
+assert.match(privacy, /Resend for transactional account email delivery/i);
+assert.match(privacy, /keeps ordinary account and gameplay records to provide account features, saved history, leaderboards, and product operations/i);
+assert.match(privacy, /Account deletion removes attributable data as described below/i);
+assert.doesNotMatch(privacy, /does not currently state a fixed retention period/i);
+assert.match(privacy, /Decision reports do not include email addresses, passwords, or auth tokens/i);
+assert.ok(privacy.indexOf('<h2>What Pack One stores</h2>') < privacy.indexOf('<h2 id="accounts">Accounts and sign-in</h2>'), 'storage overview should lead the policy');
+assert.ok(privacy.indexOf('<h2 id="accounts">Accounts and sign-in</h2>') < privacy.indexOf('<h2>Gameplay, analytics, and decision reports</h2>'), 'Accounts should be the second substantive section');
+assert.doesNotMatch(privacy, /may earn a commission|membership cannot be verified/i);
+
+const patreonPageHtml = await readFile('patreon/index.html','utf8');
+assert.match(patreonPageHtml, /Supporter and Elite both remove Pack One display ads and the Daily-home sponsored promotion/i);
+assert.match(patreonPageHtml, /Supporter \+ Elite/);
+assert.match(patreonPageHtml, /Once Pack One confirms your membership/i);
+assert.doesNotMatch(patreonPageHtml, /eligible entitlement/i);
 
 const noEmDashCopyFiles = [
   'index.html','ads.mjs','growth.mjs','draft-run-feedback.mjs','draft-run-product.mjs',

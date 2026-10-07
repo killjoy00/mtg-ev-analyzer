@@ -248,7 +248,15 @@ async function neonAuth(path,{method='GET',body}={}) {
     signal:AbortSignal.timeout(15000),
   });
   const data=await response.json().catch(()=>({}));
-  if(!response.ok)throw Object.assign(Error(data.message||data.error||`Account request failed (${response.status}).`),{status:response.status,providerCode:data.code||null});
+  if(!response.ok) {
+    const retryHeader=response.headers.get('x-retry-after')||response.headers.get('retry-after');
+    const parsedRetry=Number(retryHeader);
+    throw Object.assign(Error(data.message||data.error||`Account request failed (${response.status}).`),{
+      status:response.status,
+      providerCode:data.code||null,
+      providerRetryAfter:Number.isFinite(parsedRetry)&&parsedRetry>0?Math.ceil(parsedRetry):null,
+    });
+  }
   return data;
 }
 
@@ -1231,7 +1239,7 @@ async function handlePasswordResetRequest(request,{mobile=false}={}) {
   return json({ok:true,message:RESET_REQUEST_MESSAGE});
 }
 
-const VERIFICATION_REQUEST_MESSAGE="If an unverified account exists for that email, we've sent a verification link.";
+const VERIFICATION_REQUEST_MESSAGE="Request accepted. If that address belongs to an unverified Pack One account, a new verification link will be sent.";
 
 async function consumeVerificationLimit(email) {
   const key=recoveryRateKey('verification:'+email);
@@ -1250,16 +1258,28 @@ async function handleVerificationEmailRequest(request,{mobile=false}={}) {
   const payload=await readJson(request);
   const email=normalizedRecoveryEmail(payload.email);
   const limit=await consumeVerificationLimit(email);
-  if(limit.limited)return json({error:'Too many verification email requests. Please try again later.'},429);
+  if(limit.limited) {
+    const retryAfter=Math.max(1,Math.ceil((new Date(limit.expiresAt).getTime()-Date.now())/1000));
+    throw Object.assign(Error('Too many verification email requests. Please wait before requesting another link.'),{
+      status:429,code:'VERIFICATION_COOLDOWN',retryAfter,
+    });
+  }
   try {
     await neonAuth('/send-verification-email',{method:'POST',body:{
       email,
       callbackURL:ACCOUNT_RETURN+'?auth=verify'+(mobile?'&native=1':''),
     }});
   } catch(error) {
-    if(Number(error?.status||500)>=500)throw Object.assign(Error('Email verification is temporarily unavailable.'),{status:503});
-    // Provider/account-specific 4xx responses are intentionally collapsed so
-    // this public endpoint does not reveal whether an address has an account.
+    const status=Number(error?.status||500);
+    if(status===429) {
+      throw Object.assign(Error('Please wait before requesting another verification link.'),{
+        status:429,code:'VERIFICATION_COOLDOWN',
+        ...(error?.providerRetryAfter?{retryAfter:error.providerRetryAfter}:{}),
+      });
+    }
+    if(status>=500)throw Object.assign(Error('Email verification is temporarily unavailable.'),{status:503,code:'VERIFICATION_PROVIDER_FAILURE'});
+    // Other provider/account-specific 4xx responses are intentionally collapsed
+    // so this public endpoint does not reveal whether an address has an account.
   }
   return json({ok:true,message:VERIFICATION_REQUEST_MESSAGE});
 }
@@ -2530,6 +2550,7 @@ export default {
       const response=json({
         error: status===500?'Request failed. Please try again.':error.message,
         ...(error?.code?{code:String(error.code)}:{}),
+        ...(Number(error?.retryAfter)>0?{retryAfter:Math.ceil(Number(error.retryAfter))}:{}),
         ...(error?.deletionCommitted&&error?.deletion?{
           deletionCommitted:true,
           operationId:error.operationId||error.deletion.operation_id||null,
