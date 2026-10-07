@@ -6,6 +6,10 @@ const NATIVE_PATHS = new Set([
   '/career',
   '/creator-run',
   '/learn',
+  '/about',
+  '/support',
+  '/privacy',
+  '/terms',
   '/help',
   '/sign-in',
   '/resume-shared-run',
@@ -33,6 +37,10 @@ function directArticlePath(pathname: string) {
     : pathname;
   if (normalized === '/how-it-works') return '/how-to';
   if (normalized === '/methodology') return '/method';
+  if (normalized === '/about') return '/about';
+  if (normalized === '/contact') return '/support';
+  if (normalized === '/privacy') return '/privacy';
+  if (normalized === '/terms') return '/terms';
   if (normalized === '/scoring') return '/scoring';
   if (normalized === '/sets') return '/sets';
   const archive = normalized.match(/^\/sets\/(msh|ecl|tmt|sos)$/);
