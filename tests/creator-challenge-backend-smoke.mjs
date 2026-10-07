@@ -212,11 +212,12 @@ try {
   const firstPayload=structuredClone(payloadById.get(templatePuzzleIds[0]));
   assert.ok(firstPayload&&firstPayload.candidates.length>=4,'legacy scoring fixture needs one verified pack');
   const [leader,selected,third,historical]=firstPayload.candidates;
+  firstPayload.candidates=[leader,selected,third,historical];
+  firstPayload.candidate_count=4;
   leader.model_probability=.19;
   selected.model_probability=.027;
   third.model_probability=.0135;
   historical.model_probability=.00675;
-  for(const card of firstPayload.candidates.slice(4))card.model_probability=.001;
   firstPayload.historical_pick_id=historical.id;
   const syntheticPuzzleId=crypto.randomUUID().replaceAll('-','');
   const syntheticSourceHash=crypto.randomUUID().replaceAll('-','');
@@ -227,7 +228,7 @@ try {
   await query(`INSERT INTO draft_run_verified_puzzles
     SELECT (jsonb_populate_record(NULL::draft_run_verified_puzzles,
       to_jsonb(source)||jsonb_build_object(
-        'puzzle_id',$2::text,'source_draft_hash',$3::text,'payload',$4::jsonb
+        'puzzle_id',$2::text,'source_draft_hash',$3::text,'candidate_count',4,'payload',$4::jsonb
       )
     )).*
     FROM draft_run_verified_puzzles source
