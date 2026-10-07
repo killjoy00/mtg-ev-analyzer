@@ -88,12 +88,15 @@ test('creator canary static cleanup dispatches exact-head green CI before merge'
   assert.match(workflow,/gh run watch "\$test_run" --exit-status/);
   assert.match(workflow,/gh run watch "\$e2e_run" --exit-status/);
   assert.match(workflow,/gh pr merge "\$pr_url" --squash --delete-branch --match-head-commit "\$head_sha"/);
+  assert.match(workflow,/pages\/builds/);
+  assert.match(workflow,/Live creator registry still contains a canary entry after cleanup/);
+  assert.match(workflow,/Live canary route still exists after cleanup/);
   const dispatch=workflow.indexOf('gh workflow run test.yml');
   const register=workflow.indexOf('actions/runs?event=workflow_dispatch');
   const watch=workflow.indexOf('gh run watch "$test_run"');
   const merge=workflow.indexOf('gh pr merge');
   assert.ok(dispatch>=0&&dispatch<register&&register<watch&&watch<merge,'cleanup must dispatch exact-head CI, observe it, wait for it, then merge');
-  assert.match(workflow,/permissions:\n  contents: write\n  pull-requests: write\n  actions: write\n  checks: read/);
+  assert.match(workflow,/permissions:\n  contents: write\n  pull-requests: write\n  actions: write\n  checks: read\n  pages: write/);
   assert.match(workflow,/GH_TOKEN: \$\{\{ github\.token \}\}/);
   assert.doesNotMatch(workflow,/token: \$\{\{ secrets\.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN \}\}/);
 });
