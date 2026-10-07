@@ -35,7 +35,11 @@ Keep practicing between Dailies with regular random runs. A free Pack One accoun
 
 Your Pack One account works across web, iPhone, iPad, and Android. Sign in with Apple, Google, or email. Account deletion is available in the app.
 
-Pack One is unofficial Fan Content permitted under the Wizards Fan Content Policy and is not approved or endorsed by Wizards. Card metadata and images are sourced from Scryfall. See packone.pro/terms/ for attribution and source-license details.`;
+Pack One is unofficial Fan Content permitted under the Wizards Fan Content Policy and is not approved or endorsed by Wizards. Card metadata and images are sourced from Scryfall. See https://packone.pro/terms/ for attribution and source-license details.
+
+Terms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+Pack One Terms: https://packone.pro/terms/
+Privacy Policy: https://packone.pro/privacy/`;
 
 const playShort='Practice real draft decisions, compare trophy picks, and track your career.';
 const playFull=`Pack One turns real trophy drafts into short, repeatable draft-decision practice.

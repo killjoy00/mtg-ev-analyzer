@@ -1,6 +1,6 @@
 # Pack One mobile store submission packet
 
-Updated 2026-10-04. This file is the source-of-truth submission packet for the first free public mobile release.
+Updated 2026-10-06. This file is the source-of-truth submission packet for the first free public mobile release.
 
 ## Final native-repair test candidates — 2026-10-04 CDT
 
@@ -47,7 +47,8 @@ These earlier binaries predate #890/#910/#955 and are upgrade starting points, n
 - Price: **$7.00/month in the United States**. The live localized price shown to users must still come from App Store Connect / StoreKit. Canada uses Apple's adjusted equalization from the U.S. $7.00 price point.
 - Benefits: Powered Cube practice and custom-set practice on the signed-in Pack One account. Regular Draft Run practice remains included without Elite.
 - Restore Purchases and Manage Apple Subscription are first-class controls on the native Membership screen.
-- Terms: https://packone.pro/terms/
+- Apple Standard Terms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+- Pack One supplemental terms: https://packone.pro/terms/
 - Privacy: https://packone.pro/privacy/
 - App Store Server Notifications V2 Production and Sandbox URL: `https://api.packone.pro/growth/v1/apple-subscriptions/notifications`
 - Review account must be able to sign in to Pack One before purchasing so the StoreKit `appAccountToken` can bind the transaction to the exact Pack One account.
@@ -87,9 +88,15 @@ Keep practicing between Dailies with regular random runs. A free Pack One accoun
 
 Your Pack One account works across web, iPhone, iPad, and Android. Sign in with Apple, Google, or email. Account deletion is available in the app.
 
-Pack One is unofficial Fan Content permitted under the Wizards Fan Content Policy and is not approved or endorsed by Wizards. Card metadata and images are sourced from Scryfall. See packone.pro/terms/ for attribution and source-license details.
+Pack One is unofficial Fan Content permitted under the Wizards Fan Content Policy and is not approved or endorsed by Wizards. Card metadata and images are sourced from Scryfall. See https://packone.pro/terms/ for attribution and source-license details.
+
+Terms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/
+Pack One Terms: https://packone.pro/terms/
+Privacy Policy: https://packone.pro/privacy/
 
 ### App Review notes
+
+**App Review metadata repair — 2026-10-06:** Apple stopped review of iOS 1.0 because the auto-renewable subscription listing did not include a functional Terms of Use (EULA) link in the App Store product-page metadata. Pack One uses Apple's standard EULA, not a custom App Store Connect license agreement. The en-US App Store description now includes the full Apple standard EULA URL, the Pack One Terms URL, and the Privacy Policy URL. This is a metadata-only correction and does not require a new binary.
 
 Pack One can be used without an account for the three Daily challenges. Account features include leaderboard participation, saved career/history, regular practice, and cross-device continuity.
 

@@ -8,6 +8,11 @@ const bundleId='pro.packone.app';
 const versionString='1.0';
 const locale='en-US';
 const privacyChoicesUrl='https://packone.pro/privacy/#delete-account';
+const appleStandardEulaUrl='https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
+const packOneTermsUrl='https://packone.pro/terms/';
+const privacyPolicyUrl='https://packone.pro/privacy/';
+const legalFooter=`Terms of Use (EULA): ${appleStandardEulaUrl}\nPack One Terms: ${packOneTermsUrl}\nPrivacy Policy: ${privacyPolicyUrl}`;
+const editableVersionStates=new Set(['PREPARE_FOR_SUBMISSION','READY_FOR_REVIEW','INVALID_BINARY','REJECTED','METADATA_REJECTED','DEVELOPER_REJECTED']);
 
 if(!issuerId||!keyId||!privateKeyText)throw Error('ASC credentials are required.');
 
@@ -47,7 +52,21 @@ const versions=await api(`/v1/apps/${appId}/appStoreVersions?filter%5Bplatform%5
 const version=(versions?.data||[]).find(x=>x.attributes?.platform==='IOS'&&x.attributes?.versionString===versionString);
 if(!version)throw Error(`No iOS version ${versionString} found.`);
 const state=version.attributes?.appVersionState||version.attributes?.appStoreState;
-if(!['PREPARE_FOR_SUBMISSION','READY_FOR_REVIEW'].includes(state))throw Error(`Version is not safely editable: ${state}`);
+if(!editableVersionStates.has(state))throw Error(`Version is not safely editable: ${state}`);
+
+const versionLocs=await api(`/v1/appStoreVersions/${encodeURIComponent(version.id)}/appStoreVersionLocalizations?limit=200`);
+const versionLoc=(versionLocs?.data||[]).find(x=>x.attributes?.locale===locale);
+if(!versionLoc)throw Error(`No ${locale} App Store version localization found.`);
+function descriptionWithRequiredLegalLinks(value){
+  let description=String(value||'').trim();
+  const footerMarker='\n\nTerms of Use (EULA):';
+  const footerIndex=description.indexOf(footerMarker);
+  if(footerIndex>=0)description=description.slice(0,footerIndex).trimEnd();
+  description=description.replace('See packone.pro/terms/ for attribution and source-license details.','See https://packone.pro/terms/ for attribution and source-license details.');
+  if(!description)throw Error('App Store description is unexpectedly empty.');
+  return `${description}\n\n${legalFooter}`;
+}
+const repairedDescription=descriptionWithRequiredLegalLinks(versionLoc.attributes?.description);
 
 if(loc.attributes?.privacyChoicesUrl!==privacyChoicesUrl){
   await api(`/v1/appInfoLocalizations/${encodeURIComponent(loc.id)}`,{
@@ -61,12 +80,20 @@ if(version.attributes?.releaseType!=='MANUAL'){
     body:{data:{type:'appStoreVersions',id:version.id,attributes:{releaseType:'MANUAL'}}},
   });
 }
+if(versionLoc.attributes?.description!==repairedDescription){
+  await api(`/v1/appStoreVersionLocalizations/${encodeURIComponent(versionLoc.id)}`,{
+    method:'PATCH',
+    body:{data:{type:'appStoreVersionLocalizations',id:versionLoc.id,attributes:{description:repairedDescription}}},
+  });
+}
 
 const finalLoc=await api(`/v1/appInfoLocalizations/${encodeURIComponent(loc.id)}?fields%5BappInfoLocalizations%5D=locale,name,subtitle,privacyPolicyUrl,privacyChoicesUrl`);
 const finalVersion=await api(`/v1/appStoreVersions/${encodeURIComponent(version.id)}?fields%5BappStoreVersions%5D=platform,versionString,appVersionState,releaseType`);
+const finalVersionLoc=await api(`/v1/appStoreVersionLocalizations/${encodeURIComponent(versionLoc.id)}?fields%5BappStoreVersionLocalizations%5D=locale,description`);
 
 if(finalLoc.data?.attributes?.privacyChoicesUrl!==privacyChoicesUrl)throw Error('Privacy Choices URL did not settle.');
 if(finalVersion.data?.attributes?.releaseType!=='MANUAL')throw Error('App Store release type did not settle to MANUAL.');
+if(finalVersionLoc.data?.attributes?.description!==repairedDescription)throw Error('App Store description legal links did not settle.');
 
 console.log(JSON.stringify({
   configured:true,
@@ -76,6 +103,9 @@ console.log(JSON.stringify({
   releaseType:finalVersion.data.attributes.releaseType,
   privacyPolicyUrl:finalLoc.data.attributes.privacyPolicyUrl,
   privacyChoicesUrl:finalLoc.data.attributes.privacyChoicesUrl,
+  standardEulaUrl:appleStandardEulaUrl,
+  packOneTermsUrl,
+  appStoreDescriptionUpdated:true,
   ageRatingChanged:false,
   reviewSubmissionCreated:false,
   releaseTriggered:false,

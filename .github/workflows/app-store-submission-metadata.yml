@@ -47,5 +47,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Configure manual release and privacy choices URL
+      - name: Configure safe App Store metadata and required legal links
         run: node .github/scripts/app-store-submission-metadata.mjs
