@@ -9,7 +9,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
-  actions: read
+  actions: write
   checks: read
 
 concurrency:
@@ -112,20 +112,23 @@ jobs:
           git push --force origin "HEAD:refs/heads/${branch}"
           pr_url="$(gh pr create --base main --head "$branch" --title "Clean retired creator canary static artifacts" --body "Automated cleanup after the production creator canary verified its privacy-safe retired routes. Removes only creator/canary-* static routes and matching registry entries.")"
           echo "Cleanup PR: $pr_url" >> "$GITHUB_STEP_SUMMARY"
+          gh workflow run test.yml --ref "$branch"
+          gh workflow run e2e.yml --ref "$branch"
           test_run=""
           e2e_run=""
           for attempt in $(seq 1 60); do
-            runs="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?event=pull_request&head_sha=${head_sha}&per_page=100")"
-            test_run="$(jq -r '.workflow_runs[] | select(.path==".github/workflows/test.yml") | .id' <<<"$runs" | head -1)"
-            e2e_run="$(jq -r '.workflow_runs[] | select(.path==".github/workflows/e2e.yml") | .id' <<<"$runs" | head -1)"
+            runs="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs?event=workflow_dispatch&head_sha=${head_sha}&per_page=100")"
+            test_run="$(jq -r --arg branch "$branch" '.workflow_runs[] | select(.path==".github/workflows/test.yml" and .head_branch==$branch) | .id' <<<"$runs" | head -1)"
+            e2e_run="$(jq -r --arg branch "$branch" '.workflow_runs[] | select(.path==".github/workflows/e2e.yml" and .head_branch==$branch) | .id' <<<"$runs" | head -1)"
             if [[ -n "$test_run" && -n "$e2e_run" ]]; then break; fi
             sleep 2
           done
           [[ -n "$test_run" && -n "$e2e_run" ]] || {
-            echo "::error::Cleanup PR test/e2e workflows never registered; refusing to merge."
+            echo "::error::Cleanup exact-head test/e2e dispatches never registered; refusing to merge."
             exit 1
           }
-          gh pr checks "$pr_url" --watch --fail-fast --interval 10
+          gh run watch "$test_run" --exit-status --interval 10
+          gh run watch "$e2e_run" --exit-status --interval 10
           gh pr merge "$pr_url" --squash --delete-branch --match-head-commit "$head_sha"
 
       - name: Upload creator canary evidence
