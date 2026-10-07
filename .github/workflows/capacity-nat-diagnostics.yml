@@ -1,0 +1,115 @@
+name: Isolated NAT phase diagnostics
+on:
+  push:
+    branches: ['ci/nat-diagnostics-1054']
+env:
+  PACK1_CAPACITY_TARGET: '25'
+permissions:
+  contents: read
+concurrency:
+  group: pack1-gateway-preview
+  cancel-in-progress: false
+  queue: max
+jobs:
+  nat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Quota, ingress and capacity regressions before provisioning
+        run: node --test tests/network-quota-recovery.test.mjs tests/network-quota-policy.test.mjs tests/ingress.test.mjs tests/launch-distributed-capacity.test.mjs tests/ci-provisioning.test.mjs tests/workflow*.test.mjs tests/draft-start-timing.test.mjs
+      - name: Validate and declare NAT target before provisioning
+        run: |
+          node --input-type=module -e "import fs from 'node:fs'; import {selectNatPolicy} from './scripts/launch-load-core.mjs'; console.log(JSON.stringify(selectNatPolicy(JSON.parse(fs.readFileSync('scripts/launch-load-policy.json','utf8')),process.env.PACK1_CAPACITY_TARGET)));"
+          echo "Diagnostic target: $PACK1_CAPACITY_TARGET players with unchanged latency limits. This run does not replace independent browser or PR acceptance." >> "$GITHUB_STEP_SUMMARY"
+      - name: Verify scoped Cloudflare access
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+        run: node scripts/edge-control.mjs preflight
+      - name: Set emergency expiry
+        id: expiry
+        run: echo "expires_at=$(date -u --date '+45 minutes' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+      - name: Create disposable production-sized branch
+        id: neon
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          CI_BRANCH_PREFIX: launch-load-${{ github.run_id }}-${{ github.run_attempt }}
+          CI_BRANCH_PARENT: br-orange-feather-ayps8kep
+          CI_BRANCH_EXPIRES: ${{ steps.expiry.outputs.expires_at }}
+          CI_BRANCH_SUSPEND: 300
+        run: node scripts/create-ci-neon-branch.mjs
+      - name: Install pinned deployment tools
+        run: node .github/scripts/install-wrangler-tool.mjs "$RUNNER_TEMP/edge-tools" neon@4.17.4 esbuild@0.28.2
+      - name: Prepare isolated schema and exact revision
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
+          PREVIEW_CREATED: ${{ steps.neon.outputs.created }}
+          ESBUILD_BIN: ${{ runner.temp }}/edge-tools/node_modules/.bin/esbuild
+        run: |
+          node --input-type=module -e "import {checkBranch} from './scripts/edge-control.mjs';checkBranch(process.env.PREVIEW_BRANCH);if(process.env.PREVIEW_CREATED!=='true')throw Error('Fresh isolated branch required');"
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+          node scripts/ci-migration-plan.mjs launch-load > "$RUNNER_TEMP/pack1-migrations.txt"
+          while IFS= read -r migration; do
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+          done < "$RUNNER_TEMP/pack1-migrations.txt"
+          node scripts/verify-neon-schema.mjs
+          PACK1_RELEASE_COMMIT="$GITHUB_SHA" node scripts/warm-practice-cache.mjs
+          node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$GITHUB_SHA"
+      - name: Prepare accounts, entitlements, score history and query plans
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
+          PREVIEW_CREATED: ${{ steps.neon.outputs.created }}
+          LOAD_FIXTURE_FILE: ${{ runner.temp }}/launch-load-fixtures.json
+        run: node scripts/launch-load-fixtures.mjs
+      - name: Deploy isolated Functions and private gateway
+        id: deploy
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
+          PREVIEW_CREATED: ${{ steps.neon.outputs.created }}
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
+        run: node scripts/edge-control.mjs deploy
+      - name: Run declared shared-network stages until the first failed gate
+        env:
+          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
+          LOAD_FIXTURE_FILE: ${{ runner.temp }}/launch-load-fixtures.json
+        run: node scripts/launch-load.mjs
+      - name: Remove this private preview route
+        if: always() && (steps.deploy.outcome == 'success' || steps.deploy.outcome == 'failure')
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+          PACK1_ENFORCE_PREVIEW_OWNER: '1'
+          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
+        run: node scripts/edge-control.mjs disable
+      - name: Delete the disposable branch
+        if: always() && steps.neon.outputs.created == 'true'
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: patient-shadow-91417882
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch: ${{ steps.neon.outputs.branch_id }}
+      - name: Verify preview mapping absence and deleted branch
+        if: always() && steps.neon.outputs.created == 'true'
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
+        run: node scripts/launch-distributed-setup.mjs cleanup
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nat-phase-diagnostics-${{ github.run_id }}
+          path: |
+            artifacts/launch-load
+            artifacts/ci-resources
+          retention-days: 30
