@@ -43,6 +43,9 @@ test('verification-required signup offers resend and expired-link recovery',()=>
   assert.match(growth,/EMAIL_NOT_VERIFIED/);
   assert.match(growth,/account-signin-verification-resend/);
   assert.match(growth,/Send a new verification link/);
+  assert.match(growth,/setVerificationRequestStatus/);
+  assert.match(growth,/VERIFICATION_COOLDOWN/);
+  assert.match(growth,/Cooldown active/);
   assert.doesNotMatch(growth.slice(growth.indexOf('function formMarkup'),growth.indexOf('async function openEliteLanding')),/Display name<input/);
   assert.match(growth,/id="account-ready"/);
   assert.match(growth,/Shown on Daily leaderboards and your public profile\./);
@@ -54,6 +57,8 @@ test('verification-required signup offers resend and expired-link recovery',()=>
 
 test('Daily auth preserves origin and returns to the completed result',()=>{
   assert.match(draft,/validateDailyRunId:run\.id,source:'daily_result'/);
+  assert.match(draft,/hasAccountSession\(\)\?'Add score to leaderboard':'Sign in to add score'/);
+  assert.match(draft,/Signed in\.<\/strong> Add this score to today’s leaderboard/);
   assert.match(draft,/export async function returnToValidatedDaily/);
   assert.match(draft,/Score added to today's leaderboard/);
   assert.match(draft,/View leaderboard/);
