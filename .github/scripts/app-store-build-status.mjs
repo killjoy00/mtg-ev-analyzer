@@ -108,7 +108,7 @@ try {
     let crashLogError = null;
     try {
       crashLog = await ascRead(
-        `/v1/betaFeedbackCrashSubmissions/${encodeURIComponent(submission.id)}/crashLog`,
+        `/v1/betaFeedbackCrashSubmissions/${encodeURIComponent(submission.id)}/crashLog?fields%5BbetaCrashLogs%5D=logText`,
       );
     } catch (error) {
       crashLogError = error instanceof Error ? error.message : 'Crash log read failed.';
