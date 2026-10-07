@@ -274,7 +274,7 @@ def render_og(args, fonts, colors):
     eyebrow = fonts.get("body", 700, 18)
     draw.text((72, 154), "BEAT THE CREATOR", font=eyebrow, fill=colors["blue"])
     title_font, title_lines = fit_wrapped(
-        draw, fonts, args.headline, 1056, 4, 62, 24, max_height=150, spacing=2
+        draw, fonts, args.headline, 1056, 5, 62, 24, max_height=150, spacing=2
     )
     draw_lines(draw, (72, 180), title_lines, title_font, colors["ink"], 2)
 
@@ -304,7 +304,7 @@ def render_square(args, fonts, colors):
     eyebrow = fonts.get("body", 700, 19)
     draw.text((70, 190), "BEAT THE CREATOR", font=eyebrow, fill=colors["blue"])
     title_font, title_lines = fit_wrapped(
-        draw, fonts, args.headline, 940, 4, 76, 30, max_height=250, spacing=4
+        draw, fonts, args.headline, 940, 5, 76, 30, max_height=250, spacing=4
     )
     draw_lines(draw, (70, 220), title_lines, title_font, colors["ink"], 4)
 
