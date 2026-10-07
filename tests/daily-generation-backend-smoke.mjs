@@ -95,6 +95,50 @@ await internal({day:'2041-06-14'},oidc(),409);
 await internal({day},'',403);
 await internal({day},oidc({...claims,aud:'wrong'}),403);
 
+// A missing day is generated once for overlapping requests in one runtime.
+// Exercise the production selector and INSERT, not an injected fake builder.
+const {ensureDailySchedule,DAILY_SCHEDULE_SELECT}=await import('../worker/draft-run-daily.mjs');
+const published=(await query(DAILY_SCHEDULE_SELECT,[day,'latest'])).rows[0];
+const removeLatest=()=>query("DELETE FROM draft_run_schedules WHERE day=$1::date AND environment='latest'",[day]);
+await removeLatest();
+let inserts=0;
+const sharedQuery=async(sql,params)=>{if(sql.startsWith('INSERT INTO draft_run_schedules'))inserts++;return query(sql,params);};
+const generationStarted=performance.now();
+const simultaneous=await Promise.all(Array.from({length:10},()=>ensureDailySchedule(sharedQuery,day,'latest')));
+const sharedGenerationMs=Math.round(performance.now()-generationStarted);
+assert.equal(inserts,1,'one production schedule INSERT per overlapping group');
+assert.equal(simultaneous.filter(r=>r.created).length,1);
+assert.ok(simultaneous.every(r=>JSON.stringify(r.schedule)===JSON.stringify(published)));
+simultaneous[0].schedule.puzzle_ids.push('caller-mutation');
+assert.deepEqual(simultaneous[1].schedule,published,'caller mutation cannot change another response');
+assert.equal((await ensureDailySchedule(sharedQuery,day,'latest')).created,false);
+assert.equal(inserts,1,'a later request reads the published row');
+
+// Independent runtime adapters still race through the production database key.
+// Force both initial SELECTs to see absence before either starts generation.
+await removeLatest();
+let arrivals=0,release;
+const initialReads=new Promise(resolve=>{release=resolve;});
+function independentAdapter() {
+  let first=true;
+  return async(sql,params)=>{
+    const result=await query(sql,params);
+    if(first&&sql===DAILY_SCHEDULE_SELECT) {
+      first=false;assert.equal(result.rows.length,0);
+      if(++arrivals===2)release();
+      await initialReads;
+    }
+    return result;
+  };
+}
+const independent=await Promise.all([
+  ensureDailySchedule(independentAdapter(),day,'latest'),
+  ensureDailySchedule(independentAdapter(),day,'latest'),
+]);
+assert.equal(independent.filter(r=>r.created).length,1);
+assert.ok(independent.every(r=>JSON.stringify(r.schedule)===JSON.stringify(published)));
+assert.equal(Number((await query("SELECT count(*) n FROM draft_run_schedules WHERE day=$1::date AND environment='latest'",[day])).rows[0].n),1);
+
 // CI-only destructive fixture: remove one throwaway schedule to prove that the
 // normal player-triggered path still creates the same current-day inventory.
 await query("DELETE FROM draft_run_schedules WHERE day=$1::date AND environment='latest'",[day]);
@@ -129,5 +173,8 @@ console.log(JSON.stringify({
   public_without_oidc:'rejected',
   wrong_identity:'rejected',
   on_demand_fallback:'passed',
+  concurrent_daily_generation:'passed',
+  shared_generation_ms:sharedGenerationMs,
+  cross_adapter_daily_uniqueness:'passed',
   sensitive_output:false,
 }));
