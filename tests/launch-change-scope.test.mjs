@@ -41,12 +41,17 @@ test('shared, gameplay, quota and ambiguous gateway edits still require the full
 
 test('capacity-sensitive application and harness paths always require the load rehearsal',()=>{
   for(const file of [
+    '.github/scripts/maintain-serving-indexes.sql',
     'worker/draft-run-function.mjs',
     'worker/draft-run-selection.mjs',
     'worker/draft-start-timing.mjs',
     'migrations/0045_batched_practice_selector.sql',
     'migrations/0050_practice_recency_bias.sql',
+    'migrations/0056_snapshot_aware_reroll_covering_index.sql',
     'scripts/edge-control.mjs',
+    'scripts/create-ci-neon-branch.mjs',
+    'scripts/control-read.mjs',
+    '.github/preview-dns-recovery.json',
     'scripts/launch-distributed-run.mjs',
     'scripts/launch-distributed-policy.json',
   ])assert.equal(classifyLaunchChange({files:[file]}).runLoad,true,file);

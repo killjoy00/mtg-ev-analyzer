@@ -17,7 +17,7 @@ import {digest} from './account-session.mjs';
 import corpusCatalog from '../corpus/draft-run/catalog.json' with {type:'json'};
 import growth, { query, player, readJson, json, withCors, gameDateKey } from './growth-function.js';
 import { handleTrophyImport } from './trophy-import.mjs';
-import {observeDecision,measurementInput,MEASUREMENT_CTE} from './decision-measurements.mjs';
+import {observeDecisionForRequest,measurementInput,MEASUREMENT_CTE} from './decision-measurements.mjs';
 import {handleAdmin} from './measurement-admin.mjs';
 import {creatorAcquisitionProps,creatorChallengeForPublic,publicCreatorChallenge,loadCreatorChallengeForStart,loadCreatorChallengeForExistingSession,creatorRevealState} from './creator-challenges.mjs';
 import {loadPuzzleMetadata,selectCachedDatabaseRun,selectDatabaseReroll,loadLiveSetMetadata,loadCachedCustomSetMetadata,servingRevisionMatches,servingCacheUnavailable} from './draft-run-selection.mjs';
@@ -593,18 +593,11 @@ async function route(request) {
             JOIN pack1_admins admin ON admin.auth_user_id=a.auth_user_id
             WHERE a.player_id=p.id
           )
-          AND NOT EXISTS (
-            SELECT 1 FROM analytics_events existing
-            WHERE existing.player_id=$1::uuid
-              AND existing.event_name=event.event_name
-              AND existing.event_props->>'creator_challenge_id'=$5
-          )
         ON CONFLICT DO NOTHING`,[
         viewer,
         JSON.stringify({creator_challenge_id:challenge.id,creator_challenge_slug:challenge.slug,creator_source_type:challenge.source_type}),
         JSON.stringify(acquisition),
         challenge.source_owner_player_id,
-        challenge.id,
       ]);
     }
     return json(publicCreatorChallenge(challenge));
@@ -612,9 +605,11 @@ async function route(request) {
   const match=path.match(/^\/v1\/runs\/([a-f0-9-]+)(?:\/(pick|reroll|share|view|report))?$/);
   if(match) {
     if(request.method==='POST'&&match[2]==='view') {
-      const owner=await player(request),body=await readJson(request),s=await session(match[1],owner);
-      if(body.revision!==s.revision||body.puzzleId!==s.puzzle_ids[s.answers.length])fail('Run changed.',409);
-      return json(await observeDecision(query,s,body));
+      const timing=draftStartTiming(process.env.PACK1_CAPACITY_DIAGNOSTICS==='1',{header:'x-pack1-view-timing'});
+      const owner=await timing.step('player',()=>player(request));
+      const body=await timing.step('body',()=>readJson(request));
+      const result=await timing.step('observation',()=>observeDecisionForRequest(query,match[1],owner,body));
+      return timing.finish(json(result));
     }
     if(request.method==='GET'&&!match[2]) return json(await responseFor(await session(match[1],await player(request))));
     if(request.method==='POST'&&match[2]==='share') return createShare(request,match[1]);

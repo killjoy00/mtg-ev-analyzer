@@ -1,0 +1,15 @@
+{
+  "hostname": "api-preview.packone.pro",
+  "worker": "pack1-gateway-preview",
+  "record_id": "94b49f8ec9bca396105c186c31158062",
+  "type": "AAAA",
+  "content": "100::",
+  "proxied": true,
+  "created_on": "2026-10-07T04:14:08.877988Z",
+  "modified_on": "2026-10-07T04:14:08.877988Z",
+  "source_run": 37568463890,
+  "source_revision": "9dd794b38881106fdf26897ca8683fad244dcecd",
+  "source_branch": "br-lingering-meadow-aynkbwo9",
+  "diagnostic_job": 112633186250,
+  "not_after": "2026-10-08T04:14:08Z"
+}

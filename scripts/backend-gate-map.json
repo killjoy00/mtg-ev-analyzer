@@ -1,6 +1,7 @@
 {
   "version": 1,
   "full_paths": [
+    ".github/scripts/maintain-serving-indexes.sql",
     ".github/workflows/backend-gate.yml",
     ".github/workflows/prepare-rebuild.yml",
     "scripts/backend-gate-scope.mjs",
@@ -20,7 +21,13 @@
     "worker/origin-telemetry.mjs",
     "game-date.mjs",
     "scripts/verify-neon-schema.mjs",
-    "scripts/load_verified_draft_run.mjs"
+    "scripts/load_verified_draft_run.mjs",
+    "worker/database-retry.mjs",
+    "scripts/creator-event-schema.mjs",
+    ".github/scripts/apply-identity-migration.sh",
+    "scripts/create-ci-neon-branch.mjs",
+    "scripts/control-read.mjs",
+    "scripts/reroll-index-schema.mjs"
   ],
   "domains": {
     "account": {
@@ -73,6 +80,7 @@
         "tests/measurement-report-math.mjs",
         "tests/eight-pick-backend-smoke.mjs",
         "tests/creator-event-migration-rollout.mjs",
+        "tests/creator-event-write-safety.mjs",
         "tests/creator-challenge-backend-smoke.mjs"
       ]
     },

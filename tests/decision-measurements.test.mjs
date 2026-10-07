@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {decisionClock} from '../decision-clock.mjs';
-import {measurementInput} from '../worker/decision-measurements.mjs';
+import {measurementInput,observeDecisionForRequest} from '../worker/decision-measurements.mjs';
 import {reportFilters,handleAdmin} from '../worker/measurement-admin.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 test('foreground timing excludes hidden time and resets only for a new decision',()=>{
@@ -16,6 +16,19 @@ test('invalid client time becomes missing rather than clamped into a useful-look
   for(const activeMs of [-1,NaN,Infinity,1800001,'100',1.5])assert.equal(measurementInput({activeMs}).activeMs,null);
   assert.equal(measurementInput({activeMs:0}).activeMs,0);
   assert.equal(measurementInput({viewId:'not-uuid'}).viewId,null);
+});
+test('view request validation keeps ownership and revision errors ahead of view ID errors',async()=>{
+  const id=crypto.randomUUID(),owner=crypto.randomUUID(),body={revision:0,puzzleId:'p',viewId:crypto.randomUUID()};
+  for(const [row,status] of [[{found:false,matches:false,ok:false},404],[{found:true,matches:false,ok:false},409]]) {
+    await assert.rejects(()=>observeDecisionForRequest(async()=>({rows:[row]}),id,owner,{...body,viewId:'bad'}),e=>e.status===status);
+  }
+  await assert.rejects(()=>observeDecisionForRequest(async()=>({rows:[{found:true,matches:true,ok:false}]}),id,owner,{...body,viewId:'bad'}),e=>e.status===400);
+  let calls=0;
+  assert.deepEqual(await observeDecisionForRequest(async(_sql,params)=>{
+    calls++;assert.deepEqual(params,[id,owner,0,'p',body.viewId,true]);
+    return {rows:[{found:'t',matches:'t',ok:'t'}]};
+  },id,owner,body),{ok:true});
+  assert.equal(calls,1);
 });
 test('reports reject malformed dates and filters and bound the query range',()=>{
   for(const qs of ['from=2026-02-30','from=2020-01-01&to=2026-01-01','from=2026-09-12&to=2026-09-11','environment=bad','set=%27'])

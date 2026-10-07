@@ -33,6 +33,7 @@ async function waitFor(predicate,{attempts=100,delay=50}={}) {
 
 const source=randomUUID(),target=randomUUID(),challenge=randomUUID();
 const advisory=91540054;
+const holderName='creator-rollout-holder-'+randomUUID();
 let holder=null,merge=null;
 try {
   // Reconstruct the pre-0054 state on this disposable branch. The old merge
@@ -77,7 +78,7 @@ try {
 
   holder=spawn('psql',[databaseUrl,'-X','-v','ON_ERROR_STOP=1','-c',
     `SELECT pg_advisory_lock(${advisory}); SELECT pg_sleep(60);`],
-    {stdio:['ignore','ignore','pipe']});
+    {stdio:['ignore','ignore','pipe'],env:{...process.env,PGAPPNAME:holderName}});
   await waitFor(()=>runPsql({sql:`SELECT NOT pg_try_advisory_lock(${advisory});`})==='t');
 
   merge=spawn('psql',[databaseUrl,'-X','-v','ON_ERROR_STOP=1','-c',
@@ -94,9 +95,14 @@ try {
   // This commits a replacement function and the new database triggers while
   // the already-entered invocation still owns the old PL/pgSQL body.
   runPsql({file:'migrations/0054_creator_event_idempotency.sql'});
+  runPsql({file:'migrations/0055_creator_event_write_safety.sql'});
 
+  const mergeDone=new Promise(resolve=>merge.once('exit',code=>resolve(code)));
+  // Terminate the server session, not just psql: killing the client does not
+  // release an advisory lock until a sleeping backend next checks its socket.
+  runPsql({sql:`SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name='${holderName}';`});
   holder.kill('SIGTERM');
-  const mergeExit=await new Promise(resolve=>merge.once('exit',code=>resolve(code)));
+  const mergeExit=await mergeDone;
   if(mergeExit!==0) {
     let stderr='';
     for await (const chunk of merge.stderr)stderr+=chunk;
@@ -120,12 +126,13 @@ try {
   assert.equal(Number(row.open_count),1,'old in-flight merge converges creator opens after 0054 lands');
   assert.equal(Number(row.touch_count),1,'old in-flight merge converges acquisition touches after 0054 lands');
   assert.equal(row.campaign,'earliest','old in-flight merge preserves earliest acquisition attribution');
-  console.log('PASS: 0054 is safe for an already-running pre-0054 account merge.');
+  console.log('PASS: 0054/0055 are safe for an already-running pre-0054 account merge.');
 } finally {
   holder?.kill('SIGTERM');
   merge?.kill('SIGTERM');
   try {
     runPsql({sql:`
+      SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name='${holderName}';
       DROP TRIGGER IF EXISTS qa_pause_creator_merge ON players;
       DROP FUNCTION IF EXISTS qa_pause_creator_merge();
       DELETE FROM analytics_events WHERE event_props->>'creator_challenge_id'='${challenge}';

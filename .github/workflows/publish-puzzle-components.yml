@@ -132,6 +132,15 @@ jobs:
           node scripts/load-traditional-components.mjs "$RUNNER_TEMP/target.connection" "$ARTIFACT_ROOT"
           node scripts/verify-puzzle-components.mjs "$RUNNER_TEMP/target.connection" "$ARTIFACT_ROOT" Candidate
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+      - name: Restore serving index visibility after committed bulk writes
+        run: |
+          set -euo pipefail
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+          connection=$(cat "$RUNNER_TEMP/target.connection")
+          psql "$connection" -X -v ON_ERROR_STOP=1 -f .github/scripts/maintain-serving-indexes.sql
       - name: Publish explicitly through the authenticated administrative lifecycle
         if: inputs.action == 'publish'
         run: node scripts/publish-puzzle-components.mjs "$RUNNER_TEMP/target.connection" "$ARTIFACT_ROOT"

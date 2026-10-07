@@ -1,7 +1,7 @@
 name: deploy neon functions
 run-name: deploy ${{ inputs.target }} ${{ inputs.commit }}
 
-# Manual promotion of one reviewed main commit. Schema is verified, not mutated.
+# Manual promotion of one reviewed main commit. Verify schema and maintain serving indexes.
 on:
   workflow_dispatch:
     inputs:
@@ -58,6 +58,7 @@ jobs:
           test ${#PACK1_DELETION_ADMIN_PASSWORD} -ge 16 || { echo '::error::PACK1_DELETION_ADMIN_PASSWORD is missing or too short.'; exit 1; }
           [[ "$RELEASE_COMMIT" =~ ^[a-f0-9]{40}$ ]] || { echo '::error::Use a full commit SHA.'; exit 1; }
           git merge-base --is-ancestor "$RELEASE_COMMIT" origin/main
+          git show "$GITHUB_SHA:.github/scripts/maintain-serving-indexes.sql" > "$RUNNER_TEMP/maintain-serving-indexes.sql"
           git checkout --detach "$RELEASE_COMMIT"
           case "$RELEASE_TARGET" in
             development)
@@ -88,6 +89,15 @@ jobs:
           printf '%s' "$connection" > "$RUNNER_TEMP/target.connection"
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
 
+      - name: Restore serving index visibility after committed bulk writes
+        run: |
+          set -euo pipefail
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+          connection=$(cat "$RUNNER_TEMP/target.connection")
+          psql "$connection" -X -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/maintain-serving-indexes.sql"
       - name: Require the same revision tested in development before production
         if: inputs.target == 'production'
         shell: bash

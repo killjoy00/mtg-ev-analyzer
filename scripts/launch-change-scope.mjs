@@ -2,6 +2,7 @@ import {execFileSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 
 const LOAD_SENSITIVE_PATHS=[
+  path=>path==='.github/scripts/maintain-serving-indexes.sql',
   path=>path.startsWith('scripts/launch-distributed'),
   path=>path==='worker/draft-start-timing.mjs',
   path=>path==='worker/draft-run-function.mjs',
@@ -9,7 +10,11 @@ const LOAD_SENSITIVE_PATHS=[
   path=>path==='migrations/0045_batched_practice_selector.sql',
   path=>path==='migrations/0050_practice_recency_bias.sql',
   path=>path==='migrations/0051_exact_pick_draw_index.sql',
+  path=>path==='migrations/0056_snapshot_aware_reroll_covering_index.sql',
   path=>path==='scripts/edge-control.mjs',
+  path=>path==='scripts/create-ci-neon-branch.mjs',
+  path=>path==='scripts/control-read.mjs',
+  path=>path==='.github/preview-dns-recovery.json',
 ];
 const PRACTICE_PERFORMANCE_PATHS=new Set([
   'scripts/practice-performance.mjs',

@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-import {fingerprint,evaluateStage,timing} from './launch-distributed-core.mjs';
+import {fingerprint,evaluateStage,timing,stageFailureEvidence} from './launch-distributed-core.mjs';
 import {policy,verifyFixture,coordinatorSQL,heartbeat,storeReport,readReports,usageGate} from './launch-distributed-control.mjs';
 import {seal} from './launch-distributed-bundle.mjs';
 import {requestClient,runPlayerStage,wait} from './launch-distributed-player.mjs';
@@ -60,7 +60,6 @@ async function main() {
         const summary=evaluateStage(reports,{scope,stage,start_at:start,networks},policy);
         if(summary.passed) {
           const end=timing(start,policy.stages[stage],policy).end;
-          await wait(Math.max(0,end+policy.telemetry_settlement_seconds*1000-Date.now()),controller.signal);
           try {summary.telemetry=await settlePreviewTelemetry({reports,sha:scope.sha,from:start,to:end,policy,account,sleep:ms=>wait(ms,controller.signal)});}
           catch(error) {summary.telemetry={passed:false,reason:'retained_preview_api_or_schema_unavailable',detail:previewTelemetryFailure(error)};}
           try {summary.usage=await usageGate(fixture.usage_baseline);}
@@ -69,6 +68,7 @@ async function main() {
           if(!summary.usage.passed)summary.reasons.push({category:'cost',reason:'reported_project_usage_gate'});
         }
         summary.passed=summary.passed&&summary.reasons.length===0;
+        console.log(JSON.stringify({stage_gate:stageFailureEvidence(summary)}));
         fs.writeFileSync(`${directory}/distributed-stage-${policy.stages[stage].players}.json`,JSON.stringify(summary,null,2));evidence.push(summary);
         message.decision={stage,passed:summary.passed,telemetry_passed:summary.telemetry?.passed===true,usage_passed:summary.usage?.passed===true,
           digest:fingerprint(summary),category:summary.reasons[0]?.category,reason:summary.reasons[0]?.reason};

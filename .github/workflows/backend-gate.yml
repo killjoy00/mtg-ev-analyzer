@@ -5,6 +5,7 @@ on:
     paths:
       - 'worker/**'
       - 'migrations/**'
+      - '.github/scripts/maintain-serving-indexes.sql'
       - 'draft-run.mjs'
       - 'draft-run-policy.mjs'
       - 'daily-selection.mjs'
@@ -13,6 +14,8 @@ on:
       - 'game-date.mjs'
       - 'tests/*backend-smoke.mjs'
       - 'scripts/verify-neon-schema.mjs'
+      - 'scripts/create-ci-neon-branch.mjs'
+      - 'scripts/control-read.mjs'
       - 'scripts/load_verified_draft_run.mjs'
       - 'scripts/*corpus*manifest.mjs'
       - 'scripts/load*tro*.mjs'
@@ -122,16 +125,13 @@ jobs:
 
       - name: Create isolated Neon branch
         id: neon
-        uses: neondatabase/create-branch-action@v6
-        with:
-          project_id: patient-shadow-91417882
-          api_key: ${{ secrets.NEON_API_KEY }}
-          # Explicit parent: never inherit Neon's default-branch label (see docs/DATABASE-RECOVERY.md).
-          parent_branch: br-orange-feather-ayps8kep
-          branch_name: ci-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.domain }}
-          database: pack1
-          role: pack1_owner
-          expires_at: ${{ steps.expiry.outputs.expires_at }}
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          CI_BRANCH_PREFIX: ci-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.domain }}
+          CI_BRANCH_PARENT: br-orange-feather-ayps8kep
+          CI_BRANCH_EXPIRES: ${{ steps.expiry.outputs.expires_at }}
+          CI_BRANCH_SUSPEND: 0
+        run: node scripts/create-ci-neon-branch.mjs
 
       - name: Prepare isolated connection
         shell: bash
@@ -180,7 +180,7 @@ jobs:
           release_backlog=(migrations/0037_mobile_oauth_handoffs.sql migrations/0038_mobile_practice_idempotency.sql migrations/0039_practice_serving_cache.sql migrations/0040_mobile_minimum_version.sql migrations/0040_practice_reroll_index.sql migrations/0041_corpus_source_snapshots.sql migrations/0041_apple_auth.sql migrations/0042_serving_revision_snapshot_staging.sql migrations/0043_corpus_activation_readiness.sql migrations/0044_snapshot_scoped_puzzle_uniqueness.sql migrations/0045_apple_subscriptions.sql migrations/0046_public_identity_safety.sql migrations/0047_admin_user_account_controls.sql)
           mapfile -t pending < <(
             {
-              for migration in "${release_backlog[@]}" migrations/0048_uncapped_v5_components.sql migrations/0049_cross_version_corpus_cutover.sql migrations/0050_practice_recency_bias.sql migrations/0051_exact_pick_draw_index.sql migrations/0052_decision_reports.sql migrations/0053_creator_challenges.sql migrations/0054_creator_event_idempotency.sql; do
+              for migration in "${release_backlog[@]}" migrations/0048_uncapped_v5_components.sql migrations/0049_cross_version_corpus_cutover.sql migrations/0050_practice_recency_bias.sql migrations/0051_exact_pick_draw_index.sql migrations/0052_decision_reports.sql migrations/0053_creator_challenges.sql migrations/0054_creator_event_idempotency.sql migrations/0055_creator_event_write_safety.sql migrations/0056_snapshot_aware_reroll_covering_index.sql; do
                 [[ -f "$migration" ]] && printf '%s\n' "$migration"
               done
               printf '%s\n' "${migration_changes[@]}" | awk -F '\t' '$1 == "A" { print $2 }'

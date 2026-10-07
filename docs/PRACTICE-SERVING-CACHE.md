@@ -115,3 +115,24 @@ spent 9.8–11.8 ms in update triggers (1,000 calls, one revision increment per
 transaction). A deliberately held two-second publication transaction delayed a
 second writer by 1,952 ms. These are bounded diagnostic samples, not full-import
 throughput claims. Keep import transactions bounded and prewarm after activation.
+
+## Covering-index visibility maintenance (#1051)
+
+Migration 0056 includes bounded ordinary VACUUM and metadata-only ANALYZE through
+`.github/scripts/maintain-serving-indexes.sql`. Run it with psql outside a
+transaction after committed bulk puzzle/rating imports. The generic Functions
+release and database import workflows repeat the same maintenance. This does not
+publish sources, change revisions, alter candidates, or require warm compute.
+It rejects the wrong database or a role that does not own both tables, waits at
+most five seconds for a conflicting maintenance lock, and bounds each table at
+eight minutes. TRUNCATE FALSE avoids end-of-vacuum heap truncation locks.
+
+A covering index can still fetch thousands of heap rows when its visibility map
+has not caught up with an import. ANALYZE and index creation do not restore those
+bits. On an isolated production-sized clone, the recorded SNC reroll took
+2,731 ms after a confirmed compute restart, with 8,066 heap fetches. After ordinary
+VACUUM and another confirmed restart, it took 184 ms with zero heap fetches;
+candidate rows and order were identical. These SQL samples explain the observed
+cold I/O cost; they do not replace browser, NAT, or distributed load acceptance.
+Future writes can clear visibility bits again. Inspect heap fetches and import
+completion before assuming an index name alone proves the serving path is fast.

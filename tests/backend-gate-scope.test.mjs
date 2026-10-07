@@ -19,6 +19,9 @@ test('gate infrastructure, migrations, shared core, unmapped files, and empty di
     ['.github/workflows/prepare-rebuild.yml'],
     ['scripts/backend-gate-scope.mjs'],
     ['scripts/backend-gate-map.json'],
+    ['scripts/create-ci-neon-branch.mjs'],
+    ['scripts/control-read.mjs'],
+    ['scripts/reroll-index-schema.mjs'],
     ['tests/backend-gate-scope.test.mjs'],
     ['migrations/9999_probe.sql'],
     ['worker/schema.sql'],
@@ -98,4 +101,10 @@ test('season smoke suite itself remains a narrow seasons route and schedules des
 test('root web files remain classified and fail closed while a neutral-only filtered list is full', () => {
   assert.equal(classifyBackendChanges(['web-only.mjs'], { map }).fullSuite, true);
   assert.equal(classifyBackendChanges(['README.md', 'docs/only.md', 'mobile/app/index.tsx', 'tests/unit.test.mjs', '.github/dependabot.yml'], { map }).fullSuite, true);
+});
+
+test('serving maintenance remains a full-suite input even beside a narrow backend edit', () => {
+  const maintenance='.github/scripts/maintain-serving-indexes.sql';
+  assert.deepEqual(filterBackendChangedPaths([maintenance,'worker/draft-run-pool.mjs']),[maintenance,'worker/draft-run-pool.mjs']);
+  assert.equal(classifyBackendChanges([maintenance,'worker/draft-run-pool.mjs'],{map}).fullSuite,true);
 });

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import http from 'node:http';
-import {fingerprint,initialControl,transition,evaluateStage,timing,permittedRequest,quantiles,validatePolicy} from '../scripts/launch-distributed-core.mjs';
+import {fingerprint,initialControl,transition,evaluateStage,timing,permittedRequest,quantiles,validatePolicy,stageFailureEvidence} from '../scripts/launch-distributed-core.mjs';
 import {policy,heartbeat,coordinatorSQL} from '../scripts/launch-distributed-control.mjs';
 import {inspectBin,inspectPreviewTelemetry,settlePreviewTelemetry,previewTelemetryFailure,queryPreviewEvents} from '../scripts/launch-distributed-telemetry.mjs';
 import {parseStartDiagnostics,requestClient} from '../scripts/launch-distributed-player.mjs';
@@ -295,6 +295,8 @@ test('runner retains bounded preview timings beside unsampled client duration',a
  const reroll=new Headers({'x-pack1-gateway-timing':headers.get('x-pack1-gateway-timing'),
    'x-pack1-reroll-timing':JSON.stringify({v:1,total_ms:120,phases:{session:30,selection:80,private:200},selector:{metadata:{count:1,sum_ms:10,max_ms:10},reroll:{count:1,sum_ms:75,max_ms:75}}})});
  assert.deepEqual(parseStartDiagnostics(reroll,'reroll'),{gateway:{duration_ms:130,quota_ms:20,upstream_ms:90},origin:{total_ms:120,phases:{session:30,selection:80},selector:{metadata:{count:1,sum_ms:10,max_ms:10},reroll:{count:1,sum_ms:75,max_ms:75}}}});
+ const view=new Headers({'x-pack1-view-timing':JSON.stringify({v:1,total_ms:80,phases:{player:20,body:1,observation:59,private:42},selector:{other:{count:1,sum_ms:40,max_ms:40}}})});
+ assert.deepEqual(parseStartDiagnostics(view,'view'),{origin:{total_ms:80,phases:{player:20,body:1,observation:59},selector:{}}});
 });
 const event=(extra={})=>({id:'event',release:scope.sha,status:200,duration_ms:50,quota_ms:5,upstream_ms:40,...extra});
 test('telemetry bins keep ambient preview boundary rejects distinct from cohort and system failures',()=>{
@@ -423,4 +425,32 @@ test('paced harness executes eight picks, repeated practice/rerolls and recovery
  assert.ok(pickCount>=80);assert.ok(rerolls>=7);assert.ok(report.requests.some(r=>r.phase==='recovery'));assert.ok(report.requests.some(r=>r.phase==='hold'&&r.route==='pick'));
  assert.equal(report.correctness_failures,0);assert.ok(report.recovery_ended_at>=report.windows.end);
  assert.equal(calls.filter(c=>c.pathname==='/growth/v1/player/session').length,5,'no identity creation during hold');
+});
+
+test('settlement waits for the inspection clock even when the first timer wakes early',async()=>{
+ const to=60000,settledAt=to+policy.telemetry_settlement_seconds*1000;
+ let now=settledAt-10,queries=0;const sleeps=[];
+ const row={$metadata:{id:'retained'},source:{event:'gateway_request',release:scope.sha,status:200,duration_ms:10,sample_rate:1,route:'draft_pick'}};
+ const result=await settlePreviewTelemetry({reports:[{requests:[{at:1}]}],sha:scope.sha,from:0,to,policy,account:'a',token:'t',clock:()=>now,
+  sleep:async ms=>{sleeps.push(ms);now+=sleeps.length===1?ms-1:ms;},
+  fetcher:async()=>{assert.ok(now>=settledAt,'never query unsettled evidence');queries++;return Response.json({result:{events:{events:[row]}}});}});
+ assert.equal(result.passed,true);assert.deepEqual(sleeps,[10,1]);assert.equal(queries,1);
+ assert.equal(result.checks[0].queried_at,new Date(settledAt).toISOString());
+});
+test('safe telemetry diagnostics distinguish settlement, timeout and transport errors',()=>{
+ assert.equal(previewTelemetryFailure(Error('telemetry_not_settled')),'telemetry_not_settled');
+ assert.equal(previewTelemetryFailure(new DOMException('private URL and credential','TimeoutError')),'preview_telemetry_timeout');
+ assert.equal(previewTelemetryFailure(Object.assign(new TypeError('private connection'),{cause:{code:'ECONNRESET',message:'private credential'}})),'preview_telemetry_transport_econnreset');
+ assert.equal(previewTelemetryFailure(Object.assign(Error('private credential'),{code:'secret_token'})),'preview_telemetry_unclassified');
+});
+test('stage gate logs expose aggregate causes without fixture or provider secrets',()=>{
+ const s={target:25,passed:false,reasons:[{category:'telemetry',reason:'retained_preview_coverage_failed',private:'secret'}],
+  scope:{preview:'secret',connection:'secret'},requests:[{cookie:'secret'}],
+  telemetry:{passed:false,reason:'retained_preview_api_or_schema_unavailable',detail:'preview_telemetry_timeout',secret:'secret',
+   bins:[{passed:false,from:1,to:2,client_requests:20,retained_events:0,required_events:1,failures:['missing_or_sparse_retained_telemetry'],events:[{ip:'secret'}]}]},
+  usage:{passed:true,comparison:{status:'reported_counter_delta',delta_bytes:100,secret:'secret'},ceiling_bytes:1000,current:{credential:'secret'}}};
+ const evidence=stageFailureEvidence(s);
+ assert.equal(evidence.telemetry.detail,'preview_telemetry_timeout');assert.equal(evidence.telemetry.failed_bins[0].required_events,1);
+ assert.equal(evidence.usage.delta_bytes,100);assert.equal(JSON.stringify(evidence).includes('secret'),false);
+ s.telemetry.detail='credential secret';assert.equal(stageFailureEvidence(s).telemetry.detail,'unclassified');
 });

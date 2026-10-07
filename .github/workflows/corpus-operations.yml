@@ -130,6 +130,15 @@ jobs:
           node scripts/register-corpus-sources.mjs "$RUNNER_TEMP/corpus.connection"
           node scripts/load_all_trophies.mjs unused generated/corpus-candidates --validate-only
           node scripts/load_all_trophies.mjs "$RUNNER_TEMP/corpus.connection" generated/corpus-candidates
+      - name: Restore serving index visibility after committed bulk writes
+        run: |
+          set -euo pipefail
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+          connection=$(cat "$RUNNER_TEMP/corpus.connection")
+          psql "$connection" -X -v ON_ERROR_STOP=1 -f .github/scripts/maintain-serving-indexes.sql
       - name: Verify newly ingested Candidate health
         shell: bash
         env:

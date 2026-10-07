@@ -98,6 +98,18 @@ jobs:
           complete=()
           if [[ "$IMPORT_SETS" == all ]]; then complete+=(--complete); fi
           node scripts/verify-corpus-load.mjs "$connection_file" generated/trophy-import "${complete[@]}"
+      - name: Restore serving index visibility after committed bulk writes
+        if: inputs.target != 'build-only'
+        env:
+          IMPORT_TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+          connection=$(cat "$RUNNER_TEMP/$IMPORT_TARGET.connection")
+          psql "$connection" -X -v ON_ERROR_STOP=1 -f .github/scripts/maintain-serving-indexes.sql
       - name: Write coverage summary
         if: always()
         run: python scripts/summarize_trophy_import.py generated/trophy-import

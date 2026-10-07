@@ -142,3 +142,21 @@ export function evaluateStage(reports,{scope,stage,start_at,networks},p) {
   if(summary.distinct_real_egress!==p.generators)reject('generator','egress_count');
   summary.passed=reasons.length===0;return summary;
 }
+
+// Aggregate failure diagnostics only: no actor IDs, request bodies, network
+// hashes, encrypted fixtures or raw provider error messages enter CI logs.
+export function stageFailureEvidence(summary) {
+  const code=value=>typeof value==='string'&&/^[a-z0-9_]{1,100}$/.test(value)?value:'unclassified';
+  const number=value=>Number.isFinite(value)&&value>=0?value:null;
+  const telemetry=summary.telemetry,usage=summary.usage;
+  return {target:number(summary.target),passed:summary.passed===true,
+    reasons:(summary.reasons||[]).map(r=>({category:code(r.category),reason:code(r.reason)})),
+    telemetry:telemetry?{passed:telemetry.passed===true,reason:telemetry.reason?code(telemetry.reason):null,
+      detail:telemetry.detail?code(telemetry.detail):null,
+      failed_bins:(telemetry.bins||[]).filter(b=>!b.passed).map(b=>({from:number(b.from),to:number(b.to),
+        client_requests:number(b.client_requests),retained_events:number(b.retained_events),required_events:number(b.required_events),
+        failures:(b.failures||[]).map(code)}))}:null,
+    usage:usage?{passed:usage.passed===true,reason:usage.reason?code(usage.reason):null,
+      comparison_status:usage.comparison?.status?code(usage.comparison.status):null,
+      delta_bytes:number(usage.comparison?.delta_bytes),ceiling_bytes:number(usage.ceiling_bytes)}:null};
+}
