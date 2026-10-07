@@ -294,8 +294,31 @@ try {
   },legacyReplayGuest.token);
   assert.equal(legacyReplay.answers[0].score,13,
     'creator gameplay dispatches through the session-pinned historical scorer');
+  while(!legacyReplay.complete) {
+    legacyReplay=await directCall(runApi,`/v1/runs/${legacyReplay.id}/pick`,{
+      revision:legacyReplay.revision,
+      round:legacyReplay.answers.length,
+      puzzleId:legacyReplay.current.puzzle_id,
+      cardId:legacyReplay.current.candidates[0].id,
+    },legacyReplayGuest.token);
+  }
+  const legacyReload=await directCall(runApi,`/v1/runs/${legacyReplay.id}`,undefined,legacyReplayGuest.token);
+  assert.equal(legacyReload.complete,true);
+  assert.equal(legacyReload.scoring_version,DRAFT_RUN_SCORING_V3_LEGACY_PROFILE,
+    'historical scoring profile survives completion and reload');
+  const legacyReport=await directCall(runApi,`/v1/runs/${legacyReplay.id}/report`,{
+    round:0,puzzleId:syntheticPuzzleId,reason:'score_recommendation',
+    comment:'historical scoring profile smoke',client:{platform:'web'},
+  },legacyReplayGuest.token);
+  assert.equal(legacyReport.ok,true);
+  const legacyReportRow=(await query(`SELECT scoring_version
+    FROM draft_run_decision_reports WHERE run_id=$1::uuid ORDER BY id DESC LIMIT 1`,[
+    legacyReplay.id,
+  ])).rows[0];
+  assert.equal(legacyReportRow.scoring_version,DRAFT_RUN_SCORING_V3_LEGACY_PROFILE,
+    'decision-report persistence retains the session scoring profile');
 
-    const publicOne=await directCall(runApi,`/v1/creator-challenges/${runtimeSlug}`,undefined,replayGuest.token);
+  const publicOne=await directCall(runApi,`/v1/creator-challenges/${runtimeSlug}`,undefined,replayGuest.token);
   const publicTwo=await directCall(runApi,`/v1/creator-challenges/${runtimeSlug}`,undefined,replayGuest.token);
   assert.equal(publicOne.id,runtimeChallenge);assert.equal(publicTwo.id,runtimeChallenge);
   assert.equal('answers' in publicOne,false,'public challenge metadata never serializes creator decisions');
