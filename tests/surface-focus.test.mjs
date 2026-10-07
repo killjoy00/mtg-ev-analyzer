@@ -25,6 +25,8 @@ test('guest Daily results offer score validation instead of a career action', as
   const source = await readFile('draft-run-product.mjs', 'utf8');
   const result = source.slice(source.indexOf('function renderResult()'), source.indexOf('async function shareResult'));
   assert.match(result, /Sign in to add score/);
+  assert.match(result, /Add score to leaderboard/);
+  assert.match(source, /<strong>Signed in\.<\/strong> Add this score to today’s leaderboard when you’re ready\./);
   assert.match(result, /Choose display name to add score/);
   assert.match(result, /validateDailyRunId:run\.id/);
   assert.match(result, /source:'daily_result'/);
