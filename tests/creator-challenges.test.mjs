@@ -634,13 +634,15 @@ test('creator funnel migration installs a merge-safe database invariant',async()
   assert.match(runtime.slice(start,finish),/ON CONFLICT DO NOTHING/);
 });
 
-test('creator admin list batches stats instead of issuing one detail query per challenge',async()=>{
+test('creator admin list bounds the page before running correlated stats',async()=>{
   const source=await readFile('worker/creator-challenges.mjs','utf8');
   const start=source.indexOf('export async function listCreatorChallenges');
   const end=source.indexOf('export async function handleCreatorChallengeAdmin',start);
   assert.ok(start>0&&end>start);
   const list=source.slice(start,end);
-  assert.match(list,/creatorChallengeSelect\(\{includeStats:true\}\)/);
+  assert.match(list,/WITH creator_page AS MATERIALIZED/);
+  assert.match(list,/LIMIT \$1::int/);
+  assert.match(list,/creatorChallengeSelect\(\{includeStats:true,paged:true\}\)/);
   assert.match(list,/return result\.rows\.map\(challengeRow\)/);
   assert.doesNotMatch(list,/creatorChallengeById/);
 });
