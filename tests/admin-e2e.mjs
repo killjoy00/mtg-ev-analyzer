@@ -343,8 +343,14 @@ try {
   assert.equal(await page.evaluate(()=>window.__copiedText),dailyCaption);
   await dailyKit.getByRole('button',{name:'Copy short caption'}).click();
   assert.equal(await page.evaluate(()=>window.__copiedText),dailyShort);
-  await dailyKit.getByRole('button',{name:'Copy image URL',exact:true}).first().click();
+  const kitImages=dailyKit.locator('[data-creator-kit-image]');
+  assert.equal(await kitImages.nth(0).getAttribute('alt'),dailyAlt);
+  assert.equal(await kitImages.nth(1).getAttribute('alt'),dailyAlt);
+  const copyImageButtons=dailyKit.getByRole('button',{name:'Copy image URL',exact:true});
+  await copyImageButtons.nth(0).click();
   assert.equal(await page.evaluate(()=>window.__copiedText),dailyPublic+'creator-card.png');
+  await copyImageButtons.nth(1).click();
+  assert.equal(await page.evaluate(()=>window.__copiedText),dailyPublic+'creator-card-square.png');
 
   await dailyKit.getByText('Open Graph image is not available yet.',{exact:true}).waitFor();
   await dailyKit.getByText('Square image ready.',{exact:true}).waitFor();
