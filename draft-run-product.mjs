@@ -55,6 +55,10 @@ async function api(path,body,auth=true) {
   const r=await fetch(base()+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),credentials:firstPartyAuthEnabled()?'include':'omit',signal:AbortSignal.timeout(30000)});
   const data=await r.json();if(!r.ok) throw Object.assign(new Error(data.error||'Could not reach the game. Try again.'),{status:r.status,capability:data.capability});return data;
 }
+async function publicApi(path) {
+  const r=await fetch(base()+path,{method:'GET',headers:{accept:'application/json'},credentials:'omit',signal:AbortSignal.timeout(30000)});
+  const data=await r.json();if(!r.ok)throw Object.assign(new Error(data.error||'Could not reach the game. Try again.'),{status:r.status});return data;
+}
 function image(card,extra='') {
   const url=/^https:\/\//.test(card.image_url||'')?card.image_url:'';
   return url?`<img src="${esc(url)}" alt="${esc(card.name)}" decoding="async" ${extra}>`:`<span class="run-card-fallback">${esc(card.name)}</span>`;
@@ -319,6 +323,15 @@ async function shareResult() {
   const button=document.querySelector('#run-share');button.disabled=true;
   try {
     const share=run.day?null:await api(`/v1/runs/${run.id}/share`,{});
+    if(!run.day&&!share?.creator) {
+      if(!/^[a-f0-9]{24}$/.test(String(share?.id||'')))throw new Error('Pack One could not verify this share link. Try Share again.');
+      try {
+        const verified=await publicApi('/v1/shared-runs/'+encodeURIComponent(share.id));
+        if(verified?.id!==share.id)throw new Error('Share identity mismatch.');
+      } catch {
+        throw new Error('Pack One could not verify this share link. Try Share again.');
+      }
+    }
     const url=run.day
       ? `${location.origin}/share/daily/v2/?environment=${encodeURIComponent(run.environment||environment)}&ref=result_share`
       : share?.creator&&share.url

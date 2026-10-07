@@ -10,7 +10,7 @@ const corpus=fs.readdirSync('corpus/draft-run').filter(f=>f.endsWith('.gz')).fla
 const environment=process.env.PACK1_TEST_ENVIRONMENT||'mixed',cube=environment==='powered-cube';
 const selectionVersion=process.env.PACK1_TEST_SELECTION_VERSION||'eight-pick-v3';
 const daily=process.env.PACK1_TEST_DAILY==='1';
-let shareCalls=0,eliteAccess=false,seasonAvailable=true,adGoogle=0,adMembership=0,runStarts=[];
+let shareCalls=0,sharedReadCalls=0,failSharedRead=false,eliteAccess=false,seasonAvailable=true,adGoogle=0,adMembership=0,runStarts=[];
 let puzzles=selectDraftRun(corpus,'browser-contract',environment,{selectionVersion}),answers=[],revision=0,rerolls=cube?{set:0,pack:2}:{set:1,pack:1};
 const sources=puzzles.map(p=>p.source_draft_hash),errors=[],events=[],views=[];
 const id='11111111-1111-4111-8111-111111111111',shareId='1234567890abcdef12345678';
@@ -32,7 +32,11 @@ await page.route('**/*-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/**',async
   if(path==='/v1/runs'&&route.request().method()==='POST'){runStarts.push(route.request().postDataJSON());body=snapshot();}
   else if(path.endsWith('/share')){shareCalls++;body={id:shareId};}
   else if(path.endsWith('/view')){const req=route.request().postDataJSON();assert.equal(req.revision,revision);assert.equal(req.puzzleId,puzzles[answers.length].puzzle_id);views.push(req);body={ok:true};}
-  else if(path.includes('/challenges/')||path.includes('/shared-runs/'))body={id:shareId,name:'Your friend',score:88,environment,run_length:puzzles.length};
+  else if(path.includes('/challenges/')||path.includes('/shared-runs/')){
+    if(path.includes('/shared-runs/'))sharedReadCalls++;
+    if(path.includes('/shared-runs/')&&failSharedRead)return route.fulfill({status:404,contentType:'application/json',body:JSON.stringify({error:'Shared run not found.'})});
+    body={id:shareId,name:'Your friend',score:88,environment,run_length:puzzles.length};
+  }
   else if(path.endsWith('/reroll')){
     const req=route.request().postDataJSON(),round=answers.length,old=puzzles[round];
     assert.equal(req.revision,revision);assert.equal(req.round,round);assert.ok(rerolls[req.type]>0);
@@ -242,6 +246,14 @@ try{
     assert.ok(resultTouches.length>=1,'result_share still records the shared-link first-touch source independently of any sharer attribution');
   }else{
     assert.match(shared.url,new RegExp('shared='+shareId));
+    assert.equal(sharedReadCalls,1,'practice share is verified through the recipient-facing read before opening the share sheet');
+    await page.evaluate(()=>{window.__runShare=null;});
+    failSharedRead=true;
+    await page.locator('#run-share').click();
+    await page.getByText('Pack One could not verify this share link. Try Share again.',{exact:true}).waitFor();
+    assert.equal(await page.evaluate(()=>window.__runShare),null,'an unresolvable practice share is never handed to the share sheet');
+    assert.equal(sharedReadCalls,2);
+    failSharedRead=false;
     await page.goto(shared.url);await page.locator('#accept-run-challenge').waitFor();assert.match(await page.locator('.run-invite').innerText(),/Play this run and compare/);await noOverflow();
     await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-invite-mobile.png`,fullPage:true});
   }
