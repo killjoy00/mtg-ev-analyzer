@@ -11,6 +11,8 @@ import {
   gradeDraftRunPick,
   gradeDraftRunPickForVersion,
   DRAFT_RUN_REPLAY_SCORING_VERSIONS,
+  DRAFT_RUN_SCORING_V3_LEGACY_PROFILE,
+  DRAFT_RUN_SCORING_V3_LINEAR_PROFILE,
   publicDraftRunPuzzle,
   SCORE_EXPONENT,
   SUPPORT_SHARPENING,
@@ -18,18 +20,26 @@ import {
   summarizeDraftRun,
 } from '../draft-run.mjs';
 
-test('replay scoring keeps v2 and v3 pinned while rejecting unimplemented versions',()=>{
-  const p={historical_pick_id:'b',candidates:[
-    {id:'a',name:'A',model_probability:.55},
-    {id:'b',name:'B',model_probability:.30},
-    {id:'c',name:'C',model_probability:.10},
-    {id:'d',name:'D',model_probability:.05},
-  ]};
-  assert.deepEqual(DRAFT_RUN_REPLAY_SCORING_VERSIONS,['trophy-consensus-v2','trophy-consensus-v3']);
-  for(const id of ['a','b','c','d']) {
-    assert.deepEqual(gradeDraftRunPickForVersion(p,id,'trophy-consensus-v2'),gradeDraftRunPick(p,id));
-    assert.deepEqual(gradeDraftRunPickForVersion(p,id,'trophy-consensus-v3'),gradeDraftRunPick(p,id));
-  }
+test('historical replay scoring pins recorded v2 and both v3 floating-point paths',()=>{
+  const p={
+    corpus_version:'elite-trophy-verified-v6',
+    historical_pick_id:'d',
+    candidates:[
+      {id:'a',name:'A',model_probability:.19},
+      {id:'b',name:'B',model_probability:.027},
+      {id:'c',name:'C',model_probability:.0135},
+      {id:'d',name:'D',model_probability:.00675},
+    ],
+  };
+  assert.ok(DRAFT_RUN_REPLAY_SCORING_VERSIONS.includes('trophy-consensus-v2'));
+  assert.ok(DRAFT_RUN_REPLAY_SCORING_VERSIONS.includes(DRAFT_RUN_SCORING_V3_LEGACY_PROFILE));
+  assert.ok(DRAFT_RUN_REPLAY_SCORING_VERSIONS.includes(DRAFT_RUN_SCORING_V3_LINEAR_PROFILE));
+  assert.equal(gradeDraftRunPickForVersion(p,'b','trophy-consensus-v2').score,14);
+  assert.equal(gradeDraftRunPickForVersion(p,'b',DRAFT_RUN_SCORING_V3_LEGACY_PROFILE).score,13);
+  assert.equal(gradeDraftRunPickForVersion(p,'b',DRAFT_RUN_SCORING_V3_LINEAR_PROFILE).score,14);
+  assert.equal(gradeDraftRunPickForVersion(p,'b','trophy-consensus-v3').score,14,
+    'coarse current v3 remains the linear implementation; creator validation resolves legacy sources to an explicit profile');
+  assert.equal(gradeDraftRunPickForVersion(p,'d',DRAFT_RUN_SCORING_V3_LEGACY_PROFILE).score,100);
   assert.throws(()=>gradeDraftRunPickForVersion(p,'a','trophy-consensus-v4'),/Unsupported Draft Run scoring version/);
 });
 
