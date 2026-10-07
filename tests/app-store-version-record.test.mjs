@@ -43,7 +43,7 @@ function runScript(sequence) {
     "globalThis.fetch = async (url, options = {}) => {",
     "  const method = options.method || 'GET';",
     "  const call = { url, method, body: options.body ? JSON.parse(options.body) : null };",
-    "  appendFileSync(process.env.MOCK_ASC_CALLS, JSON.stringify(call) + '\\\\n');",
+    "  appendFileSync(process.env.MOCK_ASC_CALLS, JSON.stringify(call) + '\\n');",
     "  if (!sequence.length) throw new Error('Unexpected fetch: ' + method + ' ' + url);",
     "  const next = sequence.shift();",
     "  if (next.throw) throw new TypeError(next.throw);",
