@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -12,10 +12,8 @@ import { colors, spacing } from '@/src/theme';
 export default function TermsScreen() {
   const params = useLocalSearchParams<{ licenses?: string }>();
   const previewLicensesOpen = config.screenshots.fixtures && params.licenses === '1';
-  const [licensesOpen, setLicensesOpen] = useState(previewLicensesOpen);
-  useEffect(() => {
-    if (previewLicensesOpen) setLicensesOpen(true);
-  }, [previewLicensesOpen]);
+  const [licensesOpen, setLicensesOpen] = useState(false);
+  const licensesVisible = previewLicensesOpen || licensesOpen;
   return (
     <ArticleScreen
       kicker="Policy"
@@ -28,13 +26,13 @@ export default function TermsScreen() {
           <Text style={styles.title}>Font licenses</Text>
           <Pressable
             accessibilityRole="button"
-            accessibilityState={{ expanded: licensesOpen }}
+            accessibilityState={{ expanded: licensesVisible }}
             onPress={() => setLicensesOpen(value => !value)}
             style={styles.toggle}
           >
-            <Text style={styles.toggleText}>{licensesOpen ? 'Hide font licenses' : 'Show font licenses'}</Text>
+            <Text style={styles.toggleText}>{licensesVisible ? 'Hide font licenses' : 'Show font licenses'}</Text>
           </Pressable>
-          {licensesOpen ? fontLicenses.map(font => (
+          {licensesVisible ? fontLicenses.map(font => (
             <View key={font.name} style={styles.licenseBlock}>
               <Text style={styles.fontName}>{font.name}</Text>
               <Text style={styles.licenseText}>{font.license}</Text>
