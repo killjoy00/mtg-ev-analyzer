@@ -102,3 +102,9 @@ test('root web files remain classified and fail closed while a neutral-only filt
   assert.equal(classifyBackendChanges(['web-only.mjs'], { map }).fullSuite, true);
   assert.equal(classifyBackendChanges(['README.md', 'docs/only.md', 'mobile/app/index.tsx', 'tests/unit.test.mjs', '.github/dependabot.yml'], { map }).fullSuite, true);
 });
+
+test('serving maintenance remains a full-suite input even beside a narrow backend edit', () => {
+  const maintenance='.github/scripts/maintain-serving-indexes.sql';
+  assert.deepEqual(filterBackendChangedPaths([maintenance,'worker/draft-run-pool.mjs']),[maintenance,'worker/draft-run-pool.mjs']);
+  assert.equal(classifyBackendChanges([maintenance,'worker/draft-run-pool.mjs'],{map}).fullSuite,true);
+});

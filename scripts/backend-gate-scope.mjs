@@ -43,7 +43,7 @@ export function filterBackendChangedPaths(paths) {
   return normalizeChangedPaths(paths).filter((path) => {
     if (path.startsWith('mobile/') || path.startsWith('docs/') || /^[^/]+\.md$/.test(path)) return false;
     if (path.startsWith('.github/')) {
-      return path === '.github/workflows/backend-gate.yml' || path === '.github/workflows/prepare-rebuild.yml';
+      return path === '.github/workflows/backend-gate.yml' || path === '.github/workflows/prepare-rebuild.yml' || path === '.github/scripts/maintain-serving-indexes.sql';
     }
     if (path.startsWith('tests/')) {
       return /^tests\/[^/]*backend-smoke\.mjs$/.test(path) || path === 'tests/backend-gate-scope.test.mjs';

@@ -5,6 +5,7 @@ on:
     paths:
       - 'worker/**'
       - 'migrations/**'
+      - '.github/scripts/maintain-serving-indexes.sql'
       - 'draft-run.mjs'
       - 'draft-run-policy.mjs'
       - 'daily-selection.mjs'

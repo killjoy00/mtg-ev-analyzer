@@ -2,6 +2,7 @@ import {execFileSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 
 const LOAD_SENSITIVE_PATHS=[
+  path=>path==='.github/scripts/maintain-serving-indexes.sql',
   path=>path.startsWith('scripts/launch-distributed'),
   path=>path==='worker/draft-start-timing.mjs',
   path=>path==='worker/draft-run-function.mjs',

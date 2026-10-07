@@ -2,7 +2,7 @@ name: isolated distributed launch acceptance
 on:
   pull_request:
     types: [opened, synchronize, reopened, ready_for_review]
-    paths: ['.github/preview-dns-recovery.json', 'scripts/create-ci-neon-branch.mjs', 'scripts/control-read.mjs', 'scripts/edge-control.mjs', 'tests/ci-provisioning.test.mjs', 'scripts/launch-distributed*', 'scripts/launch-change-scope.mjs', 'tests/launch-change-scope.test.mjs', 'tests/launch-distributed-capacity.test.mjs', 'tests/draft-start-timing.test.mjs', 'tests/ingress.test.mjs', 'worker/draft-start-timing.mjs', 'worker/draft-run-function.mjs', 'worker/draft-run-selection.mjs', 'migrations/0045_batched_practice_selector.sql', 'migrations/0050_practice_recency_bias.sql', 'migrations/0051_exact_pick_draw_index.sql', 'migrations/0056_snapshot_aware_reroll_covering_index.sql', 'edge/gateway.mjs', '.github/workflows/launch-distributed.yml']
+    paths: ['.github/scripts/maintain-serving-indexes.sql', '.github/preview-dns-recovery.json', 'scripts/create-ci-neon-branch.mjs', 'scripts/control-read.mjs', 'scripts/edge-control.mjs', 'tests/ci-provisioning.test.mjs', 'scripts/launch-distributed*', 'scripts/launch-change-scope.mjs', 'tests/launch-change-scope.test.mjs', 'tests/launch-distributed-capacity.test.mjs', 'tests/draft-start-timing.test.mjs', 'tests/ingress.test.mjs', 'worker/draft-start-timing.mjs', 'worker/draft-run-function.mjs', 'worker/draft-run-selection.mjs', 'migrations/0045_batched_practice_selector.sql', 'migrations/0050_practice_recency_bias.sql', 'migrations/0051_exact_pick_draw_index.sql', 'migrations/0056_snapshot_aware_reroll_covering_index.sql', 'edge/gateway.mjs', '.github/workflows/launch-distributed.yml']
   workflow_dispatch:
 permissions:
   contents: read

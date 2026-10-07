@@ -1,6 +1,7 @@
 {
   "version": 1,
   "full_paths": [
+    ".github/scripts/maintain-serving-indexes.sql",
     ".github/workflows/backend-gate.yml",
     ".github/workflows/prepare-rebuild.yml",
     "scripts/backend-gate-scope.mjs",
