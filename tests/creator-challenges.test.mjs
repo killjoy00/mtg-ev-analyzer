@@ -241,6 +241,12 @@ test('published creator page has creator social metadata but no gameplay answers
   assert.doesNotMatch(retired,/Lola|87\/100|location\.replace/);
 });
 
+test('checked-in creator registry and generated tree match the current renderer contract',async()=>{
+  const result=await checkCreatorChallenges({root:process.cwd()});
+  assert.equal(result.entries,result.published+result.retired);
+  assert.ok(result.published>=1,'expected at least one checked-in published creator challenge');
+});
+
 test('creator publication registry is immutable, collision-safe, and retirement scrubs metadata',async t=>{
   const root=await mkdtemp(path.join(os.tmpdir(),'packone-creator-publish-'));
   t.after(()=>rm(root,{recursive:true,force:true}));
