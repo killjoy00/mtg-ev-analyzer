@@ -136,6 +136,17 @@ jobs:
           }
           gh run watch "$test_run" --exit-status --interval 10
           gh run watch "$e2e_run" --exit-status --interval 10
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          current_main="$(git rev-parse refs/remotes/origin/main)"
+          [[ "$current_main" == "$base_sha" ]] || {
+            echo "::error::Creator canary cleanup base moved from $base_sha to $current_main; refusing an untested merge."
+            exit 1
+          }
+          pr_base="$(gh pr view "$pr_url" --json baseRefOid --jq .baseRefOid)"
+          [[ "$pr_base" == "$base_sha" ]] || {
+            echo "::error::Creator canary cleanup PR base changed from $base_sha to $pr_base."
+            exit 1
+          }
           gh pr merge "$pr_url" --squash --delete-branch --match-head-commit "$head_sha"
 
           gh api --method POST "repos/${GITHUB_REPOSITORY}/pages/builds" >/tmp/creator-canary-pages-build.json
