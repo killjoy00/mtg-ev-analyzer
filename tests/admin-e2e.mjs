@@ -385,7 +385,7 @@ try {
   assert.ok((await freshKit.getByLabel('Tracked link').inputValue()).includes('creator='+creatorId));
   assert.equal(await freshKit.getByLabel('Open Graph image URL').inputValue(),'https://packone.pro/creator/practice-creator/creator-card.png');
   assert.equal(await freshKit.getByLabel('Square image URL').inputValue(),'https://packone.pro/creator/practice-creator/creator-card-square.png');
-  assert.match(await freshKit.getByLabel('Ready-to-post caption').inputValue(),/I'm Practice Creator\.[\s\S]*87\/100[\s\S]*Pack One Draft Run Practice/);
+  assert.match(await freshKit.getByLabel('Ready-to-post caption').inputValue(),/I'm Practice Creator\.[\s\S]*87\/100[\s\S]*in Pack One Draft Run practice/);
   assert.match(await freshKit.getByLabel('Image alt text').inputValue(),/Practice Creator[\s\S]*87 out of 100[\s\S]*Draft Run Practice/);
   assert.equal((await freshKit.innerText()).includes('P3 was the one I really wasn’t sure about.'),false,'post-run creator note must not enter social kit assets/copy');
   assert.ok(creatorPublicationBodies.some(body=>body.id===creatorId&&body.action==='publish'));

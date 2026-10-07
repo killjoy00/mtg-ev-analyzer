@@ -148,11 +148,33 @@ def wrap_text(draw, text, font, max_width):
     return lines or [""]
 
 
-def fit_wrapped(draw, fonts, text, max_width, max_lines, start, minimum, weight=700):
+def wrapped_height(draw, lines, font, spacing):
+    cursor = 0
+    bottom = 0
+    for line in lines:
+        box = draw.textbbox((0, cursor), line or "Ag", font=font)
+        bottom = max(bottom, box[3])
+        cursor += (box[3] - box[1]) + spacing
+    return bottom
+
+
+def fit_wrapped(
+    draw,
+    fonts,
+    text,
+    max_width,
+    max_lines,
+    start,
+    minimum,
+    *,
+    max_height,
+    spacing,
+    weight=700,
+):
     for size in range(start, minimum - 1, -1):
         font = fonts.get("display", weight, size)
         lines = wrap_text(draw, text, font, max_width)
-        if len(lines) <= max_lines:
+        if len(lines) <= max_lines and wrapped_height(draw, lines, font, spacing) <= max_height:
             return font, lines
     raise SystemExit("Creator challenge headline cannot fit the Pack One social-card layout.")
 
@@ -251,7 +273,9 @@ def render_og(args, fonts, colors):
 
     eyebrow = fonts.get("body", 700, 18)
     draw.text((72, 154), "BEAT THE CREATOR", font=eyebrow, fill=colors["blue"])
-    title_font, title_lines = fit_wrapped(draw, fonts, args.headline, 1056, 3, 62, 38)
+    title_font, title_lines = fit_wrapped(
+        draw, fonts, args.headline, 1056, 5, 62, 24, max_height=150, spacing=2
+    )
     draw_lines(draw, (72, 180), title_lines, title_font, colors["ink"], 2)
 
     environment_label, source_label, accent_key = challenge_context(
@@ -279,7 +303,9 @@ def render_square(args, fonts, colors):
 
     eyebrow = fonts.get("body", 700, 19)
     draw.text((70, 190), "BEAT THE CREATOR", font=eyebrow, fill=colors["blue"])
-    title_font, title_lines = fit_wrapped(draw, fonts, args.headline, 940, 3, 76, 44)
+    title_font, title_lines = fit_wrapped(
+        draw, fonts, args.headline, 940, 5, 76, 30, max_height=250, spacing=4
+    )
     draw_lines(draw, (70, 220), title_lines, title_font, colors["ink"], 4)
 
     environment_label, source_label, accent_key = challenge_context(

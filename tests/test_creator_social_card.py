@@ -14,6 +14,7 @@ BLUE = (0x1E, 0x4D, 0x7A)
 PAGE = (0xF7, 0xF8, 0xFA)
 CUBE = (0x97, 0x68, 0x22)
 LATEST = (0x93, 0x4B, 0x42)
+INK = (0x10, 0x18, 0x20)
 
 
 class CreatorSocialCardTests(unittest.TestCase):
@@ -106,6 +107,8 @@ class CreatorSocialCardTests(unittest.TestCase):
                         self.assertEqual(image.getpixel((0, 0)), BLUE)
                         self.assertEqual(image.getpixel((0, 10)), PAGE)
                         self.assertEqual(image.getpixel((515, 400)), accent)
+                        if slug == "long-name":
+                            self.assertNotIn(INK, image.crop((72, 332, 1128, 350)).getdata())
                     with Image.open(square) as image:
                         self.assertEqual(image.size, (1080, 1080))
                         self.assertEqual(image.mode, "RGB")
@@ -115,6 +118,23 @@ class CreatorSocialCardTests(unittest.TestCase):
         finally:
             if temp is not None:
                 temp.cleanup()
+
+    def test_maximum_valid_headline_stays_clear_of_scorecard_dividers(self):
+        with tempfile.TemporaryDirectory(prefix="packone-creator-social-max-") as tmp:
+            headline=("Can you beat " + "W" * 148)[:160]
+            og, square = self.render(
+                Path(tmp),
+                "max-headline",
+                creator="A" * 80,
+                headline=headline,
+                score=100,
+                environment="mixed",
+                source_type="practice",
+            )
+            with Image.open(og) as image:
+                self.assertNotIn(INK, image.crop((72, 332, 1128, 350)).getdata())
+            with Image.open(square) as image:
+                self.assertNotIn(INK, image.crop((70, 476, 1010, 500)).getdata())
 
 
 if __name__ == "__main__":
