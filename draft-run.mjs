@@ -112,7 +112,9 @@ function replayRankCandidates(candidates) {
   });
 }
 function replaySupportSharpening(corpusVersion) {
-  return supportedComponent(corpusVersion)||String(corpusVersion).includes('-colour-stage-')?1.75:2;
+  // Frozen from the direct-ratio v3 implementation at 26039b7. Traditional
+  // component support was added later and must not retroactively change replay.
+  return String(corpusVersion).includes('-colour-stage-')?1.75:2;
 }
 function replayCalibratedSupports(candidates,exponent) {
   if(!Number.isFinite(exponent)||exponent<=0)throw Error('Invalid support calibration.');
