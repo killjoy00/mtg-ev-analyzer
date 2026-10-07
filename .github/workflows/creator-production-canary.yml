@@ -11,6 +11,7 @@ permissions:
   pull-requests: write
   actions: write
   checks: read
+  pages: write
 
 concurrency:
   group: pack1-creator-production-canary
@@ -97,6 +98,12 @@ jobs:
           base_sha="$(git rev-parse origin/main)"
           branch="automation/creator-canary-cleanup-${GITHUB_RUN_ID}"
           git checkout -B "$branch" origin/main
+          mapfile -t canary_routes < <(
+            {
+              find creator -mindepth 1 -maxdepth 1 -type d -name 'canary-*' -printf '%f\n'
+              jq -r '.[] | select(.slug | startswith("canary-")) | .slug' creator-challenges.json
+            } | sort -u
+          )
           node scripts/cleanup-creator-canary-static.mjs
           if git diff --quiet -- creator-challenges.json creator; then
             echo "No creator canary static artifacts remain." >> "$GITHUB_STEP_SUMMARY"
@@ -130,6 +137,35 @@ jobs:
           gh run watch "$test_run" --exit-status --interval 10
           gh run watch "$e2e_run" --exit-status --interval 10
           gh pr merge "$pr_url" --squash --delete-branch --match-head-commit "$head_sha"
+
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/pages/builds" >/tmp/creator-canary-pages-build.json
+          for attempt in $(seq 1 120); do
+            pages_status="$(gh api "repos/${GITHUB_REPOSITORY}/pages/builds/latest" --jq '.status')"
+            if [[ "$pages_status" == built ]]; then break; fi
+            if [[ "$pages_status" == errored ]]; then
+              echo "::error::Pages build failed after creator canary cleanup."
+              exit 1
+            fi
+            sleep 5
+          done
+          [[ "$pages_status" == built ]] || {
+            echo "::error::Timed out waiting for Pages build after creator canary cleanup."
+            exit 1
+          }
+
+          live_registry="$(curl --fail --silent --show-error -H 'cache-control: no-cache' "https://packone.pro/creator-challenges.json?cleanup=${head_sha}")"
+          jq -e 'all(.[]; ((.slug | startswith("canary-")) | not))' <<<"$live_registry" >/dev/null || {
+            echo "::error::Live creator registry still contains a canary entry after cleanup."
+            exit 1
+          }
+          for slug in "${canary_routes[@]}"; do
+            code="$(curl --silent --show-error -H 'cache-control: no-cache' -o /tmp/creator-canary-cleanup-route.html -w '%{http_code}' "https://packone.pro/creator/${slug}/?cleanup=${head_sha}")"
+            [[ "$code" == 404 || "$code" == 410 ]] || {
+              echo "::error::Live canary route still exists after cleanup: ${slug} (HTTP ${code})"
+              exit 1
+            }
+          done
+          echo "Creator canary static cleanup is deployed and verified live." >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload creator canary evidence
         if: always()
