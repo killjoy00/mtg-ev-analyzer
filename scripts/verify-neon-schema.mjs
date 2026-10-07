@@ -57,6 +57,7 @@ const result=await query(`SELECT
       AND t.tgrelid='analytics_events'::regclass
       AND t.tgenabled IN ('O','A')
       AND t.tgfoid='pack1_creator_event_update_dedupe()'::regprocedure
+      AND position('REFERENCING NEW TABLE AS creator_event_updates' in pg_get_triggerdef(t.oid))>0
   ) creator_challenge_event_update_dedupe_trigger,
   to_regclass('analytics_creator_challenge_event_uq') IS NULL creator_challenge_event_no_merge_hostile_unique_index,
   EXISTS(
@@ -67,6 +68,9 @@ const result=await query(`SELECT
       AND i.indisvalid
       AND NOT i.indisunique
       AND pg_get_expr(i.indpred,i.indrelid) LIKE '%creator_challenge_id%'
+      AND position('player_id' in pg_get_indexdef(idx.oid))>0
+      AND position('event_name' in pg_get_indexdef(idx.oid))>0
+      AND position('creator_challenge_id' in pg_get_indexdef(idx.oid))>0
   ) creator_challenge_event_lookup_index,
   EXISTS(
     SELECT 1 FROM pg_class idx
@@ -75,6 +79,9 @@ const result=await query(`SELECT
       AND i.indrelid='analytics_events'::regclass
       AND i.indisvalid
       AND pg_get_expr(i.indpred,i.indrelid) LIKE '%creator_challenge_id%'
+      AND position('creator_challenge_id' in pg_get_indexdef(idx.oid))>0
+      AND position('event_name' in pg_get_indexdef(idx.oid))>0
+      AND position('player_id' in pg_get_indexdef(idx.oid))>0
   ) creator_challenge_funnel_index,
   position('pack1_creator_event_player_lock' in pg_get_functiondef('merge_pack1_player(uuid,uuid)'::regprocedure))>0
     AND position('creator_funnel_ranked' in pg_get_functiondef('merge_pack1_player(uuid,uuid)'::regprocedure))>0 creator_challenge_merge_event_dedupe,
