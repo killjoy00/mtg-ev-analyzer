@@ -19,10 +19,6 @@ jobs:
     if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
     runs-on: ubuntu-latest
     environment: pack-one-mobile-release
-    env:
-      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
-      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-      ASC_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
     steps:
       - uses: actions/checkout@v4
       - name: Validate guarded App Store version request
@@ -40,6 +36,9 @@ jobs:
           if (typeof request.reason !== 'string' || !request.reason.trim()) throw Error('App Store version request reason is required.');
           appendFileSync(process.env.GITHUB_OUTPUT, `version=${request.version}\n`);
           NODE
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
       - name: Require current approved main revision
         shell: bash
         run: |
@@ -51,12 +50,15 @@ jobs:
             echo "Checked-out revision $head_sha is no longer current main ($main_sha)." >&2
             exit 1
           }
-          echo "Verified current main revision: $head_sha"
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
+          echo "Verified current main revision immediately before the provider step: $head_sha"
+      # Main can still move in the short interval after the freshness check.
+      # The provider step remains pinned to the reviewed app/iOS 1.1 action
+      # and re-reads provider identity/state before every mutation.
       - name: Ensure editable manual App Store version 1.1 exists
         env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
           PACKONE_ASC_VERSION_OUTPUT: ${{ runner.temp }}/pack-one-app-store-version.json
         run: node .github/scripts/app-store-ensure-version.mjs "${{ steps.request.outputs.version }}"
       - name: Retain App Store version evidence
