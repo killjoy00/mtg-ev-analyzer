@@ -126,6 +126,22 @@ test('secondary gameplay controls keep mobile-sized targets', async () => {
 });
 
 
+test('account settings keep a clear hierarchy and isolate destructive actions', async () => {
+  const [profile,css]=await Promise.all([
+    readFile('profile-product.mjs','utf8'),
+    readFile('profile.css','utf8'),
+  ]);
+  const settings=profile.slice(profile.indexOf('function settingsMarkup'),profile.indexOf('function profileMarkup'));
+  assert.match(settings,/profile-settings-profile/);
+  assert.match(settings,/profile-settings-actions"><button class="button primary" type="submit">Save profile/);
+  assert.doesNotMatch(settings,/Change name<\/a>/);
+  assert.ok(settings.indexOf('Profile &amp; visibility') < settings.indexOf('Membership'));
+  assert.ok(settings.indexOf('Membership') < settings.indexOf('Sign-in &amp; security'));
+  assert.ok(settings.indexOf('Sign-in &amp; security') < settings.indexOf('Delete account'));
+  assert.match(css,/\.my-pack-one-account-panel \.profile-danger\s*\{[^}]*border-color:/);
+  assert.match(css,/@media \(max-width:760px\)[\s\S]*\.my-pack-one-account-panel \.profile-settings-actions \.button \{ width:100%; \}/);
+});
+
 test('profile CSS keeps one base rule for previously layered selectors', async () => {
   const css = await readFile('profile.css', 'utf8');
   const base = css.slice(0, css.indexOf('@media'));
