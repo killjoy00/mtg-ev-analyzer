@@ -1,0 +1,43 @@
+name: inspect distributed rolling latency failure
+on:
+  push:
+    branches: ['diagnostics/1051-nat-report']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: distributed-capacity-1-runner-*
+          path: failed-report
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: 37581124840
+      - name: Print sanitized route and selector evidence for failed stage 50
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import path from 'node:path';
+          import {quantiles} from './scripts/launch-distributed-core.mjs';
+          const root='failed-report',files=fs.readdirSync(root,{recursive:true}),reports=[];
+          const safe=q=>q&&({index:q.index,route:q.route,phase:q.phase,status:q.status,at:q.at,ms:q.ms,diagnostics:q.diagnostics,transport:q.transport});
+          for(const file of files) {
+            if(!/^distributed-1-\d\.json$/.test(path.basename(file)))continue;
+            const r=JSON.parse(fs.readFileSync(path.join(root,file),'utf8'));reports.push(r);
+            const f=r.root_failure;
+            console.log(JSON.stringify({shard:r.shard,root_failure:f&&{category:f.category,reason:f.reason,request_index:f.request_index,latency:f.latency,transport:f.transport},
+              triggering_request:safe(r.requests.find(q=>q.index===f?.request_index)),
+              requests:r.requests.length,failures:r.failures,correctness_failures:r.correctness_failures,
+              slowest:r.requests.slice().sort((a,b)=>b.ms-a.ms).slice(0,10).map(safe)},null,2));
+          }
+          const requests=reports.flatMap(r=>r.requests);
+          for(const route of [...new Set(requests.map(q=>q.route))])console.log(JSON.stringify({route,...quantiles(requests.filter(q=>q.route===route).map(q=>q.ms))}));
+          NODE
