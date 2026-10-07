@@ -5,6 +5,7 @@
 -- A BEFORE INSERT guard uses the same advisory lock as the merge so workers
 -- from either side of a rolling deploy cannot recreate the race.
 BEGIN;
+SET LOCAL lock_timeout='10s';
 
 LOCK TABLE analytics_events IN SHARE ROW EXCLUSIVE MODE;
 
