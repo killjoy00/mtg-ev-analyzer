@@ -48,5 +48,19 @@
     "id": "42d1f9af-b63c-4e6b-90cd-f11940b159cb",
     "slug": "canary-practice-88ac6d76",
     "status": "retired"
+  },
+  {
+    "id": "d4d2cad1-f48a-4f6c-a44b-d8b042487ff8",
+    "slug": "cuberun",
+    "status": "published",
+    "creator_name": "Killjoy00",
+    "headline": "Bet you can't beat this one!",
+    "score": 96,
+    "environment": "powered-cube",
+    "source_type": "practice",
+    "source_day": null,
+    "source": "admin",
+    "campaign": "launch",
+    "medium": "text"
   }
 ]
