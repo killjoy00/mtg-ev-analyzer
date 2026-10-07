@@ -219,29 +219,23 @@ export async function routeAlert(fetcher,env,report) {
   if(existing)return 'existing';
   return 'none';
 }
-// Gateway logs only reflect real traffic, so a gateway failing every request
-// stays invisible while nobody plays (2026-10-07: one logged 5xx in the first
-// hour). Probe the full quota + origin path of each service on every run.
-export const GATEWAY_PROBE_SERVICES=['draft','growth','legacy'];
-export const PROBE_ATTEMPTS=3,PROBE_RETRY_MS=5000;
-export async function probeGateway(fetcher,{attempts=PROBE_ATTEMPTS,retryMs=PROBE_RETRY_MS,sleep=ms=>new Promise(r=>setTimeout(r,ms))}={}) {
-  const services={};
-  for(const service of GATEWAY_PROBE_SERVICES) {
+// Gateway logs only reflect real traffic, so an outage stays invisible while
+// nobody plays (2026-10-07). One health request through the gateway's quota
+// and origin path per run; a single retry keeps one blip from alerting.
+export const PROBE_URL='https://api.packone.pro/draft/health?quick=1',PROBE_RETRY_MS=5000;
+export async function probeGateway(fetcher,{retryMs=PROBE_RETRY_MS,sleep=ms=>new Promise(r=>setTimeout(r,ms))}={}) {
+  for(let attempt=1;;attempt++) {
     let result;
-    for(let attempt=1;attempt<=attempts;attempt++) {
-      try {
-        const r=await fetcher(`https://api.packone.pro/${service}/health?quick=1`,{redirect:'error',signal:AbortSignal.timeout(15000)});
-        const body=await r.json().catch(()=>null);
-        result={status:r.status,ok:r.status===200&&body?.ok===true,attempts:attempt};
-      } catch(error) {
-        result={status:0,ok:false,attempts:attempt,error:error?.name==='TimeoutError'?'timeout':'network'};
-      }
-      if(result.ok)break;
-      if(attempt<attempts)await sleep(retryMs);
+    try {
+      const r=await fetcher(PROBE_URL,{redirect:'error',signal:AbortSignal.timeout(15000)});
+      const body=await r.json().catch(()=>null);
+      result={status:r.status,ok:r.status===200&&body?.ok===true,attempts:attempt};
+    } catch(error) {
+      result={status:0,ok:false,attempts:attempt,error:error?.name==='TimeoutError'?'timeout':'network'};
     }
-    services[service]=result;
+    if(result.ok||attempt===2)return result;
+    await sleep(retryMs);
   }
-  return {services,failed:GATEWAY_PROBE_SERVICES.filter(service=>!services[service].ok)};
 }
 
 async function productionAccount(fetcher,env) {
@@ -353,7 +347,7 @@ export async function run({fetcher=fetch,env=process.env,now=Date.now(),mode='ch
   report.alerts=[...new Set(report.alerts)];
   if(mode==='alert') {
     report.probe=await probeGateway(fetcher);
-    if(report.probe.failed.length)report.alerts.push('gateway_probe_failed');
+    if(!report.probe.ok)report.alerts.push('gateway_probe_failed');
     if(report.coverage?.pending_windows>0&&!report.coverage.unrecoverable) {
       try {
         const continuation=await scheduleCoverageContinuation(fetcher,env,report.coverage);
