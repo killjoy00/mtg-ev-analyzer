@@ -55,26 +55,49 @@ function decodeText(value) {
     .trim();
 }
 
-function webHeadings(html) {
-  return [...html.matchAll(/<h[23](?:\s[^>]*)?>([\s\S]*?)<\/h[23]>/g)]
-    .map((match) => decodeText(match[1]));
+function webSections(html) {
+  const prose = html.match(/<div class="prose">([\s\S]*?)<\/div>/)?.[1] ?? '';
+  const sections = [];
+  for (const match of prose.matchAll(/<(h[23]|p)(?:\s[^>]*)?>([\s\S]*?)<\/\1>/g)) {
+    const value = decodeText(match[2]);
+    if (match[1] === 'p') {
+      assert.ok(sections.length, 'legal paragraph must belong to a heading');
+      sections.at(-1).body.push(value);
+    } else {
+      sections.push({ title: value, body: [] });
+    }
+  }
+  return sections;
 }
 
-function nativeTitles(exportName, nextExportName) {
+function nativeSections(exportName, nextExportName) {
   const start = nativeEditorial.indexOf(`export const ${exportName}`);
   assert.notEqual(start, -1, `${exportName} must exist`);
   const end = nextExportName
     ? nativeEditorial.indexOf(`export const ${nextExportName}`, start + 1)
     : nativeEditorial.length;
   const block = nativeEditorial.slice(start, end === -1 ? nativeEditorial.length : end);
-  return [...block.matchAll(/title:\s*'([^']+)'/g)].map((match) => match[1]);
+  return [...block.matchAll(/\{\s*title:\s*(['"])(.*?)\1,\s*body:\s*\[([\s\S]*?)\]\s*,?\s*\}/g)]
+    .map((match) => ({
+      title: match[2],
+      body: [...match[3].matchAll(/(['"])(.*?)\1\s*,?/g)].map((bodyMatch) => bodyMatch[2]),
+    }));
 }
 
 test('native editorial heading structure stays aligned with canonical web pages', () => {
-  assert.deepEqual(nativeTitles('aboutSections', 'supportSections'), webHeadings(aboutWeb));
-  assert.deepEqual(nativeTitles('supportSections', 'privacySections'), webHeadings(contactWeb));
-  assert.deepEqual(nativeTitles('privacySections', 'termsSections'), webHeadings(privacyWeb));
-  assert.deepEqual(nativeTitles('termsSections'), webHeadings(termsWeb));
+  assert.deepEqual(
+    nativeSections('aboutSections', 'supportSections').map(({ title }) => title),
+    webSections(aboutWeb).map(({ title }) => title),
+  );
+  assert.deepEqual(
+    nativeSections('supportSections', 'privacySections').map(({ title }) => title),
+    webSections(contactWeb).map(({ title }) => title),
+  );
+});
+
+test('native Privacy and Terms legal sections match canonical web text exactly', () => {
+  assert.deepEqual(nativeSections('privacySections', 'termsSections'), webSections(privacyWeb));
+  assert.deepEqual(nativeSections('termsSections'), webSections(termsWeb));
 });
 
 test('About preserves attribution and routes to native Support, Privacy, and Terms', () => {
