@@ -34,6 +34,7 @@ export default function NativeAcceptanceScreen() {
       else if (screen === 'support') router.replace('/support');
       else if (screen === 'privacy') router.replace('/privacy');
       else if (screen === 'terms') router.replace('/terms');
+      else if (screen === 'terms-licenses') router.replace({ pathname: '/terms', params: { licenses: '1' } });
       else router.dismissTo('/');
     })();
     return () => { active = false; };
