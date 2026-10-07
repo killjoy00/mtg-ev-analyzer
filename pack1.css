@@ -759,6 +759,7 @@ h3 {
 .account-verification-success h2 { margin-bottom: 8px; }
 .account-verification-success p { margin: 0 0 16px; color: var(--ink); line-height: 1.55; }
 .form-success { color: var(--green-dark); }
+.form-cooldown { min-height:1.2em; color:var(--muted); font-size:14px; font-weight:700; line-height:1.4; }
 .account-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; margin-bottom: 20px; }
 .account-columns > div { padding: 22px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
 .account-form { display: grid; gap: 12px; }
