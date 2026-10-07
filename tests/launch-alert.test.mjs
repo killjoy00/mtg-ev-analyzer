@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  GATEWAY_MAX_PAGES,GATEWAY_PAGE_SIZE,MAX_CONTINUATION_DEPTH,evaluate,inspectGatewayCoverage,parseGatewayEvent,parseNeonUsage,queryEvents,routeAlert,scheduleCoverageContinuation,
+  GATEWAY_MAX_PAGES,GATEWAY_PAGE_SIZE,MAX_CONTINUATION_DEPTH,evaluate,inspectGatewayCoverage,parseGatewayEvent,parseNeonUsage,probeGateway,queryEvents,routeAlert,scheduleCoverageContinuation,
 } from '../scripts/launch-alert.mjs';
 import {
   WINDOW_MS,coverageTarget,mergeCoverageState,parseCoverageState,renderCoverageState,
@@ -346,3 +346,34 @@ test('recoverable coverage issue stays open when coverage persistence is unavail
  assert.equal(patches,0,'missing coverage evidence must not auto-close the pending incident');
 });
 
+
+const probeFetcher=responses=>{
+ const calls=[];
+ return {calls,fetcher:async url=>{
+  const service=new URL(url).pathname.split('/')[1];calls.push(service);
+  const next=(responses[service]||[]).shift()??{status:200,body:{ok:true}};
+  if(next instanceof Error)throw next;
+  return new Response(JSON.stringify(next.body),{status:next.status});
+ }};
+};
+test('gateway probe passes on a healthy first response for every service',async()=>{
+ const {calls,fetcher}=probeFetcher({}),sleeps=[];
+ const probe=await probeGateway(fetcher,{sleep:async ms=>sleeps.push(ms)});
+ assert.deepEqual(probe.failed,[]);assert.deepEqual(calls,['draft','growth','legacy']);assert.deepEqual(sleeps,[]);
+ assert.deepEqual(probe.services.draft,{status:200,ok:true,attempts:1});
+});
+test('gateway probe retries a transient failure without alerting',async()=>{
+ const {calls,fetcher}=probeFetcher({growth:[{status:503,body:{error:'Gateway unavailable.'}}]}),sleeps=[];
+ const probe=await probeGateway(fetcher,{retryMs:5000,sleep:async ms=>sleeps.push(ms)});
+ assert.deepEqual(probe.failed,[]);assert.deepEqual(probe.services.growth,{status:200,ok:true,attempts:2});assert.deepEqual(sleeps,[5000]);
+ assert.deepEqual(calls,['draft','growth','growth','legacy']);
+});
+test('gateway probe fails a service only after every attempt fails, including network and unhealthy bodies',async()=>{
+ const down={status:503,body:{error:'Gateway unavailable.'}};
+ const {fetcher}=probeFetcher({draft:[down,down,down],growth:[new TypeError('fetch failed'),new TypeError('fetch failed'),new TypeError('fetch failed')],legacy:[{status:200,body:{ok:false}},{status:200,body:{ok:false}},{status:200,body:{ok:false}}]});
+ const sleeps=[],probe=await probeGateway(fetcher,{sleep:async ms=>sleeps.push(ms)});
+ assert.deepEqual(probe.failed,['draft','growth','legacy']);assert.equal(sleeps.length,6);
+ assert.deepEqual(probe.services.draft,{status:503,ok:false,attempts:3});
+ assert.deepEqual(probe.services.growth,{status:0,ok:false,attempts:3,error:'network'});
+ assert.deepEqual(probe.services.legacy,{status:200,ok:false,attempts:3});
+});

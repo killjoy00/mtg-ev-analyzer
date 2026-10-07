@@ -219,6 +219,31 @@ export async function routeAlert(fetcher,env,report) {
   if(existing)return 'existing';
   return 'none';
 }
+// Gateway logs only reflect real traffic, so a gateway failing every request
+// stays invisible while nobody plays (2026-10-07: one logged 5xx in the first
+// hour). Probe the full quota + origin path of each service on every run.
+export const GATEWAY_PROBE_SERVICES=['draft','growth','legacy'];
+export const PROBE_ATTEMPTS=3,PROBE_RETRY_MS=5000;
+export async function probeGateway(fetcher,{attempts=PROBE_ATTEMPTS,retryMs=PROBE_RETRY_MS,sleep=ms=>new Promise(r=>setTimeout(r,ms))}={}) {
+  const services={};
+  for(const service of GATEWAY_PROBE_SERVICES) {
+    let result;
+    for(let attempt=1;attempt<=attempts;attempt++) {
+      try {
+        const r=await fetcher(`https://api.packone.pro/${service}/health?quick=1`,{redirect:'error',signal:AbortSignal.timeout(15000)});
+        const body=await r.json().catch(()=>null);
+        result={status:r.status,ok:r.status===200&&body?.ok===true,attempts:attempt};
+      } catch(error) {
+        result={status:0,ok:false,attempts:attempt,error:error?.name==='TimeoutError'?'timeout':'network'};
+      }
+      if(result.ok)break;
+      if(attempt<attempts)await sleep(retryMs);
+    }
+    services[service]=result;
+  }
+  return {services,failed:GATEWAY_PROBE_SERVICES.filter(service=>!services[service].ok)};
+}
+
 async function productionAccount(fetcher,env) {
   const zones=await json(fetcher,'https://api.cloudflare.com/client/v4/zones?name=packone.pro&per_page=50',env.CLOUDFLARE_EDGE_TOKEN);
   const zone=zones.result?.filter(z=>z.name==='packone.pro'&&z.status==='active');
@@ -327,6 +352,8 @@ export async function run({fetcher=fetch,env=process.env,now=Date.now(),mode='ch
   }
   report.alerts=[...new Set(report.alerts)];
   if(mode==='alert') {
+    report.probe=await probeGateway(fetcher);
+    if(report.probe.failed.length)report.alerts.push('gateway_probe_failed');
     if(report.coverage?.pending_windows>0&&!report.coverage.unrecoverable) {
       try {
         const continuation=await scheduleCoverageContinuation(fetcher,env,report.coverage);
@@ -357,6 +384,9 @@ export async function run({fetcher=fetch,env=process.env,now=Date.now(),mode='ch
   if(report.alerts.includes('coverage_unrecoverable'))throw Error('Launch telemetry coverage is unrecoverable');
   if(report.alerts.includes('coverage_continuation_failed'))throw Error('Launch telemetry continuation failed');
   if(report.alerts.includes('telemetry_unavailable'))throw Error('Launch telemetry access failed');
+  // Fail the run as well as routing the issue: a hard-down gateway should also
+  // reach the operator through GitHub's failed-run notification.
+  if(report.alerts.includes('gateway_probe_failed'))throw Error('Production gateway probe failed');
   return report;
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)run({mode:process.argv[2]||'check'}).catch(()=>{console.error('Launch watcher failed; inspect sanitized report.');process.exitCode=1;});
