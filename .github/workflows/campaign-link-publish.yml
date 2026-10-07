@@ -133,7 +133,7 @@ jobs:
 
       - name: Install creator card renderer
         if: inputs.kind == 'creator' && inputs.creator_action == 'publish'
-        run: python3 -m pip install --quiet 'Pillow==11.3.0'
+        run: python3 -m pip install --quiet 'Pillow==11.3.0' 'fonttools[woff]==4.60.1'
 
       - name: Prepare deterministic campaign route
         shell: bash
@@ -144,7 +144,9 @@ jobs:
             if [[ "$CREATOR_ACTION" == "publish" ]]; then
               python3 scripts/generate-creator-social-card.py \
                 --output "creator/${CAMPAIGN_SLUG}/creator-card.png" \
+                --square-output "creator/${CAMPAIGN_SLUG}/creator-card-square.png" \
                 --creator "$CREATOR_NAME" \
+                --headline "$CREATOR_HEADLINE" \
                 --score "$CREATOR_SCORE" \
                 --environment "$CREATOR_ENVIRONMENT" \
                 --source-type "$CREATOR_SOURCE_TYPE" \
