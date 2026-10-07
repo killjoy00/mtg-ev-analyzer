@@ -333,10 +333,20 @@ try {
   await page.getByRole('button',{name:'Send a new verification link',exact:true}).click();
   await page.getByText("Request accepted. If that address belongs to an unverified Pack One account, a new verification link will be sent.",{exact:true}).waitFor();
   assert.deepEqual(resendBodies.at(-1),{email:'qa@example.invalid'});
+  // Resend styling must not prevent another sign-in attempt or style its error as success.
+  await unverified.getByRole('button',{name:'Sign in',exact:true}).click();
+  await page.getByText('Verify your email to finish creating your account. Check your inbox or send a new link.',{exact:true}).waitFor();
+  assert.equal(await page.locator('#account-signin-status').getAttribute('class'),'form-error');
+  assert.equal(await page.locator('#account-signin-status').getAttribute('data-state'),null);
+  assert.equal(await unverified.getByRole('button',{name:'Sign in',exact:true}).isEnabled(),true);
   resendCooldown=true;
   await page.getByRole('button',{name:'Send a new verification link',exact:true}).click();
   await page.getByText('Cooldown active. Try again in about 2 minutes.',{exact:true}).waitFor();
   assert.equal(await page.locator('[data-state="cooldown"]').count(),1);
+  // Once verified, the same form must still sign in after a resend cooldown.
+  unverifiedSignin=false;
+  await unverified.getByRole('button',{name:'Sign in',exact:true}).click();
+  await page.locator('.my-pack-one-page').waitFor();
 
   // A first account claim routes through the compact account-ready step.
   await fresh({source:'nav'});
