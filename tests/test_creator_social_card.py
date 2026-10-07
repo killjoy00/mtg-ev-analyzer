@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import sys
@@ -80,7 +81,7 @@ class CreatorSocialCardTests(unittest.TestCase):
                 BLUE,
             ),
         )
-        fixture_dir = os.environ.get("PACK1_CREATOR_FIXTURE_DIR") or (str(ROOT / "artifacts/tests/creator-fixtures") if os.environ.get("GITHUB_ACTIONS") == "true" else None)
+        fixture_dir = os.environ.get("PACK1_CREATOR_FIXTURE_DIR")
         temp = None
         if fixture_dir:
             root = Path(fixture_dir)
@@ -118,6 +119,18 @@ class CreatorSocialCardTests(unittest.TestCase):
         finally:
             if temp is not None:
                 temp.cleanup()
+
+    def test_checked_in_published_creator_cards_match_current_renderer(self):
+        registry = json.loads((ROOT / "creator-challenges.json").read_text(encoding="utf-8"))
+        published = [entry["slug"] for entry in registry if entry.get("status") == "published"]
+        self.assertTrue(published, "expected at least one published creator challenge")
+        for slug in published:
+            with self.subTest(slug=slug):
+                subprocess.run(
+                    [sys.executable, str(ROOT / "scripts/check-creator-social-card.py"), "--slug", slug],
+                    cwd=ROOT,
+                    check=True,
+                )
 
     def test_maximum_valid_headline_stays_clear_of_scorecard_dividers(self):
         with tempfile.TemporaryDirectory(prefix="packone-creator-social-max-") as tmp:
