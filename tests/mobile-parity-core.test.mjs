@@ -59,8 +59,10 @@ test('native Draft Run keeps web feedback and result-review parity', () => {
   assert.match(draftScreen, /Thanks \\u2014 report sent\./);
   assert.match(draftApi, /Application\.nativeApplicationVersion/);
   assert.match(draftApi, /Application\.nativeBuildVersion/);
-  assert.match(draftApi, /native\.Platform\.OS === 'ios'/);
-  assert.match(draftApi, /import\('expo-application'\)/);
+  assert.match(draftApi, /import \* as Application from 'expo-application'/);
+  assert.match(draftApi, /import \{ Platform \} from 'react-native'/);
+  assert.match(draftApi, /Platform\.OS === 'ios'/);
+  assert.doesNotMatch(draftApi, /import\('expo-application'\)|import\('react-native'\)/);
   assert.match(draftScreen, /Model&apos;s strongest choice/);
   assert.match(draftScreen, /Compare all/);
   assert.match(draftScreen, /Your \{run\.run_length\} picks/);
