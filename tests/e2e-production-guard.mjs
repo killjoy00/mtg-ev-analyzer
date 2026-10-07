@@ -30,14 +30,19 @@ async function instrument(context) {
   const root=path.join('artifacts/browser',id);fs.mkdirSync(root,{recursive:true});
   const index=contextIndex++,events=[];
   await context.tracing.start({screenshots:true,snapshots:true});
-  context.on('page',page=>{
+  const observed=new WeakSet();
+  const observePage=page=>{
+    if(observed.has(page))return;
+    observed.add(page);
     page.on('pageerror',error=>events.push({kind:'pageerror',message:error.message}));
     page.on('console',message=>{if(message.type()==='error')events.push({kind:'console',message:message.text().slice(0,1000)});});
     page.on('requestfailed',request=>{
       const url=new URL(request.url());
       events.push({kind:'requestfailed',method:request.method(),host:url.hostname,path:url.pathname,error:request.failure()?.errorText});
     });
-  });
+  };
+  context.on('page',observePage);
+  for(const page of context.pages())observePage(page);
   const flush=async()=>{
     if(flushed.has(context))return;
     flushed.add(context);
@@ -56,7 +61,9 @@ async function instrument(context) {
 for(const type of [chromium,firefox,webkit]) {
   const launch=type.launch.bind(type);
   type.launch=async(options={})=>{
-    const browser=await launch(type===chromium?{...options,args:[...(options.args||[]),CHROMIUM_RESOLVER_RULES]}:options);
+    const pinnedOptions={...options};
+    if(type===chromium&&pinnedOptions.channel==='chrome')delete pinnedOptions.channel;
+    const browser=await launch(type===chromium?{...pinnedOptions,args:[...(pinnedOptions.args||[]),CHROMIUM_RESOLVER_RULES]}:pinnedOptions);
     const newContext=browser.newContext.bind(browser),newPage=browser.newPage.bind(browser);
     browser.newContext=async(...args)=>instrument(await blockProduction(await newContext(...args)));
     browser.newPage=async(...args)=>{const page=await newPage(...args);await instrument(await blockProduction(page.context()));return page;};

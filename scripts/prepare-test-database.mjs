@@ -21,6 +21,7 @@ try {
   for(const path of migrationPlan(manifest,'fresh',{fresh:true})) {
     console.log('Applying '+path);apply(path);
     if(path==='migrations/0004_draft_run_product.sql') {
+      apply('tests/support/legacy-retirement-schema.sql');
       // Historical migrations ran after these environments had been imported.
       // Reproduce that prerequisite, including the four later-retired sets.
       for(const id of new Set([...catalog.sets.map(set=>set.id),'stx','mid','vow','snc'])) {

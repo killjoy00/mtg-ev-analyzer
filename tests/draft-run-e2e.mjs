@@ -4,19 +4,26 @@ import {gunzipSync} from 'node:zlib';
 import {chromium} from 'playwright';
 import {selectDraftRun,selectDraftRunReroll,interestingDraftRunPuzzle,publicDraftRunPuzzle,gradeDraftRunPick,calibratedSupports,supportSharpening} from '../draft-run.mjs';
 import {rateDraftRunPuzzle} from '../draft-run-difficulty.mjs';
+import policy from '../data/selection-policy.json' with {type:'json'};
+import {regularRunSet} from '../draft-run-policy.mjs';
+import {latestSetPlan} from '../daily-selection.mjs';
 
 const base=process.env.PACK1_E2E_URL||'http://127.0.0.1:4173';
 const corpus=fs.readdirSync('corpus/draft-run').filter(f=>f.endsWith('.gz')).flatMap(f=>JSON.parse(gunzipSync(fs.readFileSync('corpus/draft-run/'+f)))).filter(interestingDraftRunPuzzle);
 const environment=process.env.PACK1_TEST_ENVIRONMENT||'mixed',cube=environment==='powered-cube';
 const selectionVersion=process.env.PACK1_TEST_SELECTION_VERSION||'eight-pick-v4';
 const daily=process.env.PACK1_TEST_DAILY==='1';
+const fixtureDay='2026-10-07';
+const metadata=[...new Set(corpus.map(p=>p.set_id))].map(set_id=>({set_id,set_name:set_id.toUpperCase(),status:'Live',regular_run:regularRunSet(set_id),release_date:policy.release_dates[set_id]||null}));
+const fixtureCorpus=environment==='latest'?corpus.filter(p=>p.set_id===latestSetPlan(metadata,fixtureDay)[0]):corpus;
 let shareCalls=0,eliteAccess=false,seasonAvailable=true,adGoogle=0,adMembership=0,runStarts=[];
-let puzzles=selectDraftRun(corpus,'browser-contract',environment,{selectionVersion,daily,day:'2026-10-07'}),answers=[],revision=0,rerolls=cube?{set:0,pack:2}:{set:1,pack:1};
+let puzzles=selectDraftRun(fixtureCorpus,'browser-contract',environment,{selectionVersion,daily,day:fixtureDay,metadata}),answers=[],revision=0,rerolls=cube?{set:0,pack:2}:{set:1,pack:1};
 const sources=puzzles.map(p=>p.source_draft_hash),errors=[],events=[],views=[];
 const id='11111111-1111-4111-8111-111111111111',shareId='1234567890abcdef12345678';
 const snapshot=()=>({id,environment,leaderboard_eligible:daily,ranked_name:daily?'QA ranked player':null,run_length:puzzles.length,set_reroll_allowed:!daily,day:daily?'2026-10-07':null,revision,round:answers.length+1,answers,rerolls,complete:answers.length===puzzles.length,score:answers.length===puzzles.length?Math.round(answers.reduce((n,a)=>n+a.score,0)/puzzles.length):null,current:answers.length===puzzles.length?null:publicDraftRunPuzzle(puzzles[answers.length]),standing:answers.length===puzzles.length?{rank:1,total:20,percentile:5,final:false}:null});
 const browser=await chromium.launch({headless:true});
 const page=await browser.newPage({viewport:{width:390,height:844}});
+await page.clock.setFixedTime(new Date(fixtureDay+'T18:00:00Z'));
 page.on('pageerror',e=>errors.push(e.message));
 await page.addInitScript(()=>{Object.defineProperty(navigator,'share',{configurable:true,value:async value=>{window.__runShare=value;}});Object.defineProperty(navigator,'canShare',{configurable:true,value:()=>false});});
 await page.route('**/*-pack1growth.compute.c-5.us-east-2.aws.neon.tech/**',async route=>{
