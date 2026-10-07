@@ -677,7 +677,7 @@ try {
   await query(`UPDATE creator_challenges
     SET status='draft',published_at=NULL,publication_operation_ref=NULL,publication_detail='{}'::jsonb
     WHERE id=ANY($1::uuid[])`,[
-    creatorOwnedChallenges,
+    '{'+creatorOwnedChallenges.join(',')+'}',
   ]);
   const privacyReady=await requestCreatorPrivacyRetirement(query,creator.playerId,{reason:'account_deletion'});
   assert.equal(privacyReady,true,'synthetic unpublished fixture challenges require no static cleanup');
