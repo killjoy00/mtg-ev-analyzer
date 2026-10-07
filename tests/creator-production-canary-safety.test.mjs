@@ -79,6 +79,19 @@ test('borrowed closed Daily eligibility is restored and canary is protected',()=
   assert.doesNotMatch(workflow,/workflow_dispatch:/);
 });
 
+test('creator canary static cleanup waits for registered green PR checks before merge',()=>{
+  assert.match(workflow,/cleanup-creator-canary-static\.mjs/);
+  assert.match(workflow,/commits\/\$\{head_sha\}\/check-runs/);
+  assert.match(workflow,/Cleanup PR checks never registered; refusing to merge/);
+  assert.match(workflow,/gh pr checks "\$pr_url" --watch --fail-fast/);
+  assert.match(workflow,/gh pr merge "\$pr_url" --squash --delete-branch --match-head-commit "\$head_sha"/);
+  const register=workflow.indexOf('/check-runs');
+  const watch=workflow.indexOf('gh pr checks');
+  const merge=workflow.indexOf('gh pr merge');
+  assert.ok(register>=0&&register<watch&&watch<merge,'cleanup must observe registered checks, wait for them, then merge');
+  assert.match(workflow,/token: \$\{\{ secrets\.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN \}\}/);
+});
+
 test('reviewed retry request explicitly forbids customer rows',()=>{
   assert.equal(request.operation,'run-creator-production-canary');
   // The request pins the corrected protected release; live markerCheck enforces it.
