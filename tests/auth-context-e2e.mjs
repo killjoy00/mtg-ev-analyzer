@@ -74,7 +74,7 @@ await page.route('https://api.packone.pro/growth/**',async route=>{
     resendBodies.push(route.request().postDataJSON());
     if(resendCooldown) {
       status=429;
-      body={error:'Please wait before requesting another verification link.',code:'VERIFICATION_COOLDOWN'};
+      body={error:'Please wait before requesting another verification link.',code:'VERIFICATION_COOLDOWN',retryAfter:90};
       return route.fulfill({status,headers:{'retry-after':'90'},contentType:'application/json',body:JSON.stringify(body)});
     }
     body={ok:true,message:"Request accepted. If that address belongs to an unverified Pack One account, a new verification link will be sent."};
