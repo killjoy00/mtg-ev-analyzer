@@ -24,8 +24,8 @@ import {loadPuzzleMetadata,selectCachedDatabaseRun,selectDatabaseReroll,loadLive
 import {DRAFT_RUN_DIFFICULTY_VERSION,LEGACY_DIFFICULTY_VERSION,publicDifficulty,rateDraftRunPuzzle} from '../draft-run-difficulty.mjs';
 import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,regularRunSet,dailySetWeight,dailyRequiredSets,DRAFT_RUN_LENGTH} from '../draft-run-policy.mjs';
 import {
-  DRAFT_RUN_CORPUS_VERSION, DRAFT_RUN_SCORING_VERSION, gradeDraftRunPick,
-  publicDraftRunPuzzle, validateDraftRunPuzzle, draftRunEnvironment, calibratedSupports, supportSharpening,
+  DRAFT_RUN_CORPUS_VERSION, DRAFT_RUN_SCORING_VERSION, gradeDraftRunPickForVersion,
+  publicDraftRunPuzzle, validateDraftRunPuzzle, draftRunEnvironment,
 } from '../draft-run.mjs';
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
@@ -286,7 +286,8 @@ async function start(request) {
         ? `shared:${source.id}:${owner}`
         : startIdempotencyHash ? `practice:${startIdempotencyHash}` : crypto.randomUUID();
   const replaySource=creatorState?.source||source;
-  let corpusVersion=replaySource?.corpus_version||DRAFT_RUN_CORPUS_VERSION,scoringVersion=replaySource?.scoring_version||DRAFT_RUN_SCORING_VERSION;
+  let corpusVersion=replaySource?.corpus_version||DRAFT_RUN_CORPUS_VERSION,
+    scoringVersion=creatorState?.source?.replay_scoring_version||replaySource?.scoring_version||DRAFT_RUN_SCORING_VERSION;
   let servingPolicy=replaySource?.serving_policy_version||(replaySource?LEGACY_SERVING_POLICY_VERSION:SERVING_POLICY_VERSION);
   let ids,featuredSets=[],difficultyVersion=replaySource?.difficulty_version||DRAFT_RUN_DIFFICULTY_VERSION,selectionVersion=replaySource?.selection_version||DRAFT_RUN_SELECTION_VERSION;
   for(let attempt=0;attempt<2;attempt++) {
@@ -373,10 +374,15 @@ async function change(request,id,action) {
   if(action==='pick') {
     const p=await puzzle(body.puzzleId,s.corpus_version);
     if(!p.candidates.some(c=>c.id===body.cardId)) fail('Choose a card from this pack.');
-    const grade=gradeDraftRunPick(p,body.cardId);
+    const grade=gradeDraftRunPickForVersion(p,body.cardId,s.scoring_version);
     const evidence=rateDraftRunPuzzle(p);
     grade.modelTargetDisagreement=evidence.modelTargetDisagreement;
-    s.answers.push({...grade,puzzle:publicDraftRunPuzzle(p),ranking:(()=>{const calibrated=calibratedSupports(p.candidates,supportSharpening(p.corpus_version));return [...p.candidates].sort((a,b)=>b.model_probability-a.model_probability).map(c=>({id:c.id,name:c.name,support:calibrated.get(c.id),score:gradeDraftRunPick(p,c.id).score}));})()});
+    s.answers.push({...grade,puzzle:publicDraftRunPuzzle(p),ranking:[...p.candidates]
+      .sort((a,b)=>b.model_probability-a.model_probability)
+      .map(card=>{
+        const candidate=gradeDraftRunPickForVersion(p,card.id,s.scoring_version);
+        return {id:card.id,name:card.name,support:candidate.selectedSupport,score:candidate.score};
+      })});
     if(s.answers.length===runLength(s)) s.score=Math.round(s.answers.reduce((n,a)=>n+a.score,0)/runLength(s));
   } else {
     if(s.day)fail('Daily runs are fixed. Rerolls are available in practice.',409);
@@ -424,7 +430,7 @@ async function reportDecision(request,id) {
     || null;
   const recommendedId=recommended?.id||null;
   const recommendedName=recommended?.name||null;
-  const recommendedScore=recommendedId?gradeDraftRunPick(fullPuzzle,recommendedId).score:null;
+  const recommendedScore=recommendedId?gradeDraftRunPickForVersion(fullPuzzle,recommendedId,s.scoring_version).score:null;
   const release=releaseMetadata().release_commit;
   const inserted=await query(`INSERT INTO draft_run_decision_reports(
       run_id,player_id,puzzle_id,set_id,pick_number,round_number,
