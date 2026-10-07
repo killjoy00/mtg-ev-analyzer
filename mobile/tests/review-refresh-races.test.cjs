@@ -178,7 +178,7 @@ test('Home refreshes loaded Daily state on focus and Pacific rollover without bl
 
     assert.equal(calls, 1);
     assert.equal(root.root.findAll(
-      (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Open Draft Run Daily',
+      (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Play Draft Run Daily',
     ).length, 1);
 
     await act(async () => {
@@ -189,7 +189,7 @@ test('Home refreshes loaded Daily state on focus and Pacific rollover without bl
 
     assert.equal(calls, 2, 'Pacific day mismatch should refresh');
     assert.equal(root.root.findAll(
-      (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'View Draft Run Daily',
+      (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'View result for Draft Run Daily',
     ).length, 1);
 
     await act(async () => {
