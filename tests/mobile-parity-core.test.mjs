@@ -128,6 +128,12 @@ test('native Account keeps auth on /account and splits signed-in management into
   assert.match(homeScreen, /name_not_allowed/);
   assert.match(homeScreen, /That display name is not allowed\. Choose another to join Daily leaderboards\./);
   assert.match(homeScreen, /Choose a different display name\. That one is already taken\./);
+  assert.match(homeScreen, /\{isComplete \? 'View result' : 'Play now'\}/);
+  assert.match(homeScreen, /isComplete \? styles\.secondaryButton : styles\.primaryButton/);
+  assert.match(homeScreen, /minHeight: 50/);
+  assert.doesNotMatch(homeScreen, /View Leaders/);
+  assert.doesNotMatch(homeScreen, /Explore Practice/);
+  assert.doesNotMatch(homeScreen, /\/3 complete/);
   assert.match(accountProfileScreen, /if \(!account \|\| !profile\)/);
   assert.match(accountSecurityScreen, /if \(!account\)/);
   assert.match(accountDeleteScreen, /if \(!account\)/);
