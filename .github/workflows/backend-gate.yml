@@ -23,6 +23,7 @@ on:
       - 'tests/support/**'
       - 'tests/fixtures/**'
       - 'tests/postgres-client-contract.mjs'
+      - 'tests/admin-invitations-postgres.mjs'
       - 'scripts/verify-neon-schema.mjs'
       - 'scripts/creator-event-schema.mjs'
       - 'scripts/reroll-index-schema.mjs'
@@ -75,6 +76,8 @@ jobs:
         run: node scripts/prepare-test-database.mjs
       - name: Exercise the actual client, gateway, worker and PostgreSQL
         run: node tests/postgres-client-contract.mjs
+      - name: Verify Owner, recipient binding, redemption races and deletion safeguards
+        run: node tests/admin-invitations-postgres.mjs
       - name: Check migration rollout, concurrent writes and rollback safety
         run: |
           printf '%s' "$PACK1_TEST_DATABASE_URL" > "$RUNNER_TEMP/pack1-postgres.connection"
