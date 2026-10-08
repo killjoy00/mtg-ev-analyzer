@@ -30,7 +30,7 @@ export const recoveryFixtures=[
 ];
 
 export function validateRecoveryFixture(row,fixture) {
-  assert.ok(row,'known canary fixture must still exist');
+  if(!row)return false;
   assert.equal(row.challenge_id,fixture.challengeId);
   assert.equal(row.session_id,fixture.sessionId);
   assert.equal(row.slug,fixture.slug);
@@ -57,6 +57,7 @@ export function validateRecoveryFixture(row,fixture) {
       assert.equal(row.profile_public,false);
     }
   }
+  return true;
 }
 
 export async function recoverKnownCanaryFixtures(query,{retire,cleanPractice,verifyRetired,record}) {
@@ -65,11 +66,15 @@ export async function recoverKnownCanaryFixtures(query,{retire,cleanPractice,ver
         c.source_owner_player_id::text source_owner_player_id,s.id::text session_id,
         s.player_id::text player_id,s.day::text source_day,s.measurement_qa,
         p.display_name,p.profile_public,a.auth_user_id::text auth_id,u.email auth_email,u.name auth_name
-      FROM creator_challenges c JOIN draft_run_sessions s ON s.id=c.source_session_id
-      JOIN players p ON p.id=s.player_id
-      LEFT JOIN account_links a ON a.player_id=p.id LEFT JOIN neon_auth."user" u ON u.id=a.auth_user_id
-      WHERE c.id=$1::uuid AND s.id=$2::uuid`,[fixture.challengeId,fixture.sessionId])).rows[0];
-    validateRecoveryFixture(row,fixture);
+      FROM (SELECT * FROM creator_challenges WHERE id=$1::uuid) c
+      FULL OUTER JOIN (SELECT * FROM draft_run_sessions WHERE id=$2::uuid) s ON s.id=c.source_session_id
+      LEFT JOIN players p ON p.id=s.player_id
+      LEFT JOIN account_links a ON a.player_id=p.id LEFT JOIN neon_auth."user" u ON u.id=a.auth_user_id`,
+      [fixture.challengeId,fixture.sessionId])).rows[0];
+    if(!validateRecoveryFixture(row,fixture)){
+      record({challenge_id:fixture.challengeId,source_session_id:fixture.sessionId,type:fixture.type,cleaned:true,already_absent:true});
+      continue;
+    }
     const assertOwnerScope=async()=>{
       const other=(await query(`SELECT id FROM creator_challenges WHERE source_owner_player_id=$1::uuid
         AND id<>$2::uuid AND NOT(status='retired' AND COALESCE(publication_detail->>'live_verified','false')='true')`,
