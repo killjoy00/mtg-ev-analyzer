@@ -83,7 +83,19 @@ async function initialize() {
   const usage=await usageGate(fixture.usage_baseline);assert.ok(usage.passed,'preparation_usage_gate');
   fs.writeFileSync(file,JSON.stringify(fixture),{mode:0o600});
   fs.mkdirSync('artifacts/launch-load',{recursive:true});
-  fs.writeFileSync('artifacts/launch-load/experiment-declaration.json',JSON.stringify({scope,policy,verified,usage_baseline:fixture.usage_baseline},null,2));
+  const source_main_sha=process.env.PACK1_SOURCE_MAIN_SHA||null;
+  const harness_head_sha=process.env.PACK1_HARNESS_HEAD_SHA||null;
+  if(policy.sequence==='50_to_100') {
+    assert.match(source_main_sha||'',/^[a-f0-9]{40}$/,'missing_exact_source_main');
+    assert.match(harness_head_sha||'',/^[a-f0-9]{40}$/,'missing_exact_harness_head');
+  }
+  fs.writeFileSync('artifacts/launch-load/experiment-declaration.json',JSON.stringify({
+    scope,policy,verified,usage_baseline:fixture.usage_baseline,
+    source_main_sha,harness_head_sha,tested_merge_revision:scope.sha,
+    deployed_preview_revision:scope.sha,policy_hash:scope.policy_hash,
+    first_stage_players:policy.stages[0].players,
+    preceding_25_player_warmup:false
+  },null,2));
   console.log('Exact disposable branch, bounded compute/expiry, policy and coordinator verified.');
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)initialize().catch(error=>{console.error(JSON.stringify({error:'disposable_coordinator_initialization_failed',code:error.code||null,line:String(error.stack).match(/launch-distributed-[a-z]+\.mjs:(\d+)/)?.[0]||null}));process.exitCode=1;});
