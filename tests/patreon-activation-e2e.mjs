@@ -91,6 +91,9 @@ async function reset({isSigned=false,status=disconnected,verify=false}={}){
   page=await browser.newPage({viewport:{width:390,height:844}});
   if(previousContext)assert.notEqual(page.context(),previousContext,'scenario must use a fresh browser context');
   await attachFixtureRoutes(page);
+  // Some callback scenarios seed sessionStorage before entering the app.
+  // Establish the first-party origin without initializing the app or sharing state.
+  await page.goto(base+'/leaderboard-config.js');
 }
 
 async function fill(kind){
