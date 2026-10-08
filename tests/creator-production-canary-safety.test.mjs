@@ -64,6 +64,7 @@ test('fresh Practice source is played through live APIs and later marked QA/priv
   assert.match(block,/\/share/);
   assert.match(block,/call\('\/draft\/v1\/shared-runs\/'\+shared\.id,\{method:'GET'\}\)/);
   assert.match(block,/public recipient share must resolve the exact fresh share/);
+  assert.match(block,/report\.fixtures\.practice\.public_recipient/);
   assert.doesNotMatch(block,/INSERT INTO draft_run_sessions/);
   assert.match(script,/async function cleanupFreshPracticeSource\(\)/);
   assert.match(script,/UPDATE draft_run_sessions SET measurement_qa=true/);
