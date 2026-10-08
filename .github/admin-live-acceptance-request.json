@@ -1,0 +1,5 @@
+{
+  "operation": "verify-admin-release",
+  "release_sha": "7c9a96a6bc4a83d434458b476ff1d280499fee2d",
+  "reason": "Run independent live post-release acceptance after successful Admin v5 database, Neon Functions and Cloudflare gateway publication. The guarded release smoke observed a transient v3 gateway header three seconds after upload; a later production smoke independently confirmed all surfaces at v5. This request repeats only the existing live smoke, not migrations or deployments, and does not authorize Owner bootstrap or real invitations."
+}

@@ -1,0 +1,47 @@
+name: independent admin live acceptance
+on:
+  push:
+    branches: [main]
+    paths: ['.github/admin-live-acceptance-request.json']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pack1-admin-live-acceptance
+  cancel-in-progress: false
+
+jobs:
+  live:
+    name: live-admin-v5-acceptance
+    environment: pack-one-mobile-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validate exact approved runtime and request
+        shell: bash
+        run: |
+          set -euo pipefail
+          release=$(node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          const input=JSON.parse(fs.readFileSync('.github/admin-live-acceptance-request.json','utf8'));
+          if(!input||Array.isArray(input)||Object.keys(input).sort().join(',')!=='operation,reason,release_sha'
+            ||input.operation!=='verify-admin-release'
+            ||typeof input.reason!=='string'||!input.reason.trim()
+            ||typeof input.release_sha!=='string'||!/^[a-f0-9]{40}$/.test(input.release_sha))
+            throw Error('Invalid Admin live acceptance request.');
+          console.log(input.release_sha);
+          NODE
+          )
+          git cat-file -e "${release}^{commit}"
+          git merge-base --is-ancestor "$release" "$GITHUB_SHA"
+          echo "RELEASE_SHA=$release" >> "$GITHUB_ENV"
+      - name: Verify exact live Functions, Admin Pages and gateway, mobile, cookie and OAuth contracts
+        run: node tests/edge-production-live-smoke.mjs "$RELEASE_SHA"
