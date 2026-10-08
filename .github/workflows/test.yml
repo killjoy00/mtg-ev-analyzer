@@ -192,7 +192,7 @@ jobs:
               fi
               ;;
             presentation)
-              node --test tests/editorial.test.mjs tests/home-product.test.mjs tests/surface-focus.test.mjs
+              node --test tests/editorial.test.mjs tests/mobile-native-editorial.test.mjs tests/home-product.test.mjs tests/surface-focus.test.mjs
               ;;
             ci)
               test -f "$RUNNER_TEMP/ci-contracts-complete"

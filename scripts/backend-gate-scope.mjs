@@ -42,10 +42,9 @@ function normalizeChangedPaths(paths) {
 export function filterBackendChangedPaths(paths, map = loadBackendMap()) {
   const registered = new Set(allSuites(map));
   return normalizeChangedPaths(paths).filter((path) => {
+    if (isFullPath(path, map)) return true;
     if (path.startsWith('mobile/') || path.startsWith('docs/') || /^[^/]+\.md$/.test(path)) return false;
-    if (path.startsWith('.github/')) {
-      return path === '.github/workflows/backend-gate.yml' || path === '.github/workflows/prepare-rebuild.yml' || path === '.github/scripts/maintain-serving-indexes.sql';
-    }
+    if (path.startsWith('.github/')) return false;
     if (path.startsWith('tests/')) {
       return registered.has(path) || /^tests\/[^/]*backend-smoke\.mjs$/.test(path) || path === 'tests/backend-gate-scope.test.mjs';
     }

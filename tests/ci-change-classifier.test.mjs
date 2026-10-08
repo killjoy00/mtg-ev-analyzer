@@ -5,7 +5,7 @@ import {classifyChanges} from '../scripts/ci-change-classifier.mjs';
 const plan=(paths,expected)=>assert.equal(classifyChanges(paths).plan,expected,paths.join(', '));
 
 test('application HTML selects its behavioral journey rather than presentation smoke',()=>{
-  for(const [path,group] of [['admin/index.html','admin'],['reset-password/index.html','account']]) {
+  for(const [path,group] of [['admin/index.html','admin'],['reset-password/index.html','account'],['patreon/index.html','account']]) {
     const result=classifyChanges([path]);
     assert.equal(result.plan,'app');
     assert.equal(result.browser,'groups');
