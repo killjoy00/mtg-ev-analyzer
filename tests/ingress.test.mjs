@@ -73,6 +73,39 @@ test('start timing is relayed only from the protected draft origin in private pr
   assert.equal(prod.headers.get('x-pack1-start-timing'),null);
   assert.equal(prod.headers.get('x-pack1-gateway-timing'),null);
 });
+test('successful preview Daily-status GET exposes measured gateway timing without production or other-route changes',async()=>{
+ const request=req('/draft/v1/daily-status',{method:'GET',body:undefined,headers:{'x-pack1-gateway-timing':'caller-spoof'}});
+ let calls=0;
+ const preview=await gateway(request,env,async(_url,options)=>{
+   calls++;
+   assert.equal(options.method,'GET');
+   assert.equal(options.headers.get('x-pack1-gateway-timing'),null,'untrusted caller timing must not reach origin');
+   return Response.json({ok:true},{headers:{'x-pack1-gateway-timing':'{"private":"origin-spoof"}'}});
+ });
+ assert.equal(calls,1);assert.equal(preview.status,200);
+ const timing=JSON.parse(preview.headers.get('x-pack1-gateway-timing'));
+ assert.deepEqual(Object.keys(timing).sort(),['duration_ms','quota_ms','upstream_ms'].sort());
+ for(const value of Object.values(timing))assert.ok(Number.isFinite(value)&&value>=0);
+ assert.deepEqual(await preview.json(),{ok:true});
+ assert.doesNotMatch(JSON.stringify(timing),/private|spoof|cookie|token/i);
+
+ const other=await gateway(req('/draft/v1/leaderboard',{method:'GET',body:undefined}),env,
+   async()=>Response.json({ok:true}));
+ assert.equal(other.headers.get('x-pack1-gateway-timing'),null,'unrelated successful GETs remain unchanged');
+
+ const missing=await gateway(req('/draft/v1/daily-status',{method:'GET',body:undefined}),env,
+   async()=>Response.json({error:'not_found'},{status:404}));
+ assert.equal(missing.status,404);
+ assert.equal(missing.headers.get('x-pack1-gateway-timing'),null,'non-5xx failed GETs do not get success timing');
+
+ const production={...env,MODE:'production',NEON_BRANCH_ID:'br-orange-feather-ayps8kep'};
+ const prodRequest=new Request('https://api.packone.pro/draft/v1/daily-status',
+   {method:'GET',headers:{'cf-connecting-ip':'192.0.2.1'}});
+ const prod=await gateway(prodRequest,production,async()=>Response.json({ok:true}));
+ assert.equal(prod.status,200);
+ assert.equal(prod.headers.get('x-pack1-gateway-timing'),null,'production must not expose preview timing');
+});
+
 for(const action of ['reroll','view'])test(action+' timing is restricted to the protected preview path',async()=>{
   const timingHeader=`x-pack1-${action}-timing`;
   const timing=JSON.stringify({v:1,total_ms:200,phases:{selection:180},selector:{}});
