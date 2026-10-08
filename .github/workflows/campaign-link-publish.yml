@@ -132,7 +132,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install creator card renderer
-        if: inputs.kind == 'creator' && inputs.creator_action == 'publish'
+        if: inputs.kind == 'creator'
         run: python3 -m pip install --quiet 'Pillow==11.3.0' 'fonttools[woff]==4.60.1'
 
       - name: Prepare deterministic campaign route
