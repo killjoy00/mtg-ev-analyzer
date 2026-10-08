@@ -17,7 +17,7 @@ const deletionStateLabel=value=>({
   complete:'Complete',
 })[value]||value||'Unknown';
 
-export async function renderUsers(root,request,growthRequest=request) {
+export async function renderUsers(root,request,growthRequest=request,viewerRole='admin') {
   let data=null,filters={search:'',status:'all'},detailLoadSerial=0;
 
   async function load() {
@@ -131,6 +131,8 @@ export async function renderUsers(root,request,growthRequest=request) {
       </div>`;
     }
     if(user.is_self)return '<p class="muted">Self-deletion is not available from Admin Users. Use the normal account settings deletion flow for your own account.</p>';
+    if(user.is_admin&&viewerRole!=='owner')
+      return '<p class="muted">Only the Owner may permanently delete another administrator account. Ask the Owner to manage access in the Team console.</p>';
     return `<form id="delete-account-form">
       <p><strong>This permanently deletes the selected Pack One account.</strong> Attributable profile, leaderboard, gameplay, and career data are removed under the existing account-deletion contract. Retained opponent/shared results are de-identified. Once the deletion state is committed, it cannot be canceled.</p>
       <p class="muted">Deleting Pack One does not cancel Apple subscriptions or Patreon memberships.</p>

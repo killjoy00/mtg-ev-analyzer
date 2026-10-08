@@ -72,8 +72,16 @@ export async function handleAdminAccountDeletion(
   if(reason.length>200)fail('Deletion reason must be 200 characters or fewer.',400);
   const acknowledgeAdmin=body.acknowledgeAdmin===true;
 
-  const targetOwner=await query("SELECT 1 FROM pack1_admins WHERE auth_user_id=$1::uuid AND role='owner'",[targetAuthUserId]);
-  if(targetOwner.rows.length)fail('The Owner account cannot be deleted. Transfer ownership through a controlled operator process first.',409,'OWNER_PROTECTED');
+  // Helpful early denial; the database initializer repeats these checks
+  // under the target identity lock before any irreversible tombstone write.
+  const targetMember=await query('SELECT role FROM pack1_admins WHERE auth_user_id=$1::uuid',[targetAuthUserId]);
+  const targetRole=targetMember.rows[0]?.role;
+  if(targetRole==='owner')fail('The Owner account cannot be deleted. Transfer ownership through a controlled operator process first.',409,'OWNER_PROTECTED');
+  if(targetRole==='admin'){
+    const actor=await query('SELECT role FROM pack1_admins WHERE auth_user_id=$1::uuid',[adminAuthUserId]);
+    if(actor.rows[0]?.role!=='owner')
+      fail('Only the Owner can permanently delete another administrator account.',403,'ADMIN_OWNER_REQUIRED');
+  }
 
   // Read before deletion starts: the auth record, and with it the address, is
   // removed by the provider phase.
@@ -89,6 +97,8 @@ export async function handleAdminAccountDeletion(
   if(!started)fail('Account deletion could not be started.',500,'DELETE_START');
   if(started.start_status==='self_delete')fail('Use the normal account settings flow to delete your own account.',409,'ADMIN_SELF_DELETE');
   if(started.start_status==='forbidden')fail('This account does not have admin access.',403);
+  if(started.start_status==='owner_required')fail('Only the Owner can permanently delete another administrator account.',403,'ADMIN_OWNER_REQUIRED');
+  if(started.start_status==='owner_protected')fail('The Owner account cannot be deleted. Transfer ownership through a controlled operator process first.',409,'OWNER_PROTECTED');
   if(started.start_status==='unknown_target')fail('User not found.',404);
   if(started.start_status==='admin_ack_required')
     fail('Confirm that you intend to permanently delete another administrator account.',409,'ADMIN_TARGET_CONFIRMATION');

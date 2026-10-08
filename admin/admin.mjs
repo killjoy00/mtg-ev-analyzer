@@ -87,6 +87,53 @@ async function switchAccount(){
   root.innerHTML='<section class="login"><h1>Signing out…</h1></section>';
   try {await signOutAccount();}finally{switching=false;login();}
 }
+function showInvitationPrompt(user,token,loadId){
+  // Merely opening the URL, signing in or reloading never redeems a token.
+  // This gate is intentionally before /v1/admin/access, so non-Admins can consent.
+  setAuthorized(false);
+  root.innerHTML=`<section class="login">
+    <h1>Administrator invitation</h1>
+    <p>Accepting gives this Pack One account administrator access. Only accept an invitation intended for you.</p>
+    <p>Signed in as <strong id="admin-invite-account">${esc(user?.email||'Unknown account')}</strong>.</p>
+    <p class="muted">The invited email must match your verified account email.</p>
+    <div class="actions">
+      <button type="button" id="accept-admin-invite">Accept admin invitation</button>
+      <button type="button" class="secondary" id="cancel-admin-invite">Cancel</button>
+      <button type="button" class="secondary" id="switch-admin-invite">Switch account</button>
+    </div>
+    <p id="admin-invite-status" role="status" aria-live="polite"></p>
+  </section>`;
+  const accept=root.querySelector('#accept-admin-invite');
+  const cancel=root.querySelector('#cancel-admin-invite');
+  const switchButton=root.querySelector('#switch-admin-invite');
+  const status=root.querySelector('#admin-invite-status');
+  const buttons=[accept,cancel,switchButton];
+  accept.onclick=async()=>{
+    if(loadId!==deferredLoad||accept.disabled)return;
+    buttons.forEach(button=>button.disabled=true);
+    status.textContent='Accepting invitation…';
+    try{
+      await request('/v1/admin/invitations/accept',{token});
+      if(loadId!==deferredLoad)return;
+      sessionStorage.removeItem(INVITE_STORAGE);
+      await load();
+    }catch(error){
+      if(loadId!==deferredLoad)return;
+      // Keep a mismatched-email or transiently failed invitation usable
+      // after an account switch; an invalid/used token can no longer work.
+      if(error?.code==='ADMIN_INVITATION_INVALID'||error?.code==='ALREADY_ADMIN')
+        sessionStorage.removeItem(INVITE_STORAGE);
+      status.textContent=error?.message||'Invitation could not be accepted.';
+      buttons.forEach(button=>button.disabled=false);
+    }
+  };
+  cancel.onclick=()=>{
+    if(loadId!==deferredLoad)return;
+    sessionStorage.removeItem(INVITE_STORAGE);
+    location.assign('/');
+  };
+  switchButton.onclick=()=>{if(loadId===deferredLoad)void switchAccount();};
+}
 function options(values,current){return values.map(([v,label])=>`<option value="${esc(v)}" ${v===current?'selected':''}>${esc(label)}</option>`).join('');}
 function table(rows,label) {
   return `<div class="scroll"><table><thead><tr><th>${label}</th><th>Answers</th><th>Trophy match</th><th>Avg. partial</th><th>Median time</th><th>Rerolls / views</th><th>Likely left / mature views</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.label)}${Number(r.answers)<30?' · early':''}</td><td>${fmt(r.answers)}</td><td>${pct(r.trophy_match_pct)}<div class="bar"><i style="width:${Math.max(0,Math.min(100,Number(r.trophy_match_pct)||0))}%"></i></div></td><td>${fmt(r.average_partial_credit)}</td><td>${r.median_seconds==null?'N/A':fmt(r.median_seconds)+'s'} <small>n=${fmt(r.timed_answers)}</small></td><td>${fmt(r.rerolls)} / ${fmt(r.exposures)}</td><td>${fmt(r.likely_abandoned)} / ${fmt(r.mature_exposures)}</td></tr>`).join('')||'<tr><td colspan="7">No player observations in this range yet.</td></tr>'}</tbody></table></div>`;
@@ -179,21 +226,13 @@ async function load() {
   try {
     session=await getAuthSession();
     if(loadId!==deferredLoad)return;
-    if(!session?.user){login('Your session may have expired. Sign in to continue.');return;}
+    if(!session?.user){login(pendingInvitation()?'Sign in to review your administrator invitation.':'Your session may have expired. Sign in to continue.');return;}
     await verifyAdminContract();
     if(loadId!==deferredLoad)return;
     const invitation=pendingInvitation();
     if(invitation){
-      try{
-        await request('/v1/admin/invitations/accept',{token:invitation});
-        sessionStorage.removeItem(INVITE_STORAGE);
-      }catch(error){
-        if(error?.code!=='ADMIN_WRONG_ACCOUNT'&&error?.code!=='ADMIN_EMAIL_UNVERIFIED')
-          sessionStorage.removeItem(INVITE_STORAGE);
-        if(loadId!==deferredLoad)return;
-        denied(session?.user,error?.message||'Invitation could not be accepted.');
-        return;
-      }
+      showInvitationPrompt(session.user,invitation,loadId);
+      return;
     }
     const access=await request('/v1/admin/access');
     if(loadId!==deferredLoad)return;
@@ -202,7 +241,7 @@ async function load() {
     const authorizedGrowthRequest=async (...args)=>{const data=await growthRequest(...args);if(loadId!==deferredLoad)throw Error('Administrator account changed.');return data;};
     const area=new URLSearchParams(location.search).get('area');
     if(area==='corpus'){await renderCorpus(root,authorizedRequest);return;}
-    if(area==='users'){await renderUsers(root,authorizedRequest,authorizedGrowthRequest);return;}
+    if(area==='users'){await renderUsers(root,authorizedRequest,authorizedGrowthRequest,access.role);return;}
     if(area==='team'){if(access.role!=='owner'){denied(session?.user);return;}await renderAdminTeam(root,authorizedRequest);return;}
     if(area==='campaign-links'){await renderCampaignLinks(root,authorizedGrowthRequest,authorizedRequest);return;}
     const queryString=params.toString();

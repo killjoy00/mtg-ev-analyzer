@@ -19,6 +19,17 @@ test('admin user control migration keeps rename and audit atomic and deletion at
   assert.match(migration,/admin_ack_required/);
 });
 
+test('Admin Users disables Admin-to-Admin deletion for non-Owners',()=>{
+  const users=fs.readFileSync('admin/users.mjs','utf8');
+  const shell=fs.readFileSync('admin/admin.mjs','utf8');
+  assert.match(shell,/renderUsers\(root,authorizedRequest,authorizedGrowthRequest,access\.role\)/);
+  assert.match(users,/user\.is_admin&&viewerRole!=='owner'/);
+  assert.match(users,/Only the Owner may permanently delete another administrator account/);
+  assert.match(shell,/Accept admin invitation/);
+  assert.match(shell,/cancel-admin-invite/);
+  assert.match(shell,/switch-admin-invite/);
+});
+
 test('gateway allows only the narrow admin username and deletion routes and methods',()=>{
   // Renames are served by growth, which sends the account notice; draft-run no longer accepts them.
   assert.equal(adminPath('/v1/admin/users/22222222-2222-4222-8222-222222222222/username','PATCH'),false);
@@ -56,7 +67,7 @@ test('Admin Users browser uses PATCH rename, typed destructive confirmation, sta
   assert.match(users,/Apple subscriptions or Patreon memberships/);
   assert.match(users,/Public username/);
   assert.match(users,/previous_display_name/);
-  assert.match(shell,/renderUsers\(root,authorizedRequest,authorizedGrowthRequest\)/);
+  assert.match(shell,/renderUsers\(root,authorizedRequest,authorizedGrowthRequest,access\.role\)/);
   assert.match(shell,/method=body\?'POST':'GET'/);
   const growth=fs.readFileSync('worker/growth-function.js','utf8');
   assert.match(growth,/deletionCommitted:true/);

@@ -85,7 +85,7 @@ test('admin deletion requires literal destructive confirmation and prohibits sel
 test('Owner accounts cannot be targeted by administrator deletion',async()=>{
   let committed=false;
   const query=async sql=>{
-    if(sql.includes("FROM pack1_admins WHERE auth_user_id="))return {rows:[{one:1}]};
+    if(sql.includes("FROM pack1_admins WHERE auth_user_id="))return {rows:[{role:'owner'}]};
     committed=true;throw Error('Should never reach deletion initializer');
   };
   await assert.rejects(handleAdminAccountDeletion(
@@ -95,9 +95,68 @@ test('Owner accounts cannot be targeted by administrator deletion',async()=>{
   assert.equal(committed,false);
 });
 
+test('regular Admin cannot delete another Admin even when acknowledgement is supplied',async()=>{
+  let targetQueries=0,actorQueries=0;
+  const query=async(sql,params=[])=>{
+    if(sql.includes('SELECT role FROM pack1_admins WHERE auth_user_id=')){
+      if(params[0]===TARGET){targetQueries++;return {rows:[{role:'admin'}]};}
+      if(params[0]===ADMIN){actorQueries++;return {rows:[{role:'admin'}]};}
+    }
+    throw Error('Deletion must be rejected before looking up email or starting an operation: '+sql);
+  };
+  await assert.rejects(handleAdminAccountDeletion(
+    request('/v1/admin/users/'+TARGET+'/delete',{method:'POST',body:{confirm:'DELETE',acknowledgeAdmin:true}}),
+    query,undefined,{readJson,adminAuthUserId:ADMIN,deletionEnabled:()=>true,
+      notify:async()=>{throw Error('must not email');},resumeDeletionOperation:async()=>{throw Error('must not resume');}},
+  ),error=>error?.status===403&&error?.code==='ADMIN_OWNER_REQUIRED');
+  assert.equal(targetQueries,1);
+  assert.equal(actorQueries,1);
+});
+
+test('Owner may reach the atomic deletion initializer for another Admin',async()=>{
+  const calls=[];
+  const query=async(sql,params=[])=>{
+    calls.push({sql,params});
+    if(sql.includes('SELECT role FROM pack1_admins WHERE auth_user_id='))
+      return {rows:[{role:params[0]===TARGET?'admin':'owner'}]};
+    if(sql.includes('SELECT email,"emailVerified" email_verified FROM neon_auth."user"'))
+      return {rows:[{email:'member@example.invalid',email_verified:true}]};
+    if(sql.includes('pack1_begin_admin_account_deletion'))
+      return {rows:[{start_status:'admin_ack_required'}]};
+    throw Error('Unexpected SQL: '+sql);
+  };
+  await assert.rejects(handleAdminAccountDeletion(
+    request('/v1/admin/users/'+TARGET+'/delete',{method:'POST',body:{confirm:'DELETE',acknowledgeAdmin:false}}),
+    query,undefined,{readJson,adminAuthUserId:ADMIN,deletionEnabled:()=>true,resumeDeletionOperation:async x=>x},
+  ),error=>error?.status===409&&error?.code==='ADMIN_TARGET_CONFIRMATION');
+  assert.equal(calls.some(call=>call.sql.includes('pack1_begin_admin_account_deletion')),true);
+});
+
+test('atomic DB owner-required and owner-protected outcomes block stale preflight and side effects',async()=>{
+  for(const [startStatus,code,http] of [
+    ['owner_required','ADMIN_OWNER_REQUIRED',403],
+    ['owner_protected','OWNER_PROTECTED',409],
+  ]){
+    let notices=0,resumes=0;
+    const query=async(sql)=>{
+      if(sql.includes('SELECT role FROM pack1_admins WHERE auth_user_id='))return {rows:[]};
+      if(sql.includes('SELECT email,"emailVerified" email_verified FROM neon_auth."user"'))return {rows:[{email:'test@example.invalid',email_verified:true}]};
+      if(sql.includes('pack1_begin_admin_account_deletion'))return {rows:[{start_status:startStatus}]};
+      throw Error('Unexpected SQL: '+sql);
+    };
+    await assert.rejects(handleAdminAccountDeletion(
+      request('/v1/admin/users/'+TARGET+'/delete',{method:'POST',body:{confirm:'DELETE',acknowledgeAdmin:true}}),
+      query,undefined,{readJson,adminAuthUserId:ADMIN,deletionEnabled:()=>true,
+        notify:async()=>{notices++;},resumeDeletionOperation:async x=>{resumes++;return x;}},
+    ),error=>error?.status===http&&error?.code===code);
+    assert.equal(notices,0);assert.equal(resumes,0);
+  }
+});
+
 test('target-admin acknowledgement is enforced by the atomic database initializer',async()=>{
-  const query=async(sql)=>{
-    if(sql.includes("FROM pack1_admins WHERE auth_user_id="))return {rows:[],rowCount:0};
+  const query=async(sql,params=[])=>{
+    if(sql.includes('SELECT role FROM pack1_admins WHERE auth_user_id='))
+      return {rows:[{role:params[0]===TARGET?'admin':'owner'}]};
     if(sql.includes('SELECT email,"emailVerified" email_verified FROM neon_auth."user"'))return {rows:[{email:'target@example.test'}],rowCount:1};
     if(sql.includes('pack1_begin_admin_account_deletion'))return {rows:[{start_status:'admin_ack_required'}],rowCount:1};
     throw Error('unexpected SQL');
