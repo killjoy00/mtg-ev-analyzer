@@ -3,9 +3,8 @@ import {chromium} from 'playwright';
 
 const base=process.env.PACK1_E2E_URL||'http://127.0.0.1:4173';
 const browser=await chromium.launch(process.env.CI?{headless:true,channel:'chrome'}:{headless:true});
-const page=await browser.newPage({viewport:{width:390,height:844}});
+let page;
 const errors=[];
-page.on('pageerror',error=>errors.push(error.message));
 
 const accountUser={id:'22222222-2222-4222-8222-222222222222',email:'qa@example.invalid',name:'QA Player'};
 const disconnected={configured:true,connected:false,membership:null,capabilities:[],support_url:'https://www.patreon.com/c/PackOne'};
@@ -20,7 +19,12 @@ let patreonStatus=disconnected;
 let connectCalls=0;
 let linkCalls=0;
 let eventNames=[];
+let accountSessionRequests=0;
 
+// Each scenario installs its mocks on a distinct browser context. A storage-only
+// reset on a reused page can preserve stale auth state across navigations.
+async function attachFixtureRoutes(page){
+page.on('pageerror',error=>errors.push(error.message));
 await page.route('**/leaderboard-config.js',route=>route.fulfill({
   status:200,
   contentType:'application/javascript',
@@ -38,6 +42,7 @@ await page.route('https://api.packone.pro/growth/**',async route=>{
   let body={ok:true},status=200;
   if(path==='/v1/player/session')body={ok:true};
   else if(path==='/v1/account/session'){
+    accountSessionRequests++;
     status=signed?200:401;
     body=signed?{user:accountUser,session:{expiresAt:'2099-01-01T00:00:00Z'}}:{error:'Account session required.'};
   } else if(path==='/v1/account/signin'){
@@ -75,11 +80,17 @@ await page.route('https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.ne
 
 await page.route('https://accounts.google.test/**',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><title>Google fixture</title><p>Google</p>'}));
 await page.route('https://www.patreon.com/**',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><title>Patreon fixture</title><p>Patreon</p>'}));
+}
 
 async function reset({isSigned=false,status=disconnected,verify=false}={}){
-  signed=isSigned;verificationRequired=verify;patreonStatus=status;connectCalls=0;linkCalls=0;eventNames=[];
-  await page.goto(base+'/leaderboard-config.js');
-  await page.evaluate(()=>{sessionStorage.clear();localStorage.clear();});
+  signed=isSigned;verificationRequired=verify;patreonStatus=status;connectCalls=0;linkCalls=0;eventNames=[];accountSessionRequests=0;
+  const previousContext=page?.context();
+  if(page)await page.close();
+  // browser.newPage() creates a fresh browser context, isolating cookies,
+  // storage, navigation history and account bootstrap for this scenario.
+  page=await browser.newPage({viewport:{width:390,height:844}});
+  if(previousContext)assert.notEqual(page.context(),previousContext,'scenario must use a fresh browser context');
+  await attachFixtureRoutes(page);
 }
 
 async function fill(kind){
@@ -97,6 +108,7 @@ try {
   await reset();
   await page.goto(base+'/patreon/');
   await page.getByRole('heading',{name:'Sign in to check your access',exact:true}).waitFor();
+  assert.ok(accountSessionRequests>0,'signed-out scenario must request account session');
   assert.equal(await page.getByRole('button',{name:'Sign in to Pack One',exact:true}).count(),1);
   assert.equal(await page.locator('.patreon-troubleshooting').count(),1);
   await page.screenshot({path:'artifacts/ui-patreon-page-signed-out-390.png',fullPage:true});
@@ -104,6 +116,7 @@ try {
   await reset({isSigned:true,status:disconnected});
   await page.goto(base+'/patreon/');
   await page.getByRole('heading',{name:'Connect Patreon to activate Elite',exact:true}).waitFor();
+  assert.ok(accountSessionRequests>0,'fresh signed-in scenario must request account session');
   assert.equal(await page.getByRole('button',{name:'Connect Patreon',exact:true}).count(),1);
   assert.equal(await page.getByRole('link',{name:'View Patreon membership',exact:true}).count(),1);
   assert.doesNotMatch((await page.locator('#app').textContent())||'',/Joining Patreon and connecting Patreon to Pack One are two separate steps/i);
