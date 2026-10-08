@@ -63,7 +63,7 @@ function main() {
     differences:'50 isolated actor identities and three Daily-status GET bursts only; no game starts, eight-pick gameplay, read mix, scores, rerolls, or full acceptance workload',
     hard_limits:{measured_requests:150,total_gateway_max:300,coordinator_queries_max:1000,
       decoded_response_bytes_max:16*1024*1024,workload_minutes:20,branch_delete_minutes:25,
-      runner_minutes_including_cleanup:57},
+      runner_minutes_including_cleanup:35,ordinary_pr_ci_timeout_envelope:40},
     usage:{measured_attempts:records.length,known_gateway_requests:requestCount,
       conservative_gateway_request_upper_bound:requestCount+91,coordinator_queries:coordinatorCount,
       coordinator_queries_upper_bound:coordinatorCount+15,decoded_response_bytes:responseBytes},
