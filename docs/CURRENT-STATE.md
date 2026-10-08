@@ -2,9 +2,31 @@
 
 Updated 2026-10-08. Implementation, backend deployment, gateway deployment, Pages deployment, database publication, and provider activation are separate. Older reviews are historical evidence.
 
-## October 8, 2026 — Admin API v5 production release: verified; Owner bootstrap not performed
+## October 8, 2026 — Admin/Owner activation and security hardening (latest verified state)
 
-**Disposition: Admin v5 code, database schema, Functions, gateway and Pages are deployed and independently live-verified; there is no Owner account yet.** Merge-to-main, Pages, Neon Functions, protected Cloudflare gateway publishing, and live acceptance are distinct. This new status is independent of, and newer than, the October 7/8 runtime-source audit below.
+**Disposition: production complete and independently accepted.** The earlier Admin v5 initial-release section below is a **pre-Owner-bootstrap historical snapshot**, not today's membership or security status. Admin sign-in uses ordinary Pack One account authentication and server-derived `pack1_admins` membership, with no setup-code privilege grant.
+
+| Surface / boundary | Evidence | Accepted state |
+| --- | --- | --- |
+| Initial Owner activation | Separately approved exact verified Auth-account promotion, followed by a read-only production SQL check; [bootstrap procedure](ADMIN-OWNER-BOOTSTRAP.md) | **One Owner**, no other Admins and no invitations at the post-release inspection; Owner uniqueness and deletion triggers active. Exact UUID/email are deliberately not committed. No Owner web grant, invitation, or second bootstrap was performed. |
+| Two focused fixes | [PR #1111](https://github.com/killjoy00/mtg-ev-analyzer/pull/1111), merged as `d9f87904dd19a8ed3d406cc7e47034fffd55267e` | **Owner-only** start/resume of another Admin's account deletion, including atomic `owner_required` refusal and direct tombstone-write guard; invitation acceptance now requires a deliberate **Accept admin invitation** click after displaying the signed-in email, with **Cancel** and **Switch account**. Neither opening nor reloading the URL submits redemption. |
+| Regression and database gates | #1111 fast-core, required browser, all six backend domains, combined backend gate and real PostgreSQL contract | **Success**, including 39 real PostgreSQL Owner/invitation lifecycle assertions (up from 30). These are disposable/synthetic tests, not destructive production tests or real production invitations. |
+| Additive schema and runtime promotion | [Release-request PR #1113](https://github.com/killjoy00/mtg-ev-analyzer/pull/1113), merge `795aec8a12e1b1a286646e4c9659856cfd312a25`; protected [secure-auth run 37836974129](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/37836974129) | **Success on attempt 1**. Migration `0058_owner_guard_admin_deletion.sql` applied in development and production; exact same-revision Neon Functions validated in both, matching Cloudflare gateway published, live gateway/OAuth and telemetry gates passed. |
+| Independent deployed-code acceptance | [PR #1114](https://github.com/killjoy00/mtg-ev-analyzer/pull/1114), merge `e19ff4835499f39a28928ece8f46860929b124e0`; protected [run 37838495782](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/37838495782) | **Success on attempt 1**. Fetched the *published* Admin JavaScript and verified consent/signed-in email/Cancel/Switch, absence of load-time redemption POST, and role-aware delete UI. Independently verified the exact release and Pages/gateway/Draft Admin API **v5** alignment, mobile leaderboard, player cookie, credentialed CORS and browser-origin Google OAuth startup. |
+| Latest repository/Pages and production smoke | [Pages run 37838495215](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/37838495215), [production smoke 37838495626](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/37838495626), plus post-merge test and E2E | **Success** on `e19ff4835499f39a28928ece8f46860929b124e0`; Pages success is independent of Functions/gateway promotion evidence. |
+
+**Read-only production verification after the release:** Owner count **1**, regular Admin count **0**, invitation count **0**; the approved existing Owner still has role `owner`; `pack1_begin_admin_account_deletion` contains the `owner_required` guard; `pack1_admin_deletion_guard()`, its `pack1_owner_guard_on_deletions` trigger, and the one-Owner index are active. These are observed data/safeguards, not a real destructive deletion or completed real invitation redemption.
+
+**Operational boundary:** Only the Owner manages invitations and Admin membership at `/admin/?area=team`. A recipient must sign in with the exact verified invited email and intentionally accept; the link is manually shared and token is shown only once. Revoking Admin membership is distinct from deleting that person's Pack One account. The Owner cannot be deleted through the Admin interface; a future transfer requires separately approved operator recovery. See the [Admin and Owner operations guide](ADMIN-OWNER-OPERATIONS.md) and [account deletion integrity](REQUEST-INTEGRITY.md#admin-initiated-account-deletion).
+
+**Not claimed:** No additional production Admin was invited or accepted during this release; no real account deletion was executed to test the guard; the real Owner browser session was not exercised as part of the automated production checks. Browser/SQL regression plus published-code/live release checks provide the evidence above.
+
+## October 8, 2026 — Admin API v5 initial release (historical pre-Owner activation)
+
+> The next section is preserved as evidence of the earlier October 8 initial release, when Owner bootstrap had **not yet** occurred. The current state is the security-hardening section above.
+
+
+**As-of-this-snapshot disposition:** Admin v5 code, database schema, Functions, gateway and Pages were deployed and independently live-verified; at this earlier point, there was no Owner account yet. Merge-to-main, Pages, Neon Functions, protected Cloudflare gateway publishing, and live acceptance are distinct. This historical release evidence is independent of the October 7/8 runtime-source audit below.
 
 | Surface / gate | Exact evidence | Disposition |
 | --- | --- | --- |
@@ -18,7 +40,7 @@ Updated 2026-10-08. Implementation, backend deployment, gateway deployment, Page
 
 **Release interpretation:** The immediate gateway-v3 response was a transient *observed mismatch*; subsequent independently successful v5 smoke and the protected full acceptance prove serving convergence. Propagation delay is consistent with the timing, but its precise internal cause is not directly measured. #1107 adds bounded retries for **read-only version/asset probes** while preserving exact-release and fail-closed checks. Do not rerun a complete deployment to resolve an already-converged read-only marker.
 
-**Remaining activation:** A specific existing and verified Auth UUID + email must be explicitly reviewed and approved outside the repository before the manual Owner bootstrap in [`docs/ADMIN-OWNER-BOOTSTRAP.md`](ADMIN-OWNER-BOOTSTRAP.md). Until that separate action, the Owner-only Team console cannot issue invitations. No real invitation token, email, or Owner privilege was provisioned by this release. Functional browser/DB tests were synthetic or disposable; no real Owner end-to-end invitation was attempted on production.
+**Activation pending at that historical snapshot (since completed):** A specific existing and verified Auth UUID + email had to be reviewed and approved outside the repository before the manual Owner bootstrap in [`docs/ADMIN-OWNER-BOOTSTRAP.md`](ADMIN-OWNER-BOOTSTRAP.md). Until that separate action, the Owner-only Team console could not issue invitations. No real invitation token, email, or Owner privilege was provisioned by this release. Functional browser/DB tests were synthetic or disposable; no real Owner end-to-end invitation was attempted on production.
 
 ## Distributed capacity — October 7 evidence reconciled October 8
 

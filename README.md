@@ -9,6 +9,7 @@ The homepage starts with **Daily Draft Run**, **Daily Powered Cube** and **Daily
 ## Read first
 
 - [Current implementation and deployment state](docs/CURRENT-STATE.md)
+- [Admin and Owner operations, invitations and access revocation](docs/ADMIN-OWNER-OPERATIONS.md)
 - [Pack One brand and marketing asset source of truth](assets/brand/README.md)
 - [Campaign Links owner guide](docs/CAMPAIGN-LINKS-OWNER-GUIDE.md)
 - [Username identity, recovery and admin monitoring](docs/USERNAME-IDENTITY.md)
