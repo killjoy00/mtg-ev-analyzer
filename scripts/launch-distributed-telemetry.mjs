@@ -141,4 +141,3 @@ export async function settlePreviewTelemetry({reports,sha,from,to,policy,account
     await sleep(Math.min(15000,Math.max(1,deadline-clock())));
   }
 }
-

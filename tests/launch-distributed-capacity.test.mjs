@@ -562,4 +562,3 @@ test('stage gate logs expose aggregate causes without fixture or provider secret
  assert.equal(evidence.usage.delta_bytes,100);assert.equal(JSON.stringify(evidence).includes('secret'),false);
  s.telemetry.detail='credential secret';assert.equal(stageFailureEvidence(s).telemetry.detail,'unclassified');
 });
-
