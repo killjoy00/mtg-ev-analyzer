@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {PROD_AUTH_BASE} from '../worker/account-config.mjs';
+import {ADMIN_API_VERSION} from '../admin-api-contract.mjs';
 const commit=process.argv[2];
 assert.match(commit||'',/^[a-f0-9]{40}$/);
 const base='https://api.packone.pro';
@@ -25,11 +26,27 @@ async function exactRelease(service) {
   assert.equal(last,commit,service+' exact release');
 }
 for(const service of ['legacy','growth','draft'])await exactRelease(service);
+// A deployment is not Admin-ready until all three independently released
+// surfaces agree: the published Pages frontend, the gateway and Draft backend.
+const origin='https://packone.pro';
+const {response:adminResponse,data:adminHealth}=await call('/draft/health?quick=1',{
+  headers:{origin},cache:'no-store',
+});
+assert.equal(adminHealth.admin_api_version,ADMIN_API_VERSION,'Draft Admin API version matches reviewed release');
+assert.equal(adminResponse.headers.get('x-pack1-admin-api-version'),String(ADMIN_API_VERSION),
+  'Production gateway Admin API version matches reviewed release');
+const publishedContract=await fetch(origin+'/admin-api-contract.mjs',{
+  cache:'no-store',redirect:'manual',signal:AbortSignal.timeout(30000),
+});
+assert.equal(publishedContract.status,200,'Published Pages Admin API contract must be accessible');
+const publishedCode=await publishedContract.text();
+const publishedVersion=publishedCode.match(/^export const ADMIN_API_VERSION=([0-9]+);\s*$/m)?.[1];
+assert.equal(publishedVersion,String(ADMIN_API_VERSION),'Published Pages Admin version matches gateway and backend');
+
 const mobileLeaderboardToken='p1_00000000-0000-4000-8000-000000000000.'+'A'.repeat(43);
 await call('/draft/v1/leaderboard?period=daily&environment=mixed',{
   headers:{'x-pack1-mobile-session':mobileLeaderboardToken},
 });
-const origin='https://packone.pro';
 const created=await call('/growth/v1/player/session',{
   method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({displayName:'QA secure auth release'}),expected:201,
 });
@@ -72,4 +89,4 @@ const rejected=await fetch(base+'/growth/v1/player/session',{
   signal:AbortSignal.timeout(30000),
 });
 assert.equal(rejected.status,403);
-console.log('Production first-party gateway, mobile leaderboard, player cookie, credentialed CORS and browser-origin Google OAuth start passed.');
+console.log('Production Admin v'+ADMIN_API_VERSION+' Pages/gateway/backend contract, first-party gateway, mobile leaderboard, player cookie, credentialed CORS and browser-origin Google OAuth start passed.');
