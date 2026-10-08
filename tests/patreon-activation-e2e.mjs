@@ -13,6 +13,14 @@ const supporter={configured:true,connected:true,membership:{effective_state:'act
 const pending={configured:true,connected:true,membership:{effective_state:'active_non_elite',sync_pending:true},capabilities:[],support_url:'https://www.patreon.com/c/PackOne'};
 const notEntitled={configured:true,connected:true,membership:{effective_state:'not_entitled',sync_pending:false},capabilities:[],support_url:'https://www.patreon.com/c/PackOne'};
 
+const apiFixture={
+  firstParty:true,
+  authBase:'https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth',
+  url:'https://api.packone.pro/legacy',
+  growthUrl:'https://api.packone.pro/growth',
+  draftRunUrl:'https://api.packone.pro/draft',
+};
+
 let signed=false;
 let verificationRequired=false;
 let patreonStatus=disconnected;
@@ -28,13 +36,7 @@ page.on('pageerror',error=>errors.push(error.message));
 await page.route('**/leaderboard-config.js',route=>route.fulfill({
   status:200,
   contentType:'application/javascript',
-  body:`window.PACK1_API={
-    firstParty:true,
-    authBase:'https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth',
-    url:'https://api.packone.pro/legacy',
-    growthUrl:'https://api.packone.pro/growth',
-    draftRunUrl:'https://api.packone.pro/draft'
-  };`,
+  body:`window.PACK1_API=${JSON.stringify(apiFixture)};`,
 }));
 
 await page.route('https://api.packone.pro/growth/**',async route=>{
@@ -90,6 +92,10 @@ async function reset({isSigned=false,status=disconnected,verify=false}={}){
   // storage, navigation history and account bootstrap for this scenario.
   page=await browser.newPage({viewport:{width:390,height:844}});
   if(previousContext)assert.notEqual(page.context(),previousContext,'scenario must use a fresh browser context');
+  // Serve the same first-party configuration before ANY page module executes.
+  // Loading leaderboard-config.js through site-nav is asynchronous, and can
+  // otherwise race the Patreon page's initial auth-session selection.
+  await page.addInitScript(api=>{window.PACK1_API=api;},apiFixture);
   await attachFixtureRoutes(page);
   // Some callback scenarios seed sessionStorage before entering the app.
   // Establish the first-party origin without initializing the app or sharing state.
