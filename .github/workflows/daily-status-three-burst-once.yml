@@ -22,7 +22,7 @@ jobs:
       github.head_ref == 'diagnostic/daily-status-3burst-once-20261008' &&
       github.event.pull_request.draft == true
     runs-on: ubuntu-latest
-    timeout-minutes: 6
+    timeout-minutes: 3
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -59,20 +59,20 @@ jobs:
           assert.equal(DIAGNOSTIC.idle_ms,120000);
           assert.equal(DIAGNOSTIC.branch_workload_deadline_ms,1200000);
           assert.equal(DIAGNOSTIC.branch_delete_deadline_ms,1500000);
-          assert.equal(6+9+5*7+7,57);
-          assert.ok(57<=75);
+          assert.equal(3+8+5*4+4,35);
+          assert.ok(35+8+2+30<=75);
           assert.ok(91+5+150<=300);
           console.log(JSON.stringify({attempts:1,actors:50,guests:25,signed_in:25,bursts:3,
             measured_requests:150,gateway_request_ceiling:300,readiness_worst_case:91,
             coordinator_queries_max:1000,response_bytes_max:16777216,
             idle_seconds:120,request_timeout_seconds:30,workload_minutes_max:20,
-            branch_delete_minutes_max:25,runner_minute_timeout_envelope:57,
+            branch_delete_minutes_max:25,runner_minute_timeout_envelope:35,ordinary_pr_ci_timeout_envelope:40,
             accepted_capacity:false,production_deploy:false}));
           NODE
   setup:
     needs: preflight
     runs-on: ubuntu-latest
-    timeout-minutes: 9
+    timeout-minutes: 8
     outputs:
       branch: ${{ steps.neon.outputs.branch_id }
       created: ${{ steps.neon.outputs.created }
@@ -171,7 +171,7 @@ jobs:
   cohort:
     needs: setup
     runs-on: ubuntu-latest
-    timeout-minutes: 7
+    timeout-minutes: 4
     strategy:
       fail-fast: false
       max-parallel: 5
@@ -204,7 +204,7 @@ jobs:
     needs: [setup, cohort]
     if: always() && needs.setup.outputs.created == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 7
+    timeout-minutes: 4
     env:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }
       CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }
