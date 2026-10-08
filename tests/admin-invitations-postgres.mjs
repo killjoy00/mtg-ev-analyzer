@@ -37,6 +37,38 @@ try {
   await assert.rejects(query('UPDATE pack1_admins SET role=\'owner\' WHERE auth_user_id=$1::uuid',[unverified]),e=>e.code==='23514');
   tests++;
 
+  // Real SQL path: a regular Admin must not start OR resume another Admin's
+  // irreversible deletion, even with acknowledgeAdmin=true.
+  const victimAdmin=await auth('protected-admin-'+suffix+'@example.invalid');
+  await query('INSERT INTO pack1_admins(auth_user_id) VALUES($1::uuid)',[victimAdmin]);
+  const beginAdmin=async(target,actor,ack=true)=>
+    (await query('SELECT * FROM pack1_begin_admin_account_deletion($1::uuid,$2::uuid,NULL::text,$3::boolean)',
+      [target,actor,ack])).rows[0];
+  check((await beginAdmin(victimAdmin,other,true)).start_status==='owner_required',
+    'Regular Admin cannot delete another Admin despite acknowledgement');
+  check((await beginAdmin(victimAdmin,other,false)).start_status==='owner_required',
+    'Owner authorization precedes destructive acknowledgement');
+  check((await query('SELECT count(*)::int n FROM account_deletion_operations WHERE auth_user_id=$1::uuid',[victimAdmin])).rows[0].n===0,
+    'Denied Admin-to-Admin deletion writes no tombstone');
+  await assert.rejects(
+    query(`INSERT INTO account_deletion_operations(auth_user_id,state,initiation_source,initiated_by_admin_auth_user_id,target_was_admin)
+      VALUES($1::uuid,'pending','admin',$2::uuid,true)`,[victimAdmin,other]),
+    error=>error.code==='23514',
+  );
+  tests++;
+  check((await query('SELECT count(*)::int n FROM account_deletion_operations WHERE auth_user_id=$1::uuid',[victimAdmin])).rows[0].n===0,
+    'Direct SQL cannot bypass Owner authorization');
+  check((await beginAdmin(victimAdmin,owner,false)).start_status==='admin_ack_required',
+    'Owner still must acknowledge deletion of another Admin');
+  const ownerStarted=await beginAdmin(victimAdmin,owner,true);
+  check(ownerStarted.start_status==='created'&&ownerStarted.target_was_admin===true
+    &&ownerStarted.initiated_by_admin_auth_user_id===owner,
+    'Owner may begin acknowledged Admin deletion with durable attribution');
+  check((await beginAdmin(victimAdmin,other,true)).start_status==='owner_required',
+    'Regular Admin cannot resume an existing Owner-initiated deletion');
+  check((await beginAdmin(owner,other,true)).start_status==='owner_protected',
+    'Owner account remains protected even when another Admin acknowledges deletion');
+
   const one=await auth('member-'+suffix+'@example.invalid');
   const wrong=await auth('wrong-'+suffix+'@example.invalid');
   const unverifiedMember=await auth('pending-'+suffix+'@example.invalid',false);
