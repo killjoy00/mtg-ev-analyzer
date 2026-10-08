@@ -8,7 +8,7 @@ const PREVIEW_PAGE_SIZE=2000,PREVIEW_MAX_PAGES=32;
 // event-page cursor directly instead of the production watcher's 200-row
 // sampling-oriented recursive splitter. The production watcher remains
 // byte-for-byte unchanged. Every retained row is still validated fail-closed.
-export async function queryPreviewEvents(fetcher,token,account,from,to) {
+export async function queryPreviewEvents(fetcher,token,account,from,to,{deadline=Infinity,clock=Date.now}={}) {
   const url=`https://api.cloudflare.com/client/v4/accounts/${account}/workers/observability/telemetry/query`,seen=new Map();
   let offset=null;
   for(let page=0;page<PREVIEW_MAX_PAGES;page++) {
@@ -18,9 +18,12 @@ export async function queryPreviewEvents(fetcher,token,account,from,to) {
         {key:'event',operation:'eq',type:'string',value:'gateway_request'},
       ]}};
     if(offset){body.offset=offset;body.offsetDirection='next';}
+    const remaining=deadline-clock();
+    if(remaining<=0)throw new DOMException('Preview evidence deadline reached','TimeoutError');
     const response=await fetcher(url,{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json',accept:'application/json'},
-      body:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(20000)});
+      body:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(Math.min(20000,Math.ceil(remaining)))});
     const data=await response.json().catch(()=>null);
+    if(clock()>=deadline)throw new DOMException('Preview evidence deadline reached','TimeoutError');
     if(!response.ok)throw Error(`preview_telemetry_http_${response.status}`);
     if(data?.success===false||data?.errors?.length)throw Error('preview_telemetry_api_error');
     const rows=data?.result?.events?.events;
@@ -78,14 +81,14 @@ export function inspectBin(events,{sha,requests,from,to},p) {
     gateway_duration_ms:quantiles(events.map(e=>e.duration_ms)),quota_ms:quantiles(events.map(e=>e.quota_ms)),upstream_ms:quantiles(events.map(e=>e.upstream_ms)),
     failures,passed:failures.length===0};
 }
-export async function inspectPreviewTelemetry({reports,sha,from,to,policy,account,token=process.env.CLOUDFLARE_EDGE_TOKEN,fetcher=fetch,clock=Date.now}) {
+export async function inspectPreviewTelemetry({reports,sha,from,to,policy,account,token=process.env.CLOUDFLARE_EDGE_TOKEN,fetcher=fetch,clock=Date.now,deadline=Infinity}) {
   assert.ok(clock()>=to+policy.telemetry_settlement_seconds*1000,'telemetry_not_settled');
   const requests=reports.flatMap(r=>r.requests),bins=[];
   for(let a=from;a<to;a+=policy.telemetry_bin_seconds*1000) {
     const b=Math.min(to,a+policy.telemetry_bin_seconds*1000),count=requests.filter(r=>r.at>=a&&r.at<b).length;
     // Still query quiet/drain bins to expose retained errors. Quiet alone is not
     // evidence of instrumentation: at least one active bin is required below.
-    const events=await queryPreviewEvents(fetcher,token,account,a,b);
+    const events=await queryPreviewEvents(fetcher,token,account,a,b,{deadline,clock});
     const bin=inspectBin(events,{sha,requests:count,from:a,to:b},policy);
     if(count===0) {bin.required_events=0;bin.failures=bin.failures.filter(f=>f!=='missing_or_sparse_retained_telemetry');bin.passed=!bin.failures.length;}
     bins.push(bin);
@@ -103,19 +106,38 @@ export async function settlePreviewTelemetry({reports,sha,from,to,policy,account
   // extend the fixed evidence deadline or weaken any coverage requirement.
   for(let remaining=settledAt-clock();remaining>0;remaining=settledAt-clock())
     await sleep(Math.max(1,remaining));
+  let providerRetries=0,lastReport;
+  const unavailable=detail=>({passed:false,reason:'retained_preview_api_or_schema_unavailable',detail,
+    settlement_seconds:policy.telemetry_settlement_seconds,timeout_seconds:policy.telemetry_timeout_seconds,checks});
   for(;;) {
-    const queriedAt=clock(),inspection=await inspectPreviewTelemetry({reports,sha,from,to,policy,account,token,fetcher,clock});
+    const queriedAt=clock();
+    if(queriedAt>=deadline)return lastReport||unavailable('preview_telemetry_timeout');
+    let inspection;
+    try {
+      inspection=await inspectPreviewTelemetry({reports,sha,from,to,policy,account,token,fetcher,clock,deadline});
+    } catch(error) {
+      const detail=previewTelemetryFailure(error);
+      const retry=/^preview_telemetry_http_(500|502|503|504)$/.test(detail)&&providerRetries<2&&clock()+5000<deadline;
+      checks.push({queried_at:new Date(queriedAt).toISOString(),detail,retry_scheduled:retry});
+      if(!retry)return unavailable(detail);
+      providerRetries++;
+      // Only repeat read-only provider queries for the same fixed windows.
+      // Two retries share the existing evidence deadline; no gameplay is rerun.
+      await sleep(5000);
+      continue;
+    }
     const missing=inspection.bins.filter(bin=>bin.failures.includes('missing_or_sparse_retained_telemetry'))
       .map(({from,to,client_requests,retained_events,required_events})=>({from,to,client_requests,retained_events,required_events}));
     checks.push({queried_at:new Date(queriedAt).toISOString(),
       retained_events:inspection.bins.reduce((sum,bin)=>sum+bin.retained_events,0),missing_or_sparse_bins:missing});
     const report={...inspection,settlement_seconds:policy.telemetry_settlement_seconds,timeout_seconds:policy.telemetry_timeout_seconds,checks};
+    lastReport=report;
     if(inspection.passed)return report;
     // Retry only eventual visibility of the same fixed request windows. Wrong
-    // release, retained 429/5xx, schema/API errors and every other hard failure
+    // release, retained 429/5xx, schema errors and every other hard failure
     // remain immediate fail-closed outcomes.
     const coverageOnly=missing.length>0&&inspection.bins.every(bin=>bin.failures.every(failure=>failure==='missing_or_sparse_retained_telemetry'));
-    if(!coverageOnly||queriedAt>=deadline)return report;
-    await sleep(Math.min(15000,Math.max(1,deadline-queriedAt)));
+    if(!coverageOnly||clock()>=deadline)return report;
+    await sleep(Math.min(15000,Math.max(1,deadline-clock())));
   }
 }

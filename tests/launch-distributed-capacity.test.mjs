@@ -460,6 +460,50 @@ test('stage telemetry preserves coverage requirements through the hard timeout a
  assert.equal(hard.passed,false);assert.equal(hardSleeps,0);assert.ok(hard.bins[1].failures.includes('retained_system_error'));
 });
 
+test('stage telemetry retries transient provider errors twice without losing the failed attempts or changing windows',async()=>{
+ for(const status of [500,502,503,504]) {
+  const to=60000,frames=[];let now=to+120000,calls=0;
+  const row={$metadata:{id:'retained'},source:{event:'gateway_request',release:scope.sha,status:200,duration_ms:10,sample_rate:1,route:'draft_pick'}};
+  const report=await settlePreviewTelemetry({reports:[{requests:[{at:1}]}],sha:scope.sha,from:0,to,policy,account:'a',token:'t',clock:()=>now,
+   sleep:async ms=>{assert.equal(ms,5000);now+=ms;},fetcher:async(url,options)=>{
+    frames.push(JSON.parse(options.body).timeframe);calls++;
+    return calls<=2?Response.json({}, {status}):Response.json({result:{events:{events:[row]}}});
+   }});
+  assert.equal(report.passed,true);assert.equal(calls,3);
+  assert.deepEqual(frames,Array(3).fill({from:0,to}));
+  assert.deepEqual(report.checks.slice(0,2).map(c=>[c.detail,c.retry_scheduled]),Array(2).fill(['preview_telemetry_http_'+status,true]));
+ }
+});
+test('persistent provider 500 is bounded and retains all three failed queries',async()=>{
+ const to=60000;let now=to+120000,calls=0;
+ const report=await settlePreviewTelemetry({reports:[{requests:[{at:1}]}],sha:scope.sha,from:0,to,policy,account:'a',token:'t',clock:()=>now,
+  sleep:async ms=>{now+=ms;},fetcher:async()=>{calls++;return Response.json({}, {status:500});}});
+ assert.equal(report.passed,false);assert.equal(calls,3);assert.equal(report.detail,'preview_telemetry_http_500');
+ assert.deepEqual(report.checks.map(c=>c.retry_scheduled),[true,true,false]);
+});
+test('provider retries share the original deadline, including an overslept retry',async()=>{
+ const to=60000,deadline=to+policy.telemetry_timeout_seconds*1000;
+ for(const oversleep of [false,true]) {
+  let now=oversleep?deadline-6000:deadline-5000,calls=0,sleeps=0;
+  const report=await settlePreviewTelemetry({reports:[{requests:[{at:1}]}],sha:scope.sha,from:0,to,policy,account:'a',token:'t',clock:()=>now,
+   sleep:async ms=>{sleeps++;now+=ms+2000;},fetcher:async()=>{assert.ok(now<deadline);calls++;return Response.json({}, {status:500});}});
+  assert.equal(report.passed,false);assert.equal(calls,1);assert.equal(sleeps,oversleep?1:0);
+ }
+ let now=deadline-1;
+ const late=await settlePreviewTelemetry({reports:[{requests:[{at:1}]}],sha:scope.sha,from:0,to,policy,account:'a',token:'t',clock:()=>now,
+  fetcher:async()=>{now=deadline;return Response.json({result:{events:{events:[]}}});}});
+ assert.equal(late.passed,false);assert.equal(late.detail,'preview_telemetry_timeout');
+});
+test('provider retry never retries auth, schema or actual retained gateway errors',async()=>{
+ for(const response of [()=>Response.json({}, {status:403}),()=>Response.json({}, {status:429}),()=>Response.json({result:{events:{events:'invalid'}}}),
+  ()=>Response.json({result:{events:{events:[{$metadata:{id:'retained'},source:{event:'gateway_request',release:scope.sha,status:503,duration_ms:10,sample_rate:1,route:'draft_pick'}}]}}})]) {
+  const to=60000;let calls=0,sleeps=0;
+  const report=await settlePreviewTelemetry({reports:[{requests:[{at:1}]}],sha:scope.sha,from:0,to,policy,account:'a',token:'t',clock:()=>to+120000,
+   sleep:async()=>{sleeps++;},fetcher:async()=>{calls++;return response();}});
+  assert.equal(report.passed,false);assert.equal(calls,1);assert.equal(sleeps,0);
+ }
+});
+
 test('paced harness executes eight picks, repeated practice/rerolls and recovery against a stateful application fixture',async()=>{
  const {runPlayerStage}=await import('../scripts/launch-distributed-player.mjs');
  const mini={...policy,ramp_seconds:0,initial_seconds:2,stages:[{players:25,hold_seconds:.2}],drain_seconds:.5,recovery_seconds:.05,think_time_ms:[1,2],guest_read_interval_ms:5,recovery_read_interval_ms:5,minimum_rolling_route_samples:10000};
