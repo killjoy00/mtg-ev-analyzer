@@ -2,13 +2,12 @@ import {withPracticeAccess} from './practice-access-fixture.mjs';
 // Explicit integration test in the isolated development database only.
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-import {createHash} from 'node:crypto';
 import {observeDecisionForRequest} from '../worker/decision-measurements.mjs';
 if(!process.argv.includes('--dev-fixtures'))throw Error('Requires --dev-fixtures and an isolated development connection.');
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 const {query}=await import('../worker/growth-function.js');
 const {default:api}=await import('../worker/draft-run-function.mjs');
-const tag=crypto.randomUUID(),user=crypto.randomUUID(),accountUser=crypto.randomUUID(),accountToken=crypto.randomUUID(),invite=crypto.randomUUID().replaceAll('-','')+crypto.randomUUID().replaceAll('-','');
+const tag=crypto.randomUUID(),user=crypto.randomUUID(),accountUser=crypto.randomUUID(),accountToken=crypto.randomUUID();
 let guest,run,repeat;
 const httpBase=process.env.PACK1_MEASUREMENT_HTTP;
 if(httpBase&&!/^https:\/\/br-twilight-hill-ayffyd2b-draftrunapi\.compute\.c-5\.us-east-2\.aws\.neon\.tech$/.test(httpBase))throw Error('HTTP integration is restricted to development.');
@@ -23,9 +22,9 @@ try {
   await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,false)',[user,'QA measurement admin',`qa-measure-${tag}@example.invalid`]);
   await query('INSERT INTO neon_auth.session(id,"userId",token,"updatedAt","expiresAt") VALUES($1::uuid,$2::uuid,$3,now(),now()+interval \'1 hour\')',[crypto.randomUUID(),user,accountToken]);
   await call('/v1/admin/measurements',undefined,null,accountToken,403);
-  await query('INSERT INTO pack1_admin_invites(token_hash,expires_at) VALUES($1,now()+interval \'1 hour\')',[createHash('sha256').update(invite).digest('hex')]);
-  await call('/v1/admin/claim',{invite},null,accountToken);
-  await call('/v1/admin/claim',{invite},null,accountToken);
+  await call('/v1/admin/claim',{invite:'a'.repeat(64)},null,accountToken,403);
+  await query('INSERT INTO pack1_admins(auth_user_id) VALUES($1::uuid)',[user]);
+  await call('/v1/admin/access',undefined,null,accountToken);
   guest=await call('/v1/session',{displayName:'Measurement fixture '+tag.slice(0,5)});
   await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,true)',[accountUser,'QA users '+tag.slice(0,6),`qa-user-${tag}@example.invalid`]);
   await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[accountUser,guest.playerId]);
@@ -80,7 +79,7 @@ try {
   report=await call('/v1/admin/measurements',undefined,null,accountToken);
   assert.ok(Number(report.coverage.qa_excluded)>=4);
   await call('/v1/admin/measurements?from=2026-02-30',undefined,null,accountToken,400);
-  console.log('PASS: admin authorization, single-use claim, view/answer retry deduplication, repeat exclusion, reload timing, rerolls, inactivity/resume and QA exclusion.');
+  console.log('PASS: admin authorization, disabled unbound claims, view/answer retry deduplication, repeat exclusion, reload timing, rerolls, inactivity/resume and QA exclusion.');
 } finally {
   if(run)await query('UPDATE draft_run_sessions SET measurement_qa=true WHERE player_id=(SELECT player_id FROM draft_run_sessions WHERE id=$1::uuid)',[run.id]);
   await query('DELETE FROM entitlement_grants WHERE auth_user_id=$1::uuid',[accountUser]);

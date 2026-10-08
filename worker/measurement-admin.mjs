@@ -1,5 +1,4 @@
 import {accountSession} from './account-session.mjs';
-import {createHash} from 'node:crypto';
 import {handleCorpusAdmin} from './corpus-admin.mjs';
 import {handleUserAdmin} from './user-admin.mjs';
 import {handleCreatorChallengeAdmin} from './creator-challenges.mjs';
@@ -162,27 +161,8 @@ async function account(request,query) {
 }
 export async function handleAdmin(request,query,readJson) {
   const url=new URL(request.url),id=await account(request,query);
-  if(url.pathname==='/v1/admin/claim'&&request.method==='POST') {
-    const body=await readJson(request);
-    if(!/^[a-f0-9]{64}$/.test(body.invite||''))fail('Invalid invitation.',403);
-    const hash=createHash('sha256').update(body.invite).digest('hex');
-    const {rows}=await query(`WITH identity_allowed AS MATERIALIZED (
-      SELECT 1 WHERE pack1_identity_attachment_allowed($2::uuid)
-    ), already AS (
-        SELECT i.redeemed_by FROM pack1_admin_invites i JOIN pack1_admins a ON a.auth_user_id=i.redeemed_by
-        WHERE i.token_hash=$1 AND i.redeemed_by=$2::uuid AND EXISTS(SELECT 1 FROM identity_allowed)
-      ), claimed AS (
-        UPDATE pack1_admin_invites SET redeemed_by=$2::uuid,redeemed_at=now()
-        WHERE token_hash=$1 AND expires_at>now() AND redeemed_at IS NULL
-          AND EXISTS(SELECT 1 FROM identity_allowed) RETURNING redeemed_by
-      ), granted AS (
-        INSERT INTO pack1_admins(auth_user_id) SELECT redeemed_by FROM claimed ON CONFLICT DO NOTHING
-      )
-      SELECT redeemed_by FROM claimed UNION SELECT redeemed_by FROM already`,[hash,id]);
-    if(!rows.length)fail('This invitation expired or has already been used.',403);
-    return {ok:true};
-  }
-  if(!(await query('SELECT 1 FROM pack1_admins WHERE auth_user_id=$1::uuid',[id])).rows.length)fail('This account does not have admin access. Use your private invitation to claim access.',403);
+  if(!(await query('SELECT 1 FROM pack1_admins WHERE auth_user_id=$1::uuid',[id])).rows.length)fail('This account does not have administrator access.',403);
+  if(url.pathname==='/v1/admin/access'&&request.method==='GET')return {ok:true,role:'admin'};
   if(url.pathname.startsWith('/v1/admin/users'))return handleUserAdmin(request,query,url,{readJson,adminAuthUserId:id});
   if(url.pathname.startsWith('/v1/admin/corpus'))return handleCorpusAdmin(request,query,readJson,id);
   if(url.pathname.startsWith('/v1/admin/creator-challenges'))return handleCreatorChallengeAdmin(request,query,readJson,id);
