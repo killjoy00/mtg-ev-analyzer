@@ -1,18 +1,31 @@
 {
   "version": 3,
   "supported_launch_target": 50,
-  "proposed_target": 50,
+  "proposed_target": 100,
   "generators": 5,
   "stages": [
-    {"players": 25, "hold_seconds": 120},
-    {"players": 50, "hold_seconds": 600}
+    {
+      "players": 25,
+      "hold_seconds": 120
+    },
+    {
+      "players": 50,
+      "hold_seconds": 600
+    },
+    {
+      "players": 100,
+      "hold_seconds": 600
+    }
   ],
   "ramp_seconds": 15,
   "initial_seconds": 120,
   "drain_seconds": 90,
   "recovery_seconds": 60,
   "recovery_players": 5,
-  "think_time_ms": [3000, 8000],
+  "think_time_ms": [
+    3000,
+    8000
+  ],
   "guest_read_interval_ms": 15000,
   "recovery_read_interval_ms": 5000,
   "cohort_timeout_seconds": 480,
@@ -27,31 +40,56 @@
   "telemetry_timeout_seconds": 240,
   "telemetry_preflight_requests": 60,
   "minimum_telemetry_sample_fraction": 0.02,
-  "maximum_experiment_minutes": 45,
+  "maximum_experiment_minutes": 60,
   "maximum_branch_lifetime_minutes": 75,
   "maximum_compute_cu": 8,
   "emergency_compute_ceiling_cu_hours": 10,
-  "maximum_runner_minutes": 270,
-  "maximum_requests": 30000,
+  "maximum_runner_minutes": 358,
+  "maximum_requests": 50000,
   "maximum_response_bytes": 268435456,
   "maximum_project_reported_egress_delta_bytes": 1073741824,
   "maximum_error_fraction": 0,
   "maximum_legitimate_429s": 0,
   "maximum_correctness_failures": 0,
-  "minimum_route_samples": {"session": 25, "start": 25, "view": 200, "pick": 200, "reroll": 5, "read": 25},
+  "minimum_route_samples": {
+    "session": 25,
+    "start": 25,
+    "view": 200,
+    "pick": 200,
+    "reroll": 5,
+    "read": 25
+  },
   "route_budgets_ms": {
-    "session": {"p95": 2000, "p99": 5000},
-    "start": {"p95": 3000, "p99": 8000},
-    "view": {"p95": 1000, "p99": 3000},
-    "pick": {"p95": 2000, "p99": 5000},
-    "reroll": {"p95": 2000, "p99": 5000},
-    "read": {"p95": 2000, "p99": 5000}
+    "session": {
+      "p95": 2000,
+      "p99": 5000
+    },
+    "start": {
+      "p95": 3000,
+      "p99": 8000
+    },
+    "view": {
+      "p95": 1000,
+      "p99": 3000
+    },
+    "pick": {
+      "p95": 2000,
+      "p99": 5000
+    },
+    "reroll": {
+      "p95": 2000,
+      "p99": 5000
+    },
+    "read": {
+      "p95": 2000,
+      "p99": 5000
+    }
   },
   "workload": {
     "initial": "50% synthetic signed-in accounts / 50% guests (rounded by fixed 10-actor blocks); 80% Daily across mixed, powered-cube and latest, 20% entitled practice with rerolls; eight paced view/pick pairs, score/share/eligibility checks, boards and account-attachment cohort",
     "hold": "All original actors remain present. Guest cohort polls Daily status and representative boards every 15 seconds; originally signed-in accounts repeatedly play eight-pick entitled practice, rotating mixed, cube, single-set and multi-set custom; every practice run rerolls. No repeated identity creation or quota reset.",
     "recovery": "After draining mutations, five existing actors (one per real egress) read status and boards for 60 seconds. No new accounts, mutation replay or provider calls.",
-    "limits": "Finite mixed-lifecycle closed-loop sessions on five networks, not 50 continuously in-flight requests, geographic diversity or indefinite endurance. Gateway sampling cannot prove lossless telemetry. Client bytes are decoded response bytes, not provider egress. Project billing-counter deltas include all branches and have no settlement watermark; they are a conservative stop signal, never run-attributed usage. Cost ceilings are resource envelopes, not a dollar invoice.",
+    "limits": "Finite mixed-lifecycle closed-loop sessions on five networks, not 100 continuously in-flight requests, geographic diversity or indefinite endurance. Gateway sampling cannot prove lossless telemetry. Client bytes are decoded response bytes, not provider egress. Project billing-counter deltas include all branches and have no settlement watermark; they are a conservative stop signal, never run-attributed usage. Cost ceilings are resource envelopes, not a dollar invoice.",
     "live_abort": "Per-runner rolling route p95/p99 over up to 200 samples is checked after 25 samples, in addition to complete-stage/phase gates. The first application error, correctness failure or local resource exhaustion stops the cohort."
   },
   "maximum_coordinator_queries": 20000,
