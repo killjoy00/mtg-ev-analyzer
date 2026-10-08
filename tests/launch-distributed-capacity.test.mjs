@@ -178,6 +178,35 @@ test('client really preserves cookies, CSRF and idempotency without forwarding-h
 });
 
 const fakeTransportObserver=state=>({begin:()=>({bound:false,body_present:true,headers_sent:false,body_sent:false,socket:'unknown',connect_ms:null,tls:null,...state}),end(){}});
+test('successful Daily-status pairs sanitized connection and gateway timings in one request record',async()=>{
+ const headers=new Headers({'x-pack1-gateway-timing':JSON.stringify({duration_ms:120,quota_ms:20,upstream_ms:80,private:'discard'})});
+ const budget={gateway_requests:0,response_bytes:0};
+ const client=state=>requestClient({fixture:{preview:'a'.repeat(64)},policy,budget,now:()=>start,
+   signal:new AbortController().signal,fetcher:async()=>Response.json({ok:true},{headers}),
+   transportObserver:fakeTransportObserver(state)});
+ const newReport={requests:[]};
+ await client({bound:true,headers_sent:true,socket:'new',connect_ms:3719.127,tls:true})(null,'read','/draft/v1/daily-status',undefined,{report:newReport});
+ assert.equal(newReport.requests.length,1);
+ const record=newReport.requests[0];
+ assert.equal(record.status,200);assert.equal(record.endpoint,'daily_status');
+ assert.deepEqual(record.transport,{socket:'new',connect_ms:3719.13});
+ assert.deepEqual(record.diagnostics.gateway,{duration_ms:120,quota_ms:20,upstream_ms:80});
+ assert.ok(record.ms>=0);
+ assert.doesNotMatch(JSON.stringify(record),/private|preview-key/);
+
+ const reused={requests:[]};
+ await client({bound:true,headers_sent:true,socket:'reused',connect_ms:9000})(null,'read','/draft/v1/daily-status',undefined,{report:reused});
+ assert.deepEqual(reused.requests[0].transport,{socket:'reused',connect_ms:null},'reused sockets must not attribute old connection setup');
+
+ const unknown={requests:[]};
+ await client({socket:'bogus',connect_ms:-1})(null,'read','/draft/v1/daily-status',undefined,{report:unknown});
+ assert.deepEqual(unknown.requests[0].transport,{socket:'unknown',connect_ms:null});
+
+ const other={requests:[]};
+ await client({socket:'new',connect_ms:200})(null,'read','/draft/v1/leaderboard',undefined,{report:other});
+ assert.equal(other.requests[0].transport,undefined,'do not expand timing capture to unrelated successful reads');
+});
+
 async function capturedTransportFailure({error,state={},aborted=false}) {
  const budget={gateway_requests:0,response_bytes:0},report={requests:[]},controller=new AbortController(),actor={id:17,cookies:new Map(),csrf:null};if(aborted)controller.abort();
  let calls=0;const fetcher=async()=>{calls++;throw error;};

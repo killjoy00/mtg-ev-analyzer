@@ -72,6 +72,13 @@ export function requestClient({fixture,policy,budget,now,signal,fetcher=fetch,tr
       const data=JSON.parse(text);
       if(r.status===429){record.scopes=data.scopes||[];record.retry_after=Number(r.headers.get('retry-after'));}
       if(!r.ok)throw Object.assign(Error('http_'+r.status),{category:'application'});
+      // Preserve only anonymous socket setup evidence for successful Daily-status reads.
+      // The same request record already retains its client and gateway timings.
+      if(endpoint==='daily_status') {
+        const socket=['new','reused'].includes(transport?.socket)?transport.socket:'unknown';
+        record.transport={socket,connect_ms:socket==='new'&&Number.isFinite(transport?.connect_ms)&&transport.connect_ms>=0?
+          Math.round(transport.connect_ms*100)/100:null};
+      }
       if(actor)for(const value of (r.headers.getSetCookie?.()||[r.headers.get('set-cookie')||'']).flatMap(s=>s.split(/,\s*(?=__(?:Host|Secure)-pack1_)/))) {
         const [pair]=value.split(';'),eq=pair.indexOf('=');if(eq>0)actor.cookies.set(pair.slice(0,eq),pair.slice(eq+1));
       }
