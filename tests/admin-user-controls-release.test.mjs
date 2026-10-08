@@ -56,7 +56,7 @@ test('Admin Users browser uses PATCH rename, typed destructive confirmation, sta
   assert.match(users,/Apple subscriptions or Patreon memberships/);
   assert.match(users,/Public username/);
   assert.match(users,/previous_display_name/);
-  assert.match(shell,/renderUsers\(root,request,growthRequest\)/);
+  assert.match(shell,/renderUsers\(root,authorizedRequest,authorizedGrowthRequest\)/);
   assert.match(shell,/method=body\?'POST':'GET'/);
   const growth=fs.readFileSync('worker/growth-function.js','utf8');
   assert.match(growth,/deletionCommitted:true/);
@@ -72,7 +72,7 @@ test('admin shell keeps timeout handling around body parsing and publishes only 
   assert.match(requestBlock,/TimeoutError.*AbortError.*admin_timeout/s);
   const loadBlock=shell.slice(shell.indexOf('async function load()'),shell.indexOf("document.addEventListener('pack1:admin-signout'"));
   assert.match(loadBlock,/await verifyAdminContract\(\)/);
-  assert.match(loadBlock,/nextReport=await request\([\s\S]*if\(loadId!==deferredLoad\)return;report=nextReport/);
+  assert.match(loadBlock,/nextReport=await authorizedRequest\([\s\S]*if\(loadId!==deferredLoad\)return;[\s\S]*report=nextReport/);
   assert.doesNotMatch(loadBlock,/report=await request\('\/v1\/admin\/measurements/);
   assert.match(shell,/x-pack1-admin-api-version/);
   assert.match(shell,/admin_release_mismatch/);
