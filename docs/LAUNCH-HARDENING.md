@@ -1,6 +1,6 @@
 # Launch hardening (#527)
 
-Current distributed release qualification is recorded in [the #629 evidence report](reports/DISTRIBUTED-CAPACITY-629.md). The current-practice selector is accepted for release, 50 players have passed the full five-egress stage, and formal promoted distributed capacity remains 25. Further selector tuning is not a v1 release blocker. Since the 2026-10-02 policy update, the distributed ladder is 25→50 with the 600-second sustained hold at 50, and 50 becomes the formal level only after a complete run under that policy.
+Distributed qualification is recorded in [the #629 evidence report](reports/DISTRIBUTED-CAPACITY-629.md). **50 active players passed the complete five-egress 25→50 policy-v3 ladder and 600-second hold on 2026-10-07**, tested merge `3ab2ec1491ff024b2610cae8c0c34f9ab5d3309d`, including telemetry, resource, recovery and cleanup gates. This qualifies that isolated revision, not every later production release; 100 remains unqualified. Further selector tuning is not a v1 release blocker. Routine checks default to 25 to control cost.
 
 Final measurements, supported capacity and release evidence are maintained in
 [the #516/#527 acceptance report](reports/PRACTICE-LAUNCH-CLOSEOUT-2026-09-26.md).
@@ -108,9 +108,10 @@ burst resets. The limits bound abuse; they do not establish capacity by
 arithmetic. Real Workers tests verify concurrency/persistence; the isolated NAT
 workload must pass its predefined gates before production uses this policy.
 
-The workload keeps the supported launch target at 25 active players while
-measuring 25/50 NAT stages and a persistent five-runner 25/50 distributed ladder
-with stricter sustained/telemetry/cleanup evidence. Stage escalation still stops
+Routine workload checks default to 25 active players. Manual 50 dispatches
+retain the 25/50 NAT stages and persistent five-runner 25→50 distributed ladder
+with stricter sustained/telemetry/cleanup evidence. The default check scope is
+separate from the October 7 verified 50-player qualification. Stage escalation still stops
 on the first failed gate. The NAT run uses 50% new guests, 30% established
 accounts and 20% entitled practice, all three Dailies, 3–8-second decision times,
 eight view/pick pairs, rerolls, sharing, boards and a guest-to-ranked cohort.

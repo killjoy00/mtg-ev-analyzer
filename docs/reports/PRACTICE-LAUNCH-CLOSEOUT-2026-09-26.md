@@ -1,5 +1,20 @@
 # Practice and launch acceptance: issues #516 and #527
 
+## 2026-10-07 qualification, reconciled 2026-10-08
+
+**50 players passed the full five-egress 25→50 ladder and 600-second hold**
+in [run 37595851332](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/37595851332),
+attempt 1, tested merge `3ab2ec1491ff024b2610cae8c0c34f9ab5d3309d`.
+The 50 stage completed 50 initial runs and 325 hold Practice runs; all 10,165
+requests returned 200/201, with zero correctness failures. Start p95/p99 was
+1355.57/2468.74 ms. Telemetry, resource, recovery and independently verified
+cleanup passed. This satisfies the policy-v3 longer-hold condition for that
+revision. 100 remains unqualified; default checks stay at 25 to control cost.
+
+Exact policy, route metrics, original final JSON and cleanup are retained in
+[the #629 capacity report](DISTRIBUTED-CAPACITY-629.md).
+The September evidence and decisions below remain historical.
+
 ## 2026-10-02 update
 
 100-player stages were removed on 2026-10-02 (owner decision); earlier results are in git history.
@@ -17,7 +32,7 @@ Runtime-code-head run [36326543142](https://github.com/killjoy00/mtg-ev-analyzer
 
 Subsequent #655 commits through the current documentation update are documentation/release-bookkeeping only; the runtime/schema implementation tested above remains `dcb543da1abc4777d1e36bf3ad599e4af4454671`.
 
-Release decision: accept the current-practice batched selector plus frozen source-decrement cache and stop treating further selector optimization as a v1 blocker. Keep the **formal supported distributed target at 25** until the current promotion rule is satisfied, while recording **50 as a demonstrated passing stage** under the earlier shorter hold.
+September 27 release decision: accept the batched selector plus frozen source-decrement cache and stop treating further selector optimization as a v1 blocker. At that point the formal target stayed at 25 and 50 was a passing shorter-hold stage. The October 7 full qualification above supersedes that capacity limit.
 
 The final browser and shared-network gates passed, and the supported 25-player distributed target passed. This report retains exact test revisions, measurement limits and the guarded production release record.
 
@@ -52,7 +67,7 @@ Under current triggers, a rollback-only 1,000-row real metadata update spent 9.8
 
 Both scenarios use disposable production clones, private preview ingress, synthetic accounts/entitlements, all three Dailies, practice and rerolls, eight view/pick pairs, score/share correctness, public boards and a profile/account-attachment cohort. NAT fixtures add 90,000 score rows; distributed fixtures add 180,000. No external email, billing or identity-provider calls are used. Raw fixture credentials remain private to the runners and encrypted transfer artifacts.
 
-The supported target was declared as 25 active players before testing. The current NAT and distributed ladders are both 25/50, stopping at the first failed gate; the distributed 50-player stage has a 600-second sustained hold. Actors arrive over 15 seconds and think for 3–8 seconds between picks. Each actor completes one paced run; this is not an indefinite endurance guarantee. Compute is 0.25–8 CU with a 300-second suspend timeout.
+The original supported target was declared as 25 active players before testing. Current checks default to 25; manual 50 selects the 25→50 ladder, stopping at the first failed gate. The distributed 50-player stage has a 600-second sustained hold. Actors arrive over 15 seconds and think for 3–8 seconds between picks. After initial gameplay, signed-in actors repeatedly play Practice while original guests poll reads throughout the hold. This is not an indefinite endurance guarantee. Compute is 0.25–8 CU with a 300-second suspend timeout.
 
 Route p95/p99 budgets in seconds: session 2/5, start 2/8, view 1/3, pick 2/5, reroll 2/5, reads 2/5. Correctness failures and unintended 429s must be zero. Distributed acceptance verifies real distinct egress and arrival lateness, rather than spoofed headers. No quota reset occurs between stages.
 
@@ -78,13 +93,13 @@ The 25- and 50-player NAT stages passed without resetting quota state. Each stag
 | 25 | 25 | 539 | 601.8/839.59 | 240.04/450.96 | 649.82/649.82 | 381.21/586.84 |
 | 50 | 50 | 1078 | 586.32/965.27 | 197.16/245.81 | 1007.55/1007.55 | 216.72/557.5 |
 
-These retained 25- and 50-player shared-network results passed their gates. The formal supported distributed launch target remains 25 under the stricter independent-egress promotion rule. The later #629 qualification produced a complete passing 50-player five-egress stage under the earlier shorter hold. Neither scenario establishes indefinite endurance or a universal capacity ceiling.
+These retained 25- and 50-player shared-network results passed their gates. At this historical release decision, the stricter distributed target remained 25. Later #629 evidence includes both shorter-hold 50-player passes and the complete October 7 policy-v3 qualification above. Neither scenario establishes indefinite endurance or a universal capacity ceiling.
 
 ## Distributed gateway acceptance
 
 [Run 36213206670](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/36213206670), tested merge revision `11f263c382b27efe971bbb73daa42b69f16839cf`, passed the supported 25-player stage across five verified distinct real egress networks. All 25 players completed; all 539 requests returned 200/201. Route p95/p99 in milliseconds: session 514/724, start 516/944, view 175/385, pick 204/377, reroll 1,100/1,100, reads 285/720. Correctness, arrival timing and quota gates passed.
 
-The later #629 persistent five-runner protocol is the current distributed qualification record: 50 passed completely under the earlier shorter hold, while formal promoted capacity remains 25 until the current 25→50 policy passes end to end.
+The current distributed qualification record is the October 7 #629 five-runner 25→50 pass, including the full 600-second 50-player hold and cleanup. The earlier shorter-hold evidence remains historical.
 
 ## Production operations and limits
 

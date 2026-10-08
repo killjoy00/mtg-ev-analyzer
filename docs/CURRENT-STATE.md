@@ -2,6 +2,20 @@
 
 Updated 2026-10-08. Implementation, backend deployment, gateway deployment, Pages deployment, database publication, and provider activation are separate. Older reviews are historical evidence.
 
+## Distributed capacity — October 7 evidence reconciled October 8
+
+50 active mixed-lifecycle players passed the complete five-egress policy-v3
+25→50 ladder, including the 600-second hold, drain, recovery and cleanup, in
+[run 37595851332](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/37595851332),
+attempt 1, tested merge `3ab2ec1491ff024b2610cae8c0c34f9ab5d3309d`.
+This supersedes stale statements that 50 remained unqualified. It is isolated
+evidence for that revision, not a 100-player or current production qualification.
+Default checks remain 25 to control cost. The
+[capacity report](reports/DISTRIBUTED-CAPACITY-629.md) retains the original
+acceptance, policy and cleanup; the
+[selection investigation](reports/PRACTICE-SELECTION-INVESTIGATION-2026-10-08.md)
+records the remaining evidence gap without another load run.
+
 ## October 8, 2026 — deployment-status audit closed for `2138aaefac0612d79dbace7be94e5b19500b9358`
 
 **Disposition: closed, verified 2026-10-08 (UTC).** The guarded October 7/8 promotion and creator lifecycle acceptance succeeded for exact **runtime release** `2138aaefac0612d79dbace7be94e5b19500b9358`. This section **supersedes the October 7 deployment-boundary snapshot below**, which is retained as as-of historical evidence. The advancing repository `main` and Pages source do **not** change the pinned Functions or gateway deployment revision.

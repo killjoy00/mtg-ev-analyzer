@@ -86,7 +86,9 @@ and offers the same manual `capacity_target=50` choice. Its independent cold/war
 browser check remains required. Dispatches default to 25. Every job uses the same
 selected policy; its fingerprint binds fixtures and reports, and the collector still
 requires all five cohorts to complete and every selected stage to pass.
-Skipping 50 does not establish current 50-player capacity. A policy change
+The complete October 7 five-egress 25→50 run qualified its exact revision at
+50, including the 600-second hold; see [the retained capacity evidence](reports/DISTRIBUTED-CAPACITY-629.md).
+A later 25-only run does not requalify that newer revision at 50. A policy change
 requires a fresh run; earlier failed runs remain failed.
 
 NAT reroll acceptance allows p95 of 3 seconds and p99 of 5 seconds. The 25-player

@@ -1,17 +1,68 @@
-# Next distributed capacity evidence (#629)
+# Distributed capacity evidence (#629)
+
+## Verified 50-player qualification — 2026-10-07
+
+Reconciled on 2026-10-08 from all five cohort artifacts and the independently
+recomputed final acceptance and cleanup artifacts. **50 active mixed-lifecycle
+players passed the complete policy-v3 25→50 ladder**, including the 600-second
+hold at 50, drain and recovery. The prior statements that 50 was unqualified
+were stale. This satisfies the longer-hold promotion condition for the exact
+tested revision; it does not qualify 100 players or every later release.
+
+- Workflow [37595851332](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/37595851332), attempt 1; PR [#1051](https://github.com/killjoy00/mtg-ev-analyzer/pull/1051) head `6eeaabc34a4fb70412af1d19da33599167320f31`.
+- Tested merge SHA: `3ab2ec1491ff024b2610cae8c0c34f9ab5d3309d`.
+- Bound policy: version 3, SHA-256 `30e135698a1c5fcb55140b77ca6dba26e7d3b27f6828f0ee8b9645c668a17a96`.
+- Five distinct real egress networks; 50 initial completions and 325 completed
+  hold Practice runs. The preceding 25-player stage also passed.
+- All 10,165 measured 50-stage requests returned HTTP 200/201: 10,140/25.
+  Zero correctness failures, request errors or legitimate 429s. Phase latency,
+  rolling abort checks, telemetry, resource and recovery gates passed.
+- Cleanup independently passed at `2026-10-07T09:35:54.452Z`: preview mapping
+  absent and disposable branch GET returned 404.
+
+| Route | Samples | p95 ms | p99 ms | Bound p95/p99 ms |
+| --- | ---: | ---: | ---: | ---: |
+| Session | 50 | 418.12 | 544.25 | 2000/5000 |
+| Start | 375 | 1355.57 | 2468.74 | 3000/8000 |
+| View | 3000 | 189.33 | 355.05 | 1000/3000 |
+| Pick | 3000 | 285.63 | 1112.94 | 2000/5000 |
+| Reroll | 335 | 736.62 | 966.09 | 2000/5000 |
+| Read | 3405 | 333.68 | 936.72 | 2000/5000 |
+
+The full experiment recorded 11,795 gateway requests, 98,260,656 decoded
+response bytes and 8,256 coordinator queries. The tested request ceiling was
+50,000; the later 30,000 ceiling is a separate policy change and must not be
+substituted into this run's fingerprint. Whole-project billing counters are
+delayed and include other branches; they do not establish zero actual usage or
+a per-player price.
+
+Durable evidence: [original final acceptance](evidence/distributed-capacity-2026-10-07/distributed-acceptance.json),
+[original cleanup](evidence/distributed-capacity-2026-10-07/cleanup.json), and
+[all start timing observations](evidence/distributed-capacity-2026-10-07/start-timings.json).
+Final artifact `11472877818` ZIP SHA-256:
+`3e056a60720ee329edcdeaedd6bc51c464bb840b6804aafa244d115421ff70a6`.
+The timing projection records the five source ZIP digests and excludes encrypted
+network attestations and fixture credentials.
+
+This is a finite isolated qualification on five networks, not a measurement of
+the deployed production release, geographic diversity or indefinite endurance.
+Later failed runs remain failed. The ordinary 25-player check remains the
+cheaper default; its scope does not erase this 50-player evidence.
+The [October 8 selection investigation](PRACTICE-SELECTION-INVESTIGATION-2026-10-08.md)
+uses these existing observations without launching another rehearsal.
 
 ## Required check update — 2026-10-07
 
 The owner chose to defer the 50-player experiment. Ordinary PRs and manual
-dispatches now default to the supported 25-player level; selecting
+dispatches now default to the cheaper 25-player check; selecting
 `capacity_target=50` manually retains the original 25→50 experiment and its
 600-second final hold. The full envelope remains in
 `scripts/launch-distributed-policy.json`; `selectCapacityPolicy` selects and
 validates the required stages before provisioning. The selected policy's
 fingerprint binds all setup, generator and collector evidence. All five
 cohorts must complete, with unchanged latency, zero-error, correctness,
-telemetry, resource and cleanup gates. Current 50-player capacity remains
-unqualified.
+telemetry, resource and cleanup gates. This default-check choice is separate
+from the verified October 7 qualification above.
 
 The separate NAT workflow uses the same default-25/manual-50 choice. Run
 37664468633 passed NAT at 25 but failed the optional 50 stage (reroll p95
@@ -41,7 +92,7 @@ Before that policy update, 50 players passed completely three times under policy
 - run 36792854202, attempt 4;
 - run 37011654672 (#847).
 
-All three used the earlier 180-second 50-player hold. **Formal supported distributed capacity remains 25** until a complete 25→50 run passes under policy version 3, including the longer 600-second hold at 50.
+All three used the earlier 180-second 50-player hold. At the October 2 decision, formal supported distributed capacity stayed at 25 pending a complete policy-v3 25→50 run with the 600-second hold. The October 7 run above subsequently satisfied that condition.
 
 ## Release decision — 2026-09-27
 
@@ -53,11 +104,11 @@ Runtime-code evidence is PR #655 head `dcb543da1abc4777d1e36bf3ad599e4af4454671`
 - **50 players: PASS.** 3,968 requests, 3,943 HTTP 200 + 25 HTTP 201, zero correctness failures. Start p95/p99 1,602.65/2,188.32 ms; synchronized-hold start p95 1,898.40 ms; reroll p95/p99 1,217.49/1,867.57 ms; view p99 383.79 ms; read p99 900.66 ms. This is the first complete five-egress 50-player pass under the unchanged #629 policy.
 - **Cleanup: PASS.** The private preview mapping was removed and disposable Neon branch `br-bitter-scene-ay6jerfh` was deleted.
 
-The release interpretation is intentionally split: **formal supported distributed capacity remains 25** because the current predeclared protocol requires a complete 25→50 ladder before promotion, while **50-player distributed capacity has been directly demonstrated** under the earlier shorter hold. Product/release work may proceed with the current selector implementation; a complete policy-v3 run is still required before the formal capacity changes.
+At this September 27 release decision, formal supported distributed capacity stayed at 25; 50 had passed the earlier shorter hold. Further selector tuning was not a v1 blocker. This historical capacity interpretation is superseded by the complete October 7 policy-v3 qualification above.
 
 ## Status and historical claims
 
-This is the implementation and measurement protocol, **not a new supported-capacity claim**. Historical #516/#527 remain completed. Read `PRACTICE-LAUNCH-CLOSEOUT-2026-09-26.md` and `results/launch-closeout-2026-09-26`: 25 players on five verified real independent egress networks passed, and the later five-egress 50-player stage also passed under the earlier shorter hold. Short paced runs were not endurance tests.
+The current recorded qualification is 50 players on the exact October 7 tested revision above. The remainder preserves the implementation protocol and earlier evidence. Historical #516/#527 remain completed. Read `PRACTICE-LAUNCH-CLOSEOUT-2026-09-26.md` and `results/launch-closeout-2026-09-26`: 25 players on five verified real independent egress networks passed, and the later five-egress 50-player stage also passed under the earlier shorter hold. Short paced runs were not endurance tests.
 
 Reviewed application baseline: `731a0b4b897ca1b0d4b8f8bd9f8e96658f7a83dc`. Concurrent activation readiness and native parity work are preserved. The production monitoring fix (#601; guarded release 36245824236 at `7fcf203b30e35df663028bc1923893c4e3109ce0`) supplies the bounded retained-log reader. Production monitoring code, probes and machine-managed #596 state are unchanged.
 
@@ -92,7 +143,7 @@ Cleanup always attempts preview-mapping removal and branch deletion, then indepe
 
 The experiment is bounded to 45 minutes from coordinator initialization and a 75-minute branch lifetime. Compute is verified at no more than eight CU with 300-second suspension, and exact observed settings are retained. Eight CU over the entire emergency lifetime is a ten-CU-hour upper envelope, not expected consumption. Job timeouts bound runner allocations below 270 runner-minutes.
 
-Limits are 50,000 gateway requests including the machine-declared 60-request private telemetry preflight, 20,000 coordinator SQL calls, 256 MiB of decoded client response bodies, and 2 MiB per individual response. Worker allowances are partitioned, not multiplied per shard. A pre-provisioning whole-project Neon billing observation is compared before gameplay and after every stage. A reported increase above 1 GiB, missing/incomparable counter, reset or changed billing period blocks escalation.
+The October 7 bound policy allowed 50,000 gateway requests; current dispatches allow 30,000, including the machine-declared 60-request private telemetry preflight, 20,000 coordinator SQL calls, 256 MiB of decoded client response bodies, and 2 MiB per individual response. Worker allowances are partitioned, not multiplied per shard. A pre-provisioning whole-project Neon billing observation is compared before gameplay and after every stage. A reported increase above 1 GiB, missing/incomparable counter, reset or changed billing period blocks escalation.
 
 The provider counter includes concurrent production, development and CI usage and has no accounting watermark. It is **not** attributed test egress or a hard actual-egress cap. Client decoded bytes, coordinator counts, compute-time bounds and provider counters are different metrics. These are resource envelopes and a conservative delayed usage signal, not a verified dollar invoice or production per-player cost. #541 and production alert thresholds are unchanged. Do not increase these envelopes merely because a run fails.
 
