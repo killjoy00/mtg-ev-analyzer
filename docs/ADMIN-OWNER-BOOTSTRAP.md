@@ -1,0 +1,19 @@
+-- After migration 0057, and ONLY during a separately approved operator
+-- operation: do not put an Owner UUID/email in the repository.
+-- Resolve the exact existing user's UUID and current verified email from
+-- neon_auth."user" using a read-only query, then review both values out of band.
+-- Use a transaction with an exact UUID and exact current email:
+--
+-- BEGIN;
+-- SELECT pg_advisory_xact_lock(hashtextextended('pack1-owner-bootstrap',0));
+-- UPDATE pack1_admins a SET role='owner'
+--   FROM neon_auth."user" u
+--   WHERE a.auth_user_id=u.id AND a.auth_user_id='<EXACT-AUTH-UUID>'::uuid
+--     AND lower(btrim(u.email))='<EXACT-VERIFIED-EMAIL>'
+--     AND u."emailVerified"=true AND a.role='admin'
+--     AND NOT EXISTS (SELECT 1 FROM pack1_admins WHERE role='owner')
+--   RETURNING a.auth_user_id,a.role;
+-- Confirm EXACTLY one row, then COMMIT; otherwise ROLLBACK.
+-- The unique partial index and triggers prevent competing owners, unverifed
+-- owner promotion, or promoting accounts with deletion tombstones.
+-- No web request, signup callback or invitation can assign owner privileges.

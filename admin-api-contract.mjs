@@ -1,1 +1,1 @@
-export const ADMIN_API_VERSION=4;
+export const ADMIN_API_VERSION=5;

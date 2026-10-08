@@ -72,6 +72,9 @@ export async function handleAdminAccountDeletion(
   if(reason.length>200)fail('Deletion reason must be 200 characters or fewer.',400);
   const acknowledgeAdmin=body.acknowledgeAdmin===true;
 
+  const targetOwner=await query("SELECT 1 FROM pack1_admins WHERE auth_user_id=$1::uuid AND role='owner'",[targetAuthUserId]);
+  if(targetOwner.rows.length)fail('The Owner account cannot be deleted. Transfer ownership through a controlled operator process first.',409,'OWNER_PROTECTED');
+
   // Read before deletion starts: the auth record, and with it the address, is
   // removed by the provider phase.
   const target=await query('SELECT email,"emailVerified" email_verified FROM neon_auth."user" WHERE id=$1::uuid LIMIT 1',[targetAuthUserId]);

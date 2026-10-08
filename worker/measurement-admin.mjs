@@ -1,4 +1,5 @@
 import {accountSession} from './account-session.mjs';
+import {acceptAdminInvitation,handleAdminTeam} from './admin-invitations.mjs';
 import {handleCorpusAdmin} from './corpus-admin.mjs';
 import {handleUserAdmin} from './user-admin.mjs';
 import {handleCreatorChallengeAdmin} from './creator-challenges.mjs';
@@ -161,8 +162,14 @@ async function account(request,query) {
 }
 export async function handleAdmin(request,query,readJson) {
   const url=new URL(request.url),id=await account(request,query);
-  if(!(await query('SELECT 1 FROM pack1_admins WHERE auth_user_id=$1::uuid',[id])).rows.length)fail('This account does not have administrator access.',403);
-  if(url.pathname==='/v1/admin/access'&&request.method==='GET')return {ok:true,role:'admin'};
+  if(url.pathname==='/v1/admin/invitations/accept')
+    return acceptAdminInvitation(request,query,readJson,id);
+  const member=await query('SELECT role FROM pack1_admins WHERE auth_user_id=$1::uuid',[id]);
+  const role=member.rows[0]?.role;
+  if(!role)fail('This account does not have administrator access.',403);
+  if(url.pathname==='/v1/admin/access'&&request.method==='GET')return {ok:true,role};
+  if(url.pathname.startsWith('/v1/admin/team'))
+    return handleAdminTeam(request,query,readJson,id,role);
   if(url.pathname.startsWith('/v1/admin/users'))return handleUserAdmin(request,query,url,{readJson,adminAuthUserId:id});
   if(url.pathname.startsWith('/v1/admin/corpus'))return handleCorpusAdmin(request,query,readJson,id);
   if(url.pathname.startsWith('/v1/admin/creator-challenges'))return handleCreatorChallengeAdmin(request,query,readJson,id);
