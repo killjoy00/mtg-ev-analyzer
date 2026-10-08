@@ -1,12 +1,11 @@
 # Decision quality reporting
 
-The owner console lives at `/admin/`. Its API is authenticated separately from
-anonymous player sessions: a live Neon account session must belong to
-`pack1_admins`. A 256-bit private setup code can grant the initial owner access.
-Only its SHA-256 hash is stored. Invitations expire after seven days and can be
-claimed by one account; a retry by that same existing admin is safe. Codes and
-account tokens must never be committed or sent in query strings. Revoking the
-admin row immediately revokes report access, including through an old invitation.
+The administration console lives at `/admin/`. Its API requires an authenticated
+Pack One account whose Auth UUID is a current member of `pack1_admins`.
+Normal account sign-in (including supported OAuth providers) provides a session,
+not administrative privileges. There is no setup-code privilege-grant route.
+Removing an administrator membership immediately denies subsequent protected requests,
+including those made using an existing account session.
 
 ## Collection
 
@@ -191,8 +190,8 @@ The arithmetic fixture checks a known five-answer cohort: 40% trophy matches,
 and five choices in its detail report.
 
 For the original decision-observation feature, apply the additive migration in production before deploying the updated API, then deploy the frontend. The later launch acquisition/habit addition in PR #505 has no new migration; promote its exact reviewed `main` commit through development and production Functions, then verify the production admin habit tables and Daily streak response. Verify public report requests return 401 and ordinary
-accounts return 403. Generate the owner's random setup code outside Git and
-insert only its hash and expiry into `pack1_admin_invites`. Share it privately.
+accounts return 403. Privilege provisioning is a separate controlled operator
+procedure; do not use unbound setup codes.
 
 The initial reports are expected to be sparse. They establish collection and
 review; they do not recalibrate difficulty or change the trophy-only, 100-point

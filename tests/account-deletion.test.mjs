@@ -357,7 +357,6 @@ test('all Auth identity attachment surfaces share deletion serialization',()=>{
     'worker/account-deletion-verification.mjs',
     'worker/patreon.mjs',
     'worker/capabilities.mjs',
-    'worker/measurement-admin.mjs',
     'worker/corpus-admin.mjs',
     'worker/draft-run-function.mjs',
     'worker/growth-function.js',
@@ -365,6 +364,8 @@ test('all Auth identity attachment surfaces share deletion serialization',()=>{
     const source=fs.readFileSync(path,'utf8');
     assert.match(source,/pack1_identity_attachment_allowed/,path+' must use the fresh-snapshot account identity guard');
   }
+  // Unbound admin claiming was removed: there is no longer an identity attachment in that handler.
+  assert.doesNotMatch(fs.readFileSync('worker/measurement-admin.mjs','utf8'),/v1\/admin\/claim/);
 });
 
 test('deletion endpoint keeps the committed 200\/202 response and clears both browser identities',()=>{

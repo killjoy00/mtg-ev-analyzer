@@ -2,17 +2,17 @@ import {renderCorpus} from './corpus.mjs';
 import {renderUsers} from './users.mjs';
 import {renderCampaignLinks} from './campaign-links.mjs';
 import {ADMIN_API_VERSION} from '../admin-api-contract.mjs';
-import {accountCsrfToken,firstPartyAuthEnabled,hasAccountSession,storedAccountToken,signInAccount,signUpAccount,signOutAccount} from '../growth-api.mjs';
+import {accountCsrfToken,firstPartyAuthEnabled,getAuthSession,storedAccountToken,signOutAccount} from '../growth-api.mjs';
+import {sanitizeAdminDestination} from './admin-return.mjs';
 const root=document.querySelector('#admin');
 const esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
 const fmt=x=>x==null?'N/A':Number(x).toLocaleString(undefined,{maximumFractionDigits:1});
 const pct=x=>x==null?'N/A':`${fmt(x)}%`;
 const draftBase=window.PACK1_API.draftRunUrl;
 const growthBase=window.PACK1_API.growthUrl;
-let report,params=new URLSearchParams(),invite=null,deferredLoad=0,adminContractVerified=false;
-const hash=new URLSearchParams(location.hash.slice(1));
-if(hash.has('invite')){invite=hash.get('invite');sessionStorage.setItem('pack1-admin-invite',invite);history.replaceState({},'',location.pathname);}
-invite=invite||sessionStorage.getItem('pack1-admin-invite');
+let report,params=new URLSearchParams(),deferredLoad=0,adminContractVerified=false,switching=false;
+const areaNavigation=document.querySelector('#admin-area-nav');
+function setAuthorized(authorized){areaNavigation.hidden=!authorized;}
 async function requestAt(base,path,body,method=body?'POST':'GET') {
   const headers={'content-type':'application/json'};
   if(firstPartyAuthEnabled()){const csrf=accountCsrfToken();if(!['GET','HEAD'].includes(method)&&csrf)headers['x-pack1-csrf']=csrf;}
@@ -43,9 +43,30 @@ async function verifyAdminContract() {
   adminContractVerified=true;
 }
 const reportQuery=f=>new URLSearchParams({from:f.start,to:f.end,environment:f.environment,type:f.type,set:f.set,version:f.version,difficulty:f.band,pick:f.pick}).toString();
+function signInHref(){
+  const destination=sanitizeAdminDestination(location.pathname+location.search,location.origin)||'/admin/';
+  return '/?account=signin&admin_return='+encodeURIComponent(destination);
+}
 function login(message='') {
-  root.innerHTML=`<section class="login"><h1>Pack One administration</h1><p>${invite?'Your private invitation is ready. Sign in, or create your admin account below.':'Sign in with the account granted admin access.'}</p><form id="login"><label>Name<input name="name" autocomplete="name"></label><label>Email<input name="email" type="email" autocomplete="username" required></label><label>Password<input name="password" type="password" autocomplete="current-password" minlength="8" required></label><label>Setup code (first visit only)<input name="invite" autocomplete="off" spellcheck="false" value="${esc(invite||'')}" placeholder="Paste your private setup code"></label><div class="actions"><button type="submit">Sign in</button><button type="submit" name="create" value="yes" class="secondary">Create account</button></div></form><p id="status" class="error" role="alert">${esc(message)}</p><a href="/">Back to Pack One</a></section>`;
-  document.querySelector('#login').onsubmit=async e=>{e.preventDefault();const form=e.currentTarget,data=Object.fromEntries(new FormData(form));form.querySelectorAll('button').forEach(b=>b.disabled=true);try{if(data.invite){if(!/^[a-f0-9]{64}$/.test(data.invite))throw Error('The setup code must contain 64 letters and numbers.');invite=data.invite;sessionStorage.setItem('pack1-admin-invite',invite);}const result=e.submitter?.name==='create'?await signUpAccount({...data,name:data.name||'Pack One Admin'}):await signInAccount(data);if(!(firstPartyAuthEnabled()?result?.user:result?.token)){document.querySelector('#status').textContent='Account created. Complete any requested email verification, then sign in to continue.';return;}await load();}catch(err){document.querySelector('#status').textContent=err.message;}finally{form.querySelectorAll('button').forEach(b=>b.disabled=false);}};
+  setAuthorized(false);
+  root.innerHTML=`<section class="login"><h1>Pack One administration</h1><p>Sign in using your existing Pack One account. Administrator access is checked after sign-in.</p><p><a class="admin-primary-link" href="${esc(signInHref())}">Sign in with Pack One</a></p>${message?`<p class="error" role="alert">${esc(message)}</p>`:''}<a href="/">Back to Pack One</a></section>`;
+}
+function denied(account){
+  setAuthorized(false);
+  root.innerHTML=`<section class="login"><h1>Administrator access required</h1><p>This account does not have administrator access.</p><p class="muted">Signed in as ${esc(account?.email||'your current account')}.</p><button id="admin-switch" type="button">Switch account</button> <a href="/">Back to Pack One</a></section>`;
+  document.querySelector('#admin-switch').onclick=()=>void switchAccount();
+}
+function unavailable(error){
+  setAuthorized(false);
+  const message=error?.message||'Administration is temporarily unavailable.';
+  root.innerHTML=`<section class="login"><h1>Administration unavailable</h1><p class="error" role="alert">${esc(message)}</p><button type="button" id="retry">Retry</button> <a href="/">Back to Pack One</a></section>`;
+  document.querySelector('#retry').onclick=()=>void load();
+}
+async function switchAccount(){
+  if(switching)return;
+  switching=true;++deferredLoad;adminContractVerified=false;setAuthorized(false);
+  root.innerHTML='<section class="login"><h1>Signing out…</h1></section>';
+  try {await signOutAccount();}finally{switching=false;login();}
 }
 function options(values,current){return values.map(([v,label])=>`<option value="${esc(v)}" ${v===current?'selected':''}>${esc(label)}</option>`).join('');}
 function table(rows,label) {
@@ -89,7 +110,7 @@ async function loadDeferredSections(loadId,queryString){
 function render() {
   const s=report.summary,c=report.coverage,f=report.filters,sf=report.share_funnel||{};
   root.innerHTML=`<h1>How the decisions play</h1><p class="muted">Current corpus ${esc(report.corpus_version||'unknown')} · First encounters · QA excluded · Historical corpus measurements retained but excluded · Updated ${esc(new Date(report.generated_at).toLocaleString())}</p>
-    <form id="filters" class="filters"><label>From<input type="date" name="from" value="${f.start}" required></label><label>Through<input type="date" name="to" value="${f.end}" required></label><label>Environment<select name="environment" aria-label="Environment">${options([['all','All'],['mixed','Regular'],['powered-cube','Powered Cube']],f.environment)}</select></label><label>Run type<select name="type" aria-label="Run type">${options([['all','All'],['daily','Daily'],['practice','Practice'],['challenge','Challenge']],f.type)}</select></label><label>Set<select name="set" aria-label="Set">${options([['all','All'],...report.sets.map(x=>[x,x==='powered-cube'?'Powered Cube':x.toUpperCase()])],f.set)}</select></label><label>Difficulty<select name="difficulty" aria-label="Difficulty">${options([['all','All'],['easy','Easy'],['medium','Medium'],['hard','Hard']],f.band)}</select></label><label>Draft pick<select name="pick" aria-label="Draft pick">${options([['all','All'],...Array.from({length:12},(_,i)=>[String(i+1),'P1P'+(i+1)])],f.pick)}</select></label><label>Selection version<select name="version" aria-label="Selection version">${options([['all','All'],...Array.from(new Set(report.groups.filter(r=>r.dimension==='version').map(r=>r.label.split(' / ')[0]))).map(x=>[x,x]),...(f.version!=='all'&&!report.groups.some(r=>r.dimension==='version'&&r.label.startsWith(f.version+' / '))?[[f.version,f.version]]:[])],f.version)}</select></label><button>Refresh</button><button type="button" class="secondary" id="csv">Export CSV</button><button type="button" class="secondary" id="signout">Sign out</button></form>
+    <form id="filters" class="filters"><label>From<input type="date" name="from" value="${f.start}" required></label><label>Through<input type="date" name="to" value="${f.end}" required></label><label>Environment<select name="environment" aria-label="Environment">${options([['all','All'],['mixed','Regular'],['powered-cube','Powered Cube']],f.environment)}</select></label><label>Run type<select name="type" aria-label="Run type">${options([['all','All'],['daily','Daily'],['practice','Practice'],['challenge','Challenge']],f.type)}</select></label><label>Set<select name="set" aria-label="Set">${options([['all','All'],...report.sets.map(x=>[x,x==='powered-cube'?'Powered Cube':x.toUpperCase()])],f.set)}</select></label><label>Difficulty<select name="difficulty" aria-label="Difficulty">${options([['all','All'],['easy','Easy'],['medium','Medium'],['hard','Hard']],f.band)}</select></label><label>Draft pick<select name="pick" aria-label="Draft pick">${options([['all','All'],...Array.from({length:12},(_,i)=>[String(i+1),'P1P'+(i+1)])],f.pick)}</select></label><label>Selection version<select name="version" aria-label="Selection version">${options([['all','All'],...Array.from(new Set(report.groups.filter(r=>r.dimension==='version').map(r=>r.label.split(' / ')[0]))).map(x=>[x,x]),...(f.version!=='all'&&!report.groups.some(r=>r.dimension==='version'&&r.label.startsWith(f.version+' / '))?[[f.version,f.version]]:[])],f.version)}</select></label><button>Refresh</button><button type="button" class="secondary" id="csv">Export CSV</button></form>
     <div class="cards">${[['First-encounter answers',fmt(s.answers)],['Trophy match rate',pct(s.trophy_match_pct)],['Average alternative credit',fmt(s.average_partial_credit)],['Median foreground time',s.median_seconds==null?'N/A':fmt(s.median_seconds)+'s'],['Players',fmt(s.players)],['Completed / observed runs',`${fmt(s.completed_runs)} / ${fmt(s.runs)}`],['Rerolls / viewed choices',`${fmt(s.rerolls)} / ${fmt(s.exposures)}`],['Likely abandonment',fmt(s.likely_abandoned)]].map(([label,value])=>`<div class="card"><span>${label}</span><strong>${value}</strong></div>`).join('')}</div>
     <h2>Daily result-share funnel</h2>
     <div class="cards share-funnel">${[['Share-link arrivals',fmt(sf.arrivals)],['Unique visitors',fmt(sf.visitors)],['New Daily starts',fmt(sf.starts)],['Completed Dailies',fmt(sf.completions)]].map(([label,value])=>`<div class="card"><span>${label}</span><strong>${value}</strong></div>`).join('')}</div>
@@ -105,8 +126,7 @@ function render() {
     ${[['difficulty','By difficulty'],['pick','By real draft pick'],['round','By game position'],['set','By set'],['source_event','By source event'],['model_disagreement','When the model questions the trophy pick'],['version','By scoring and selection version']].map(([dimension,title])=>`<h2>${title}</h2>${table(report.groups.filter(r=>r.dimension===dimension).sort((a,b)=>dimension==='difficulty'?['easy','medium','hard','unrated'].indexOf(a.label)-['easy','medium','hard','unrated'].indexOf(b.label):a.label.localeCompare(b.label,undefined,{numeric:true})),dimension==='model_disagreement'?'Disagreement':'Group')}`).join('')}
     <h2>Alternative-credit distribution</h2><p>${[['0–24',s.partial_0_24],['25–49',s.partial_25_49],['50–74',s.partial_50_74],['75–95',s.partial_75_95]].map(([label,n])=>`${label} points: <strong>${fmt(n)}</strong>`).join(' · ')}</p>
     <h2>Decisions to review</h2><p class="muted">At least five first-encounter answers. Model disagreements appear first, then the largest samples. Small samples are exploratory.</p><div id="reviews"><p class="muted">Loading decisions to review…</p></div><p id="status" role="status"></p>`;
-  document.querySelector('#filters').onsubmit=async e=>{e.preventDefault();params=new URLSearchParams(new FormData(e.currentTarget));await load();};
-  document.querySelector('#signout').onclick=async()=>{await signOutAccount();login();};
+  document.querySelector('#filters').onsubmit=async e=>{e.preventDefault();params=new URLSearchParams(new FormData(e.currentTarget));await refreshReport();};
   document.querySelector('#csv').onclick=()=>{
     const rows=report.groups,keys=rows.length?Object.keys(rows[0]):['dimension','label','answers'];
     const cell=v=>'"'+String(v??'').replace(/^[=+@-]/,"'$&").replaceAll('"','""')+'"';
@@ -114,12 +134,56 @@ function render() {
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`pack-one-decisions-${f.start}-${f.end}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
   };
 }
-async function load() {
-  if(!hasAccountSession()){login();return;}
+// Report refresh does not reset the authorized shell or remove filters while a
+// previous report request is in flight. In particular, a second refresh must
+// be possible before the first response returns.
+async function refreshReport() {
   const loadId=++deferredLoad;
-  await verifyAdminContract();
-  try{if(invite){await request('/v1/admin/claim',{invite});sessionStorage.removeItem('pack1-admin-invite');invite=null;}const area=new URLSearchParams(location.search).get('area');if(area==='corpus'){await renderCorpus(root,request);return;}if(area==='users'){await renderUsers(root,request,growthRequest);return;}if(area==='campaign-links'){await renderCampaignLinks(root,growthRequest,request);return;}const queryString=params.toString(),nextReport=await request('/v1/admin/measurements'+(queryString?'?'+queryString:''));if(loadId!==deferredLoad)return;report=nextReport;const effectiveQuery=reportQuery(report.filters);render();void loadDeferredSections(loadId,effectiveQuery);}
-  catch(err){if(loadId!==deferredLoad)return;if(err.status===401||err.status===403){login(err.message);return;}const status=document.querySelector('#status');if(status)status.textContent=err.message;else root.innerHTML=`<h1>Report unavailable</h1><p class="error">${esc(err.message)}</p><button id="retry">Try again</button>`;document.querySelector('#retry')?.addEventListener('click',load);}
+  try {
+    const queryString=params.toString();
+    const nextReport=await request('/v1/admin/measurements'+(queryString?'?'+queryString:''));
+    if(loadId!==deferredLoad)return;
+    report=nextReport;render();void loadDeferredSections(loadId,reportQuery(report.filters));
+  } catch(error) {
+    if(loadId!==deferredLoad)return;
+    if(error?.status===401||error?.status===403){await load();return;}
+    const status=document.querySelector('#status');
+    if(status)status.textContent=error?.message||'Report temporarily unavailable.';
+  }
 }
-document.addEventListener('pack1:admin-signout',async()=>{await signOutAccount();login();});
+
+async function load() {
+  const loadId=++deferredLoad;
+  setAuthorized(false);
+  root.innerHTML='<p>Checking administrator access…</p>';
+  let session=null;
+  try {
+    session=await getAuthSession();
+    if(loadId!==deferredLoad)return;
+    if(!session?.user){login('Your session may have expired. Sign in to continue.');return;}
+    await verifyAdminContract();
+    if(loadId!==deferredLoad)return;
+    await request('/v1/admin/access');
+    if(loadId!==deferredLoad)return;
+    setAuthorized(true);
+    const authorizedRequest=async (...args)=>{const data=await request(...args);if(loadId!==deferredLoad)throw Error('Administrator account changed.');return data;};
+    const authorizedGrowthRequest=async (...args)=>{const data=await growthRequest(...args);if(loadId!==deferredLoad)throw Error('Administrator account changed.');return data;};
+    const area=new URLSearchParams(location.search).get('area');
+    if(area==='corpus'){await renderCorpus(root,authorizedRequest);return;}
+    if(area==='users'){await renderUsers(root,authorizedRequest,authorizedGrowthRequest);return;}
+    if(area==='campaign-links'){await renderCampaignLinks(root,authorizedGrowthRequest,authorizedRequest);return;}
+    const queryString=params.toString();
+    const nextReport=await authorizedRequest('/v1/admin/measurements'+(queryString?'?'+queryString:''));
+    if(loadId!==deferredLoad)return;
+    report=nextReport;render();void loadDeferredSections(loadId,reportQuery(report.filters));
+  } catch(error) {
+    if(loadId!==deferredLoad)return;
+    if(error?.status===401){login('Your session expired. Sign in again to continue.');return;}
+    if(error?.status===403){denied(session?.user);return;}
+    unavailable(error);
+  }
+}
+document.querySelector('#admin-signout').onclick=()=>void switchAccount();
+document.addEventListener('pack1:admin-signout',()=>void switchAccount());
+window.addEventListener('packone-account-changed',()=>{if(!switching)void load();});
 await load();
