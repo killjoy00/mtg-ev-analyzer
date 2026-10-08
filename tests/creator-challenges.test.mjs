@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {spawnSync} from 'node:child_process';
 import {mkdir,mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -723,4 +724,14 @@ test('creator admin list bounds the page before running correlated stats',async(
   assert.doesNotMatch(list,/creatorChallengeById/);
   assert.match(source,/e\.event_props \? 'creator_challenge_id'/,
     'funnel lookup must carry the partial-index predicate explicitly');
+});
+
+
+test('retired creator social-card validation does not require Pillow',async()=>{
+  const registry=JSON.parse(await readFile('creator-challenges.json','utf8'));
+  const retired=registry.find(entry=>entry.status==='retired');
+  assert.ok(retired,'expected at least one retired creator challenge fixture');
+  const checked=spawnSync('python3',['-S','scripts/check-creator-social-card.py','--slug',retired.slug],{encoding:'utf8'});
+  assert.equal(checked.status,0,checked.stderr||checked.stdout);
+  assert.match(checked.stdout,/has no social images/);
 });
