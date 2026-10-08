@@ -30,6 +30,7 @@ try {
   let holdDeletionStatus=false,releaseDeletionStatus=null,failDeleteAfterCommit=false;
   let holdHabitReport=true,releaseHabitReport=null,holdStaleCore=false,releaseStaleCore=null;
   let markStaleCoreHeld;const staleCoreHeld=new Promise(resolve=>{markStaleCoreHeld=resolve;});
+  await page.route('**/v1/admin/team',route=>route.fulfill({json:{ok:true,members:[],invitations:[],audit:[]}}));
   await page.route('**/v1/account/session',route=>route.fulfill({json:{user:{id:'22222222-2222-4222-8222-222222222222',email:'admin@example.com'}}}));
   await page.route(/\/health\?quick=1$/,route=>route.fulfill({headers:{'x-pack1-admin-api-version':String(ADMIN_API_VERSION)},json:{ok:true,admin_api_version:ADMIN_API_VERSION,campaign_link_publish_configured:true}}));
   await page.route(/^https:\/\/packone\.pro\/creator\/[^/]+\/creator-card(?:-square)?\.png(?:\?.*)?$/,route=>{

@@ -1862,6 +1862,8 @@ async function handleAccountDeleteVerificationStart(request,{mobile=false}={}) {
 }
 
 async function commitAccountDeletion(auth,{mobile=false}={}) {
+  const owner=await query("SELECT 1 FROM pack1_admins WHERE auth_user_id=$1::uuid AND role='owner'",[auth.user_id]);
+  if(owner.rows.length)throw Object.assign(Error('The Owner account cannot be deleted until ownership is transferred.'),{status:409,code:'OWNER_PROTECTED'});
   const operation=await beginDeletion(query,{authUserId:auth.user_id});
   if(!operation)throw Object.assign(Error('Account deletion could not be started.'),{status:500,code:'DELETE_START'});
   const final=await resumeDeletionOperation(operation,{knownEmail:auth.email});

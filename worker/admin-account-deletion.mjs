@@ -77,6 +77,8 @@ export async function handleAdminAccountDeletion(
   const target=await query('SELECT email,"emailVerified" email_verified FROM neon_auth."user" WHERE id=$1::uuid LIMIT 1',[targetAuthUserId]);
   const knownEmail=target.rows[0]?.email||null;
   const noticeEmail=bool(target.rows[0]?.email_verified)?knownEmail:null;
+  const targetOwner=await query("SELECT 1 FROM pack1_admins WHERE auth_user_id=$1::uuid AND role='owner'",[targetAuthUserId]);
+  if(targetOwner.rows.length)fail('The Owner account cannot be deleted. Transfer ownership through a controlled operator process first.',409,'OWNER_PROTECTED');
   const started=await beginAdminDeletion(query,{
     authUserId:targetAuthUserId,
     adminAuthUserId,
