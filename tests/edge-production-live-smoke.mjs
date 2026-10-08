@@ -27,21 +27,43 @@ async function exactRelease(service) {
 }
 for(const service of ['legacy','growth','draft'])await exactRelease(service);
 // A deployment is not Admin-ready until all three independently released
-// surfaces agree: the published Pages frontend, the gateway and Draft backend.
+// surfaces agree: published Pages, gateway and Draft backend. Cloudflare
+// Workers can temporarily serve the prior gateway version after the publish
+// control returns. Retry *read-only health/asset probes* within the same
+// bounded settle window as the exact-release markers; never replay mutations.
 const origin='https://packone.pro';
-const {response:adminResponse,data:adminHealth}=await call('/draft/health?quick=1',{
-  headers:{origin},cache:'no-store',
-});
-assert.equal(adminHealth.admin_api_version,ADMIN_API_VERSION,'Draft Admin API version matches reviewed release');
-assert.equal(adminResponse.headers.get('x-pack1-admin-api-version'),String(ADMIN_API_VERSION),
-  'Production gateway Admin API version matches reviewed release');
-const publishedContract=await fetch(origin+'/admin-api-contract.mjs',{
-  cache:'no-store',redirect:'manual',signal:AbortSignal.timeout(30000),
-});
-assert.equal(publishedContract.status,200,'Published Pages Admin API contract must be accessible');
-const publishedCode=await publishedContract.text();
-const publishedVersion=publishedCode.match(/^export const ADMIN_API_VERSION=([0-9]+);\s*$/m)?.[1];
-assert.equal(publishedVersion,String(ADMIN_API_VERSION),'Published Pages Admin version matches gateway and backend');
+async function awaitAdminVersionAlignment(){
+  let observed={backend:null,gateway:null,pages:null},lastError=null;
+  for(let attempt=0;attempt<15;attempt++){
+    try {
+      const {response,data}=await call('/draft/health?quick=1',{
+        headers:{origin},cache:'no-store',signal:AbortSignal.timeout(10000),
+      });
+      const published=await fetch(origin+'/admin-api-contract.mjs',{
+        cache:'no-store',redirect:'manual',signal:AbortSignal.timeout(10000),
+      });
+      assert.equal(published.status,200,'Published Pages Admin contract must be accessible');
+      const publishedCode=await published.text();
+      observed={
+        backend:Number(data.admin_api_version)||null,
+        gateway:response.headers.get('x-pack1-admin-api-version'),
+        pages:publishedCode.match(/^export const ADMIN_API_VERSION=([0-9]+);\\s*$/m)?.[1]||null,
+      };
+      lastError=null;
+      if(observed.backend===ADMIN_API_VERSION&&observed.gateway===String(ADMIN_API_VERSION)
+        &&observed.pages===String(ADMIN_API_VERSION)) {
+        console.log('Admin Pages/gateway/backend v'+ADMIN_API_VERSION+' aligned after '+(attempt+1)+' read-only probe(s).');
+        return;
+      }
+    }catch(error){lastError=error;}
+    if(attempt<14)await sleep(2000);
+  }
+  if(lastError)throw lastError;
+  assert.deepEqual(observed,{
+    backend:ADMIN_API_VERSION,gateway:String(ADMIN_API_VERSION),pages:String(ADMIN_API_VERSION),
+  },'Admin Pages/gateway/Draft API versions must converge before release acceptance');
+}
+await awaitAdminVersionAlignment();
 
 const mobileLeaderboardToken='p1_00000000-0000-4000-8000-000000000000.'+'A'.repeat(43);
 await call('/draft/v1/leaderboard?period=daily&environment=mixed',{
