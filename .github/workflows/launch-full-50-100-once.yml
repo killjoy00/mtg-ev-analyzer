@@ -1,0 +1,101 @@
+name: one-shot full current-code 50 then 100 acceptance
+on:
+  pull_request:
+    types: [opened]
+    branches: [main]
+    paths:
+      - 'scripts/launch-distributed-policy.json'
+      - 'scripts/launch-distributed-core.mjs'
+      - 'scripts/launch-distributed-player.mjs'
+      - 'scripts/launch-distributed-collect.mjs'
+      - 'tests/launch-distributed-capacity.test.mjs'
+      - '.github/workflows/launch-distributed-preview.yml'
+      - '.github/workflows/launch-full-50-100-once.yml'
+permissions:
+  contents: read
+  checks: read
+  pull-requests: read
+jobs:
+  preflight:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'diagnostic/current-code-full-50-100-20261008-r1' &&
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validate the temporary harness before provisioning
+        run: |
+          node --check scripts/launch-distributed-core.mjs
+          node --check scripts/launch-distributed-player.mjs
+          node --check scripts/launch-distributed-collect.mjs
+          node --test tests/launch-distributed-capacity.test.mjs tests/launch-alert.test.mjs tests/launch-controls.test.mjs tests/preview-resource-ownership.test.mjs tests/ci-source-gate.test.mjs
+      - name: Declare exact 50-then-100 workload, budgets and source identity
+        env:
+          PACK1_CAPACITY_TARGET: '50-100'
+          SOURCE_MAIN: ${{ github.event.pull_request.base.sha }}
+          HARNESS_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {fingerprint} from './scripts/launch-distributed-core.mjs';
+          import {policy} from './scripts/launch-distributed-control.mjs';
+          import {fixtureIndexForActor} from './scripts/launch-distributed-player.mjs';
+          assert.match(process.env.SOURCE_MAIN,/^[a-f0-9]{40}$/);
+          assert.match(process.env.HARNESS_HEAD,/^[a-f0-9]{40}$/);
+          assert.equal(policy.sequence,'50_to_100');
+          assert.deepEqual(policy.stages,[{players:50,hold_seconds:600},{players:100,hold_seconds:600}]);
+          assert.equal(policy.supported_launch_target,50);
+          assert.equal(policy.proposed_target,100);
+          const a=Array.from({length:50},(_,i)=>fixtureIndexForActor(policy,0,i));
+          const b=Array.from({length:100},(_,i)=>fixtureIndexForActor(policy,1,i));
+          assert.deepEqual([a[0],a.at(-1),b[0],b.at(-1)],[0,49,50,149]);
+          assert.equal(new Set([...a,...b]).size,150);
+          for(const [k,v] of Object.entries({
+            maximum_experiment_minutes:60,maximum_branch_lifetime_minutes:75,
+            maximum_compute_cu:8,maximum_runner_minutes:358,maximum_requests:50000,
+            maximum_coordinator_queries:20000,maximum_response_bytes:268435456,
+            maximum_project_reported_egress_delta_bytes:1073741824,
+            maximum_error_fraction:0,maximum_legitimate_429s:0,maximum_correctness_failures:0}))
+            assert.equal(policy[k],v,k);
+          assert.deepEqual(policy.route_budgets_ms,{
+            session:{p95:2000,p99:5000},start:{p95:3000,p99:8000},
+            view:{p95:1000,p99:3000},pick:{p95:2000,p99:5000},
+            reroll:{p95:2000,p99:5000},read:{p95:2000,p99:5000}});
+          const phases=policy.stages.reduce((n,s)=>n+policy.initial_seconds+s.hold_seconds+policy.drain_seconds+policy.recovery_seconds,0);
+          const normal=phases+2*(policy.arm_seconds+policy.telemetry_settlement_seconds);
+          const worst=phases+2*(policy.arm_seconds+policy.telemetry_timeout_seconds);
+          assert.equal(phases,1740);assert.equal(normal,2040);assert.equal(worst,2280);
+          // Two PRs: ordinary test 8+2, browser 30, distributed scope 3+regression 8.
+          // Special one-shot: preflight 9, setup 15, 5*45 generators, cleanup 7.
+          assert.equal(2*(8+2+30+3+8)+(9+15+5*45+7),358);
+          console.log(JSON.stringify({main_source:process.env.SOURCE_MAIN,
+            harness_head:process.env.HARNESS_HEAD,tested_merge:process.env.GITHUB_SHA,
+            policy_hash:fingerprint(policy),stages:policy.stages,
+            no_25_player_warmup:true,nominal_seconds:normal,worst_telemetry_seconds:worst,
+            all_timeout_runner_minutes:358}));
+          NODE
+      - name: Require successful current-head test and browser checks before provisioning
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEWED_HEAD: ${{ github.event.pull_request.head.sha }}
+          REVIEWED_PR: ${{ github.event.pull_request.number }}
+          REQUIRE_PERFORMANCE: 'false'
+        run: node scripts/require-ci-source.mjs
+  capacity:
+    needs: preflight
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'diagnostic/current-code-full-50-100-20261008-r1' &&
+      github.event.pull_request.draft == false
+    uses: ./.github/workflows/launch-distributed-preview.yml
+    with:
+      require_performance: 'false'
+      capacity_target: '50-100'
+      source_main_sha: ${{ github.event.pull_request.base.sha }}
+      harness_head_sha: ${{ github.event.pull_request.head.sha }}
+    secrets: inherit
