@@ -1,0 +1,92 @@
+name: one-shot current-code 100-player acceptance
+on:
+  pull_request:
+    types: [opened]
+    branches: [main]
+    paths:
+      - 'scripts/launch-distributed-policy.json'
+      - 'scripts/launch-distributed-core.mjs'
+      - 'scripts/launch-distributed-player.mjs'
+      - 'tests/launch-distributed-capacity.test.mjs'
+      - '.github/workflows/launch-distributed-preview.yml'
+      - '.github/workflows/launch-distributed-100-once.yml'
+permissions:
+  contents: read
+  checks: read
+  pull-requests: read
+jobs:
+  preflight:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'diagnostic/current-code-100-acceptance-20261008-r2' &&
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validate the temporary harness before provisioning
+        run: |
+          node --check scripts/launch-distributed-core.mjs
+          node --check scripts/launch-distributed-player.mjs
+          node --test tests/launch-distributed-capacity.test.mjs tests/launch-alert.test.mjs tests/launch-controls.test.mjs tests/preview-resource-ownership.test.mjs tests/ci-source-gate.test.mjs
+      - name: Declare the exact one-shot target, gates and resource budget
+        env:
+          PACK1_CAPACITY_TARGET: '100'
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {policy} from './scripts/launch-distributed-control.mjs';
+          assert.equal(policy.supported_launch_target,50);
+          assert.equal(policy.proposed_target,100);
+          assert.deepEqual(policy.stages,[{players:25,hold_seconds:120},{players:50,hold_seconds:600},{players:100,hold_seconds:600}]);
+          assert.equal(policy.maximum_compute_cu,8);
+          assert.equal(policy.maximum_experiment_minutes,45);
+          assert.equal(policy.maximum_branch_lifetime_minutes,75);
+          assert.equal(policy.maximum_runner_minutes,270);
+          assert.equal(policy.maximum_requests,50000);
+          assert.equal(policy.maximum_coordinator_queries,20000);
+          assert.equal(policy.maximum_response_bytes,268435456);
+          assert.equal(policy.maximum_project_reported_egress_delta_bytes,1073741824);
+          assert.equal(policy.maximum_error_fraction,0);
+          assert.equal(policy.maximum_legitimate_429s,0);
+          assert.equal(policy.maximum_correctness_failures,0);
+          console.log(JSON.stringify({
+            target:policy.proposed_target,stages:policy.stages,route_budgets_ms:policy.route_budgets_ms,
+            resource_budget:{
+              maximum_compute_cu:policy.maximum_compute_cu,
+              maximum_experiment_minutes:policy.maximum_experiment_minutes,
+              maximum_branch_lifetime_minutes:policy.maximum_branch_lifetime_minutes,
+              maximum_runner_minutes:policy.maximum_runner_minutes,
+              maximum_gateway_requests:policy.maximum_requests,
+              maximum_coordinator_queries:policy.maximum_coordinator_queries,
+              maximum_decoded_response_bytes:policy.maximum_response_bytes,
+              maximum_project_reported_egress_delta_bytes:policy.maximum_project_reported_egress_delta_bytes
+            },
+            zero_error_gates:{
+              maximum_error_fraction:policy.maximum_error_fraction,
+              maximum_legitimate_429s:policy.maximum_legitimate_429s,
+              maximum_correctness_failures:policy.maximum_correctness_failures
+            }
+          }));
+          NODE
+      - name: Require successful current-head test and browser checks before provisioning
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REVIEWED_HEAD: ${{ github.event.pull_request.head.sha }}
+          REVIEWED_PR: ${{ github.event.pull_request.number }}
+          REQUIRE_PERFORMANCE: 'false'
+        run: node scripts/require-ci-source.mjs
+  capacity:
+    needs: preflight
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'diagnostic/current-code-100-acceptance-20261008-r2' &&
+      github.event.pull_request.draft == false
+    uses: ./.github/workflows/launch-distributed-preview.yml
+    with:
+      require_performance: 'false'
+      capacity_target: '100'
+    secrets: inherit
