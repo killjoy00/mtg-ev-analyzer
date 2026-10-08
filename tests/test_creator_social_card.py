@@ -1,3 +1,4 @@
+import json
 import os
 import subprocess
 import sys
@@ -118,6 +119,16 @@ class CreatorSocialCardTests(unittest.TestCase):
         finally:
             if temp is not None:
                 temp.cleanup()
+
+    def test_checked_in_creator_social_assets_match_registry_state(self):
+        registry = json.loads((ROOT / "creator-challenges.json").read_text(encoding="utf-8"))
+        for entry in registry:
+            with self.subTest(slug=entry["slug"], status=entry.get("status")):
+                subprocess.run(
+                    [sys.executable, str(ROOT / "scripts/check-creator-social-card.py"), "--slug", entry["slug"]],
+                    cwd=ROOT,
+                    check=True,
+                )
 
     def test_maximum_valid_headline_stays_clear_of_scorecard_dividers(self):
         with tempfile.TemporaryDirectory(prefix="packone-creator-social-max-") as tmp:

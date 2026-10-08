@@ -22,6 +22,7 @@ function changedRegistryEntries(before,after){
   return [...slugs].filter(slug=>!jsonEqual(a.get(slug),b.get(slug))).map(slug=>({slug,before:a.get(slug),after:b.get(slug)}));
 }
 function readBaseJson(base,path,{cwd}){return JSON.parse(git(['show',`${base}:${path}`],{cwd}));}
+function basePathExists(base,path,{cwd}){return git(['cat-file','-e',`${base}:${path}`],{cwd,allowFailure:true})!==null;}
 function statusMap(changes){return new Map(changes.map(change=>[change.path,change.status]));}
 
 export function validatePublicationDiff({base,head,cwd=process.cwd()}={}){
@@ -79,8 +80,12 @@ export function validatePublicationDiff({base,head,cwd=process.cwd()}={}){
   }else if(change.after.status==='retired'&&(!change.before||change.before.status==='published')){
     action='retire';
     for(const [asset,label] of [[card,'Open Graph'],[square,'square']]){
+      const existedAtBase=basePathExists(base,asset,{cwd});
       assert.equal(existsSync(`${cwd}/${asset}`),false,`retired creator route must not retain its ${label} social card`);
-      if(change.before?.status==='published')assert.equal(statuses.get(asset),'D',`published creator retirement must delete its ${label} social card`);
+      if(existedAtBase)
+        assert.equal(statuses.get(asset),'D',`creator retirement must delete the ${label} social card that existed at the base`);
+      else
+        assert.equal(statuses.has(asset),false,`creator retirement must not synthesize a missing historical ${label} social card`);
     }
   }else throw new Error('creator fast path only accepts a new publication or a transition to retired');
   return {kind:'creator',slug,action,paths};
