@@ -47,7 +47,7 @@ async function awaitAdminVersionAlignment(){
       observed={
         backend:Number(data.admin_api_version)||null,
         gateway:response.headers.get('x-pack1-admin-api-version'),
-        pages:publishedCode.match(/^export const ADMIN_API_VERSION=([0-9]+);\\s*$/m)?.[1]||null,
+        pages:publishedCode.match(/^export const ADMIN_API_VERSION=([0-9]+);\s*$/m)?.[1]||null,
       };
       lastError=null;
       if(observed.backend===ADMIN_API_VERSION&&observed.gateway===String(ADMIN_API_VERSION)
