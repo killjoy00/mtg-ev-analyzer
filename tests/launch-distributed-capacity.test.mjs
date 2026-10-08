@@ -9,7 +9,8 @@ import {parseStartDiagnostics,requestClient} from '../scripts/launch-distributed
 import {transportFailureEvidence,undiciTransportObserver} from '../scripts/launch-distributed-transport.mjs';
 import {inspectPreflightEvents,preflightTelemetry} from '../scripts/launch-distributed-setup.mjs';
 import {waitForPreviewReadiness} from '../scripts/edge-control.mjs';
-const envelope=JSON.parse(fs.readFileSync(new URL('../scripts/launch-distributed-policy.json',import.meta.url),'utf8'));\nconst policy=selectCapacityPolicy(envelope,'50');
+const envelope=JSON.parse(fs.readFileSync(new URL('../scripts/launch-distributed-policy.json',import.meta.url),'utf8'));
+const policy=selectCapacityPolicy(envelope,'50');
 const start=1_000_000,scope={sha:'a'.repeat(40),branch:'br-capacity-fixture',run_id:'123',attempt:'2',policy_hash:fingerprint(policy)};
 const msg=(shard,extra={})=>({scope,shard,nonce:`00000000-0000-4000-8000-${String(shard).padStart(12,'0')}`,network:String(shard+1).repeat(64),ready:0,ack:null,done:null,...extra});
 const formed=()=>{let s=initialControl(scope,start,policy);for(let i=0;i<5;i++)s=transition(s,msg(i),start+100,policy);return s;};
