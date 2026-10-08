@@ -30,6 +30,7 @@ export const BROWSER_GROUPS={
 };
 export const PRESENTATION_BROWSER=[spec('tests/e2e.mjs'),spec('tests/sets-e2e.mjs')];
 export const FULL_BROWSER=[
+  spec('tests/admin-invitations-e2e.mjs'),
   spec('tests/e2e.mjs'),spec('tests/sets-e2e.mjs'),
   ...BROWSER_GROUPS.practice,...BROWSER_GROUPS.profile,
   spec('tests/home-today-e2e.mjs'),spec('tests/home-auth-hydration-e2e.mjs'),

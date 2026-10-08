@@ -21,6 +21,14 @@ async function pageFor({signedIn=true,role='owner',acceptStatus=200}={}){
     requests.push({path,method:req.method(),body:req.postDataJSON?.()||null});
     if(path==='/v1/admin/invitations/accept')return route.fulfill({status:acceptStatus,json:acceptStatus===200?{ok:true,role:'admin'}:{error:'Sign in with the invited account.',code:'ADMIN_WRONG_ACCOUNT'}});
     if(path==='/v1/admin/access')return route.fulfill({json:{ok:true,role}});
+    if(path==='/v1/admin/measurements')return route.fulfill({json:{
+      generated_at:'2026-10-08T00:00:00Z',corpus_version:'synthetic-browser',
+      filters:{start:'2026-10-01',end:'2026-10-08',environment:'all',type:'all',set:'all',version:'all',band:'all',pick:'all'},
+      summary:{exposures:0,players:0,answers:0,completed_runs:0,runs:0,rerolls:0},
+      coverage:{qa_excluded:0,repeats_excluded:0,unobserved_excluded:0},
+      share_funnel:{},groups:[],sets:[],reviews:[],
+    }});
+
     if(path==='/v1/admin/team')return route.fulfill({json:{ok:true,members:[
       {id:ownerId,email:'owner@example.invalid',role:'owner',name:'Owner'},
       ...(!revokedMember?[{id:memberId,email:'member@example.invalid',role:'admin',name:'Member'}]:[])],
@@ -61,7 +69,7 @@ try {
 
   const invitee=await pageFor({role:'admin'});
   await invitee.page.goto('http://127.0.0.1:4173/admin/#invite='+token);
-  await invitee.page.getByRole('heading',{name:'Administration unavailable'}).waitFor();
+  await invitee.page.getByRole('heading',{name:'How the decisions play'}).waitFor();
   const claim=invitee.requests.find(r=>r.path==='/v1/admin/invitations/accept');
   assert.equal(claim.method,'POST');assert.deepEqual(claim.body,{token});
   assert.equal(invitee.page.url().includes(token),false,'Invitation token must be removed from browser address after intake');
