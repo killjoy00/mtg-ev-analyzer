@@ -1,5 +1,6 @@
 import {renderCorpus} from './corpus.mjs';
 import {renderUsers} from './users.mjs';
+import {renderAdminTeam} from './team.mjs';
 import {renderCampaignLinks} from './campaign-links.mjs';
 import {ADMIN_API_VERSION} from '../admin-api-contract.mjs';
 import {accountCsrfToken,firstPartyAuthEnabled,getAuthSession,storedAccountToken,signOutAccount} from '../growth-api.mjs';
@@ -11,8 +12,25 @@ const pct=x=>x==null?'N/A':`${fmt(x)}%`;
 const draftBase=window.PACK1_API.draftRunUrl;
 const growthBase=window.PACK1_API.growthUrl;
 let report,params=new URLSearchParams(),deferredLoad=0,adminContractVerified=false,switching=false;
+const INVITE_STORAGE='pack1-pending-admin-invite-v2';
+const INVITE_TTL_MS=15*60*1000;
+function pendingInvitation(){
+  try{const saved=JSON.parse(sessionStorage.getItem(INVITE_STORAGE)||'null');
+    if(saved&&Date.now()>=saved.at&&Date.now()-saved.at<INVITE_TTL_MS&&/^[A-Za-z0-9_-]{43}$/.test(saved.token))return saved.token;
+  }catch{}
+  sessionStorage.removeItem(INVITE_STORAGE);return null;
+}
+const invitationHash=new URLSearchParams(location.hash.slice(1));
+if(invitationHash.has('invite')){
+  const token=invitationHash.get('invite');
+  if(/^[A-Za-z0-9_-]{43}$/.test(token))sessionStorage.setItem(INVITE_STORAGE,JSON.stringify({token,at:Date.now()}));
+  history.replaceState({},'',location.pathname+location.search);
+}
 const areaNavigation=document.querySelector('#admin-area-nav');
-function setAuthorized(authorized){areaNavigation.hidden=!authorized;}
+function setAuthorized(authorized,role='admin'){
+  areaNavigation.hidden=!authorized;
+  document.querySelector('#admin-team-link').hidden=!authorized||role!=='owner';
+}
 async function requestAt(base,path,body,method=body?'POST':'GET') {
   const headers={'content-type':'application/json'};
   if(firstPartyAuthEnabled()){const csrf=accountCsrfToken();if(!['GET','HEAD'].includes(method)&&csrf)headers['x-pack1-csrf']=csrf;}
@@ -51,9 +69,10 @@ function login(message='') {
   setAuthorized(false);
   root.innerHTML=`<section class="login"><h1>Pack One administration</h1><p>Sign in using your existing Pack One account. Administrator access is checked after sign-in.</p><p><a class="admin-primary-link" href="${esc(signInHref())}">Sign in with Pack One</a></p>${message?`<p class="error" role="alert">${esc(message)}</p>`:''}<a href="/">Back to Pack One</a></section>`;
 }
-function denied(account){
+function denied(account,message='This account does not have administrator access.'){
+
   setAuthorized(false);
-  root.innerHTML=`<section class="login"><h1>Administrator access required</h1><p>This account does not have administrator access.</p><p class="muted">Signed in as ${esc(account?.email||'your current account')}.</p><button id="admin-switch" type="button">Switch account</button> <a href="/">Back to Pack One</a></section>`;
+  root.innerHTML=`<section class="login"><h1>Administrator access required</h1><p>${esc(message)}</p><p class="muted">Signed in as ${esc(account?.email||'your current account')}.</p><button id="admin-switch" type="button">Switch account</button> <a href="/">Back to Pack One</a></section>`;
   document.querySelector('#admin-switch').onclick=()=>void switchAccount();
 }
 function unavailable(error){
@@ -163,14 +182,28 @@ async function load() {
     if(!session?.user){login('Your session may have expired. Sign in to continue.');return;}
     await verifyAdminContract();
     if(loadId!==deferredLoad)return;
-    await request('/v1/admin/access');
+    const invitation=pendingInvitation();
+    if(invitation){
+      try{
+        await request('/v1/admin/invitations/accept',{token:invitation});
+        sessionStorage.removeItem(INVITE_STORAGE);
+      }catch(error){
+        if(error?.code!=='ADMIN_WRONG_ACCOUNT'&&error?.code!=='ADMIN_EMAIL_UNVERIFIED')
+          sessionStorage.removeItem(INVITE_STORAGE);
+        if(loadId!==deferredLoad)return;
+        denied(session?.user,error?.message||'Invitation could not be accepted.');
+        return;
+      }
+    }
+    const access=await request('/v1/admin/access');
     if(loadId!==deferredLoad)return;
-    setAuthorized(true);
+    setAuthorized(true,access.role);
     const authorizedRequest=async (...args)=>{const data=await request(...args);if(loadId!==deferredLoad)throw Error('Administrator account changed.');return data;};
     const authorizedGrowthRequest=async (...args)=>{const data=await growthRequest(...args);if(loadId!==deferredLoad)throw Error('Administrator account changed.');return data;};
     const area=new URLSearchParams(location.search).get('area');
     if(area==='corpus'){await renderCorpus(root,authorizedRequest);return;}
     if(area==='users'){await renderUsers(root,authorizedRequest,authorizedGrowthRequest);return;}
+    if(area==='team'){if(access.role!=='owner'){denied(session?.user);return;}await renderAdminTeam(root,authorizedRequest);return;}
     if(area==='campaign-links'){await renderCampaignLinks(root,authorizedGrowthRequest,authorizedRequest);return;}
     const queryString=params.toString();
     const nextReport=await authorizedRequest('/v1/admin/measurements'+(queryString?'?'+queryString:''));
