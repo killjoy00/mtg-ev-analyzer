@@ -67,7 +67,7 @@ test('Admin Users browser uses PATCH rename, typed destructive confirmation, sta
   assert.match(users,/Apple subscriptions or Patreon memberships/);
   assert.match(users,/Public username/);
   assert.match(users,/previous_display_name/);
-  assert.match(shell,/renderUsers\(root,authorizedRequest,authorizedGrowthRequest\)/);
+  assert.match(shell,/renderUsers\(root,authorizedRequest,authorizedGrowthRequest,access\.role\)/);
   assert.match(shell,/method=body\?'POST':'GET'/);
   const growth=fs.readFileSync('worker/growth-function.js','utf8');
   assert.match(growth,/deletionCommitted:true/);
