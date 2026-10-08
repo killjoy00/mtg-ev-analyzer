@@ -1,4 +1,5 @@
 import { escapeHtml as esc } from './html.mjs';
+import {sanitizeAdminDestination} from './admin/admin-return.mjs';
 import { accountAuthCompleted, completeAppleDeletion, completeAppleSignIn, completeEmailVerification, completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, linkAccount, loadMyProfile, requestPasswordReset, requestVerificationEmail, signInAccount, signOutAccount, signUpAccount, startAppleSignIn, startGoogleSignIn, updateProfile } from './growth-api.mjs';
 import { clearPatreonActivation, hasPatreonActivationIntent, rememberPatreonActivation, renderPatreonActivation as renderPatreonActivationPage } from './patreon-activation.mjs?v=2';
 import { flushEvents, trackEvent as event } from './retention-events.mjs';
@@ -9,6 +10,26 @@ let currentAccountError = null;
 let pendingDailyRunValidation = null;
 let pendingSignupNamePrompt = null;
 const AUTH_FLOW_KEY='pack1-auth-flow-v1';
+const ADMIN_RETURN_KEY='pack1-admin-return-v1';
+const ADMIN_RETURN_TTL_MS=15*60*1000;
+function rememberAdminReturn(){
+  const value=new URLSearchParams(location.search).get('admin_return');
+  if(!value)return;
+  const url=sanitizeAdminDestination(value,location.origin);
+  if(url)try{sessionStorage.setItem(ADMIN_RETURN_KEY,JSON.stringify({url,at:Date.now()}));}catch{}
+}
+function activeAdminReturn(){
+  try{const data=JSON.parse(sessionStorage.getItem(ADMIN_RETURN_KEY)||'null');
+    if(data&&Date.now()-data.at<ADMIN_RETURN_TTL_MS&&Date.now()>=data.at)return sanitizeAdminDestination(data.url,location.origin);
+  }catch{}
+  try{sessionStorage.removeItem(ADMIN_RETURN_KEY);}catch{}
+  return null;
+}
+function finishAdminReturn(){
+  const url=activeAdminReturn();if(!url)return false;
+  try{sessionStorage.removeItem(ADMIN_RETURN_KEY);}catch{}
+  location.assign(url);return true;
+}
 const PROFILE_SAFETY_KEY='pack1-profile-safety-intent-v1';
 
 function saveAuthFlow(intent,source) {
@@ -297,6 +318,7 @@ document.addEventListener('pack1:profile-updated',async eventObject=>{
 });
 
 export async function renderAccount({ validateDailyRunId = null, intent = null, source = 'account', notice = '', mode = null } = {}) {
+  rememberAdminReturn();
   if(!intent&&hasPatreonActivationIntent())intent='patreon-activate';
   if(intent==='patreon-activate')rememberPatreonActivation(source);
   if(validateDailyRunId) pendingDailyRunValidation=validateDailyRunId;
@@ -316,6 +338,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
     return;
   }
   if(currentAccount?.user) {
+    if(finishAdminReturn())return;
     const validationRunId=pendingDailyRunValidation;
     let linked=null;
     try {
@@ -354,7 +377,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
   const validatingDaily=Boolean(pendingDailyRunValidation);
   const upgradingElite=intent==='elite';
   const activatingPatreon=intent==='patreon-activate';
-  const authMode=mode==='signup'||mode==='signin'?mode:(validatingDaily||upgradingElite||activatingPatreon?'signup':'signin');
+  const authMode=activeAdminReturn()?'signin':mode==='signup'||mode==='signin'?mode:(validatingDaily||upgradingElite||activatingPatreon?'signup':'signin');
   const heading=validatingDaily?'Add your score to the leaderboard.':activatingPatreon?'Activate Pack One Elite':upgradingElite?'Unlock Elite practice.':authMode==='signup'?'Create Account':'Sign In';
   const intro=validatingDaily
     ? 'Sign in or create a free account to validate this Daily score and add it to today’s leaderboard.'
@@ -369,7 +392,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
     : '';
   const toggleCopy=authMode==='signup'
     ? 'Already have an account? <button class="text-button" id="account-mode-toggle" type="button">Sign in</button>'
-    : 'New to Pack One? <button class="text-button" id="account-mode-toggle" type="button">Create account</button>';
+    : activeAdminReturn()?'Administrator sign-in uses an existing account.':'New to Pack One? <button class="text-button" id="account-mode-toggle" type="button">Create account</button>';
   const accountNote=authMode==='signin'?'<small>A free account saves your record and enables leaderboard participation.</small>':'';
   const accountConsent=authMode==='signup'
     ? '<p class="account-identity-rules account-creation-consent"><small>By creating an account, you agree to the <a href="https://packone.pro/terms/">Pack One Terms</a>.</small></p>'
@@ -478,6 +501,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       const data=Object.fromEntries(new FormData(form));
       const auth=await signInAccount(data);
       if(!accountAuthCompleted(auth))throw Error('Sign in did not finish. Please try again.');
+      if(finishAdminReturn())return;
       const claimed=await claimCurrentSession();
       event('auth_sign_in',{source});
       if(claimed?.linked?.newlyClaimed) {
@@ -571,6 +595,7 @@ export async function resumeAccountAuth(status) {
           : 'Email verified. Sign in to continue on this browser.',
       });
     }
+    if(finishAdminReturn())return;
     if(Object.prototype.hasOwnProperty.call(flow,'validateDailyRunId'))pendingDailyRunValidation=flow.validateDailyRunId||null;
     const claimed=await claimCurrentSession();
     if(claimed?.linked?.newlyClaimed) {

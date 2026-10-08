@@ -43,7 +43,7 @@ export async function renderUsers(root,request,growthRequest=request) {
   function render() {
     const s=data.summary||{};
     root.innerHTML=`<section class="users-page">
-      <div class="users-heading"><div><h1>Users</h1><p class="muted">Authenticated Pack One accounts only. Anonymous and guest gameplay identities are intentionally not listed here.</p></div><button type="button" class="secondary" id="users-signout">Sign out</button></div>
+      <div class="users-heading"><div><h1>Users</h1><p class="muted">Authenticated Pack One accounts only. Anonymous and guest gameplay identities are intentionally not listed here.</p></div></div>
       <div class="cards user-cards">
         ${[['Accounts',s.total],['New · 30d',s.new_30d],['Active · 30d',s.active_30d],['Username attention',s.username_attention],['Patreon',s.patreon],['Paid',s.paid],['Admins',s.admins]].map(([label,value])=>`<div class="card"><span>${esc(label)}</span><strong>${fmt(value)}</strong></div>`).join('')}
       </div>
@@ -70,7 +70,6 @@ export async function renderUsers(root,request,growthRequest=request) {
       filters={search:String(form.get('search')||'').trim(),status:String(form.get('status')||'all')};
       await load();
     };
-    document.querySelector('#users-signout').onclick=()=>document.dispatchEvent(new CustomEvent('pack1:admin-signout'));
     document.querySelectorAll('[data-user]').forEach(button=>button.onclick=()=>openDetail(button.dataset.user));
   }
 

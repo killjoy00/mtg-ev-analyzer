@@ -30,6 +30,7 @@ try {
   let holdDeletionStatus=false,releaseDeletionStatus=null,failDeleteAfterCommit=false;
   let holdHabitReport=true,releaseHabitReport=null,holdStaleCore=false,releaseStaleCore=null;
   let markStaleCoreHeld;const staleCoreHeld=new Promise(resolve=>{markStaleCoreHeld=resolve;});
+  await page.route('**/v1/account/session',route=>route.fulfill({json:{user:{id:'22222222-2222-4222-8222-222222222222',email:'admin@example.com'}}}));
   await page.route(/\/health\?quick=1$/,route=>route.fulfill({headers:{'x-pack1-admin-api-version':String(ADMIN_API_VERSION)},json:{ok:true,admin_api_version:ADMIN_API_VERSION,campaign_link_publish_configured:true}}));
   await page.route(/^https:\/\/packone\.pro\/creator\/[^/]+\/creator-card(?:-square)?\.png(?:\?.*)?$/,route=>{
     const pathname=new URL(route.request().url()).pathname;
@@ -42,6 +43,7 @@ try {
   });
   await page.route('**/v1/admin/**',async route=>{
     requests.push(route.request().url());
+    if(new URL(route.request().url()).pathname==='/v1/admin/access')return route.fulfill({json:{ok:true,role:'admin'}});
     const requestUrl=new URL(route.request().url()),path=requestUrl.pathname,method=route.request().method();
     if(path.startsWith(`/v1/admin/users/${userId}`))adminControlRequests.push({url:route.request().url(),path,method});
     if(path==='/v1/admin/creator-challenges/resolve'&&method==='POST') {
