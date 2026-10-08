@@ -52,18 +52,18 @@ test('one-shot resource and cleanup controls are hard bounded before provisionin
  assert.doesNotMatch(wf,/synchronize|workflow_dispatch/);
  assert.match(wf,/diagnostic\/daily-status-3burst-once-20261008/);
  assert.match(wf,/group: pack1-gateway-preview/);
- assert.match(wf,/timeout-minutes: 6/);
- assert.match(wf,/timeout-minutes: 9/);
- assert.match(wf,/timeout-minutes: 7/);
+ assert.match(wf,/timeout-minutes: 3/);
+ assert.match(wf,/timeout-minutes: 8/);
+ assert.match(wf,/timeout-minutes: 4/);
  assert.match(wf,/matrix: \{shard: \[0, 1, 2, 3, 4\]\}/);
  assert.match(wf,/date -u --date '\+23 minutes'/);
  assert.match(wf,/scripts\/daily-status-read-fixtures\.mjs/);
  assert.doesNotMatch(wf,/launch-distributed-fixtures\.mjs|launch-distributed-run\.mjs|launch-load-fixtures\.mjs|practice-performance\.mjs/);
  assert.match(wf,/scripts\/launch-distributed-setup\.mjs cleanup/);
  assert.match(wf,/neondatabase\/delete-branch-action@v3/);
- assert.equal(6+9+5*7+7,57);
- assert.ok(57<=75);
- assert.ok(9+7+7<=25);
+ assert.equal(3+8+5*4+4,35);
+ assert.ok(35+8+2+30<=75,'include ordinary PR test and browser timeout envelopes');
+ assert.ok(8+4+4<=25);
  assert.ok(91+5+150<=300,'worst 3m edge readiness plus five health checks plus measured traffic');
 });
 test('fixture creation uses no scores, history or account batch generator',()=>{
