@@ -60,6 +60,7 @@ function main() {
     run_id:process.env.GITHUB_RUN_ID,attempt:process.env.GITHUB_RUN_ATTEMPT,
     result:problems.length?'incomplete_or_failed':slow.length?'slow_success_reproduced':'not reproduced',
     qualification:'none',prior_50_player_acceptance:'unchanged',players_100_qualified:false,
+    read_latency_references_ms:{p95:2000,p99:5000},
     differences:'50 isolated actor identities and three Daily-status GET bursts only; no game starts, eight-pick gameplay, read mix, scores, rerolls, or full acceptance workload',
     hard_limits:{measured_requests:150,total_gateway_max:300,coordinator_queries_max:1000,
       decoded_response_bytes_max:16*1024*1024,workload_minutes:20,branch_delete_minutes:25,
