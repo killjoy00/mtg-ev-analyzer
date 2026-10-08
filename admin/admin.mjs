@@ -126,7 +126,7 @@ function render() {
     ${[['difficulty','By difficulty'],['pick','By real draft pick'],['round','By game position'],['set','By set'],['source_event','By source event'],['model_disagreement','When the model questions the trophy pick'],['version','By scoring and selection version']].map(([dimension,title])=>`<h2>${title}</h2>${table(report.groups.filter(r=>r.dimension===dimension).sort((a,b)=>dimension==='difficulty'?['easy','medium','hard','unrated'].indexOf(a.label)-['easy','medium','hard','unrated'].indexOf(b.label):a.label.localeCompare(b.label,undefined,{numeric:true})),dimension==='model_disagreement'?'Disagreement':'Group')}`).join('')}
     <h2>Alternative-credit distribution</h2><p>${[['0–24',s.partial_0_24],['25–49',s.partial_25_49],['50–74',s.partial_50_74],['75–95',s.partial_75_95]].map(([label,n])=>`${label} points: <strong>${fmt(n)}</strong>`).join(' · ')}</p>
     <h2>Decisions to review</h2><p class="muted">At least five first-encounter answers. Model disagreements appear first, then the largest samples. Small samples are exploratory.</p><div id="reviews"><p class="muted">Loading decisions to review…</p></div><p id="status" role="status"></p>`;
-  document.querySelector('#filters').onsubmit=async e=>{e.preventDefault();params=new URLSearchParams(new FormData(e.currentTarget));await load();};
+  document.querySelector('#filters').onsubmit=async e=>{e.preventDefault();params=new URLSearchParams(new FormData(e.currentTarget));await refreshReport();};
   document.querySelector('#csv').onclick=()=>{
     const rows=report.groups,keys=rows.length?Object.keys(rows[0]):['dimension','label','answers'];
     const cell=v=>'"'+String(v??'').replace(/^[=+@-]/,"'$&").replaceAll('"','""')+'"';
@@ -134,6 +134,24 @@ function render() {
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`pack-one-decisions-${f.start}-${f.end}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
   };
 }
+// Report refresh does not reset the authorized shell or remove filters while a
+// previous report request is in flight. In particular, a second refresh must
+// be possible before the first response returns.
+async function refreshReport() {
+  const loadId=++deferredLoad;
+  try {
+    const queryString=params.toString();
+    const nextReport=await request('/v1/admin/measurements'+(queryString?'?'+queryString:''));
+    if(loadId!==deferredLoad)return;
+    report=nextReport;render();void loadDeferredSections(loadId,reportQuery(report.filters));
+  } catch(error) {
+    if(loadId!==deferredLoad)return;
+    if(error?.status===401||error?.status===403){await load();return;}
+    const status=document.querySelector('#status');
+    if(status)status.textContent=error?.message||'Report temporarily unavailable.';
+  }
+}
+
 async function load() {
   const loadId=++deferredLoad;
   setAuthorized(false);
