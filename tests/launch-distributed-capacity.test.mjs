@@ -60,7 +60,7 @@ test('one-shot workflow is the only route that selects 100',()=>{
  assert.match(parent,/capacity_target: \$\{\{ inputs\.capacity_target \|\| '25' \}\}/);
  assert.match(child,/env:\n  PACK1_CAPACITY_TARGET: \$\{\{ inputs\.capacity_target \}\}/);
  assert.match(oneShot,/capacity_target: '100'/);
- assert.match(oneShot,/diagnostic\/current-code-100-acceptance-20261008/);
+ assert.match(oneShot,/diagnostic\/current-code-100-acceptance-20261008-r2/);
  assert.ok(child.indexOf('Validate and declare capacity target')<child.indexOf('Create disposable production-sized branch'));
 });
 test('100-player stage uses a disjoint fixture block after the 25 and 50 stages',()=>{
