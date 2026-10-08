@@ -8,8 +8,16 @@ on:
       capacity_target:
         type: string
         default: '25'
+      source_main_sha:
+        type: string
+        default: ''
+      harness_head_sha:
+        type: string
+        default: ''
 env:
   PACK1_CAPACITY_TARGET: ${{ inputs.capacity_target }}
+  PACK1_SOURCE_MAIN_SHA: ${{ inputs.source_main_sha }}
+  PACK1_HARNESS_HEAD_SHA: ${{ inputs.harness_head_sha }}
 permissions:
   contents: read
   checks: read
@@ -43,6 +51,15 @@ jobs:
           REVIEWED_PR: ${{ github.event.pull_request.number }}
           REQUIRE_PERFORMANCE: ${{ inputs.require_performance }}
         run: node scripts/require-ci-source.mjs --once
+      - name: Reject drift in main before provisioning the special 50-to-100 sequence
+        if: inputs.capacity_target == '50-100'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN: ${{ inputs.source_main_sha }}
+        run: |
+          set -euo pipefail
+          current="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')"
+          test "$current" = "$EXPECTED_MAIN" || { echo "::error::main advanced; no resources provisioned"; exit 1; }
       - name: Verify scoped Cloudflare access
         env:
           CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
@@ -176,7 +193,7 @@ jobs:
     needs: [setup, cohort]
     if: always() && needs.setup.outputs.created == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 7
     env:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
       CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
