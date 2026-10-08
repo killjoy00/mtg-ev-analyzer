@@ -181,5 +181,52 @@ BEGIN
   RETURN 'revoked';
 END;$pack1$;
 
+-- The account-deletion machinery predates roles. Block Owner deletion at
+-- the first irreversible tombstone write, not only at final cleanup.
+CREATE OR REPLACE FUNCTION pack1_admin_owner_write_guard()
+RETURNS trigger LANGUAGE plpgsql VOLATILE AS $pack1$
+BEGIN
+  IF TG_OP='DELETE' THEN
+    IF OLD.role='owner' THEN
+      RAISE EXCEPTION 'Owner role must be transferred before deleting membership.'
+        USING ERRCODE='23514';
+    END IF;
+    RETURN OLD;
+  END IF;
+  IF NEW.role='owner' THEN
+    PERFORM pg_advisory_xact_lock(hashtextextended(NEW.auth_user_id::text,0));
+    IF NOT EXISTS(
+      SELECT 1 FROM neon_auth."user" u
+      WHERE u.id=NEW.auth_user_id AND u."emailVerified"=true
+    ) OR EXISTS(
+      SELECT 1 FROM account_deletion_operations d
+      WHERE d.auth_user_id=NEW.auth_user_id
+    ) THEN
+      RAISE EXCEPTION 'Owner requires a verified existing Auth account with no deletion history.'
+        USING ERRCODE='23514';
+    END IF;
+  END IF;
+  RETURN NEW;
+END;$pack1$;
+DROP TRIGGER IF EXISTS pack1_owner_guard_on_admins ON pack1_admins;
+CREATE TRIGGER pack1_owner_guard_on_admins
+BEFORE INSERT OR UPDATE OR DELETE ON pack1_admins
+FOR EACH ROW EXECUTE FUNCTION pack1_admin_owner_write_guard();
+
+CREATE OR REPLACE FUNCTION pack1_admin_deletion_guard()
+RETURNS trigger LANGUAGE plpgsql VOLATILE AS $pack1$
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtextextended(NEW.auth_user_id::text,0));
+  IF EXISTS(SELECT 1 FROM pack1_admins WHERE auth_user_id=NEW.auth_user_id AND role='owner') THEN
+    RAISE EXCEPTION 'Owner account deletion requires controlled ownership transfer.'
+      USING ERRCODE='23514';
+  END IF;
+  RETURN NEW;
+END;$pack1$;
+DROP TRIGGER IF EXISTS pack1_owner_guard_on_deletions ON account_deletion_operations;
+CREATE TRIGGER pack1_owner_guard_on_deletions
+BEFORE INSERT OR UPDATE OF auth_user_id ON account_deletion_operations
+FOR EACH ROW EXECUTE FUNCTION pack1_admin_deletion_guard();
+
 -- The legacy 0011 invitation table is unused, retained as inert historical data.
 -- Do not resurrect its unbound claim path.
