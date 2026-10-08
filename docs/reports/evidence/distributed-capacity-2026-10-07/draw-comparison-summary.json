@@ -1,0 +1,443 @@
+{
+  "source": {
+    "run_id": "37179231416",
+    "attempt": 1,
+    "head_sha": "5b745284b5f642efd5895b71b9ab92990d14f493",
+    "report_sha": "61bdaacf54cedc82c83eda02653541bcad516840",
+    "artifact_id": 11294861955,
+    "zip_sha256": "a8f9a051102b592888ed64f31d2a6766d3bcd3c5583f42400c01278ba42cbea1",
+    "entry": "draw-report.json"
+  },
+  "scope": "bounded clone SQL draw diagnosis; exact parity and concurrent SQL timing, not API capacity",
+  "snapshot": "48",
+  "revision": "111",
+  "passed": true,
+  "index_bytes": 454156288,
+  "phases": [
+    {
+      "name": "reference",
+      "summary": {
+        "samples": 50,
+        "p50_ms": 678,
+        "p95_ms": 1749,
+        "p99_ms": 1915
+      }
+    },
+    {
+      "name": "pick_index",
+      "summary": {
+        "samples": 50,
+        "p50_ms": 181,
+        "p95_ms": 321,
+        "p99_ms": 439
+      }
+    },
+    {
+      "name": "reference_recheck",
+      "summary": {
+        "samples": 50,
+        "p50_ms": 144,
+        "p95_ms": 214,
+        "p99_ms": 311
+      }
+    },
+    {
+      "name": "pick_index_recheck",
+      "summary": {
+        "samples": 50,
+        "p50_ms": 139,
+        "p95_ms": 196,
+        "p99_ms": 220
+      }
+    }
+  ],
+  "plans": [
+    {
+      "phase": "reference",
+      "group": {
+        "n": 2655,
+        "band": "easy",
+        "set_id": "dmu",
+        "sources": 2655,
+        "pick_number": 1
+      },
+      "plan": [
+        {
+          "Plan": {
+            "Node Type": "Limit",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 2636.36,
+            "Total Cost": 2638.56,
+            "Plan Rows": 1,
+            "Plan Width": 99,
+            "Actual Startup Time": 2.405,
+            "Actual Total Time": 2.406,
+            "Actual Rows": 1,
+            "Actual Loops": 1,
+            "Disabled": false,
+            "Shared Hit Blocks": 309,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Scan Direction": "Forward",
+                "Index Name": "draft_run_inventory_draw_idx",
+                "Relation Name": "draft_run_serving_inventory",
+                "Alias": "draft_run_serving_inventory",
+                "Startup Cost": 0.56,
+                "Total Cost": 2636.36,
+                "Plan Rows": 1197,
+                "Plan Width": 99,
+                "Actual Startup Time": 0.035,
+                "Actual Total Time": 2.29,
+                "Actual Rows": 2523,
+                "Actual Loops": 1,
+                "Disabled": false,
+                "Index Cond": "((snapshot_id = '48'::bigint) AND (set_id = 'dmu'::text) AND (band = 'easy'::text))",
+                "Rows Removed by Index Recheck": 0,
+                "Filter": "((pick_number >= 1) AND (pick_number <= 1))",
+                "Rows Removed by Filter": 13939,
+                "Heap Fetches": 0,
+                "Index Searches": 1,
+                "Shared Hit Blocks": 309,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0
+              }
+            ]
+          },
+          "Planning": {
+            "Shared Hit Blocks": 0,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0
+          },
+          "Planning Time": 0.121,
+          "Triggers": [],
+          "Execution Time": 2.433
+        }
+      ]
+    },
+    {
+      "phase": "pick_index",
+      "group": {
+        "n": 2655,
+        "band": "easy",
+        "set_id": "dmu",
+        "sources": 2655,
+        "pick_number": 1
+      },
+      "plan": [
+        {
+          "Plan": {
+            "Node Type": "Limit",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 109.01,
+            "Total Cost": 109.09,
+            "Plan Rows": 1,
+            "Plan Width": 99,
+            "Actual Startup Time": 0.524,
+            "Actual Total Time": 0.524,
+            "Actual Rows": 1,
+            "Actual Loops": 1,
+            "Disabled": false,
+            "Shared Hit Blocks": 41,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Scan Direction": "Forward",
+                "Index Name": "draft_run_inventory_pick_draw_idx",
+                "Relation Name": "draft_run_serving_inventory",
+                "Alias": "draft_run_serving_inventory",
+                "Startup Cost": 0.56,
+                "Total Cost": 109.01,
+                "Plan Rows": 1298,
+                "Plan Width": 99,
+                "Actual Startup Time": 0.027,
+                "Actual Total Time": 0.416,
+                "Actual Rows": 2523,
+                "Actual Loops": 1,
+                "Disabled": false,
+                "Index Cond": "((snapshot_id = '48'::bigint) AND (set_id = 'dmu'::text) AND (band = 'easy'::text) AND (pick_number = 1))",
+                "Rows Removed by Index Recheck": 0,
+                "Heap Fetches": 0,
+                "Index Searches": 1,
+                "Shared Hit Blocks": 41,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0
+              }
+            ]
+          },
+          "Planning": {
+            "Shared Hit Blocks": 0,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0
+          },
+          "Planning Time": 0.115,
+          "Triggers": [],
+          "Execution Time": 0.548
+        }
+      ]
+    },
+    {
+      "phase": "reference_recheck",
+      "group": {
+        "n": 2655,
+        "band": "easy",
+        "set_id": "dmu",
+        "sources": 2655,
+        "pick_number": 1
+      },
+      "plan": [
+        {
+          "Plan": {
+            "Node Type": "Limit",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 182.62,
+            "Total Cost": 182.62,
+            "Plan Rows": 1,
+            "Plan Width": 99,
+            "Actual Startup Time": 1.035,
+            "Actual Total Time": 1.035,
+            "Actual Rows": 1,
+            "Actual Loops": 1,
+            "Disabled": false,
+            "Shared Hit Blocks": 43,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Plans": [
+              {
+                "Node Type": "Sort",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Startup Cost": 179.37,
+                "Total Cost": 182.62,
+                "Plan Rows": 1298,
+                "Plan Width": 99,
+                "Actual Startup Time": 0.818,
+                "Actual Total Time": 0.933,
+                "Actual Rows": 2523,
+                "Actual Loops": 1,
+                "Disabled": false,
+                "Sort Key": [
+                  "puzzle_id COLLATE \"C\""
+                ],
+                "Sort Method": "quicksort",
+                "Sort Space Used": 449,
+                "Sort Space Type": "Memory",
+                "Shared Hit Blocks": 43,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0,
+                "Plans": [
+                  {
+                    "Node Type": "Index Only Scan",
+                    "Parent Relationship": "Outer",
+                    "Parallel Aware": false,
+                    "Async Capable": false,
+                    "Scan Direction": "Forward",
+                    "Index Name": "draft_run_inventory_pick_draw_idx",
+                    "Relation Name": "draft_run_serving_inventory",
+                    "Alias": "draft_run_serving_inventory",
+                    "Startup Cost": 0.56,
+                    "Total Cost": 112.25,
+                    "Plan Rows": 1298,
+                    "Plan Width": 99,
+                    "Actual Startup Time": 0.033,
+                    "Actual Total Time": 0.459,
+                    "Actual Rows": 2655,
+                    "Actual Loops": 1,
+                    "Disabled": false,
+                    "Index Cond": "((snapshot_id = '48'::bigint) AND (set_id = 'dmu'::text) AND (band = 'easy'::text) AND (pick_number >= 1) AND (pick_number <= 1))",
+                    "Rows Removed by Index Recheck": 0,
+                    "Heap Fetches": 0,
+                    "Index Searches": 1,
+                    "Shared Hit Blocks": 43,
+                    "Shared Read Blocks": 0,
+                    "Shared Dirtied Blocks": 0,
+                    "Shared Written Blocks": 0,
+                    "Local Hit Blocks": 0,
+                    "Local Read Blocks": 0,
+                    "Local Dirtied Blocks": 0,
+                    "Local Written Blocks": 0,
+                    "Temp Read Blocks": 0,
+                    "Temp Written Blocks": 0
+                  }
+                ]
+              }
+            ]
+          },
+          "Planning": {
+            "Shared Hit Blocks": 0,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0
+          },
+          "Planning Time": 0.121,
+          "Triggers": [],
+          "Execution Time": 1.06
+        }
+      ]
+    },
+    {
+      "phase": "pick_index_recheck",
+      "group": {
+        "n": 2655,
+        "band": "easy",
+        "set_id": "dmu",
+        "sources": 2655,
+        "pick_number": 1
+      },
+      "plan": [
+        {
+          "Plan": {
+            "Node Type": "Limit",
+            "Parallel Aware": false,
+            "Async Capable": false,
+            "Startup Cost": 109.01,
+            "Total Cost": 109.09,
+            "Plan Rows": 1,
+            "Plan Width": 99,
+            "Actual Startup Time": 0.536,
+            "Actual Total Time": 0.537,
+            "Actual Rows": 1,
+            "Actual Loops": 1,
+            "Disabled": false,
+            "Shared Hit Blocks": 41,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0,
+            "Plans": [
+              {
+                "Node Type": "Index Only Scan",
+                "Parent Relationship": "Outer",
+                "Parallel Aware": false,
+                "Async Capable": false,
+                "Scan Direction": "Forward",
+                "Index Name": "draft_run_inventory_pick_draw_idx",
+                "Relation Name": "draft_run_serving_inventory",
+                "Alias": "draft_run_serving_inventory",
+                "Startup Cost": 0.56,
+                "Total Cost": 109.01,
+                "Plan Rows": 1298,
+                "Plan Width": 99,
+                "Actual Startup Time": 0.032,
+                "Actual Total Time": 0.401,
+                "Actual Rows": 2523,
+                "Actual Loops": 1,
+                "Disabled": false,
+                "Index Cond": "((snapshot_id = '48'::bigint) AND (set_id = 'dmu'::text) AND (band = 'easy'::text) AND (pick_number = 1))",
+                "Rows Removed by Index Recheck": 0,
+                "Heap Fetches": 0,
+                "Index Searches": 1,
+                "Shared Hit Blocks": 41,
+                "Shared Read Blocks": 0,
+                "Shared Dirtied Blocks": 0,
+                "Shared Written Blocks": 0,
+                "Local Hit Blocks": 0,
+                "Local Read Blocks": 0,
+                "Local Dirtied Blocks": 0,
+                "Local Written Blocks": 0,
+                "Temp Read Blocks": 0,
+                "Temp Written Blocks": 0
+              }
+            ]
+          },
+          "Planning": {
+            "Shared Hit Blocks": 0,
+            "Shared Read Blocks": 0,
+            "Shared Dirtied Blocks": 0,
+            "Shared Written Blocks": 0,
+            "Local Hit Blocks": 0,
+            "Local Read Blocks": 0,
+            "Local Dirtied Blocks": 0,
+            "Local Written Blocks": 0,
+            "Temp Read Blocks": 0,
+            "Temp Written Blocks": 0
+          },
+          "Planning Time": 0.116,
+          "Triggers": [],
+          "Execution Time": 0.563
+        }
+      ]
+    }
+  ]
+}
