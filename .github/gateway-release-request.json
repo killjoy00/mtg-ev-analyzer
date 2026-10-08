@@ -1,6 +1,6 @@
 {
   "operation": "deploy-gateway",
-  "source_sha": "0875c5b15de7110181a327759b12f753bb7b2d0f",
-  "production_run_id": "37659073903",
-  "reason": "Promote the gateway from PR #1052. NetworkQuota now keeps all of a network's buckets in one Durable Object row and arms its cleanup alarm once per active network, which cuts billed row writes per admitted request from three to one. Limits, 429 bodies and Retry-After are unchanged. Counters stored under the previous per-bucket layout are still read, so quota identity and live windows survive the deploy. Production Functions for this exact source passed Daily and account-linked Practice acceptance on deploy run 37659073903. Admin API contract stays at v3."
+  "source_sha": "2138aaefac0612d79dbace7be94e5b19500b9358",
+  "production_run_id": "37717941183",
+  "reason": "Promote the audited October 7 runtime candidate. Production Functions for exact source 2138aaefac0612d79dbace7be94e5b19500b9358 passed the guarded development run 37717086904 and production run 37717941183, including the same-revision development gate, release-marker/Daily acceptance, and live v5 account-linked Practice acceptance. This source includes the gateway fresh-stub transient retry/diagnostics behavior introduced at 632c762b575d687f157c7370d64272100d0ebc56; overload, HTTP denial, abort and timeout remain non-retryable, application mutations are not replayed, and quota identity must be preserved by the protected gateway release. Admin API contract remains unchanged."
 }
