@@ -39,6 +39,7 @@ export function sanitized(record,burst,shard,guest) {
     status:record.status,total_ms:duration(record.ms),
     socket:['new','reused','unknown'].includes(transport.socket)?transport.socket:'unknown',
     connect_ms:duration(transport.connect_ms),
+    completed_at_ms:record.completed_at_ms??null,
     gateway_ms:duration(gateway.duration_ms),quota_ms:duration(gateway.quota_ms),
     upstream_ms:duration(gateway.upstream_ms),
     failure:record.failure||null,
@@ -148,13 +149,13 @@ async function run() {
           throw e;
         } finally {
           const record=report.requests[index];
-          if(record){record.dispatch_at_ms=dispatched;record.burst=phase;}
+          if(record){record.dispatch_at_ms=dispatched;record.completed_at_ms=Date.now();record.burst=phase;}
         }
       }));
       const rows=report.requests.map(r=>sanitized(r,phase,shard,actors.find(a=>a.id===r.actor)?.guest??null));
       records.push(...rows);
-      const failed=settled.filter(x=>x.status==='rejected').length+
-        rows.filter(x=>x.status!==200||x.gateway_ms===null).length;
+      const failed=settled.reduce((n,result,i)=>n+Number(result.status==='rejected'||!rows[i]||
+        rows[i].status!==200||rows[i].gateway_ms===null),0);
       const burstReport={burst:phase,index:burst,start_at_ms:start,
         first_dispatch_ms:Math.min(...issued),last_dispatch_ms:Math.max(...issued),
         local_dispatch_spread_ms:Math.max(...issued)-Math.min(...issued),
