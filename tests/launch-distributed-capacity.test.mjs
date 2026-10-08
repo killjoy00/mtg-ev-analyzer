@@ -5,7 +5,7 @@ import http from 'node:http';
 import {fingerprint,initialControl,transition,evaluateStage,timing,permittedRequest,quantiles,validatePolicy,selectCapacityPolicy,stageFailureEvidence} from '../scripts/launch-distributed-core.mjs';
 import {heartbeat,coordinatorSQL} from '../scripts/launch-distributed-control.mjs';
 import {inspectBin,inspectPreviewTelemetry,settlePreviewTelemetry,previewTelemetryFailure,queryPreviewEvents} from '../scripts/launch-distributed-telemetry.mjs';
-import {parseStartDiagnostics,requestClient} from '../scripts/launch-distributed-player.mjs';
+import {parseStartDiagnostics,requestClient,fixtureIndexForActor} from '../scripts/launch-distributed-player.mjs';
 import {transportFailureEvidence,undiciTransportObserver} from '../scripts/launch-distributed-transport.mjs';
 import {inspectPreflightEvents,preflightTelemetry} from '../scripts/launch-distributed-setup.mjs';
 import {waitForPreviewReadiness} from '../scripts/edge-control.mjs';
@@ -14,6 +14,107 @@ const start=1_000_000,scope={sha:'a'.repeat(40),branch:'br-capacity-fixture',run
 const msg=(shard,extra={})=>({scope,shard,nonce:`00000000-0000-4000-8000-${String(shard).padStart(12,'0')}`,network:String(shard+1).repeat(64),ready:0,ack:null,done:null,...extra});
 const formed=()=>{let s=initialControl(scope,start,policy);for(let i=0;i<5;i++)s=transition(s,msg(i),start+100,policy);return s;};
 const released=()=>{let s=formed();for(let i=0;i<5;i++)s=transition(s,msg(i,{ack:0}),start+200,policy);return s;};
+
+
+test('one-shot 50-then-100 runs 50 FIRST, preserving historical default policy, error gates and exact timing',()=>{
+ const diagnostic=selectCapacityPolicy(policy,'50-100');
+ assert.equal(diagnostic.sequence,'50_to_100');
+ assert.deepEqual(diagnostic.stages,[{players:50,hold_seconds:600},{players:100,hold_seconds:600}]);
+ assert.equal(diagnostic.supported_launch_target,50);assert.equal(diagnostic.proposed_target,100);
+ assert.deepEqual(selectCapacityPolicy(policy).stages,[{players:25,hold_seconds:120}]);
+ assert.deepEqual(selectCapacityPolicy(policy,'50').stages,[{players:25,hold_seconds:120},{players:50,hold_seconds:600}]);
+ for(const key of ['route_budgets_ms','minimum_route_samples','minimum_rolling_route_samples','maximum_error_fraction','maximum_legitimate_429s','maximum_correctness_failures','ramp_seconds','initial_seconds','drain_seconds','recovery_seconds','recovery_players','think_time_ms','guest_read_interval_ms','recovery_read_interval_ms','maximum_start_lateness_ms','maximum_arrival_lateness_ms','telemetry_settlement_seconds','telemetry_timeout_seconds','telemetry_preflight_requests'])
+   assert.deepEqual(diagnostic[key],policy[key],key);
+ assert.equal(diagnostic.maximum_experiment_minutes,60);
+ assert.equal(diagnostic.maximum_runner_minutes,358);
+ assert.equal(diagnostic.maximum_requests,50000);
+ assert.equal(diagnostic.maximum_coordinator_queries,20000);
+ assert.equal(diagnostic.maximum_response_bytes,268435456);
+ assert.equal(diagnostic.maximum_project_reported_egress_delta_bytes,1073741824);
+ for(const bad of [
+  {...diagnostic,stages:[{players:25,hold_seconds:120},...diagnostic.stages]},
+  {...diagnostic,stages:[{players:50,hold_seconds:599},{players:100,hold_seconds:600}]},
+  {...diagnostic,supported_launch_target:100},
+  {...diagnostic,maximum_requests:50001},
+  {...diagnostic,maximum_experiment_minutes:61},
+  {...diagnostic,maximum_runner_minutes:359},
+  {...diagnostic,sequence:'normal'}
+ ])assert.throws(()=>validatePolicy(bad));
+});
+test('50 and 100 stages draw DISJOINT indexed fixtures; per-stage actor IDs still start at zero',()=>{
+ const p=selectCapacityPolicy(policy,'50-100');
+ const first=Array.from({length:50},(_,id)=>fixtureIndexForActor(p,0,id));
+ const second=Array.from({length:100},(_,id)=>fixtureIndexForActor(p,1,id));
+ assert.deepEqual([first[0],first.at(-1),second[0],second.at(-1)],[0,49,50,149]);
+ assert.equal(new Set([...first,...second]).size,150);
+ assert.equal(first.filter(i=>i%10<5).length,25);
+ assert.equal(second.filter(i=>i%10<5).length,50);
+ assert.throws(()=>fixtureIndexForActor(p,1,100));
+ assert.throws(()=>fixtureIndexForActor(p,0,50));
+ const ordinary=selectCapacityPolicy(policy,'50');
+ assert.equal(fixtureIndexForActor(ordinary,0,24),24);
+ assert.equal(fixtureIndexForActor(ordinary,1,49),74);
+});
+test('coordinator cannot advance to 100 on a failed 50 stage; successful 50 then 100 completes exactly twice',()=>{
+ const p=selectCapacityPolicy(policy,'50-100');
+ const sc={...scope,policy_hash:fingerprint(p)};
+ const message=(shard,extra={})=>({...msg(shard),scope:sc,...extra});
+ const untilChecking=(state,stage,t)=>{
+   for(let i=0;i<5;i++)state=transition(state,message(i,{ready:stage,ack:null,done:null}),t+100,p);
+   assert.equal(state.phase,'armed');assert.equal(state.stage,stage);
+   for(let i=0;i<5;i++)state=transition(state,message(i,{ready:stage,ack:stage,done:null}),t+200,p);
+   assert.equal(state.phase,'released');
+   for(let i=0;i<5;i++)state=transition(state,message(i,{ready:stage,ack:stage,done:stage}),t+300,p);
+   assert.equal(state.phase,'checking');return state;
+ };
+ const c=untilChecking(initialControl(sc,start,p),0,start);
+ const failed=transition(c,message(0,{ready:0,ack:0,done:0,decision:{
+    stage:0,passed:false,category:'application',reason:'route_latency_read',
+    telemetry_passed:false,usage_passed:true}}),start+400,p);
+ assert.equal(failed.phase,'aborted');assert.equal(failed.stage,0);
+ assert.equal(transition(failed,message(0,{ready:1}),start+500,p).phase,'aborted');
+ const pass50=transition(c,message(0,{ready:0,ack:0,done:0,decision:{
+    stage:0,passed:true,telemetry_passed:true,usage_passed:true,digest:'50'}}),start+400,p);
+ assert.equal(pass50.stage,1);assert.equal(pass50.phase,'forming');
+ assert.equal(pass50.history.length,1);
+ const c100=untilChecking(pass50,1,start+500);
+ const complete=transition(c100,message(0,{ready:1,ack:1,done:1,decision:{
+    stage:1,passed:true,telemetry_passed:true,usage_passed:true,digest:'100'}}),start+900,p);
+ assert.equal(complete.phase,'complete');assert.equal(complete.stage,2);
+ assert.deepEqual(complete.history.map(x=>x.stage),[0,1]);
+});
+test('one-shot source gate, exact branch, stage target and summed PR CI runner timeouts are explicit',()=>{
+ const parent=fs.readFileSync(new URL('../.github/workflows/launch-distributed.yml',import.meta.url),'utf8');
+ const child=fs.readFileSync(new URL('../.github/workflows/launch-distributed-preview.yml',import.meta.url),'utf8');
+ const once=fs.readFileSync(new URL('../.github/workflows/launch-full-50-100-once.yml',import.meta.url),'utf8');
+ assert.match(parent,/options: \['25', '50'\]/,'ordinary workflows cannot select special 100');
+ assert.match(child,/capacity_target:\s*\n\s*type: string/);
+ assert.match(child,/PACK1_CAPACITY_TARGET: \$\{\{ inputs\.capacity_target \}\}/);
+ assert.match(child,/source_main_sha/);
+ assert.match(child,/harness_head_sha/);
+ assert.ok(child.indexOf('Recheck unchanged source')<child.indexOf('Create disposable production-sized branch'));
+ assert.ok(child.indexOf('Reject drift in main')<child.indexOf('Create disposable production-sized branch'));
+ assert.match(once,/types: \[opened\]/);
+ assert.doesNotMatch(once,/synchronize|workflow_dispatch/);
+ assert.match(once,/diagnostic\/current-code-full-50-100-20261008-r1/);
+ assert.match(once,/capacity_target: '50-100'/);
+ assert.match(once,/scripts\/require-ci-source\.mjs/);
+ const timeout=(text,job)=>{
+  const r=text.match(new RegExp('^  '+job+':\\n[\\s\\S]*?^    timeout-minutes: (\\d+)','m'));
+  assert.ok(r,'missing timeout '+job);return Number(r[1]);
+ };
+ assert.deepEqual([timeout(once,'preflight'),timeout(child,'setup'),timeout(child,'cohort'),timeout(child,'collect_cleanup')],[9,15,45,7]);
+ const special=9+15+5*45+7,ordinary=2*(8+2+30+3+8);
+ assert.equal(special,256);assert.equal(ordinary,102);assert.equal(special+ordinary,358);
+ const p=selectCapacityPolicy(policy,'50-100');
+ const workload=p.stages.reduce((n,s)=>n+p.initial_seconds+s.hold_seconds+p.drain_seconds+p.recovery_seconds,0);
+ assert.equal(workload,1740);
+ assert.equal(workload+2*(p.arm_seconds+p.telemetry_settlement_seconds),2040);
+ assert.equal(workload+2*(p.arm_seconds+p.telemetry_timeout_seconds),2280);
+ assert.equal(p.maximum_experiment_minutes*60-2280,1320);
+ assert.equal(p.maximum_branch_lifetime_minutes-p.maximum_experiment_minutes,15);
+ assert.equal(p.maximum_branch_lifetime_minutes*p.maximum_compute_cu/60,p.emergency_compute_ceiling_cu_hours);
+});
 
 test('preview readiness cannot pass on one good response followed by a stale response',async()=>{
  let now=0,index=0;
