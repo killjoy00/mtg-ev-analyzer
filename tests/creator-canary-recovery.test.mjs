@@ -19,7 +19,8 @@ test('fresh fixture identity survives the production player-name normalizer with
   assert.throws(()=>practiceCanaryIdentity('invalid'));
 });
 
-test('recovery requires exact recorded source/challenge identities and owned fixture naming',()=>{
+test('recovery requires exact recorded source/challenge identities and owned fixture naming when a fixture remains',()=>{
+  assert.equal(validateRecoveryFixture(null,recoveryFixtures[0]),false);
   for(const fixture of recoveryFixtures){
     const row=rowFor(fixture);validateRecoveryFixture(row,fixture);
     for(const replacement of [{session_id:'customer-source'},{challenge_id:'unknown-challenge'},
@@ -44,4 +45,33 @@ test('recovery stops before retirement if an owner has unrelated active work',as
     cleanPractice:async()=>{},verifyRetired:async()=>{},record:()=>{},
   }),/unrelated active work/);
   assert.equal(mutation,false);
+});
+
+
+test('recovery skips historical fixtures that are already fully absent',async()=>{
+  const records=[];let mutations=0;
+  const query=async()=>({rows:[]});
+  await recoverKnownCanaryFixtures(query,{
+    retire:async()=>{mutations++;},
+    cleanPractice:async()=>{mutations++;},
+    verifyRetired:async()=>{mutations++;},
+    record:record=>records.push(record),
+  });
+  assert.equal(mutations,0);
+  assert.equal(records.length,recoveryFixtures.length);
+  assert.ok(records.every(record=>record.cleaned===true&&record.already_absent===true));
+});
+
+test('a partial historical fixture still fails closed instead of being treated as absent',async()=>{
+  const fixture=recoveryFixtures[0];let mutations=0;
+  const partial={...rowFor(fixture),session_id:null};
+  let first=true;
+  const query=async()=>first?(first=false,{rows:[partial]}):{rows:[]};
+  await assert.rejects(recoverKnownCanaryFixtures(query,{
+    retire:async()=>{mutations++;},
+    cleanPractice:async()=>{mutations++;},
+    verifyRetired:async()=>{mutations++;},
+    record:()=>{},
+  }));
+  assert.equal(mutations,0);
 });
