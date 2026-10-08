@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {spawnSync} from 'node:child_process';
 import {mkdir,mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -723,4 +724,32 @@ test('creator admin list bounds the page before running correlated stats',async(
   assert.doesNotMatch(list,/creatorChallengeById/);
   assert.match(source,/e\.event_props \? 'creator_challenge_id'/,
     'funnel lookup must carry the partial-index predicate explicitly');
+});
+
+
+test('retired creator social-card validation does not require Pillow',async()=>{
+  const root=await mkdtemp(path.join(os.tmpdir(),'packone-retired-card-check-'));
+  try{
+    await mkdir(path.join(root,'scripts'),{recursive:true});
+    await mkdir(path.join(root,'mobile/assets/images'),{recursive:true});
+    await mkdir(path.join(root,'assets/fonts'),{recursive:true});
+    await writeFile(path.join(root,'scripts/check-creator-social-card.py'),await readFile('scripts/check-creator-social-card.py','utf8'));
+    await writeFile(path.join(root,'scripts/generate-creator-social-card.py'),[
+      'mobile/assets/images/header-mark.png',
+      'barlow-condensed-600.woff2',
+      'barlow-condensed-700.woff2',
+      'source-sans-3-400.woff2',
+      'source-sans-3-600.woff2',
+      'source-sans-3-700.woff2',
+    ].join('\n'));
+    await writeFile(path.join(root,'mobile/assets/images/header-mark.png'),'fixture');
+    for(const name of ['barlow-condensed-600.woff2','barlow-condensed-700.woff2','source-sans-3-400.woff2','source-sans-3-600.woff2','source-sans-3-700.woff2'])
+      await writeFile(path.join(root,'assets/fonts',name),'fixture');
+    await writeFile(path.join(root,'creator-challenges.json'),JSON.stringify([{slug:'retired-fixture',status:'retired'}]));
+    const checked=spawnSync('python3',['-S',path.join(root,'scripts/check-creator-social-card.py'),'--slug','retired-fixture'],{encoding:'utf8'});
+    assert.equal(checked.status,0,checked.stderr||checked.stdout);
+    assert.match(checked.stdout,/has no social images/);
+  }finally{
+    await rm(root,{recursive:true,force:true});
+  }
 });
