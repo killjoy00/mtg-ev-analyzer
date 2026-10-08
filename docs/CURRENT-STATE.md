@@ -26,7 +26,7 @@ Updated 2026-10-08. Implementation, backend deployment, gateway deployment, Page
 > The next section is preserved as evidence of the earlier October 8 initial release, when Owner bootstrap had **not yet** occurred. The current state is the security-hardening section above.
 
 
-**As-of-this-snapshot disposition:** Admin v5 code, database schema, Functions, gateway and Pages were deployed and independently live-verified; at this earlier point, there was no Owner account yet. Merge-to-main, Pages, Neon Functions, protected Cloudflare gateway publishing, and live acceptance are distinct. This new status is independent of, and newer than, the October 7/8 runtime-source audit below.
+**As-of-this-snapshot disposition:** Admin v5 code, database schema, Functions, gateway and Pages were deployed and independently live-verified; at this earlier point, there was no Owner account yet. Merge-to-main, Pages, Neon Functions, protected Cloudflare gateway publishing, and live acceptance are distinct. This historical release evidence is independent of the October 7/8 runtime-source audit below.
 
 | Surface / gate | Exact evidence | Disposition |
 | --- | --- | --- |
