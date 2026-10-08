@@ -94,6 +94,8 @@ const result=await query(`SELECT
   EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='account_deletion_operations'::regclass AND pg_get_constraintdef(oid) LIKE '%operator_review%') account_deletion_states,
   to_regprocedure('pack1_admin_rename_public_username(uuid,uuid,text,boolean,text)') IS NOT NULL admin_username_rename,
   to_regprocedure('pack1_begin_admin_account_deletion(uuid,uuid,text,boolean)') IS NOT NULL admin_account_deletion_begin,
+  EXISTS(SELECT 1 FROM pg_proc WHERE oid=to_regprocedure('pack1_begin_admin_account_deletion(uuid,uuid,text,boolean)')
+    AND prosrc LIKE '%owner_required%') admin_delete_owner_guard,
   EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='pack1_admins' AND column_name='role') admin_owner_role,
   EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='pack1_admin_one_owner') admin_unique_owner,
   to_regclass('pack1_admin_invitations') IS NOT NULL admin_invitation_table,

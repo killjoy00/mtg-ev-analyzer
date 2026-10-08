@@ -61,7 +61,8 @@
     "0054_creator_event_idempotency.sql",
     "0055_creator_event_write_safety.sql",
     "0056_snapshot_aware_reroll_covering_index.sql",
-    "0057_admin_owner_invitations.sql"
+    "0057_admin_owner_invitations.sql",
+    "0058_owner_guard_admin_deletion.sql"
   ],
   "same_prefix_order": {
     "0037": [
@@ -170,7 +171,8 @@
         "0054_creator_event_idempotency.sql",
         "0055_creator_event_write_safety.sql",
         "0056_snapshot_aware_reroll_covering_index.sql",
-        "0057_admin_owner_invitations.sql"
+        "0057_admin_owner_invitations.sql",
+    "0058_owner_guard_admin_deletion.sql"
       ]
     },
     "daily-calendar": {
@@ -222,7 +224,8 @@
         "0054_creator_event_idempotency.sql",
         "0055_creator_event_write_safety.sql",
         "0056_snapshot_aware_reroll_covering_index.sql",
-        "0057_admin_owner_invitations.sql"
+        "0057_admin_owner_invitations.sql",
+    "0058_owner_guard_admin_deletion.sql"
       ]
     },
     "launch-load": {
@@ -249,7 +252,8 @@
         "0054_creator_event_idempotency.sql",
         "0055_creator_event_write_safety.sql",
         "0056_snapshot_aware_reroll_covering_index.sql",
-        "0057_admin_owner_invitations.sql"
+        "0057_admin_owner_invitations.sql",
+    "0058_owner_guard_admin_deletion.sql"
       ]
     },
     "launch-distributed": {
@@ -278,7 +282,8 @@
         "0054_creator_event_idempotency.sql",
         "0055_creator_event_write_safety.sql",
         "0056_snapshot_aware_reroll_covering_index.sql",
-        "0057_admin_owner_invitations.sql"
+        "0057_admin_owner_invitations.sql",
+    "0058_owner_guard_admin_deletion.sql"
       ]
     }
   }
