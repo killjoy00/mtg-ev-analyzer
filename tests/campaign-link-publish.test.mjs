@@ -17,6 +17,7 @@ const TOKEN='github_pat_fixture_abcdefghijklmnopqrstuvwxyz';
 const USER='11111111-1111-4111-8111-111111111111';
 const entry={slug:'newsletter-launch',destination:'/',source:'newsletter',campaign:'launch-week',medium:'email'};
 const publishWorkflow=readFileSync('.github/workflows/campaign-link-publish.yml','utf8');
+const testWorkflow=readFileSync('.github/workflows/test.yml','utf8');
 
 test('campaign publish workflow preserves protected-main publication',()=>{
   assert.match(publishWorkflow,/permissions:\s+[\s\S]*contents: write[\s\S]*pull-requests: write[\s\S]*actions: write[\s\S]*pages: write/);
@@ -38,6 +39,13 @@ test('campaign publish workflow preserves protected-main publication',()=>{
   assert.ok(publishWorkflow.includes('repos/${GITHUB_REPOSITORY}/pages/builds'));
   assert.match(publishWorkflow,/timeout-minutes: 60/);
 });
+test('creator retirement installs the social-card checker dependencies anywhere it validates generated creator output',()=>{
+  assert.match(publishWorkflow,/- name: Install creator card renderer\n        if: inputs\.kind == 'creator'/);
+  assert.doesNotMatch(publishWorkflow,/- name: Install creator card renderer\n        if: inputs\.kind == 'creator' && inputs\.creator_action == 'publish'/);
+  assert.match(testWorkflow,/- name: Install creator card renderer dependencies\n        if: steps\.scope\.outputs\.unit_plan == 'full' \|\| \(steps\.scope\.outputs\.plan == 'publication' && steps\.publication\.outputs\.kind == 'creator'\)/);
+  assert.doesNotMatch(testWorkflow,/steps\.publication\.outputs\.kind == 'creator' && steps\.publication\.outputs\.action == 'publish'/);
+});
+
 test('campaign publish configuration follows the scoped production dispatch credential',()=>{
   assert.equal(campaignLinkPublishConfigured({PACK1_LAUNCH_WATCHER_GITHUB_TOKEN:TOKEN}),true);
   assert.equal(campaignLinkPublishConfigured({}),false);
