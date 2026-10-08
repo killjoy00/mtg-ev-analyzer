@@ -26,16 +26,7 @@
   {
     "id": "043246e9-3454-43b8-9032-31e961a0ec2b",
     "slug": "canary-practice-80cfaa36",
-    "status": "published",
-    "creator_name": "Pack One Canary",
-    "headline": "Pack One release canary",
-    "score": 83,
-    "environment": "mixed",
-    "source_type": "practice",
-    "source_day": null,
-    "source": "creator",
-    "campaign": "release-canary",
-    "medium": "creator"
+    "status": "retired"
   },
   {
     "id": "d4d2cad1-f48a-4f6c-a44b-d8b042487ff8",
