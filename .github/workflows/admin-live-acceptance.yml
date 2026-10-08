@@ -43,5 +43,43 @@ jobs:
           git cat-file -e "${release}^{commit}"
           git merge-base --is-ancestor "$release" "$GITHUB_SHA"
           echo "RELEASE_SHA=$release" >> "$GITHUB_ENV"
+      - name: Verify published Admin invitation consent and Owner-aware deletion controls
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          const origin='https://packone.pro';
+          async function loadPublished(path){
+            let failure;
+            for(let i=0;i<15;i++){
+              try{
+                const response=await fetch(origin+path,{cache:'no-store',redirect:'manual',signal:AbortSignal.timeout(12000)});
+                assert.equal(response.status,200,path+' must be publicly served by Pages');
+                const body=await response.text();
+                assert.ok(body.length>1000,'Published Admin JavaScript appears unexpectedly empty');
+                return body;
+              }catch(error){failure=error;}
+              if(i<14)await new Promise(resolve=>setTimeout(resolve,2000));
+            }
+            throw failure;
+          }
+          const [shell,users]=await Promise.all([
+            loadPublished('/admin/admin.mjs'),loadPublished('/admin/users.mjs'),
+          ]);
+          assert.match(shell,/function showInvitationPrompt\(user,token,loadId\)/);
+          const prompt=shell.slice(shell.indexOf('function showInvitationPrompt('),shell.indexOf('function options('));
+          assert.match(prompt,/Accept admin invitation/);
+          assert.match(prompt,/Signed in as/);
+          assert.match(prompt,/Cancel/);
+          assert.match(prompt,/Switch account/);
+          assert.match(prompt,/accept\.onclick=async\(\)=>\{[\s\S]*await request\('\/v1\/admin\/invitations\/accept',\{token\}\)/);
+          const load=shell.slice(shell.indexOf('async function load()'));
+          assert.match(load,/if\(invitation\)\{\s*showInvitationPrompt\(session\.user,invitation,loadId\);\s*return;/);
+          assert.doesNotMatch(load,/await request\('\/v1\/admin\/invitations\/accept'/);
+          assert.match(load,/renderUsers\(root,authorizedRequest,authorizedGrowthRequest,access\.role\)/);
+          assert.match(users,/user\.is_admin&&viewerRole!=='owner'/);
+          console.log('PASS: published Admin JS requires explicit invitation acceptance; cancel/switch and role-aware deletion UI present.');
+          NODE
       - name: Verify exact live Functions, Admin Pages and gateway, mobile, cookie and OAuth contracts
         run: node tests/edge-production-live-smoke.mjs "$RELEASE_SHA"
