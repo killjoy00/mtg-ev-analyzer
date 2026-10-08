@@ -9,7 +9,8 @@ import {parseStartDiagnostics,requestClient} from '../scripts/launch-distributed
 import {transportFailureEvidence,undiciTransportObserver} from '../scripts/launch-distributed-transport.mjs';
 import {inspectPreflightEvents,preflightTelemetry} from '../scripts/launch-distributed-setup.mjs';
 import {waitForPreviewReadiness} from '../scripts/edge-control.mjs';
-const policy=selectCapacityPolicy(JSON.parse(fs.readFileSync(new URL('../scripts/launch-distributed-policy.json',import.meta.url),'utf8')),'50');
+const envelope=JSON.parse(fs.readFileSync(new URL('../scripts/launch-distributed-policy.json',import.meta.url),'utf8'));
+const policy=selectCapacityPolicy(envelope,'50');
 const start=1_000_000,scope={sha:'a'.repeat(40),branch:'br-capacity-fixture',run_id:'123',attempt:'2',policy_hash:fingerprint(policy)};
 const msg=(shard,extra={})=>({scope,shard,nonce:`00000000-0000-4000-8000-${String(shard).padStart(12,'0')}`,network:String(shard+1).repeat(64),ready:0,ack:null,done:null,...extra});
 const formed=()=>{let s=initialControl(scope,start,policy);for(let i=0;i<5;i++)s=transition(s,msg(i),start+100,policy);return s;};
@@ -22,29 +23,51 @@ test('preview readiness cannot pass on one good response followed by a stale res
    clock:()=>now,sleep:async ms=>{now+=ms;},probe:async()=>responses[Math.min(index++,responses.length-1)]});
  assert.equal(result.ready,false);assert.equal(result.attempts,2);assert.equal(result.consecutive,0);
 });
-test('committed policy is bounded and cannot silently claim 100 or launch 500 players',()=>{
- assert.equal(validatePolicy(policy),policy);
- assert.deepEqual(policy.stages,[{players:25,hold_seconds:120},{players:50,hold_seconds:600}]);assert.equal(policy.supported_launch_target,50);assert.equal(policy.proposed_target,50);
- assert.throws(()=>validatePolicy({...policy,stages:[...policy.stages,{players:100,hold_seconds:600}],proposed_target:100}));
- assert.throws(()=>validatePolicy({...policy,stages:[policy.stages[0],{players:50,hold_seconds:180}]}),'final stage keeps the 600 s sustained hold');
+test('one-shot envelope adds only a bounded 100 stage while preserving current gates',()=>{
+ assert.equal(validatePolicy(envelope),envelope);
+ assert.deepEqual(envelope.stages,[{players:25,hold_seconds:120},{players:50,hold_seconds:600},{players:100,hold_seconds:600}]);
+ assert.equal(envelope.supported_launch_target,50);assert.equal(envelope.proposed_target,100);
+ assert.deepEqual(policy.stages,[{players:25,hold_seconds:120},{players:50,hold_seconds:600}]);
+ assert.equal(policy.supported_launch_target,50);assert.equal(policy.proposed_target,50);
+ assert.deepEqual(envelope.route_budgets_ms.start,{p95:3000,p99:8000});
+ assert.equal(envelope.maximum_requests,50000);
  const nat=JSON.parse(fs.readFileSync(new URL('../scripts/launch-load-policy.json',import.meta.url),'utf8'));
  assert.deepEqual(nat.nat_stages,[25,50]);assert.equal('distributed_stages' in nat,false);
- assert.deepEqual(policy.route_budgets_ms.start,{p95:3000,p99:8000});
- for(const patch of [{supported_launch_target:25},{supported_launch_target:100},{generators:20},{maximum_compute_cu:9},{maximum_error_fraction:.01},{maximum_branch_lifetime_minutes:120},{telemetry_preflight_requests:101},{maximum_requests:30001}])assert.throws(()=>validatePolicy({...policy,...patch}));
- assert.throws(()=>validatePolicy({...policy,stages:[...policy.stages,{players:500,hold_seconds:600}]}));
+ for(const patch of [{supported_launch_target:100},{generators:20},{maximum_compute_cu:9},{maximum_error_fraction:.01},{maximum_branch_lifetime_minutes:120},{telemetry_preflight_requests:101},{maximum_requests:50001}])assert.throws(()=>validatePolicy({...envelope,...patch}));
+ assert.throws(()=>validatePolicy({...envelope,stages:[...envelope.stages,{players:500,hold_seconds:600}],proposed_target:500}));
+ assert.throws(()=>validatePolicy({...envelope,stages:[envelope.stages[0],envelope.stages[1],{players:100,hold_seconds:599}]}),'final stage keeps the 600 s sustained hold');
  assert.throws(()=>initialControl({...scope,branch:'br-orange-feather-ayps8kep'},start,policy));
 });
-test('default capacity stops at 25 and preserves every acceptance budget',()=>{
- const required=selectCapacityPolicy(policy);
+test('default capacity stops at 25; explicit 50 and 100 preserve acceptance budgets',()=>{
+ const required=selectCapacityPolicy(envelope);
  assert.deepEqual(required.stages,[{players:25,hold_seconds:120}]);
  assert.equal(required.supported_launch_target,25);assert.equal(required.proposed_target,25);
- const {stages,supported_launch_target,proposed_target,...budgets}=required;
- const {stages:extendedStages,supported_launch_target:extendedSupported,proposed_target:extendedTarget,...extendedBudgets}=policy;
- assert.deepEqual(budgets,extendedBudgets);assert.notEqual(fingerprint(required),fingerprint(policy));
- assert.deepEqual(selectCapacityPolicy(policy,'50'),policy);
- for(const target of ['', '100', 'skip', 25, null])assert.throws(()=>selectCapacityPolicy(policy,target));
+ const fifty=selectCapacityPolicy(envelope,'50'),hundred=selectCapacityPolicy(envelope,'100');
+ assert.deepEqual(fifty.stages,[{players:25,hold_seconds:120},{players:50,hold_seconds:600}]);
+ assert.deepEqual(hundred.stages,envelope.stages);
+ assert.equal(hundred.supported_launch_target,50);assert.equal(hundred.proposed_target,100);
+ const strip=p=>{const {stages,supported_launch_target,proposed_target,...budgets}=p;return budgets;};
+ assert.deepEqual(strip(required),strip(envelope));assert.deepEqual(strip(fifty),strip(envelope));assert.deepEqual(strip(hundred),strip(envelope));
+ assert.notEqual(fingerprint(required),fingerprint(envelope));assert.equal(fingerprint(hundred),fingerprint(envelope));
+ for(const target of ['', 'skip', 25, null, '500'])assert.throws(()=>selectCapacityPolicy(envelope,target));
  assert.throws(()=>selectCapacityPolicy(required,'50'),'a missing 50-player stage cannot be promoted');
 });
+test('one-shot workflow is the only route that selects 100',()=>{
+ const parent=fs.readFileSync(new URL('../.github/workflows/launch-distributed.yml',import.meta.url),'utf8');
+ const child=fs.readFileSync(new URL('../.github/workflows/launch-distributed-preview.yml',import.meta.url),'utf8');
+ const oneShot=fs.readFileSync(new URL('../.github/workflows/launch-distributed-100-once.yml',import.meta.url),'utf8');
+ assert.match(parent,/options: \['25', '50'\]/);
+ assert.match(parent,/capacity_target: \$\{\{ inputs\.capacity_target \|\| '25' \}\}/);
+ assert.match(child,/env:\n  PACK1_CAPACITY_TARGET: \$\{\{ inputs\.capacity_target \}\}/);
+ assert.match(oneShot,/capacity_target: '100'/);
+ assert.match(oneShot,/diagnostic\/current-code-100-acceptance-20261008-r2/);
+ assert.ok(child.indexOf('Validate and declare capacity target')<child.indexOf('Create disposable production-sized branch'));
+});
+test('100-player stage uses a disjoint fixture block after the 25 and 50 stages',()=>{
+ const player=fs.readFileSync(new URL('../scripts/launch-distributed-player.mjs',import.meta.url),'utf8');
+ assert.match(player,/offset=\[0,25,75\]\[stage\]/);
+});
+
 test('25-player profile completes only after positive application, telemetry and usage gates',()=>{
  const required=selectCapacityPolicy(policy);
  let s=initialControl(scope,start,required);
