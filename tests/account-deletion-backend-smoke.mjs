@@ -60,6 +60,7 @@ try {
     WHERE NOT EXISTS (
       SELECT 1 FROM account_deletion_operations d WHERE d.auth_user_id=u.id
     )
+      AND NOT EXISTS(SELECT 1 FROM pack1_admins a WHERE a.auth_user_id=u.id)
     ORDER BY u."createdAt",u.id
     LIMIT 1`)).rows[0]?.id;
   assert.ok(raceAuth,'isolated branch must contain an Auth identity for the deletion/session race');
@@ -78,14 +79,22 @@ try {
   // source/actor attribution and rechecking admin-target acknowledgement.
   const adminFixtures=(await query(`SELECT u.id
     FROM neon_auth."user" u
-    WHERE u.id<>$1::uuid
+    WHERE u.id<>$1::uuid AND u."emailVerified"=true
+      AND NOT EXISTS(SELECT 1 FROM pack1_admins a WHERE a.auth_user_id=u.id)
       AND NOT EXISTS(SELECT 1 FROM account_deletion_operations d WHERE d.auth_user_id=u.id)
     ORDER BY u."createdAt",u.id
     LIMIT 2`,[raceAuth])).rows;
-  assert.equal(adminFixtures.length,2,'isolated branch needs two Auth identities for admin deletion attribution');
-  adminActor=adminFixtures[0].id;
+  assert.equal(adminFixtures.length,2,'isolated branch needs two eligible Auth identities for admin deletion attribution');
+  // Production-derived CI branches may already have a protected Owner.
+  // Borrow its identity as the actor without mutating that membership.
+  const existingOwner=(await query("SELECT auth_user_id id FROM pack1_admins WHERE role='owner' LIMIT 1")).rows[0]?.id||null;
+  adminActor=existingOwner||adminFixtures[0].id;
   adminTarget=adminFixtures[1].id;
-  await query('INSERT INTO pack1_admins(auth_user_id) VALUES($1::uuid),($2::uuid) ON CONFLICT DO NOTHING',[adminActor,adminTarget]);
+  if(!existingOwner){
+    await query('INSERT INTO pack1_admins(auth_user_id) VALUES($1::uuid)',[adminActor]);
+    await query("UPDATE pack1_admins SET role='owner' WHERE auth_user_id=$1::uuid",[adminActor]);
+  }
+  await query('INSERT INTO pack1_admins(auth_user_id) VALUES($1::uuid)',[adminTarget]);
   const needsAck=await beginAdminDeletion(query,{
     authUserId:adminTarget,adminAuthUserId:adminActor,reason:'QA admin deletion',acknowledgeAdmin:false,
   });
@@ -306,6 +315,7 @@ try {
   await query('DELETE FROM account_deletion_verifications WHERE auth_user_id=$1::uuid OR auth_user_id=$2::uuid',[verificationAuth,verificationRaceAuth]);
   if(adminTarget)await query('DELETE FROM account_deletion_operations WHERE auth_user_id=$1::uuid',[adminTarget]).catch(()=>{});
   if(adminRaceTarget)await query('DELETE FROM account_deletion_operations WHERE auth_user_id=$1::uuid',[adminRaceTarget]).catch(()=>{});
-  if(adminActor||adminTarget)await query('DELETE FROM pack1_admins WHERE auth_user_id=$1::uuid OR auth_user_id=$2::uuid',[adminActor,adminTarget]).catch(()=>{});
+  // Never remove an existing Owner from a production-derived disposable branch.
+  if(adminTarget)await query('DELETE FROM pack1_admins WHERE auth_user_id=$1::uuid',[adminTarget]).catch(()=>{});
   await query('DELETE FROM players WHERE id=$1::uuid OR id=$2::uuid',[other,player]);
 }
