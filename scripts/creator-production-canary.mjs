@@ -137,6 +137,12 @@ async function createFreshPracticeSource() {
   assert.equal(Number(publicShare.score),Number(run.score),'public recipient share must preserve the source score');
   assert.equal(publicShare.environment,run.environment,'public recipient share must preserve the source environment');
   assert.equal(Number(publicShare.run_length),8,'public recipient share must expose all eight source decisions');
+  report.fixtures.practice.public_recipient={
+    id:publicShare.id,
+    score:Number(publicShare.score),
+    environment:publicShare.environment,
+    run_length:Number(publicShare.run_length),
+  };
   report.checks.push('fresh Practice share resolved through the unauthenticated public-recipient gateway read');
 
   const row=(await query(`SELECT s.id::text session_id,s.player_id::text player_id,
