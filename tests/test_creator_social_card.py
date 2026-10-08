@@ -120,14 +120,12 @@ class CreatorSocialCardTests(unittest.TestCase):
             if temp is not None:
                 temp.cleanup()
 
-    def test_checked_in_published_creator_cards_match_current_renderer(self):
+    def test_checked_in_creator_social_assets_match_registry_state(self):
         registry = json.loads((ROOT / "creator-challenges.json").read_text(encoding="utf-8"))
-        published = [entry["slug"] for entry in registry if entry.get("status") == "published"]
-        self.assertTrue(published, "expected at least one published creator challenge")
-        for slug in published:
-            with self.subTest(slug=slug):
+        for entry in registry:
+            with self.subTest(slug=entry["slug"], status=entry.get("status")):
                 subprocess.run(
-                    [sys.executable, str(ROOT / "scripts/check-creator-social-card.py"), "--slug", slug],
+                    [sys.executable, str(ROOT / "scripts/check-creator-social-card.py"), "--slug", entry["slug"]],
                     cwd=ROOT,
                     check=True,
                 )
