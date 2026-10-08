@@ -1,0 +1,90 @@
+name: one-off Practice selector concurrent SQL profile
+on:
+  pull_request:
+    types: [opened]
+    branches: [main]
+    paths:
+      - 'scripts/practice-selector-concurrency-diagnostic.mjs'
+      - '.github/workflows/practice-selector-concurrency-diagnostic.yml'
+permissions:
+  contents: read
+  pull-requests: read
+concurrency:
+  group: one-off-selector-diagnostic
+  cancel-in-progress: false
+jobs:
+  diagnose:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'diagnostic/practice-selector-25-concurrency-20261008'
+    runs-on: ubuntu-latest
+    timeout-minutes: 13
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Prepare runner before provisioning anything
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          node --check scripts/practice-selector-concurrency-diagnostic.mjs
+          node scripts/practice-selector-concurrency-diagnostic.mjs --preflight
+      - name: Set ten-minute emergency clone expiry
+        id: expiry
+        run: echo "expires_at=$(date -u --date '+10 minutes' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+      - name: Create exactly one disposable production-derived branch
+        id: clone
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: patient-shadow-91417882
+          parent_branch: br-orange-feather-ayps8kep
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch_name: selector-sql-25-${{ github.run_id }}-${{ github.run_attempt }}
+          database: pack1
+          role: pack1_owner
+          suspend_timeout: 300
+          expires_at: ${{ steps.expiry.outputs.expires_at }}
+      - name: Measure only two waves of 25 SQL selections
+        if: steps.clone.outputs.created == 'true'
+        env:
+          DATABASE_URL: ${{ steps.clone.outputs.db_url }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PACK1_BENCHMARK_BRANCH: ${{ steps.clone.outputs.branch_id }}
+          PACK1_CLONE_CREATED: ${{ steps.clone.outputs.created }}
+          GITHUB_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: node scripts/practice-selector-concurrency-diagnostic.mjs --run
+      - name: Delete only this newly created disposable branch
+        if: always() && steps.clone.outputs.created == 'true' && steps.clone.outputs.branch_id != ''
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: patient-shadow-91417882
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch: ${{ steps.clone.outputs.branch_id }}
+      - name: Independently verify branch deletion
+        if: always() && steps.clone.outputs.created == 'true' && steps.clone.outputs.branch_id != ''
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          BRANCH_ID: ${{ steps.clone.outputs.branch_id }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const project='patient-shadow-91417882',branch=process.env.BRANCH_ID;
+          const base='https://console.neon.tech/api/v2/projects/'+project;
+          const get=async path=>fetch(base+path,{headers:{authorization:'Bearer '+process.env.NEON_API_KEY},redirect:'error',signal:AbortSignal.timeout(15000)});
+          const direct=await get('/branches/'+branch),list=await get('/branches?limit=100');
+          const branches=list.ok?((await list.json()).branches||[]):[];
+          const report={checked_at:new Date().toISOString(),branch,direct_get_404:direct.status===404,
+            branch_list_ok:list.ok,branch_list_absent:list.ok&&!branches.some(b=>b.id===branch)};
+          fs.mkdirSync('artifacts/practice-selector-concurrency',{recursive:true});
+          fs.writeFileSync('artifacts/practice-selector-concurrency/cleanup.json',JSON.stringify(report,null,2)+'\n');
+          console.log(JSON.stringify(report));
+          if(!report.direct_get_404||!report.branch_list_absent)process.exitCode=1;
+          NODE
+      - name: Preserve sanitized evidence even after failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: practice-selector-concurrency-${{ github.run_id }}
+          path: artifacts/practice-selector-concurrency
+          if-no-files-found: warn
+          retention-days: 30
