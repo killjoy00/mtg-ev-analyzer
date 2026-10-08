@@ -61,7 +61,7 @@ try {
 
   const invitee=await pageFor({role:'admin'});
   await invitee.page.goto('http://127.0.0.1:4173/admin/#invite='+token);
-  await invitee.page.getByRole('heading',{name:'Report unavailable'}).waitFor();
+  await invitee.page.getByRole('heading',{name:'Administration unavailable'}).waitFor();
   const claim=invitee.requests.find(r=>r.path==='/v1/admin/invitations/accept');
   assert.equal(claim.method,'POST');assert.deepEqual(claim.body,{token});
   assert.equal(invitee.page.url().includes(token),false,'Invitation token must be removed from browser address after intake');
