@@ -1,5 +1,19 @@
 [
   {
+    "id": "630c773b-149d-4d06-9d7f-56cf7d39e63a",
+    "slug": "canary-daily-69af6b03",
+    "status": "published",
+    "creator_name": "Pack One Canary",
+    "headline": "Pack One release canary",
+    "score": 62,
+    "environment": "mixed",
+    "source_type": "daily",
+    "source_day": "2026-10-06",
+    "source": "creator",
+    "campaign": "release-canary",
+    "medium": "creator"
+  },
+  {
     "id": "ae320c5d-f1ad-47dc-91da-3b31fa166d5b",
     "slug": "canary-practice-69af6b03",
     "status": "published",
