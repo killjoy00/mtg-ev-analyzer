@@ -154,11 +154,11 @@ jobs:
           node scripts/generate-campaign-links.mjs --check
           node scripts/check-creator-challenges.mjs
       - uses: actions/setup-python@v5
-        if: steps.scope.outputs.unit_plan == 'full' || steps.scope.outputs.unit_plan == 'ci' || steps.scope.outputs.dataset_audit == 'true' || (steps.scope.outputs.plan == 'publication' && steps.publication.outputs.kind == 'creator' && steps.publication.outputs.action == 'publish')
+        if: steps.scope.outputs.unit_plan == 'full' || steps.scope.outputs.unit_plan == 'ci' || steps.scope.outputs.dataset_audit == 'true' || (steps.scope.outputs.plan == 'publication' && steps.publication.outputs.kind == 'creator')
         with:
           python-version: '3.12'
       - name: Install creator card renderer dependencies
-        if: steps.scope.outputs.unit_plan == 'full' || (steps.scope.outputs.plan == 'publication' && steps.publication.outputs.kind == 'creator' && steps.publication.outputs.action == 'publish')
+        if: steps.scope.outputs.unit_plan == 'full' || (steps.scope.outputs.plan == 'publication' && steps.publication.outputs.kind == 'creator')
         run: python3 -m pip install --quiet 'Pillow==11.3.0' 'fonttools[woff]==4.60.1'
 
       - name: Verify deployment bundles and embedded revisions
