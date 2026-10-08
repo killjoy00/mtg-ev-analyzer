@@ -27,7 +27,7 @@ for(let stage=0;stage<policy.stages.length;stage++) {
 const budget=cohorts.reduce((n,c)=>{for(const key of Object.keys(n))n[key]+=c.budget?.[key]||0;return n;},{gateway_requests:preflight?.health_requests||0,response_bytes:0,coordinator_queries:0});
 if(budget.gateway_requests>policy.maximum_requests||budget.response_bytes>policy.maximum_response_bytes||budget.coordinator_queries>policy.maximum_coordinator_queries)reject('aggregate_resource_ceiling');
 const report={scope,policy,verified:declaration?.verified,budget,stages,reasons,passed:!reasons.length,
-  historical_supported_distributed_players:25,candidate_distributed_players:!reasons.length?policy.proposed_target:null,
+  historical_supported_distributed_players:50,candidate_distributed_players:!reasons.length?policy.proposed_target:null,
   capacity_claim:'Not promoted until private ingress removal and disposable branch deletion are separately verified. Five-network finite mixed-lifecycle evidence only; not universal backend capacity or indefinite endurance.'};
 fs.mkdirSync('artifacts/launch-load',{recursive:true});fs.writeFileSync('artifacts/launch-load/distributed-acceptance.json',JSON.stringify(report,null,2));
 console.log(JSON.stringify({passed:report.passed,reasons,budget,passed_stages:stages.map(s=>s.target),
