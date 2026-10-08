@@ -180,7 +180,7 @@ test('client really preserves cookies, CSRF and idempotency without forwarding-h
 const fakeTransportObserver=state=>({begin:()=>({bound:false,body_present:true,headers_sent:false,body_sent:false,socket:'unknown',connect_ms:null,tls:null,...state}),end(){}});
 test('successful Daily-status pairs sanitized connection and gateway timings in one request record',async()=>{
  const headers=new Headers({'x-pack1-gateway-timing':JSON.stringify({duration_ms:120,quota_ms:20,upstream_ms:80,private:'discard'})});
- const reports=[],budget={gateway_requests:0,response_bytes:0};
+ const budget={gateway_requests:0,response_bytes:0};
  const client=state=>requestClient({fixture:{preview:'a'.repeat(64)},policy,budget,now:()=>start,
    signal:new AbortController().signal,fetcher:async()=>Response.json({ok:true},{headers}),
    transportObserver:fakeTransportObserver(state)});
