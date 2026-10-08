@@ -1,0 +1,251 @@
+name: one-shot Daily-status timing bursts
+on:
+  pull_request:
+    types: [opened]
+    branches: [main]
+    paths:
+      - '.github/workflows/daily-status-three-burst-once.yml'
+      - 'scripts/daily-status-*'
+      - 'tests/daily-status-timing.test.mjs'
+permissions:
+  contents: read
+  checks: read
+  pull-requests: read
+concurrency:
+  group: pack1-gateway-preview
+  cancel-in-progress: false
+  queue: max
+jobs:
+  preflight:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'diagnostic/daily-status-3burst-once-20261008' &&
+      github.event.pull_request.draft == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify main remains the exact PR base before provisioning
+        env:
+          GH_TOKEN: ${{ github.token }
+          REVIEWED_MAIN: ${{ github.event.pull_request.base.sha }
+        run: |
+          set -euo pipefail
+          current="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')"
+          test "$current" = "$REVIEWED_MAIN" || { echo "::error::main advanced"; exit 1; }
+      - name: Validate all relevant script, transport and ingress contracts
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+          node --check scripts/daily-status-read-fixtures.mjs
+          node --check scripts/daily-status-three-burst.mjs
+          node --check scripts/daily-status-read-collect.mjs
+          node --test tests/daily-status-timing.test.mjs tests/launch-distributed-capacity.test.mjs tests/ingress.test.mjs
+      - name: Declare one-attempt hard limits
+        run: |
+          node --input-type=module <<'NODE'
+          import assert from 'node:assert/strict';
+          import {DIAGNOSTIC} from './scripts/daily-status-three-burst.mjs';
+          assert.equal(DIAGNOSTIC.generators,5);
+          assert.equal(DIAGNOSTIC.actors_per_generator,10);
+          assert.equal(DIAGNOSTIC.measured_requests,150);
+          assert.equal(DIAGNOSTIC.gateway_request_ceiling,300);
+          assert.equal(DIAGNOSTIC.coordinator_query_ceiling,1000);
+          assert.equal(DIAGNOSTIC.response_byte_ceiling,16777216);
+          assert.equal(DIAGNOSTIC.request_timeout_ms,30000);
+          assert.equal(DIAGNOSTIC.idle_ms,120000);
+          assert.equal(DIAGNOSTIC.branch_workload_deadline_ms,1200000);
+          assert.equal(DIAGNOSTIC.branch_delete_deadline_ms,1500000);
+          assert.equal(6+9+5*7+7,57);
+          assert.ok(57<=75);
+          assert.ok(91+5+150<=300);
+          console.log(JSON.stringify({attempts:1,actors:50,guests:25,signed_in:25,bursts:3,
+            measured_requests:150,gateway_request_ceiling:300,readiness_worst_case:91,
+            coordinator_queries_max:1000,response_bytes_max:16777216,
+            idle_seconds:120,request_timeout_seconds:30,workload_minutes_max:20,
+            branch_delete_minutes_max:25,runner_minute_timeout_envelope:57,
+            accepted_capacity:false,production_deploy:false}));
+          NODE
+  setup:
+    needs: preflight
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    outputs:
+      branch: ${{ steps.neon.outputs.branch_id }
+      created: ${{ steps.neon.outputs.created }
+      expires: ${{ steps.expiry.outputs.expires_at }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Recheck main after obtaining exclusive preview access
+        env:
+          GH_TOKEN: ${{ github.token }
+          REVIEWED_MAIN: ${{ github.event.pull_request.base.sha }
+        run: |
+          current="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')"
+          test "$current" = "$REVIEWED_MAIN" || { echo "::error::main advanced, do not provision"; exit 1; }
+      - name: Verify existing Cloudflare and Neon credentials before creating a clone
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }
+        run: |
+          node scripts/edge-control.mjs preflight
+          node scripts/launch-distributed-setup.mjs budget
+      - name: Fix emergency branch expiry before creation
+        id: expiry
+        run: echo "expires_at=$(date -u --date '+23 minutes' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+      - name: Create one disposable clone of the production parent
+        id: neon
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }
+          CI_BRANCH_PREFIX: launch-load-${{ github.run_id }-${{ github.run_attempt }
+          CI_BRANCH_PARENT: br-orange-feather-ayps8kep
+          CI_BRANCH_EXPIRES: ${{ steps.expiry.outputs.expires_at }
+          CI_BRANCH_SUSPEND: '300'
+        run: node scripts/create-ci-neon-branch.mjs
+      - name: Install pinned preview deployment tools
+        run: node .github/scripts/install-wrangler-tool.mjs "$RUNNER_TEMP/edge-tools" neon@4.17.4 esbuild@0.28.2
+      - name: Validate cloned schema and compile preview (no corpus warmup or gameplay)
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }
+          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }
+          PREVIEW_CREATED: ${{ steps.neon.outputs.created }
+          ESBUILD_BIN: ${{ runner.temp }/edge-tools/node_modules/.bin/esbuild
+        run: |
+          set -euo pipefail
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+          node scripts/ci-migration-plan.mjs launch-distributed > "$RUNNER_TEMP/read-migrations.txt"
+          while IFS= read -r migration; do
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+          done < "$RUNNER_TEMP/read-migrations.txt"
+          node scripts/verify-neon-schema.mjs
+          node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$GITHUB_SHA"
+      - name: Prepare exactly 50 identities without score-history generation
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }
+          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }
+          PREVIEW_CREATED: ${{ steps.neon.outputs.created }
+          LOAD_FIXTURE_FILE: /tmp/pack1-daily-read-fixtures.json
+        run: node scripts/daily-status-read-fixtures.mjs
+      - name: Deploy only the isolated private-preview functions and gateway
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }
+          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }
+          PREVIEW_CREATED: ${{ steps.neon.outputs.created }
+          EDGE_TOOLS_DIR: ${{ runner.temp }/edge-tools
+        run: node scripts/edge-control.mjs deploy
+      - name: Initialize isolated SQL-only synchronization barrier
+        env:
+          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }
+          PREVIEW_CREATED: ${{ steps.neon.outputs.created }
+          LOAD_FIXTURE_FILE: /tmp/pack1-daily-read-fixtures.json
+        run: node scripts/daily-status-three-burst.mjs init
+      - name: Encrypt isolated credentials for five runner jobs
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }
+          LOAD_FIXTURE_FILE: /tmp/pack1-daily-read-fixtures.json
+        run: node scripts/launch-distributed-bundle.mjs pack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: daily-status-${{ github.run_attempt }-private-bundle
+          path: artifacts/load-private
+          retention-days: 1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: daily-status-${{ github.run_attempt }-setup
+          path: |
+            artifacts/daily-status-timing
+            artifacts/ci-resources
+          retention-days: 30
+  cohort:
+    needs: setup
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix: {shard: [0, 1, 2, 3, 4]}
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }
+      PREVIEW_BRANCH: ${{ needs.setup.outputs.branch }
+      LOAD_FIXTURE_FILE: /tmp/pack1-daily-read-fixtures.json
+      LOAD_SHARD: ${{ matrix.shard }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          name: daily-status-${{ github.run_attempt }-private-bundle
+          path: artifacts/load-private
+      - name: Unpack credentials privately; never upload plaintext
+        run: node scripts/launch-distributed-bundle.mjs unpack
+      - name: One read-only 3-burst experiment, with persistent connections and no retries
+        run: node --network-family-autoselection-attempt-timeout=1000 scripts/daily-status-three-burst.mjs run
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: daily-status-${{ github.run_attempt }-generator-${{ matrix.shard }
+          path: artifacts/daily-status-timing
+          retention-days: 30
+  collect_cleanup:
+    needs: [setup, cohort]
+    if: always() && needs.setup.outputs.created == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }
+      CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }
+      PREVIEW_BRANCH: ${{ needs.setup.outputs.branch }
+      PACK1_ENFORCE_PREVIEW_OWNER: '1'
+      CI_RESOURCE_EXPIRES: ${{ needs.setup.outputs.expires }
+      PACK1_RESOURCE_RECEIPT_FILE: artifacts/daily-status-collected/daily-status-${{ github.run_attempt }-setup/ci-resources/preview.json
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: daily-status-${{ github.run_attempt }-generator-*
+          path: artifacts/daily-status-collected
+      - uses: actions/download-artifact@v4
+        with:
+          name: daily-status-${{ github.run_attempt }-setup
+          path: artifacts/daily-status-collected/daily-status-${{ github.run_attempt }-setup
+      - name: Collect only sanitized timing records (never credential bundle)
+        run: node scripts/daily-status-read-collect.mjs
+      - name: Disable private preview on every collector outcome
+        if: always()
+        run: node scripts/edge-control.mjs disable
+      - name: Delete the owned disposable branch on every outcome
+        if: always()
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: patient-shadow-91417882
+          api_key: ${{ secrets.NEON_API_KEY }
+          branch: ${{ needs.setup.outputs.branch }
+      - name: Verify absent preview mapping and branch HTTP 404
+        if: always()
+        run: node scripts/launch-distributed-setup.mjs cleanup
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: daily-status-${{ github.run_attempt }-final
+          path: |
+            artifacts/daily-status-timing
+            artifacts/launch-load/cleanup.json
+            artifacts/ci-resources
+          retention-days: 30
