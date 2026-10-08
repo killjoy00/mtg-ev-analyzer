@@ -7,6 +7,7 @@ on:
       - 'scripts/launch-distributed-policy.json'
       - 'scripts/launch-distributed-core.mjs'
       - 'scripts/launch-distributed-player.mjs'
+      - 'scripts/launch-distributed-collect.mjs'
       - 'tests/launch-distributed-capacity.test.mjs'
       - '.github/workflows/launch-distributed-preview.yml'
       - '.github/workflows/launch-distributed-100-once.yml'
@@ -31,6 +32,7 @@ jobs:
         run: |
           node --check scripts/launch-distributed-core.mjs
           node --check scripts/launch-distributed-player.mjs
+          node --check scripts/launch-distributed-collect.mjs
           node --test tests/launch-distributed-capacity.test.mjs tests/launch-alert.test.mjs tests/launch-controls.test.mjs tests/preview-resource-ownership.test.mjs tests/ci-source-gate.test.mjs
       - name: Declare the exact one-shot target, gates and resource budget
         env:
