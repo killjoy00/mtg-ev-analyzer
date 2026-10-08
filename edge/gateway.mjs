@@ -330,8 +330,10 @@ export async function gateway(request,env,fetcher=fetch) {
       headers.set('access-control-expose-headers','Retry-After, X-Pack1-Admin-Api-Version');
     }
     if(mode==='preview'&&previewNetwork&&url.pathname==='/draft/health')headers.set('x-pack1-preview-network',previewNetwork);
-    if(mode==='preview'&&request.method==='POST'&&
-      (url.pathname==='/draft/v1/runs'||/^\/draft\/v1\/runs\/[a-f0-9-]+\/(?:reroll|view)$/.test(url.pathname))&&metric.upstream_calls===1)
+    if(mode==='preview'&&metric.upstream_calls===1&&(
+      (request.method==='POST'&&
+        (url.pathname==='/draft/v1/runs'||/^\/draft\/v1\/runs\/[a-f0-9-]+\/(?:reroll|view)$/.test(url.pathname)))||
+      (request.method==='GET'&&url.pathname==='/draft/v1/daily-status'&&result.ok)))
       headers.set('x-pack1-gateway-timing',JSON.stringify({duration_ms:duration,quota_ms:quota,upstream_ms:upstream}));
     if(mode==='preview'&&previewNetwork&&result.status>=500)
       headers.set('x-pack1-gateway-timing',JSON.stringify({duration_ms:duration,quota_ms:quota,upstream_ms:upstream,
