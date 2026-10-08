@@ -9,9 +9,6 @@ import sys
 import tempfile
 from pathlib import Path
 
-from PIL import Image, ImageChops
-
-
 ROOT = Path(__file__).resolve().parents[1]
 GENERATOR = ROOT / "scripts/generate-creator-social-card.py"
 ASSETS = {
@@ -44,6 +41,8 @@ def png_chunks(path: Path):
 
 
 def check_png_shape(path: Path, expected_size):
+    from PIL import Image
+
     chunks = png_chunks(path)
     if not chunks or chunks[0] != b"IHDR" or chunks[-1] != b"IEND" or b"IDAT" not in chunks:
         raise AssertionError(f"{path} has an invalid PNG chunk structure: {chunks}")
@@ -101,6 +100,8 @@ def generator_command(entry, og_path: Path, square_path: Path):
 
 
 def compare_pixels(actual: Path, expected: Path):
+    from PIL import Image, ImageChops
+
     with Image.open(actual) as left, Image.open(expected) as right:
         diff = ImageChops.difference(left.convert("RGB"), right.convert("RGB"))
         if diff.getbbox() is not None:
