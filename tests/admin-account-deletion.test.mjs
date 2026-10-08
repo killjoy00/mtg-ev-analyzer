@@ -82,8 +82,22 @@ test('admin deletion requires literal destructive confirmation and prohibits sel
   );
 });
 
+test('Owner accounts cannot be targeted by administrator deletion',async()=>{
+  let committed=false;
+  const query=async sql=>{
+    if(sql.includes("FROM pack1_admins WHERE auth_user_id="))return {rows:[{one:1}]};
+    committed=true;throw Error('Should never reach deletion initializer');
+  };
+  await assert.rejects(handleAdminAccountDeletion(
+    request('/v1/admin/users/'+TARGET+'/delete',{method:'POST',body:{confirm:'DELETE'}}),
+    query,undefined,{readJson,adminAuthUserId:ADMIN,deletionEnabled:()=>true,resumeDeletionOperation:async x=>x},
+  ),error=>error?.code==='OWNER_PROTECTED'&&error?.status===409);
+  assert.equal(committed,false);
+});
+
 test('target-admin acknowledgement is enforced by the atomic database initializer',async()=>{
   const query=async(sql)=>{
+    if(sql.includes("FROM pack1_admins WHERE auth_user_id="))return {rows:[],rowCount:0};
     if(sql.includes('SELECT email,"emailVerified" email_verified FROM neon_auth."user"'))return {rows:[{email:'target@example.test'}],rowCount:1};
     if(sql.includes('pack1_begin_admin_account_deletion'))return {rows:[{start_status:'admin_ack_required'}],rowCount:1};
     throw Error('unexpected SQL');
@@ -102,6 +116,8 @@ test('admin initiation needs no target credential and runs the supplied complete
   const created=row({state:'pending',attempts:'0',last_error_code:null,app_cleanup_completed_at:null,deletion_reason:'spam cleanup'});
   const query=async(sql,params=[])=>{
     calls.push({sql,params});
+    if(sql.includes("FROM pack1_admins WHERE auth_user_id="))return {rows:[],rowCount:0};
+    if(sql.includes("FROM pack1_admins WHERE auth_user_id="))return {rows:[],rowCount:0};
     if(sql.includes('SELECT email,"emailVerified" email_verified FROM neon_auth."user"'))return {rows:[{email:'target@example.test'}],rowCount:1};
     if(sql.includes('pack1_begin_admin_account_deletion'))return {rows:[{start_status:'created',...created}],rowCount:1};
     throw Error('unexpected SQL');
@@ -127,6 +143,7 @@ test('admin initiation needs no target credential and runs the supplied complete
 test('admin deletion lifecycle failures propagate after the durable start so normal route logging can report them',async()=>{
   const created=row({state:'pending',attempts:'0',last_error_code:null,app_cleanup_completed_at:null});
   const query=async(sql)=>{
+    if(sql.includes("FROM pack1_admins WHERE auth_user_id="))return {rows:[],rowCount:0};
     if(sql.includes('SELECT email,"emailVerified" email_verified FROM neon_auth."user"'))return {rows:[{email:'target@example.test'}],rowCount:1};
     if(sql.includes('pack1_begin_admin_account_deletion'))return {rows:[{start_status:'created',...created}],rowCount:1};
     if(sql.includes('FROM account_deletion_operations WHERE auth_user_id='))return {rows:[created],rowCount:1};
@@ -163,6 +180,7 @@ test('admin deletion lifecycle failures propagate after the durable start so nor
 test('retrying an existing self-service operation preserves its original attribution',async()=>{
   const existing=row({state:'provider_delete_pending',initiation_source:'self_service',initiated_by_admin_auth_user_id:null,target_was_admin:false});
   const query=async(sql)=>{
+    if(sql.includes("FROM pack1_admins WHERE auth_user_id="))return {rows:[],rowCount:0};
     if(sql.includes('SELECT email,"emailVerified" email_verified FROM neon_auth."user"'))return {rows:[],rowCount:0};
     if(sql.includes('pack1_begin_admin_account_deletion'))return {rows:[{start_status:'existing',...existing}],rowCount:1};
     throw Error('unexpected SQL');
@@ -187,6 +205,7 @@ test('admin deletion rejects malformed and unknown target identities',async()=>{
     error=>error?.status===400,
   );
   const query=async(sql)=>{
+    if(sql.includes("FROM pack1_admins WHERE auth_user_id="))return {rows:[],rowCount:0};
     if(sql.includes('SELECT email,"emailVerified" email_verified FROM neon_auth."user"'))return {rows:[],rowCount:0};
     if(sql.includes('pack1_begin_admin_account_deletion'))return {rows:[{start_status:'unknown_target'}],rowCount:1};
     throw Error('unexpected SQL');
@@ -201,6 +220,7 @@ test('admin deletion rejects malformed and unknown target identities',async()=>{
 });
 
 const emailQuery=({email='target@example.test',verified=true,startStatus='created',operation=null}={})=>async sql=>{
+  if(sql.includes("FROM pack1_admins WHERE auth_user_id="))return {rows:[],rowCount:0};
   if(sql.includes('FROM neon_auth."user"'))return {rows:email?[{email,email_verified:verified}]:[],rowCount:email?1:0};
   if(sql.includes('pack1_begin_admin_account_deletion'))
     return {rows:[{start_status:startStatus,...(operation||row({state:'pending',attempts:'0',last_error_code:null}))}],rowCount:1};
