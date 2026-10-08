@@ -84,8 +84,13 @@ for (const path of publicStaticTopbarPages) {
   assert.doesNotMatch(html, /class="site-header"|class="admin-brand"/, `${path} must not use a legacy top-level header`);
 }
 const adminTopbar = await readFile('admin/index.html','utf8');
-assert.match(adminTopbar, /href="\/\?game=draft-run&board=daily">Leaders<\/a>/);
-assert.match(adminTopbar, /href="\/how-it-works\/"[^>]*>How To Play\?<\/a>/);
+assert.match(adminTopbar, /class="top-actions"[^>]*data-site-nav/, 'admin uses shared account-aware navigation');
+assert.match(adminTopbar, /href="\/\?game=draft-run&daily=1">Daily Run<\/a>/);
+assert.match(adminTopbar, /href="\/how-it-works\/"[^>]*>How To Play<\/a>/);
+assert.match(adminTopbar, /id="account-nav" href="\/\?account=1">Sign in<\/a>/, 'guest fallback stays a sign-in link');
+assert.doesNotMatch(adminTopbar, /href="\/\?game=draft-run&board=daily">Leaders<\/a>/, 'guest fallback stays minimal');
+assert.match(adminTopbar, /src="\/site-nav\.mjs"/, 'admin hydrates the shared signed-in account navigation');
+assert.match(adminTopbar, /href="\/visual-c\.css\?v=9"/, 'admin receives responsive signed-in navigation styles');
 for (const path of ['about/index.html','contact/index.html','privacy/index.html','terms/index.html']) {
   const html = await readFile(path, 'utf8');
   assert.doesNotMatch(html, /Make the decision before you read the answer\./, `${path} should not use the coaching CTA`);
