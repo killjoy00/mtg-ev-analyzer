@@ -26,7 +26,7 @@ export const BROWSER_GROUPS={
     spec('tests/account-deletion-e2e.mjs'),
   ],
   ads:[spec('tests/ads-e2e.mjs')],
-  admin:[spec('tests/admin-e2e.mjs'),spec('tests/corpus-readiness-e2e.mjs')],
+  admin:[spec('tests/admin-e2e.mjs'),spec('tests/corpus-readiness-e2e.mjs'),spec('tests/admin-invitations-e2e.mjs')],
 };
 export const PRESENTATION_BROWSER=[spec('tests/e2e.mjs'),spec('tests/sets-e2e.mjs')];
 export const FULL_BROWSER=[
