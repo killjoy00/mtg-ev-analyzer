@@ -72,6 +72,11 @@ test('fresh Practice source is played through live APIs and later marked QA/priv
   assert.match(script,/await cleanupFreshPracticeSource\(\)/);
 });
 
+test('current release acceptance does not depend on historical canary fixture recovery',()=>{
+  assert.doesNotMatch(script,/recoverKnownCanaryFixtures/);
+  assert.match(script,/historical canary fixtures are not prerequisites for current release acceptance/);
+});
+
 test('borrowed closed Daily eligibility is restored and canary is protected',()=>{
   assert.match(script,/async function restoreBorrowedSources\(\)/);
   assert.match(script,/UPDATE draft_run_sessions SET measurement_qa=\$2::boolean/);
