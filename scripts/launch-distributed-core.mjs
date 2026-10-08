@@ -11,15 +11,23 @@ export const quantiles=values=>{
 };
 export function validatePolicy(p) {
   assert.equal(p.version,3);assert.equal(p.generators,5);
-  assert.ok([25,50].includes(p.proposed_target),'capacity_target');
-  assert.deepEqual(p.stages.map(s=>s.players),p.proposed_target===25?[25]:[25,50]);
-  assert.equal(p.supported_launch_target,p.proposed_target);
+  const special=p.sequence==='50_to_100';
+  assert.ok((!special&&[25,50].includes(p.proposed_target))||(special&&p.proposed_target===100),'capacity_target');
+  assert.deepEqual(p.stages.map(s=>s.players),special?[50,100]:p.proposed_target===25?[25]:[25,50]);
+  assert.equal(p.supported_launch_target,special?50:p.proposed_target);
+  if(special)assert.deepEqual(p.stages.map(s=>s.hold_seconds),[600,600],'50_then_100_full_holds');
   assert.ok(p.stages.every(s=>s.hold_seconds>=120&&s.players%p.generators===0));
   assert.ok((p.proposed_target===25||p.stages.at(-1).hold_seconds>=600)&&p.recovery_seconds>=60);
   assert.ok(p.initial_seconds>=90&&p.drain_seconds>=60&&p.recovery_players===5);
   for(const k of ['ramp_seconds','heartbeat_seconds','lease_seconds','cohort_timeout_seconds','arm_seconds','ack_margin_seconds','maximum_start_lateness_ms','maximum_arrival_lateness_ms','telemetry_bin_seconds','telemetry_settlement_seconds','telemetry_timeout_seconds','telemetry_preflight_requests','maximum_experiment_minutes','maximum_branch_lifetime_minutes','maximum_compute_cu','maximum_requests','maximum_response_bytes','maximum_project_reported_egress_delta_bytes'])assert.ok(Number.isSafeInteger(p[k])&&p[k]>0,k);
   assert.ok(p.lease_seconds>=3*p.heartbeat_seconds&&p.arm_seconds>p.ack_margin_seconds+p.lease_seconds);
-  assert.ok(p.maximum_compute_cu<=8&&p.maximum_requests<=30000&&p.maximum_branch_lifetime_minutes<=75&&p.telemetry_preflight_requests<=100);
+  assert.ok(p.maximum_compute_cu<=8&&p.maximum_requests<=(special?50000:30000)&&p.maximum_branch_lifetime_minutes<=75&&p.telemetry_preflight_requests<=100);
+  if(special) {
+    assert.equal(p.maximum_experiment_minutes,60);assert.equal(p.maximum_runner_minutes,358);
+    assert.equal(p.maximum_requests,50000);assert.equal(p.maximum_coordinator_queries,20000);
+    assert.equal(p.maximum_response_bytes,268435456);
+    assert.equal(p.maximum_project_reported_egress_delta_bytes,1073741824);
+  }
   assert.ok(p.maximum_branch_lifetime_minutes*p.maximum_compute_cu/60<=p.emergency_compute_ceiling_cu_hours);
   assert.ok(p.maximum_experiment_minutes<p.maximum_branch_lifetime_minutes);
   assert.equal(p.maximum_error_fraction,0);assert.equal(p.maximum_legitimate_429s,0);assert.equal(p.maximum_correctness_failures,0);
@@ -31,10 +39,23 @@ export function validatePolicy(p) {
 // experiment requires an explicit selection and keeps its original gates.
 export function selectCapacityPolicy(p,target='25') {
   validatePolicy(p);
-  assert.ok(target==='25'||target==='50','capacity_target_must_be_25_or_50');
-  const selected=structuredClone(p),players=Number(target);
-  selected.stages=selected.stages.filter(s=>s.players<=players);
-  selected.supported_launch_target=players;selected.proposed_target=players;
+  assert.ok(['25','50','50-100'].includes(target),'capacity_target_must_be_25_50_or_50_100');
+  const selected=structuredClone(p);
+  if(target==='50-100') {
+    // Single explicit temporary acceptance path: stage 0 is full 50-player gameplay,
+    // followed only after all gates pass by 100 distinct actors. No 25-player warmup.
+    assert.deepEqual(p.stages,[{players:25,hold_seconds:120},{players:50,hold_seconds:600}]);
+    selected.sequence='50_to_100';
+    selected.stages=[{players:50,hold_seconds:600},{players:100,hold_seconds:600}];
+    selected.supported_launch_target=50;selected.proposed_target=100;
+    selected.maximum_experiment_minutes=60;
+    selected.maximum_runner_minutes=358;
+    selected.maximum_requests=50000;
+  } else {
+    const players=Number(target);
+    selected.stages=selected.stages.filter(s=>s.players<=players);
+    selected.supported_launch_target=players;selected.proposed_target=players;
+  }
   return validatePolicy(selected);
 }
 export function initialControl(scope,now,p) {
