@@ -79,7 +79,6 @@ jobs:
           CI_BRANCH_PARENT: br-orange-feather-ayps8kep
           CI_BRANCH_EXPIRES: ${{ steps.expiry.outputs.expires_at }}
           CI_BRANCH_SUSPEND: 300
-          CI_BRANCH_FIXED_CU: ${{ inputs.capacity_target == '100' && '8' || '' }}
         run: node scripts/create-ci-neon-branch.mjs
       - name: Read back exact 8/8-CU endpoint and wait for control-plane readiness before any workload
         if: inputs.capacity_target == '100'

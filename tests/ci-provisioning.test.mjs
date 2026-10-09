@@ -47,27 +47,6 @@ test('unknown Neon create outcome reconciles its unique branch without a second 
   assert.deepEqual(result,{branch_id:branch.id,created:'true'});assert.equal(posts,1);assert.equal(reads,2);
   assert.equal(connections,2);assert.deepEqual(outputs[2],['db_url',uri]);
 });
-
-test('exact one-shot 8-CU provisioning requests fixed min and max, never changes default CI branches',async()=>{
-  const bodies=[];
-  const res=await createCiBranch({...config,fixedCu:8,fetcher:async(url,options)=>{
-    if(options.method==='POST'){bodies.push(JSON.parse(options.body));return Response.json({branch});}
-    if(url.includes('/branches?'))return Response.json({branches:[]});
-    return Response.json({uri});
-  }});
-  assert.equal(res.branch_id,branch.id);
-  assert.equal(bodies.length,1);
-  assert.deepEqual(bodies[0].endpoints,[{type:'read_write',suspend_timeout_seconds:300,
-    autoscaling_limit_min_cu:8,autoscaling_limit_max_cu:8}]);
-  for(const value of [0.25,4,16,-1,NaN]) {
-    await assert.rejects(createCiBranch({...config,fixedCu:value,
-      fetcher:async()=>assert.fail('Invalid compute settings must fail before any API access')}),
-      /Fixed 8 CU/);
-  }
-  await assert.rejects(createCiBranch({...config,fixedCu:8,prefix:'ci-pr-123-456-1-corpus',
-    fetcher:async()=>assert.fail('Only launch-load can request fixed CU')}),/Fixed 8 CU/);
-});
-
 test('Neon failure publishes cleanup ownership before connection reads fail',async()=>{
   const outputs=[];
   await assert.rejects(createCiBranch({...config,output:(...o)=>outputs.push(o),fetcher:async(url,options)=>{

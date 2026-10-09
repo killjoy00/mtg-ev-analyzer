@@ -90,11 +90,11 @@ test('one-shot direct 100 has an exact branch, opened-only trigger and bounded r
  const workload=p.initial_seconds+600+p.drain_seconds+p.recovery_seconds;
  assert.equal(workload,870);assert.equal(workload+p.arm_seconds+p.telemetry_timeout_seconds,1140);
  assert.equal(p.maximum_runner_minutes,334);assert.equal(p.maximum_experiment_minutes,45);
- assert.match(child,/CI_BRANCH_FIXED_CU:/);
+ assert.match(child,/Read back exact 8\/8-CU endpoint/);
  assert.match(child,/verify-fixed-8cu-compute\.mjs/);
- const creation=fs.readFileSync('scripts/create-ci-neon-branch.mjs','utf8');
- assert.match(creation,/autoscaling_limit_min_cu=8/);
- assert.match(creation,/autoscaling_limit_max_cu=8/);
+ const creation=fs.readFileSync('scripts/verify-fixed-8cu-compute.mjs','utf8');
+ assert.match(creation,/autoscaling_limit_min_cu:8/);
+ assert.match(creation,/autoscaling_limit_max_cu:8/);
 });
 
 test('25-player profile completes only after positive application, telemetry and usage gates',()=>{

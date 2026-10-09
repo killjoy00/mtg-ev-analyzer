@@ -6,7 +6,7 @@ import {resourceReceipt,writeResourceReceipt} from './preview-resource-ownership
 
 const PROJECT='patient-shadow-91417882',BASE=`https://console.neon.tech/api/v2/projects/${PROJECT}`;
 const PARENTS=['br-orange-feather-ayps8kep','br-twilight-hill-ayffyd2b'];
-export async function createCiBranch({prefix,parent,expires,suspend=300,fixedCu=null,token,
+export async function createCiBranch({prefix,parent,expires,suspend=300,token,
   nonce=randomBytes(16).toString('hex'),now=Date.now,sleep=ms=>new Promise(r=>setTimeout(r,ms)),
   fetcher=fetch,output=()=>{}}={}) {
   if(!/^(?:ci-pr-[0-9]+-[0-9]+-[0-9]+-[a-z_]+|launch-load-[0-9]+-[0-9]+|gateway-preview-[0-9]+-[0-9]+)$/.test(prefix||'')||
@@ -14,10 +14,6 @@ export async function createCiBranch({prefix,parent,expires,suspend=300,fixedCu=
     !/^[a-f0-9]{32}$/.test(nonce)||!Number.isFinite(Date.parse(expires))||
     Date.parse(expires)<=now()+60000||Date.parse(expires)>now()+25*3600000)
     throw Error('Neon control requires a fixed CI branch prefix, explicit parent and bounded expiry.');
-  // This experiment explicitly requests 8/8 on launch-load only. Other CI
-  // branches keep their original unconstrained endpoint settings.
-  if(fixedCu!==null&&(fixedCu!==8||!/^launch-load-[0-9]+-[0-9]+$/.test(prefix)||suspend!==300))
-    throw Error('Fixed 8 CU is allowed only for bounded launch-load branches.');
   // A random per-invocation name permits reconciliation after an unknown POST
   // outcome without adopting another job's branch or issuing a second POST.
   const name=`${prefix}-${nonce}`;
@@ -30,15 +26,10 @@ export async function createCiBranch({prefix,parent,expires,suspend=300,fixedCu=
     return found[0];
   };
   if(await inventory())throw Error('Neon control refuses to reuse an existing CI branch.');
-  const endpoint={type:'read_write',suspend_timeout_seconds:suspend};
-  if(fixedCu===8) {
-    endpoint.autoscaling_limit_min_cu=8;
-    endpoint.autoscaling_limit_max_cu=8;
-  }
   let branch;
   try {
     branch=(await request('/branches',{method:'POST',body:{branch:{name,parent_id:parent,expires_at:expires},
-      endpoints:[endpoint]}}))?.branch;
+      endpoints:[{type:'read_write',suspend_timeout_seconds:suspend}]}}))?.branch;
   } catch(error) {
     if(error.status&&!transientControlStatus(error.status))throw error;
     for(let attempt=0;attempt<4;attempt++) {
@@ -65,8 +56,7 @@ export async function createCiBranch({prefix,parent,expires,suspend=300,fixedCu=
 if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url) {
   let createdBranch;
   createCiBranch({prefix:process.env.CI_BRANCH_PREFIX,parent:process.env.CI_BRANCH_PARENT,
-    expires:process.env.CI_BRANCH_EXPIRES,suspend:Number(process.env.CI_BRANCH_SUSPEND||300),
-    fixedCu:process.env.CI_BRANCH_FIXED_CU?Number(process.env.CI_BRANCH_FIXED_CU):null,token:process.env.NEON_API_KEY,
+    expires:process.env.CI_BRANCH_EXPIRES,suspend:Number(process.env.CI_BRANCH_SUSPEND||300),token:process.env.NEON_API_KEY,
     output:(name,value)=>{
       if(name==='branch_id')createdBranch=value;
       if(name==='db_url') {

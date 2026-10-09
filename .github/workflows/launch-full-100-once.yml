@@ -89,9 +89,9 @@ jobs:
           assert.equal(manifest.ordered.at(-1),'0058_owner_guard_admin_deletion.sql');
           assert.equal(manifest.ordered.some(x=>x.startsWith('0059_')),false);
           const preview=fs.readFileSync('.github/workflows/launch-distributed-preview.yml','utf8');
-          assert.match(preview,/CI_BRANCH_FIXED_CU:.*8/);
+          assert.ok(preview.includes('Read back exact 8/8-CU endpoint'));
           assert.match(preview,/verify-fixed-8cu-compute\.mjs/);
-          const provisioner=fs.readFileSync('scripts/create-ci-neon-branch.mjs','utf8');
+          const provisioner=fs.readFileSync('scripts/verify-fixed-8cu-compute.mjs','utf8');
           assert.match(provisioner,/autoscaling_limit_min_cu/);
           assert.match(provisioner,/autoscaling_limit_max_cu/);
           assert.equal(2*(8+2+30+3+8)+(9+15+5*30+7),283);
