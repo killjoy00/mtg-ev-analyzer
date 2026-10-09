@@ -513,7 +513,7 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
       if(statusTarget)statusTarget.textContent=creatorPublicationProgressText(expected,attempt);
       await new Promise(resolve=>setTimeout(resolve,6000));
     }
-    throw new Error('Publication is still running. Reload Admin to reconcile the existing operation before distributing the URL.');
+    throw new Error(expected==='retired'?'Delete is not yet live-verified. Select Finish delete to retry the protected retirement and check the published unavailable page.':'Publication is still running. Reload Admin to reconcile the existing operation before distributing the URL.');
   }
 
   creatorPublish.addEventListener('click',async()=>{
