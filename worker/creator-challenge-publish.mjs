@@ -563,14 +563,14 @@ export async function purgeVerifiedCreatorCanary(query,id,slug) {
         SELECT 1 FROM game_results result
         LEFT JOIN players player ON player.id=result.player_id
         WHERE result.creator_challenge_id=c.id
-          AND (player.id IS NULL OR player.display_name !~* '^QA Creator Canary'
+          AND (player.id IS NULL OR player.display_name IS DISTINCT FROM 'QA Creator Canary'
             OR EXISTS(SELECT 1 FROM account_links linked WHERE linked.player_id=result.player_id))
       )
       AND NOT EXISTS(
         SELECT 1 FROM analytics_events event
         LEFT JOIN players player ON player.id=event.player_id
         WHERE event.event_props->>'creator_challenge_id'=c.id::text
-          AND (player.id IS NULL OR player.display_name !~* '^QA Creator Canary'
+          AND (player.id IS NULL OR player.display_name IS DISTINCT FROM 'QA Creator Canary'
             OR EXISTS(SELECT 1 FROM account_links linked WHERE linked.player_id=event.player_id))
       )
     RETURNING c.id,c.slug`,[id,slug]);
