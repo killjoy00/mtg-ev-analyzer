@@ -20,7 +20,7 @@ import {inspectLaunchCoverageFreshness} from './launch-watcher-stale.mjs';
 import {reconcileLaunchWatcherAlert} from './launch-watcher-alert.mjs';
 import {launchWatcherRecoveryConfigured,reconcileLaunchWatcherCadence,reconcileLaunchWatcherDispatch} from './launch-watcher-dispatch.mjs';
 import {campaignLinkPublishConfigured,handleCampaignLinkPublish} from './campaign-link-publish.mjs';
-import {handleCreatorChallengePublication,requestCreatorPrivacyRetirement} from './creator-challenge-publish.mjs';
+import {handleCreatorChallengePublication,handleCreatorChallengePurge,requestCreatorPrivacyRetirement} from './creator-challenge-publish.mjs';
 import {handleAdminAccountDeletion} from './admin-account-deletion.mjs';
 import {handleAdminUsernameChange} from './admin-username-change.mjs';
 import {maintainServingReadiness} from './corpus-readiness.mjs';
@@ -2470,6 +2470,7 @@ async function route(request) {
   }
   if (url.pathname === '/v1/admin/campaign-links/publish') return handleCampaignLinkPublish(request,{query,readJson,allowedOrigins:ALLOWED_ORIGINS});
   if (/^\/v1\/admin\/creator-challenges\/[a-f0-9-]{36}\/publication$/i.test(url.pathname)) return handleCreatorChallengePublication(request,{query,readJson,allowedOrigins:ALLOWED_ORIGINS,today:gameDateKey()});
+  if (/^\/v1\/admin\/creator-challenges\/[a-f0-9-]{36}\/purge$/i.test(url.pathname)) return handleCreatorChallengePurge(request,{query,readJson,allowedOrigins:ALLOWED_ORIGINS});
   if (request.method === 'POST' && url.pathname === '/internal/player-session-refresh') return handleBrowserPlayerSession(request,{existingOnly:true});
   if (request.method === 'POST' && url.pathname === '/v1/player/session') return handleBrowserPlayerSession(request);
   if (request.method === 'POST' && url.pathname === '/v1/player/migrate') return handlePlayerMigration(request);

@@ -231,6 +231,8 @@ function statePayload(row,extra={}) {
     challenge:row,
     reconciled:false,
     live_verified:detail.live_verified===true,
+    // Capability is absent from older deployed Functions. Static Admin must fail closed.
+    purge_supported:true,
     dispatch:detail.dispatch||null,
     ...extra,
   };
@@ -530,4 +532,66 @@ export async function handleCreatorChallengePublication(request,{query,readJson,
     operation:begun.operation,
     reused_operation:begun.reused,
   },{status:202,headers:{'cache-control':'no-store'}});
+}
+
+/**
+ * Physical removal is intentionally limited to retired, live-verified release canaries.
+ * Customer creator challenges always use protected retirement instead. FKs preserve
+ * player sessions/results (SET NULL) and only canary-specific audit rows cascade.
+ */
+export async function purgeVerifiedCreatorCanary(query,id,slug) {
+  if(!UUID.test(String(id||''))||!/^canary-(practice|daily)-[a-f0-9]{8}$/.test(String(slug||'')))
+    fail('Only verified release canaries can be removed permanently.',409,'CREATOR_PURGE_FORBIDDEN');
+  const removed=await query(`DELETE FROM creator_challenges c
+    WHERE c.id=$1::uuid AND c.slug=$2
+      AND c.status='retired'
+      AND c.publication_detail->>'live_verified'='true'
+      AND c.creator_public_name='A creator'
+      AND c.creator_handle IS NULL
+      AND c.privacy_removed_at IS NOT NULL
+      AND c.acquisition_campaign='release-canary'
+      AND c.slug ~ '^canary-(practice|daily)-[a-f0-9]{8}$'
+      AND EXISTS(
+        SELECT 1 FROM draft_run_sessions source
+        WHERE source.id=c.source_session_id AND source.measurement_qa
+      )
+      AND NOT EXISTS(
+        SELECT 1 FROM draft_run_sessions challenger
+        WHERE challenger.creator_challenge_id=c.id AND NOT challenger.measurement_qa
+      )
+      AND NOT EXISTS(
+        SELECT 1 FROM game_results result
+        LEFT JOIN players player ON player.id=result.player_id
+        WHERE result.creator_challenge_id=c.id
+          AND (player.id IS NULL OR player.display_name IS DISTINCT FROM 'QA Creator Canary'
+            OR EXISTS(SELECT 1 FROM account_links linked WHERE linked.player_id=result.player_id))
+      )
+      AND NOT EXISTS(
+        SELECT 1 FROM analytics_events event
+        LEFT JOIN players player ON player.id=event.player_id
+        WHERE event.event_props->>'creator_challenge_id'=c.id::text
+          AND (player.id IS NULL OR player.display_name IS DISTINCT FROM 'QA Creator Canary'
+            OR EXISTS(SELECT 1 FROM account_links linked WHERE linked.player_id=event.player_id))
+      )
+    RETURNING c.id,c.slug`,[id,slug]);
+  if(!removed.rows[0])fail(
+    'This challenge is not a fully verified QA-only canary or has real-player activity. Nothing was deleted.',
+    409,'CREATOR_PURGE_FORBIDDEN',
+  );
+  return {id:String(removed.rows[0].id),slug:removed.rows[0].slug};
+}
+
+export async function handleCreatorChallengePurge(request,{query,readJson,allowedOrigins}={}) {
+  if(typeof query!=='function'||typeof readJson!=='function'||!(allowedOrigins instanceof Set))
+    throw Error('Creator purge dependencies are unavailable.');
+  const id=new URL(request.url).pathname.match(/^\/v1\/admin\/creator-challenges\/([a-f0-9-]{36})\/purge$/i)?.[1];
+  if(!id)fail('Not found.',404);
+  if(request.method!=='POST')fail('Method not allowed.',405);
+  await requireCreatorAdmin(request,{query,allowedOrigins,csrf:true});
+  const row=await creatorChallengeById(query,id);
+  if(!row)fail('Creator challenge not found.',404);
+  const input=await readJson(request);
+  if(input?.confirm!==row.slug)fail('Confirm the exact QA test slug.',400,'CREATOR_PURGE_CONFIRM');
+  const removed=await purgeVerifiedCreatorCanary(query,row.id,row.slug);
+  return Response.json({ok:true,removed},{headers:{'cache-control':'no-store'}});
 }

@@ -58,6 +58,7 @@ export function adminGrowthPath(path,method,mode) {
   if(method==='GET'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/deletion$/.test(path))return true;
   if(method==='PATCH'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/username$/.test(path))return true;
   if(['GET','POST'].includes(method)&&/^\/v1\/admin\/creator-challenges\/[a-f0-9-]{36}\/publication$/.test(path))return true;
+  if(method==='POST'&&/^\/v1\/admin\/creator-challenges\/[a-f0-9-]{36}\/purge$/.test(path))return true;
   return false;
 }
 

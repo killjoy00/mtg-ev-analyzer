@@ -5,6 +5,8 @@ import {
   mergeCreatorChallengeState,
   creatorChallengesForDisplay,
   creatorPublicationProgressText,
+  creatorPublicationFailure,
+  creatorCanaryMayBePurged,
 } from '../admin/campaign-links.mjs';
 
 test('reconciliation preserves list stats while taking current publication state',()=>{
@@ -57,4 +59,40 @@ test('creator Admin exposes plain Delete and recovery-oriented Finish delete lab
   assert.match(source,/data-retire>Delete<\/button>/);
   assert.match(source,/data-resume-retire>Finish delete<\/button>/);
   assert.match(source,/id="creator-show-deleted"/);
+});
+
+test('failed retirement is actionable rather than waiting for ten minutes',()=>{
+  const failed={
+    state:'retired',live_verified:false,
+    workflow:{status:'completed',conclusion:'failure'},
+    challenge:{status:'retired',publication_error:'Synthetic CI retirement failure',publication_detail:{live_verified:false}},
+  };
+  assert.match(creatorPublicationFailure(failed,'retired'),/Synthetic CI retirement failure/);
+  assert.equal(creatorPublicationFailure({...failed,live_verified:true,challenge:{...failed.challenge,publication_detail:{live_verified:true}}},'retired'),null);
+  assert.match(creatorPublicationFailure({
+    state:'retired',dispatch:{state:'rejected',error:'GitHub dispatch rejected'},
+    challenge:{status:'retired',publication_detail:{live_verified:false}},
+  },'retired'),/GitHub dispatch rejected/);
+  assert.equal(creatorPublicationFailure({state:'retired',challenge:{status:'retired',publication_detail:{live_verified:false}}},'retired'),null);
+});
+
+test('permanent test removal is never offered to a customer challenge or unverified canary',()=>{
+  const safe={slug:'canary-practice-1234abcd',purge_supported:true,status:'retired',creator_public_name:'A creator',acquisition_campaign:'release-canary',
+    privacy_removed_at:'2026-10-09T00:00:00Z',publication_detail:{live_verified:true}};
+  assert.equal(creatorCanaryMayBePurged(safe),true);
+  for(const diff of [
+    {slug:'personal-creator'}, {slug:'canary-practice-hello'}, {status:'published'},
+    {purge_supported:false}, {purge_supported:undefined},
+    {creator_public_name:'Customer'}, {acquisition_campaign:'organic'},
+    {privacy_removed_at:null}, {publication_detail:{live_verified:false}},
+  ])assert.equal(creatorCanaryMayBePurged({...safe,...diff}),false);
+});
+
+test('Admin creator delete requests cannot reuse cached API responses',()=>{
+  const source=fs.readFileSync('admin/admin.mjs','utf8');
+  assert.match(source,/credentials:firstPartyAuthEnabled\(\)\?'include':'omit',cache:'no-store',signal:AbortSignal.timeout\(45000\)/);
+  const creator=fs.readFileSync('admin/campaign-links.mjs','utf8');
+  assert.match(creator,/status==='retired'&&challenge.publication_detail\?\.live_verified!==true/);
+  assert.match(creator,/const failure=creatorPublicationFailure\(status,expected\)/);
+  assert.match(creator,/data-purge-test>Permanently remove test/);
 });

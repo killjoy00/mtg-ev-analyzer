@@ -21,12 +21,14 @@ try {
   const retryCreatorId='55555555-5555-4555-8555-555555555555';
   const existingDailyCreatorId='66666666-6666-4666-8666-666666666666';
   const creatorPublicationBodies=[];
+  const creatorPurgeBodies=[];
   const creatorImageRequests=new Map();
   let creatorChallenges=[
     {id:existingDailyCreatorId,slug:'daily-creator',creator_public_name:'Daily Creator',creator_handle:'@daily',headline:'Beat Daily Creator',source_type:'daily',source_day:'2026-09-11',source_environment:'latest',source_score:91,acquisition_source:'creator',acquisition_campaign:'daily-creator',acquisition_medium:'creator',status:'published',publication_detail:{live_verified:true},published_at:'2026-09-12T01:00:00Z',created_at:'2026-09-11T20:00:00Z',opens:12,starts:8,attempts:6,completions:6,wins:2,ties:1,losses:3,beat_percentage:33.3,average_score:84.2},
     {id:retryCreatorId,slug:'retry-creator',creator_public_name:'Retry Creator',creator_handle:null,headline:'Beat Retry Creator',source_type:'practice',source_day:null,source_environment:'mixed',source_score:82,acquisition_source:'creator',acquisition_campaign:'retry-creator',acquisition_medium:'creator',status:'failed',publication_detail:{action:'publish'},publication_error:'Synthetic dispatch failure',created_at:'2026-09-12T01:00:00Z',opens:0,starts:0,attempts:0,completions:0,wins:0,ties:0,losses:0},
   ];
   let renamedPublicUsername='Test Member',deletionFixture=null,deletionStatusFailure=false;
+  let failNextCreatorRetirement=false;
   let holdDeletionStatus=false,releaseDeletionStatus=null,failDeleteAfterCommit=false;
   let holdHabitReport=true,releaseHabitReport=null,holdStaleCore=false,releaseStaleCore=null;
   let markStaleCoreHeld;const staleCoreHeld=new Promise(resolve=>{markStaleCoreHeld=resolve;});
@@ -59,6 +61,16 @@ try {
       creatorChallenges=[created,...creatorChallenges];
       return route.fulfill({json:{challenge:created}});
     }
+    const creatorPurge=path.match(/^\/v1\/admin\/creator-challenges\/([a-f0-9-]{36})\/purge$/i);
+    if(creatorPurge) {
+      assert.equal(method,'POST');
+      const challenge=creatorChallenges.find(item=>item.id===creatorPurge[1]);
+      assert.ok(challenge&&challenge.slug.startsWith('canary-')&&challenge.publication_detail?.live_verified===true);
+      const body=route.request().postDataJSON();creatorPurgeBodies.push({id:challenge.id,...body});
+      assert.equal(body.confirm,challenge.slug);
+      creatorChallenges=creatorChallenges.filter(item=>item.id!==challenge.id);
+      return route.fulfill({json:{ok:true,removed:{id:challenge.id,slug:challenge.slug}}});
+    }
     const creatorPublication=path.match(/^\/v1\/admin\/creator-challenges\/([a-f0-9-]{36})\/publication$/i);
     if(creatorPublication) {
       const challenge=creatorChallenges.find(item=>item.id===creatorPublication[1]);
@@ -69,13 +81,20 @@ try {
           challenge.status='publishing';challenge.publication_detail={action:'publish',dispatch:{state:'accepted'}};
           return route.fulfill({status:202,json:{ok:true,state:'publishing',operation:'88888888-8888-4888-8888-888888888888',challenge}});
         }
-        challenge.status='retired';challenge.publication_detail={action:'retire',live_verified:false};
+        challenge.status='retired';challenge.publication_error=null;
+        if(failNextCreatorRetirement) {
+          failNextCreatorRetirement=false;
+          challenge.publication_detail={action:'retire',live_verified:false,workflow:{status:'completed',conclusion:'failure'}};
+          challenge.publication_error='Synthetic retirement CI failed';
+        } else challenge.publication_detail={action:'retire',live_verified:false};
         return route.fulfill({status:202,json:{ok:true,state:'retired',operation:'99999999-9999-4999-8999-999999999999',challenge}});
       }
       if(method==='GET') {
         if(challenge.status==='publishing'){challenge.status='published';challenge.publication_detail={action:'publish',live_verified:true};challenge.published_at='2026-09-12T03:00:00Z';}
-        if(challenge.status==='retired')challenge.publication_detail={action:'retire',live_verified:true};
-        return route.fulfill({json:{state:challenge.status,live_verified:challenge.publication_detail.live_verified===true,challenge}});
+        if(challenge.status==='retired'&&challenge.publication_detail.workflow?.conclusion!=='failure')
+          challenge.publication_detail={action:'retire',live_verified:true};
+        return route.fulfill({json:{state:challenge.status,live_verified:challenge.publication_detail.live_verified===true,
+          workflow:challenge.publication_detail.workflow||null,purge_supported:true,challenge}});
       }
     }
     if(path==='/v1/admin/campaign-links/publish') {
@@ -392,6 +411,47 @@ try {
   assert.match(await freshKit.getByLabel('Image alt text').inputValue(),/Practice Creator[\s\S]*87 out of 100[\s\S]*Draft Run Practice/);
   assert.equal((await freshKit.innerText()).includes('P3 was the one I really wasn’t sure about.'),false,'post-run creator note must not enter social kit assets/copy');
   assert.ok(creatorPublicationBodies.some(body=>body.id===creatorId&&body.action==='publish'));
+
+  // Deletion must hide a normal published challenge after live verification.
+  page.once('dialog',dialog=>dialog.accept());
+  await creatorPanel.locator('#creator-existing > article').filter({hasText:'daily-creator'}).getByRole('button',{name:'Delete',exact:true}).click();
+  await creatorPanel.locator('#creator-existing > article').filter({hasText:'daily-creator'}).waitFor({state:'detached'});
+  assert.ok(creatorPublicationBodies.some(body=>body.id===existingDailyCreatorId&&body.action==='retire'));
+  await creatorPanel.getByRole('button',{name:/Show deleted/}).click();
+  await creatorPanel.locator('#creator-existing > article').filter({hasText:'daily-creator'}).getByText('Status: retired').waitFor();
+  assert.equal(await creatorPanel.locator('#creator-existing > article').filter({hasText:'daily-creator'}).getByRole('button',{name:'Delete',exact:true}).count(),0);
+  await creatorPanel.getByRole('button',{name:/Hide deleted/}).click();
+
+  // Failure has to show the CI error promptly and offer a working Finish delete retry.
+  failNextCreatorRetirement=true;
+  page.once('dialog',dialog=>dialog.accept());
+  await creatorPanel.locator('#creator-existing > article').filter({hasText:'practice-creator'}).getByRole('button',{name:'Delete',exact:true}).click();
+  await creatorPanel.getByText('Synthetic retirement CI failed',{exact:true}).waitFor();
+  const retryDelete=creatorPanel.locator('#creator-existing > article').filter({hasText:'practice-creator'});
+  await retryDelete.getByRole('button',{name:'Finish delete'}).click();
+  await retryDelete.waitFor({state:'detached'});
+  assert.equal(creatorPublicationBodies.filter(body=>body.id===creatorId&&body.action==='retire').length,2);
+
+  // Verified synthetic QA challenges get a separate permanent-removal action;
+  // normal creator challenges never get that action.
+  const purgeId='77777777-7777-4777-8777-777777777777';
+  const purgeSlug='canary-practice-1234abcd';
+  creatorChallenges=[{
+    id:purgeId,slug:purgeSlug,creator_public_name:'A creator',creator_handle:null,
+    headline:'Creator challenge unavailable',source_type:'practice',source_day:null,source_environment:'mixed',
+    source_score:44,acquisition_source:'creator',acquisition_campaign:'release-canary',
+    acquisition_medium:'creator',status:'retired',publication_detail:{action:'retire',live_verified:true},
+    privacy_removed_at:'2026-10-09T01:00:00Z',created_at:'2026-10-09T00:00:00Z',opens:0,starts:0,attempts:0,
+  },...creatorChallenges];
+  await creatorPanel.getByRole('button',{name:/Show deleted/}).click();
+  const purgeRow=creatorPanel.locator('#creator-existing > article').filter({hasText:purgeSlug});
+  await purgeRow.getByRole('button',{name:'Permanently remove test'}).waitFor();
+  assert.equal(await creatorPanel.locator('#creator-existing > article').filter({hasText:'retry-creator'}).getByRole('button',{name:'Permanently remove test'}).count(),0);
+  page.once('dialog',dialog=>dialog.accept());
+  await purgeRow.getByRole('button',{name:'Permanently remove test'}).click();
+  await purgeRow.waitFor({state:'detached'});
+  assert.deepEqual(creatorPurgeBodies,[{id:purgeId,confirm:purgeSlug}]);
+  assert.ok(creatorChallenges.some(row=>row.slug==='daily-creator'&&row.status==='retired'));
 
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),'Campaign link builder must not overflow horizontally');
   await page.screenshot({path:'artifacts/ui-campaign-links-mobile.png',fullPage:true});

@@ -111,3 +111,16 @@ test('completed deletion redacts rename and deletion free text while retaining o
   assert.match(deletion,/deletion_reason=NULL/);
   assert.match(deletion,/initiated_by_admin_auth_user_id/);
 });
+
+test('QA purge endpoint is available only through the authenticated production growth gateway',()=>{
+  const route='/v1/admin/creator-challenges/11111111-1111-4111-8111-111111111111/purge';
+  assert.equal(adminGrowthPath(route,'POST','production'),true);
+  assert.equal(adminGrowthPath(route,'GET','production'),false);
+  assert.equal(adminGrowthPath(route,'DELETE','production'),false);
+  assert.equal(adminGrowthPath(route,'POST','preview'),false);
+  assert.equal(adminPath(route,'POST'),false);
+  assert.equal(adminGrowthPath('/v1/admin/creator-challenges/garbage/purge','POST','production'),false);
+  const backend=fs.readFileSync('worker/creator-challenge-publish.mjs','utf8');
+  assert.match(backend,/handleCreatorChallengePurge[\s\S]*requireCreatorAdmin\(request,\{query,allowedOrigins,csrf:true\}\)/);
+  assert.match(backend,/if\(input\?\.confirm!==row\.slug\)/);
+});

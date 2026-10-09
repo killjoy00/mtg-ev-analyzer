@@ -31,6 +31,7 @@ import {
   discoverCreatorPublicationWorkflowRun,
   dispatchCreatorPublicationAttempt,
   requestCreatorPrivacyRetirement,
+  purgeVerifiedCreatorCanary,
   verifyCreatorPublicationLive,
 } from '../worker/creator-challenge-publish.mjs';
 
@@ -752,4 +753,38 @@ test('retired creator social-card validation does not require Pillow',async()=>{
   }finally{
     await rm(root,{recursive:true,force:true});
   }
+});
+
+test('hard deletion is restricted to verified QA-only canaries, not real creator rows',async()=>{
+  const id='dddddddd-dddd-4ddd-8ddd-dddddddddddd';
+  let calls=0;
+  const query=async(sql,params)=>{
+    calls++;
+    assert.match(sql,/^DELETE FROM creator_challenges c/);
+    assert.match(sql,/c\.status='retired'/);
+    assert.match(sql,/c\.publication_detail->>'live_verified'='true'/);
+    assert.match(sql,/c\.creator_public_name='A creator'/);
+    assert.match(sql,/c\.privacy_removed_at IS NOT NULL/);
+    assert.match(sql,/c\.acquisition_campaign='release-canary'/);
+    assert.match(sql,/source\.measurement_qa/);
+    assert.match(sql,/challenger\.measurement_qa/);
+    assert.match(sql,/game_results result/);
+    assert.match(sql,/analytics_events event/);
+    assert.match(sql,/account_links linked/);
+    assert.equal((sql.match(/player\.display_name IS DISTINCT FROM 'QA Creator Canary'/g)||[]).length,2,
+      'nullable or unknown player identities must always block permanent deletion');
+    assert.match(sql,/RETURNING c\.id,c\.slug/);
+    assert.deepEqual(params,[id,'canary-daily-1234abcd']);
+    return {rows:[{id,slug:'canary-daily-1234abcd'}]};
+  };
+  assert.deepEqual(await purgeVerifiedCreatorCanary(query,id,'canary-daily-1234abcd'),
+    {id,slug:'canary-daily-1234abcd'});
+  assert.equal(calls,1);
+  await assert.rejects(()=>purgeVerifiedCreatorCanary(query,id,'customer-challenge'),/Only verified release canaries/);
+  await assert.rejects(()=>purgeVerifiedCreatorCanary(query,id,'canary-practice-not-hex'),/Only verified release canaries/);
+  assert.equal(calls,1,'unsafe slugs must never execute destructive SQL');
+  await assert.rejects(
+    ()=>purgeVerifiedCreatorCanary(async()=>({rows:[]}),id,'canary-practice-1234abcd'),
+    /not a fully verified QA-only canary/,
+  );
 });
