@@ -192,7 +192,10 @@ BEGIN
   -- and all sixteen seeded random draws above remain unchanged.
   -- LATERAL LIMIT 1 retains the original metadata eligibility and row choice.
   SELECT COALESCE(jsonb_agg(meta.metadata ORDER BY picked.ordinality),'[]'::jsonb),
-         MIN(picked.ordinality) FILTER (WHERE meta.metadata IS NULL)
+         MIN(picked.ordinality) FILTER (WHERE
+           jsonb_typeof(meta.metadata) IS DISTINCT FROM 'object'
+           OR meta.metadata->>'puzzle_id' IS DISTINCT FROM picked.puzzle_id
+           OR meta.metadata->>'selected_id' IS DISTINCT FROM picked.puzzle_id)
     INTO selected,missing_metadata_round
   FROM unnest(chosen_puzzle_ids) WITH ORDINALITY AS picked(puzzle_id,ordinality)
   LEFT JOIN LATERAL (
@@ -214,6 +217,10 @@ BEGIN
     RETURN jsonb_build_object('ok',false,'error','corpus_changed',
       'round',(missing_metadata_round-1)::integer,
       'draws_used',(missing_metadata_round-1)::integer*2+2);
+  END IF;
+  -- No partial or malformed eight-pick payload may escape the selector.
+  IF jsonb_typeof(selected) IS DISTINCT FROM 'array' OR jsonb_array_length(selected)<>8 THEN
+    RETURN jsonb_build_object('ok',false,'error','corpus_changed','draws_used',16);
   END IF;
   SELECT revision INTO current_revision FROM draft_run_serving_revision WHERE singleton;
   IF current_revision IS DISTINCT FROM p_snapshot_revision THEN
