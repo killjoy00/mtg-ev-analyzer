@@ -414,20 +414,20 @@ try {
 
   // Deletion must hide a normal published challenge after live verification.
   page.once('dialog',dialog=>dialog.accept());
-  await creatorPanel.locator('article').filter({hasText:'daily-creator'}).getByRole('button',{name:'Delete',exact:true}).click();
-  await creatorPanel.locator('article').filter({hasText:'daily-creator'}).waitFor({state:'detached'});
+  await creatorPanel.locator('#creator-existing > article').filter({hasText:'daily-creator'}).getByRole('button',{name:'Delete',exact:true}).click();
+  await creatorPanel.locator('#creator-existing > article').filter({hasText:'daily-creator'}).waitFor({state:'detached'});
   assert.ok(creatorPublicationBodies.some(body=>body.id===existingDailyCreatorId&&body.action==='retire'));
   await creatorPanel.getByRole('button',{name:/Show deleted/}).click();
-  await creatorPanel.locator('article').filter({hasText:'daily-creator'}).getByText('Status: retired').waitFor();
-  assert.equal(await creatorPanel.locator('article').filter({hasText:'daily-creator'}).getByRole('button',{name:'Delete',exact:true}).count(),0);
+  await creatorPanel.locator('#creator-existing > article').filter({hasText:'daily-creator'}).getByText('Status: retired').waitFor();
+  assert.equal(await creatorPanel.locator('#creator-existing > article').filter({hasText:'daily-creator'}).getByRole('button',{name:'Delete',exact:true}).count(),0);
   await creatorPanel.getByRole('button',{name:/Hide deleted/}).click();
 
   // Failure has to show the CI error promptly and offer a working Finish delete retry.
   failNextCreatorRetirement=true;
   page.once('dialog',dialog=>dialog.accept());
-  await creatorPanel.locator('article').filter({hasText:'practice-creator'}).getByRole('button',{name:'Delete',exact:true}).click();
+  await creatorPanel.locator('#creator-existing > article').filter({hasText:'practice-creator'}).getByRole('button',{name:'Delete',exact:true}).click();
   await creatorPanel.getByText('Synthetic retirement CI failed',{exact:true}).waitFor();
-  const retryDelete=creatorPanel.locator('article').filter({hasText:'practice-creator'});
+  const retryDelete=creatorPanel.locator('#creator-existing > article').filter({hasText:'practice-creator'});
   await retryDelete.getByRole('button',{name:'Finish delete'}).click();
   await retryDelete.waitFor({state:'detached'});
   assert.equal(creatorPublicationBodies.filter(body=>body.id===creatorId&&body.action==='retire').length,2);
@@ -444,9 +444,9 @@ try {
     privacy_removed_at:'2026-10-09T01:00:00Z',created_at:'2026-10-09T00:00:00Z',opens:0,starts:0,attempts:0,
   },...creatorChallenges];
   await creatorPanel.getByRole('button',{name:/Show deleted/}).click();
-  const purgeRow=creatorPanel.locator('article').filter({hasText:purgeSlug});
+  const purgeRow=creatorPanel.locator('#creator-existing > article').filter({hasText:purgeSlug});
   await purgeRow.getByRole('button',{name:'Permanently remove test'}).waitFor();
-  assert.equal(await creatorPanel.locator('article').filter({hasText:'retry-creator'}).getByRole('button',{name:'Permanently remove test'}).count(),0);
+  assert.equal(await creatorPanel.locator('#creator-existing > article').filter({hasText:'retry-creator'}).getByRole('button',{name:'Permanently remove test'}).count(),0);
   page.once('dialog',dialog=>dialog.accept());
   await purgeRow.getByRole('button',{name:'Permanently remove test'}).click();
   await purgeRow.waitFor({state:'detached'});
