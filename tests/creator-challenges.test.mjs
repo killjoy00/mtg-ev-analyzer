@@ -771,6 +771,8 @@ test('hard deletion is restricted to verified QA-only canaries, not real creator
     assert.match(sql,/game_results result/);
     assert.match(sql,/analytics_events event/);
     assert.match(sql,/account_links linked/);
+    assert.equal((sql.match(/player\.display_name IS DISTINCT FROM 'QA Creator Canary'/g)||[]).length,2,
+      'nullable or unknown player identities must always block permanent deletion');
     assert.match(sql,/RETURNING c\.id,c\.slug/);
     assert.deepEqual(params,[id,'canary-daily-1234abcd']);
     return {rows:[{id,slug:'canary-daily-1234abcd'}]};
