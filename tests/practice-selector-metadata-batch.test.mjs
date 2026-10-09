@@ -23,7 +23,7 @@ test('all eight seeded planning, difficulty, weighted-set, exclusion and indexed
   const oldStart=prior.indexOf(start),newStart=next.indexOf(start);
   assert.ok(oldStart>=0&&newStart>=0,'each selector must retain the first band-availability query');
   assert.ok(oldStart<beforeMetadata&&newStart<beforeGroup);
-  assert.equal(next.slice(newStart,beforeGroup),prior.slice(oldStart,beforeMetadata),
+  assert.equal(next.slice(newStart,beforeGroup).trimEnd(),prior.slice(oldStart,beforeMetadata).trimEnd(),
     'Every round decision, band fallback, RNG use and exact-pick/range lookup is unchanged');
   const afterGroup='    SELECT group_counts INTO round_delta';
   const oldGroup=prior.slice(unique(prior,afterGroup),prior.lastIndexOf('  END LOOP;'));
