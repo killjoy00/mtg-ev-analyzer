@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {corpusDatabase} from './neon-corpus-db.mjs';
-const sql=fs.readFileSync('migrations/0051_exact_pick_draw_index.sql','utf8');
+const sql=fs.readFileSync('migrations/0059_batch_practice_selected_metadata.sql','utf8');
 const expected=sql.split('AS $function$')[1]?.split('$function$')[0];
 assert.ok(expected);
 const query=corpusDatabase(process.argv[2]);
