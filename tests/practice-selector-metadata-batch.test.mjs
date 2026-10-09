@@ -20,7 +20,8 @@ test('all eight seeded planning, difficulty, weighted-set, exclusion and indexed
   const start='    WITH effective AS (';
   const beforeMetadata=unique(prior,'    SELECT to_jsonb(t) INTO chosen_metadata');
   const beforeGroup=unique(next,'    SELECT group_counts INTO round_delta');
-  const oldStart=unique(prior,start),newStart=unique(next,start);
+  const oldStart=prior.indexOf(start),newStart=next.indexOf(start);
+  assert.ok(oldStart>=0&&newStart>=0,'each selector must retain the first band-availability query');
   assert.ok(oldStart<beforeMetadata&&newStart<beforeGroup);
   assert.equal(next.slice(newStart,beforeGroup),prior.slice(oldStart,beforeMetadata),
     'Every round decision, band fallback, RNG use and exact-pick/range lookup is unchanged');
