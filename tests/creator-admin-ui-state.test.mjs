@@ -77,11 +77,12 @@ test('failed retirement is actionable rather than waiting for ten minutes',()=>{
 });
 
 test('permanent test removal is never offered to a customer challenge or unverified canary',()=>{
-  const safe={slug:'canary-practice-1234abcd',status:'retired',creator_public_name:'A creator',acquisition_campaign:'release-canary',
+  const safe={slug:'canary-practice-1234abcd',purge_supported:true,status:'retired',creator_public_name:'A creator',acquisition_campaign:'release-canary',
     privacy_removed_at:'2026-10-09T00:00:00Z',publication_detail:{live_verified:true}};
   assert.equal(creatorCanaryMayBePurged(safe),true);
   for(const diff of [
     {slug:'personal-creator'}, {slug:'canary-practice-hello'}, {status:'published'},
+    {purge_supported:false}, {purge_supported:undefined},
     {creator_public_name:'Customer'}, {acquisition_campaign:'organic'},
     {privacy_removed_at:null}, {publication_detail:{live_verified:false}},
   ])assert.equal(creatorCanaryMayBePurged({...safe,...diff}),false);
