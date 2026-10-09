@@ -231,6 +231,8 @@ function statePayload(row,extra={}) {
     challenge:row,
     reconciled:false,
     live_verified:detail.live_verified===true,
+    // Capability is absent from older deployed Functions. Static Admin must fail closed.
+    purge_supported:true,
     dispatch:detail.dispatch||null,
     ...extra,
   };
