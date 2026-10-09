@@ -94,7 +94,7 @@ try {
         if(challenge.status==='retired'&&challenge.publication_detail.workflow?.conclusion!=='failure')
           challenge.publication_detail={action:'retire',live_verified:true};
         return route.fulfill({json:{state:challenge.status,live_verified:challenge.publication_detail.live_verified===true,
-          workflow:challenge.publication_detail.workflow||null,challenge}});
+          workflow:challenge.publication_detail.workflow||null,purge_supported:true,challenge}});
       }
     }
     if(path==='/v1/admin/campaign-links/publish') {
