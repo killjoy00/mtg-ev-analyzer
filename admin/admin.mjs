@@ -1,7 +1,7 @@
 import {renderCorpus} from './corpus.mjs';
 import {renderUsers} from './users.mjs';
 import {renderAdminTeam} from './team.mjs';
-import {renderCampaignLinks} from './campaign-links.mjs';
+import {renderCampaignLinks} from './campaign-links.mjs?v=20261009-delete';
 import {ADMIN_API_VERSION} from '../admin-api-contract.mjs';
 import {accountCsrfToken,firstPartyAuthEnabled,getAuthSession,storedAccountToken,signOutAccount} from '../growth-api.mjs';
 import {sanitizeAdminDestination} from './admin-return.mjs';
@@ -36,7 +36,7 @@ async function requestAt(base,path,body,method=body?'POST':'GET') {
   if(firstPartyAuthEnabled()){const csrf=accountCsrfToken();if(!['GET','HEAD'].includes(method)&&csrf)headers['x-pack1-csrf']=csrf;}
   else headers['x-pack1-auth-session']=storedAccountToken()||'';
   try {
-    const r=await fetch(base+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),credentials:firstPartyAuthEnabled()?'include':'omit',signal:AbortSignal.timeout(45000)});
+    const r=await fetch(base+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),credentials:firstPartyAuthEnabled()?'include':'omit',cache:'no-store',signal:AbortSignal.timeout(45000)});
     const d=await r.json();if(!r.ok)throw Object.assign(Error(d.error||'Report unavailable.'),{status:r.status,code:d.code||null,data:d});return d;
   } catch(error){if(error?.name==='TimeoutError'||error?.name==='AbortError')throw Object.assign(Error('This admin request exceeded the 45-second load limit.'),{status:0,code:'admin_timeout'});throw error;}
 }
