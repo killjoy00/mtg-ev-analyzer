@@ -46,7 +46,7 @@ async function servingState() {
   assert.equal(active.length,30,'Preserve all 30 active v9 snapshot pointers');
   const {prosrc}=(await query(`SELECT prosrc FROM pg_proc
     WHERE oid='pack1_select_serving_run_v1(bigint,bigint,text,text,text,jsonb)'::regprocedure`)).rows[0];
-  const expected=fs.readFileSync('migrations/0051_exact_pick_draw_index.sql','utf8').split('AS $function$')[1].split('$function$')[0];
+  const expected=fs.readFileSync('migrations/0059_batch_practice_selected_metadata.sql','utf8').split('AS $function$')[1].split('$function$')[0];
   assert.equal(prosrc,expected,'Retain the exact weighted selector and pick-draw optimization');
   const {revision}=(await query('SELECT revision::text FROM draft_run_serving_revision WHERE singleton')).rows[0];
   return {revision,active_v9_sets:active.length,policy_sha256:createHash('sha256').update(JSON.stringify(policies)).digest('hex'),
