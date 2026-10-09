@@ -52,7 +52,13 @@ test('metadata is fetched with one SQL statement in exact pick order and origina
   assert.match(next,/FROM unnest\(chosen_puzzle_ids\) WITH ORDINALITY AS picked\(puzzle_id,ordinality\)/);
   assert.match(next,/jsonb_agg\(meta\.metadata ORDER BY picked\.ordinality\)/);
   assert.match(next,/LEFT JOIN LATERAL \(/);
-  assert.match(next,/MIN\(picked\.ordinality\) FILTER \(WHERE meta\.metadata IS NULL\)/);
+  assert.match(next,/MIN\\(picked\\.ordinality\\) FILTER \\(WHERE/);
+  assert.match(next,/jsonb_typeof\\(meta\\.metadata\\) IS DISTINCT FROM 'object'/);
+  assert.match(next,/meta\\.metadata->>'puzzle_id' IS DISTINCT FROM picked\\.puzzle_id/);
+  assert.match(next,/meta\\.metadata->>'selected_id' IS DISTINCT FROM picked\\.puzzle_id/);
+  assert.match(next,/jsonb_array_length\\(selected\\)<>8/);
+  assert.ok(next.lastIndexOf('IF jsonb_typeof(selected)') <
+    next.lastIndexOf('SELECT revision INTO current_revision'), 'exact-eight guard precedes final revision check');
   assert.match(next,/'round',\(missing_metadata_round-1\)::integer/);
   assert.match(next,/'draws_used',\(missing_metadata_round-1\)::integer\*2\+2/);
   assert.ok(next.indexOf('IF missing_metadata_round IS NOT NULL')<
