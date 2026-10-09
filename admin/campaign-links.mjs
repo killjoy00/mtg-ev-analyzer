@@ -57,6 +57,33 @@ export function creatorChallengesForDisplay(challenges,{showDeleted=false}={}) {
   };
 }
 
+// An unsuccessful retirement keeps status='retired'; the status field alone cannot signal failure.
+export function creatorPublicationFailure(status,expected='published') {
+  const challenge=status?.challenge||{};
+  const detail=challenge.publication_detail||{};
+  const verified=status?.live_verified===true||detail.live_verified===true;
+  if(expected==='retired'&&challenge.status==='retired'&&verified)return null;
+  if(expected==='published'&&status?.state==='published'&&status?.live_verified!==false)return null;
+  const workflow=status?.workflow||detail.workflow||{};
+  const dispatch=status?.dispatch||detail.dispatch||{};
+  if(workflow.status==='completed'&&workflow.conclusion&&workflow.conclusion!=='success')
+    return challenge.publication_error||'The publication workflow failed. Choose Finish delete to retry.';
+  if(dispatch.state==='rejected')
+    return dispatch.error||challenge.publication_error||'The deletion request was rejected. Choose Finish delete to retry.';
+  if(status?.state==='failed')
+    return challenge.publication_error||'Creator publication failed. Retry from this list.';
+  return null;
+}
+
+export function creatorCanaryMayBePurged(challenge) {
+  return challenge?.status==='retired'
+    &&challenge.publication_detail?.live_verified===true
+    &&/^canary-(practice|daily)-[a-f0-9]{8}$/.test(String(challenge.slug||''))
+    &&challenge.acquisition_campaign==='release-canary'
+    &&challenge.creator_public_name==='A creator'
+    &&Boolean(challenge.privacy_removed_at);
+}
+
 export function creatorPublicationProgressText(expected='published',attempt=0) {
   const elapsed=Math.max(0,Number(attempt)||0)*6;
   const minutes=Math.floor(elapsed/60),seconds=elapsed%60;
@@ -481,7 +508,8 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
       const status=await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/publication`);
       if(expected==='published'&&status.state==='published'&&status.live_verified!==false)return status.challenge;
       if(expected==='retired'&&status.state==='retired'&&status.live_verified===true)return status.challenge;
-      if(status.state==='failed')throw new Error(status.challenge?.publication_error||'Creator challenge publication failed.');
+      const failure=creatorPublicationFailure(status,expected);
+      if(failure)throw new Error(failure);
       if(statusTarget)statusTarget.textContent=creatorPublicationProgressText(expected,attempt);
       await new Promise(resolve=>setTimeout(resolve,6000));
     }
@@ -514,7 +542,7 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
       const data=await draftRequest('/v1/admin/creator-challenges?limit=100');
       data.challenges=await Promise.all(data.challenges.map(async challenge=>{
         const pending=challenge.status==='publishing'
-          ||(challenge.status==='retired'&&challenge.publication_operation_ref&&challenge.publication_detail?.live_verified!==true);
+          ||(challenge.status==='retired'&&challenge.publication_detail?.live_verified!==true);
         if(!pending)return challenge;
         try {
           const current=await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/publication`);
@@ -534,7 +562,7 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
         const item=document.createElement('article');item.className='note';
         const publicUrl=`https://packone.pro/creator/${challenge.slug}/`,trackedUrl=creatorTrackedUrl(challenge);
         const retiredVerified=challenge.status==='retired'&&challenge.publication_detail?.live_verified===true;
-        item.innerHTML=`<strong>${esc(challenge.creator_public_name)}</strong> · ${esc(challenge.slug)}<br>${esc(challenge.source_type==='daily'?`Daily · ${dateLabel(challenge.source_day)}`:'Practice')} · ${esc(environmentLabel(challenge.source_environment))} · ${Number(challenge.source_score)}/100<br>Status: <strong>${esc(challenge.status)}</strong>${challenge.status==='retired'&&!retiredVerified?' · retired page not yet verified':''} · Opens: ${Number(challenge.opens||0)} · Starts: ${Number(challenge.starts||0)} · Completions: ${Number(challenge.completions||challenge.attempts||0)}<br>Attempts: ${Number(challenge.attempts||0)} · Beat rate: ${challenge.beat_percentage==null?'—':Number(challenge.beat_percentage)+'%'} · Avg challenger: ${challenge.average_score==null?'—':Number(challenge.average_score)+'/100'} · W/T/L: ${Number(challenge.wins||0)}/${Number(challenge.ties||0)}/${Number(challenge.losses||0)}<br><small>${esc(publicUrl)} · created ${esc(dateLabel(String(challenge.created_at||'').slice(0,10)))}${challenge.published_at?` · published ${esc(dateLabel(String(challenge.published_at).slice(0,10))) }`:''}</small><div class="actions">${['draft','failed','publishing'].includes(challenge.status)?'<button type="button" class="secondary" data-resume-publish>Publish / resume</button>':''}${challenge.status==='retired'&&!retiredVerified?'<button type="button" class="secondary" data-resume-retire>Finish delete</button>':''}<button type="button" class="secondary" data-copy-public>Copy public URL</button><button type="button" class="secondary" data-copy-tracked>Copy tracked URL</button>${challenge.status==='published'?'<button type="button" class="secondary" data-show-kit>Creator kit</button><a class="button secondary" target="_blank" rel="noopener" href="'+esc(publicUrl)+'">Open challenge</a>':''}${challenge.status!=='retired'?'<button type="button" class="secondary" data-retire>Delete</button>':''}</div><section class="note" data-existing-creator-kit hidden></section>`;
+        item.innerHTML=`<strong>${esc(challenge.creator_public_name)}</strong> · ${esc(challenge.slug)}<br>${esc(challenge.source_type==='daily'?`Daily · ${dateLabel(challenge.source_day)}`:'Practice')} · ${esc(environmentLabel(challenge.source_environment))} · ${Number(challenge.source_score)}/100<br>Status: <strong>${esc(challenge.status)}</strong>${challenge.status==='retired'&&!retiredVerified?' · retired page not yet verified':''} · Opens: ${Number(challenge.opens||0)} · Starts: ${Number(challenge.starts||0)} · Completions: ${Number(challenge.completions||challenge.attempts||0)}<br>Attempts: ${Number(challenge.attempts||0)} · Beat rate: ${challenge.beat_percentage==null?'—':Number(challenge.beat_percentage)+'%'} · Avg challenger: ${challenge.average_score==null?'—':Number(challenge.average_score)+'/100'} · W/T/L: ${Number(challenge.wins||0)}/${Number(challenge.ties||0)}/${Number(challenge.losses||0)}<br><small>${esc(publicUrl)} · created ${esc(dateLabel(String(challenge.created_at||'').slice(0,10)))}${challenge.published_at?` · published ${esc(dateLabel(String(challenge.published_at).slice(0,10))) }`:''}</small><div class="actions">${['draft','failed','publishing'].includes(challenge.status)?'<button type="button" class="secondary" data-resume-publish>Publish / resume</button>':''}${challenge.status==='retired'&&!retiredVerified?'<button type="button" class="secondary" data-resume-retire>Finish delete</button>':''}<button type="button" class="secondary" data-copy-public>Copy public URL</button><button type="button" class="secondary" data-copy-tracked>Copy tracked URL</button>${challenge.status==='published'?'<button type="button" class="secondary" data-show-kit>Creator kit</button><a class="button secondary" target="_blank" rel="noopener" href="'+esc(publicUrl)+'">Open challenge</a>':''}${challenge.status!=='retired'?'<button type="button" class="secondary" data-retire>Delete</button>':''}${creatorCanaryMayBePurged(challenge)?'<button type="button" class="secondary" data-purge-test>Permanently remove test</button>':''}</div><section class="note" data-existing-creator-kit hidden></section>`;
         item.querySelector('[data-copy-public]').onclick=()=>copy(publicUrl,creatorExistingStatus);
         item.querySelector('[data-copy-tracked]').onclick=()=>copy(trackedUrl,creatorExistingStatus);
         item.querySelector('[data-show-kit]')?.addEventListener('click',()=>{
@@ -552,23 +580,44 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
             await loadCreatorChallenges();
           } catch(error){creatorExistingStatus.textContent=error.message||'Could not publish challenge.';}
         });
-        item.querySelector('[data-resume-retire]')?.addEventListener('click',async()=>{
-          creatorExistingStatus.textContent='Finishing delete…';
+        async function retireExistingChallenge(button) {
+          if(button.disabled)return;
+          button.disabled=true;
+          creatorExistingStatus.textContent='Checking current deletion status…';
           try {
-            await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/publication`,{action:'retire'});
-            await waitForCreatorPublication(challenge,'retired',creatorExistingStatus);
-            creatorExistingStatus.textContent='Delete finished.';
+            const current=await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/publication`);
+            if(!(current.state==='retired'&&current.live_verified===true)) {
+              await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/publication`,{action:'retire'});
+              creatorExistingStatus.textContent='Deleting challenge. Verifying its unavailable page and removed images…';
+              await waitForCreatorPublication(challenge,'retired',creatorExistingStatus);
+            }
             await loadCreatorChallenges();
-          } catch(error){creatorExistingStatus.textContent=error.message||'Could not finish deleting challenge.';}
+            creatorExistingStatus.textContent='Delete verified. The challenge is hidden unless Show deleted is selected.';
+          } catch(error) {
+            // Refresh so the row offers Finish delete even if the failed workflow already retired it.
+            await loadCreatorChallenges().catch(()=>{});
+            creatorExistingStatus.textContent=error.message||'Could not finish deleting challenge. Retry with Finish delete.';
+          } finally {button.disabled=false;}
+        }
+        item.querySelector('[data-resume-retire]')?.addEventListener('click',function(){
+          void retireExistingChallenge(this);
         });
-        item.querySelector('[data-retire]')?.addEventListener('click',async()=>{
-          if(!confirm(`Delete ${challenge.creator_public_name} / ${challenge.slug}? New challenge attempts will stop and any published URL will show an unavailable page.`))return;
+        item.querySelector('[data-retire]')?.addEventListener('click',function(){
+          if(!confirm(`Delete ${challenge.creator_public_name} / ${challenge.slug}? New challenge attempts will stop and its public URL will show an unavailable page. Verification must finish before it is hidden.`))return;
+          void retireExistingChallenge(this);
+        });
+        item.querySelector('[data-purge-test]')?.addEventListener('click',async function(){
+          if(this.disabled||!confirm(`Permanently remove verified QA test ${challenge.slug}? This deletes its creator audit records but preserves player results. Its retired public placeholder remains.`))return;
+          this.disabled=true;
+          creatorExistingStatus.textContent='Removing verified test challenge…';
           try {
-            await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/publication`,{action:'retire'});
-            creatorExistingStatus.textContent='Deleting challenge. Publishing its unavailable page…';
-            await waitForCreatorPublication(challenge,'retired',creatorExistingStatus);
+            await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/purge`,{confirm:challenge.slug});
             await loadCreatorChallenges();
-          } catch(error){creatorExistingStatus.textContent=error.message||'Could not delete challenge.';}
+            creatorExistingStatus.textContent='QA test removed permanently. The unavailable public placeholder remains.';
+          } catch(error) {
+            creatorExistingStatus.textContent=error.message||'Test removal failed. Nothing else was deleted.';
+            this.disabled=false;
+          }
         });
         return item;
       }));
