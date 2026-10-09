@@ -76,7 +76,8 @@ export function creatorPublicationFailure(status,expected='published') {
 }
 
 export function creatorCanaryMayBePurged(challenge) {
-  return challenge?.status==='retired'
+  return challenge?.purge_supported===true
+    &&challenge.status==='retired'
     &&challenge.publication_detail?.live_verified===true
     &&/^canary-(practice|daily)-[a-f0-9]{8}$/.test(String(challenge.slug||''))
     &&challenge.acquisition_campaign==='release-canary'
@@ -542,11 +543,13 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
       const data=await draftRequest('/v1/admin/creator-challenges?limit=100');
       data.challenges=await Promise.all(data.challenges.map(async challenge=>{
         const pending=challenge.status==='publishing'
-          ||(challenge.status==='retired'&&challenge.publication_detail?.live_verified!==true);
+          ||(challenge.status==='retired'&&challenge.publication_detail?.live_verified!==true)
+          // Only show the QA purge control when the deployed runtime advertises it.
+          ||(creatorShowDeletedRows&&challenge.status==='retired'&&/^canary-(practice|daily)-[a-f0-9]{8}$/.test(challenge.slug||''));
         if(!pending)return challenge;
         try {
           const current=await publishRequest(`/v1/admin/creator-challenges/${challenge.id}/publication`);
-          return mergeCreatorChallengeState(challenge,current.challenge);
+          return {...mergeCreatorChallengeState(challenge,current.challenge),purge_supported:current.purge_supported===true};
         } catch {
           return challenge;
         }
