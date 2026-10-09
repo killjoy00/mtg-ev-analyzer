@@ -115,6 +115,7 @@
         "tests/retirement-backend-smoke.mjs",
         "tests/corpus-version-backend-smoke.mjs",
         "tests/serving-statistics-backend-smoke.mjs",
+        "tests/practice-selector-metadata-parity-backend-smoke.mjs",
         "tests/serving-cache-backend-smoke.mjs",
         "tests/corpus-admin-backend-smoke.mjs",
         "tests/snapshot-uniqueness-backend-smoke.mjs",

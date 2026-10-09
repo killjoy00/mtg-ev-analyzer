@@ -159,6 +159,10 @@ jobs:
         with:
           node-version: 24
 
+      - name: Install direct PostgreSQL client for isolated selector parity
+        if: matrix.domain == 'corpus'
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
       - name: Verify Neon CI credential
         shell: bash
         env:
