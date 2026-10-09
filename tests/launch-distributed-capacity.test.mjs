@@ -5,7 +5,7 @@ import http from 'node:http';
 import {fingerprint,initialControl,transition,evaluateStage,timing,permittedRequest,quantiles,validatePolicy,selectCapacityPolicy,stageFailureEvidence} from '../scripts/launch-distributed-core.mjs';
 import {heartbeat,coordinatorSQL} from '../scripts/launch-distributed-control.mjs';
 import {inspectBin,inspectPreviewTelemetry,settlePreviewTelemetry,previewTelemetryFailure,queryPreviewEvents} from '../scripts/launch-distributed-telemetry.mjs';
-import {parseStartDiagnostics,requestClient} from '../scripts/launch-distributed-player.mjs';
+import {parseStartDiagnostics,requestClient,fixtureIndexForActor} from '../scripts/launch-distributed-player.mjs';
 import {transportFailureEvidence,undiciTransportObserver} from '../scripts/launch-distributed-transport.mjs';
 import {inspectPreflightEvents,preflightTelemetry} from '../scripts/launch-distributed-setup.mjs';
 import {waitForPreviewReadiness} from '../scripts/edge-control.mjs';
@@ -42,9 +42,61 @@ test('default capacity stops at 25 and preserves every acceptance budget',()=>{
  const {stages:extendedStages,supported_launch_target:extendedSupported,proposed_target:extendedTarget,...extendedBudgets}=policy;
  assert.deepEqual(budgets,extendedBudgets);assert.notEqual(fingerprint(required),fingerprint(policy));
  assert.deepEqual(selectCapacityPolicy(policy,'50'),policy);
- for(const target of ['', '100', 'skip', 25, null])assert.throws(()=>selectCapacityPolicy(policy,target));
+ for(const target of ['', '500', 'skip', 25, null])assert.throws(()=>selectCapacityPolicy(policy,target));
  assert.throws(()=>selectCapacityPolicy(required,'50'),'a missing 50-player stage cannot be promoted');
 });
+test('direct 100 uses 100 distinct actors, one full hold and unchanged acceptance gates',()=>{
+ const p=selectCapacityPolicy(policy,'100');
+ assert.equal(p.sequence,'direct_100');assert.deepEqual(p.stages,[{players:100,hold_seconds:600}]);
+ assert.equal(p.supported_launch_target,50);assert.equal(p.proposed_target,100);
+ const indexes=Array.from({length:100},(_,i)=>fixtureIndexForActor(p,0,i));
+ assert.deepEqual([indexes[0],indexes.at(-1)],[0,99]);assert.equal(new Set(indexes).size,100);
+ assert.equal(indexes.filter(i=>i%10<5).length,50);
+ assert.throws(()=>fixtureIndexForActor(p,0,100));assert.throws(()=>fixtureIndexForActor(p,1,0));
+ assert.equal(fixtureIndexForActor(policy,1,49),74);
+ for(const key of ['route_budgets_ms','minimum_route_samples','minimum_rolling_route_samples','maximum_error_fraction','maximum_legitimate_429s','maximum_correctness_failures','ramp_seconds','initial_seconds','drain_seconds','recovery_seconds','recovery_players','think_time_ms','guest_read_interval_ms','recovery_read_interval_ms','maximum_start_lateness_ms','maximum_arrival_lateness_ms','telemetry_settlement_seconds','telemetry_timeout_seconds','telemetry_preflight_requests'])
+  assert.deepEqual(p[key],policy[key],key);
+ for(const bad of [{...p,stages:[{players:50,hold_seconds:600},...p.stages]},
+  {...p,stages:[{players:100,hold_seconds:599}]},{...p,supported_launch_target:100},
+  {...p,maximum_requests:50001},{...p,maximum_runner_minutes:335}])assert.throws(()=>validatePolicy(bad));
+});
+test('direct 100 completes once only after application, telemetry and usage all pass',()=>{
+ const p=selectCapacityPolicy(policy,'100'),sc={...scope,policy_hash:fingerprint(p)};
+ const message=(shard,extra={})=>({...msg(shard),scope:sc,...extra});
+ let s=initialControl(sc,start,p);
+ for(let i=0;i<5;i++)s=transition(s,message(i),start+100,p);
+ for(let i=0;i<5;i++)s=transition(s,message(i,{ack:0}),start+200,p);
+ for(let i=0;i<5;i++)s=transition(s,message(i,{ack:0,done:0}),start+300,p);
+ assert.equal(s.phase,'checking');
+ const decision={stage:0,passed:true,telemetry_passed:true,usage_passed:true};
+ for(const patch of [{passed:false},{telemetry_passed:false},{usage_passed:false}])
+  assert.equal(transition(s,message(0,{done:0,decision:{...decision,...patch}}),start+400,p).phase,'aborted');
+ const complete=transition(s,message(0,{done:0,decision}),start+400,p);
+ assert.equal(complete.phase,'complete');assert.equal(complete.stage,1);assert.equal(complete.history.length,1);
+});
+test('one-shot direct 100 has an exact branch, opened-only trigger and bounded runner timeouts',()=>{
+ const once=fs.readFileSync(new URL('../.github/workflows/launch-full-100-once.yml',import.meta.url),'utf8');
+ const child=fs.readFileSync(new URL('../.github/workflows/launch-distributed-preview.yml',import.meta.url),'utf8');
+ assert.match(once,/types: \[opened\]/);assert.doesNotMatch(once,/synchronize|workflow_dispatch/);
+ assert.match(once,/diagnostic\/fixed8-direct100-once-20261008-r1/);
+ assert.match(once,/capacity_target: '100'/);assert.match(once,/scripts\/require-ci-source\.mjs/);
+ assert.ok(child.indexOf('Recheck unchanged source')<child.indexOf('Create disposable production-sized branch'));
+ assert.ok(child.indexOf('Reject drift in main')<child.indexOf('Create disposable production-sized branch'));
+ const timeout=(text,job)=>Number(text.match(new RegExp('^  '+job+':\\n[\\s\\S]*?^    timeout-minutes: (\\d+)','m'))?.[1]);
+ assert.deepEqual([timeout(once,'preflight'),timeout(child,'setup'),timeout(child,'cohort'),timeout(child,'collect_cleanup')],[9,15,30,7]);
+ assert.equal(2*(8+2+30+3+8)+9+15+5*30+7,283);
+ assert.ok(283<=334);
+ const p=selectCapacityPolicy(policy,'100');
+ const workload=p.initial_seconds+600+p.drain_seconds+p.recovery_seconds;
+ assert.equal(workload,870);assert.equal(workload+p.arm_seconds+p.telemetry_timeout_seconds,1140);
+ assert.equal(p.maximum_runner_minutes,334);assert.equal(p.maximum_experiment_minutes,45);
+ assert.match(child,/CI_BRANCH_FIXED_CU:/);
+ assert.match(child,/verify-fixed-8cu-compute\.mjs/);
+ const creation=fs.readFileSync('scripts/create-ci-neon-branch.mjs','utf8');
+ assert.match(creation,/autoscaling_limit_min_cu=8/);
+ assert.match(creation,/autoscaling_limit_max_cu=8/);
+});
+
 test('25-player profile completes only after positive application, telemetry and usage gates',()=>{
  const required=selectCapacityPolicy(policy);
  let s=initialControl(scope,start,required);

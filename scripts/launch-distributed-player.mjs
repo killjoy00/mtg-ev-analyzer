@@ -96,8 +96,16 @@ export function requestClient({fixture,policy,budget,now,signal,fetcher=fetch,tr
     }
   };
 }
+// Stage-local actor IDs and credentials start at zero for the direct 100 stage.
+export function fixtureIndexForActor(policy,stage,id) {
+  const count=policy.stages[stage]?.players;
+  assert.ok(Number.isInteger(count)&&Number.isInteger(id)&&id>=0&&id<count,'invalid_fixture_actor');
+  const offset=policy.sequence==='direct_100'?[0][stage]:[0,25][stage];
+  assert.ok(Number.isInteger(offset),'invalid_fixture_stage');
+  return offset+id;
+}
 export async function runPlayerStage({fixture,policy,scope,stage,shard,start_at,network,now,signal,client,onFailure}) {
-  const spec=policy.stages[stage],population=spec.players/policy.generators,windows=timing(start_at,spec,policy),offset=[0,25][stage];
+  const spec=policy.stages[stage],population=spec.players/policy.generators,windows=timing(start_at,spec,policy);
   const report={schema:2,scope,stage,shard,start_at,network,started:0,initial_completed:0,correctness_failures:0,failures:[],root_failure:null,arrival_delay_ms:[],actors:[],requests:[],daily:{},windows};
   const call=async(actor,route,path,body)=>{
     try {
@@ -132,7 +140,7 @@ export async function runPlayerStage({fixture,policy,scope,stage,shard,start_at,
     report.failures.push(failure);onFailure({category,reason});
   };
   const actors=Array.from({length:population},(_,i)=>{
-    const id=shard*population+i,user=fixture.users[offset+id],guest=id%10<5;
+    const id=shard*population+i,user=fixture.users[fixtureIndexForActor(policy,stage,id)],guest=id%10<5;
     assert.ok(user,'missing_fixture_actor');
     const actor={id,guest,user,cookies:new Map(),csrf:null,random:seededRandom(`distributed-v2:${stage}:${id}`),evidence:{id,guest,hold_runs:0,hold_reads:0}};
     actor.attach=()=>{actor.cookies.set('__Host-pack1_account',user.account);actor.cookies.set('__Secure-pack1_csrf',user.csrf);actor.csrf=user.csrf;};

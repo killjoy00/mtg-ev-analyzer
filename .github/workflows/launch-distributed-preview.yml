@@ -8,8 +8,16 @@ on:
       capacity_target:
         type: string
         default: '25'
+      source_main_sha:
+        type: string
+        default: ''
+      harness_head_sha:
+        type: string
+        default: ''
 env:
   PACK1_CAPACITY_TARGET: ${{ inputs.capacity_target }}
+  PACK1_SOURCE_MAIN_SHA: ${{ inputs.source_main_sha }}
+  PACK1_HARNESS_HEAD_SHA: ${{ inputs.harness_head_sha }}
 permissions:
   contents: read
   checks: read
@@ -43,6 +51,15 @@ jobs:
           REVIEWED_PR: ${{ github.event.pull_request.number }}
           REQUIRE_PERFORMANCE: ${{ inputs.require_performance }}
         run: node scripts/require-ci-source.mjs --once
+      - name: Reject drift in main before provisioning direct 100
+        if: inputs.capacity_target == '100'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EXPECTED_MAIN: ${{ inputs.source_main_sha }}
+        run: |
+          set -euo pipefail
+          current="$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')"
+          test "$current" = "$EXPECTED_MAIN" || { echo "::error::main advanced; no resources provisioned"; exit 1; }
       - name: Verify scoped Cloudflare access
         env:
           CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
@@ -62,7 +79,15 @@ jobs:
           CI_BRANCH_PARENT: br-orange-feather-ayps8kep
           CI_BRANCH_EXPIRES: ${{ steps.expiry.outputs.expires_at }}
           CI_BRANCH_SUSPEND: 300
+          CI_BRANCH_FIXED_CU: ${{ inputs.capacity_target == '100' && '8' || '' }}
         run: node scripts/create-ci-neon-branch.mjs
+      - name: Read back exact 8/8-CU endpoint and wait for control-plane readiness before any workload
+        if: inputs.capacity_target == '100'
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
+          PREVIEW_CREATED: ${{ steps.neon.outputs.created }}
+        run: node scripts/verify-fixed-8cu-compute.mjs
       - name: Install pinned deployment tools
         run: node .github/scripts/install-wrangler-tool.mjs "$RUNNER_TEMP/edge-tools" neon@4.17.4 esbuild@0.28.2
       - name: Prepare isolated schema and exact revision
@@ -134,7 +159,7 @@ jobs:
   cohort:
     needs: setup
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       max-parallel: 5
@@ -176,7 +201,7 @@ jobs:
     needs: [setup, cohort]
     if: always() && needs.setup.outputs.created == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 7
     env:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
       CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
