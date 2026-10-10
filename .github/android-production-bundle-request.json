@@ -1,1 +1,4 @@
-{"operation":"build-play-signed-aab","reason":"Owner-authorized fresh Pack One 1.0 Android release candidate from current main after merged PR #837 (account-flow UX cleanup), including the updated account-ready display-name behavior and native account/profile changes. Build the Play-signed production AAB and retain it as the reviewed release artifact; do not publish, promote, or alter any Google Play track."}
+{
+  "operation": "build-play-signed-aab",
+  "reason": "Owner-authorized Android native signed release candidate build from merged Daily peer comparison and trophy record UI in PR #1129 on main 0162a7d2c8d06f1f46f197c5283c50ca26ce3add. Android validation, production bundle smoke, backend feature and e2e checks have passed. Build the registered Play upload-key signed Android AAB with a new valid version code and retain it as a GitHub workflow artifact for review. Do not upload or publish to any Google Play track, do not change the production-access Closed Testing track, participants, eligibility, country coverage, or test clock."
+}
