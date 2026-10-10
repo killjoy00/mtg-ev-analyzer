@@ -1,8 +1,23 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {compactDraftRunFeedback,consensusFeedback} from '../draft-run-feedback.mjs';
+import {compactDraftRunFeedback,consensusFeedback,trophyRevealSentence} from '../draft-run-feedback.mjs';
 import {draftRunShareText} from '../share-cards.mjs';
 import {escapeHtml} from '../html.mjs';
+
+test('trophy reveal headlines use complete sentences and attribute the match record to the drafter',()=>{
+ const match={historicalMatch:true,historicalName:'Lightning Bolt',trophyRecord:'won 7 matches'};
+ assert.equal(trophyRevealSentence(match),'You matched the trophy drafter, who won 7 matches.');
+ assert.equal(trophyRevealSentence({...match,trophyRecord:'went 7–1'}),'You matched the trophy drafter, who went 7–1.');
+ assert.equal(trophyRevealSentence({...match,trophyRecord:null}),'You matched the trophy drafter.');
+ const different={...match,historicalMatch:false};
+ assert.equal(trophyRevealSentence(different),'The trophy drafter took Lightning Bolt and won 7 matches.');
+ assert.equal(trophyRevealSentence({...different,trophyRecord:'went 7–1'}),'The trophy drafter took Lightning Bolt and went 7–1.');
+ assert.equal(trophyRevealSentence({...different,trophyRecord:null}),'The trophy drafter took Lightning Bolt.');
+ assert.equal(trophyRevealSentence({...different,historicalName:null,trophyRecord:null}),'The trophy drafter took another card.');
+ for(const state of [match,different]){
+  assert.doesNotMatch(trophyRevealSentence(state),/\. (?:\d+ wins|\d+–\d+)\b/,'never show a freestanding record fragment');
+ }
+});
 
 test('locked feedback separates the trophy bonus from relative model support',()=>{
  const answer={consensusName:'Leader',consensusSupport:0.5,selectedSupport:0.05,selectedId:'trophy',historicalId:'trophy',historicalName:'Trophy',historicalMatch:true,ranking:[{id:'trophy',name:'Trophy',support:0.05,score:100},{id:'leader',name:'Leader',support:0.5,score:95}]};

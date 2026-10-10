@@ -4,6 +4,7 @@ import {gunzipSync} from 'node:zlib';
 import {chromium} from 'playwright';
 import {selectDraftRun,selectDraftRunReroll,interestingDraftRunPuzzle,publicDraftRunPuzzle,gradeDraftRunPick,calibratedSupports,supportSharpening} from '../draft-run.mjs';
 import {rateDraftRunPuzzle} from '../draft-run-difficulty.mjs';
+import {trophyRevealSentence} from '../draft-run-feedback.mjs';
 import policy from '../data/selection-policy.json' with {type:'json'};
 import {regularRunSet} from '../draft-run-policy.mjs';
 import {latestSetPlan} from '../daily-selection.mjs';
@@ -154,6 +155,8 @@ try{
     await page.locator(`[data-pick="${selected}"]`).click();await page.locator('#run-lock').click();await page.locator('#run-next').waitFor();
     assert.equal(views.at(-1).puzzleId,p.puzzle_id,'Feedback must not record the next decision as viewed');
     assert.equal(Number.parseInt(await page.locator('.run-feedback-score').innerText(),10),expectedGrade.score,'visible pick score matches gradeDraftRunPick');
+    assert.equal(await page.locator('#run-feedback-result').innerText(),trophyRevealSentence(expectedGrade),'visible trophy reveal is a complete sentence for matched and unmatched picks');
+    assert.ok((await page.locator('#run-feedback-result').getAttribute('aria-label'))?.includes(trophyRevealSentence(expectedGrade)),'accessible copy matches the visible trophy record');
     assert.equal(await page.evaluate(()=>document.activeElement?.id),'run-feedback-result','locked result receives deterministic focus');
     assert.equal(await page.locator('.run-analysis').getAttribute('open'),null,'analysis stays collapsed by default');
     assert.equal(await page.locator('.run-pack-review').getAttribute('open'),null,'pack review stays collapsed by default');
@@ -164,7 +167,6 @@ try{
     });
     assert.equal(domOrder,true,'continuation precedes analysis and pack review in DOM order');
     if(expectedGrade.historicalMatch){
-      assert.match(await page.locator('.run-feedback-copy').innerText(),/You matched the trophy drafter\./);
       assert.equal(await page.locator('.run-reveal-pick').count(),1,'trophy match still shows the shared card once');
       assert.match(await page.locator('.run-reveal-picks').innerText(),/Trophy and Your Pick/i);
       assert.equal(await page.locator('.run-reveal-pick.is-shared [data-zoom]').getAttribute('data-zoom'),selected,'shared reveal card is the player and trophy pick');
