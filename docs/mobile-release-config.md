@@ -176,7 +176,7 @@ The verified provider resource is `projects/77537515004/locations/global/workloa
 
 ### Narrowing the existing provider
 
-The provider was originally created with the repo-wide condition `assertion.repository == 'killjoy00/mtg-ev-analyzer'`, which admits any workflow on any branch. Narrow it in place (same Cloud Shell variables as above):
+The provider originally used a repo-wide condition, which was subsequently narrowed and verified. The following is the **completed historical hardening command**, **not a pending change** (same Cloud Shell variables as above):
 
 ```bash
 gcloud iam workload-identity-pools providers update-oidc "$PROVIDER_ID" \
@@ -186,7 +186,7 @@ gcloud iam workload-identity-pools providers update-oidc "$PROVIDER_ID" \
   --attribute-condition="assertion.repository == '$REPO' && assertion.ref == 'refs/heads/main' && assertion.environment == 'pack-one-mobile-release'"
 ```
 
-Then dispatch `google-play-access.yml` from `main`; it must still pass. A token without the `environment` claim (any job outside `pack-one-mobile-release`) or from another ref is rejected by the provider.
+The protected main-only `google-play-access.yml` probe **already passed in run 37017937127** after the change. A token without the `environment` claim or from another ref is rejected by the provider. Re-run only if trust/provider configuration is intentionally changed.
 
 
 ## Store build numbering
@@ -217,9 +217,9 @@ Current protected boundary: the `pack-one-mobile-release` Environment is main-on
 
 ## Review deadlines for deferred items
 
-- **Export compliance:** the current internal TestFlight build may show Missing Compliance. The owner must answer App Store Connect's encryption questions before internal installation if Apple blocks the build. Source-control `ITSAppUsesNonExemptEncryption=false` only after the owner explicitly confirms that declaration is correct for the app.
+- **Export compliance:** signed iOS 1.1/100733 explicitly declares `ITSAppUsesNonExemptEncryption=false` in its archived plist and passed the archive verification in run 38075036098. This does not substitute for any additional Apple compliance questions if the console presents them; confirm any future prompt with the owner rather than assuming a reviewer approval.
 - **External TestFlight / App Store review:** Sign in with Apple is implemented for native iOS and is also available through Pack One's web authorization flow for Android/web continuity. The secure-auth release requires repository secrets `APPLE_TEAM_ID`, `APPLE_SIGN_IN_KEY_ID`, `APPLE_SIGN_IN_KEY_P8`, and the independent 32-byte hex token-encryption key `APPLE_TOKEN_ENCRYPTION_KEY_V1`. The token key is versioned separately so routine rate-limit-secret rotation cannot make stored Apple refresh tokens unreadable. The exact public release candidate still needs physical-iPhone verification and the then-current App Review requirement re-check.
 - **Apple Private Email Relay:** register Pack One's exact outbound email source/domain under Apple Developer → Sign in with Apple for Email Communication and verify SPF/DKIM before launch. Apple relay users can use legacy `privaterelay.appleid.com` or new `private.icloud.com` addresses. Apple-linked account deletion does **not** depend on relay email: Pack One requires a fresh Apple authorization bound to the existing Apple subject before deletion. Relay delivery still needs a real-device/inbox test because account/recovery communications to an unregistered sender can bounce.
 - **Physical iPhone SIWA validation:** on the exact public RC, verify (1) first sign-in with both shared email and Hide My Email, (2) a real Pack One email reaches the relay address, (3) Apple re-authentication can permanently delete the Apple-linked account and the authorization is revoked, (4) the deleted Apple authorization cannot be reused, and (5) the Sign in with Apple control is at least as prominent as the Google control. The current native layout renders both social controls full-width at the same 52-point height.
-- **Payments / Patreon access:** native purchase steering is removed and Patreon is presented only as existing-account OAuth. That presentation hardening does **not** settle Apple payment eligibility. Pack One is not a Reader app, and current 3.1.3(b) requires externally acquired digital features to also be available as IAP. Before App Store review, either ship equivalent StoreKit access, make/disable those premium practice modes on iOS so no external purchase unlock is required, or obtain explicit Apple confirmation of another applicable exception.
-- **Production Google Play:** run **Narrowing the existing provider** before granting any production-release permission.
+- **Payments / Patreon access:** the native iOS app **already includes Apple StoreKit Elite purchase, restore and manage access**, with backend-verified entitlements, while Patreon in iOS remains existing-account OAuth only and has no native purchase CTA. This is an **implemented feature in iOS 1.1/100733**, not a missing development task. What remains open in #575 and #673 is exact signed-device StoreKit/Sandbox lifecycle verification, product/subscription provider settings, refund/cancellation/revocation scenarios, and Apple App Review acceptance. Do not infer those from source availability or a valid TestFlight upload.
+- **Production Google Play:** the provider-narrowing step already passed its main-only protected access probe; **Production access/rollout remains a separate qualification and owner-approval gate**, and existing Closed Testing must not be disrupted.
