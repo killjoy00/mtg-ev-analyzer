@@ -1,6 +1,6 @@
 # Mobile web/native parity inventory
 
-Tracking: #575. Final native test delivery reconciled October 4, 2026 (CDT). Production secure-auth baseline remains `a564a207e9f336639636624c366bff55c6a9759f` from September 27; Apple-IAP physical/provider acceptance is separately tracked in #673.
+Tracking: #575. Reconciled **October 10, 2026 (CDT)**: the latest iOS native TestFlight candidate is **1.1/100733**, not the older 1.0/100505 shown in the historical October 4 section below. The current feature inclusion/exclusion and production dependency matrix is [iOS 1.1 exact-build feature and release inventory](mobile-ios-1.1-testflight-inventory-2026-10-10.md). Production secure-auth baseline evidence is retained historically; Apple-IAP physical/provider acceptance is separately tracked in #673.
 
 This document replaces blanket source-string parity claims with an A–E inventory. **Implemented** means reviewed product code is present on main. It does not mean physical-device acceptance, live association-file verification, store-console approval, or public-release authorization.
 
@@ -11,7 +11,14 @@ Status vocabulary:
 - **Policy decision open** — code intentionally does not claim storefront approval.
 - **Release evidence open** — implementation exists but required device/signing/live-host evidence is still missing.
 
-## October 4 native repair — implementation merged; physical acceptance open
+## October 10 TestFlight 1.1 — what is and is not parity-complete
+
+- **Included in the signed binary:** Beat the Creator native flow (#985/#1001), responsive native UI/navigation and brand, October 7 in-app About/Support/Privacy/Terms + Stats/Account settings + larger Daily actions (#1057), post-lock peer-percentage UI and trophy match record (#1129).
+- **Not functionally live:** peer percentages from `GET /draft/v1/runs/:id/stats` remain blocked by the Cloudflare gateway; [#1136](https://github.com/killjoy00/mtg-ev-analyzer/pull/1136) and a verified protected backend/gateway deployment are required. The native client binary does not need to change for that.
+- **Not an iOS update:** website grammatical reveal text #1132 and Bluesky/Discord scheduled posting are separately delivered web/server work.
+- **Not accepted/released:** 1.1 App Store record is missing, the workflow failed after Apple processed build 100733 as `VALID`, owner-visible TestFlight distribution is not independent group verification, and physical iOS acceptance, Apple subscription lifecycle, review and public release remain open.
+
+## Historical October 4 native repair — implementation merged; physical acceptance open
 
 PR #910 merged as `ae70e2af79b804c137b8c289c2a1b0535e5c76dd` and addresses the original owner complaints, which were not completed by #890. See [the complaint/evidence ledger](mobile-native-ux-repair-575.md). Existing “Implemented” rows below describe source capability; they do not override failed physical observations or certify the old distributed binaries. Native run `37232560582` passed all 24 Android checks and 14 scenes plus measured text growth on each iPhone/iPad, with actual image review. Secondary tab-return correction #955 also passed 25 Android checks and the iPhone/iPad scenes in run `37236842723`; it merged as `f0f30c939d1016c70f5d3548d46b0b8b3f839e79`. Fresh exact-main smoke `37239878233` passed including its final manifest; #951 passed fresh checks and merged as `f721389d392867cc43c342c07ecddfc20c9f28f8`, with identical mobile and build-workflow inputs to the certified runtime source. Tester distribution and physical/provider acceptance remain separate gates recorded in that ledger.
 
@@ -23,7 +30,7 @@ Final signed binary source: `747478440400e242aae32469d6ed18f1785b591d` (protecte
 - **Android 1.0 / 100491:** signed Internal run `37247429578` accepted and committed the bundle as draft; exact-version promotion run `37249437434` reports existing `production-access`, `completed`, `committed=true`, `requiresConsoleRollout=false`, `createdTrack=false`. No rebuild, tester/country/track change or Production release.
 - **Store images:** final main-source capture `37244011193` passed every job. All 17 original Android/iPhone/iPad/membership images were individually inspected and approved. Apple replacement run `37251116289`, after processing-only fix #971, verified five iPhone, five iPad and the subscription review image after provider processing/order checks. Play run `37249880752` committed and independently verified five phone screenshots and the identical approved icon; feature graphic untouched.
 
-Original provider results and source-attributed delivery metadata are retained in [mobile-evidence/575-native-3a8244eb/README.md](mobile-evidence/575-native-3a8244eb/README.md). Prior core repair builds iOS 100500 / Android 100488 remain historical evidence and exclude #960. Physical upgrades from iOS 100415 / Android 100444 must target **100505 / 100491** now.
+Original provider results and source-attributed delivery metadata are retained in [mobile-evidence/575-native-3a8244eb/README.md](mobile-evidence/575-native-3a8244eb/README.md). Prior core repair builds iOS 100500 / Android 100488 remain historical evidence and exclude #960. Historical October 4 repair validation used iOS 100505 / Android 100491 after older 100415/100444. For the **current** iOS 1.1 test candidate use 100733; for Android check the actual closed track before expecting the separately uploaded 100740 bundle.
 
 ## October 2, 2026 UAT parity candidate
 

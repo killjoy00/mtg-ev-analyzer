@@ -1,8 +1,18 @@
 # Pack One mobile store submission packet
 
-Updated 2026-10-06. This file is the source-of-truth submission packet for the first free public mobile release.
+Updated October 10, 2026. This remains the source-of-truth **first public release (1.0) submission packet**. The separate [iOS 1.1 exact-build feature and release inventory](mobile-ios-1.1-testflight-inventory-2026-10-10.md) records the newer TestFlight 1.1/100733 candidate, its complete included/excluded scope and why it is not an App Store 1.1 release. **Do not substitute the 1.1 TestFlight upload for the 1.0 App Review submission or silently change the 1.0 reviewer metadata.**
 
-## Final native-repair test candidates — 2026-10-04 CDT
+## Current TestFlight 1.1 candidate — October 10, 2026
+
+- **iOS 1.1 / 100733**, signed binary source `67c6d25917f3e8b632922b80c7a5479ca897af9f`: [run 38075036098](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/38075036098) uploaded successfully and Apple reported `VALID` / `APP_STORE_ELIGIBLE`. The owner can see it in TestFlight; internal-group association was **not** independently reverified by the failed finalizer.
+- **The workflow failed after upload**, at **`App Store version 1.1 was not found`**. There is no confirmed editable 1.1 App Store record, build attachment, 1.1 submission, 1.1 approval, or public 1.1 release. Current 1.0 review state must be read from Apple before any further version-record or submission operation.
+- Comparison of the signed source with current-main snapshot `a2cf1e139b0fffadafc1e502f6b731200e6dd6a1` shows no later iOS/React Native app changes. The 1.1 binary **includes** October 7 native About/legal/navigation parity (#1057), Beat the Creator native flows (#985/#1001), Daily post-pick peer UI and trophy records (#1129) and prior original v1 repairs. **It does not include** the subsequent website-only copy fix (#1132) as native code; native already uses grammatical text.
+- **Not yet working live:** the peer comparison endpoint is still blocked by the Cloudflare gateway until [#1136](https://github.com/killjoy00/mtg-ev-analyzer/pull/1136) merges, deploys and passes production read-back. This does **not** require another iOS build. Physical acceptance, Apple purchase lifecycle and the original #575 owner/store gates remain open.
+- **Android is separately 1.0**. AAB versionCode **100740** is accepted into Google Play's *bundle library*, **not promoted to any testing track**; the existing closed-test testers/clock are unchanged ([run 38079116799](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/38079116799)).
+
+The October 4 signed candidates in the next section remain **historical 1.0 repair/qualification evidence**, not the newest iOS TestFlight build.
+
+## Historical 1.0 native-repair test candidates — 2026-10-04 CDT
 
 Final signed binary source: `747478440400e242aae32469d6ed18f1785b591d` (protected #963 merge). The mobile app, native configuration, dependencies and binary build workflows match certified runtime `3a8244eb0568769c133365ea2821d512c62a3515`; exact-main certification run `37244011180` is attributed to that earlier SHA, not relabelled as the delivery source. Concurrent #961 operations and #962 admin/backend work are preserved. Later #964/#965/#966 change release controls/probes and the gateway release request, with no mobile binary-input or supplied web-reference changes. #962 changes the production smoke contract, not the mobile binary inputs. Later #969 changes hosted social-preview metadata and assets, including index.html Open Graph/Twitter image references; it does not change visible homepage UI or mobile binary inputs. The final control-source refresh through #971 preserves that work.
 
@@ -10,7 +20,7 @@ Final signed binary source: `747478440400e242aae32469d6ed18f1785b591d` (protecte
 - **Android 1.0 / 100491:** signed Internal run `37247429578` accepted and committed the bundle as draft; exact-version promotion run `37249437434` reports existing `production-access`, `completed`, `committed=true`, `requiresConsoleRollout=false`, `createdTrack=false`. No rebuild, tester/country/track change or Production release.
 - **Store images:** final main-source capture `37244011193` passed every job. All 17 original Android/iPhone/iPad/membership images were individually inspected and approved. Apple replacement run `37251116289`, after processing-only fix #971, verified five iPhone, five iPad and the subscription review image after provider processing/order checks. Play run `37249880752` committed and independently verified five phone screenshots and the identical approved icon; feature graphic untouched.
 
-Original provider results and source-attributed delivery metadata are retained in [mobile-evidence/575-native-3a8244eb/README.md](mobile-evidence/575-native-3a8244eb/README.md). Prior core repair builds iOS 100500 / Android 100488 remain historical evidence and exclude #960. Physical upgrades from iOS 100415 / Android 100444 must target **100505 / 100491** now.
+Original provider results and source-attributed delivery metadata are retained in [mobile-evidence/575-native-3a8244eb/README.md](mobile-evidence/575-native-3a8244eb/README.md). Prior core repair builds iOS 100500 / Android 100488 remain historical evidence and exclude #960. At the October 4 1.0 repair checkpoint, upgrades from iOS 100415 / Android 100444 targeted **100505 / 100491**. **For current iOS 1.1 physical acceptance, use 100733**; do not assume Android 100740 is on the closed-test track merely because it is in Play's bundle library.
 
 Physical upgrades, iOS gestures, iPad landscape/narrow windows, accessibility, real auth/billing/deletion and provider reviewer Notes reconfirmation remain open in #575. No App Review submission or public release is authorized by this delivery.
 
@@ -120,7 +130,9 @@ Reviewer path for the native navigation repair (#910):
 6. Open My Pack One → Account settings for profile, membership, sign-in/security, sign-out and permanent deletion. Help and policies are available from Help or Account settings.
 7. Shared invitations require explicit acceptance. Practice shows Continue shared run / View shared result only for a valid identity-bound checkpoint on this device; it is not a cloud history list.
 
-These revised instructions apply to final iOS 100505 / Android 100491, containing #890/#910/#955/#960. Do not use the October 2 builds (iOS 100415 / Android 100444) to accept this repair.
+**These seven historical reviewer steps apply to iOS 1.0/100505 and Android 1.0/100491**, containing #890/#910/#955/#960. They are not the complete iOS 1.1 navigation instructions. Do not use the October 2 builds (iOS 100415 / Android 100444) to accept this repair.
+
+**Future iOS 1.1 review-note delta (not submitted):** In 100733 the legacy Help stack is gone. Reviewers should find in-app **About, Support, Privacy and Terms** screens through About or their native entry points, use **Stats / Account settings** from My Pack One, and see the larger Daily **Play now / View result** buttons. Beat the Creator challenge invitations can replay completed Practice or Daily sources without creating another ranked Daily. New post-lock peer percentages are visible **only after #1136's production gateway fix and the ten-real-player threshold**, so do not promise them to a reviewer before live acceptance. Validate/report the original iOS 1.0 review state before replacing its Notes with any 1.1-specific instructions. See [iOS 1.1 exact-build feature and release inventory](mobile-ios-1.1-testflight-inventory-2026-10-10.md).
 
 Apple-linked account deletion requires fresh Apple authorization and revokes the Apple authorization before provider cleanup completes.
 
@@ -326,8 +338,8 @@ Physical iPhone/iPad acceptance remains separate and is intentionally not listed
 Do **not** spend console time on these unless an automated probe reports a problem:
 - Google Cloud WIF narrowing and the repo-side non-publishing Google Play access probe are complete; run `37017937127` passed on `main` and verified WIF authentication, Play track-read access, and Play signing fingerprint coverage in `.well-known/assetlinks.json`;
 - uploading/replacing the current RC binaries;
-- attaching the current successful App Store-eligible iOS RC to App Store version 1.0; repair build `100500` is `VALID`, `APP_STORE_ELIGIBLE`, and attached by run `37240960344`; separate tester availability must also be verified;
-- building/uploading/promoting the Android RC; repair versionCode `100488` is signed, uploaded, and active on existing `production-access` via run `37242766267`;
+- **historical 1.0 attachment:** repair builds 100500 and later 100505 had separate verified App Store 1.0 attachment/availability evidence; **1.1/100733 is not attached to an App Store version** and needs a separate reviewed version-record prerequisite when Apple permits it;
+- **historical Android closed-test candidate:** repair 100488 and later 100491 had verified promotion; **100740 is only in the Play bundle library**, with no testing-track promotion;
 - Google Data Safety (already done) or replacement store graphics after reviewed-main capture and visual inspection;
 - App Store listing copy, manual-release flag, reviewed age-rating answers, or content-rights declaration (already present);
 - release-track/API status audits;

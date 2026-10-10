@@ -1,6 +1,16 @@
 # Current state
 
-Updated 2026-10-08. Implementation, backend deployment, gateway deployment, Pages deployment, database publication, and provider activation are separate. Older reviews are historical evidence.
+Updated October 10, 2026 for mobile TestFlight 1.1; the October 8 Admin/Owner section remains its separately verified historical snapshot. Implementation, backend deployment, gateway deployment, Pages deployment, database publication and provider activation remain separate. Older reviews are historical evidence.
+
+## October 10, 2026 — iOS 1.1 TestFlight candidate vs App Store review
+
+- **Signed iOS 1.1/100733** from `67c6d25917f3e8b632922b80c7a5479ca897af9f` reached Apple `VALID` / `APP_STORE_ELIGIBLE` after a successful upload ([run 38075036098](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/38075036098)); the owner reports it in TestFlight. The **overall workflow failed** attempting to attach to a nonexistent App Store version 1.1. **Not a 1.1 App Store submission/public release**, and exact beta groups were not independently checked.
+- Compared with main `a2cf1e139b0fffadafc1e502f6b731200e6dd6a1`, the 1.1 binary contains all latest merged native app features (Creator, #1057 native parity/Account/legal and #1129 Daily post-pick UI). The newer changes under `mobile/` are Android-only release tooling.
+- **Peer percentages not live yet:** Cloudflare's `/stats` allowlist and QA exclusion are pending [PR #1136](https://github.com/killjoy00/mtg-ev-analyzer/pull/1136) and protected production backend/gateway release; the current iOS binary can use the fix without reupload.
+- Android **1.0 / AAB code 100740** was committed to the Play bundle library in [run 38079116799](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/38079116799); **not** promoted to Internal or Closed Testing. Existing 12-tester/14-day qualification has not been changed by the upload.
+- The old iOS delivery [PR #1046](https://github.com/killjoy00/mtg-ev-analyzer/pull/1046) is closed as superseded; #1136 remains legitimately open. The #575 physical acceptance/Apple 1.0 review and 1.1 version-record constraints are **still open**. The actual current state of 1.0 App Review has not been independently reconfirmed.
+
+See [iOS 1.1 exact-build feature and release inventory](mobile-ios-1.1-testflight-inventory-2026-10-10.md) for precise **included vs excluded vs server-dependent** functionality and the original [#575](https://github.com/killjoy00/mtg-ev-analyzer/issues/575) store/device acceptance tracker.
 
 ## October 8, 2026 — Admin/Owner activation and security hardening (latest verified state)
 

@@ -2,6 +2,8 @@
 
 Start with [CURRENT-STATE](CURRENT-STATE.md) for verified deployment boundaries, [CHARTER](CHARTER.md) for the product, and the [Pack One brand and marketing asset guide](../assets/brand/README.md) for identity, fonts, colors, logos, and distribution artwork.
 
+**Current mobile release reference (October 10):** [iOS 1.1 exact-build feature and release inventory](mobile-ios-1.1-testflight-inventory-2026-10-10.md) distinguishes what is in signed iOS 1.1 TestFlight build 100733, what's blocked by pending backend fixes, and what's **not** an App Store release. Pair it with [#575](https://github.com/killjoy00/mtg-ev-analyzer/issues/575), the [mobile runbook](mobile-release-runbook.md), [store submission packet](mobile-store-submission.md), and [native parity inventory](mobile-parity-inventory.md).
+
 - [Corpus/selection](DATA-MANAGEMENT.md), [Corpus Operations](CORPUS-OPERATIONS.md), [card-image maintenance](CARD-IMAGE-MAINTENANCE.md), [Traditional admission/publication](TRADITIONAL-PUZZLE-ADMISSION.md)
 - [Scoring](SCORING-AND-DIFFICULTY.md), [decision measurements, launch attribution, and Daily habit cohorts](DECISION-MEASUREMENTS.md), [launch measurement owner guide](LAUNCH-MEASUREMENT-OWNER-GUIDE.md), [campaign links owner guide](CAMPAIGN-LINKS-OWNER-GUIDE.md)
 - [17Lands policy](17LANDS-DATA-REVIEW-2026-09-18.md)

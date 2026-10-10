@@ -1,6 +1,6 @@
 # Pack One mobile release configuration
 
-Updated 2026-09-25.
+Updated 2026-10-10 (CDT).
 
 Pack One uses Expo SDK and Expo Prebuild as React Native tooling, but **does not require Expo Application Services (EAS), an Expo account, or an Expo project ID** to build or release the app.
 
@@ -23,7 +23,9 @@ The `packone://` custom URL scheme remains unchanged for the current native auth
 
 ## Marketing version
 
-The first public store target is **1.0**. `mobile/app.json` is the Expo/native source version, while `mobile/store-release.json` records the intended App Store and Google Play marketing versions. Production preflight fails unless all three values match. CI additionally verifies the generated iOS `CFBundleShortVersionString` and Android `versionName` against the same store target.
+The **first public App Store/Play release target remains 1.0**, with its approval/qualification tracked in #575. TestFlight already has a newer **iOS 1.1 build 100733**; this does **not** indicate a public iOS 1.1 release or an Android 1.1 version.
+
+`mobile/app.json` still provides the Expo base `version: 1.0`. The explicit platform targets in `mobile/store-release.json` currently specify `appStoreVersion: 1.1` and `playVersionName: 1.0`. Production Expo config and CI validate **each platform against its own target**: iOS generated `CFBundleShortVersionString=1.1`, Android generated `versionName=1.0`. Never require the two platforms to share a marketing version; the base Expo value is not evidence of the signed iOS version. See [iOS 1.1 exact-build feature and release inventory](mobile-ios-1.1-testflight-inventory-2026-10-10.md).
 
 ## Native generation and local builds
 
@@ -56,7 +58,7 @@ Production/release compilation requires the normal native platform prerequisites
 - production Android identity remains `pro.packone.app`
 - no EAS project ID is required
 - the production P¹ icon exists
-- source, App Store, and Google Play marketing versions agree
+- signed/generated iOS and Android marketing versions match **their own** `mobile/store-release.json` targets, not each other
 
 ## Artwork
 
@@ -174,7 +176,7 @@ The verified provider resource is `projects/77537515004/locations/global/workloa
 
 ### Narrowing the existing provider
 
-The provider was originally created with the repo-wide condition `assertion.repository == 'killjoy00/mtg-ev-analyzer'`, which admits any workflow on any branch. Narrow it in place (same Cloud Shell variables as above):
+The provider originally used a repo-wide condition, which was subsequently narrowed and verified. The following is the **completed historical hardening command**, **not a pending change** (same Cloud Shell variables as above):
 
 ```bash
 gcloud iam workload-identity-pools providers update-oidc "$PROVIDER_ID" \
@@ -184,7 +186,7 @@ gcloud iam workload-identity-pools providers update-oidc "$PROVIDER_ID" \
   --attribute-condition="assertion.repository == '$REPO' && assertion.ref == 'refs/heads/main' && assertion.environment == 'pack-one-mobile-release'"
 ```
 
-Then dispatch `google-play-access.yml` from `main`; it must still pass. A token without the `environment` claim (any job outside `pack-one-mobile-release`) or from another ref is rejected by the provider.
+The protected main-only `google-play-access.yml` probe **already passed in run 37017937127** after the change. A token without the `environment` claim or from another ref is rejected by the provider. Re-run only if trust/provider configuration is intentionally changed.
 
 
 ## Store build numbering
@@ -209,15 +211,15 @@ The native root layout blocks navigation only for the initial cold-start check. 
 
 ## Store publishing boundary
 
-The TestFlight and Google Play Internal publishing workflows are manual-only and their publishing jobs fail closed unless the dispatch is from `main` and the checked-out commit still equals current `origin/main`. Store status/probe workflows use the same current-main check. These jobs reference the `pack-one-mobile-release` GitHub Environment so repository owners can apply required-review / protected-branch rules at one release boundary.
+The publishing workflows run only from reviewed `main` and require their checkout to equal current `origin/main`. Uploads may be triggered **by a reviewed release-request file on main or an explicitly authorized main dispatch**, not by feature-branch PR checks. They use the `pack-one-mobile-release` Environment. Uploading a signed build to Apple **does not** itself submit App Review, create a missing App Store 1.1 version, or release publicly; uploading an Android AAB to Play's bundle library **does not** assign a track. The latest exact-build and no-track-mutation evidence is in [iOS 1.1 exact-build feature and release inventory](mobile-ios-1.1-testflight-inventory-2026-10-10.md).
 
-Before the first public release candidate, the owner still needs to configure that GitHub Environment as protected, move Apple release credentials to environment-scoped secrets (or an equivalent protected secret boundary), and narrow Google Workload Identity Federation from repo-wide trust to the same protected release context (see **Narrowing the existing provider**). The workflow checks in this repository do not by themselves change Google Cloud IAM policy.
+Current protected boundary: the `pack-one-mobile-release` Environment is main-only, and Google Workload Identity Federation has been narrowed to the repo, main ref and protected release context (verified by the [Google Play probe](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/37017937127)). The owner has **explicitly declined** re-scoping existing Apple release secrets solely for this purpose; do not relabel it as outstanding owner work absent a new decision. Repository checks alone do not substitute for the established external IAM/Environment restrictions.
 
 ## Review deadlines for deferred items
 
-- **Export compliance:** the current internal TestFlight build may show Missing Compliance. The owner must answer App Store Connect's encryption questions before internal installation if Apple blocks the build. Source-control `ITSAppUsesNonExemptEncryption=false` only after the owner explicitly confirms that declaration is correct for the app.
+- **Export compliance:** signed iOS 1.1/100733 explicitly declares `ITSAppUsesNonExemptEncryption=false` in its archived plist and passed the archive verification in run 38075036098. This does not substitute for any additional Apple compliance questions if the console presents them; confirm any future prompt with the owner rather than assuming a reviewer approval.
 - **External TestFlight / App Store review:** Sign in with Apple is implemented for native iOS and is also available through Pack One's web authorization flow for Android/web continuity. The secure-auth release requires repository secrets `APPLE_TEAM_ID`, `APPLE_SIGN_IN_KEY_ID`, `APPLE_SIGN_IN_KEY_P8`, and the independent 32-byte hex token-encryption key `APPLE_TOKEN_ENCRYPTION_KEY_V1`. The token key is versioned separately so routine rate-limit-secret rotation cannot make stored Apple refresh tokens unreadable. The exact public release candidate still needs physical-iPhone verification and the then-current App Review requirement re-check.
 - **Apple Private Email Relay:** register Pack One's exact outbound email source/domain under Apple Developer → Sign in with Apple for Email Communication and verify SPF/DKIM before launch. Apple relay users can use legacy `privaterelay.appleid.com` or new `private.icloud.com` addresses. Apple-linked account deletion does **not** depend on relay email: Pack One requires a fresh Apple authorization bound to the existing Apple subject before deletion. Relay delivery still needs a real-device/inbox test because account/recovery communications to an unregistered sender can bounce.
 - **Physical iPhone SIWA validation:** on the exact public RC, verify (1) first sign-in with both shared email and Hide My Email, (2) a real Pack One email reaches the relay address, (3) Apple re-authentication can permanently delete the Apple-linked account and the authorization is revoked, (4) the deleted Apple authorization cannot be reused, and (5) the Sign in with Apple control is at least as prominent as the Google control. The current native layout renders both social controls full-width at the same 52-point height.
-- **Payments / Patreon access:** native purchase steering is removed and Patreon is presented only as existing-account OAuth. That presentation hardening does **not** settle Apple payment eligibility. Pack One is not a Reader app, and current 3.1.3(b) requires externally acquired digital features to also be available as IAP. Before App Store review, either ship equivalent StoreKit access, make/disable those premium practice modes on iOS so no external purchase unlock is required, or obtain explicit Apple confirmation of another applicable exception.
-- **Production Google Play:** run **Narrowing the existing provider** before granting any production-release permission.
+- **Payments / Patreon access:** the native iOS app **already includes Apple StoreKit Elite purchase, restore and manage access**, with backend-verified entitlements, while Patreon in iOS remains existing-account OAuth only and has no native purchase CTA. This is an **implemented feature in iOS 1.1/100733**, not a missing development task. What remains open in #575 and #673 is exact signed-device StoreKit/Sandbox lifecycle verification, product/subscription provider settings, refund/cancellation/revocation scenarios, and Apple App Review acceptance. Do not infer those from source availability or a valid TestFlight upload.
+- **Production Google Play:** the provider-narrowing step already passed its main-only protected access probe; **Production access/rollout remains a separate qualification and owner-approval gate**, and existing Closed Testing must not be disrupted.
