@@ -5,6 +5,11 @@ on:
     # 08:10 Pacific, summer and winter. Script skips the extra UTC trigger.
     - cron: '10 15 * * *'
     - cron: '10 16 * * *'
+  pull_request:
+    paths:
+      - '.github/workflows/daily-social-post.yml'
+      - 'scripts/post-daily-social.mjs'
+      - 'tests/daily-social-post.test.mjs'
   workflow_dispatch:
     inputs:
       live:
@@ -33,6 +38,7 @@ jobs:
       - name: Verify offline publishing contracts
         run: node --test tests/daily-social-post.test.mjs
       - name: Publish or preview Daily
+        if: github.event_name != 'pull_request'
         run: node scripts/post-daily-social.mjs
         env:
           MANUAL_LIVE: ${{ inputs.live }}
