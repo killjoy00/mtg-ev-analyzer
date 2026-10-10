@@ -2,15 +2,16 @@
 // this exact Daily decision. We intentionally never return a sample count or percentages below 10 completed player picks.
 export const MIN_DAILY_PEERS=10;
 
+// Count from the narrow per-pick observation rows (indexed by puzzle) rather
+// than reading every same-day session's full answers document.
 export const DAILY_PEER_STATS_SQL=`WITH daily_decisions AS (
   SELECT DISTINCT ON (COALESCE(s.daily_account_id::text,s.player_id::text))
-    s.answers -> $4::int ->> 'selectedId' AS selected_id
-  FROM draft_run_sessions s
-  WHERE s.day=$1::date AND s.environment=$2
+    o.selected_id
+  FROM draft_run_decision_observations o
+  JOIN draft_run_sessions s ON s.id=o.session_id
+  WHERE o.puzzle_id=$3::text AND o.round=$4::int+1 AND o.outcome='pick'
+    AND s.day=$1::date AND s.environment=$2
     AND NOT s.measurement_qa
-    AND s.puzzle_ids -> $4::int = to_jsonb($3::text)
-    AND jsonb_array_length(s.answers)>$4::int
-    AND s.answers -> $4::int -> 'puzzle' ->> 'puzzle_id'=$3
   ORDER BY COALESCE(s.daily_account_id::text,s.player_id::text),s.created_at,s.id
 )
 SELECT count(*)::int players,

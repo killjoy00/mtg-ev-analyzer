@@ -157,15 +157,21 @@ function draftRunScoringEvidence(puzzle,selectedId) {
   };
 }
 
-// A trophy records its wins, but many archives omit the losses. Do not
-// convert an unknown loss count into a fabricated undefeated record.
+// Every trophy has the maximum wins, so wins alone say nothing about the
+// drafter. Prefer evidence that varies: a known Premier record, else the
+// archived game win rate, else the legacy Arena rank. Never fabricate losses.
 export function trophyDrafterRecord(puzzle) {
   const wins=Number(puzzle?.event_match_wins);
-  if(!Number.isInteger(wins)||wins<1||wins>7)return null;
   const losses=puzzle?.event_match_losses;
-  if(losses!=null&&String(losses).trim()!==''&&Number.isInteger(Number(losses))&&Number(losses)>=0&&Number(losses)<=2)
+  const premier=(puzzle?.source_event_type??'PremierDraft')==='PremierDraft';
+  if(premier&&wins===7&&losses!=null&&String(losses).trim()!==''&&Number.isInteger(Number(losses))&&Number(losses)>=0&&Number(losses)<=2)
     return `went ${wins}\u2013${Number(losses)}`;
-  return `won ${wins} matches`;
+  const rate=Number(puzzle?.player_win_rate_bucket);
+  if(puzzle?.player_win_rate_bucket!=null&&Number.isFinite(rate)&&rate>=0.5&&rate<=1)
+    return `has a ${Math.round(rate*100)}% win rate`;
+  const rank=String(puzzle?.player_rank_tier||'').toLowerCase();
+  if(rank==='mythic'||rank==='diamond')return `reached ${rank[0].toUpperCase()+rank.slice(1)} rank`;
+  return null;
 }
 
 function scoredDraftRunPick(puzzle,selectedId,profile) {
