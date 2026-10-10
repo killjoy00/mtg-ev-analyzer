@@ -71,6 +71,7 @@ export type DraftRunAnswer = {
   historicalId: string | null;
   historicalName: string | null;
   historicalMatch: boolean;
+  trophyRecord?: string | null;
   creatorId?: string;
   creatorName?: string;
   creatorMatch?: boolean;
@@ -374,6 +375,21 @@ export function createDraftRunShare(id: string, session: MobileSession) {
     mobileSessionToken: session.playerToken,
     mobileAccountToken: session.accountToken,
     body: {},
+    timeoutMs: 15_000,
+  });
+}
+
+export type DailyPeerStats = {
+  available: boolean;
+  players?: number;
+  matching_pick_pct?: number;
+  trophy_pick_pct?: number;
+};
+
+export function loadDailyPeerStats(id: string, round: number, session: MobileSession) {
+  return requestJson<DailyPeerStats>(`/draft/v1/runs/${encodeURIComponent(id)}/stats?round=${round}`, {
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
     timeoutMs: 15_000,
   });
 }
