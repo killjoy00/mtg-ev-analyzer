@@ -100,16 +100,16 @@ if (deletionState==='deleted'||deletionState==='deleting') {
 } else if (historicalShare) {
   const { installHistoricalShare } = await import('./historical-share.mjs');
   await installHistoricalShare();
-  const growth=await import('./growth.mjs?v=9');
+  const growth=await import('./growth.mjs?v=10');
   syncPrimaryNavState(growth.accountState());
   if(account)account.onclick=()=>void growth.renderAccount({source:'nav'});
 } else {
   // Paint the real Daily layout immediately, but keep account/progress-specific
   // claims neutral until the cookie-backed session and Daily status resolve.
   const home = params.get('game') !== 'draft-run' && !params.has('profile') && !params.has('account') && !params.has('patreon')
-    ? await import('./daily-home.mjs?v=10') : null;
+    ? await import('./daily-home.mjs?v=11') : null;
   home?.renderDailyHome(null,'checking');
-  const growthReady = import('./growth.mjs?v=9');
+  const growthReady = import('./growth.mjs?v=10');
   const identityReady = growthReady.then(m => m.installGrowthLayer());
 
   if(account)account.onclick = async () => {
@@ -141,7 +141,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     if(patreonResult==='activate'||growth.hasPatreonActivationIntent()) {
       await growth.renderPatreonActivation({result:patreonResult==='activate'?null:patreonResult,source:patreonResult==='activate'?'welcome_note':'oauth_return'});
     } else {
-      const profiles=await import('./profile-product.mjs?v=9');
+      const profiles=await import('./profile-product.mjs?v=10');
       profiles.installProfileProductLayer();
       (await import('./profile-polish.mjs?v=6')).installProfilePolish();
       await profiles.renderMyProfile();
@@ -157,9 +157,9 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     }
   } else if (params.has('profile')) {
     await identityReady;
-    (await import('./profile-product.mjs?v=9')).installProfileProductLayer();
+    (await import('./profile-product.mjs?v=10')).installProfileProductLayer();
   } else {
-    const game = await import('./draft-run-product.mjs?v=13');
+    const game = await import('./draft-run-product.mjs?v=14');
     await identityReady;
     await refreshPrimaryNav();
     await game.installDraftRunPage();
