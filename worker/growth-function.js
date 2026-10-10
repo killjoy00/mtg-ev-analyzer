@@ -2548,6 +2548,8 @@ export default {
       // naming why, instead of an untyped stack trace per request (#803).
       if(error?.status===401&&error?.playerSessionReason)console.log(JSON.stringify(playerSessionRejection(request,error.playerSessionReason)));
       else if(error?.status===401&&error?.accountSessionReason)console.log(JSON.stringify(accountSessionRejection(request,error.accountSessionReason)));
+      else if(error?.status===403&&error?.accountCsrfReason)
+        console.log(JSON.stringify(sessionRejection('account_csrf_rejected',request,error.accountCsrfReason)));
       else console.error(error);
       const status=Number(error?.status||500);
       const response=json({
