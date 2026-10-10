@@ -6,6 +6,7 @@ import {verifyRerollIndexSchema} from './reroll-index-schema.mjs';
 import {verifyServingStatistics} from '../worker/serving-statistics.mjs';
 const result=await query(`SELECT
   EXISTS(SELECT 1 FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid WHERE c.relname='draft_run_reroll_set_window_idx' AND i.indisvalid) reroll_set_window,
+  EXISTS(SELECT 1 FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid WHERE c.relname='draft_run_sessions_peer_stats_idx' AND i.indisvalid AND i.indisready) daily_peer_stats_index,
   to_regprocedure('pack1_serving_snapshot(text,text,text)') IS NOT NULL practice_snapshot,
   to_regclass('draft_run_serving_inventory') IS NOT NULL practice_inventory,
   to_regclass('draft_run_serving_source_groups') IS NOT NULL practice_source_groups,
