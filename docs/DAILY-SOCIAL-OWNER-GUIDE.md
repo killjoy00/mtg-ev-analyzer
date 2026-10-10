@@ -1,0 +1,27 @@
+# Pack One morning Daily posts — owner setup
+
+The [Daily social workflow](../.github/workflows/daily-social-post.yml) runs on **main only** at approximately **8:10 a.m. America/Los_Angeles**, using two UTC schedules and a Pacific-hour guard to handle daylight saving. It posts one Daily link; the Daily homepage also offers Powered Cube and Latest Set. This does **not** replace the independent Neon Daily puzzle generation.
+
+## Configure destinations privately
+
+In GitHub **Settings → Secrets and variables → Actions**, configure the destinations you want:
+
+- Secret `PACKONE_BLUESKY_HANDLE`: dedicated Pack One Bluesky handle.
+- Secret `PACKONE_BLUESKY_APP_PASSWORD`: Bluesky **app password**, never the primary account password.
+- Secret `PACKONE_DISCORD_WEBHOOK_URLS`: one Discord incoming webhook URL per line, supplied privately by server admins who choose to opt in. Add or remove servers by editing this secret. **Do not** expose webhooks in public forms, pull requests, issues, or source code.
+- Variable `PACKONE_DAILY_IMAGE_URL_TEMPLATE` (optional, after image feature #3 exists): a public Pack One-hosted URL template such as `https://packone.pro/daily/{date}.png`. If the image is missing, the post is text-only. Images must be PNG, JPEG, or WebP, at most 1 MB.
+
+Configure at least one destination for live publishing. A half-configured Bluesky account fails explicitly rather than posting silently to fewer destinations.
+
+## Verify and operate
+
+1. Open **Actions → post Pack One Daily to Bluesky and Discord → Run workflow**, with **live unchecked**. It performs an offline dry run, printing only the public copy and number of destinations.
+2. Before enabling real publication, verify today’s Daily and the target accounts/channels. The Daily scheduling system is separate.
+3. Once the PR is merged and credentials exist, scheduled runs automatically post each Pacific morning. A manually checked **live** run publishes immediately for the current Pacific day, so use deliberately.
+4. Inspect the GitHub Actions job for errors. Failures set a nonzero exit code; neither webhook URLs nor account passwords are logged.
+5. To opt in another server, have its administrator create a Discord incoming webhook for their chosen channel and pass the link privately to the Pack One owner. Append it as a new line to `PACKONE_DISCORD_WEBHOOK_URLS`.
+6. To revoke a server, remove its URL from the secret and ask its administrator to delete or rotate its webhook.
+
+Bluesky uses a stable per-day record key to prevent accidental duplicate records. Discord does not guarantee cross-run deduplication. The script skips automatic rerun attempts and manual runs default to dry run. GitHub scheduling is best-effort and can be delayed or skipped.
+
+The job has read-only repository permissions and sends posts only to destinations supplied via Actions secrets. Tests never use real credentials or submit live posts.

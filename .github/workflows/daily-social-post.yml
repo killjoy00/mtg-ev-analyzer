@@ -1,0 +1,48 @@
+name: post Pack One Daily to Bluesky and Discord
+
+on:
+  schedule:
+    # 08:10 Pacific, summer and winter. Script skips the extra UTC trigger.
+    - cron: '10 15 * * *'
+    - cron: '10 16 * * *'
+  pull_request:
+    paths:
+      - '.github/workflows/daily-social-post.yml'
+      - 'scripts/post-daily-social.mjs'
+      - 'tests/daily-social-post.test.mjs'
+  workflow_dispatch:
+    inputs:
+      live:
+        description: 'Publish for real (default is a no-network dry run)'
+        type: boolean
+        default: false
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: packone-morning-social-post
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'killjoy00/mtg-ev-analyzer'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify offline publishing contracts
+        run: node --test tests/daily-social-post.test.mjs
+      - name: Publish or preview Daily
+        if: github.event_name != 'pull_request'
+        run: node scripts/post-daily-social.mjs
+        env:
+          MANUAL_LIVE: ${{ inputs.live }}
+          BLUESKY_HANDLE: ${{ secrets.PACKONE_BLUESKY_HANDLE }}
+          BLUESKY_APP_PASSWORD: ${{ secrets.PACKONE_BLUESKY_APP_PASSWORD }}
+          DISCORD_WEBHOOK_URLS: ${{ secrets.PACKONE_DISCORD_WEBHOOK_URLS }}
+          DAILY_IMAGE_URL_TEMPLATE: ${{ vars.PACKONE_DAILY_IMAGE_URL_TEMPLATE }}
