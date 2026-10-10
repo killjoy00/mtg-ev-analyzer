@@ -10,7 +10,7 @@ import {verifyDailyGenerationToken} from './daily-generation-auth.mjs';
 import {neonTriggerInvocationHeader,verifyNeonScheduleTrigger,zonedDateTime} from './neon-trigger.mjs';
 import {DAILY_ENVIRONMENTS,generateDailyEnvironmentResults} from './daily-generation-results.mjs';
 import {ensureDailySchedule as ensureDailyScheduleForQuery} from './draft-run-daily.mjs';
-import {DAILY_PEER_STATS_SQL,summarizeDailyPeers} from './daily-peer-stats.mjs';
+import {DAILY_PEER_STATS_SQL,lockedDailyPeerAnswer,summarizeDailyPeers} from './daily-peer-stats.mjs';
 import {draftRunLeaderboardRows,normalizeLeaderboardPeriod,resolveCurrentSeason} from './draft-run-season.mjs';
 import {consumePlayerLimit} from './request-limits.mjs';
 import {draftStartTiming} from './draft-start-timing.mjs';
@@ -122,7 +122,7 @@ async function dailyPeerStatsFor(request,id,searchParams) {
   if(!s.day)fail('Peer comparisons are available on fixed Dailies only.',404);
   const value=searchParams.get('round');
   if(!/^(?:0|[1-9][0-9]?)$/.test(value||''))fail('Invalid Daily round.');
-  const round=Number(value),answer=s.answers[round];
+  const round=Number(value),answer=lockedDailyPeerAnswer(s,round);
   // Authenticate the owning session AND its already-committed decision before
   // reading any population statistics. Never expose future-round preferences.
   if(round>=runLength(s)||!answer||answer.puzzle?.puzzle_id!==s.puzzle_ids[round])
