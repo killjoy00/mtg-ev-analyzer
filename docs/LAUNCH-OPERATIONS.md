@@ -44,3 +44,20 @@ Do not close #541 solely because the earlier no-op scan was fixed or because the
 6. Restore the last known-good reviewed Functions/gateway revision through the secure-auth release workflow if the new release caused errors. Deploy compatible backend Functions before the gateway. Keep additive migrations 0038/0039 and the existing QUOTA_KEY; do not drop cache tables or roll back corpus data as an application rollback. Verify cookie refresh, a guest Daily, release identity and alert query access afterward.
 
 Public leaderboard/profile caching remains conditional on measured cost. Cached public results would need strict separation from authenticated self-profile responses, short explicit TTLs and purge semantics. Do not cache account/session or run mutation responses. Retained fixture plans and measured route latency determine whether that work is necessary for the declared launch target.
+
+## Browser script errors
+
+The main site (`index.html` via `bootstrap.mjs`) reports uncaught script errors and unhandled promise rejections as `client_error` product events through the existing `/v1/events` pipeline. Each event carries only `kind` (`error` or `rejection`), `context` (the message with URLs and email addresses replaced, 100 characters), `type` (same-origin `file:line:column`, or `(unknown)` for rejections), `surface` (page path without query or hash), plus the usual allowlisted game `mode`/`set` and browser-session id. Extension, third-party and opaque cross-origin errors, and offline/aborted/timed-out requests are not reported; a page sends at most five distinct reports. Server and gateway monitoring above remains the authority for API availability; these events show what broke in players' browsers.
+
+Review after a release or a player report:
+
+```sql
+SELECT event_props->>'type' AS location, event_props->>'context' AS message,
+       event_props->>'kind' AS kind, count(*) AS events, count(DISTINCT player_id) AS players,
+       min(created_at) AS first_seen, max(created_at) AS last_seen
+FROM analytics_events
+WHERE event_name='client_error' AND created_at > now() - interval '7 days'
+GROUP BY 1,2,3 ORDER BY players DESC, events DESC LIMIT 50;
+```
+
+The native apps do not report script errors yet; adding it changes the App Store privacy and Google Play Data Safety declarations.

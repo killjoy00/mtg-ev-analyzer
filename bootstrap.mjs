@@ -1,12 +1,15 @@
 import { installRenderLifecycle } from './render-lifecycle.mjs';
 import { signalAccountChange } from './growth-api.mjs';
 import { normalizeAcquisitionValue as acquisitionValue } from './campaign-links.mjs';
+import { installClientErrorReporting } from './client-errors.mjs';
 
 // Authentication cookies are first-party to packone.pro. Treat the GitHub Pages
 // hostname as a publishing mirror, never as a second account origin.
 if (location.hostname === 'killjoy00.github.io') {
   location.replace('https://packone.pro' + location.pathname + location.search + location.hash);
 } else {
+
+installClientErrorReporting((name,props)=>import('./retention-events.mjs').then(({trackEvent})=>trackEvent(name,props)));
 
 const params = new URLSearchParams(location.search);
 const resultShare=params.get('ref')==='result_share'&&params.get('game')==='draft-run'&&params.get('daily')==='1';
