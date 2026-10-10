@@ -35,6 +35,7 @@ test('Daily peer comparison becomes available at ten players and rounds percenta
 
 test('Daily peer SQL scopes date/environment/exact puzzle, locked rounds and deduped identities',()=>{
   assert.match(DAILY_PEER_STATS_SQL,/s\.day=\$1::date AND s\.environment=\$2/);
+  assert.match(DAILY_PEER_STATS_SQL,/AND NOT s\.measurement_qa/,'QA sessions never enter the 10-player threshold or percentages');
   assert.match(DAILY_PEER_STATS_SQL,/s\.puzzle_ids -> \$4::int = to_jsonb\(\$3::text\)/);
   assert.match(DAILY_PEER_STATS_SQL,/jsonb_array_length\(s\.answers\)>\$4::int/);
   assert.match(DAILY_PEER_STATS_SQL,/DISTINCT ON \(COALESCE\(s\.daily_account_id::text,s\.player_id::text\)\)/);

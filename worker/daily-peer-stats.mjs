@@ -7,6 +7,7 @@ export const DAILY_PEER_STATS_SQL=`WITH daily_decisions AS (
     s.answers -> $4::int ->> 'selectedId' AS selected_id
   FROM draft_run_sessions s
   WHERE s.day=$1::date AND s.environment=$2
+    AND NOT s.measurement_qa
     AND s.puzzle_ids -> $4::int = to_jsonb($3::text)
     AND jsonb_array_length(s.answers)>$4::int
     AND s.answers -> $4::int -> 'puzzle' ->> 'puzzle_id'=$3

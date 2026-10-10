@@ -1,6 +1,6 @@
 # Pack One morning Daily posts — owner setup
 
-The [Daily social workflow](../.github/workflows/daily-social-post.yml) runs on **main only** at approximately **8:10 a.m. America/Los_Angeles**, using two UTC schedules and a Pacific-hour guard to handle daylight saving. It posts one Daily link; the Daily homepage also offers Powered Cube and Latest Set. This does **not** replace the independent Neon Daily puzzle generation.
+The [Daily social workflow](../.github/workflows/daily-social-post.yml) runs live on **main only** at approximately **8:10 a.m. America/Los_Angeles**. Two UTC schedules handle daylight saving; the original GitHub run time identifies the intended Pacific Daily so delayed jobs can still post for the correct day. It posts one Daily link; the Daily homepage also offers Powered Cube and Latest Set. This does **not** replace the independent Neon Daily puzzle generation.
 
 ## Configure destinations privately
 
@@ -22,6 +22,6 @@ Configure at least one destination for live publishing. A half-configured Bluesk
 5. To opt in another server, have its administrator create a Discord incoming webhook for their chosen channel and pass the link privately to the Pack One owner. Append it as a new line to `PACKONE_DISCORD_WEBHOOK_URLS`.
 6. To revoke a server, remove its URL from the secret and ask its administrator to delete or rotate its webhook.
 
-Bluesky uses a stable per-day record key to prevent accidental duplicate records. Discord does not guarantee cross-run deduplication. The script skips automatic rerun attempts and manual runs default to dry run. GitHub scheduling is best-effort and can be delayed or skipped.
+Bluesky now uses a valid, deterministic AT Protocol TID per Daily and verifies existing records before skipping. Text-only posts include an external link card. Discord uses persistent, non-secret receipt claims in [issue #1135](https://github.com/killjoy00/mtg-ev-analyzer/issues/1135) keyed by day and SHA-256 webhook fingerprint. Only receipts written by `github-actions[bot]` are trusted, so comments from anyone else on that public issue are ignored. If Discord answers with an HTTP error, the receipt is marked `failed` and the next scheduled trigger (three each morning) retries that server. Only a timeout or network failure leaves a receipt `claimed`, because the message may have been delivered: check that channel, then edit the bot comment's `status:` line to `posted` (it arrived) or `failed` (retry on the next trigger). Discord 429 responses get bounded retries. A malformed entry in `PACKONE_DISCORD_WEBHOOK_URLS` is reported by line number and does not stop other destinations. Both channels use source-specific UTM links with one stable campaign, `daily_post`. Unsubscribe from issue #1135 if the daily receipt comments notify you. Manual live runs are restricted to main; PR/dry-run work never shares live concurrency. GitHub scheduling is best-effort.
 
 The job has read-only repository permissions and sends posts only to destinations supplied via Actions secrets. Tests never use real credentials or submit live posts.

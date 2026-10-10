@@ -51,7 +51,7 @@ function takeProfileSafetyIntent() {
 async function resumeProfileSafetyIntent() {
   const pending=takeProfileSafetyIntent();
   if(!pending)return false;
-  const profiles=await import('./profile-product.mjs?v=9');
+  const profiles=await import('./profile-product.mjs?v=10');
   profiles.installProfileProductLayer();
   (await import('./profile-polish.mjs?v=6')).installProfilePolish();
   await profiles.renderPublicProfile(pending.profileKey);
@@ -68,7 +68,7 @@ async function resumeProfileSafetyIntent() {
 
 async function renderSignedInHome(source='account') {
   if(source==='profile_safety'&&await resumeProfileSafetyIntent())return;
-  const profiles=await import('./profile-product.mjs?v=9');
+  const profiles=await import('./profile-product.mjs?v=10');
   profiles.installProfileProductLayer();
   (await import('./profile-polish.mjs?v=6')).installProfilePolish();
   await profiles.renderMyProfile();
@@ -232,7 +232,7 @@ function setFormPending(form,pending,label) {
 
 async function returnToValidatedDaily(validationRunId,linked,source,{confirmed=true}={}) {
   if(confirmed)event('daily_score_validated',{source});
-  const draft=await import('./draft-run-product.mjs?v=12');
+  const draft=await import('./draft-run-product.mjs?v=14');
   await draft.returnToValidatedDaily(validationRunId,{standing:linked?.standing||null,confirmed});
 }
 
@@ -354,7 +354,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
     const displayNameAttention=Boolean(validationRunId&&linked?.rankingIdentity?.eligible===false&&['username_taken','username_required','name_not_allowed'].includes(linked?.rankingIdentity?.reason));
     if(displayNameAttention) {
       pendingDailyRunValidation=validationRunId;
-      const profiles=await import('./profile-product.mjs?v=9');
+      const profiles=await import('./profile-product.mjs?v=10');
       profiles.installProfileProductLayer();
       (await import('./profile-polish.mjs?v=6')).installProfilePolish();
       await profiles.renderMyProfile();
@@ -440,7 +440,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
     }
   });
   document.querySelector('#account-forgot')?.addEventListener('click',()=>void renderForgotPassword());
-  document.querySelector('#account-career')?.addEventListener('click',async()=>{pendingDailyRunValidation=null;if(activatingPatreon)clearPatreonActivation();await (await import('./profile-product.mjs?v=9')).renderMyProfile();});
+  document.querySelector('#account-career')?.addEventListener('click',async()=>{pendingDailyRunValidation=null;if(activatingPatreon)clearPatreonActivation();await (await import('./profile-product.mjs?v=10')).renderMyProfile();});
   document.querySelector('#account-home')?.addEventListener('click',()=>{pendingDailyRunValidation=null;if(activatingPatreon)clearPatreonActivation();document.querySelector('#brand-home')?.click();});
 
   const signup=document.querySelector('#account-signup');
