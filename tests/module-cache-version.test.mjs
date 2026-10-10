@@ -15,7 +15,7 @@ test('account and profile entry modules use release-versioned imports', async ()
     readFile('patreon-page.mjs', 'utf8'),
   ]);
 
-  assert.match(index, /bootstrap\.mjs\?v=11/);
+  assert.match(index, /bootstrap\.mjs\?v=12/);
   assert.match(bootstrap, /growth\.mjs\?v=9/);
   assert.match(bootstrap, /daily-home\.mjs\?v=10/);
   assert.match(bootstrap, /profile-product\.mjs\?v=9/);
