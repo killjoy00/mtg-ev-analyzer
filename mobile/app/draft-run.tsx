@@ -30,6 +30,7 @@ import {
   createDraftRunShare,
   DAILY_ENVIRONMENT_META,
   isDailyEnvironment,
+  loadDailyPeerStats,
   loadDraftRun,
   rerollDraftRun,
   startDailyDraftRun,
@@ -37,6 +38,7 @@ import {
   submitDraftRunDecisionReport,
   submitDraftRunPick,
   type DailyEnvironment,
+  type DailyPeerStats,
   type DecisionReportReason,
   type DraftRunAnswer,
   type DraftRunCard,
@@ -181,6 +183,13 @@ const DECISION_REPORT_OPTIONS: readonly { value: DecisionReportReason; label: st
   { value: 'broken', label: 'Something is broken' },
   { value: 'other', label: 'Other' },
 ];
+
+function trophyRevealSentence(answer: DraftRunAnswer) {
+  const record = answer.trophyRecord || '';
+  return answer.historicalMatch
+    ? `You matched the trophy drafter${record ? `, who ${record}` : ''}.`
+    : `The trophy drafter took ${answer.historicalName ?? 'another card'}${record ? ` and ${record}` : ''}.`;
+}
 
 function compactFeedback(answer: DraftRunAnswer) {
   if (answer.historicalMatch) return '';
@@ -509,12 +518,25 @@ export default function DraftRunScreen({
   const [reportSending, setReportSending] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportedDecision, setReportedDecision] = useState<string | null>(null);
+  const [dailyPeers, setDailyPeers] = useState<{ runId: string; round: number; stats: DailyPeerStats } | null>(null);
   const scroll = useRef<ScrollView>(null);
 
   const commitState = (next: LoadState) => {
     stateRef.current = next;
     setState(next);
   };
+
+  useEffect(() => {
+    if (state.status !== 'ready' || !state.run.day || mode !== 'feedback' || reviewIndex === null) return;
+    const runId = state.run.id;
+    let current = true;
+    void loadDailyPeerStats(runId, reviewIndex, state.session)
+      .then((stats) => {
+        if (current && stats.available) setDailyPeers({ runId, round: reviewIndex, stats });
+      })
+      .catch(() => undefined); // Peer comparison is optional, never block a reveal.
+    return () => { current = false; };
+  }, [state, mode, reviewIndex]);
 
   useEffect(() => subscribeSession((next) => {
     const current = stateRef.current;
@@ -724,9 +746,7 @@ export default function DraftRunScreen({
     const latestAnswer = run.answers[feedbackIndex];
     if (latestAnswer) {
       AccessibilityInfo.announceForAccessibility(
-        `${latestAnswer.score} out of 100. ${latestAnswer.historicalMatch
-          ? 'You matched the trophy drafter.'
-          : `The trophy drafter took ${latestAnswer.historicalName ?? 'another card'}.`}`,
+        `${latestAnswer.score} out of 100. ${trophyRevealSentence(latestAnswer)}`,
       );
     }
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -1086,13 +1106,16 @@ export default function DraftRunScreen({
                 <Text testID="feedback-score" onLayout={(event) => recordLayout('score', event)} onTextLayout={(event) => recordText('score', event)} style={styles.feedbackScoreNumber}>{answer.score}<Text style={styles.feedbackScoreSuffix}>/100</Text></Text>
                 <View testID="feedback-copy" onLayout={(event) => recordLayout('copy', event)} style={[styles.feedbackCopy, wideFeedback && styles.feedbackCopyWide]}>
                   <Text testID="feedback-title" onLayout={(event) => recordLayout('title', event)} onTextLayout={(event) => recordText('title', event)} style={styles.feedbackTitle}>
-                    {answer.historicalMatch
-                      ? 'You matched the trophy drafter.'
-                      : `The trophy drafter took ${answer.historicalName ?? 'another card'}.`}
+                    {trophyRevealSentence(answer)}
                   </Text>
                   <Text testID="feedback-choice" onLayout={(event) => recordLayout('choice', event)} onTextLayout={(event) => recordText('choice', event)} style={styles.feedbackBody}>You chose {answer.selectedName}.</Text>
                 </View>
               </View>
+              {run.day && dailyPeers?.runId === run.id && dailyPeers.round === reviewIndex && dailyPeers.stats.available ? (
+                <Text accessibilityRole="text" style={styles.dailyPeerStats}>
+                  {dailyPeers.stats.matching_pick_pct}% of players picked this · {dailyPeers.stats.trophy_pick_pct}% matched the trophy drafter ({dailyPeers.stats.players} players)
+                </Text>
+              ) : null}
 
               <View style={[styles.feedbackComparison, stackComparison && { flexDirection: 'column' }]}>
                 {(() => {
@@ -1422,6 +1445,7 @@ const styles = StyleSheet.create({
   feedbackCopy: { minWidth: 0, flexShrink: 1, gap: spacing.sm, justifyContent: 'center' },
   feedbackTitle: { color: colors.ink, fontSize: 17, lineHeight: 22, fontWeight: '800' },
   feedbackBody: { color: colors.muted, fontSize: 14, lineHeight: 20 },
+  dailyPeerStats: { color: colors.accent, fontSize: 13, lineHeight: 20, fontWeight: '700', marginTop: spacing.sm, marginBottom: spacing.sm },
   feedbackComparison: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
   feedbackCard: {
     flexGrow: 1,
