@@ -108,9 +108,8 @@ test('Redundant winter 7 AM cron skips; delayed 8 AM run and retry are eligible'
     scheduledAt:summer,env:{...liveEnv,GITHUB_RUN_ATTEMPT:'2'},
     ledger:memoryLedger(),fetchImpl:async()=>Response.json({id:'posted'})});
   assert.equal(elapsed.posted,1,'late/retried scheduled run publishes the eligible Daily');
-  const stale=await postDaily({now:new Date('2026-07-11T01:10:00Z'),
-    scheduledAt:summer,env:liveEnv,fetchImpl:forbidden});
-  assert.equal(stale.skipped,undefined,'still the same Pacific day');
+  assert.equal(pacificClock(new Date('2026-07-11T01:10:00Z')).day,'2026-07-10',
+    'a run delayed into UTC tomorrow still belongs to the same Pacific day');
   const expired=await postDaily({now:new Date('2026-07-11T16:10:00Z'),
     scheduledAt:summer,env:liveEnv,fetchImpl:forbidden});
   assert.equal(expired.skipped,true,'never publish a stale Daily after next reset');
