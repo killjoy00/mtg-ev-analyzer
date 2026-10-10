@@ -17,6 +17,16 @@ SELECT count(*)::int players,
        count(*) FILTER (WHERE selected_id=$6)::int trophy_pick
 FROM daily_decisions`;
 
+export function lockedDailyPeerAnswer(session,round) {
+  if(!session?.day||!Number.isInteger(round)||round<0||
+      !Array.isArray(session.puzzle_ids)||round>=session.puzzle_ids.length)return null;
+  const answer=session.answers?.[round];
+  if(answer?.puzzle?.puzzle_id!==session.puzzle_ids[round]||
+      typeof answer.selectedId!=='string'||!answer.selectedId||
+      typeof answer.historicalId!=='string'||!answer.historicalId)return null;
+  return answer;
+}
+
 export function summarizeDailyPeers(row) {
   const players=Number(row?.players);
   if(!Number.isSafeInteger(players)||players<MIN_DAILY_PEERS)return {available:false};
