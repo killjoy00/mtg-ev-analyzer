@@ -2,13 +2,15 @@ name: post Pack One Daily to Bluesky and Discord
 
 on:
   schedule:
-    # 08:10 Pacific, summer and winter. Script skips the extra UTC trigger.
+    # 08:10 Pacific, summer and winter. Durable receipts deduplicate both triggers
+    # and allow the later trigger to recover a missed or delayed early one.
     - cron: '10 15 * * *'
     - cron: '10 16 * * *'
   pull_request:
     paths:
       - '.github/workflows/daily-social-post.yml'
       - 'scripts/post-daily-social.mjs'
+      - 'scripts/daily-social-ledger.mjs'
       - 'tests/daily-social-post.test.mjs'
   workflow_dispatch:
     inputs:
@@ -20,21 +22,23 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
-  group: packone-morning-social-post
+  # Dry runs and PR tests never occupy the live publisher's serialized queue.
+  group: ${{ github.event_name == 'pull_request' && format('packone-social-review-{0}', github.ref) || (github.event_name == 'workflow_dispatch' && inputs.live != true && format('packone-social-preview-{0}', github.ref) || 'packone-social-live') }}
   cancel-in-progress: false
 
 jobs:
   publish:
-    if: github.repository == 'killjoy00/mtg-ev-analyzer'
+    if: github.repository == 'killjoy00/mtg-ev-analyzer' && (github.event_name == 'pull_request' || github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
+          node-version: '24'
       - name: Verify offline publishing contracts
         run: node --test tests/daily-social-post.test.mjs
       - name: Publish or preview Daily
@@ -42,6 +46,8 @@ jobs:
         run: node scripts/post-daily-social.mjs
         env:
           MANUAL_LIVE: ${{ inputs.live }}
+          GITHUB_TOKEN: ${{ github.token }}
+          SOCIAL_LEDGER_ISSUE: '1135'
           BLUESKY_HANDLE: ${{ secrets.PACKONE_BLUESKY_HANDLE }}
           BLUESKY_APP_PASSWORD: ${{ secrets.PACKONE_BLUESKY_APP_PASSWORD }}
           DISCORD_WEBHOOK_URLS: ${{ secrets.PACKONE_DISCORD_WEBHOOK_URLS }}
