@@ -119,6 +119,7 @@ async function fixture(options = {}) {
     '@/src/storage/session': { readSession: async () => session, subscribeSession: callback => { sessionListeners.add(callback); return () => sessionListeners.delete(callback); } },
     '@/src/api/draftRun': {
       createDraftRunShare: async () => ({ id: 'a'.repeat(24) }),
+      loadDailyPeerStats: async () => ({ available: false }),
       DAILY_ENVIRONMENT_META: {
         mixed: { eyebrow: 'DAILY DRAFT RUN', resultTitle: 'Your Draft Run.' },
         latest: { eyebrow: 'LATEST SET DAILY', resultTitle: 'Your Latest Set run.' },
