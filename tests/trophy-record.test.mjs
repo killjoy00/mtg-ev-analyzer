@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {trophyDrafterRecord,gradeDraftRunPick} from '../draft-run.mjs';
+import {trophyDrafterRecord} from '../draft-run.mjs';
 
 test('record displays archived losses exactly when evidence exists',()=>{
   assert.equal(trophyDrafterRecord({event_match_wins:7,event_match_losses:1}),'went 7–1');
