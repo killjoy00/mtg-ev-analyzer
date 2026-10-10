@@ -12,6 +12,7 @@ test('missing losses are never represented as zero losses',()=>{
   assert.equal(trophyDrafterRecord({event_match_wins:7,event_match_losses:null}),'won 7 matches');
   assert.equal(trophyDrafterRecord({event_match_wins:7}),'won 7 matches');
   assert.equal(trophyDrafterRecord({event_match_wins:7,event_match_losses:5}),'won 7 matches');
+  assert.equal(trophyDrafterRecord({event_match_wins:7,event_match_losses:'  '}),'won 7 matches');
   assert.equal(trophyDrafterRecord({event_match_wins:null,event_match_losses:null}),null);
 });
 
