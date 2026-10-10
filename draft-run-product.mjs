@@ -15,6 +15,7 @@ const webClientBuild=()=>new URL(import.meta.url).searchParams.get('v')||null;
 const reportSentText='Thanks \u2014 report sent.';
 let run=null,selection=null,review=null,busy=false,dailyValidationConfirmation=null;
 const reportedDecisions=new Set();
+const dailyPeerCache=new Map();
 const clock=decisionClock();let viewPromise=Promise.resolve(),viewKey=null;
 document.addEventListener('visibilitychange',()=>{if(document.hidden)clock.pause();else if(run?.current&&review==null&&!busy)recordView(true);});
 function recordView(touch=false) {
@@ -121,11 +122,32 @@ function revealAnalysis(p,answer) {
   const sent=reportedDecisions.has(answer.puzzle.puzzle_id);
   return `<details class="run-analysis"><summary>Why this score?</summary><div class="run-analysis-body">${revealComparison(p,answer)}${consensusFeedback(answer)}<div class="run-decision-report"><button type="button" class="text-button" data-report-decision>Report this decision</button><span id="run-report-status" role="status">${sent?esc(reportSentText):''}</span></div></div></details>`;
 }
+function trophyRevealSentence(answer) {
+  const record=answer.trophyRecord?String(answer.trophyRecord):'';
+  return answer.historicalMatch
+    ? `You matched the trophy drafter${record?` (${record})`:''}.`
+    : `The trophy drafter took ${answer.historicalName||'another card'}${record?` and ${record}`:''}.`;
+}
 function compactResultLabel(answer,sentence='') {
-  const verdict=answer.historicalMatch
-    ? 'You matched the trophy drafter.'
-    : `The trophy drafter took ${answer.historicalName}.`;
-  return `${answer.score} out of 100. ${verdict}${sentence?` ${sentence}`:''}`;
+  return `${answer.score} out of 100. ${trophyRevealSentence(answer)}${sentence?` ${sentence}`:''}`;
+}
+async function revealDailyPeers(round,answer) {
+  if(!run?.day||!Number.isInteger(round)||!answer)return;
+  const id=run.id,key=`${id}:${round}`;
+  const show=stats=>{
+    if(!stats?.available||run?.id!==id||review!==round||
+        run?.answers?.[round]?.puzzle?.puzzle_id!==answer.puzzle?.puzzle_id)return;
+    const node=document.querySelector('#run-peer-stats');
+    if(!node)return;
+    node.textContent=`${stats.matching_pick_pct}% of players picked this · ${stats.trophy_pick_pct}% matched the trophy drafter (${stats.players} players)`;
+    node.hidden=false;
+  };
+  if(dailyPeerCache.has(key)){show(dailyPeerCache.get(key));return;}
+  try {
+    const result=await api(`/v1/runs/${encodeURIComponent(id)}/stats?round=${round}`);
+    if(result.available)dailyPeerCache.set(key,result);
+    show(result);
+  } catch { /* Reveals must work even if peer statistics are unavailable. */ }
 }
 function cardGrid(p,answer=null) {
   const candidates=sortPackByRarity(p.candidates);
@@ -165,13 +187,13 @@ function render() {
     ${rankingStateMarkup(run)}
     ${run.comparison?run.comparison.kind==='creator'?`<aside class="run-friend"><strong>BEAT THE CREATOR</strong> · ${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. You’re playing the same ${runLength()} decisions.</aside>`:`<aside class="run-friend">${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. ${run.comparison.exact?`You’re playing the same ${runLength()} packs.`:'Packs changed. This result counts as practice.'}</aside>`:''}
     ${answer?'':pool(p)}
-    ${answer?`<section class="run-feedback"><strong class="run-feedback-score">${answer.score}<small>/100</small></strong>${compactRevealCards(p,answer)}<div class="run-feedback-copy"><h2 id="run-feedback-result" tabindex="-1" aria-label="${esc(compactResultLabel(answer,compactSentence))}">${answer.historicalMatch?'You matched the trophy drafter.':'The trophy drafter took '+esc(answer.historicalName)+'.'}</h2>${compactSentence?`<p>${esc(compactSentence)}</p>`:''}</div><div class="run-next-dock"><button class="button primary" id="run-next">${run.complete?'See result':'Next pick'}</button></div></section>${revealAnalysis(p,answer)}`:
+    ${answer?`<section class="run-feedback"><strong class="run-feedback-score">${answer.score}<small>/100</small></strong>${compactRevealCards(p,answer)}<div class="run-feedback-copy"><h2 id="run-feedback-result" tabindex="-1" aria-label="${esc(compactResultLabel(answer,compactSentence))}">${esc(trophyRevealSentence(answer))}</h2>${compactSentence?`<p>${esc(compactSentence)}</p>`:''}<p id="run-peer-stats" class="run-peer-stats" role="status" hidden></p></div><div class="run-next-dock"><button class="button primary" id="run-next">${run.complete?'See result':'Next pick'}</button></div></section>${revealAnalysis(p,answer)}`:
     ''}
     ${answer?`<details class="run-pack-review"><summary>Review the pack</summary>${pool(p)}${cardGrid(p,answer)}</details>`:cardGrid(p)}
     ${answer?'':`<div class="run-lock"><div class="run-lock-choice"><span id="run-selection-label">Choose a card</span><button class="button primary" id="run-lock" disabled>Lock pick</button></div>${run.day||run.comparison?.exact?'':`<div class="run-tools"><div>${cube()||run.custom_set_ids?.length?'':`<button class="button secondary" data-reroll="set" ${!run.rerolls.set||run.set_reroll_allowed===false?'disabled':''}>Reroll set · ${run.rerolls.set}</button>`}<button class="button secondary" data-reroll="pack" ${!run.rerolls.pack?'disabled':''}>Reroll pack · ${run.rerolls.pack}</button></div></div>`}</div>`}
     <p class="run-error" id="run-error" role="alert"></p></section>`;
   bind(p,answer);
-  if(answer) document.querySelector('#run-feedback-result')?.focus({preventScroll:true});
+  if(answer) {document.querySelector('#run-feedback-result')?.focus({preventScroll:true});void revealDailyPeers(review,answer);}
   else recordView();
 }
 function openDecisionReport(answer) {
