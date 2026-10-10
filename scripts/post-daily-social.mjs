@@ -72,7 +72,7 @@ async function responseJson(fetchImpl,url,options,label) {
 async function maybeDailyImage(fetchImpl,url) {
   if(!url)return null;
   try {
-    const response=await fetchImpl(url,{signal:AbortSignal.timeout(15_000)});
+    const response=await fetchImpl(url,{signal:AbortSignal.timeout(15_000),redirect:'error'});
     if(!response.ok)return null; // Image #3 may not have been published yet.
     const type=(response.headers.get('content-type')||'').split(';')[0].trim();
     if(!['image/png','image/jpeg','image/webp'].includes(type))return null;
@@ -160,8 +160,13 @@ export async function postDaily({env=process.env,now=new Date(),fetchImpl=fetch}
     jobs.push({label:'Discord server '+(index+1),run:()=>discordPublish(fetchImpl,webhook,
       {text:text.text,image})});
   const results=await Promise.allSettled(jobs.map(job=>job.run()));
-  const failed=results.flatMap((r,i)=>r.status==='rejected'?
-    [jobs[i].label+': '+(r.reason instanceof Error?r.reason.message:'request failed')]:[]);
+  // Network clients sometimes include full URLs in thrown error messages.
+  // Only emit a channel label and an optional numeric HTTP status.
+  const failed=results.flatMap((r,i)=>{
+    if(r.status!=='rejected')return [];
+    const status=String(r.reason?.message||'').match(/HTTP ([0-9]{3})/);
+    return [jobs[i].label+' failed'+(status?' (HTTP '+status[1]+')':'')];
+  });
   if(failed.length)throw Error('Daily publish incomplete: '+failed.join(' | '));
   return {day,posted:results.filter(r=>r.status==='fulfilled'&&r.value==='posted').length,
     already_posted:results.filter(r=>r.status==='fulfilled'&&r.value==='already-posted').length,
