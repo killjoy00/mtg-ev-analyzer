@@ -163,7 +163,7 @@ export function trophyDrafterRecord(puzzle) {
   const wins=Number(puzzle?.event_match_wins);
   if(!Number.isInteger(wins)||wins<1||wins>7)return null;
   const losses=puzzle?.event_match_losses;
-  if(losses!=null&&Number.isInteger(Number(losses))&&Number(losses)>=0&&Number(losses)<=2)
+  if(losses!=null&&String(losses).trim()!==''&&Number.isInteger(Number(losses))&&Number(losses)>=0&&Number(losses)<=2)
     return `went ${wins}\u2013${Number(losses)}`;
   return `won ${wins} matches`;
 }
