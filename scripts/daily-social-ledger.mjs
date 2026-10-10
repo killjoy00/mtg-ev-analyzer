@@ -35,7 +35,10 @@ export function createGithubReceiptLedger({token,repo,issueNumber,fetchImpl=fetc
     for(let page=1;page<=20;page++) {
       const batch=await github('/issues/'+issueNumber+'/comments?since='+since+
         '&per_page=100&page='+page);
-      const found=batch.find(c=>typeof c.body==='string'&&c.body.startsWith(marker));
+      // The ledger issue is public: anyone can comment, so only receipts
+      // written by this workflow's GITHUB_TOKEN identity are trusted.
+      const found=batch.find(c=>c?.user?.login==='github-actions[bot]'&&
+        typeof c.body==='string'&&c.body.startsWith(marker));
       if(found)return found;
       if(batch.length<100)return null;
     }
@@ -48,6 +51,14 @@ export function createGithubReceiptLedger({token,repo,issueNumber,fetchImpl=fetc
       const found=await existing(day,channel);
       if(found) {
         if(found.body.includes('\nstatus: posted\n'))return {alreadyPosted:true};
+        // Discord answered an earlier attempt with an HTTP error, so nothing
+        // was delivered: reuse the receipt and try again.
+        if(found.body.includes('\nstatus: failed\n')) {
+          await github('/issues/comments/'+found.id,{
+            method:'PATCH',body:{body:entryBody(day,channel,'claimed')},
+          });
+          return {id:found.id,alreadyPosted:false};
+        }
         // A webhook may have succeeded before the final receipt was written.
         // Do not risk a second delivery; require reconciliation.
         throw Error('An earlier Discord delivery is unconfirmed; manual reconciliation required.');
@@ -63,6 +74,15 @@ export function createGithubReceiptLedger({token,repo,issueNumber,fetchImpl=fetc
         throw Error('Invalid Daily receipt claim.');
       await github('/issues/comments/'+claim.id,{
         method:'PATCH',body:{body:entryBody(day,channel,'posted')},
+      });
+    },
+    // Only for a definite HTTP error from Discord. Timeouts and network
+    // failures stay claimed because the message may have been delivered.
+    async markFailed(day,channel,claim) {
+      if(!Number.isSafeInteger(claim?.id)||claim.alreadyPosted)
+        throw Error('Invalid Daily receipt claim.');
+      await github('/issues/comments/'+claim.id,{
+        method:'PATCH',body:{body:entryBody(day,channel,'failed')},
       });
     },
   };

@@ -21,7 +21,8 @@ export function dailyCopy(day,channel='bluesky') {
   if(!/^\d{4}-\d{2}-\d{2}$/.test(day))throw Error('Invalid Pacific Daily date.');
   const title=new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',timeZone:'UTC'})
     .format(new Date(day+'T12:00:00Z'));
-  const url=DAILY_URL+'&utm_source='+channel+'&utm_medium=social&utm_campaign=packone_daily_'+day.replaceAll('-','');
+  // One stable campaign so launch reports group every Daily post together.
+  const url=DAILY_URL+'&utm_source='+channel+'&utm_medium=social&utm_campaign=daily_post';
   const text='Pack One Daily · '+title+'\n\n'+
     'Three new MTG draft challenges: Draft Run, Powered Cube and Latest Set. '+
     'Make your picks, then compare with the trophy drafter.\n\n'+url;
@@ -59,18 +60,31 @@ export function blueskyLinkFacets(text,url) {
   }];
 }
 
-export function discordWebhookList(value='') {
+function validDiscordWebhook(candidate) {
+  let url;
+  try {url=new URL(candidate);}catch{return null;}
+  if(url.protocol!=='https:'||url.hostname!=='discord.com'||url.port||url.username||url.password||
+     url.search||url.hash||!/^\/api\/webhooks\/[0-9]+\/[A-Za-z0-9_-]+$/.test(url.pathname))
+    return null;
+  return url.toString();
+}
+
+// One badly pasted entry must not silence Bluesky and every other server.
+// Invalid entries are reported by position only, never by value.
+export function discordWebhookEntries(value='') {
   const entries=String(value||'').split(/[\n,]+/).map(s=>s.trim()).filter(Boolean);
-  const unique=new Set();
-  for(const candidate of entries) {
-    let url;
-    try {url=new URL(candidate);}catch{throw Error('Invalid Discord webhook URL.');}
-    if(url.protocol!=='https:'||url.hostname!=='discord.com'||url.port||url.username||url.password||
-       url.search||url.hash||!/^\/api\/webhooks\/[0-9]+\/[A-Za-z0-9_-]+$/.test(url.pathname))
-      throw Error('Invalid Discord webhook URL.');
-    unique.add(url.toString());
-  }
-  return [...unique];
+  const unique=new Set(),invalid=[];
+  entries.forEach((candidate,index)=>{
+    const url=validDiscordWebhook(candidate);
+    if(url)unique.add(url);else invalid.push(index+1);
+  });
+  return {webhooks:[...unique],invalid};
+}
+
+export function discordWebhookList(value='') {
+  const {webhooks,invalid}=discordWebhookEntries(value);
+  if(invalid.length)throw Error('Invalid Discord webhook URL.');
+  return webhooks;
 }
 
 export function dailyImageUrl(template,day) {
@@ -185,7 +199,8 @@ export async function discordPublish(fetchImpl,webhook,{text,image},{
       await sleep(waitMs);
       continue;
     }
-    if(!response.ok)throw Error('Discord publish returned HTTP '+response.status+'.');
+    if(!response.ok)
+      throw Object.assign(Error('Discord publish returned HTTP '+response.status+'.'),{status:response.status});
     return 'posted';
   }
   throw Error('Discord publish retry budget exhausted.');
@@ -199,8 +214,9 @@ export async function postDaily({
   const wall=pacificClock(now);
   const {day}=triggered;
   const live=event==='schedule'||env.MANUAL_LIVE==='true';
-  // The 07:10 winter UTC clock is a redundant trigger. The 09:10 summer
-  // trigger can recover if the 08:10 run was dropped; receipts deduplicate.
+  // In winter the 15:10 UTC trigger is 07:10 PST and skips; 16:10 posts and
+  // 17:10 retries. In summer 15:10 posts and both later triggers retry.
+  // Receipts and the deterministic Bluesky record deduplicate every retry.
   if(event==='schedule'&&(triggered.hour<8||triggered.day!==wall.day))
     return {day,skipped:true,reason:'before Daily reset or expired scheduled day'};
   if(live&&env.GITHUB_REF!=='refs/heads/main')
@@ -210,11 +226,12 @@ export async function postDaily({
   const handle=String(env.BLUESKY_HANDLE||'').trim();
   const password=String(env.BLUESKY_APP_PASSWORD||'');
   if(Boolean(handle)!==Boolean(password))throw Error('Bluesky credentials are incomplete.');
-  const webhooks=discordWebhookList(env.DISCORD_WEBHOOK_URLS||'');
+  const {webhooks,invalid:invalidWebhooks}=discordWebhookEntries(env.DISCORD_WEBHOOK_URLS||'');
   const imageUrl=dailyImageUrl(env.DAILY_IMAGE_URL_TEMPLATE||'',day);
   if(!live)return {day,dry_run:true,bluesky:Boolean(handle),discord_servers:webhooks.length,
-    image_requested:Boolean(imageUrl),text:blue.text};
-  if(!handle&&!webhooks.length)throw Error('Configure a Bluesky account or Discord webhooks before enabling live posting.');
+    invalid_discord_entries:invalidWebhooks,image_requested:Boolean(imageUrl),text:blue.text};
+  if(!handle&&!webhooks.length)throw Error('Configure a Bluesky account or Discord webhooks before enabling live posting.'+
+    (invalidWebhooks.length?' Invalid Discord webhook entries: '+invalidWebhooks.join(', ')+'.':''));
   const receipts=ledger||(webhooks.length?createGithubReceiptLedger({
     token:env.GITHUB_TOKEN,repo:env.GITHUB_REPOSITORY,issueNumber:Number(env.SOCIAL_LEDGER_ISSUE),
     fetchImpl,
@@ -228,7 +245,17 @@ export async function postDaily({
       const channel=discordReceiptKey(webhook);
       const claim=await receipts.claim(day,channel);
       if(claim.alreadyPosted)return 'already-posted';
-      const result=await discordPublish(fetchImpl,webhook,{text:discord.text,image});
+      let result;
+      try {
+        result=await discordPublish(fetchImpl,webhook,{text:discord.text,image});
+      } catch(error) {
+        // An HTTP error response means Discord did not create the message, so
+        // the next scheduled attempt may retry. Timeouts stay unconfirmed.
+        if(Number.isInteger(error?.status)) {
+          try {await receipts.markFailed(day,channel,claim);} catch {}
+        }
+        throw error;
+      }
       await receipts.markPosted(day,channel,claim);
       return result;
     }});
@@ -239,6 +266,7 @@ export async function postDaily({
     const status=String(r.reason?.message||'').match(/HTTP ([0-9]{3})/);
     return [jobs[i].label+' failed'+(status?' (HTTP '+status[1]+')':'')];
   });
+  for(const line of invalidWebhooks)failed.push('Discord webhook entry '+line+' is invalid');
   if(failed.length)throw Error('Daily publish incomplete: '+failed.join(' | '));
   return {day,posted:results.filter(r=>r.status==='fulfilled'&&r.value==='posted').length,
     already_posted:results.filter(r=>r.status==='fulfilled'&&r.value==='already-posted').length,

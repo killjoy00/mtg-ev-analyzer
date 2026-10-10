@@ -2,10 +2,12 @@ name: post Pack One Daily to Bluesky and Discord
 
 on:
   schedule:
-    # 08:10 Pacific, summer and winter. Durable receipts deduplicate both triggers
-    # and allow the later trigger to recover a missed or delayed early one.
+    # 08:10 Pacific, summer and winter. Durable receipts deduplicate every trigger
+    # and let the later triggers recover a missed or delayed earlier one (the
+    # 17:10 UTC run is the only retry in winter, when 15:10 UTC is 07:10 PST).
     - cron: '10 15 * * *'
     - cron: '10 16 * * *'
+    - cron: '10 17 * * *'
   pull_request:
     paths:
       - '.github/workflows/daily-social-post.yml'

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {
-  pacificClock,dailyCopy,blueskyLinkFacets,blueskyDailyRkey,discordWebhookList,dailyImageUrl,
+  pacificClock,dailyCopy,blueskyLinkFacets,blueskyDailyRkey,discordWebhookList,discordWebhookEntries,dailyImageUrl,
   postDaily,blueskyPublish,discordPublish,
 } from '../scripts/post-daily-social.mjs';
 
@@ -18,6 +18,7 @@ function memoryLedger() {
     async claim(day,key) {
       const name=day+':'+key,existing=claims.get(name);
       if(existing?.posted)return {alreadyPosted:true};
+      if(existing?.failed) {existing.failed=false;return {id:existing.id,alreadyPosted:false};}
       if(existing)throw Error('An earlier Discord delivery is unconfirmed.');
       const next={id:++id,posted:false};
       claims.set(name,next);
@@ -27,6 +28,11 @@ function memoryLedger() {
       const entry=claims.get(day+':'+key);
       assert.equal(entry?.id,claim.id);
       entry.posted=true;
+    },
+    async markFailed(day,key,claim) {
+      const entry=claims.get(day+':'+key);
+      assert.equal(entry?.id,claim.id);
+      entry.failed=true;
     },
   };
 }
@@ -232,4 +238,49 @@ test('Review workflows never publish from feature branches or cancel live dispat
   assert.match(yml,/packone-social-preview/);
   assert.match(yml,/packone-social-live/);
   assert.match(yml,/SOCIAL_LEDGER_ISSUE: '1135'/);
+});
+
+test('posted links use one stable daily_post campaign per channel',()=>{
+  for(const channel of ['bluesky','discord']) {
+    const url=new URL(dailyCopy('2026-10-10',channel).url);
+    assert.equal(url.searchParams.get('utm_source'),channel);
+    assert.equal(url.searchParams.get('utm_campaign'),'daily_post');
+    assert.equal(url.searchParams.get('utm_medium'),'social');
+  }
+  assert.equal(dailyCopy('2026-10-10').url,dailyCopy('2026-10-11').url,'no per-day campaign values');
+});
+
+test('a Discord HTTP error lets the next scheduled trigger retry; a timeout does not',async()=>{
+  const ledger=memoryLedger();
+  let calls=0;
+  const failing=async()=>{calls++;return new Response('{}',{status:500});};
+  await assert.rejects(postDaily({now:summer,env:liveEnv,ledger,fetchImpl:failing}),/Discord server 1 failed \(HTTP 500\)/);
+  const retried=await postDaily({now:new Date('2026-07-10T16:10:00Z'),env:liveEnv,ledger,
+    fetchImpl:async()=>{calls++;return Response.json({id:'ok'});}});
+  assert.equal(retried.posted,1,'the later trigger recovers a definite failure');
+  assert.equal(calls,2);
+
+  const unsure=memoryLedger();
+  await assert.rejects(postDaily({now:summer,env:liveEnv,ledger:unsure,
+    fetchImpl:async()=>{throw new TypeError('fetch failed');}}),/Discord server 1 failed/);
+  await assert.rejects(postDaily({now:new Date('2026-07-10T16:10:00Z'),env:liveEnv,ledger:unsure,
+    fetchImpl:async()=>Response.json({id:'never'})}),/Discord server 1 failed/,
+    'an ambiguous delivery is never sent twice');
+});
+
+test('one invalid Discord entry is reported by position and does not block other channels',async()=>{
+  const bad='https://ptb.discord.com/api/webhooks/2/secret_TOKEN';
+  assert.deepEqual(discordWebhookEntries(bad+'\n'+webhook),{webhooks:[webhook],invalid:[1]});
+  const posted=[];
+  const error=await postDaily({now:summer,env:{...liveEnv,DISCORD_WEBHOOK_URLS:bad+'\n'+webhook},
+    ledger:memoryLedger(),fetchImpl:async(url)=>{posted.push(String(url));return Response.json({id:'ok'});}})
+    .then(()=>null,e=>e);
+  assert.equal(posted.length,1,'the valid webhook still receives the Daily post');
+  assert.match(error?.message||'',/Discord webhook entry 1 is invalid/);
+  assert.doesNotMatch(error.message,/secret_TOKEN|ptb\.discord/);
+});
+
+test('winter schedule has a retry trigger after the 08:10 PST run',()=>{
+  const yml=readFileSync('.github/workflows/daily-social-post.yml','utf8');
+  for(const cron of ['10 15 * * *','10 16 * * *','10 17 * * *'])assert.ok(yml.includes(`cron: '${cron}'`),cron);
 });
