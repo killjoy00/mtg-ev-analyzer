@@ -6,7 +6,7 @@ import {decisionClock} from './decision-clock.mjs';
 import { sortPackByRarity } from './replay-data.mjs';
 import { escapeHtml as esc } from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
-import { compactDraftRunFeedback, consensusFeedback } from './draft-run-feedback.mjs';
+import { compactDraftRunFeedback, consensusFeedback, trophyRevealSentence } from './draft-run-feedback.mjs?v=2';
 import { tcgplayerUrl } from './tcgplayer.mjs';
 import { dailyResetCue } from './game-date.mjs';
 
@@ -122,21 +122,6 @@ function revealAnalysis(p,answer) {
   const sent=reportedDecisions.has(answer.puzzle.puzzle_id);
   return `<details class="run-analysis"><summary>Why this score?</summary><div class="run-analysis-body">${revealComparison(p,answer)}${consensusFeedback(answer)}<div class="run-decision-report"><button type="button" class="text-button" data-report-decision>Report this decision</button><span id="run-report-status" role="status">${sent?esc(reportSentText):''}</span></div></div></details>`;
 }
-function trophyRevealSentence(answer) {
-  const record=answer.trophyRecord?String(answer.trophyRecord):'';
-  const verdict=answer.historicalMatch
-    ? 'You matched the trophy drafter.'
-    : `The trophy drafter took ${answer.historicalName||'another card'}.`;
-  return `${verdict}${record?` They ${record}.`:''}`;
-}
-function compactTrophyRevealSentence(answer) {
-  const record=answer.trophyRecord
-    ? String(answer.trophyRecord).replace(/^went /,'').replace(/^won (\d+) matches$/,'$1 wins')
-    : '';
-  return answer.historicalMatch
-    ? `You matched the trophy drafter.${record?` ${record}`:''}`
-    : `Trophy pick: ${answer.historicalName||'another card'}${record?` · ${record}`:''}.`;
-}
 function compactResultLabel(answer,sentence='') {
   return `${answer.score} out of 100. ${trophyRevealSentence(answer)}${sentence?` ${sentence}`:''}`;
 }
@@ -196,7 +181,7 @@ function render() {
     ${rankingStateMarkup(run)}
     ${run.comparison?run.comparison.kind==='creator'?`<aside class="run-friend"><strong>BEAT THE CREATOR</strong> · ${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. You’re playing the same ${runLength()} decisions.</aside>`:`<aside class="run-friend">${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. ${run.comparison.exact?`You’re playing the same ${runLength()} packs.`:'Packs changed. This result counts as practice.'}</aside>`:''}
     ${answer?'':pool(p)}
-    ${answer?`<section class="run-feedback"><strong class="run-feedback-score">${answer.score}<small>/100</small></strong>${compactRevealCards(p,answer)}<div class="run-feedback-copy"><h2 id="run-feedback-result" tabindex="-1" aria-label="${esc(compactResultLabel(answer,compactSentence))}">${esc(compactTrophyRevealSentence(answer))}</h2>${compactSentence?`<p>${esc(compactSentence)}</p>`:''}<div id="run-peer-stats" class="run-peer-stats" role="status" hidden></div></div><div class="run-next-dock"><button class="button primary" id="run-next">${run.complete?'See result':'Next pick'}</button></div></section>${revealAnalysis(p,answer)}`:
+    ${answer?`<section class="run-feedback"><strong class="run-feedback-score">${answer.score}<small>/100</small></strong>${compactRevealCards(p,answer)}<div class="run-feedback-copy"><h2 id="run-feedback-result" tabindex="-1" aria-label="${esc(compactResultLabel(answer,compactSentence))}">${esc(trophyRevealSentence(answer))}</h2>${compactSentence?`<p>${esc(compactSentence)}</p>`:''}<div id="run-peer-stats" class="run-peer-stats" role="status" hidden></div></div><div class="run-next-dock"><button class="button primary" id="run-next">${run.complete?'See result':'Next pick'}</button></div></section>${revealAnalysis(p,answer)}`:
     ''}
     ${answer?`<details class="run-pack-review"><summary>Review the pack</summary>${pool(p)}${cardGrid(p,answer)}</details>`:cardGrid(p)}
     ${answer?'':`<div class="run-lock"><div class="run-lock-choice"><span id="run-selection-label">Choose a card</span><button class="button primary" id="run-lock" disabled>Lock pick</button></div>${run.day||run.comparison?.exact?'':`<div class="run-tools"><div>${cube()||run.custom_set_ids?.length?'':`<button class="button secondary" data-reroll="set" ${!run.rerolls.set||run.set_reroll_allowed===false?'disabled':''}>Reroll set · ${run.rerolls.set}</button>`}<button class="button secondary" data-reroll="pack" ${!run.rerolls.pack?'disabled':''}>Reroll pack · ${run.rerolls.pack}</button></div></div>`}</div>`}

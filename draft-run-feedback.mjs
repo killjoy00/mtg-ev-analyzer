@@ -1,5 +1,12 @@
 import { escapeHtml as esc } from './html.mjs';
 
+export function trophyRevealSentence(answer) {
+  const record=String(answer?.trophyRecord||'').trim();
+  if(answer?.historicalMatch)
+    return `You matched the trophy drafter${record?`, who ${record}`:''}.`;
+  return `The trophy drafter took ${answer?.historicalName||'another card'}${record?` and ${record}`:''}.`;
+}
+
 export function compactDraftRunFeedback(answer) {
   if (!answer || answer.historicalMatch) return '';
   const selectedName=String(answer.selectedName||'').trim();
