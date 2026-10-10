@@ -83,14 +83,19 @@ test('Publish sends one Bluesky record and one no-mention Discord message',async
   }});
   assert.equal(result.posted,2);
   assert.equal(requests.length,3);
-  const record=JSON.parse(requests[1].options.body);
+  // Channels publish concurrently; never assume their request order.
+  const recordCall=requests.find(r=>r.url.endsWith('com.atproto.repo.createRecord'));
+  const discordCall=requests.find(r=>r.url.startsWith('https://discord.com/api/webhooks/'));
+  assert.ok(recordCall);
+  assert.ok(discordCall);
+  const record=JSON.parse(recordCall.options.body);
   assert.equal(record.rkey,'packone-daily-2026-07-10');
   assert.equal(record.record.$type,'app.bsky.feed.post');
   assert.equal(record.record.facets[0].features[0].uri,dailyCopy('2026-07-10').url);
-  const discord=JSON.parse(requests[2].options.body);
+  const discord=JSON.parse(discordCall.options.body);
   assert.deepEqual(discord.allowed_mentions,{parse:[]});
   assert.equal(discord.content,dailyCopy('2026-07-10').text);
-  assert.equal(requests[2].url.endsWith('?wait=true'),true);
+  assert.equal(discordCall.url.endsWith('?wait=true'),true);
 });
 
 test('A duplicate Bluesky record is already-posted',async()=>{
