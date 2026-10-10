@@ -1,0 +1,207 @@
+name: Upload verified existing Pack One AAB to Internal Testing
+
+# A one-time, source-pinned import. The reviewed artifact was already built,
+# Android-audited and signed by the protected release workflow.
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/android-upload-existing-aab.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pack-one-existing-aab-internal-upload
+  cancel-in-progress: false
+
+jobs:
+  upload-reviewed-artifact:
+    if: github.repository == 'killjoy00/mtg-ev-analyzer'
+    name: Upload exact signed AAB to Google Play internal draft
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: pack-one-mobile-release
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Require current main and verify original artifact provenance
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == 'refs/heads/main' ]]
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]] || {
+            echo 'Main moved; refusing an unreviewed artifact upload.' >&2
+            exit 1
+          }
+          run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/38075036105")"
+          jq -e '
+            .name == "Android production bundle" and
+            .event == "push" and
+            .status == "completed" and
+            .conclusion == "success" and
+            .head_sha == "67c6d25917f3e8b632922b80c7a5479ca897af9f"
+          ' <<< "$run" >/dev/null || {
+            echo 'Source build is not the reviewed successful Pack One build.' >&2
+            exit 1
+          }
+          artifact="$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/11678685367")"
+          jq -e '
+            .id == 11678685367 and
+            .name == "pack-one-play-signed-aab" and
+            .expired == false and
+            .workflow_run.id == 38075036105 and
+            .digest == "sha256:e31e7e45afbbe6cb72a8fdb2409aa84beb3052c790fa2026a2b586046329e691"
+          ' <<< "$artifact" >/dev/null || {
+            echo 'Signed AAB source artifact has changed or expired.' >&2
+            exit 1
+          }
+          echo 'Verified existing AAB artifact #11678685367 from successful run #38075036105.'
+
+      - name: Download exact already-signed AAB (no rebuild)
+        uses: actions/download-artifact@v4
+        with:
+          name: pack-one-play-signed-aab
+          run-id: 38075036105
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/existing-signed-aab
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Verify previously reviewed Play upload signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle="$RUNNER_TEMP/existing-signed-aab/app-release.aab"
+          test -s "$bundle"
+          jarsigner -verify -verbose -certs "$bundle" > "$RUNNER_TEMP/existing-aab-jarverify.txt"
+          grep -q 'jar verified' "$RUNNER_TEMP/existing-aab-jarverify.txt"
+          expected='83:BB:D7:ED:15:27:BA:BE:18:B6:E7:FD:92:F5:A3:50:BD:62:7B:2B'
+          actual="$(keytool -printcert -jarfile "$bundle" | awk -F': ' '/SHA1:/{print $2; exit}')"
+          [[ "$actual" == "$expected" ]] || {
+            echo 'AAB does not match the Google Play registered Pack One upload certificate.' >&2
+            exit 1
+          }
+          echo "Verified registered Google Play upload signer: $actual"
+          sha256sum "$bundle"
+
+      - id: auth
+        name: Authenticate to Google Play with protected release identity
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: pack-one
+          workload_identity_provider: projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer
+          service_account: packone-play-ci@pack-one.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+
+      - name: Preflight exact bundle version and preserve existing tracks
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import {writeFileSync} from 'node:fs';
+          const api='https://androidpublisher.googleapis.com/androidpublisher/v3/applications/pro.packone.app';
+          const headers={authorization:'Bearer '+process.env.PLAY_ACCESS_TOKEN,'content-type':'application/json'};
+          async function req(path,method='GET',optional=false){
+            const r=await fetch(api+path,{method,headers,body:method==='POST'?'{}':undefined});
+            if(optional&&r.status===404)return null;
+            if(!r.ok)throw Error('Google Play preflight '+method+' '+path+' returned HTTP '+r.status);
+            return r.status===204?null:await r.json();
+          }
+          const edit=await req('/edits','POST');
+          if(!edit?.id)throw Error('Google Play did not issue a release edit');
+          try{
+            const base='/edits/'+encodeURIComponent(edit.id);
+            const bundles=await req(base+'/bundles');
+            if((bundles?.bundles||[]).some(b=>Number(b.versionCode)===100740))
+              throw Error('Version 100740 is already present in Google Play; refusing duplicate upload');
+            const internal=await req(base+'/tracks/internal','GET',true);
+            if((internal?.releases||[]).some(r=>r.status!=='draft'))
+              throw Error('Internal track has an active release; refusing to replace it with a draft');
+            const closed=await req(base+'/tracks/production-access','GET',true);
+            writeFileSync(process.env.RUNNER_TEMP+'/android-closed-track-before.json',JSON.stringify(closed));
+            console.log('Checked: version 100740 unused; internal track safe; closed track snapshot retained.');
+          } finally {
+            await req('/edits/'+encodeURIComponent(edit.id),'DELETE');
+          }
+          NODE
+
+      - name: Upload the same signed AAB to Internal Testing draft only
+        shell: bash
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          PACKONE_ANDROID_PACKAGE: pro.packone.app
+          PACKONE_EXPECTED_UPLOAD_VERSION_CODE: '100740'
+        run: |
+          set -euo pipefail
+          result="$(node mobile/scripts/play-internal-release.mjs "$RUNNER_TEMP/existing-signed-aab/app-release.aab")"
+          printf '%s\n' "$result"
+          node -e '
+            const assert=require("node:assert/strict");
+            const x=JSON.parse(process.argv[1]);
+            assert.equal(x.packageName,"pro.packone.app");
+            assert.equal(x.track,"internal");
+            assert.equal(String(x.versionCode),"100740");
+            assert.equal(x.releaseStatus,"draft");
+            assert.equal(x.committed,true);
+          ' "$result"
+
+      - name: Read back Internal Testing and verify Closed Testing is unchanged
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import {readFileSync} from 'node:fs';
+          import assert from 'node:assert/strict';
+          const api='https://androidpublisher.googleapis.com/androidpublisher/v3/applications/pro.packone.app';
+          const headers={authorization:'Bearer '+process.env.PLAY_ACCESS_TOKEN,'content-type':'application/json'};
+          async function req(path,method='GET',optional=false){
+            const r=await fetch(api+path,{method,headers,body:method==='POST'?'{}':undefined});
+            if(optional&&r.status===404)return null;
+            if(!r.ok)throw Error('Google Play postflight '+method+' '+path+' returned HTTP '+r.status);
+            return r.status===204?null:await r.json();
+          }
+          const edit=await req('/edits','POST');
+          if(!edit?.id)throw Error('No Google Play verification edit');
+          try{
+            const base='/edits/'+encodeURIComponent(edit.id);
+            const internal=await req(base+'/tracks/internal');
+            assert.ok((internal?.releases||[]).some(r=>
+              r.status==='draft'&&(r.versionCodes||[]).map(String).includes('100740')
+            ),'Exact AAB version 100740 must be on the Internal Testing draft track');
+            const before=JSON.parse(readFileSync(process.env.RUNNER_TEMP+'/android-closed-track-before.json','utf8'));
+            const after=await req(base+'/tracks/production-access','GET',true);
+            assert.deepEqual(after,before,'Production-access Closed Testing track must not change');
+            console.log('Verified Google Play Internal Testing draft version 100740.');
+            console.log('Verified existing production-access Closed Testing track unchanged.');
+          } finally {
+            await req('/edits/'+encodeURIComponent(edit.id),'DELETE');
+          }
+          NODE
+          {
+            echo '## Google Play Android AAB upload'
+            echo '- Reused signed source artifact #11678685367, without rebuilding.'
+            echo '- Package: `pro.packone.app`'
+            echo '- Google Play Internal Testing: `draft`'
+            echo '- Accepted version code: `100740`'
+            echo '- Existing Closed Testing track: unchanged (verified).'
+            echo '- No Production release, new track, or tester settings changed.'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -58,6 +58,10 @@ try {
 
   const versionCode = String(uploaded?.versionCode ?? '');
   if (!versionCode) throw new Error('Google Play did not return an uploaded version code.');
+  const expectedCode = process.env.PACKONE_EXPECTED_UPLOAD_VERSION_CODE?.trim();
+  if (expectedCode && versionCode !== expectedCode) {
+    throw new Error(`Existing AAB version code mismatch: expected ${expectedCode}, got ${versionCode}.`);
+  }
 
   const releaseName = `Pack One internal ${process.env.GITHUB_SHA?.slice(0, 7) || versionCode}`;
   await request(
