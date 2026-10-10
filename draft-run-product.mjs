@@ -125,7 +125,7 @@ function revealAnalysis(p,answer) {
 function trophyRevealSentence(answer) {
   const record=answer.trophyRecord?String(answer.trophyRecord):'';
   return answer.historicalMatch
-    ? `You matched the trophy drafter${record?` (${record})`:''}.`
+    ? `You matched the trophy drafter${record?`, who ${record}`:''}.`
     : `The trophy drafter took ${answer.historicalName||'another card'}${record?` and ${record}`:''}.`;
 }
 function compactResultLabel(answer,sentence='') {
