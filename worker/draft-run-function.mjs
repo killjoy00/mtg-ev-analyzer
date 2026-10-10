@@ -10,6 +10,7 @@ import {verifyDailyGenerationToken} from './daily-generation-auth.mjs';
 import {neonTriggerInvocationHeader,verifyNeonScheduleTrigger,zonedDateTime} from './neon-trigger.mjs';
 import {DAILY_ENVIRONMENTS,generateDailyEnvironmentResults} from './daily-generation-results.mjs';
 import {ensureDailySchedule as ensureDailyScheduleForQuery} from './draft-run-daily.mjs';
+import {DAILY_PEER_STATS_SQL,summarizeDailyPeers} from './daily-peer-stats.mjs';
 import {draftRunLeaderboardRows,normalizeLeaderboardPeriod,resolveCurrentSeason} from './draft-run-season.mjs';
 import {consumePlayerLimit} from './request-limits.mjs';
 import {draftStartTiming} from './draft-start-timing.mjs';
@@ -114,6 +115,22 @@ async function persistResult(s) {
     JSON.stringify(['game_completed',...(environmentOf(s)==='powered-cube'?['cube_completed']:[]),...(s.day?['daily_completed']:[]),...(exact&&other?['challenge_complete']:[]),...(creator?['creator_challenge_complete']:[])]),
     environmentOf(s),s.id,s.leaderboard_eligible,s.creator_challenge_id||null,
   ]);
+}
+
+async function dailyPeerStatsFor(request,id,searchParams) {
+  const owner=await player(request),s=await session(id,owner);
+  if(!s.day)fail('Peer comparisons are available on fixed Dailies only.',404);
+  const value=searchParams.get('round');
+  if(!/^(?:0|[1-9][0-9]?)$/.test(value||''))fail('Invalid Daily round.');
+  const round=Number(value),answer=s.answers[round];
+  // Authenticate the owning session AND its already-committed decision before
+  // reading any population statistics. Never expose future-round preferences.
+  if(round>=runLength(s)||!answer||answer.puzzle?.puzzle_id!==s.puzzle_ids[round])
+    fail('Lock this Daily pick before viewing how others chose.',403);
+  const result=await query(DAILY_PEER_STATS_SQL,[
+    s.day,environmentOf(s),s.puzzle_ids[round],round,answer.selectedId,answer.historicalId,
+  ]);
+  return json(summarizeDailyPeers(result.rows[0]));
 }
 
 async function responseFor(s,timing=null) {
@@ -605,7 +622,7 @@ async function route(request) {
     }
     return json(publicCreatorChallenge(challenge));
   }
-  const match=path.match(/^\/v1\/runs\/([a-f0-9-]+)(?:\/(pick|reroll|share|view|report))?$/);
+  const match=path.match(/^\/v1\/runs\/([a-f0-9-]+)(?:\/(pick|reroll|share|view|report|stats))?$/);
   if(match) {
     if(request.method==='POST'&&match[2]==='view') {
       const timing=draftStartTiming(process.env.PACK1_CAPACITY_DIAGNOSTICS==='1',{header:'x-pack1-view-timing'});
@@ -614,6 +631,7 @@ async function route(request) {
       const result=await timing.step('observation',()=>observeDecisionForRequest(query,match[1],owner,body));
       return timing.finish(json(result));
     }
+    if(request.method==='GET'&&match[2]==='stats') return dailyPeerStatsFor(request,match[1],url.searchParams);
     if(request.method==='GET'&&!match[2]) return json(await responseFor(await session(match[1],await player(request))));
     if(request.method==='POST'&&match[2]==='share') return createShare(request,match[1]);
     if(request.method==='POST'&&match[2]==='report') return reportDecision(request,match[1]);
