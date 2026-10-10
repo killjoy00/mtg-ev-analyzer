@@ -9,10 +9,10 @@ export async function installHistoricalShare() {
     ['legacy-product.mjs', 'installLegacyCohortLayer'],
     ['leaderboard-product.mjs', 'installLeaderboardProductLayer'],
     ['flow-fixes.mjs', 'installFlowFixes'],
-    ['growth.mjs', 'installGrowthLayer'],
+    ['growth.mjs?v=10', 'installGrowthLayer'],
     ['historical-growth.mjs', 'installHistoricalGrowthLayer'],
     ['retention.mjs', 'installRetentionLayer'],
-    ['profile-product.mjs', 'installProfileProductLayer'],
+    ['profile-product.mjs?v=10', 'installProfileProductLayer'],
   ];
   for (const [file, install] of layers) await (await import(`./${file}`))[install]();
 }
