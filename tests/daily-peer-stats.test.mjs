@@ -1,6 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {DAILY_PEER_STATS_SQL,MIN_DAILY_PEERS,summarizeDailyPeers} from '../worker/daily-peer-stats.mjs';
+import {DAILY_PEER_STATS_SQL,MIN_DAILY_PEERS,lockedDailyPeerAnswer,summarizeDailyPeers} from '../worker/daily-peer-stats.mjs';
+
+test('only owned, already committed, matching Daily decisions can be compared',()=>{
+  const session={day:'2026-10-10',puzzle_ids:['p1','p2'],answers:[
+    {puzzle:{puzzle_id:'p1'},selectedId:'card-a',historicalId:'card-b'},
+  ]};
+  assert.equal(lockedDailyPeerAnswer(session,0),session.answers[0]);
+  assert.equal(lockedDailyPeerAnswer(session,1),null); // future round
+  assert.equal(lockedDailyPeerAnswer({...session,day:null},0),null); // practice
+  assert.equal(lockedDailyPeerAnswer({...session,answers:[{...session.answers[0],puzzle:{puzzle_id:'other'}}]},0),null);
+  assert.equal(lockedDailyPeerAnswer({...session,answers:[]},0),null);
+  assert.equal(lockedDailyPeerAnswer(session,-1),null);
+});
 
 test('Daily peer comparison hides the entire sample below twenty',()=>{
   assert.equal(MIN_DAILY_PEERS,20);
