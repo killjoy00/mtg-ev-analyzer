@@ -12,6 +12,7 @@ on:
       - 'scripts/post-daily-social.mjs'
       - 'scripts/daily-social-ledger.mjs'
       - 'tests/daily-social-post.test.mjs'
+      - 'tests/daily-social-ledger.test.mjs'
   workflow_dispatch:
     inputs:
       live:
@@ -40,7 +41,7 @@ jobs:
         with:
           node-version: '24'
       - name: Verify offline publishing contracts
-        run: node --test tests/daily-social-post.test.mjs
+        run: node --test tests/daily-social-post.test.mjs tests/daily-social-ledger.test.mjs
       - name: Publish or preview Daily
         if: github.event_name != 'pull_request'
         run: node scripts/post-daily-social.mjs
