@@ -144,6 +144,7 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
     '@/src/api/guest': { ensureGuestSession: async () => session },
     '@/src/api/draftRun': {
       createDraftRunShare: async () => ({ id: 'a'.repeat(24) }),
+      loadDailyPeerStats: async () => ({ available: false }),
       DAILY_ENVIRONMENT_META: {
         mixed: { title: 'Draft Run', eyebrow: 'DAILY DRAFT RUN', description: '', resultTitle: 'Your Draft Run.' },
         'powered-cube': { title: 'Powered Cube', eyebrow: 'POWERED CUBE DAILY', description: '', resultTitle: 'Your Powered Cube.' },
@@ -274,6 +275,7 @@ test('a committed pick with a lost response is reconciled into feedback', async 
     '@/src/api/guest': { ensureGuestSession: async () => session },
     '@/src/api/draftRun': {
       createDraftRunShare: async () => ({ id: 'a'.repeat(24) }),
+      loadDailyPeerStats: async () => ({ available: false }),
       DAILY_ENVIRONMENT_META: {
         mixed: { title: 'Draft Run', eyebrow: 'DAILY DRAFT RUN', description: '', resultTitle: 'Your Draft Run.' },
         'powered-cube': { title: 'Powered Cube', eyebrow: 'POWERED CUBE DAILY', description: '', resultTitle: 'Your Powered Cube.' },

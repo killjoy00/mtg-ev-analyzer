@@ -1,0 +1,53 @@
+name: verify Daily peer reveal and trophy record
+
+on:
+  pull_request:
+    paths:
+      - 'draft-run.mjs'
+      - 'draft-run-product.mjs'
+      - 'draft-run.css'
+      - 'worker/daily-peer-stats.mjs'
+      - 'worker/draft-run-function.mjs'
+      - 'migrations/0059_daily_peer_stats.sql'
+      - 'migrations/manifest.json'
+      - 'mobile/app/draft-run.tsx'
+      - 'mobile/src/api/draftRun.ts'
+      - 'tests/daily-peer-stats.test.mjs'
+      - 'tests/trophy-record.test.mjs'
+      - '.github/workflows/daily-reveal-contract.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  web-and-backend:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check changed JS modules
+        run: |
+          node --check draft-run.mjs
+          node --check draft-run-product.mjs
+          node --check worker/daily-peer-stats.mjs
+          node --check worker/draft-run-function.mjs
+      - name: Test peer privacy guard and evidence-only records
+        run: node --test tests/daily-peer-stats.test.mjs tests/trophy-record.test.mjs
+  native-types:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install native dependencies
+        run: npm ci --prefix mobile --ignore-scripts --no-audit --no-fund
+      - name: Typecheck native Daily reveal
+        run: npm --prefix mobile run typecheck
