@@ -1,4 +1,4 @@
 {
   "operation": "upload-testflight-app-store-eligible",
-  "reason": "Owner-authorized Issue #984 signed iOS delivery after creator production canary run 37480643195 passed with acceptance artifact passed:true and exact-main mobile RC run 37493111484 passed on source 4844ba34cf34dd433100c52f00e79f6624d33e71. Build the binary-equivalent current-main candidate with a fresh monotonic build number, upload to TestFlight as App Store-eligible, verify processing and internal TestFlight availability, and preserve all physical-device/provider/owner App Review and public-launch gates. No public App Store release."
+  "reason": "Owner-authorized new Pack One iOS native build for merged Daily peer comparison and trophy record UI from PR #1129, main 0162a7d2c8d06f1f46f197c5283c50ca26ce3add. PR iOS archive and typecheck, mobile validation, full browser e2e and exact-main RC checks passed. Sign the current-main release candidate with a fresh App Store build number, upload for internal TestFlight evaluation only, verify accepted processing. Do not publish to the public App Store or change external beta release gates."
 }
