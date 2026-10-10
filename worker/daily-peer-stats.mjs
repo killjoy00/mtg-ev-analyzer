@@ -1,6 +1,6 @@
 // Peer comparisons are calculated only after the current player has locked
-// this exact Daily decision. We intentionally never return a count below 20.
-export const MIN_DAILY_PEERS=20;
+// this exact Daily decision. We intentionally never return a sample count or percentages below 10 completed player picks.
+export const MIN_DAILY_PEERS=10;
 
 export const DAILY_PEER_STATS_SQL=`WITH daily_decisions AS (
   SELECT DISTINCT ON (COALESCE(s.daily_account_id::text,s.player_id::text))

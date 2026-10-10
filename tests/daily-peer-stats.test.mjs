@@ -14,18 +14,22 @@ test('only owned, already committed, matching Daily decisions can be compared',(
   assert.equal(lockedDailyPeerAnswer(session,-1),null);
 });
 
-test('Daily peer comparison hides the entire sample below twenty',()=>{
-  assert.equal(MIN_DAILY_PEERS,20);
+test('Daily peer comparison hides samples below ten distinct completed picks',()=>{
+  assert.equal(MIN_DAILY_PEERS,10);
   assert.deepEqual(summarizeDailyPeers({players:'1',matching_pick:'1',trophy_pick:'1'}),{available:false});
-  assert.deepEqual(summarizeDailyPeers({players:'19',matching_pick:'19',trophy_pick:'19'}),{available:false});
+  assert.deepEqual(summarizeDailyPeers({players:'5',matching_pick:'5',trophy_pick:'5'}),{available:false});
+  assert.deepEqual(summarizeDailyPeers({players:'9',matching_pick:'9',trophy_pick:'9'}),{available:false});
   assert.deepEqual(summarizeDailyPeers({players:'NaN',matching_pick:0,trophy_pick:0}),{available:false});
 });
 
-test('Daily peer comparison rounds percentages for separate personal and trophy answers',()=>{
+test('Daily peer comparison becomes available at ten players and rounds percentages',()=>{
+  assert.deepEqual(summarizeDailyPeers({players:'10',matching_pick:'4',trophy_pick:'2'}),
+    {available:true,players:10,matching_pick_pct:40,trophy_pick_pct:20});
   assert.deepEqual(summarizeDailyPeers({players:'20',matching_pick:'8',trophy_pick:'4'}),
     {available:true,players:20,matching_pick_pct:40,trophy_pick_pct:20});
   assert.deepEqual(summarizeDailyPeers({players:22,matching_pick:9,trophy_pick:4}),
     {available:true,players:22,matching_pick_pct:41,trophy_pick_pct:18});
+  assert.deepEqual(summarizeDailyPeers({players:10,matching_pick:11,trophy_pick:1}),{available:false});
   assert.deepEqual(summarizeDailyPeers({players:20,matching_pick:21,trophy_pick:1}),{available:false});
 });
 
