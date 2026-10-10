@@ -1,6 +1,6 @@
 # Pack One mobile release configuration
 
-Updated 2026-09-25.
+Updated 2026-10-10 (CDT).
 
 Pack One uses Expo SDK and Expo Prebuild as React Native tooling, but **does not require Expo Application Services (EAS), an Expo account, or an Expo project ID** to build or release the app.
 
@@ -23,7 +23,9 @@ The `packone://` custom URL scheme remains unchanged for the current native auth
 
 ## Marketing version
 
-The first public store target is **1.0**. `mobile/app.json` is the Expo/native source version, while `mobile/store-release.json` records the intended App Store and Google Play marketing versions. Production preflight fails unless all three values match. CI additionally verifies the generated iOS `CFBundleShortVersionString` and Android `versionName` against the same store target.
+The **first public App Store/Play release target remains 1.0**, with its approval/qualification tracked in #575. TestFlight already has a newer **iOS 1.1 build 100733**; this does **not** indicate a public iOS 1.1 release or an Android 1.1 version.
+
+`mobile/app.json` still provides the Expo base `version: 1.0`. The explicit platform targets in `mobile/store-release.json` currently specify `appStoreVersion: 1.1` and `playVersionName: 1.0`. Production Expo config and CI validate **each platform against its own target**: iOS generated `CFBundleShortVersionString=1.1`, Android generated `versionName=1.0`. Never require the two platforms to share a marketing version; the base Expo value is not evidence of the signed iOS version. See [iOS 1.1 exact-build feature and release inventory](mobile-ios-1.1-testflight-inventory-2026-10-10.md).
 
 ## Native generation and local builds
 
@@ -56,7 +58,7 @@ Production/release compilation requires the normal native platform prerequisites
 - production Android identity remains `pro.packone.app`
 - no EAS project ID is required
 - the production P¹ icon exists
-- source, App Store, and Google Play marketing versions agree
+- signed/generated iOS and Android marketing versions match **their own** `mobile/store-release.json` targets, not each other
 
 ## Artwork
 
@@ -209,9 +211,9 @@ The native root layout blocks navigation only for the initial cold-start check. 
 
 ## Store publishing boundary
 
-The TestFlight and Google Play Internal publishing workflows are manual-only and their publishing jobs fail closed unless the dispatch is from `main` and the checked-out commit still equals current `origin/main`. Store status/probe workflows use the same current-main check. These jobs reference the `pack-one-mobile-release` GitHub Environment so repository owners can apply required-review / protected-branch rules at one release boundary.
+The publishing workflows run only from reviewed `main` and require their checkout to equal current `origin/main`. Uploads may be triggered **by a reviewed release-request file on main or an explicitly authorized main dispatch**, not by feature-branch PR checks. They use the `pack-one-mobile-release` Environment. Uploading a signed build to Apple **does not** itself submit App Review, create a missing App Store 1.1 version, or release publicly; uploading an Android AAB to Play's bundle library **does not** assign a track. The latest exact-build and no-track-mutation evidence is in [iOS 1.1 exact-build feature and release inventory](mobile-ios-1.1-testflight-inventory-2026-10-10.md).
 
-Before the first public release candidate, the owner still needs to configure that GitHub Environment as protected, move Apple release credentials to environment-scoped secrets (or an equivalent protected secret boundary), and narrow Google Workload Identity Federation from repo-wide trust to the same protected release context (see **Narrowing the existing provider**). The workflow checks in this repository do not by themselves change Google Cloud IAM policy.
+Current protected boundary: the `pack-one-mobile-release` Environment is main-only, and Google Workload Identity Federation has been narrowed to the repo, main ref and protected release context (verified by the [Google Play probe](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/37017937127)). The owner has **explicitly declined** re-scoping existing Apple release secrets solely for this purpose; do not relabel it as outstanding owner work absent a new decision. Repository checks alone do not substitute for the established external IAM/Environment restrictions.
 
 ## Review deadlines for deferred items
 

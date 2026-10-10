@@ -1,8 +1,8 @@
 # Pack One mobile release runbook
 
-Updated 2026-10-04 (CDT).
+Updated 2026-10-10 (CDT).
 
-This is the owner runbook for Pack One mobile releases. It covers normal releases, emergency fixes, rollback/containment, and the external release-security boundary.
+This is the owner runbook for Pack One mobile releases. It covers normal releases, emergency fixes, rollback/containment, and the external release-security boundary. For what is actually in the current TestFlight 1.1 binary, see [iOS 1.1 exact-build feature and release inventory](mobile-ios-1.1-testflight-inventory-2026-10-10.md).
 
 ## Plain-English meaning of the release-security requirement
 
@@ -34,9 +34,9 @@ This file satisfies that operational-documentation requirement.
 
 ## Versioning
 
-- User-facing marketing version is shared across iOS and Android.
-- `1.0` remains `1.0` while uploading replacement release-candidate builds.
-- Change the marketing version only for a new store version (for example `1.0.1` or `1.1`).
+- iOS and Android have **independent user-facing marketing versions**. `mobile/store-release.json` currently pins **App Store iOS 1.1** and **Google Play Android 1.0**; production generation must use the correct platform override. The Expo base version in `mobile/app.json` remains 1.0, not the effective iOS release version.
+- A replacement build within the same App Store/Play marketing version advances only the platform build number/code. Never interpret TestFlight 1.1 as an Android 1.1 rollout.
+- Change a store marketing version only for a separately intended new version (for example `1.0.1` or `1.1`).
 - iOS `CFBundleVersion` and Android `versionCode` advance for every store upload.
 - Store-aware allocators choose monotonic build numbers/codes and must remain the source of truth.
 
@@ -52,7 +52,15 @@ Before either platform's final signed candidate is uploaded:
 
 The store-free smoke proves source/build reproducibility only. It never substitutes for signed store processing or physical-device acceptance.
 
-## Pack One 1.0 release checkpoint
+## October 10 iOS 1.1 TestFlight checkpoint (not a public 1.1 release)
+
+Signed iOS 1.1 build **100733**, source `67c6d25917f3e8b632922b80c7a5479ca897af9f`, successfully uploaded to Apple and was processed `VALID` / `APP_STORE_ELIGIBLE` in [run 38075036098](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/38075036098). Owner observes it in TestFlight. The **overall workflow failed** on the separate version-attachment step because **App Store version 1.1 was not found**; its internal beta-group association was not independently proven by this finalizer. **No 1.1 App Review submission or public release** is established. Preserve the separate 1.0 review; its current state requires a fresh Apple read.
+
+Compared to reviewed main `a2cf1e139b0fffadafc1e502f6b731200e6dd6a1`, build 100733 still has the latest merged native app code; later `mobile/` edits are Android-only release tooling. It includes Beat the Creator, native About/legal/account-navigation repairs and peer-comparison UI. The **peer API route remains broken on production until #1136's backend/Cloudflare deployment**; no new native build is required for that server fix. Physical signed-device verification and store launch gates remain in #575. For the exact included/excluded feature matrix, see [iOS 1.1 exact-build feature and release inventory](mobile-ios-1.1-testflight-inventory-2026-10-10.md).
+
+Separately, Android **1.0/100740** has been uploaded to the Google Play bundle library, **not** to Internal or Closed Testing; leave the existing `production-access` closed-test track and qualification clock unchanged.
+
+## Pack One 1.0 release checkpoint (historical October 4 signed repair candidates)
 
 Earlier October 4 repair checkpoint: #910 merged as `ae70e2af79b804c137b8c289c2a1b0535e5c76dd` after native run `37232560582` passed Android/iPhone/iPad verification and image review. Exact-main RC smoke `37235554314` passed including the final manifest. Secondary return-path correction #955 passed native run `37236842723` (25 Android checks; 14 scenes plus text growth on each iPhone/iPad) and merged as `f0f30c939d1016c70f5d3548d46b0b8b3f839e79`. Fresh exact-main smoke `37239878233` passed all four stages, including the final exact-main manifest. #951 passed fresh checks and merged as `f721389d392867cc43c342c07ecddfc20c9f28f8`, with unchanged mobile and binary workflow inputs. Signed upload runs `37240960344` (iOS) and `37240960371` (Android) use that release source; upload, tester availability and physical acceptance must each be recorded separately. The October 2 builds below predate both #890 and #910 and cannot establish acceptance for those changes. Current native evidence and remaining gates are tracked in [the repair ledger](mobile-native-ux-repair-575.md) and #575.
 
@@ -62,7 +70,7 @@ Final signed binary source: `747478440400e242aae32469d6ed18f1785b591d` (protecte
 - **Android 1.0 / 100491:** signed Internal run `37247429578` accepted and committed the bundle as draft; exact-version promotion run `37249437434` reports existing `production-access`, `completed`, `committed=true`, `requiresConsoleRollout=false`, `createdTrack=false`. No rebuild, tester/country/track change or Production release.
 - **Store images:** final main-source capture `37244011193` passed every job. All 17 original Android/iPhone/iPad/membership images were individually inspected and approved. Apple replacement run `37251116289`, after processing-only fix #971, verified five iPhone, five iPad and the subscription review image after provider processing/order checks. Play run `37249880752` committed and independently verified five phone screenshots and the identical approved icon; feature graphic untouched.
 
-Original provider results and source-attributed delivery metadata are retained in [mobile-evidence/575-native-3a8244eb/README.md](mobile-evidence/575-native-3a8244eb/README.md). Prior core repair builds iOS 100500 / Android 100488 remain historical evidence and exclude #960. Physical upgrades from iOS 100415 / Android 100444 must target **100505 / 100491** now.
+Original provider results and source-attributed delivery metadata are retained in [mobile-evidence/575-native-3a8244eb/README.md](mobile-evidence/575-native-3a8244eb/README.md). Prior core repair builds iOS 100500 / Android 100488 remain historical evidence and exclude #960. Physical upgrades for the **historical October 4 repair certification** targeted iOS 100505 / Android 100491. For the current iOS 1.1 candidate use 100733, and verify Android's active closed-track code rather than presuming uploaded 100740 is installed.
 
 
 Historical distributed candidates, as of 2026-10-02:
@@ -89,12 +97,12 @@ Before an iOS candidate can be treated as release-ready:
 1. Merge application changes to reviewed current `main`.
 2. Update the TestFlight release-request file through a reviewed PR.
 3. Merge only after required CI is green.
-4. The guarded TestFlight workflow allocates a new App Store build number, signs the exact current-main revision, uploads an App Store-eligible TestFlight build, waits for App Store Connect processing, requires `VALID` + `APP_STORE_ELIGIBLE`, and attaches that exact build to the editable App Store version.
+4. The guarded TestFlight workflow allocates a new iOS build number, signs exact reviewed main and uploads to TestFlight, then **separately** verifies Apple's processing and attachment to an already-editable App Store version. **An upload can succeed while attachment fails**; do not infer a version record or public release from TestFlight visibility. Do not retrigger uploads merely to resolve a missing App Store version.
 5. Wait for Apple processing.
 6. Install that exact build on a physical iPhone.
 7. Run the physical acceptance checklist: Dailies, practice, account flows, Apple/Google/email sign-in, career/leaderboard, share, relaunch/resume, slow-network sanity, accessibility basics, deletion, upgrade continuity, and Apple Elite subscribe/restore/manage.
 8. Confirm Sign in with Apple Hide My Email delivery and Apple-confirmed account deletion/revocation. Separately exercise StoreKit Sandbox/TestFlight renewal, cancellation-at-period-end, billing grace, refund/revocation, Restore Purchases, same-account binding, wrong-account rejection, and duplicate-provider protection.
-9. In App Store Connect version 1.0, attach that exact build.
+9. In App Store Connect, **first verify that the intended version is present, editable and permitted by the state of the current 1.0 review**; attach only the explicitly selected, already-verified build. Never auto-create/submit/publish 1.1 during a 1.0 review.
 10. Fill metadata from `docs/mobile-store-submission.md`.
 11. Confirm the already-completed App Store availability setting remains **United States + Canada only** using the repo's read-only availability verifier; do not enable pre-order.
 12. Select **Manually release this version**.

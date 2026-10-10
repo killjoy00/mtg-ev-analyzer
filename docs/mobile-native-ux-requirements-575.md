@@ -1,5 +1,7 @@
 # Original native UX request: implementation and evidence cross-reference
 
+**October 10 current-build note:** The original repair evidence below refers to the older iOS 1.0/100505 checkpoint. Current iOS TestFlight **1.1/100733** includes these merged native repairs plus #1057's native legal/Account/Daily changes and #1129's peer UI. Physical/provider acceptance remains open and peer data requires pending #1136 production gateway remediation; see [iOS 1.1 exact-build feature and release inventory](mobile-ios-1.1-testflight-inventory-2026-10-10.md).
+
 This is the requirement-by-requirement companion to [the repair ledger](mobile-native-ux-repair-575.md) and [release tracker #575](https://github.com/killjoy00/mtg-ev-analyzer/issues/575). Implementation is in merged #910/#955/#960, preserving #890. “Native” below means an emulator/simulator running the app, not physical acceptance. The ledger names exact sources, devices, OS versions, text settings, artifacts and measured results.
 
 ## Reference refresh and changes since the initial snapshot
