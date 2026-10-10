@@ -51,6 +51,9 @@ try {
     assert.equal(run.selection_version,DRAFT_RUN_SELECTION_VERSION);assert.equal(run.run_length,8);
     assert.equal((await request('/v1/runs',{daily:true,environment})).id,run.id,'Daily retry must recover the same persisted run');
     assert.equal(run.current.historical_pick_id,undefined,'Unanswered API response must conceal the answer');
+    await request(`/v1/runs/${run.id}/stats?round=0`,undefined,403);
+    // Contract crosses browser first-party gateway -> real Draft worker -> local PostgreSQL.
+    // This would catch a gateway 404 and SQL errors which regex-only tests miss.
     for(let round=0;round<8;round++) {
       const body={revision:run.revision,round,puzzleId:run.current.puzzle_id,cardId:run.current.candidates[0].id};
       const other=run.current.candidates[1].id;
@@ -61,6 +64,11 @@ try {
       assert.equal(accepted[0].body.revision,body.revision+1,'Exactly one revision must be persisted');
       for(const result of accepted)assert.equal(result.body.revision,accepted[0].body.revision);
       run=await request(`/v1/runs/${run.id}`);assert.equal(run.revision,accepted[0].body.revision);
+      if(round===0){
+        const peer=await request(`/v1/runs/${run.id}/stats?round=0`);
+        assert.equal(typeof peer.available,'boolean','post-lock stats must reach SQL through the gateway');
+        await request(`/v1/runs/${run.id}/stats?round=1`,undefined,403);
+      }
       assert.equal((await request(`/v1/runs/${run.id}/pick`,body)).revision,run.revision,'An identical persisted pick must be retryable');
       await request(`/v1/runs/${run.id}/pick`,{...body,cardId:other},409);
     }
