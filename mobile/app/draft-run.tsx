@@ -293,7 +293,7 @@ function FeedbackAnalysis({
 
       {compactFeedback(answer) ? <Text style={styles.analysisLead}>{compactFeedback(answer)}</Text> : null}
       {answer.trophyRecord?.trim() ? (
-        <Text style={styles.analysisBody}>Trophy drafter {answer.trophyRecord.trim()}.</Text>
+        <Text style={styles.analysisBody}>{`Trophy drafter ${answer.trophyRecord.trim()}.`}</Text>
       ) : null}
 
       {modelLeaderName ? (
