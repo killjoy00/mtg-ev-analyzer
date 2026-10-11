@@ -43,3 +43,7 @@ unrelated typeface system.
 
 Verification includes responsive layouts at 320, 390, 768, and 1440 pixels and
 direct visual inspection of the published homepage and gameplay.
+
+## Approved My Pack One extension (not yet shipped)
+
+My Pack One will retain the current Pack One scorecard styling and expose **Stats | Insights | Account settings** as **three local tabs**, in that order. The independent Insights panel will show evidence-based pick-depth, time, format and difficulty analysis; existing Stats and Account settings remain intact. On native, this is inside My Pack One and **not a new primary bottom-navigation destination**. Charts need accessible count/uncertainty labels and the existing blue/white typography and tokens. See the [approved Insights specification](MY-PACK-ONE-INSIGHTS.md) and [implementation prompt](MY-PACK-ONE-INSIGHTS-IMPLEMENTATION-PROMPT.md). This design direction is **backlog scope, not a live feature**.
