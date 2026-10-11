@@ -83,7 +83,7 @@ try {
   // accidentally recording research data. Switch it only in this isolated
   // disposable PostgreSQL database to test the production non-QA Insights SQL.
   const insightQuery=async(text,values=[])=>pool.query({text,values,types:textTypes});
-  await insightQuery("UPDATE players SET display_name='Insights synthetic fixture' WHERE id=$1::uuid",[player.playerId]);
+  await insightQuery("UPDATE players SET display_name='Insight Tester' WHERE id=$1::uuid",[player.playerId]);
   const insightResult=await loadDraftRunInsights(insightQuery,player.playerId,{environment:'mixed',period:'all'});
   assert.equal(insightResult.unlocked,true,'Eight completed picks unlock Insights in real PostgreSQL');
   assert.ok(insightResult.eligible_decisions>=8);
