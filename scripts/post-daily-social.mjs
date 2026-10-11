@@ -227,6 +227,10 @@ export async function postDaily({
   const password=String(env.BLUESKY_APP_PASSWORD||'');
   if(Boolean(handle)!==Boolean(password))throw Error('Bluesky credentials are incomplete.');
   const {webhooks,invalid:invalidWebhooks}=discordWebhookEntries(env.DISCORD_WEBHOOK_URLS||'');
+  // Posting is opt-in: until a destination is configured the schedule is a
+  // no-op, not a daily failure. Partial or malformed configuration still fails.
+  if(event==='schedule'&&!handle&&!webhooks.length&&!invalidWebhooks.length)
+    return {day,skipped:true,reason:'no social destinations configured'};
   const imageUrl=dailyImageUrl(env.DAILY_IMAGE_URL_TEMPLATE||'',day);
   if(!live)return {day,dry_run:true,bluesky:Boolean(handle),discord_servers:webhooks.length,
     invalid_discord_entries:invalidWebhooks,image_requested:Boolean(imageUrl),text:blue.text};

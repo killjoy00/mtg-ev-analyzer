@@ -11,7 +11,7 @@ In GitHub **Settings → Secrets and variables → Actions**, configure the dest
 - Secret `PACKONE_DISCORD_WEBHOOK_URLS`: one Discord incoming webhook URL per line, supplied privately by server admins who choose to opt in. Add or remove servers by editing this secret. **Do not** expose webhooks in public forms, pull requests, issues, or source code.
 - Variable `PACKONE_DAILY_IMAGE_URL_TEMPLATE` (optional, after image feature #3 exists): a public Pack One-hosted URL template such as `https://packone.pro/daily/{date}.png`. If the image is missing, the post is text-only. Images must be PNG, JPEG, or WebP, at most 1 MB.
 
-Configure at least one destination for live publishing. A half-configured Bluesky account fails explicitly rather than posting silently to fewer destinations.
+Until at least one destination is configured, the scheduled runs succeed without posting (the job log reports `no social destinations configured`), so the workflow can stay enabled before launch. A manual live run with nothing configured fails. A half-configured Bluesky account or a malformed Discord entry fails explicitly rather than posting silently to fewer destinations.
 
 ## Verify and operate
 
