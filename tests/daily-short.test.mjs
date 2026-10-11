@@ -92,6 +92,62 @@ test('YouTube upload is resumable and the destination hostname is pinned',async(
   assert.equal(metadata.status.privacyStatus,'public');
   assert.match(calls[0].url,/uploadType=resumable/);
 });
+test('A YouTube refusal is retryable; a timeout or server error stays fail-closed',async()=>{
+  const refusal=(initStatus,putStatus)=>uploadVideo({accessToken:'fake',day,bytes:new Uint8Array(110000),
+    fetchImpl:async(url,options)=>{
+      if(options.method==='POST')return new Response(null,{status:initStatus,
+        headers:{location:'https://www.googleapis.com/upload/youtube/v3/videos?upload_id=fake'}});
+      if(putStatus==='timeout')throw Object.assign(Error('timed out'),{name:'TimeoutError'});
+      return Response.json({error:{code:putStatus}},{status:putStatus});
+    }});
+  await assert.rejects(refusal(403),e=>e.refused===true&&/initiation returned HTTP 403/.test(e.message));
+  await assert.rejects(refusal(200,400),e=>e.refused===true&&/media upload returned HTTP 400/.test(e.message));
+  await assert.rejects(refusal(200,503),e=>!e.refused,'a server error may have stored the video');
+  await assert.rejects(refusal(200,'timeout'),e=>!e.refused,'a timeout may have stored the video');
+
+  const uploader=readFileSync('scripts/upload-daily-short.mjs','utf8');
+  assert.match(uploader,/if\(error\?\.refused\)await receipts\.markFailed\(claim\)/);
+
+  const original=globalThis.fetch;
+  const writes=[];
+  let stored=null;
+  globalThis.fetch=async(url,options={})=>{
+    const method=options.method||'GET';
+    if(method==='GET')return Response.json(stored?[stored]:[]);
+    const body=JSON.parse(options.body).body;
+    writes.push({method,url:String(url),body});
+    stored={id:77,user:{login:'github-actions[bot]'},body};
+    return Response.json(stored);
+  };
+  try {
+    const receipts=await youtubeReceipt({token:'gh',day});
+    const claim=await receipts.claim();
+    assert.match(writes.at(-1).body,/\nstatus: claimed/);
+    await receipts.markFailed(claim);
+    assert.equal(writes.at(-1).method,'PATCH');
+    assert.match(writes.at(-1).url,/\/issues\/comments\/77$/);
+    assert.match(writes.at(-1).body,/^packone-daily-youtube:2026-10-10\nstatus: failed/);
+    const retry=await receipts.claim();
+    assert.equal(retry.alreadyPosted,false,'a refused upload can be retried the same day');
+    assert.match(writes.at(-1).body,/\nstatus: claimed/);
+  } finally {globalThis.fetch=original;}
+});
+
+test('The recording guest is named as QA traffic so production metrics exclude it',()=>{
+  const capture=readFileSync('scripts/record-daily-short.mjs','utf8');
+  const name=capture.match(/QA_PLAYER_NAME='([^']+)'/)?.[1];
+  assert.equal(name,'QA Daily Short');
+  assert.match(capture,/addInitScript\(name=>\{try\{localStorage\.setItem\('pack1-player-name-v1',name\);\}catch\{\}\},QA_PLAYER_NAME\)/);
+  assert.ok(capture.indexOf('addInitScript(')<capture.indexOf('const warm=await context.newPage()'),
+    'the name must be set before the first page creates the guest session');
+  assert.match(readFileSync('growth-api.mjs','utf8'),/const NAME_KEY = 'pack1-player-name-v1';/);
+  // Mirror of the server's QA display-name rule for new Daily sessions.
+  const server=readFileSync('worker/draft-run-function.mjs','utf8');
+  const rule=server.match(/display_name ~\* '([^']+)' FROM players/)?.[1];
+  assert.ok(rule,'server QA display-name rule not found');
+  assert.match(name,new RegExp(rule,'i'));
+});
+
 test('Receipt supports posted dedupe and blocks uncertain duplicate YouTube upload',async()=>{
   // The ledger uses GitHub's existing issue #1135 and only trusts github-actions[bot].
   const workflow=readFileSync('.github/workflows/daily-youtube-short.yml','utf8');

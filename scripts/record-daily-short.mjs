@@ -15,6 +15,7 @@ import {renderBrandedFrames} from './render-daily-short-brand.mjs';
 const execFileAsync=promisify(execFile);
 const FRAME={width:540,height:960}; // Native 9:16 phone viewport, three real card columns.
 const ARTIFACT_DIR='artifacts/daily-short';
+export const QA_PLAYER_NAME='QA Daily Short';
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
 async function imagesReady(page,count) {
@@ -155,6 +156,9 @@ export async function recordDaily() {
     browser=await chromium.launch({headless:true});
     context=await browser.newContext({viewport:FRAME,deviceScaleFactor:1,locale:'en-US',
       timezoneId:'America/Los_Angeles',colorScheme:'light',recordVideo:{dir:temp,size:FRAME}});
+    // A "QA" guest name marks this automated Daily as QA traffic, so admin
+    // metrics, measurements and leaderboards exclude it like other prod checks.
+    await context.addInitScript(name=>{try{localStorage.setItem('pack1-player-name-v1',name);}catch{}},QA_PLAYER_NAME);
     // Warm the original site, guest session and every real card asset before recording.
     const warm=await context.newPage();
     let manifest;

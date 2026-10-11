@@ -50,6 +50,9 @@ export async function youtubeReceipt({token,day}) {
       const created=await issueApi(token,`/issues/${LEDGER}/comments`,{method:'POST',body:{body:receiptBody(day,'claimed')}});
       return {id:created.id,alreadyPosted:false};
     },
+    async markFailed(claim) {
+      await issueApi(token,`/issues/comments/${claim.id}`,{method:'PATCH',body:{body:receiptBody(day,'failed')}});
+    },
     async markPosted(claim,videoId) {
       if(!/^[A-Za-z0-9_-]{11}$/.test(videoId))throw Error('YouTube returned invalid video ID.');
       await issueApi(token,`/issues/comments/${claim.id}`,{method:'PATCH',body:{body:receiptBody(day,'posted',videoId)}});
@@ -82,7 +85,8 @@ export async function uploadVideo({accessToken,day,bytes,fetchImpl=fetch}) {
       'x-upload-content-type':'video/mp4','x-upload-content-length':String(bytes.length)},
     body:JSON.stringify(shortMetadata(day)),signal:AbortSignal.timeout(FETCH_TIMEOUT),
   });
-  if(!initial.ok)throw Error(`YouTube upload initiation returned HTTP ${initial.status}.`);
+  // An HTTP refusal means YouTube created nothing, so the day can be retried.
+  if(!initial.ok)throw Object.assign(Error(`YouTube upload initiation returned HTTP ${initial.status}.`),{refused:true});
   const uploadUrl=checkedUploadLocation(initial.headers.get('location'));
   // Once the bytes request starts, timeouts/errors can mean YouTube actually
   // accepted the upload; the claimed receipt intentionally blocks all retries.
@@ -90,6 +94,8 @@ export async function uploadVideo({accessToken,day,bytes,fetchImpl=fetch}) {
     method:'PUT',headers:{'content-type':'video/mp4','content-length':String(bytes.length)},
     body:bytes,signal:AbortSignal.timeout(150_000),
   });
+  if(done.status>=400&&done.status<500)
+    throw Object.assign(Error(`YouTube media upload returned HTTP ${done.status}.`),{refused:true});
   const video=await readJson(done,'YouTube media upload');
   if(!/^[A-Za-z0-9_-]{11}$/.test(video?.id||''))throw Error('YouTube upload lacks a video ID.');
   return {id:video.id,visibility:video.status?.privacyStatus||null};
@@ -115,7 +121,13 @@ export async function main() {
   if(claim.alreadyPosted){console.log(JSON.stringify({day,already_posted:true}));return;}
   // Fail-closed on any ambiguous failure, including a successful upload whose
   // receipt PATCH fails. Reconciliation is required before the next attempt.
-  const uploaded=await uploadVideo({accessToken:token,day,bytes});
+  // Only an explicit YouTube refusal marks the receipt failed for a retry.
+  let uploaded;
+  try {uploaded=await uploadVideo({accessToken:token,day,bytes});}
+  catch(error) {
+    if(error?.refused)await receipts.markFailed(claim).catch(()=>{});
+    throw error;
+  }
   await receipts.markPosted(claim,uploaded.id);
   console.log(JSON.stringify({day,posted:true,video_url:`https://youtu.be/${uploaded.id}`,
     api_visibility:uploaded.visibility,requested_visibility:'public'}));
