@@ -1,5 +1,6 @@
 // Morning Pack One distribution. Node 22+, built-in fetch only.
 // Never print session tokens, app passwords, or Discord webhook URLs.
+import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {createGithubReceiptLedger,discordReceiptKey} from './daily-social-ledger.mjs';
 
@@ -7,6 +8,9 @@ const SITE='https://packone.pro';
 const DAILY_URL=SITE+'/?game=draft-run&daily=1';
 const PACIFIC='America/Los_Angeles';
 const MAX_IMAGE_BYTES=1_000_000;
+// The site's existing share banner, centered on its own background at the
+// 1200x630 shape Bluesky crops link-card images to, so nothing is cut off.
+export const LINK_CARD_IMAGE=new URL('../social-card-v1.png',import.meta.url);
 
 export function pacificClock(now=new Date()) {
   const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{
@@ -23,11 +27,14 @@ export function dailyCopy(day,channel='bluesky') {
     .format(new Date(day+'T12:00:00Z'));
   // One stable campaign so launch reports group every Daily post together.
   const url=DAILY_URL+'&utm_source='+channel+'&utm_medium=social&utm_campaign=daily_post';
+  // Bluesky shows post text verbatim, so it gets a short link label that
+  // still points at the tracked URL. Discord unfurls the raw link itself.
+  const linkText=channel==='bluesky'?'packone.pro':url;
   const text='Pack One Daily · '+title+'\n\n'+
     'Three new MTG draft challenges: Draft Run, Powered Cube and Latest Set. '+
-    'Make your picks, then compare with the trophy drafter.\n\n'+url;
+    'Make your picks, then compare with the trophy drafter.\n\n'+linkText;
   if([...text].length>300)throw Error('Bluesky Daily copy exceeds 300 characters.');
-  return {text,url};
+  return {text,url,linkText};
 }
 
 // app.bsky.feed.post has a tid record-key Lexicon. Use one valid, stable,
@@ -48,13 +55,13 @@ export function blueskyDailyRkey(day) {
   return tid;
 }
 
-export function blueskyLinkFacets(text,url) {
-  const index=text.indexOf(url);
+export function blueskyLinkFacets(text,url,linkText=url) {
+  const index=text.lastIndexOf(linkText);
   if(index<0)throw Error('Daily link is missing from the post.');
   return [{
     index:{
       byteStart:Buffer.byteLength(text.slice(0,index),'utf8'),
-      byteEnd:Buffer.byteLength(text.slice(0,index+url.length),'utf8'),
+      byteEnd:Buffer.byteLength(text.slice(0,index+linkText.length),'utf8'),
     },
     features:[{$type:'app.bsky.richtext.facet#link',uri:url}],
   }];
@@ -118,29 +125,20 @@ async function maybeDailyImage(fetchImpl,url) {
   } catch {return null;} // Text-only posting must always remain possible.
 }
 
-export async function blueskyPublish(fetchImpl,{handle,password,day,text,url,image}) {
+export async function linkCardImage(path=LINK_CARD_IMAGE) {
+  try {
+    const bytes=new Uint8Array(await readFile(path));
+    return bytes.length&&bytes.byteLength<=MAX_IMAGE_BYTES?{bytes,type:'image/png'}:null;
+  } catch {return null;}
+}
+
+export async function blueskyPublish(fetchImpl,{handle,password,day,text,url,linkText=url,image,cardImage=null}) {
   const session=await responseJson(fetchImpl,'https://bsky.social/xrpc/com.atproto.server.createSession',{
     method:'POST',headers:{'content-type':'application/json'},
     body:JSON.stringify({identifier:handle,password}),
   },'Bluesky login');
   if(!session?.accessJwt||!session.did)throw Error('Bluesky login returned no session.');
   const auth={'authorization':'Bearer '+session.accessJwt};
-  let embed={$type:'app.bsky.embed.external',external:{uri:url,title:'Pack One Daily',
-    description:'Three daily Magic: The Gathering draft challenges.'}};
-  if(image) {
-    const blob=await responseJson(fetchImpl,'https://bsky.social/xrpc/com.atproto.repo.uploadBlob',{
-      method:'POST',headers:{...auth,'content-type':image.type},body:image.bytes,
-    },'Bluesky image upload');
-    if(!blob?.blob)throw Error('Bluesky upload returned no blob.');
-    embed={$type:'app.bsky.embed.images',images:[{alt:'Pack One Daily draft challenge',image:blob.blob}]};
-  }
-  const record={
-    $type:'app.bsky.feed.post',
-    text,
-    createdAt:new Date().toISOString(),
-    facets:blueskyLinkFacets(text,url),
-    ...(embed?{embed}:{}),
-  };
   const rkey=blueskyDailyRkey(day);
   const getUrl=new URL('https://bsky.social/xrpc/com.atproto.repo.getRecord');
   getUrl.searchParams.set('repo',session.did);
@@ -161,6 +159,31 @@ export async function blueskyPublish(fetchImpl,{handle,password,day,text,url,ima
     return true;
   }
   if(await alreadyPosted())return 'already-posted';
+  const uploadBlob=(file,label)=>responseJson(fetchImpl,'https://bsky.social/xrpc/com.atproto.repo.uploadBlob',{
+    method:'POST',headers:{...auth,'content-type':file.type},body:file.bytes,
+  },label);
+  const external={uri:url,title:'Pack One Daily',
+    description:'Three daily Magic: The Gathering draft challenges.'};
+  if(!image&&cardImage) {
+    // The banner is decoration: a failed upload still posts the link card.
+    try {
+      const blob=await uploadBlob(cardImage,'Bluesky link card upload');
+      if(blob?.blob)external.thumb=blob.blob;
+    } catch {}
+  }
+  let embed={$type:'app.bsky.embed.external',external};
+  if(image) {
+    const blob=await uploadBlob(image,'Bluesky image upload');
+    if(!blob?.blob)throw Error('Bluesky upload returned no blob.');
+    embed={$type:'app.bsky.embed.images',images:[{alt:'Pack One Daily draft challenge',image:blob.blob}]};
+  }
+  const record={
+    $type:'app.bsky.feed.post',
+    text,
+    createdAt:new Date().toISOString(),
+    facets:blueskyLinkFacets(text,url,linkText),
+    embed,
+  };
   const response=await fetchImpl('https://bsky.social/xrpc/com.atproto.repo.createRecord',{
     method:'POST',
     headers:{...auth,'content-type':'application/json'},
@@ -207,7 +230,7 @@ export async function discordPublish(fetchImpl,webhook,{text,image},{
 }
 
 export async function postDaily({
-  env=process.env,now=new Date(),scheduledAt=now,fetchImpl=fetch,ledger=null,
+  env=process.env,now=new Date(),scheduledAt=now,fetchImpl=fetch,ledger=null,cardImagePath=LINK_CARD_IMAGE,
 }={}) {
   const event=env.GITHUB_EVENT_NAME||'workflow_dispatch';
   const triggered=pacificClock(event==='schedule'?scheduledAt:now);
@@ -242,8 +265,9 @@ export async function postDaily({
   }):null);
   const image=await maybeDailyImage(fetchImpl,imageUrl);
   const jobs=[];
+  const cardImage=handle&&!image?await linkCardImage(cardImagePath):null;
   if(handle)jobs.push({label:'Bluesky',run:()=>blueskyPublish(fetchImpl,
-    {handle,password,day,text:blue.text,url:blue.url,image})});
+    {handle,password,day,text:blue.text,url:blue.url,linkText:blue.linkText,image,cardImage})});
   for(const [index,webhook] of webhooks.entries())
     jobs.push({label:'Discord server '+(index+1),run:async()=>{
       const channel=discordReceiptKey(webhook);

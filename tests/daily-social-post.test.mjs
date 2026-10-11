@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {
   pacificClock,dailyCopy,blueskyLinkFacets,blueskyDailyRkey,discordWebhookList,discordWebhookEntries,dailyImageUrl,
-  postDaily,blueskyPublish,discordPublish,
+  postDaily,blueskyPublish,discordPublish,linkCardImage,
 } from '../scripts/post-daily-social.mjs';
 
 const summer=new Date('2026-07-10T15:10:00Z');
@@ -47,16 +47,21 @@ test('Pacific clock handles daylight and standard time',()=>{
 test('Daily copy includes separate campaign attribution and UTF-8 facets',()=>{
   const blue=dailyCopy('2026-10-10','bluesky');
   const discord=dailyCopy('2026-10-10','discord');
-  for(const {text,url} of [blue,discord]) {
+  for(const {text,url,linkText} of [blue,discord]) {
     assert.match(text,/Powered Cube and Latest Set/);
     assert.match(url,/https:\/\/packone\.pro\/\?game=draft-run&daily=1/);
     assert.match(url,/utm_medium=social/);
     assert.match(text,/Pack One Daily/);
     assert.ok([...text].length<=300);
-    const facet=blueskyLinkFacets(text,url)[0];
-    assert.equal(facet.index.byteStart,Buffer.byteLength(text.slice(0,text.indexOf(url))));
-    assert.equal(facet.index.byteEnd-facet.index.byteStart,Buffer.byteLength(url));
+    assert.ok(text.endsWith('\n\n'+linkText));
+    const facet=blueskyLinkFacets(text,url,linkText)[0];
+    assert.equal(facet.index.byteStart,Buffer.byteLength(text.slice(0,text.lastIndexOf(linkText))));
+    assert.equal(facet.index.byteEnd-facet.index.byteStart,Buffer.byteLength(linkText));
+    assert.equal(facet.features[0].uri,url,'the link always opens the tracked URL');
   }
+  assert.equal(blue.linkText,'packone.pro','Bluesky shows a short link label instead of the tracking URL');
+  assert.doesNotMatch(blue.text,/utm_/);
+  assert.equal(discord.linkText,discord.url,'Discord unfurls the raw link');
   assert.match(blue.url,/utm_source=bluesky/);
   assert.match(discord.url,/utm_source=discord/);
   assert.notEqual(blue.url,discord.url);
@@ -142,17 +147,23 @@ test('Bluesky uses a valid TID, external link card and one Discord no-mention po
       return Response.json({did:'did:plc:abc',accessJwt:'sensitive_jwt'});
     if(dest.includes('com.atproto.repo.getRecord'))
       return Response.json({error:'RecordNotFound'},{status:400});
+    if(dest.endsWith('com.atproto.repo.uploadBlob'))
+      return Response.json({blob:cardBlob});
     if(dest.endsWith('com.atproto.repo.createRecord'))
       return Response.json({uri:'at://did:plc:abc/app.bsky.feed.post/'+blueskyDailyRkey('2026-07-10')});
     if(dest.startsWith('https://discord.com/api/webhooks/'))
       return Response.json({id:'123'});
     throw Error('Unexpected API endpoint.');
   };
+  const cardBlob={$type:'blob',ref:{$link:'bafkreicard'},mimeType:'image/png',size:19330};
   const result=await postDaily({now:summer,fetchImpl,ledger:memoryLedger(),env:{
     ...liveEnv,BLUESKY_HANDLE:'packone.bsky.social',BLUESKY_APP_PASSWORD:'test_app_password',
   }});
   assert.equal(result.posted,2);
-  assert.equal(requests.length,4);
+  assert.equal(requests.length,5);
+  const upload=requests.find(r=>r.url.endsWith('com.atproto.repo.uploadBlob'));
+  assert.equal(upload.options.headers['content-type'],'image/png');
+  assert.deepEqual([...upload.options.body.slice(0,4)],[0x89,0x50,0x4e,0x47],'uploads the PNG banner bytes');
   const recordCall=requests.find(r=>r.url.endsWith('com.atproto.repo.createRecord'));
   assert.ok(recordCall);
   const record=JSON.parse(recordCall.options.body);
@@ -160,6 +171,9 @@ test('Bluesky uses a valid TID, external link card and one Discord no-mention po
   assert.equal(record.record.$type,'app.bsky.feed.post');
   assert.equal(record.record.facets[0].features[0].uri,dailyCopy('2026-07-10','bluesky').url);
   assert.equal(record.record.embed.$type,'app.bsky.embed.external');
+  assert.deepEqual(record.record.embed.external.thumb,cardBlob,'the link card shows the share banner');
+  assert.equal(record.record.embed.external.uri,dailyCopy('2026-07-10','bluesky').url);
+  assert.ok(record.record.text.endsWith('\n\npackone.pro'));
   const discordCall=requests.find(r=>r.url.startsWith('https://discord.com/api/webhooks/'));
   const discord=JSON.parse(discordCall.options.body);
   assert.deepEqual(discord.allowed_mentions,{parse:[]});
@@ -175,13 +189,34 @@ test('Bluesky retry checks the existing record before posting a second time',asy
       return Response.json({did:'did:plc:abc',accessJwt:'jwt'});
     if(String(url).includes('getRecord'))
       return Response.json({value:{text:copy.text,
-        facets:blueskyLinkFacets(copy.text,copy.url)}});
+        facets:blueskyLinkFacets(copy.text,copy.url,copy.linkText)}});
     posts++;
     return Response.json({uri:'unexpected'});
   },{handle:'x.bsky.social',password:'secret',day:'2026-10-10',
     ...copy,image:null});
   assert.equal(result,'already-posted');
   assert.equal(posts,0);
+});
+
+test('the link card banner is the 1200x630 share card, and a failed upload still posts the card',async()=>{
+  const card=await linkCardImage();
+  assert.equal(card.type,'image/png');
+  assert.ok(card.bytes.byteLength<1_000_000);
+  const view=new DataView(card.bytes.buffer,card.bytes.byteOffset);
+  assert.deepEqual([view.getUint32(16),view.getUint32(20)],[1200,630],'Bluesky crops link cards to 1200x630');
+  assert.equal(await linkCardImage(new URL('file:///nonexistent/card.png')),null);
+
+  let record;
+  const result=await blueskyPublish(async(url,options)=>{
+    if(String(url).includes('createSession'))return Response.json({did:'did:plc:abc',accessJwt:'jwt'});
+    if(String(url).includes('getRecord'))return Response.json({error:'RecordNotFound'},{status:400});
+    if(String(url).includes('uploadBlob'))return Response.json({error:'InternalServerError'},{status:500});
+    record=JSON.parse(options.body).record;
+    return Response.json({uri:'at://x'});
+  },{handle:'x.bsky.social',password:'secret',day:'2026-10-10',...dailyCopy('2026-10-10'),image:null,cardImage:card});
+  assert.equal(result,'posted');
+  assert.equal(record.embed.$type,'app.bsky.embed.external');
+  assert.equal(record.embed.external.thumb,undefined);
 });
 
 test('Bluesky does not silently accept arbitrary HTTP 400 errors as duplicates',async()=>{
