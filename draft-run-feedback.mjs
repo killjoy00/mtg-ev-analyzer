@@ -1,10 +1,15 @@
 import { escapeHtml as esc } from './html.mjs';
 
 export function trophyRevealSentence(answer) {
+  if(answer?.historicalMatch)return 'You matched the trophy drafter.';
+  return `The trophy drafter took ${answer?.historicalName||'another card'}.`;
+}
+
+// Keep source-drafter background behind the post-pick score explanation, not
+// in the primary decision headline. The record is unrelated to card win rate.
+export function trophyDrafterDetails(answer) {
   const record=String(answer?.trophyRecord||'').trim();
-  if(answer?.historicalMatch)
-    return `You matched the trophy drafter${record?`, who ${record}`:''}.`;
-  return `The trophy drafter took ${answer?.historicalName||'another card'}${record?` and ${record}`:''}.`;
+  return record?`<p class="run-trophy-record">Trophy drafter ${esc(record)}.</p>`:'';
 }
 
 export function compactDraftRunFeedback(answer) {
