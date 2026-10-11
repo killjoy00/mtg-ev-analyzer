@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {fixturePool,postgresTransport,SQL_CONNECTION,textTypes} from './support/postgres-fixture.mjs';
 import {gateway} from '../edge/gateway.mjs';
 import {DRAFT_RUN_SELECTION_VERSION} from '../draft-run-policy.mjs';
+import {loadDraftRunInsights} from '../worker/draft-run-insights.mjs';
 const pool=fixturePool(),sql=postgresTransport(pool);
 const secret='a'.repeat(64),cookies=new Map(),memory=new Map();
 process.env.DATABASE_URL=SQL_CONNECTION;
@@ -78,4 +79,21 @@ try {
     assert.equal(result.rows[0].n,'1','Completion and retry must persist exactly one result');
     console.log('Real client/gateway/worker/PostgreSQL contract passed: '+environment);
   }
+  // The existing fixture player has a QA-prefixed display name to avoid
+  // accidentally recording research data. Switch it only in this isolated
+  // disposable PostgreSQL database to test the production non-QA Insights SQL.
+  const insightQuery=async(text,values=[])=>pool.query({text,values,types:textTypes});
+  await insightQuery("UPDATE players SET display_name='Insights synthetic fixture' WHERE id=$1::uuid",[player.playerId]);
+  const insightResult=await loadDraftRunInsights(insightQuery,player.playerId,{environment:'mixed',period:'all'});
+  assert.equal(insightResult.unlocked,true,'Eight completed picks unlock Insights in real PostgreSQL');
+  assert.ok(insightResult.eligible_decisions>=8);
+  assert.equal(insightResult.formats.length,3);
+  assert.ok(insightResult.pick_depth.length>0,'Real source pick numbers survive joins');
+  assert.ok(insightResult.difficulty.some(d=>d.count>0),'Real rated puzzle difficulty joins');
+  assert.equal(insightResult.months.reduce((n,row)=>n+row.count,0),insightResult.eligible_decisions);
+  const inaccessible=await fetch('https://api-preview.packone.pro/growth/v1/profile/insights?environment=mixed');
+  assert.equal(inaccessible.status,401,'Guest player cookie cannot authorize private Insights');
+  const noMobileAuth=await fetch('https://api-preview.packone.pro/growth/v1/mobile/profile/insights?environment=mixed');
+  assert.notEqual(noMobileAuth.status,200,'Missing native account token denies private Insights');
+  console.log('Real PostgreSQL Insights SQL, filtering and private-API denial contract passed.');
 } finally {await pool.end();}
