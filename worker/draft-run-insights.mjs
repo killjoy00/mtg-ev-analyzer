@@ -48,8 +48,12 @@ function normalise(rows) {
   const seen=new Set(),answers=[];
   // Query is ascending by locked-answer time, so the first occurrence wins,
   // even if it came from a now-merged practice/creator/duplicate Daily.
-  const sorted=[...rows].sort((a,b)=>String(a.answered_at).localeCompare(String(b.answered_at))||
-    String(a.session_id).localeCompare(String(b.session_id)));
+  const sorted=[...rows].sort((a,b)=>{
+    const t=x=>x.answered_at==null?Infinity:new Date(x.answered_at).getTime();
+    const ta=t(a),tb=t(b);
+    return (Number.isFinite(ta)?ta:Infinity)-(Number.isFinite(tb)?tb:Infinity)||
+      String(a.session_id).localeCompare(String(b.session_id));
+  });
   for(const row of sorted){
     const id=String(row.puzzle_id||'');
     const score=Number(row.score),pick=Number(row.pick_number),when=row.answered_at==null?NaN:new Date(row.answered_at).getTime();
@@ -94,6 +98,7 @@ export function aggregateDraftRunInsights(source,{environment='mixed',period='al
   const difficulty=BANDS.map(band=>({band,...countSummary(selected.filter(r=>r.difficulty_band===band))}))
     .filter(row=>row.count>0);
   const months=grouped(selected,row=>monthKey(row.answered_at),INSIGHTS_MONTH_MIN)
+    .filter(row=>row.count>=INSIGHTS_MONTH_MIN)
     .sort((a,b)=>a.value.localeCompare(b.value))
     .map(({value,...rest})=>({month:value,...rest}));
   const formats=INSIGHTS_ENVIRONMENTS.map(value=>({environment:value,label:LABELS[value],
