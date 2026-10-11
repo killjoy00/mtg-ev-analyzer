@@ -14,7 +14,9 @@ const env={MODE:'preview',NEON_BRANCH_ID:'br-ci-fixture',QUOTA_KEY:secret,PREVIE
 globalThis.window={PACK1_API:{growthUrl:'https://api-preview.packone.pro/growth',draftRunUrl:'https://api-preview.packone.pro/draft',firstParty:true}};
 globalThis.document={cookie:''};
 globalThis.localStorage={getItem:key=>memory.get(key)||null,setItem:(key,value)=>memory.set(key,value),removeItem:key=>memory.delete(key)};
-memory.set('pack1-player-name-v1','QA wire contract');
+// Non-QA synthetic player is necessary to exercise the real Insights eligibility path.
+// This client/gateway/PostgreSQL fixture is disposable and cannot hit production.
+memory.set('pack1-player-name-v1','Insight Tester');
 globalThis.fetch=async(url,options={})=>{
   if(String(url)==='https://api.us-east-2.aws.neon.tech/sql')return sql(url,options);
   const target=new URL(url);
@@ -79,11 +81,9 @@ try {
     assert.equal(result.rows[0].n,'1','Completion and retry must persist exactly one result');
     console.log('Real client/gateway/worker/PostgreSQL contract passed: '+environment);
   }
-  // The existing fixture player has a QA-prefixed display name to avoid
-  // accidentally recording research data. Switch it only in this isolated
-  // disposable PostgreSQL database to test the production non-QA Insights SQL.
+  // In the isolated fixture this player was non-QA at session creation,
+  // so the immutable per-run measurement_qa flag correctly remains false.
   const insightQuery=async(text,values=[])=>pool.query({text,values,types:textTypes});
-  await insightQuery("UPDATE players SET display_name='Insight Tester' WHERE id=$1::uuid",[player.playerId]);
   const insightResult=await loadDraftRunInsights(insightQuery,player.playerId,{environment:'mixed',period:'all'});
   assert.equal(insightResult.unlocked,true,'Eight completed picks unlock Insights in real PostgreSQL');
   assert.ok(insightResult.eligible_decisions>=8);
