@@ -98,7 +98,9 @@ test('Receipt supports posted dedupe and blocks uncertain duplicate YouTube uplo
   assert.match(workflow,/issues: write/);
   assert.match(workflow,/needs.record.outputs.recorded == 'true'/);
   assert.match(workflow,/github.ref == 'refs\/heads\/main'/);
-  assert.match(workflow,/vars.PACKONE_YOUTUBE_UPLOAD_ENABLED == 'true'/);
+  assert.match(workflow,/vars\.PACKONE_YOUTUBE_UPLOAD_PAUSED != 'true'/);
+  assert.doesNotMatch(workflow,/vars\.PACKONE_YOUTUBE_UPLOAD_ENABLED/);
+  assert.match(workflow,/inputs\.publish == true/);
   assert.match(workflow,/retention-days: 5/);
   const capture=readFileSync('scripts/record-daily-short.mjs','utf8');
   assert.match(capture,/\.run-cards \.run-card-select img/);
