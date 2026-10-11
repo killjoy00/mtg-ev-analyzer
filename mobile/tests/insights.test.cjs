@@ -68,7 +68,7 @@ async function mount(t,{initial=session(),respond=async (_s,env)=>fixture(env)}=
   await act(async()=>{await flush();});
   t.after(async()=>{await act(async()=>root.unmount());});
   return {
-    root,calls,routes,text:()=>labels(root.toJSON()),
+    root,calls,routes,text:()=>labels(root.toJSON()).replace(/\s+/g,' ').trim(),
     async choose(label){
       const button=root.root.findAll(n=>n.type==='Pressable'&&(n.props.accessibilityLabel===label||labels(n)===label))[0];
       assert.ok(button,'Missing Insights button: '+label);
