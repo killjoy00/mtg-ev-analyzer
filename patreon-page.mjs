@@ -49,7 +49,7 @@ async function renderMembershipState() {
     action.disabled=false;
     action.onclick=async()=>{
       action.disabled=true;
-      const { beginEliteUpgrade }=await import('/growth.mjs?v=7');
+      const { beginEliteUpgrade }=await import('/growth.mjs?v=10');
       await beginEliteUpgrade({source:'patreon_landing'});
     };
     setStatus('Sign in or create a free Pack One account to connect membership and keep Elite access with the right player record.',{state:'signed-out',heading:'Sign in to check your access'});
