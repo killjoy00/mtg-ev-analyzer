@@ -9,6 +9,7 @@ import {achievementMark} from './achievement-icons.mjs';
 import { compactDraftRunFeedback, consensusFeedback, trophyRevealSentence } from './draft-run-feedback.mjs?v=2';
 import { tcgplayerUrl } from './tcgplayer.mjs';
 import { dailyResetCue } from './game-date.mjs';
+import {nextUnfinishedDaily} from './today-status.mjs';
 
 const base = () => String(window.PACK1_API?.draftRunUrl||'').replace(/\/$/,'');
 const webClientBuild=()=>new URL(import.meta.url).searchParams.get('v')||null;
@@ -295,6 +296,18 @@ async function renderDailyResultCue(resultId) {
   cue.className='post-game-daily-cue';
   cue.textContent=`${dailyResetCue()}${streak>=2?` · ${streak}-day streak`:''}`;
   root.append(cue);
+  // Only an authoritative, current-day history can turn the fallback home link
+  // into a direct next Daily. Failed or delayed status leaves navigation safe.
+  const next=nextUnfinishedDaily(status,{completedDay:run.day,completedEnvironment:run.environment});
+  if(next) {
+    const page=root.closest('.run-result-page');
+    const primary=page?.querySelector('[data-next-daily-action]');
+    if(primary) {
+      primary.href=next.href;
+      primary.textContent=next.label;
+      page.querySelector('[data-all-dailies]')?.removeAttribute('hidden');
+    }
+  }
 }
 function renderResult() {
   document.body.classList.remove('is-game');
@@ -312,7 +325,8 @@ function renderResult() {
     ${rankingStateMarkup(run)}
     ${run.comparison&&run.comparison.kind!=='creator'?`<p class="run-friend">${run.comparison.exact?`You: ${run.score} · ${esc(run.comparison.name)}: ${run.comparison.score}`:'These scores came from different decisions.'}</p>`:''}
     ${creator?.creator_post_run_note?`<blockquote class="run-friend"><strong>${esc(creator.name)} after the run:</strong> “${esc(creator.creator_post_run_note)}”</blockquote>`:''}
-    <div class="run-result-actions"><a class="button primary" href="${repeat.href}">${repeat.label}</a><button class="button secondary" id="run-share">${run.day?'Share result':'Share this run and compare'}</button><a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">${run.day&&!run.leaderboard_eligible?(['username_taken','username_required','name_not_allowed'].includes(run.ranking_identity?.reason)?'Choose display name to add score':hasAccountSession()?'Add score to leaderboard':'Sign in to add score'):'View your career'}</button></div>
+    <div class="run-result-actions"><a class="button primary" data-next-daily-action href="${repeat.href}">${repeat.label}</a><button class="button secondary" id="run-share">${run.day?'Share result':'Share this run and compare'}</button><a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">${run.day&&!run.leaderboard_eligible?(['username_taken','username_required','name_not_allowed'].includes(run.ranking_identity?.reason)?'Choose display name to add score':hasAccountSession()?'Add score to leaderboard':'Sign in to add score'):'View your career'}</button></div>
+    ${run.day?'<p data-all-dailies hidden><a class="text-button" href="./">All Dailies</a></p>':''}
     <h2>Your ${runLength()} picks</h2><ol class="run-review-list">${run.answers.map((a,i)=>`<li><button data-review="${i}"><span>${i+1}</span><div><strong>${esc(setName(a.puzzle.set_id))} · Pick ${a.pickNumber}</strong><small>${esc(a.selectedName)}${a.historicalMatch?' · Trophy match':''}</small></div><b>${a.score}</b></button></li>`).join('')}</ol>
     <p class="run-note">Your final score is the rounded average of ${runLength()} decisions. Trophy picks earn 100; other picks can earn up to 95 based on broader drafting evidence.</p><p id="run-share-status" role="status"></p><p id="run-error" role="alert"></p></section>`;
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render();window.scrollTo({top:0,behavior:'instant'});});
