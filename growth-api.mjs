@@ -226,6 +226,10 @@ export async function loadDailyStatus() {
 }
 
 export async function loadMyProfile(){return api('/v1/profile/me',{auth:true});}
+export async function loadMyInsights({environment='mixed',period='all'}={}) {
+  const query=new URLSearchParams({environment,period});
+  return api('/v1/profile/insights?'+query.toString(),{auth:true});
+}
 export async function loadPublicProfile(profileKey){return api(`/v1/profile/${encodeURIComponent(profileKey)}`,{auth:false});}
 export async function updateProfile({displayName,profilePublic,favoriteSetId,showcaseAchievement,acceptPublicIdentityTerms}={}) {
   const body={};
