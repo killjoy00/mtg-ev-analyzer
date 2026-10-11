@@ -1,22 +1,31 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {compactDraftRunFeedback,consensusFeedback,trophyRevealSentence} from '../draft-run-feedback.mjs';
+import {compactDraftRunFeedback,consensusFeedback,trophyDrafterDetails,trophyRevealSentence} from '../draft-run-feedback.mjs';
 import {draftRunShareText} from '../share-cards.mjs';
 import {escapeHtml} from '../html.mjs';
 
-test('trophy reveal headlines use complete sentences and attribute the match record to the drafter',()=>{
- const match={historicalMatch:true,historicalName:'Lightning Bolt',trophyRecord:'won 7 matches'};
- assert.equal(trophyRevealSentence(match),'You matched the trophy drafter, who won 7 matches.');
- assert.equal(trophyRevealSentence({...match,trophyRecord:'went 7–1'}),'You matched the trophy drafter, who went 7–1.');
+test('trophy reveal headlines name the pick only, regardless of source-drafter evidence',()=>{
+ const match={historicalMatch:true,historicalName:'Lightning Bolt',trophyRecord:'has a 62% win rate'};
+ assert.equal(trophyRevealSentence(match),'You matched the trophy drafter.');
+ assert.equal(trophyRevealSentence({...match,trophyRecord:'went 7–1'}),'You matched the trophy drafter.');
  assert.equal(trophyRevealSentence({...match,trophyRecord:null}),'You matched the trophy drafter.');
  const different={...match,historicalMatch:false};
- assert.equal(trophyRevealSentence(different),'The trophy drafter took Lightning Bolt and won 7 matches.');
- assert.equal(trophyRevealSentence({...different,trophyRecord:'went 7–1'}),'The trophy drafter took Lightning Bolt and went 7–1.');
+ assert.equal(trophyRevealSentence(different),'The trophy drafter took Lightning Bolt.');
+ assert.equal(trophyRevealSentence({...different,trophyRecord:'went 7–2'}),'The trophy drafter took Lightning Bolt.');
  assert.equal(trophyRevealSentence({...different,trophyRecord:null}),'The trophy drafter took Lightning Bolt.');
- assert.equal(trophyRevealSentence({...different,historicalName:null,trophyRecord:null}),'The trophy drafter took another card.');
- for(const state of [match,different]){
-  assert.doesNotMatch(trophyRevealSentence(state),/\. (?:\d+ wins|\d+–\d+)\b/,'never show a freestanding record fragment');
- }
+ assert.equal(trophyRevealSentence({...different,historicalName:null}),'The trophy drafter took another card.');
+ for(const state of [match,different])assert.doesNotMatch(trophyRevealSentence(state),/62%|7–1|7–2|win rate/);
+});
+
+test('source-drafter record is optional, escaped, and shown only in expanded analysis',()=>{
+ assert.equal(trophyDrafterDetails({trophyRecord:'has a 62% win rate'}),'<p class="run-trophy-record">Trophy drafter has a 62% win rate.</p>');
+ assert.equal(trophyDrafterDetails({trophyRecord:'went 7–1'}),'<p class="run-trophy-record">Trophy drafter went 7–1.</p>');
+ assert.equal(trophyDrafterDetails({trophyRecord:'reached Mythic rank'}),'<p class="run-trophy-record">Trophy drafter reached Mythic rank.</p>');
+ assert.equal(trophyDrafterDetails({trophyRecord:null}),'');
+ assert.equal(trophyDrafterDetails({}),'');
+ const escaped=trophyDrafterDetails({trophyRecord:'<script>alert("x")</script>'});
+ assert.doesNotMatch(escaped,/<script/);
+ assert.match(escaped,/&lt;script&gt;/);
 });
 
 test('locked feedback separates the trophy bonus from relative model support',()=>{
