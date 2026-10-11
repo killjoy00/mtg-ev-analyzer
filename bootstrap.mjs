@@ -107,7 +107,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
   // Paint the real Daily layout immediately, but keep account/progress-specific
   // claims neutral until the cookie-backed session and Daily status resolve.
   const home = params.get('game') !== 'draft-run' && !params.has('profile') && !params.has('account') && !params.has('patreon')
-    ? await import('./daily-home.mjs?v=11') : null;
+    ? await import('./daily-home.mjs?v=12') : null;
   home?.renderDailyHome(null,'checking');
   const growthReady = import('./growth.mjs?v=11');
   const identityReady = growthReady.then(m => m.installGrowthLayer());
