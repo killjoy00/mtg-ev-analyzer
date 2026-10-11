@@ -1,6 +1,6 @@
 # My Pack One: Drafting Insights (approved product specification)
 
-- **Status:** Approved design and implementation scope; **not yet implemented or released**.
+- **Status:** Approved design and implementation scope; **not yet implemented or released**. Data audit, counting rules and thresholds recorded October 11, 2026 (see [Audit results](#audit-results-october-11-2026) and [Counting rules and thresholds](#counting-rules-and-thresholds)).
 - **Decision date:** October 11, 2026.
 - **Tracking issue:** [#1150 — My Pack One: dedicated Insights tab](https://github.com/killjoy00/mtg-ev-analyzer/issues/1150).
 - **Implementation handoff:** [MY-PACK-ONE-INSIGHTS-IMPLEMENTATION-PROMPT.md](MY-PACK-ONE-INSIGHTS-IMPLEMENTATION-PROMPT.md).
@@ -59,20 +59,64 @@ Existing relevant authoritative records and helpers:
 - worker/draft-run-function.mjs: originally awarded scoring is recorded when a pick is locked; scoring variants must not be silently recomputed.
 - worker/growth-function.js and mobile/web career APIs: existing private account/profile boundaries and account-link ownership need to be reused.
 
-The first engineering task is a **read-only source-field and cohort audit** on representative synthetic fixtures / reviewed schema. Determine coverage for legacy sessions, incomplete and ten-pick runs, unobserved client outcomes, rerolls, score/difficulty/model version drift and repeat puzzle exposures. Record exact inclusion/exclusion and provenance decisions in this document **before or alongside code**.
+The read-only source-field and cohort audit is **done** (October 11, 2026, from the reviewed schema, worker code and synthetic checks). Its results and the resulting counting rules are recorded below; implementation follows them and only re-verifies them with fixtures.
 
 ### Required metric contract
 
 - **Canonical unit:** one authoritative awarded **pick decision**, not a reroll, duplicate retry, game result, rendered card exposure or number of times the same answer appears in two joined tables. Decide and document how historical outcomes lacking observation telemetry are included/flagged.
 - **Original awarded score:** mean of persisted per-decision awarded scores (0–100) for the stated eligible cohort; no rescoring based on today's model. Trophy-match percentage uses the same well-defined denominator where historical match data are available; never label a model-supported alternative categorically incorrect.
-- **Real pick depth:** verified puzzle source pick_number, with a separate run_position if displayed. Regular eight-pick sources typically correspond to P1P1–P1P8; Powered Cube source positions can be P1P2–P1P9. Verify actual available source data, including legacy ten-pick releases; do not hardcode a made-up universal offset.
+- **Real pick depth:** the answer's stored source pick_number, with a separate run_position if displayed. Current eight-pick Dailies use P1P1–P1P8 (Powered Cube P1P2–P1P9); eight-pick practice reaches up to P1P10 (Powered Cube P1P11) depending on the run's selection version. Use the stored number; never apply an offset.
 - **Environments:** distinguish mixed, latest, powered-cube; compare only defensible cohorts (scoring/corpus/selection/difficulty version compatibility). When comparability cannot be supported, segment by version or show a caveated/disabled comparison.
 - **Time trend:** compare well-defined windows of answered decision time, not visit time or overall game recency. Show dates, counts and incomplete-window warnings; do not imply a causally proven improvement from a descriptive difference.
-- **Difficulty:** use rated/known difficulty attached to the decision's historically applicable version, otherwise "unknown"; do not infer missing band labels or present an invented difficulty-adjusted ability score.
-- **Duplicates and QA:** honor idempotent revision outcomes, clear reroll semantics, genuine first encounters, repeat encounters, imported/legacy gaps and measurement_qa exclusions. Account linking and record merging must not multiply decisions.
+- **Difficulty:** use the puzzle's `support-ratio-v1` band (the only difficulty definition that has ever existed; every verified puzzle is rated on insert), otherwise "unknown"; do not infer missing band labels or present an invented difficulty-adjusted ability score.
+- **Duplicates and QA:** honor idempotent revision outcomes, clear reroll semantics, first encounters only and measurement_qa exclusions; ten-pick runs are excluded. Account linking and record merging must not multiply decisions.
 - **No-data and confidence:** every chart and comparison shows its eligible sample size. Before writing qualitative "stronger", "improving" or "weaker" text, specify conservative per-group minimums and comparability rules; tests must cover below-threshold samples. Even over threshold, copy stays descriptive, not statistical significance or skill certification.
 
-The exact cohort thresholds and query/index plan are engineering decisions backed by the audit; **do not guess production coverage or assert unavailable measurements exist**. Every metric should be explainable from the returned aggregation contract.
+The thresholds and query plan below are decided. **Do not guess production coverage or assert unavailable measurements exist**; every metric must be explainable from the returned aggregation contract.
+
+### Audit results (October 11, 2026)
+
+Sources: migrations 0004, 0008, 0011, 0014 and 0054, `worker/draft-run-function.mjs`, `worker/decision-measurements.mjs`, `draft-run.mjs`, `draft-run-policy.mjs` and `worker/growth-function.js`. No production data was read; per [AGENTS.md](../AGENTS.md), production coverage numbers must never be published in this repository.
+
+| Question | Finding |
+| --- | --- |
+| Where is one pick recorded? | `draft_run_sessions.answers`, one element per locked pick. A pick is appended only when the request's `revision` and `round` match the session (optimistic concurrency), and an exact retry returns early, so **answers never contain duplicates**. Rerolls replace `puzzle_ids[round]` and never write an answer. |
+| What does an answer hold? | `score` (0–100 as awarded), `historicalMatch` (trophy match), `selectedId`, `historicalId`, and `puzzle` with `puzzle_id`, `set_id` and the source `pick_number`. |
+| When was it answered? | `draft_run_decision_observations` (migration 0011) gets one row per pick with `outcome='pick'`, `round` = answer index + 1 and `answered_at=now()`, written in the same statement as the answer. Eight-pick runs (migration 0014) all post-date 0011, so every eight-pick decision has an answer time, except picks whose rows the one-time retired-source cleanup in migration 0016 deleted; those are excluded by the counting rules below. |
+| Do scoring versions change scores? | No, in practice. All stored profiles (`trophy-consensus-v2`, `-v3-calibrated-v1`, `-v3-linear-v2`) award 100 for a trophy match and round(95 × selected ÷ top model support) otherwise; the calibrated profile reaches the same ratio by an algebraically equivalent path. A synthetic check of 222,854 decisions across all three profiles found **zero** score differences. Scores still reflect the model and corpus in use at the time; Insights shows them as originally awarded and never rescores. |
+| Difficulty coverage | One definition exists, `support-ratio-v1` (rating = round(100 × second ÷ top model support), band easy < 50 ≤ medium < 80 ≤ hard). A trigger added in migration 0008 rates every puzzle when it is inserted; there is no separate backfill. Puzzles are inserted per corpus version, and eight-pick runs serve corpus versions imported after 0008, so a band is expected for nearly every counted decision. This is inferred from code, not checked against production; any missing rating shows as `unknown`. Sessions labelled `difficulty_version='legacy'` describe how puzzles were *selected*, not the puzzle's difficulty. |
+| Repeats | The same puzzle can be answered again in practice, shared or creator challenges, and after an account merge. |
+| Account scope and merges | `account_links` maps one account to one `player_id`. `merge_pack1_player` moves a guest's sessions onto the account player; a same-day, same-environment duplicate Daily is kept with `day=NULL` and `merged_daily_date` set. |
+| QA traffic | `draft_run_sessions.measurement_qa`, or a player display name matching `^(QA([ _-]\|$)\|Import check$\|Production smoke\|Release check)` (the existing measurement rule). |
+| Query cost | `draft_run_sessions_player_idx (player_id, created_at DESC)` supports a bounded per-player scan; no new index is required for the planned query. |
+
+### Counting rules and thresholds
+
+**Counted decision (canonical unit).** One element of `answers`, in a session that:
+- belongs to the signed-in account's linked `player_id` (resolved on the server from `account_links`);
+- is an **eight-pick run** (`isEightPickVersion(selection_version)`, so `jsonb_array_length(puzzle_ids)=8`). **Legacy ten-pick runs are excluded entirely**, with no fallbacks for older data (owner decision, October 11);
+- is not QA (`measurement_qa` false and the display name does not match the QA rule).
+
+Then, per puzzle, **only the first encounter counts**: the earliest answer for that `puzzle_id` by `answered_at`. Later answers to the same puzzle (practice replays, shared/creator challenges, merged duplicate Dailies) are excluded. All run types (Daily, practice, shared and creator challenges) count. Incomplete runs count every locked pick.
+
+- **Score** = the answer's stored `score`. **Trophy match** = the answer's `historicalMatch`, over the same denominator.
+- **Pick depth** = the answer's `puzzle.pick_number`. **Environment** = the session's `environment` (`mixed`, `latest`, `powered-cube`).
+- **Decision time** = the pick observation's `answered_at`, matched on (session, round, `outcome='pick'`). A decision with no pick observation is excluded rather than given a guessed time.
+- **Difficulty band** = the puzzle's `support-ratio-v1` band, else `unknown`.
+- **Bound:** read at most the player's 1,000 most recent eight-pick sessions (about 8,000 decisions) via the player index, and state the cap in the method text when it applies.
+
+**Thresholds** (deliberately conservative; owner-delegated decision, October 11). Scores range 0–100 and single picks swing widely, so small groups are not averaged and only large, clear gaps become text.
+
+| Use | Rule |
+| --- | --- |
+| Insights tab unlocks | At least **8** counted decisions in the selected environment (one full run). Below that: a "Play a few more runs" state that shows the current count. |
+| A chart group shows an average (pick number, difficulty band, environment) | At least **5** decisions in the group. Smaller groups show their count with "not enough to average". |
+| A month shows on the progress chart (Pacific calendar months) | At least **10** decisions in that month. |
+| Progress comparison | The most recent **40** counted decisions vs the **40** before them, in the selected environment, with both date ranges shown. Requires 80 decisions. |
+| Any written observation ("higher", "lower", "up", "down") | Both sides have at least **40** decisions **and** the averages differ by at least **10** points. Otherwise say the averages are about the same or that more comparable decisions are needed. |
+| Observations shown | At most **3**, preferring the comparisons with the largest smaller-side sample. If none qualify: "Not enough comparable decisions yet." |
+
+Written observations stay descriptive: no "significant", no causal claims, no skill ratings. Cross-environment comparisons always carry a note that the card pools differ.
 
 ## Private API and lifecycle
 
@@ -87,7 +131,14 @@ The exact cohort thresholds and query/index plan are engineering decisions backe
 
 - Option A-only Stats-card implementation, generic game-score sparkline presented as pick quality, new top-level nav / native bottom tab, publicly shared private insights, new paid-access gate, LLM claims, new telemetry collection solely for display, scoring/puzzle/model changes.
 - Daily reminder scheduling, email or push implementation from [#1151](https://github.com/killjoy00/mtg-ev-analyzer/issues/1151).
-- App-store approval, tester-track promotion, binary signing/upload, provider credential changes and production activation as side effects of building Insights.
+- App Review submission, public store release and provider credential changes. (New mobile builds are **in scope after merge**; see below.)
+
+## Mobile delivery (owner decision, October 11, 2026)
+
+Native Insights ships in the same PR as the backend and web. After the PR is merged with the owner's go-ahead and its backend/gateway release passes, build new binaries through the repository's existing guarded workflows, as was done for iOS 1.1/100733 and Android 100740 (see [mobile-release-runbook.md](mobile-release-runbook.md)):
+- **iOS:** a new signed 1.1 build (next build number) uploaded to TestFlight. Do not submit to App Review or change the App Store version; the owner selects the build. If version 1.1 is already in App Review, upload to TestFlight only and report.
+- **Android:** a new signed AAB with a new version code, uploaded and promoted unchanged to the existing `production-access` closed-test track. Do not change testers, groups, countries or the Production track.
+- Update [CURRENT-STATE.md](CURRENT-STATE.md), the exact-build inventory and #575 with the new build numbers.
 
 ## Acceptance and evidence
 
@@ -98,5 +149,6 @@ The exact cohort thresholds and query/index plan are engineering decisions backe
 - [ ] Web keyboard/screen-reader, touch, narrow screens and native dynamic type/Back navigation verified with synthetic representative player fixtures.
 - [ ] CI required test + browser checks green, and native/backend-specific tests green for changed paths.
 - [ ] No historical rescoring, no changes to Daily/ranking selection, no public profile leakage, no reminder implementation and no effect on in-flight iOS/Android store reviews.
+- [ ] After merge and backend/gateway release: new iOS TestFlight build and Android closed-test build containing Insights, recorded in CURRENT-STATE, the exact-build inventory and #575.
 
-Implementation should proceed via a reviewed GitHub feature PR. **Do not interpret this documentation approval as permission to promote backend/schema to production or submit new mobile builds**; release gating is separately controlled.
+Implementation should proceed via **one** reviewed GitHub feature PR containing the backend, gateway, web, native, tests and docs. Merging and the production backend/gateway release need the owner's go-ahead; the mobile builds above follow automatically once merged.

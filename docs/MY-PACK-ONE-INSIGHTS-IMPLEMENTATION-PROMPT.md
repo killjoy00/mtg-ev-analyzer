@@ -16,12 +16,14 @@ This is an **end-to-end feature implementation task, not a brainstorming exercis
 4. Match Pack One's existing navy/white/light gray visual system, Barlow Condensed/Source Sans 3 typography, scorecard cards, spacing and compact charts. The approved mockup is directional; never hardcode its sample statistics into production.
 5. Insights stays **private to the signed-in account**; do not expose data or conclusions on public profiles, sharing surfaces, leaderboards or analytics. Guests see sign-in guidance.
 6. **Do not implement issue #1151 (Daily reminders)** as part of this project. That remains separately tracked.
+7. **One PR** contains everything: backend endpoint, gateway route, web tab, native screen, tests and docs. Do not split it.
+8. **Only current eight-pick runs count.** Legacy ten-pick runs are excluded entirely; build no fallbacks or special handling for older data.
 
 ## User-facing feature
 
 Build the complete, responsive Insights tab, with four real analysis areas and conservative evidence-based observations:
 
-- **Pick-depth patterns:** awarded score and sample size by verified **source pick_number**, optionally trophy-match share. Distinguish source P1P* from game round. Powered Cube can use P1P2–P1P9 rather than P1P1–P1P8; handle verified legacy numbering instead of assigning an offset.
+- **Pick-depth patterns:** awarded score and sample size by verified **source pick_number**, optionally trophy-match share. Distinguish source P1P* from game round. Use each answer's stored pick_number (Powered Cube starts at P1P2); never assign an offset.
 - **Progress over time:** honest, bounded recent/earlier comparisons or rolling decision trends for comparable versions and periods; display dates, decision counts, and what qualifies for the comparison.
 - **Format patterns:** Mixed, Latest Set and Powered Cube selectors and/or summaries; no unqualified cross-format skill ranking or misleading pooling.
 - **Difficulty context:** show distributions/averages by historically applicable verified difficulty band; mark unknowns rather than inventing a difficulty-adjusted rating.
@@ -29,20 +31,18 @@ Build the complete, responsive Insights tab, with four real analysis areas and c
 
 Provide filters, empty/insufficient-data states, accessible readable charts, count/uncertainty notes, loading/error/retry handling, and a compact "How these insights are calculated" explanation. Use live account-authorized aggregates, **not mock data in production**.
 
-## Data and backend: audit first, then build
+## Data and backend: rules are decided
 
-Before writing metrics or migrations, inspect **draft_run_sessions.answers** (persisted original score and puzzle context), **draft_run_decision_observations** (revision, outcome, score, trophy_match and rendered-observation caveats), **draft_run_verified_puzzles.pick_number**, **draft_run_measurements / draft_run_source_measurements**, current account links and the existing private Growth profile routes. Read and reuse prior decision-measurement semantics where appropriate, but do **not** mistake Admin-only reports for a player authorization path.
+The data audit is **done**. Implement the [Audit results](MY-PACK-ONE-INSIGHTS.md#audit-results-october-11-2026) and [Counting rules and thresholds](MY-PACK-ONE-INSIGHTS.md#counting-rules-and-thresholds) in the spec exactly; do not redesign them. In short:
 
-Write down the **canonical per-pick cohort** and missing-data treatment in docs/MY-PACK-ONE-INSIGHTS.md. Verify, with fixtures:
+- **Counted decision:** one element of `draft_run_sessions.answers` in the account's linked player's non-QA **eight-pick** sessions, first encounter per `puzzle_id` only (earliest `answered_at`). Rerolls never appear in `answers`; incomplete runs count their locked picks.
+- **Fields:** stored `score` and `historicalMatch` (never rescore), `puzzle.pick_number`, session `environment`, the pick observation's `answered_at` (no observation → excluded), and the puzzle's `support-ratio-v1` band (else `unknown`).
+- **Thresholds:** unlock at 8 decisions; averages need 5 per group; months need 10; progress compares the latest 40 decisions with the 40 before; written observations need 40 per side and a 10-point gap; at most 3 observations.
+- **Bound:** at most the 1,000 most recent eight-pick sessions via `draft_run_sessions_player_idx`; no migration is expected.
 
-- Pick versus reroll, retries and duplicate revisions, repeated source puzzles, measured/legacy unobserved decisions, imported history, historical eight- and ten-pick runs, QA sessions, completed/incomplete games.
-- Original awarded scores, historical trophy match, source pick_number vs run index, scoring/selection/corpus/difficulty versions and missing ratings.
-- Account merge/claim and ownership boundaries. Ensure joining answers to observations cannot double-count a pick; decide whether and how first encounters are counted.
-- Equal/comparable time windows and minimum group samples for every conclusion. If compatibility or coverage cannot be proved, segment the cohort or omit the comparison; never silently regrade old decisions.
+Re-verify these rules with synthetic fixtures (PostgreSQL contract tests). If the code contradicts a recorded finding, stop and report it rather than silently changing the rule. **No production data is needed or permitted**: never query production for this work, and never put production counts or player data in code, tests, PRs or comments (see AGENTS.md).
 
-Implement a **private, bounded, read-only aggregate endpoint** through the existing Growth/profile service (or justify a safer equivalent), with shared stable response types for web and mobile. Resolve account/player identity **on the server** from the authenticated session. No client-chosen player ID, public profile key or unbounded history dump may authorize another person's analytics. Index/limit queries and add an additive migration only if performance evidence warrants it. Update gateway request routing/allowlists and auth tests for any new path.
-
-The endpoint should return chart-ready grouped values with numerator/denominator/sample counts, environment/pick/band/time grouping, selected versions and data-coverage caveats. Use consistent filters across components; forbid public/guest access; prevent cross-account cache leaks and stale in-flight responses after logout, account switch or account deletion.
+Implement a **private, bounded, read-only aggregate endpoint** in the Growth service, with shared stable response types for web and mobile. Resolve account/player identity **on the server** from the authenticated session (browser cookie or native account token). No client-chosen player ID, public profile key or unbounded history dump may authorize another person's analytics. Add the route to the gateway's browser and native account allowlists and test the 401/403 paths. The endpoint returns chart-ready grouped values with counts (environment, pick number, difficulty band, month, the 40/40 progress windows with date ranges), the qualifying observations, and coverage notes. Forbid public/guest access; prevent cross-account cache leaks and stale in-flight responses after logout, account switch or account deletion.
 
 ## Web implementation
 
@@ -56,20 +56,22 @@ Start with **mobile/src/screens/career.tsx**, **mobile/src/components/ProfileOve
 
 Add focused unit, backend PostgreSQL and browser/native regression tests, reusing existing project conventions:
 
-- Selection/aggregation math by source pick number, Cube offset/legacy numbering, score/trophy rules, difficulty and format filters, version compatibility, time windows and thresholds.
-- Reroll/no-pick, duplicate revision/retry, incomplete/ten-pick/legacy games, repeat source puzzles, QA exclusions, missing data, account migration and zero-history paths.
+- Selection/aggregation math by stored source pick number (including Powered Cube's P1P2 start), score/trophy rules, difficulty and format filters, time windows and thresholds.
+- Reroll/no-pick, duplicate revision/retry, incomplete games, ten-pick sessions being excluded, repeat source puzzles (first encounter only), merged duplicate Dailies, QA exclusions, missing observation or rating, and zero-history paths.
+- Every threshold boundary: 7 vs 8 decisions to unlock, 4 vs 5 per group, 9 vs 10 per month, 79 vs 80 for progress, 39 vs 40 per side and 9 vs 10 points for observations, and the 3-observation cap.
 - Private endpoint auth failures, cross-account isolation, public-profile non-disclosure, account deletion/credential retirement, logout/switch races and bounded-query behavior.
 - Web ARIA keyboard/focus/tab state, Stats and Account settings preservation, error fallback and all responsive widths; native three-section navigation/back, offline/error, refresh, accessibility and account switching.
 - Run the appropriate offline fast test suite and all required PR checks. Do not claim tests or provider/device validations that did not run. Record the exact test commands, check status, known limitations and final diffs in the PR description.
 
 ## Working procedure and finish line
 
-1. Audit the current data/UX contracts; report material uncertainties without guessing. Update the spec with verified cohort decisions.
+1. Read the recorded audit and rules; confirm them with fixtures. Report, rather than change, anything the code contradicts.
 2. Implement the backend aggregation + auth/gateway contracts, web three-tab UI, and native My Pack One Insights UI. Deliver the full Option B, not only the pick chart.
 3. Add documentation, fixture coverage and regression tests; run checks and fix failures.
-4. Create a focused **GitHub feature pull request linked to #1150**. Summarize the implemented pages, sample-size/legacy rules, source paths, changed files, tested platforms and release impact.
-5. **Do not** rewrite historic scores, puzzles, Daily schedules or ranking authority; modify provider credentials; post secrets/private logs to public GitHub; enable reminder delivery; or change store-review tracks. **Do not merge, promote production backend/schema, deploy production UI, sign/upload binaries or submit to Apple/Google without separate explicit authorization.** Keep current app-store testing/approval clocks intact.
-6. Return the PR link, exact implemented scope, verification results and any remaining bounded release/physical-device acceptance steps. Do not call a partial UI or mock data "complete."
+4. Create **one GitHub feature pull request linked to #1150** with all layers. Summarize the implemented pages, counting rules, thresholds, source paths, changed files, tested platforms and release impact.
+5. **Do not** rewrite historic scores, puzzles, Daily schedules or ranking authority; modify provider credentials; post secrets/private logs to public GitHub; or enable reminder delivery. **Do not merge or run the production backend/gateway release without the owner's go-ahead.**
+6. **After merge and a passing backend/gateway release, build new mobile binaries** (owner-approved October 11) through the existing guarded workflows, as for iOS 1.1/100733 and Android 100740 ([runbook](mobile-release-runbook.md)): a new iOS 1.1 build to TestFlight (do not submit to App Review or touch the App Store version; if 1.1 is already in review, upload only and report), and a new Android AAB uploaded and promoted unchanged to the existing `production-access` closed-test track (no tester, group, country or Production change). Then update CURRENT-STATE.md, the exact-build inventory and #575 with the new build numbers.
+7. Return the PR link, exact implemented scope, verification results, the new build numbers once built, and any remaining physical-device acceptance steps. Do not call a partial UI or mock data "complete."
 
 When implementation choices are not explicitly fixed, use the simplest existing production pattern that meets the spec. Ask for a decision only if a genuine blocking product tradeoff remains. Otherwise implement, validate and deliver a reviewable PR.
 
