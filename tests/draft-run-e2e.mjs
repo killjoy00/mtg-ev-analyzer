@@ -55,7 +55,7 @@ await page.route('**/*-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/**',async
     const grade=gradeDraftRunPick(p,req.cardId),evidence=rateDraftRunPuzzle(p),calibrated=calibratedSupports(p.candidates,supportSharpening(p.corpus_version));
     grade.modelTargetDisagreement=evidence.modelTargetDisagreement;
     answers.push({...grade,puzzle:publicDraftRunPuzzle(p),ranking:[...p.candidates].sort((a,b)=>b.model_probability-a.model_probability).map(c=>({id:c.id,name:c.name,support:calibrated.get(c.id),score:gradeDraftRunPick(p,c.id).score}))});revision++;body=snapshot();
-  }else if(path==='/v1/daily-status')body=eliteAccess?{player:{claimed:true},capabilities:['account','custom_corpus','unlimited_cube_practice'],daily_streak:daily?3:0}:{player:{claimed:false},capabilities:[],daily_streak:daily?3:0};
+  }else if(path==='/v1/daily-status')body=eliteAccess?{day:fixtureDay,daily_history:[],player:{claimed:true},capabilities:['account','custom_corpus','unlimited_cube_practice'],daily_streak:daily?3:0}:{day:fixtureDay,daily_history:[],player:{claimed:false},capabilities:[],daily_streak:daily?3:0};
   else if(path==='/v1/leaderboard'){
     const requested=requestUrl.searchParams.get('period')||'daily',period=requested==='month'?'season':requested;
     body={rows:[],period,season:period==='season'&&seasonAvailable?{id:'hob',set_id:'hob',name:'The Hobbit',set_release_date:'2026-08-14',start_date:'2026-09-10',end_date:null,established_by_day:'2026-09-19'}:null};
@@ -233,7 +233,18 @@ try{
     const cue=(await page.locator('.post-game-daily-cue').innerText()).trim();
     assert.match(cue,/^New Dailies in \d+(?:h(?: \d+m)?|m) · 3-day streak$/,'completed Daily result shows reset countdown and session-based streak');
   }else assert.equal(await page.locator('.post-game-daily-cue').count(),0,'practice results never show the next-Daily cue');
-  assert.equal((await page.locator('.run-result-actions .button').first().textContent())?.trim(),daily?'Back to Dailies':cube?'Start Another Powered Cube Run':'Start Another Draft Run');assert.match(await page.locator('.run-result-page .run-note').innerText(),/other picks can earn up to 95 based on broader drafting evidence\./);
+  if(daily) {
+    const target=environment==='mixed'
+      ? {label:'Play Daily Powered Cube',href:'?game=draft-run&set=powered-cube&daily=1'}
+      : {label:'Play Daily Draft Run',href:'?game=draft-run&daily=1'};
+    await page.locator('[data-all-dailies]:not([hidden])').waitFor();
+    assert.equal((await page.locator('[data-next-daily-action]').innerText()).trim(),target.label);
+    assert.equal(await page.locator('[data-next-daily-action]').getAttribute('href'),target.href);
+    assert.equal(await page.locator('[data-all-dailies] a').getAttribute('href'),'./');
+  } else {
+    assert.equal((await page.locator('.run-result-actions .button').first().textContent())?.trim(),cube?'Start Another Powered Cube Run':'Start Another Draft Run');
+    assert.equal(await page.locator('[data-all-dailies]:not([hidden])').count(),0,'Practice never shows the Daily handoff');
+  }assert.match(await page.locator('.run-result-page .run-note').innerText(),/other picks can earn up to 95 based on broader drafting evidence\./);
   const actionStyles=await page.locator('.run-result-actions .button').evaluateAll(nodes=>nodes.map(node=>{const style=getComputedStyle(node);return [style.display,style.alignItems,style.justifyContent];}));
   assert.ok(actionStyles.every(([display,align,justify])=>display==='flex'&&align==='center'&&justify==='center'),'Result actions use the same centered layout');
   await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-result-mobile.png`,fullPage:true});
