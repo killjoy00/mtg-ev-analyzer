@@ -66,8 +66,12 @@ export async function accountSession(request,query,{required=true,allowLegacy=tr
     if(account) {
       if(csrf&&!SAFE_METHODS.has(request.method)) {
         const supplied=String(request.headers.get('x-pack1-csrf')||'');
-        if(!validOpaque(supplied)||!sameDigest(digest(supplied),account.csrf_hash))
-          throw Object.assign(Error('Account request could not be verified.'),{status:403});
+        const valid=validOpaque(supplied);
+        if(!valid||!sameDigest(digest(supplied),account.csrf_hash)) {
+          // Reasons are server-only diagnostics. Never log or return the proof.
+          const reason=!supplied?'missing':!valid?'invalid':'mismatch';
+          throw Object.assign(Error('Account request could not be verified.'),{status:403,accountCsrfReason:reason});
+        }
       }
       return {...account,source:'cookie'};
     }

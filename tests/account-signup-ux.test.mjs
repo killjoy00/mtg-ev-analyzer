@@ -51,7 +51,7 @@ test('native first claim shows the account-ready display-name step before contin
 
 
 test('web signed-in auth callbacks route newly claimed accounts through account-ready',()=>{
-  const signedInBranch=growth.slice(growth.indexOf('if(currentAccount?.user)'),growth.indexOf('const validatingDaily='));
+  const signedInBranch=growth.slice(growth.indexOf('if(currentAccount?.user&&!reauthenticate)'),growth.indexOf('const validatingDaily='));
   assert.match(signedInBranch,/if\(linked\?\.newlyClaimed\)/);
   assert.match(signedInBranch,/openSignupNamePrompt\(\{linked,validationRunId,intent,source\}\)/);
   assert.match(growth,/profile\?\.player\?\.display_name_reason\|\|profile\?\.ranking_identity\?\.reason\|\|linked\?\.rankingIdentity\?\.reason/);

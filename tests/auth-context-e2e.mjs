@@ -17,6 +17,7 @@ let googleStartFails=false;
 let unverifiedSignin=false;
 let nextLinkNewlyClaimed=false;
 let nextLinkRankingReason=null;
+let csrfLinkFailure=false;
 let linkBodies=[];
 let resendBodies=[];
 let resendCooldown=false;
@@ -81,15 +82,20 @@ await page.route('https://api.packone.pro/growth/**',async route=>{
   } else if(path==='/v1/account/link-browser') {
     const input=route.request().postDataJSON();
     linkBodies.push(input);
-    body={
-      ok:true,
-      merged:false,
-      newlyClaimed:nextLinkNewlyClaimed,
-      validatedDailyScore:Boolean(input.validateDailyRunId),
-      displayName:'QA Player',
-      rankingIdentity:nextLinkRankingReason?{eligible:false,reason:nextLinkRankingReason}:{eligible:true},
-    };
-    nextLinkNewlyClaimed=false;
+    if(csrfLinkFailure) {
+      status=403;
+      body={error:'Account request could not be verified.'};
+    } else {
+      body={
+        ok:true,
+        merged:false,
+        newlyClaimed:nextLinkNewlyClaimed,
+        validatedDailyScore:Boolean(input.validateDailyRunId),
+        displayName:'QA Player',
+        rankingIdentity:nextLinkRankingReason?{eligible:false,reason:nextLinkRankingReason}:{eligible:true},
+      };
+      nextLinkNewlyClaimed=false;
+    }
   } else if(path==='/v1/account/migrate') {
     signed=true;
     body={ok:true};
@@ -128,7 +134,7 @@ await page.route('https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.ne
 });
 
 async function fresh({source='nav',validateDailyRunId=null,intent=null,width=390}={}) {
-  signed=false;verificationRequired=false;delaySignup=false;delaySignin=false;delayGoogle=false;googleStartFails=false;unverifiedSignin=false;nextLinkNewlyClaimed=false;nextLinkRankingReason=null;linkBodies=[];resendBodies=[];resendCooldown=false;
+  signed=false;verificationRequired=false;delaySignup=false;delaySignin=false;delayGoogle=false;googleStartFails=false;unverifiedSignin=false;nextLinkNewlyClaimed=false;nextLinkRankingReason=null;csrfLinkFailure=false;linkBodies=[];resendBodies=[];resendCooldown=false;
   await page.setViewportSize({width,height:width<700?844:900});
   await page.goto(base+'/tests/auth-context-harness.html');
   await page.waitForFunction(()=>Boolean(window.__renderAccount));
@@ -256,6 +262,26 @@ try {
   assert.equal(await page.locator('#account-signin').count(),0);
   await fresh({source:'practice_gate',intent:'elite'});
   await page.locator('#account-signup').waitFor();
+
+  // An already-signed-in browser with a rejected CSRF proof must be able to
+  // sign in again without deleting guest/player cookies or dropping a Daily return.
+  await fresh({source:'daily_result',validateDailyRunId:runId});
+  signed=true;
+  csrfLinkFailure=true;
+  await page.evaluate(async id=>window.__renderAccount({source:'daily_result',validateDailyRunId:id}),runId);
+  await page.getByRole('heading',{name:'Confirm your sign-in.'}).waitFor();
+  assert.equal(await page.locator('#account-signin').count(),0);
+  await page.getByRole('button',{name:'Sign in again',exact:true}).click();
+  await page.locator('#account-signin').waitFor();
+  assert.equal(await page.locator('#account-signup').count(),0);
+  assert.equal(await page.locator('#account-mode-toggle').count(),0,'recover the existing account, do not prompt a second signup');
+  csrfLinkFailure=false;
+  const recovery=page.locator('#account-signin');
+  await recovery.locator('[name="email"]').fill('qa@example.invalid');
+  await recovery.locator('[name="password"]').fill('fixture-password-123');
+  await recovery.getByRole('button',{name:'Sign in',exact:true}).click();
+  await page.getByText("Score added to today's leaderboard",{exact:true}).waitFor();
+  assert.deepEqual(linkBodies.at(-1),{validateDailyRunId:runId},'recover the pending Daily result after a fresh sign-in');
 
   // Google disables while pending; errors stay in its own area and the control recovers.
   await fresh({source:'nav'});

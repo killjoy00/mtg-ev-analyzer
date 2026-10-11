@@ -117,8 +117,15 @@ async function openEliteLanding(source='account') {
   location.assign('/patreon/');
 }
 
-function renderAccountError(app, error, retry=()=>renderAccount()) {
+function renderAccountError(app, error, retry=()=>renderAccount(), reauth=()=>renderAccount({mode:'signin',reauthenticate:true})) {
   document.body.classList.remove('is-game');
+  if(error?.status===403&&error?.message==='Account request could not be verified.') {
+    // A valid account cookie with a failed CSRF proof cannot be repaired by
+    // retrying the same protected write. Require a fresh provider sign-in instead.
+    app.innerHTML=`<section class="message-card"><p class="eyebrow">Account</p><h1>Confirm your sign-in.</h1><p>Pack One couldn't verify this browser's account security token. Sign in again to restore secure access. Your saved progress won't be cleared.</p><button class="button primary" id="account-reauth">Sign in again</button><a class="button secondary" href="./">Back to Dailies</a></section>`;
+    document.querySelector('#account-reauth')?.addEventListener('click',()=>void reauth());
+    return;
+  }
   app.innerHTML=`<section class="message-card"><p class="eyebrow">Account</p><h1>Account access is temporarily unavailable.</h1><p>${esc(error?.message||'Please try again.')}</p><button class="button primary" id="account-retry">Try again</button><a class="button secondary" href="./">Back to Dailies</a></section>`;
   document.querySelector('#account-retry')?.addEventListener('click',()=>void retry());
 }
@@ -317,7 +324,7 @@ document.addEventListener('pack1:profile-updated',async eventObject=>{
   } catch {}
 });
 
-export async function renderAccount({ validateDailyRunId = null, intent = null, source = 'account', notice = '', mode = null } = {}) {
+export async function renderAccount({ validateDailyRunId = null, intent = null, source = 'account', notice = '', mode = null, reauthenticate = false } = {}) {
   rememberAdminReturn();
   if(!intent&&hasPatreonActivationIntent())intent='patreon-activate';
   if(intent==='patreon-activate')rememberPatreonActivation(source);
@@ -334,17 +341,21 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
     currentAccountState='unavailable';
     currentAccountError=error;
     syncAccountNav();
-    renderAccountError(app,error,()=>renderAccount({validateDailyRunId:pendingDailyRunValidation,intent,source,mode}));
+    renderAccountError(app,error,
+      ()=>renderAccount({validateDailyRunId:pendingDailyRunValidation,intent,source,mode}),
+      ()=>renderAccount({validateDailyRunId:pendingDailyRunValidation,intent,source,mode:'signin',reauthenticate:true}));
     return;
   }
-  if(currentAccount?.user) {
+  if(currentAccount?.user&&!reauthenticate) {
     if(finishAdminReturn())return;
     const validationRunId=pendingDailyRunValidation;
     let linked=null;
     try {
       linked=await linkAccount(undefined,{validateDailyRunId:validationRunId});
     } catch(error) {
-      renderAccountError(app,error,()=>renderAccount({validateDailyRunId:validationRunId,intent,source,mode}));
+      renderAccountError(app,error,
+        ()=>renderAccount({validateDailyRunId:validationRunId,intent,source,mode}),
+        ()=>renderAccount({validateDailyRunId:validationRunId,intent,source,mode:'signin',reauthenticate:true}));
       return;
     }
     if(linked?.newlyClaimed) {
@@ -377,10 +388,12 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
   const validatingDaily=Boolean(pendingDailyRunValidation);
   const upgradingElite=intent==='elite';
   const activatingPatreon=intent==='patreon-activate';
-  const authMode=activeAdminReturn()?'signin':mode==='signup'||mode==='signin'?mode:(validatingDaily||upgradingElite||activatingPatreon?'signup':'signin');
-  const heading=validatingDaily?'Add your score to the leaderboard.':activatingPatreon?'Activate Pack One Elite':upgradingElite?'Unlock Elite practice.':authMode==='signup'?'Create Account':'Sign In';
-  const intro=validatingDaily
-    ? 'Sign in or create a free account to validate this Daily score and add it to today’s leaderboard.'
+  const authMode=reauthenticate||activeAdminReturn()?'signin':mode==='signup'||mode==='signin'?mode:(validatingDaily||upgradingElite||activatingPatreon?'signup':'signin');
+  const heading=reauthenticate?'Sign in again':validatingDaily?'Add your score to the leaderboard.':activatingPatreon?'Activate Pack One Elite':upgradingElite?'Unlock Elite practice.':authMode==='signup'?'Create Account':'Sign In';
+  const intro=reauthenticate
+    ? 'Use your existing Pack One account to renew your secure session. This will not clear your saved progress.'
+    : validatingDaily
+      ? 'Sign in or create a free account to validate this Daily score and add it to today’s leaderboard.'
     : activatingPatreon
       ? 'Sign in or create your free Pack One account. Then authorize Patreon so Pack One can verify and activate Elite.'
       : upgradingElite
@@ -390,8 +403,10 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
   const social=firstPartyAuthEnabled()
     ? `<div class="account-social"><button class="button primary provider-button" id="account-apple" type="button">${providerVerb} with Apple</button><p class="form-error" id="account-apple-error" aria-live="polite"></p><button class="button secondary provider-button" id="account-google" type="button">${providerVerb} with Google</button><p class="form-error" id="account-google-error" aria-live="polite"></p></div>`
     : '';
-  const toggleCopy=authMode==='signup'
-    ? 'Already have an account? <button class="text-button" id="account-mode-toggle" type="button">Sign in</button>'
+  const toggleCopy=reauthenticate
+    ? 'Sign in with the account you were using.'
+    : authMode==='signup'
+      ? 'Already have an account? <button class="text-button" id="account-mode-toggle" type="button">Sign in</button>'
     : activeAdminReturn()?'Administrator sign-in uses an existing account.':'New to Pack One? <button class="text-button" id="account-mode-toggle" type="button">Create account</button>';
   const accountNote=authMode==='signin'?'<small>A free account saves your record and enables leaderboard participation.</small>':'';
   const accountConsent=authMode==='signup'

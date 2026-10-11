@@ -84,6 +84,18 @@ test('sign-out style optional reads never bypass CSRF on a live session',async()
   assert.equal(session.source,'cookie');
 });
 
+test('CSRF rejects missing, malformed and mismatched proofs without changing the public error',async()=>{
+  for(const [supplied,reason] of [[null,'missing'],['invalid','invalid'],[opaque('d'),'mismatch']]) {
+    const headers=supplied==null?{}:{'x-pack1-csrf':supplied};
+    await assert.rejects(
+      accountSession(request(accountCookie(LIVE),{method:'POST',headers}),fakeQuery()),
+      error=>error.status===403&&error.message==='Account request could not be verified.'&&error.accountCsrfReason===reason,
+    );
+  }
+  const account=await accountSession(request(accountCookie(LIVE),{method:'POST',headers:{'x-pack1-csrf':CSRF}}),fakeQuery());
+  assert.equal(account.source,'cookie','a matching proof must still authorize writes');
+});
+
 test('no credential at all stays 401 for required callers and null for optional ones',async()=>{
   await assert.rejects(accountSession(request(null),fakeQuery()),error=>error.status===401);
   assert.equal(await accountSession(request(null),fakeQuery(),{required:false}),null);
