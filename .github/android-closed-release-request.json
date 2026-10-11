@@ -1,6 +1,6 @@
 {
   "operation": "promote-android-closed",
-  "reason": "Owner-authorized promotion of the exact Pack One Android candidate accepted by Google Play Internal Testing in run 37681388402. Promote existing version code 100698 unchanged to the existing production-access Closed Testing track without rebuilding. Preserve the existing track, testers, groups, countries, and qualification continuity. Treat any draft/requiresConsoleRollout result as incomplete delivery rather than success. Do not create a new track, alter tester/group/country configuration, release to Production, or publish publicly.",
-  "version_code": "100698",
+  "reason": "Owner-authorized October 11 promotion of the current Pack One Android candidate. Promote existing bundle versionCode 100740, already in the Play bundle library from run 38079116799 and built from 67c6d25917f3e8b632922b80c7a5479ca897af9f (the same native source as iOS 1.1/100733, with no later native app change on main), unchanged to the existing production-access Closed Testing track, replacing 100698. Do not rebuild. Preserve the existing track, testers, groups, countries and qualification continuity. Treat any draft/requiresConsoleRollout result as incomplete delivery rather than success. Do not create a new track, alter tester/group/country configuration, release to Production, or publish publicly.",
+  "version_code": "100740",
   "track": "production-access"
 }
