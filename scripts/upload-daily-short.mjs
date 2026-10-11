@@ -3,7 +3,8 @@
 import {readFile} from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {pacificDay,shortMetadata,videoFilename,youtubeReceiptMarker,validateOpeningRun,checkedDay} from './daily-short.mjs';
+import {pacificDay,shortMetadata,videoFilename,youtubeReceiptMarker,checkedDay,
+  INTRO_SECONDS,PACK_SECONDS,OUTRO_SECONDS,TEMPLATE_VERSION,TOTAL_FRAMES} from './daily-short.mjs';
 
 const ROOT='https://api.github.com/repos/killjoy00/mtg-ev-analyzer';
 const LEDGER=1135; // Already-owned Daily social publishing ledger; no secrets in comments.
@@ -101,7 +102,10 @@ export async function main() {
   const raw=JSON.parse(await readFile('artifacts/daily-short/capture.json','utf8'));
   const day=checkedDay(raw.day);
   if(raw.real_browser_capture!==true||raw.spoiler_free!==true||raw.environment!=='mixed'||
-     raw.duration_seconds!==10||typeof raw.puzzle_id!=='string'||raw.cards<10)
+     raw.duration_seconds!==10||raw.template_version!==TEMPLATE_VERSION||
+     raw.intro_seconds!==INTRO_SECONDS||raw.pack_seconds!==PACK_SECONDS||
+     raw.outro_seconds!==OUTRO_SECONDS||raw.frames!==TOTAL_FRAMES||
+     typeof raw.puzzle_id!=='string'||raw.cards<10)
     throw Error('YouTube publication requires a validated real-browser, spoiler-free Daily.');
   if(day!==pacificDay())throw Error('Refusing to post a previous Daily.');
   const bytes=new Uint8Array(await readFile(path.join('artifacts/daily-short',videoFilename(day))));
