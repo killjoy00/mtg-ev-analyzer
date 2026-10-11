@@ -203,8 +203,11 @@ function usernameAttentionMarkup(profile) {
   return '<aside class="profile-claim profile-username-attention" role="alert"><div><span>Display name needs attention</span><strong>'+esc(message)+'</strong><p>Your account is linked, but this display name cannot be shown on Daily leaderboards yet.</p></div><button type="button" class="button secondary" id="profile-username-fix">Change display name</button></aside>';
 }
 export function resetMyPackOneTab() {
-  // Preserve the selected section across a same-owner refresh, but invalidate
-  // any old private response while another account/session is being loaded.
+  // Entering My Pack One from account navigation or completing a new sign-in
+  // must start in Stats, even when a claimed account has no profile key yet.
+  // Saving an existing profile uses renderProfile directly and preserves its tab.
+  activeTab='stats';
+  previousOwner=null;
   invalidateMyPackInsights();
 }
 
