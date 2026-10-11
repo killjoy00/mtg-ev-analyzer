@@ -1,7 +1,7 @@
 name: Branded Pack One Daily YouTube Short
 
 on:
-  # 08:40 PDT / 09:40 PST, after the Pacific Daily reset and Bluesky post.
+  # 09:40 PDT / 08:40 PST (16:40 UTC), after Pacific Daily reset and Bluesky.
   # One trigger/day prevents repeated rendering and controls Actions/storage cost.
   schedule:
     - cron: '40 16 * * *'
@@ -76,12 +76,14 @@ jobs:
           echo "Download the **packone-daily-short** workflow artifact to preview the MP4." >> "$GITHUB_STEP_SUMMARY"
 
   youtube:
+    # Live YouTube upload tested as PUBLIC on 2026-10-10 (run 38110645769).
+    # Daily posting is owner-approved; PACKONE_YOUTUBE_UPLOAD_PAUSED=true stops the schedule.
     needs: record
     if: >-
       github.repository == 'killjoy00/mtg-ev-analyzer' &&
       github.ref == 'refs/heads/main' &&
       needs.record.outputs.recorded == 'true' &&
-      ((github.event_name == 'schedule' && vars.PACKONE_YOUTUBE_UPLOAD_ENABLED == 'true') ||
+      ((github.event_name == 'schedule' && vars.PACKONE_YOUTUBE_UPLOAD_PAUSED != 'true') ||
        (github.event_name == 'workflow_dispatch' && inputs.publish == true))
     runs-on: ubuntu-latest
     timeout-minutes: 8
