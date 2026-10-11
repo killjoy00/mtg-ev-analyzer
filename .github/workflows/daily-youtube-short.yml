@@ -1,0 +1,103 @@
+name: Record the real Pack One Daily Short
+
+on:
+  # 08:40 PDT / 09:40 PST, after the Pacific Daily reset and Bluesky post.
+  # One trigger/day prevents repeated rendering and controls Actions/storage cost.
+  schedule:
+    - cron: '40 16 * * *'
+  workflow_dispatch:
+    inputs:
+      publish:
+        description: 'Upload the 10-second recording to YouTube (requires private OAuth secrets)'
+        type: boolean
+        required: true
+        default: false
+  pull_request:
+    paths:
+      - '.github/workflows/daily-youtube-short.yml'
+      - 'scripts/daily-short.mjs'
+      - 'scripts/record-daily-short.mjs'
+      - 'scripts/upload-daily-short.mjs'
+      - 'tests/daily-short.test.mjs'
+      - 'docs/DAILY-YOUTUBE-SHORT.md'
+
+concurrency:
+  group: ${{ github.event_name == 'pull_request' && format('packone-daily-short-review-{0}', github.event.pull_request.number) || (github.event_name == 'workflow_dispatch' && !inputs.publish && format('packone-daily-short-preview-{0}', github.run_id) || 'packone-daily-short-live') }}
+  cancel-in-progress: false
+
+jobs:
+  record:
+    if: github.repository == 'killjoy00/mtg-ev-analyzer' && (github.event_name == 'pull_request' || github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      recorded: ${{ steps.capture.outputs.recorded }}
+      day: ${{ steps.capture.outputs.day }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate Daily screen recording contracts without network
+        run: node --test tests/daily-short.test.mjs
+      - name: Install browser with existing pinned project dependencies
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends ffmpeg
+          fi
+      - name: Record the live site and its real card images
+        id: capture
+        env:
+          GITHUB_TOKEN: ${{ github.event_name == 'schedule' && github.token || '' }}
+        run: node scripts/record-daily-short.mjs
+      - uses: actions/upload-artifact@v4
+        if: steps.capture.outputs.recorded == 'true'
+        with:
+          name: packone-daily-short
+          path: artifacts/daily-short/
+          if-no-files-found: error
+          retention-days: 5
+      - name: Summarize recording
+        if: steps.capture.outputs.recorded == 'true'
+        env:
+          DAILY_DAY: ${{ steps.capture.outputs.day }}
+        run: |
+          echo "### Actual browser screen recording: $DAILY_DAY" >> "$GITHUB_STEP_SUMMARY"
+          echo "10 seconds, vertical 1080x1920, real cards from the live first Daily pack, no picks/reveal." >> "$GITHUB_STEP_SUMMARY"
+          echo "Download the **packone-daily-short** workflow artifact to preview the MP4." >> "$GITHUB_STEP_SUMMARY"
+
+  youtube:
+    needs: record
+    if: >-
+      github.repository == 'killjoy00/mtg-ev-analyzer' &&
+      github.ref == 'refs/heads/main' &&
+      needs.record.outputs.recorded == 'true' &&
+      ((github.event_name == 'schedule' && vars.PACKONE_YOUTUBE_UPLOAD_ENABLED == 'true') ||
+       (github.event_name == 'workflow_dispatch' && inputs.publish == true))
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v4
+        with:
+          name: packone-daily-short
+          path: artifacts/daily-short
+      - name: Upload video once per Pacific Daily
+        run: node scripts/upload-daily-short.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PACKONE_YOUTUBE_CLIENT_ID: ${{ secrets.PACKONE_YOUTUBE_CLIENT_ID }}
+          PACKONE_YOUTUBE_CLIENT_SECRET: ${{ secrets.PACKONE_YOUTUBE_CLIENT_SECRET }}
+          PACKONE_YOUTUBE_REFRESH_TOKEN: ${{ secrets.PACKONE_YOUTUBE_REFRESH_TOKEN }}
