@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {
   INSIGHTS_SQL, INSIGHTS_SESSION_LIMIT, aggregateDraftRunInsights, validateInsightsFilters, loadDraftRunInsights,
 } from '../worker/draft-run-insights.mjs';
@@ -12,7 +13,7 @@ function row(n,{environment='mixed',score=72,pick=1,band='medium',time,puzzle,ma
     environment,pick_number:pick,score,trophy_match:match,
     answered_at:time||new Date(Date.UTC(2026,8,1)+n*86400000).toISOString(),
     difficulty_band:band,scoring_version:'trophy-consensus-v3-linear-v2',
-    selection_version:'eight-pick-v4',corpus_version:'elite-trophy-colour-stage-v9',
+    selection_version:'eight-pick-v4',corpus_version:DRAFT_RUN_CORPUS_VERSION,
   };
 }
 const result=(rows,filters={})=>aggregateDraftRunInsights(rows,{now,...filters});
