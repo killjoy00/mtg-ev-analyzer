@@ -52,7 +52,7 @@ function normalise(rows) {
     String(a.session_id).localeCompare(String(b.session_id)));
   for(const row of sorted){
     const id=String(row.puzzle_id||'');
-    const score=Number(row.score),pick=Number(row.pick_number),when=new Date(row.answered_at).getTime();
+    const score=Number(row.score),pick=Number(row.pick_number),when=row.answered_at==null?NaN:new Date(row.answered_at).getTime();
     if(!id||!Number.isInteger(score)||score<0||score>100||!Number.isInteger(pick)||pick<1||pick>11||
       !Number.isFinite(when)||!INSIGHTS_ENVIRONMENTS.includes(row.environment)||
       ![true,false,'true','false','t','f'].includes(row.trophy_match)||seen.has(id))continue;
