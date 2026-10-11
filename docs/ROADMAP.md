@@ -10,6 +10,8 @@ The rebuild, serving optimization, leakage-corrected v8/v4 model release, Tradit
 - **[#1151](https://github.com/killjoy00/mtg-ev-analyzer/issues/1151): opt-in Daily reminders** remain an independent product request: configurable frequency, web email and native push. Reminders are **not** part of #1150, and native store-review gates remain in force.
 
 
+## Existing operating and research priorities
+
 1. Observe the next genuinely new archive through the automated Candidate pipeline. Keep explicit publication and existing quality gates. SIR's v4 Traditional component remains Candidate under its Candidate parent; HBG/HOB/KTK/PIO Traditional sources remain blocked.
 2. Validate physical-device authentication, native sharing, and assistive technology with real devices. Browser viewport tests do not establish those results.
 3. Observe the next genuine Patreon billing/tier change and correlate it with signed provider webhook/reconciliation evidence. Exact tier boundaries, revocation, ordering, expiry, manual-grant preservation, activation routing and authoritative `elite_activated` transitions have automated coverage; real OAuth, reconnect, premium practice, authoritative API reconciliation and the Welcome Note route have passed. This is continuing provider-observation work, not an open #181 acceptance blocker. Do not purchase or modify subscriptions merely to manufacture evidence.
