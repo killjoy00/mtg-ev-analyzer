@@ -1,8 +1,16 @@
 # Remaining work and future scope
 
-Use [CURRENT-STATE](CURRENT-STATE.md) for deployment and [CHARTER](CHARTER.md) for the product. Updated September 25, 2026.
+Use [CURRENT-STATE](CURRENT-STATE.md) for deployment and [CHARTER](CHARTER.md) for the product. Updated October 11, 2026 (newly approved product backlog; prior operating priorities retained).
 
 The rebuild, serving optimization, leakage-corrected v8/v4 model release, Traditional v4 publication, three Dailies, Elite custom/Cube practice, public Patreon linking, and the Patreon purchase-to-activation loop are complete. The launch-attribution/habit release and the static campaign-link/Admin Link Builder follow-on are also complete; campaign vanity publishing is now an operating workflow, not remaining product scope. Issue #181 is closed after the Welcome Note activation route, authoritative OAuth verification, identity-stability protections, server-written `elite_activated` measurement, and live mobile acceptance for the already-entitled path. Issue #164 is also closed after complement-only fold construction, held-label invariance coverage, measured impact, and separately versioned release. Prior PR149/150/153/154 are closed and superseded by reviewed releases.
+
+## Approved product scope — not yet implemented
+
+- **[#1150](https://github.com/killjoy00/mtg-ev-analyzer/issues/1150): My Pack One Insights.** The chosen **Option B** is a complete **Stats | Insights | Account settings** internal-tab experience on web and native. Insights includes private pick-depth, time trend, environment comparisons, difficulty context, and sample-qualified descriptive observations. It is **not** an Option A-only Stats chart, new native bottom tab, or currently shipped feature. Read the [My Pack One Insights approved specification](MY-PACK-ONE-INSIGHTS.md) and reuse the [Insights implementation prompt](MY-PACK-ONE-INSIGHTS-IMPLEMENTATION-PROMPT.md) for implementation.
+- **[#1151](https://github.com/killjoy00/mtg-ev-analyzer/issues/1151): opt-in Daily reminders** remain an independent product request: configurable frequency, web email and native push. Reminders are **not** part of #1150, and native store-review gates remain in force.
+
+
+## Existing operating and research priorities
 
 1. Observe the next genuinely new archive through the automated Candidate pipeline. Keep explicit publication and existing quality gates. SIR's v4 Traditional component remains Candidate under its Candidate parent; HBG/HOB/KTK/PIO Traditional sources remain blocked.
 2. Validate physical-device authentication, native sharing, and assistive technology with real devices. Browser viewport tests do not establish those results.
