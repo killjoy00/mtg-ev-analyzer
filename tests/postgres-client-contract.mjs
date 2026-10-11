@@ -90,7 +90,7 @@ try {
   assert.equal(insightResult.formats.length,3);
   assert.ok(insightResult.pick_depth.length>0,'Real source pick numbers survive joins');
   assert.ok(insightResult.difficulty.some(d=>d.count>0),'Real rated puzzle difficulty joins');
-  assert.equal(insightResult.months.reduce((n,row)=>n+row.count,0),insightResult.eligible_decisions);
+  assert.ok(insightResult.months.every(row=>row.count>=10),'Only months with ten picks appear in progress');
   const inaccessible=await fetch('https://api-preview.packone.pro/growth/v1/profile/insights?environment=mixed');
   assert.equal(inaccessible.status,401,'Guest player cookie cannot authorize private Insights');
   const noMobileAuth=await fetch('https://api-preview.packone.pro/growth/v1/mobile/profile/insights?environment=mixed');
