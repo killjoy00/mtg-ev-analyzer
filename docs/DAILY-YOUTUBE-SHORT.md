@@ -1,14 +1,14 @@
 # Daily real-browser YouTube Short — owner guide
 
-This is a **screen recording**, not an illustration, generated pack, or staged card image. The workflow opens the production `https://packone.pro` site as a new guest, validates today's actual Pacific-date main **Daily Draft Run**, loads and decodes **every real card image**, and records its homepage followed by the opening round. The 10-second output is a 1080 × 1920 MP4 assembled from two real browser video segments (1.6 seconds homepage, 8.4 seconds smoothly scrolling the first pack). It never clicks a card, locks a pick, completes a run, or reveals the trophy pick.
+This is a **screen recording**, not an illustration, generated pack, or staged card image. The workflow opens the production `https://packone.pro` site as a new guest, validates today's actual Pacific-date main **Daily Draft Run**, loads and decodes **every real card image**, and records its homepage followed by the opening round. The 10-second output is a 1080 × 1920, 30fps MP4 assembled automatically from **three segments**: **1.5 seconds branded "TODAY'S DRAFT" intro**, **6.5 seconds of the real opening pack screen recording** (top-to-bottom card-grid scroll), and **2.0 seconds branded "WHAT WOULD YOU PICK? / PLAY AT PACKONE.PRO →" CTA over a frozen real pack screenshot**. The final CTA hangs for 0.5 seconds longer than the initially reviewed cut and the entire **P** in PLAY must remain inside the padded white button. It never clicks a card, locks a pick, completes a run, or reveals the trophy pick.
 
 ## Review a recording before publication
 
 - Open [Record the real Pack One Daily Short](https://github.com/killjoy00/mtg-ev-analyzer/actions/workflows/daily-youtube-short.yml) in GitHub Actions.
 - Run **workflow_dispatch** on `main` with **publish = false**, or open a PR changing the recording workflow. The PR event records a video but **never posts to YouTube**, and no credentials are exposed.
-- Download the `packone-daily-short` artifact. It contains `packone-daily-YYYY-MM-DD-10s.mp4`, screenshots of the home and real card grid, and `capture.json` with date, first puzzle ID and card count. Retention is five days to minimize storage cost.
-- A weekday schedule at **16:40 UTC** records one video daily: **8:40 AM Pacific Daylight Time / 9:40 AM Pacific Standard Time**, after the independent Daily reset and Bluesky workflow. A delayed/rerun schedule from a previous Pacific day exits without recording. The first pack is validated in the live run-start API, not inferred from local fixtures.
-- If the live Daily, first pack or even one actual card image fails to load, **capture fails** rather than substituting placeholder/fake cards or uploading a broken Short. The video is silent (true site capture, no licensed background music).
+- Download the `packone-daily-short` artifact. It contains `packone-daily-YYYY-MM-DD-10s.mp4`, real site screenshots (`homepage.png`, `first-pack.png`, `first-pack-bottom.png`), generated source-true bookends (`intro.png`, `outro.png`), and `capture.json` with date, first puzzle ID, card count, template version, precise segment timing and frame count. Retention is five days to minimize storage cost.
+- A daily schedule at **16:40 UTC** records one video daily: **8:40 AM Pacific Daylight Time / 9:40 AM Pacific Standard Time**, after the independent Daily reset and Bluesky workflow. A delayed/rerun schedule from a previous Pacific day exits without recording. The first pack is validated in the live run-start API, not inferred from local fixtures.
+- If the live Daily, first pack or even one actual card image fails to load, **capture fails** rather than substituting placeholder/fake cards or uploading a broken Short. The video is silent (true site capture and deterministic brand bookends, no licensed background music).
 
 ## Connect YouTube (private owner step)
 
@@ -23,4 +23,21 @@ The YouTube video points to the Daily with attribution `utm_source=youtube&utm_m
 
 ## Cost and boundaries
 
-The one Linux capture job uses the repository's pinned Playwright, Chromium and FFmpeg. It runs **once per day** plus explicit previews, and keeps videos/screenshots for only five days. No Mac runner, AI video API or replay/corpus job is used. Only two scoped GitHub tokens exist: a read-only recorder token (also for PRs), and an `issues: write` token in the main-only uploader. The video remains a real live-site screen recording, not an advertisement assembled from card placeholders.
+The one Linux capture job uses the repository's pinned Playwright, Chromium and FFmpeg. It runs **once per day** plus explicit previews, and keeps videos/screenshots for only five days. No Mac runner, AI video API or replay/corpus job is used. Only two scoped GitHub tokens exist: a read-only recorder token (also for PRs), and an `issues: write` token in the main-only uploader. The body of the video remains a real live-site screen recording, not an advertisement assembled from card placeholders.
+
+## Approved visual template, reproducible every day
+
+The intro and outro are generated at runtime by `scripts/render-daily-short-brand.mjs`; **no manually generated or dated PNGs** are committed. The generator reads:
+
+- `mobile/assets/images/brand-mark.svg`: the actual outlined canonical P¹ logo, **not a Unicode recreation**;
+- `assets/fonts/barlow-condensed-{600,700}.woff2` and `assets/fonts/source-sans-3-{400,700}.woff2`: Pack One's actual bundled fonts;
+- Pack One's live blue `#1e4d7a`, ink `#101820`, and page `#f7f8fa` from `visual-c.css` / `assets/brand/README.md`;
+- fresh `homepage.png` and `first-pack.png` captured from the real browser on the same Daily run.
+
+The intro features the canonical P¹/wordmark, softly blurred real homepage, **"TODAY'S DRAFT"**, **"PACK ONE"**, and **"Eight picks. Your call."** The outro displays the actual first-pack screen with a translucent navy panel and **"WHAT WOULD YOU PICK? / PLAY AT PACKONE.PRO →"**, keeping the complete leading P and arrow inside a padded white bar. Playwright renders the frames offline from repo assets, then validates real logo presence, card image visibility, font loading and CTA bounding boxes. **A clipped CTA or unloaded asset is a hard failure.**
+
+The segment durations are constants in `scripts/daily-short.mjs`: **INTRO_SECONDS=1.5, PACK_SECONDS=6.5, OUTRO_SECONDS=2.0**, totaling **300 frames at 30fps (10 seconds)**. FFmpeg composites the branded PNGs around the browser's real pack video. It verifies output dimensions, frame count, and duration; the optional uploader refuses an obsolete/mismatched template manifest.
+
+To verify a future Daily, open the scheduled [GitHub Action](https://github.com/killjoy00/mtg-ev-analyzer/actions/workflows/daily-youtube-short.yml) and download the five-day artifact. PRs generate preview artifacts without YouTube credentials or publishing. YouTube publication remains gated behind private owner OAuth setup and the explicit `PACKONE_YOUTUBE_UPLOAD_ENABLED=true` variable.
+
+Tracking issue: [#1146 — Daily YouTube Shorts](https://github.com/killjoy00/mtg-ev-analyzer/issues/1146).
