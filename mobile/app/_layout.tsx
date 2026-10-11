@@ -89,6 +89,7 @@ export default function RootLayout() {
           <Stack.Screen name="method" options={{ title: 'Method' }} />
           <Stack.Screen name="sets" options={{ title: 'Sets' }} />
           <Stack.Screen name="set-archive" options={{ title: 'Set Archive' }} />
+          <Stack.Screen name="insights" options={{ title: 'My Pack One' }} />
           <Stack.Screen name="account" options={{ title: 'Account settings' }} />
           <Stack.Screen name="account-profile" options={{ title: 'Profile & visibility' }} />
           <Stack.Screen name="about" options={{ title: 'About' }} />
