@@ -2,9 +2,28 @@
 export const SITE_URL='https://packone.pro/';
 export const DAILY_URL='https://packone.pro/?game=draft-run&daily=1';
 export const PACIFIC='America/Los_Angeles';
-export const HOME_SECONDS=1.6;
-export const PACK_SECONDS=8.4;
+export const INTRO_SECONDS=1.5;
+export const PACK_SECONDS=6.5;
+export const OUTRO_SECONDS=2.0;
 export const SHORT_SECONDS=10;
+export const TEMPLATE_VERSION='branded-real-pack-v1';
+export const FRAMES_PER_SECOND=30;
+export const TOTAL_FRAMES=SHORT_SECONDS*FRAMES_PER_SECOND;
+if(INTRO_SECONDS+PACK_SECONDS+OUTRO_SECONDS!==SHORT_SECONDS)
+  throw Error('Daily branded Short timing does not total 10 seconds.');
+
+// Defined here so the recorder and its contract tests cannot drift apart.
+export function videoFilter(packStart) {
+  if(!Number.isFinite(packStart)||packStart<0)throw Error('Invalid real-pack video start.');
+  const segment=(stream,trim,alias)=>
+    `[${stream}:v]trim=${trim},setpts=PTS-STARTPTS,fps=${FRAMES_PER_SECOND},scale=1080:1920:flags=lanczos,setsar=1[${alias}]`;
+  return [
+    segment(0,`duration=${INTRO_SECONDS}`,'intro'),
+    segment(1,`start=${packStart.toFixed(3)}:duration=${PACK_SECONDS}`,'pack'),
+    segment(2,`duration=${OUTRO_SECONDS}`,'outro'),
+    '[intro][pack][outro]concat=n=3:v=1:a=0,format=yuv420p[out]',
+  ].join(';');
+}
 
 export function pacificDay(now=new Date()) {
   const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{

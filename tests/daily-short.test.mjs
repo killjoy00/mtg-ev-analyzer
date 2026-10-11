@@ -2,7 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {pacificDay,intendedDay,validateOpeningRun,clipTailStart,videoFilename,
-  shortMetadata,youtubeReceiptMarker,HOME_SECONDS,PACK_SECONDS,SHORT_SECONDS} from '../scripts/daily-short.mjs';
+  shortMetadata,youtubeReceiptMarker,INTRO_SECONDS,PACK_SECONDS,OUTRO_SECONDS,
+  SHORT_SECONDS,TOTAL_FRAMES,TEMPLATE_VERSION,videoFilter} from '../scripts/daily-short.mjs';
+import {BRAND,VIDEO_FRAME,introHtml,outroHtml,loadBrandAssets,verifyBrandedFrame} from '../scripts/render-daily-short-brand.mjs';
 import {youtubeAccessToken,checkedUploadLocation,uploadVideo,youtubeReceipt} from '../scripts/upload-daily-short.mjs';
 
 const day='2026-10-10';
@@ -31,11 +33,22 @@ test('Capture must be the unplayed main Daily with a complete first pack',()=>{
     {answers:[{score:100}]},{current:{puzzle_id:'test',candidates:[]}},{run_length:10},
   ])assert.throws(()=>validateOpeningRun({...fullRun,...changed},day),/Live main Daily/);
 });
-test('Only the exact final 10 seconds of real browser footage are composed',()=>{
-  assert.equal(HOME_SECONDS+PACK_SECONDS,SHORT_SECONDS);
+test('Approved brand/pack/CTA timing is 1.5 + 6.5 + 2.0 seconds (300 frames)',()=>{
+  assert.equal(INTRO_SECONDS,1.5);
+  assert.equal(PACK_SECONDS,6.5);
+  assert.equal(OUTRO_SECONDS,2);
+  assert.equal(INTRO_SECONDS+PACK_SECONDS+OUTRO_SECONDS,SHORT_SECONDS);
   assert.equal(SHORT_SECONDS,10);
-  assert.equal(clipTailStart(14,8.4).toFixed(2),'5.52');
-  assert.throws(()=>clipTailStart(8.4,8.4),/shorter/);
+  assert.equal(TOTAL_FRAMES,300);
+  assert.equal(TEMPLATE_VERSION,'branded-real-pack-v1');
+  const graph=videoFilter(3.14);
+  assert.match(graph,/trim=duration=1\.5/);
+  assert.match(graph,/trim=start=3\.140:duration=6\.5/);
+  assert.match(graph,/trim=duration=2/);
+  assert.match(graph,/concat=n=3:v=1:a=0/);
+  assert.throws(()=>videoFilter(-1),/start/);
+  assert.equal(clipTailStart(10,6.5).toFixed(2),'3.42');
+  assert.throws(()=>clipTailStart(6.5,6.5),/shorter/);
   assert.equal(videoFilename(day),'packone-daily-2026-10-10-10s.mp4');
 });
 test('YouTube title, description and receipt never spoil the trophy pick',()=>{
@@ -92,4 +105,57 @@ test('Receipt supports posted dedupe and blocks uncertain duplicate YouTube uplo
   assert.match(capture,/naturalWidth>100/);
   assert.doesNotMatch(capture,/\.click\(\).*run-card-select|#run-lock'\)\.click/);
   assert.match(capture,/recordVideo/);
+  assert.match(capture,/renderBrandedFrames/);
+  assert.match(capture,/videoFilter/);
+  assert.match(capture,/template_version:TEMPLATE_VERSION/);
+  assert.match(workflow,/render-daily-short-brand\.mjs/);
+});
+test('Canonical brand assets are the repo-owned P¹ vector and Pack One web fonts',async()=>{
+  const paths=[];
+  const brand=await loadBrandAssets({read:async file=>{
+    paths.push(file);
+    return file.endsWith('.svg')?Buffer.from('<svg fill="#1e4d7a"></svg>'):
+      Buffer.alloc(25000,0);
+  }});
+  assert.ok(paths.some(path=>path.endsWith('mobile/assets/images/brand-mark.svg')));
+  for(const ending of ['barlow-condensed-600.woff2','barlow-condensed-700.woff2',
+    'source-sans-3-400.woff2','source-sans-3-700.woff2'])
+    assert.ok(paths.some(path=>path.endsWith(ending)),ending);
+  assert.ok(brand.logo.startsWith('data:image/svg+xml;base64,'));
+  assert.equal(BRAND.blue,'#1e4d7a');
+  assert.equal(BRAND.page,'#f7f8fa');
+  assert.deepEqual(VIDEO_FRAME,{width:1080,height:1920});
+});
+
+test('Intro and outro are per-day browser templates with real logo, screenshot and fully visible CTA',()=>{
+  const assets={logo:'data:image/svg+xml;base64,abc',display:'data:font/woff2;base64,abc',
+    displayBold:'data:font/woff2;base64,abc',body:'data:font/woff2;base64,abc',
+    bodyBold:'data:font/woff2;base64,abc'};
+  const image='data:image/png;base64,abc';
+  const intro=introHtml({assets,homeScreenshot:image,day});
+  assert.match(intro,/TODAY'S/);
+  assert.match(intro,/DRAFT/);
+  assert.match(intro,/Eight picks\. Your call\./);
+  assert.match(intro,/data-brand-mark/);
+  assert.match(intro,/data-duration="1\.5"/);
+  assert.match(intro,/Pack One Display/);
+  assert.match(intro,/2026-10-10/);
+  const outro=outroHtml({assets,packScreenshot:image,day});
+  assert.match(outro,/WHAT WOULD YOU PICK\?/);
+  assert.match(outro,/PLAY AT PACKONE\.PRO/);
+  assert.match(outro,/data-duration="2"/);
+  assert.match(outro,/Real first pack/);
+  assert.match(outro,/2026-10-10/);
+  assert.throws(()=>outroHtml({assets,packScreenshot:'fake',day}),/data:image/);
+});
+
+test('Layout guard rejects clipped PLAY label and missing actual logo/card image',async()=>{
+  const box=(left,right,top=100,bottom=200)=>({left,right,top,bottom,x:left,y:top,width:right-left,height:bottom-top});
+  const valid={day,clip:'outro',images:1,imagesReady:true,fontsReady:true,
+    cta:box(35,1045),action:box(175,905),label:box(242,792),arrow:box(814,860),
+    question:box(105,975),bodyScrollWidth:1080};
+  assert.equal((await verifyBrandedFrame({evaluate:async()=>valid},'outro',day)).imagesReady,true);
+  await assert.rejects(verifyBrandedFrame({evaluate:async()=>({...valid,label:box(20,792)})},'outro',day),/clipped/);
+  await assert.rejects(verifyBrandedFrame({evaluate:async()=>({...valid,imagesReady:false})},'outro',day),/did not load/);
+  await assert.rejects(verifyBrandedFrame({evaluate:async()=>({...valid,clip:'intro',images:2,logo:null})},'intro',day),/logo missing/);
 });
