@@ -245,6 +245,26 @@ test('finishing an old practice-key cleanup cannot restore a previous run after 
 });
 
 
+for (const trophyRecord of ['has a 62% win rate', 'went 7–2']) {
+  test(`trophy drafter context ${trophyRecord} appears only in expanded native analysis`, async () => {
+    const revealed = { ...answer(0, 'a', 88), trophyRecord };
+    const completedPick = { ...runZero(), revision: 5, round: 1, answers: [revealed], current: puzzle(1) };
+    const screen = await fixture({ submitPick: async () => completedPick });
+    try {
+      await screen.chooseAndConfirm();
+      const title = screen.root.root.findAll((node) => node.type === 'Text' && node.props.testID === 'feedback-title')[0];
+      assert.ok(title);
+      assert.equal(renderedText(title), 'The trophy drafter took Card B.');
+      assert.doesNotMatch(screen.text(), new RegExp(trophyRecord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
+        'source-drafter background stays out of the compact reveal');
+      const why = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Why this score?'))[0];
+      assert.ok(why);
+      await act(async () => why.props.onPress());
+      assert.ok(screen.text().includes(`Trophy drafter ${trophyRecord}.`));
+    } finally { await screen.close(); }
+  });
+}
+
 test('TCGplayer affiliate destinations stay hidden until score analysis is opened', async () => {
   const completedPick = { ...runZero(), revision: 5, round: 1, answers: [answer(0, 'a', 88)], current: puzzle(1) };
   const screen = await fixture({ submitPick: async () => completedPick });
