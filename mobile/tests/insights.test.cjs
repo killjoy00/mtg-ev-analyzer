@@ -40,7 +40,7 @@ function compile(relative,mocks) {
     return require(name);
   };
   mod._compile(ts.transpileModule(fs.readFileSync(filename,'utf8'),{
-    compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true},
+    compilerOptions:{module:ts.ModuleKind.CommonJS,jsx:ts.JsxEmit.ReactJSX,target:ts.ScriptTarget.ES2022,esModuleInterop:true},
     fileName:filename,
   }).outputText,filename);
   return mod.exports;
