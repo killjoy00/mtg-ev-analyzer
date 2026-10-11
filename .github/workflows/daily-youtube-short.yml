@@ -1,4 +1,4 @@
-name: Record the real Pack One Daily Short
+name: Branded Pack One Daily YouTube Short
 
 on:
   # 08:40 PDT / 09:40 PST, after the Pacific Daily reset and Bluesky post.
@@ -17,6 +17,9 @@ on:
       - '.github/workflows/daily-youtube-short.yml'
       - 'scripts/daily-short.mjs'
       - 'scripts/record-daily-short.mjs'
+      - 'scripts/render-daily-short-brand.mjs'
+      - 'mobile/assets/images/brand-mark.svg'
+      - 'assets/fonts/**'
       - 'scripts/upload-daily-short.mjs'
       - 'tests/daily-short.test.mjs'
       - 'docs/DAILY-YOUTUBE-SHORT.md'
@@ -41,7 +44,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Validate Daily screen recording contracts without network
+      - name: Validate approved branded 1.5s / 6.5s / 2.0s video template contracts without network
         run: node --test tests/daily-short.test.mjs
       - name: Install browser with existing pinned project dependencies
         run: |
@@ -51,7 +54,7 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y --no-install-recommends ffmpeg
           fi
-      - name: Record the live site and its real card images
+      - name: Record real daily cards and compose branded intro and outro
         id: capture
         env:
           GITHUB_TOKEN: ${{ github.event_name == 'schedule' && github.token || '' }}
@@ -69,7 +72,7 @@ jobs:
           DAILY_DAY: ${{ steps.capture.outputs.day }}
         run: |
           echo "### Actual browser screen recording: $DAILY_DAY" >> "$GITHUB_STEP_SUMMARY"
-          echo "10 seconds, vertical 1080x1920, real cards from the live first Daily pack, no picks/reveal." >> "$GITHUB_STEP_SUMMARY"
+          echo "10s / 1080x1920 / real first-pack cards / P¹ actual logo / intro 1.5s + pack 6.5s + CTA 2.0s / no picks or reveal." >> "$GITHUB_STEP_SUMMARY"
           echo "Download the **packone-daily-short** workflow artifact to preview the MP4." >> "$GITHUB_STEP_SUMMARY"
 
   youtube:
