@@ -106,6 +106,18 @@ test('Live posts reject unreviewed refs; preview remains available',async()=>{
   assert.equal(preview.dry_run,true);
 });
 
+test('the schedule is a quiet no-op until a destination is configured',async()=>{
+  const fetchImpl=()=>{throw Error('network must not be used');};
+  assert.deepEqual(await postDaily({env:{GITHUB_EVENT_NAME:'schedule',GITHUB_REF:'refs/heads/main'},now:summer,fetchImpl}),
+    {day:'2026-07-10',skipped:true,reason:'no social destinations configured'});
+  await assert.rejects(postDaily({env:{GITHUB_EVENT_NAME:'schedule',GITHUB_REF:'refs/heads/main',BLUESKY_HANDLE:'packone.bsky.social'},now:summer,fetchImpl}),
+    /Bluesky credentials are incomplete/);
+  await assert.rejects(postDaily({env:{GITHUB_EVENT_NAME:'schedule',GITHUB_REF:'refs/heads/main',DISCORD_WEBHOOK_URLS:'https://example.com/hook'},now:summer,fetchImpl}),
+    /Discord webhook entries: 1|Discord webhook entry 1 is invalid/);
+  await assert.rejects(postDaily({env:{GITHUB_EVENT_NAME:'workflow_dispatch',GITHUB_REF:'refs/heads/main',MANUAL_LIVE:'true'},now:summer,fetchImpl}),
+    /Configure a Bluesky account or Discord webhooks/,'an explicit live run still reports missing destinations');
+});
+
 test('Redundant winter 7 AM cron skips; delayed 8 AM run and retry are eligible',async()=>{
   const forbidden=()=>{throw Error('Off-hours scheduled traffic');};
   const early=await postDaily({now:new Date('2026-01-10T15:10:00Z'),env:liveEnv,fetchImpl:forbidden});
