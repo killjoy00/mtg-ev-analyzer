@@ -140,6 +140,8 @@ Native Insights ships in the same PR as the backend and web. After the PR is mer
 - **Android:** a new signed AAB with a new version code, uploaded and promoted unchanged to the existing `production-access` closed-test track. Do not change testers, groups, countries or the Production track.
 - Update [CURRENT-STATE.md](CURRENT-STATE.md), the exact-build inventory and #575 with the new build numbers.
 
+**Result (October 11):** the backend and gateway were released in [run 38182202420](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/38182202420). Android **100765** is on the `production-access` closed track (promotion `completed`). iOS 1.1/**100758** was uploaded and is `VALID` / `APP_STORE_ELIGIBLE`; the workflow did not attach it to a version (no `1.1` record found) or verify TestFlight availability.
+
 ## Acceptance and evidence
 
 - [ ] Full **Stats | Insights | Account settings** internal navigation on web and native. Existing Stats/Account settings features unchanged and independently regression-tested.
