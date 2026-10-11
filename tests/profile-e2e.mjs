@@ -13,6 +13,7 @@ let updatePayload = null;
 let updateMode = 'success';
 let shareCalls = 0;
 let accountMode = 'signed-in';
+let insightsMode = 'ready';
 
 await page.addInitScript(() => {
   localStorage.setItem('pack1-auth-session-v1','profile-auth-fixture');
@@ -119,6 +120,33 @@ await page.route(`${growthOrigin}/**`, async (route) => {
     body = { token:'p1_00000000-0000-4000-8000-000000000000.e2e', merged:false };
   } else if (url.pathname === '/v1/patreon/status') {
     body = { configured:true, connected:false, membership:null, capabilities:[], support_url:'https://www.patreon.com/c/PackOne' };
+  } else if (url.pathname === '/v1/profile/insights') {
+    const env = url.searchParams.get('environment') || 'mixed';
+    const period = url.searchParams.get('period') || 'all';
+    if (insightsMode === 'offline') {
+      status = 503;
+      body = { error:'Synthetic Insights outage.' };
+    } else {
+      body = {
+        environment:env,
+        period,
+        environment_label:{mixed:'Mixed',latest:'Latest Set','powered-cube':'Powered Cube'}[env],
+        eligible_decisions:80,total_eligible_decisions:160,unlocked:true,unlock_at:8,unknown_difficulty:0,
+        pick_depth:[{pick_number:env==='powered-cube'?2:1,label:env==='powered-cube'?'P1P2':'P1P1',count:40,average_score:78,trophy_match_pct:50}],
+        difficulty:[{band:'medium',count:80,average_score:77,trophy_match_pct:40}],
+        months:[{month:'2026-09',count:80,average_score:77,trophy_match_pct:40}],
+        formats:['mixed','latest','powered-cube'].map((environment,index)=>({
+          environment,label:{mixed:'Mixed',latest:'Latest Set','powered-cube':'Powered Cube'}[environment],
+          count:80,average_score:76+index,trophy_match_pct:40,
+        })),
+        progress:{recent:{count:40,average_score:83,trophy_match_pct:50,from:'2026-09-15',to:'2026-09-25'},
+          previous:{count:40,average_score:70,trophy_match_pct:30,from:'2026-09-01',to:'2026-09-14'},delta:13},
+        observations:[{id:'progress',text:'Recent 40 picks averaged 13.0 points higher than the previous 40 picks (40 vs 40 decisions).'}],
+        versions:{scoring:['trophy-consensus-v3-linear-v2'],selection:['eight-pick-v4'],corpus:['fixture']},
+        range:{from:'2026-09-01',to:'2026-09-25'},session_limit:1000,
+        methodology:'First answer to each puzzle, original points, 1,000-session cap.',
+      };
+    }
   } else if (url.pathname === '/v1/profile/me') {
     body = fixture;
   } else if (url.pathname === `/v1/profile/${profileKey}`) {
@@ -181,6 +209,43 @@ try {
   assert.equal(await page.locator('.my-profile-card h2 [data-achievement-mark="explorer5"]').count(),1,'showcased badge sits beside the player name');
   assert.equal(await page.locator('#profile-stats-tab').getAttribute('aria-selected'),'true');
   assert.equal(await page.locator('#profile-account-panel').isHidden(),true);
+
+  assert.equal(await page.locator('[role="tab"][id^="profile-"]').count(),3,'My Pack One has three local sections');
+  await page.locator('#profile-insights-tab').click();
+  assert.equal(await page.locator('#profile-insights-tab').getAttribute('aria-selected'),'true');
+  await page.locator('#my-insights-result').getByText('Your patterns',{exact:true}).waitFor();
+  assert.match(await page.locator('#my-insights-result').textContent(),/Pick-by-pick strengths/);
+  assert.match(await page.locator('#my-insights-result').textContent(),/Progress over time/);
+  assert.match(await page.locator('#my-insights-result').textContent(),/Difficulty context/);
+  assert.match(await page.locator('#my-insights-result').textContent(),/Format patterns/);
+  assert.equal(await page.locator('.my-insights-bar').count(),2,'pick and difficulty charts use actual backend data');
+  await page.locator('#my-insights-environment').selectOption('powered-cube');
+  await page.locator('#my-insights-result').getByText('P1P2').waitFor();
+  await page.locator('#my-insights-period').selectOption('90d');
+  await page.locator('.my-insights-sample').getByText(/Last 90 days/).waitFor();
+  for(const width of [320,390,768,1440]){
+    await page.setViewportSize({width,height:844});
+    await noOverflow();
+  }
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:'artifacts/ui-profile-insights-390.png',fullPage:true});
+  insightsMode='offline';
+  await page.locator('#my-insights-refresh').click();
+  await page.getByText('Insights unavailable',{exact:true}).waitFor();
+  insightsMode='ready';
+  await page.locator('#my-insights-retry').click();
+  await page.locator('#my-insights-result').getByText('Your patterns',{exact:true}).waitFor();
+  await page.locator('#profile-insights-tab').focus();
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await page.locator('#profile-account-tab').getAttribute('aria-selected'),'true','right arrow moves focus/selection');
+  await page.keyboard.press('Home');
+  assert.equal(await page.locator('#profile-stats-tab').getAttribute('aria-selected'),'true','Home returns to Stats');
+  await page.locator('#profile-stats-tab').focus();
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await page.locator('#profile-account-tab').getAttribute('aria-selected'),'true','left arrow wraps');
+  await page.locator('#profile-stats-tab').click();
+  assert.equal(await page.locator('#profile-insights-panel').isHidden(),true);
+
 
   const catalogIds = await page.evaluate(async () => {
     const response = await fetch('/data/catalog.json', { cache:'no-store' });
