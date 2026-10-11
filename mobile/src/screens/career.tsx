@@ -260,6 +260,9 @@ export default function CareerScreen() {
         <Pressable accessibilityRole="tab" accessibilityState={{ selected: true }} style={[styles.modeTab, styles.modeTabActive]}>
           <Text style={[styles.modeTabText, styles.modeTabTextActive]}>Stats</Text>
         </Pressable>
+        <Pressable accessibilityRole="tab" accessibilityState={{ selected: false }} onPress={() => router.push('/insights')} style={styles.modeTab}>
+          <Text style={styles.modeTabText}>Insights</Text>
+        </Pressable>
         <Pressable accessibilityRole="tab" accessibilityState={{ selected: false }} onPress={() => router.push('/account')} style={styles.modeTab}>
           <Text style={styles.modeTabText}>Account settings</Text>
         </Pressable>
