@@ -2,9 +2,11 @@ import {escapeHtml as esc} from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
 import {environmentProgress,formatChallengeRecord,modeName,unlockedAchievements} from './profile-core.mjs';
 import {PATREON_POLICY} from './patreon-policy.mjs';
+import {invalidateMyPackInsights,mountMyPackInsights} from './my-pack-insights.mjs';
 import {eliteSource} from './membership-source.mjs';
 
 let activeTab='stats';
+let previousOwner=null;
 
 const num=value=>Number(value||0);
 
@@ -201,36 +203,44 @@ function usernameAttentionMarkup(profile) {
   return '<aside class="profile-claim profile-username-attention" role="alert"><div><span>Display name needs attention</span><strong>'+esc(message)+'</strong><p>Your account is linked, but this display name cannot be shown on Daily leaderboards yet.</p></div><button type="button" class="button secondary" id="profile-username-fix">Change display name</button></aside>';
 }
 export function resetMyPackOneTab() {
-  activeTab='stats';
+  // Preserve the selected section across a same-owner refresh, but invalidate
+  // any old private response while another account/session is being loaded.
+  invalidateMyPackInsights();
 }
 
 function selectTab(tab,{focus=false}={}) {
-  activeTab=tab==='account'?'account':'stats';
-  const statsButton=document.querySelector('#profile-stats-tab');
-  const accountButton=document.querySelector('#profile-account-tab');
-  const stats=document.querySelector('[data-profile-panel="stats"]');
-  const account=document.querySelector('[data-profile-panel="account"]');
-  if(statsButton){statsButton.setAttribute('aria-selected',String(activeTab==='stats'));statsButton.tabIndex=activeTab==='stats'?0:-1;}
-  if(accountButton){accountButton.setAttribute('aria-selected',String(activeTab==='account'));accountButton.tabIndex=activeTab==='account'?0:-1;}
-  if(stats)stats.hidden=activeTab!=='stats';
-  if(account)account.hidden=activeTab!=='account';
-  if(focus)(activeTab==='stats'?statsButton:accountButton)?.focus();
+  const choices=['stats','insights','account'];
+  activeTab=choices.includes(tab)?tab:'stats';
+  for(const choice of choices){
+    const button=document.querySelector('#profile-'+choice+'-tab');
+    const panel=document.querySelector('[data-profile-panel="'+choice+'"]');
+    if(button){
+      button.setAttribute('aria-selected',String(activeTab===choice));
+      button.tabIndex=activeTab===choice?0:-1;
+    }
+    if(panel)panel.hidden=activeTab!==choice;
+  }
+  if(activeTab==='insights')mountMyPackInsights(document.querySelector('#profile-insights-panel'));
+  if(focus)document.querySelector('#profile-'+activeTab+'-tab')?.focus();
   window.scrollTo?.({top:0,behavior:'smooth'});
 }
 
 export function bindMyPackOneTabs() {
-  const statsButton=document.querySelector('#profile-stats-tab');
-  const accountButton=document.querySelector('#profile-account-tab');
-  if(!statsButton||!accountButton)return;
-  statsButton.addEventListener('click',()=>selectTab('stats'));
-  accountButton.addEventListener('click',()=>selectTab('account'));
-  for(const button of [statsButton,accountButton]) {
+  const choices=['stats','insights','account'];
+  const buttons=choices.map(tab=>document.querySelector('#profile-'+tab+'-tab'));
+  if(buttons.some(button=>!button))return;
+  buttons.forEach((button,index)=>{
+    button.addEventListener('click',()=>selectTab(choices[index]));
     button.addEventListener('keydown',event=>{
-      if(!['ArrowLeft','ArrowRight'].includes(event.key))return;
+      const direction=event.key==='ArrowRight'?1:event.key==='ArrowLeft'?-1:null;
+      const next=event.key==='Home'?0:event.key==='End'?choices.length-1:
+        direction===null?null:(index+direction+choices.length)%choices.length;
+      if(next===null)return;
       event.preventDefault();
-      selectTab(button===statsButton?'account':'stats',{focus:true});
+      selectTab(choices[next],{focus:true});
     });
-  }
+  });
+  if(activeTab==='insights')mountMyPackInsights(document.querySelector('#profile-insights-panel'));
   document.querySelector('#profile-edit')?.addEventListener('click',()=>selectTab('account',{focus:true}));
   document.querySelector('#profile-username-fix')?.addEventListener('click',()=>{
     selectTab('account',{focus:true});
@@ -239,13 +249,19 @@ export function bindMyPackOneTabs() {
 }
 
 export function myPackOneMarkup(profile,catalog,{account=null,patreon=null,settingsMarkup}={}) {
+  const owner=String(profile?.player?.profile_key||'unclaimed');
+  if(previousOwner!==owner){activeTab='stats';previousOwner=owner;invalidateMyPackInsights();}
   const progress=environmentProgress(catalog,profile.by_set||[]);
   const accountSelected=activeTab==='account';
   return '<section class="player-profile-page my-pack-one-page growth-page" data-profile-key="'+esc(profile.player.profile_key||'')+'">'+
     '<header class="my-pack-one-heading"><h1>My Pack One</h1><p>Your stats, settings, and everything in one place.</p></header>'+
     usernameAttentionMarkup(profile)+
-    '<div class="my-pack-one-tabs" role="tablist" aria-label="My Pack One"><button type="button" role="tab" id="profile-stats-tab" aria-controls="profile-stats-panel" aria-selected="'+String(!accountSelected)+'" tabindex="'+(!accountSelected?'0':'-1')+'">Stats</button><button type="button" role="tab" id="profile-account-tab" aria-controls="profile-account-panel" aria-selected="'+String(accountSelected)+'" tabindex="'+(accountSelected?'0':'-1')+'">Account settings</button></div>'+
-    '<section class="my-pack-one-panel" id="profile-stats-panel" role="tabpanel" aria-labelledby="profile-stats-tab" data-profile-panel="stats" '+(accountSelected?'hidden':'')+'>'+statsMarkup(profile,catalog,account,patreon)+'</section>'+
+    '<div class="my-pack-one-tabs" role="tablist" aria-label="My Pack One">'+
+      '<button type="button" role="tab" id="profile-stats-tab" aria-controls="profile-stats-panel" aria-selected="'+String(activeTab==='stats')+'" tabindex="'+(activeTab==='stats'?'0':'-1')+'">Stats</button>'+
+      '<button type="button" role="tab" id="profile-insights-tab" aria-controls="profile-insights-panel" aria-selected="'+String(activeTab==='insights')+'" tabindex="'+(activeTab==='insights'?'0':'-1')+'">Insights</button>'+
+      '<button type="button" role="tab" id="profile-account-tab" aria-controls="profile-account-panel" aria-selected="'+String(activeTab==='account')+'" tabindex="'+(activeTab==='account'?'0':'-1')+'">Account settings</button></div>'+
+    '<section class="my-pack-one-panel" id="profile-stats-panel" role="tabpanel" tabindex="0" aria-labelledby="profile-stats-tab" data-profile-panel="stats" '+(activeTab==='stats'?'':'hidden')+'>'+statsMarkup(profile,catalog,account,patreon)+'</section>'+
+    '<section class="my-pack-one-panel" id="profile-insights-panel" role="tabpanel" tabindex="0" aria-labelledby="profile-insights-tab" data-profile-panel="insights" '+(activeTab==='insights'?'':'hidden')+'></section>'+
     '<section class="my-pack-one-panel my-pack-one-account-panel" id="profile-account-panel" role="tabpanel" aria-labelledby="profile-account-tab" data-profile-panel="account" '+(!accountSelected?'hidden':'')+'>'+
       '<div class="my-account-heading"><h2>Account settings</h2><p>Manage your profile, membership, and sign-in.</p></div>'+
       (typeof settingsMarkup==='function'?settingsMarkup(profile,progress,account,patreon):'')+
