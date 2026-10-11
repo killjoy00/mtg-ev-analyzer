@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {fixturePool,postgresTransport,SQL_CONNECTION,textTypes} from './support/postgres-fixture.mjs';
 import {gateway} from '../edge/gateway.mjs';
 import {DRAFT_RUN_SELECTION_VERSION} from '../draft-run-policy.mjs';
+import {loadDraftRunInsights} from '../worker/draft-run-insights.mjs';
 const pool=fixturePool(),sql=postgresTransport(pool);
 const secret='a'.repeat(64),cookies=new Map(),memory=new Map();
 process.env.DATABASE_URL=SQL_CONNECTION;
@@ -13,7 +14,9 @@ const env={MODE:'preview',NEON_BRANCH_ID:'br-ci-fixture',QUOTA_KEY:secret,PREVIE
 globalThis.window={PACK1_API:{growthUrl:'https://api-preview.packone.pro/growth',draftRunUrl:'https://api-preview.packone.pro/draft',firstParty:true}};
 globalThis.document={cookie:''};
 globalThis.localStorage={getItem:key=>memory.get(key)||null,setItem:(key,value)=>memory.set(key,value),removeItem:key=>memory.delete(key)};
-memory.set('pack1-player-name-v1','QA wire contract');
+// Non-QA synthetic player is necessary to exercise the real Insights eligibility path.
+// This client/gateway/PostgreSQL fixture is disposable and cannot hit production.
+memory.set('pack1-player-name-v1','Insight Tester');
 globalThis.fetch=async(url,options={})=>{
   if(String(url)==='https://api.us-east-2.aws.neon.tech/sql')return sql(url,options);
   const target=new URL(url);
@@ -78,4 +81,19 @@ try {
     assert.equal(result.rows[0].n,'1','Completion and retry must persist exactly one result');
     console.log('Real client/gateway/worker/PostgreSQL contract passed: '+environment);
   }
+  // In the isolated fixture this player was non-QA at session creation,
+  // so the immutable per-run measurement_qa flag correctly remains false.
+  const insightQuery=async(text,values=[])=>pool.query({text,values,types:textTypes});
+  const insightResult=await loadDraftRunInsights(insightQuery,player.playerId,{environment:'mixed',period:'all'});
+  assert.equal(insightResult.unlocked,true,'Eight completed picks unlock Insights in real PostgreSQL');
+  assert.ok(insightResult.eligible_decisions>=8);
+  assert.equal(insightResult.formats.length,3);
+  assert.ok(insightResult.pick_depth.length>0,'Real source pick numbers survive joins');
+  assert.ok(insightResult.difficulty.some(d=>d.count>0),'Real rated puzzle difficulty joins');
+  assert.ok(insightResult.months.every(row=>row.count>=10),'Only months with ten picks appear in progress');
+  const inaccessible=await fetch('https://api-preview.packone.pro/growth/v1/profile/insights?environment=mixed');
+  assert.equal(inaccessible.status,401,'Guest player cookie cannot authorize private Insights');
+  const noMobileAuth=await fetch('https://api-preview.packone.pro/growth/v1/mobile/profile/insights?environment=mixed');
+  assert.notEqual(noMobileAuth.status,200,'Missing native account token denies private Insights');
+  console.log('Real PostgreSQL Insights SQL, filtering and private-API denial contract passed.');
 } finally {await pool.end();}
