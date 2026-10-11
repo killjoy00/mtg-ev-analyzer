@@ -3,13 +3,14 @@
 import assert from 'node:assert/strict';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
-import {mkdtemp,mkdir,readFile,rm,writeFile} from 'node:fs/promises';
+import {mkdtemp,mkdir,rm,writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {chromium} from 'playwright';
-import {SITE_URL,DAILY_URL,HOME_SECONDS,PACK_SECONDS,SHORT_SECONDS,
-  pacificDay,intendedDay,validateOpeningRun,clipTailStart,videoFilename} from './daily-short.mjs';
+import {SITE_URL,DAILY_URL,INTRO_SECONDS,PACK_SECONDS,OUTRO_SECONDS,SHORT_SECONDS,
+  TEMPLATE_VERSION,TOTAL_FRAMES,videoFilter,intendedDay,validateOpeningRun,clipTailStart,videoFilename} from './daily-short.mjs';
+import {renderBrandedFrames} from './render-daily-short-brand.mjs';
 
 const execFileAsync=promisify(execFile);
 const FRAME={width:540,height:960}; // Native 9:16 phone viewport, three real card columns.
@@ -56,13 +57,12 @@ async function startGuestDaily(page,day) {
 }
 async function recordHome(context,day,output) {
   const page=await context.newPage();
-  const video=page.video();
+  const file=path.join(output,'homepage.png');
   try {
     await homepageReady(page,day);
-    await page.screenshot({path:path.join(output,'homepage.png')});
-    await sleep(2_150); // Trim to the final 1.6 s: no page loading in final video.
+    await page.screenshot({path:file});
   } finally {await page.close();}
-  return video.path();
+  return file;
 }
 async function recordPack(context,day,count,output) {
   const page=await context.newPage();
@@ -75,14 +75,14 @@ async function recordPack(context,day,count,output) {
     await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
     await page.screenshot({path:path.join(output,'first-pack.png')});
     const started=Date.now();
-    await sleep(1_250);
+    await sleep(1_500);
     await page.evaluate(async()=>{
       const grid=document.querySelector('.run-cards');
       if(!grid)throw Error('Missing card grid.');
       const bottom=grid.getBoundingClientRect().bottom+window.scrollY;
       const from=window.scrollY;
       const target=Math.max(from,bottom-window.innerHeight+120);
-      const duration=6_300;
+      const duration=4_800;
       const begin=performance.now();
       await new Promise(resolve=>{
         function tick(now) {
@@ -94,7 +94,7 @@ async function recordPack(context,day,count,output) {
         requestAnimationFrame(tick);
       });
     });
-    await sleep(Math.max(0,9_500-(Date.now()-started)));
+    await sleep(Math.max(0,7_400-(Date.now()-started)));
     await page.screenshot({path:path.join(output,'first-pack-bottom.png')});
     assert.equal(await page.locator('.run-feedback').count(),0);
     assert.equal(await page.locator('#run-lock').isDisabled(),true);
@@ -105,18 +105,25 @@ async function duration(file) {
   const {stdout}=await execFileAsync('ffprobe',['-v','error','-show_entries','format=duration','-of','default=noprint_wrappers=1:nokey=1',file]);
   return Number(stdout.trim());
 }
-async function compose(home,pack,out) {
-  const [homeTime,packTime]=await Promise.all([duration(home),duration(pack)]);
-  const homeStart=clipTailStart(homeTime,HOME_SECONDS);
+async function compose(intro,pack,outro,out) {
+  const packTime=await duration(pack);
   const packStart=clipTailStart(packTime,PACK_SECONDS);
-  const chain=`[0:v]trim=start=${homeStart.toFixed(3)}:duration=${HOME_SECONDS},setpts=PTS-STARTPTS,fps=30,scale=1080:1920:flags=lanczos,setsar=1[v0];`+
-    `[1:v]trim=start=${packStart.toFixed(3)}:duration=${PACK_SECONDS},setpts=PTS-STARTPTS,fps=30,scale=1080:1920:flags=lanczos,setsar=1[v1];`+
-    '[v0][v1]concat=n=2:v=1:a=0,format=yuv420p[out]';
-  await execFileAsync('ffmpeg',['-hide_banner','-loglevel','error','-y','-i',home,'-i',pack,
-    '-filter_complex',chain,'-map','[out]','-frames:v','300','-an','-c:v','libx264',
-    '-preset','fast','-crf','21','-movflags','+faststart',out],{timeout:120_000});
+  const args=['-hide_banner','-loglevel','error','-y',
+    '-loop','1','-framerate','30','-i',intro,'-i',pack,
+    '-loop','1','-framerate','30','-i',outro,
+    '-filter_complex',videoFilter(packStart),'-map','[out]',
+    '-frames:v',String(TOTAL_FRAMES),'-an','-c:v','libx264',
+    '-preset','fast','-crf','21','-movflags','+faststart',out];
+  await execFileAsync('ffmpeg',args,{timeout:120_000});
   const finalDuration=await duration(out);
-  if(Math.abs(finalDuration-SHORT_SECONDS)>0.07)throw Error(`Rendered MP4 is not 10 seconds (${finalDuration}s).`);
+  if(Math.abs(finalDuration-SHORT_SECONDS)>0.07)
+    throw Error(`Rendered branded MP4 is not 10 seconds (${finalDuration}s).`);
+  const {stdout}=await execFileAsync('ffprobe',['-v','error','-select_streams','v:0',
+    '-count_frames','-show_entries','stream=width,height,nb_read_frames',
+    '-of','default=noprint_wrappers=1',out]);
+  if(!/width=1080\b/.test(stdout)||!/height=1920\b/.test(stdout)||
+     !new RegExp(`nb_read_frames=${TOTAL_FRAMES}\\b`).test(stdout))
+    throw Error(`Branded MP4 failed resolution / frame-count check: ${stdout.trim()}`);
 }
 async function scheduledOriginalTime() {
   const {GITHUB_REPOSITORY:repo,GITHUB_RUN_ID:runId,GITHUB_TOKEN:token}=process.env;
@@ -155,14 +162,18 @@ export async function recordDaily() {
     const home=await recordHome(context,day,ARTIFACT_DIR);
     const pack=await recordPack(context,day,manifest.cards,ARTIFACT_DIR);
     await context.close();context=null;
+    const stills=await renderBrandedFrames(browser,{output:ARTIFACT_DIR,day,
+      homePath:home,packPath:path.join(ARTIFACT_DIR,'first-pack.png')});
     const file=path.join(ARTIFACT_DIR,videoFilename(day));
-    await compose(home,pack,file);
+    await compose(stills.intro,pack,stills.outro,file);
     await writeFile(path.join(ARTIFACT_DIR,'capture.json'),JSON.stringify({...manifest,
       captured_at:new Date().toISOString(),duration_seconds:SHORT_SECONDS,
+      template_version:TEMPLATE_VERSION,intro_seconds:INTRO_SECONDS,pack_seconds:PACK_SECONDS,
+      outro_seconds:OUTRO_SECONDS,frames:TOTAL_FRAMES,
       source:DAILY_URL,real_browser_capture:true,spoiler_free:true},null,2)+'\n');
     await writeOutput(true,day);
     console.log(JSON.stringify({recorded:true,day,puzzle_id:manifest.puzzle_id,cards:manifest.cards,
-      output:file,duration_seconds:SHORT_SECONDS,real_card_images:true}));
+      output:file,duration_seconds:SHORT_SECONDS,template_version:TEMPLATE_VERSION,real_card_images:true}));
   } finally {
     if(context)await context.close().catch(()=>{});
     if(browser)await browser.close().catch(()=>{});
