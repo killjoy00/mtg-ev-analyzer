@@ -90,7 +90,7 @@ test('source pick number is used literally, including Powered Cube P1P2 and P1P9
 
 test('a Pacific month requires ten counted decisions and marks smaller groups insufficient',()=>{
   const items=Array.from({length:10},(_,i)=>row(i,{time:'2026-10-'+String(i+1).padStart(2,'0')+'T12:00:00Z',score:80}));
-  assert.equal(result(items.slice(0,9)).months[0].average_score,null);
+  assert.equal(result(items.slice(0,9)).months.length,0,'under-sampled month is absent from the progress chart');
   assert.equal(result(items).months[0].average_score,80);
   assert.equal(result(items).months[0].count,10);
   const boundary=row(12,{time:'2026-11-01T03:15:00Z'});
