@@ -61,3 +61,7 @@ GROUP BY 1,2,3 ORDER BY players DESC, events DESC LIMIT 50;
 ```
 
 The native apps do not report script errors yet; adding it changes the App Store privacy and Google Play Data Safety declarations.
+
+## Rejected account and player sessions
+
+The Growth function logs one JSON line per rejected session instead of a stack trace: `player_session_rejected` and `account_session_rejected` (401s, #803) and, since #1138, `account_csrf_rejected` (the web Account page's “Account request could not be verified.” 403). Each line carries only `event`, `reason`, a path with ids replaced by `:id`, a client class (`browser`, `native_account` or `no_origin`) and `release_commit`. Tokens, cookies and account identifiers are never logged. These lines live only in the Neon console's logs for the Growth function; nothing alerts on them. When a player reports the Account error, filter those logs for `account_csrf_rejected`: `missing` means the page could not read its security cookie, `invalid` means the cookie was malformed, and `mismatch` means the cookie belongs to a different session than the account cookie.
