@@ -268,7 +268,7 @@ try {
   await fresh({source:'daily_result',validateDailyRunId:runId});
   signed=true;
   csrfLinkFailure=true;
-  await page.evaluate(async()=>window.__renderAccount({source:'daily_result',validateDailyRunId:runId}));
+  await page.evaluate(async id=>window.__renderAccount({source:'daily_result',validateDailyRunId:id}),runId);
   await page.getByRole('heading',{name:'Confirm your sign-in.'}).waitFor();
   assert.equal(await page.locator('#account-signin').count(),0);
   await page.getByRole('button',{name:'Sign in again',exact:true}).click();
