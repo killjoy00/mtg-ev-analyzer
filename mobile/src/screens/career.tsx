@@ -4,6 +4,7 @@ import { ActivityIndicator, FlatList, Pressable, Share, StyleSheet, View } from 
 import { Text } from '@/src/components/Text';
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 import { AboutLink } from '@/src/components/AboutLink';
+import { MyPackSectionTabs } from '@/src/components/MyPackSectionTabs';
 
 import { loadMobileCareer, loadMobileCareerHistory, type CareerHistoryRow, type CareerProfile } from '@/src/api/career';
 import { ApiError } from '@/src/api/client';
@@ -256,17 +257,7 @@ export default function CareerScreen() {
   const firstRun = Number(state.profile.summary.games || 0) === 0;
   const header = (
     <View style={styles.header} onLayout={() => { if (config.screenshots.fixtures) console.info('PACKONE_CAREER_READY', JSON.stringify({ firstRun })); }}>
-      <View accessibilityLabel="My Pack One sections" style={styles.modeTabs}>
-        <Pressable accessibilityRole="tab" accessibilityState={{ selected: true }} style={[styles.modeTab, styles.modeTabActive]}>
-          <Text style={[styles.modeTabText, styles.modeTabTextActive]}>Stats</Text>
-        </Pressable>
-        <Pressable accessibilityRole="tab" accessibilityState={{ selected: false }} onPress={() => router.push('/insights')} style={styles.modeTab}>
-          <Text style={styles.modeTabText}>Insights</Text>
-        </Pressable>
-        <Pressable accessibilityRole="tab" accessibilityState={{ selected: false }} onPress={() => router.push('/account')} style={styles.modeTab}>
-          <Text style={styles.modeTabText}>Account settings</Text>
-        </Pressable>
-      </View>
+      <MyPackSectionTabs active="stats" />
       {firstRun ? (
         <View style={styles.firstRunCard}>
           <Text style={styles.eyebrow}>WELCOME TO MY PACK ONE</Text>
@@ -320,11 +311,6 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   list: { paddingBottom: spacing.xxl, alignSelf: 'center', width: '100%', maxWidth: 980 },
   header: { padding: spacing.lg, gap: spacing.lg },
-  modeTabs: { flexDirection: 'row', borderBottomWidth: 1, borderColor: colors.line },
-  modeTab: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.sm },
-  modeTabActive: { borderBottomWidth: 3, borderColor: colors.accent },
-  modeTabText: { color: colors.muted, fontSize: 14, fontWeight: '800', textAlign: 'center' },
-  modeTabTextActive: { color: colors.ink },
   firstRunCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.xl, gap: spacing.md },
   firstRunTitle: { color: colors.ink, fontSize: 28, lineHeight: 33, fontWeight: '800', letterSpacing: -0.5 },
   firstRunBody: { color: colors.muted, fontSize: 15, lineHeight: 22 },
