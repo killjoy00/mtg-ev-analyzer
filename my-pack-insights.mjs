@@ -168,7 +168,7 @@ function journeyMarkup(data) {
     (journey.total_windows>windows.length?'<p class="my-insights-note">Showing the latest '+
       windows.length+' of '+journey.total_windows+' windows.</p>':'')+
     '<h3 class="my-insights-subheading">Recent vs previous 40 picks</h3>'+
-    (journey.versions_comparable?progressMarkup(data):
+    (journey.progress_compatible!==false?progressMarkup(data):
       '<p class="my-insights-note">Recorded windows span incompatible source/scoring versions; a progress comparison is unavailable.</p>')+
     (milestone?'<h3 class="my-insights-subheading">Your milestones</h3><ol class="my-insights-milestones">'+milestone+'</ol>':'')+
     '<p class="my-insights-note">'+esc(journey.note||'Historical model and card-pool versions may differ.')+'</p>'+
@@ -228,6 +228,7 @@ function bindInsightCards(root,state,ticket,gen) {
       const el=root.querySelector('#my-insights-'+panel+'-panel');
       if(el)el.hidden=panel!==chosen;
     }
+    state.viewTicket=(state.viewTicket||0)+1;
     const detail=root.querySelector('#my-insights-decision');if(detail)detail.innerHTML='';
   }));
   root.querySelectorAll('[data-insights-review]').forEach(button=>button.addEventListener('click',async()=>{
