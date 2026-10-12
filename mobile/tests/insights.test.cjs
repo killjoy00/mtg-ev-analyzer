@@ -101,6 +101,45 @@ test('native Insights screen renders all analyses, current tab and live sample f
   assert.deepEqual(ui.routes.at(-1),['push','/account']);
 });
 
+test('237 eligible decisions with no standout 10-point gap show honest numeric patterns',async t=>{
+  const sample=fixture('mixed');
+  const data={
+    ...sample,eligible_decisions:237,total_eligible_decisions:237,
+    observations:[],
+    formats:sample.formats.map(x=>x.environment==='mixed'
+      ? {...x,count:237,average_score:76.8,trophy_match_pct:42.2}:x),
+    pick_depth:[{label:'P1P4',pick_number:4,count:31,average_score:74.5,trophy_match_pct:43}],
+    progress:{previous:{count:40,average_score:75.2,from:'2026-09-01',to:'2026-09-10'},
+      recent:{count:40,average_score:77.1,from:'2026-09-11',to:'2026-09-20'},delta:1.9},
+  };
+  const ui=await mount(t,{respond:async()=>data});
+  const view=ui.text();
+  assert.ok(view.includes('237 eligible decisions'),'total remains visible');
+  assert.ok(view.includes('No standout comparison met both thresholds'),'reason is accurate');
+  assert.ok(view.includes('Across 237 eligible Mixed decisions'),'cohort appears in patterns');
+  assert.ok(view.includes('76.8/100'),'existing score aggregate is reused');
+  assert.ok(view.includes('42.2%'),'trophy-match is backed by the cohort');
+  assert.ok(view.includes('Your most recent 40 picks averaged 77.1/100'),'small descriptive trend still shown');
+  assert.ok(view.includes('preceding 40 averaged 75.2/100'),'both comparison windows visible');
+  assert.ok(view.includes('P1P4: 31 decisions averaging 74.5/100'),'largest source pick position is descriptive');
+  assert.ok(!view.includes('Not enough comparable decisions yet'),'high-sample accounts are not told they lack decisions');
+});
+
+test('under-sampled descriptive groups are not represented as measured patterns',async t=>{
+  const sample=fixture('mixed');
+  const data={...sample,eligible_decisions:8,total_eligible_decisions:8,
+    observations:[],progress:null,
+    formats:sample.formats.map(x=>x.environment==='mixed'
+      ? {...x,count:8,average_score:70,trophy_match_pct:50}:x),
+    pick_depth:[{label:'P1P1',pick_number:1,count:3,average_score:null,trophy_match_pct:null}],
+  };
+  const ui=await mount(t,{respond:async()=>data});
+  const view=ui.text();
+  assert.ok(view.includes('Across 8 eligible Mixed decisions'));
+  assert.ok(!view.includes('Your most-recorded source pick position'),'3-pick group must not produce average copy');
+  assert.ok(!view.includes('Your most recent 40 picks averaged'),'missing windows must not produce trend');
+});
+
 test('native Insights clears private data after logout and blocks old-owner responses',async t=>{
   const ui=await mount(t);
   assert.ok(ui.text().includes('P1P1'));

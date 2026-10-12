@@ -62,6 +62,34 @@ function Metrics({ rows }: { rows: (InsightGroup & { label: string })[] }) {
   </View>)}</View>;
 }
 
+// Only the server's >=40-per-side / >=10-point findings are standout claims.
+// When none exist, expose factual score snapshots rather than implying an account
+// with substantial history has no usable decisions.
+function descriptivePatternRows(data: DraftInsights): string[] {
+  const rows: string[] = [];
+  const summary = data.formats.find(row => row.environment === data.environment);
+  if (summary && summary.count >= 5 && typeof summary.average_score === 'number' && Number.isFinite(summary.average_score)) {
+    const match = typeof summary.trophy_match_pct === 'number' && Number.isFinite(summary.trophy_match_pct)
+      ? ' Trophy-drafter pick match: ' + score(summary.trophy_match_pct) + '%.' : '';
+    rows.push('Across ' + num(summary.count) + ' eligible ' + data.environment_label +
+      ' decisions, your average originally awarded score was ' + score(summary.average_score) + '/100.' + match);
+  }
+  const progress = data.progress;
+  if (progress && progress.recent.count >= 40 && progress.previous.count >= 40 &&
+    typeof progress.recent.average_score === 'number' && Number.isFinite(progress.recent.average_score) &&
+    typeof progress.previous.average_score === 'number' && Number.isFinite(progress.previous.average_score)) {
+    rows.push('Your most recent 40 picks averaged ' + score(progress.recent.average_score) +
+      '/100; the preceding 40 averaged ' + score(progress.previous.average_score) +
+      '/100. These are recorded scores, not a proven change in skill.');
+  }
+  const depth = [...data.pick_depth]
+    .filter(row => row.count >= 5 && typeof row.average_score === 'number' && Number.isFinite(row.average_score))
+    .sort((a, b) => b.count - a.count || a.pick_number - b.pick_number)[0];
+  if (depth) rows.push('Your most-recorded source pick position is ' + depth.label +
+    ': ' + num(depth.count) + ' decisions averaging ' + score(depth.average_score) + '/100.');
+  return rows.slice(0, 3);
+}
+
 function InsightSections({ data }: { data: DraftInsights }) {
   if (!data.unlocked) return <Section title="Unlock your Drafting Insights">
     <Text style={styles.body}>Play a few more runs in {data.environment_label}. You have {num(data.eligible_decisions)} of {data.unlock_at} eligible first-time decisions in this period.</Text>
@@ -71,11 +99,17 @@ function InsightSections({ data }: { data: DraftInsights }) {
   </Section>;
 
   const monthly = data.months || [];
+  const snapshots = data.observations.length ? [] : descriptivePatternRows(data);
   return <>
-    <Section title="Your patterns" caption="Conservative observations from comparable decision groups">
+    <Section title="Your patterns" caption="Observed scores with clear sample-size safeguards">
       {data.observations.length ? data.observations.map(row =>
         <View key={row.id} style={styles.observation}><Text style={styles.observationMark}>◆</Text><Text style={styles.observationCopy}>{row.text}</Text></View>)
-        : <Text style={styles.caption}>Not enough comparable decisions yet. Observations need 40 picks per group and a 10-point gap.</Text>}
+        : <>
+          <Text style={styles.caption}>No standout comparison met both thresholds: at least 40 decisions on each side and a 10-point average difference. Your recorded history still provides these descriptive snapshots:</Text>
+          {snapshots.length ? snapshots.map((text, index) =>
+            <View key={'snapshot-' + index} style={styles.observation}><Text style={styles.observationMark}>◆</Text><Text style={styles.observationCopy}>{text}</Text></View>)
+            : <Text style={styles.caption}>The pick, difficulty and progress charts below show every supported group as you collect more decisions.</Text>}
+        </>}
     </Section>
     <Section title="Pick-by-pick strengths" caption="Actual source P1P positions, not game-round order. Five decisions are needed for each average.">
       <Metrics rows={data.pick_depth.map(row => ({ ...row, label: row.label }))} />

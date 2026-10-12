@@ -1,6 +1,6 @@
 # My Pack One: Drafting Insights (approved product specification)
 
-- **Status:** Approved design and implementation scope; **not yet implemented or released**. Data audit, counting rules and thresholds recorded October 11, 2026 (see [Audit results](#audit-results-october-11-2026) and [Counting rules and thresholds](#counting-rules-and-thresholds)).
+- **Status:** Full Insights implemented and released on web and the private API October 11, 2026 (PRs #1156 and #1157); Android closed-test candidate 100765 and owner-confirmed iOS candidate 100758. A follow-up clarifies the no-standout comparison state without changing scoring or the approved counting thresholds. Data audit and thresholds are documented below.
 - **Decision date:** October 11, 2026.
 - **Tracking issue:** [#1150 — My Pack One: dedicated Insights tab](https://github.com/killjoy00/mtg-ev-analyzer/issues/1150).
 - **Implementation handoff:** [MY-PACK-ONE-INSIGHTS-IMPLEMENTATION-PROMPT.md](MY-PACK-ONE-INSIGHTS-IMPLEMENTATION-PROMPT.md).
@@ -114,7 +114,7 @@ Then, per puzzle, **only the first encounter counts**: the earliest answer for t
 | A month shows on the progress chart (Pacific calendar months) | At least **10** decisions in that month. |
 | Progress comparison | The most recent **40** counted decisions vs the **40** before them, in the selected environment, with both date ranges shown. Requires 80 decisions. |
 | Any written observation ("higher", "lower", "up", "down") | Both sides have at least **40** decisions **and** the averages differ by at least **10** points. Otherwise say the averages are about the same or that more comparable decisions are needed. |
-| Observations shown | At most **3**, preferring the comparisons with the largest smaller-side sample. If none qualify: "Not enough comparable decisions yet." |
+| Observations shown | At most **3** standout comparisons, preferring the largest smaller-side sample. If none qualifies, explain that no comparison cleared the **40 per side / 10-point gap** thresholds, then show up to three **descriptive snapshots** using existing aggregates: a format-wide average (5+ decisions), recent and previous 40-pick averages (80+ decisions), and a well-sampled pick-depth count and average (5+ decisions). Do not imply insufficient *total* history merely because the differences are below the standout threshold. These snapshots are not strength rankings or trend claims. |
 
 Written observations stay descriptive: no "significant", no causal claims, no skill ratings. Cross-environment comparisons always carry a note that the card pools differ.
 
