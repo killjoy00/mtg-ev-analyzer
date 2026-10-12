@@ -38,6 +38,38 @@ assert not calls
   assert.equal(result.status, 0, result.stderr);
 });
 
+test('native driver scrolls expanded font licenses into view before capturing them', () => {
+  // Bounds come from the failed API 35 Terms capture: the Show font licenses
+  // tap landed on a button 40px above the viewport's bottom edge, so the
+  // expanded Barlow Condensed license opened entirely below y=2328.
+  const result = spawnSync('python3', ['-c', `
+import ast, re, xml.etree.ElementTree as ET
+from pathlib import Path
+module = ast.parse(Path('mobile/scripts/native-acceptance.py').read_text())
+helpers = [node for node in module.body if isinstance(node, ast.FunctionDef) and node.name in ('visible_bounds', 'reveal')]
+swipes = []
+screens = []
+scope = {'re': re, 'hierarchy': lambda: ('', screens.pop(0)), 'swipe_page': lambda up: swipes.append(up)}
+exec(compile(ast.Module(body=helpers, type_ignores=[]), '<native-reveal>', 'exec'), scope)
+expanded = ET.fromstring('<hierarchy><node class="android.widget.ScrollView" scrollable="true" bounds="[0,279][1170,2328]"/><node text="Font licenses" bounds="[72,2159][1098,2240]"/><node content-desc="Hide font licenses" bounds="[72,2288][1098,2328]"/><node text="Barlow Condensed" bounds="[0,0][0,0]"/></hierarchy>')
+scrolled = ET.fromstring('<hierarchy><node class="android.widget.ScrollView" scrollable="true" bounds="[0,279][1170,2328]"/><node text="Copyright 2017 The Barlow Project Authors" bounds="[72,1400][1098,1460]"/><node text="Barlow Condensed" bounds="[72,1300][1098,1360]"/></hierarchy>')
+screens[:] = [expanded, scrolled]
+scope['reveal']('Barlow Condensed', exact=True)
+assert swipes == [True], swipes
+assert not screens
+swipes.clear()
+screens[:] = [expanded] * 24
+try:
+    scope['reveal']('Barlow Condensed', exact=True)
+except AssertionError as error:
+    assert 'never scrolled into view' in str(error)
+else:
+    raise AssertionError('A license that never appears must fail the scene')
+assert swipes == [True] * 24
+`], {encoding: 'utf8'});
+  assert.equal(result.status, 0, result.stderr);
+});
+
 // Exercise the action's /bin/sh boundary without an SDK or a running emulator.
 test('Android screenshot action enters one Bash script and preserves readiness/install failure gates', () => {
   const workflow = fs.readFileSync('.github/workflows/mobile-store-screenshots.yml', 'utf8');

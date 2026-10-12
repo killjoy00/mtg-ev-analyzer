@@ -76,20 +76,38 @@ def snapshot(name):
     return xml, logs
 
 
+def visible_bounds(root, label, exact=False):
+    for node in root.iter():
+        values = [node.get('text', ''), node.get('content-desc', '')]
+        if any(value == label if exact else label.lower() in value.lower() for value in values):
+            bounds = [int(n) for n in re.findall(r'\d+', node.get('bounds', ''))]
+            if len(bounds) == 4 and bounds[2] > bounds[0] and bounds[3] > bounds[1]:
+                return bounds
+    return None
+
+
 def tap(label, exact=False, scroll=True):
     for step in range(24 if scroll else 1):
         _, root = hierarchy()
-        for node in root.iter():
-            values = [node.get('text', ''), node.get('content-desc', '')]
-            if any(value == label if exact else label.lower() in value.lower() for value in values):
-                bounds = [int(n) for n in re.findall(r'\d+', node.get('bounds', ''))]
-                if len(bounds) == 4 and bounds[2] > bounds[0] and bounds[3] > bounds[1]:
-                    adb('shell', 'input', 'tap', str((bounds[0]+bounds[2])//2), str((bounds[1]+bounds[3])//2))
-                    time.sleep(2)
-                    return
+        bounds = visible_bounds(root, label, exact)
+        if bounds:
+            adb('shell', 'input', 'tap', str((bounds[0]+bounds[2])//2), str((bounds[1]+bounds[3])//2))
+            time.sleep(2)
+            return
         if scroll:
             swipe_page(up=True)
     raise AssertionError(f'No visible actionable {label!r}')
+
+
+def reveal(label, exact=False):
+    # Content expanded by a control at the bottom edge opens below the
+    # viewport. Scroll until it is on screen before capturing it.
+    for _ in range(24):
+        _, root = hierarchy()
+        if visible_bounds(root, label, exact):
+            return
+        swipe_page(up=True)
+    raise AssertionError(f'{label!r} never scrolled into view')
 
 
 def enter_field(label, value):
@@ -374,6 +392,7 @@ if platform == 'android':
         xml, _ = snapshot('terms')
         require('Use of the site' in xml, 'Native Terms page did not render')
         tap('Show font licenses', exact=True)
+        reveal('Barlow Condensed', exact=True)
         xml, _ = snapshot('terms-font-licenses-barlow')
         require('Barlow Condensed' in xml, 'Barlow Condensed license is not visible in native Terms')
         tap('Source Sans 3', exact=True)
