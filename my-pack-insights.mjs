@@ -401,6 +401,9 @@ async function refresh(root,state) {
   const ticket=++state.ticket,gen=generation;
   const dialog=root.querySelector('#my-insights-decision-dialog');
   if(dialog?.open)dialog.close();
+  // Fail closed on owner/session transitions and rejected requests; never retain
+  // private DNA from an earlier successfully loaded account.
+  const previousDna=root.querySelector('#my-insights-dna');if(previousDna)previousDna.innerHTML='';
   if(state.lastGen!==gen){const node=root.querySelector('#my-insights-dna');if(node)node.innerHTML='';state.lastGen=gen;state.autoMatched=false;}
   // Preserve keyboard focus in filters rather than replacing the whole panel.
   const result=root.querySelector('#my-insights-result');
