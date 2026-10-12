@@ -79,12 +79,13 @@ export function normaliseInsightsRows(rows) {
   return answers.sort((a,b)=>b.answered_at.localeCompare(a.answered_at)||a.session_id.localeCompare(b.session_id));
 }
 
-function comparison(rows,labelA,labelB,a,b,id,note='') {
+function comparison(rows,labelA,labelB,a,b,id,note='',groups=[]) {
   if(a.count<INSIGHTS_COMPARISON_MIN||b.count<INSIGHTS_COMPARISON_MIN||
     a.average_score===null||b.average_score===null)return null;
   const gap=round(a.average_score-b.average_score);
   if(Math.abs(gap)<INSIGHTS_OBSERVATION_GAP)return null;
   return {id,count:Math.min(a.count,b.count),gap:Math.abs(gap),
+    groups:groups.map((group,index)=>({...group,relation:(index===0)===(gap>0)?'higher':'lower'})),
     text:labelA+' averaged '+Math.abs(gap).toFixed(1)+' points '+(gap>0?'higher':'lower')+
     ' than '+labelB+' ('+a.count+' vs '+b.count+' decisions).'+(note?' '+note:'')};
 }
@@ -122,7 +123,9 @@ export function aggregateDraftRunInsights(source,{environment='mixed',period='al
   const proposals=[];
   if(progress) {
     const result=comparison(selected,'Recent 40 picks','previous 40 picks',
-      progress.recent,progress.previous,'progress','Recorded scores describe picks, not causation.');
+      progress.recent,progress.previous,'progress','Recorded scores describe picks, not causation.',[
+        {label:'the recent 40 picks',puzzle_ids:recent.map(r=>r.puzzle_id)},
+        {label:'the previous 40 picks',puzzle_ids:prior.map(r=>r.puzzle_id)}]);
     if(result)proposals.push(result);
   }
   // Only large cohorts may trigger copy; 5-answer chart groups remain descriptive.
@@ -131,7 +134,9 @@ export function aggregateDraftRunInsights(source,{environment='mixed',period='al
     const higher=[...goodPicks].sort((a,b)=>b.average_score-a.average_score)[0];
     const lower=[...goodPicks].sort((a,b)=>a.average_score-b.average_score)[0];
     if(higher.pick_number!==lower.pick_number){
-      const result=comparison(selected,higher.label,lower.label,higher,lower,'pick-depth');
+      const result=comparison(selected,higher.label,lower.label,higher,lower,'pick-depth','',[
+        {label:higher.label+' decisions',pick_number:higher.pick_number},
+        {label:lower.label+' decisions',pick_number:lower.pick_number}]);
       if(result)proposals.push(result);
     }
   }
@@ -141,7 +146,9 @@ export function aggregateDraftRunInsights(source,{environment='mixed',period='al
     const lower=[...goodBands].sort((a,b)=>a.average_score-b.average_score)[0];
     if(higher.band!==lower.band){
       const result=comparison(selected,higher.band+' decisions',lower.band+' decisions',higher,lower,'difficulty',
-        'The puzzle difficulty groups are different.');
+        'The puzzle difficulty groups are different.',[
+          {label:higher.band+'-rated decisions',band:higher.band},
+          {label:lower.band+'-rated decisions',band:lower.band}]);
       if(result)proposals.push(result);
     }
   }
@@ -149,7 +156,9 @@ export function aggregateDraftRunInsights(source,{environment='mixed',period='al
   for(const other of formats){
     if(other.environment===environment)continue;
     const result=comparison(selected,main.label+' drafts',other.label+' drafts',main,other,
-      'format-'+other.environment,'The card pools differ between formats.');
+      'format-'+other.environment,'The card pools differ between formats.',[
+        {label:main.label+' drafts',environment:main.environment},
+        {label:other.label+' drafts',environment:other.environment}]);
     if(result)proposals.push(result);
   }
   proposals.sort((a,b)=>b.count-a.count||b.gap-a.gap||a.id.localeCompare(b.id));
@@ -158,8 +167,12 @@ export function aggregateDraftRunInsights(source,{environment='mixed',period='al
   const drafting_dna=buildDraftingDNA(all);
   const card_choices=buildCardChoiceContext(all);
   const journey={...buildDraftingJourney(selected),progress_compatible};
-  const leading_finding=observations[0]||null;
-  const highlights=selectInsightHighlights(selected,{page,finding:leading_finding});
+  const featured=proposals[0]||null;
+  // Only public labels leave this function. Progress group puzzle IDs remain
+  // private selector inputs rather than another way to reconstruct history.
+  const leading_finding=featured?{id:featured.id,text:featured.text,
+    compared_groups:featured.groups.map(({label,relation})=>({label,relation}))}:null;
+  const highlights=selectInsightHighlights(selected,{page,finding:featured});
   const versions={
     scoring:[...new Set(selected.map(r=>r.scoring_version))].sort(),
     selection:[...new Set(selected.map(r=>r.selection_version))].sort(),
