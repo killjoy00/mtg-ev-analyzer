@@ -3,7 +3,16 @@
 import {safeCardImageUrl} from '../card-image-policy.mjs';
 export const DNA_VERSION='drafting-dna-v2';
 export const JOURNEY_VERSION='drafting-journey-v2';
-export const HIGHLIGHTS_VERSION='decision-highlights-v2';
+export const HIGHLIGHTS_VERSION='decision-highlights-v3';
+export const HIGHLIGHT_REASON_VERSION='highlight-reasons-v1';
+export const CHOICE_CONTEXT_VERSION='choice-context-v1';
+// Descriptive opportunity rule, not a probability or personality qualification.
+// Compare support only within an original saved pack, and never pool scoring
+// versions into one claimed card-choice rate.
+export const CHOICE_CONTEXT_RULE=Object.freeze({
+  version:CHOICE_CONTEXT_VERSION,support_to_leader:0.5,minimum_opportunities:20,
+  max_examples:2,
+});
 // PROVISIONAL, unaudited qualification gates. One versioned source of truth;
 // see docs/DRAFTING-DNA.md. Never describe these as validated percentiles.
 export const DNA_QUALIFICATION=Object.freeze({
@@ -184,42 +193,154 @@ export function buildDraftingDNA(rows) {
     note:'Provisional gates describe recorded decisions, not validated skill ranks. Traits must qualify both now and before the latest eight eligible decisions.'};
 }
 
+
+const asArray=value=>{
+  if(Array.isArray(value))return value;
+  if(typeof value==='string')try{const parsed=JSON.parse(value);return Array.isArray(parsed)?parsed:[];}catch{}
+  return [];
+};
+const typeCategory=card=>typeof card?.type_line==='string'&&card.type_line.trim()
+  ?(/\\bcreature\\b/i.test(card.type_line)?'creature':'noncreature'):null;
+const rarityCategory=card=>['rare','mythic'].includes(String(card?.rarity||'').toLowerCase())?'rare-mythic':
+  ['common','uncommon'].includes(String(card?.rarity||'').toLowerCase())?'common-uncommon':null;
+const choiceVersion=row=>[row.scoring_version,row.selection_version,row.corpus_version].join('|');
+
+// A saved ranking is a model-support snapshot, not P(player picks card).
+// Partial metadata and mismatched IDs fail closed for that particular choice.
+function supportedChoices(row) {
+  const candidates=asArray(row.choice_candidates).slice(0,25);
+  const ranking=asArray(row.choice_ranking).slice(0,25);
+  const cards=new Map(candidates.filter(c=>c&&typeof c.id==='string').map(c=>[c.id,c]));
+  const comparable=ranking.filter(r=>r&&typeof r.id==='string'&&
+    typeof r.support==='number'&&Number.isFinite(r.support)&&r.support>=0&&cards.has(r.id));
+  if(comparable.length!==ranking.length||comparable.length<2)return null;
+  const strongest=Math.max(...comparable.map(r=>r.support));
+  if(!(strongest>0))return null;
+  const competitive=comparable.filter(r=>r.support/strongest>=CHOICE_CONTEXT_RULE.support_to_leader)
+    .map(r=>cards.get(r.id));
+  if(competitive.length<2||!cards.has(row.selected_id))return null;
+  return {competitive,selected:cards.get(row.selected_id),ranked:comparable,strongest};
+}
+export function buildCardChoiceContext(rows) {
+  const families=[
+    {id:'card-type',title:'Creature or noncreature',names:['creature','noncreature'],classify:typeCategory},
+    {id:'rarity',title:'Rare/mythic or common/uncommon',names:['rare-mythic','common-uncommon'],classify:rarityCategory},
+  ];
+  const choices=families.map(family=>{
+    const groups=new Map();
+    for(const row of rows){
+      const picked=supportedChoices(row);if(!picked)continue;
+      const selected=family.classify(picked.selected);
+      const options=picked.competitive.map(family.classify);
+      if(!selected||options.some(v=>!v)||new Set(options).size!==2)continue;
+      const key=choiceVersion(row);
+      if(!groups.has(key))groups.set(key,[]);
+      groups.get(key).push({row,selected,options});
+    }
+    // One compatible version cohort, deterministic ties; never a blended rate.
+    const ordered=[...groups].sort((a,b)=>b[1].length-a[1].length||a[0].localeCompare(b[0]));
+    const [cohort,decisions]=ordered[0]||['',[]];
+    const count=decisions.length,selected=Object.fromEntries(family.names.map(v=>[v,0]));
+    const availability=Object.fromEntries(family.names.map(v=>[v,0]));
+    for(const item of decisions){
+      selected[item.selected]++;
+      for(const option of item.options)availability[option]++;
+    }
+    const examples=[...decisions].sort((a,b)=>b.row.answered_at.localeCompare(a.row.answered_at)||
+      a.row.puzzle_id.localeCompare(b.row.puzzle_id)).slice(0,CHOICE_CONTEXT_RULE.max_examples).map(({row})=>({
+      session_id:row.session_id,round:row.round,puzzle_id:row.puzzle_id,
+      set_id:row.set_id,pick_number:row.pick_number,date:row.answered_at.slice(0,10),
+      selected_name:row.selected_name,
+    }));
+    const ready=count>=CHOICE_CONTEXT_RULE.minimum_opportunities;
+    const first=family.names[0],second=family.names[1];
+    const summary=family.id==='card-type'
+      ?'When both creatures and noncreatures had competitive saved model support, you chose a creature in '+
+        selected[first]+' of '+count+' decisions.'
+      :'When rare/mythic and common/uncommon cards both had competitive saved model support, you chose a rare or mythic in '+
+        selected[first]+' of '+count+' decisions.';
+    return {id:family.id,title:family.title,status:ready?'ready':'developing',
+      opportunities:count,selected,availability,cohort,examples:ready?examples:[],
+      ...(ready?{summary}:{}),other_version_opportunities:ordered.slice(1).reduce((n,x)=>n+x[1].length,0)};
+  });
+  return {schema_version:CHOICE_CONTEXT_VERSION,scope:'all-eligible-history; single compatible version cohort per breakdown',
+    minimum_opportunities:CHOICE_CONTEXT_RULE.minimum_opportunities,choices,
+    note:'Competitive means support at least half the highest support in the same saved pack. This is a descriptive comparison rule, not a validated pick probability or proof of preference. Different scoring, selection and corpus cohorts are not mixed.'};
+}
+const reasonEvidence=row=>{
+  const ranks=asArray(row.choice_ranking).filter(r=>r&&typeof r.id==='string'&&
+    typeof r.support==='number'&&Number.isFinite(r.support)&&r.support>=0);
+  const leader=ranks.reduce((a,b)=>!a||b.support>a.support?b:a,null);
+  const chosen=ranks.find(r=>r.id===row.selected_id);
+  if(leader&&chosen&&leader.id!==chosen.id&&leader.support>0&&
+    chosen.support/leader.support<=0.5)
+    return {gap:true,selected_support:chosen.support,leader_support:leader.support,leader_name:leader.name||'another card'};
+  return {gap:false};
+};
+function highlightReason(row) {
+  const support=reasonEvidence(row);
+  if(row.trophy_match&&row.difficulty_band==='hard')
+    return {reason_code:'hard-trophy-match',reason_text:'You matched the trophy selection on a historically hard-rated puzzle.',
+      reason_evidence:{difficulty_band:'hard'}};
+  if(!row.trophy_match&&row.score>=80)
+    return {reason_code:'strong-scored-alternative',
+      reason_text:'Your non-trophy choice earned '+row.score+'/100 from the original scoring model.',
+      reason_evidence:{original_score:row.score}};
+  if(!row.trophy_match&&support.gap)
+    return {reason_code:'saved-support-gap',
+      reason_text:'The saved model supported '+support.leader_name+' more strongly than your choice; your original score was '+row.score+'/100.',
+      reason_evidence:{original_score:row.score}};
+  return {reason_code:'low-scored-alternative',
+    reason_text:'Your non-trophy choice earned '+row.score+'/100 in the original scored puzzle; review the saved alternatives.',
+    reason_evidence:{original_score:row.score}};
+}
 const highlightRow=r=>({session_id:r.session_id,round:r.round,puzzle_id:r.puzzle_id,
   set_id:r.set_id,environment:r.environment,pick_number:r.pick_number,
   date:r.answered_at.slice(0,10),score:r.score,trophy_match:r.trophy_match,
-  selection_kind:r.trophy_match?'trophy-match':'alternative'});
-function selectVariety(rows,limit,already=new Set()) {
-  const chosen=[],sets=new Set(),positions=new Set();
+  selection_kind:r.trophy_match?'trophy-match':'alternative',
+  reason_version:HIGHLIGHT_REASON_VERSION,...highlightReason(r)});
+function selectVariety(rows,limit,already=new Set(),finding=null) {
+  const chosen=[],sets=new Set(),positions=new Set(),cards=new Set(),reasons=new Set();
   const remaining=rows.filter(r=>!already.has(r.puzzle_id)&&r.session_id&&Number.isInteger(r.round)&&r.round>=1&&r.round<=8);
+  // Reason and recency weigh the ordering; the diversity bonus prevents a
+  // wall of near-identical perfect matches or the same historical set.
   while(chosen.length<limit&&remaining.length){
-    let bestIndex=0,bestBonus=-1;
+    let bestIndex=0,bestWeight=-Infinity;
     for(let i=0;i<remaining.length;i++){
-      const r=remaining[i],bonus=(sets.has(r.set_id)?0:2)+(positions.has(r.pick_number)?0:1);
-      if(bonus>bestBonus){bestBonus=bonus;bestIndex=i;if(bonus===3)break;}
+      const r=remaining[i],reason=highlightReason(r).reason_code;
+      const relevance=(finding?.id==='difficulty'&&r.difficulty_band==='hard')||
+        (finding?.id==='pick-depth'&&r.pick_number<=3)?3:0;
+      const variety=(sets.has(r.set_id)?0:5)+(positions.has(r.pick_number)?0:3)+
+        (cards.has(r.selected_id)?0:2)+(reasons.has(reason)?0:4);
+      const recency=Math.min(10,Math.max(0,(Date.parse(r.answered_at)-Date.UTC(2020,0,1))/86400000/300));
+      const quality=r.trophy_match?2:Math.abs(r.score-70)/10;
+      const weight=relevance+variety+recency+quality;
+      if(weight>bestWeight){bestWeight=weight;bestIndex=i;}
     }
-    const picked=remaining.splice(bestIndex,1)[0];
+    const picked=remaining.splice(bestIndex,1)[0],reason=highlightReason(picked).reason_code;
     chosen.push(highlightRow(picked));already.add(picked.puzzle_id);
     sets.add(picked.set_id);positions.add(picked.pick_number);
+    cards.add(picked.selected_id);reasons.add(reason);
   }
   return chosen;
 }
-export function selectInsightHighlights(rows,{page=1}={}) {
+export function selectInsightHighlights(rows,{page=1,finding=null}={}) {
   if(!Number.isInteger(page)||page<1||page>2)
     throw Object.assign(new Error('Only the first two highlight pages are available.'),{status:400});
   const valid=rows.filter(r=>r.session_id&&r.puzzle_id&&r.selected_id&&r.historical_id&&
     r.set_id&&Number.isInteger(r.round)&&r.round>=1&&r.round<=8);
-  const strong=valid.filter(r=>!r.trophy_match&&r.score>=80)
-    .sort((a,b)=>b.score-a.score||a.answered_at.localeCompare(b.answered_at)||a.puzzle_id.localeCompare(b.puzzle_id));
-  const tough=valid.filter(r=>r.trophy_match&&r.difficulty_band==='hard')
-    .sort((a,b)=>a.answered_at.localeCompare(b.answered_at)||a.puzzle_id.localeCompare(b.puzzle_id));
-  const low=valid.filter(r=>!r.trophy_match&&r.score<=60)
-    .sort((a,b)=>a.score-b.score||a.answered_at.localeCompare(b.answered_at)||a.puzzle_id.localeCompare(b.puzzle_id));
+  const strong=valid.filter(r=>!r.trophy_match&&r.score>=80).sort((a,b)=>
+    b.answered_at.localeCompare(a.answered_at)||b.score-a.score||a.puzzle_id.localeCompare(b.puzzle_id));
+  const tough=valid.filter(r=>r.trophy_match&&r.difficulty_band==='hard').sort((a,b)=>
+    b.answered_at.localeCompare(a.answered_at)||a.puzzle_id.localeCompare(b.puzzle_id));
+  const low=valid.filter(r=>!r.trophy_match&&r.score<=60).sort((a,b)=>
+    Math.floor(a.score/20)-Math.floor(b.score/20)||b.answered_at.localeCompare(a.answered_at)||a.puzzle_id.localeCompare(b.puzzle_id));
   const seen=new Set(),bestPages=[];
-  for(let i=0;i<2;i++)bestPages.push([...selectVariety(strong,3,seen),...selectVariety(tough,3,seen)]);
-  const missesPages=[selectVariety(low,6,seen),selectVariety(low,6,seen)];
+  for(let i=0;i<2;i++)bestPages.push([...selectVariety(strong,3,seen,finding),...selectVariety(tough,3,seen,finding)]);
+  const missesPages=[selectVariety(low,6,seen,finding),selectVariety(low,6,seen,finding)];
   return {schema_version:HIGHLIGHTS_VERSION,page,best:bestPages[page-1],misses:missesPages[page-1],
     has_more:{best:page===1&&bestPages[1].length>0,misses:page===1&&missesPages[1].length>0},
-    note:'Best Calls and Biggest Misses reflect originally awarded scores, not objectively correct or incorrect strategic decisions.'};
+    note:'Highlights are selected from originally awarded scores and saved support, not proof of an objectively correct draft strategy.'};
 }
 
 const safeCard=c=>c&&typeof c==='object'&&typeof c.id==='string'?{
@@ -227,6 +348,7 @@ const safeCard=c=>c&&typeof c==='object'&&typeof c.id==='string'?{
   image_url:safeCardImageUrl(c.image_url),
   mana_cost:typeof c.mana_cost==='string'?c.mana_cost.slice(0,60):null,
   rarity:typeof c.rarity==='string'?c.rarity.slice(0,40):null,
+  type_line:typeof c.type_line==='string'?c.type_line.slice(0,140):null,
 }:null;
 export function publicLockedDecision(answer,extra={}) {
   if(!answer||typeof answer!=='object'||!answer.puzzle||!Array.isArray(answer.puzzle.candidates))return null;
