@@ -132,7 +132,7 @@ test('under-sampled groups remain descriptive, without repetitive threshold para
      eligible_decisions:8,primary:null,secondary:[{status:'emerging',label:'Developing'},
      {status:'emerging',label:'Developing'}],note:'Provisional only.'}};
  const ui=await mount(t,{respond:async()=>data});
- assert.ok(ui.text().includes('All available history'));
+ assert.ok(ui.text().includes('8 saved decisions'));
  assert.ok(!ui.text().includes('3-pick average is a skill measure'));
  await ui.choose('Explore your data · charts and methodology');
  assert.ok(ui.text().includes('Need 5 picks'));
@@ -168,7 +168,7 @@ test('native scouting report renders evidence-backed DNA, original cards and Jou
           trophy:{id:'trophy',name:'Swiftwater Cliffs',image_url:null}}}]},
   };
   const ui=await mount(t,{respond:async()=>advanced});
-  for(const piece of ['Your Drafting DNA','The Independent Thinker','The Closer','Developing',
+  for(const piece of ['Your Drafting DNA','The Independent Thinker','The Closer','Another trait is taking shape',
     'Decision report','Your Drafting Journey','69.0','81.0','Verdant Rebirth']) {
     assert.ok(ui.text().includes(piece),'Missing scouting UI: '+piece);
   }
@@ -242,7 +242,7 @@ test('native v2 renders pick distance, bounded page 2, local timestamp ranges an
    misses:[]}};
  const ui=await mount(t,{respond:async(_s,_e,_p,page)=>page===2?next:first});
  const content=ui.text();
- assert.ok(content.includes('Reaching the sample floor does not guarantee a trait.'));
+ assert.ok(content.includes('How these patterns are counted'));
  assert.ok(!content.includes('56 more eligible decisions'),'threshold copy stays collapsed');
  assert.match(content,/Oct 31/,'v2 timestamps are rendered in local format');
  const images=ui.root.root.findAll(n=>n.type==='Image');
@@ -254,6 +254,75 @@ test('native v2 renders pick distance, bounded page 2, local timestamp ranges an
  assert.ok(ui.text().includes('Second Card'));
  assert.ok(!ui.text().includes('See more saved decisions'));
  assert.deepEqual(ui.calls.map(c=>c[3]),[1,2]);
+});
+
+test('older native Insights response still presents the leading observation, 40/40 progress and monthly scores',async t=>{
+  const data=fixture('mixed'); // Existing API response: no highlights, Journey or DNA.
+  const ui=await mount(t,{respond:async()=>data});
+  const text=ui.text();
+  assert.ok(text.includes('Your patterns'),'first observation gets an independent home');
+  assert.ok(text.includes(data.observations[0].text),'existing qualified observation is not swallowed');
+  assert.equal(text.split(data.observations[0].text).length-1,1);
+  assert.ok(text.includes('Your Drafting Journey'),'legacy progress is still visible');
+  assert.ok(text.includes('Recent 40: 83.0/100'));
+  assert.ok(text.includes('Previous 40: 70.0/100'));
+  assert.ok(text.includes('2026-09'));
+  assert.ok(text.includes('77.0'),'legacy monthly history is retained');
+  assert.ok(!text.includes('Decision report'),'missing newer highlight payload does not generate fake cards');
+});
+test('native first observation remains visible without highlights even if a newer leading_finding exists',async t=>{
+  const data={...fixture('mixed'),observations:[],
+    leading_finding:{id:'difficulty',text:'Hard-rated decisions scored differently from easy-rated decisions.'}};
+  const ui=await mount(t,{respond:async()=>data});
+  assert.ok(ui.text().includes(data.leading_finding.text));
+});
+test('native Journey visibly marks incomparable versions and the exact cohort boundary',async t=>{
+  const data={...fixture('mixed'),
+    journey:{version:'drafting-journey-v2',eligible_decisions:80,window_size:40,
+      windows:[{id:'one',from:'2026-08-01',to:'2026-08-25',count:40,average_score:63,
+        complete:true,cohort:'old-scoring'},
+        {id:'two',from:'2026-09-01',to:'2026-09-25',count:40,average_score:89,
+          complete:true,cohort:'new-scoring'}],
+      total_windows:2,versions_comparable:false,progress_compatible:false,
+      milestones:[],limited:false,note:'Historical scoring differs.'}};
+  const ui=await mount(t,{respond:async()=>data});
+  const text=ui.text();
+  assert.ok(text.includes('These windows are not one continuous progress trend'));
+  assert.ok(text.includes('Version changed'),'boundary marker appears next to the chart');
+  assert.ok(!text.includes('Recent 40: 83.0/100'),
+    'unsupported comparison is never presented as a coherent progress line');
+  await ui.choose('View journey details');
+  assert.ok(ui.text().includes('Historical scoring differs.'));
+});
+test('native compact choice rows show the result first and hide method/examples by default',async t=>{
+  const data={...fixture('mixed'),drafting_dna:{
+    schema_version:'drafting-dna-v2',status:'ready',scope:'all-eligible-history',eligible_decisions:237,
+    primary:{status:'qualified',id:'independent-thinker',title:'The Independent Thinker',
+      summary:'You often made strong alternative picks.',supporting_decisions:237,
+      evidence_family:'alternatives',evidence:[{label:'Strong alternatives',value:48}]},
+    secondary:[{status:'emerging',label:'Trait still developing'},{status:'emerging',label:'Trait still developing'}],
+    note:'Threshold rules stay behind a disclosure.'
+  },card_choices:{schema_version:'choice-context-v1',scope:'all-eligible-history',minimum_opportunities:20,
+    note:'Same saved pack support only.',choices:[
+      {id:'card-type',title:'Creature vs noncreature',status:'ready',opportunities:26,
+        selected:{creature:19,noncreature:7},availability:{creature:26,noncreature:26},
+        cohort:'v1',summary:'When both creatures and noncreatures were competitive, 19 were creatures.',examples:[]},
+      {id:'rarity',title:'Rarity',status:'ready',opportunities:26,
+        selected:{'rare-mythic':8,'common-uncommon':18},
+        availability:{'rare-mythic':26,'common-uncommon':26},
+        cohort:'v1',summary:'When rarities competed, 8 were rare or mythic.',examples:[]}]
+  }};
+  const ui=await mount(t,{respond:async()=>data});
+  const text=ui.text();
+  assert.ok(text.includes('The Independent Thinker'));
+  assert.ok(text.includes('19 of 26 picks'));
+  assert.ok(text.includes('8 of 26 picks'));
+  assert.ok(!text.includes('When both creatures and noncreatures were competitive'));
+  assert.ok(!text.includes('Threshold rules stay behind a disclosure'));
+  await ui.choose('Options and real examples');
+  assert.ok(ui.text().includes('When both creatures and noncreatures were competitive'));
+  await ui.choose('How these patterns are counted');
+  assert.ok(ui.text().includes('Threshold rules stay behind a disclosure'));
 });
 test('native shared image policy refuses HTTP, script and foreign hosts',async()=>{
  const {safeCardImageUrl}=await import('../../card-image-policy.mjs');
