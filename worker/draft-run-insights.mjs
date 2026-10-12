@@ -1,6 +1,6 @@
-import {buildDraftingJourney,buildDraftingDNA,selectInsightHighlights,publicLockedDecision} from './draft-run-insights-extras.mjs';
+import {buildDraftingJourney,buildDraftingDNA,buildCardChoiceContext,selectInsightHighlights,publicLockedDecision} from './draft-run-insights-extras.mjs';
 // Private My Pack One decision insights. Original stored answer score is authoritative.
-export const INSIGHTS_SQL="WITH recent_sessions AS MATERIALIZED (\n  SELECT s.id,s.environment,s.answers,s.scoring_version,s.selection_version,s.corpus_version\n  FROM draft_run_sessions s JOIN players p ON p.id=s.player_id\n  WHERE s.player_id=$1::uuid AND NOT s.measurement_qa\n    AND p.display_name !~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)'\n    AND jsonb_array_length(s.puzzle_ids)=8\n    AND s.selection_version IN ('eight-pick-v3','eight-pick-v4')\n  ORDER BY s.created_at DESC,s.id DESC\n  LIMIT 1000\n)\nSELECT s.id::text session_id,s.environment,s.scoring_version,s.selection_version,s.corpus_version,\n       picked.ordinality::int answer_round,\n       picked.answer->>'selectedId' selected_id,picked.answer->>'historicalId' historical_id,\n       picked.answer->>'selectedName' selected_name,picked.answer->>'historicalName' historical_name,\n       picked.answer->'puzzle'->>'set_id' set_id,\n       picked.answer->'puzzle'->>'puzzle_id' puzzle_id,\n       (picked.answer->'puzzle'->>'pick_number')::int pick_number,\n       (picked.answer->>'score')::int score,\n       (picked.answer->>'historicalMatch')::boolean trophy_match,\n       o.answered_at,COALESCE(r.band,'unknown') difficulty_band\nFROM recent_sessions s\nCROSS JOIN LATERAL jsonb_array_elements(s.answers) WITH ORDINALITY picked(answer,ordinality)\nJOIN draft_run_decision_observations o\n  ON o.session_id=s.id AND o.round=picked.ordinality::int AND o.outcome='pick'\n  AND o.puzzle_id=(picked.answer->'puzzle'->>'puzzle_id')\nLEFT JOIN draft_run_puzzle_ratings r ON r.puzzle_id=o.puzzle_id AND r.difficulty_version='support-ratio-v1'\nWHERE jsonb_typeof(picked.answer->'puzzle')='object'\n  AND picked.answer->>'score' ~ '^(100|[0-9]{1,2})$'\n  AND picked.answer->'puzzle'->>'pick_number' ~ '^[0-9]{1,2}$'\n  AND picked.answer->>'historicalMatch' IN ('true','false')\nORDER BY o.answered_at ASC,s.id,picked.ordinality\nLIMIT 8000";
+export const INSIGHTS_SQL="WITH recent_sessions AS MATERIALIZED (\n  SELECT s.id,s.environment,s.answers,s.scoring_version,s.selection_version,s.corpus_version\n  FROM draft_run_sessions s JOIN players p ON p.id=s.player_id\n  WHERE s.player_id=$1::uuid AND NOT s.measurement_qa\n    AND p.display_name !~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)'\n    AND jsonb_array_length(s.puzzle_ids)=8\n    AND s.selection_version IN ('eight-pick-v3','eight-pick-v4')\n  ORDER BY s.created_at DESC,s.id DESC\n  LIMIT 1000\n)\nSELECT s.id::text session_id,s.environment,s.scoring_version,s.selection_version,s.corpus_version,\n       picked.ordinality::int answer_round,\n       picked.answer->>'selectedId' selected_id,picked.answer->>'historicalId' historical_id,\n       picked.answer->>'selectedName' selected_name,picked.answer->>'historicalName' historical_name,\n       picked.answer->'puzzle'->>'set_id' set_id,\n       picked.answer->'puzzle'->>'puzzle_id' puzzle_id,\n       (picked.answer->'puzzle'->>'pick_number')::int pick_number,\n       (picked.answer->>'score')::int score,\n       (picked.answer->>'historicalMatch')::boolean trophy_match,\n       o.answered_at,COALESCE(r.band,'unknown') difficulty_band,\n       (SELECT jsonb_agg(jsonb_build_object('id',c->>'id','type_line',c->>'type_line','rarity',c->>'rarity'))\n        FROM jsonb_array_elements(CASE WHEN jsonb_typeof(picked.answer->'puzzle'->'candidates')='array'\n          THEN picked.answer->'puzzle'->'candidates' ELSE '[]'::jsonb END) c) choice_candidates,\n       picked.answer->'ranking' choice_ranking\nFROM recent_sessions s\nCROSS JOIN LATERAL jsonb_array_elements(s.answers) WITH ORDINALITY picked(answer,ordinality)\nJOIN draft_run_decision_observations o\n  ON o.session_id=s.id AND o.round=picked.ordinality::int AND o.outcome='pick'\n  AND o.puzzle_id=(picked.answer->'puzzle'->>'puzzle_id')\nLEFT JOIN draft_run_puzzle_ratings r ON r.puzzle_id=o.puzzle_id AND r.difficulty_version='support-ratio-v1'\nWHERE jsonb_typeof(picked.answer->'puzzle')='object'\n  AND picked.answer->>'score' ~ '^(100|[0-9]{1,2})$'\n  AND picked.answer->'puzzle'->>'pick_number' ~ '^[0-9]{1,2}$'\n  AND picked.answer->>'historicalMatch' IN ('true','false')\nORDER BY o.answered_at ASC,s.id,picked.ordinality\nLIMIT 8000";
 export const INSIGHTS_SESSION_LIMIT=1000;
 export const INSIGHTS_GROUP_MIN=5;
 export const INSIGHTS_MONTH_MIN=10;
@@ -73,17 +73,19 @@ export function normaliseInsightsRows(rows) {
       answered_at:new Date(when).toISOString(),
       scoring_version:String(row.scoring_version||''),selection_version:String(row.selection_version||''),
       corpus_version:String(row.corpus_version||''),
+      choice_candidates:row.choice_candidates||[],choice_ranking:row.choice_ranking||[],
     });
   }
   return answers.sort((a,b)=>b.answered_at.localeCompare(a.answered_at)||a.session_id.localeCompare(b.session_id));
 }
 
-function comparison(rows,labelA,labelB,a,b,id,note='') {
+function comparison(rows,labelA,labelB,a,b,id,note='',groups=[]) {
   if(a.count<INSIGHTS_COMPARISON_MIN||b.count<INSIGHTS_COMPARISON_MIN||
     a.average_score===null||b.average_score===null)return null;
   const gap=round(a.average_score-b.average_score);
   if(Math.abs(gap)<INSIGHTS_OBSERVATION_GAP)return null;
   return {id,count:Math.min(a.count,b.count),gap:Math.abs(gap),
+    groups:groups.map((group,index)=>({...group,relation:(index===0)===(gap>0)?'higher':'lower'})),
     text:labelA+' averaged '+Math.abs(gap).toFixed(1)+' points '+(gap>0?'higher':'lower')+
     ' than '+labelB+' ('+a.count+' vs '+b.count+' decisions).'+(note?' '+note:'')};
 }
@@ -121,7 +123,9 @@ export function aggregateDraftRunInsights(source,{environment='mixed',period='al
   const proposals=[];
   if(progress) {
     const result=comparison(selected,'Recent 40 picks','previous 40 picks',
-      progress.recent,progress.previous,'progress','Recorded scores describe picks, not causation.');
+      progress.recent,progress.previous,'progress','Recorded scores describe picks, not causation.',[
+        {label:'the recent 40 picks',puzzle_ids:recent.map(r=>r.puzzle_id)},
+        {label:'the previous 40 picks',puzzle_ids:prior.map(r=>r.puzzle_id)}]);
     if(result)proposals.push(result);
   }
   // Only large cohorts may trigger copy; 5-answer chart groups remain descriptive.
@@ -130,7 +134,9 @@ export function aggregateDraftRunInsights(source,{environment='mixed',period='al
     const higher=[...goodPicks].sort((a,b)=>b.average_score-a.average_score)[0];
     const lower=[...goodPicks].sort((a,b)=>a.average_score-b.average_score)[0];
     if(higher.pick_number!==lower.pick_number){
-      const result=comparison(selected,higher.label,lower.label,higher,lower,'pick-depth');
+      const result=comparison(selected,higher.label,lower.label,higher,lower,'pick-depth','',[
+        {label:higher.label+' decisions',pick_number:higher.pick_number},
+        {label:lower.label+' decisions',pick_number:lower.pick_number}]);
       if(result)proposals.push(result);
     }
   }
@@ -140,7 +146,9 @@ export function aggregateDraftRunInsights(source,{environment='mixed',period='al
     const lower=[...goodBands].sort((a,b)=>a.average_score-b.average_score)[0];
     if(higher.band!==lower.band){
       const result=comparison(selected,higher.band+' decisions',lower.band+' decisions',higher,lower,'difficulty',
-        'The puzzle difficulty groups are different.');
+        'The puzzle difficulty groups are different.',[
+          {label:higher.band+'-rated decisions',band:higher.band},
+          {label:lower.band+'-rated decisions',band:lower.band}]);
       if(result)proposals.push(result);
     }
   }
@@ -148,15 +156,23 @@ export function aggregateDraftRunInsights(source,{environment='mixed',period='al
   for(const other of formats){
     if(other.environment===environment)continue;
     const result=comparison(selected,main.label+' drafts',other.label+' drafts',main,other,
-      'format-'+other.environment,'The card pools differ between formats.');
+      'format-'+other.environment,'The card pools differ between formats.',[
+        {label:main.label+' drafts',environment:main.environment},
+        {label:other.label+' drafts',environment:other.environment}]);
     if(result)proposals.push(result);
   }
   proposals.sort((a,b)=>b.count-a.count||b.gap-a.gap||a.id.localeCompare(b.id));
   const observations=proposals.slice(0,3).map(({id,text})=>({id,text}));
   // DNA uses the complete bounded first-encounter history, not chart filters.
   const drafting_dna=buildDraftingDNA(all);
+  const card_choices=buildCardChoiceContext(all);
   const journey={...buildDraftingJourney(selected),progress_compatible};
-  const highlights=selectInsightHighlights(selected,{page});
+  const featured=proposals[0]||null;
+  // Only public labels leave this function. Progress group puzzle IDs remain
+  // private selector inputs rather than another way to reconstruct history.
+  const leading_finding=featured?{id:featured.id,text:featured.text,
+    compared_groups:featured.groups.map(({label,relation})=>({label,relation}))}:null;
+  const highlights=selectInsightHighlights(selected,{page,finding:featured});
   const versions={
     scoring:[...new Set(selected.map(r=>r.scoring_version))].sort(),
     selection:[...new Set(selected.map(r=>r.selection_version))].sort(),
@@ -167,7 +183,8 @@ export function aggregateDraftRunInsights(source,{environment='mixed',period='al
     eligible_decisions:total,unlocked:total>=INSIGHTS_UNLOCK_MIN,unlock_at:INSIGHTS_UNLOCK_MIN,
     total_eligible_decisions:eligible.length,unknown_difficulty:selected.filter(r=>r.difficulty_band==='unknown').length,
     pick_depth:depth,difficulty,months,formats,progress,observations,versions,
-    drafting_dna,journey,highlights,
+    drafting_dna,card_choices,journey,highlights,leading_finding,
+    default_environment:all[0]?.environment||'mixed',
     range:oldestNewest(selected),session_limit:INSIGHTS_SESSION_LIMIT,
     methodology:'Original awarded pick scores; first answer to each puzzle in up to 1,000 recent eight-pick non-QA runs. '+
       'Pick numbers are real source pick positions. Group averages require 5 picks; months need 10; progress needs two sets of 40; '+

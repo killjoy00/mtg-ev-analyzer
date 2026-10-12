@@ -23,14 +23,23 @@ export type DraftingDNA = {
 };
 export type JourneyWindow = {id:string;from:string;to:string;from_at?:string;to_at?:string;count:number;
   average_score:number|null;complete:boolean;cohort:string};
+export type CardChoiceExample = { session_id:string;round:number;puzzle_id:string;set_id:string;pick_number:number;date:string;selected_name:string };
+export type CardChoiceBreakdown = {id:string;title:string;status:'ready'|'developing';opportunities:number;
+  selected:Record<string,number>;availability:Record<string,number>;cohort:string;
+  examples?:CardChoiceExample[];summary?:string;other_version_opportunities?:number};
+export type CardChoices = {schema_version:string;scope:string;minimum_opportunities:number;
+  choices:CardChoiceBreakdown[];note:string};
 export type DraftingJourney = {version:string;eligible_decisions:number;window_size:number;
   windows:JourneyWindow[];total_windows:number;versions_comparable:boolean;
   milestones:{id:string;date:string;from_at?:string;to_at?:string;text:string;count:number;average_score?:number;hard_decisions?:number}[];
   limited:boolean;note:string;progress_compatible?:boolean};
-export type InsightCard = {id:string;name:string;image_url:string|null;mana_cost?:string|null;rarity?:string|null};
+export type InsightCard = {id:string;name:string;image_url:string|null;mana_cost?:string|null;rarity?:string|null;type_line?:string|null};
+export type InsightDecisionLocator = {session_id:string;round:number;puzzle_id:string};
 export type InsightHighlight = {session_id:string;round:number;puzzle_id:string;set_id:string;
   environment:InsightsEnvironment;pick_number:number;date:string;score:number;
-  trophy_match:boolean;selection_kind:string;preview?:{selected:InsightCard;trophy:InsightCard}};
+  trophy_match:boolean;selection_kind:string;reason_version?:string;reason_code?:string;reason_text?:string;
+   reason_evidence?:Record<string,string|number>;finding_context?:string;selected_name?:string;historical_name?:string;
+   preview?:{selected:InsightCard;trophy:InsightCard}};
 export type InsightHighlights = {schema_version:string;best:InsightHighlight[];misses:InsightHighlight[];note:string;
   page?:number;has_more?:{best:boolean;misses:boolean}};
 export type InsightDecision = {set_id:string;pick_number:number;score:number;trophy_match:boolean;
@@ -59,6 +68,9 @@ export type DraftInsights = {
   session_limit: number;
   methodology: string;
   drafting_dna?: DraftingDNA;
+  card_choices?: CardChoices;
+  leading_finding?: {id:string;text:string;compared_groups?:{label:string;relation:'higher'|'lower'}[]}|null;
+  default_environment?: InsightsEnvironment;
   journey?: DraftingJourney;
   highlights?: InsightHighlights;
 };
@@ -74,7 +86,7 @@ export async function loadMobileInsights(session: MobileSession, environment: In
   });
 }
 
-export async function loadMobileInsightDecision(session: MobileSession, item: InsightHighlight): Promise<InsightDecision> {
+export async function loadMobileInsightDecision(session: MobileSession, item: InsightDecisionLocator): Promise<InsightDecision> {
   if (!session.accountToken) throw Error('Sign in to view your saved picks.');
   const params=new URLSearchParams({
     session_id:item.session_id,round:String(item.round),puzzle_id:item.puzzle_id,

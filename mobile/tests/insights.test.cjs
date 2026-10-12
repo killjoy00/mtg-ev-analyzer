@@ -54,8 +54,9 @@ async function mount(t,{initial=session(),respond=async (_s,env)=>fixture(env)}=
     'expo-router':{router:{push:v=>routes.push(['push',v]),dismissTo:v=>routes.push(['dismiss',v])},
       Stack:{Screen:host('StackScreen')},useFocusEffect:callback=>React.useEffect(callback,[callback])},
     'react-native':{ActivityIndicator:host('ActivityIndicator'),Image:host('Image'),Pressable:host('Pressable'),
-      ScrollView:host('ScrollView'),StyleSheet:{create:v=>v},View:host('View')},
+      ScrollView:host('ScrollView'),Modal:host('Modal'),StyleSheet:{create:v=>v},View:host('View')},
     '@/src/components/AboutLink':{AboutLink:host('AboutLink')},
+    '@/src/config':{config:{screenshots:{fixtures:false}}},
     '@/src/api/insights':{loadMobileInsights:async(s,env,period,page=1)=>{
       calls.push([s.accountToken,env,period,page]);return respond(s,env,period,page);
     },loadMobileInsightDecision:async(s,item)=>{
@@ -94,62 +95,48 @@ async function mount(t,{initial=session(),respond=async (_s,env)=>fixture(env)}=
   };
 }
 
-test('native Insights screen renders all analyses, current tab and live sample figures',async t=>{
-  const ui=await mount(t);
-  const content=ui.text();
-  for(const piece of ['Stats','Insights','Account settings','Your Drafting Insights','Pick-by-pick strengths',
-    'Difficulty context','Progress over time','Format patterns','P1P1','77.0','80 eligible decisions']){
-    assert.ok(content.includes(piece),'Expected Insights content: '+piece);
-  }
-  assert.equal(ui.calls[0][1],'mixed');
-  await ui.choose('Environment: Powered Cube');
-  assert.ok(ui.text().includes('P1P2'));
-  assert.equal(ui.calls.at(-1)[1],'powered-cube');
-  await ui.choose('Time period: Last 90 days');
-  assert.equal(ui.calls.at(-1)[2],'90d');
-  await ui.choose('Stats');
-  assert.deepEqual(ui.routes.at(-1),['dismiss','/career']);
-  await ui.choose('Account settings');
-  assert.deepEqual(ui.routes.at(-1),['push','/account']);
+test('native Insights keeps hierarchy, breakdowns collapsed and navigation intact',async t=>{
+ const ui=await mount(t),content=ui.text();
+ for(const piece of ['Stats','Insights','Account settings','Your Drafting Insights','Explore your data','80 eligible decisions']){
+   assert.ok(content.includes(piece),'Expected overview: '+piece);
+ }
+ assert.ok(!content.includes('Pick-by-pick breakdown'),'Charts start collapsed');
+ await ui.choose('Explore your data · charts and methodology');
+ for(const piece of ['Pick-by-pick breakdown','Difficulty breakdown','Format breakdown','P1P1','74.0','78.0']){
+   assert.ok(ui.text().includes(piece),'Missing expanded chart: '+piece);
+ }
+ assert.equal(ui.calls[0][1],'mixed');
+ await ui.choose('Environment: Powered Cube');
+ assert.ok(ui.text().includes('Powered Cube'));
+ assert.equal(ui.calls.at(-1)[1],'powered-cube');
+ await ui.choose('Time period: Last 90 days');
+ assert.equal(ui.calls.at(-1)[2],'90d');
+ await ui.choose('Stats');assert.deepEqual(ui.routes.at(-1),['dismiss','/career']);
+ await ui.choose('Account settings');assert.deepEqual(ui.routes.at(-1),['push','/account']);
 });
 
-test('237 eligible decisions with no standout 10-point gap show honest numeric patterns',async t=>{
-  const sample=fixture('mixed');
-  const data={
-    ...sample,eligible_decisions:237,total_eligible_decisions:237,
-    observations:[],
-    formats:sample.formats.map(x=>x.environment==='mixed'
-      ? {...x,count:237,average_score:76.8,trophy_match_pct:42.2}:x),
-    pick_depth:[{label:'P1P4',pick_number:4,count:31,average_score:74.5,trophy_match_pct:43}],
-    progress:{previous:{count:40,average_score:75.2,from:'2026-09-01',to:'2026-09-10'},
-      recent:{count:40,average_score:77.1,from:'2026-09-11',to:'2026-09-20'},delta:1.9},
-  };
-  const ui=await mount(t,{respond:async()=>data});
-  const view=ui.text();
-  assert.ok(view.includes('237 eligible decisions'),'total remains visible');
-  assert.ok(view.includes('No standout comparison met both thresholds'),'reason is accurate');
-  assert.ok(view.includes('Across 237 eligible Mixed decisions'),'cohort appears in patterns');
-  assert.ok(view.includes('76.8/100'),'existing score aggregate is reused');
-  assert.ok(view.includes('42.2%'),'trophy-match is backed by the cohort');
-  assert.ok(view.includes('Your most recent 40 picks averaged 77.1/100'),'small descriptive trend still shown');
-  assert.ok(view.includes('preceding 40 averaged 75.2/100'),'both comparison windows visible');
-  assert.ok(view.includes('P1P4: 31 decisions averaging 74.5/100'),'largest source pick position is descriptive');
-  assert.ok(!view.includes('Not enough comparable decisions yet'),'high-sample accounts are not told they lack decisions');
+test('237 decisions without standout finding keep neutral copy, not a manufactured average',async t=>{
+ const sample=fixture('mixed'),data={...sample,eligible_decisions:237,total_eligible_decisions:237,observations:[],
+   highlights:{schema_version:'decision-highlights-v2',best:[],misses:[],note:'Historical calls.'}};
+ const ui=await mount(t,{respond:async()=>data});
+ const view=ui.text();
+ assert.ok(view.includes('237 eligible decisions'));
+ assert.ok(view.includes('No standout comparison has qualified'));
+ assert.ok(!view.includes('Your most-recorded source pick position'));
 });
 
-test('under-sampled descriptive groups are not represented as measured patterns',async t=>{
-  const sample=fixture('mixed');
-  const data={...sample,eligible_decisions:8,total_eligible_decisions:8,
-    observations:[],progress:null,
-    formats:sample.formats.map(x=>x.environment==='mixed'
-      ? {...x,count:8,average_score:70,trophy_match_pct:50}:x),
-    pick_depth:[{label:'P1P1',pick_number:1,count:3,average_score:null,trophy_match_pct:null}],
-  };
-  const ui=await mount(t,{respond:async()=>data});
-  const view=ui.text();
-  assert.ok(view.includes('Across 8 eligible Mixed decisions'));
-  assert.ok(!view.includes('Your most-recorded source pick position'),'3-pick group must not produce average copy');
-  assert.ok(!view.includes('Your most recent 40 picks averaged'),'missing windows must not produce trend');
+test('under-sampled groups remain descriptive, without repetitive threshold paragraphs',async t=>{
+ const sample=fixture('mixed');
+ const data={...sample,eligible_decisions:8,total_eligible_decisions:8,observations:[],progress:null,
+   pick_depth:[{label:'P1P1',pick_number:1,count:3,average_score:null,trophy_match_pct:null}],
+   drafting_dna:{schema_version:'drafting-dna-v2',status:'emerging',scope:'all-eligible-history',
+     eligible_decisions:8,primary:null,secondary:[{status:'emerging',label:'Developing'},
+     {status:'emerging',label:'Developing'}],note:'Provisional only.'}};
+ const ui=await mount(t,{respond:async()=>data});
+ assert.ok(ui.text().includes('8 saved decisions'));
+ assert.ok(!ui.text().includes('3-pick average is a skill measure'));
+ await ui.choose('Explore your data · charts and methodology');
+ assert.ok(ui.text().includes('Need 5 picks'));
 });
 
 test('native scouting report renders evidence-backed DNA, original cards and Journey with owner-only review',async t=>{
@@ -182,8 +169,8 @@ test('native scouting report renders evidence-backed DNA, original cards and Jou
           trophy:{id:'trophy',name:'Swiftwater Cliffs',image_url:null}}}]},
   };
   const ui=await mount(t,{respond:async()=>advanced});
-  for(const piece of ['Your Drafting DNA','The Independent Thinker','The Closer','Trait still developing',
-    'Your Best Calls & Biggest Misses','Your Drafting Journey','69.0','81.0','Verdant Rebirth']) {
+  for(const piece of ['Your Drafting DNA','The Independent Thinker','The Closer','Another trait is taking shape',
+    'Decision report','Your Drafting Journey','69.0','81.0','Verdant Rebirth']) {
     assert.ok(ui.text().includes(piece),'Missing scouting UI: '+piece);
   }
   await ui.choose('Review original pack');
@@ -191,6 +178,8 @@ test('native scouting report renders evidence-backed DNA, original cards and Jou
     assert.ok(ui.text().includes(piece),'Original detail missing '+piece);
   }
   assert.ok(ui.calls.some(x=>x[1]==='decision'&&x[2]==='fixture-1'));
+  await ui.choose('Close original pack');
+  assert.ok(!ui.text().includes('Mystic Monastery'),'Detail closes without losing overview');
   await ui.switchAccount(null);
   assert.ok(ui.text().includes('Sign in to see your Insights'));
   assert.ok(!ui.text().includes('Verdant Rebirth'));
@@ -198,7 +187,7 @@ test('native scouting report renders evidence-backed DNA, original cards and Jou
 
 test('native Insights clears private data after logout and blocks old-owner responses',async t=>{
   const ui=await mount(t);
-  assert.ok(ui.text().includes('P1P1'));
+  assert.ok(ui.text().includes('80 eligible decisions · Mixed'));
   await ui.switchAccount(null);
   assert.ok(ui.text().includes('Sign in to see your Insights'));
   assert.ok(!ui.text().includes('P1P1'));
@@ -212,8 +201,8 @@ test('new owner cannot see old owner Insight response after account switch',asyn
   const ui=await mount(t,{respond:async(s,env)=>s.accountToken==='synthetic-token-a'?slow:fixture('powered-cube')});
   await ui.switchAccount(session('b'));
   await act(async()=>{releaseFirst(fixture('mixed'));await flush();});
-  assert.ok(ui.text().includes('P1P2'));
-  assert.ok(!ui.text().includes('P1P1'));
+  assert.ok(ui.text().includes('80 eligible decisions · Powered Cube'));
+  assert.ok(!ui.text().includes('80 eligible decisions · Mixed'));
   assert.equal(ui.calls.at(-1)[0],'synthetic-token-b');
 });
 
@@ -254,16 +243,101 @@ test('native v2 renders pick distance, bounded page 2, local timestamp ranges an
    misses:[]}};
  const ui=await mount(t,{respond:async(_s,_e,_p,page)=>page===2?next:first});
  const content=ui.text();
- assert.match(content,/56 more eligible decisions/);
+ assert.ok(content.includes('How these patterns are counted'));
+ assert.ok(!content.includes('56 more eligible decisions'),'threshold copy stays collapsed');
  assert.match(content,/Oct 31/,'v2 timestamps are rendered in local format');
  const images=ui.root.root.findAll(n=>n.type==='Image');
  assert.equal(images.length,1,'unapproved selected art is a card-name fallback');
  assert.equal(images[0].props.source.uri,'https://cards.scryfall.io/normal/front/card.jpg');
  assert.ok(content.includes('Only Placeholder'));
- await ui.choose('Load more saved picks (page 2 of 2)');
+ await ui.choose('See more');
+ await ui.choose('See more saved decisions');
  assert.ok(ui.text().includes('Second Card'));
- assert.ok(!ui.text().includes('Load more saved picks (page 2 of 2)'));
+ assert.ok(!ui.text().includes('See more saved decisions'));
  assert.deepEqual(ui.calls.map(c=>c[3]),[1,2]);
+});
+
+test('older native Insights response still presents the leading observation, 40/40 progress and monthly scores',async t=>{
+  const data=fixture('mixed'); // Existing API response: no highlights, Journey or DNA.
+  const ui=await mount(t,{respond:async()=>data});
+  const text=ui.text();
+  assert.ok(text.includes('Your patterns'),'first observation gets an independent home');
+  assert.ok(text.includes(data.observations[0].text),'existing qualified observation is not swallowed');
+  assert.equal(text.split(data.observations[0].text).length-1,1);
+  assert.ok(text.includes('Your Drafting Journey'),'legacy progress is still visible');
+  assert.ok(text.includes('Recent 40: 83.0/100'));
+  assert.ok(text.includes('Previous 40: 70.0/100'));
+  assert.ok(text.includes('2026-09'));
+  assert.ok(text.includes('77.0'),'legacy monthly history is retained');
+  assert.ok(!text.includes('Decision report'),'missing newer highlight payload does not generate fake cards');
+});
+test('native first observation remains visible without highlights even if a newer leading_finding exists',async t=>{
+  const data={...fixture('mixed'),observations:[],
+    leading_finding:{id:'difficulty',text:'Hard-rated decisions scored differently from easy-rated decisions.'}};
+  const ui=await mount(t,{respond:async()=>data});
+  assert.ok(ui.text().includes(data.leading_finding.text));
+});
+test('native Journey visibly marks incomparable versions and the exact cohort boundary',async t=>{
+  const data={...fixture('mixed'),
+    journey:{version:'drafting-journey-v2',eligible_decisions:80,window_size:40,
+      windows:[{id:'one',from:'2026-08-01',to:'2026-08-25',count:40,average_score:63,
+        complete:true,cohort:'old-scoring'},
+        {id:'two',from:'2026-09-01',to:'2026-09-25',count:40,average_score:89,
+          complete:true,cohort:'new-scoring'}],
+      total_windows:2,versions_comparable:false,progress_compatible:false,
+      milestones:[],limited:false,note:'Historical scoring differs.'}};
+  const ui=await mount(t,{respond:async()=>data});
+  const text=ui.text();
+  assert.ok(text.includes('These windows are not one continuous progress trend'));
+  assert.ok(text.includes('Version changed'),'boundary marker appears next to the chart');
+  assert.ok(!text.includes('Recent 40: 83.0/100'),
+    'unsupported comparison is never presented as a coherent progress line');
+  await ui.choose('View journey details');
+  assert.ok(ui.text().includes('Historical scoring differs.'));
+});
+test('a single short Journey without a full window does not invent a model-version change',async t=>{
+  const data={...fixture('mixed'),progress:null,
+    journey:{version:'drafting-journey-v2',eligible_decisions:12,window_size:40,
+      windows:[{id:'partial',from:'2026-10-01',to:'2026-10-04',count:12,
+        average_score:75,complete:false,cohort:'same-model'}],
+      total_windows:1,versions_comparable:false,progress_compatible:true,
+      milestones:[],limited:false,note:'Original recorded scores.'}};
+  const ui=await mount(t,{respond:async()=>data});
+  assert.ok(ui.text().includes('Your Drafting Journey'));
+  assert.ok(!ui.text().includes('Historical card-pool or scoring rules changed'));
+  assert.ok(!ui.text().includes('Version changed'));
+});
+
+test('native compact choice rows show the result first and hide method/examples by default',async t=>{
+  const data={...fixture('mixed'),drafting_dna:{
+    schema_version:'drafting-dna-v2',status:'ready',scope:'all-eligible-history',eligible_decisions:237,
+    primary:{status:'qualified',id:'independent-thinker',title:'The Independent Thinker',
+      summary:'You often made strong alternative picks.',supporting_decisions:237,
+      evidence_family:'alternatives',evidence:[{label:'Strong alternatives',value:48}]},
+    secondary:[{status:'emerging',label:'Trait still developing'},{status:'emerging',label:'Trait still developing'}],
+    note:'Threshold rules stay behind a disclosure.'
+  },card_choices:{schema_version:'choice-context-v1',scope:'all-eligible-history',minimum_opportunities:20,
+    note:'Same saved pack support only.',choices:[
+      {id:'card-type',title:'Creature vs noncreature',status:'ready',opportunities:26,
+        selected:{creature:19,noncreature:7},availability:{creature:26,noncreature:26},
+        cohort:'v1',summary:'When both creatures and noncreatures were competitive, 19 were creatures.',examples:[]},
+      {id:'rarity',title:'Rarity',status:'ready',opportunities:26,
+        selected:{'rare-mythic':8,'common-uncommon':18},
+        availability:{'rare-mythic':26,'common-uncommon':26},
+        cohort:'v1',summary:'When rarities competed, 8 were rare or mythic.',examples:[]}]
+  }};
+  const ui=await mount(t,{respond:async()=>data});
+  const text=ui.text();
+  assert.ok(text.includes('The Independent Thinker'));
+  assert.ok(text.includes('All available history · 237 saved decisions'));
+  assert.ok(text.includes('19 of 26 picks'));
+  assert.ok(text.includes('8 of 26 picks'));
+  assert.ok(!text.includes('When both creatures and noncreatures were competitive'));
+  assert.ok(!text.includes('Threshold rules stay behind a disclosure'));
+  await ui.choose('Options and real examples');
+  assert.ok(ui.text().includes('When both creatures and noncreatures were competitive'));
+  await ui.choose('How these patterns are counted');
+  assert.ok(ui.text().includes('Threshold rules stay behind a disclosure'));
 });
 test('native shared image policy refuses HTTP, script and foreign hosts',async()=>{
  const {safeCardImageUrl}=await import('../../card-image-policy.mjs');

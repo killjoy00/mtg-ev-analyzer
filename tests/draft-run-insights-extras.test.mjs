@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {safeCardImageUrl,CARD_IMAGE_HOSTS} from '../card-image-policy.mjs';
 import {
-  buildDraftingDNA,buildDraftingJourney,selectInsightHighlights,publicLockedDecision,
-  DNA_QUALIFICATION,DNA_VERSION,JOURNEY_VERSION,HIGHLIGHTS_VERSION,
+  buildDraftingDNA,buildDraftingJourney,buildCardChoiceContext,selectInsightHighlights,publicLockedDecision,
+  DNA_QUALIFICATION,DNA_VERSION,JOURNEY_VERSION,HIGHLIGHTS_VERSION,CHOICE_CONTEXT_RULE,HIGHLIGHT_REASON_VERSION,
 } from '../worker/draft-run-insights-extras.mjs';
 import {
   aggregateDraftRunInsights,INSIGHTS_SQL,INSIGHTS_PREVIEW_SQL,INSIGHTS_DECISION_SQL,
@@ -344,4 +344,166 @@ test('Targeted winner matches full normalise() over synthetic reruns, ties and i
  assert.match(sql,/picked.answer->>'score' ~/);
  assert.match(sql,/picked.answer->>'historicalMatch' IN/);
  assert.ok(!sql.includes('LIMIT 8000'),'puzzle filter is inside the same 1000-session CTE');
+});
+
+test('Saved type and rarity choices require competitive cross-category options, not raw counts',()=>{
+ const row=(n,extra={})=>({
+   ...pick(n),selected_id:n%4===0?'spell':'creature',
+   selected_name:n%4===0?'Synthetic Spell':'Synthetic Creature',
+   choice_candidates:[
+     {id:'creature',type_line:'Artifact Creature — Golem',rarity:'common'},
+     {id:'spell',type_line:'Instant',rarity:'rare'},
+     {id:'filler',type_line:'Creature — Beast',rarity:'uncommon'},
+   ],
+   choice_ranking:[{id:'creature',name:'Synthetic Creature',support:.52},
+     {id:'spell',name:'Synthetic Spell',support:.48},
+     {id:'filler',name:'Synthetic Filler',support:.01}],...extra,
+ });
+ const base=Array.from({length:32},(_,i)=>row(i));
+ const result=buildCardChoiceContext(base);
+ assert.equal(result.schema_version,CHOICE_CONTEXT_RULE.version);
+ assert.equal(result.scope.startsWith('all-eligible-history'),true);
+ const cardType=result.choices.find(c=>c.id==='card-type'),rarity=result.choices.find(c=>c.id==='rarity');
+ for(const group of [cardType,rarity]){
+   assert.equal(group.status,'ready');
+   assert.equal(group.opportunities,32);
+   assert.equal(group.examples.length,2);
+   assert.ok(group.summary.includes('32 decisions'));
+   assert.equal(group.availability['creature']??group.availability['common-uncommon'],32);
+ }
+ assert.deepEqual(cardType.selected,{creature:24,noncreature:8});
+ assert.deepEqual(rarity.selected,{'rare-mythic':8,'common-uncommon':24});
+ assert.deepEqual(cardType.availability,{creature:32,noncreature:32},
+   'Low-support second creature is filler, not an additional competitive alternative');
+ const invalid=row(100,{choice_candidates:[{id:'creature',type_line:'',rarity:''},
+   {id:'spell',type_line:'Instant',rarity:'rare'}],choice_ranking:[
+     {id:'creature',support:.5},{id:'spell',support:.5}]});
+ const oneCategory=row(101,{choice_candidates:[
+   {id:'creature',type_line:'Creature',rarity:'common'},
+   {id:'spell',type_line:'Creature',rarity:'common'}]});
+ const lowSupport=row(102,{choice_ranking:[{id:'creature',support:.95},
+   {id:'spell',support:.01},{id:'filler',support:.01}]});
+ const malformed=row(103,{choice_ranking:[{id:'creature',support:null},{id:'spell',support:.5}]});
+ const partialRanking=row(104,{choice_ranking:[{id:'creature',support:.51},
+   {id:'spell',support:.49}]});
+ const duplicateCard=row(105,{choice_candidates:[
+   {id:'creature',type_line:'Creature',rarity:'common'},
+   {id:'creature',type_line:'Creature',rarity:'common'},
+   {id:'spell',type_line:'Instant',rarity:'rare'}]});
+ const withBad=buildCardChoiceContext([...base,invalid,oneCategory,lowSupport,malformed,
+   partialRanking,duplicateCard]);
+ assert.equal(withBad.choices[0].opportunities,32);
+ assert.equal(withBad.choices[1].opportunities,32);
+ const splitType=row(106,{choice_candidates:[
+   {id:'creature',type_line:'Creature — Golem // Instant',rarity:'common'},
+   {id:'spell',type_line:'Sorcery',rarity:'rare'},
+   {id:'filler',type_line:'Creature',rarity:'uncommon'}]});
+ const split=buildCardChoiceContext([...base,splitType]);
+ assert.equal(split.choices[0].opportunities,32,
+   'mixed creature/noncreature faces must not imply a single card-type choice');
+ assert.equal(split.choices[1].opportunities,33,
+   'a supported card with known rarity can still count for rarity context');
+});
+test('Availability counts vary with competitive cards; small version cohorts stay developing',()=>{
+ const sample=(n,version='v1')=>({...pick(n,{version}),
+   selected_id:'creature',
+   choice_candidates:[
+     {id:'creature',type_line:'Creature',rarity:'uncommon'},
+     {id:'other',type_line:'Creature',rarity:'common'},
+     {id:'spell',type_line:'Sorcery',rarity:'rare'},
+   ],
+   choice_ranking:[{id:'creature',support:.9},{id:'other',support:.81},{id:'spell',support:.7}],
+ });
+ const first=Array.from({length:18},(_,i)=>sample(i));
+ const merged=buildCardChoiceContext([...first,...Array.from({length:17},(_,i)=>sample(100+i,'v2'))]);
+ const type=merged.choices[0];
+ assert.equal(type.status,'developing','35 rows across incompatible cohorts cannot meet the floor');
+ assert.equal(type.opportunities,18);
+ assert.equal(type.other_version_opportunities,17);
+ assert.deepEqual(type.availability,{creature:36,noncreature:18});
+ assert.deepEqual(type.selected,{creature:18,noncreature:0});
+ assert.equal(type.examples.length,0,'Do not expose detail refs for under-sampled cohorts');
+});
+test('Highlight v3 reasons are factual, deterministic, disjoint and scoped',()=>{
+ const source=Array.from({length:90},(_,i)=>{
+   const hard=i%6===0,miss=i%6===1;
+   return {...pick(i,{score:hard?100:miss?15:89,match:hard,band:hard?'hard':'medium'}),
+     selected_id:'synthetic-'+(i%5),historical_id:'historical-'+i,
+     choice_ranking:miss?[{id:'model',name:'Better Supported Choice',support:.8},
+       {id:'synthetic-'+(i%5),name:'Picked Card',support:.16}]:[],
+   };
+ });
+ const first=selectInsightHighlights(source),reverse=selectInsightHighlights([...source].reverse());
+ assert.deepEqual(first,reverse);
+ assert.equal(first.schema_version,HIGHLIGHTS_VERSION);
+ const next=selectInsightHighlights(source,{page:2});
+ const total=[...first.best,...first.misses,...next.best,...next.misses];
+ assert.equal(new Set(total.map(r=>r.puzzle_id)).size,total.length);
+ assert.ok(total.every(item=>item.reason_version===HIGHLIGHT_REASON_VERSION));
+ assert.ok(total.every(item=>typeof item.reason_text==='string'&&item.reason_text.length>20));
+ assert.ok(first.best.some(item=>item.reason_code==='hard-trophy-match'));
+ assert.ok(first.misses.some(item=>item.reason_code==='saved-support-gap'));
+ assert.ok(first.misses.every(item=>!item.trophy_match));
+ assert.ok(first.best.length<=6&&first.misses.length<=6);
+ const short=selectInsightHighlights(source.filter(row=>row.environment==='mixed'&&row.pick_number<3));
+ assert.ok(short.best.every(item=>item.pick_number<3));
+ assert.ok(short.misses.every(item=>item.pick_number<3));
+});
+
+test('leading difficulty finding features a relevant hard match before unrelated easy alternatives',()=>{
+  const rows=[
+    ...Array.from({length:10},(_,n)=>pick(n,{score:94,band:'easy',day:1900+n})),
+    pick(101,{score:100,match:true,band:'hard',day:1911}),
+    pick(102,{score:90,band:'hard',day:1906}),
+    pick(103,{score:91,band:'easy',day:1907}),
+  ];
+  const finding={id:'difficulty',groups:[
+    {band:'easy',label:'easy-rated decisions',relation:'higher'},
+    {band:'hard',label:'hard-rated decisions',relation:'lower'},
+  ]};
+  const highlights=selectInsightHighlights(rows,{finding});
+  assert.equal(highlights.best[0].puzzle_id,'p101',
+    'hard source match competes for the featured position, not after three strong alternatives');
+  assert.ok(highlights.best.slice(0,3).some(r=>r.finding_context?.includes('hard-rated')));
+  assert.ok(highlights.best.slice(0,3).every(r=>r.finding_context),
+    'when actual compared-group examples exist, the visible report should explain its finding');
+  assert.deepEqual(selectInsightHighlights([...rows].reverse(),{finding}),highlights);
+});
+test('pick-position finding uses the compared positions, not a blanket early-pick boost',()=>{
+  const rows=[
+    ...Array.from({length:12},(_,n)=>pick(n,{score:98,sourcePick:1,day:1900+n})),
+    ...Array.from({length:6},(_,n)=>pick(100+n,{score:85,sourcePick:n%2?8:6,day:1900+n})),
+  ];
+  const finding={id:'pick-depth',groups:[
+    {pick_number:6,label:'P1P6 decisions',relation:'higher'},
+    {pick_number:8,label:'P1P8 decisions',relation:'lower'},
+  ]};
+  const best=selectInsightHighlights(rows,{finding}).best;
+  assert.equal(best.length,6);
+  assert.ok(best.slice(0,3).every(row=>[6,8].includes(row.pick_number)));
+  assert.ok(best[0].finding_context?.includes('P1P6'));
+  const wrong=selectInsightHighlights(rows,{finding:{id:'pick-depth',groups:[
+    {pick_number:11,label:'P1P11 decisions',relation:'higher'}]}}).best;
+  assert.equal(wrong[0].finding_context,undefined,'unsupported positions cannot imply evidence');
+});
+test('recent useful misses beat three-year-old extremes without changing saved scores',()=>{
+  const old=pick(900,{score:0,day:1,sourcePick:5}),
+    recent=pick(901,{score:34,day:1096,sourcePick:5});
+  old.set_id='neo';recent.set_id='neo';
+  const result=selectInsightHighlights([old,recent]);
+  assert.equal(result.misses[0].puzzle_id,'p901');
+  assert.deepEqual(selectInsightHighlights([recent,old]),result);
+  assert.equal(result.misses[1].score,0,'old extreme is retained as an additional true example');
+});
+test('aggregate passes exact compared 6/8 groups to highlights but returns no raw puzzle IDs',()=>{
+  const rows=Array.from({length:80},(_,n)=>raw(pick(n,{
+    score:n%2?42:95,sourcePick:n%2?8:6,day:Math.floor(n/2),band:'medium',
+  })));
+  const result=aggregateDraftRunInsights(rows,{now:new Date('2027-12-01T00:00:00Z')});
+  assert.equal(result.leading_finding?.id,'pick-depth');
+  assert.deepEqual(result.leading_finding.compared_groups.map(g=>g.label),
+    ['P1P6 decisions','P1P8 decisions']);
+  assert.ok(result.highlights.best.slice(0,3).every(r=>[6,8].includes(r.pick_number)));
+  assert.ok(result.highlights.misses.slice(0,3).every(r=>[6,8].includes(r.pick_number)));
+  assert.doesNotMatch(JSON.stringify(result.leading_finding),/puzzle_ids|puzzle_id/);
 });

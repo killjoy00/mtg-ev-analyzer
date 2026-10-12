@@ -2,6 +2,7 @@ import * as SecureStore from '@/src/screenshots/storage';
 import { pacificDay } from '@/src/dailyClock';
 import { config } from '@/src/config';
 import { readScreenshotSession, screenshotSession } from '@/src/screenshots/session';
+import { screenshotInsights, screenshotInsightDecision } from '@/src/screenshots/insights';
 import type { NativeAppleSubscriptionStatus } from '@/src/api/apple-subscriptions';
 import type { CareerHistoryPage, CareerProfile } from '@/src/api/career';
 import type {
@@ -365,6 +366,16 @@ export async function requestScreenshotFixture<T>(
   if (path === '/draft/v1/runs/33333333-3333-4333-8333-333333333333/share' && method === 'POST') return { id: '0123456789abcdef01234567' } as T;
   if (path === '/growth/v1/patreon/mobile/status') return { ...clone(membershipStatus), ad_free: elite, ads_allowed: !elite, account_capabilities: elite ? ['account', 'unlimited_regular_practice', 'unlimited_cube_practice', 'custom_corpus'] : ['account', 'unlimited_regular_practice'] } as T;
   if (path === '/growth/v1/apple-subscriptions/mobile/status') return { ...clone(appleStatus), account_capabilities: elite ? ['account', 'unlimited_regular_practice', 'unlimited_cube_practice', 'custom_corpus'] : ['account', 'unlimited_regular_practice'] } as T;
+  // Owner-scoped, synthetic Insights screens for native acceptance only.
+  // requestJson imports this module exclusively in preview screenshot builds.
+  if (path.startsWith('/growth/v1/mobile/profile/insights/decision?')) {
+    if (guest) throw new Error('A fixture account is required for saved Insights.');
+    return screenshotInsightDecision(path) as T;
+  }
+  if (path.startsWith('/growth/v1/mobile/profile/insights?')) {
+    if (guest) throw new Error('A fixture account is required for Insights.');
+    return screenshotInsights(path, scenario) as T;
+  }
   if (path === '/growth/v1/mobile/profile/me' || path === '/growth/v1/mobile/profile/a1b2c3d4e5f60718') {
     const profile = clone(careerProfile);
     if (currentSession.accountUser?.email === 'second@packone.example') profile.player.display_name = 'SecondReviewer';

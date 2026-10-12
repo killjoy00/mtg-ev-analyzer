@@ -1,16 +1,17 @@
 import { router, Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {safeCardImageUrl} from '../../../card-image-policy.mjs';
 import { Text } from '@/src/components/Text';
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 import { AboutLink } from '@/src/components/AboutLink';
-import { loadMobileInsights, loadMobileInsightDecision, type DraftInsights, type DraftingDNA, type DnaTrait, type DraftingJourney, type InsightHighlights, type InsightHighlight, type InsightDecision, type InsightCard, type InsightGroup, type InsightsEnvironment, type InsightsPeriod } from '@/src/api/insights';
+import { loadMobileInsights, loadMobileInsightDecision, type DraftInsights, type DraftingDNA, type DnaTrait, type CardChoices, type DraftingJourney, type InsightHighlights, type InsightHighlight, type InsightDecisionLocator, type InsightDecision, type InsightCard, type InsightGroup, type InsightsEnvironment, type InsightsPeriod } from '@/src/api/insights';
 import { ApiError } from '@/src/api/client';
 import { ensureGuestSession } from '@/src/api/guest';
 import { useAppResume } from '@/src/hooks/useAppResume';
 import { readSession, subscribeSession, type MobileSession } from '@/src/storage/session';
 import { colors, spacing } from '@/src/theme';
+import { config } from '@/src/config';
 
 const environments: { value: InsightsEnvironment; label: string }[] = [
   { value: 'mixed', label: 'Mixed' }, { value: 'latest', label: 'Latest Set' }, { value: 'powered-cube', label: 'Powered Cube' },
@@ -22,6 +23,22 @@ const identity = (session: MobileSession | null) => session
   ? JSON.stringify([session.playerToken, session.accountToken ?? '', session.subjectId ?? '', session.accountUser?.id ?? '']) : '';
 const score = (value: number | null) => value === null ? '—' : Number(value).toFixed(1);
 const num = (value: number) => Number(value || 0).toLocaleString();
+const shortDate = (value?:string) => {
+  if (!value || !/^\d{4}-\d{2}-\d{2}/.test(value)) return value||'';
+  const n=Number(value.slice(5,7)),date=Number(value.slice(8,10));
+  return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][n-1]+' '+date;
+};
+
+function shortJourneyRange(window:{from:string;to:string;from_at?:string;to_at?:string}) {
+  const local=(timestamp:string|undefined,fallback:string)=>{
+    if(!timestamp)return shortDate(fallback);
+    const value=new Date(timestamp);
+    return Number.isFinite(value.getTime())?
+      value.toLocaleDateString(undefined,{month:'short',day:'numeric'}):shortDate(fallback);
+  };
+  const from=local(window.from_at,window.from),to=local(window.to_at,window.to);
+  return from===to?from:from+'–'+to;
+}
 
 function ChoiceRow<T extends string>({ name, values, selected, onChange }: {
   name: string; values: { value: T; label: string }[]; selected: T; onChange: (value: T) => void;
@@ -39,8 +56,10 @@ function ChoiceRow<T extends string>({ name, values, selected, onChange }: {
   </View>;
 }
 
-function Section({ title, caption, children }: { title: string; caption?: string; children: React.ReactNode }) {
-  return <View style={styles.section}>
+function Section({ title, caption, children, compact=false, onLayout }: {
+  title:string;caption?:string;children:React.ReactNode;compact?:boolean;onLayout?:()=>void;
+}) {
+  return <View style={[styles.section,compact&&styles.dnaSection]} onLayout={onLayout}>
     <Text accessibilityRole="header" style={styles.sectionTitle}>{title}</Text>
     {caption ? <Text style={styles.caption}>{caption}</Text> : null}
     {children}
@@ -63,34 +82,6 @@ function Metrics({ rows }: { rows: (InsightGroup & { label: string })[] }) {
   </View>)}</View>;
 }
 
-// Only the server's >=40-per-side / >=10-point findings are standout claims.
-// When none exist, expose factual score snapshots rather than implying an account
-// with substantial history has no usable decisions.
-function descriptivePatternRows(data: DraftInsights): string[] {
-  const rows: string[] = [];
-  const summary = data.formats.find(row => row.environment === data.environment);
-  if (summary && summary.count >= 5 && typeof summary.average_score === 'number' && Number.isFinite(summary.average_score)) {
-    const match = typeof summary.trophy_match_pct === 'number' && Number.isFinite(summary.trophy_match_pct)
-      ? ' Trophy-drafter pick match: ' + score(summary.trophy_match_pct) + '%.' : '';
-    rows.push('Across ' + num(summary.count) + ' eligible ' + data.environment_label +
-      ' decisions, your average originally awarded score was ' + score(summary.average_score) + '/100.' + match);
-  }
-  const progress = data.progress;
-  if (progress && progress.recent.count >= 40 && progress.previous.count >= 40 &&
-    typeof progress.recent.average_score === 'number' && Number.isFinite(progress.recent.average_score) &&
-    typeof progress.previous.average_score === 'number' && Number.isFinite(progress.previous.average_score)) {
-    rows.push('Your most recent 40 picks averaged ' + score(progress.recent.average_score) +
-      '/100; the preceding 40 averaged ' + score(progress.previous.average_score) +
-      '/100. These are recorded scores, not a proven change in skill.');
-  }
-  const depth = [...data.pick_depth]
-    .filter(row => row.count >= 5 && typeof row.average_score === 'number' && Number.isFinite(row.average_score))
-    .sort((a, b) => b.count - a.count || a.pick_number - b.pick_number)[0];
-  if (depth) rows.push('Your most-recorded source pick position is ' + depth.label +
-    ': ' + num(depth.count) + ' decisions averaging ' + score(depth.average_score) + '/100.');
-  return rows.slice(0, 3);
-}
-
 function insightLocalRange(value:{from_at?:string;to_at?:string;from?:string;to?:string;date?:string}) {
   const local=(s?:string)=>{
     if(!s)return null;
@@ -102,35 +93,82 @@ function insightLocalRange(value:{from_at?:string;to_at?:string;from?:string;to?
   return first&&last?first+' to '+last:
     value.from&&value.to?value.from+' to '+value.to:value.date||value.to||'';
 }
-function DNATrait({trait,primary=false,floorRemaining=null,reason}: {
-  trait:DnaTrait|null;primary?:boolean;floorRemaining?:number|null;reason?:string;
-}) {
-  if(!trait||trait.status!=='qualified')return <View style={[styles.dnaTrait,primary&&styles.dnaPrimary]}>
-    <Text style={styles.dnaTitle}>{primary?'Your drafting DNA is taking shape':'Trait still developing'}</Text>
-    <Text style={styles.caption}>{(trait?.picks_needed??floorRemaining)!=null
-      ?String(trait?.picks_needed??floorRemaining)+' more eligible decisions to reach the provisional sample floor.'
-      :trait?.reason||reason||'No additional stable evidence gate has qualified yet.'}</Text>
-  </View>;
-  return <View style={[styles.dnaTrait,primary&&styles.dnaPrimary]}>
-    <Text style={[styles.dnaTitle,primary&&styles.dnaPrimaryTitle]}>{trait.title}</Text>
-    <Text style={styles.body}>{trait.summary}</Text>
-    <Text style={styles.meta}>{trait.supporting_decisions} eligible supporting decisions</Text>
-    <View style={styles.evidence}>
-      <Text style={styles.summary}>Why this fits</Text>
+
+function DNATrait({trait,primary=false}: {trait:DnaTrait|null;primary?:boolean}) {
+  const [expanded,setExpanded]=useState(false);
+  if (!trait || trait.status!=='qualified') {
+    return primary?<View style={[styles.dnaTrait,styles.dnaPrimary]}>
+      <Text style={styles.dnaTitle}>Your Drafting DNA is taking shape</Text>
+      <Text style={styles.caption}>No clear pattern has qualified yet.</Text>
+    </View>:<Text style={styles.dnaDeveloping}>Another trait is taking shape</Text>;
+  }
+  return <View style={[styles.dnaTrait,primary?styles.dnaPrimary:styles.dnaCompact]}>
+    {primary?<><Text style={styles.dnaTitle}>{trait.title}</Text>
+      <Text style={styles.body}>{trait.summary}</Text></>:null}
+    <Pressable accessibilityRole="button" accessibilityState={{expanded}}
+      style={styles.dnaDisclosure} onPress={()=>setExpanded(current=>!current)}>
+      <Text style={styles.summary}>{primary?'Why this fits':trait.title+' · '+(expanded?'Hide details':'Why this fits')}</Text>
+    </Pressable>
+    {expanded?<View style={styles.evidence}>
+      {!primary?<Text style={styles.caption}>{trait.summary}</Text>:null}
+      <Text style={styles.meta}>From {trait.supporting_decisions} saved decisions</Text>
       {trait.evidence.map((entry,index)=><Text key={entry.label+index} style={styles.caption}>
         {entry.label}: {String(entry.value)}
       </Text>)}
-    </View>
+    </View>:null}
   </View>;
 }
-function DNASummary({dna}:{dna:DraftingDNA}) {
-  return <Section title="Your Drafting DNA" caption="All eligible first-time decisions, independent of the filters below">
-    <DNATrait trait={dna.primary||dna.primary_emerging||null} floorRemaining={dna.picks_needed} reason={dna.reason} primary />
+function DNASummary({dna,cardChoices,onReview}:{
+  dna:DraftingDNA;cardChoices?:CardChoices;onReview:(item:InsightDecisionLocator)=>void;
+}) {
+  const [showRules,setShowRules]=useState(false);
+  const [expandedChoices,setExpandedChoices]=useState<string[]>([]);
+  const ready=(cardChoices?.choices||[]).filter(choice=>choice.status==='ready');
+  return <Section title="Your Drafting DNA" caption={'All available history · '+num(dna.eligible_decisions)+' saved decisions'} compact>
+    <DNATrait trait={dna.primary||dna.primary_emerging||null} primary/>
     <View style={styles.dnaSecondary}>
-      {(dna.secondary||[]).slice(0,2).map((trait,index)=>
-        <View key={'trait-'+index} style={styles.dnaHalf}><DNATrait trait={trait} floorRemaining={dna.picks_needed} reason={dna.reason}/></View>)}
+      {(dna.secondary||[{status:'emerging',label:'Developing'},{status:'emerging',label:'Developing'}] as DnaTrait[]).slice(0,2).map((trait,index)=>
+        <View key={'trait-'+index} style={styles.dnaHalf}><DNATrait trait={trait}/></View>)}
     </View>
-    <Text style={styles.caption}>{dna.note}</Text>
+    {ready.length?<View style={styles.contextWrap}>
+      <Text style={styles.contextTitle}>When both kinds of cards were competitive</Text>
+      {ready.map(choice=>{
+        const isType=choice.id==='card-type';
+        const chosen=num(choice.selected[isType?'creature':'rare-mythic']||0);
+        const label=isType?'Creature choices':'Rare or mythic choices';
+        const expanded=expandedChoices.includes(choice.id);
+        return <View key={choice.id} style={styles.contextFact}>
+          <View style={styles.contextLine}>
+            <Text style={styles.body}>{label}</Text>
+            <Text style={styles.contextCount}>{chosen} of {num(choice.opportunities)} picks</Text>
+          </View>
+          <Pressable accessibilityRole="button" accessibilityState={{expanded}}
+            style={styles.dnaDisclosure} onPress={()=>setExpandedChoices(prev=>prev.includes(choice.id)?
+              prev.filter(id=>id!==choice.id):[...prev,choice.id])}>
+            <Text style={styles.summary}>Options and real examples</Text>
+          </Pressable>
+          {expanded?<View style={styles.evidence}>
+            <Text style={styles.caption}>{choice.summary}</Text>
+            <Text style={styles.caption}>Competitive cards: {Object.entries(choice.availability).map(([name,count])=>name+': '+count).join(' · ')}</Text>
+            <Text style={styles.caption}>Your picks: {Object.entries(choice.selected).map(([name,count])=>name+': '+count).join(' · ')}</Text>
+            {(choice.examples||[]).map(example=><Pressable key={example.puzzle_id}
+              accessibilityRole="button" style={styles.exampleLink} onPress={()=>onReview(example)}>
+              <Text style={styles.secondaryText}>Review {example.selected_name||'saved pick'} · {example.set_id} P1P{example.pick_number} · {shortDate(example.date)}</Text>
+            </Pressable>)}
+          </View>:null}
+        </View>;
+      })}
+    </View>:null}
+    <Pressable accessibilityRole="button" accessibilityState={{expanded:showRules}}
+      style={styles.dnaDisclosure} onPress={()=>setShowRules(value=>!value)}>
+      <Text style={styles.summary}>How these patterns are counted</Text>
+    </Pressable>
+    {showRules?<View style={styles.evidence}>
+      <Text style={styles.caption}>These patterns describe saved decisions, not skill. Each needs enough comparable records.</Text>
+      {cardChoices&&!ready.length?<Text style={styles.caption}>Card-choice patterns need more comparable saved packs.</Text>:null}
+      <Text style={styles.caption}>{dna.note}</Text>
+      {cardChoices?<Text style={styles.caption}>{cardChoices.note}</Text>:null}
+    </View>:null}
   </Section>;
 }
 function CardArtwork({card,label}: {card:InsightCard|null|undefined;label:string}) {
@@ -157,13 +195,13 @@ function SavedDecisionDetail({detail,onClose}: {detail:InsightDecision;onClose:(
         <Text style={styles.meta}>{card.name}{card.id===detail.selected.id?' · Your pick':''}{card.id===detail.trophy.id?' · Trophy pick':''}</Text>
       </View>)}
     </View>
-    {detail.prior_picks.length?<><Text style={styles.subheading}>Previously selected cards</Text>
+    {detail.prior_picks.length?<><Text style={styles.subheading}>Original drafter’s prior picks</Text>
       <Text style={styles.caption}>{detail.prior_picks.map(c=>c.name).join(' · ')}</Text></>:null}
     {detail.trophy_drafter?.record?<Text style={styles.caption}>This verified trophy draft finished {detail.trophy_drafter.record}.</Text>:null}
     {detail.trophy_drafter?.win_rate!=null?<Text style={styles.caption}>The original drafter’s approximate overall game win rate was {detail.trophy_drafter.win_rate}%, not this card’s win rate.</Text>:null}
     {detail.ranking?.length?<><Text style={styles.subheading}>Why this score? Saved alternatives</Text>
       {detail.ranking.filter(r=>r.score!=null).map(r=><Text key={r.id} style={styles.caption}>
-        {r.name}: {r.score}/100{r.id===detail.selected.id?' · Your pick':''}
+        {r.name}: {r.score}/100{r.support!=null?' · saved support '+r.support:''}{r.id===detail.selected.id?' · Your pick':''}
         {r.id===detail.trophy.id?' · Trophy pick':''}
       </Text>)}</>:null}
     <Text style={styles.caption}>Read-only historical results. Your original score and pick are unchanged.</Text>
@@ -172,139 +210,167 @@ function SavedDecisionDetail({detail,onClose}: {detail:InsightDecision;onClose:(
     </Pressable>
   </View>;
 }
-function HighlightsStory({highlights,onReview,detail,detailPhase,onClose,onLoadMore,morePhase}:{
-  highlights:InsightHighlights;onReview:(item:InsightHighlight)=>void;detail:InsightDecision|null;
-  detailPhase:'idle'|'loading'|'ready'|'error';onClose:()=>void;
-  onLoadMore:()=>void;morePhase:'idle'|'loading'|'error';
+function HighlightsStory({highlights,finding,onReview,onLoadMore,morePhase}:{
+  highlights:InsightHighlights;finding?:{id:string;text:string}|null;
+  onReview:(item:InsightHighlight)=>void;onLoadMore:()=>void;morePhase:'idle'|'loading'|'error';
 }) {
   const [selected,setSelected]=useState<'best'|'misses'>('best');
+  const [expanded,setExpanded]=useState(false);
   const rows=selected==='best'?highlights.best:highlights.misses;
-  return <Section title="Your Best Calls & Biggest Misses" caption="Real saved cards and original awarded scores, not proof that any alternative was objectively wrong">
+  const show=expanded?rows:rows.slice(0,3);
+  return <Section title="Decision report" caption={num(rows.length)+' saved highlights available in '+(selected==='best'?'Best Calls':'Biggest Misses')}
+    onLayout={config.screenshots.fixtures?()=>console.info('PACKONE_INSIGHTS_READY'):undefined}>
+    <Text style={styles.reportLead}>
+      <Text style={styles.summary}>{finding?'Leading finding: ':'Your recent decisions: '}</Text>
+      {finding?.text||'No standout comparison has qualified in this environment and time period. These saved picks are factual examples.'}
+    </Text>
     <View style={styles.choices}>
-      <Pressable accessibilityRole="button" accessibilityState={{selected:selected==='best'}}
-        onPress={()=>{setSelected('best');onClose();}} style={[styles.choice,selected==='best'&&styles.choiceActive]}>
-        <Text style={styles.choiceText}>Best Calls</Text>
-      </Pressable>
-      <Pressable accessibilityRole="button" accessibilityState={{selected:selected==='misses'}}
-        onPress={()=>{setSelected('misses');onClose();}} style={[styles.choice,selected==='misses'&&styles.choiceActive]}>
-        <Text style={styles.choiceText}>Biggest Misses</Text>
-      </Pressable>
+      {(['best','misses'] as const).map(kind=><Pressable key={kind} accessibilityRole="button"
+        accessibilityState={{selected:selected===kind}}
+        onPress={()=>{setSelected(kind);setExpanded(false);}}
+        style={[styles.choice,selected===kind&&styles.choiceActive]}>
+        <Text style={[styles.choiceText,selected===kind&&styles.choiceTextActive]}>{kind==='best'?'Best Calls':'Biggest Misses'}</Text>
+      </Pressable>)}
     </View>
-    {rows.length?rows.map(item=><View key={item.puzzle_id} style={styles.highlightCard}>
-      <View style={styles.highlightVisual}>
-        <CardArtwork card={item.preview?.selected} label="Your original choice"/>
-        {item.preview?.trophy?.id!==item.preview?.selected?.id&&item.preview?.trophy?
-          <CardArtwork card={item.preview.trophy} label="Original trophy choice"/>:null}
-      </View>
-      <Text style={styles.summary}>{item.preview?.selected?.name||'Your saved pick'} · {item.score}/100</Text>
-      <Text style={styles.meta}>{item.set_id} · P1P{item.pick_number} · {item.date} · {item.trophy_match?'Matched trophy':'Alternative selection'}</Text>
-      <Pressable accessibilityRole="button" onPress={()=>onReview(item)} style={styles.secondaryButton}>
+    {show.length?show.map((item,index)=><View key={item.puzzle_id} style={[styles.highlightCard,index>0&&styles.highlightCompact]}>
+      {index===0?<View style={styles.highlightVisual}>
+        <View style={styles.highlightArtWrap}><Text style={styles.meta}>Your pick</Text><CardArtwork card={item.preview?.selected} label="Your pick"/></View>
+        {!item.trophy_match?<View style={styles.highlightArtWrap}><Text style={styles.meta}>Trophy pick</Text><CardArtwork card={item.preview?.trophy} label="Trophy pick"/></View>:null}
+      </View>:null}
+      <Text style={styles.summary}>Your pick: {item.preview?.selected?.name||item.selected_name||'Saved selection'}</Text>
+      <Text style={styles.meta}>{item.trophy_match?'Trophy pick matched':'Trophy pick: '+(item.preview?.trophy?.name||item.historical_name||'Original trophy selection')}</Text>
+      <Text style={styles.meta}>{item.set_id} · P1P{item.pick_number} · {shortDate(item.date)} · Original score {item.score}/100</Text>
+      {item.finding_context?<Text style={styles.contextNote}>{item.finding_context}</Text>:null}
+      <Text style={styles.body}>{item.reason_text||(
+        item.trophy_match?'You matched the original trophy selection.':
+          'Your original non-trophy decision earned '+item.score+'/100.')}</Text>
+      <Pressable accessibilityRole="button" onPress={()=>onReview(item)} style={styles.compactAction}>
         <Text style={styles.secondaryText}>Review original pack</Text>
       </Pressable>
-    </View>):<Text style={styles.caption}>No qualifying saved picks in this group yet.</Text>}
-    {highlights.has_more?.[selected]?<Pressable accessibilityRole="button" disabled={morePhase==='loading'}
+    </View>):<Text style={styles.caption}>No qualifying saved picks in this group for these filters.</Text>}
+    {!expanded&&(rows.length>3||highlights.has_more?.[selected])?<Pressable accessibilityRole="button" style={styles.secondaryButton}
+      onPress={()=>setExpanded(true)}><Text style={styles.secondaryText}>See more</Text></Pressable>:null}
+    {expanded&&highlights.has_more?.[selected]?<Pressable accessibilityRole="button" disabled={morePhase==='loading'}
       onPress={onLoadMore} style={styles.secondaryButton}>
       <Text style={styles.secondaryText}>{morePhase==='loading'?'Loading saved picks…':
-        morePhase==='error'?'Retry loading more picks':'Load more saved picks (page 2 of 2)'}</Text>
+        morePhase==='error'?'Retry loading more picks':'See more saved decisions'}</Text>
     </Pressable>:null}
-    {detailPhase==='loading'?<Text style={styles.caption}>Loading your saved decision…</Text>:null}
-    {detailPhase==='error'?<Text accessibilityRole="alert" style={styles.caption}>This original decision could not be loaded. Try again.</Text>:null}
-    {detailPhase==='ready'&&detail?<SavedDecisionDetail detail={detail} onClose={onClose}/>:null}
+    <Text style={styles.caption}>These are historical scored calls, not proof of objectively right or wrong Magic choices.</Text>
   </Section>;
 }
 function JourneyStory({journey,progress,months}:{
   journey:DraftingJourney;progress:DraftInsights['progress'];months:DraftInsights['months'];
 }) {
-  return <Section title="Your Drafting Journey" caption="Original scores in 40-decision chronological windows">
+  const [details,setDetails]=useState(false);
+  const versionBoundary=journey.progress_compatible===false||
+    new Set(journey.windows.map(w=>w.cohort)).size>1;
+  return <Section title="Your Drafting Journey" caption="Originally awarded scores · 40-decision windows">
+    {versionBoundary?<Text style={styles.journeyWarning} accessibilityRole="alert">
+      Historical card-pool or scoring rules changed. These windows are not one continuous progress trend.
+    </Text>:null}
     {journey.windows.length?<ScrollView horizontal contentContainerStyle={styles.journeyWindowRow} accessibilityLabel="Your recorded score timeline">
-      {journey.windows.map(w=><View key={w.id} style={styles.journeyWindow}
+      {journey.windows.map((w,index)=><View key={w.id} style={styles.journeyWindow}
         accessibilityLabel={insightLocalRange(w)+', '+w.count+' decisions'+(w.complete?'':' incomplete')}>
+        {index>0&&journey.windows[index-1]?.cohort!==w.cohort?
+          <Text style={styles.journeyBoundary}>Version changed</Text>:null}
         <Text style={styles.bigScore}>{score(w.average_score)}</Text>
         <View style={styles.journeyTrack}><View style={[styles.journeyFill,
           {height:(Math.max(0,Math.min(100,w.average_score??0))+'%') as '100%'}]}/></View>
-        <Text style={styles.meta}>{insightLocalRange(w)}</Text>
-        <Text style={styles.meta}>{w.count} picks{w.complete?'':' · incomplete'}</Text>
+        <Text style={styles.meta}>{shortJourneyRange(w)}</Text>
+        <Text style={styles.meta}>{w.count} picks{w.complete?'':' · partial'}</Text>
       </View>)}
-    </ScrollView>:<Text style={styles.caption}>Your drafting journey grows with your original recorded decisions.</Text>}
-    <Text style={styles.caption}>{journey.note}</Text>
-    <Text style={styles.subheading}>Most recent vs previous 40</Text>
-    {journey.progress_compatible!==false&&progress?<View style={styles.windowRow}>
-      <View style={styles.window}><Text style={styles.meta}>Previous 40</Text><Text style={styles.bigScore}>{score(progress.previous.average_score)}</Text></View>
-      <View style={styles.window}><Text style={styles.meta}>Recent 40</Text><Text style={styles.bigScore}>{score(progress.recent.average_score)}</Text></View>
-    </View>:<Text style={styles.caption}>{journey.progress_compatible!==false?
-      'Two completed 40-pick windows are needed for a recent-vs-previous score comparison.':
-      'Historical windows span incompatible scoring or card-pool versions; their averages are not directly compared.'}</Text>}
-    {journey.milestones.length?<><Text style={styles.subheading}>Your milestones</Text>
-      {journey.milestones.map(m=><Text key={m.id} style={styles.body}>{insightLocalRange(m)} · {m.text}{m.average_score!=null?' · '+score(m.average_score)+'/100':''}</Text>)}</>:null}
-    <Text style={styles.subheading}>Pacific calendar months</Text>
-    <View style={styles.months}>{months.map(m=><View key={m.month} style={styles.month}>
-      <Text style={styles.meta}>{m.month}</Text><Text style={styles.monthScore}>{score(m.average_score)}</Text>
-      <Text style={styles.meta}>{m.count} decisions</Text>
-    </View>)}</View>
+    </ScrollView>:<Text style={styles.caption}>Your drafting Journey grows with your original recorded decisions.</Text>}
+    {journey.progress_compatible!==false&&progress?<Text style={styles.body}>
+      Recent 40: {score(progress.recent.average_score)}/100 · Previous 40: {score(progress.previous.average_score)}/100 ·
+      {' '}Difference {progress.delta>0?'+':''}{score(progress.delta)} points (descriptive, not proof of improvement).
+    </Text>:null}
+    <Pressable accessibilityRole="button" accessibilityState={{expanded:details}}
+      style={styles.disclosure} onPress={()=>setDetails(v=>!v)}>
+      <Text style={styles.summary}>{details?'Hide journey details':'View journey details'}</Text>
+    </Pressable>
+    {details?<View style={styles.detailBody}>
+      <Text style={styles.caption}>{journey.note} Incomplete windows remain visible as partial.</Text>
+      {journey.total_windows>journey.windows.length?<Text style={styles.caption}>Showing the most recent {journey.windows.length} of {journey.total_windows} windows.</Text>:null}
+      {journey.windows.map(w=><Text key={w.id} style={styles.caption}>{insightLocalRange(w)} · {w.count} decisions · {score(w.average_score)}/100 · {w.complete?'complete':'incomplete'}</Text>)}
+      {journey.progress_compatible===false?<Text style={styles.caption}>Incompatible source/scoring versions prevent the 40/40 comparison.</Text>:null}
+      {!progress&&journey.progress_compatible!==false?<Text style={styles.caption}>Two complete and compatible 40-pick groups are needed for the comparison.</Text>:null}
+      {journey.milestones.length?<><Text style={styles.subheading}>Milestones</Text>
+        {journey.milestones.map(m=><Text key={m.id} style={styles.caption}>{insightLocalRange(m)} · {m.text}{m.average_score!=null?' · '+score(m.average_score)+'/100':''}</Text>)}</>:null}
+      <Text style={styles.subheading}>Pacific calendar months</Text>
+      {months.length?<View style={styles.months}>{months.map(m=><View key={m.month} style={styles.month}>
+        <Text style={styles.meta}>{m.month}</Text><Text style={styles.monthScore}>{score(m.average_score)}</Text>
+        <Text style={styles.meta}>{m.count} decisions</Text>
+      </View>)}</View>:<Text style={styles.caption}>Monthly averages require at least 10 decisions in a month.</Text>}
+    </View>:null}
   </Section>;
 }
-
-function InsightSections({ data,onReview,detail,detailPhase,onClose,onLoadMore,morePhase }: {
-  data:DraftInsights;onReview:(item:InsightHighlight)=>void;detail:InsightDecision|null;
-  detailPhase:'idle'|'loading'|'ready'|'error';onClose:()=>void;
+function LegacyJourney({progress,months}:{
+  progress:DraftInsights['progress'];months:DraftInsights['months'];
+}) {
+  const [allMonths,setAllMonths]=useState(false);
+  if(!progress&&!months?.length)return null;
+  const visible=allMonths?months:months.slice(-3);
+  return <Section title="Your Drafting Journey" caption="Original recorded scores">
+    {progress?<Text style={styles.body}>{`Recent 40: ${score(progress.recent.average_score)}/100 · Previous 40: ${score(progress.previous.average_score)}/100 · Difference ${progress.delta>0?'+':''}${score(progress.delta)} points.`}</Text>:null}
+    {progress?<Text style={styles.caption}>These are different saved decisions, not proof that your drafting improved or declined.</Text>:null}
+    {months.length?<><Text style={styles.subheading}>Pacific calendar months</Text>
+      <View style={styles.months}>{visible.map(month=><View key={month.month} style={styles.month}>
+        <Text style={styles.meta}>{month.month}</Text>
+        <Text style={styles.monthScore}>{score(month.average_score)}</Text>
+        <Text style={styles.meta}>{month.count} decisions</Text>
+      </View>)}</View>
+      {months.length>3?<Pressable accessibilityRole="button"
+        accessibilityState={{expanded:allMonths}} style={styles.disclosure}
+        onPress={()=>setAllMonths(current=>!current)}>
+        <Text style={styles.summary}>{allMonths?'Show recent months':'See all monthly records'}</Text>
+      </Pressable>:null}</>:null}
+  </Section>;
+}
+function InsightSections({data,onReview,onLoadMore,morePhase}:{
+  data:DraftInsights;onReview:(item:InsightHighlight)=>void;
   onLoadMore:()=>void;morePhase:'idle'|'loading'|'error';
 }) {
-  if (!data.unlocked) return <>
-    {data.drafting_dna?<DNASummary dna={data.drafting_dna}/>:null}
-    <Section title="Unlock your Drafting Insights">
+  const [explore,setExplore]=useState(false);
+  if (!data.unlocked) return <Section title="Unlock your Drafting Insights">
     <Text style={styles.body}>Play a few more runs in {data.environment_label}. You have {num(data.eligible_decisions)} of {data.unlock_at} eligible first-time decisions in this period.</Text>
     <Pressable accessibilityRole="button" onPress={() => router.push('/')} style={styles.primaryButton}>
       <Text style={styles.primaryText}>Play today&apos;s Daily</Text>
     </Pressable>
-  </Section></>;
-
-  const monthly = data.months || [];
-  const snapshots = data.observations.length ? [] : descriptivePatternRows(data);
+  </Section>;
+  const leading=data.leading_finding||data.observations?.[0];
+  const extra=(data.observations||[]).slice(leading?1:0);
   return <>
-    {data.drafting_dna?<DNASummary dna={data.drafting_dna}/>:null}
-    {data.highlights?<HighlightsStory highlights={data.highlights} onReview={onReview}
-      detail={detail} detailPhase={detailPhase} onClose={onClose}
-      onLoadMore={onLoadMore} morePhase={morePhase}/>:null}
-    {data.journey?<JourneyStory journey={data.journey} progress={data.progress} months={monthly}/>:null}
-    <Section title="Your patterns" caption="Observed scores with clear sample-size safeguards">
-      {data.observations.length ? data.observations.map(row =>
-        <View key={row.id} style={styles.observation}><Text style={styles.observationMark}>◆</Text><Text style={styles.observationCopy}>{row.text}</Text></View>)
-        : <>
-          <Text style={styles.caption}>No standout comparison met both thresholds: at least 40 decisions on each side and a 10-point average difference. Your recorded history still provides these descriptive snapshots:</Text>
-          {snapshots.length ? snapshots.map((text, index) =>
-            <View key={'snapshot-' + index} style={styles.observation}><Text style={styles.observationMark}>◆</Text><Text style={styles.observationCopy}>{text}</Text></View>)
-            : <Text style={styles.caption}>The pick, difficulty and progress charts below show every supported group as you collect more decisions.</Text>}
-        </>}
-    </Section>
-    <Section title="Pick-by-pick strengths" caption="Actual source P1P positions, not game-round order. Five decisions are needed for each average.">
-      <Metrics rows={data.pick_depth.map(row => ({ ...row, label: row.label }))} />
-    </Section>
-    <Section title="Difficulty context" caption="These bands contain different puzzles; no difficulty-adjusted skill grade is inferred.">
-      <Metrics rows={data.difficulty.map(row => ({ ...row, label: row.band.charAt(0).toUpperCase() + row.band.slice(1) }))} />
-      {data.unknown_difficulty ? <Text style={styles.meta}>{num(data.unknown_difficulty)} decisions lack a verified difficulty band.</Text> : null}
-    </Section>
-    {!data.journey?<Section title="Progress over time" caption="Two consecutive 40-pick windows in the selected environment">
-      {data.progress ? <>
-        <View style={styles.windowRow}>
-          <View style={styles.window}><Text style={styles.meta}>Previous 40 picks</Text><Text style={styles.bigScore}>{score(data.progress.previous.average_score)}</Text>
-            <Text style={styles.meta}>{data.progress.previous.from} to {data.progress.previous.to}</Text></View>
-          <View style={styles.window}><Text style={styles.meta}>Latest 40 picks</Text><Text style={styles.bigScore}>{score(data.progress.recent.average_score)}</Text>
-            <Text style={styles.meta}>{data.progress.recent.from} to {data.progress.recent.to}</Text></View>
-        </View>
-        <Text style={styles.caption}>Recorded difference: {data.progress.delta > 0 ? '+' : ''}{score(data.progress.delta)} points. Different picks cannot prove improvement or decline.</Text>
-      </> : <Text style={styles.caption}>This comparison needs 80 eligible decisions (40 in each window). You have {num(data.eligible_decisions)}.</Text>}
-      <Text style={styles.subheading}>Pacific calendar months</Text>
-      {monthly.length ? <View style={styles.months}>{monthly.map(row => <View key={row.month} style={styles.month}>
-        <Text style={styles.meta}>{row.month}</Text><Text style={styles.monthScore}>{score(row.average_score)}</Text>
-        <Text style={styles.meta}>{num(row.count)} picks{row.average_score === null ? ' · need 10' : ''}</Text>
-      </View>)}</View> : <Text style={styles.caption}>Monthly averages need at least 10 eligible decisions per Pacific month.</Text>}
-    </Section>:null}
-    <Section title="Format patterns" caption="Card pools differ between formats; these are recorded scores, not skill rankings.">
-      <View style={styles.formats}>{data.formats.map(row => <View key={row.environment}
-        style={[styles.format, row.environment === data.environment && styles.formatSelected]}>
-        <Text style={styles.formatName}>{row.label}</Text><Text style={styles.bigScore}>{score(row.average_score)}</Text>
-        <Text style={styles.meta}>{num(row.count)} eligible picks{row.average_score === null ? ' · need 5' : ''}</Text>
-      </View>)}</View>
+    {data.highlights?<HighlightsStory highlights={data.highlights} finding={leading}
+      onReview={onReview} onLoadMore={onLoadMore} morePhase={morePhase}/>:
+      leading?<Section title="Your patterns"><Text style={styles.body}>{leading.text}</Text></Section>:null}
+    {data.journey?<JourneyStory journey={data.journey} progress={data.progress} months={data.months||[]}/>:
+      <LegacyJourney progress={data.progress} months={data.months||[]}/>}
+    <Section title="Explore your data">
+      <Pressable accessibilityRole="button" accessibilityState={{expanded:explore}}
+        style={styles.disclosure} onPress={()=>setExplore(v=>!v)}>
+        <Text style={styles.summary}>{explore?'Hide supporting breakdowns':'Explore your data · charts and methodology'}</Text>
+      </Pressable>
+      {explore?<View style={styles.detailBody}>
+        <Text style={styles.subheading}>Pick-by-pick breakdown</Text>
+        <Text style={styles.caption}>Actual source P1P positions, with at least five decisions per displayed average.</Text>
+        <Metrics rows={(data.pick_depth||[]).map(row=>({...row,label:row.label}))}/>
+        <Text style={styles.subheading}>Difficulty breakdown</Text>
+        <Metrics rows={(data.difficulty||[]).map(row=>({...row,label:row.band.charAt(0).toUpperCase()+row.band.slice(1)}))}/>
+        {data.unknown_difficulty?<Text style={styles.caption}>{num(data.unknown_difficulty)} picks lack a verified difficulty band.</Text>:null}
+        <Text style={styles.subheading}>Format breakdown</Text>
+        <Text style={styles.caption}>Different card pools; recorded averages do not establish comparable skill.</Text>
+        <View style={styles.formats}>{(data.formats||[]).map(row=><View key={row.environment}
+          style={[styles.format,row.environment===data.environment&&styles.formatSelected]}>
+          <Text style={styles.formatName}>{row.label}</Text>
+          <Text style={styles.bigScore}>{score(row.average_score)}</Text>
+          <Text style={styles.meta}>{num(row.count)} eligible picks{row.average_score===null?' · need 5':''}</Text>
+        </View>)}</View>
+        <Text style={styles.subheading}>Additional observations</Text>
+        {extra.length?extra.map(row=><Text key={row.id} style={styles.body}>{row.text}</Text>):
+          <Text style={styles.caption}>No additional comparison cleared the minimum sample and score-gap rules.</Text>}
+        <Text style={styles.subheading}>Methodology</Text>
+        <Text style={styles.caption}>{data.methodology}</Text>
+      </View>:null}
     </Section>
   </>;
 }
@@ -319,6 +385,7 @@ export default function InsightsScreen() {
   const [detailPhase,setDetailPhase]=useState<'idle'|'loading'|'ready'|'error'>('idle');
   const [morePhase,setMorePhase]=useState<'idle'|'loading'|'error'>('idle');
   const detailTicket=useRef(0);
+  const manualEnvironment=useRef(false);
   const requestId = useRef(0);
   const activeOwner = useRef('');
 
@@ -344,6 +411,11 @@ export default function InsightsScreen() {
       if (!current?.accountToken || identity(current) !== owner) {
         activeOwner.current = ''; setData(null); setPhase('signed-out'); return;
       }
+      if(!manualEnvironment.current&&environment==='mixed'&&response.default_environment&&
+        response.default_environment!=='mixed'&&environments.some(v=>v.value===response.default_environment)){
+        setEnvironment(response.default_environment);
+        return;
+      }
       setData(response);
       setPhase('ready');
     } catch (error: unknown) {
@@ -366,6 +438,7 @@ export default function InsightsScreen() {
     setDetailPhase('idle');
     setMorePhase('idle');
     activeOwner.current = current;
+    manualEnvironment.current=false;
     setData(null);
     setPhase(current ? 'loading' : 'signed-out');
     if (current) void load();
@@ -380,7 +453,7 @@ export default function InsightsScreen() {
     setDetail(null);
     setDetailPhase('idle');
   };
-  const reviewDetail=async(item:InsightHighlight)=>{
+  const reviewDetail=async(item:InsightDecisionLocator)=>{
     const t=++detailTicket.current,epoch=requestId.current,owner=activeOwner.current;
     setDetail(null);setDetailPhase('loading');
     try{
@@ -438,9 +511,10 @@ export default function InsightsScreen() {
           onPress={() => router.push('/account')} style={styles.tab}><Text style={styles.tabText}>Account settings</Text></Pressable>
       </View>
       <Text accessibilityRole="header" style={styles.heading}>Your Drafting Insights</Text>
-      <Text style={styles.intro}>Explore how your real draft decisions vary by pick, format and difficulty.</Text>
+      {phase==='ready'&&data?.drafting_dna?<DNASummary dna={data.drafting_dna}
+        cardChoices={data.card_choices} onReview={reviewDetail}/>:null}
       <View style={styles.filters}>
-        <ChoiceRow name="Environment" values={environments} selected={environment} onChange={setEnvironment} />
+        <ChoiceRow name="Environment" values={environments} selected={environment} onChange={value=>{manualEnvironment.current=true;setEnvironment(value);}} />
         <ChoiceRow name="Time period" values={periods} selected={period} onChange={setPeriod} />
       </View>
       {phase === 'loading' ? <View style={styles.notice}><ActivityIndicator accessibilityLabel="Loading Insights" /><Text style={styles.body}>Loading your private drafting decisions…</Text></View> : null}
@@ -454,17 +528,33 @@ export default function InsightsScreen() {
       </Section> : null}
       {phase === 'ready' && data ? <>
         <Text style={styles.summary}>{num(data.eligible_decisions)} eligible decisions · {data.environment_label} · {periods.find(p => p.value === period)?.label}</Text>
-        <InsightSections data={data} detail={detail} detailPhase={detailPhase}
-          onReview={reviewDetail} onClose={closeDetail}
+        <InsightSections data={data} onReview={reviewDetail}
           onLoadMore={()=>void loadMore()} morePhase={morePhase}/>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>How these insights are calculated</Text>
-          <Text style={styles.caption}>{data.methodology}</Text>
-        </View>
       </> : null}
       <Pressable accessibilityRole="button" onPress={() => void load()} style={styles.secondaryButton}><Text style={styles.secondaryText}>Refresh Insights</Text></Pressable>
       <AboutLink />
     </ScrollView>
+    {detailPhase!=='idle'?<Modal visible animationType="slide" onRequestClose={closeDetail}
+      presentationStyle="pageSheet" accessibilityViewIsModal>
+      <SafeAreaView style={styles.safe}>
+        <ScrollView contentContainerStyle={styles.page}>
+          {detailPhase==='loading'?<View style={styles.notice}>
+            <ActivityIndicator accessibilityLabel="Loading saved decision"/>
+            <Text style={styles.body}>Loading your original pack…</Text>
+            <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={closeDetail}>
+              <Text style={styles.secondaryText}>Cancel review</Text>
+            </Pressable>
+          </View>:null}
+          {detailPhase==='error'?<View style={styles.section}>
+            <Text accessibilityRole="alert" style={styles.body}>This original decision could not be loaded.</Text>
+            <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={closeDetail}>
+              <Text style={styles.secondaryText}>Close original pack</Text>
+            </Pressable>
+          </View>:null}
+          {detailPhase==='ready'&&detail?<SavedDecisionDetail detail={detail} onClose={closeDetail}/>:null}
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>:null}
   </SafeAreaView>;
 }
 
@@ -515,13 +605,24 @@ const styles = StyleSheet.create({
   format: { padding: spacing.md, borderWidth: 1, borderColor: colors.line, gap: spacing.xs },
   formatSelected: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
   formatName: { color: colors.muted, fontSize: 13, fontWeight: '800' },
-  dnaTrait: {borderWidth:1,borderColor:colors.line,padding:spacing.md,gap:spacing.sm,backgroundColor:colors.surfaceSoft},
-  dnaPrimary: {borderLeftWidth:4,borderLeftColor:colors.accent},
-  dnaTitle: {fontSize:20,fontWeight:'800',color:colors.ink},
-  dnaPrimaryTitle: {fontSize:27},
+  dnaTrait: {gap:spacing.xs,padding:spacing.sm},
+  dnaSection: {padding:spacing.md,gap:spacing.sm},
+  dnaPrimary: {borderLeftWidth:3,borderLeftColor:colors.accent,backgroundColor:colors.surfaceSoft,
+    paddingHorizontal:spacing.md,paddingVertical:spacing.sm},
+  dnaTitle: {fontSize:23,fontWeight:'800',color:colors.ink},
   dnaSecondary: {flexDirection:'row',gap:spacing.sm},
-  dnaHalf: {flex:1,minWidth:0},
-  evidence: {paddingTop:spacing.sm,gap:spacing.xs},
+  dnaHalf: {flex:1,minWidth:0,borderBottomWidth:1,borderColor:colors.line},
+  dnaCompact: {paddingHorizontal:0,paddingVertical:0},
+  dnaDeveloping: {fontSize:12,color:colors.muted,paddingVertical:spacing.sm,lineHeight:17},
+  dnaDisclosure: {minHeight:36,justifyContent:'center',paddingVertical:spacing.xs},
+  evidence: {paddingTop:spacing.xs,gap:spacing.xs},
+  contextTitle: {fontSize:12,fontWeight:'700',color:colors.muted},
+  contextLine: {flexDirection:'row',alignItems:'baseline',gap:spacing.sm,justifyContent:'space-between'},
+  contextCount: {fontSize:13,fontWeight:'800',color:colors.accentDark,textAlign:'right'},
+  contextNote: {fontSize:12,fontWeight:'700',color:colors.accentDark},
+  journeyWarning: {fontSize:13,lineHeight:19,color:colors.ink,borderLeftWidth:3,
+    borderLeftColor:colors.line,paddingLeft:spacing.sm},
+  journeyBoundary: {fontSize:10,fontWeight:'800',color:colors.accentDark,textAlign:'center'},
   highlightCard: {borderWidth:1,borderColor:colors.line,padding:spacing.md,gap:spacing.sm},
   highlightVisual: {flexDirection:'row',gap:spacing.sm},
   cardArt: {minHeight:100,flex:1,justifyContent:'center',alignItems:'center',backgroundColor:colors.surfaceSoft},
@@ -539,4 +640,14 @@ const styles = StyleSheet.create({
   primaryText: { color: colors.surface, fontSize: 14, fontWeight: '800' },
   secondaryButton: { minHeight: 48, borderWidth: 1, borderColor: colors.accent, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.md },
   secondaryText: { color: colors.accentDark, fontSize: 14, fontWeight: '800' },
+  disclosure: {borderTopWidth:1,borderColor:colors.line,paddingVertical:spacing.sm,minHeight:44,justifyContent:'center'},
+  contextWrap: {gap:spacing.xs,borderTopWidth:1,borderColor:colors.line,paddingTop:spacing.sm},
+  contextFact: {gap:spacing.xs,paddingVertical:spacing.xs,borderBottomWidth:1,borderColor:colors.line},
+  exampleLink: {borderWidth:1,borderColor:colors.accent,padding:spacing.sm,minHeight:44,justifyContent:'center'},
+  reportLead: {color:colors.ink,fontSize:14,lineHeight:21},
+  highlightCompact: {padding:spacing.sm,gap:spacing.xs},
+  highlightArtWrap: {flex:1,minWidth:0,gap:spacing.xs},
+  compactAction: {minHeight:44,alignItems:'flex-start',justifyContent:'center',paddingHorizontal:spacing.sm,borderWidth:1,borderColor:colors.accent},
+  detailBody: {gap:spacing.md},
+
 });
