@@ -171,7 +171,7 @@ export function selectInsightHighlights(rows) {
     .sort((a,b)=>b.score-a.score||a.answered_at.localeCompare(b.answered_at)||a.puzzle_id.localeCompare(b.puzzle_id));
   const tough=valid.filter(r=>r.trophy_match&&r.difficulty_band==='hard')
     .sort((a,b)=>a.answered_at.localeCompare(b.answered_at)||a.puzzle_id.localeCompare(b.puzzle_id));
-  const low=valid.filter(r=>!r.trophy_match)
+  const low=valid.filter(r=>!r.trophy_match&&r.score<=60)
     .sort((a,b)=>a.score-b.score||a.answered_at.localeCompare(b.answered_at)||a.puzzle_id.localeCompare(b.puzzle_id));
   const seen=new Set();
   const best=[...selectVariety(strong,3,seen),...selectVariety(tough,3,seen)];
@@ -200,7 +200,7 @@ export function publicLockedDecision(answer,extra={}) {
   })):[];
   const trophyFacts=answer.trophyDrafter&&typeof answer.trophyDrafter==='object'?{
     record:/^7[–-][012]$/.test(String(answer.trophyDrafter.record||''))?String(answer.trophyDrafter.record):null,
-    win_rate:Number.isFinite(Number(answer.trophyDrafter.winRate))?
+    win_rate:answer.trophyDrafter.winRate!=null&&Number.isFinite(Number(answer.trophyDrafter.winRate))?
       Math.max(0,Math.min(100,Number(answer.trophyDrafter.winRate))):null,
   }:null;
   return {set_id:String(original.set_id||'').slice(0,60),pick_number:Number(original.pick_number)||null,
