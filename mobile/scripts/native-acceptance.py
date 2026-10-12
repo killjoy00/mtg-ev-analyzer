@@ -100,14 +100,18 @@ def tap(label, exact=False, scroll=True):
 
 
 def reveal(label, exact=False):
-    # Content expanded by a control at the bottom edge opens below the
-    # viewport. Scroll until it is on screen before capturing it.
-    for _ in range(24):
-        _, root = hierarchy()
-        if visible_bounds(root, label, exact):
-            return
-        swipe_page(up=True)
-    raise AssertionError(f'{label!r} never scrolled into view')
+    # Android's continuous scroll can pass a short heading between hierarchy
+    # snapshots. Check both directions before declaring content missing.
+    # The reverse pass must still find the actual native accessibility node;
+    # it must never treat the mere presence of the text in source as success.
+    for up in (True, False):
+        for _ in range(24):
+            _, root = hierarchy()
+            if visible_bounds(root, label, exact):
+                return
+            swipe_page(up=up)
+            time.sleep(0.2)
+    raise AssertionError(f'{label!r} never scrolled into view (both directions)')
 
 
 def enter_field(label, value):
