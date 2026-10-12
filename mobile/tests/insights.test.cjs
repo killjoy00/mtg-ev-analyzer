@@ -294,6 +294,19 @@ test('native Journey visibly marks incomparable versions and the exact cohort bo
   await ui.choose('View journey details');
   assert.ok(ui.text().includes('Historical scoring differs.'));
 });
+test('a single short Journey without a full window does not invent a model-version change',async t=>{
+  const data={...fixture('mixed'),progress:null,
+    journey:{version:'drafting-journey-v2',eligible_decisions:12,window_size:40,
+      windows:[{id:'partial',from:'2026-10-01',to:'2026-10-04',count:12,
+        average_score:75,complete:false,cohort:'same-model'}],
+      total_windows:1,versions_comparable:false,progress_compatible:true,
+      milestones:[],limited:false,note:'Original recorded scores.'}};
+  const ui=await mount(t,{respond:async()=>data});
+  assert.ok(ui.text().includes('Your Drafting Journey'));
+  assert.ok(!ui.text().includes('Historical card-pool or scoring rules changed'));
+  assert.ok(!ui.text().includes('Version changed'));
+});
+
 test('native compact choice rows show the result first and hide method/examples by default',async t=>{
   const data={...fixture('mixed'),drafting_dna:{
     schema_version:'drafting-dna-v2',status:'ready',scope:'all-eligible-history',eligible_decisions:237,
