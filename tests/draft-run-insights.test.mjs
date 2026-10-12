@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {
-  INSIGHTS_SQL, INSIGHTS_SESSION_LIMIT, aggregateDraftRunInsights, validateInsightsFilters, loadDraftRunInsights,
+  INSIGHTS_SQL, INSIGHTS_PREVIEW_SQL, INSIGHTS_SESSION_LIMIT, aggregateDraftRunInsights, validateInsightsFilters, loadDraftRunInsights,
 } from '../worker/draft-run-insights.mjs';
 
 const now=new Date('2026-12-25T12:00:00Z');
