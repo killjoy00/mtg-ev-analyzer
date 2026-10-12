@@ -493,6 +493,9 @@ export default function InsightsScreen() {
           {detailPhase==='loading'?<View style={styles.notice}>
             <ActivityIndicator accessibilityLabel="Loading saved decision"/>
             <Text style={styles.body}>Loading your original pack…</Text>
+            <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={closeDetail}>
+              <Text style={styles.secondaryText}>Cancel review</Text>
+            </Pressable>
           </View>:null}
           {detailPhase==='error'?<View style={styles.section}>
             <Text accessibilityRole="alert" style={styles.body}>This original decision could not be loaded.</Text>
