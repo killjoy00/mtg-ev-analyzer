@@ -5,6 +5,7 @@ import {safeCardImageUrl} from '../../../card-image-policy.mjs';
 import { Text } from '@/src/components/Text';
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 import { AboutLink } from '@/src/components/AboutLink';
+import { MyPackSectionTabs } from '@/src/components/MyPackSectionTabs';
 import { loadMobileInsights, loadMobileInsightDecision, type DraftInsights, type DraftingDNA, type DnaTrait, type CardChoices, type DraftingJourney, type InsightHighlights, type InsightHighlight, type InsightDecisionLocator, type InsightDecision, type InsightCard, type InsightGroup, type InsightsEnvironment, type InsightsPeriod } from '@/src/api/insights';
 import { ApiError } from '@/src/api/client';
 import { ensureGuestSession } from '@/src/api/guest';
@@ -502,14 +503,7 @@ export default function InsightsScreen() {
     <Stack.Screen options={{ title: 'My Pack One' }} />
     <ScrollView contentContainerStyle={styles.page}>
       <Text style={styles.eyebrow}>MY PACK ONE</Text>
-      <View accessibilityLabel="My Pack One sections" style={styles.tabs}>
-        <Pressable accessibilityRole="tab" accessibilityState={{ selected: false }}
-          onPress={() => router.dismissTo('/career')} style={styles.tab}><Text style={styles.tabText}>Stats</Text></Pressable>
-        <Pressable accessibilityRole="tab" accessibilityState={{ selected: true }}
-          style={[styles.tab, styles.tabSelected]}><Text style={[styles.tabText, styles.tabTextSelected]}>Insights</Text></Pressable>
-        <Pressable accessibilityRole="tab" accessibilityState={{ selected: false }}
-          onPress={() => router.push('/account')} style={styles.tab}><Text style={styles.tabText}>Account settings</Text></Pressable>
-      </View>
+      <MyPackSectionTabs active="insights" />
       <Text accessibilityRole="header" style={styles.heading}>Your Drafting Insights</Text>
       {phase==='ready'&&data?.drafting_dna?<DNASummary dna={data.drafting_dna}
         cardChoices={data.card_choices} onReview={reviewDetail}/>:null}
@@ -564,11 +558,6 @@ const styles = StyleSheet.create({
   eyebrow: { color: colors.accent, fontWeight: '800', fontSize: 11, letterSpacing: 1.2 },
   heading: { color: colors.ink, fontSize: 30, lineHeight: 34, fontWeight: '800' },
   intro: { color: colors.muted, fontSize: 14, lineHeight: 20, marginTop: -12 },
-  tabs: { flexDirection: 'row', borderBottomWidth: 1, borderColor: colors.line },
-  tab: { minWidth: 0, flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.xs },
-  tabSelected: { borderBottomWidth: 3, borderColor: colors.accent },
-  tabText: { color: colors.muted, fontSize: 13, fontWeight: '800', textAlign: 'center' },
-  tabTextSelected: { color: colors.ink },
   filters: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.md, gap: spacing.md },
   choiceGroup: { gap: spacing.xs },
   controlLabel: { color: colors.muted, fontWeight: '800', fontSize: 12 },
