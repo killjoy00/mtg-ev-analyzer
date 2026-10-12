@@ -189,7 +189,9 @@ export async function loadDraftRunInsights(query,owner,filters={}) {
   const list=[...result.highlights.best,...result.highlights.misses];
   const ids=[...new Set(list.map(r=>r.session_id).filter(s=>UUID.test(s)))].slice(0,12);
   if(ids.length) {
-    const selected=await query(INSIGHTS_PREVIEW_SQL,[owner,ids]);
+    // Neon query parameter binding uses a Postgres array literal for ANY(uuid[]).
+    // Every member was already validated as a UUID above.
+    const selected=await query(INSIGHTS_PREVIEW_SQL,[owner,'{'+ids.join(',')+'}']);
     const indexed=new Map((selected.rows||[]).map(row=>[row.session_id,asAnswers(row.answers)]));
     for(const item of list) {
       const answer=indexed.get(item.session_id)?.[item.round-1];
