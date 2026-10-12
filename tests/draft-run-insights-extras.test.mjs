@@ -1,11 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {safeCardImageUrl,CARD_IMAGE_HOSTS} from '../card-image-policy.mjs';
 import {
   buildDraftingDNA,buildDraftingJourney,selectInsightHighlights,publicLockedDecision,
+  DNA_QUALIFICATION,DNA_VERSION,JOURNEY_VERSION,HIGHLIGHTS_VERSION,
 } from '../worker/draft-run-insights-extras.mjs';
 import {
-  aggregateDraftRunInsights,INSIGHTS_SQL,INSIGHTS_PREVIEW_SQL,INSIGHTS_DECISION_SQL,loadDraftRunInsightDecision,
+  aggregateDraftRunInsights,INSIGHTS_SQL,INSIGHTS_PREVIEW_SQL,INSIGHTS_DECISION_SQL,
+  INSIGHTS_DECISION_ELIGIBILITY_SQL,normaliseInsightsRows,loadDraftRunInsightDecision,
   loadDraftRunInsights,
 } from '../worker/draft-run-insights.mjs';
 const id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -86,15 +89,16 @@ test('Locked decision preserves actual saved pack but strips unsanctioned data',
    [{id:'mine',name:'A',image_url:'javascript:alert(1)'},source.candidates[1]]}});
  assert.equal(bad.selected.image_url,null);
 });
-test('Owner-scoped detail loader validates inputs, score history and session query',async()=>{
+test('Owner-scoped detail uses a targeted first-encounter eligibility read',async()=>{
  let calls=0;const owner='ffffffff-ffff-4fff-8fff-ffffffffffff';
  for(const data of [{session_id:'bad',round:1,puzzle_id:'p1'},{session_id:id,round:0,puzzle_id:'p1'}]){
    await assert.rejects(loadDraftRunInsightDecision(async()=>{calls++;},owner,data),e=>e.status===400);
  }
  assert.equal(calls,0);
- const eligibleRow={...raw(pick(1,{sid:id,sourcePick:3,score:83})),puzzle_id:'p1',answer_round:3};
  const query=async(sql,args)=>{
-   if(sql===INSIGHTS_SQL){assert.deepEqual(args,[owner]);return {rows:[eligibleRow]};}
+   if(sql===INSIGHTS_DECISION_ELIGIBILITY_SQL){
+     assert.deepEqual(args,[owner,'p1']);return {rows:[{session_id:id,answer_round:3,puzzle_id:'p1'}]};
+   }
    assert.equal(sql,INSIGHTS_DECISION_SQL);
    assert.deepEqual(args,[owner,id,3,'p1']);
    return {rows:[{answer,answered_at:'2026-09-01T00:00:00Z',scoring_version:'v1',corpus_version:'corpus-v1'}]};
@@ -103,14 +107,16 @@ test('Owner-scoped detail loader validates inputs, score history and session que
  assert.equal(detail.selected.name,'Aerial Responder');
  assert.equal(detail.answered_at,'2026-09-01T00:00:00.000Z');
  await assert.rejects(loadDraftRunInsightDecision(async()=>({rows:[]}),owner,{session_id:id,round:3,puzzle_id:'p1'}),e=>e.status===404);
- await assert.rejects(loadDraftRunInsightDecision(async(sql)=>{
-   if(sql===INSIGHTS_SQL)return {rows:[{...eligibleRow,session_id:id2,answered_at:'2026-08-01T00:00:00.000Z'},eligibleRow]};
-   throw Error('Duplicate second answer must not be loaded');
- },owner,{session_id:id,round:3,puzzle_id:'p1'}),e=>e.status===404);
- for(const sql of [INSIGHTS_PREVIEW_SQL,INSIGHTS_DECISION_SQL]){
-   assert.match(sql,/player_id=\$1::uuid/);
-   assert.doesNotMatch(sql,/\b(INSERT|UPDATE|DELETE|TRUNCATE)\b/i);
+ await assert.rejects(loadDraftRunInsightDecision(async()=>({rows:[{session_id:id2,answer_round:3,puzzle_id:'p1'}]}),
+   owner,{session_id:id,round:3,puzzle_id:'p1'}),e=>e.status===404);
+ for(const sql of [INSIGHTS_PREVIEW_SQL,INSIGHTS_DECISION_SQL,INSIGHTS_DECISION_ELIGIBILITY_SQL]){
+   assert.match(sql,/player_id=\\$1::uuid/);
+   assert.doesNotMatch(sql,/\\b(INSERT|UPDATE|DELETE|TRUNCATE)\\b/i);
  }
+ assert.match(INSIGHTS_DECISION_ELIGIBILITY_SQL,/LIMIT 1000/);
+ assert.match(INSIGHTS_DECISION_ELIGIBILITY_SQL,/puzzle_id'=\\$2/);
+ assert.match(INSIGHTS_DECISION_ELIGIBILITY_SQL,/p\\.display_name !~\\*/);
+ assert.match(INSIGHTS_DECISION_ELIGIBILITY_SQL,/ORDER BY o\\.answered_at ASC,s\\.id,picked\\.ordinality/);
 });
 test('Shortlist source preview reads only owner sessions and returns no unbounded history',async()=>{
  const owner='ffffffff-ffff-4fff-8fff-ffffffffffff',history=Array.from({length:12},(_,n)=>raw(pick(n,{score:n%2?12:91,sid:n<8?id:id2})));
@@ -152,4 +158,166 @@ test('Growth handlers keep highlight detail private and gateway explicitly allow
  assert.match(g,/\/v1\/mobile\/profile\/insights\/decision/);
  assert.match(gate,/\/v1\/profile\/insights\/decision/);
  assert.match(gate,/\/v1\/mobile\/profile\/insights\/decision/);
+});
+
+test('All DNA threshold gates are declared provisionally and deferrals stay explicit',()=>{
+ assert.equal(DNA_QUALIFICATION.version,DNA_VERSION);
+ assert.equal(DNA_QUALIFICATION.minimum_decisions,80);
+ assert.equal(DNA_QUALIFICATION.stability_recent_run,8);
+ assert.deepEqual([...DNA_QUALIFICATION.deferred],['trophy-twin','puzzle-solver','specialist']);
+ assert.equal(buildDraftingDNA([]).picks_needed,80);
+ const emerging=buildDraftingDNA(Array.from({length:7},(_,n)=>pick(n)));
+ assert.equal(emerging.picks_needed,73);
+ assert.equal(emerging.primary_emerging.picks_needed,73);
+ assert.deepEqual(emerging.secondary.map(x=>x.picks_needed),[73,73]);
+ const grown=buildDraftingDNA(Array.from({length:88},(_,n)=>pick(n,{score:50,match:true})));
+ assert.equal(grown.picks_needed,null);
+ assert.equal(grown.primary,null,'No raw match rate may qualify Trophy Twin');
+ assert.ok(grown.secondary.every(x=>x.picks_needed===null&&x.reason));
+});
+test('Sharpshooter and Steady Hand cannot share slots on 70 high and 30 moderate scores',()=>{
+ const dna=buildDraftingDNA(Array.from({length:100},(_,n)=>pick(n,{score:n<70?95:70})));
+ const ids=[dna.primary,...dna.secondary].filter(x=>x?.status==='qualified').map(x=>x.id);
+ assert.ok(ids.some(id=>id==='sharpshooter'||id==='steady-hand'));
+ assert.ok(!(ids.includes('sharpshooter')&&ids.includes('steady-hand')));
+});
+test('Steady Hand is measured within every known difficulty/version/format cohort',()=>{
+ const good=Array.from({length:112},(_,n)=>pick(n,{score:85,band:n<56?'hard':'medium'}));
+ const labels=rows=>[buildDraftingDNA(rows).primary,...buildDraftingDNA(rows).secondary]
+   .filter(x=>x?.status==='qualified').map(x=>x.id);
+ assert.ok(labels(good).includes('steady-hand'),'two compatible sampled cohorts should pass');
+ const bad=good.map((r,i)=>i>=56&&i<64?{...r,score:0}:r);
+ assert.ok(!labels(bad).includes('steady-hand'),'a sampled cohort below the gate must veto the trait');
+ const scattered=Array.from({length:96},(_,n)=>pick(n,{
+   score:85,band:n%3===0?'easy':n%3===1?'medium':'hard',
+   version:n<48?'old':'new'}));
+ assert.ok(!labels(scattered).includes('steady-hand'),'no cohort of 40 means no stable claim');
+});
+test('An eight-decision run cannot instantly turn a borderline score gate into a trait',()=>{
+ const borderline=Array.from({length:100},(_,n)=>pick(n,{score:n<64?95:60}));
+ const add=Array.from({length:8},(_,i)=>pick(100+i,{score:95}));
+ const ids=history=>[buildDraftingDNA(history).primary,...buildDraftingDNA(history).secondary]
+   .filter(x=>x?.status==='qualified').map(x=>x.id);
+ assert.ok(!ids(borderline).includes('sharpshooter'));
+ assert.ok(!ids([...borderline,...add]).includes('sharpshooter'),
+   'even though the full 108-pick sample now passes, the prior 100 do not');
+ assert.ok(ids([...borderline,...add,...Array.from({length:8},(_,i)=>pick(108+i,{score:95}))])
+   .includes('sharpshooter'),'a subsequent stable qualified period can earn it');
+});
+test('Journey v2 uses a second irregular 96-pick history, a dip, recovery, and version boundary',()=>{
+ const picks=Array.from({length:96},(_,n)=>pick(n,{
+   score:n<32?90:n<64?40:75,
+   band:n>=48&&n<60?'hard':'medium',
+   version:n<48?'older':'newer',
+   day:n+Math.floor(n/9)*2,
+ }));
+ const journey=buildDraftingJourney(picks);
+ assert.equal(journey.version,JOURNEY_VERSION);
+ assert.equal(journey.eligible_decisions,96);
+ assert.deepEqual(journey.windows.map(w=>w.count),[40,8,40,8]);
+ assert.deepEqual(journey.windows.map(w=>w.average_score),[80,40,61,75]);
+ assert.deepEqual(journey.windows.map(w=>w.complete),[true,false,true,false]);
+ assert.deepEqual(journey.windows.map(w=>[w.from,w.to]),[
+   ['2026-08-01','2026-09-17'],['2026-09-18','2026-09-27'],
+   ['2026-09-28','2026-11-14'],['2026-11-15','2026-11-24'],
+ ]);
+ assert.equal(journey.windows[2].from_at,'2026-09-28T00:00:00.000Z');
+ assert.equal(journey.windows[2].to_at,'2026-11-14T00:00:00.000Z');
+ assert.equal(journey.versions_comparable,false);
+ assert.equal(journey.best_window,null);
+ assert.deepEqual(journey.milestones.map(m=>m.id),['first-forty','eighty','hard-coverage']);
+ assert.deepEqual(journey.milestones.map(m=>m.date),[
+   '2026-09-17','2026-11-14','2026-11-14',
+ ]);
+ assert.equal(journey.milestones.find(m=>m.id==='hard-coverage').hard_decisions,12);
+ assert.equal(journey.milestones.find(m=>m.id==='hard-coverage').from_at,'2026-09-28T00:00:00.000Z');
+ assert.equal(journey.milestones.find(m=>m.id==='eighty').to_at,'2026-11-14T00:00:00.000Z');
+ assert.doesNotMatch(journey.milestones.map(m=>m.text).join(' '),/improved|better/i);
+});
+test('Journey keeps UTC timestamps across midnight instead of collapsing two local-time decisions',()=>{
+ const picks=[{...pick(1),answered_at:'2026-10-31T23:55:00.000Z'},
+   {...pick(2),answered_at:'2026-11-01T00:05:00.000Z'}];
+ const journey=buildDraftingJourney(picks);
+ assert.deepEqual([journey.windows[0].from,journey.windows[0].to],['2026-10-31','2026-11-01']);
+ assert.equal(journey.windows[0].from_at,'2026-10-31T23:55:00.000Z');
+ assert.equal(journey.windows[0].to_at,'2026-11-01T00:05:00.000Z');
+ assert.equal(new Intl.DateTimeFormat('en-US',{timeZone:'America/Los_Angeles',month:'short',day:'numeric'})
+   .format(new Date(journey.windows[0].to_at)),'Oct 31');
+});
+test('Saved images enforce a single audited HTTPS Scryfall host on server and shared clients',()=>{
+ assert.deepEqual(CARD_IMAGE_HOSTS,['cards.scryfall.io']);
+ for(const [url,allowed] of [
+   ['http://cards.scryfall.io/card.jpg',false],
+   ['javascript:alert(1)',false],
+   ['https://evil.example/card.jpg',false],
+   ['https://cards.scryfall.io/normal/front/card.jpg',true],
+ ]) {
+   const locked=publicLockedDecision({...answer,puzzle:{...source,candidates:[
+     {...source.candidates[0],image_url:url},source.candidates[1]]}});
+   assert.equal(Boolean(locked.selected.image_url),allowed,url);
+   assert.equal(Boolean(safeCardImageUrl(url)),allowed,url);
+ }
+ assert.equal(safeCardImageUrl('https://cards.scryfall.io.evil.example/card.jpg'),null);
+ assert.equal(safeCardImageUrl('https://evil.example@cards.scryfall.io/card.jpg'),null);
+});
+test('Highlights v2 paginates no more than twice and is unique across all four sets',()=>{
+ const all=Array.from({length:100},(_,n)=>pick(n,{score:n%5===0?100:n%5===1?95:n%5===2?10:85,
+   match:n%5===0,band:n%5===0?'hard':'medium'}));
+ const one=selectInsightHighlights(all),two=selectInsightHighlights(all,{page:2});
+ assert.equal(one.schema_version,HIGHLIGHTS_VERSION);
+ assert.equal(one.page,1);assert.equal(two.page,2);
+ assert.deepEqual(one.has_more,{best:true,misses:true});
+ assert.deepEqual(two.has_more,{best:false,misses:false});
+ assert.deepEqual([one.best.length,one.misses.length,two.best.length,two.misses.length],[6,6,6,6]);
+ const combined=[...one.best,...one.misses,...two.best,...two.misses];
+ assert.equal(new Set(combined.map(x=>x.puzzle_id)).size,24);
+ assert.deepEqual(selectInsightHighlights([...all],{page:2}),two);
+ for(const invalid of [0,3,1.5,NaN])assert.throws(()=>selectInsightHighlights(all,{page:invalid}),e=>e.status===400);
+});
+test('Targeted winner matches full normalise() over synthetic reruns, ties and invalids',async()=>{
+ const owner='ffffffff-ffff-4fff-8fff-ffffffffffff';
+ const input=[
+   {...raw(pick(1,{sid:id2,score:80})),puzzle_id:'shared',answer_round:6,answered_at:'2026-08-02T00:00:00Z'},
+   {...raw(pick(2,{sid:id,score:90})),puzzle_id:'shared',answer_round:3,answered_at:'2026-08-02T00:00:00Z'},
+   {...raw(pick(3,{sid:id,score:99})),puzzle_id:'shared',answer_round:4,answered_at:'2026-08-03T00:00:00Z'},
+   {...raw(pick(4,{sid:id2,score:45})),puzzle_id:'another',answer_round:2},
+   {...raw(pick(5,{sid:id,score:200})),puzzle_id:'invalid-score',answer_round:1},
+   {...raw(pick(6,{sid:id,score:55})),puzzle_id:'invalid-pick',answer_round:5,pick_number:0},
+   {...raw(pick(7,{sid:id,score:55})),puzzle_id:'invalid-match',answer_round:1,trophy_match:null},
+   {...raw(pick(8,{sid:id,score:70})),puzzle_id:'no-time',answer_round:3,answered_at:null},
+   {...raw(pick(9,{sid:id,score:70})),puzzle_id:'shared',answer_round:2,answered_at:'2026-08-01T00:00:00Z',environment:'unknown'},
+ ];
+ const normal=normaliseInsightsRows(input),expected=normal.find(r=>r.puzzle_id==='shared');
+ assert.equal(expected.session_id,id);
+ assert.equal(expected.round,3);
+ const sql=INSIGHTS_DECISION_ELIGIBILITY_SQL;
+ // As a synthetic query stand-in, apply the SQL's own validity gates and
+ // timestamp/session/round ordering to the same rows, independent of normalise.
+ const selected=(puzzle)=>input.filter(r=>r.puzzle_id===puzzle&&
+   Number.isInteger(r.score)&&r.score>=0&&r.score<=100&&
+   Number.isInteger(r.pick_number)&&r.pick_number>=1&&r.pick_number<=11&&
+   ['mixed','latest','powered-cube'].includes(r.environment)&&
+   [true,false].includes(r.trophy_match)&&r.answered_at!=null)
+   .sort((a,b)=>new Date(a.answered_at)-new Date(b.answered_at)||
+     a.session_id.localeCompare(b.session_id)||a.answer_round-b.answer_round)[0];
+ for(const puzzle of ['shared','another','invalid-score','invalid-pick','invalid-match','no-time']) {
+   const targeted=selected(puzzle);
+   assert.equal(targeted?.session_id,normal.find(r=>r.puzzle_id===puzzle)?.session_id,
+     'First accepted session for '+puzzle);
+   const req=targeted||input.find(r=>r.puzzle_id===puzzle);
+   const mock=async(q,args)=>{
+     if(q===sql){assert.deepEqual(args,[owner,puzzle]);return {rows:targeted?[targeted]:[]};}
+     if(q===INSIGHTS_DECISION_SQL)return {rows:[{answer:{...answer,puzzle:{...source,puzzle_id:puzzle}},
+       answered_at:targeted.answered_at,scoring_version:'v1',corpus_version:'v1'}]};
+     throw Error('Unexpected full query');
+   };
+   if(targeted)await loadDraftRunInsightDecision(mock,owner,{
+     session_id:targeted.session_id,round:targeted.answer_round,puzzle_id:puzzle});
+   else await assert.rejects(loadDraftRunInsightDecision(mock,owner,{
+     session_id:req.session_id,round:req.answer_round,puzzle_id:puzzle}),e=>e.status===404);
+ }
+ assert.match(sql,/jsonb_array_elements\(s.answers\) WITH ORDINALITY/);
+ assert.match(sql,/picked.answer->>'score' ~/);
+ assert.match(sql,/picked.answer->>'historicalMatch' IN/);
+ assert.ok(!sql.includes('LIMIT 8000'),'puzzle filter is inside the same 1000-session CTE');
 });

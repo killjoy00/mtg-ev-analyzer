@@ -1,8 +1,21 @@
 // Drafting Insights follow-up: server-only, deterministic summaries of the
 // already owner-scoped, first-encounter normalized rows. No raw history leaves.
-export const DNA_VERSION='drafting-dna-v1';
-export const JOURNEY_VERSION='drafting-journey-v1';
-export const HIGHLIGHTS_VERSION='decision-highlights-v1';
+import {safeCardImageUrl} from '../card-image-policy.mjs';
+export const DNA_VERSION='drafting-dna-v2';
+export const JOURNEY_VERSION='drafting-journey-v2';
+export const HIGHLIGHTS_VERSION='decision-highlights-v2';
+// PROVISIONAL, unaudited qualification gates. One versioned source of truth;
+// see docs/DRAFTING-DNA.md. Never describe these as validated percentiles.
+export const DNA_QUALIFICATION=Object.freeze({
+  version:DNA_VERSION,minimum_decisions:80,stability_recent_run:8,
+  independent:Object.freeze({minimum_alternatives:40,alternative_share:.50,minimum_high_alternatives:20,strong_score:80}),
+  sharpshooter:Object.freeze({high_score:90,minimum_high_share:.65,low_score:40,maximum_low_share:.10}),
+  high_roller:Object.freeze({high_score:90,low_score:40,minimum_each_tail_share:.20}),
+  steady_hand:Object.freeze({cohort_minimum:40,minimum_score:65,minimum_share:.85,low_score:40,maximum_low_share:.05}),
+  depth:Object.freeze({minimum_per_phase:40,minimum_gap:10,early_regular:[1,3],late_regular:[6,8],early_cube:[2,4],late_cube:[7,9]}),
+  rising:Object.freeze({minimum_per_window:40,minimum_gap:10}),
+  deferred:Object.freeze(['trophy-twin','puzzle-solver','specialist']),
+});
 const WINDOW=40;
 const round=n=>Math.round(n*10)/10;
 const mean=rows=>rows.length?round(rows.reduce((n,r)=>n+r.score,0)/rows.length):null;
@@ -12,7 +25,7 @@ const byTime=(a,b)=>a.answered_at.localeCompare(b.answered_at)||a.puzzle_id.loca
 const evidence=(label,value)=>({label,value});
 
 export function buildDraftingJourney(rows) {
-  const oldest=[...rows].sort(byTime),windows=[],groups=[];
+  const oldest=[...rows].sort(byTime),windows=[],groups=[],hardCounts=[];
   for(const pick of oldest){
     const last=groups.at(-1);
     if(!last||last.key!==version(pick)||last.rows.length>=WINDOW)groups.push({key:version(pick),rows:[pick]});
@@ -21,24 +34,26 @@ export function buildDraftingJourney(rows) {
   for(let i=0;i<groups.length;i++){
     const {key,rows:chunk}=groups[i],complete=chunk.length===WINDOW;
     windows.push({id:'window-'+i,from:chunk[0].answered_at.slice(0,10),
-      to:chunk.at(-1).answered_at.slice(0,10),count:chunk.length,
+      to:chunk.at(-1).answered_at.slice(0,10),
+      from_at:chunk[0].answered_at,to_at:chunk.at(-1).answered_at,count:chunk.length,
       average_score:chunk.length>=5?mean(chunk):null,complete,cohort:key});
+    hardCounts.push(chunk.filter(r=>r.difficulty_band==='hard').length);
   }
-  // A high score across unrelated corpus/scoring versions is not an all-time
-  // "best". Name a best window only when the completed windows are compatible.
   const complete=windows.filter(w=>w.complete);
   const compatible=complete.length>0&&complete.every(w=>w.cohort===complete[0].cohort);
-  const best=compatible?[...complete].sort((a,b)=>b.average_score-a.average_score||a.from.localeCompare(b.from))[0]:null;
-  const tail=windows.slice(-24);
-  const milestones=[];
+  const best=compatible?[...complete].sort((a,b)=>b.average_score-a.average_score||a.from_at.localeCompare(b.from_at))[0]:null;
+  const tail=windows.slice(-24),milestones=[];
+  const stamp=(id,text,from,to,count,extra={})=>({id,date:to.to,from_at:from.from_at,to_at:to.to_at,text,count,...extra});
   const first=complete[0];
-  if(first)milestones.push({id:'first-forty',date:first.to,
-    text:'First completed 40-decision window',count:WINDOW});
-  if(complete.length>=2)milestones.push({id:'eighty',date:complete[1].to,
-    text:'First two completed 40-decision windows',count:WINDOW*2});
-  if(best&&complete.length>1)milestones.push({id:'best-window',date:best.to,
-    text:'Highest average among the comparable windows shown',count:WINDOW,
-    average_score:best.average_score});
+  if(first)milestones.push(stamp('first-forty','First completed 40-decision window',first,first,WINDOW));
+  if(complete.length>=2)milestones.push(stamp('eighty','First two completed 40-decision windows',complete[0],complete[1],WINDOW*2));
+  if(best&&complete.length>1)milestones.push(stamp('best-window',
+    'Highest average among the comparable windows shown',best,best,WINDOW,{average_score:best.average_score}));
+  const difficult=windows.findIndex((w,i)=>w.complete&&hardCounts[i]>=10);
+  if(difficult>=0)milestones.push(stamp('hard-coverage',
+    'First complete window with 10 or more hard-band decisions',windows[difficult],windows[difficult],
+    WINDOW,{hard_decisions:hardCounts[difficult]}));
+  milestones.sort((a,b)=>a.to_at.localeCompare(b.to_at)||a.id.localeCompare(b.id));
   return {version:JOURNEY_VERSION,eligible_decisions:rows.length,window_size:WINDOW,
     windows:tail,total_windows:windows.length,versions_comparable:compatible,
     best_window:best,milestones,limited:windows.length>tail.length,
@@ -51,65 +66,73 @@ function candidate(id,title,family,description,n,metrics,strength) {
   return {id,title,evidence_family:family,summary:description,
     supporting_decisions:n,evidence:metrics,strength:round(strength)};
 }
-export function buildDraftingDNA(rows) {
-  const all=[...rows],n=all.length,options=[],matched=all.filter(r=>r.trophy_match);
+function qualifiedDNA(rows) {
+  const all=[...rows],n=all.length,options=[];
+  const c=DNA_QUALIFICATION;
+  if(n<c.minimum_decisions)return options;
   const alternatives=all.filter(r=>!r.trophy_match);
-  const highAlt=alternatives.filter(r=>r.score>=80).length;
-  // Thresholds are descriptive evidence gates, not peer percentiles or
-  // calibrated "elite skill" rankings. Defer Puzzle Solver/Specialist.
-  if(n>=80&&matched.length>=Math.ceil(n*.65)){
-    const rate=pct(matched.length,n);
-    options.push(candidate('trophy-twin','The Trophy Twin','alignment',
-      'Your recorded selections frequently matched the original trophy picks.',
-      n,[evidence('Matched trophy picks',matched.length),evidence('Match rate',rate+'%')],
-      rate-65));
-  }
-  if(n>=80&&alternatives.length>=40&&alternatives.length>=Math.ceil(n*.5)&&highAlt>=20){
+  const highAlt=alternatives.filter(r=>r.score>=c.independent.strong_score).length;
+  // Stored ranking support is model card-choice support (sometimes calibrated),
+  // NOT P(the historical trophy drafter picked this card). Trophy Twin needs a
+  // properly matched trophy baseline; neither this support nor raw match rate is one.
+  if(alternatives.length>=c.independent.minimum_alternatives&&
+      alternatives.length>=Math.ceil(n*c.independent.alternative_share)&&
+      highAlt>=c.independent.minimum_high_alternatives){
     options.push(candidate('independent-thinker','The Independent Thinker','alternatives',
       'You often took a different card; several alternatives still earned strong original scores.',
       n,[evidence('Alternative selections',alternatives.length),
         evidence('Alternatives scoring 80+',highAlt)],
-      pct(alternatives.length,n)-50+pct(highAlt,alternatives.length)/2));
+      pct(alternatives.length,n)-100*c.independent.alternative_share+pct(highAlt,alternatives.length)/2));
   }
-  const high=all.filter(r=>r.score>=90).length,low=all.filter(r=>r.score<=40).length;
-  if(n>=80&&high>=Math.ceil(n*.65)&&low<=Math.floor(n*.1)){
-    options.push(candidate('sharpshooter','The Sharpshooter','score-quality',
+  const high=all.filter(r=>r.score>=c.sharpshooter.high_score).length;
+  const low=all.filter(r=>r.score<=c.sharpshooter.low_score).length;
+  if(high>=Math.ceil(n*c.sharpshooter.minimum_high_share)&&low<=Math.floor(n*c.sharpshooter.maximum_low_share)){
+    options.push(candidate('sharpshooter','The Sharpshooter','score-distribution',
       'Your recorded scores are frequently high, with relatively few low-score picks.',
       n,[evidence('Scores of 90+',high),evidence('Scores of 40 or below',low)],
-      pct(high,n)-65));
+      pct(high,n)-100*c.sharpshooter.minimum_high_share));
   }
-  if(n>=80&&high>=Math.ceil(n*.2)&&low>=Math.ceil(n*.2)){
+  const variableHigh=all.filter(r=>r.score>=c.high_roller.high_score).length;
+  const variableLow=all.filter(r=>r.score<=c.high_roller.low_score).length;
+  if(variableHigh>=Math.ceil(n*c.high_roller.minimum_each_tail_share)&&
+      variableLow>=Math.ceil(n*c.high_roller.minimum_each_tail_share)){
     options.push(candidate('high-roller','The High-Roller','score-variation',
       'Your recorded scores span both high and low ends of the scoring scale.',
-      n,[evidence('Scores of 90+',high),evidence('Scores of 40 or below',low)],
-      Math.min(pct(high,n),pct(low,n))-20));
+      n,[evidence('Scores of 90+',variableHigh),evidence('Scores of 40 or below',variableLow)],
+      Math.min(pct(variableHigh,n),pct(variableLow,n))-100*c.high_roller.minimum_each_tail_share));
   }
-  if(n>=80&&low<=Math.floor(n*.05)&&all.filter(r=>r.score>=65).length>=Math.ceil(n*.85)){
-    options.push(candidate('steady-hand','The Steady Hand','consistency',
-      'Most recorded choices earned at least 65 points, with few very low scores.',
-      n,[evidence('Scores of 65+',all.filter(r=>r.score>=65).length),
-        evidence('Scores of 40 or below',low)],pct(all.filter(r=>r.score>=65).length,n)-85));
-  }
-  // Compare source picks only within the same format, scoring, selection and
-  // corpus cohort. A cube's P1P2 cannot be treated as another format's P1P2.
+  // Exactly the same environment + scoring/selection/corpus + known difficulty
+  // cohorts used by Architect/Closer. Every sufficiently sampled cohort must
+  // pass, not just the pooled overall score distribution.
   const cohorts=new Map();
   for(const pick of all){
-    // Depth and time-tendency claims must not compare a player's harder packs
-    // against their easier packs as if a raw awarded score were adjusted.
     if(!['easy','medium','hard'].includes(pick.difficulty_band))continue;
     const key=pick.environment+'|'+version(pick)+'|'+pick.difficulty_band;
     if(!cohorts.has(key))cohorts.set(key,[]);
     cohorts.get(key).push(pick);
   }
+  const comparable=[...cohorts.values()].filter(a=>a.length>=c.steady_hand.cohort_minimum);
+  if(comparable.length&&comparable.every(a=>a.filter(r=>r.score>=c.steady_hand.minimum_score).length>=
+      Math.ceil(a.length*c.steady_hand.minimum_share)&&
+      a.filter(r=>r.score<=c.steady_hand.low_score).length<=Math.floor(a.length*c.steady_hand.maximum_low_share))){
+    const total=comparable.reduce((n,a)=>n+a.length,0);
+    const minimumPct=Math.min(...comparable.map(a=>pct(a.filter(r=>r.score>=c.steady_hand.minimum_score).length,a.length)));
+    options.push(candidate('steady-hand','The Steady Hand','score-distribution',
+      'Within each sufficiently sampled comparable cohort, most choices earned at least 65 points with few very low scores.',
+      total,[evidence('Comparable cohorts',comparable.length),
+        evidence('Lowest cohort share scoring 65+',minimumPct+'%')],
+      minimumPct-100*c.steady_hand.minimum_share));
+  }
   const comparisons=[];
   for(const [key,cohort] of cohorts){
-    const early=cohort.filter(r=>r.environment==='powered-cube'
-      ?r.pick_number>=2&&r.pick_number<=4:r.pick_number>=1&&r.pick_number<=3);
-    const late=cohort.filter(r=>r.environment==='powered-cube'
-      ?r.pick_number>=7&&r.pick_number<=9:r.pick_number>=6&&r.pick_number<=8);
-    if(early.length>=40&&late.length>=40){
+    const cube=cohort[0].environment==='powered-cube';
+    const earlyRange=cube?c.depth.early_cube:c.depth.early_regular;
+    const lateRange=cube?c.depth.late_cube:c.depth.late_regular;
+    const early=cohort.filter(r=>r.pick_number>=earlyRange[0]&&r.pick_number<=earlyRange[1]);
+    const late=cohort.filter(r=>r.pick_number>=lateRange[0]&&r.pick_number<=lateRange[1]);
+    if(early.length>=c.depth.minimum_per_phase&&late.length>=c.depth.minimum_per_phase){
       const gap=round(mean(early)-mean(late));
-      if(Math.abs(gap)>=10)comparisons.push({key,early:early.length,late:late.length,gap});
+      if(Math.abs(gap)>=c.depth.minimum_gap)comparisons.push({key,early:early.length,late:late.length,gap});
     }
   }
   comparisons.sort((a,b)=>Math.abs(b.gap)-Math.abs(a.gap)||a.key.localeCompare(b.key));
@@ -120,19 +143,26 @@ export function buildDraftingDNA(rows) {
         'Your later source picks averaged higher scores within a compatible cohort.',
       best.early+best.late,[evidence('Early source picks',best.early),
         evidence('Later source picks',best.late),evidence('Recorded score gap',Math.abs(best.gap)+' points')],
-      Math.abs(best.gap)-10));
+      Math.abs(best.gap)-c.depth.minimum_gap));
   }
   for(const cohort of cohorts.values()){
-    const ordered=[...cohort].sort((a,b)=>b.answered_at.localeCompare(a.answered_at));
-    if(ordered.length<80)continue;
-    const recent=ordered.slice(0,40),previous=ordered.slice(40,80);
+    const ordered=[...cohort].sort((a,b)=>b.answered_at.localeCompare(a.answered_at)||a.puzzle_id.localeCompare(b.puzzle_id));
+    const floor=c.rising.minimum_per_window;
+    if(ordered.length<floor*2)continue;
+    const recent=ordered.slice(0,floor),previous=ordered.slice(floor,floor*2);
     const delta=round(mean(recent)-mean(previous));
-    if(delta>=10)options.push(candidate('rising-star','The Rising Star','time-trend',
-      'Your most recent 40 scored picks averaged higher than the previous 40 in this comparable cohort.',
-      80,[evidence('Recent 40 average',mean(recent)),evidence('Previous 40 average',mean(previous)),
-        evidence('Recorded difference',delta+' points')],delta-10));
+    if(delta>=c.rising.minimum_gap)options.push(candidate('rising-star','The Rising Star','time-trend',
+      'Your latest and preceding 40 recorded picks have different averages within a comparable cohort.',
+      floor*2,[evidence('Recent 40 average',mean(recent)),evidence('Previous 40 average',mean(previous)),
+        evidence('Recorded difference',delta+' points')],delta-c.rising.minimum_gap));
   }
-  const ranked=options.sort((a,b)=>b.strength-a.strength||
+  return options;
+}
+export function buildDraftingDNA(rows) {
+  const all=[...rows].sort(byTime),n=all.length,c=DNA_QUALIFICATION;
+  const previous=all.slice(0,Math.max(0,n-c.stability_recent_run));
+  const stable=new Set(qualifiedDNA(previous).map(item=>item.id));
+  const ranked=qualifiedDNA(all).filter(item=>stable.has(item.id)).sort((a,b)=>b.strength-a.strength||
     b.supporting_decisions-a.supporting_decisions||a.id.localeCompare(b.id));
   const picked=[],families=new Set();
   for(const item of ranked){
@@ -140,12 +170,17 @@ export function buildDraftingDNA(rows) {
     families.add(item.evidence_family);picked.push(item);
     if(picked.length===3)break;
   }
-  const clean=x=>{if(!x)return {status:'emerging',label:'Trait still developing'};
+  const picks_needed=n<c.minimum_decisions?c.minimum_decisions-n:null;
+  const reason=picks_needed!==null?'Complete the provisional 80-decision sample floor.':
+    'The sample floor is met; another supported, stable and distinct qualification gate is needed.';
+  const clean=x=>{if(!x)return {status:'emerging',label:'Trait still developing',picks_needed,reason};
     const {strength,...publicItem}=x;return {status:'qualified',...publicItem};};
   return {schema_version:DNA_VERSION,status:picked.length?'ready':'emerging',
-    scope:'all-eligible-history',eligible_decisions:n,primary:picked[0]?clean(picked[0]):null,
+    scope:'all-eligible-history',eligible_decisions:n,picks_needed,
+    ...(picked.length?{}:{reason}),primary:picked[0]?clean(picked[0]):null,
+    ...(picked.length?{}:{primary_emerging:clean(null)}),
     secondary:[clean(picked[1]),clean(picked[2])],
-    note:'Labels describe recorded decisions. They are not validated skill rankings or the original drafter’s motives.'};
+    note:'Provisional gates describe recorded decisions, not validated skill ranks. Traits must qualify both now and before the latest eight eligible decisions.'};
 }
 
 const highlightRow=r=>({session_id:r.session_id,round:r.round,puzzle_id:r.puzzle_id,
@@ -167,7 +202,9 @@ function selectVariety(rows,limit,already=new Set()) {
   }
   return chosen;
 }
-export function selectInsightHighlights(rows) {
+export function selectInsightHighlights(rows,{page=1}={}) {
+  if(!Number.isInteger(page)||page<1||page>2)
+    throw Object.assign(new Error('Only the first two highlight pages are available.'),{status:400});
   const valid=rows.filter(r=>r.session_id&&r.puzzle_id&&r.selected_id&&r.historical_id&&
     r.set_id&&Number.isInteger(r.round)&&r.round>=1&&r.round<=8);
   const strong=valid.filter(r=>!r.trophy_match&&r.score>=80)
@@ -176,16 +213,17 @@ export function selectInsightHighlights(rows) {
     .sort((a,b)=>a.answered_at.localeCompare(b.answered_at)||a.puzzle_id.localeCompare(b.puzzle_id));
   const low=valid.filter(r=>!r.trophy_match&&r.score<=60)
     .sort((a,b)=>a.score-b.score||a.answered_at.localeCompare(b.answered_at)||a.puzzle_id.localeCompare(b.puzzle_id));
-  const seen=new Set();
-  const best=[...selectVariety(strong,3,seen),...selectVariety(tough,3,seen)];
-  const misses=selectVariety(low,6,seen);
-  return {schema_version:HIGHLIGHTS_VERSION,best,misses,note:
-    'Best Calls and Biggest Misses reflect originally awarded scores, not objectively correct or incorrect strategic decisions.'};
+  const seen=new Set(),bestPages=[];
+  for(let i=0;i<2;i++)bestPages.push([...selectVariety(strong,3,seen),...selectVariety(tough,3,seen)]);
+  const missesPages=[selectVariety(low,6,seen),selectVariety(low,6,seen)];
+  return {schema_version:HIGHLIGHTS_VERSION,page,best:bestPages[page-1],misses:missesPages[page-1],
+    has_more:{best:page===1&&bestPages[1].length>0,misses:page===1&&missesPages[1].length>0},
+    note:'Best Calls and Biggest Misses reflect originally awarded scores, not objectively correct or incorrect strategic decisions.'};
 }
 
 const safeCard=c=>c&&typeof c==='object'&&typeof c.id==='string'?{
   id:c.id,name:String(c.name||'Unknown card').slice(0,140),
-  image_url:typeof c.image_url==='string'&&/^https:\/\//.test(c.image_url)?c.image_url:null,
+  image_url:safeCardImageUrl(c.image_url),
   mana_cost:typeof c.mana_cost==='string'?c.mana_cost.slice(0,60):null,
   rarity:typeof c.rarity==='string'?c.rarity.slice(0,40):null,
 }:null;

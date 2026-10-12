@@ -8,7 +8,7 @@ const profileKey = '0123456789abcdef';
 await mkdir('artifacts', { recursive: true });
 
 const browser = await chromium.launch(process.env.CI ? { headless:true, channel:'chrome' } : { headless:true });
-const page = await browser.newPage({ viewport:{ width:390, height:844 } });
+const page = await browser.newPage({ viewport:{ width:390, height:844 }, timezoneId:'America/Los_Angeles' });
 let updatePayload = null;
 let updateMode = 'success';
 let shareCalls = 0;
@@ -172,6 +172,30 @@ await page.route(`${growthOrigin}/**`, async (route) => {
               trophy:{id:'card-trophy',name:'Frost Lynx',image_url:null}}}]},
         methodology:'First answer to each puzzle, original points, 1,000-session cap.',
       };
+      if(insightsMode==='v2') {
+        body={...body,
+          drafting_dna:{schema_version:'drafting-dna-v2',status:'emerging',scope:'all-eligible-history',
+            eligible_decisions:38,picks_needed:42,primary:null,
+            secondary:[{status:'emerging',label:'Trait still developing',picks_needed:42},
+              {status:'emerging',label:'Trait still developing',picks_needed:42}],note:'Provisional gates.'},
+          journey:{...body.journey,version:'drafting-journey-v2',windows:[
+            {...body.journey.windows[0],from:'2026-10-31',to:'2026-11-01',
+              from_at:'2026-10-31T23:55:00.000Z',to_at:'2026-11-01T00:05:00.000Z'}],
+            milestones:[{id:'first-forty',date:'2026-11-01',text:'First complete window',count:40,
+              from_at:'2026-10-31T23:55:00.000Z',to_at:'2026-11-01T00:05:00.000Z'}]},
+          highlights:{...body.highlights,schema_version:'decision-highlights-v2',
+            page:Number(url.searchParams.get('page')||'1'),
+            has_more:{best:url.searchParams.get('page')!=='2',misses:false},
+            best:url.searchParams.get('page')==='2'?
+              [{...body.highlights.best[0],puzzle_id:'fixture-pack-3',preview:{
+                selected:{id:'card-mine',name:'Second Page Card',image_url:'https://not-scryfall.invalid/x.jpg'},
+                trophy:{id:'card-trophy',name:'Source Card',image_url:null}}}]:
+              [{...body.highlights.best[0],preview:{
+                selected:{id:'card-mine',name:'First Page Card',image_url:'javascript:alert(1)'},
+                trophy:{id:'card-trophy',name:'Scryfall Art',image_url:'https://cards.scryfall.io/normal/front/x.jpg'}}}],
+          },
+        };
+      }
       if(insightsMode==='descriptive') {
         // 237 real-looking eligible decisions with no qualifying 10-point gap.
         // Keep the backend's observations array empty to test the UI fallback.
@@ -290,6 +314,26 @@ try {
   await page.getByRole('tab',{name:'Biggest Misses'}).click();
   await page.locator('#my-insights-misses-panel').getByText(/32\/100/).waitFor();
   await page.getByRole('tab',{name:'Best Calls'}).click();
+  assert.match(await page.locator('.my-insights-journey-point').first().textContent(),/2026-09-14/,
+    'legacy v1 windows still render their unchanged UTC calendar fields');
+  insightsMode='v2';
+  await page.locator('#my-insights-refresh').click();
+  await page.locator('#my-insights-best-panel').getByText('First Page Card').waitFor();
+  assert.match(await page.locator('.my-insights-dna').textContent(),/42 more eligible decisions/);
+  assert.match(await page.locator('.my-insights-journey-point').first().textContent(),/Oct 31/,
+    'viewer-local dates replace the UTC date-only fields in v2');
+  assert.equal(await page.locator('#my-insights-best-panel img[src*="not-scryfall.invalid"]').count(),0);
+  assert.equal(await page.locator('#my-insights-best-panel img[src*="javascript"]').count(),0);
+  assert.equal(await page.locator('#my-insights-best-panel img[src*="cards.scryfall.io"]').count(),1);
+  await page.getByRole('button',{name:'Load more Best Calls'}).click();
+  await page.locator('#my-insights-best-panel').getByText('Second Page Card').waitFor();
+  assert.equal(await page.locator('#my-insights-best-panel .my-insights-pick').count(),2,
+    'each page adds distinct records without replacing the previous page');
+  assert.equal(await page.getByRole('button',{name:'Load more Best Calls'}).count(),0,
+    'the UI offers a maximum of two pages');
+  insightsMode='ready';
+  await page.locator('#my-insights-refresh').click();
+  await page.locator('#my-insights-result').getByText('The Independent Thinker').waitFor();
   assert.equal(await page.locator('.my-insights-bar').count(),2,'pick and difficulty charts use actual backend data');
   await page.locator('#my-insights-environment').selectOption('powered-cube');
   await page.locator('#my-insights-result').getByText('P1P2').waitFor();

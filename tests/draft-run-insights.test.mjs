@@ -147,3 +147,37 @@ test('no public exposure or disabled old local-tab paths',()=>{
   assert.match(gateway,/\/v1\/mobile\/profile\/insights/);
   assert.doesNotMatch(worker,/handlePublicProfile\([^)]*insights/);
 });
+
+test('Highlights pages fail closed beyond two and preview at most twelve owner sessions per request',async()=>{
+ const owner='ffffffff-ffff-4fff-8fff-ffffffffffff';
+ const history=Array.from({length:100},(_,n)=>({
+   ...row(n,{score:n%5===0?100:n%5===1?95:n%5===2?10:85,
+     match:n%5===0,band:n%5===0?'hard':'medium'}),
+   session_id:'00000000-0000-4000-8000-'+n.toString(16).padStart(12,'0'),
+   answer_round:n%8+1,selected_id:'synthetic-card',historical_id:'synthetic-trophy',
+   selected_name:'Synthetic Card',historical_name:'Trophy Card',set_id:'neo',
+ }));
+ const previews=[],reads=[];
+ const query=async(sql,args)=>{
+   reads.push(sql);
+   if(sql===INSIGHTS_SQL){assert.deepEqual(args,[owner]);return {rows:history};}
+   assert.equal(sql,INSIGHTS_PREVIEW_SQL);
+   const sessions=args[1].slice(1,-1).split(',');
+   assert.ok(sessions.length<=12,'at most twelve owner previews per request');
+   assert.equal(new Set(sessions).size,sessions.length);
+   previews.push(sessions);return {rows:[]};
+ };
+ const first=await loadDraftRunInsights(query,owner,{environment:'mixed',page:1});
+ const second=await loadDraftRunInsights(query,owner,{environment:'mixed',page:2});
+ assert.equal(first.highlights.page,1);assert.equal(second.highlights.page,2);
+ assert.deepEqual(first.highlights.has_more,{best:true,misses:true});
+ assert.equal(reads.filter(q=>q===INSIGHTS_SQL).length,2);
+ assert.equal(previews.length,2);
+ const all=[...first.highlights.best,...first.highlights.misses,
+   ...second.highlights.best,...second.highlights.misses];
+ assert.equal(new Set(all.map(x=>x.puzzle_id)).size,all.length);
+ const before=reads.length;
+ for(const page of [0,3,-1,'nonsense',2.25])
+   await assert.rejects(loadDraftRunInsights(query,owner,{page}),e=>e.status===400);
+ assert.equal(reads.length,before,'invalid pages are rejected before DB access');
+});

@@ -45,7 +45,7 @@ function grouped(rows,key,minimum=INSIGHTS_GROUP_MIN) {
   return [...groups].map(([value,items])=>({value,...countSummary(items,minimum)}));
 }
 
-function normalise(rows) {
+export function normaliseInsightsRows(rows) {
   const seen=new Set(),answers=[];
   // Query is ascending by locked-answer time, so the first occurrence wins,
   // even if it came from a now-merged practice/creator/duplicate Daily.
@@ -89,9 +89,9 @@ function comparison(rows,labelA,labelB,a,b,id,note='') {
 }
 
 // Chart-ready, private, bounded aggregation. No raw decision rows leave the server.
-export function aggregateDraftRunInsights(source,{environment='mixed',period='all',now=new Date()}={}) {
+export function aggregateDraftRunInsights(source,{environment='mixed',period='all',page=1,now=new Date()}={}) {
   const filter=validateInsightsFilters({environment,period});
-  const all=normalise(Array.isArray(source)?source:[]);
+  const all=normaliseInsightsRows(Array.isArray(source)?source:[]);
   const current=now instanceof Date?now:new Date(now);
   const maxAge=period==='90d'?90:period==='365d'?365:Infinity;
   const cutoff=Number.isFinite(maxAge)?current.getTime()-maxAge*86400000:-Infinity;
@@ -156,7 +156,7 @@ export function aggregateDraftRunInsights(source,{environment='mixed',period='al
   // DNA uses the complete bounded first-encounter history, not chart filters.
   const drafting_dna=buildDraftingDNA(all);
   const journey={...buildDraftingJourney(selected),progress_compatible};
-  const highlights=selectInsightHighlights(selected);
+  const highlights=selectInsightHighlights(selected,{page});
   const versions={
     scoring:[...new Set(selected.map(r=>r.scoring_version))].sort(),
     selection:[...new Set(selected.map(r=>r.selection_version))].sort(),
@@ -188,8 +188,11 @@ function asAnswers(value) {
 }
 export async function loadDraftRunInsights(query,owner,filters={}) {
   const clean=validateInsightsFilters(filters);
+  const page=filters.page===undefined?1:Number(filters.page);
+  if(!Number.isInteger(page)||page<1||page>2)
+    throw Object.assign(new Error('Only the first two highlight pages are available.'),{status:400});
   const rows=await query(INSIGHTS_SQL,[owner]);
-  const result=aggregateDraftRunInsights(rows.rows,clean);
+  const result=aggregateDraftRunInsights(rows.rows,{...clean,page});
   const list=[...result.highlights.best,...result.highlights.misses];
   const ids=[...new Set(list.map(r=>r.session_id).filter(s=>UUID.test(s)))].slice(0,12);
   if(ids.length) {
@@ -208,6 +211,32 @@ export async function loadDraftRunInsights(query,owner,filters={}) {
   return result;
 }
 
+// This targeted query uses the exact bounded 1,000-recent-session CTE.
+// Eight-pick v3/v4 sessions persist at most eight answers, so 1,000 x 8 =
+// 8,000 maximum candidate rows (the full query's LIMIT 8000 is non-truncating).
+// Pick observations are unique per session/round/puzzle. A puzzle-specific
+// earliest timestamp, session ID, ordinal check equals normalise()'s winner.
+const INSIGHTS_RECENT_CTE=INSIGHTS_SQL.slice(0,INSIGHTS_SQL.indexOf('\nSELECT s.id::text session_id'));
+export const INSIGHTS_DECISION_ELIGIBILITY_SQL=INSIGHTS_RECENT_CTE+`
+SELECT s.id::text session_id,picked.ordinality::int answer_round,
+       picked.answer->'puzzle'->>'puzzle_id' puzzle_id
+FROM recent_sessions s
+CROSS JOIN LATERAL jsonb_array_elements(s.answers) WITH ORDINALITY picked(answer,ordinality)
+JOIN draft_run_decision_observations o
+  ON o.session_id=s.id AND o.round=picked.ordinality::int AND o.outcome='pick'
+  AND o.puzzle_id=picked.answer->'puzzle'->>'puzzle_id'
+WHERE picked.answer->'puzzle'->>'puzzle_id'=$2
+  AND jsonb_typeof(picked.answer->'puzzle')='object'
+  AND picked.answer->>'score' ~ '^(100|[0-9]{1,2})$'
+  AND picked.answer->'puzzle'->>'pick_number' ~ '^[0-9]{1,2}$'
+  AND CASE WHEN picked.answer->'puzzle'->>'pick_number' ~ '^[0-9]{1,2}$'
+    THEN (picked.answer->'puzzle'->>'pick_number')::int BETWEEN 1 AND 11 ELSE false END
+  AND picked.answer->>'historicalMatch' IN ('true','false')
+  AND o.answered_at IS NOT NULL
+  AND s.environment IN ('mixed','latest','powered-cube')
+ORDER BY o.answered_at ASC,s.id,picked.ordinality
+LIMIT 1`;
+
 export const INSIGHTS_DECISION_SQL=`SELECT picked.answer,o.answered_at,s.scoring_version,s.corpus_version
 FROM draft_run_sessions s
 CROSS JOIN LATERAL jsonb_array_elements(s.answers) WITH ORDINALITY picked(answer,ordinality)
@@ -224,11 +253,9 @@ export async function loadDraftRunInsightDecision(query,owner,params={}) {
   if(!UUID.test(id)||!Number.isInteger(round)||round<1||round>8||
     !/^[a-zA-Z0-9._:-]{1,160}$/.test(puzzle))
     throw Object.assign(new Error('Invalid saved decision.'),{status:400});
-  // Fail closed even for an owner-owned session if that answer was a rerun,
-  // QA/legacy decision, or fell outside the bounded Insights history window.
-  // Normalise uses the first locked answer per puzzle across those sessions.
-  const eligible=normalise((await query(INSIGHTS_SQL,[owner])).rows||[]);
-  if(!eligible.some(r=>r.session_id===id&&r.round===round&&r.puzzle_id===puzzle))
+  // Only the first eligible answer to this puzzle for the signed-in owner.
+  const eligible=(await query(INSIGHTS_DECISION_ELIGIBILITY_SQL,[owner,puzzle])).rows?.[0];
+  if(!eligible||eligible.session_id!==id||Number(eligible.answer_round)!==round||eligible.puzzle_id!==puzzle)
     throw Object.assign(new Error('Saved decision unavailable.'),{status:404});
   const found=await query(INSIGHTS_DECISION_SQL,[owner,id,round,puzzle]);
   const row=found.rows?.[0];

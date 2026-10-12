@@ -48,14 +48,16 @@ function compile(relative,mocks) {
 async function mount(t,{initial=session(),respond=async (_s,env)=>fixture(env)}={}) {
   let stored=initial,listener=()=>{},root;
   const calls=[],routes=[];
+  const imagePolicy=await import('../../card-image-policy.mjs');
   const mocks={
+    '../../../card-image-policy.mjs':imagePolicy,
     'expo-router':{router:{push:v=>routes.push(['push',v]),dismissTo:v=>routes.push(['dismiss',v])},
       Stack:{Screen:host('StackScreen')},useFocusEffect:callback=>React.useEffect(callback,[callback])},
     'react-native':{ActivityIndicator:host('ActivityIndicator'),Image:host('Image'),Pressable:host('Pressable'),
       ScrollView:host('ScrollView'),StyleSheet:{create:v=>v},View:host('View')},
     '@/src/components/AboutLink':{AboutLink:host('AboutLink')},
-    '@/src/api/insights':{loadMobileInsights:async(s,env,period)=>{
-      calls.push([s.accountToken,env,period]);return respond(s,env,period);
+    '@/src/api/insights':{loadMobileInsights:async(s,env,period,page=1)=>{
+      calls.push([s.accountToken,env,period,page]);return respond(s,env,period,page);
     },loadMobileInsightDecision:async(s,item)=>{
       calls.push([s.accountToken,'decision',item.puzzle_id]);
       return {set_id:'neo',pick_number:item.pick_number,score:item.score,trophy_match:false,
@@ -223,4 +225,50 @@ test('native Insights files stay local to My Pack One; no new bottom tab',()=>{
   assert.match(layout,/Stack\.Screen name="insights"/);
   assert.doesNotMatch(tabBar,/Tabs\.Screen name="insights"/);
   assert.match(fs.readFileSync('src/api/insights.ts','utf8'),/mobileAccountToken: session\.accountToken/);
+});
+
+test('native v2 renders pick distance, bounded page 2, local timestamp ranges and safe card fallbacks',async t=>{
+ const first={...fixture('mixed'),
+   drafting_dna:{schema_version:'drafting-dna-v2',status:'emerging',scope:'all-eligible-history',
+     eligible_decisions:24,picks_needed:56,primary:null,
+     secondary:[{status:'emerging',label:'Trait still developing',picks_needed:56},
+       {status:'emerging',label:'Trait still developing',picks_needed:56}],note:'Provisional gates.'},
+   journey:{version:'drafting-journey-v2',eligible_decisions:80,window_size:40,
+     windows:[{id:'window-0',from:'2026-10-31',to:'2026-11-01',
+       from_at:'2026-10-31T23:55:00.000Z',to_at:'2026-11-01T00:05:00.000Z',
+       count:40,average_score:85,complete:true,cohort:'synthetic'}],
+     milestones:[{id:'first-forty',date:'2026-11-01',text:'First 40 decisions',count:40,
+       from_at:'2026-10-31T23:55:00.000Z',to_at:'2026-11-01T00:05:00.000Z'}],
+     total_windows:1,versions_comparable:true,limited:false,note:'Original scores.'},
+   highlights:{schema_version:'decision-highlights-v2',page:1,has_more:{best:true,misses:true},
+     best:[{session_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',round:1,puzzle_id:'fixture-1',
+       set_id:'neo',environment:'mixed',pick_number:1,date:'2026-11-01',score:90,
+       trophy_match:false,preview:{selected:{id:'mine',name:'Only Placeholder',image_url:'https://unsafe.invalid/tracker.jpg'},
+         trophy:{id:'trophy',name:'Allowed Original',image_url:'https://cards.scryfall.io/normal/front/card.jpg'}}}],
+     misses:[],note:'Original picks.'},
+ };
+ const next={...first,highlights:{...first.highlights,page:2,has_more:{best:false,misses:false},
+   best:[{...first.highlights.best[0],puzzle_id:'fixture-2',preview:{
+     selected:{id:'mine',name:'Second Card',image_url:'javascript:alert(1)'},
+     trophy:{id:'trophy',name:'Trophy Card',image_url:null}}}],
+   misses:[]}};
+ const ui=await mount(t,{respond:async(_s,_e,_p,page)=>page===2?next:first});
+ const content=ui.text();
+ assert.match(content,/56 more eligible decisions/);
+ assert.match(content,/Oct 31/,'v2 timestamps are rendered in local format');
+ const images=ui.root.root.findAll(n=>n.type==='Image');
+ assert.equal(images.length,1,'unapproved selected art is a card-name fallback');
+ assert.equal(images[0].props.source.uri,'https://cards.scryfall.io/normal/front/card.jpg');
+ assert.ok(content.includes('Only Placeholder'));
+ await ui.choose('Load more saved picks (page 2 of 2)');
+ assert.ok(ui.text().includes('Second Card'));
+ assert.ok(!ui.text().includes('Load more saved picks (page 2 of 2)'));
+ assert.deepEqual(ui.calls.map(c=>c[3]),[1,2]);
+});
+test('native shared image policy refuses HTTP, script and foreign hosts',async()=>{
+ const {safeCardImageUrl}=await import('../../card-image-policy.mjs');
+ for(const input of ['http://cards.scryfall.io/normal/x.jpg','javascript:alert(1)',
+   'https://other.invalid/x.jpg'])assert.equal(safeCardImageUrl(input),null);
+ assert.equal(safeCardImageUrl('https://cards.scryfall.io/normal/x.jpg'),
+   'https://cards.scryfall.io/normal/x.jpg');
 });

@@ -2,7 +2,7 @@
 
 **Decision:** Owner approved adding **Your Drafting Journey** and **Your Best Calls & Biggest Misses** alongside the already approved **Drafting DNA** (one primary archetype + two secondary traits), October 11, 2026.
 
-**Status:** Product direction/specification approved. These three new experience sections are **not implemented or released**. The original My Pack One Insights charts and private API are already live.
+**Status:** Initial backend/web/native source implementation merged via #1173; #1179 tracks code-quality follow-ups and separate signed-in acceptance. No native build is implied by source changes.
 
 **Implementation tracking:** [Drafting DNA #1167](https://github.com/killjoy00/mtg-ev-analyzer/issues/1167), [Drafting Journey #1170](https://github.com/killjoy00/mtg-ev-analyzer/issues/1170), [Best Calls & Biggest Misses #1171](https://github.com/killjoy00/mtg-ev-analyzer/issues/1171).
 **Source of existing Insights rules:** [MY-PACK-ONE-INSIGHTS.md](MY-PACK-ONE-INSIGHTS.md); DNA evidence contract: [DRAFTING-DNA.md](DRAFTING-DNA.md).
@@ -106,3 +106,50 @@ No fabricated Magic card images or personality labels; no source-drafter reasoni
 - Opening a real highlighted decision shows the **original pack, saved prior picks, player's choice and trophy choice**, with the frozen-score explanation; never a newly graded simulator.
 - Zero-history and partially populated accounts see truthful placeholders; supported fields never masquerade as complete when missing.
 - No private response is accessible to the wrong account or guest. Previous-account data disappears immediately on logout/switch. Web/native parity tests and existing scoring/nav regressions pass before any release.
+
+## Code follow-up: Journey v2 and highlights v2 (#1179)
+
+`drafting-journey-v2` preserves the original `from`/`to` UTC date
+strings, and adds ISO `from_at`/`to_at` to windows and milestones
+(with the existing milestone `date` unchanged). Web and native display
+the viewer's local calendar dates when the ISO fields exist, and
+fall back to legacy strings from older functions. Every milestone
+represents only measured first-encounter history, without an
+unsubstantiated improvement claim. The new difficulty-coverage
+milestone is the **first complete, version-consistent 40-decision
+window with at least 10 known hard-band decisions**. The count comes
+from its own window, not from global hard pick totals. Journey is
+already restricted to one selected environment by
+`aggregateDraftRunInsights`; a milestone for *format coverage within
+a Journey* is therefore inapplicable. Version boundaries and irregular
+time gaps remain visible rather than interpolated.
+
+`decision-highlights-v2` supports optional pages 1 and 2, **at
+most six Best Calls and six Biggest Misses per page**. It holds the
+per-request saved-pack-preview lookup to **at most 12 unique sessions**,
+with a shared deduplication set across lists and pages. Pagination
+is deterministic for the selected environment/time period and its
+bounded first-encounter rows. Out-of-range pages fail with HTTP 400,
+rather than extending the 1,000-session / 8,000-candidate budget.
+New page and has-more metadata is additive; native binaries that
+ignore it still see the original first six cards.
+
+Saved images originate in `scripts/fetch_card_metadata.py` through
+Scryfall's `image_uris.normal` fields, propagated through the image
+refresh scripts and saved puzzle candidate snapshots. The shared
+`card-image-policy.mjs` allows **HTTPS on exactly
+`cards.scryfall.io`**, without credentials or custom ports. The
+server, web viewer and native image component apply this same policy;
+missing, malformed, downgraded or foreign-host URLs show the actual
+saved card name, not invented art.
+
+Detail eligibility uses an owner-scoped **puzzle-targeted** read
+inside the identical 1,000-session CTE, rather than transferring and
+normalizing the full Insights rowset on every click. The documented
+eight-answer-per-eight-pick-session invariant and observation
+uniqueness make the full query's 8,000 row cap non-truncating.
+The eligibility query still checks QA name/session filters,
+selection version, score/pick/match validity and first locked
+answer order including session-ID tie-break, before the existing
+separate owner-scoped saved-answer retrieval. These details never
+introduce a playable retry.
