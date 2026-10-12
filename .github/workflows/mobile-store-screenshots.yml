@@ -266,7 +266,9 @@ jobs:
     name: capture Android phone
     needs: validate
     if: needs.validate.outputs.capture_required == 'true'
-    timeout-minutes: 45
+    # The full 28+ scenario native acceptance suite consistently reaches the
+    # final account-switch scenario just as the old 45-minute cap expires.
+    timeout-minutes: 60
     runs-on: ubuntu-latest
     env:
       EXPO_PUBLIC_PACKONE_ENV: preview
