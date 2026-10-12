@@ -156,7 +156,7 @@ function highlightsMarkup(data) {
   return '<section class="my-pack-card my-insights-wide my-insights-highlights"><div class="my-card-heading">'+
     '<h2>Decision report</h2><span>'+number(data.eligible_decisions)+' eligible decisions in this view</span></div>'+
     '<p class="my-insights-leading"><strong>'+(finding?'Leading finding':'Your recent decisions')+'</strong> · '+
-      esc(finding?.text||'A standout comparison has not qualified in this environment and period. Review factual saved picks below.')+'</p>'+
+      esc(finding?.text||'No standout comparison has qualified in this environment and period. Review factual saved picks below.')+'</p>'+
     '<div role="tablist" aria-label="Saved decision highlights" class="my-insights-highlight-tabs">'+
       '<button type="button" role="tab" id="my-insights-best-tab" aria-selected="true" aria-controls="my-insights-best-panel" data-insights-tab="best">Best Calls</button>'+
       '<button type="button" role="tab" id="my-insights-misses-tab" aria-selected="false" aria-controls="my-insights-misses-panel" data-insights-tab="misses">Biggest Misses</button></div>'+
