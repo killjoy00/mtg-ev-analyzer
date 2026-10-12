@@ -159,9 +159,7 @@ function DNASummary({dna,cardChoices,onReview}:{
           <Text style={styles.caption}>Available competitive options: {Object.entries(choice.availability).map(([name,count])=>name+': '+count).join(' · ')}</Text>
           <Text style={styles.caption}>Your selections: {Object.entries(choice.selected).map(([name,count])=>name+': '+count).join(' · ')}</Text>
           {(choice.examples||[]).map(example=><Pressable key={example.puzzle_id}
-            accessibilityRole="button" style={styles.exampleLink} onPress={()=>onReview({
-              ...example,score:0,trophy_match:false,environment:'mixed',selection_kind:'alternative',
-            )}>
+            accessibilityRole="button" style={styles.exampleLink} onPress={()=>onReview(example)}>
             <Text style={styles.secondaryText}>Review {example.selected_name||'saved pick'} · {example.set_id} P1P{example.pick_number} · {shortDate(example.date)}</Text>
           </Pressable>)}
         </View>:null}
