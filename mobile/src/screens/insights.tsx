@@ -28,6 +28,17 @@ const shortDate = (value?:string) => {
   return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][n-1]+' '+date;
 };
 
+function shortJourneyRange(window:{from:string;to:string;from_at?:string;to_at?:string}) {
+  const local=(timestamp:string|undefined,fallback:string)=>{
+    if(!timestamp)return shortDate(fallback);
+    const value=new Date(timestamp);
+    return Number.isFinite(value.getTime())?
+      value.toLocaleDateString(undefined,{month:'short',day:'numeric'}):shortDate(fallback);
+  };
+  const from=local(window.from_at,window.from),to=local(window.to_at,window.to);
+  return from===to?from:from+'–'+to;
+}
+
 function ChoiceRow<T extends string>({ name, values, selected, onChange }: {
   name: string; values: { value: T; label: string }[]; selected: T; onChange: (value: T) => void;
 }) {
@@ -270,7 +281,7 @@ function JourneyStory({journey,progress,months}:{
         <Text style={styles.bigScore}>{score(w.average_score)}</Text>
         <View style={styles.journeyTrack}><View style={[styles.journeyFill,
           {height:(Math.max(0,Math.min(100,w.average_score??0))+'%') as '100%'}]}/></View>
-        <Text style={styles.meta}>{shortDate(w.from_at?new Date(w.from_at).toLocaleDateString('en-CA'):w.from)+'–'+shortDate(w.to_at?new Date(w.to_at).toLocaleDateString('en-CA'):w.to)}</Text>
+        <Text style={styles.meta}>{shortJourneyRange(w)}</Text>
         <Text style={styles.meta}>{w.count} picks{w.complete?'':' · partial'}</Text>
       </View>)}
     </ScrollView>:<Text style={styles.caption}>Your drafting Journey grows with your original recorded decisions.</Text>}
