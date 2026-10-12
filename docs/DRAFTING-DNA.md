@@ -1,7 +1,7 @@
 # Drafting DNA — one primary identity and two secondary traits
 
 **Decision:** Owner approved **one primary archetype + two secondary traits** on October 11, 2026.
-**Status:** Initial code merged through #1173; qualification refinement under #1179 is code-only and awaits separate acceptance.
+**Status:** Qualification refinement #1180 merged and the guarded backend release #1181 succeeded. Signed-in acceptance in #1179 and the private audit of provisional gates remain outstanding.
 **Implementation tracking:** [#1179](https://github.com/killjoy00/mtg-ev-analyzer/issues/1179) (consolidating #1167/#1170/#1171).
 **Existing Insights:** [#1150](https://github.com/killjoy00/mtg-ev-analyzer/issues/1150) and [MY-PACK-ONE-INSIGHTS.md](MY-PACK-ONE-INSIGHTS.md).
 **Approved surrounding experience:** [INSIGHTS-REDESIGN.md](INSIGHTS-REDESIGN.md) — Drafting DNA, real Best Calls & Biggest Misses, and Your Drafting Journey. Companion implementation issues [#1170](https://github.com/killjoy00/mtg-ev-analyzer/issues/1170) and [#1171](https://github.com/killjoy00/mtg-ev-analyzer/issues/1171).
@@ -127,11 +127,14 @@ single source of truth is the exported, versioned
 (`drafting-dna-v2`). No production data, distribution counts or private
 query output belong in this repository.
 
-All enabled candidates first require **at least 80 eligible first-encounter
-decisions** (PROVISIONAL). Each candidate must qualify twice: on the complete
-bounded owner history, and on the same history with the latest **8 eligible
-decisions** removed (PROVISIONAL one-run stability gate). This stability
-requirement is not a stored identity snapshot; it delays transitions near a
+Each enabled candidate requires **at least 80 eligible first-encounter decisions
+per evaluation** (PROVISIONAL): it must qualify both on the complete bounded
+owner history and on that history with the latest **8 eligible decisions**
+removed (PROVISIONAL one-run stability gate). Thus **88 total eligible
+decisions** is the effective stability sample floor and the earliest any trait
+can qualify. At 80–87 decisions, no label can yet pass both checks; reaching
+88 does not guarantee a label without the candidate's other evidence. This
+stability requirement is not a stored identity snapshot; it delays transitions near a
 threshold without adding personal storage. It cannot eliminate every
 possible historical revision or threshold flip, so no claim of permanent
 personality is made. Qualified candidates rank by excess above their
@@ -159,9 +162,10 @@ to originally locked picks; sample and count gates are not verified
 player percentiles. Score thresholds in the original 40/40 observation
 charts are unchanged.
 
-The additive DNA response now includes `picks_needed` on the DNA
-object and each emerging slot. While total eligible history is below
-the sample floor it reports the distance to 80. At the sample floor
+The additive DNA response includes `picks_needed` on the DNA object
+and each emerging slot. While total eligible history is below the **effective
+88-decision stability floor**, it reports the distance to 88 (so 80, 84 and 87
+decisions report **8, 4 and 1** more, respectively). At 88 or more decisions
 without another stable qualification, it returns `null` with a brief
 `reason` rather than falsely promising a specific number of picks.
 Existing status/primary/secondary fields remain for installed clients. For the otherwise-null primary slot, the additive `primary_emerging` object also provides `picks_needed` and an explanatory reason; older binaries continue using `primary:null`.

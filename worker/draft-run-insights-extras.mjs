@@ -152,7 +152,7 @@ function qualifiedDNA(rows) {
     const recent=ordered.slice(0,floor),previous=ordered.slice(floor,floor*2);
     const delta=round(mean(recent)-mean(previous));
     if(delta>=c.rising.minimum_gap)options.push(candidate('rising-star','The Rising Star','time-trend',
-      'Your latest and preceding 40 recorded picks have different averages within a comparable cohort.',
+      'Your latest 40 recorded picks averaged at least 10 points higher than the preceding 40 within a comparable cohort.',
       floor*2,[evidence('Recent 40 average',mean(recent)),evidence('Previous 40 average',mean(previous)),
         evidence('Recorded difference',delta+' points')],delta-c.rising.minimum_gap));
   }
@@ -170,9 +170,10 @@ export function buildDraftingDNA(rows) {
     families.add(item.evidence_family);picked.push(item);
     if(picked.length===3)break;
   }
-  const picks_needed=n<c.minimum_decisions?c.minimum_decisions-n:null;
-  const reason=picks_needed!==null?'Complete the provisional 80-decision sample floor.':
-    'The sample floor is met; another supported, stable and distinct qualification gate is needed.';
+  const picks_needed=n<c.minimum_decisions+c.stability_recent_run?
+    c.minimum_decisions+c.stability_recent_run-n:null;
+  const reason=picks_needed!==null?'Complete the provisional 88-decision stability sample floor (80 per check, including one without the latest 8).':
+    'The stability sample floor is met; another supported, stable and distinct qualification gate is needed.';
   const clean=x=>{if(!x)return {status:'emerging',label:'Trait still developing',picks_needed,reason};
     const {strength,...publicItem}=x;return {status:'qualified',...publicItem};};
   return {schema_version:DNA_VERSION,status:picked.length?'ready':'emerging',
