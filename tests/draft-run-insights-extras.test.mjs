@@ -110,13 +110,13 @@ test('Owner-scoped detail uses a targeted first-encounter eligibility read',asyn
  await assert.rejects(loadDraftRunInsightDecision(async()=>({rows:[{session_id:id2,answer_round:3,puzzle_id:'p1'}]}),
    owner,{session_id:id,round:3,puzzle_id:'p1'}),e=>e.status===404);
  for(const sql of [INSIGHTS_PREVIEW_SQL,INSIGHTS_DECISION_SQL,INSIGHTS_DECISION_ELIGIBILITY_SQL]){
-   assert.match(sql,/player_id=\\$1::uuid/);
-   assert.doesNotMatch(sql,/\\b(INSERT|UPDATE|DELETE|TRUNCATE)\\b/i);
+   assert.ok(sql.includes('player_id=$1::uuid'));
+   assert.ok(!['INSERT','UPDATE','DELETE','TRUNCATE'].some(word=>sql.includes(word+' ')));
  }
  assert.match(INSIGHTS_DECISION_ELIGIBILITY_SQL,/LIMIT 1000/);
- assert.match(INSIGHTS_DECISION_ELIGIBILITY_SQL,/puzzle_id'=\\$2/);
- assert.match(INSIGHTS_DECISION_ELIGIBILITY_SQL,/p\\.display_name !~\\*/);
- assert.match(INSIGHTS_DECISION_ELIGIBILITY_SQL,/ORDER BY o\\.answered_at ASC,s\\.id,picked\\.ordinality/);
+ assert.ok(INSIGHTS_DECISION_ELIGIBILITY_SQL.includes("puzzle_id'=$2"));
+ assert.ok(INSIGHTS_DECISION_ELIGIBILITY_SQL.includes('p.display_name !~*'));
+ assert.ok(INSIGHTS_DECISION_ELIGIBILITY_SQL.includes('ORDER BY o.answered_at ASC,s.id,picked.ordinality'));
 });
 test('Shortlist source preview reads only owner sessions and returns no unbounded history',async()=>{
  const owner='ffffffff-ffff-4fff-8fff-ffffffffffff',history=Array.from({length:12},(_,n)=>raw(pick(n,{score:n%2?12:91,sid:n<8?id:id2})));
