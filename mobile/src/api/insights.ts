@@ -34,6 +34,7 @@ export type InsightHighlight = {session_id:string;round:number;puzzle_id:string;
 export type InsightHighlights = {schema_version:string;best:InsightHighlight[];misses:InsightHighlight[];note:string};
 export type InsightDecision = {set_id:string;pick_number:number;score:number;trophy_match:boolean;
   selected:InsightCard;trophy:InsightCard;candidates:InsightCard[];prior_picks:InsightCard[];
+  ranking?:{id:string;name:string;score:number|null;support:number|null}[];
   trophy_drafter?:{record:string|null;win_rate:number|null}|null;
   scoring_version:string;corpus_version:string;answered_at:string};
 
