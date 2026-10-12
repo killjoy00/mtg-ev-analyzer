@@ -149,6 +149,7 @@ function highlightCards(rows,kind,expanded=false) {
         (row.trophy_match?'':'<div><strong>Trophy pick</strong>'+cardVisual(trophy,trophyName)+'</div>')+'</div>':'')+
       '<div class="my-insights-pick-info"><strong>Your pick: '+esc(name)+'</strong>'+
       (row.trophy_match?'<span>Trophy pick matched</span>':'<span>Trophy pick: '+esc(trophyName)+'</span>')+
+      (row.finding_context?'<small class="my-insights-context">'+esc(row.finding_context)+'</small>':'')+
       '<small>'+esc(row.set_id)+' · P1P'+Number(row.pick_number)+' · '+esc(shortInsightDate(row.date))+
       ' · Original score '+number(row.score)+'/100</small>'+
       '<p class="my-insights-reason">'+esc(row.reason_text||(
@@ -194,13 +195,16 @@ function journeyMarkup(data) {
   const milestone=(journey.milestones||[]).map(m=>'<li><strong>'+esc(m.text)+'</strong> · '+
     esc(insightLocalRange(m,m.date,m.date))+(m.average_score!=null?' · '+score(m.average_score)+'/100':'')+'</li>').join('');
   const compatible=journey.progress_compatible!==false;
+  const sameVersions=journey.versions_comparable!==false;
+  const boundaryWarning=!compatible||!sameVersions?
+    '<p class="my-insights-journey-warning" role="note">These saved picks cross different scoring or card-pool versions. The windows are not a continuous progress trend.</p>':'';
   const progress=compatible&&data.progress?'<p class="my-insights-journey-summary">Recent 40: '+
     score(data.progress.recent.average_score)+'/100 · Previous 40: '+
     score(data.progress.previous.average_score)+'/100 · Difference '+
     (data.progress.delta>0?'+':'')+score(data.progress.delta)+' points (descriptive, not proof of improvement).</p>':'';
   return '<section class="my-pack-card my-insights-wide my-insights-journey">'+
     '<div class="my-card-heading"><h2>Your Drafting Journey</h2><span>Original scores · 40-pick windows</span></div>'+
-    chart+progress+
+    chart+boundaryWarning+progress+
     '<details class="my-insights-journey-details"><summary>View journey details</summary>'+
     '<p class="my-insights-note">'+esc(journey.note||'Historical versions may differ.')+
     ' Incomplete windows are marked with an asterisk.</p>'+
