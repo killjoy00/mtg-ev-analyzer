@@ -272,7 +272,7 @@ try {
   assert.equal(await page.locator('#profile-insights-tab').getAttribute('aria-selected'),'true');
   await page.locator('#my-insights-result').getByText('Your patterns',{exact:true}).waitFor();
   assert.match(await page.locator('#my-insights-result').textContent(),/Pick-by-pick strengths/);
-  assert.match(await page.locator('#my-insights-result').textContent(),/Progress over time/);
+  assert.match(await page.locator('#my-insights-result').textContent(),/Your Drafting Journey/);
   assert.match(await page.locator('#my-insights-result').textContent(),/Difficulty context/);
   assert.match(await page.locator('#my-insights-result').textContent(),/Format patterns/);
   assert.match(await page.locator('#my-insights-result').textContent(),/Your Drafting DNA/);
