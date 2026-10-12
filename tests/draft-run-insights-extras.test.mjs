@@ -5,7 +5,7 @@ import {
   buildDraftingDNA,buildDraftingJourney,selectInsightHighlights,publicLockedDecision,
 } from '../worker/draft-run-insights-extras.mjs';
 import {
-  aggregateDraftRunInsights,INSIGHTS_PREVIEW_SQL,INSIGHTS_DECISION_SQL,loadDraftRunInsightDecision,
+  aggregateDraftRunInsights,INSIGHTS_SQL,INSIGHTS_PREVIEW_SQL,INSIGHTS_DECISION_SQL,loadDraftRunInsightDecision,
   loadDraftRunInsights,
 } from '../worker/draft-run-insights.mjs';
 const id='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -92,7 +92,9 @@ test('Owner-scoped detail loader validates inputs, score history and session que
    await assert.rejects(loadDraftRunInsightDecision(async()=>{calls++;},owner,data),e=>e.status===400);
  }
  assert.equal(calls,0);
+ const eligibleRow={...raw(pick(1,{sid:id,sourcePick:3,score:83})),puzzle_id:'p1',answer_round:3};
  const query=async(sql,args)=>{
+   if(sql===INSIGHTS_SQL){assert.deepEqual(args,[owner]);return {rows:[eligibleRow]};}
    assert.equal(sql,INSIGHTS_DECISION_SQL);
    assert.deepEqual(args,[owner,id,3,'p1']);
    return {rows:[{answer,answered_at:'2026-09-01T00:00:00Z',scoring_version:'v1',corpus_version:'corpus-v1'}]};
@@ -101,6 +103,10 @@ test('Owner-scoped detail loader validates inputs, score history and session que
  assert.equal(detail.selected.name,'Aerial Responder');
  assert.equal(detail.answered_at,'2026-09-01T00:00:00.000Z');
  await assert.rejects(loadDraftRunInsightDecision(async()=>({rows:[]}),owner,{session_id:id,round:3,puzzle_id:'p1'}),e=>e.status===404);
+ await assert.rejects(loadDraftRunInsightDecision(async(sql)=>{
+   if(sql===INSIGHTS_SQL)return {rows:[{...eligibleRow,session_id:id2,answered_at:'2026-08-01T00:00:00.000Z'},eligibleRow]};
+   throw Error('Duplicate second answer must not be loaded');
+ },owner,{session_id:id,round:3,puzzle_id:'p1'}),e=>e.status===404);
  for(const sql of [INSIGHTS_PREVIEW_SQL,INSIGHTS_DECISION_SQL]){
    assert.match(sql,/player_id=\$1::uuid/);
    assert.doesNotMatch(sql,/\b(INSERT|UPDATE|DELETE|TRUNCATE)\b/i);
@@ -125,6 +131,19 @@ test('Shortlist source preview reads only owner sessions and returns no unbounde
  assert.equal(out.highlights.misses[0].session_id===id||out.highlights.misses[0].session_id===id2,true);
  assert.equal(Object.hasOwn(out,'raw_decisions'),false);
 });
+test('Mixed historical score versions suppress misleading 40/40 progress, while retaining a true Journey',()=>{
+ const rawHistory=Array.from({length:80},(_,n)=>raw(pick(n,{version:n<40?'old-scoring':'new-scoring'})));
+ const result=aggregateDraftRunInsights(rawHistory);
+ assert.equal(result.eligible_decisions,80);
+ assert.equal(result.progress,null);
+ assert.equal(result.journey.progress_compatible,false);
+ assert.equal(result.journey.eligible_decisions,80);
+ assert.ok(result.journey.windows.length>=2);
+ const uniform=aggregateDraftRunInsights(rawHistory.map(r=>({...r,corpus_version:'one-version'})));
+ assert.equal(uniform.progress?.recent?.count,40);
+ assert.equal(uniform.journey.progress_compatible,true);
+});
+
 test('Growth handlers keep highlight detail private and gateway explicitly allowlists reads',()=>{
  const g=fs.readFileSync('worker/growth-function.js','utf8'),gate=fs.readFileSync('edge/gateway.mjs','utf8');
  assert.match(g,/loadDraftRunInsightDecision\(query,owner/);
