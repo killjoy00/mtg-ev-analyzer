@@ -146,6 +146,23 @@ await page.route(`${growthOrigin}/**`, async (route) => {
         range:{from:'2026-09-01',to:'2026-09-25'},session_limit:1000,
         methodology:'First answer to each puzzle, original points, 1,000-session cap.',
       };
+      if(insightsMode==='descriptive') {
+        // 237 real-looking eligible decisions with no qualifying 10-point gap.
+        // Keep the backend's observations array empty to test the UI fallback.
+        body={...body,eligible_decisions:237,total_eligible_decisions:237,observations:[],
+          formats:[
+            {environment:'mixed',label:'Mixed',count:237,average_score:76.8,trophy_match_pct:42.2},
+            {environment:'latest',label:'Latest Set',count:0,average_score:null,trophy_match_pct:null},
+            {environment:'powered-cube',label:'Powered Cube',count:0,average_score:null,trophy_match_pct:null},
+          ],
+          pick_depth:[{pick_number:4,label:'P1P4',count:31,average_score:74.5,trophy_match_pct:41}],
+          progress:{
+            recent:{count:40,average_score:77.1,trophy_match_pct:50,from:'2026-09-15',to:'2026-09-25'},
+            previous:{count:40,average_score:75.2,trophy_match_pct:47,from:'2026-09-01',to:'2026-09-14'},
+            delta:1.9,
+          },
+        };
+      }
     }
   } else if (url.pathname === '/v1/profile/me') {
     body = fixture;
@@ -229,6 +246,23 @@ try {
   }
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:'artifacts/ui-profile-insights-390.png',fullPage:true});
+  // A large cohort can have no conservative standout: show factual aggregates,
+  // not the misleading 'not enough comparable decisions yet' copy.
+  insightsMode='descriptive';
+  await page.locator('#my-insights-environment').selectOption('mixed');
+  await page.locator('#my-insights-period').selectOption('all');
+  await page.locator('#my-insights-refresh').click();
+  await page.getByText(/Across 237 eligible Mixed decisions/).waitFor();
+  const reportedPatterns=await page.locator('#my-insights-result').textContent();
+  assert.match(reportedPatterns,/237 eligible decisions/);
+  assert.match(reportedPatterns,/No standout comparison met both thresholds/);
+  assert.match(reportedPatterns,/76\.8\/100/);
+  assert.match(reportedPatterns,/Trophy-drafter pick match: 42\.2%/);
+  assert.match(reportedPatterns,/most recent 40 picks averaged 77\.1\/100/);
+  assert.match(reportedPatterns,/preceding 40 averaged 75\.2\/100/);
+  assert.match(reportedPatterns,/P1P4: 31 decisions averaging 74\.5\/100/);
+  assert.doesNotMatch(reportedPatterns,/Not enough comparable decisions yet/);
+  await page.screenshot({path:'artifacts/ui-profile-insights-237.png',fullPage:true});
   insightsMode='offline';
   await page.locator('#my-insights-refresh').click();
   await page.getByText('Insights unavailable',{exact:true}).waitFor();
