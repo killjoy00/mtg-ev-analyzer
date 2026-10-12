@@ -592,30 +592,30 @@
 
 
 /* Focused Insights report: one clear hierarchy across desktop and phone. */
-.my-insights-dna .my-card-heading { display:flex; gap:12px; flex-wrap:wrap; align-items:baseline; justify-content:space-between; margin-bottom:12px; }
-.my-insights-dna-primary { border-left:5px solid var(--green); padding:14px 18px; background:var(--surface); border-radius:8px; }
-.my-insights-dna-primary > strong { display:block; color:var(--ink); font-family:var(--display); font-size:clamp(23px,2.7vw,31px); line-height:1.2; }
-.my-insights-dna-primary p { font-size:14px; line-height:1.5; margin:7px 0; color:var(--ink); }
-.my-insights-dna-primary small { color:var(--muted); font-size:12px; }
-.my-insights-dna details summary, .my-insights-journey-details summary, .my-insights-explore > summary { color:var(--green-dark); font-size:13px; font-weight:800; cursor:pointer; padding:10px 0; }
-.my-insights-dna details summary:focus-visible, .my-insights-journey-details summary:focus-visible, .my-insights-explore > summary:focus-visible { outline:3px solid var(--green); outline-offset:2px; }
-.my-insights-dna-secondary-row { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; margin:10px 0; }
-.my-insights-dna-secondary { padding:8px 12px; border:1px solid var(--line); border-radius:8px; background:var(--surface); min-width:0; }
-.my-insights-dna-secondary summary { padding:6px 0!important; font-weight:800; }
-.my-insights-dna-secondary strong { font-size:14px; color:var(--ink); display:block; }
-.my-insights-dna-secondary small { font-size:11px; color:var(--muted); }
-.my-insights-dna-secondary p, .my-insights-dna-primary details, .my-insights-dna-secondary li { font-size:12px; line-height:1.55; }
-.my-insights-dna-secondary ul, .my-insights-dna-primary ul { padding-left:20px; margin:6px 0; }
-.my-insights-dna-secondary.is-developing { border-style:dashed; }
-.my-insights-choice-context { border-top:1px solid var(--line); padding-top:10px; display:grid; gap:10px; }
-.my-insights-choice-context h3 { font-size:15px; margin:0; color:var(--ink); }
-.my-insights-choice-fact { font-size:13px; line-height:1.5; padding:8px 12px; background:var(--surface); border:1px solid var(--line); border-radius:8px; }
-.my-insights-choice-fact strong { color:var(--ink); }
-.my-insights-choice-fact p { margin:5px 0; }
+.my-insights-dna .my-card-heading { display:flex; gap:8px; flex-wrap:wrap; align-items:baseline; justify-content:space-between; margin-bottom:7px; }
+.my-insights-dna .my-card-heading span { font-size:11px; color:var(--muted); }
+.my-insights-dna-primary { border-left:3px solid var(--green); padding:8px 12px; background:var(--surface); }
+.my-insights-dna-primary > strong { display:block; color:var(--ink); font-family:var(--display); font-size:clamp(22px,2.7vw,29px); line-height:1.2; }
+.my-insights-dna-primary > p { font-size:13px; line-height:1.45; margin:4px 0; color:var(--ink); }
+.my-insights-dna details summary,.my-insights-journey-details summary,.my-insights-explore > summary { color:var(--green-dark); font-size:12px; font-weight:750; cursor:pointer; padding:7px 0; }
+.my-insights-dna details summary:focus-visible,.my-insights-journey-details summary:focus-visible,.my-insights-explore > summary:focus-visible { outline:3px solid var(--green); outline-offset:2px; }
+.my-insights-dna-secondary-row { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin:5px 0 7px; }
+.my-insights-dna-secondary { min-width:0; background:none; color:var(--ink); border-bottom:1px solid var(--line); font-size:12px; padding:0 5px; }
+.my-insights-dna-secondary > summary { padding:5px 0!important; line-height:1.35; }
+.my-insights-dna-secondary.is-developing { display:flex; align-items:center; color:var(--muted); line-height:1.4; padding:5px; }
+.my-insights-dna-secondary p,.my-insights-dna-primary details,.my-insights-dna-secondary li { font-size:12px; line-height:1.5; }
+.my-insights-dna-secondary ul,.my-insights-dna-primary ul { padding-left:18px; margin:6px 0; }
+.my-insights-choice-context { border-top:1px solid var(--line); padding-top:6px; display:grid; gap:0; }
+.my-insights-choice-context h3 { font-size:12px; margin:3px 0; color:var(--muted); font-weight:750; }
+.my-insights-choice-fact { display:grid; grid-template-columns:minmax(0,1fr) auto; column-gap:8px; align-items:center; font-size:12px; line-height:1.4; border-bottom:1px solid var(--line); padding:5px 2px; min-width:0; }
+.my-insights-choice-fact > span { color:var(--ink); }
+.my-insights-choice-fact > strong { color:var(--green-dark); font-weight:850; white-space:nowrap; }
+.my-insights-choice-fact > details { grid-column:1/-1; }
+.my-insights-choice-fact p { margin:4px 0; }
 .my-insights-example { display:inline-flex; margin:5px 5px 0 0; border:1px solid var(--line-strong); background:var(--surface-soft); color:var(--green-dark); border-radius:5px; padding:8px; min-height:40px; font-size:12px; cursor:pointer; }
 .my-insights-choice-fact details > p { font-size:12px; color:var(--muted); }
-.my-insights-dna-method { border-top:1px solid var(--line); }
-.my-insights-dna-method p { font-size:12px; line-height:1.6; color:var(--muted); }
+.my-insights-dna-method { margin-top:5px; }
+.my-insights-dna-method p { font-size:12px; line-height:1.55; color:var(--muted); }
 .my-insights-leading { line-height:1.6; color:var(--ink); font-size:14px; margin:4px 0 14px; }
 .my-insights-leading strong { color:var(--green-dark); }
 .my-insights-highlights .my-insights-card-row { display:flex; flex-direction:column; gap:10px; }
@@ -629,6 +629,8 @@
 .my-insights-highlights .my-insights-pick .my-insights-pick-info { padding:12px; display:grid; gap:5px; flex:1; align-content:center; }
 .my-insights-highlights .my-insights-pick-info strong { font-size:14px; }
 .my-insights-highlights .my-insights-pick-info small { font-size:11px; }
+.my-insights-highlights .my-insights-context { display:block; font-weight:750; color:var(--green-dark); }
+.my-insights-journey-warning { margin:8px 0; font-size:12px; line-height:1.5; border-left:3px solid var(--line-strong); padding-left:10px; color:var(--ink); }
 .my-insights-highlights .my-insights-pick-info span { font-size:12px; }
 .my-insights-highlights .my-insights-pick-info .my-insights-reason { font-size:13px; line-height:1.5; color:var(--ink); margin:2px 0; }
 .my-insights-highlights .my-insights-pick.is-compact { display:flex; flex-direction:row; align-items:center; }
