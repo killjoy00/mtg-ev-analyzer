@@ -238,6 +238,7 @@ function HighlightsStory({highlights,finding,onReview,onLoadMore,morePhase}:{
       <Text style={styles.summary}>Your pick: {item.preview?.selected?.name||item.selected_name||'Saved selection'}</Text>
       <Text style={styles.meta}>{item.trophy_match?'Trophy pick matched':'Trophy pick: '+(item.preview?.trophy?.name||item.historical_name||'Original trophy selection')}</Text>
       <Text style={styles.meta}>{item.set_id} · P1P{item.pick_number} · {shortDate(item.date)} · Original score {item.score}/100</Text>
+      {item.finding_context?<Text style={styles.contextNote}>{item.finding_context}</Text>:null}
       <Text style={styles.body}>{item.reason_text||(
         item.trophy_match?'You matched the original trophy selection.':
           'Your original non-trophy decision earned '+item.score+'/100.')}</Text>
@@ -259,10 +260,16 @@ function JourneyStory({journey,progress,months}:{
   journey:DraftingJourney;progress:DraftInsights['progress'];months:DraftInsights['months'];
 }) {
   const [details,setDetails]=useState(false);
+  const versionBoundary=journey.versions_comparable===false||journey.progress_compatible===false;
   return <Section title="Your Drafting Journey" caption="Originally awarded scores · 40-decision windows">
+    {versionBoundary?<Text style={styles.journeyWarning} accessibilityRole="alert">
+      Historical card-pool or scoring rules changed. These windows are not one continuous progress trend.
+    </Text>:null}
     {journey.windows.length?<ScrollView horizontal contentContainerStyle={styles.journeyWindowRow} accessibilityLabel="Your recorded score timeline">
-      {journey.windows.map(w=><View key={w.id} style={styles.journeyWindow}
+      {journey.windows.map((w,index)=><View key={w.id} style={styles.journeyWindow}
         accessibilityLabel={insightLocalRange(w)+', '+w.count+' decisions'+(w.complete?'':' incomplete')}>
+        {index>0&&journey.windows[index-1].cohort!==w.cohort?
+          <Text style={styles.journeyBoundary}>Version changed</Text>:null}
         <Text style={styles.bigScore}>{score(w.average_score)}</Text>
         <View style={styles.journeyTrack}><View style={[styles.journeyFill,
           {height:(Math.max(0,Math.min(100,w.average_score??0))+'%') as '100%'}]}/></View>
@@ -294,6 +301,31 @@ function JourneyStory({journey,progress,months}:{
     </View>:null}
   </Section>;
 }
+function LegacyJourney({progress,months}:{
+  progress:DraftInsights['progress'];months:DraftInsights['months'];
+}) {
+  const [allMonths,setAllMonths]=useState(false);
+  if(!progress&&!months?.length)return null;
+  const visible=allMonths?months:months.slice(-3);
+  return <Section title="Your Drafting Journey" caption="Original recorded scores">
+    {progress?<Text style={styles.body}>
+      Recent 40: {score(progress.recent.average_score)}/100 · Previous 40: {score(progress.previous.average_score)}/100 ·
+      {' '}Difference {progress.delta>0?'+':''}{score(progress.delta)} points.
+    </Text>:null}
+    {progress?<Text style={styles.caption}>These are different saved decisions, not proof that your drafting improved or declined.</Text>:null}
+    {months.length?<><Text style={styles.subheading}>Pacific calendar months</Text>
+      <View style={styles.months}>{visible.map(month=><View key={month.month} style={styles.month}>
+        <Text style={styles.meta}>{month.month}</Text>
+        <Text style={styles.monthScore}>{score(month.average_score)}</Text>
+        <Text style={styles.meta}>{month.count} decisions</Text>
+      </View>)}</View>
+      {months.length>3?<Pressable accessibilityRole="button"
+        accessibilityState={{expanded:allMonths}} style={styles.disclosure}
+        onPress={()=>setAllMonths(current=>!current)}>
+        <Text style={styles.summary}>{allMonths?'Show recent months':'See all monthly records'}</Text>
+      </Pressable>:null}</>:null}
+  </Section>;
+}
 function InsightSections({data,onReview,onLoadMore,morePhase}:{
   data:DraftInsights;onReview:(item:InsightHighlight)=>void;
   onLoadMore:()=>void;morePhase:'idle'|'loading'|'error';
@@ -305,11 +337,14 @@ function InsightSections({data,onReview,onLoadMore,morePhase}:{
       <Text style={styles.primaryText}>Play today&apos;s Daily</Text>
     </Pressable>
   </Section>;
-  const extra=(data.observations||[]).slice(1);
+  const leading=data.leading_finding||data.observations?.[0];
+  const extra=(data.observations||[]).slice(leading?1:0);
   return <>
-    {data.highlights?<HighlightsStory highlights={data.highlights} finding={data.leading_finding||data.observations?.[0]}
-      onReview={onReview} onLoadMore={onLoadMore} morePhase={morePhase}/>:null}
-    {data.journey?<JourneyStory journey={data.journey} progress={data.progress} months={data.months||[]}/>:null}
+    {data.highlights?<HighlightsStory highlights={data.highlights} finding={leading}
+      onReview={onReview} onLoadMore={onLoadMore} morePhase={morePhase}/>:
+      leading?<Section title="Your patterns"><Text style={styles.body}>{leading.text}</Text></Section>:null}
+    {data.journey?<JourneyStory journey={data.journey} progress={data.progress} months={data.months||[]}/>:
+      <LegacyJourney progress={data.progress} months={data.months||[]}/>}</>
     <Section title="Explore your data">
       <Pressable accessibilityRole="button" accessibilityState={{expanded:explore}}
         style={styles.disclosure} onPress={()=>setExplore(v=>!v)}>
