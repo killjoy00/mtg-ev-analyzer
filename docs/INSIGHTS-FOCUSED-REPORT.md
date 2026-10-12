@@ -13,6 +13,8 @@ Within the existing authenticated My Pack One → Insights tab on web and native
 
 Web opens the original saved pack in a native HTML dialog with focus return. The native app uses a read-only modal. Both use the existing account-scoped first-eligible-decision detail endpoint and never score, replay, replace, or write a historic pick. The report does not create a global navigation destination.
 
+The overview is intentionally result-first: the identity is the main element, two secondary traits are short disclosure rows, and each qualified creature/rarity observation is one line (`X of N picks`). Calculations, competitive-option counters, underlying saved examples and trait thresholds remain behind optional disclosure. In native clients receiving an older API response without `highlights` or `journey`, the first observation appears independently and saved `progress`/`months` still render. A Journey with different original scoring/source cohorts displays a visible non-comparability warning and a boundary marker; a single incomplete 40-pick window never implies that scoring versions changed.
+
 ## Private API additions
 
 `worker/draft-run-insights.mjs` continues to bound its source to up to 1,000 eligible recent eight-pick non-QA sessions, joined to locked original answer observations; the first answer to each distinct puzzle wins. Its response adds:
@@ -40,9 +42,11 @@ The thresholds are provisional UX evidence gates. They are **not validated playe
 
 ### Highlights and reasons
 
-`decision-highlights-v3` stays deterministic and first-encounter-only, with unique decisions across Best Calls/Biggest Misses and both capped pages. Ranking uses saved score facts, set/source-position variety, reason-code variety and recency. Labels are phrased as historical model-scored outcomes, not objectively right/wrong gameplay.
+`decision-highlights-v3` stays deterministic and first-encounter-only, with unique decisions across Best Calls/Biggest Misses and both capped pages. Strong-scored alternatives and hard-puzzle trophy matches **compete in one pool** for featured and supporting positions. Ranking first favors actual groups from the qualified leading comparison (specific difficulty bands or source pick positions, the exact previous/recent 40, or compared formats), then weighs recency against set, reason, and source-position variety. When available, the first three visible highlights come from the compared groups. Recency decays with days since the newest eligible saved decision, so a useful recent miss need not sit behind an extreme miss from years earlier. Labels describe historical model-scored outcomes, not objectively right/wrong gameplay.
 
 The server emits one reproducible factual reason code per highlight, such as `hard-trophy-match`, `strong-scored-alternative`, `saved-support-gap`, or `low-scored-alternative`. A support-gap reason requires a valid saved chosen/leader support comparison; otherwise it falls back to the original awarded score. No invented card win rates or invalid sample-size claims are made.
+
+`leading_finding.compared_groups` exposes only labels and which group's recorded average is higher/lower. Internal puzzle membership for a recent/previous 40 comparison stays server-side. A preview's optional `finding_context` identifies which compared group that saved decision belongs to; a single saved card is **an illustration, not statistical proof** of the finding.
 
 ## Privacy and failure behavior
 
@@ -53,6 +57,8 @@ All source reads remain owner-scoped and bounded. Highlight previews still retur
 Synthetic tests cover competitive-options logic, unknown metadata, incomplete rankings, mixed historical cohorts, reason consistency, duplicate avoidance and saved-image restrictions. Native tests cover collapsed breakdowns, historical detail access, pagination, owner change and signed-out states. Pull-request CI must still establish the final JavaScript, native lint/typecheck, browser and backend gate results.
 
 For acceptance, review at desktop, 390px and 320px widths; check focus trapping/return, the tab switch, two-page “See more,” disclosure semantics and the read-only saved-pack exit; verify accounts with 0/7/8 eligible decisions, 19/20 competitive opportunities, long histories, mixed source versions, missing archived metadata and a session switch. **Signed-in production-data acceptance and physical-device testing remain separate release gates.**
+
+The synthetic web browser fixture now includes at least five Best Calls, of which the **first three are visible**: one featured hard-rated example and two compact cards, all marked with their compared group. It captures `artifacts/ui-profile-insights-populated-390.png` and `artifacts/ui-profile-insights-populated-desktop.png`; these are non-production screenshots from the browser CI artifact, not verified live account images. Native visual/device acceptance remains a separate required check.
 
 ## Release boundary
 
