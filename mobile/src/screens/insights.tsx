@@ -79,34 +79,6 @@ function Metrics({ rows }: { rows: (InsightGroup & { label: string })[] }) {
   </View>)}</View>;
 }
 
-// Only the server's >=40-per-side / >=10-point findings are standout claims.
-// When none exist, expose factual score snapshots rather than implying an account
-// with substantial history has no usable decisions.
-function descriptivePatternRows(data: DraftInsights): string[] {
-  const rows: string[] = [];
-  const summary = data.formats.find(row => row.environment === data.environment);
-  if (summary && summary.count >= 5 && typeof summary.average_score === 'number' && Number.isFinite(summary.average_score)) {
-    const match = typeof summary.trophy_match_pct === 'number' && Number.isFinite(summary.trophy_match_pct)
-      ? ' Trophy-drafter pick match: ' + score(summary.trophy_match_pct) + '%.' : '';
-    rows.push('Across ' + num(summary.count) + ' eligible ' + data.environment_label +
-      ' decisions, your average originally awarded score was ' + score(summary.average_score) + '/100.' + match);
-  }
-  const progress = data.progress;
-  if (progress && progress.recent.count >= 40 && progress.previous.count >= 40 &&
-    typeof progress.recent.average_score === 'number' && Number.isFinite(progress.recent.average_score) &&
-    typeof progress.previous.average_score === 'number' && Number.isFinite(progress.previous.average_score)) {
-    rows.push('Your most recent 40 picks averaged ' + score(progress.recent.average_score) +
-      '/100; the preceding 40 averaged ' + score(progress.previous.average_score) +
-      '/100. These are recorded scores, not a proven change in skill.');
-  }
-  const depth = [...data.pick_depth]
-    .filter(row => row.count >= 5 && typeof row.average_score === 'number' && Number.isFinite(row.average_score))
-    .sort((a, b) => b.count - a.count || a.pick_number - b.pick_number)[0];
-  if (depth) rows.push('Your most-recorded source pick position is ' + depth.label +
-    ': ' + num(depth.count) + ' decisions averaging ' + score(depth.average_score) + '/100.');
-  return rows.slice(0, 3);
-}
-
 function insightLocalRange(value:{from_at?:string;to_at?:string;from?:string;to?:string;date?:string}) {
   const local=(s?:string)=>{
     if(!s)return null;
