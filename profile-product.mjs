@@ -25,7 +25,7 @@ import { trackEvent } from './retention-events.mjs';
 import { nextMilestones } from './progression.mjs?v=10';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { eliteSource } from './membership-source.mjs';
-import { renderAccount, renderDeletionState } from './growth.mjs?v=11';
+import { renderAccount, renderDeletionState } from './growth.mjs?v=12';
 import {
   bestPercentile,
   environmentProgress,
@@ -39,7 +39,7 @@ import {
   shareProfileCard,
   shareResultCard,
 } from './share-cards.mjs';
-import {bindMyPackOneTabs,currentSeasonMarkup,myPackOneMarkup,resetMyPackOneTab} from './my-pack-one.mjs?v=3';
+import {bindMyPackOneTabs,currentSeasonMarkup,myPackOneMarkup,resetMyPackOneTab} from './my-pack-one.mjs?v=4';
 
 let catalogPromise = null;
 let profileRendering = false;
