@@ -270,7 +270,7 @@ function JourneyStory({journey,progress,months}:{
         <Text style={styles.bigScore}>{score(w.average_score)}</Text>
         <View style={styles.journeyTrack}><View style={[styles.journeyFill,
           {height:(Math.max(0,Math.min(100,w.average_score??0))+'%') as '100%'}]}/></View>
-        <Text style={styles.meta}>{shortDate(w.from)+'–'+shortDate(w.to)}</Text>
+        <Text style={styles.meta}>{shortDate(w.from_at?new Date(w.from_at).toLocaleDateString('en-CA'):w.from)+'–'+shortDate(w.to_at?new Date(w.to_at).toLocaleDateString('en-CA'):w.to)}</Text>
         <Text style={styles.meta}>{w.count} picks{w.complete?'':' · partial'}</Text>
       </View>)}
     </ScrollView>:<Text style={styles.caption}>Your drafting Journey grows with your original recorded decisions.</Text>}
