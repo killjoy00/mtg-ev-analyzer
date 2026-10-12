@@ -11,6 +11,7 @@ import { ensureGuestSession } from '@/src/api/guest';
 import { useAppResume } from '@/src/hooks/useAppResume';
 import { readSession, subscribeSession, type MobileSession } from '@/src/storage/session';
 import { colors, spacing } from '@/src/theme';
+import { config } from '@/src/config';
 
 const environments: { value: InsightsEnvironment; label: string }[] = [
   { value: 'mixed', label: 'Mixed' }, { value: 'latest', label: 'Latest Set' }, { value: 'powered-cube', label: 'Powered Cube' },
@@ -55,10 +56,10 @@ function ChoiceRow<T extends string>({ name, values, selected, onChange }: {
   </View>;
 }
 
-function Section({ title, caption, children, compact=false }: {
-  title:string;caption?:string;children:React.ReactNode;compact?:boolean;
+function Section({ title, caption, children, compact=false, onLayout }: {
+  title:string;caption?:string;children:React.ReactNode;compact?:boolean;onLayout?:()=>void;
 }) {
-  return <View style={[styles.section,compact&&styles.dnaSection]}>
+  return <View style={[styles.section,compact&&styles.dnaSection]} onLayout={onLayout}>
     <Text accessibilityRole="header" style={styles.sectionTitle}>{title}</Text>
     {caption ? <Text style={styles.caption}>{caption}</Text> : null}
     {children}
@@ -217,7 +218,8 @@ function HighlightsStory({highlights,finding,onReview,onLoadMore,morePhase}:{
   const [expanded,setExpanded]=useState(false);
   const rows=selected==='best'?highlights.best:highlights.misses;
   const show=expanded?rows:rows.slice(0,3);
-  return <Section title="Decision report" caption={num(rows.length)+' saved highlights available in '+(selected==='best'?'Best Calls':'Biggest Misses')}>
+  return <Section title="Decision report" caption={num(rows.length)+' saved highlights available in '+(selected==='best'?'Best Calls':'Biggest Misses')}
+    onLayout={config.screenshots.fixtures?()=>console.info('PACKONE_INSIGHTS_READY'):undefined}>
     <Text style={styles.reportLead}>
       <Text style={styles.summary}>{finding?'Leading finding: ':'Your recent decisions: '}</Text>
       {finding?.text||'No standout comparison has qualified in this environment and time period. These saved picks are factual examples.'}

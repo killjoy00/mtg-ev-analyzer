@@ -376,6 +376,57 @@ if platform == 'android':
 
     attempt('member-tabs-profile-settings-and-hardware-back', member_navigation)
 
+    def native_insights():
+        # Isolated, signed-in preview records; no production API or owner history.
+        launch('member-insights', 'insights', 390)
+        xml, logs = snapshot('insights-populated-dna')
+        require('PACKONE_INSIGHTS_READY' in logs, 'Native Insights did not render its decision report')
+        require('Your Drafting DNA' in xml and 'The Independent Thinker' in xml,
+                'Populated DNA identity is missing')
+        require('All available history' in xml, 'DNA does not identify its independent all-history scope')
+        reveal('Decision report')
+        xml, _ = snapshot('insights-populated-decisions')
+        require('Decision report' in xml and 'Best Calls' in xml, 'Decision report is not visible')
+        tap('Biggest Misses', exact=True)
+        reveal('Your pick: Cosmic Cube')
+        xml, _ = snapshot('insights-biggest-misses')
+        require('Your pick: Cosmic Cube' in xml, 'Switching highlight category retained Best Calls')
+        top()
+        tap('Best Calls', exact=True)
+        tap('Review original pack', exact=True)
+        xml, _ = snapshot('insights-readonly-original-pack')
+        require('Original saved pack' in xml and 'Hero in Training' in xml,
+                'Original saved pack modal failed to load')
+        adb('shell', 'input', 'keyevent', '4')
+        time.sleep(2)
+        xml, _ = snapshot('insights-modal-back-restores-report')
+        require('Original saved pack' not in xml, 'Native back did not dismiss the saved pack modal')
+        reveal('Your Drafting Journey')
+        xml, _ = snapshot('insights-journey')
+        require('Your Drafting Journey' in xml, 'Journey is missing after compact highlights')
+
+    attempt('insights-populated-highlights-original-pack-and-journey', native_insights)
+
+    def native_insights_versions():
+        launch('member-insights-versions', 'insights', 390)
+        reveal('Historical card-pool or scoring rules changed')
+        xml, logs = snapshot('insights-noncomparable-journey')
+        require('PACKONE_INSIGHTS_READY' in logs, 'Version-boundary report never rendered')
+        require('These windows are not one continuous progress trend' in xml,
+                'Native Journey hides a material version boundary')
+
+    attempt('insights-visible-historical-version-limitation', native_insights_versions)
+
+    def native_insights_sparse():
+        launch('member-insights-sparse', 'insights', 320, 1.5)
+        xml, logs = snapshot('insights-sparse-320dp-large-text')
+        require('PACKONE_INSIGHTS_READY' in logs, 'Sparse Insights fixture did not render')
+        require('Your Drafting DNA is taking shape' in xml,
+                'Sparse history unexpectedly names a qualified identity')
+        require('All available history' in xml, 'Sparse DNA loses the history scope')
+
+    attempt('insights-sparse-narrow-large-text', native_insights_sparse)
+
     def editorial_navigation():
         launch('guest', 'about')
         xml, _ = snapshot('about')
@@ -499,6 +550,10 @@ elif platform == 'ios':
             scenes = [('guest','home'), ('guest','learn'), ('member','learn'), ('member-new','career'),
                       ('member-long','feedback'), ('member-match','feedback'), ('member-zero','feedback')]
             if setting == 'large':
+                scenes += [('member-insights-sparse','insights'),
+                           ('member-insights-versions','insights')]
+            scenes += [('member-insights','insights')]
+            if setting == 'large':
                 scenes += [
                     ('member','home'), ('guest','how-to'), ('member','leaders'), ('member','account'),
                     ('guest','about'), ('guest','support'), ('guest','privacy'), ('guest','terms'),
@@ -522,10 +577,11 @@ elif platform == 'ios':
                         layout_ready = ('"label":"choice"' in logs if screen == 'feedback' else
                                         'PACKONE_BRAND' in logs if screen == 'home' else
                                         'PACKONE_CAREER_READY' in logs if screen == 'career' else
+                                        'PACKONE_INSIGHTS_READY' in logs if screen == 'insights' else
                                         'PACKONE_ACCOUNT_READY' in logs if screen == 'account' else
                                         'PACKONE_ARTICLE_READY' in logs if screen in ['how-to','about','support','privacy','terms','terms-licenses']
                                         else 'PACKONE_HEADER' in logs)
-                        if screen != 'feedback' and setting != 'large':
+                        if screen not in ['feedback','insights'] and setting != 'large':
                             layout_ready = layout_ready and '"kind":"bar"' in logs
                         ready = scene_ready and 'PACKONE_FONTS' in logs and layout_ready
                         if ready:
@@ -543,7 +599,7 @@ elif platform == 'ios':
                         scene['header_metrics'] = measure_header(logs)
                     if screen == 'home':
                         scene['brand_metrics'] = measure_brand(logs)
-                    if screen != 'feedback' and setting != 'large':
+                    if screen not in ['feedback','insights'] and setting != 'large':
                         scene['tab_metrics'] = measure_tabs(logs)
                     if screen == 'feedback':
                         scene['metrics'] = measure(logs)

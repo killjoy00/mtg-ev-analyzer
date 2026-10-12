@@ -58,7 +58,17 @@ Synthetic tests cover competitive-options logic, unknown metadata, incomplete ra
 
 For acceptance, review at desktop, 390px and 320px widths; check focus trapping/return, the tab switch, two-page “See more,” disclosure semantics and the read-only saved-pack exit; verify accounts with 0/7/8 eligible decisions, 19/20 competitive opportunities, long histories, mixed source versions, missing archived metadata and a session switch. **Signed-in production-data acceptance and physical-device testing remain separate release gates.**
 
-The synthetic web browser fixture now includes at least five Best Calls, of which the **first three are visible**: one featured hard-rated example and two compact cards, all marked with their compared group. It captures `artifacts/ui-profile-insights-populated-390.png` and `artifacts/ui-profile-insights-populated-desktop.png`; these are non-production screenshots from the browser CI artifact, not verified live account images. Native visual/device acceptance remains a separate required check.
+The synthetic web browser fixture now includes at least five Best Calls, of which the **first three are visible**: one featured hard-rated example and two compact cards, all marked with their compared group. It captures `artifacts/ui-profile-insights-populated-390.png` and `artifacts/ui-profile-insights-populated-desktop.png`; these are non-production screenshots from the browser CI artifact, not verified live account images. Native screenshot acceptance uses the isolated preview-only `member-insights`,
+`member-insights-sparse`, and `member-insights-versions` scenarios. Android
+acceptance exercises a populated DNA overview, both decision categories, the
+read-only original-pack modal and hardware-back dismissal, Journey access, a
+visible non-comparability notice, and narrow 320dp/large-text sparse evidence.
+iOS Simulator captures signed-in populated, sparse and version-boundary states
+at the regular text size and the populated state at the enlarged accessibility
+text size. A fixture-only on-layout marker guards captures against loading or
+blank screens. These are **simulator/emulator tests** using synthetic saved
+decisions, not physical-device or real-owner acceptance. The existing preview
+artifact and release boundary remain unchanged.
 
 ## Release boundary
 
