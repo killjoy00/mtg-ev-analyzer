@@ -114,7 +114,8 @@ test('Shortlist source preview reads only owner sessions and returns no unbounde
    if(calls.length===1)return {rows:history};
    assert.equal(sql,INSIGHTS_PREVIEW_SQL);
    assert.equal(args[0],owner);
-   assert.ok(args[1].length<=12);
+   assert.match(args[1],/^\{[a-f0-9,-]+\}$/i);
+   assert.ok(args[1].slice(1,-1).split(',').length<=12);
    return {rows:[{session_id:id,answers:Array.from({length:8},(_,i)=>({...answer,puzzle:{...source,puzzle_id:'p'+i}}))}]};
  };
  const out=await loadDraftRunInsights(query,owner,{environment:'mixed'});
