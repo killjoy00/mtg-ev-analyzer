@@ -118,11 +118,16 @@ test('guest/member navigation changes with persisted identity and keeps public r
 });
 
 test('accessibility tab bar keeps real navigation events, hidden routes and keyboard behavior', async () => {
-  const listeners = new Map(), navigations = [], events = [], heights = [];
+  const listeners = new Map(), navigations = [], events = [], heights = [], scrolls = [];
   let prevented = false;
   let dimensions = { width: 440, height: 956, fontScale: 3.571 };
   const Height = React.createContext(undefined);
-  const native = Object.fromEntries(['Pressable', 'Text', 'View', 'ScrollView'].map(name => [name, host(name)]));
+  const native = Object.fromEntries(['Pressable', 'Text', 'View'].map(name => [name, host(name)]));
+  native.ScrollView = React.forwardRef(function ScrollViewHost(props, ref) {
+    React.useImperativeHandle(ref, () => ({ scrollTo: value => scrolls.push(value) }), []);
+    return React.createElement('ScrollView', props, props.children);
+  });
+  const flattenStyle = value => Object.assign({}, ...[value].flat(Infinity).filter(Boolean));
   const load = compiler({
     'react-native': { ...native, useWindowDimensions: () => dimensions,
       StyleSheet: { create: x => x, flatten: value => Object.assign({}, ...[value].flat().filter(Boolean)) },
@@ -146,6 +151,21 @@ test('accessibility tab bar keeps real navigation events, hidden routes and keyb
     assert.deepEqual(buttons().map(node => node.props.accessibilityLabel), routes.slice(0, 5).map(route => route.name));
     assert.ok(buttons().every(node => node.props.accessibilityRole === 'tab'));
     assert.deepEqual(buttons()[0].props.accessibilityState, { selected: true });
+    assert.equal(root.root.findByType('ScrollView').props.horizontal, true,
+      'AX-XXXL phone uses a horizontally scrollable row, not a three-row bottom bar');
+    assert.ok(buttons().every(node => flattenStyle(node.props.style).width >= 270),
+      'Every AX-XXXL destination has width for complete large-text labels');
+    assert.ok(root.root.findAllByType('Text').every(node =>
+      node.props.numberOfLines === undefined && node.props.allowFontScaling === undefined),
+      'System text scaling must not be truncated or capped');
+
+    props.state.index = 4;
+    await act(async () => root.update(element()));
+    assert.deepEqual(buttons()[4].props.accessibilityState, { selected: true });
+    assert.equal(scrolls.at(-1).x, 4 * flattenStyle(buttons()[4].props.style).width,
+      'Newly selected off-screen destination scrolls into view');
+    props.state.index = 0;
+    await act(async () => root.update(element()));
     await act(async () => { buttons()[0].props.onPress(); buttons()[1].props.onPress(); });
     assert.deepEqual(navigations, [['Practice', undefined]], 'Selected tab must not create another navigation entry');
     assert.equal(events[0].type, 'tabPress');
@@ -160,6 +180,22 @@ test('accessibility tab bar keeps real navigation events, hidden routes and keyb
     assert.equal(heights.at(-1), 0);
     await act(async () => listeners.get('keyboardDidHide')());
     assert.equal(buttons().length, 5);
+
+    dimensions = { width: 390, height: 844, fontScale: 1.5 };
+    await act(async () => root.update(element()));
+    assert.equal(root.root.findAllByType('ScrollView').length, 0,
+      'Medium enlarged text uses a readable, two-row portrait grid');
+    assert.ok(buttons().every(node => flattenStyle(node.props.style).width >= 112));
+    assert.equal(Math.ceil(buttons().length / Math.floor(390 / flattenStyle(buttons()[0].props.style).width)), 2);
+
+    dimensions = { width: 320, height: 680, fontScale: 1.5 };
+    await act(async () => root.update(element()));
+    assert.equal(root.root.findByType('ScrollView').props.horizontal, true,
+      'Narrow iPhone switches to scrolling before a three-row grid is needed');
+    assert.ok(buttons().every(node => flattenStyle(node.props.style).width >= 112));
+
+    dimensions = { width: 440, height: 956, fontScale: 3.571 };
+    await act(async () => root.update(element()));
     for (const index of [1, 2, 4]) descriptors[String(index)].options.tabBarItemStyle = { display: 'none' };
     descriptors['5'].options.tabBarItemStyle = {};
     descriptors['3'].options.title = 'How to Play';
@@ -168,6 +204,8 @@ test('accessibility tab bar keeps real navigation events, hidden routes and keyb
     dimensions = { width: 840, height: 400, fontScale: 3.571 };
     await act(async () => root.update(element()));
     assert.equal(root.root.findByType('ScrollView').props.horizontal, true, 'Short windows retain content space with a scrollable bar');
+    assert.ok(buttons().every(node => flattenStyle(node.props.style).width >= 270),
+      'Landscape tab width respects enlarged text and scrolls horizontally');
     dimensions = { width: 440, height: 956, fontScale: 1 };
     await act(async () => root.update(element()));
     assert.equal(root.root.findAllByType('DefaultTabBar').length, 1, 'Ordinary text keeps the familiar one-row navigator');
