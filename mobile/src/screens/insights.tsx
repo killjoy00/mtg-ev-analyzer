@@ -597,4 +597,15 @@ const styles = StyleSheet.create({
   primaryText: { color: colors.surface, fontSize: 14, fontWeight: '800' },
   secondaryButton: { minHeight: 48, borderWidth: 1, borderColor: colors.accent, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.md },
   secondaryText: { color: colors.accentDark, fontSize: 14, fontWeight: '800' },
+  dnaCompact: {padding:spacing.sm,gap:spacing.xs},
+  disclosure: {borderTopWidth:1,borderColor:colors.line,paddingVertical:spacing.sm,minHeight:44,justifyContent:'center'},
+  contextWrap: {gap:spacing.md,borderTopWidth:1,borderColor:colors.line,paddingTop:spacing.md},
+  contextFact: {gap:spacing.sm,padding:spacing.md,borderWidth:1,borderColor:colors.line,backgroundColor:colors.surfaceSoft},
+  exampleLink: {borderWidth:1,borderColor:colors.accent,padding:spacing.sm,minHeight:44,justifyContent:'center'},
+  reportLead: {color:colors.ink,fontSize:14,lineHeight:21},
+  highlightCompact: {padding:spacing.sm,gap:spacing.xs},
+  highlightArtWrap: {flex:1,minWidth:0,gap:spacing.xs},
+  compactAction: {minHeight:44,alignItems:'flex-start',justifyContent:'center',paddingHorizontal:spacing.sm,borderWidth:1,borderColor:colors.accent},
+  detailBody: {gap:spacing.md},
+
 });
