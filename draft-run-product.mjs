@@ -6,7 +6,7 @@ import {decisionClock} from './decision-clock.mjs';
 import { sortPackByRarity } from './replay-data.mjs';
 import { escapeHtml as esc } from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
-import { compactDraftRunFeedback, consensusFeedback, trophyRevealSentence } from './draft-run-feedback.mjs?v=2';
+import { compactDraftRunFeedback, consensusFeedback, trophyDrafterDetails, trophyRevealSentence } from './draft-run-feedback.mjs?v=3';
 import { tcgplayerUrl } from './tcgplayer.mjs';
 import { dailyResetCue } from './game-date.mjs';
 import {nextUnfinishedDaily} from './today-status.mjs';
@@ -121,7 +121,7 @@ function revealComparison(p,answer) {
 }
 function revealAnalysis(p,answer) {
   const sent=reportedDecisions.has(answer.puzzle.puzzle_id);
-  return `<details class="run-analysis"><summary>Why this score?</summary><div class="run-analysis-body">${revealComparison(p,answer)}${consensusFeedback(answer)}<div class="run-decision-report"><button type="button" class="text-button" data-report-decision>Report this decision</button><span id="run-report-status" role="status">${sent?esc(reportSentText):''}</span></div></div></details>`;
+  return `<details class="run-analysis"><summary>Why this score?</summary><div class="run-analysis-body">${revealComparison(p,answer)}${trophyDrafterDetails(answer)}${consensusFeedback(answer)}<div class="run-decision-report"><button type="button" class="text-button" data-report-decision>Report this decision</button><span id="run-report-status" role="status">${sent?esc(reportSentText):''}</span></div></div></details>`;
 }
 function compactResultLabel(answer,sentence='') {
   return `${answer.score} out of 100. ${trophyRevealSentence(answer)}${sentence?` ${sentence}`:''}`;

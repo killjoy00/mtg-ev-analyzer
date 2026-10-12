@@ -156,7 +156,7 @@ try{
     assert.equal(views.at(-1).puzzleId,p.puzzle_id,'Feedback must not record the next decision as viewed');
     assert.equal(Number.parseInt(await page.locator('.run-feedback-score').innerText(),10),expectedGrade.score,'visible pick score matches gradeDraftRunPick');
     assert.equal(await page.locator('#run-feedback-result').innerText(),trophyRevealSentence(expectedGrade),'visible trophy reveal is a complete sentence for matched and unmatched picks');
-    assert.ok((await page.locator('#run-feedback-result').getAttribute('aria-label'))?.includes(trophyRevealSentence(expectedGrade)),'accessible copy matches the visible trophy record');
+    assert.ok((await page.locator('#run-feedback-result').getAttribute('aria-label'))?.includes(trophyRevealSentence(expectedGrade)),'accessible copy matches the pick-only reveal');
     assert.equal(await page.evaluate(()=>document.activeElement?.id),'run-feedback-result','locked result receives deterministic focus');
     assert.equal(await page.locator('.run-analysis').getAttribute('open'),null,'analysis stays collapsed by default');
     assert.equal(await page.locator('.run-pack-review').getAttribute('open'),null,'pack review stays collapsed by default');
@@ -201,6 +201,11 @@ try{
     }
     await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>document.activeElement?.id),'run-next','Next pick is the next Tab stop after the focused result');
     await page.locator('.run-analysis>summary').click();
+    const drafterRecord=page.locator('.run-analysis .run-trophy-record');
+    if(expectedGrade.trophyRecord){
+      assert.equal(await drafterRecord.innerText(),`Trophy drafter ${expectedGrade.trophyRecord}.`,'drafter context is below Why this score');
+      assert.ok(!(await page.locator('#run-feedback-result').innerText()).includes(expectedGrade.trophyRecord),'drafter context stays out of the headline');
+    }else assert.equal(await drafterRecord.count(),0,'unknown drafter context is omitted');
     await page.getByRole('heading',{name:'Model’s strongest choice: '+expectedGrade.consensusName,exact:true}).waitFor();
     assert.equal(await page.locator('.run-consensus-leaders li').count(),3);
     assert.equal(await page.locator('.run-consensus-leaders li').first().locator('[data-zoom]').getAttribute('data-zoom'),p.historical_pick_id);

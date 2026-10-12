@@ -185,10 +185,9 @@ const DECISION_REPORT_OPTIONS: readonly { value: DecisionReportReason; label: st
 ];
 
 function trophyRevealSentence(answer: DraftRunAnswer) {
-  const record = answer.trophyRecord || '';
   return answer.historicalMatch
-    ? `You matched the trophy drafter${record ? `, who ${record}` : ''}.`
-    : `The trophy drafter took ${answer.historicalName ?? 'another card'}${record ? ` and ${record}` : ''}.`;
+    ? 'You matched the trophy drafter.'
+    : `The trophy drafter took ${answer.historicalName ?? 'another card'}.`;
 }
 
 function compactFeedback(answer: DraftRunAnswer) {
@@ -293,6 +292,9 @@ function FeedbackAnalysis({
       </Text>
 
       {compactFeedback(answer) ? <Text style={styles.analysisLead}>{compactFeedback(answer)}</Text> : null}
+      {answer.trophyRecord?.trim() ? (
+        <Text style={styles.analysisBody}>{`Trophy drafter ${answer.trophyRecord.trim()}.`}</Text>
+      ) : null}
 
       {modelLeaderName ? (
         <>
