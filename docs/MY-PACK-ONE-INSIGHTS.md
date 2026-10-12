@@ -4,7 +4,7 @@
 - **Decision date:** October 11, 2026.
 - **Tracking issue:** [#1150 — My Pack One: dedicated Insights tab](https://github.com/killjoy00/mtg-ev-analyzer/issues/1150).
 - **Implementation handoff:** [MY-PACK-ONE-INSIGHTS-IMPLEMENTATION-PROMPT.md](MY-PACK-ONE-INSIGHTS-IMPLEMENTATION-PROMPT.md).
-- **Approved future extension:** [Drafting DNA](DRAFTING-DNA.md) — one primary archetype + two secondary traits, evidence-backed, tracked independently in [#1167](https://github.com/killjoy00/mtg-ev-analyzer/issues/1167). Product direction approved; this extension is not implemented or released.
+- **Approved future redesign:** [INSIGHTS-REDESIGN.md](INSIGHTS-REDESIGN.md) — **Drafting DNA** (one primary archetype plus two secondary traits, [#1167](https://github.com/killjoy00/mtg-ev-analyzer/issues/1167)), **Your Best Calls & Biggest Misses** (real saved pack reviews, [#1171](https://github.com/killjoy00/mtg-ev-analyzer/issues/1171)) and **Your Drafting Journey** (extended evidence-backed progress, [#1170](https://github.com/killjoy00/mtg-ev-analyzer/issues/1170)). These are approved future features, **not yet implemented or released**; the original Insights API and charts remain live.
 - **Related but independent:** [#1151 — opt-in Daily reminders](https://github.com/killjoy00/mtg-ev-analyzer/issues/1151) is **not** included in the Insights implementation.
 
 This specification records the approved **Option B: Drafting Strengths & Progress** experience. Option A (a small standalone pick-by-pick chart inserted into Stats) was **not selected**, and must not be built as a separate product or release. Pick-depth analysis is a component of the complete Insights tab.

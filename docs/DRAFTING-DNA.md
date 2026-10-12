@@ -4,6 +4,7 @@
 **Status:** Product/UI direction approved; **not implemented or released**.
 **Implementation tracking:** [#1167](https://github.com/killjoy00/mtg-ev-analyzer/issues/1167).
 **Existing Insights:** [#1150](https://github.com/killjoy00/mtg-ev-analyzer/issues/1150) and [MY-PACK-ONE-INSIGHTS.md](MY-PACK-ONE-INSIGHTS.md).
+**Approved surrounding experience:** [INSIGHTS-REDESIGN.md](INSIGHTS-REDESIGN.md) — Drafting DNA, real Best Calls & Biggest Misses, and Your Drafting Journey. Companion implementation issues [#1170](https://github.com/killjoy00/mtg-ev-analyzer/issues/1170) and [#1171](https://github.com/killjoy00/mtg-ev-analyzer/issues/1171).
 
 ## Product promise
 
@@ -29,7 +30,7 @@ All three **positions** remain visible. If a player has not qualified for all th
 
 The sample/title pair above is **illustrative only**. Never use fabricated player facts in a live response or screenshot presented as the owner's real identity. Actual evidence may instead yield one identity and two still-developing placeholders.
 
-Below the primary section, retain the existing **Your patterns, Pick-by-pick strengths, Difficulty context, Progress over time and Format patterns** content. The primary identity is a summary/navigation affordance, not a substitute for transparent metrics.
+Below the primary section, show the approved **Your Best Calls & Biggest Misses** real-card reviews and **Your Drafting Journey** timeline. Retain **Your patterns, Pick-by-pick strengths, Difficulty context and Format patterns** as supporting breakdowns and absorb the existing **Progress over time** card into Journey rather than displaying two redundant timelines. See [INSIGHTS-REDESIGN.md](INSIGHTS-REDESIGN.md). The primary identity is a summary/navigation affordance, not a substitute for transparent metrics.
 
 ### Scope and timing
 
