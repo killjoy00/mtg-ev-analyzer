@@ -227,6 +227,8 @@ def measure_tabs(logs):
             require(box['x']+line['x'] >= 0 and box['x']+line['x']+line['width'] <= item['width'], f'{label} tab line overflows its tile')
             require(line['y']+line['height'] <= box['height']+1, f'{label} tab line is clipped')
         result['items'][label] = {'item': item, 'label': box, 'text': text}
+    result['rows'] = len({round(record['item']['y']) for record in result['items'].values()})
+    require(result['rows'] <= 2, 'Enlarged bottom navigation requires three or more rows')
     return result
 
 
@@ -321,9 +323,8 @@ if platform == 'android':
             launch(s, scale=2.0)
             _, logs = snapshot(s+'-large-tabs')
             tab_metrics = measure_tabs(logs)
-            if s == 'member':
-                require(tab_metrics['bar']['layoutMode'] == 'horizontal-scroll',
-                        'Five enlarged Android destinations must not consume three grid rows')
+            require(tab_metrics['rows'] <= 2,
+                    'Enlarged Android navigation must not use three rows')
             manifest['scenes'].append({'name': s+'-large-tabs', 'width_dp': 390, 'font_scale': 2.0,
                                       'tab_metrics': tab_metrics, 'brand_metrics': measure_brand(logs)})
         attempt(scenario+'-large-tabs', enlarged_navigation)
@@ -608,8 +609,13 @@ elif platform == 'ios':
                         scene['brand_metrics'] = measure_brand(logs)
                     if screen not in ['feedback','insights'] and setting != 'large':
                         scene['tab_metrics'] = measure_tabs(logs)
-                        require(scene['tab_metrics']['bar']['layoutMode'] == 'horizontal-scroll',
-                                'iPhone AX-XXXL must keep bottom tabs to one scrollable row')
+                        if label == 'iphone':
+                            require(scene['tab_metrics']['bar']['layoutMode'] == 'horizontal-scroll',
+                                    'iPhone AX-XXXL must keep bottom tabs to one scrollable row')
+                        else:
+                            require(scene['tab_metrics']['bar']['layoutMode'] == 'grid' and
+                                    scene['tab_metrics']['rows'] == 1,
+                                    'Roomy iPad should retain one-row navigation at large text')
                     if screen == 'feedback':
                         scene['metrics'] = measure(logs)
                         ios_metrics[(scenario, setting)] = scene['metrics']
