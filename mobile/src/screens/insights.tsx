@@ -1,11 +1,11 @@
 import { router, Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import {safeCardImageUrl} from '../../../card-image-policy.mjs';
 import { Text } from '@/src/components/Text';
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 import { AboutLink } from '@/src/components/AboutLink';
-import { loadMobileInsights, loadMobileInsightDecision, type DraftInsights, type DraftingDNA, type DnaTrait, type DraftingJourney, type InsightHighlights, type InsightHighlight, type InsightDecision, type InsightCard, type InsightGroup, type InsightsEnvironment, type InsightsPeriod } from '@/src/api/insights';
+import { loadMobileInsights, loadMobileInsightDecision, type DraftInsights, type DraftingDNA, type DnaTrait, type CardChoices, type DraftingJourney, type InsightHighlights, type InsightHighlight, type InsightDecision, type InsightCard, type InsightGroup, type InsightsEnvironment, type InsightsPeriod } from '@/src/api/insights';
 import { ApiError } from '@/src/api/client';
 import { ensureGuestSession } from '@/src/api/guest';
 import { useAppResume } from '@/src/hooks/useAppResume';
@@ -22,6 +22,11 @@ const identity = (session: MobileSession | null) => session
   ? JSON.stringify([session.playerToken, session.accountToken ?? '', session.subjectId ?? '', session.accountUser?.id ?? '']) : '';
 const score = (value: number | null) => value === null ? '—' : Number(value).toFixed(1);
 const num = (value: number) => Number(value || 0).toLocaleString();
+const shortDate = (value?:string) => {
+  if (!value || !/^\\d{4}-\\d{2}-\\d{2}/.test(value)) return value||'';
+  const n=Number(value.slice(5,7)),date=Number(value.slice(8,10));
+  return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][n-1]+' '+date;
+};
 
 function ChoiceRow<T extends string>({ name, values, selected, onChange }: {
   name: string; values: { value: T; label: string }[]; selected: T; onChange: (value: T) => void;
@@ -102,35 +107,73 @@ function insightLocalRange(value:{from_at?:string;to_at?:string;from?:string;to?
   return first&&last?first+' to '+last:
     value.from&&value.to?value.from+' to '+value.to:value.date||value.to||'';
 }
-function DNATrait({trait,primary=false,floorRemaining=null,reason}: {
-  trait:DnaTrait|null;primary?:boolean;floorRemaining?:number|null;reason?:string;
-}) {
-  if(!trait||trait.status!=='qualified')return <View style={[styles.dnaTrait,primary&&styles.dnaPrimary]}>
-    <Text style={styles.dnaTitle}>{primary?'Your drafting DNA is taking shape':'Trait still developing'}</Text>
-    <Text style={styles.caption}>{(trait?.picks_needed??floorRemaining)!=null
-      ?String(trait?.picks_needed??floorRemaining)+' more eligible decisions to reach the provisional sample floor.'
-      :trait?.reason||reason||'No additional stable evidence gate has qualified yet.'}</Text>
-  </View>;
-  return <View style={[styles.dnaTrait,primary&&styles.dnaPrimary]}>
+
+function DNATrait({trait,primary=false}: {trait:DnaTrait|null;primary?:boolean}) {
+  const [expanded,setExpanded]=useState(false);
+  if (!trait || trait.status!=='qualified') {
+    return <View style={[styles.dnaTrait,primary&&styles.dnaPrimary,styles.dnaCompact]}>
+      <Text style={primary?styles.dnaTitle:styles.summary}>{primary?'Your Drafting DNA is taking shape':'Developing'}</Text>
+      {primary?<Text style={styles.caption}>No provisional identity currently meets its full evidence and stability rules.</Text>:null}
+    </View>;
+  }
+  return <View style={[styles.dnaTrait,primary&&styles.dnaPrimary,!primary&&styles.dnaCompact]}>
     <Text style={[styles.dnaTitle,primary&&styles.dnaPrimaryTitle]}>{trait.title}</Text>
-    <Text style={styles.body}>{trait.summary}</Text>
-    <Text style={styles.meta}>{trait.supporting_decisions} eligible supporting decisions</Text>
-    <View style={styles.evidence}>
-      <Text style={styles.summary}>Why this fits</Text>
+    {primary?<Text style={styles.body}>{trait.summary}</Text>:null}
+    <Pressable accessibilityRole="button" accessibilityState={{expanded}}
+      style={styles.disclosure} onPress={()=>setExpanded(current=>!current)}>
+      <Text style={styles.summary}>{expanded?'Hide evidence':'Why this fits'}</Text>
+    </Pressable>
+    {expanded?<View style={styles.evidence}>
+      {!primary?<Text style={styles.caption}>{trait.summary}</Text>:null}
+      <Text style={styles.meta}>{trait.supporting_decisions} eligible supporting decisions</Text>
       {trait.evidence.map((entry,index)=><Text key={entry.label+index} style={styles.caption}>
         {entry.label}: {String(entry.value)}
       </Text>)}
-    </View>
+    </View>:null}
   </View>;
 }
-function DNASummary({dna}:{dna:DraftingDNA}) {
-  return <Section title="Your Drafting DNA" caption="All eligible first-time decisions, independent of the filters below">
-    <DNATrait trait={dna.primary||dna.primary_emerging||null} floorRemaining={dna.picks_needed} reason={dna.reason} primary />
+function DNASummary({dna,cardChoices,onReview}:{
+  dna:DraftingDNA;cardChoices?:CardChoices;onReview:(item:InsightHighlight)=>void;
+}) {
+  const [showRules,setShowRules]=useState(false);
+  const [expandedChoices,setExpandedChoices]=useState<string[]>([]);
+  const ready=(cardChoices?.choices||[]).filter(choice=>choice.status==='ready');
+  return <Section title="Your Drafting DNA" caption={'All available history · '+num(dna.eligible_decisions)+' eligible decisions'}>
+    <DNATrait trait={dna.primary||dna.primary_emerging||null} primary/>
     <View style={styles.dnaSecondary}>
-      {(dna.secondary||[]).slice(0,2).map((trait,index)=>
-        <View key={'trait-'+index} style={styles.dnaHalf}><DNATrait trait={trait} floorRemaining={dna.picks_needed} reason={dna.reason}/></View>)}
+      {(dna.secondary||[{status:'emerging',label:'Developing'},{status:'emerging',label:'Developing'}] as DnaTrait[]).slice(0,2).map((trait,index)=>
+        <View key={'trait-'+index} style={styles.dnaHalf}><DNATrait trait={trait}/></View>)}
     </View>
-    <Text style={styles.caption}>{dna.note}</Text>
+    <Text style={styles.caption}>Reaching the sample floor does not guarantee a trait.</Text>
+    {ready.length?<View style={styles.contextWrap}>
+      <Text style={styles.subheading}>Your card choices</Text>
+      {ready.map(choice=><View key={choice.id} style={styles.contextFact}>
+        <Text style={styles.summary}>{choice.title}</Text>
+        <Text style={styles.body}>{choice.summary}</Text>
+        <Pressable accessibilityRole="button" accessibilityState={{expanded:expandedChoices.includes(choice.id)}}
+          style={styles.disclosure} onPress={()=>setExpandedChoices(prev=>prev.includes(choice.id)?
+            prev.filter(id=>id!==choice.id):[...prev,choice.id])}>
+          <Text style={styles.summary}>Options and examples · {choice.opportunities} decisions</Text>
+        </Pressable>
+        {expandedChoices.includes(choice.id)?<View style={styles.evidence}>
+          <Text style={styles.caption}>Available competitive options: {Object.entries(choice.availability).map(([name,count])=>name+': '+count).join(' · ')}</Text>
+          <Text style={styles.caption}>Your selections: {Object.entries(choice.selected).map(([name,count])=>name+': '+count).join(' · ')}</Text>
+          {(choice.examples||[]).map(example=><Pressable key={example.puzzle_id}
+            accessibilityRole="button" style={styles.exampleLink} onPress={()=>onReview({
+              ...example,score:0,trophy_match:false,environment:'mixed',selection_kind:'alternative',
+            } as InsightHighlight)}>
+            <Text style={styles.secondaryText}>Review {example.selected_name||'saved pick'} · {example.set_id} P1P{example.pick_number} · {shortDate(example.date)}</Text>
+          </Pressable>)}
+        </View>:null}
+      </View>)}
+    </View>:<Text style={styles.caption}>Card-choice context is developing. At least {cardChoices?.minimum_opportunities??20} qualifying opportunities in one model-version cohort are needed to display a breakdown.</Text>}
+    <Pressable accessibilityRole="button" accessibilityState={{expanded:showRules}}
+      style={styles.disclosure} onPress={()=>setShowRules(value=>!value)}>
+      <Text style={styles.summary}>Scope and evidence rules</Text>
+    </Pressable>
+    {showRules?<View style={styles.evidence}><Text style={styles.caption}>{dna.note}</Text>
+      <Text style={styles.caption}>{cardChoices?.note||'Historical saved card-choice context may be unavailable.'}</Text>
+    </View>:null}
   </Section>;
 }
 function CardArtwork({card,label}: {card:InsightCard|null|undefined;label:string}) {
