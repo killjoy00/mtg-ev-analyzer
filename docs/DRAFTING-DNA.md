@@ -22,9 +22,9 @@ All three **positions** remain visible. If a player has not qualified for all th
 
 **Suggested content hierarchy** (not live data):
 
-> YOUR DRAFTING DNA · All eligible history  
-> **The Independent Thinker** — Your recorded choices sometimes differ from the original trophy drafter, with strong awarded scores on a supported share of those alternatives.  
-> **Secondary:** Closer · Steady Hand  
+> YOUR DRAFTING DNA · All eligible history
+> **The Independent Thinker** — Your recorded choices sometimes differ from the original trophy drafter, with strong awarded scores on a supported share of those alternatives.
+> **Secondary:** Closer · Steady Hand
 > [Why this fits] [How Drafting DNA works]
 
 The sample/title pair above is **illustrative only**. Never use fabricated player facts in a live response or screenshot presented as the owner's real identity. Actual evidence may instead yield one identity and two still-developing placeholders.
