@@ -144,6 +144,32 @@ await page.route(`${growthOrigin}/**`, async (route) => {
         observations:[{id:'progress',text:'Recent 40 picks averaged 13.0 points higher than the previous 40 picks (40 vs 40 decisions).'}],
         versions:{scoring:['trophy-consensus-v3-linear-v2'],selection:['eight-pick-v4'],corpus:['fixture']},
         range:{from:'2026-09-01',to:'2026-09-25'},session_limit:1000,
+        drafting_dna:{schema_version:'drafting-dna-v1',status:'ready',scope:'all-eligible-history',
+          eligible_decisions:160,primary:{status:'qualified',id:'independent-thinker',title:'The Independent Thinker',
+            evidence_family:'alternatives',summary:'You often found a supported alternative to the trophy pick.',
+            supporting_decisions:160,evidence:[{label:'High scoring alternatives',value:44}]},
+          secondary:[{status:'qualified',id:'steady-hand',title:'The Steady Hand',evidence_family:'consistency',
+            summary:'Your first-time scores had a narrow low tail.',supporting_decisions:160,
+            evidence:[{label:'Low-score picks',value:3}]},
+            {status:'emerging',label:'Trait still developing'}],
+          note:'Descriptive labels, not proven skill ratings.'},
+        journey:{version:'drafting-journey-v1',eligible_decisions:80,window_size:40,total_windows:2,
+          windows:[{id:'window-0',from:'2026-09-01',to:'2026-09-14',count:40,
+            average_score:70,complete:true,cohort:'same'},
+            {id:'window-1',from:'2026-09-15',to:'2026-09-25',count:40,
+              average_score:83,complete:true,cohort:'same'}],
+          versions_comparable:true,limited:false,best_window:null,
+          milestones:[{id:'first-forty',date:'2026-09-14',text:'First completed 40-decision window',count:40}],
+          note:'Original recorded scores, not an estimate of skill improvement.'},
+        highlights:{schema_version:'decision-highlights-v1',note:'Original awarded picks',
+          best:[{session_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',round:2,puzzle_id:'fixture-pack-1',
+            set_id:'neo',environment:'mixed',pick_number:3,date:'2026-09-15',score:92,
+            trophy_match:false,preview:{selected:{id:'card-mine',name:'Daring Skyjek',image_url:null},
+              trophy:{id:'card-trophy',name:'Frost Lynx',image_url:null}}}],
+          misses:[{session_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',round:3,puzzle_id:'fixture-pack-2',
+            set_id:'ktk',environment:'mixed',pick_number:5,date:'2026-09-16',score:32,
+            trophy_match:false,preview:{selected:{id:'card-mine',name:'Daring Skyjek',image_url:null},
+              trophy:{id:'card-trophy',name:'Frost Lynx',image_url:null}}}]},
         methodology:'First answer to each puzzle, original points, 1,000-session cap.',
       };
       if(insightsMode==='descriptive') {
@@ -164,6 +190,20 @@ await page.route(`${growthOrigin}/**`, async (route) => {
         };
       }
     }
+  } else if (url.pathname === '/v1/profile/insights/decision') {
+    assert.equal(route.request().headers()['x-pack1-auth-session'],'profile-auth-fixture');
+    assert.equal(url.searchParams.get('session_id'),'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+    assert.ok(['2','3'].includes(url.searchParams.get('round')));
+    assert.ok(['fixture-pack-1','fixture-pack-2'].includes(url.searchParams.get('puzzle_id')));
+    body={set_id:'neo',pick_number:3,score:92,trophy_match:false,
+      selected:{id:'card-mine',name:'Daring Skyjek',image_url:null},
+      trophy:{id:'card-trophy',name:'Frost Lynx',image_url:null},
+      candidates:[{id:'card-mine',name:'Daring Skyjek',image_url:null},
+        {id:'card-trophy',name:'Frost Lynx',image_url:null},
+        {id:'card-third',name:'Goblin Electromancer',image_url:null}],
+      prior_picks:[{id:'previous-card',name:'Counterspell',image_url:null}],
+      trophy_drafter:{record:'7–1',win_rate:63},
+      answered_at:'2026-09-15T18:00:00.000Z',scoring_version:'v1',corpus_version:'c1'};
   } else if (url.pathname === '/v1/profile/me') {
     body = fixture;
   } else if (url.pathname === `/v1/profile/${profileKey}`) {
@@ -235,6 +275,21 @@ try {
   assert.match(await page.locator('#my-insights-result').textContent(),/Progress over time/);
   assert.match(await page.locator('#my-insights-result').textContent(),/Difficulty context/);
   assert.match(await page.locator('#my-insights-result').textContent(),/Format patterns/);
+  assert.match(await page.locator('#my-insights-result').textContent(),/Your Drafting DNA/);
+  assert.match(await page.locator('#my-insights-result').textContent(),/The Independent Thinker/);
+  assert.match(await page.locator('#my-insights-result').textContent(),/Trait still developing/);
+  assert.match(await page.locator('#my-insights-result').textContent(),/Your Best Calls & Biggest Misses/);
+  assert.match(await page.locator('#my-insights-result').textContent(),/Your Drafting Journey/);
+  await page.getByRole('button',{name:'Review original pack'}).first().click();
+  await page.locator('.my-insights-locked-pack').getByText('Frost Lynx').first().waitFor();
+  const savedPackText=await page.locator('.my-insights-locked-pack').textContent();
+  assert.match(savedPackText,/Goblin Electromancer/,'exact saved pack shown');
+  assert.match(savedPackText,/Counterspell/,'original prior picks shown');
+  assert.match(savedPackText,/7–1/,'verified drafter record is distinct');
+  await page.getByRole('button',{name:'Close'}).first().click();
+  await page.getByRole('tab',{name:'Biggest Misses'}).click();
+  await page.locator('#my-insights-misses-panel').getByText(/32\/100/).waitFor();
+  await page.getByRole('tab',{name:'Best Calls'}).click();
   assert.equal(await page.locator('.my-insights-bar').count(),2,'pick and difficulty charts use actual backend data');
   await page.locator('#my-insights-environment').selectOption('powered-cube');
   await page.locator('#my-insights-result').getByText('P1P2').waitFor();
