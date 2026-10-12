@@ -212,7 +212,9 @@ test('native Insights files stay local to My Pack One; no new bottom tab',()=>{
   const career=fs.readFileSync('src/screens/career.tsx','utf8');
   const layout=fs.readFileSync('app/_layout.tsx','utf8');
   const tabBar=fs.readFileSync('app/(tabs)/_layout.tsx','utf8');
-  assert.match(career,/router\.push\('\/insights'\)/);
+  assert.match(career,/<MyPackSectionTabs active="stats" \/>/);
+  const navigation=fs.readFileSync('src/components/MyPackSectionTabs.tsx','utf8');
+  assert.match(navigation,/router\.push\('\/insights'\)/);
   assert.match(layout,/Stack\.Screen name="insights"/);
   assert.doesNotMatch(tabBar,/Tabs\.Screen name="insights"/);
   assert.match(fs.readFileSync('src/api/insights.ts','utf8'),/mobileAccountToken: session\.accountToken/);
