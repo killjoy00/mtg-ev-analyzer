@@ -1,6 +1,19 @@
 # Current state
 
-Updated October 11, 2026 for the My Pack One Insights release and the new iOS 1.1/100758 and Android 100765 candidates, after the Daily peer-stats, trophy-evidence and account-recovery releases; the October 10 mobile and October 8 Admin/Owner sections below are historical snapshots. Implementation, backend deployment, gateway deployment, Pages deployment, database publication and provider activation remain separate. Older reviews are historical evidence.
+Updated October 12, 2026 for the exact trophy-record release and the iOS 1.1/100765 and Android 100772 candidates, after the My Pack One Insights release and the Daily peer-stats, trophy-evidence and account-recovery releases; the October 10 mobile and October 8 Admin/Owner sections below are historical snapshots. Implementation, backend deployment, gateway deployment, Pages deployment, database publication and provider activation remain separate. Older reviews are historical evidence.
+
+## October 12, 2026 — exact trophy records and new store candidates
+
+| Change | Production state | Evidence |
+| --- | --- | --- |
+| Verified trophy records | **Live.** When a pick is graded, the server reads the source draft's loss count from the trophy ledgers and keeps it only if every entry agrees on 7 wins and 0–2 losses. The post-pick headline is only “The trophy drafter took [card].” Under **Why this score?**, the record (7–0/7–1/7–2) and the 17Lands overall win rate are separate lines. Installed builds that put the old phrase in the headline now receive none | [#1164](https://github.com/killjoy00/mtg-ev-analyzer/issues/1164), [#1166](https://github.com/killjoy00/mtg-ev-analyzer/pull/1166), [release run 38194270764](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/38194270764) |
+
+Live health reported `release_commit` `6601e87fe07b9ef7c021ecdba618900befdc4e48` after the release.
+
+**New store candidates.** Both were built from `f449b8b0b36c77b7d7d219f5de53842871f848ec`. They add the drafter details (#1163, #1166) and the native Insights pattern fallback (#1165) to iOS 100758 / Android 100765. iOS and Android number builds independently.
+
+- **Android 1.0 / versionCode 100772:** built in [run 38195844511](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/38195844511) ([#1169](https://github.com/killjoy00/mtg-ev-analyzer/pull/1169)), uploaded unchanged to the Play bundle library in [run 38197217062](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/38197217062) ([#1174](https://github.com/killjoy00/mtg-ev-analyzer/pull/1174)) and promoted to the existing `production-access` closed track in [run 38197383817](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/38197383817) ([#1175](https://github.com/killjoy00/mtg-ev-analyzer/pull/1175)), replacing 100765. Play reported `releaseStatus: completed` with no Console rollout required.
+- **iOS 1.1 / build 100765:** uploaded and processed `VALID` / `APP_STORE_ELIGIBLE` in [run 38195844543](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/38195844543). The finalizer again found no App Store version `1.1` through Apple's API, so 1.1 still has 100758 (owner-confirmed October 12). Owner step: select 100765 on version 1.1.
 
 ## October 11, 2026 (evening) — My Pack One Insights and new store candidates
 
