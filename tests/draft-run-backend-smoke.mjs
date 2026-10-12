@@ -193,12 +193,12 @@ async function privateInsights(path,token,headers={},expected=200) {
   assert.equal(response.status,expected,'Private Insights must honor expected access status');
   return response.json();
 }
-const artificialPuzzle='synthetic-insight-'+tag;
+const artificialPuzzle=firstAnswer.puzzle.puzzle_id; // Verified FK; synthetic fixture uses its original saved pack.
 const alternate=firstAnswer.puzzle.candidates.find(c=>c.id!==firstAnswer.historicalId);
 assert.ok(alternate,'Isolated saved-pack fixture requires two different candidates');
 const artificialAnswer={...firstAnswer,selectedId:alternate.id,selectedName:alternate.name,
-  historicalMatch:false,score:90,puzzle:{...firstAnswer.puzzle,puzzle_id:artificialPuzzle}};
-async function insertSavedInsightsFixture() {
+  historicalMatch:false,score:100,puzzle:{...firstAnswer.puzzle,puzzle_id:artificialPuzzle}};
+async function insertSavedInsightsFixture(first=false) {
   // Source metadata is borrowed from this isolated fixture run; no existing
   // saved answer is updated. A new explicitly synthetic decision is inserted.
   const inserted=await query(`INSERT INTO draft_run_sessions
@@ -215,18 +215,19 @@ async function insertSavedInsightsFixture() {
   const newId=inserted.rows[0].id;
   await query(`INSERT INTO draft_run_decision_observations
     (session_id,revision,round,puzzle_id,outcome,answered_at,selected_id,score,trophy_match)
-    VALUES($1::uuid,0,1,$2,'pick',clock_timestamp(),$3,90,false)`,
-  [newId,artificialPuzzle,alternate.id]);
+    VALUES($1::uuid,0,1,$2,'pick',CASE WHEN $4::boolean
+      THEN TIMESTAMPTZ '2020-01-01T00:00:00Z' ELSE clock_timestamp() END,$3,100,false)`,
+  [newId,artificialPuzzle,alternate.id,first]);
   return newId;
 }
-const artificialSession=await insertSavedInsightsFixture();
+const artificialSession=await insertSavedInsightsFixture(true);
 const firstReview='/v1/profile/insights/decision?session_id='+artificialSession+
   '&round=1&puzzle_id='+encodeURIComponent(artificialPuzzle);
 const reviewed=await privateInsights(firstReview,owner.token,authHeaders);
 assert.equal(reviewed.selected.id,alternate.id);
 assert.equal(reviewed.trophy.id,firstAnswer.historicalId);
 assert.equal(reviewed.candidates.length,firstAnswer.puzzle.candidates.length);
-assert.equal(reviewed.score,90);
+assert.equal(reviewed.score,100);
 const accountA=await privateInsights('/v1/profile/insights?environment=mixed&period=all',
   owner.token,authHeaders);
 const ownHighlights=[...accountA.highlights.best,...accountA.highlights.misses].map(v=>v.puzzle_id);

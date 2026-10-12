@@ -276,6 +276,6 @@ test('native shared image policy refuses HTTP, script and foreign hosts',async()
 test('Metro resolver includes the repository root for the canonical shared image policy',()=>{
  const path=require('node:path');
  const config=require('../metro.config.js');
- const repoRoot=path.resolve(__dirname,'../..');
+ const repoRoot=path.resolve(process.cwd(),'..');
  assert.ok(config.watchFolders.some(folder=>path.resolve(folder)===repoRoot));
 });
