@@ -71,7 +71,9 @@ export type DraftRunAnswer = {
   historicalId: string | null;
   historicalName: string | null;
   historicalMatch: boolean;
+  /** Display string saved on older answers; the server now sends trophyDrafter instead. */
   trophyRecord?: string | null;
+  trophyDrafter?: { record?: string | null; winRate?: number | null; rank?: string | null } | null;
   creatorId?: string;
   creatorName?: string;
   creatorMatch?: boolean;

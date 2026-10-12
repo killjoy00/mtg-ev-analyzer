@@ -52,6 +52,7 @@ import { readSession, subscribeSession, type MobileSession } from '@/src/storage
 import type { SharedRunSurface } from '@/src/state/sharedRunSurface';
 import { tcgplayerUrl } from '@/src/tcgplayer';
 import { colors, spacing } from '@/src/theme';
+import { trophyDrafterFacts, trophyDrafterSentences } from '@/src/trophyDrafter';
 
 type LoadState =
   | { status: 'loading' }
@@ -292,9 +293,9 @@ function FeedbackAnalysis({
       </Text>
 
       {compactFeedback(answer) ? <Text style={styles.analysisLead}>{compactFeedback(answer)}</Text> : null}
-      {answer.trophyRecord?.trim() ? (
-        <Text style={styles.analysisBody}>{`Trophy drafter ${answer.trophyRecord.trim()}.`}</Text>
-      ) : null}
+      {trophyDrafterSentences(trophyDrafterFacts(answer)).map((line) => (
+        <Text key={line} style={styles.analysisBody}>{line}</Text>
+      ))}
 
       {modelLeaderName ? (
         <>

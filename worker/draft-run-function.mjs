@@ -18,6 +18,7 @@ import {digest} from './account-session.mjs';
 import corpusCatalog from '../corpus/draft-run/catalog.json' with {type:'json'};
 import growth, { query, player, readJson, json, withCors, gameDateKey } from './growth-function.js';
 import { handleTrophyImport } from './trophy-import.mjs';
+import { trophySourceLosses } from './trophy-source-record.mjs';
 import {observeDecisionForRequest,measurementInput,MEASUREMENT_CTE} from './decision-measurements.mjs';
 import {handleAdmin} from './measurement-admin.mjs';
 import {creatorAcquisitionProps,creatorChallengeForPublic,publicCreatorChallenge,loadCreatorChallengeForStart,loadCreatorChallengeForExistingSession,creatorRevealState} from './creator-challenges.mjs';
@@ -26,7 +27,7 @@ import {DRAFT_RUN_DIFFICULTY_VERSION,LEGACY_DIFFICULTY_VERSION,publicDifficulty,
 import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,regularRunSet,dailySetWeight,dailyRequiredSets,DRAFT_RUN_LENGTH} from '../draft-run-policy.mjs';
 import {
   DRAFT_RUN_CORPUS_VERSION, DRAFT_RUN_SCORING_VERSION, gradeDraftRunPickForVersion,
-  publicDraftRunPuzzle, validateDraftRunPuzzle, draftRunEnvironment,
+  publicDraftRunPuzzle, publicDraftRunAnswer, validateDraftRunPuzzle, draftRunEnvironment, withSourceDraftRecord,
 } from '../draft-run.mjs';
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
@@ -166,6 +167,7 @@ async function responseFor(s,timing=null) {
     const row=r.rows[0],total=Number(row.total);
     standing={rank:Number(row.rank),total,percentile:total>=10?Math.max(1,Math.ceil(Number(row.through_ties)/total*100)):null,final:s.day<gameDateKey()};
   }
+  answers=answers.map(publicDraftRunAnswer);
   const rankedName=rankedIdentity?.display_name||null;
   return {ranked_name:rankedName,ranking_identity:identityStatus?{eligible:identityStatus.eligible,reason:identityStatus.reason}:null,id:s.id,corpus_version:s.corpus_version,source_components:s.source_components,serving_policy_version:s.serving_policy_version||LEGACY_SERVING_POLICY_VERSION,run_length:runLength(s),daily_featured_sets:s.daily_featured_sets,set_reroll_allowed:!s.day&&!s.challenge_id&&!s.creator_challenge_id&&!s.custom_set_ids.length,custom_set_ids:s.custom_set_ids,leaderboard_eligible:Boolean(s.leaderboard_eligible&&rankedIdentity),environment:environmentOf(s),day:s.day,revision:s.revision,round:s.answers.length+1,complete,score:s.score,answers,rerolls:s.day||s.creator_challenge_id?{set:0,pack:0}:s.rerolls,current,comparison,standing,scoring_version:s.scoring_version,difficulty_version:s.difficulty_version,selection_version:s.selection_version,creator_challenge_id:s.creator_challenge_id||null};
 }
@@ -389,7 +391,8 @@ async function change(request,id,action) {
   if(s.day && s.day!==gameDateKey()) fail('This Daily has closed. Start today’s run.',410);
   if(s.revision!==body.revision || round!==s.answers.length || body.puzzleId!==s.puzzle_ids[round]) fail('Your run changed in another tab. Reload to continue.',409);
   if(action==='pick') {
-    const p=await puzzle(body.puzzleId,s.corpus_version);
+    const [stored,sourceLosses]=await Promise.all([puzzle(body.puzzleId,s.corpus_version),trophySourceLosses(query,body.puzzleId)]);
+    const p=withSourceDraftRecord(stored,sourceLosses);
     if(!p.candidates.some(c=>c.id===body.cardId)) fail('Choose a card from this pack.');
     const grade=gradeDraftRunPickForVersion(p,body.cardId,s.scoring_version);
     const evidence=rateDraftRunPuzzle(p);

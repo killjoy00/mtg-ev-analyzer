@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {compactDraftRunFeedback,consensusFeedback,trophyDrafterDetails,trophyRevealSentence} from '../draft-run-feedback.mjs';
+import {compactDraftRunFeedback,consensusFeedback,trophyDrafterDetails,trophyDrafterFacts,trophyDrafterSentences,trophyRevealSentence} from '../draft-run-feedback.mjs';
 import {draftRunShareText} from '../share-cards.mjs';
 import {escapeHtml} from '../html.mjs';
 
@@ -17,15 +17,31 @@ test('trophy reveal headlines name the pick only, regardless of source-drafter e
  for(const state of [match,different])assert.doesNotMatch(trophyRevealSentence(state),/62%|7–1|7–2|win rate/);
 });
 
-test('source-drafter record is optional, escaped, and shown only in expanded analysis',()=>{
- assert.equal(trophyDrafterDetails({trophyRecord:'has a 62% win rate'}),'<p class="run-trophy-record">Trophy drafter has a 62% win rate.</p>');
- assert.equal(trophyDrafterDetails({trophyRecord:'went 7–1'}),'<p class="run-trophy-record">Trophy drafter went 7–1.</p>');
- assert.equal(trophyDrafterDetails({trophyRecord:'reached Mythic rank'}),'<p class="run-trophy-record">Trophy drafter reached Mythic rank.</p>');
- assert.equal(trophyDrafterDetails({trophyRecord:null}),'');
+test('source-drafter record and win rate are shown separately, only in expanded analysis',()=>{
+ const both=trophyDrafterDetails({trophyDrafter:{record:'7–1',winRate:62,rank:null}});
+ assert.equal(both,'<div class="run-trophy-record"><p>This trophy draft finished 7–1.</p><p>17Lands reports the trophy drafter’s overall game win rate as about 62%. It describes the drafter, not this draft or this card.</p></div>');
+ assert.equal(trophyDrafterDetails({trophyDrafter:{record:null,winRate:null,rank:'Mythic'}}),'<div class="run-trophy-record"><p>The trophy drafter reached Mythic rank.</p></div>');
+ assert.equal(trophyDrafterDetails({trophyDrafter:null}),'');
  assert.equal(trophyDrafterDetails({}),'');
- const escaped=trophyDrafterDetails({trophyRecord:'<script>alert("x")</script>'});
- assert.doesNotMatch(escaped,/<script/);
- assert.match(escaped,/&lt;script&gt;/);
+ assert.doesNotMatch(trophyDrafterDetails({trophyDrafter:{record:'<script>',winRate:'<b>',rank:'<i>'}}),/<script|<b>|<i>/,'only known shapes render');
+});
+
+test('older answers keep their saved drafter context without a new lookup',()=>{
+ assert.deepEqual(trophyDrafterFacts({trophyRecord:'has a 62% win rate'}),{record:null,winRate:62,rank:null});
+ assert.deepEqual(trophyDrafterFacts({trophyRecord:'went 7–2'}),{record:'7–2',winRate:null,rank:null});
+ assert.deepEqual(trophyDrafterFacts({trophyRecord:'reached Diamond rank'}),{record:null,winRate:null,rank:'Diamond'});
+ for(const legacy of ['won 7 matches','went 7–3','has a 140% win rate','<script>alert(1)</script>',null,''])
+  assert.equal(trophyDrafterFacts({trophyRecord:legacy}),null,String(legacy));
+ assert.deepEqual(trophyDrafterFacts({trophyDrafter:{record:'7–0',winRate:64},trophyRecord:'went 7–2'}),{record:'7–0',winRate:64,rank:null},'structured evidence wins');
+});
+
+test('the win rate is labeled as 17Lands\u2019 overall figure, never this format, draft or card',()=>{
+ const [record,rate]=trophyDrafterSentences({record:'7–2',winRate:60,rank:null});
+ assert.equal(record,'This trophy draft finished 7–2.');
+ assert.match(rate,/^17Lands reports the trophy drafter\u2019s overall game win rate as about 60%\./);
+ assert.match(rate,/not this draft or this card/);
+ assert.doesNotMatch(rate,/Premier|format|this set/i);
+ assert.deepEqual(trophyDrafterSentences(null),[]);
 });
 
 test('locked feedback separates the trophy bonus from relative model support',()=>{
