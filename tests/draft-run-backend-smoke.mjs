@@ -182,6 +182,126 @@ renamed=await call(growth,'/v1/profile',{displayName:leaderboardName},owner.toke
 assert.equal(renamed.player.display_name,leaderboardName);
 renamed=await call(growth,'/v1/profile',{showcaseAchievement:'first'},owner.token,200,{method:'PATCH',headers:authHeaders});
 assert.equal(renamed.player.showcase_achievement,'first');
+
+// Isolated-Postgres Insights access gate: only synthetic fixtures, never
+// production history or account identifiers, are used or printed here.
+async function privateInsights(path,token,headers={},expected=200) {
+  const url=httpPrefix?httpPrefix+'pack1growth.compute.c-5.us-east-2.aws.neon.tech'+path:'https://packone.pro'+path;
+  const request=new Request(url,{headers:{...(token?{authorization:'Bearer '+token}:{}),...headers},
+    signal:AbortSignal.timeout(45000)});
+  const response=await withPracticeAccess(request,query,r=>httpPrefix?fetch(r):growth.fetch(r));
+  assert.equal(response.status,expected,'Private Insights must honor expected access status');
+  return response.json();
+}
+const artificialPuzzle=firstAnswer.puzzle.puzzle_id; // Verified FK; synthetic fixture uses its original saved pack.
+const alternate=firstAnswer.puzzle.candidates.find(c=>c.id!==firstAnswer.historicalId);
+assert.ok(alternate,'Isolated saved-pack fixture requires two different candidates');
+const artificialAnswer={...firstAnswer,selectedId:alternate.id,selectedName:alternate.name,
+  historicalMatch:false,score:100,puzzle:{...firstAnswer.puzzle,puzzle_id:artificialPuzzle}};
+async function insertSavedInsightsFixture(first=false) {
+  // Source metadata is borrowed from this isolated fixture run; no existing
+  // saved answer is updated. A new explicitly synthetic decision is inserted.
+  const inserted=await query(`INSERT INTO draft_run_sessions
+    (player_id,seed,corpus_version,scoring_version,puzzle_ids,seen_sources,
+     environment,rerolls,difficulty_version,difficulty_anchors,
+     selection_version,measurement_qa,answers)
+    SELECT player_id,seed,corpus_version,scoring_version,
+      jsonb_set(puzzle_ids,'{0}',to_jsonb($2::text)),seen_sources,
+      environment,rerolls,difficulty_version,difficulty_anchors,
+      selection_version,false,jsonb_build_array($3::jsonb)
+    FROM draft_run_sessions WHERE id=$1::uuid RETURNING id`,
+  [s.id,artificialPuzzle,JSON.stringify(artificialAnswer)]);
+  assert.equal(inserted.rows.length,1);
+  const newId=inserted.rows[0].id;
+  await query(`INSERT INTO draft_run_decision_observations
+    (session_id,revision,round,puzzle_id,outcome,answered_at,selected_id,score,trophy_match)
+    VALUES($1::uuid,0,1,$2,'pick',CASE WHEN $4::boolean
+      THEN TIMESTAMPTZ '2020-01-01T00:00:00Z' ELSE clock_timestamp() END,$3,100,false)`,
+  [newId,artificialPuzzle,alternate.id,first]);
+  return newId;
+}
+const artificialSession=await insertSavedInsightsFixture(true);
+const firstReview='/v1/profile/insights/decision?session_id='+artificialSession+
+  '&round=1&puzzle_id='+encodeURIComponent(artificialPuzzle);
+const reviewed=await privateInsights(firstReview,owner.token,authHeaders);
+assert.equal(reviewed.selected.id,alternate.id);
+assert.equal(reviewed.trophy.id,firstAnswer.historicalId);
+assert.equal(reviewed.candidates.length,firstAnswer.puzzle.candidates.length);
+assert.equal(reviewed.score,100);
+const accountA=await privateInsights('/v1/profile/insights?environment=mixed&period=all',
+  owner.token,authHeaders);
+const ownHighlights=[...accountA.highlights.best,...accountA.highlights.misses].map(v=>v.puzzle_id);
+assert.ok(ownHighlights.includes(artificialPuzzle),'Synthetic owner A decision appears in owner A shortlist');
+assert.equal((await privateInsights('/v1/profile/insights?page=2',owner.token,authHeaders)).highlights.page,2);
+await privateInsights('/v1/profile/insights?page=3',owner.token,authHeaders,400);
+
+// A second linked account is not allowed to read A's saved decision or summaries.
+const otherGuest=await call(growth,'/v1/session',{displayName:'Fixture peer '+tag});
+const otherAuth=crypto.randomUUID(),otherToken=crypto.randomUUID()+crypto.randomUUID();
+await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,false)',
+  [otherAuth,'Fixture peer',`qa-peer-${otherAuth}@example.invalid`]);
+await query('INSERT INTO neon_auth.session(token,"userId","expiresAt","updatedAt") VALUES($1,$2::uuid,now()+interval \'1 hour\',now())',
+  [otherToken,otherAuth]);
+await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',
+  [otherAuth,otherGuest.playerId]);
+const otherHeaders={'x-pack1-auth-session':otherToken};
+await privateInsights(firstReview,otherGuest.token,otherHeaders,404);
+await privateInsights(firstReview,otherGuest.token,{},401);
+await privateInsights(firstReview,owner.token,{},401);
+const expiredToken=crypto.randomUUID()+crypto.randomUUID();
+await query('INSERT INTO neon_auth.session(token,"userId","expiresAt","updatedAt") VALUES($1,$2::uuid,now()-interval \'1 minute\',now())',
+  [expiredToken,authId]);
+await privateInsights(firstReview,owner.token,{'x-pack1-auth-session':expiredToken},401);
+await privateInsights(firstReview.replace('round=1','round=8'),owner.token,authHeaders,404);
+await privateInsights(firstReview.replace(artificialPuzzle,'synthetic-wrong-puzzle'),
+  owner.token,authHeaders,404);
+const otherInsights=await privateInsights('/v1/profile/insights?environment=mixed&period=all',
+  otherGuest.token,otherHeaders);
+const otherHighlights=[...otherInsights.highlights.best,...otherInsights.highlights.misses].map(v=>v.puzzle_id);
+assert.ok(ownHighlights.every(id=>!otherHighlights.includes(id)),
+  'Account B can never receive account A saved decision highlights');
+
+// A later encounter to the same synthetic puzzle remains excluded, even
+// though it is still a valid, owner-owned saved answer in a recent session.
+const repeatedSession=await insertSavedInsightsFixture();
+const repeated='/v1/profile/insights/decision?session_id='+repeatedSession+
+  '&round=1&puzzle_id='+encodeURIComponent(artificialPuzzle);
+await privateInsights(repeated,owner.token,authHeaders,404);
+
+// Native reads use the separate, real mobile-account session source.
+const mobileOpaque=()=>Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url');
+const mobileOwner=mobileOpaque(),mobileOther=mobileOpaque(),mobileExpired=mobileOpaque();
+for(const [token,auth,life] of [
+  [mobileOwner,authId,'1 hour'],[mobileOther,otherAuth,'1 hour'],[mobileExpired,authId,'-1 hour']]){
+  await query(`INSERT INTO account_sessions(session_hash,auth_user_id,csrf_hash,expires_at)
+    VALUES($1,$2::uuid,$3,now()+$4::interval)`,
+    [digest(token),auth,digest(mobileOpaque()),life]);
+}
+const nativePath=firstReview.replace('/v1/profile/','/v1/mobile/profile/');
+assert.equal((await privateInsights(nativePath,owner.token,{'x-pack1-mobile-account':mobileOwner})).selected.id,alternate.id);
+await privateInsights(nativePath,otherGuest.token,{'x-pack1-mobile-account':mobileOther},404);
+await privateInsights(nativePath,owner.token,{'x-pack1-mobile-account':mobileExpired},401);
+await privateInsights(nativePath,owner.token,{},401);
+await privateInsights(nativePath.replace('round=1','round=7'),
+  owner.token,{'x-pack1-mobile-account':mobileOwner},404);
+await privateInsights(nativePath.replace(artificialPuzzle,'synthetic-wrong-puzzle'),
+  owner.token,{'x-pack1-mobile-account':mobileOwner},404);
+await privateInsights(repeated.replace('/v1/profile/','/v1/mobile/profile/'),
+  owner.token,{'x-pack1-mobile-account':mobileOwner},404);
+
+// Remove only synthetic, isolated fixtures created by this coverage.
+await query('DELETE FROM draft_run_decision_observations WHERE session_id=ANY($1::uuid[])',
+  ['{'+[artificialSession,repeatedSession].join(',')+'}']);
+await query('DELETE FROM draft_run_sessions WHERE id=ANY($1::uuid[])',
+  ['{'+[artificialSession,repeatedSession].join(',')+'}']);
+await query('DELETE FROM account_sessions WHERE session_hash=ANY($1::text[])',
+  ['{'+[mobileOwner,mobileOther,mobileExpired].map(digest).join(',')+'}']);
+await query('DELETE FROM account_links WHERE auth_user_id=$1::uuid',[otherAuth]);
+await query('DELETE FROM neon_auth.session WHERE "userId"=$1::uuid',[otherAuth]);
+await query('DELETE FROM neon_auth."user" WHERE id=$1::uuid',[otherAuth]);
+await query('DELETE FROM neon_auth.session WHERE token=$1',[expiredToken]);
+console.log('Isolated Insights detail: owner web/native access, crossed owners, guest, expired, wrong puzzle/round, reruns and private summary isolation passed.');
+
 await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json,details_json) VALUES($1::uuid,$2::date,'mixed','draft_run',100,'A','[]'::jsonb,jsonb_build_object('corpus_version',$3::text)) ON CONFLICT DO NOTHING",[owner.playerId,gameDateKey(),DRAFT_RUN_CORPUS_VERSION]);
 const namedBoard=await call(runApi,'/v1/leaderboard?period=daily&environment=mixed');
 const namedRow=namedBoard.rows.find(row=>row.display_name===leaderboardName);

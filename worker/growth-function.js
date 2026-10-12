@@ -2216,6 +2216,7 @@ async function handleMyInsights(request,{mobile=false}={}) {
   return json(await loadDraftRunInsights(query,owner,{
     environment:url.searchParams.get('environment')||'mixed',
     period:url.searchParams.get('period')||'all',
+    page:url.searchParams.get('page')||'1',
   }));
 }
 

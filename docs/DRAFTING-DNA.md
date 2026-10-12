@@ -1,8 +1,8 @@
 # Drafting DNA — one primary identity and two secondary traits
 
 **Decision:** Owner approved **one primary archetype + two secondary traits** on October 11, 2026.
-**Status:** Product/UI direction approved; **not implemented or released**.
-**Implementation tracking:** [#1167](https://github.com/killjoy00/mtg-ev-analyzer/issues/1167).
+**Status:** Initial code merged through #1173; qualification refinement under #1179 is code-only and awaits separate acceptance.
+**Implementation tracking:** [#1179](https://github.com/killjoy00/mtg-ev-analyzer/issues/1179) (consolidating #1167/#1170/#1171).
 **Existing Insights:** [#1150](https://github.com/killjoy00/mtg-ev-analyzer/issues/1150) and [MY-PACK-ONE-INSIGHTS.md](MY-PACK-ONE-INSIGHTS.md).
 **Approved surrounding experience:** [INSIGHTS-REDESIGN.md](INSIGHTS-REDESIGN.md) — Drafting DNA, real Best Calls & Biggest Misses, and Your Drafting Journey. Companion implementation issues [#1170](https://github.com/killjoy00/mtg-ev-analyzer/issues/1170) and [#1171](https://github.com/killjoy00/mtg-ev-analyzer/issues/1171).
 
@@ -116,3 +116,58 @@ If old clients ignore the field, they must continue to function. Account logout/
 ## Non-goals
 
 No coaching LLM, no new draft score, no inferred aggro/control/rare preference, no social/public DNA sharing without separate privacy approval, no unverified peer percentiles, and no changes to unrelated [#1151](https://github.com/killjoy00/mtg-ev-analyzer/issues/1151).
+
+## Drafting DNA v2 qualification contract (code-review follow-up #1179)
+
+**Every numeric identity threshold below is PROVISIONAL pending an owner-run
+private distribution audit.** The audit has not been run, and this change does
+not approve publication of these gates as calibrated peer baselines. The
+single source of truth is the exported, versioned
+`DNA_QUALIFICATION` object in `worker/draft-run-insights-extras.mjs`
+(`drafting-dna-v2`). No production data, distribution counts or private
+query output belong in this repository.
+
+All enabled candidates first require **at least 80 eligible first-encounter
+decisions** (PROVISIONAL). Each candidate must qualify twice: on the complete
+bounded owner history, and on the same history with the latest **8 eligible
+decisions** removed (PROVISIONAL one-run stability gate). This stability
+requirement is not a stored identity snapshot; it delays transitions near a
+threshold without adding personal storage. It cannot eliminate every
+possible historical revision or threshold flip, so no claim of permanent
+personality is made. Qualified candidates rank by excess above their
+own gate, then supporting count, then lexical ID. A primary and at most two
+secondary labels are selected with one label per evidence family. Sharpshooter
+and Steady Hand share **score-distribution**, while Architect and Closer share
+**pick-depth**; neither pair can be awarded together.
+
+| Candidate | Decision | PROVISIONAL numeric qualification gate or reason for deferral |
+| --- | --- | --- |
+| **Trophy Twin** | **Deferred** | Historical `ranking[].support`/`selectedSupport` is card-choice model support, **not** an expected probability of the historical trophy drafter matching a player's selection. It is raw `model_probability` in v2 and a version-pinned, sharpened/calibrated model card-share in v3. No comparable per-puzzle trophy-match expectation exists, so a raw 65% match threshold is not defendable. Requires a validated per-puzzle matched trophy baseline before enabling. |
+| **Independent Thinker** | Enabled (provisional) | At least **40** non-trophy picks, at least **50%** of all picks non-trophy, and at least **20** non-trophy picks with original score **80+**. Distinct supported alternatives only; no claim of being objectively better. |
+| **Sharpshooter** | Enabled (provisional) | At least **65%** of decisions score **90+** and at most **10%** score **40 or below**. Provisional unbenchmarked distribution, not a peer percentile. |
+| **High-Roller** | Enabled (provisional) | At least **20%** score **90+** and at least **20%** score **40 or below**. Mixed score distributions are descriptive only. |
+| **Puzzle Solver** | **Deferred** | Needs difficulty/puzzle-adjusted expected performance, not raw hard-band averages. |
+| **Architect** | Enabled (provisional) | Within the **same environment, scoring, selection and corpus version, and known difficulty band**, at least **40 early** and **40 late** source picks with early average at least **10 points** above late. Regular early P1P1–3, late P1P6–8; Powered Cube early P1P2–4, late P1P7–9. Strongest absolute-gap comparable cohort wins. |
+| **Closer** | Enabled (provisional) | The same **40/40**, same-cohort and source-pick definitions as Architect, but the **10-point** gap favors late picks. |
+| **Specialist** | **Deferred** | Environment participation is not comparative strength; requires calibrated cross-format baselines that account for card pool and scoring-model differences. |
+| **Steady Hand** | Enabled (provisional) | At least **one cohort of 40** decisions using exactly Architect/Closer's **environment + scoring/selection/corpus version + known difficulty band** grouping. In **every** such sampled cohort, at least **85%** score **65+**, and at most **5%** score **40 or below**. Unknown bands and smaller cohorts cannot qualify it. |
+| **Rising Star** | Enabled (provisional) | Two chronological **40-decision** spans inside one same-key comparable cohort; recent original average exceeds previous by **10+ points**. It says nothing about causal skill improvement. |
+
+All percentages, sample floors, split points and effect gaps in this
+section are **PROVISIONAL**. The qualified trait's evidence is traceable
+to originally locked picks; sample and count gates are not verified
+player percentiles. Score thresholds in the original 40/40 observation
+charts are unchanged.
+
+The additive DNA response now includes `picks_needed` on the DNA
+object and each emerging slot. While total eligible history is below
+the sample floor it reports the distance to 80. At the sample floor
+without another stable qualification, it returns `null` with a brief
+`reason` rather than falsely promising a specific number of picks.
+Existing status/primary/secondary fields remain for installed clients. For the otherwise-null primary slot, the additive `primary_emerging` object also provides `picks_needed` and an explanatory reason; older binaries continue using `primary:null`.
+
+**Owner action still needed:** a private distribution audit should
+evaluate candidate frequencies and comparator validity across
+environment, scoring, selection, corpus and difficulty strata before
+any gate is described as validated. That audit is intentionally out
+of this public code-review PR.

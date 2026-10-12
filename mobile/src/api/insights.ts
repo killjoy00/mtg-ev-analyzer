@@ -16,22 +16,23 @@ export type InsightWindow = InsightGroup & { from: string; to: string };
 export type InsightProgress = { recent: InsightWindow; previous: InsightWindow; delta: number };
 export type DnaTrait = { status: 'qualified'; id: string; title: string; summary: string;
   evidence_family: string; supporting_decisions: number; evidence: {label:string;value:string|number}[] }
-  | {status:'emerging';label:string};
+  | {status:'emerging';label:string;picks_needed?:number|null;reason?:string};
 export type DraftingDNA = {
   schema_version:string;status:'ready'|'emerging';scope:string;eligible_decisions:number;
-  primary:DnaTrait|null;secondary:DnaTrait[];note:string;
+  primary:DnaTrait|null;primary_emerging?:DnaTrait;secondary:DnaTrait[];note:string;picks_needed?:number|null;reason?:string;
 };
-export type JourneyWindow = {id:string;from:string;to:string;count:number;
+export type JourneyWindow = {id:string;from:string;to:string;from_at?:string;to_at?:string;count:number;
   average_score:number|null;complete:boolean;cohort:string};
 export type DraftingJourney = {version:string;eligible_decisions:number;window_size:number;
   windows:JourneyWindow[];total_windows:number;versions_comparable:boolean;
-  milestones:{id:string;date:string;text:string;count:number;average_score?:number}[];
+  milestones:{id:string;date:string;from_at?:string;to_at?:string;text:string;count:number;average_score?:number;hard_decisions?:number}[];
   limited:boolean;note:string;progress_compatible?:boolean};
 export type InsightCard = {id:string;name:string;image_url:string|null;mana_cost?:string|null;rarity?:string|null};
 export type InsightHighlight = {session_id:string;round:number;puzzle_id:string;set_id:string;
   environment:InsightsEnvironment;pick_number:number;date:string;score:number;
   trophy_match:boolean;selection_kind:string;preview?:{selected:InsightCard;trophy:InsightCard}};
-export type InsightHighlights = {schema_version:string;best:InsightHighlight[];misses:InsightHighlight[];note:string};
+export type InsightHighlights = {schema_version:string;best:InsightHighlight[];misses:InsightHighlight[];note:string;
+  page?:number;has_more?:{best:boolean;misses:boolean}};
 export type InsightDecision = {set_id:string;pick_number:number;score:number;trophy_match:boolean;
   selected:InsightCard;trophy:InsightCard;candidates:InsightCard[];prior_picks:InsightCard[];
   ranking?:{id:string;name:string;score:number|null;support:number|null}[];
@@ -62,9 +63,10 @@ export type DraftInsights = {
   highlights?: InsightHighlights;
 };
 
-export async function loadMobileInsights(session: MobileSession, environment: InsightsEnvironment, period: InsightsPeriod): Promise<DraftInsights> {
+export async function loadMobileInsights(session: MobileSession, environment: InsightsEnvironment, period: InsightsPeriod, page=1): Promise<DraftInsights> {
   if (!session.accountToken) throw Error('Sign in to view your private drafting Insights.');
   const params = new URLSearchParams({ environment, period });
+  if(page!==1)params.set('page',String(page));
   return requestJson<DraftInsights>('/growth/v1/mobile/profile/insights?' + params.toString(), {
     mobileSessionToken: session.playerToken,
     mobileAccountToken: session.accountToken,

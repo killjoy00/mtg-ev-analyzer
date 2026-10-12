@@ -1,6 +1,7 @@
 import { router, Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import {safeCardImageUrl} from '../../../card-image-policy.mjs';
 import { Text } from '@/src/components/Text';
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 import { AboutLink } from '@/src/components/AboutLink';
@@ -90,10 +91,25 @@ function descriptivePatternRows(data: DraftInsights): string[] {
   return rows.slice(0, 3);
 }
 
-function DNATrait({trait,primary=false}: {trait:DnaTrait|null;primary?:boolean}) {
+function insightLocalRange(value:{from_at?:string;to_at?:string;from?:string;to?:string;date?:string}) {
+  const local=(s?:string)=>{
+    if(!s)return null;
+    const date=new Date(s);
+    return Number.isFinite(date.getTime())?date.toLocaleString(undefined,
+      {year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}):null;
+  };
+  const first=local(value.from_at),last=local(value.to_at);
+  return first&&last?first+' to '+last:
+    value.from&&value.to?value.from+' to '+value.to:value.date||value.to||'';
+}
+function DNATrait({trait,primary=false,floorRemaining=null,reason}: {
+  trait:DnaTrait|null;primary?:boolean;floorRemaining?:number|null;reason?:string;
+}) {
   if(!trait||trait.status!=='qualified')return <View style={[styles.dnaTrait,primary&&styles.dnaPrimary]}>
     <Text style={styles.dnaTitle}>{primary?'Your drafting DNA is taking shape':'Trait still developing'}</Text>
-    <Text style={styles.caption}>More comparable first-time decisions are needed to support a classification.</Text>
+    <Text style={styles.caption}>{(trait?.picks_needed??floorRemaining)!=null
+      ?String(trait?.picks_needed??floorRemaining)+' more eligible decisions to reach the provisional sample floor.'
+      :trait?.reason||reason||'No additional stable evidence gate has qualified yet.'}</Text>
   </View>;
   return <View style={[styles.dnaTrait,primary&&styles.dnaPrimary]}>
     <Text style={[styles.dnaTitle,primary&&styles.dnaPrimaryTitle]}>{trait.title}</Text>
@@ -109,18 +125,18 @@ function DNATrait({trait,primary=false}: {trait:DnaTrait|null;primary?:boolean})
 }
 function DNASummary({dna}:{dna:DraftingDNA}) {
   return <Section title="Your Drafting DNA" caption="All eligible first-time decisions, independent of the filters below">
-    <DNATrait trait={dna.primary} primary />
+    <DNATrait trait={dna.primary||dna.primary_emerging||null} floorRemaining={dna.picks_needed} reason={dna.reason} primary />
     <View style={styles.dnaSecondary}>
       {(dna.secondary||[]).slice(0,2).map((trait,index)=>
-        <View key={'trait-'+index} style={styles.dnaHalf}><DNATrait trait={trait}/></View>)}
+        <View key={'trait-'+index} style={styles.dnaHalf}><DNATrait trait={trait} floorRemaining={dna.picks_needed} reason={dna.reason}/></View>)}
     </View>
     <Text style={styles.caption}>{dna.note}</Text>
   </Section>;
 }
 function CardArtwork({card,label}: {card:InsightCard|null|undefined;label:string}) {
-  const url=card?.image_url;
+  const url=safeCardImageUrl(card?.image_url);
   return <View style={styles.cardArt}>
-    {url&&/^https:\/\//.test(url)?<Image source={{uri:url}}
+    {url?<Image source={{uri:url}}
       accessibilityLabel={label+': '+card?.name}
       resizeMode="contain" style={styles.cardImage}/>:
       <Text style={styles.caption}>{card?.name||'Card image unavailable'}</Text>}
@@ -156,9 +172,10 @@ function SavedDecisionDetail({detail,onClose}: {detail:InsightDecision;onClose:(
     </Pressable>
   </View>;
 }
-function HighlightsStory({highlights,onReview,detail,detailPhase,onClose}:{
+function HighlightsStory({highlights,onReview,detail,detailPhase,onClose,onLoadMore,morePhase}:{
   highlights:InsightHighlights;onReview:(item:InsightHighlight)=>void;detail:InsightDecision|null;
   detailPhase:'idle'|'loading'|'ready'|'error';onClose:()=>void;
+  onLoadMore:()=>void;morePhase:'idle'|'loading'|'error';
 }) {
   const [selected,setSelected]=useState<'best'|'misses'>('best');
   const rows=selected==='best'?highlights.best:highlights.misses;
@@ -185,6 +202,11 @@ function HighlightsStory({highlights,onReview,detail,detailPhase,onClose}:{
         <Text style={styles.secondaryText}>Review original pack</Text>
       </Pressable>
     </View>):<Text style={styles.caption}>No qualifying saved picks in this group yet.</Text>}
+    {highlights.has_more?.[selected]?<Pressable accessibilityRole="button" disabled={morePhase==='loading'}
+      onPress={onLoadMore} style={styles.secondaryButton}>
+      <Text style={styles.secondaryText}>{morePhase==='loading'?'Loading saved picks…':
+        morePhase==='error'?'Retry loading more picks':'Load more saved picks (page 2 of 2)'}</Text>
+    </Pressable>:null}
     {detailPhase==='loading'?<Text style={styles.caption}>Loading your saved decision…</Text>:null}
     {detailPhase==='error'?<Text accessibilityRole="alert" style={styles.caption}>This original decision could not be loaded. Try again.</Text>:null}
     {detailPhase==='ready'&&detail?<SavedDecisionDetail detail={detail} onClose={onClose}/>:null}
@@ -196,11 +218,11 @@ function JourneyStory({journey,progress,months}:{
   return <Section title="Your Drafting Journey" caption="Original scores in 40-decision chronological windows">
     {journey.windows.length?<ScrollView horizontal contentContainerStyle={styles.journeyWindowRow} accessibilityLabel="Your recorded score timeline">
       {journey.windows.map(w=><View key={w.id} style={styles.journeyWindow}
-        accessibilityLabel={w.from+' to '+w.to+', '+w.count+' decisions'+(w.complete?'':' incomplete')}>
+        accessibilityLabel={insightLocalRange(w)+', '+w.count+' decisions'+(w.complete?'':' incomplete')}>
         <Text style={styles.bigScore}>{score(w.average_score)}</Text>
         <View style={styles.journeyTrack}><View style={[styles.journeyFill,
           {height:(Math.max(0,Math.min(100,w.average_score??0))+'%') as '100%'}]}/></View>
-        <Text style={styles.meta}>{w.to}</Text>
+        <Text style={styles.meta}>{insightLocalRange(w)}</Text>
         <Text style={styles.meta}>{w.count} picks{w.complete?'':' · incomplete'}</Text>
       </View>)}
     </ScrollView>:<Text style={styles.caption}>Your drafting journey grows with your original recorded decisions.</Text>}
@@ -213,7 +235,7 @@ function JourneyStory({journey,progress,months}:{
       'Two completed 40-pick windows are needed for a recent-vs-previous score comparison.':
       'Historical windows span incompatible scoring or card-pool versions; their averages are not directly compared.'}</Text>}
     {journey.milestones.length?<><Text style={styles.subheading}>Your milestones</Text>
-      {journey.milestones.map(m=><Text key={m.id} style={styles.body}>{m.date} · {m.text}{m.average_score!=null?' · '+score(m.average_score)+'/100':''}</Text>)}</>:null}
+      {journey.milestones.map(m=><Text key={m.id} style={styles.body}>{insightLocalRange(m)} · {m.text}{m.average_score!=null?' · '+score(m.average_score)+'/100':''}</Text>)}</>:null}
     <Text style={styles.subheading}>Pacific calendar months</Text>
     <View style={styles.months}>{months.map(m=><View key={m.month} style={styles.month}>
       <Text style={styles.meta}>{m.month}</Text><Text style={styles.monthScore}>{score(m.average_score)}</Text>
@@ -222,9 +244,10 @@ function JourneyStory({journey,progress,months}:{
   </Section>;
 }
 
-function InsightSections({ data,onReview,detail,detailPhase,onClose }: {
+function InsightSections({ data,onReview,detail,detailPhase,onClose,onLoadMore,morePhase }: {
   data:DraftInsights;onReview:(item:InsightHighlight)=>void;detail:InsightDecision|null;
   detailPhase:'idle'|'loading'|'ready'|'error';onClose:()=>void;
+  onLoadMore:()=>void;morePhase:'idle'|'loading'|'error';
 }) {
   if (!data.unlocked) return <>
     {data.drafting_dna?<DNASummary dna={data.drafting_dna}/>:null}
@@ -240,7 +263,8 @@ function InsightSections({ data,onReview,detail,detailPhase,onClose }: {
   return <>
     {data.drafting_dna?<DNASummary dna={data.drafting_dna}/>:null}
     {data.highlights?<HighlightsStory highlights={data.highlights} onReview={onReview}
-      detail={detail} detailPhase={detailPhase} onClose={onClose}/>:null}
+      detail={detail} detailPhase={detailPhase} onClose={onClose}
+      onLoadMore={onLoadMore} morePhase={morePhase}/>:null}
     {data.journey?<JourneyStory journey={data.journey} progress={data.progress} months={monthly}/>:null}
     <Section title="Your patterns" caption="Observed scores with clear sample-size safeguards">
       {data.observations.length ? data.observations.map(row =>
@@ -293,6 +317,7 @@ export default function InsightsScreen() {
   const [problem, setProblem] = useState<string | null>(null);
   const [detail,setDetail]=useState<InsightDecision|null>(null);
   const [detailPhase,setDetailPhase]=useState<'idle'|'loading'|'ready'|'error'>('idle');
+  const [morePhase,setMorePhase]=useState<'idle'|'loading'|'error'>('idle');
   const detailTicket=useRef(0);
   const requestId = useRef(0);
   const activeOwner = useRef('');
@@ -302,6 +327,7 @@ export default function InsightsScreen() {
     detailTicket.current+=1;
     setDetail(null);
     setDetailPhase('idle');
+    setMorePhase('idle');
     setData(null);
     setProblem(null);
     setPhase('loading');
@@ -338,6 +364,7 @@ export default function InsightsScreen() {
     detailTicket.current+=1;
     setDetail(null);
     setDetailPhase('idle');
+    setMorePhase('idle');
     activeOwner.current = current;
     setData(null);
     setPhase(current ? 'loading' : 'signed-out');
@@ -367,6 +394,34 @@ export default function InsightsScreen() {
     }catch{
       if(t===detailTicket.current&&epoch===requestId.current)
         setDetailPhase('error');
+    }
+  };
+
+  const loadMore=async()=>{
+    const epoch=requestId.current,owner=activeOwner.current;
+    if(!data?.highlights?.has_more?.best&&!data?.highlights?.has_more?.misses)return;
+    setMorePhase('loading');
+    try{
+      const before=await readSession();
+      if(!before?.accountToken||identity(before)!==owner)return;
+      const next=await loadMobileInsights(before,environment,period,2);
+      const after=await readSession();
+      if(epoch!==requestId.current||!after?.accountToken||identity(after)!==owner)return;
+      setData(current=>{
+        if(!current?.highlights||!next.highlights)return current;
+        const used=new Set<string>();
+        const unique=(items:InsightHighlight[])=>items.filter(item=>{
+          if(used.has(item.puzzle_id))return false;
+          used.add(item.puzzle_id);return true;
+        });
+        const best=unique([...current.highlights.best,...next.highlights.best]);
+        const misses=unique([...current.highlights.misses,...next.highlights.misses]);
+        return {...current,highlights:{...current.highlights,best,misses,
+          has_more:{best:false,misses:false}}};
+      });
+      setMorePhase('idle');
+    }catch{
+      if(epoch===requestId.current)setMorePhase('error');
     }
   };
 
@@ -400,7 +455,8 @@ export default function InsightsScreen() {
       {phase === 'ready' && data ? <>
         <Text style={styles.summary}>{num(data.eligible_decisions)} eligible decisions · {data.environment_label} · {periods.find(p => p.value === period)?.label}</Text>
         <InsightSections data={data} detail={detail} detailPhase={detailPhase}
-          onReview={reviewDetail} onClose={closeDetail}/>
+          onReview={reviewDetail} onClose={closeDetail}
+          onLoadMore={()=>void loadMore()} morePhase={morePhase}/>
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>How these insights are calculated</Text>
           <Text style={styles.caption}>{data.methodology}</Text>
