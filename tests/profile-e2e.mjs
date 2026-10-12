@@ -21,6 +21,19 @@ await page.addInitScript(() => {
   Object.defineProperty(navigator, 'canShare', { configurable:true, value: () => false });
 });
 
+// The UI snapshot needs a deterministic *loaded-image* state as well as
+// card-name fallbacks. This route never fetches live card art or uses player data.
+const syntheticCardArt = `<svg xmlns="http://www.w3.org/2000/svg" width="488" height="680" viewBox="0 0 488 680">
+  <rect width="488" height="680" fill="#e8f0f6"/>
+  <rect x="21" y="21" width="446" height="638" rx="24" fill="#244d75"/>
+  <circle cx="244" cy="237" r="143" fill="#7fb7c7"/>
+  <path d="M76 462 L186 285 L252 380 L331 260 L415 462 Z" fill="#f1d593"/>
+  <text x="244" y="558" text-anchor="middle" font-family="sans-serif" font-size="33" fill="#fff">SYNTHETIC ART</text>
+</svg>`;
+await page.route('https://cards.scryfall.io/normal/front/synthetic-*.svg', async route => {
+  await route.fulfill({ status:200, contentType:'image/svg+xml', body:syntheticCardArt });
+});
+
 const fixture = {
   player: {
     display_name:'Profile Tester',
@@ -188,8 +201,8 @@ await page.route(`${growthOrigin}/**`, async (route) => {
             trophy_match:false,reason_code:'strong-scored-alternative',
             finding_context:'From hard-rated decisions in this comparison',
             reason_text:'Your original non-trophy pick earned 92/100 in a hard-rated saved pack.',
-            preview:{selected:{id:'card-mine',name:'Daring Skyjek',image_url:null},
-              trophy:{id:'card-trophy',name:'Frost Lynx',image_url:null}}},
+            preview:{selected:{id:'card-mine',name:'Daring Skyjek',image_url:'https://cards.scryfall.io/normal/front/synthetic-selected.svg'},
+              trophy:{id:'card-trophy',name:'Frost Lynx',image_url:'https://cards.scryfall.io/normal/front/synthetic-trophy.svg'}}},
           {session_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',round:4,puzzle_id:'fixture-pack-4',
             set_id:'ktk',environment:'mixed',pick_number:6,date:'2026-09-20',score:100,
             trophy_match:true,reason_code:'hard-trophy-match',
@@ -361,6 +374,13 @@ try {
     'three finding-linked highlights are visible before See more');
   assert.equal(await page.locator('#my-insights-best-panel .my-insights-pick.is-featured:visible').count(),1);
   assert.equal(await page.locator('#my-insights-best-panel .my-insights-pick.is-compact:visible').count(),2);
+  const featuredArt=page.locator('#my-insights-best-panel .my-insights-pick.is-featured img');
+  assert.equal(await featuredArt.count(),2,'synthetic selected/trophy art should use the real card-image layout');
+  await featuredArt.first().scrollIntoViewIfNeeded();
+  await page.waitForFunction(() => {
+    const images=[...document.querySelectorAll('#my-insights-best-panel .my-insights-pick.is-featured img')];
+    return images.length===2&&images.every(img=>img.complete&&img.naturalWidth>0);
+  },null,{timeout:10000});
   assert.match(await page.locator('#my-insights-best-panel .my-insights-pick.is-featured').textContent(),/hard-rated decisions/);
   assert.match(await page.locator('#my-insights-best-panel .my-insights-pick.is-compact').nth(0).textContent(),/Skyguard Captain/);
   assert.match(await page.locator('#my-insights-best-panel .my-insights-pick.is-compact').nth(1).textContent(),/Luminous Oath/);
