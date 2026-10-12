@@ -272,3 +272,10 @@ test('native shared image policy refuses HTTP, script and foreign hosts',async()
  assert.equal(safeCardImageUrl('https://cards.scryfall.io/normal/x.jpg'),
    'https://cards.scryfall.io/normal/x.jpg');
 });
+
+test('Metro resolver includes the repository root for the canonical shared image policy',()=>{
+ const path=require('node:path');
+ const config=require('../metro.config.js');
+ const repoRoot=path.resolve(__dirname,'../..');
+ assert.ok(config.watchFolders.some(folder=>path.resolve(folder)===repoRoot));
+});

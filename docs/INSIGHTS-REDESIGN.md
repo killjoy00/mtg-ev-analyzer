@@ -153,3 +153,10 @@ selection version, score/pick/match validity and first locked
 answer order including session-ID tie-break, before the existing
 separate owner-scoped saved-answer retrieval. These details never
 introduce a playable retry.
+
+The native screen imports that same policy from the repository root.
+`mobile/metro.config.js` explicitly watches the parent directory so Expo
+Metro can resolve the canonical module without duplicating the allowlist or
+changing the native projects. A dedicated regression assertion covers the
+resolver configuration; no native build or store operation is part of this
+code change.

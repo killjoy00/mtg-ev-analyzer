@@ -318,7 +318,7 @@ try {
     'legacy v1 windows still render their unchanged UTC calendar fields');
   insightsMode='v2';
   await page.locator('#my-insights-refresh').click();
-  await page.locator('#my-insights-best-panel').getByText('First Page Card').waitFor();
+  await page.locator('#my-insights-best-panel').locator('.my-insights-pick-info strong').getByText('First Page Card').waitFor();
   assert.match(await page.locator('.my-insights-dna').textContent(),/42 more eligible decisions/);
   assert.match(await page.locator('.my-insights-journey-point').first().textContent(),/Oct 31/,
     'viewer-local dates replace the UTC date-only fields in v2');
@@ -326,7 +326,7 @@ try {
   assert.equal(await page.locator('#my-insights-best-panel img[src*="javascript"]').count(),0);
   assert.equal(await page.locator('#my-insights-best-panel img[src*="cards.scryfall.io"]').count(),1);
   await page.getByRole('button',{name:'Load more Best Calls'}).click();
-  await page.locator('#my-insights-best-panel').getByText('Second Page Card').waitFor();
+  await page.locator('#my-insights-best-panel').locator('.my-insights-pick-info strong').getByText('Second Page Card').waitFor();
   assert.equal(await page.locator('#my-insights-best-panel .my-insights-pick').count(),2,
     'each page adds distinct records without replacing the previous page');
   assert.equal(await page.getByRole('button',{name:'Load more Best Calls'}).count(),0,
