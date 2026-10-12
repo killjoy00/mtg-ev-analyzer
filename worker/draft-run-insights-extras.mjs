@@ -302,34 +302,65 @@ function highlightReason(row) {
     reason_text:'Your non-trophy choice earned '+row.score+'/100 in the original scored puzzle; review the saved alternatives.',
     reason_evidence:{original_score:row.score}};
 }
-const highlightRow=r=>({session_id:r.session_id,round:r.round,puzzle_id:r.puzzle_id,
-  set_id:r.set_id,environment:r.environment,pick_number:r.pick_number,
-  date:r.answered_at.slice(0,10),score:r.score,trophy_match:r.trophy_match,
-  selection_kind:r.trophy_match?'trophy-match':'alternative',
-  selected_name:r.selected_name,historical_name:r.historical_name,
-  reason_version:HIGHLIGHT_REASON_VERSION,...highlightReason(r)});
-function selectVariety(rows,limit,already=new Set(),finding=null) {
-  const chosen=[],sets=new Set(),positions=new Set(),cards=new Set(),reasons=new Set();
-  const remaining=rows.filter(r=>!already.has(r.puzzle_id)&&r.session_id&&Number.isInteger(r.round)&&r.round>=1&&r.round<=8);
-  // Reason and recency weigh the ordering; the diversity bonus prevents a
-  // wall of near-identical perfect matches or the same historical set.
+// The finding is computed from two *actual* comparison groups by the
+// aggregator. Never infer relevance from a generic label such as pick-depth.
+const matchedFindingGroup=(row,finding)=>{
+  if(!finding?.groups?.length)return null;
+  return finding.groups.find(group=>{
+    if(finding.id==='difficulty')return row.difficulty_band===group.band;
+    if(finding.id==='pick-depth')return row.pick_number===group.pick_number;
+    if(finding.id==='progress')return group.puzzle_ids?.includes(row.puzzle_id);
+    if(finding.id.startsWith('format-'))return row.environment===group.environment;
+    return false;
+  })||null;
+};
+const highlightRow=(row,finding)=>({
+  session_id:row.session_id,round:row.round,puzzle_id:row.puzzle_id,
+  set_id:row.set_id,environment:row.environment,pick_number:row.pick_number,
+  date:row.answered_at.slice(0,10),score:row.score,trophy_match:row.trophy_match,
+  selection_kind:row.trophy_match?'trophy-match':'alternative',
+  selected_name:row.selected_name,historical_name:row.historical_name,
+  ...(matchedFindingGroup(row,finding)?{
+    finding_context:'From '+matchedFindingGroup(row,finding).label+' in this comparison',
+  }:{}),
+  reason_version:HIGHLIGHT_REASON_VERSION,...highlightReason(row),
+});
+function selectVariety(rows,limit,already,newest,finding,kind) {
+  const chosen=[],sets=new Set(),positions=new Set(),cards=new Set(),
+    reasons=new Set(),groups=new Set();
+  const remaining=rows.filter(r=>!already.has(r.puzzle_id)&&r.session_id&&
+    Number.isInteger(r.round)&&r.round>=1&&r.round<=8)
+    .sort((a,b)=>b.answered_at.localeCompare(a.answered_at)||
+      a.puzzle_id.localeCompare(b.puzzle_id));
   while(chosen.length<limit&&remaining.length){
-    let bestIndex=0,bestWeight=-Infinity;
-    for(let i=0;i<remaining.length;i++){
-      const r=remaining[i],reason=highlightReason(r).reason_code;
-      const relevance=(finding?.id==='difficulty'&&r.difficulty_band==='hard')||
-        (finding?.id==='pick-depth'&&r.pick_number<=3)?3:0;
-      const variety=(sets.has(r.set_id)?0:5)+(positions.has(r.pick_number)?0:3)+
-        (cards.has(r.selected_id)?0:2)+(reasons.has(reason)?0:4);
-      const recency=Math.min(10,Math.max(0,(Date.parse(r.answered_at)-Date.UTC(2020,0,1))/86400000/300));
-      const quality=r.trophy_match?2:Math.abs(r.score-70)/10;
-      const weight=relevance+variety+recency+quality;
-      if(weight>bestWeight){bestWeight=weight;bestIndex=i;}
+    // Exhaust the actual compared groups before filling a short page with
+    // unrelated examples. First three rows are the visible report.
+    const relevant=finding?remaining.filter(r=>matchedFindingGroup(r,finding)):[],
+      eligible=relevant.length&&chosen.length<3?relevant:remaining;
+    let winner=eligible[0],bestWeight=-Infinity;
+    for(const row of eligible){
+      const group=matchedFindingGroup(row,finding);
+      const reason=highlightReason(row).reason_code;
+      const age=Math.max(0,(newest-Date.parse(row.answered_at))/86400000);
+      // A recent useful saved miss outranks a years-old extreme miss; relative
+      // to newest eligible history so results never drift with the system clock.
+      const recency=14*Math.exp(-age/150);
+      const quality=kind==='misses'?Math.max(0,60-row.score)/25:
+        row.trophy_match?2:Math.max(0,row.score-80)/10;
+      const variety=(sets.has(row.set_id)?0:1)+(positions.has(row.pick_number)?0:1)+
+        (cards.has(row.selected_id)?0:0.5)+(reasons.has(reason)?0:1.5);
+      const groupVariety=group&&!groups.has(group.label)?4:0;
+      const groupDirection=group?.relation===(kind==='best'?'higher':'lower')?2:0;
+      const hardExample=finding?.id==='difficulty'&&group?.band==='hard'&&
+        row.trophy_match?5:0;
+      const weight=recency+quality+variety+groupVariety+groupDirection+hardExample;
+      if(weight>bestWeight){bestWeight=weight;winner=row;}
     }
-    const picked=remaining.splice(bestIndex,1)[0],reason=highlightReason(picked).reason_code;
-    chosen.push(highlightRow(picked));already.add(picked.puzzle_id);
-    sets.add(picked.set_id);positions.add(picked.pick_number);
-    cards.add(picked.selected_id);reasons.add(reason);
+    remaining.splice(remaining.indexOf(winner),1);
+    chosen.push(highlightRow(winner,finding));already.add(winner.puzzle_id);
+    sets.add(winner.set_id);positions.add(winner.pick_number);
+    cards.add(winner.selected_id);reasons.add(highlightReason(winner).reason_code);
+    const group=matchedFindingGroup(winner,finding);if(group)groups.add(group.label);
   }
   return chosen;
 }
@@ -338,15 +369,15 @@ export function selectInsightHighlights(rows,{page=1,finding=null}={}) {
     throw Object.assign(new Error('Only the first two highlight pages are available.'),{status:400});
   const valid=rows.filter(r=>r.session_id&&r.puzzle_id&&r.selected_id&&r.historical_id&&
     r.set_id&&Number.isInteger(r.round)&&r.round>=1&&r.round<=8);
-  const strong=valid.filter(r=>!r.trophy_match&&r.score>=80).sort((a,b)=>
-    b.answered_at.localeCompare(a.answered_at)||b.score-a.score||a.puzzle_id.localeCompare(b.puzzle_id));
-  const tough=valid.filter(r=>r.trophy_match&&r.difficulty_band==='hard').sort((a,b)=>
-    b.answered_at.localeCompare(a.answered_at)||a.puzzle_id.localeCompare(b.puzzle_id));
-  const low=valid.filter(r=>!r.trophy_match&&r.score<=60).sort((a,b)=>
-    Math.floor(a.score/20)-Math.floor(b.score/20)||b.answered_at.localeCompare(a.answered_at)||a.puzzle_id.localeCompare(b.puzzle_id));
+  const strong=valid.filter(r=>!r.trophy_match&&r.score>=80);
+  const tough=valid.filter(r=>r.trophy_match&&r.difficulty_band==='hard');
+  // Rank high-scored alternatives and hard trophy matches *together*.
+  const positive=[...strong,...tough],low=valid.filter(r=>!r.trophy_match&&r.score<=60);
+  const newest=Math.max(0,...valid.map(r=>Date.parse(r.answered_at)||0));
   const seen=new Set(),bestPages=[];
-  for(let i=0;i<2;i++)bestPages.push([...selectVariety(strong,3,seen,finding),...selectVariety(tough,3,seen,finding)]);
-  const missesPages=[selectVariety(low,6,seen,finding),selectVariety(low,6,seen,finding)];
+  for(let i=0;i<2;i++)bestPages.push(selectVariety(positive,6,seen,newest,finding,'best'));
+  const missesPages=[selectVariety(low,6,seen,newest,finding,'misses'),
+    selectVariety(low,6,seen,newest,finding,'misses')];
   return {schema_version:HIGHLIGHTS_VERSION,page,best:bestPages[page-1],misses:missesPages[page-1],
     has_more:{best:page===1&&bestPages[1].length>0,misses:page===1&&missesPages[1].length>0},
     note:'Highlights are selected from originally awarded scores and saved support, not proof of an objectively correct draft strategy.'};
