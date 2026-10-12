@@ -7,7 +7,7 @@ import {consumePlayerLimit} from './request-limits.mjs';
 import {readJson} from './request-json.mjs';
 import {gameDateKey} from '../game-date.mjs';
 import {currentSeasonForPlayer} from './draft-run-season.mjs';
-import {loadDraftRunInsights} from './draft-run-insights.mjs';
+import {loadDraftRunInsights,loadDraftRunInsightDecision} from './draft-run-insights.mjs';
 import {handlePatreon} from './patreon.mjs';
 import {handleAppleSubscriptions} from './apple-subscriptions.mjs';
 import {accountSession,clearAccountCookies,clearPlayerCookie,consumeNeonSession,digest,issueAccountSession,requireTrustedOrigin,revokeAccountSession,revokeAllAccountSessions,withAccountCookies,withPlayerCookie} from './account-session.mjs';
@@ -2219,6 +2219,14 @@ async function handleMyInsights(request,{mobile=false}={}) {
   }));
 }
 
+async function handleMyInsightDecision(request,{mobile=false}={}) {
+  const owner=await authenticatedProfilePlayer(request,{mobile});
+  const params=new URL(request.url).searchParams;
+  return json(await loadDraftRunInsightDecision(query,owner,{
+    session_id:params.get('session_id'),round:params.get('round'),puzzle_id:params.get('puzzle_id'),
+  }));
+}
+
 async function handleMyProfile(request) {
   const id = await player(request);
   const meta = await profileMetaByPlayer(id);
@@ -2522,6 +2530,7 @@ async function route(request) {
   if (request.method === 'GET' && url.pathname === '/v1/mobile/account/session') return handleMobileAccount(request);
   if (request.method === 'GET' && url.pathname === '/v1/mobile/profile/me') return handleMobileMyProfile(request);
   if (request.method === 'GET' && url.pathname === '/v1/mobile/profile/insights') return handleMyInsights(request,{mobile:true});
+  if (request.method === 'GET' && url.pathname === '/v1/mobile/profile/insights/decision') return handleMyInsightDecision(request,{mobile:true});
   if (request.method === 'GET' && url.pathname === '/v1/mobile/profile/history') return handleMobileMyHistory(request);
   if (request.method === 'PATCH' && url.pathname === '/v1/mobile/profile') return handleProfileUpdate(request,{mobile:true});
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/signout') return handleMobileSignout(request);
@@ -2530,6 +2539,7 @@ async function route(request) {
   if (request.method === 'GET' && url.pathname === '/v1/account/daily-dates') return handleDates(request);
   if (request.method === 'GET' && url.pathname === '/v1/profile/me') return handleMyProfile(request);
   if (request.method === 'GET' && url.pathname === '/v1/profile/insights') return handleMyInsights(request);
+  if (request.method === 'GET' && url.pathname === '/v1/profile/insights/decision') return handleMyInsightDecision(request);
   if (request.method === 'PATCH' && url.pathname === '/v1/profile') return handleProfileUpdate(request);
   if (request.method === 'GET' && url.pathname === '/v1/profile/history') return handleMyHistory(request);
   if (request.method === 'POST' && url.pathname === '/v1/profile-lookup') return handleProfileLookup(request);

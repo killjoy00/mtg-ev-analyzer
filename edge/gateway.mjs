@@ -80,8 +80,8 @@ function permitted(service,path,method,search,mode) {
     if(method==='GET'&&[
       '/v1/account/session','/v1/account/daily-dates','/v1/account/google/callback',
       '/v1/mobile/account/google/callback','/v1/mobile/account/session','/v1/mobile/version',
-      '/v1/mobile/profile/me','/v1/mobile/profile/insights','/v1/mobile/profile/history',
-      '/v1/stats','/v1/profile/me','/v1/profile/insights','/v1/profile/history','/v1/patreon/status',
+      '/v1/mobile/profile/me','/v1/mobile/profile/insights','/v1/mobile/profile/insights/decision','/v1/mobile/profile/history',
+      '/v1/stats','/v1/profile/me','/v1/profile/insights','/v1/profile/insights/decision','/v1/profile/history','/v1/patreon/status',
     ].includes(path))return true;
     if(method==='GET'&&/^\/v1\/profile\/[a-f0-9]{16}(?:\/history)?$/.test(path))return true;
     if(method==='GET'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}$/.test(path))return true;
@@ -173,7 +173,7 @@ function mobileSessionRoute(service,path,method) {
     if(method==='POST'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}\/(report|block)$/.test(path))return true;
     if(method==='DELETE'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}\/block$/.test(path))return true;
     if(method==='GET'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}$/.test(path))return true;
-    return method==='GET'&&['/v1/mobile/account/session','/v1/mobile/profile/me','/v1/mobile/profile/insights','/v1/mobile/profile/history'].includes(path);
+    return method==='GET'&&['/v1/mobile/account/session','/v1/mobile/profile/me','/v1/mobile/profile/insights','/v1/mobile/profile/insights/decision','/v1/mobile/profile/history'].includes(path);
   }
   if(service!=='draft')return false;
   if(method==='POST'&&path==='/v1/runs')return true;
@@ -191,7 +191,7 @@ function mobileAccountRoute(service,path,method) {
     if(method==='POST'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}\/(report|block)$/.test(path))return true;
     if(method==='DELETE'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}\/block$/.test(path))return true;
     if(method==='GET'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}$/.test(path))return true;
-    return method==='GET'&&['/v1/mobile/account/session','/v1/mobile/profile/me','/v1/mobile/profile/insights','/v1/mobile/profile/history'].includes(path);
+    return method==='GET'&&['/v1/mobile/account/session','/v1/mobile/profile/me','/v1/mobile/profile/insights','/v1/mobile/profile/insights/decision','/v1/mobile/profile/history'].includes(path);
   }
   if(service!=='draft')return false;
   if(method==='POST'&&path==='/v1/runs')return true;
