@@ -153,8 +153,8 @@ test('accessibility tab bar keeps real navigation events, hidden routes and keyb
     assert.deepEqual(buttons()[0].props.accessibilityState, { selected: true });
     assert.equal(root.root.findByType('ScrollView').props.horizontal, true,
       'AX-XXXL phone uses a horizontally scrollable row, not a three-row bottom bar');
-    assert.ok(buttons().every(node => flattenStyle(node.props.style).width >= 270),
-      'Every AX-XXXL destination has width for complete large-text labels');
+    assert.ok(buttons().every(node => flattenStyle(node.props.style).width >= 200),
+      'Every AX-XXXL destination has a scaled-width tile for complete labels');
     assert.ok(root.root.findAllByType('Text').every(node =>
       node.props.numberOfLines === undefined && node.props.allowFontScaling === undefined),
       'System text scaling must not be truncated or capped');
@@ -194,6 +194,13 @@ test('accessibility tab bar keeps real navigation events, hidden routes and keyb
       'Narrow iPhone switches to scrolling before a three-row grid is needed');
     assert.ok(buttons().every(node => flattenStyle(node.props.style).width >= 112));
 
+    dimensions = { width: 1032, height: 1376, fontScale: 3.571 };
+    await act(async () => root.update(element()));
+    assert.equal(root.root.findAllByType('ScrollView').length, 0,
+      'Roomy iPad retains its existing single-row, five-destination layout');
+    assert.ok(buttons().every(node => flattenStyle(node.props.style).width >= 200));
+    assert.equal(Math.floor(1032 / flattenStyle(buttons()[0].props.style).width), 5);
+
     dimensions = { width: 440, height: 956, fontScale: 3.571 };
     await act(async () => root.update(element()));
     for (const index of [1, 2, 4]) descriptors[String(index)].options.tabBarItemStyle = { display: 'none' };
@@ -204,7 +211,7 @@ test('accessibility tab bar keeps real navigation events, hidden routes and keyb
     dimensions = { width: 840, height: 400, fontScale: 3.571 };
     await act(async () => root.update(element()));
     assert.equal(root.root.findByType('ScrollView').props.horizontal, true, 'Short windows retain content space with a scrollable bar');
-    assert.ok(buttons().every(node => flattenStyle(node.props.style).width >= 270),
+    assert.ok(buttons().every(node => flattenStyle(node.props.style).width >= 200),
       'Landscape tab width respects enlarged text and scrolls horizontally');
     dimensions = { width: 440, height: 956, fontScale: 1 };
     await act(async () => root.update(element()));
