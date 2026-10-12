@@ -167,7 +167,9 @@ function journeyMarkup(data) {
     chart+
     (journey.total_windows>windows.length?'<p class="my-insights-note">Showing the latest '+
       windows.length+' of '+journey.total_windows+' windows.</p>':'')+
-    '<h3 class="my-insights-subheading">Recent vs previous 40 picks</h3>'+progressMarkup(data)+
+    '<h3 class="my-insights-subheading">Recent vs previous 40 picks</h3>'+
+    (journey.versions_comparable?progressMarkup(data):
+      '<p class="my-insights-note">Recorded windows span incompatible source/scoring versions; a progress comparison is unavailable.</p>')+
     (milestone?'<h3 class="my-insights-subheading">Your milestones</h3><ol class="my-insights-milestones">'+milestone+'</ol>':'')+
     '<p class="my-insights-note">'+esc(journey.note||'Historical model and card-pool versions may differ.')+'</p>'+
     '<h3 class="my-insights-subheading">Pacific calendar months</h3>'+monthMarkup(data.months)+'</section>';
@@ -189,6 +191,10 @@ function lockedDecisionMarkup(value) {
     ).join('')+'</div>'+
     (value.prior_picks?.length?'<h4>Original drafter’s previous selections</h4><div class="my-insights-original-pool">'+
       value.prior_picks.map(c=>'<span>'+esc(c.name)+'</span>').join('')+'</div>':'')+
+    '<details class="my-insights-original-analysis"><summary>Why this score? Saved alternatives</summary>'+
+      '<ol>'+((value.ranking||[]).filter(r=>r.score!=null).map(r=>'<li>'+esc(r.name)+
+      ': '+number(r.score)+'/100'+(r.id===chosen?.id?' · Your pick':'')+
+      (r.id===trophy?.id?' · Trophy pick':'')+'</li>').join(''))+'</ol></details>'+
     '<p class="my-insights-note">This is a read-only record of your original selection. Its awarded score is unchanged.</p>'+
     (value.trophy_drafter?.record?'<p class="my-insights-note">The verified source trophy draft finished '+esc(value.trophy_drafter.record)+'.</p>':'')+
     (value.trophy_drafter?.win_rate!=null?'<p class="my-insights-note">The archived drafter’s overall game win rate was about '+
