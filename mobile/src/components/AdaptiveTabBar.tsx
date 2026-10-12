@@ -12,13 +12,25 @@ export function AdaptiveTabBar(props: BottomTabBarProps) {
   const reportHeight = useContext(BottomTabBarHeightCallbackContext);
   const [keyboardVisible, setKeyboardVisible] = useState(false);
   const scroller = useRef<ScrollView>(null);
-  const enlarged = fontScale > 1.8;
+  // Switch before medium Dynamic Type squeezes the five destinations into narrow slots.
+  const enlarged = fontScale > 1.35;
   const shortWindow = height < 500;
-  const available = width - props.insets.left - props.insets.right;
+  const available = Math.max(1, width - props.insets.left - props.insets.right);
   const routes = props.state.routes.filter(route => props.descriptors[route.key] &&
     StyleSheet.flatten(props.descriptors[route.key]!.options.tabBarItemStyle)?.display !== 'none');
-  const columns = Math.max(1, Math.min(routes.length, Math.max(2, Math.floor(available / (56 * fontScale)))));
-  const itemWidth = shortWindow ? Math.max(180, 72 * fontScale) : available / columns;
+  // Avoid forcing two unreadably narrow columns at AX-XXXL. A grid that needs
+  // three or more rows consumes too much of the screen: use a single scrollable
+  // row with wide, intrinsically growing labels instead.
+  // A scaled minimum retains one-row navigation on roomy iPads (where short
+  // labels already fit) without forcing cramped columns on small phones.
+  const minimumItemWidth = Math.ceil(Math.max(112, 56 * fontScale));
+  const columns = Math.max(1, Math.min(routes.length, Math.floor(available / minimumItemWidth)));
+  const rows = Math.ceil(routes.length / columns);
+  const scrollHorizontally = shortWindow || rows > 2 ||
+    (fontScale > 2.3 && rows > 1 && available < 600);
+  const itemWidth = scrollHorizontally
+    ? Math.min(available, Math.max(minimumItemWidth, shortWindow ? 180 : 0))
+    : available / columns;
   const selectedKey = props.state.routes[props.state.index]?.key;
   const selectedIndex = routes.findIndex(route => route.key === selectedKey);
   useEffect(() => {
@@ -30,9 +42,9 @@ export function AdaptiveTabBar(props: BottomTabBarProps) {
     if (enlarged && keyboardVisible) reportHeight?.(0);
   }, [enlarged, keyboardVisible, reportHeight]);
   useEffect(() => {
-    if (enlarged && shortWindow && selectedIndex >= 0)
+    if (enlarged && scrollHorizontally && selectedIndex >= 0)
       scroller.current?.scrollTo({ x: selectedIndex * itemWidth, animated: false });
-  }, [enlarged, shortWindow, selectedIndex, itemWidth]);
+  }, [enlarged, scrollHorizontally, selectedIndex, itemWidth]);
   if (!enlarged) return <BottomTabBar {...props} />;
   if (keyboardVisible) return null;
 
@@ -62,10 +74,11 @@ export function AdaptiveTabBar(props: BottomTabBarProps) {
   return <View onLayout={event => {
     reportHeight?.(event.nativeEvent.layout.height);
     if (config.screenshots.fixtures) console.info('PACKONE_TAB_LAYOUT', JSON.stringify({ kind: 'bar', label: 'navigation',
-      labels: routes.map(route => props.descriptors[route.key]!.options.title), windowHeight: height, ...event.nativeEvent.layout }));
+      labels: routes.map(route => props.descriptors[route.key]!.options.title), windowHeight: height,
+      layoutMode: scrollHorizontally ? 'horizontal-scroll' : 'grid', fontScale, ...event.nativeEvent.layout }));
   }}
     style={[styles.bar, { paddingLeft: props.insets.left, paddingRight: props.insets.right, paddingBottom: Math.max(props.insets.bottom, 8) }]}>
-    {shortWindow ? <ScrollView ref={scroller} horizontal style={styles.scroller}
+    {scrollHorizontally ? <ScrollView ref={scroller} horizontal style={styles.scroller}
       onContentSizeChange={() => scroller.current?.scrollTo({ x: Math.max(0, selectedIndex) * itemWidth, animated: false })}
       showsHorizontalScrollIndicator accessibilityHint="Swipe left or right for more destinations">
       {items}
