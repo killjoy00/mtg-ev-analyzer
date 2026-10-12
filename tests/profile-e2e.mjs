@@ -336,7 +336,7 @@ try {
   assert.equal(await reviewButton.evaluate(node=>document.activeElement===node),true,
     'dialog close restores focus to its original review button');
   await page.getByRole('tab',{name:'Biggest Misses'}).click();
-  await page.locator('#my-insights-misses-panel').getByText(/32\/100/).waitFor();
+  await page.locator('#my-insights-misses-panel .my-insights-pick-info small').getByText(/Original score 32\/100/).waitFor();
   await page.getByRole('tab',{name:'Best Calls'}).click();
   assert.match(await page.locator('.my-insights-journey-point').first().textContent(),/Sep 1–Sep 14/,
     'old response date-only windows have compact readable dates');
