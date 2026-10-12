@@ -34,6 +34,7 @@ export type DraftingJourney = {version:string;eligible_decisions:number;window_s
   milestones:{id:string;date:string;from_at?:string;to_at?:string;text:string;count:number;average_score?:number;hard_decisions?:number}[];
   limited:boolean;note:string;progress_compatible?:boolean};
 export type InsightCard = {id:string;name:string;image_url:string|null;mana_cost?:string|null;rarity?:string|null;type_line?:string|null};
+export type InsightDecisionLocator = {session_id:string;round:number;puzzle_id:string};
 export type InsightHighlight = {session_id:string;round:number;puzzle_id:string;set_id:string;
   environment:InsightsEnvironment;pick_number:number;date:string;score:number;
   trophy_match:boolean;selection_kind:string;reason_version?:string;reason_code?:string;reason_text?:string;
@@ -85,7 +86,7 @@ export async function loadMobileInsights(session: MobileSession, environment: In
   });
 }
 
-export async function loadMobileInsightDecision(session: MobileSession, item: InsightHighlight): Promise<InsightDecision> {
+export async function loadMobileInsightDecision(session: MobileSession, item: InsightDecisionLocator): Promise<InsightDecision> {
   if (!session.accountToken) throw Error('Sign in to view your saved picks.');
   const params=new URLSearchParams({
     session_id:item.session_id,round:String(item.round),puzzle_id:item.puzzle_id,
