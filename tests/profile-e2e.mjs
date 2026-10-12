@@ -362,6 +362,13 @@ try {
   assert.match(await page.locator('#my-insights-best-panel .my-insights-pick.is-featured').textContent(),/hard-rated decisions/);
   assert.match(await page.locator('#my-insights-best-panel .my-insights-pick.is-compact').nth(0).textContent(),/Skyguard Captain/);
   assert.match(await page.locator('#my-insights-best-panel .my-insights-pick.is-compact').nth(1).textContent(),/Luminous Oath/);
+  // Captured before filters change: one real-looking headline and exactly three
+  // fully populated examples; capture both the phone and desktop presentation.
+  await page.screenshot({path:'artifacts/ui-profile-insights-populated-390.png',fullPage:true});
+  await page.setViewportSize({width:1440,height:900});
+  await noOverflow();
+  await page.screenshot({path:'artifacts/ui-profile-insights-populated-desktop.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});
   assert.equal(await page.locator('.my-insights-explore').evaluate(node=>node.open),false,
     'supporting breakdowns start collapsed');
   const reviewButton=page.getByRole('button',{name:'Review original pack'}).first();
