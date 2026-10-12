@@ -356,6 +356,7 @@ export default function InsightsScreen() {
   const [detailPhase,setDetailPhase]=useState<'idle'|'loading'|'ready'|'error'>('idle');
   const [morePhase,setMorePhase]=useState<'idle'|'loading'|'error'>('idle');
   const detailTicket=useRef(0);
+  const manualEnvironment=useRef(false);
   const requestId = useRef(0);
   const activeOwner = useRef('');
 
@@ -381,6 +382,11 @@ export default function InsightsScreen() {
       if (!current?.accountToken || identity(current) !== owner) {
         activeOwner.current = ''; setData(null); setPhase('signed-out'); return;
       }
+      if(!manualEnvironment.current&&environment==='mixed'&&response.default_environment&&
+        response.default_environment!=='mixed'&&environments.some(v=>v.value===response.default_environment)){
+        setEnvironment(response.default_environment);
+        return;
+      }
       setData(response);
       setPhase('ready');
     } catch (error: unknown) {
@@ -403,6 +409,7 @@ export default function InsightsScreen() {
     setDetailPhase('idle');
     setMorePhase('idle');
     activeOwner.current = current;
+    manualEnvironment.current=false;
     setData(null);
     setPhase(current ? 'loading' : 'signed-out');
     if (current) void load();
@@ -475,9 +482,10 @@ export default function InsightsScreen() {
           onPress={() => router.push('/account')} style={styles.tab}><Text style={styles.tabText}>Account settings</Text></Pressable>
       </View>
       <Text accessibilityRole="header" style={styles.heading}>Your Drafting Insights</Text>
-      <Text style={styles.intro}>Explore how your real draft decisions vary by pick, format and difficulty.</Text>
+      {phase==='ready'&&data?.drafting_dna?<DNASummary dna={data.drafting_dna}
+        cardChoices={data.card_choices} onReview={reviewDetail}/>:null}
       <View style={styles.filters}>
-        <ChoiceRow name="Environment" values={environments} selected={environment} onChange={setEnvironment} />
+        <ChoiceRow name="Environment" values={environments} selected={environment} onChange={value=>{manualEnvironment.current=true;setEnvironment(value);}} />
         <ChoiceRow name="Time period" values={periods} selected={period} onChange={setPeriod} />
       </View>
       {phase === 'loading' ? <View style={styles.notice}><ActivityIndicator accessibilityLabel="Loading Insights" /><Text style={styles.body}>Loading your private drafting decisions…</Text></View> : null}
@@ -491,17 +499,30 @@ export default function InsightsScreen() {
       </Section> : null}
       {phase === 'ready' && data ? <>
         <Text style={styles.summary}>{num(data.eligible_decisions)} eligible decisions · {data.environment_label} · {periods.find(p => p.value === period)?.label}</Text>
-        <InsightSections data={data} detail={detail} detailPhase={detailPhase}
-          onReview={reviewDetail} onClose={closeDetail}
+        <InsightSections data={data} onReview={reviewDetail}
           onLoadMore={()=>void loadMore()} morePhase={morePhase}/>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>How these insights are calculated</Text>
-          <Text style={styles.caption}>{data.methodology}</Text>
-        </View>
       </> : null}
       <Pressable accessibilityRole="button" onPress={() => void load()} style={styles.secondaryButton}><Text style={styles.secondaryText}>Refresh Insights</Text></Pressable>
       <AboutLink />
     </ScrollView>
+    {detailPhase!=='idle'?<Modal visible animationType="slide" onRequestClose={closeDetail}
+      presentationStyle="pageSheet" accessibilityViewIsModal>
+      <SafeAreaView style={styles.safe}>
+        <ScrollView contentContainerStyle={styles.page}>
+          {detailPhase==='loading'?<View style={styles.notice}>
+            <ActivityIndicator accessibilityLabel="Loading saved decision"/>
+            <Text style={styles.body}>Loading your original pack…</Text>
+          </View>:null}
+          {detailPhase==='error'?<View style={styles.section}>
+            <Text accessibilityRole="alert" style={styles.body}>This original decision could not be loaded.</Text>
+            <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={closeDetail}>
+              <Text style={styles.secondaryText}>Close original pack</Text>
+            </Pressable>
+          </View>:null}
+          {detailPhase==='ready'&&detail?<SavedDecisionDetail detail={detail} onClose={closeDetail}/>:null}
+        </ScrollView>
+      </SafeAreaView>
+    </Modal>:null}
   </SafeAreaView>;
 }
 
