@@ -51,11 +51,21 @@ async function mount(t,{initial=session(),respond=async (_s,env)=>fixture(env)}=
   const mocks={
     'expo-router':{router:{push:v=>routes.push(['push',v]),dismissTo:v=>routes.push(['dismiss',v])},
       Stack:{Screen:host('StackScreen')},useFocusEffect:callback=>React.useEffect(callback,[callback])},
-    'react-native':{ActivityIndicator:host('ActivityIndicator'),Pressable:host('Pressable'),
+    'react-native':{ActivityIndicator:host('ActivityIndicator'),Image:host('Image'),Pressable:host('Pressable'),
       ScrollView:host('ScrollView'),StyleSheet:{create:v=>v},View:host('View')},
     '@/src/components/AboutLink':{AboutLink:host('AboutLink')},
     '@/src/api/insights':{loadMobileInsights:async(s,env,period)=>{
       calls.push([s.accountToken,env,period]);return respond(s,env,period);
+    },loadMobileInsightDecision:async(s,item)=>{
+      calls.push([s.accountToken,'decision',item.puzzle_id]);
+      return {set_id:'neo',pick_number:item.pick_number,score:item.score,trophy_match:false,
+        selected:{id:'mine',name:'Verdant Rebirth',image_url:'https://cards.scryfall.io/large/front/1.jpg'},
+        trophy:{id:'trophy',name:'Swiftwater Cliffs',image_url:null},
+        candidates:[{id:'mine',name:'Verdant Rebirth',image_url:'https://cards.scryfall.io/large/front/1.jpg'},
+          {id:'trophy',name:'Swiftwater Cliffs',image_url:null}],
+        prior_picks:[{id:'prior',name:'Mystic Monastery',image_url:null}],
+        trophy_drafter:{record:'7–0',win_rate:64},scoring_version:'v1',corpus_version:'v1',
+        answered_at:'2026-09-12T00:00:00Z'};
     }},
     '@/src/api/client':{ApiError:class ApiError extends Error{constructor(message,status){super(message);this.status=status;}}},
     '@/src/api/guest':{ensureGuestSession:async()=>stored||{playerToken:'synthetic-guest',accountToken:null}},
@@ -138,6 +148,50 @@ test('under-sampled descriptive groups are not represented as measured patterns'
   assert.ok(view.includes('Across 8 eligible Mixed decisions'));
   assert.ok(!view.includes('Your most-recorded source pick position'),'3-pick group must not produce average copy');
   assert.ok(!view.includes('Your most recent 40 picks averaged'),'missing windows must not produce trend');
+});
+
+test('native scouting report renders evidence-backed DNA, original cards and Journey with owner-only review',async t=>{
+  const initial=fixture('mixed');
+  const advanced={...initial,
+    drafting_dna:{schema_version:'drafting-dna-v1',status:'ready',scope:'all-eligible-history',
+      eligible_decisions:237,primary:{status:'qualified',id:'independent-thinker',
+        title:'The Independent Thinker',evidence_family:'alternatives',
+        summary:'You made strong alternatives.',supporting_decisions:237,
+        evidence:[{label:'Strong alternatives',value:48}]},
+      secondary:[{status:'qualified',id:'closer',title:'The Closer',summary:'Later picks scored higher.',
+        evidence_family:'pick-depth',supporting_decisions:90,evidence:[{label:'Late picks',value:44}]},
+        {status:'emerging',label:'Trait still developing'}],
+      note:'Original scores only.'},
+    journey:{version:'drafting-journey-v1',eligible_decisions:80,window_size:40,
+      windows:[{id:'window-0',from:'2026-09-01',to:'2026-09-09',count:40,
+        average_score:69,complete:true,cohort:'c1'},
+        {id:'window-1',from:'2026-09-10',to:'2026-09-20',count:40,
+          average_score:81,complete:true,cohort:'c1'}],
+      total_windows:2,versions_comparable:true,milestones:[{id:'first-40',date:'2026-09-09',
+        text:'First 40 decisions',count:40}],note:'True recorded scores.',limited:false},
+    highlights:{schema_version:'decision-highlights-v1',note:'Original selections',
+      best:[{session_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',round:1,puzzle_id:'fixture-1',
+        set_id:'neo',environment:'mixed',pick_number:3,date:'2026-09-12',score:91,
+        trophy_match:false,preview:{selected:{id:'mine',name:'Verdant Rebirth',image_url:'https://cards.scryfall.io/large/front/1.jpg'},
+          trophy:{id:'trophy',name:'Swiftwater Cliffs',image_url:null}}}],
+      misses:[{session_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',round:2,puzzle_id:'fixture-2',
+        set_id:'neo',environment:'mixed',pick_number:4,date:'2026-09-13',score:24,
+        trophy_match:false,preview:{selected:{id:'mine',name:'Verdant Rebirth',image_url:null},
+          trophy:{id:'trophy',name:'Swiftwater Cliffs',image_url:null}}}]},
+  };
+  const ui=await mount(t,{respond:async()=>advanced});
+  for(const piece of ['Your Drafting DNA','The Independent Thinker','The Closer','Trait still developing',
+    'Your Best Calls & Biggest Misses','Your Drafting Journey','69.0','81.0','Verdant Rebirth']) {
+    assert.ok(ui.text().includes(piece),'Missing scouting UI: '+piece);
+  }
+  await ui.choose('Review original pack');
+  for(const piece of ['Original saved pack','Swiftwater Cliffs','Mystic Monastery','7–0']){
+    assert.ok(ui.text().includes(piece),'Original detail missing '+piece);
+  }
+  assert.ok(ui.calls.some(x=>x[1]==='decision'&&x[2]==='fixture-1'));
+  await ui.switchAccount(null);
+  assert.ok(ui.text().includes('Sign in to see your Insights'));
+  assert.ok(!ui.text().includes('Verdant Rebirth'));
 });
 
 test('native Insights clears private data after logout and blocks old-owner responses',async t=>{
