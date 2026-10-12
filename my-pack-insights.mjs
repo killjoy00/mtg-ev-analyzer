@@ -1,5 +1,5 @@
 import {escapeHtml as esc} from './html.mjs';
-import {loadMyInsights} from './growth-api.mjs';
+import {loadMyInsights,firstPartyAuthEnabled,ensurePackSession,storedAccountToken} from './growth-api.mjs';
 
 let generation=0;
 const mounted=new WeakMap();
@@ -90,12 +90,167 @@ function observationsMarkup(data) {
       : '<p class="my-pack-empty">The pick, difficulty and progress charts below show every supported group as you collect more decisions.</p>');
 }
 
+// The private API owns the identity and evidence rules; the browser is purely
+// a presenter. Unknown/older API revisions retain the original Insights UI.
+function dnaMarkup(data) {
+  const dna=data.drafting_dna;
+  if(!dna)return '';
+  const trait=(v,primary=false)=>v?.status==='qualified'
+    ?'<article class="my-insights-trait'+(primary?' is-primary':'')+'"><strong>'+esc(v.title)+'</strong>'+
+      '<p>'+esc(v.summary)+'</p><details><summary>Why this fits · '+number(v.supporting_decisions)+' decisions</summary>'+
+      '<ul>'+((v.evidence||[]).map(e=>'<li>'+esc(e.label)+': <strong>'+esc(String(e.value))+'</strong></li>').join(''))+
+      '</ul></details></article>'
+    :'<article class="my-insights-trait is-emerging"><strong>'+(primary?'Your Drafting DNA is taking shape':'Trait still developing')+
+      '</strong><p>More comparable first-time decisions are needed for a supported label.</p></article>';
+  return '<section class="my-pack-card my-insights-wide my-insights-dna">'+
+    '<div class="my-card-heading"><h2>Your Drafting DNA</h2><span>All eligible first-time decisions</span></div>'+
+    '<div class="my-insights-trait-hero">'+trait(dna.primary,true)+'</div>'+
+    '<div class="my-insights-trait-secondary">'+(dna.secondary||[]).slice(0,2).map(v=>trait(v)).join('')+'</div>'+
+    '<p class="my-insights-note">'+esc(dna.note||'Traits describe your recorded choices, not your innate abilities.')+'</p></section>';
+}
+function safeCardImage(url) {
+  try {const p=new URL(url);return p.protocol==='https:'?p.href:null;}catch{return null;}
+}
+function cardVisual(card,label) {
+  const safe=safeCardImage(card?.image_url);
+  return '<div class="my-insights-art">'+(safe
+    ?'<img src="'+esc(safe)+'" alt="'+esc(card?.name||label)+'" loading="lazy">'
+    :'<span role="img" aria-label="Card image unavailable">'+esc(card?.name||label)+'</span>')+'</div>';
+}
+function highlightCards(rows,kind) {
+  if(!rows?.length)return '<p class="my-pack-empty">No qualifying saved picks in this group yet.</p>';
+  return '<div class="my-insights-card-row">'+rows.map(row=>{
+    const pick=row.preview?.selected,trophy=row.preview?.trophy;
+    return '<article class="my-insights-pick">'+
+      '<div class="my-insights-pick-art">'+cardVisual(pick,pick?.name||'Your saved card')+
+        (trophy&&trophy.id!==pick?.id?cardVisual(trophy,'Trophy pick'):'')+'</div>'+
+      '<div class="my-insights-pick-info"><strong>'+esc(pick?.name||'Your saved pick')+'</strong>'+
+        '<small>'+esc(row.set_id)+' · P1P'+Number(row.pick_number)+' · '+esc(row.date)+'</small>'+
+        '<span>'+number(row.score)+'/100 · '+esc(row.trophy_match?'Matched the trophy pick':'Alternative selection')+'</span>'+
+        '<button type="button" class="button secondary" data-insights-review data-session="'+esc(row.session_id)+'"'+
+        ' data-round="'+Number(row.round)+'" data-puzzle="'+esc(row.puzzle_id)+'">Review original pack</button></div></article>';
+  }).join('')+'</div>';
+}
+function highlightsMarkup(data) {
+  if(!data.highlights)return '';
+  return '<section class="my-pack-card my-insights-wide my-insights-highlights"><div class="my-card-heading">'+
+    '<h2>Your Best Calls & Biggest Misses</h2><span>Actual decisions · original scored picks</span></div>'+
+    '<p class="my-insights-note">Scores follow Pack One’s historical model and trophy-pick objective. An alternative pick is not necessarily wrong.</p>'+
+    '<div role="tablist" aria-label="Saved decision highlights" class="my-insights-highlight-tabs">'+
+      '<button type="button" role="tab" id="my-insights-best-tab" aria-selected="true" aria-controls="my-insights-best-panel" data-insights-tab="best">Best Calls</button>'+
+      '<button type="button" role="tab" id="my-insights-misses-tab" aria-selected="false" aria-controls="my-insights-misses-panel" data-insights-tab="misses">Biggest Misses</button></div>'+
+    '<div id="my-insights-best-panel" role="tabpanel" aria-labelledby="my-insights-best-tab">'+highlightCards(data.highlights.best,'best')+'</div>'+
+    '<div id="my-insights-misses-panel" role="tabpanel" aria-labelledby="my-insights-misses-tab" hidden>'+
+      highlightCards(data.highlights.misses,'misses')+'</div>'+
+    '<div id="my-insights-decision" aria-live="polite"></div></section>';
+}
+function journeyMarkup(data) {
+  const journey=data.journey;
+  if(!journey)return '<section class="my-pack-card my-insights-wide">'+
+    '<div class="my-card-heading"><h2>Progress over time</h2><span>Most recent vs earlier picks</span></div>'+
+    progressMarkup(data)+'<h3 class="my-insights-subheading">Pacific calendar months</h3>'+monthMarkup(data.months)+'</section>';
+  const windows=journey.windows||[];
+  const chart=windows.length?'<div class="my-insights-journey-timeline" role="list" aria-label="Recorded score windows">'+
+    windows.map(w=>'<div class="my-insights-journey-point" role="listitem" aria-label="'+
+      esc(w.from+' to '+w.to+', '+w.count+' decisions, average '+(w.average_score??'unavailable')+' points'+
+      (w.complete?'':' incomplete window'))+'">'+
+      '<strong>'+esc(w.average_score==null?'—':score(w.average_score))+'</strong>'+
+      '<div class="my-insights-journey-track" aria-hidden="true"><i style="height:'+
+      Math.max(0,Math.min(100,Number(w.average_score||0)))+'%"></i></div>'+
+      '<small>'+esc(w.to)+'<span>'+w.count+(w.complete?'':'*')+' picks</span></small></div>').join('')+
+    '</div>':'<p class="my-pack-empty">Your timeline will grow as you record first-time decisions.</p>';
+  const milestone=(journey.milestones||[]).map(m=>'<li><strong>'+esc(m.text)+'</strong> · '+
+    esc(m.date)+(m.average_score!=null?' · '+score(m.average_score)+'/100':'')+'</li>').join('');
+  return '<section class="my-pack-card my-insights-wide my-insights-journey">'+
+    '<div class="my-card-heading"><h2>Your Drafting Journey</h2><span>Original scores · dated decisions</span></div>'+
+    '<p class="my-insights-note">Each complete window contains 40 first-encounter decisions. An asterisk marks a partial window.</p>'+
+    chart+
+    (journey.total_windows>windows.length?'<p class="my-insights-note">Showing the latest '+
+      windows.length+' of '+journey.total_windows+' windows.</p>':'')+
+    '<h3 class="my-insights-subheading">Recent vs previous 40 picks</h3>'+progressMarkup(data)+
+    (milestone?'<h3 class="my-insights-subheading">Your milestones</h3><ol class="my-insights-milestones">'+milestone+'</ol>':'')+
+    '<p class="my-insights-note">'+esc(journey.note||'Historical model and card-pool versions may differ.')+'</p>'+
+    '<h3 class="my-insights-subheading">Pacific calendar months</h3>'+monthMarkup(data.months)+'</section>';
+}
+function lockedDecisionMarkup(value) {
+  const chosen=value.selected,trophy=value.trophy,other=trophy?.id!==chosen?.id;
+  const pack=value.candidates||[];
+  return '<section class="my-insights-locked-pack" aria-label="Original saved draft pack">'+
+    '<div class="my-card-heading"><h3>Review original pack</h3><button type="button" class="button secondary" data-insights-close>Close</button></div>'+
+    '<p>'+esc(value.set_id)+' · P1P'+Number(value.pick_number)+' · '+number(value.score)+'/100 · '+
+      esc(value.answered_at?.slice(0,10)||'')+'</p>'+
+    '<div class="my-insights-locked-choices"><figure>'+cardVisual(chosen,'Your pick')+
+      '<figcaption>Your pick: '+esc(chosen?.name||'Unknown')+'</figcaption></figure>'+
+      (other?'<figure>'+cardVisual(trophy,'Trophy pick')+'<figcaption>Trophy pick: '+
+        esc(trophy?.name||'Unknown')+'</figcaption></figure>':'')+'</div>'+
+    '<h4>The original pack</h4><div class="my-insights-original-pack">'+pack.map(c=>
+      '<figure>'+cardVisual(c,c.name)+'<figcaption>'+esc(c.name)+
+      (c.id===chosen?.id?' · Your pick':'')+(c.id===trophy?.id?' · Trophy pick':'')+'</figcaption></figure>'
+    ).join('')+'</div>'+
+    (value.prior_picks?.length?'<h4>Original drafter’s previous selections</h4><div class="my-insights-original-pool">'+
+      value.prior_picks.map(c=>'<span>'+esc(c.name)+'</span>').join('')+'</div>':'')+
+    '<p class="my-insights-note">This is a read-only record of your original selection. Its awarded score is unchanged.</p>'+
+    (value.trophy_drafter?.record?'<p class="my-insights-note">The verified source trophy draft finished '+esc(value.trophy_drafter.record)+'.</p>':'')+
+    (value.trophy_drafter?.win_rate!=null?'<p class="my-insights-note">The archived drafter’s overall game win rate was about '+
+      esc(String(value.trophy_drafter.win_rate))+'%; that is not this card’s win rate.</p>':'')+'</section>';
+}
+async function loadSavedInsightDecision({session_id,round,puzzle_id}) {
+  const base=String(window.PACK1_API?.growthUrl||window.PACK1_API?.url||'').replace(/\/$/,'');
+  if(!/^https:\/\//.test(base))throw Error('Insights server is unavailable.');
+  const params=new URLSearchParams({session_id,round:String(round),puzzle_id});
+  const headers={};
+  if(!firstPartyAuthEnabled()){
+    headers.authorization='Bearer '+await ensurePackSession();
+    const auth=storedAccountToken();
+    if(auth)headers['x-pack1-auth-session']=auth;
+  }
+  const response=await fetch(base+'/v1/profile/insights/decision?'+params.toString(),{
+    method:'GET',headers,credentials:firstPartyAuthEnabled()?'include':'omit',signal:AbortSignal.timeout(20000),
+  });
+  const result=await response.json().catch(()=>({}));
+  if(!response.ok)throw Error(result.error||'Saved decision is unavailable.');
+  return result;
+}
+function bindInsightCards(root,state,ticket,gen) {
+  const current=()=>gen===generation&&ticket===state.ticket&&root.isConnected;
+  root.querySelectorAll('[data-insights-tab]').forEach(button=>button.addEventListener('click',()=>{
+    const chosen=button.dataset.insightsTab;
+    for(const other of root.querySelectorAll('[data-insights-tab]')){
+      other.setAttribute('aria-selected',String(other.dataset.insightsTab===chosen));
+    }
+    for(const panel of ['best','misses']){
+      const el=root.querySelector('#my-insights-'+panel+'-panel');
+      if(el)el.hidden=panel!==chosen;
+    }
+    const detail=root.querySelector('#my-insights-decision');if(detail)detail.innerHTML='';
+  }));
+  root.querySelectorAll('[data-insights-review]').forEach(button=>button.addEventListener('click',async()=>{
+    const detail=root.querySelector('#my-insights-decision');if(!detail)return;
+    const viewTicket=(state.viewTicket=(state.viewTicket||0)+1);
+    detail.innerHTML='<p role="status">Loading your original pack…</p>';
+    try{
+      const response=await loadSavedInsightDecision({session_id:button.dataset.session,
+        round:Number(button.dataset.round),puzzle_id:button.dataset.puzzle});
+      if(!current()||viewTicket!==state.viewTicket)return;
+      detail.innerHTML=lockedDecisionMarkup(response);
+      detail.querySelector('[data-insights-close]')?.addEventListener('click',()=>{
+        detail.innerHTML='';button.focus();
+      });
+      detail.querySelector('[data-insights-close]')?.focus({preventScroll:true});
+    }catch{
+      if(current()&&viewTicket===state.viewTicket)
+        detail.innerHTML='<p role="alert">That original pack could not be loaded. Try again.</p>';
+    }
+  }));
+}
+
 function insightsContent(data) {
-  if(data.unlocked!==true)return '<section class="my-pack-card" aria-live="polite"><div class="my-card-heading"><h2>Unlock your Drafting Insights</h2></div>'+
+  if(data.unlocked!==true)return '<div class="my-insights-grid">'+dnaMarkup(data)+'<section class="my-pack-card" aria-live="polite"><div class="my-card-heading"><h2>Unlock your Drafting Insights</h2></div>'+
     '<p>Play a few more runs in '+esc(data.environment_label)+'. You have <strong>'+number(data.eligible_decisions)+
     ' of '+data.unlock_at+'</strong> eligible, first-time draft decisions in this period.</p>'+
-    '<a class="button primary" href="/?game=draft-run&daily=1">Play today’s Daily</a></section>';
+    '<a class="button primary" href="/?game=draft-run&daily=1">Play today’s Daily</a></section></div>';
   return '<div class="my-insights-grid">'+
+    dnaMarkup(data)+highlightsMarkup(data)+journeyMarkup(data)+
     '<section class="my-pack-card my-insights-wide"><div class="my-card-heading"><h2>Your patterns</h2><span>Rules-based observations</span></div>'+observationsMarkup(data)+'</section>'+
     '<section class="my-pack-card"><div class="my-card-heading"><h2>Pick-by-pick strengths</h2><span>Actual source picks</span></div>'+
       '<p class="my-insights-note">Average awarded score by real P1P pick number, not the eight-game-decision order. Each displayed average needs at least five picks.</p>'+
@@ -105,8 +260,7 @@ function insightsContent(data) {
       barRows(data.difficulty.map(row=>({...row,label:row.band==='unknown'?'Unknown':row.band[0].toUpperCase()+row.band.slice(1)})))+
       (data.unknown_difficulty?'<p class="my-insights-note">'+number(data.unknown_difficulty)+' decisions have no verified historical difficulty band.</p>':'')+
       '</section>'+
-    '<section class="my-pack-card my-insights-wide"><div class="my-card-heading"><h2>Progress over time</h2><span>Most recent vs earlier picks</span></div>'+
-      progressMarkup(data)+'<h3 class="my-insights-subheading">Pacific calendar months</h3>'+monthMarkup(data.months)+'</section>'+
+
     '<section class="my-pack-card my-insights-wide"><div class="my-card-heading"><h2>Format patterns</h2><span>Different card pools</span></div>'+
       formatsMarkup(data.formats,data.environment)+'</section>'+
     '</div>';
@@ -145,6 +299,7 @@ async function refresh(root,state) {
     const target=root.querySelector('#my-insights-result');
     if(target)target.innerHTML='<p class="my-insights-sample">'+number(response.eligible_decisions)+' eligible decisions · '+
       esc(labelOf(response.environment))+' · '+esc(periodLabel(response.period))+'</p>'+insightsContent(response);
+    if(target)bindInsightCards(root,state,ticket,gen);
   } catch {
     if(gen!==generation||ticket!==state.ticket||!root.isConnected)return;
     const target=root.querySelector('#my-insights-result');
