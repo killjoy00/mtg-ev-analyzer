@@ -269,7 +269,7 @@ function JourneyStory({journey,progress,months}:{
     {journey.windows.length?<ScrollView horizontal contentContainerStyle={styles.journeyWindowRow} accessibilityLabel="Your recorded score timeline">
       {journey.windows.map((w,index)=><View key={w.id} style={styles.journeyWindow}
         accessibilityLabel={insightLocalRange(w)+', '+w.count+' decisions'+(w.complete?'':' incomplete')}>
-        {index>0&&journey.windows[index-1].cohort!==w.cohort?
+        {index>0&&journey.windows[index-1]?.cohort!==w.cohort?
           <Text style={styles.journeyBoundary}>Version changed</Text>:null}
         <Text style={styles.bigScore}>{score(w.average_score)}</Text>
         <View style={styles.journeyTrack}><View style={[styles.journeyFill,
