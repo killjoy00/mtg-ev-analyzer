@@ -19,7 +19,7 @@ function fixture() {
       dismissTo: destination => destinations.push(['dismiss', destination]),
     } },
     'react-native': {
-      Pressable: host('Pressable'), View: host('View'),
+      Pressable: host('Pressable'), View: host('View'), Text: host('Text'),
       StyleSheet: { create: rules => rules }, useWindowDimensions: () => dimensions,
     },
     '@/src/components/Text': { Text: host('Text') },
