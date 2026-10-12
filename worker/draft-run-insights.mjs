@@ -1,5 +1,6 @@
+import {buildDraftingJourney,buildDraftingDNA,selectInsightHighlights,publicLockedDecision} from './draft-run-insights-extras.mjs';
 // Private My Pack One decision insights. Original stored answer score is authoritative.
-export const INSIGHTS_SQL="WITH recent_sessions AS MATERIALIZED (\n  SELECT s.id,s.environment,s.answers,s.scoring_version,s.selection_version,s.corpus_version\n  FROM draft_run_sessions s JOIN players p ON p.id=s.player_id\n  WHERE s.player_id=$1::uuid AND NOT s.measurement_qa\n    AND p.display_name !~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)'\n    AND jsonb_array_length(s.puzzle_ids)=8\n    AND s.selection_version IN ('eight-pick-v3','eight-pick-v4')\n  ORDER BY s.created_at DESC,s.id DESC\n  LIMIT 1000\n)\nSELECT s.id::text session_id,s.environment,s.scoring_version,s.selection_version,s.corpus_version,\n       picked.answer->'puzzle'->>'puzzle_id' puzzle_id,\n       (picked.answer->'puzzle'->>'pick_number')::int pick_number,\n       (picked.answer->>'score')::int score,\n       (picked.answer->>'historicalMatch')::boolean trophy_match,\n       o.answered_at,COALESCE(r.band,'unknown') difficulty_band\nFROM recent_sessions s\nCROSS JOIN LATERAL jsonb_array_elements(s.answers) WITH ORDINALITY picked(answer,ordinality)\nJOIN draft_run_decision_observations o\n  ON o.session_id=s.id AND o.round=picked.ordinality::int AND o.outcome='pick'\n  AND o.puzzle_id=(picked.answer->'puzzle'->>'puzzle_id')\nLEFT JOIN draft_run_puzzle_ratings r ON r.puzzle_id=o.puzzle_id AND r.difficulty_version='support-ratio-v1'\nWHERE jsonb_typeof(picked.answer->'puzzle')='object'\n  AND picked.answer->>'score' ~ '^(100|[0-9]{1,2})$'\n  AND picked.answer->'puzzle'->>'pick_number' ~ '^[0-9]{1,2}$'\n  AND picked.answer->>'historicalMatch' IN ('true','false')\nORDER BY o.answered_at ASC,s.id,picked.ordinality\nLIMIT 8000";
+export const INSIGHTS_SQL="WITH recent_sessions AS MATERIALIZED (\n  SELECT s.id,s.environment,s.answers,s.scoring_version,s.selection_version,s.corpus_version\n  FROM draft_run_sessions s JOIN players p ON p.id=s.player_id\n  WHERE s.player_id=$1::uuid AND NOT s.measurement_qa\n    AND p.display_name !~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)'\n    AND jsonb_array_length(s.puzzle_ids)=8\n    AND s.selection_version IN ('eight-pick-v3','eight-pick-v4')\n  ORDER BY s.created_at DESC,s.id DESC\n  LIMIT 1000\n)\nSELECT s.id::text session_id,s.environment,s.scoring_version,s.selection_version,s.corpus_version,\n       picked.ordinality::int answer_round,\n       picked.answer->>'selectedId' selected_id,picked.answer->>'historicalId' historical_id,\n       picked.answer->>'selectedName' selected_name,picked.answer->>'historicalName' historical_name,\n       picked.answer->'puzzle'->>'set_id' set_id,\n       picked.answer->'puzzle'->>'puzzle_id' puzzle_id,\n       (picked.answer->'puzzle'->>'pick_number')::int pick_number,\n       (picked.answer->>'score')::int score,\n       (picked.answer->>'historicalMatch')::boolean trophy_match,\n       o.answered_at,COALESCE(r.band,'unknown') difficulty_band\nFROM recent_sessions s\nCROSS JOIN LATERAL jsonb_array_elements(s.answers) WITH ORDINALITY picked(answer,ordinality)\nJOIN draft_run_decision_observations o\n  ON o.session_id=s.id AND o.round=picked.ordinality::int AND o.outcome='pick'\n  AND o.puzzle_id=(picked.answer->'puzzle'->>'puzzle_id')\nLEFT JOIN draft_run_puzzle_ratings r ON r.puzzle_id=o.puzzle_id AND r.difficulty_version='support-ratio-v1'\nWHERE jsonb_typeof(picked.answer->'puzzle')='object'\n  AND picked.answer->>'score' ~ '^(100|[0-9]{1,2})$'\n  AND picked.answer->'puzzle'->>'pick_number' ~ '^[0-9]{1,2}$'\n  AND picked.answer->>'historicalMatch' IN ('true','false')\nORDER BY o.answered_at ASC,s.id,picked.ordinality\nLIMIT 8000";
 export const INSIGHTS_SESSION_LIMIT=1000;
 export const INSIGHTS_GROUP_MIN=5;
 export const INSIGHTS_MONTH_MIN=10;
@@ -63,6 +64,10 @@ function normalise(rows) {
     seen.add(id);
     answers.push({
       puzzle_id:id,session_id:String(row.session_id),environment:row.environment,
+      round:Number(row.answer_round),selected_id:String(row.selected_id||''),
+      historical_id:String(row.historical_id||''),
+      selected_name:String(row.selected_name||''),historical_name:String(row.historical_name||''),
+      set_id:String(row.set_id||''),
       score,pick_number:pick,trophy_match:row.trophy_match===true||row.trophy_match==='true'||row.trophy_match==='t',
       difficulty_band:BANDS.includes(row.difficulty_band)?row.difficulty_band:'unknown',
       answered_at:new Date(when).toISOString(),
@@ -144,6 +149,10 @@ export function aggregateDraftRunInsights(source,{environment='mixed',period='al
   }
   proposals.sort((a,b)=>b.count-a.count||b.gap-a.gap||a.id.localeCompare(b.id));
   const observations=proposals.slice(0,3).map(({id,text})=>({id,text}));
+  // DNA uses the complete bounded first-encounter history, not chart filters.
+  const drafting_dna=buildDraftingDNA(all);
+  const journey=buildDraftingJourney(selected);
+  const highlights=selectInsightHighlights(selected);
   const versions={
     scoring:[...new Set(selected.map(r=>r.scoring_version))].sort(),
     selection:[...new Set(selected.map(r=>r.selection_version))].sort(),
@@ -153,7 +162,7 @@ export function aggregateDraftRunInsights(source,{environment='mixed',period='al
     environment:filter.environment,period:filter.period,environment_label:LABELS[environment],
     eligible_decisions:total,unlocked:total>=INSIGHTS_UNLOCK_MIN,unlock_at:INSIGHTS_UNLOCK_MIN,
     total_eligible_decisions:eligible.length,unknown_difficulty:selected.filter(r=>r.difficulty_band==='unknown').length,
-    pick_depth:depth,difficulty,months,formats,progress,observations,versions,
+    pick_depth:depth,difficulty,months,formats,progress,observations,versions,\n    drafting_dna,journey,highlights,
     range:oldestNewest(selected),session_limit:INSIGHTS_SESSION_LIMIT,
     methodology:'Original awarded pick scores; first answer to each puzzle in up to 1,000 recent eight-pick non-QA runs. '+
       'Pick numbers are real source pick positions. Group averages require 5 picks; months need 10; progress needs two sets of 40; '+
@@ -161,8 +170,62 @@ export function aggregateDraftRunInsights(source,{environment='mixed',period='al
   };
 }
 
+// Bounded preview retrieval: at most twelve cards' source sessions, from
+// this owner only. Candidate lists are never exposed through the summary.
+export const INSIGHTS_PREVIEW_SQL=`SELECT id::text session_id,answers
+FROM draft_run_sessions WHERE player_id=$1::uuid AND id=ANY($2::uuid[])
+  AND NOT measurement_qa AND jsonb_array_length(puzzle_ids)=8
+  AND selection_version IN ('eight-pick-v3','eight-pick-v4') LIMIT 12`;
+const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-8][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
+function asAnswers(value) {
+  if(Array.isArray(value))return value;
+  try{return JSON.parse(value||'[]');}catch{return [];}
+}
 export async function loadDraftRunInsights(query,owner,filters={}) {
   const clean=validateInsightsFilters(filters);
   const rows=await query(INSIGHTS_SQL,[owner]);
-  return aggregateDraftRunInsights(rows.rows,clean);
+  const result=aggregateDraftRunInsights(rows.rows,clean);
+  const list=[...result.highlights.best,...result.highlights.misses];
+  const ids=[...new Set(list.map(r=>r.session_id).filter(s=>UUID.test(s)))].slice(0,12);
+  if(ids.length) {
+    const selected=await query(INSIGHTS_PREVIEW_SQL,[owner,ids]);
+    const indexed=new Map((selected.rows||[]).map(row=>[row.session_id,asAnswers(row.answers)]));
+    for(const item of list) {
+      const answer=indexed.get(item.session_id)?.[item.round-1];
+      if(answer?.puzzle?.puzzle_id!==item.puzzle_id)continue;
+      const decision=publicLockedDecision(answer);
+      if(!decision)continue;
+      item.preview={selected:decision.selected,trophy:decision.trophy};
+    }
+  }
+  return result;
+}
+
+export const INSIGHTS_DECISION_SQL=`SELECT picked.answer,o.answered_at,s.scoring_version,s.corpus_version
+FROM draft_run_sessions s
+CROSS JOIN LATERAL jsonb_array_elements(s.answers) WITH ORDINALITY picked(answer,ordinality)
+JOIN draft_run_decision_observations o
+  ON o.session_id=s.id AND o.round=picked.ordinality::int AND o.outcome='pick'
+  AND o.puzzle_id=picked.answer->'puzzle'->>'puzzle_id'
+WHERE s.player_id=$1::uuid AND s.id=$2::uuid AND picked.ordinality=$3::int
+  AND picked.answer->'puzzle'->>'puzzle_id'=$4
+  AND NOT s.measurement_qa AND jsonb_array_length(s.puzzle_ids)=8
+  AND s.selection_version IN ('eight-pick-v3','eight-pick-v4')
+LIMIT 1`;
+export async function loadDraftRunInsightDecision(query,owner,params={}) {
+  const id=String(params.session_id||''),round=Number(params.round),puzzle=String(params.puzzle_id||'');
+  if(!UUID.test(id)||!Number.isInteger(round)||round<1||round>8||
+    !/^[a-zA-Z0-9._:-]{1,160}$/.test(puzzle))
+    throw Object.assign(new Error('Invalid saved decision.'),{status:400});
+  const found=await query(INSIGHTS_DECISION_SQL,[owner,id,round,puzzle]);
+  const row=found.rows?.[0];
+  if(!row)throw Object.assign(new Error('Saved decision unavailable.'),{status:404});
+  const answer=typeof row.answer==='string'?JSON.parse(row.answer):row.answer;
+  const detail=publicLockedDecision(answer,{
+    answered_at:new Date(row.answered_at).toISOString(),scoring_version:row.scoring_version,
+    corpus_version:row.corpus_version,
+  });
+  if(!detail||answer.puzzle.puzzle_id!==puzzle)
+    throw Object.assign(new Error('Saved decision unavailable.'),{status:404});
+  return detail;
 }
