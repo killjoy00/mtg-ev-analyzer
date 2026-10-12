@@ -300,67 +300,48 @@ function JourneyStory({journey,progress,months}:{
     </View>:null}
   </Section>;
 }
-function InsightSections({ data,onReview,detail,detailPhase,onClose,onLoadMore,morePhase }: {
-  data:DraftInsights;onReview:(item:InsightHighlight)=>void;detail:InsightDecision|null;
-  detailPhase:'idle'|'loading'|'ready'|'error';onClose:()=>void;
+function InsightSections({data,onReview,onLoadMore,morePhase}:{
+  data:DraftInsights;onReview:(item:InsightHighlight)=>void;
   onLoadMore:()=>void;morePhase:'idle'|'loading'|'error';
 }) {
-  if (!data.unlocked) return <>
-    {data.drafting_dna?<DNASummary dna={data.drafting_dna}/>:null}
-    <Section title="Unlock your Drafting Insights">
+  const [explore,setExplore]=useState(false);
+  if (!data.unlocked) return <Section title="Unlock your Drafting Insights">
     <Text style={styles.body}>Play a few more runs in {data.environment_label}. You have {num(data.eligible_decisions)} of {data.unlock_at} eligible first-time decisions in this period.</Text>
     <Pressable accessibilityRole="button" onPress={() => router.push('/')} style={styles.primaryButton}>
       <Text style={styles.primaryText}>Play today&apos;s Daily</Text>
     </Pressable>
-  </Section></>;
-
-  const monthly = data.months || [];
-  const snapshots = data.observations.length ? [] : descriptivePatternRows(data);
+  </Section>;
+  const extra=(data.observations||[]).slice(1);
   return <>
-    {data.drafting_dna?<DNASummary dna={data.drafting_dna}/>:null}
-    {data.highlights?<HighlightsStory highlights={data.highlights} onReview={onReview}
-      detail={detail} detailPhase={detailPhase} onClose={onClose}
-      onLoadMore={onLoadMore} morePhase={morePhase}/>:null}
-    {data.journey?<JourneyStory journey={data.journey} progress={data.progress} months={monthly}/>:null}
-    <Section title="Your patterns" caption="Observed scores with clear sample-size safeguards">
-      {data.observations.length ? data.observations.map(row =>
-        <View key={row.id} style={styles.observation}><Text style={styles.observationMark}>◆</Text><Text style={styles.observationCopy}>{row.text}</Text></View>)
-        : <>
-          <Text style={styles.caption}>No standout comparison met both thresholds: at least 40 decisions on each side and a 10-point average difference. Your recorded history still provides these descriptive snapshots:</Text>
-          {snapshots.length ? snapshots.map((text, index) =>
-            <View key={'snapshot-' + index} style={styles.observation}><Text style={styles.observationMark}>◆</Text><Text style={styles.observationCopy}>{text}</Text></View>)
-            : <Text style={styles.caption}>The pick, difficulty and progress charts below show every supported group as you collect more decisions.</Text>}
-        </>}
-    </Section>
-    <Section title="Pick-by-pick strengths" caption="Actual source P1P positions, not game-round order. Five decisions are needed for each average.">
-      <Metrics rows={data.pick_depth.map(row => ({ ...row, label: row.label }))} />
-    </Section>
-    <Section title="Difficulty context" caption="These bands contain different puzzles; no difficulty-adjusted skill grade is inferred.">
-      <Metrics rows={data.difficulty.map(row => ({ ...row, label: row.band.charAt(0).toUpperCase() + row.band.slice(1) }))} />
-      {data.unknown_difficulty ? <Text style={styles.meta}>{num(data.unknown_difficulty)} decisions lack a verified difficulty band.</Text> : null}
-    </Section>
-    {!data.journey?<Section title="Progress over time" caption="Two consecutive 40-pick windows in the selected environment">
-      {data.progress ? <>
-        <View style={styles.windowRow}>
-          <View style={styles.window}><Text style={styles.meta}>Previous 40 picks</Text><Text style={styles.bigScore}>{score(data.progress.previous.average_score)}</Text>
-            <Text style={styles.meta}>{data.progress.previous.from} to {data.progress.previous.to}</Text></View>
-          <View style={styles.window}><Text style={styles.meta}>Latest 40 picks</Text><Text style={styles.bigScore}>{score(data.progress.recent.average_score)}</Text>
-            <Text style={styles.meta}>{data.progress.recent.from} to {data.progress.recent.to}</Text></View>
-        </View>
-        <Text style={styles.caption}>Recorded difference: {data.progress.delta > 0 ? '+' : ''}{score(data.progress.delta)} points. Different picks cannot prove improvement or decline.</Text>
-      </> : <Text style={styles.caption}>This comparison needs 80 eligible decisions (40 in each window). You have {num(data.eligible_decisions)}.</Text>}
-      <Text style={styles.subheading}>Pacific calendar months</Text>
-      {monthly.length ? <View style={styles.months}>{monthly.map(row => <View key={row.month} style={styles.month}>
-        <Text style={styles.meta}>{row.month}</Text><Text style={styles.monthScore}>{score(row.average_score)}</Text>
-        <Text style={styles.meta}>{num(row.count)} picks{row.average_score === null ? ' · need 10' : ''}</Text>
-      </View>)}</View> : <Text style={styles.caption}>Monthly averages need at least 10 eligible decisions per Pacific month.</Text>}
-    </Section>:null}
-    <Section title="Format patterns" caption="Card pools differ between formats; these are recorded scores, not skill rankings.">
-      <View style={styles.formats}>{data.formats.map(row => <View key={row.environment}
-        style={[styles.format, row.environment === data.environment && styles.formatSelected]}>
-        <Text style={styles.formatName}>{row.label}</Text><Text style={styles.bigScore}>{score(row.average_score)}</Text>
-        <Text style={styles.meta}>{num(row.count)} eligible picks{row.average_score === null ? ' · need 5' : ''}</Text>
-      </View>)}</View>
+    {data.highlights?<HighlightsStory highlights={data.highlights} finding={data.leading_finding||data.observations?.[0]}
+      onReview={onReview} onLoadMore={onLoadMore} morePhase={morePhase}/>:null}
+    {data.journey?<JourneyStory journey={data.journey} progress={data.progress} months={data.months||[]}/>:null}
+    <Section title="Explore your data">
+      <Pressable accessibilityRole="button" accessibilityState={{expanded:explore}}
+        style={styles.disclosure} onPress={()=>setExplore(v=>!v)}>
+        <Text style={styles.summary}>{explore?'Hide supporting breakdowns':'Explore your data · charts and methodology'}</Text>
+      </Pressable>
+      {explore?<View style={styles.detailBody}>
+        <Text style={styles.subheading}>Pick-by-pick breakdown</Text>
+        <Text style={styles.caption}>Actual source P1P positions, with at least five decisions per displayed average.</Text>
+        <Metrics rows={(data.pick_depth||[]).map(row=>({...row,label:row.label}))}/>
+        <Text style={styles.subheading}>Difficulty breakdown</Text>
+        <Metrics rows={(data.difficulty||[]).map(row=>({...row,label:row.band.charAt(0).toUpperCase()+row.band.slice(1)}))}/>
+        {data.unknown_difficulty?<Text style={styles.caption}>{num(data.unknown_difficulty)} picks lack a verified difficulty band.</Text>:null}
+        <Text style={styles.subheading}>Format breakdown</Text>
+        <Text style={styles.caption}>Different card pools; recorded averages do not establish comparable skill.</Text>
+        <View style={styles.formats}>{(data.formats||[]).map(row=><View key={row.environment}
+          style={[styles.format,row.environment===data.environment&&styles.formatSelected]}>
+          <Text style={styles.formatName}>{row.label}</Text>
+          <Text style={styles.bigScore}>{score(row.average_score)}</Text>
+          <Text style={styles.meta}>{num(row.count)} eligible picks{row.average_score===null?' · need 5':''}</Text>
+        </View>)}</View>
+        <Text style={styles.subheading}>Additional observations</Text>
+        {extra.length?extra.map(row=><Text key={row.id} style={styles.body}>{row.text}</Text>):
+          <Text style={styles.caption}>No additional comparison cleared the minimum sample and score-gap rules.</Text>}
+        <Text style={styles.subheading}>Methodology</Text>
+        <Text style={styles.caption}>{data.methodology}</Text>
+      </View>:null}
     </Section>
   </>;
 }
