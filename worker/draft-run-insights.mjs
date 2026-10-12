@@ -109,7 +109,11 @@ export function aggregateDraftRunInsights(source,{environment='mixed',period='al
   const formats=INSIGHTS_ENVIRONMENTS.map(value=>({environment:value,label:LABELS[value],
     ...countSummary(eligible.filter(r=>r.environment===value))}));
   const recent=selected.slice(0,40),prior=selected.slice(40,80);
-  const progress=prior.length===40?{
+  // An 80-pick comparison requires the same original scoring and source revision
+  // on both sides; a score delta across different systems is not interpretable.
+  const progress_compatible=selected.length<80||new Set(selected.slice(0,80).map(r=>
+    [r.scoring_version,r.selection_version,r.corpus_version].join('|'))).size===1;
+  const progress=prior.length===40&&progress_compatible?{
     recent:{...countSummary(recent,40),...oldestNewest(recent)},
     previous:{...countSummary(prior,40),...oldestNewest(prior)},
     delta:round(countSummary(recent,40).average_score-countSummary(prior,40).average_score),
@@ -151,7 +155,7 @@ export function aggregateDraftRunInsights(source,{environment='mixed',period='al
   const observations=proposals.slice(0,3).map(({id,text})=>({id,text}));
   // DNA uses the complete bounded first-encounter history, not chart filters.
   const drafting_dna=buildDraftingDNA(all);
-  const journey=buildDraftingJourney(selected);
+  const journey={...buildDraftingJourney(selected),progress_compatible};
   const highlights=selectInsightHighlights(selected);
   const versions={
     scoring:[...new Set(selected.map(r=>r.scoring_version))].sort(),
@@ -220,6 +224,12 @@ export async function loadDraftRunInsightDecision(query,owner,params={}) {
   if(!UUID.test(id)||!Number.isInteger(round)||round<1||round>8||
     !/^[a-zA-Z0-9._:-]{1,160}$/.test(puzzle))
     throw Object.assign(new Error('Invalid saved decision.'),{status:400});
+  // Fail closed even for an owner-owned session if that answer was a rerun,
+  // QA/legacy decision, or fell outside the bounded Insights history window.
+  // Normalise uses the first locked answer per puzzle across those sessions.
+  const eligible=normalise((await query(INSIGHTS_SQL,[owner])).rows||[]);
+  if(!eligible.some(r=>r.session_id===id&&r.round===round&&r.puzzle_id===puzzle))
+    throw Object.assign(new Error('Saved decision unavailable.'),{status:404});
   const found=await query(INSIGHTS_DECISION_SQL,[owner,id,round,puzzle]);
   const row=found.rows?.[0];
   if(!row)throw Object.assign(new Error('Saved decision unavailable.'),{status:404});
