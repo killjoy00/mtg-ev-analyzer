@@ -344,7 +344,7 @@ function InsightSections({data,onReview,onLoadMore,morePhase}:{
       onReview={onReview} onLoadMore={onLoadMore} morePhase={morePhase}/>:
       leading?<Section title="Your patterns"><Text style={styles.body}>{leading.text}</Text></Section>:null}
     {data.journey?<JourneyStory journey={data.journey} progress={data.progress} months={data.months||[]}/>:
-      <LegacyJourney progress={data.progress} months={data.months||[]}/>}</>
+      <LegacyJourney progress={data.progress} months={data.months||[]}/>}
     <Section title="Explore your data">
       <Pressable accessibilityRole="button" accessibilityState={{expanded:explore}}
         style={styles.disclosure} onPress={()=>setExplore(v=>!v)}>
@@ -605,13 +605,24 @@ const styles = StyleSheet.create({
   format: { padding: spacing.md, borderWidth: 1, borderColor: colors.line, gap: spacing.xs },
   formatSelected: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
   formatName: { color: colors.muted, fontSize: 13, fontWeight: '800' },
-  dnaTrait: {borderWidth:1,borderColor:colors.line,padding:spacing.md,gap:spacing.sm,backgroundColor:colors.surfaceSoft},
-  dnaPrimary: {borderLeftWidth:4,borderLeftColor:colors.accent},
-  dnaTitle: {fontSize:20,fontWeight:'800',color:colors.ink},
-  dnaPrimaryTitle: {fontSize:27},
+  dnaTrait: {gap:spacing.xs,padding:spacing.sm},
+  dnaSection: {padding:spacing.md,gap:spacing.sm},
+  dnaPrimary: {borderLeftWidth:3,borderLeftColor:colors.accent,backgroundColor:colors.surfaceSoft,
+    paddingHorizontal:spacing.md,paddingVertical:spacing.sm},
+  dnaTitle: {fontSize:23,fontWeight:'800',color:colors.ink},
   dnaSecondary: {flexDirection:'row',gap:spacing.sm},
-  dnaHalf: {flex:1,minWidth:0},
-  evidence: {paddingTop:spacing.sm,gap:spacing.xs},
+  dnaHalf: {flex:1,minWidth:0,borderBottomWidth:1,borderColor:colors.line},
+  dnaCompact: {paddingHorizontal:0,paddingVertical:0},
+  dnaDeveloping: {fontSize:12,color:colors.muted,paddingVertical:spacing.sm,lineHeight:17},
+  dnaDisclosure: {minHeight:36,justifyContent:'center',paddingVertical:spacing.xs},
+  evidence: {paddingTop:spacing.xs,gap:spacing.xs},
+  contextTitle: {fontSize:12,fontWeight:'750',color:colors.muted},
+  contextLine: {flexDirection:'row',alignItems:'baseline',gap:spacing.sm,justifyContent:'space-between'},
+  contextCount: {fontSize:13,fontWeight:'800',color:colors.accentDark,textAlign:'right'},
+  contextNote: {fontSize:12,fontWeight:'750',color:colors.accentDark},
+  journeyWarning: {fontSize:13,lineHeight:19,color:colors.ink,borderLeftWidth:3,
+    borderLeftColor:colors.line,paddingLeft:spacing.sm},
+  journeyBoundary: {fontSize:10,fontWeight:'800',color:colors.accentDark,textAlign:'center'},
   highlightCard: {borderWidth:1,borderColor:colors.line,padding:spacing.md,gap:spacing.sm},
   highlightVisual: {flexDirection:'row',gap:spacing.sm},
   cardArt: {minHeight:100,flex:1,justifyContent:'center',alignItems:'center',backgroundColor:colors.surfaceSoft},
@@ -631,8 +642,8 @@ const styles = StyleSheet.create({
   secondaryText: { color: colors.accentDark, fontSize: 14, fontWeight: '800' },
   dnaCompact: {padding:spacing.sm,gap:spacing.xs},
   disclosure: {borderTopWidth:1,borderColor:colors.line,paddingVertical:spacing.sm,minHeight:44,justifyContent:'center'},
-  contextWrap: {gap:spacing.md,borderTopWidth:1,borderColor:colors.line,paddingTop:spacing.md},
-  contextFact: {gap:spacing.sm,padding:spacing.md,borderWidth:1,borderColor:colors.line,backgroundColor:colors.surfaceSoft},
+  contextWrap: {gap:spacing.xs,borderTopWidth:1,borderColor:colors.line,paddingTop:spacing.sm},
+  contextFact: {gap:spacing.xs,paddingVertical:spacing.xs,borderBottomWidth:1,borderColor:colors.line},
   exampleLink: {borderWidth:1,borderColor:colors.accent,padding:spacing.sm,minHeight:44,justifyContent:'center'},
   reportLead: {color:colors.ink,fontSize:14,lineHeight:21},
   highlightCompact: {padding:spacing.sm,gap:spacing.xs},
