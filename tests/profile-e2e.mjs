@@ -384,8 +384,14 @@ try {
   assert.match(await page.locator('#my-insights-best-panel .my-insights-pick.is-featured').textContent(),/hard-rated decisions/);
   assert.match(await page.locator('#my-insights-best-panel .my-insights-pick.is-compact').nth(0).textContent(),/Skyguard Captain/);
   assert.match(await page.locator('#my-insights-best-panel .my-insights-pick.is-compact').nth(1).textContent(),/Luminous Oath/);
-  // Captured before filters change: one real-looking headline and exactly three
-  // fully populated examples; capture both the phone and desktop presentation.
+  // Keep the optional expanded-evidence state as separate acceptance evidence.
+  // The overview screenshots must show the actual compact *default* state.
+  await page.screenshot({path:'artifacts/ui-profile-insights-evidence-expanded-390.png',fullPage:true});
+  await page.locator('.my-insights-choice-fact').first().getByText(/Options and real examples/).click();
+  assert.equal(await page.locator('.my-insights-choice-fact details').first().evaluate(node=>node.open),false,
+    'evidence disclosure closes cleanly before compact overview screenshots');
+  // Captured before filters change: one leading finding, one featured example
+  // with loaded synthetic art, and two compact supporting examples.
   await page.screenshot({path:'artifacts/ui-profile-insights-populated-390.png',fullPage:true});
   await page.setViewportSize({width:1440,height:900});
   await noOverflow();
