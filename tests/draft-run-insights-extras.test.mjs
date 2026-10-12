@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {safeCardImageUrl,CARD_IMAGE_HOSTS} from '../card-image-policy.mjs';
 import {
-  buildDraftingDNA,buildDraftingJourney,selectInsightHighlights,publicLockedDecision,
-  DNA_QUALIFICATION,DNA_VERSION,JOURNEY_VERSION,HIGHLIGHTS_VERSION,
+  buildDraftingDNA,buildDraftingJourney,buildCardChoiceContext,selectInsightHighlights,publicLockedDecision,
+  DNA_QUALIFICATION,DNA_VERSION,JOURNEY_VERSION,HIGHLIGHTS_VERSION,CHOICE_CONTEXT_RULE,HIGHLIGHT_REASON_VERSION,
 } from '../worker/draft-run-insights-extras.mjs';
 import {
   aggregateDraftRunInsights,INSIGHTS_SQL,INSIGHTS_PREVIEW_SQL,INSIGHTS_DECISION_SQL,
@@ -344,4 +344,92 @@ test('Targeted winner matches full normalise() over synthetic reruns, ties and i
  assert.match(sql,/picked.answer->>'score' ~/);
  assert.match(sql,/picked.answer->>'historicalMatch' IN/);
  assert.ok(!sql.includes('LIMIT 8000'),'puzzle filter is inside the same 1000-session CTE');
+});
+
+test('Saved type and rarity choices require competitive cross-category options, not raw counts',()=>{
+ const row=(n,extra={})=>({
+   ...pick(n),selected_id:n%4===0?'spell':'creature',
+   selected_name:n%4===0?'Synthetic Spell':'Synthetic Creature',
+   choice_candidates:[
+     {id:'creature',type_line:'Artifact Creature — Golem',rarity:'common'},
+     {id:'spell',type_line:'Instant',rarity:'rare'},
+     {id:'filler',type_line:'Creature — Beast',rarity:'uncommon'},
+   ],
+   choice_ranking:[{id:'creature',name:'Synthetic Creature',support:.52},
+     {id:'spell',name:'Synthetic Spell',support:.48},
+     {id:'filler',name:'Synthetic Filler',support:.01}],...extra,
+ });
+ const base=Array.from({length:32},(_,i)=>row(i));
+ const result=buildCardChoiceContext(base);
+ assert.equal(result.schema_version,CHOICE_CONTEXT_RULE.version);
+ assert.equal(result.scope.startsWith('all-eligible-history'),true);
+ const cardType=result.choices.find(c=>c.id==='card-type'),rarity=result.choices.find(c=>c.id==='rarity');
+ for(const group of [cardType,rarity]){
+   assert.equal(group.status,'ready');
+   assert.equal(group.opportunities,32);
+   assert.equal(group.examples.length,2);
+   assert.ok(group.summary.includes('32 decisions'));
+   assert.equal(group.availability['creature']??group.availability['common-uncommon'],32);
+ }
+ assert.deepEqual(cardType.selected,{creature:24,noncreature:8});
+ assert.deepEqual(rarity.selected,{'rare-mythic':8,'common-uncommon':24});
+ assert.deepEqual(cardType.availability,{creature:32,noncreature:32},
+   'Low-support second creature is filler, not an additional competitive alternative');
+ const invalid=row(100,{choice_candidates:[{id:'creature',type_line:'',rarity:''},
+   {id:'spell',type_line:'Instant',rarity:'rare'}],choice_ranking:[
+     {id:'creature',support:.5},{id:'spell',support:.5}]});
+ const oneCategory=row(101,{choice_candidates:[
+   {id:'creature',type_line:'Creature',rarity:'common'},
+   {id:'spell',type_line:'Creature',rarity:'common'}]});
+ const lowSupport=row(102,{choice_ranking:[{id:'creature',support:.95},
+   {id:'spell',support:.01},{id:'filler',support:.01}]});
+ const malformed=row(103,{choice_ranking:[{id:'creature',support:null},{id:'spell',support:.5}]});
+ const withBad=buildCardChoiceContext([...base,invalid,oneCategory,lowSupport,malformed]);
+ assert.equal(withBad.choices[0].opportunities,32);
+ assert.equal(withBad.choices[1].opportunities,32);
+});
+test('Availability counts vary with competitive cards; small version cohorts stay developing',()=>{
+ const sample=(n,version='v1')=>({...pick(n,{version}),
+   selected_id:'creature',
+   choice_candidates:[
+     {id:'creature',type_line:'Creature',rarity:'uncommon'},
+     {id:'other',type_line:'Creature',rarity:'common'},
+     {id:'spell',type_line:'Sorcery',rarity:'rare'},
+   ],
+   choice_ranking:[{id:'creature',support:.9},{id:'other',support:.81},{id:'spell',support:.7}],
+ });
+ const first=Array.from({length:18},(_,i)=>sample(i));
+ const merged=buildCardChoiceContext([...first,...Array.from({length:17},(_,i)=>sample(100+i,'v2'))]);
+ const type=merged.choices[0];
+ assert.equal(type.status,'developing','35 rows across incompatible cohorts cannot meet the floor');
+ assert.equal(type.opportunities,18);
+ assert.equal(type.other_version_opportunities,17);
+ assert.deepEqual(type.availability,{creature:36,noncreature:18});
+ assert.deepEqual(type.selected,{creature:18,noncreature:0});
+ assert.equal(type.examples.length,0,'Do not expose detail refs for under-sampled cohorts');
+});
+test('Highlight v3 reasons are factual, deterministic, disjoint and scoped',()=>{
+ const source=Array.from({length:90},(_,i)=>{
+   const hard=i%6===0,miss=i%6===1;
+   return {...pick(i,{score:hard?100:miss?15:89,match:hard,band:hard?'hard':'medium'}),
+     selected_id:'synthetic-'+(i%5),historical_id:'historical-'+i,
+     choice_ranking:miss?[{id:'model',name:'Better Supported Choice',support:.8},
+       {id:'synthetic-'+(i%5),name:'Picked Card',support:.16}]:[],
+   };
+ });
+ const first=selectInsightHighlights(source),reverse=selectInsightHighlights([...source].reverse());
+ assert.deepEqual(first,reverse);
+ assert.equal(first.schema_version,HIGHLIGHTS_VERSION);
+ const next=selectInsightHighlights(source,{page:2});
+ const total=[...first.best,...first.misses,...next.best,...next.misses];
+ assert.equal(new Set(total.map(r=>r.puzzle_id)).size,total.length);
+ assert.ok(total.every(item=>item.reason_version===HIGHLIGHT_REASON_VERSION));
+ assert.ok(total.every(item=>typeof item.reason_text==='string'&&item.reason_text.length>20));
+ assert.ok(first.best.some(item=>item.reason_code==='hard-trophy-match'));
+ assert.ok(first.misses.some(item=>item.reason_code==='saved-support-gap'));
+ assert.ok(first.misses.every(item=>!item.trophy_match));
+ assert.ok(first.best.length<=6&&first.misses.length<=6);
+ const short=selectInsightHighlights(source.filter(row=>row.environment==='mixed'&&row.pick_number<3));
+ assert.ok(short.best.every(item=>item.pick_number<3));
+ assert.ok(short.misses.every(item=>item.pick_number<3));
 });
