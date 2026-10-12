@@ -186,7 +186,7 @@ test('native scouting report renders evidence-backed DNA, original cards and Jou
 
 test('native Insights clears private data after logout and blocks old-owner responses',async t=>{
   const ui=await mount(t);
-  assert.ok(ui.text().includes('P1P1'));
+  assert.ok(ui.text().includes('80 eligible decisions · Mixed'));
   await ui.switchAccount(null);
   assert.ok(ui.text().includes('Sign in to see your Insights'));
   assert.ok(!ui.text().includes('P1P1'));
