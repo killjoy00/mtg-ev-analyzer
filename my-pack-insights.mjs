@@ -23,6 +23,15 @@ export function insightLocalRange(value,legacyFrom=value?.from,legacyTo=value?.t
 
 export function invalidateMyPackInsights(){generation+=1;}
 
+function shortInsightDate(iso) {
+  if(typeof iso!=='string'||!/^[0-9]{4}-[0-9]{2}-[0-9]{2}/.test(iso))return String(iso||'');
+  const month=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(iso.slice(5,7))-1];
+  return month?month+' '+Number(iso.slice(8,10)):'';
+}
+function shortInsightRange(value) {
+  const from=shortInsightDate(value?.from),to=shortInsightDate(value?.to);
+  return from===to?from:from+'–'+to;
+}
 function periodLabel(key){return PERIODS.find(x=>x[0]===key)?.[1]||'All available';}
 function labelOf(env){return ENVIRONMENTS.find(x=>x[0]===env)?.[1]||env;}
 function rowText(row,label) {
@@ -108,21 +117,40 @@ function observationsMarkup(data) {
 function dnaMarkup(data) {
   const dna=data.drafting_dna;
   if(!dna)return '';
-  const trait=(v,primary=false)=>v?.status==='qualified'
-    ?'<article class="my-insights-trait'+(primary?' is-primary':'')+'"><strong>'+esc(v.title)+'</strong>'+
-      '<p>'+esc(v.summary)+'</p><details><summary>Why this fits · '+number(v.supporting_decisions)+' decisions</summary>'+
-      '<ul>'+((v.evidence||[]).map(e=>'<li>'+esc(e.label)+': <strong>'+esc(String(e.value))+'</strong></li>').join(''))+
-      '</ul></details></article>'
-    :'<article class="my-insights-trait is-emerging"><strong>'+(primary?'Your Drafting DNA is taking shape':'Trait still developing')+
-      '</strong><p>'+((v?.picks_needed??dna.picks_needed)!=null
-        ?number(v?.picks_needed??dna.picks_needed)+' more eligible decisions to reach the provisional sample floor.'
-        :esc(v?.reason||dna.reason||'No additional supported trait passed the evidence gates yet.'))+
-      '</p></article>';
+  const qualified=dna.primary?.status==='qualified'?dna.primary:null;
+  const primary=qualified
+    ?'<div class="my-insights-dna-primary"><strong>'+esc(qualified.title)+'</strong>'+
+      '<p>'+esc(qualified.summary)+'</p><small>'+number(qualified.supporting_decisions)+' eligible supporting decisions</small>'+
+      '<details><summary>Why this fits</summary><ul>'+
+      (qualified.evidence||[]).map(e=>'<li>'+esc(e.label)+': <strong>'+esc(String(e.value))+'</strong></li>').join('')+
+      '</ul></details></div>'
+    :'<div class="my-insights-dna-primary"><strong>Your Drafting DNA is taking shape</strong>'+
+      '<p>No provisional identity meets its complete stability evidence requirements yet.</p></div>';
+  const secondary=(dna.secondary||[]).slice(0,2).map(v=>v.status==='qualified'
+    ?'<details class="my-insights-dna-secondary"><summary>'+esc(v.title)+'</summary>'+
+      '<p>'+esc(v.summary)+'</p><small>'+number(v.supporting_decisions)+' supporting decisions</small>'+
+      '<ul>'+(v.evidence||[]).map(e=>'<li>'+esc(e.label)+': '+esc(String(e.value))+'</li>').join('')+'</ul></details>'
+    :'<div class="my-insights-dna-secondary is-developing"><strong>Developing</strong><small>Another trait has not qualified</small></div>').join('');
+  const context=data.card_choices;
+  const choices=(context?.choices||[]).filter(v=>v.status==='ready');
+  const contextHtml=choices.length?'<div class="my-insights-choice-context"><h3>Your card choices</h3>'+
+    choices.map(v=>'<div class="my-insights-choice-fact"><strong>'+esc(v.title)+'</strong><p>'+esc(v.summary)+'</p>'+
+      '<details><summary>Options and real examples · '+number(v.opportunities)+' decisions</summary>'+
+      '<p>Available competitive options: '+Object.entries(v.availability||{}).map(([k,n])=>esc(k)+': '+number(n)).join(' · ')+
+      '. Selections: '+Object.entries(v.selected||{}).map(([k,n])=>esc(k)+': '+number(n)).join(' · ')+'.</p>'+
+      (v.examples||[]).map(e=>'<button type="button" class="my-insights-example" data-insights-review data-session="'+
+        esc(e.session_id)+'" data-round="'+Number(e.round)+'" data-puzzle="'+esc(e.puzzle_id)+'">'+
+        esc(e.selected_name||'Saved selection')+' · '+esc(e.set_id)+' P1P'+Number(e.pick_number)+' · '+esc(shortInsightDate(e.date))+'</button>').join('')+
+      '</details></div>').join('')+'</div>'
+    :'<p class="my-insights-note">Your card-choice details are developing: a breakdown needs at least '+
+      number(context?.minimum_opportunities||20)+' comparable saved opportunities in one model-version cohort.</p>';
   return '<section class="my-pack-card my-insights-wide my-insights-dna">'+
-    '<div class="my-card-heading"><h2>Your Drafting DNA</h2><span>All eligible first-time decisions</span></div>'+
-    '<div class="my-insights-trait-hero">'+trait(dna.primary||dna.primary_emerging,true)+'</div>'+
-    '<div class="my-insights-trait-secondary">'+(dna.secondary||[]).slice(0,2).map(v=>trait(v)).join('')+'</div>'+
-    '<p class="my-insights-note">'+esc(dna.note||'Traits describe your recorded choices, not your innate abilities.')+'</p></section>';
+    '<div class="my-card-heading"><h2>Your Drafting DNA</h2><span>All available history · '+number(dna.eligible_decisions)+' eligible decisions</span></div>'+
+    primary+'<div class="my-insights-dna-secondary-row">'+secondary+'</div>'+
+    '<p class="my-insights-note">Reaching the sample floor does not guarantee a trait.</p>'+contextHtml+
+    '<details class="my-insights-dna-method"><summary>Scope and evidence rules</summary><p>'+
+    esc(dna.note||'Provisional rules describe records, not skill or personality.')+'</p><p>'+
+    esc(context?.note||'Card-choice context is unavailable from this saved history.')+'</p></details></section>';
 }
 export function safeCardImage(url) {return safeCardImageUrl(url);}
 function cardVisual(card,label) {
@@ -133,63 +161,79 @@ function cardVisual(card,label) {
 }
 function highlightCards(rows,kind) {
   if(!rows?.length)return '<p class="my-pack-empty">No qualifying saved picks in this group yet.</p>';
-  return '<div class="my-insights-card-row">'+rows.map(row=>{
-    const pick=row.preview?.selected,trophy=row.preview?.trophy;
-    return '<article class="my-insights-pick">'+
-      '<div class="my-insights-pick-art">'+cardVisual(pick,pick?.name||'Your saved card')+
-        (trophy&&trophy.id!==pick?.id?cardVisual(trophy,'Trophy pick'):'')+'</div>'+
-      '<div class="my-insights-pick-info"><strong>'+esc(pick?.name||'Your saved pick')+'</strong>'+
-        '<small>'+esc(row.set_id)+' · P1P'+Number(row.pick_number)+' · '+esc(row.date)+'</small>'+
-        '<span>'+number(row.score)+'/100 · '+esc(row.trophy_match?'Matched the trophy pick':'Alternative selection')+'</span>'+
-        '<button type="button" class="button secondary" data-insights-review data-session="'+esc(row.session_id)+'"'+
-        ' data-round="'+Number(row.round)+'" data-puzzle="'+esc(row.puzzle_id)+'">Review original pack</button></div></article>';
+  return '<div class="my-insights-card-row">'+rows.map((row,index)=>{
+    const pick=row.preview?.selected,trophy=row.preview?.trophy,featured=index===0;
+    const name=pick?.name||row.selected_name||'Your saved pick';
+    const trophyName=trophy?.name||row.historical_name||'Original trophy pick';
+    return '<article class="my-insights-pick'+(featured?' is-featured':' is-compact')+'"'+
+      (index>=3?' hidden data-insights-extra="'+kind+'"':'')+'>'+
+      (featured?'<div class="my-insights-pick-art"><div><strong>Your pick</strong>'+cardVisual(pick,name)+'</div>'+
+        (row.trophy_match?'':'<div><strong>Trophy pick</strong>'+cardVisual(trophy,trophyName)+'</div>')+'</div>':'')+
+      '<div class="my-insights-pick-info"><strong>Your pick: '+esc(name)+'</strong>'+
+      (row.trophy_match?'<span>Trophy pick matched</span>':'<span>Trophy pick: '+esc(trophyName)+'</span>')+
+      '<small>'+esc(row.set_id)+' · P1P'+Number(row.pick_number)+' · '+esc(shortInsightDate(row.date))+
+      ' · Original score '+number(row.score)+'/100</small>'+
+      '<p class="my-insights-reason">'+esc(row.reason_text||(
+        row.trophy_match?'You matched the saved trophy choice.':'This saved non-trophy selection earned '+number(row.score)+'/100.'))+'</p>'+
+      '<button type="button" class="button secondary" data-insights-review data-session="'+esc(row.session_id)+'"'+
+      ' data-round="'+Number(row.round)+'" data-puzzle="'+esc(row.puzzle_id)+'">Review original pack</button></div></article>';
   }).join('')+'</div>';
 }
 function highlightsMarkup(data) {
   if(!data.highlights)return '';
-  const more=kind=>data.highlights.has_more?.[kind]?
-    '<button type="button" class="button secondary" data-insights-more="'+kind+'">Load more '+
-      (kind==='best'?'Best Calls':'Biggest Misses')+'</button>':'';
+  const more=kind=>data.highlights?.[kind]?.length>3||data.highlights.has_more?.[kind]
+    ?'<button type="button" class="button secondary" data-insights-more="'+kind+'">See more '+(kind==='best'?'Best Calls':'Biggest Misses')+'</button>':'';
+  const finding=data.leading_finding||data.observations?.[0];
   return '<section class="my-pack-card my-insights-wide my-insights-highlights"><div class="my-card-heading">'+
-    '<h2>Your Best Calls & Biggest Misses</h2><span>Actual decisions · original scored picks</span></div>'+
-    '<p class="my-insights-note">Scores follow Pack One’s historical model and trophy-pick objective. An alternative pick is not necessarily wrong.</p>'+
+    '<h2>Decision report</h2><span>'+number(data.eligible_decisions)+' eligible decisions in this view</span></div>'+
+    '<p class="my-insights-leading"><strong>'+(finding?'Leading finding':'Your recent decisions')+'</strong> · '+
+      esc(finding?.text||'A standout comparison has not qualified in this environment and period. Review factual saved picks below.')+'</p>'+
     '<div role="tablist" aria-label="Saved decision highlights" class="my-insights-highlight-tabs">'+
       '<button type="button" role="tab" id="my-insights-best-tab" aria-selected="true" aria-controls="my-insights-best-panel" data-insights-tab="best">Best Calls</button>'+
       '<button type="button" role="tab" id="my-insights-misses-tab" aria-selected="false" aria-controls="my-insights-misses-panel" data-insights-tab="misses">Biggest Misses</button></div>'+
-    '<div id="my-insights-best-panel" role="tabpanel" aria-labelledby="my-insights-best-tab">'+highlightCards(data.highlights.best,'best')+more('best')+'</div>'+
+    '<div id="my-insights-best-panel" role="tabpanel" aria-labelledby="my-insights-best-tab">'+
+       highlightCards(data.highlights.best,'best')+more('best')+'</div>'+
     '<div id="my-insights-misses-panel" role="tabpanel" aria-labelledby="my-insights-misses-tab" hidden>'+
-      highlightCards(data.highlights.misses,'misses')+more('misses')+'</div>'+
-    '<div id="my-insights-decision" aria-live="polite"></div></section>';
+       highlightCards(data.highlights.misses,'misses')+more('misses')+'</div>'+
+    '<p class="my-insights-note">These labels describe original scored decisions, not objectively correct or wrong Magic picks.</p></section>';
 }
 function journeyMarkup(data) {
   const journey=data.journey;
   if(!journey)return '<section class="my-pack-card my-insights-wide">'+
-    '<div class="my-card-heading"><h2>Progress over time</h2><span>Most recent vs earlier picks</span></div>'+
-    progressMarkup(data)+'<h3 class="my-insights-subheading">Pacific calendar months</h3>'+monthMarkup(data.months)+'</section>';
+    '<div class="my-card-heading"><h2>Your Drafting Journey</h2></div>'+
+    progressMarkup(data)+'<details><summary>View journey details</summary>'+
+    '<h3>Pacific calendar months</h3>'+monthMarkup(data.months)+'</details></section>';
   const windows=journey.windows||[];
   const chart=windows.length?'<div class="my-insights-journey-timeline" role="list" aria-label="Recorded score windows">'+
     windows.map(w=>'<div class="my-insights-journey-point" role="listitem" aria-label="'+
-      esc(insightLocalRange(w)+', '+w.count+' decisions, average '+(w.average_score??'unavailable')+' points'+
-      (w.complete?'':' incomplete window'))+'">'+
+      esc(insightLocalRange(w)+', '+w.count+' decisions, average '+(w.average_score??'unavailable')+
+      (w.complete?'':' incomplete'))+'">'+
       '<strong>'+esc(w.average_score==null?'—':score(w.average_score))+'</strong>'+
       '<div class="my-insights-journey-track" aria-hidden="true"><i style="height:'+
       Math.max(0,Math.min(100,Number(w.average_score||0)))+'%"></i></div>'+
-      '<small>'+esc(insightLocalRange(w))+'<span>'+w.count+(w.complete?'':'*')+' picks</span></small></div>').join('')+
-    '</div>':'<p class="my-pack-empty">Your timeline will grow as you record first-time decisions.</p>';
+      '<small>'+esc(shortInsightRange(w))+'<span>'+w.count+(w.complete?'':'*')+' picks</span></small></div>').join('')+
+    '</div>':'<p class="my-pack-empty">Your timeline will grow with original scored decisions.</p>';
   const milestone=(journey.milestones||[]).map(m=>'<li><strong>'+esc(m.text)+'</strong> · '+
     esc(insightLocalRange(m,m.date,m.date))+(m.average_score!=null?' · '+score(m.average_score)+'/100':'')+'</li>').join('');
+  const compatible=journey.progress_compatible!==false;
+  const progress=compatible&&data.progress?'<p class="my-insights-journey-summary">Recent 40: '+
+    score(data.progress.recent.average_score)+'/100 · Previous 40: '+
+    score(data.progress.previous.average_score)+'/100 · Difference '+
+    (data.progress.delta>0?'+':'')+score(data.progress.delta)+' points (descriptive, not proof of improvement).</p>':'';
   return '<section class="my-pack-card my-insights-wide my-insights-journey">'+
-    '<div class="my-card-heading"><h2>Your Drafting Journey</h2><span>Original scores · dated decisions</span></div>'+
-    '<p class="my-insights-note">Each complete window contains 40 first-encounter decisions. An asterisk marks a partial window.</p>'+
-    chart+
-    (journey.total_windows>windows.length?'<p class="my-insights-note">Showing the latest '+
-      windows.length+' of '+journey.total_windows+' windows.</p>':'')+
-    '<h3 class="my-insights-subheading">Recent vs previous 40 picks</h3>'+
-    (journey.progress_compatible!==false?progressMarkup(data):
-      '<p class="my-insights-note">Recorded windows span incompatible source/scoring versions; a progress comparison is unavailable.</p>')+
-    (milestone?'<h3 class="my-insights-subheading">Your milestones</h3><ol class="my-insights-milestones">'+milestone+'</ol>':'')+
-    '<p class="my-insights-note">'+esc(journey.note||'Historical model and card-pool versions may differ.')+'</p>'+
-    '<h3 class="my-insights-subheading">Pacific calendar months</h3>'+monthMarkup(data.months)+'</section>';
+    '<div class="my-card-heading"><h2>Your Drafting Journey</h2><span>Original scores · 40-pick windows</span></div>'+
+    chart+progress+
+    '<details class="my-insights-journey-details"><summary>View journey details</summary>'+
+    '<p class="my-insights-note">'+esc(journey.note||'Historical versions may differ.')+
+    ' Incomplete windows are marked with an asterisk.</p>'+
+    (journey.total_windows>windows.length?'<p class="my-insights-note">Latest '+windows.length+
+       ' of '+journey.total_windows+' windows shown.</p>':'')+
+    '<ol>'+windows.map(w=>'<li>'+esc(insightLocalRange(w))+' · '+w.count+' picks · '+
+      (w.complete?'complete':'incomplete')+' · '+score(w.average_score)+'/100</li>').join('')+'</ol>'+
+    (!compatible?'<p>Historical model and card-pool versions differ; recent-versus-previous comparison unavailable.</p>':
+      '<h3>Previous and recent pick windows</h3>'+progressMarkup(data))+
+    (milestone?'<h3>Your milestones</h3><ol class="my-insights-milestones">'+milestone+'</ol>':'')+
+    '<h3>Pacific calendar months</h3>'+monthMarkup(data.months)+'</details></section>';
 }
 function lockedDecisionMarkup(value) {
   const chosen=value.selected,trophy=value.trophy,other=trophy?.id!==chosen?.id;
