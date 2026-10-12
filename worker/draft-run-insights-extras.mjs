@@ -298,6 +298,7 @@ const highlightRow=r=>({session_id:r.session_id,round:r.round,puzzle_id:r.puzzle
   set_id:r.set_id,environment:r.environment,pick_number:r.pick_number,
   date:r.answered_at.slice(0,10),score:r.score,trophy_match:r.trophy_match,
   selection_kind:r.trophy_match?'trophy-match':'alternative',
+  selected_name:r.selected_name,historical_name:r.historical_name,
   reason_version:HIGHLIGHT_REASON_VERSION,...highlightReason(r)});
 function selectVariety(rows,limit,already=new Set(),finding=null) {
   const chosen=[],sets=new Set(),positions=new Set(),cards=new Set(),reasons=new Set();
