@@ -2,7 +2,7 @@ import {escapeHtml as esc} from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
 import {environmentProgress,formatChallengeRecord,modeName,unlockedAchievements} from './profile-core.mjs';
 import {PATREON_POLICY} from './patreon-policy.mjs';
-import {invalidateMyPackInsights,mountMyPackInsights} from './my-pack-insights.mjs';
+import {invalidateMyPackInsights,mountMyPackInsights} from './my-pack-insights.mjs?v=2';
 import {eliteSource} from './membership-source.mjs';
 
 let activeTab='stats';
