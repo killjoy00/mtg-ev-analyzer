@@ -384,9 +384,25 @@ test('Saved type and rarity choices require competitive cross-category options, 
  const lowSupport=row(102,{choice_ranking:[{id:'creature',support:.95},
    {id:'spell',support:.01},{id:'filler',support:.01}]});
  const malformed=row(103,{choice_ranking:[{id:'creature',support:null},{id:'spell',support:.5}]});
- const withBad=buildCardChoiceContext([...base,invalid,oneCategory,lowSupport,malformed]);
+ const partialRanking=row(104,{choice_ranking:[{id:'creature',support:.51},
+   {id:'spell',support:.49}]});
+ const duplicateCard=row(105,{choice_candidates:[
+   {id:'creature',type_line:'Creature',rarity:'common'},
+   {id:'creature',type_line:'Creature',rarity:'common'},
+   {id:'spell',type_line:'Instant',rarity:'rare'}]});
+ const withBad=buildCardChoiceContext([...base,invalid,oneCategory,lowSupport,malformed,
+   partialRanking,duplicateCard]);
  assert.equal(withBad.choices[0].opportunities,32);
  assert.equal(withBad.choices[1].opportunities,32);
+ const splitType=row(106,{choice_candidates:[
+   {id:'creature',type_line:'Creature — Golem // Instant',rarity:'common'},
+   {id:'spell',type_line:'Sorcery',rarity:'rare'},
+   {id:'filler',type_line:'Creature',rarity:'uncommon'}]});
+ const split=buildCardChoiceContext([...base,splitType]);
+ assert.equal(split.choices[0].opportunities,32,
+   'mixed creature/noncreature faces must not imply a single card-type choice');
+ assert.equal(split.choices[1].opportunities,33,
+   'a supported card with known rarity can still count for rarity context');
 });
 test('Availability counts vary with competitive cards; small version cohorts stay developing',()=>{
  const sample=(n,version='v1')=>({...pick(n,{version}),
