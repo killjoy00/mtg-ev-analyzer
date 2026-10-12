@@ -101,7 +101,7 @@ test('native Insights keeps hierarchy, breakdowns collapsed and navigation intac
  }
  assert.ok(!content.includes('Pick-by-pick breakdown'),'Charts start collapsed');
  await ui.choose('Explore your data · charts and methodology');
- for(const piece of ['Pick-by-pick breakdown','Difficulty breakdown','Format breakdown','P1P1','77.0']){
+ for(const piece of ['Pick-by-pick breakdown','Difficulty breakdown','Format breakdown','P1P1','74.0','78.0']){
    assert.ok(ui.text().includes(piece),'Missing expanded chart: '+piece);
  }
  assert.equal(ui.calls[0][1],'mixed');
