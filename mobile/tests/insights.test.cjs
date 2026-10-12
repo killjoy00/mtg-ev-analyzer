@@ -56,6 +56,7 @@ async function mount(t,{initial=session(),respond=async (_s,env)=>fixture(env)}=
     'react-native':{ActivityIndicator:host('ActivityIndicator'),Image:host('Image'),Pressable:host('Pressable'),
       ScrollView:host('ScrollView'),Modal:host('Modal'),StyleSheet:{create:v=>v},View:host('View')},
     '@/src/components/AboutLink':{AboutLink:host('AboutLink')},
+    '@/src/config':{config:{screenshots:{fixtures:false}}},
     '@/src/api/insights':{loadMobileInsights:async(s,env,period,page=1)=>{
       calls.push([s.accountToken,env,period,page]);return respond(s,env,period,page);
     },loadMobileInsightDecision:async(s,item)=>{
