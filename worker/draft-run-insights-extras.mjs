@@ -94,7 +94,10 @@ export function buildDraftingDNA(rows) {
   // corpus cohort. A cube's P1P2 cannot be treated as another format's P1P2.
   const cohorts=new Map();
   for(const pick of all){
-    const key=pick.environment+'|'+version(pick);
+    // Depth and time-tendency claims must not compare a player's harder packs
+    // against their easier packs as if a raw awarded score were adjusted.
+    if(!['easy','medium','hard'].includes(pick.difficulty_band))continue;
+    const key=pick.environment+'|'+version(pick)+'|'+pick.difficulty_band;
     if(!cohorts.has(key))cohorts.set(key,[]);
     cohorts.get(key).push(pick);
   }
