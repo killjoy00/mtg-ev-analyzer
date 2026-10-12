@@ -308,10 +308,7 @@ function LegacyJourney({progress,months}:{
   if(!progress&&!months?.length)return null;
   const visible=allMonths?months:months.slice(-3);
   return <Section title="Your Drafting Journey" caption="Original recorded scores">
-    {progress?<Text style={styles.body}>
-      Recent 40: {score(progress.recent.average_score)}/100 · Previous 40: {score(progress.previous.average_score)}/100 ·
-      {' '}Difference {progress.delta>0?'+':''}{score(progress.delta)} points.
-    </Text>:null}
+    {progress?<Text style={styles.body}>{`Recent 40: ${score(progress.recent.average_score)}/100 · Previous 40: ${score(progress.previous.average_score)}/100 · Difference ${progress.delta>0?'+':''}${score(progress.delta)} points.`}</Text>:null}
     {progress?<Text style={styles.caption}>These are different saved decisions, not proof that your drafting improved or declined.</Text>:null}
     {months.length?<><Text style={styles.subheading}>Pacific calendar months</Text>
       <View style={styles.months}>{visible.map(month=><View key={month.month} style={styles.month}>
