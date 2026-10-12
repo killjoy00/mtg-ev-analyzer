@@ -206,10 +206,10 @@ function JourneyStory({journey,progress,months}:{
     </ScrollView>:<Text style={styles.caption}>Your drafting journey grows with your original recorded decisions.</Text>}
     <Text style={styles.caption}>{journey.note}</Text>
     <Text style={styles.subheading}>Most recent vs previous 40</Text>
-    {journey.versions_comparable&&progress?<View style={styles.windowRow}>
+    {journey.progress_compatible!==false&&progress?<View style={styles.windowRow}>
       <View style={styles.window}><Text style={styles.meta}>Previous 40</Text><Text style={styles.bigScore}>{score(progress.previous.average_score)}</Text></View>
       <View style={styles.window}><Text style={styles.meta}>Recent 40</Text><Text style={styles.bigScore}>{score(progress.recent.average_score)}</Text></View>
-    </View>:<Text style={styles.caption}>{journey.versions_comparable?
+    </View>:<Text style={styles.caption}>{journey.progress_compatible!==false?
       'Two completed 40-pick windows are needed for a recent-vs-previous score comparison.':
       'Historical windows span incompatible scoring or card-pool versions; their averages are not directly compared.'}</Text>}
     {journey.milestones.length?<><Text style={styles.subheading}>Your milestones</Text>
