@@ -29,7 +29,13 @@ function shortInsightDate(iso) {
   return month?month+' '+Number(iso.slice(8,10)):'';
 }
 function shortInsightRange(value) {
-  const from=shortInsightDate(value?.from),to=shortInsightDate(value?.to);
+  const local=stamp=>{
+    const date=new Date(stamp);
+    return Number.isFinite(date.getTime())?
+      date.toLocaleDateString(undefined,{month:'short',day:'numeric'}):null;
+  };
+  const from=(value?.from_at&&local(value.from_at))||shortInsightDate(value?.from);
+  const to=(value?.to_at&&local(value.to_at))||shortInsightDate(value?.to);
   return from===to?from:from+'–'+to;
 }
 function periodLabel(key){return PERIODS.find(x=>x[0]===key)?.[1]||'All available';}
