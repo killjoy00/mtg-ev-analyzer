@@ -195,8 +195,8 @@ function journeyMarkup(data) {
   const milestone=(journey.milestones||[]).map(m=>'<li><strong>'+esc(m.text)+'</strong> · '+
     esc(insightLocalRange(m,m.date,m.date))+(m.average_score!=null?' · '+score(m.average_score)+'/100':'')+'</li>').join('');
   const compatible=journey.progress_compatible!==false;
-  const sameVersions=journey.versions_comparable!==false;
-  const boundaryWarning=!compatible||!sameVersions?
+  const versionBoundary=new Set((journey.windows||[]).map(w=>w.cohort)).size>1;
+  const boundaryWarning=!compatible||versionBoundary?
     '<p class="my-insights-journey-warning" role="note">These saved picks cross different scoring or card-pool versions. The windows are not a continuous progress trend.</p>':'';
   const progress=compatible&&data.progress?'<p class="my-insights-journey-summary">Recent 40: '+
     score(data.progress.recent.average_score)+'/100 · Previous 40: '+
