@@ -21,9 +21,13 @@ export function AdaptiveTabBar(props: BottomTabBarProps) {
   // Avoid forcing two unreadably narrow columns at AX-XXXL. A grid that needs
   // three or more rows consumes too much of the screen: use a single scrollable
   // row with wide, intrinsically growing labels instead.
-  const minimumItemWidth = Math.ceil(Math.max(112, 76 * fontScale));
+  // A scaled minimum retains one-row navigation on roomy iPads (where short
+  // labels already fit) without forcing cramped columns on small phones.
+  const minimumItemWidth = Math.ceil(Math.max(112, 56 * fontScale));
   const columns = Math.max(1, Math.min(routes.length, Math.floor(available / minimumItemWidth)));
-  const scrollHorizontally = shortWindow || Math.ceil(routes.length / columns) > 2;
+  const rows = Math.ceil(routes.length / columns);
+  const scrollHorizontally = shortWindow || rows > 2 ||
+    (fontScale > 2.3 && rows > 1 && available < 600);
   const itemWidth = scrollHorizontally
     ? Math.min(available, Math.max(minimumItemWidth, shortWindow ? 180 : 0))
     : available / columns;
