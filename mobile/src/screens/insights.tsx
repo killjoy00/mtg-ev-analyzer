@@ -5,7 +5,7 @@ import {safeCardImageUrl} from '../../../card-image-policy.mjs';
 import { Text } from '@/src/components/Text';
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 import { AboutLink } from '@/src/components/AboutLink';
-import { loadMobileInsights, loadMobileInsightDecision, type DraftInsights, type DraftingDNA, type DnaTrait, type CardChoices, type DraftingJourney, type InsightHighlights, type InsightHighlight, type InsightDecision, type InsightCard, type InsightGroup, type InsightsEnvironment, type InsightsPeriod } from '@/src/api/insights';
+import { loadMobileInsights, loadMobileInsightDecision, type DraftInsights, type DraftingDNA, type DnaTrait, type CardChoices, type DraftingJourney, type InsightHighlights, type InsightHighlight, type InsightDecisionLocator, type InsightDecision, type InsightCard, type InsightGroup, type InsightsEnvironment, type InsightsPeriod } from '@/src/api/insights';
 import { ApiError } from '@/src/api/client';
 import { ensureGuestSession } from '@/src/api/guest';
 import { useAppResume } from '@/src/hooks/useAppResume';
@@ -133,7 +133,7 @@ function DNATrait({trait,primary=false}: {trait:DnaTrait|null;primary?:boolean})
   </View>;
 }
 function DNASummary({dna,cardChoices,onReview}:{
-  dna:DraftingDNA;cardChoices?:CardChoices;onReview:(item:InsightHighlight)=>void;
+  dna:DraftingDNA;cardChoices?:CardChoices;onReview:(item:InsightDecisionLocator)=>void;
 }) {
   const [showRules,setShowRules]=useState(false);
   const [expandedChoices,setExpandedChoices]=useState<string[]>([]);
@@ -161,7 +161,7 @@ function DNASummary({dna,cardChoices,onReview}:{
           {(choice.examples||[]).map(example=><Pressable key={example.puzzle_id}
             accessibilityRole="button" style={styles.exampleLink} onPress={()=>onReview({
               ...example,score:0,trophy_match:false,environment:'mixed',selection_kind:'alternative',
-            } as InsightHighlight)}>
+            )}>
             <Text style={styles.secondaryText}>Review {example.selected_name||'saved pick'} · {example.set_id} P1P{example.pick_number} · {shortDate(example.date)}</Text>
           </Pressable>)}
         </View>:null}
@@ -424,7 +424,7 @@ export default function InsightsScreen() {
     setDetail(null);
     setDetailPhase('idle');
   };
-  const reviewDetail=async(item:InsightHighlight)=>{
+  const reviewDetail=async(item:InsightDecisionLocator)=>{
     const t=++detailTicket.current,epoch=requestId.current,owner=activeOwner.current;
     setDetail(null);setDetailPhase('loading');
     try{
