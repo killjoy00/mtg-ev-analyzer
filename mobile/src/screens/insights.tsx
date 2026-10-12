@@ -200,13 +200,13 @@ function SavedDecisionDetail({detail,onClose}: {detail:InsightDecision;onClose:(
         <Text style={styles.meta}>{card.name}{card.id===detail.selected.id?' · Your pick':''}{card.id===detail.trophy.id?' · Trophy pick':''}</Text>
       </View>)}
     </View>
-    {detail.prior_picks.length?<><Text style={styles.subheading}>Previously selected cards</Text>
+    {detail.prior_picks.length?<><Text style={styles.subheading}>Original drafter’s prior picks</Text>
       <Text style={styles.caption}>{detail.prior_picks.map(c=>c.name).join(' · ')}</Text></>:null}
     {detail.trophy_drafter?.record?<Text style={styles.caption}>This verified trophy draft finished {detail.trophy_drafter.record}.</Text>:null}
     {detail.trophy_drafter?.win_rate!=null?<Text style={styles.caption}>The original drafter’s approximate overall game win rate was {detail.trophy_drafter.win_rate}%, not this card’s win rate.</Text>:null}
     {detail.ranking?.length?<><Text style={styles.subheading}>Why this score? Saved alternatives</Text>
       {detail.ranking.filter(r=>r.score!=null).map(r=><Text key={r.id} style={styles.caption}>
-        {r.name}: {r.score}/100{r.id===detail.selected.id?' · Your pick':''}
+        {r.name}: {r.score}/100{r.support!=null?' · saved support '+r.support:''}{r.id===detail.selected.id?' · Your pick':''}
         {r.id===detail.trophy.id?' · Trophy pick':''}
       </Text>)}</>:null}
     <Text style={styles.caption}>Read-only historical results. Your original score and pick are unchanged.</Text>
@@ -215,78 +215,91 @@ function SavedDecisionDetail({detail,onClose}: {detail:InsightDecision;onClose:(
     </Pressable>
   </View>;
 }
-function HighlightsStory({highlights,onReview,detail,detailPhase,onClose,onLoadMore,morePhase}:{
-  highlights:InsightHighlights;onReview:(item:InsightHighlight)=>void;detail:InsightDecision|null;
-  detailPhase:'idle'|'loading'|'ready'|'error';onClose:()=>void;
-  onLoadMore:()=>void;morePhase:'idle'|'loading'|'error';
+function HighlightsStory({highlights,finding,onReview,onLoadMore,morePhase}:{
+  highlights:InsightHighlights;finding?:{id:string;text:string}|null;
+  onReview:(item:InsightHighlight)=>void;onLoadMore:()=>void;morePhase:'idle'|'loading'|'error';
 }) {
   const [selected,setSelected]=useState<'best'|'misses'>('best');
+  const [expanded,setExpanded]=useState(false);
   const rows=selected==='best'?highlights.best:highlights.misses;
-  return <Section title="Your Best Calls & Biggest Misses" caption="Real saved cards and original awarded scores, not proof that any alternative was objectively wrong">
+  const show=expanded?rows:rows.slice(0,3);
+  return <Section title="Decision report" caption={num(rows.length)+' saved highlights available in '+(selected==='best'?'Best Calls':'Biggest Misses')}>
+    <Text style={styles.reportLead}>
+      <Text style={styles.summary}>{finding?'Leading finding: ':'Your recent decisions: '}</Text>
+      {finding?.text||'No standout comparison has qualified in this environment and time period. These saved picks are factual examples.'}
+    </Text>
     <View style={styles.choices}>
-      <Pressable accessibilityRole="button" accessibilityState={{selected:selected==='best'}}
-        onPress={()=>{setSelected('best');onClose();}} style={[styles.choice,selected==='best'&&styles.choiceActive]}>
-        <Text style={styles.choiceText}>Best Calls</Text>
-      </Pressable>
-      <Pressable accessibilityRole="button" accessibilityState={{selected:selected==='misses'}}
-        onPress={()=>{setSelected('misses');onClose();}} style={[styles.choice,selected==='misses'&&styles.choiceActive]}>
-        <Text style={styles.choiceText}>Biggest Misses</Text>
-      </Pressable>
+      {(['best','misses'] as const).map(kind=><Pressable key={kind} accessibilityRole="button"
+        accessibilityState={{selected:selected===kind}}
+        onPress={()=>{setSelected(kind);setExpanded(false);}}
+        style={[styles.choice,selected===kind&&styles.choiceActive]}>
+        <Text style={[styles.choiceText,selected===kind&&styles.choiceTextActive]}>{kind==='best'?'Best Calls':'Biggest Misses'}</Text>
+      </Pressable>)}
     </View>
-    {rows.length?rows.map(item=><View key={item.puzzle_id} style={styles.highlightCard}>
-      <View style={styles.highlightVisual}>
-        <CardArtwork card={item.preview?.selected} label="Your original choice"/>
-        {item.preview?.trophy?.id!==item.preview?.selected?.id&&item.preview?.trophy?
-          <CardArtwork card={item.preview.trophy} label="Original trophy choice"/>:null}
-      </View>
-      <Text style={styles.summary}>{item.preview?.selected?.name||'Your saved pick'} · {item.score}/100</Text>
-      <Text style={styles.meta}>{item.set_id} · P1P{item.pick_number} · {item.date} · {item.trophy_match?'Matched trophy':'Alternative selection'}</Text>
-      <Pressable accessibilityRole="button" onPress={()=>onReview(item)} style={styles.secondaryButton}>
+    {show.length?show.map((item,index)=><View key={item.puzzle_id} style={[styles.highlightCard,index>0&&styles.highlightCompact]}>
+      {index===0?<View style={styles.highlightVisual}>
+        <View style={styles.highlightArtWrap}><Text style={styles.meta}>Your pick</Text><CardArtwork card={item.preview?.selected} label="Your pick"/></View>
+        {!item.trophy_match?<View style={styles.highlightArtWrap}><Text style={styles.meta}>Trophy pick</Text><CardArtwork card={item.preview?.trophy} label="Trophy pick"/></View>:null}
+      </View>:null}
+      <Text style={styles.summary}>Your pick: {item.preview?.selected?.name||item.selected_name||'Saved selection'}</Text>
+      <Text style={styles.meta}>{item.trophy_match?'Trophy pick matched':'Trophy pick: '+(item.preview?.trophy?.name||item.historical_name||'Original trophy selection')}</Text>
+      <Text style={styles.meta}>{item.set_id} · P1P{item.pick_number} · {shortDate(item.date)} · Original score {item.score}/100</Text>
+      <Text style={styles.body}>{item.reason_text||(
+        item.trophy_match?'You matched the original trophy selection.':
+          'Your original non-trophy decision earned '+item.score+'/100.')}</Text>
+      <Pressable accessibilityRole="button" onPress={()=>onReview(item)} style={styles.compactAction}>
         <Text style={styles.secondaryText}>Review original pack</Text>
       </Pressable>
-    </View>):<Text style={styles.caption}>No qualifying saved picks in this group yet.</Text>}
-    {highlights.has_more?.[selected]?<Pressable accessibilityRole="button" disabled={morePhase==='loading'}
+    </View>):<Text style={styles.caption}>No qualifying saved picks in this group for these filters.</Text>}
+    {rows.length>3&&!expanded?<Pressable accessibilityRole="button" style={styles.secondaryButton}
+      onPress={()=>setExpanded(true)}><Text style={styles.secondaryText}>See more</Text></Pressable>:null}
+    {expanded&&highlights.has_more?.[selected]?<Pressable accessibilityRole="button" disabled={morePhase==='loading'}
       onPress={onLoadMore} style={styles.secondaryButton}>
       <Text style={styles.secondaryText}>{morePhase==='loading'?'Loading saved picks…':
-        morePhase==='error'?'Retry loading more picks':'Load more saved picks (page 2 of 2)'}</Text>
+        morePhase==='error'?'Retry loading more picks':'See more saved decisions'}</Text>
     </Pressable>:null}
-    {detailPhase==='loading'?<Text style={styles.caption}>Loading your saved decision…</Text>:null}
-    {detailPhase==='error'?<Text accessibilityRole="alert" style={styles.caption}>This original decision could not be loaded. Try again.</Text>:null}
-    {detailPhase==='ready'&&detail?<SavedDecisionDetail detail={detail} onClose={onClose}/>:null}
+    <Text style={styles.caption}>These are historical scored calls, not proof of objectively right or wrong Magic choices.</Text>
   </Section>;
 }
 function JourneyStory({journey,progress,months}:{
   journey:DraftingJourney;progress:DraftInsights['progress'];months:DraftInsights['months'];
 }) {
-  return <Section title="Your Drafting Journey" caption="Original scores in 40-decision chronological windows">
+  const [details,setDetails]=useState(false);
+  return <Section title="Your Drafting Journey" caption="Originally awarded scores · 40-decision windows">
     {journey.windows.length?<ScrollView horizontal contentContainerStyle={styles.journeyWindowRow} accessibilityLabel="Your recorded score timeline">
       {journey.windows.map(w=><View key={w.id} style={styles.journeyWindow}
         accessibilityLabel={insightLocalRange(w)+', '+w.count+' decisions'+(w.complete?'':' incomplete')}>
         <Text style={styles.bigScore}>{score(w.average_score)}</Text>
         <View style={styles.journeyTrack}><View style={[styles.journeyFill,
           {height:(Math.max(0,Math.min(100,w.average_score??0))+'%') as '100%'}]}/></View>
-        <Text style={styles.meta}>{insightLocalRange(w)}</Text>
-        <Text style={styles.meta}>{w.count} picks{w.complete?'':' · incomplete'}</Text>
+        <Text style={styles.meta}>{shortDate(w.from)+'–'+shortDate(w.to)}</Text>
+        <Text style={styles.meta}>{w.count} picks{w.complete?'':' · partial'}</Text>
       </View>)}
-    </ScrollView>:<Text style={styles.caption}>Your drafting journey grows with your original recorded decisions.</Text>}
-    <Text style={styles.caption}>{journey.note}</Text>
-    <Text style={styles.subheading}>Most recent vs previous 40</Text>
-    {journey.progress_compatible!==false&&progress?<View style={styles.windowRow}>
-      <View style={styles.window}><Text style={styles.meta}>Previous 40</Text><Text style={styles.bigScore}>{score(progress.previous.average_score)}</Text></View>
-      <View style={styles.window}><Text style={styles.meta}>Recent 40</Text><Text style={styles.bigScore}>{score(progress.recent.average_score)}</Text></View>
-    </View>:<Text style={styles.caption}>{journey.progress_compatible!==false?
-      'Two completed 40-pick windows are needed for a recent-vs-previous score comparison.':
-      'Historical windows span incompatible scoring or card-pool versions; their averages are not directly compared.'}</Text>}
-    {journey.milestones.length?<><Text style={styles.subheading}>Your milestones</Text>
-      {journey.milestones.map(m=><Text key={m.id} style={styles.body}>{insightLocalRange(m)} · {m.text}{m.average_score!=null?' · '+score(m.average_score)+'/100':''}</Text>)}</>:null}
-    <Text style={styles.subheading}>Pacific calendar months</Text>
-    <View style={styles.months}>{months.map(m=><View key={m.month} style={styles.month}>
-      <Text style={styles.meta}>{m.month}</Text><Text style={styles.monthScore}>{score(m.average_score)}</Text>
-      <Text style={styles.meta}>{m.count} decisions</Text>
-    </View>)}</View>
+    </ScrollView>:<Text style={styles.caption}>Your drafting Journey grows with your original recorded decisions.</Text>}
+    {journey.progress_compatible!==false&&progress?<Text style={styles.body}>
+      Recent 40: {score(progress.recent.average_score)}/100 · Previous 40: {score(progress.previous.average_score)}/100 ·
+      {' '}Difference {progress.delta>0?'+':''}{score(progress.delta)} points (descriptive, not proof of improvement).
+    </Text>:null}
+    <Pressable accessibilityRole="button" accessibilityState={{expanded:details}}
+      style={styles.disclosure} onPress={()=>setDetails(v=>!v)}>
+      <Text style={styles.summary}>{details?'Hide journey details':'View journey details'}</Text>
+    </Pressable>
+    {details?<View style={styles.detailBody}>
+      <Text style={styles.caption}>{journey.note} Incomplete windows remain visible as partial.</Text>
+      {journey.total_windows>journey.windows.length?<Text style={styles.caption}>Showing the most recent {journey.windows.length} of {journey.total_windows} windows.</Text>:null}
+      {journey.windows.map(w=><Text key={w.id} style={styles.caption}>{insightLocalRange(w)} · {w.count} decisions · {score(w.average_score)}/100 · {w.complete?'complete':'incomplete'}</Text>)}
+      {journey.progress_compatible===false?<Text style={styles.caption}>Incompatible source/scoring versions prevent the 40/40 comparison.</Text>:null}
+      {!progress&&journey.progress_compatible!==false?<Text style={styles.caption}>Two complete and compatible 40-pick groups are needed for the comparison.</Text>:null}
+      {journey.milestones.length?<><Text style={styles.subheading}>Milestones</Text>
+        {journey.milestones.map(m=><Text key={m.id} style={styles.caption}>{insightLocalRange(m)} · {m.text}{m.average_score!=null?' · '+score(m.average_score)+'/100':''}</Text>)}</>:null}
+      <Text style={styles.subheading}>Pacific calendar months</Text>
+      {months.length?<View style={styles.months}>{months.map(m=><View key={m.month} style={styles.month}>
+        <Text style={styles.meta}>{m.month}</Text><Text style={styles.monthScore}>{score(m.average_score)}</Text>
+        <Text style={styles.meta}>{m.count} decisions</Text>
+      </View>)}</View>:<Text style={styles.caption}>Monthly averages require at least 10 decisions in a month.</Text>}
+    </View>:null}
   </Section>;
 }
-
 function InsightSections({ data,onReview,detail,detailPhase,onClose,onLoadMore,morePhase }: {
   data:DraftInsights;onReview:(item:InsightHighlight)=>void;detail:InsightDecision|null;
   detailPhase:'idle'|'loading'|'ready'|'error';onClose:()=>void;
