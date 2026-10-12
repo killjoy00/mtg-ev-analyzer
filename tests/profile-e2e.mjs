@@ -153,6 +153,22 @@ await page.route(`${growthOrigin}/**`, async (route) => {
             evidence:[{label:'Low-score picks',value:3}]},
             {status:'emerging',label:'Trait still developing'}],
           note:'Descriptive labels, not proven skill ratings.'},
+        card_choices:{schema_version:'choice-context-v1',scope:'all-eligible-history',minimum_opportunities:20,
+          note:'Competitive saved support is a descriptive comparison, not a card-pick probability.',
+          choices:[
+            {id:'card-type',title:'Creature or noncreature',status:'ready',opportunities:26,
+              selected:{creature:19,noncreature:7},availability:{creature:26,noncreature:26},
+              cohort:'fixture-scoring|eight-pick-v4|fixture-corpus',
+              summary:'When both creatures and noncreatures had competitive saved model support, you chose a creature in 19 of 26 decisions.',
+              examples:[{session_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',round:2,puzzle_id:'fixture-pack-1',
+                set_id:'neo',pick_number:3,date:'2026-09-15',selected_name:'Daring Skyjek'}]},
+            {id:'rarity',title:'Rare/mythic or common/uncommon',status:'ready',opportunities:26,
+              selected:{'rare-mythic':8,'common-uncommon':18},
+              availability:{'rare-mythic':26,'common-uncommon':26},
+              cohort:'fixture-scoring|eight-pick-v4|fixture-corpus',
+              summary:'When rare/mythic and common/uncommon cards both had competitive saved model support, you chose a rare or mythic in 8 of 26 decisions.',
+              examples:[]}
+          ]},
         journey:{version:'drafting-journey-v1',eligible_decisions:80,window_size:40,total_windows:2,
           windows:[{id:'window-0',from:'2026-09-01',to:'2026-09-14',count:40,
             average_score:70,complete:true,cohort:'same'},
@@ -298,6 +314,12 @@ try {
   assert.match(await page.locator('#my-insights-dna').textContent(),/Your Drafting DNA/);
   assert.match(await page.locator('#my-insights-dna').textContent(),/The Independent Thinker/);
   assert.equal(await page.locator('.my-insights-dna-secondary-row > *').count(),2);
+  assert.match(await page.locator('.my-insights-choice-context').textContent(),/creature in 19 of 26 decisions/);
+  assert.match(await page.locator('.my-insights-choice-context').textContent(),/rare or mythic in 8 of 26 decisions/);
+  await page.locator('.my-insights-choice-fact').first().getByText(/Options and real examples/).click();
+  await page.getByRole('button',{name:/Daring Skyjek · neo P1P3/}).click();
+  await page.locator('#my-insights-decision-dialog[open] .my-insights-locked-pack').waitFor();
+  await page.locator('#my-insights-decision-dialog').getByRole('button',{name:'Close'}).click();
   assert.match(await page.locator('#my-insights-result').textContent(),/Your Drafting Journey/);
   assert.match(await page.locator('#my-insights-result').textContent(),/Explore your data/);
   assert.equal(await page.locator('.my-insights-explore').evaluate(node=>node.open),false,
