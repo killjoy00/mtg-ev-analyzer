@@ -89,37 +89,46 @@ function dnaMarkup(data) {
   const qualified=dna.primary?.status==='qualified'?dna.primary:null;
   const primary=qualified
     ?'<div class="my-insights-dna-primary"><strong>'+esc(qualified.title)+'</strong>'+
-      '<p>'+esc(qualified.summary)+'</p><small>'+number(qualified.supporting_decisions)+' eligible supporting decisions</small>'+
-      '<details><summary>Why this fits</summary><ul>'+
+      '<p>'+esc(qualified.summary)+'</p>'+
+      '<details><summary>Why this fits</summary><p>'+number(qualified.supporting_decisions)+
+      ' original decisions supported this pattern.</p><ul>'+
       (qualified.evidence||[]).map(e=>'<li>'+esc(e.label)+': <strong>'+esc(String(e.value))+'</strong></li>').join('')+
       '</ul></details></div>'
     :'<div class="my-insights-dna-primary"><strong>Your Drafting DNA is taking shape</strong>'+
-      '<p>No provisional identity meets its complete stability evidence requirements yet.</p></div>';
+      '<p>We haven’t seen a pattern strong enough to name yet.</p></div>';
   const secondary=(dna.secondary||[]).slice(0,2).map(v=>v.status==='qualified'
     ?'<details class="my-insights-dna-secondary"><summary>'+esc(v.title)+'</summary>'+
-      '<p>'+esc(v.summary)+'</p><small>'+number(v.supporting_decisions)+' supporting decisions</small>'+
+      '<p>'+esc(v.summary)+'</p><small>Based on '+number(v.supporting_decisions)+' saved decisions</small>'+
       '<ul>'+(v.evidence||[]).map(e=>'<li>'+esc(e.label)+': '+esc(String(e.value))+'</li>').join('')+'</ul></details>'
-    :'<div class="my-insights-dna-secondary is-developing"><strong>Developing</strong><small>Another trait has not qualified</small></div>').join('');
+    :'<span class="my-insights-dna-secondary is-developing">Another trait is taking shape</span>').join('');
   const context=data.card_choices;
   const choices=(context?.choices||[]).filter(v=>v.status==='ready');
-  const contextHtml=choices.length?'<div class="my-insights-choice-context"><h3>Your card choices</h3>'+
-    choices.map(v=>'<div class="my-insights-choice-fact"><strong>'+esc(v.title)+'</strong><p>'+esc(v.summary)+'</p>'+
-      '<details><summary>Options and real examples · '+number(v.opportunities)+' decisions</summary>'+
-      '<p>Available competitive options: '+Object.entries(v.availability||{}).map(([k,n])=>esc(k)+': '+number(n)).join(' · ')+
-      '. Selections: '+Object.entries(v.selected||{}).map(([k,n])=>esc(k)+': '+number(n)).join(' · ')+'.</p>'+
-      (v.examples||[]).map(e=>'<button type="button" class="my-insights-example" data-insights-review data-session="'+
-        esc(e.session_id)+'" data-round="'+Number(e.round)+'" data-puzzle="'+esc(e.puzzle_id)+'">'+
-        esc(e.selected_name||'Saved selection')+' · '+esc(e.set_id)+' P1P'+Number(e.pick_number)+' · '+esc(shortInsightDate(e.date))+'</button>').join('')+
-      '</details></div>').join('')+'</div>'
-    :'<p class="my-insights-note">Your card-choice details are developing: a breakdown needs at least '+
-      number(context?.minimum_opportunities||20)+' comparable saved opportunities in one model-version cohort.</p>';
+  const contextHtml=choices.length?'<div class="my-insights-choice-context">'+
+    '<h3>When both kinds of cards were competitive</h3>'+
+    choices.map(v=>{
+      const isType=v.id==='card-type',count=number(v.selected?.[isType?'creature':'rare-mythic']||0);
+      const label=isType?'Creature choices':'Rare or mythic choices';
+      return '<div class="my-insights-choice-fact"><span>'+esc(label)+'</span><strong>'+count+
+        ' of '+number(v.opportunities)+' picks</strong>'+
+        '<details><summary>Options and real examples</summary><p>'+esc(v.summary||'')+'</p>'+
+        '<p>Competitive cards: '+Object.entries(v.availability||{}).map(([k,n])=>esc(k)+': '+number(n)).join(' · ')+
+        '. Your picks: '+Object.entries(v.selected||{}).map(([k,n])=>esc(k)+': '+number(n)).join(' · ')+'.</p>'+
+        (v.examples||[]).map(e=>'<button type="button" class="my-insights-example" data-insights-review data-session="'+
+          esc(e.session_id)+'" data-round="'+Number(e.round)+'" data-puzzle="'+esc(e.puzzle_id)+'">'+
+          esc(e.selected_name||'Saved selection')+' · '+esc(e.set_id)+' P1P'+Number(e.pick_number)+' · '+
+          esc(shortInsightDate(e.date))+'</button>').join('')+
+        '</details></div>';
+    }).join('')+'</div>':'';
+  const developing=context&&!choices.length?'<p>Card-choice patterns need more comparable saved packs.</p>':'';
   return '<section class="my-pack-card my-insights-wide my-insights-dna">'+
-    '<div class="my-card-heading"><h2>Your Drafting DNA</h2><span>All available history · '+number(dna.eligible_decisions)+' eligible decisions</span></div>'+
+    '<div class="my-card-heading"><h2>Your Drafting DNA</h2><span>'+
+    number(dna.eligible_decisions)+' saved decisions</span></div>'+
     primary+'<div class="my-insights-dna-secondary-row">'+secondary+'</div>'+
-    '<p class="my-insights-note">Reaching the sample floor does not guarantee a trait.</p>'+contextHtml+
-    '<details class="my-insights-dna-method"><summary>Scope and evidence rules</summary><p>'+
-    esc(dna.note||'Provisional rules describe records, not skill or personality.')+'</p><p>'+
-    esc(context?.note||'Card-choice context is unavailable from this saved history.')+'</p></details></section>';
+    contextHtml+
+    '<details class="my-insights-dna-method"><summary>How these patterns are counted</summary>'+
+    developing+'<p>These are descriptions of your saved choices, not a skill rating. Traits need enough records and must stay consistent over time.</p>'+
+    '<p>'+esc(dna.note||'Results are based on original saved decisions.')+'</p>'+
+    (context?'<p>'+esc(context.note||'')+'</p>':'')+'</details></section>';
 }
 export function safeCardImage(url) {return safeCardImageUrl(url);}
 function cardVisual(card,label) {
