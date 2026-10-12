@@ -35,6 +35,7 @@ function compile(relative,mocks) {
   mod.require=name=>{
     if(name==='@/src/components/Text')return {Text:host('Text')};
     if(name==='@/src/components/ScreenArea')return {ScreenArea:host('SafeAreaView')};
+    if(name==='@/src/components/MyPackSectionTabs')return compile('src/components/MyPackSectionTabs.tsx',mocks);
     if(Object.prototype.hasOwnProperty.call(mocks,name))return mocks[name];
     if(name.startsWith('@/'))throw Error('Unmocked Insights module: '+name);
     return require(name);
@@ -54,7 +55,8 @@ async function mount(t,{initial=session(),respond=async (_s,env)=>fixture(env)}=
     'expo-router':{router:{push:v=>routes.push(['push',v]),dismissTo:v=>routes.push(['dismiss',v])},
       Stack:{Screen:host('StackScreen')},useFocusEffect:callback=>React.useEffect(callback,[callback])},
     'react-native':{ActivityIndicator:host('ActivityIndicator'),Image:host('Image'),Pressable:host('Pressable'),
-      ScrollView:host('ScrollView'),Modal:host('Modal'),StyleSheet:{create:v=>v},View:host('View')},
+      ScrollView:host('ScrollView'),Modal:host('Modal'),StyleSheet:{create:v=>v},View:host('View'),
+      useWindowDimensions:()=>({width:390,height:844,fontScale:1})},
     '@/src/components/AboutLink':{AboutLink:host('AboutLink')},
     '@/src/config':{config:{screenshots:{fixtures:false}}},
     '@/src/api/insights':{loadMobileInsights:async(s,env,period,page=1)=>{
