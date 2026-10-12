@@ -200,8 +200,8 @@ test('new owner cannot see old owner Insight response after account switch',asyn
   const ui=await mount(t,{respond:async(s,env)=>s.accountToken==='synthetic-token-a'?slow:fixture('powered-cube')});
   await ui.switchAccount(session('b'));
   await act(async()=>{releaseFirst(fixture('mixed'));await flush();});
-  assert.ok(ui.text().includes('P1P2'));
-  assert.ok(!ui.text().includes('P1P1'));
+  assert.ok(ui.text().includes('80 eligible decisions · Powered Cube'));
+  assert.ok(!ui.text().includes('80 eligible decisions · Mixed'));
   assert.equal(ui.calls.at(-1)[0],'synthetic-token-b');
 });
 
