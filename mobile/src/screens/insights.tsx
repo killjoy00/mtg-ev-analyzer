@@ -251,7 +251,7 @@ function HighlightsStory({highlights,finding,onReview,onLoadMore,morePhase}:{
         <Text style={styles.secondaryText}>Review original pack</Text>
       </Pressable>
     </View>):<Text style={styles.caption}>No qualifying saved picks in this group for these filters.</Text>}
-    {rows.length>3&&!expanded?<Pressable accessibilityRole="button" style={styles.secondaryButton}
+    {!expanded&&(rows.length>3||highlights.has_more?.[selected])?<Pressable accessibilityRole="button" style={styles.secondaryButton}
       onPress={()=>setExpanded(true)}><Text style={styles.secondaryText}>See more</Text></Pressable>:null}
     {expanded&&highlights.has_more?.[selected]?<Pressable accessibilityRole="button" disabled={morePhase==='loading'}
       onPress={onLoadMore} style={styles.secondaryButton}>
