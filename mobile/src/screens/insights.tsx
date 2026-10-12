@@ -260,7 +260,8 @@ function JourneyStory({journey,progress,months}:{
   journey:DraftingJourney;progress:DraftInsights['progress'];months:DraftInsights['months'];
 }) {
   const [details,setDetails]=useState(false);
-  const versionBoundary=journey.versions_comparable===false||journey.progress_compatible===false;
+  const versionBoundary=journey.progress_compatible===false||
+    new Set(journey.windows.map(w=>w.cohort)).size>1;
   return <Section title="Your Drafting Journey" caption="Originally awarded scores · 40-decision windows">
     {versionBoundary?<Text style={styles.journeyWarning} accessibilityRole="alert">
       Historical card-pool or scoring rules changed. These windows are not one continuous progress trend.
