@@ -211,6 +211,9 @@ def measure_tabs(logs):
     require(('bar', 'navigation') in records, 'Missing intrinsic tab bar measurement')
     bar = records[('bar', 'navigation')]
     require(bar['height'] > 0 and bar['y']+bar['height'] <= bar['windowHeight']+1, 'Tab bar extends beyond the window')
+    if bar.get('layoutMode') == 'horizontal-scroll' and bar['windowHeight'] >= 600:
+        require(bar['height'] <= bar['windowHeight'] * 0.32,
+                'Large-text bottom navigation hides too much of the content area')
     result = {'bar': bar, 'items': {}}
     for label in bar['labels']:
         for kind in ['item', 'label', 'text']:
@@ -317,8 +320,12 @@ if platform == 'android':
         def enlarged_navigation(s=scenario):
             launch(s, scale=2.0)
             _, logs = snapshot(s+'-large-tabs')
+            tab_metrics = measure_tabs(logs)
+            if s == 'member':
+                require(tab_metrics['bar']['layoutMode'] == 'horizontal-scroll',
+                        'Five enlarged Android destinations must not consume three grid rows')
             manifest['scenes'].append({'name': s+'-large-tabs', 'width_dp': 390, 'font_scale': 2.0,
-                                      'tab_metrics': measure_tabs(logs), 'brand_metrics': measure_brand(logs)})
+                                      'tab_metrics': tab_metrics, 'brand_metrics': measure_brand(logs)})
         attempt(scenario+'-large-tabs', enlarged_navigation)
 
     def daily_journey():
@@ -601,6 +608,8 @@ elif platform == 'ios':
                         scene['brand_metrics'] = measure_brand(logs)
                     if screen not in ['feedback','insights'] and setting != 'large':
                         scene['tab_metrics'] = measure_tabs(logs)
+                        require(scene['tab_metrics']['bar']['layoutMode'] == 'horizontal-scroll',
+                                'iPhone AX-XXXL must keep bottom tabs to one scrollable row')
                     if screen == 'feedback':
                         scene['metrics'] = measure(logs)
                         ios_metrics[(scenario, setting)] = scene['metrics']
