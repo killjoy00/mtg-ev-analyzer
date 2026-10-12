@@ -449,3 +449,61 @@ test('Highlight v3 reasons are factual, deterministic, disjoint and scoped',()=>
  assert.ok(short.best.every(item=>item.pick_number<3));
  assert.ok(short.misses.every(item=>item.pick_number<3));
 });
+
+test('leading difficulty finding features a relevant hard match before unrelated easy alternatives',()=>{
+  const rows=[
+    ...Array.from({length:10},(_,n)=>pick(n,{score:94,band:'easy',day:1900+n})),
+    pick(101,{score:100,match:true,band:'hard',day:1911}),
+    pick(102,{score:90,band:'hard',day:1906}),
+    pick(103,{score:91,band:'easy',day:1907}),
+  ];
+  const finding={id:'difficulty',groups:[
+    {band:'easy',label:'easy-rated decisions',relation:'higher'},
+    {band:'hard',label:'hard-rated decisions',relation:'lower'},
+  ]};
+  const highlights=selectInsightHighlights(rows,{finding});
+  assert.equal(highlights.best[0].puzzle_id,'p101',
+    'hard source match competes for the featured position, not after three strong alternatives');
+  assert.ok(highlights.best.slice(0,3).some(r=>r.finding_context?.includes('hard-rated')));
+  assert.ok(highlights.best.slice(0,3).every(r=>r.finding_context),
+    'when actual compared-group examples exist, the visible report should explain its finding');
+  assert.deepEqual(selectInsightHighlights([...rows].reverse(),{finding}),highlights);
+});
+test('pick-position finding uses the compared positions, not a blanket early-pick boost',()=>{
+  const rows=[
+    ...Array.from({length:12},(_,n)=>pick(n,{score:98,sourcePick:1,day:1900+n})),
+    ...Array.from({length:6},(_,n)=>pick(100+n,{score:85,sourcePick:n%2?8:6,day:1900+n})),
+  ];
+  const finding={id:'pick-depth',groups:[
+    {pick_number:6,label:'P1P6 decisions',relation:'higher'},
+    {pick_number:8,label:'P1P8 decisions',relation:'lower'},
+  ]};
+  const best=selectInsightHighlights(rows,{finding}).best;
+  assert.equal(best.length,6);
+  assert.ok(best.slice(0,3).every(row=>[6,8].includes(row.pick_number)));
+  assert.ok(best[0].finding_context?.includes('P1P6'));
+  const wrong=selectInsightHighlights(rows,{finding:{id:'pick-depth',groups:[
+    {pick_number:11,label:'P1P11 decisions',relation:'higher'}]}}).best;
+  assert.equal(wrong[0].finding_context,undefined,'unsupported positions cannot imply evidence');
+});
+test('recent useful misses beat three-year-old extremes without changing saved scores',()=>{
+  const old=pick(900,{score:0,day:1,sourcePick:5}),
+    recent=pick(901,{score:34,day:1096,sourcePick:5});
+  old.set_id='neo';recent.set_id='neo';
+  const result=selectInsightHighlights([old,recent]);
+  assert.equal(result.misses[0].puzzle_id,'p901');
+  assert.deepEqual(selectInsightHighlights([recent,old]),result);
+  assert.equal(result.misses[1].score,0,'old extreme is retained as an additional true example');
+});
+test('aggregate passes exact compared 6/8 groups to highlights but returns no raw puzzle IDs',()=>{
+  const rows=Array.from({length:80},(_,n)=>raw(pick(n,{
+    score:n%2?42:95,sourcePick:n%2?8:6,day:Math.floor(n/2),band:'medium',
+  })));
+  const result=aggregateDraftRunInsights(rows,{now:new Date('2027-12-01T00:00:00Z')});
+  assert.equal(result.leading_finding?.id,'pick-depth');
+  assert.deepEqual(result.leading_finding.compared_groups.map(g=>g.label),
+    ['P1P6 decisions','P1P8 decisions']);
+  assert.ok(result.highlights.best.slice(0,3).every(r=>[6,8].includes(r.pick_number)));
+  assert.ok(result.highlights.misses.slice(0,3).every(r=>[6,8].includes(r.pick_number)));
+  assert.doesNotMatch(JSON.stringify(result.leading_finding),/puzzle_ids|puzzle_id/);
+});
