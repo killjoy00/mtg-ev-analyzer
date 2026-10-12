@@ -2,6 +2,8 @@
 
 **Decision:** Owner approved adding **Your Drafting Journey** and **Your Best Calls & Biggest Misses** alongside the already approved **Drafting DNA** (one primary archetype + two secondary traits), October 11, 2026.
 
+**October 12, 2026 focused-report follow-on:** see [INSIGHTS-FOCUSED-REPORT.md](INSIGHTS-FOCUSED-REPORT.md) for the compact overview, provisional card-choice comparison rule, reason-code contract, privacy boundaries and PR acceptance checklist. This follow-on does not change the approved underlying eligibility or scoring model.
+
 **Status:** Refined source merged via #1180; the matching web Pages deployment and #1181 guarded backend release succeeded. #1182 uploaded Android 1.0/100773 to Internal Testing (draft release); iOS 1.1/100789 uploaded, but TestFlight processing/attachment is unverified after a finalizer timeout. #1179 still tracks signed-in and physical-device acceptance; neither platform has a public store release.
 
 **Implementation tracking:** [Drafting DNA #1167](https://github.com/killjoy00/mtg-ev-analyzer/issues/1167), [Drafting Journey #1170](https://github.com/killjoy00/mtg-ev-analyzer/issues/1170), [Best Calls & Biggest Misses #1171](https://github.com/killjoy00/mtg-ev-analyzer/issues/1171).
