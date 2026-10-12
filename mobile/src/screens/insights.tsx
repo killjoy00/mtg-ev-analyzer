@@ -145,6 +145,11 @@ function SavedDecisionDetail({detail,onClose}: {detail:InsightDecision;onClose:(
       <Text style={styles.caption}>{detail.prior_picks.map(c=>c.name).join(' · ')}</Text></>:null}
     {detail.trophy_drafter?.record?<Text style={styles.caption}>This verified trophy draft finished {detail.trophy_drafter.record}.</Text>:null}
     {detail.trophy_drafter?.win_rate!=null?<Text style={styles.caption}>The original drafter’s approximate overall game win rate was {detail.trophy_drafter.win_rate}%, not this card’s win rate.</Text>:null}
+    {detail.ranking?.length?<><Text style={styles.subheading}>Why this score? Saved alternatives</Text>
+      {detail.ranking.filter(r=>r.score!=null).map(r=><Text key={r.id} style={styles.caption}>
+        {r.name}: {r.score}/100{r.id===detail.selected.id?' · Your pick':''}
+        {r.id===detail.trophy.id?' · Trophy pick':''}
+      </Text>)}</>:null}
     <Text style={styles.caption}>Read-only historical results. Your original score and pick are unchanged.</Text>
     <Pressable accessibilityRole="button" onPress={onClose} style={styles.secondaryButton}>
       <Text style={styles.secondaryText}>Close original pack</Text>
@@ -201,10 +206,12 @@ function JourneyStory({journey,progress,months}:{
     </ScrollView>:<Text style={styles.caption}>Your drafting journey grows with your original recorded decisions.</Text>}
     <Text style={styles.caption}>{journey.note}</Text>
     <Text style={styles.subheading}>Most recent vs previous 40</Text>
-    {progress?<View style={styles.windowRow}>
+    {journey.versions_comparable&&progress?<View style={styles.windowRow}>
       <View style={styles.window}><Text style={styles.meta}>Previous 40</Text><Text style={styles.bigScore}>{score(progress.previous.average_score)}</Text></View>
       <View style={styles.window}><Text style={styles.meta}>Recent 40</Text><Text style={styles.bigScore}>{score(progress.recent.average_score)}</Text></View>
-    </View>:<Text style={styles.caption}>Two completed 40-pick windows are needed for a recent-vs-previous score comparison.</Text>}
+    </View>:<Text style={styles.caption}>{journey.versions_comparable?
+      'Two completed 40-pick windows are needed for a recent-vs-previous score comparison.':
+      'Historical windows span incompatible scoring or card-pool versions; their averages are not directly compared.'}</Text>}
     {journey.milestones.length?<><Text style={styles.subheading}>Your milestones</Text>
       {journey.milestones.map(m=><Text key={m.id} style={styles.body}>{m.date} · {m.text}{m.average_score!=null?' · '+score(m.average_score)+'/100':''}</Text>)}</>:null}
     <Text style={styles.subheading}>Pacific calendar months</Text>
