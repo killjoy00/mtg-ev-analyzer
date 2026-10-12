@@ -38,7 +38,7 @@ export type InsightDecisionLocator = {session_id:string;round:number;puzzle_id:s
 export type InsightHighlight = {session_id:string;round:number;puzzle_id:string;set_id:string;
   environment:InsightsEnvironment;pick_number:number;date:string;score:number;
   trophy_match:boolean;selection_kind:string;reason_version?:string;reason_code?:string;reason_text?:string;
-   reason_evidence?:Record<string,string|number>;selected_name?:string;historical_name?:string;
+   reason_evidence?:Record<string,string|number>;finding_context?:string;selected_name?:string;historical_name?:string;
    preview?:{selected:InsightCard;trophy:InsightCard}};
 export type InsightHighlights = {schema_version:string;best:InsightHighlight[];misses:InsightHighlight[];note:string;
   page?:number;has_more?:{best:boolean;misses:boolean}};
@@ -69,7 +69,7 @@ export type DraftInsights = {
   methodology: string;
   drafting_dna?: DraftingDNA;
   card_choices?: CardChoices;
-  leading_finding?: {id:string;text:string}|null;
+  leading_finding?: {id:string;text:string;compared_groups?:{label:string;relation:'higher'|'lower'}[]}|null;
   default_environment?: InsightsEnvironment;
   journey?: DraftingJourney;
   highlights?: InsightHighlights;
