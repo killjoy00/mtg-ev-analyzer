@@ -328,6 +328,7 @@ test('native compact choice rows show the result first and hide method/examples 
   const ui=await mount(t,{respond:async()=>data});
   const text=ui.text();
   assert.ok(text.includes('The Independent Thinker'));
+  assert.ok(text.includes('All available history · 237 saved decisions'));
   assert.ok(text.includes('19 of 26 picks'));
   assert.ok(text.includes('8 of 26 picks'));
   assert.ok(!text.includes('When both creatures and noncreatures were competitive'));

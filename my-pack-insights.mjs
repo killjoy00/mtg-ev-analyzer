@@ -122,7 +122,7 @@ function dnaMarkup(data) {
   const developing=context&&!choices.length?'<p>Card-choice patterns need more comparable saved packs.</p>':'';
   return '<section class="my-pack-card my-insights-wide my-insights-dna">'+
     '<div class="my-card-heading"><h2>Your Drafting DNA</h2><span>'+
-    number(dna.eligible_decisions)+' saved decisions</span></div>'+
+    'All available history · '+number(dna.eligible_decisions)+' saved decisions</span></div>'+
     primary+'<div class="my-insights-dna-secondary-row">'+secondary+'</div>'+
     contextHtml+
     '<details class="my-insights-dna-method"><summary>How these patterns are counted</summary>'+

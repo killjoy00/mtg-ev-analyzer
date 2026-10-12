@@ -123,7 +123,7 @@ function DNASummary({dna,cardChoices,onReview}:{
   const [showRules,setShowRules]=useState(false);
   const [expandedChoices,setExpandedChoices]=useState<string[]>([]);
   const ready=(cardChoices?.choices||[]).filter(choice=>choice.status==='ready');
-  return <Section title="Your Drafting DNA" caption={num(dna.eligible_decisions)+' saved decisions'} compact>
+  return <Section title="Your Drafting DNA" caption={'All available history · '+num(dna.eligible_decisions)+' saved decisions'} compact>
     <DNATrait trait={dna.primary||dna.primary_emerging||null} primary/>
     <View style={styles.dnaSecondary}>
       {(dna.secondary||[{status:'emerging',label:'Developing'},{status:'emerging',label:'Developing'}] as DnaTrait[]).slice(0,2).map((trait,index)=>

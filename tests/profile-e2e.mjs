@@ -345,6 +345,8 @@ try {
   assert.equal(await page.locator('#profile-insights-tab').getAttribute('aria-selected'),'true');
   await page.locator('#my-insights-result').getByText('Decision report',{exact:true}).waitFor();
   assert.match(await page.locator('#my-insights-dna').textContent(),/Your Drafting DNA/);
+  assert.match(await page.locator('#my-insights-dna').textContent(),/All available history · 160 saved decisions/,
+    'DNA explicitly labels its all-history scope');
   assert.match(await page.locator('#my-insights-dna').textContent(),/The Independent Thinker/);
   assert.equal(await page.locator('.my-insights-dna-secondary-row > *').count(),2);
   assert.match(await page.locator('.my-insights-choice-context').textContent(),/creature in 19 of 26 decisions/);
@@ -420,6 +422,8 @@ try {
   await page.locator('#my-insights-result').getByText('P1P2').waitFor();
   await page.locator('#my-insights-period').selectOption('90d');
   await page.locator('.my-insights-sample').getByText(/Last 90 days/).waitFor();
+  assert.match(await page.locator('#my-insights-dna').textContent(),/All available history · 160 saved decisions/,
+    'report filters must not change all-history DNA scope');
   for(const width of [320,390,768,1440]){
     await page.setViewportSize({width,height:844});
     await noOverflow();
