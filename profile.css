@@ -619,6 +619,8 @@
 .my-insights-leading { line-height:1.6; color:var(--ink); font-size:14px; margin:4px 0 14px; }
 .my-insights-leading strong { color:var(--green-dark); }
 .my-insights-highlights .my-insights-card-row { display:flex; flex-direction:column; gap:10px; }
+/* The author-level flex rule must not override the semantic hidden attribute. */
+.my-insights-pick[hidden], .my-insights-card-row[hidden] { display:none!important; }
 .my-insights-highlights .my-insights-pick { display:flex; flex-direction:column; border-radius:8px; }
 .my-insights-highlights .my-insights-pick.is-featured { flex-direction:row; background:var(--surface-soft); align-items:center; }
 .my-insights-highlights .my-insights-pick.is-featured .my-insights-pick-art { flex:0 0 min(40%,305px); min-width:0; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
