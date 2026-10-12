@@ -133,7 +133,8 @@ await page.route(`${growthOrigin}/**`, async (route) => {
         environment_label:{mixed:'Mixed',latest:'Latest Set','powered-cube':'Powered Cube'}[env],
         eligible_decisions:80,total_eligible_decisions:160,unlocked:true,unlock_at:8,unknown_difficulty:0,
         pick_depth:[{pick_number:env==='powered-cube'?2:1,label:env==='powered-cube'?'P1P2':'P1P1',count:40,average_score:78,trophy_match_pct:50}],
-        difficulty:[{band:'medium',count:80,average_score:77,trophy_match_pct:40}],
+        difficulty:[{band:'hard',count:40,average_score:88,trophy_match_pct:55},
+           {band:'easy',count:40,average_score:76,trophy_match_pct:35}],
         months:[{month:'2026-09',count:80,average_score:77,trophy_match_pct:40}],
         formats:['mixed','latest','powered-cube'].map((environment,index)=>({
           environment,label:{mixed:'Mixed',latest:'Latest Set','powered-cube':'Powered Cube'}[environment],
@@ -141,7 +142,11 @@ await page.route(`${growthOrigin}/**`, async (route) => {
         })),
         progress:{recent:{count:40,average_score:83,trophy_match_pct:50,from:'2026-09-15',to:'2026-09-25'},
           previous:{count:40,average_score:70,trophy_match_pct:30,from:'2026-09-01',to:'2026-09-14'},delta:13},
-        observations:[{id:'progress',text:'Recent 40 picks averaged 13.0 points higher than the previous 40 picks (40 vs 40 decisions).'}],
+        observations:[{id:'difficulty',text:'Hard-rated decisions averaged 12.0 points higher than easy-rated decisions (40 vs 40 decisions).'},
+           {id:'progress',text:'Recent 40 picks averaged 13.0 points higher than the previous 40 picks (40 vs 40 decisions).'}],
+         leading_finding:{id:'difficulty',text:'Hard-rated decisions averaged 12.0 points higher than easy-rated decisions (40 vs 40 decisions).',
+           compared_groups:[{label:'hard-rated decisions',relation:'higher'},
+             {label:'easy-rated decisions',relation:'lower'}]},
         versions:{scoring:['trophy-consensus-v3-linear-v2'],selection:['eight-pick-v4'],corpus:['fixture']},
         range:{from:'2026-09-01',to:'2026-09-25'},session_limit:1000,
         drafting_dna:{schema_version:'drafting-dna-v1',status:'ready',scope:'all-eligible-history',
@@ -180,8 +185,35 @@ await page.route(`${growthOrigin}/**`, async (route) => {
         highlights:{schema_version:'decision-highlights-v1',note:'Original awarded picks',
           best:[{session_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',round:2,puzzle_id:'fixture-pack-1',
             set_id:'neo',environment:'mixed',pick_number:3,date:'2026-09-15',score:92,
-            trophy_match:false,preview:{selected:{id:'card-mine',name:'Daring Skyjek',image_url:null},
-              trophy:{id:'card-trophy',name:'Frost Lynx',image_url:null}}}],
+            trophy_match:false,reason_code:'strong-scored-alternative',
+            finding_context:'From hard-rated decisions in this comparison',
+            reason_text:'Your original non-trophy pick earned 92/100 in a hard-rated saved pack.',
+            preview:{selected:{id:'card-mine',name:'Daring Skyjek',image_url:null},
+              trophy:{id:'card-trophy',name:'Frost Lynx',image_url:null}}},
+          {session_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',round:4,puzzle_id:'fixture-pack-4',
+            set_id:'ktk',environment:'mixed',pick_number:6,date:'2026-09-20',score:100,
+            trophy_match:true,reason_code:'hard-trophy-match',
+            finding_context:'From hard-rated decisions in this comparison',
+            reason_text:'You matched the source trophy pick on a historically hard-rated pack.',
+            preview:{selected:{id:'same',name:'Skyguard Captain',image_url:null},
+              trophy:{id:'same',name:'Skyguard Captain',image_url:null}}},
+          {session_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',round:5,puzzle_id:'fixture-pack-5',
+            set_id:'mkm',environment:'mixed',pick_number:8,date:'2026-09-18',score:88,
+            trophy_match:false,reason_code:'strong-scored-alternative',
+            finding_context:'From easy-rated decisions in this comparison',
+            reason_text:'Your saved alternative earned 88/100 from the original scoring model.',
+            preview:{selected:{id:'oath',name:'Luminous Oath',image_url:null},
+              trophy:{id:'reckoner',name:'Boros Reckoner',image_url:null}}},
+          {session_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',round:6,puzzle_id:'fixture-pack-6',
+            set_id:'neo',environment:'mixed',pick_number:6,date:'2026-09-17',score:90,
+            trophy_match:false,finding_context:'From hard-rated decisions in this comparison',
+            preview:{selected:{id:'four',name:'Skyline Adept',image_url:null},
+              trophy:{id:'other',name:'Frost Lynx',image_url:null}}},
+          {session_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',round:7,puzzle_id:'fixture-pack-7',
+            set_id:'ktk',environment:'mixed',pick_number:8,date:'2026-09-16',score:89,
+            trophy_match:false,finding_context:'From easy-rated decisions in this comparison',
+            preview:{selected:{id:'five',name:'Riverstone Sentinel',image_url:null},
+              trophy:{id:'other',name:'Frost Lynx',image_url:null}}}],
           misses:[{session_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',round:3,puzzle_id:'fixture-pack-2',
             set_id:'ktk',environment:'mixed',pick_number:5,date:'2026-09-16',score:32,
             trophy_match:false,preview:{selected:{id:'card-mine',name:'Daring Skyjek',image_url:null},
@@ -215,7 +247,8 @@ await page.route(`${growthOrigin}/**`, async (route) => {
       if(insightsMode==='descriptive') {
         // 237 real-looking eligible decisions with no qualifying 10-point gap.
         // Keep the backend's observations array empty to test the UI fallback.
-        body={...body,eligible_decisions:237,total_eligible_decisions:237,observations:[],
+        body={...body,eligible_decisions:237,total_eligible_decisions:237,observations:[],leading_finding:null,
+           difficulty:[{band:'medium',count:237,average_score:76.8,trophy_match_pct:42.2}],
           formats:[
             {environment:'mixed',label:'Mixed',count:237,average_score:76.8,trophy_match_pct:42.2},
             {environment:'latest',label:'Latest Set',count:0,average_score:null,trophy_match_pct:null},
@@ -233,8 +266,8 @@ await page.route(`${growthOrigin}/**`, async (route) => {
   } else if (url.pathname === '/v1/profile/insights/decision') {
     assert.equal(route.request().headers()['x-pack1-auth-session'],'profile-auth-fixture');
     assert.equal(url.searchParams.get('session_id'),'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
-    assert.ok(['2','3'].includes(url.searchParams.get('round')));
-    assert.ok(['fixture-pack-1','fixture-pack-2'].includes(url.searchParams.get('puzzle_id')));
+    assert.ok(['2','3','4','5','6','7'].includes(url.searchParams.get('round')));
+    assert.ok(['fixture-pack-1','fixture-pack-2','fixture-pack-4','fixture-pack-5','fixture-pack-6','fixture-pack-7'].includes(url.searchParams.get('puzzle_id')));
     body={set_id:'neo',pick_number:3,score:92,trophy_match:false,
       selected:{id:'card-mine',name:'Daring Skyjek',image_url:null},
       trophy:{id:'card-trophy',name:'Frost Lynx',image_url:null},
@@ -322,6 +355,13 @@ try {
   await page.locator('#my-insights-decision-dialog').getByRole('button',{name:'Close'}).click();
   assert.match(await page.locator('#my-insights-result').textContent(),/Your Drafting Journey/);
   assert.match(await page.locator('#my-insights-result').textContent(),/Explore your data/);
+  assert.equal(await page.locator('#my-insights-best-panel .my-insights-pick:visible').count(),3,
+    'three finding-linked highlights are visible before See more');
+  assert.equal(await page.locator('#my-insights-best-panel .my-insights-pick.is-featured:visible').count(),1);
+  assert.equal(await page.locator('#my-insights-best-panel .my-insights-pick.is-compact:visible').count(),2);
+  assert.match(await page.locator('#my-insights-best-panel .my-insights-pick.is-featured').textContent(),/hard-rated decisions/);
+  assert.match(await page.locator('#my-insights-best-panel .my-insights-pick.is-compact').nth(0).textContent(),/Skyguard Captain/);
+  assert.match(await page.locator('#my-insights-best-panel .my-insights-pick.is-compact').nth(1).textContent(),/Luminous Oath/);
   assert.equal(await page.locator('.my-insights-explore').evaluate(node=>node.open),false,
     'supporting breakdowns start collapsed');
   const reviewButton=page.getByRole('button',{name:'Review original pack'}).first();
@@ -366,7 +406,7 @@ try {
   await page.locator('#my-insights-refresh').click();
   await page.locator('#my-insights-dna').getByText('The Independent Thinker').waitFor();
   await page.locator('.my-insights-explore > summary').click();
-  assert.equal(await page.locator('.my-insights-bar').count(),2,'pick and difficulty metrics remain accessible');
+  assert.equal(await page.locator('.my-insights-bar').count(),3,'pick and two difficulty metrics remain accessible');
   await page.locator('#my-insights-environment').selectOption('powered-cube');
   await page.locator('.my-insights-sample').getByText(/Powered Cube/).waitFor();
   await page.locator('.my-insights-explore > summary').click();
@@ -376,6 +416,8 @@ try {
   for(const width of [320,390,768,1440]){
     await page.setViewportSize({width,height:844});
     await noOverflow();
+    assert.equal(await page.locator('#my-insights-best-panel .my-insights-pick:visible').count(),3,
+      'responsive report retains exactly three initial examples');
   }
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:'artifacts/ui-profile-insights-390.png',fullPage:true});
