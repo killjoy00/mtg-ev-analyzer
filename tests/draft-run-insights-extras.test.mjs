@@ -165,15 +165,39 @@ test('All DNA threshold gates are declared provisionally and deferrals stay expl
  assert.equal(DNA_QUALIFICATION.minimum_decisions,80);
  assert.equal(DNA_QUALIFICATION.stability_recent_run,8);
  assert.deepEqual([...DNA_QUALIFICATION.deferred],['trophy-twin','puzzle-solver','specialist']);
- assert.equal(buildDraftingDNA([]).picks_needed,80);
+ assert.equal(buildDraftingDNA([]).picks_needed,88);
  const emerging=buildDraftingDNA(Array.from({length:7},(_,n)=>pick(n)));
- assert.equal(emerging.picks_needed,73);
- assert.equal(emerging.primary_emerging.picks_needed,73);
- assert.deepEqual(emerging.secondary.map(x=>x.picks_needed),[73,73]);
+ assert.equal(emerging.picks_needed,81);
+ assert.equal(emerging.primary_emerging.picks_needed,81);
+ assert.deepEqual(emerging.secondary.map(x=>x.picks_needed),[81,81]);
  const grown=buildDraftingDNA(Array.from({length:88},(_,n)=>pick(n,{score:50,match:true})));
  assert.equal(grown.picks_needed,null);
  assert.equal(grown.primary,null,'No raw match rate may qualify Trophy Twin');
  assert.ok(grown.secondary.every(x=>x.picks_needed===null&&x.reason));
+});
+test('DNA shows the effective 88-decision stability floor at 80, 84, 87 and 88',()=>{
+ const history=Array.from({length:88},(_,n)=>pick(n,{score:95,match:true}));
+ for(const [size,needed] of [[0,88],[7,81],[80,8],[84,4],[87,1]]){
+  const dna=buildDraftingDNA(history.slice(0,size));
+  assert.equal(dna.status,'emerging','no trait before both 80-pick checks can run');
+  assert.equal(dna.primary,null);
+  assert.equal(dna.picks_needed,needed);
+  assert.equal(dna.primary_emerging.picks_needed,needed);
+  assert.deepEqual(dna.secondary.map(x=>x.picks_needed),[needed,needed]);
+  assert.match(dna.reason,/88-decision stability sample floor/);
+ }
+ const ready=buildDraftingDNA(history);
+ assert.equal(ready.status,'ready');
+ assert.equal(ready.primary.id,'sharpshooter');
+ assert.equal(ready.picks_needed,null);
+});
+test('Rising Star describes a 10-point higher recent average, not just any difference',()=>{
+ const history=Array.from({length:96},(_,n)=>pick(n,{score:n<48?50:90,match:true}));
+ const dna=buildDraftingDNA(history);
+ const rising=[dna.primary,...dna.secondary].find(x=>x?.id==='rising-star');
+ assert.ok(rising,'the increase must be stable in both comparable 40-pick windows');
+ assert.match(rising.summary,/at least 10 points higher/);
+ assert.doesNotMatch(rising.summary,/different averages/);
 });
 test('Sharpshooter and Steady Hand cannot share slots on 70 high and 30 moderate scores',()=>{
  const dna=buildDraftingDNA(Array.from({length:100},(_,n)=>pick(n,{score:n<70?95:70})));
