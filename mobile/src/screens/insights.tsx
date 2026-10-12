@@ -638,7 +638,6 @@ const styles = StyleSheet.create({
   primaryText: { color: colors.surface, fontSize: 14, fontWeight: '800' },
   secondaryButton: { minHeight: 48, borderWidth: 1, borderColor: colors.accent, justifyContent: 'center', alignItems: 'center', paddingHorizontal: spacing.md },
   secondaryText: { color: colors.accentDark, fontSize: 14, fontWeight: '800' },
-  dnaCompact: {padding:spacing.sm,gap:spacing.xs},
   disclosure: {borderTopWidth:1,borderColor:colors.line,paddingVertical:spacing.sm,minHeight:44,justifyContent:'center'},
   contextWrap: {gap:spacing.xs,borderTopWidth:1,borderColor:colors.line,paddingTop:spacing.sm},
   contextFact: {gap:spacing.xs,paddingVertical:spacing.xs,borderBottomWidth:1,borderColor:colors.line},
