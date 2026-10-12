@@ -162,7 +162,8 @@ export function aggregateDraftRunInsights(source,{environment='mixed',period='al
     environment:filter.environment,period:filter.period,environment_label:LABELS[environment],
     eligible_decisions:total,unlocked:total>=INSIGHTS_UNLOCK_MIN,unlock_at:INSIGHTS_UNLOCK_MIN,
     total_eligible_decisions:eligible.length,unknown_difficulty:selected.filter(r=>r.difficulty_band==='unknown').length,
-    pick_depth:depth,difficulty,months,formats,progress,observations,versions,\n    drafting_dna,journey,highlights,
+    pick_depth:depth,difficulty,months,formats,progress,observations,versions,
+    drafting_dna,journey,highlights,
     range:oldestNewest(selected),session_limit:INSIGHTS_SESSION_LIMIT,
     methodology:'Original awarded pick scores; first answer to each puzzle in up to 1,000 recent eight-pick non-QA runs. '+
       'Pick numbers are real source pick positions. Group averages require 5 picks; months need 10; progress needs two sets of 40; '+
