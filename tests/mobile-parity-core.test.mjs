@@ -18,6 +18,7 @@ const [
   accountLayout,
   homeScreen,
   careerScreen,
+  sectionTabs,
   publicProfileScreen,
   webHowTo,
   webScoring,
@@ -37,6 +38,7 @@ const [
   readFile(new URL('../mobile/app/_layout.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../mobile/src/screens/index.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../mobile/src/screens/career.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/src/components/MyPackSectionTabs.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../mobile/app/profile.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../how-it-works/index.html', import.meta.url), 'utf8'),
   readFile(new URL('../scoring/index.html', import.meta.url), 'utf8'),
@@ -115,11 +117,15 @@ test('native instructional copy preserves current web Daily eligibility semantic
 });
 
 
-test('My Pack One exposes Stats and Account settings at the top', () => {
-  assert.match(careerScreen, />Stats<\/Text>/);
-  assert.match(careerScreen, />Account settings<\/Text>/);
-  assert.match(careerScreen, /accessibilityRole="tab"/);
-  assert.match(careerScreen, /router\.push\('\/account'\)/);
+test('My Pack One keeps Stats, Insights and Account settings in accessible section tabs', () => {
+  assert.match(careerScreen, /<MyPackSectionTabs active="stats" \/>/);
+  for (const label of ['Stats', 'Insights', 'Account settings']) {
+    assert.ok(sectionTabs.includes("label: '" + label + "'"), 'Missing section: ' + label);
+  }
+  assert.match(sectionTabs, /accessibilityRole="tab"/);
+  assert.match(sectionTabs, /accessibilityState=\{\{ selected \}\}/);
+  assert.match(sectionTabs, /router\.push\('\/account'\)/);
+  assert.match(sectionTabs, /fontScale/);
 });
 
 test('native Account keeps auth on /account and splits signed-in management into flat routes', () => {
