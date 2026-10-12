@@ -81,43 +81,6 @@ function monthMarkup(rows) {
     number(row.count)+' decisions'+(row.average_score===null?' · fewer than 10':'')+'</small></div>'
   ).join('')+'</div>';
 }
-// Standout claims come only from the API's conservative 40-per-side / 10-point
-// comparisons. If none qualify, report factual snapshots from already-authorized
-// aggregates instead of incorrectly telling an experienced player they lack data.
-function descriptivePatternRows(data) {
-  const rows=[];
-  const summary=data.formats?.find(row=>row.environment===data.environment);
-  if(summary?.count>=5&&Number.isFinite(summary.average_score)) {
-    const matched=Number.isFinite(summary.trophy_match_pct)
-      ? ' Trophy-drafter pick match: '+score(summary.trophy_match_pct)+'%.':'';
-    rows.push('Across '+number(summary.count)+' eligible '+labelOf(data.environment)+
-      ' decisions, your average originally awarded score was '+score(summary.average_score)+'/100.'+matched);
-  }
-  const progress=data.progress;
-  if(progress?.recent?.count>=40&&progress?.previous?.count>=40&&
-    Number.isFinite(progress.recent.average_score)&&Number.isFinite(progress.previous.average_score)) {
-    rows.push('Your most recent 40 picks averaged '+score(progress.recent.average_score)+
-      '/100; the preceding 40 averaged '+score(progress.previous.average_score)+
-      '/100. These are recorded scores, not a proven change in skill.');
-  }
-  const depth=[...(data.pick_depth||[])]
-    .filter(row=>row.count>=5&&Number.isFinite(row.average_score))
-    .sort((a,b)=>b.count-a.count||a.pick_number-b.pick_number)[0];
-  if(depth)rows.push('Your most-recorded source pick position is '+depth.label+
-    ': '+number(depth.count)+' decisions averaging '+score(depth.average_score)+'/100.');
-  return rows.slice(0,3);
-}
-
-function observationsMarkup(data) {
-  if(data.observations?.length)
-    return '<ul class="my-insights-observations">'+data.observations.map(row=>'<li>'+esc(row.text)+'</li>').join('')+'</ul>';
-  const snapshots=descriptivePatternRows(data);
-  return '<p class="my-insights-note">No standout comparison met both thresholds: at least 40 decisions on each side and a 10-point average difference. Your recorded history still provides these descriptive snapshots:</p>'+
-    (snapshots.length
-      ? '<ul class="my-insights-observations">'+snapshots.map(text=>'<li>'+esc(text)+'</li>').join('')+'</ul>'
-      : '<p class="my-pack-empty">The pick, difficulty and progress charts below show every supported group as you collect more decisions.</p>');
-}
-
 // The private API owns the identity and evidence rules; the browser is purely
 // a presenter. Unknown/older API revisions retain the original Insights UI.
 function dnaMarkup(data) {
@@ -306,7 +269,9 @@ function bindInsightCards(root,state,ticket,gen) {
       if(!dialog||!dialogBody||!current())return;
       state.returnFocus=button;
       const viewTicket=(state.viewTicket=(state.viewTicket||0)+1);
-      dialogBody.innerHTML='<p role="status">Loading your saved pack…</p>';
+      dialogBody.innerHTML='<p role="status">Loading your saved pack…</p>'+
+        '<button type="button" class="button secondary" data-insights-close>Close</button>';
+      dialogBody.querySelector('[data-insights-close]')?.addEventListener('click',()=>dialog.close());
       if(typeof dialog.showModal==='function')dialog.showModal();
       else dialog.setAttribute('open','');
       try{
