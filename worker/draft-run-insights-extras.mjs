@@ -199,8 +199,14 @@ const asArray=value=>{
   if(typeof value==='string')try{const parsed=JSON.parse(value);return Array.isArray(parsed)?parsed:[];}catch{}
   return [];
 };
-const typeCategory=card=>typeof card?.type_line==='string'&&card.type_line.trim()
-  ?(/\bcreature\b/i.test(card.type_line)?'creature':'noncreature'):null;
+const typeCategory=card=>{
+  if(typeof card?.type_line!=='string'||!card.type_line.trim())return null;
+  // Two-faced cards can have different card types on each face; do not
+  // silently assign an ambiguous creature/noncreature bucket.
+  const faces=card.type_line.split(/\s*\/\/\s*/).map(value=>
+    /\bcreature\b/i.test(value)?'creature':'noncreature');
+  return faces.every(value=>value===faces[0])?faces[0]:null;
+};
 const rarityCategory=card=>['rare','mythic'].includes(String(card?.rarity||'').toLowerCase())?'rare-mythic':
   ['common','uncommon'].includes(String(card?.rarity||'').toLowerCase())?'common-uncommon':null;
 const choiceVersion=row=>[row.scoring_version,row.selection_version,row.corpus_version].join('|');
@@ -211,6 +217,8 @@ function supportedChoices(row) {
   const candidates=asArray(row.choice_candidates).slice(0,25);
   const ranking=asArray(row.choice_ranking).slice(0,25);
   const cards=new Map(candidates.filter(c=>c&&typeof c.id==='string').map(c=>[c.id,c]));
+  if(candidates.length<2||cards.size!==candidates.length||ranking.length!==candidates.length||
+    new Set(ranking.map(r=>r?.id)).size!==ranking.length)return null;
   const comparable=ranking.filter(r=>r&&typeof r.id==='string'&&
     typeof r.support==='number'&&Number.isFinite(r.support)&&r.support>=0&&cards.has(r.id));
   if(comparable.length!==ranking.length||comparable.length<2)return null;
