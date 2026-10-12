@@ -144,7 +144,7 @@ function SavedDecisionDetail({detail,onClose}: {detail:InsightDecision;onClose:(
     {detail.prior_picks.length?<><Text style={styles.subheading}>Previously selected cards</Text>
       <Text style={styles.caption}>{detail.prior_picks.map(c=>c.name).join(' · ')}</Text></>:null}
     {detail.trophy_drafter?.record?<Text style={styles.caption}>This verified trophy draft finished {detail.trophy_drafter.record}.</Text>:null}
-    {detail.trophy_drafter?.win_rate!=null?<Text style={styles.caption}>The original drafter's approximate overall game win rate was {detail.trophy_drafter.win_rate}%, not this card's win rate.</Text>:null}
+    {detail.trophy_drafter?.win_rate!=null?<Text style={styles.caption}>The original drafter’s approximate overall game win rate was {detail.trophy_drafter.win_rate}%, not this card’s win rate.</Text>:null}
     <Text style={styles.caption}>Read-only historical results. Your original score and pick are unchanged.</Text>
     <Pressable accessibilityRole="button" onPress={onClose} style={styles.secondaryButton}>
       <Text style={styles.secondaryText}>Close original pack</Text>
