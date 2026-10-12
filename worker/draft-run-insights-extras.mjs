@@ -200,7 +200,7 @@ const asArray=value=>{
   return [];
 };
 const typeCategory=card=>typeof card?.type_line==='string'&&card.type_line.trim()
-  ?(/\\bcreature\\b/i.test(card.type_line)?'creature':'noncreature'):null;
+  ?(/\bcreature\b/i.test(card.type_line)?'creature':'noncreature'):null;
 const rarityCategory=card=>['rare','mythic'].includes(String(card?.rarity||'').toLowerCase())?'rare-mythic':
   ['common','uncommon'].includes(String(card?.rarity||'').toLowerCase())?'common-uncommon':null;
 const choiceVersion=row=>[row.scoring_version,row.selection_version,row.corpus_version].join('|');
