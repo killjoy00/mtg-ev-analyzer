@@ -23,7 +23,7 @@ const identity = (session: MobileSession | null) => session
 const score = (value: number | null) => value === null ? '—' : Number(value).toFixed(1);
 const num = (value: number) => Number(value || 0).toLocaleString();
 const shortDate = (value?:string) => {
-  if (!value || !/^\\d{4}-\\d{2}-\\d{2}/.test(value)) return value||'';
+  if (!value || !/^\d{4}-\d{2}-\d{2}/.test(value)) return value||'';
   const n=Number(value.slice(5,7)),date=Number(value.slice(8,10));
   return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][n-1]+' '+date;
 };
