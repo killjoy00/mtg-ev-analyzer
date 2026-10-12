@@ -8,6 +8,7 @@ import { sortPackByRarity } from './replay-data.mjs';
 import {rateDraftRunPuzzle,DRAFT_RUN_DIFFICULTY_VERSION,LEGACY_DIFFICULTY_VERSION,MAX_REROLL_RATING_DELTA} from './draft-run-difficulty.mjs';
 import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,DRAFT_RUN_LENGTH,isEightPickVersion,earlyRoundsForSelection,eligibleRunPuzzle,regularRunSet,chooseRunSet,runDifficultyBands,dailyRequiredSets,releasedRunSets,requiredSetRounds} from './draft-run-policy.mjs';
 import {gameDateKey} from './game-date.mjs';
+import {trophyDrafterFacts} from './draft-run-feedback.mjs';
 import {approvedTraditionalSource,modelVersionForComponent,supportedComponent} from './corpus-components.mjs';
 
 const EPSILON = 1e-9;
@@ -157,21 +158,40 @@ function draftRunScoringEvidence(puzzle,selectedId) {
   };
 }
 
-// Every trophy has the maximum wins, so wins alone say nothing about the
-// drafter. Prefer evidence that varies: a known Premier record, else the
-// archived game win rate, else the legacy Arena rank. Never fabricate losses.
-export function trophyDrafterRecord(puzzle) {
-  const wins=Number(puzzle?.event_match_wins);
+// Background on the trophy drafter, shown only inside the post-pick analysis.
+// The record is this source draft's verified Premier result; the win rate is
+// 17Lands' approximate overall figure for the drafter. Keep them separate,
+// fall back to the legacy Arena rank only without a win rate, and never
+// fabricate losses. Wins alone say nothing: every trophy has seven.
+export function trophyDrafterEvidence(puzzle) {
   const losses=puzzle?.event_match_losses;
   const premier=(puzzle?.source_event_type??'PremierDraft')==='PremierDraft';
-  if(premier&&wins===7&&losses!=null&&String(losses).trim()!==''&&Number.isInteger(Number(losses))&&Number(losses)>=0&&Number(losses)<=2)
-    return `went ${wins}\u2013${Number(losses)}`;
+  const record=premier&&Number(puzzle?.event_match_wins)===7&&losses!=null&&String(losses).trim()!==''
+    &&Number.isInteger(Number(losses))&&Number(losses)>=0&&Number(losses)<=2?`7\u2013${Number(losses)}`:null;
   const rate=Number(puzzle?.player_win_rate_bucket);
-  if(puzzle?.player_win_rate_bucket!=null&&Number.isFinite(rate)&&rate>=0.5&&rate<=1)
-    return `has a ${Math.round(rate*100)}% win rate`;
-  const rank=String(puzzle?.player_rank_tier||'').toLowerCase();
-  if(rank==='mythic'||rank==='diamond')return `reached ${rank[0].toUpperCase()+rank.slice(1)} rank`;
-  return null;
+  const winRate=puzzle?.player_win_rate_bucket!=null&&Number.isFinite(rate)&&rate>=0.5&&rate<=1?Math.round(rate*100):null;
+  const tier=String(puzzle?.player_rank_tier||'').toLowerCase();
+  const rank=winRate==null&&(tier==='mythic'||tier==='diamond')?tier[0].toUpperCase()+tier.slice(1):null;
+  return record||winRate!=null||rank?{record,winRate,rank}:null;
+}
+
+// Served payloads mostly lack the loss count, which the verified source
+// ledger keeps. Overlay it in memory only; a payload count that disagrees with
+// the ledger leaves the record unknown.
+export function withSourceDraftRecord(puzzle,losses) {
+  if(losses==null||(puzzle?.source_event_type??'PremierDraft')!=='PremierDraft')return puzzle;
+  const stored=puzzle.event_match_losses;
+  if(stored==null||String(stored).trim()==='')return {...puzzle,event_match_losses:Number(losses)};
+  return Number(stored)===Number(losses)?puzzle:{...puzzle,event_match_losses:null};
+}
+
+// Answers saved before structured drafter evidence carry one display string,
+// which older app builds put in the post-pick headline. Responses drop it and
+// send only the structured form.
+export function publicDraftRunAnswer(answer) {
+  if(!answer||typeof answer!=='object'||!Object.hasOwn(answer,'trophyRecord'))return answer;
+  const {trophyRecord,...rest}=answer;
+  return {...rest,trophyDrafter:rest.trophyDrafter??trophyDrafterFacts({trophyRecord})};
 }
 
 function scoredDraftRunPick(puzzle,selectedId,profile) {
@@ -216,7 +236,7 @@ function scoredDraftRunPick(puzzle,selectedId,profile) {
     historicalId:historical?.id||historicalId||null,
     historicalName:historical?.name||puzzle.historical_pick_name||null,
     historicalMatch,
-    trophyRecord:trophyDrafterRecord(puzzle),
+    trophyDrafter:trophyDrafterEvidence(puzzle),
     consensusId:leader.id,
     consensusName:leader.name,
     consensusSupport:leaderSupport,

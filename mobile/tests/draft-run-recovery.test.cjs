@@ -245,9 +245,15 @@ test('finishing an old practice-key cleanup cannot restore a previous run after 
 });
 
 
-for (const trophyRecord of ['has a 62% win rate', 'went 7–2']) {
-  test(`trophy drafter context ${trophyRecord} appears only in expanded native analysis`, async () => {
-    const revealed = { ...answer(0, 'a', 88), trophyRecord };
+const RECORD_LINE = 'This trophy draft finished 7–2.';
+const WIN_RATE_LINE = '17Lands reports the trophy drafter’s overall game win rate as about 62%. It describes the drafter, not this draft or this card.';
+for (const [label, fields, expected] of [
+  ['record and win rate', { trophyDrafter: { record: '7–2', winRate: 62, rank: null } }, [RECORD_LINE, WIN_RATE_LINE]],
+  ['saved win rate string', { trophyRecord: 'has a 62% win rate' }, [WIN_RATE_LINE]],
+  ['saved record string', { trophyRecord: 'went 7–2' }, [RECORD_LINE]],
+]) {
+  test(`trophy drafter ${label} appears only in expanded native analysis`, async () => {
+    const revealed = { ...answer(0, 'a', 88), ...fields };
     const completedPick = { ...runZero(), revision: 5, round: 1, answers: [revealed], current: puzzle(1) };
     const screen = await fixture({ submitPick: async () => completedPick });
     try {
@@ -255,12 +261,13 @@ for (const trophyRecord of ['has a 62% win rate', 'went 7–2']) {
       const title = screen.root.root.findAll((node) => node.type === 'Text' && node.props.testID === 'feedback-title')[0];
       assert.ok(title);
       assert.equal(renderedText(title), 'The trophy drafter took Card B.');
-      assert.doesNotMatch(screen.text(), new RegExp(trophyRecord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')),
-        'source-drafter background stays out of the compact reveal');
+      assert.doesNotMatch(screen.text(), /17Lands reports|finished 7–/, 'source-drafter background stays out of the compact reveal');
       const why = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Why this score?'))[0];
       assert.ok(why);
       await act(async () => why.props.onPress());
-      assert.ok(screen.text().includes(`Trophy drafter ${trophyRecord}.`));
+      const lines = screen.root.root.findAll((node) => node.type === 'Text' && expected.includes(renderedText(node)));
+      assert.deepEqual(lines.map(renderedText), expected, 'record and win rate are separate lines, in order');
+      if (expected.length === 1) assert.doesNotMatch(screen.text(), expected[0] === RECORD_LINE ? /17Lands reports/ : /finished 7–/);
     } finally { await screen.close(); }
   });
 }

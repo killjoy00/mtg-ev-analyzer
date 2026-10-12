@@ -2,9 +2,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {gunzipSync} from 'node:zlib';
 import {chromium} from 'playwright';
-import {selectDraftRun,selectDraftRunReroll,interestingDraftRunPuzzle,publicDraftRunPuzzle,gradeDraftRunPick,calibratedSupports,supportSharpening} from '../draft-run.mjs';
+import {selectDraftRun,selectDraftRunReroll,interestingDraftRunPuzzle,publicDraftRunPuzzle,gradeDraftRunPick,calibratedSupports,supportSharpening,withSourceDraftRecord} from '../draft-run.mjs';
 import {rateDraftRunPuzzle} from '../draft-run-difficulty.mjs';
-import {trophyRevealSentence} from '../draft-run-feedback.mjs';
+import {trophyDrafterFacts,trophyDrafterSentences,trophyRevealSentence} from '../draft-run-feedback.mjs';
 import policy from '../data/selection-policy.json' with {type:'json'};
 import {regularRunSet} from '../draft-run-policy.mjs';
 import {latestSetPlan} from '../daily-selection.mjs';
@@ -52,7 +52,8 @@ await page.route('**/*-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/**',async
   }else if(path.endsWith('/pick')){
     const req=route.request().postDataJSON(),p=puzzles[answers.length];assert.equal(req.revision,revision);assert.equal(req.puzzleId,p.puzzle_id);
     assert.equal(req.viewId,views.at(-1).viewId);assert.ok(Number.isInteger(req.activeMs)&&req.activeMs>=0);
-    const grade=gradeDraftRunPick(p,req.cardId),evidence=rateDraftRunPuzzle(p),calibrated=calibratedSupports(p.candidates,supportSharpening(p.corpus_version));
+    // Like the worker, overlay the source ledger's verified loss count.
+    const grade=gradeDraftRunPick(withSourceDraftRecord(p,answers.length%3),req.cardId),evidence=rateDraftRunPuzzle(p),calibrated=calibratedSupports(p.candidates,supportSharpening(p.corpus_version));
     grade.modelTargetDisagreement=evidence.modelTargetDisagreement;
     answers.push({...grade,puzzle:publicDraftRunPuzzle(p),ranking:[...p.candidates].sort((a,b)=>b.model_probability-a.model_probability).map(c=>({id:c.id,name:c.name,support:calibrated.get(c.id),score:gradeDraftRunPick(p,c.id).score}))});revision++;body=snapshot();
   }else if(path==='/v1/daily-status')body=eliteAccess?{day:fixtureDay,daily_history:[],player:{claimed:true},capabilities:['account','custom_corpus','unlimited_cube_practice'],daily_streak:daily?3:0}:{day:fixtureDay,daily_history:[],player:{claimed:false},capabilities:[],daily_streak:daily?3:0};
@@ -151,7 +152,7 @@ try{
   for(let round=0;round<puzzles.length;round++){
     const p=puzzles[round];if(cube)assert.equal(p.set_id,'powered-cube');assert.equal(await page.locator('.run-pool-cards>button').count(),p.pick_number-1);assert.equal(await page.locator('.run-pool-empty').count(),p.pick_number===1?1:0,'only first-pick states show the empty previous-card box');if(p.pick_number>1){assert.equal(await page.locator('.run-pool-note').innerText(),'Already selected by this drafter.');assert.notEqual(await page.locator('.run-pool-cards').evaluate(el=>getComputedStyle(el).backgroundColor),'rgba(0, 0, 0, 0)','previous cards share one off-color strip background');assert.equal(await page.locator('.run-pool-cards>button').first().evaluate(el=>getComputedStyle(el).backgroundColor),'rgba(0, 0, 0, 0)','individual previous cards stay transparent inside the shared strip');}
     const selected=round===0?weakChoice.id:round===strongRound?strongChoice.id:p.historical_pick_id;
-    const expectedGrade=gradeDraftRunPick(p,selected);
+    const expectedGrade=gradeDraftRunPick(withSourceDraftRecord(p,round%3),selected);
     await page.locator(`[data-pick="${selected}"]`).click();await page.locator('#run-lock').click();await page.locator('#run-next').waitFor();
     assert.equal(views.at(-1).puzzleId,p.puzzle_id,'Feedback must not record the next decision as viewed');
     assert.equal(Number.parseInt(await page.locator('.run-feedback-score').innerText(),10),expectedGrade.score,'visible pick score matches gradeDraftRunPick');
@@ -201,11 +202,11 @@ try{
     }
     await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>document.activeElement?.id),'run-next','Next pick is the next Tab stop after the focused result');
     await page.locator('.run-analysis>summary').click();
-    const drafterRecord=page.locator('.run-analysis .run-trophy-record');
-    if(expectedGrade.trophyRecord){
-      assert.equal(await drafterRecord.innerText(),`Trophy drafter ${expectedGrade.trophyRecord}.`,'drafter context is below Why this score');
-      assert.ok(!(await page.locator('#run-feedback-result').innerText()).includes(expectedGrade.trophyRecord),'drafter context stays out of the headline');
-    }else assert.equal(await drafterRecord.count(),0,'unknown drafter context is omitted');
+    const drafterRecord=page.locator('.run-analysis .run-trophy-record p');
+    const drafterLines=trophyDrafterSentences(trophyDrafterFacts(expectedGrade));
+    assert.deepEqual(await drafterRecord.allInnerTexts(),drafterLines,'drafter record and win rate are separate lines below Why this score');
+    const headline=await page.locator('#run-feedback-result').innerText();
+    assert.doesNotMatch(headline,/win rate|7–[0-2]|Mythic|Diamond/,'drafter context stays out of the headline');
     await page.getByRole('heading',{name:'Model’s strongest choice: '+expectedGrade.consensusName,exact:true}).waitFor();
     assert.equal(await page.locator('.run-consensus-leaders li').count(),3);
     assert.equal(await page.locator('.run-consensus-leaders li').first().locator('[data-zoom]').getAttribute('data-zoom'),p.historical_pick_id);

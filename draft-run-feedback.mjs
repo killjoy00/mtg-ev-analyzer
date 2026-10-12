@@ -5,11 +5,48 @@ export function trophyRevealSentence(answer) {
   return `The trophy drafter took ${answer?.historicalName||'another card'}.`;
 }
 
+const LEGACY_RECORD=/^went 7–([0-2])$/;
+const LEGACY_WIN_RATE=/^has an? (\d{1,3})% win rate$/;
+const LEGACY_RANK=/^reached (Mythic|Diamond) rank$/;
+
+// Source-drafter background from a locked answer: the structured form, or the
+// single display string saved with older answers. Null when nothing is known.
+export function trophyDrafterFacts(answer) {
+  const given=answer?.trophyDrafter;
+  if(given&&typeof given==='object') {
+    const record=/^7–[0-2]$/.test(String(given.record??''))?given.record:null;
+    const rate=Number(given.winRate);
+    const winRate=given.winRate!=null&&Number.isInteger(rate)&&rate>=50&&rate<=100?rate:null;
+    const rank=given.rank==='Mythic'||given.rank==='Diamond'?given.rank:null;
+    return record||winRate!=null||rank?{record,winRate,rank}:null;
+  }
+  const legacy=String(answer?.trophyRecord||'').trim();
+  let match;
+  if((match=LEGACY_RECORD.exec(legacy)))return {record:`7–${match[1]}`,winRate:null,rank:null};
+  if((match=LEGACY_WIN_RATE.exec(legacy))) {
+    const rate=Number(match[1]);
+    return rate>=50&&rate<=100?{record:null,winRate:rate,rank:null}:null;
+  }
+  if((match=LEGACY_RANK.exec(legacy)))return {record:null,winRate:null,rank:match[1]};
+  return null;
+}
+
+// 17Lands calls the archived figure the drafter's overall win rate, so it is
+// not labeled as specific to this format, draft or card.
+export function trophyDrafterSentences(facts) {
+  if(!facts)return [];
+  return [
+    facts.record&&`This trophy draft finished ${facts.record}.`,
+    facts.winRate!=null&&`17Lands reports the trophy drafter’s overall game win rate as about ${facts.winRate}%. It describes the drafter, not this draft or this card.`,
+    facts.rank&&`The trophy drafter reached ${facts.rank} rank.`,
+  ].filter(Boolean);
+}
+
 // Keep source-drafter background behind the post-pick score explanation, not
 // in the primary decision headline. The record is unrelated to card win rate.
 export function trophyDrafterDetails(answer) {
-  const record=String(answer?.trophyRecord||'').trim();
-  return record?`<p class="run-trophy-record">Trophy drafter ${esc(record)}.</p>`:'';
+  const lines=trophyDrafterSentences(trophyDrafterFacts(answer));
+  return lines.length?`<div class="run-trophy-record">${lines.map(line=>`<p>${esc(line)}</p>`).join('')}</div>`:'';
 }
 
 export function compactDraftRunFeedback(answer) {

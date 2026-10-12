@@ -6,7 +6,7 @@ import {decisionClock} from './decision-clock.mjs';
 import { sortPackByRarity } from './replay-data.mjs';
 import { escapeHtml as esc } from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
-import { compactDraftRunFeedback, consensusFeedback, trophyDrafterDetails, trophyRevealSentence } from './draft-run-feedback.mjs?v=3';
+import { compactDraftRunFeedback, consensusFeedback, trophyDrafterDetails, trophyRevealSentence } from './draft-run-feedback.mjs?v=4';
 import { tcgplayerUrl } from './tcgplayer.mjs';
 import { dailyResetCue } from './game-date.mjs';
 import {nextUnfinishedDaily} from './today-status.mjs';

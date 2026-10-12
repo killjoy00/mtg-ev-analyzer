@@ -49,6 +49,14 @@ try {
   const status=await client.loadDailyStatus();assert.ok(status);
   const bypass=await draft.fetch(new Request('https://fixture.invalid/v1/daily-status'));
   assert.equal(bypass.status,403,'Worker must reject bypassing the gateway');
+  // The fixture has no source ledger. Seed every source draft with a known,
+  // varied record so each served pick can be checked against it.
+  const fixtureQuery=async(text,values=[])=>pool.query({text,values,types:textTypes});
+  const seededLosses='get_byte(decode(md5(p.source_draft_hash),\'hex\'),0)%3';
+  await fixtureQuery(`INSERT INTO corpus_trophy_trajectories(set_id,corpus_version,source_draft_hash,event_type,wins,losses,qualified,included)
+    SELECT DISTINCT p.set_id,p.corpus_version,p.source_draft_hash,'PremierDraft',7,(${seededLosses})::smallint,true,true
+    FROM draft_run_verified_puzzles p ON CONFLICT DO NOTHING`);
+  const expectedRecord=async puzzleId=>'7\u2013'+(await fixtureQuery(`SELECT ${seededLosses} losses FROM draft_run_verified_puzzles p WHERE p.puzzle_id=$1`,[puzzleId])).rows[0].losses;
   for(const environment of ['mixed','powered-cube','latest']) {
     let run=await request('/v1/runs',{daily:true,environment});
     assert.equal(run.selection_version,DRAFT_RUN_SELECTION_VERSION);assert.equal(run.run_length,8);
@@ -76,6 +84,11 @@ try {
       await request(`/v1/runs/${run.id}/pick`,{...body,cardId:other},409);
     }
     assert.equal(run.complete,true);assert.equal(run.answers.length,8);assert.ok(Number.isFinite(run.score));
+    for(const answer of run.answers) {
+      assert.equal(Object.hasOwn(answer,'trophyRecord'),false,'Responses never send the legacy headline string');
+      assert.equal(answer.trophyDrafter?.record,await expectedRecord(answer.puzzle.puzzle_id),'Each pick carries its source draft\u2019s ledger record');
+      assert.equal(answer.puzzle.event_match_losses,undefined,'The public puzzle still conceals source results');
+    }
     await request(`/v1/runs/${run.id}`);
     const result=await pool.query({text:'SELECT count(*)::text n FROM game_results WHERE player_id=$1::uuid AND client_result_id=$2',values:[player.playerId,'draft-run:'+run.id],types:textTypes});
     assert.equal(result.rows[0].n,'1','Completion and retry must persist exactly one result');
@@ -83,7 +96,23 @@ try {
   }
   // In the isolated fixture this player was non-QA at session creation,
   // so the immutable per-run measurement_qa flag correctly remains false.
-  const insightQuery=async(text,values=[])=>pool.query({text,values,types:textTypes});
+  const {trophySourceLosses}=await import('../worker/trophy-source-record.mjs');
+  const probe=(await fixtureQuery(`SELECT p.puzzle_id,p.set_id,p.source_draft_hash,${seededLosses} losses,
+      (SELECT s.source_snapshot_id FROM corpus_source_snapshots s WHERE s.set_id=p.set_id LIMIT 1) snapshot
+    FROM draft_run_verified_puzzles p ORDER BY p.puzzle_id LIMIT 1`)).rows[0];
+  assert.equal(await trophySourceLosses(fixtureQuery,probe.puzzle_id),Number(probe.losses),'Real PostgreSQL resolves the frozen ledger record');
+  const snapshotRow=losses=>fixtureQuery(`INSERT INTO corpus_source_snapshot_trajectories(source_snapshot_id,source_draft_hash,event_type,wins,losses,qualified,included)
+    VALUES($1,$2,'PremierDraft',7,$3::smallint,true,true) ON CONFLICT(source_snapshot_id,source_draft_hash) DO UPDATE SET losses=EXCLUDED.losses`,[probe.snapshot,probe.source_draft_hash,losses]);
+  await snapshotRow(Number(probe.losses));
+  assert.equal(await trophySourceLosses(fixtureQuery,probe.puzzle_id),Number(probe.losses),'Agreeing snapshot and frozen ledgers keep the record');
+  await snapshotRow((Number(probe.losses)+1)%3);
+  assert.equal(await trophySourceLosses(fixtureQuery,probe.puzzle_id),null,'Disagreeing ledgers omit the record');
+  await snapshotRow(3);
+  assert.equal(await trophySourceLosses(fixtureQuery,probe.puzzle_id),null,'An invalid 7\u20133 entry is never shown as a trophy record');
+  await fixtureQuery('DELETE FROM corpus_source_snapshot_trajectories WHERE source_snapshot_id=$1 AND source_draft_hash=$2',[probe.snapshot,probe.source_draft_hash]);
+  assert.equal(await trophySourceLosses(fixtureQuery,'missing-puzzle'),null,'An unknown puzzle has no record');
+  console.log('Real PostgreSQL trophy source record contract passed.');
+  const insightQuery=fixtureQuery;
   const insightResult=await loadDraftRunInsights(insightQuery,player.playerId,{environment:'mixed',period:'all'});
   assert.equal(insightResult.unlocked,true,'Eight completed picks unlock Insights in real PostgreSQL');
   assert.ok(insightResult.eligible_decisions>=8);
