@@ -43,13 +43,13 @@ test('native driver scrolls expanded font licenses into view before capturing th
   // tap landed on a button 40px above the viewport's bottom edge, so the
   // expanded Barlow Condensed license opened entirely below y=2328.
   const result = spawnSync('python3', ['-c', `
-import ast, re, xml.etree.ElementTree as ET
+import ast, re, types, xml.etree.ElementTree as ET
 from pathlib import Path
 module = ast.parse(Path('mobile/scripts/native-acceptance.py').read_text())
 helpers = [node for node in module.body if isinstance(node, ast.FunctionDef) and node.name in ('visible_bounds', 'reveal')]
 swipes = []
 screens = []
-scope = {'re': re, 'hierarchy': lambda: ('', screens.pop(0)), 'swipe_page': lambda up: swipes.append(up)}
+scope = {'re': re, 'time': types.SimpleNamespace(sleep=lambda _: None), 'hierarchy': lambda: ('', screens.pop(0)), 'swipe_page': lambda up: swipes.append(up)}
 exec(compile(ast.Module(body=helpers, type_ignores=[]), '<native-reveal>', 'exec'), scope)
 expanded = ET.fromstring('<hierarchy><node class="android.widget.ScrollView" scrollable="true" bounds="[0,279][1170,2328]"/><node text="Font licenses" bounds="[72,2159][1098,2240]"/><node content-desc="Hide font licenses" bounds="[72,2288][1098,2328]"/><node text="Barlow Condensed" bounds="[0,0][0,0]"/></hierarchy>')
 scrolled = ET.fromstring('<hierarchy><node class="android.widget.ScrollView" scrollable="true" bounds="[0,279][1170,2328]"/><node text="Copyright 2017 The Barlow Project Authors" bounds="[72,1400][1098,1460]"/><node text="Barlow Condensed" bounds="[72,1300][1098,1360]"/></hierarchy>')
@@ -57,15 +57,21 @@ screens[:] = [expanded, scrolled]
 scope['reveal']('Barlow Condensed', exact=True)
 assert swipes == [True], swipes
 assert not screens
+# The #1191 Android heading search checks both scroll directions.
 swipes.clear()
-screens[:] = [expanded] * 24
+screens[:] = [expanded] * 25 + [scrolled]
+scope['reveal']('Barlow Condensed', exact=True)
+assert swipes == [True] * 24 + [False], swipes
+assert not screens
+swipes.clear()
+screens[:] = [expanded] * 48
 try:
     scope['reveal']('Barlow Condensed', exact=True)
 except AssertionError as error:
     assert 'never scrolled into view' in str(error)
 else:
     raise AssertionError('A license that never appears must fail the scene')
-assert swipes == [True] * 24
+assert swipes == [True] * 24 + [False] * 24
 `], {encoding: 'utf8'});
   assert.equal(result.status, 0, result.stderr);
 });
