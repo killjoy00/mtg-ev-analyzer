@@ -1,6 +1,6 @@
 {
   "operation": "rollout-android-internal",
-  "reason": "Owner requested on 2026-10-13 that the already uploaded and authenticated Pack One Android 1.0 release versionCode 100810 (PR #1192, signed release run 38354065211) be activated for the existing Google Play Internal Testing track. Do not rebuild, replace the uploaded bundle, alter the separate production-access Closed Testing version 100772 or its tester qualification window, change tester lists/groups/countries, or publish Production. Verify status completed from Google Play after committing; if Console-only first-rollout prerequisites reject API activation, stop without altering other tracks.",
+  "reason": "Owner-authorized 2026-10-13 Pack One Android rollout to existing Google Play Internal Testing. Authenticated live status run 38449709824 found exact two releases: new signed 100810 in draft and older 100015 completed. Supersede only the existing active Internal Testing 100015 with the already uploaded 100810; do not rebuild or introduce a new bundle. Guard exact prior release and require a completed post-commit read from Google Play. Preserve the separate production-access Closed Testing completed version 100772, its uninterrupted 14-day tester qualification, tester groups, countries, all unrelated tracks and Production. If Play denies activation, stop safely.",
   "track": "internal",
   "version_code": "100810",
   "preserve_closed_version_code": "100772"
