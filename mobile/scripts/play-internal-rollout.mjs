@@ -15,12 +15,25 @@ function releasesFor(track) {
 function singleRelease(track, versionCode) {
   assert.equal(track?.track, INTERNAL, 'Expected the existing internal track.');
   const releases = releasesFor(track);
-  assert.equal(releases.length, 1, 'Refusing to replace a multi-release internal track.');
-  const release = releases[0];
-  assert.deepEqual((release.versionCodes || []).map(String), [versionCode],
-    'Internal track no longer points exclusively at the reviewed bundle.');
+  assert.ok(releases.length >= 1 && releases.length <= 2,
+    'Refusing an unexpected multi-release internal track.');
+  const target = releases.filter((release) =>
+    JSON.stringify((release.versionCodes || []).map(String)) === JSON.stringify([versionCode]));
+  assert.equal(target.length, 1, 'Expected exactly one reviewed 100810 internal release.');
+  const release = target[0];
   assert.ok(['draft', 'completed'].includes(release.status),
-    'Internal release has an unexpected status.');
+    'Internal target release has an unexpected status.');
+
+  const existing = releases.filter((candidate) => candidate !== release);
+  if (existing.length) {
+    assert.equal(existing.length, 1, 'Refusing multiple old internal releases.');
+    assert.deepEqual((existing[0].versionCodes || []).map(String), ['100015'],
+      'Refusing to displace an unreviewed previous internal release.');
+    assert.equal(existing[0].status, 'completed',
+      'The historical internal fallback is not currently completed.');
+    assert.equal(release.status, 'draft',
+      'Refusing to rewrite a completed 100810 release alongside a fallback.');
+  }
   return release;
 }
 
@@ -89,6 +102,7 @@ export async function rolloutInternalRelease({
   let committed = false;
   let releaseName;
   let priorStatus;
+  let replacedInternalCode = null;
   let beforeOther;
   try {
     editId = await newEdit();
@@ -106,6 +120,7 @@ export async function rolloutInternalRelease({
     assert.ok(inventory.tracks.some((track) => track.track === INTERNAL),
       'Refusing to create a new internal track.');
     const release = singleRelease(internal, expectedVersionCode);
+    replacedInternalCode = releasesFor(internal).length === 2 ? '100015' : null;
     releaseName = release.name;
     priorStatus = release.status;
 
@@ -114,6 +129,7 @@ export async function rolloutInternalRelease({
         packageName: PACKAGE, track: INTERNAL, versionCode: expectedVersionCode,
         releaseName, priorStatus, releaseStatus: 'completed',
         committed: false, alreadyActive: true, closedTrackPreserved: true,
+        replacedInternalCode: null,
       };
     }
 
@@ -158,6 +174,7 @@ export async function rolloutInternalRelease({
     packageName: PACKAGE, track: INTERNAL, versionCode: expectedVersionCode,
     releaseName, priorStatus, releaseStatus: 'completed', committed: true,
     alreadyActive: false, closedTrackPreserved: true, verifiedAfterCommit: true,
+    replacedInternalCode,
   };
 }
 
