@@ -28,15 +28,31 @@ function ascToken() {
 }
 
 async function asc(path, { method = 'GET', body } = {}) {
-  const response = await fetch(`https://api.appstoreconnect.apple.com${path}`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${ascToken()}`,
-      Accept: 'application/json',
-      ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
+  // Read-only requests may transiently time out after a successful Xcode upload.
+  // Never automatically retry PATCH; a mutation needs explicit reconciliation.
+  let response;
+  for (let attempt = 1; attempt <= 4; attempt += 1) {
+    try {
+      response = await fetch(`https://api.appstoreconnect.apple.com${path}`, {
+        method,
+        headers: {
+          Authorization: `Bearer ${ascToken()}`,
+          Accept: 'application/json',
+          ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+        },
+        body: body === undefined ? undefined : JSON.stringify(body),
+      });
+      break;
+    } catch (error) {
+      if (method !== 'GET' || attempt === 4) throw error;
+      console.warn(JSON.stringify({
+        operation: 'retry_app_store_connect_read',
+        attempt,
+        errorCode: error?.cause?.code ?? error?.code ?? null,
+      }));
+      await sleep(attempt * 1500);
+    }
+  }
   const text = await response.text();
   let data = null;
   if (text) {
@@ -84,28 +100,41 @@ if (!build || build.attributes?.processingState !== 'VALID' || build.attributes?
 }
 
 const versions = await asc(`/v1/apps/${appId}/appStoreVersions?filter%5Bplatform%5D=IOS&limit=200`);
-const version = (versions.data || []).find(
+if (!Array.isArray(versions?.data) || versions.links?.next) {
+  throw new Error('App Store version inventory is malformed or incomplete.');
+}
+const matches = versions.data.filter(
   (item) => item.attributes?.platform === 'IOS' && item.attributes?.versionString === versionString,
 );
-if (!version) throw new Error(`App Store version ${versionString} was not found.`);
-const versionState = version.attributes?.appVersionState ?? version.attributes?.appStoreState ?? null;
-if (!['PREPARE_FOR_SUBMISSION', 'READY_FOR_REVIEW'].includes(versionState)) {
-  throw new Error(`App Store version ${versionString} is not safely editable: ${versionState}`);
-}
+if (matches.length > 1) throw new Error(`Multiple App Store versions matched ${versionString}.`);
+const version = matches[0] || null;
+const versionState = version?.attributes?.appVersionState ?? version?.attributes?.appStoreState ?? null;
+let attached = false;
+let attachmentSkippedReason = null;
 
-await asc(`/v1/appStoreVersions/${encodeURIComponent(version.id)}/relationships/build`, {
-  method: 'PATCH',
-  body: { data: { type: 'builds', id: build.id } },
-});
-
-const attached = await asc(
-  `/v1/appStoreVersions/${encodeURIComponent(version.id)}/build?fields%5Bbuilds%5D=version,processingState,buildAudienceType`,
-);
-if (attached.data?.id !== build.id ||
-    attached.data?.attributes?.version !== buildNumber ||
-    attached.data?.attributes?.processingState !== 'VALID' ||
-    attached.data?.attributes?.buildAudienceType !== 'APP_STORE_ELIGIBLE') {
-  throw new Error('App Store version build-attachment verification failed.');
+// A VALID App Store-eligible build can reach existing internal TestFlight testers
+// without an editable App Store version record. Apple's current 1.0 review
+// state may prevent creation of 1.1 (HTTP 409); never mutate 1.0 as a workaround.
+if (version && ['PREPARE_FOR_SUBMISSION', 'READY_FOR_REVIEW'].includes(versionState)) {
+  await asc(`/v1/appStoreVersions/${encodeURIComponent(version.id)}/relationships/build`, {
+    method: 'PATCH',
+    body: { data: { type: 'builds', id: build.id } },
+  });
+  const selected = await asc(
+    `/v1/appStoreVersions/${encodeURIComponent(version.id)}/build?fields%5Bbuilds%5D=version,processingState,buildAudienceType`,
+  );
+  if (selected.data?.id !== build.id ||
+      selected.data?.attributes?.version !== buildNumber ||
+      selected.data?.attributes?.processingState !== 'VALID' ||
+      selected.data?.attributes?.buildAudienceType !== 'APP_STORE_ELIGIBLE') {
+    throw new Error('App Store version build-attachment verification failed.');
+  }
+  attached = true;
+} else {
+  attachmentSkippedReason = version
+    ? `App Store version ${versionString} is not safely editable: ${versionState}`
+    : `App Store version ${versionString} was not found; TestFlight-only delivery remains valid.`;
+  console.log(JSON.stringify({ buildNumber, attachmentSkippedReason }));
 }
 
 // Processing and App Store attachment do not prove TestFlight availability.
@@ -131,14 +160,15 @@ const result = {
   testFlight,
   appId,
   versionString,
-  versionId: version.id,
+  versionId: version?.id ?? null,
   versionState,
   buildId: build.id,
   buildNumber,
   processingState: build.attributes.processingState,
   buildAudienceType: build.attributes.buildAudienceType,
   usesNonExemptEncryption: build.attributes?.usesNonExemptEncryption ?? null,
-  attached: true,
+  attached,
+  attachmentSkippedReason,
   reviewSubmissionCreated: false,
 };
 console.log(JSON.stringify(result, null, 2));
@@ -151,7 +181,8 @@ if (process.env.GITHUB_STEP_SUMMARY) {
     `- Build number: \`${buildNumber}\``,
     `- Processing state: \`${result.processingState}\``,
     `- Audience: \`${result.buildAudienceType}\``,
-    `- Attached to App Store version ${versionString}: true`,
+    `- Attached to App Store version ${versionString}: ${attached}`,
+    ...(attachmentSkippedReason ? [`- App Store attachment skipped: ${attachmentSkippedReason}`] : []),
     '- App Review submission created: false',
     `- TestFlight availability read: ${testFlight.verified ? 'verified' : 'unavailable'}`,
     `- Internal testing state: ${testFlight.internalBuildState ?? 'unknown'}`,
