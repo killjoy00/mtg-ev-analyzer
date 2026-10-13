@@ -113,3 +113,47 @@ for (const available of [true, false]) {
     assert.deepEqual(JSON.parse(run.stdout.split('TEST_WRITES ')[1]), [{ path: '/v1/appStoreVersions/version/relationships/build', method: 'PATCH' }]);
   });
 }
+
+
+// Apple may accept a VALID TestFlight upload while rejecting creation of
+// App Store version 1.1. The absence of that optional record is not a failed
+// internal TestFlight release and must never mutate an existing version.
+for (const scenario of ['missing-version', 'non-editable-version']) {
+  test(`candidate verifies internal TestFlight without mutating an unavailable App Store version: ${scenario}`, () => {
+    const script = `
+      import assert from 'node:assert/strict';
+      import { generateKeyPairSync } from 'node:crypto';
+      const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+      Object.assign(process.env, { ASC_ISSUER_ID: 'test', ASC_KEY_ID: 'test',
+        ASC_PRIVATE_KEY: privateKey.export({ type: 'pkcs8', format: 'pem' }), PACKONE_ASC_APP_ID: 'app', PACKONE_ASC_VERSION: '1.1' });
+      delete process.env.GITHUB_STEP_SUMMARY;
+      process.argv[2] = '100790';
+      const build = { id: 'build', attributes: { version: '100790', processingState: 'VALID', buildAudienceType: 'APP_STORE_ELIGIBLE' } };
+      globalThis.fetch = async (url, options) => {
+        assert.equal(options.method, 'GET', 'TestFlight-only path must not mutate provider data');
+        const path = new URL(url).pathname;
+        let data;
+        if (path === '/v1/builds') data = { data: [build] };
+        else if (path === '/v1/apps/app/appStoreVersions') data = { data: '${scenario}' === 'missing-version' ? [] : [
+          { id: 'locked-version', attributes: { platform: 'IOS', versionString: '1.1', appVersionState: 'WAITING_FOR_REVIEW' } }
+        ] };
+        else if (path === '/v1/builds/build/buildBetaDetail') {
+          data = { data: { attributes: { internalBuildState: 'IN_BETA_TESTING', externalBuildState: 'READY_FOR_BETA_SUBMISSION' } } };
+        } else if (path === '/v1/betaGroups') {
+          assert.equal(new URL(url).searchParams.get('filter[builds]'), 'build');
+          data = { data: [{ id: 'existing', attributes: { isInternalGroup: true, hasAccessToAllBuilds: true } }] };
+        } else throw Error('Unexpected provider read: ' + path);
+        return new Response(JSON.stringify(data), { status: 200 });
+      };
+      await import('./.github/scripts/app-store-finalize-release-candidate.mjs');
+    `;
+    const run = spawnSync(process.execPath, ['--input-type=module', '-e', script], {
+      cwd: new URL('..', import.meta.url), encoding: 'utf8',
+    });
+    assert.equal(run.status, 0, run.stderr);
+    assert.match(run.stdout, /"attached": false/);
+    assert.match(run.stdout, /"attachmentSkippedReason":/);
+    assert.match(run.stdout, /"internalBuildState": "IN_BETA_TESTING"/);
+    assert.match(run.stdout, /"reviewSubmissionCreated": false/);
+  });
+}
