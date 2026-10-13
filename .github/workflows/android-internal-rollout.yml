@@ -83,13 +83,15 @@ jobs:
           const data=JSON.parse(process.env.RESULT);
           if(data.track!=='internal'||data.versionCode!=='100810'||
               data.releaseStatus!=='completed'||!data.closedTrackPreserved||
-              (!data.verifiedAfterCommit&&!data.alreadyActive)) {
+              (!data.verifiedAfterCommit&&!data.alreadyActive)||
+              (!data.alreadyActive&&data.replacedInternalCode!=='100015')) {
             throw Error('Google Play rollout evidence did not satisfy internal-only completion.');
           }
           console.log('## Pack One Android internal rollout');
           console.log('- Package: `'+data.packageName+'`');
           console.log('- Target: `internal`, version code `100810`');
           console.log('- Google Play release status: `completed`');
+          if(data.replacedInternalCode) console.log('- Replaced prior Internal Testing version: `'+data.replacedInternalCode+'`');
           console.log('- Already active before operation: `'+Boolean(data.alreadyActive)+'`');
           console.log('- Post-commit store read: `'+Boolean(data.verifiedAfterCommit)+'`');
           console.log('- production-access Closed Testing 100772: preserved and verified.');
