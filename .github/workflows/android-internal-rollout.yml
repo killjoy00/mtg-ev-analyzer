@@ -1,0 +1,97 @@
+name: Android Internal Testing rollout
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/android-internal-rollout-request.json'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: android-internal-rollout
+  cancel-in-progress: false
+
+jobs:
+  rollout:
+    name: activate verified Android 100810 internal test
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify reviewed internal rollout request
+        id: request
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+          request=json.loads(Path('.github/android-internal-rollout-request.json').read_text())
+          expected={'operation','reason','track','version_code','preserve_closed_version_code'}
+          if set(request) != expected:
+              raise SystemExit('Unexpected Android internal rollout request keys: '+str(sorted(request)))
+          if request['operation'] != 'rollout-android-internal':
+              raise SystemExit('Unsupported operation.')
+          if request['track'] != 'internal' or request['version_code'] != '100810':
+              raise SystemExit('Only reviewed internal version 100810 is authorized.')
+          if request['preserve_closed_version_code'] != '100772':
+              raise SystemExit('Do not change the existing production-access release baseline.')
+          if not isinstance(request['reason'],str) or not request['reason'].strip():
+              raise SystemExit('Rollout requires an owner-authorized reason.')
+          print('version_code=100810')
+          PY
+
+      - name: Require approved current main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || exit 1
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]] || {
+            echo 'Main changed during rollout; refusing a stale release.' >&2
+            exit 1
+          }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - id: auth
+        name: Authenticate to existing protected Google Play connection
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: pack-one
+          workload_identity_provider: projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer
+          service_account: packone-play-ci@pack-one.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+
+      - name: Activate reviewed internal release and verify Google Play
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          result="$(node mobile/scripts/play-internal-rollout.mjs '${{ steps.request.outputs.version_code }}')"
+          echo "$result"
+          RESULT="$result" node <<'NODE' >> "$GITHUB_STEP_SUMMARY"
+          const data=JSON.parse(process.env.RESULT);
+          if(data.track!=='internal'||data.versionCode!=='100810'||
+              data.releaseStatus!=='completed'||!data.closedTrackPreserved||
+              (!data.verifiedAfterCommit&&!data.alreadyActive)) {
+            throw Error('Google Play rollout evidence did not satisfy internal-only completion.');
+          }
+          console.log('## Pack One Android internal rollout');
+          console.log('- Package: `'+data.packageName+'`');
+          console.log('- Target: `internal`, version code `100810`');
+          console.log('- Google Play release status: `completed`');
+          console.log('- Already active before operation: `'+Boolean(data.alreadyActive)+'`');
+          console.log('- Post-commit store read: `'+Boolean(data.verifiedAfterCommit)+'`');
+          console.log('- production-access Closed Testing 100772: preserved and verified.');
+          console.log('- No Production track, tester lists, groups, or countries modified.');
+          NODE
