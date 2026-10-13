@@ -1,1 +1,4 @@
-{"operation":"check-android-internal-status","reason":"Verify the fresh Pack One 1.0 Android Internal Testing release requested after the Sign in with Apple launch work."}
+{
+  "operation": "check-android-internal-status",
+  "reason": "Read-only owner-authorized 2026-10-13 Google Play Internal Testing track inspection after guarded rollout run 38449527569 detected two release entries and refused to replace them. Capture both entries, version codes and statuses, while preserving production-access Closed Testing 100772, all tester settings, and Production. No release mutation."
+}
