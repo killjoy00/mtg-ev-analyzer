@@ -146,7 +146,7 @@ function cardVisual(card,label) {
     ?'<img src="'+esc(safe)+'" alt="'+esc(card?.name||label)+'" loading="lazy">'
     :'<span role="img" aria-label="Artwork unavailable for '+esc(card?.name||label)+'">No art</span>')+'</div>';
 }
-function highlightCards(rows,kind,expanded=false) {
+function highlightCards(rows,kind,expanded=false,showFinding=false) {
   if(!rows?.length)return '<p class="my-pack-empty">No '+(kind==='misses'?'picks to revisit':'high-scoring picks')+
     ' in this view. This doesn’t mean you drafted badly.</p>';
   return '<div class="my-insights-card-row">'+rows.map((row,index)=>{
@@ -162,7 +162,7 @@ function highlightCards(rows,kind,expanded=false) {
       '<span>Trophy pick: <strong>'+esc(trophyName)+'</strong></span></div>'+
       '<small>'+esc(readableSet(row.set_id))+' · Source P1P'+Number(row.pick_number)+' · '+
        esc(shortInsightDate(row.date))+' · Score '+number(row.score)+'/100</small>'+
-      (row.finding_context?'<small class="my-insights-context">'+esc(row.finding_context)+'</small>':'')+
+      (showFinding&&row.finding_context?'<small class="my-insights-context">'+esc(row.finding_context)+'</small>':'')+
       '<p class="my-insights-reason">'+esc(highlightExplanation(row))+'</p>'+
       '<button type="button" class="button secondary" data-insights-review data-session="'+esc(row.session_id)+'"'+
       ' data-round="'+Number(row.round)+'" data-puzzle="'+esc(row.puzzle_id)+'">Review pick</button></div></article>';
@@ -189,10 +189,10 @@ function highlightsMarkup(data) {
       '" data-insights-tab="best">High-scoring picks</button></div>'+
     '<div id="my-insights-misses-panel" role="tabpanel" aria-labelledby="my-insights-misses-tab"'+
       (selected==='misses'?'':' hidden')+'>'+
-      highlightCards(data.highlights.misses,'misses')+more('misses')+'</div>'+
+      highlightCards(data.highlights.misses,'misses',false,Boolean(finding))+more('misses')+'</div>'+
     '<div id="my-insights-best-panel" role="tabpanel" aria-labelledby="my-insights-best-tab"'+
       (selected==='best'?'':' hidden')+'>'+
-      highlightCards(data.highlights.best,'best')+more('best')+'</div>'+
+      highlightCards(data.highlights.best,'best',false,Boolean(finding))+more('best')+'</div>'+
     '<p class="my-insights-note">100 means you matched the trophy pick. Other picks earn up to 95 based on the model.</p>'+
     '<details class="my-insights-how"><summary>How this works</summary>'+
     '<p>Only the first included answer to each puzzle counts. Scores describe picks, not drafting skill.</p></details></section>';
@@ -355,7 +355,7 @@ function bindInsightCards(root,state,ticket,gen) {
       if(!current()||viewTicket!==state.viewTicket)return;
       const rows=response.highlights?.[kind]||[];
       if(rows.length&&panel){
-        button.insertAdjacentHTML('beforebegin',highlightCards(rows,kind,true));
+        button.insertAdjacentHTML('beforebegin',highlightCards(rows,kind,true,Boolean(state.finding)));
         bindReviews(panel);
       }
       button.remove();
@@ -440,6 +440,7 @@ async function refresh(root,state) {
     const target=root.querySelector('#my-insights-result');
     if(target)target.innerHTML='<p class="my-insights-sample">'+number(response.eligible_decisions)+' picks included · '+
       esc(labelOf(response.environment))+' · '+esc(periodLabel(response.period))+'</p>'+insightsContent(response);
+    state.finding=safeFinding(response);
     if(target)bindInsightCards(root,state,ticket,gen);
   } catch {
     if(gen!==generation||ticket!==state.ticket||!root.isConnected)return;
