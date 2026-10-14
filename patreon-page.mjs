@@ -99,4 +99,26 @@ async function renderMembershipState() {
       : {state:'unconnected',heading:'Connect Patreon to activate Elite',showPatreon:true});
 }
 
-void renderMembershipState();
+// This module and site-nav load independently. If this one starts first,
+// getAuthSession() would otherwise take the legacy/no-config path and render
+// a misleading signed-out page without checking the first-party session.
+// Await the shared config import before making an account decision.
+async function bootMembershipState() {
+  if (!globalThis.PACK1_API) {
+    try { await import('/leaderboard-config.js'); } catch {}
+  }
+  const origin=String(globalThis.PACK1_API?.growthUrl||globalThis.PACK1_API?.url||'');
+  if (!origin.startsWith('https://')) {
+    if(action) {
+      action.textContent='Try again';
+      action.disabled=false;
+      action.onclick=()=>location.reload();
+    }
+    setStatus('Pack One could not load its account service configuration. Please try again.',
+      {state:'error',heading:'Account status unavailable'});
+    return;
+  }
+  await renderMembershipState();
+}
+
+void bootMembershipState();

@@ -25,7 +25,12 @@ let accountSessionRequests=0;
 // reset on a reused page can preserve stale auth state across navigations.
 async function attachFixtureRoutes(page){
 page.on('pageerror',error=>errors.push(error.message));
-await page.route('**/leaderboard-config.js',route=>route.fulfill({
+await page.route('**/leaderboard-config.js',async route=>{
+  // Delay module config to expose the site-nav/patreon-page startup race.
+  // It must still make a first-party session request before rendering signed-out.
+  if(route.request().resourceType()==='script')
+    await new Promise(resolve=>setTimeout(resolve,180));
+  return route.fulfill({
   status:200,
   contentType:'application/javascript',
   body:`window.PACK1_API={
@@ -35,7 +40,8 @@ await page.route('**/leaderboard-config.js',route=>route.fulfill({
     growthUrl:'https://api.packone.pro/growth',
     draftRunUrl:'https://api.packone.pro/draft'
   };`,
-}));
+});
+});
 
 await page.route('https://api.packone.pro/growth/**',async route=>{
   const path=new URL(route.request().url()).pathname.replace(/^\/growth/,'');
