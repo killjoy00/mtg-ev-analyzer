@@ -304,43 +304,47 @@ function JourneyStory({journey,progress,months}:{
   const [details,setDetails]=useState(false);
   const versionBoundary=journey.progress_compatible===false||
     new Set(journey.windows.map(w=>w.cohort)).size>1;
-  return <Section title="Your Drafting Journey" caption="Originally awarded scores · 40-decision windows">
+  return <Section title="Your scores over time" caption="40-pick groups · Average points out of 100">
     {versionBoundary?<Text style={styles.journeyWarning} accessibilityRole="alert">
-      Historical card-pool or scoring rules changed. These windows are not one continuous progress trend.
+      Scoring or card-pool versions changed. These groups cannot be read as one continuous trend.
     </Text>:null}
-    {journey.windows.length?<ScrollView horizontal contentContainerStyle={styles.journeyWindowRow} accessibilityLabel="Your recorded score timeline">
+    {journey.progress_compatible!==false&&progress?<Text style={styles.body}>
+      Your last 40 picks averaged {score(progress.recent.average_score)}/100,{' '}
+      {progress.delta===0?'the same as':(progress.delta>0?'up ':'down ')+score(Math.abs(progress.delta))+' points from'}{' '}
+      the previous 40 ({score(progress.previous.average_score)}/100).
+    </Text>:null}
+    {journey.windows.length?<ScrollView horizontal contentContainerStyle={styles.journeyWindowRow}
+      accessibilityLabel="Scores over time, 40-pick groups">
       {journey.windows.map((w,index)=><View key={w.id} style={styles.journeyWindow}
-        accessibilityLabel={insightLocalRange(w)+', '+w.count+' decisions'+(w.complete?'':' incomplete')}>
+        accessibilityLabel={insightLocalRange(w)+', '+w.count+' picks, average '+score(w.average_score)+
+          ' out of 100'+(w.complete?'':' incomplete group')}>
         {index>0&&journey.windows[index-1]?.cohort!==w.cohort?
-          <Text style={styles.journeyBoundary}>Version changed</Text>:null}
-        <Text style={styles.bigScore}>{score(w.average_score)}</Text>
+          <Text style={styles.journeyBoundary}>Scoring or card pool changed</Text>:null}
+        <Text style={styles.windowScore}>{score(w.average_score)}/100</Text>
         <View style={styles.journeyTrack}><View style={[styles.journeyFill,
           {height:(Math.max(0,Math.min(100,w.average_score??0))+'%') as '100%'}]}/></View>
         <Text style={styles.meta}>{shortJourneyRange(w)}</Text>
         <Text style={styles.meta}>{w.count} picks{w.complete?'':' · partial'}</Text>
       </View>)}
-    </ScrollView>:<Text style={styles.caption}>Your drafting Journey grows with your original recorded decisions.</Text>}
-    {journey.progress_compatible!==false&&progress?<Text style={styles.body}>
-      Recent 40: {score(progress.recent.average_score)}/100 · Previous 40: {score(progress.previous.average_score)}/100 ·
-      {' '}Difference {progress.delta>0?'+':''}{score(progress.delta)} points (descriptive, not proof of improvement).
-    </Text>:null}
+    </ScrollView>:<Text style={styles.caption}>Your score history will appear as you play.</Text>}
+    <Text style={styles.caption}>These are the scores of different picks, not proof of improvement or decline in drafting skill.</Text>
     <Pressable accessibilityRole="button" accessibilityState={{expanded:details}}
       style={styles.disclosure} onPress={()=>setDetails(v=>!v)}>
-      <Text style={styles.summary}>{details?'Hide journey details':'View journey details'}</Text>
+      <Text style={styles.summary}>More score details</Text>
     </Pressable>
     {details?<View style={styles.detailBody}>
-      <Text style={styles.caption}>{journey.note} Incomplete windows remain visible as partial.</Text>
-      {journey.total_windows>journey.windows.length?<Text style={styles.caption}>Showing the most recent {journey.windows.length} of {journey.total_windows} windows.</Text>:null}
-      {journey.windows.map(w=><Text key={w.id} style={styles.caption}>{insightLocalRange(w)} · {w.count} decisions · {score(w.average_score)}/100 · {w.complete?'complete':'incomplete'}</Text>)}
-      {journey.progress_compatible===false?<Text style={styles.caption}>Incompatible source/scoring versions prevent the 40/40 comparison.</Text>:null}
-      {!progress&&journey.progress_compatible!==false?<Text style={styles.caption}>Two complete and compatible 40-pick groups are needed for the comparison.</Text>:null}
-      {journey.milestones.length?<><Text style={styles.subheading}>Milestones</Text>
+      <Text style={styles.caption}>{journey.note} Partial groups show their actual pick counts.</Text>
+      {journey.total_windows>journey.windows.length?<Text style={styles.caption}>Showing the latest {journey.windows.length} of {journey.total_windows} groups.</Text>:null}
+      {journey.windows.map(w=><Text key={w.id} style={styles.caption}>{insightLocalRange(w)} · {w.count} picks · {score(w.average_score)}/100 · {w.complete?'complete':'partial'}</Text>)}
+      {journey.progress_compatible===false?<Text style={styles.caption}>Different scoring or card-pool versions prevent a recent/previous comparison.</Text>:null}
+      {!progress&&journey.progress_compatible!==false?<Text style={styles.caption}>Two complete 40-pick groups using the same scoring version are needed for comparison.</Text>:null}
+      {(journey.milestones||[]).length?<><Text style={styles.subheading}>Milestones</Text>
         {journey.milestones.map(m=><Text key={m.id} style={styles.caption}>{insightLocalRange(m)} · {m.text}{m.average_score!=null?' · '+score(m.average_score)+'/100':''}</Text>)}</>:null}
       <Text style={styles.subheading}>Pacific calendar months</Text>
       {months.length?<View style={styles.months}>{months.map(m=><View key={m.month} style={styles.month}>
-        <Text style={styles.meta}>{m.month}</Text><Text style={styles.monthScore}>{score(m.average_score)}</Text>
-        <Text style={styles.meta}>{m.count} decisions</Text>
-      </View>)}</View>:<Text style={styles.caption}>Monthly averages require at least 10 decisions in a month.</Text>}
+        <Text style={styles.meta}>{m.month}</Text><Text style={styles.monthScore}>{score(m.average_score)}/100</Text>
+        <Text style={styles.meta}>{m.count} picks</Text>
+      </View>)}</View>:<Text style={styles.caption}>Monthly averages need at least 10 picks in a month.</Text>}
     </View>:null}
   </Section>;
 }
@@ -348,21 +352,23 @@ function LegacyJourney({progress,months}:{
   progress:DraftInsights['progress'];months:DraftInsights['months'];
 }) {
   const [allMonths,setAllMonths]=useState(false);
-  if(!progress&&!months?.length)return null;
   const visible=allMonths?months:months.slice(-3);
-  return <Section title="Your Drafting Journey" caption="Original recorded scores">
-    {progress?<Text style={styles.body}>{`Recent 40: ${score(progress.recent.average_score)}/100 · Previous 40: ${score(progress.previous.average_score)}/100 · Difference ${progress.delta>0?'+':''}${score(progress.delta)} points.`}</Text>:null}
-    {progress?<Text style={styles.caption}>These are different saved decisions, not proof that your drafting improved or declined.</Text>:null}
+  return <Section title="Your scores over time" caption="Average points out of 100">
+    {progress?<Text style={styles.body}>
+      Your last 40 picks averaged {score(progress.recent.average_score)}/100,{' '}
+      {progress.delta===0?'the same as':(progress.delta>0?'up ':'down ')+score(Math.abs(progress.delta))+' points from'}{' '}
+      the previous 40 ({score(progress.previous.average_score)}/100).
+    </Text>:<Text style={styles.caption}>Two complete, compatible 40-pick groups are needed for a recent/previous comparison.</Text>}
+    <Text style={styles.caption}>These scores describe different picks, not proven skill improvement.</Text>
     {months.length?<><Text style={styles.subheading}>Pacific calendar months</Text>
       <View style={styles.months}>{visible.map(month=><View key={month.month} style={styles.month}>
         <Text style={styles.meta}>{month.month}</Text>
-        <Text style={styles.monthScore}>{score(month.average_score)}</Text>
-        <Text style={styles.meta}>{month.count} decisions</Text>
+        <Text style={styles.monthScore}>{score(month.average_score)}/100</Text>
+        <Text style={styles.meta}>{month.count} picks</Text>
       </View>)}</View>
-      {months.length>3?<Pressable accessibilityRole="button"
-        accessibilityState={{expanded:allMonths}} style={styles.disclosure}
-        onPress={()=>setAllMonths(current=>!current)}>
-        <Text style={styles.summary}>{allMonths?'Show recent months':'See all monthly records'}</Text>
+      {months.length>3?<Pressable accessibilityRole="button" accessibilityState={{expanded:allMonths}}
+        style={styles.disclosure} onPress={()=>setAllMonths(v=>!v)}>
+        <Text style={styles.summary}>{allMonths?'Show recent months':'See all months'}</Text>
       </Pressable>:null}</>:null}
   </Section>;
 }
@@ -371,45 +377,50 @@ function InsightSections({data,onReview,onLoadMore,morePhase}:{
   onLoadMore:()=>void;morePhase:'idle'|'loading'|'error';
 }) {
   const [explore,setExplore]=useState(false);
-  if (!data.unlocked) return <Section title="Unlock your Drafting Insights">
-    <Text style={styles.body}>Play a few more runs in {data.environment_label}. You have {num(data.eligible_decisions)} of {data.unlock_at} eligible first-time decisions in this period.</Text>
+  if (!data.unlocked) return <Section title="Picks to review">
+    <Text style={styles.body}>Play a few more puzzles in {data.environment_label}. You have {num(data.eligible_decisions)} of {data.unlock_at} picks included for this view.</Text>
     <Pressable accessibilityRole="button" onPress={() => router.push('/')} style={styles.primaryButton}>
       <Text style={styles.primaryText}>Play today&apos;s Daily</Text>
     </Pressable>
   </Section>;
-  const leading=data.leading_finding||data.observations?.[0];
-  const extra=(data.observations||[]).slice(leading?1:0);
+  const finding=safeFinding(data);
+  const extra=(data.observations||[]).filter(row=>['progress','pick-depth'].includes(row.id)&&row.id!==finding?.id);
   return <>
-    {data.highlights?<HighlightsStory highlights={data.highlights} finding={leading}
+    {data.highlights?<HighlightsStory highlights={data.highlights} finding={finding}
       onReview={onReview} onLoadMore={onLoadMore} morePhase={morePhase}/>:
-      leading?<Section title="Your patterns"><Text style={styles.body}>{leading.text}</Text></Section>:null}
+      <Section title="Picks to review"><Text style={styles.caption}>Pick examples aren’t available from this version yet.</Text></Section>}
     {data.journey?<JourneyStory journey={data.journey} progress={data.progress} months={data.months||[]}/>:
       <LegacyJourney progress={data.progress} months={data.months||[]}/>}
-    <Section title="Explore your data">
+    {data.drafting_dna?<DNASummary dna={data.drafting_dna} cardChoices={data.card_choices}
+      onReview={onReview}/>:
+      <Section title="Your pick patterns" caption="Across formats · All available history">
+        <Text style={styles.caption}>Pattern details aren’t available from this version yet.</Text>
+      </Section>}
+    <Section title="More stats">
       <Pressable accessibilityRole="button" accessibilityState={{expanded:explore}}
         style={styles.disclosure} onPress={()=>setExplore(v=>!v)}>
-        <Text style={styles.summary}>{explore?'Hide supporting breakdowns':'Explore your data · charts and methodology'}</Text>
+        <Text style={styles.summary}>More stats</Text>
       </Pressable>
       {explore?<View style={styles.detailBody}>
-        <Text style={styles.subheading}>Pick-by-pick breakdown</Text>
-        <Text style={styles.caption}>Actual source P1P positions, with at least five decisions per displayed average.</Text>
+        <Text style={styles.subheading}>Scores by source pick position</Text>
+        <Text style={styles.caption}>P1P positions are from the source draft, not the question number in this game. Averages need five picks.</Text>
         <Metrics rows={(data.pick_depth||[]).map(row=>({...row,label:row.label}))}/>
-        <Text style={styles.subheading}>Difficulty breakdown</Text>
+        <Text style={styles.subheading}>Model-support closeness</Text>
+        <Text style={styles.caption}>“Hard” means two cards had similar model support; this does not measure how hard people found the pick.</Text>
         <Metrics rows={(data.difficulty||[]).map(row=>({...row,label:row.band.charAt(0).toUpperCase()+row.band.slice(1)}))}/>
-        {data.unknown_difficulty?<Text style={styles.caption}>{num(data.unknown_difficulty)} picks lack a verified difficulty band.</Text>:null}
-        <Text style={styles.subheading}>Format breakdown</Text>
-        <Text style={styles.caption}>Different card pools; recorded averages do not establish comparable skill.</Text>
+        {data.unknown_difficulty?<Text style={styles.caption}>{num(data.unknown_difficulty)} picks have no rating.</Text>:null}
+        <Text style={styles.subheading}>Scores by format</Text>
+        <Text style={styles.caption}>These formats use different card pools. Their averages are not comparable skill ranks.</Text>
         <View style={styles.formats}>{(data.formats||[]).map(row=><View key={row.environment}
           style={[styles.format,row.environment===data.environment&&styles.formatSelected]}>
-          <Text style={styles.formatName}>{row.label}</Text>
-          <Text style={styles.bigScore}>{score(row.average_score)}</Text>
-          <Text style={styles.meta}>{num(row.count)} eligible picks{row.average_score===null?' · need 5':''}</Text>
+          <Text style={styles.formatName}>{row.environment==='mixed'?'Mixed sets':row.label}</Text>
+          <Text style={styles.bigScore}>{score(row.average_score)}/100</Text>
+          <Text style={styles.meta}>{num(row.count)} picks included{row.average_score===null?' · need 5':''}</Text>
         </View>)}</View>
-        <Text style={styles.subheading}>Additional observations</Text>
-        {extra.length?extra.map(row=><Text key={row.id} style={styles.body}>{row.text}</Text>):
-          <Text style={styles.caption}>No additional comparison cleared the minimum sample and score-gap rules.</Text>}
-        <Text style={styles.subheading}>Methodology</Text>
-        <Text style={styles.caption}>{data.methodology}</Text>
+        {extra.length?<><Text style={styles.subheading}>Other within-format comparisons</Text>
+          {extra.map(row=><Text key={row.id} style={styles.body}>{row.text}</Text>)}</>:null}
+        <Text style={styles.subheading}>How this works</Text>
+        <Text style={styles.caption}>{data.methodology||'Only the first included answer to each puzzle counts.'}</Text>
       </View>:null}
     </Section>
   </>;
