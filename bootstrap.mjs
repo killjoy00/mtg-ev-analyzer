@@ -159,7 +159,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     await identityReady;
     (await import('./profile-product.mjs?v=13')).installProfileProductLayer();
   } else {
-    const game = await import('./draft-run-product.mjs?v=14');
+    const game = await import('./draft-run-product.mjs?v=15');
     await identityReady;
     await refreshPrimaryNav();
     await game.installDraftRunPage();
