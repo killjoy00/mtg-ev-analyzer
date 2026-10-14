@@ -1,75 +1,43 @@
-# Focused Insights report (review candidate)
+# Player-focused Insights in My Pack One
 
-**Status:** implementation on `feat/insights-focused-report-20261012`. This document describes the code contract, not a completed deployment or production acceptance. Existing Drafting DNA qualifications and Journey rules are unchanged; see [DRAFTING-DNA.md](DRAFTING-DNA.md) and [INSIGHTS-REDESIGN.md](INSIGHTS-REDESIGN.md).
+**Status:** Implementation candidate on `feat/insights-player-review-20261014`. This is a product hierarchy update to the earlier DNA-first report; it does not change stored scores, game difficulty, puzzle inclusion, or DNA qualification. Real-account and physical-device acceptance are separate release decisions.
 
-## Product hierarchy
+## What players see
 
-Within the existing authenticated My Pack One → Insights tab on web and native:
+The Insights tab stays inside **My Pack One** on web and native, in this order:
 
-1. **Your Drafting DNA**: primary archetype (if qualified) and two small secondary positions, followed by optional factual card-choice context. The hero uses **all available first-encounter history**; changing the report's environment or time period does not change the DNA's source.
-2. **Decision report**: environment and period selectors, one qualified leading finding or an explicitly neutral introduction, Best Calls / Biggest Misses, **one featured card comparison plus two compact supporting rows** by default, and optional more rows.
-3. **Your Drafting Journey**: the existing bounded 40-decision chronology and factual recent/previous comparison, with milestones, timestamp detail, and Pacific calendar months behind a disclosure.
-4. **Explore your data**: existing pick-by-pick, difficulty, formats, secondary observations and methodology; collapsed until requested.
+1. **Your picks** heading, **Format** and time filters. **Mixed sets** is a separate format, *not* the union of Latest Set, Powered Cube and other modes. The existing filter defaults and newest-environment auto-selection remain.
+2. **Picks to review**, the main feature. **Picks to revisit** opens by default when non-trophy, lower-scoring examples qualify; otherwise **High-scoring picks** opens. If neither category has an example, a neutral empty state appears. The first item is a featured comparison, followed by up to two supporting cards. Each shows both named cards (art when approved/available), the original score, a readable set name, the *source draft* P1P position, date and one factual explanation. The review action is **Review pick**.
+3. **Your scores over time**, using original 40-pick history groups. A compatible last-40-versus-previous-40 comparison is descriptive, not proof of improved skill. Partial groups display the actual count. Version changes remain visible, and window/milestone/month details are optional.
+4. **Your pick patterns**, smaller and sourced from **Across formats · All available history**, independent of Format and time filters. Show only genuinely qualified traits. No developing placeholders or promises that a fixed number of extra picks guarantees a trait. Conditional creature/rarity counts and qualification evidence are available only on request.
+5. Collapsed **More stats**: scores by source pick position, model-support closeness, format averages and **How this works**.
 
-Web opens the original saved pack in a native HTML dialog with focus return. The native app uses a read-only modal. Both use the existing account-scoped first-eligible-decision detail endpoint and never score, replay, replace, or write a historic pick. The report does not create a global navigation destination.
+This page answers "which picks should I review and what did the trophy drafter pick?" before discussing analytical traits.
 
-The overview is intentionally result-first: the identity is the main element, two secondary traits are short disclosure rows, and each qualified creature/rarity observation is one line (`X of N picks`). Calculations, competitive-option counters, underlying saved examples and trait thresholds remain behind optional disclosure. In native clients receiving an older API response without `highlights` or `journey`, the first observation appears independently and saved `progress`/`months` still render. A Journey with different original scoring/source cohorts displays a visible non-comparability warning and a boundary marker; a single incomplete 40-pick window never implies that scoring versions changed.
+## What the player can inspect
 
-## Private API additions
+The owner-only GET decision endpoint returns the original chosen/trophy cards, **Trophy drafter’s earlier picks**, the full pack and saved alternative scores. The earlier-pick pool is the source trophy drafter's pool, not the player's own drafted deck. This review is read-only: no gameplay/replay, rescore, progress changes or writes. The detail also retains verified trophy draft metadata, when present.
 
-`worker/draft-run-insights.mjs` continues to bound its source to up to 1,000 eligible recent eight-pick non-QA sessions, joined to locked original answer observations; the first answer to each distinct puzzle wins. Its response adds:
+Review explanations do not make strategy claims about signals, curve, card roles, synergies or player mistakes. When the saved model ranking identifies a more supported card, the response includes that card's identity and whether it is **also** the trophy pick. Missing rankings, card metadata, approved art or older API fields yield simpler factual text; they never trigger invented analysis.
 
-- `card_choices` (`choice-context-v1`), an **all-environment, all-period** card-choice summary;
-- `leading_finding`, the existing strongest qualified written comparison or `null`;
-- `default_environment`, the environment of the **most recent eligible** locked decision;
-- additive `reason_version`, `reason_code`, `reason_text`, and bounded `reason_evidence` on each highlight (`decision-highlights-v3`), plus saved selected/trophy names as image fallbacks.
+**100 means you matched the trophy pick. Other picks earn up to 95 based on the model.** This is the existing model-support partial-credit scale, not an objective verdict on a Magic choice. A **hard** label measures how close the two leading *model-support values* were; it is not a human difficulty measure and does not justify a headline about player weakness.
 
-The base field types, controls, originally awarded scores, eligibility, Journey, stable DNA, private ownership rules, and two-page highlight cap remain unchanged. Older mobile clients can ignore the new optional fields; updated clients render fallback copy if older servers omit them. No public profile or aggregate API gains these fields.
+## Defensible comparisons
 
-### Real card-choice context (choice-context-v1)
+Headline comparisons are limited to recent-versus-previous scores in one compatible scoring/selection/corpus revision, or to **source P1P positions** within an individual compatible revision. The existing requirements of 40 picks per group and a gap of at least 10 points still apply. Different card pools and raw difficulty groups may be summarized in **More stats**, but are not promoted into a player diagnosis, skill claim or training recommendation.
 
-These **descriptive** breakdowns are derived only from the original saved `puzzle.candidates` card metadata (`type_line`, `rarity`) and saved `ranking` model-support values; no fresh corpus, card metadata service, peer data, or post-hoc scoring is used.
+A displayed finding requires a saved example from an actual compared group. An example illustrates membership; it cannot establish why the score gap occurred. If no defensible comparison has an example, the page simply introduces review picks.
 
-- **Card type:** creature vs noncreature, classified from the saved type line.
-- **Rarity:** rare/mythic vs common/uncommon, from saved original card rarity.
-- An opportunity qualifies for a particular breakdown only when the saved pack has at least one **competitive** candidate from **both** categories and the selected card has verifiable matching saved metadata.
-- For this provisional reporting rule, competitive means **at least 50% of the highest saved model support within that same pack**. This ratio measures *relative recorded model support*, **not** the chance that a player or trophy drafter would choose that card.
-- Rows missing trustworthy card types, rarity, positive leader support or complete matching saved rankings are skipped for that breakdown. Model/selection/corpus version combinations are never pooled: choose the largest compatible cohort (deterministic tie breaker) for each breakdown.
-- Only cohorts with **at least 20 qualifying opportunities** publish a sentence such as “You chose a creature in X of N decisions” plus up to two original saved-decision examples. Smaller or fragmented cohorts remain **developing** rather than implying a preference.
-- The `availability` counters refer to *competitive card options per category*, not percentages of packs in which the category occurred; because both categories are required for a qualifying opportunity, the sample is **conditional**, not an all-picks choice rate.
+## History and compatibility boundaries
 
-The thresholds are provisional UX evidence gates. They are **not validated player skill ranks, psychological archetypes, preferences, or causal explanations**. They do not change Drafting DNA qualification.
+Only the first included answer to each puzzle counts. The backend uses locked first-encounter observations from up to **1,000 recent, owner-scoped, eligible eight-pick sessions**, excluding QA, with at most two pages of bounded highlights. The exact counting and version rules remain behind optional details. DNA uses this bounded all-format history even when the visible review and score history are filtered. Conditional type/rarity denominators count only packs where both categories had competitive saved support, sufficient card data, and a compatible version cohort; they are not overall selection rates or proof of preference.
 
-### Highlights and reasons
+The API keeps the existing `highlights.best`, `highlights.misses`, `journey`, `drafting_dna` and `card_choices` fields, first-eligible decision route and owner protections. Legacy native clients can ignore added evidence fields; updated web/native clients render a simple fallback when an older server omits a section. Web clears private UI on owner/session/filter refresh; native invalidates stale requests on identity transitions. All art continues through the audited Scryfall HTTPS allowlist.
 
-`decision-highlights-v3` stays deterministic and first-encounter-only, with unique decisions across Best Calls/Biggest Misses and both capped pages. Strong-scored alternatives and hard-puzzle trophy matches **compete in one pool** for featured and supporting positions. Ranking first favors actual groups from the qualified leading comparison (specific difficulty bands or source pick positions, the exact previous/recent 40, or compared formats), then weighs recency against set, reason, and source-position variety. When available, the first three visible highlights come from the compared groups. Recency decays with days since the newest eligible saved decision, so a useful recent miss need not sit behind an extreme miss from years earlier. Labels describe historical model-scored outcomes, not objectively right/wrong gameplay.
+## Verification and release boundary
 
-The server emits one reproducible factual reason code per highlight, such as `hard-trophy-match`, `strong-scored-alternative`, `saved-support-gap`, or `low-scored-alternative`. A support-gap reason requires a valid saved chosen/leader support comparison; otherwise it falls back to the original awarded score. No invented card win rates or invalid sample-size claims are made.
+Use **synthetic accounts** for public Playwright and native screenshot fixtures. Cover empty/no highlights, one-category-only highlights, sparse/no qualified traits, missing art/set metadata, incompatible score versions, older responses, filter and account races, pagination, modal close/focus return, desktop, 390px and 320px widths, and native enlarged text.
 
-`leading_finding.compared_groups` exposes only labels and which group's recorded average is higher/lower. Internal puzzle membership for a recent/previous 40 comparison stays server-side. A preview's optional `finding_context` identifies which compared group that saved decision belongs to; a single saved card is **an illustration, not statistical proof** of the finding.
+**Fixture verification** is not signed-in real-account acceptance. Emulator/simulator capture is not physical-device acceptance. Report actual passing/failing commands and available CI artifacts in the PR; never present screenshots from mock data as real player history.
 
-## Privacy and failure behavior
-
-All source reads remain owner-scoped and bounded. Highlight previews still return only small saved card previews; detailed candidate cards and rankings are read only on explicit owner-authorized review. User identifiers and raw answers are not included in documentation, tests, public profiles, or logs. Web clears previously displayed private DNA before refetch, including account/session failures; native invalidates stale requests on account transitions. Card art uses the existing audited HTTPS Scryfall allowlist, with accessible name fallbacks.
-
-## Validation and acceptance
-
-Synthetic tests cover competitive-options logic, unknown metadata, incomplete rankings, mixed historical cohorts, reason consistency, duplicate avoidance and saved-image restrictions. Native tests cover collapsed breakdowns, historical detail access, pagination, owner change and signed-out states. Pull-request CI must still establish the final JavaScript, native lint/typecheck, browser and backend gate results.
-
-For acceptance, review at desktop, 390px and 320px widths; check focus trapping/return, the tab switch, two-page “See more,” disclosure semantics and the read-only saved-pack exit; verify accounts with 0/7/8 eligible decisions, 19/20 competitive opportunities, long histories, mixed source versions, missing archived metadata and a session switch. **Signed-in production-data acceptance and physical-device testing remain separate release gates.**
-
-The synthetic web browser fixture now includes at least five Best Calls, of which the **first three are visible**: one featured hard-rated example and two compact cards, all marked with their compared group. It captures `artifacts/ui-profile-insights-populated-390.png` and `artifacts/ui-profile-insights-populated-desktop.png`; these are non-production screenshots from the browser CI artifact, not verified live account images. Native screenshot acceptance uses the isolated preview-only `member-insights`,
-`member-insights-sparse`, and `member-insights-versions` scenarios. Android
-acceptance exercises a populated DNA overview, both decision categories, the
-read-only original-pack modal and hardware-back dismissal, Journey access, a
-visible non-comparability notice, and narrow 320dp/large-text sparse evidence.
-iOS Simulator captures signed-in populated, sparse and version-boundary states
-at the regular text size and the populated state at the enlarged accessibility
-text size. A fixture-only on-layout marker guards captures against loading or
-blank screens. These are **simulator/emulator tests** using synthetic saved
-decisions, not physical-device or real-owner acceptance. The existing preview
-artifact and release boundary remain unchanged.
-
-## Release boundary
-
-Open a PR against `main` for review. Do **not** merge, deploy backend functions, publish web assets, submit a mobile build or alter production accounts/records as part of this implementation.
+Until the relevant CI and acceptance results are known, opening the PR is not proof of a safe release. Preserve the existing guarded web/backend deploy and signed native release process.
