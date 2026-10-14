@@ -375,136 +375,174 @@ try {
   assert.equal(await page.locator('[role="tab"][id^="profile-"]').count(),3,'My Pack One has three local sections');
   await page.locator('#profile-insights-tab').click();
   assert.equal(await page.locator('#profile-insights-tab').getAttribute('aria-selected'),'true');
-  await page.locator('#my-insights-result').getByText('Decision report',{exact:true}).waitFor();
-  assert.match(await page.locator('#my-insights-dna').textContent(),/Your Drafting DNA/);
-  assert.match(await page.locator('#my-insights-dna').textContent(),/All available history · 160 saved decisions/,
-    'DNA explicitly labels its all-history scope');
-  assert.match(await page.locator('#my-insights-dna').textContent(),/The Independent Thinker/);
-  assert.equal(await page.locator('.my-insights-dna-secondary-row > *').count(),2);
-  assert.match(await page.locator('.my-insights-choice-context').textContent(),/creature in 19 of 26 decisions/);
-  assert.match(await page.locator('.my-insights-choice-context').textContent(),/rare or mythic in 8 of 26 decisions/);
-  await page.locator('.my-insights-choice-fact').first().getByText(/Options and real examples/).click();
-  await page.getByRole('button',{name:/Daring Skyjek · neo P1P3/}).click();
-  await page.locator('#my-insights-decision-dialog[open] .my-insights-locked-pack').waitFor();
-  await page.locator('#my-insights-decision-dialog').getByRole('button',{name:'Close'}).click();
-  assert.match(await page.locator('#my-insights-result').textContent(),/Your Drafting Journey/);
-  assert.match(await page.locator('#my-insights-result').textContent(),/Explore your data/);
-  assert.equal(await page.locator('#my-insights-best-panel .my-insights-pick:visible').count(),3,
-    'three finding-linked highlights are visible before See more');
+  await page.locator('#my-insights-result').getByText('Picks to review',{exact:true}).waitFor();
+  assert.equal(await page.locator('.my-insights-heading h2').textContent(),'Your picks');
+  assert.equal(await page.locator('#my-insights-environment').evaluate(el=>el.previousSibling?.textContent),'Format');
+  const order=await page.locator('#my-insights-result .my-insights-grid > *').evaluateAll(nodes=>
+    nodes.map(node=>node.querySelector('h2')?.textContent||node.querySelector('summary')?.textContent));
+  assert.deepEqual(order,['Picks to review','Your scores over time','Your pick patterns','More stats']);
+  assert.match(await page.locator('.my-insights-dna').textContent(),/Across formats · All available history/);
+  assert.match(await page.locator('.my-insights-dna').textContent(),/The Independent Thinker/);
+  assert.equal(await page.locator('.my-insights-qualified-trait').count(),2,
+    'only qualified traits appear, with no empty secondary positions');
+  assert.equal(await page.locator('.my-insights-explore').evaluate(node=>node.open),false);
+  assert.equal(await page.locator('.my-insights-choice-disclosure').evaluate(node=>node.open),false);
+
+  const revisit=page.getByRole('tab',{name:'Picks to revisit'});
+  const high=page.getByRole('tab',{name:'High-scoring picks'});
+  assert.equal(await revisit.getAttribute('aria-selected'),'true','revisit is default when available');
+  assert.equal(await page.locator('#my-insights-misses-panel .my-insights-pick:visible').count(),1);
+  assert.match(await page.locator('#my-insights-misses-panel').textContent(),/Khans of Tarkir/);
+  assert.match(await page.locator('#my-insights-misses-panel').textContent(),/Source P1P5/);
+  assert.doesNotMatch(await page.locator('.my-insights-leading').count().then(String),/^[1-9]/,
+    'an old difficulty comparison cannot be promoted to a headline');
+  // Default screenshot shows the actual first-open state for a player with revisit picks.
+  await page.screenshot({path:'artifacts/ui-profile-insights-revisit-default-390.png',fullPage:true});
+  await high.click();
+  assert.equal(await page.locator('#my-insights-best-panel .my-insights-pick:visible').count(),3);
   assert.equal(await page.locator('#my-insights-best-panel .my-insights-pick.is-featured:visible').count(),1);
   assert.equal(await page.locator('#my-insights-best-panel .my-insights-pick.is-compact:visible').count(),2);
   const featuredArt=page.locator('#my-insights-best-panel .my-insights-pick.is-featured img');
-  assert.equal(await featuredArt.count(),2,'synthetic selected/trophy art should use the real card-image layout');
+  assert.equal(await featuredArt.count(),2,'synthetic card art is shown for both cards');
   await featuredArt.first().scrollIntoViewIfNeeded();
   await page.waitForFunction(() => {
     const images=[...document.querySelectorAll('#my-insights-best-panel .my-insights-pick.is-featured img')];
     return images.length===2&&images.every(img=>img.complete&&img.naturalWidth>0);
   },null,{timeout:10000});
-  assert.match(await page.locator('#my-insights-best-panel .my-insights-pick.is-featured').textContent(),/hard-rated decisions/);
+  const featuredText=await page.locator('#my-insights-best-panel .my-insights-pick.is-featured').textContent();
+  assert.match(featuredText,/Kamigawa: Neon Dynasty/);
+  assert.match(featuredText,/Source P1P3/);
+  assert.match(featuredText,/Score 92\/100/);
+  assert.doesNotMatch(featuredText,/hard-rated decisions/,'unqualified old comparison tags are hidden');
   assert.match(await page.locator('#my-insights-best-panel .my-insights-pick.is-compact').nth(0).textContent(),/Skyguard Captain/);
   assert.match(await page.locator('#my-insights-best-panel .my-insights-pick.is-compact').nth(1).textContent(),/Luminous Oath/);
-  // Keep the optional expanded-evidence state as separate acceptance evidence.
-  // The overview screenshots must show the actual compact *default* state.
+
+  // Optional card-choice denominator and real examples stay behind disclosures.
+  await page.locator('.my-insights-choice-disclosure > summary').click();
+  assert.match(await page.locator('.my-insights-choice-disclosure').textContent(),/19 of 26 qualifying picks/);
+  assert.match(await page.locator('.my-insights-choice-disclosure').textContent(),/8 of 26 qualifying picks/);
+  await page.locator('.my-insights-choice-fact').first().getByText('Examples and counts').click();
+  await page.getByRole('button',{name:/Daring Skyjek · Kamigawa: Neon Dynasty P1P3/}).click();
+  await page.locator('#my-insights-decision-dialog[open] .my-insights-locked-pack').waitFor();
+  await page.locator('#my-insights-decision-dialog').getByRole('button',{name:'Close'}).click();
   await page.screenshot({path:'artifacts/ui-profile-insights-evidence-expanded-390.png',fullPage:true});
-  await page.locator('.my-insights-choice-fact').first().getByText(/Options and real examples/).click();
-  assert.equal(await page.locator('.my-insights-choice-fact details').first().evaluate(node=>node.open),false,
-    'evidence disclosure closes cleanly before compact overview screenshots');
-  // Captured before filters change: one leading finding, one featured example
-  // with loaded synthetic art, and two compact supporting examples.
+  await page.locator('.my-insights-choice-disclosure > summary').click();
   await page.screenshot({path:'artifacts/ui-profile-insights-populated-390.png',fullPage:true});
   await page.setViewportSize({width:1440,height:900});
   await noOverflow();
   await page.screenshot({path:'artifacts/ui-profile-insights-populated-desktop.png',fullPage:true});
   await page.setViewportSize({width:390,height:844});
-  assert.equal(await page.locator('.my-insights-explore').evaluate(node=>node.open),false,
-    'supporting breakdowns start collapsed');
-  const reviewButton=page.getByRole('button',{name:'Review original pack'}).first();
+
+  const reviewButton=page.getByRole('button',{name:'Review pick'}).first();
   await reviewButton.click();
   await page.locator('#my-insights-decision-dialog[open] .my-insights-locked-pack').getByText('Frost Lynx').first().waitFor();
   const savedPackText=await page.locator('#my-insights-decision-dialog').textContent();
-  assert.match(savedPackText,/Goblin Electromancer/,'original saved pack is shown');
-  assert.match(savedPackText,/Counterspell/,'original prior picks are shown');
-  assert.match(savedPackText,/7–1/,'source drafter record remains distinct');
+  assert.match(savedPackText,/Full pack.*Goblin Electromancer/s);
+  assert.match(savedPackText,/Trophy drafter’s earlier picks.*Counterspell/s);
+  assert.match(savedPackText,/7–1/);
+  assert.match(savedPackText,/Read-only review/);
   await page.locator('#my-insights-decision-dialog').getByRole('button',{name:'Close'}).click();
   assert.equal(await page.locator('#my-insights-decision-dialog').isHidden(),true);
   assert.equal(await reviewButton.evaluate(node=>document.activeElement===node),true,
-    'dialog close restores focus to its original review button');
-  await page.getByRole('tab',{name:'Biggest Misses'}).click();
-  await page.locator('#my-insights-misses-panel .my-insights-pick-info small').getByText(/Original score 32\/100/).waitFor();
-  await page.getByRole('tab',{name:'Best Calls'}).click();
-  assert.match(await page.locator('.my-insights-journey-point').first().textContent(),/Sep 1–Sep 14/,
-    'old response date-only windows have compact readable dates');
+    'closing review returns keyboard focus to the same Review pick button');
+  await high.focus();
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await revisit.getAttribute('aria-selected'),'true');
+  await page.keyboard.press('End');
+  assert.equal(await high.getAttribute('aria-selected'),'true');
+  await page.keyboard.press('Home');
+  assert.equal(await revisit.getAttribute('aria-selected'),'true');
+  await high.click();
+  assert.match(await page.locator('.my-insights-journey-point').first().textContent(),/Sep 1–Sep 14/);
   await page.locator('.my-insights-journey-details > summary').click();
-  assert.match(await page.locator('.my-insights-journey-details').textContent(),/2026-09-01 to 2026-09-14/,
-    'the exact chronological window remains available in Journey details');
+  assert.match(await page.locator('.my-insights-journey-details').textContent(),/2026-09-01 to 2026-09-14/);
 
+  // Old response, missing/unsafe art, paginated cards, no qualified DNA.
   insightsMode='v2';
   await page.locator('#my-insights-refresh').click();
-  await page.locator('#my-insights-best-panel').locator('.my-insights-pick-info strong').getByText(/First Page Card/).waitFor();
-  assert.match(await page.locator('#my-insights-dna').textContent(),/Your Drafting DNA is taking shape/);
-  assert.doesNotMatch(await page.locator('#my-insights-dna').textContent(),/42 more eligible decisions/,
-    'the same evidence-floor paragraph is not repeated in every trait slot');
+  await page.locator('.my-insights-dna').getByText('No clear pick pattern to show yet.').waitFor();
+  await high.click();
+  await page.locator('#my-insights-best-panel').getByText(/First Page Card/).first().waitFor();
   assert.match(await page.locator('.my-insights-journey-point').first().textContent(),/Oct 31/,
-    'viewer-local dates should collapse UTC midnight to one local date');
+    'local dates collapse UTC midnight to the correct local day');
   assert.equal(await page.locator('#my-insights-best-panel img[src*="not-scryfall.invalid"]').count(),0);
   assert.equal(await page.locator('#my-insights-best-panel img[src*="javascript"]').count(),0);
   assert.equal(await page.locator('#my-insights-best-panel img[src*="cards.scryfall.io"]').count(),1);
-  await page.getByRole('button',{name:'See more Best Calls'}).click();
-  await page.locator('#my-insights-best-panel').locator('.my-insights-pick-info strong').getByText(/Second Page Card/).waitFor();
-  assert.equal(await page.locator('#my-insights-best-panel .my-insights-pick').count(),2,
-    'page 2 adds distinct records rather than replacing page 1');
-  assert.equal(await page.getByRole('button',{name:'See more Best Calls'}).count(),0,
-    'the UI is bounded to two highlight pages');
+  await page.getByRole('button',{name:'See more picks'}).click();
+  await page.locator('#my-insights-best-panel').getByText(/Second Page Card/).first().waitFor();
+  assert.equal(await page.locator('#my-insights-best-panel .my-insights-pick').count(),2);
+  assert.equal(await page.getByRole('button',{name:'See more picks'}).count(),0);
 
   insightsMode='ready';
   await page.locator('#my-insights-refresh').click();
-  await page.locator('#my-insights-dna').getByText('The Independent Thinker').waitFor();
+  await page.locator('.my-insights-dna').getByText('The Independent Thinker').waitFor();
   await page.locator('.my-insights-explore > summary').click();
-  assert.equal(await page.locator('.my-insights-bar').count(),3,'pick and two difficulty metrics remain accessible');
+  assert.equal(await page.locator('.my-insights-bar').count(),3);
   await page.locator('#my-insights-environment').selectOption('powered-cube');
   await page.locator('.my-insights-sample').getByText(/Powered Cube/).waitFor();
   await page.locator('.my-insights-explore > summary').click();
   await page.locator('#my-insights-result').getByText('P1P2').waitFor();
   await page.locator('#my-insights-period').selectOption('90d');
   await page.locator('.my-insights-sample').getByText(/Last 90 days/).waitFor();
-  assert.match(await page.locator('#my-insights-dna').textContent(),/All available history · 160 saved decisions/,
-    'report filters must not change all-history DNA scope');
+  assert.match(await page.locator('.my-insights-dna').textContent(),/Across formats · All available history/,
+    'all-history DNA scope does not change under review filters');
+  await high.click();
   for(const width of [320,390,768,1440]){
     await page.setViewportSize({width,height:844});
     await noOverflow();
     assert.equal(await page.locator('#my-insights-best-panel .my-insights-pick:visible').count(),3,
-      'responsive report retains exactly three initial examples');
+      'all layouts show a featured comparison and two supporting cards');
   }
+  await page.setViewportSize({width:320,height:844});
+  await page.screenshot({path:'artifacts/ui-profile-insights-320.png',fullPage:true});
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:'artifacts/ui-profile-insights-390.png',fullPage:true});
 
-  // A high-sample account can have no strong comparison without being short on data.
   insightsMode='descriptive';
   await page.locator('#my-insights-environment').selectOption('mixed');
   await page.locator('#my-insights-period').selectOption('all');
   await page.locator('#my-insights-refresh').click();
-  await page.waitForFunction(()=>document.querySelector('.my-insights-sample')?.textContent?.includes('237 eligible decisions'));
+  await page.waitForFunction(()=>document.querySelector('.my-insights-sample')?.textContent?.includes('237 picks included'));
   const reported=await page.locator('#my-insights-result').textContent();
-  assert.match(reported,/No standout comparison has qualified/);
-  assert.match(reported,/237 eligible decisions/);
-  assert.match(reported,/Recent 40: 77\.1\/100/);
-  assert.match(reported,/Previous 40: 75\.2\/100/);
+  assert.doesNotMatch(reported,/No standout comparison has qualified|Leading finding/);
+  assert.match(reported,/237 picks included/);
+  assert.match(reported,/Your last 40 picks averaged 77\.1\/100, up 1\.9 points from the previous 40/);
   await page.locator('.my-insights-explore > summary').click();
   const supporting=await page.locator('.my-insights-explore-content').textContent();
   assert.match(supporting,/P1P4/);
   assert.match(supporting,/74\.5/);
   assert.match(supporting,/76\.8/);
-  assert.doesNotMatch(reported,/Not enough comparable decisions yet/);
   await page.screenshot({path:'artifacts/ui-profile-insights-237.png',fullPage:true});
+
+  insightsMode='no-revisit';
+  await page.locator('#my-insights-refresh').click();
+  assert.equal(await high.getAttribute('aria-selected'),'true','only high-scoring picks are available');
+  insightsMode='no-best';
+  await page.locator('#my-insights-refresh').click();
+  assert.equal(await revisit.getAttribute('aria-selected'),'true','only revisit picks are available');
+  insightsMode='no-examples';
+  await page.locator('#my-insights-refresh').click();
+  assert.match(await page.locator('#my-insights-best-panel').textContent(),/No high-scoring picks/);
+  await revisit.click();
+  assert.match(await page.locator('#my-insights-misses-panel').textContent(),/No picks to revisit/);
+  insightsMode='sparse';
+  await page.locator('#my-insights-refresh').click();
+  await page.locator('.my-insights-sample').getByText(/9 picks included/).waitFor();
+  assert.match(await page.locator('.my-insights-dna').textContent(),/No clear pick pattern/);
+  assert.equal(await page.locator('.my-insights-qualified-trait').count(),0);
+  insightsMode='versions';
+  await page.locator('#my-insights-refresh').click();
+  assert.match(await page.locator('.my-insights-journey-warning').textContent(),/cannot be read as one continuous trend/);
+  assert.equal(await page.locator('.my-insights-journey-break').count(),1);
 
   insightsMode='offline';
   await page.locator('#my-insights-refresh').click();
   await page.getByText('Insights unavailable',{exact:true}).waitFor();
-  assert.equal((await page.locator('#my-insights-dna').textContent()).trim(),'',
-    'a failed owner-scoped refresh cannot retain private DNA');
+  assert.equal(await page.locator('.my-insights-dna').count(),0,
+    'failed refresh cannot expose an earlier account’s private patterns');
   insightsMode='ready';
   await page.locator('#my-insights-retry').click();
-  await page.locator('#my-insights-result').getByText('Decision report',{exact:true}).waitFor();
+  await page.locator('#my-insights-result').getByText('Picks to review',{exact:true}).waitFor();
   await page.locator('#profile-insights-tab').focus();
   await page.keyboard.press('ArrowRight');
   assert.equal(await page.locator('#profile-account-tab').getAttribute('aria-selected'),'true','right arrow moves focus/selection');
