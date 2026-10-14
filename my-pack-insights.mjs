@@ -4,10 +4,30 @@ import {loadMyInsights,firstPartyAuthEnabled,ensurePackSession,storedAccountToke
 
 let generation=0;
 const mounted=new WeakMap();
-const ENVIRONMENTS=[['mixed','Mixed'],['latest','Latest Set'],['powered-cube','Powered Cube']];
+const ENVIRONMENTS=[['mixed','Mixed sets'],['latest','Latest Set'],['powered-cube','Powered Cube']];
 const PERIODS=[['all','All available'],['90d','Last 90 days'],['365d','Last year']];
 const score=v=>v===null||v===undefined?'Not enough to average':Number(v).toFixed(1);
 const number=v=>Number(v||0).toLocaleString('en-US');
+const INSIGHTS_SET_NAMES=Object.freeze({"stx":"Strixhaven: School of Mages","mid":"Innistrad: Midnight Hunt","vow":"Innistrad: Crimson Vow","neo":"Kamigawa: Neon Dynasty","snc":"Streets of New Capenna","hbg":"Alchemy Horizons: Baldur's Gate","dmu":"Dominaria United","bro":"The Brothers' War","one":"Phyrexia: All Will Be One","sir":"Shadows over Innistrad Remastered","mom":"March of the Machine","ltr":"The Lord of the Rings: Tales of Middle-earth","woe":"Wilds of Eldraine","lci":"The Lost Caverns of Ixalan","ktk":"Khans of Tarkir","mkm":"Murders at Karlov Manor","otj":"Outlaws of Thunder Junction","mh3":"Modern Horizons 3","blb":"Bloomburrow","sos":"Secrets of Strixhaven","dsk":"Duskmourn: House of Horror","fdn":"Foundations","pio":"Pioneer Masters","dft":"Aetherdrift","tdm":"Tarkir: Dragonstorm","fin":"Final Fantasy","eoe":"Edge of Eternities","tla":"Avatar: The Last Airbender","hob":"The Hobbit","msh":"Marvel Super Heroes","tmt":"Teenage Mutant Ninja Turtles","ecl":"Lorwyn Eclipsed","fra":"Reality Fracture","powered-cube":"Powered Cube"});
+const readableSet=id=>INSIGHTS_SET_NAMES[String(id||'').toLowerCase()]||String(id||'Unknown set').toUpperCase();
+function highlightExplanation(row) {
+  if(row.trophy_match)return 'You matched the trophy pick.';
+  const evidence=row.reason_evidence||{};
+  if(row.reason_code==='saved-support-gap'&&typeof evidence.leader_id==='string'&&
+    typeof evidence.leader_name==='string'&&evidence.leader_name.trim()&&
+    evidence.leader_id!==(row.preview?.selected?.id||'')){
+    return evidence.leader_id===(row.preview?.trophy?.id||row.historical_id)
+      ?'The saved model supported the trophy pick more strongly than your choice.'
+      :'The saved model favored '+evidence.leader_name+' — a different card from the trophy pick.';
+  }
+  return 'You chose a different card.';
+}
+function safeFinding(data) {
+  const finding=data.leading_finding;
+  if(!['progress','pick-depth'].includes(finding?.id))return null;
+  const examples=[...(data.highlights?.best||[]).slice(0,3),...(data.highlights?.misses||[]).slice(0,3)];
+  return examples.some(row=>row.finding_context)?finding:null;
+}
 export function insightLocalRange(value,legacyFrom=value?.from,legacyTo=value?.to) {
   const format=iso=>{
     if(typeof iso!=='string')return null;
@@ -41,10 +61,10 @@ function shortInsightRange(value) {
 function periodLabel(key){return PERIODS.find(x=>x[0]===key)?.[1]||'All available';}
 function labelOf(env){return ENVIRONMENTS.find(x=>x[0]===env)?.[1]||env;}
 function rowText(row,label) {
-  return label+': '+row.count+' eligible decisions; '+(row.average_score===null?'not enough to average':row.average_score.toFixed(1)+' average points');
+  return label+': '+row.count+' picks included; '+(row.average_score===null?'not enough to average':row.average_score.toFixed(1)+' average points');
 }
 function barRows(rows,{labelKey='label',valueLabel='picks'}={}) {
-  if(!rows.length)return '<p class="my-pack-empty">There are no qualifying decisions in this group yet.</p>';
+  if(!rows.length)return '<p class="my-pack-empty">No picks to show in this group yet.</p>';
   return '<div class="my-insights-bars">'+rows.map(row=>{
     const label=String(row[labelKey]||row.value||row.band||'');
     const avg=row.average_score;
@@ -85,96 +105,97 @@ function monthMarkup(rows) {
 // a presenter. Unknown/older API revisions retain the original Insights UI.
 function dnaMarkup(data) {
   const dna=data.drafting_dna;
-  if(!dna)return '';
-  const qualified=dna.primary?.status==='qualified'?dna.primary:null;
-  const primary=qualified
-    ?'<div class="my-insights-dna-primary"><strong>'+esc(qualified.title)+'</strong>'+
-      '<p>'+esc(qualified.summary)+'</p>'+
-      '<details><summary>Why this fits</summary><p>'+number(qualified.supporting_decisions)+
-      ' original decisions supported this pattern.</p><ul>'+
-      (qualified.evidence||[]).map(e=>'<li>'+esc(e.label)+': <strong>'+esc(String(e.value))+'</strong></li>').join('')+
-      '</ul></details></div>'
-    :'<div class="my-insights-dna-primary"><strong>Your Drafting DNA is taking shape</strong>'+
-      '<p>We haven’t seen a pattern strong enough to name yet.</p></div>';
-  const secondary=(dna.secondary||[]).slice(0,2).map(v=>v.status==='qualified'
-    ?'<details class="my-insights-dna-secondary"><summary>'+esc(v.title)+'</summary>'+
-      '<p>'+esc(v.summary)+'</p><small>Based on '+number(v.supporting_decisions)+' saved decisions</small>'+
-      '<ul>'+(v.evidence||[]).map(e=>'<li>'+esc(e.label)+': '+esc(String(e.value))+'</li>').join('')+'</ul></details>'
-    :'<span class="my-insights-dna-secondary is-developing">Another trait is taking shape</span>').join('');
-  const context=data.card_choices;
-  const choices=(context?.choices||[]).filter(v=>v.status==='ready');
-  const contextHtml=choices.length?'<div class="my-insights-choice-context">'+
-    '<h3>When both kinds of cards were competitive</h3>'+
+  if(!dna)return '<section class="my-pack-card my-insights-wide my-insights-dna"><h2>Your pick patterns</h2>'+
+    '<p class="my-insights-note">Pattern details aren’t available from this version yet.</p></section>';
+  const traits=[dna.primary,...(dna.secondary||[])].filter(t=>t?.status==='qualified');
+  const distinct=[...new Map(traits.map(t=>[t.id,t])).values()];
+  const traitHtml=distinct.length?'<div class="my-insights-qualified-traits">'+distinct.map(trait=>
+    '<div class="my-insights-qualified-trait"><strong>'+esc(trait.title)+'</strong><p>'+esc(trait.summary)+'</p>'+
+    '<details><summary>Why this fits</summary><p>'+number(trait.supporting_decisions)+' picks included in this pattern.</p>'+
+    '<ul>'+(trait.evidence||[]).map(e=>'<li>'+esc(e.label)+': '+esc(String(e.value))+'</li>').join('')+
+    '</ul></details></div>').join('')+'</div>':
+    '<p class="my-insights-note">No clear pick pattern to show yet.</p>';
+  const choices=(data.card_choices?.choices||[]).filter(c=>c.status==='ready');
+  const choiceHtml=choices.length?'<details class="my-insights-choice-disclosure"><summary>Card type and rarity counts</summary>'+
+    '<p class="my-insights-note">These counts only include packs where both categories had competitive model support, with known card details and one compatible scoring version. They are not rates for all your picks or proof of preference.</p>'+
     choices.map(v=>{
       const isType=v.id==='card-type',count=number(v.selected?.[isType?'creature':'rare-mythic']||0);
-      const label=isType?'Creature choices':'Rare or mythic choices';
-      return '<div class="my-insights-choice-fact"><span>'+esc(label)+'</span><strong>'+count+
-        ' of '+number(v.opportunities)+' picks</strong>'+
-        '<details><summary>Options and real examples</summary><p>'+esc(v.summary||'')+'</p>'+
-        '<p>Competitive cards: '+Object.entries(v.availability||{}).map(([k,n])=>esc(k)+': '+number(n)).join(' · ')+
+      return '<div class="my-insights-choice-fact"><span>'+esc(isType?'Creature choices':'Rare or mythic choices')+
+        '</span><strong>'+count+' of '+number(v.opportunities)+' qualifying picks</strong>'+
+        '<details><summary>Examples and counts</summary><p>'+esc(v.summary||'')+'</p>'+
+        '<p>Competitive options: '+Object.entries(v.availability||{}).map(([k,n])=>esc(k)+': '+number(n)).join(' · ')+
         '. Your picks: '+Object.entries(v.selected||{}).map(([k,n])=>esc(k)+': '+number(n)).join(' · ')+'.</p>'+
         (v.examples||[]).map(e=>'<button type="button" class="my-insights-example" data-insights-review data-session="'+
           esc(e.session_id)+'" data-round="'+Number(e.round)+'" data-puzzle="'+esc(e.puzzle_id)+'">'+
-          esc(e.selected_name||'Saved selection')+' · '+esc(e.set_id)+' P1P'+Number(e.pick_number)+' · '+
-          esc(shortInsightDate(e.date))+'</button>').join('')+
-        '</details></div>';
-    }).join('')+'</div>':'';
-  const developing=context&&!choices.length?'<p>Card-choice patterns need more comparable saved packs.</p>':'';
+          esc(e.selected_name||'Pick')+' · '+esc(readableSet(e.set_id))+' P1P'+Number(e.pick_number)+
+          ' · '+esc(shortInsightDate(e.date))+'</button>').join('')+'</details></div>';
+    }).join('')+'</details>':'';
   return '<section class="my-pack-card my-insights-wide my-insights-dna">'+
-    '<div class="my-card-heading"><h2>Your Drafting DNA</h2><span>'+
-    'All available history · '+number(dna.eligible_decisions)+' saved decisions</span></div>'+
-    primary+'<div class="my-insights-dna-secondary-row">'+secondary+'</div>'+
-    contextHtml+
-    '<details class="my-insights-dna-method"><summary>How these patterns are counted</summary>'+
-    developing+'<p>These are descriptions of your saved choices, not a skill rating. Traits need enough records and must stay consistent over time.</p>'+
-    '<p>'+esc(dna.note||'Results are based on original saved decisions.')+'</p>'+
-    (context?'<p>'+esc(context.note||'')+'</p>':'')+'</details></section>';
+    '<div class="my-card-heading"><h2>Your pick patterns</h2><span>Across formats · All available history</span></div>'+
+    traitHtml+choiceHtml+
+    '<details class="my-insights-dna-method"><summary>How this works</summary>'+
+    '<p class="my-insights-note">'+number(dna.eligible_decisions)+' picks included, regardless of the Format and time filters. Only the first included answer per puzzle counts. History is bounded to recent eligible runs, so older picks may not appear.</p>'+
+    '<p class="my-insights-note">Traits describe patterns in your picks, not measured skill. '+esc(dna.note||'')+'</p>'+
+    (data.card_choices?'<p class="my-insights-note">'+esc(data.card_choices.note||'')+'</p>':'')+
+    '</details></section>';
 }
 export function safeCardImage(url) {return safeCardImageUrl(url);}
 function cardVisual(card,label) {
   const safe=safeCardImage(card?.image_url);
   return '<div class="my-insights-art">'+(safe
     ?'<img src="'+esc(safe)+'" alt="'+esc(card?.name||label)+'" loading="lazy">'
-    :'<span role="img" aria-label="Card image unavailable">'+esc(card?.name||label)+'</span>')+'</div>';
+    :'<span role="img" aria-label="Artwork unavailable for '+esc(card?.name||label)+'">No art</span>')+'</div>';
 }
 function highlightCards(rows,kind,expanded=false) {
-  if(!rows?.length)return '<p class="my-pack-empty">No qualifying saved picks in this group yet.</p>';
+  if(!rows?.length)return '<p class="my-pack-empty">No '+(kind==='misses'?'picks to revisit':'high-scoring picks')+
+    ' in this view. This doesn’t mean you drafted badly.</p>';
   return '<div class="my-insights-card-row">'+rows.map((row,index)=>{
-    const pick=row.preview?.selected,trophy=row.preview?.trophy,featured=index===0;
-    const name=pick?.name||row.selected_name||'Your saved pick';
-    const trophyName=trophy?.name||row.historical_name||'Original trophy pick';
+    const pick=row.preview?.selected,trophy=row.preview?.trophy,featured=index===0&&!expanded;
+    const name=pick?.name||row.selected_name||'Card name unavailable';
+    const trophyName=trophy?.name||row.historical_name||'Card name unavailable';
+    const art='<div class="my-insights-pick-art"><div><strong>Your pick</strong>'+cardVisual(pick,name)+'</div>'+
+      '<div><strong>Trophy pick</strong>'+cardVisual(trophy,trophyName)+'</div></div>';
     return '<article class="my-insights-pick'+(featured?' is-featured':' is-compact')+'"'+
       (index>=3&&!expanded?' hidden data-insights-extra="'+kind+'"':'')+'>'+
-      (featured?'<div class="my-insights-pick-art"><div><strong>Your pick</strong>'+cardVisual(pick,name)+'</div>'+
-        (row.trophy_match?'':'<div><strong>Trophy pick</strong>'+cardVisual(trophy,trophyName)+'</div>')+'</div>':'')+
-      '<div class="my-insights-pick-info"><strong>Your pick: '+esc(name)+'</strong>'+
-      (row.trophy_match?'<span>Trophy pick matched</span>':'<span>Trophy pick: '+esc(trophyName)+'</span>')+
+      art+'<div class="my-insights-pick-info"><div class="my-insights-pick-names">'+
+      '<span>Your pick: <strong>'+esc(name)+'</strong></span>'+
+      '<span>Trophy pick: <strong>'+esc(trophyName)+'</strong></span></div>'+
+      '<small>'+esc(readableSet(row.set_id))+' · Source P1P'+Number(row.pick_number)+' · '+
+       esc(shortInsightDate(row.date))+' · Score '+number(row.score)+'/100</small>'+
       (row.finding_context?'<small class="my-insights-context">'+esc(row.finding_context)+'</small>':'')+
-      '<small>'+esc(row.set_id)+' · P1P'+Number(row.pick_number)+' · '+esc(shortInsightDate(row.date))+
-      ' · Original score '+number(row.score)+'/100</small>'+
-      '<p class="my-insights-reason">'+esc(row.reason_text||(
-        row.trophy_match?'You matched the saved trophy choice.':'This saved non-trophy selection earned '+number(row.score)+'/100.'))+'</p>'+
+      '<p class="my-insights-reason">'+esc(highlightExplanation(row))+'</p>'+
       '<button type="button" class="button secondary" data-insights-review data-session="'+esc(row.session_id)+'"'+
-      ' data-round="'+Number(row.round)+'" data-puzzle="'+esc(row.puzzle_id)+'">Review original pack</button></div></article>';
+      ' data-round="'+Number(row.round)+'" data-puzzle="'+esc(row.puzzle_id)+'">Review pick</button></div></article>';
   }).join('')+'</div>';
 }
 function highlightsMarkup(data) {
-  if(!data.highlights)return '';
+  if(!data.highlights)return '<section class="my-pack-card my-insights-wide my-insights-highlights">'+
+    '<h2>Picks to review</h2><p class="my-insights-note">Pick examples aren’t available from this version yet.</p></section>';
+  const selected=data.highlights.misses?.length?'misses':'best';
   const more=kind=>data.highlights?.[kind]?.length>3||data.highlights.has_more?.[kind]
-    ?'<button type="button" class="button secondary" data-insights-more="'+kind+'" data-insights-page2="'+String(Boolean(data.highlights.has_more?.[kind]))+'">See more '+(kind==='best'?'Best Calls':'Biggest Misses')+'</button>':'';
-  const finding=data.leading_finding||data.observations?.[0];
+    ?'<button type="button" class="button secondary" data-insights-more="'+kind+'" data-insights-page2="'+String(Boolean(data.highlights.has_more?.[kind]))+'">See more picks</button>':'';
+  const finding=safeFinding(data);
+  const lead=finding?'<p class="my-insights-leading">'+esc(finding.text)+
+    ' <small>These examples illustrate the comparison; they don’t prove its cause.</small></p>':
+    '<p class="my-insights-note">Open a pick to see the full pack and the trophy drafter’s earlier picks.</p>';
   return '<section class="my-pack-card my-insights-wide my-insights-highlights"><div class="my-card-heading">'+
-    '<h2>Decision report</h2><span>'+number(data.eligible_decisions)+' eligible decisions in this view</span></div>'+
-    '<p class="my-insights-leading"><strong>'+(finding?'Leading finding':'Your recent decisions')+'</strong> · '+
-      esc(finding?.text||'No standout comparison has qualified in this environment and period. Review factual saved picks below.')+'</p>'+
-    '<div role="tablist" aria-label="Saved decision highlights" class="my-insights-highlight-tabs">'+
-      '<button type="button" role="tab" id="my-insights-best-tab" aria-selected="true" aria-controls="my-insights-best-panel" data-insights-tab="best">Best Calls</button>'+
-      '<button type="button" role="tab" id="my-insights-misses-tab" aria-selected="false" aria-controls="my-insights-misses-panel" data-insights-tab="misses">Biggest Misses</button></div>'+
-    '<div id="my-insights-best-panel" role="tabpanel" aria-labelledby="my-insights-best-tab">'+
-       highlightCards(data.highlights.best,'best')+more('best')+'</div>'+
-    '<div id="my-insights-misses-panel" role="tabpanel" aria-labelledby="my-insights-misses-tab" hidden>'+
-       highlightCards(data.highlights.misses,'misses')+more('misses')+'</div>'+
-    '<p class="my-insights-note">These labels describe original scored decisions, not objectively correct or wrong Magic picks.</p></section>';
+    '<h2>Picks to review</h2><span>'+number(data.eligible_decisions)+' picks included in this view</span></div>'+
+    lead+'<div role="tablist" aria-label="Pick examples" class="my-insights-highlight-tabs">'+
+      '<button type="button" role="tab" id="my-insights-misses-tab" aria-selected="'+(selected==='misses')+
+      '" aria-controls="my-insights-misses-panel" tabindex="'+(selected==='misses'?0:-1)+
+      '" data-insights-tab="misses">Picks to revisit</button>'+
+      '<button type="button" role="tab" id="my-insights-best-tab" aria-selected="'+(selected==='best')+
+      '" aria-controls="my-insights-best-panel" tabindex="'+(selected==='best'?0:-1)+
+      '" data-insights-tab="best">High-scoring picks</button></div>'+
+    '<div id="my-insights-misses-panel" role="tabpanel" aria-labelledby="my-insights-misses-tab"'+
+      (selected==='misses'?'':' hidden')+'>'+
+      highlightCards(data.highlights.misses,'misses')+more('misses')+'</div>'+
+    '<div id="my-insights-best-panel" role="tabpanel" aria-labelledby="my-insights-best-tab"'+
+      (selected==='best'?'':' hidden')+'>'+
+      highlightCards(data.highlights.best,'best')+more('best')+'</div>'+
+    '<p class="my-insights-note">100 means you matched the trophy pick. Other picks earn up to 95 based on the model.</p>'+
+    '<details class="my-insights-how"><summary>How this works</summary>'+
+    '<p>Only the first included answer to each puzzle counts. Scores describe picks, not drafting skill.</p></details></section>';
 }
 function journeyMarkup(data) {
   const journey=data.journey;
