@@ -1,5 +1,8 @@
 # Drafting DNA — one primary identity and two secondary traits
 
+> **Presentation superseded October 14, 2026:** The owner changed the Insights hierarchy to prioritize **Picks to review**, followed by **Your scores over time**, with qualified DNA traits in a smaller **Your pick patterns** section. Unqualified secondary slots and the large "taking shape" hero are no longer displayed. The historical DNA-first proposal below is retained as design history, not current UI instructions. See [Player-focused Insights](INSIGHTS-FOCUSED-REPORT.md). All deterministic DNA qualification and stability rules below remain unchanged.
+
+
 **Decision:** Owner approved **one primary archetype + two secondary traits** on October 11, 2026.
 **Status:** Qualification refinement #1180 merged and the guarded backend release #1181 succeeded. Signed-in acceptance in #1179 and the private audit of provisional gates remain outstanding.
 **Implementation tracking:** [#1179](https://github.com/killjoy00/mtg-ev-analyzer/issues/1179) (consolidating #1167/#1170/#1171).
