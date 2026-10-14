@@ -374,7 +374,7 @@ function LegacyJourney({progress,months}:{
   </Section>;
 }
 function InsightSections({data,onReview,onLoadMore,morePhase}:{
-  data:DraftInsights;onReview:(item:InsightHighlight)=>void;
+  data:DraftInsights;onReview:(item:InsightDecisionLocator)=>void;
   onLoadMore:()=>void;morePhase:'idle'|'loading'|'error';
 }) {
   const [explore,setExplore]=useState(false);
