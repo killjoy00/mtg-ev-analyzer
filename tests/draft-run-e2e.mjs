@@ -26,7 +26,7 @@ const browser=await chromium.launch({headless:true});
 const page=await browser.newPage({viewport:{width:390,height:844}});
 await page.clock.setFixedTime(new Date(fixtureDay+'T18:00:00Z'));
 page.on('pageerror',e=>errors.push(e.message));
-await page.addInitScript(()=>{Object.defineProperty(navigator,'share',{configurable:true,value:async value=>{window.__runShare=value;}});Object.defineProperty(navigator,'canShare',{configurable:true,value:()=>false});});
+await page.addInitScript(()=>{Object.defineProperty(navigator,'share',{configurable:true,value:async value=>{window.__runShare=value;}});Object.defineProperty(navigator,'canShare',{configurable:true,value:()=>false});Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async value=>{if(window.__denyClipboard)throw new Error('Clipboard permission denied');window.__runCopied=value;}}});});
 await page.route('**/*-pack1growth.compute.c-5.us-east-2.aws.neon.tech/**',async route=>{
   const path=new URL(route.request().url()).pathname;let body={ok:true};
   if(path==='/v1/session')body={token:'test-token'};
@@ -233,7 +233,7 @@ try{
     await page.locator('#run-next').click();
     if(round===0){const thumb=await page.locator('.run-pool-cards img').first().boundingBox(),pack=await page.locator('.run-card-select img').first().boundingBox();assert.ok(Math.abs(thumb.width/pack.width-.85)<.03,`Prior picks are about 85% of pack cards: ${thumb.width}/${pack.width}`);assert.equal(await page.locator('.run-pool-cards>button').count(),cube?2:1);await page.reload();await page.locator('.run-cards').waitFor();assert.equal(answers.length,1);}
   }
-  await page.locator('.run-result-page').waitFor();assert.equal(await page.locator('.run-image-share,#run-share-image').count(),0);assert.equal(await page.locator('.run-review-list li').count(),puzzles.length);assert.match(await page.locator('.run-final-score').innerText(),new RegExp(String(snapshot().score))); assert.equal(await page.locator('.run-result-actions .button').count(),4);assert.equal(await page.locator('#home-editorial').count(),0);assert.ok(await page.getByRole('button',{name:'View your career',exact:true}).isVisible());assert.equal(await page.locator('.run-result-page .run-note').evaluate(el=>getComputedStyle(el).marginTop),'24px','result footnote retains its spacing');await noOverflow();
+  await page.locator('.run-result-page').waitFor();assert.equal(await page.locator('.run-image-share,#run-share-image').count(),0);assert.equal(await page.locator('.run-review-list li').count(),puzzles.length);assert.match(await page.locator('.run-final-score').innerText(),new RegExp(String(snapshot().score))); assert.equal(await page.locator('.run-result-actions .button').count(),5);assert.ok(await page.getByRole('button',{name:'Copy result + dots',exact:true}).isVisible());assert.equal(await page.locator('#home-editorial').count(),0);assert.ok(await page.getByRole('button',{name:'View your career',exact:true}).isVisible());assert.equal(await page.locator('.run-result-page .run-note').evaluate(el=>getComputedStyle(el).marginTop),'24px','result footnote retains its spacing');await noOverflow();
   if(daily){
     await page.locator('.post-game-daily-cue').waitFor();
     const cue=(await page.locator('.post-game-daily-cue').innerText()).trim();
@@ -257,6 +257,18 @@ try{
   await page.locator('#run-share').click();await page.waitForFunction(()=>Boolean(window.__runShare));
   assert.equal((await page.locator('#run-share-status').textContent())?.trim(),'');
   const shared=await page.evaluate(()=>window.__runShare);const expectedSquares=answers.map(a=>a.historicalMatch?'🟩':a.score>=85?'🟦':a.score>=60?'🟨':a.score>=25?'🟧':'⬛').join('');assert.ok(shared.text.includes(expectedSquares),'share text reflects the answers exercised by this browser run');assert.equal(shared.files,undefined);assert.doesNotMatch(shared.url,/profile|token/);
+  await page.locator('#run-copy-result').click();
+  await page.waitForFunction(()=>Boolean(window.__runCopied));
+  assert.equal(await page.evaluate(()=>window.__runCopied),`${shared.text}\n${shared.url}`,'copy includes exactly the summary, colored squares and playable URL');
+  assert.match(await page.locator('#run-share-status').innerText(),/Score, colored squares and link copied/);
+  if(daily){
+    await page.evaluate(()=>{window.__denyClipboard=true;});
+    await page.locator('#run-copy-result').click();
+    await page.locator('.run-copy-fallback').waitFor();
+    assert.equal(await page.locator('.run-copy-fallback').inputValue(),`${shared.text}\n${shared.url}`,'manual fallback preserves the exact result when WebKit rejects clipboard writes');
+    assert.match(await page.locator('#run-share-status').innerText(),/Automatic copy unavailable/);
+    await page.evaluate(()=>{window.__denyClipboard=false;});
+  }
   if(daily){
     assert.match(shared.text,/I scored \d+\/100 on today’s Pack One [^.]+\. Can you beat it\?/);assert.match(shared.text,/Daily 2026-10-07/);
     const sharedUrl=new URL(shared.url);assert.equal(sharedUrl.pathname,'/share/daily/v2/');assert.equal(sharedUrl.searchParams.get('environment'),environment);assert.equal(sharedUrl.searchParams.get('ref'),'result_share');assert.doesNotMatch(shared.url,/challenge=/);assert.equal(shareCalls,0);
@@ -272,13 +284,13 @@ try{
     assert.ok(resultTouches.length>=1,'result_share still records the shared-link first-touch source independently of any sharer attribution');
   }else{
     assert.match(shared.url,new RegExp('shared='+shareId));
-    assert.equal(sharedReadCalls,1,'practice share is verified through the recipient-facing read before opening the share sheet');
+    assert.equal(sharedReadCalls,2,'native share and explicit copy both verify the recipient-facing link');
     await page.evaluate(()=>{window.__runShare=null;});
     failSharedRead=true;
     await page.locator('#run-share').click();
     await page.getByText('Pack One could not verify this share link. Try Share again.',{exact:true}).waitFor();
     assert.equal(await page.evaluate(()=>window.__runShare),null,'an unresolvable practice share is never handed to the share sheet');
-    assert.equal(sharedReadCalls,2);
+    assert.equal(sharedReadCalls,3);
     failSharedRead=false;
     await page.goto(shared.url);await page.locator('#accept-run-challenge').waitFor();assert.match(await page.locator('.run-invite').innerText(),/Play this run and compare/);await noOverflow();
     await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-invite-mobile.png`,fullPage:true});
