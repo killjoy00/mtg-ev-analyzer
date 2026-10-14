@@ -111,17 +111,29 @@ async function cardBlob({ eyebrow, title, bigValue, subtitle, pills = [], rows =
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png', 0.94));
 }
 
+// Some iOS share targets accept only the URL field when URL and text are
+// provided separately. Keep the score/squares and link in a single text item
+// so Messages can retain the whole result while still linkifying the URL.
+export function draftRunNativeShareData(text, url, { userAgent = '', platform = '', maxTouchPoints = 0 } = {}) {
+  const ios = /iPhone|iPad|iPod/i.test(userAgent) || (platform === 'MacIntel' && maxTouchPoints > 1);
+  return ios ? { text: `${text}\n${url}` } : { title: 'Pack One', text, url };
+}
+
 async function shareBlob(blob, { text, url, filename, context }) {
   const payloadText = String(text || 'Pack One');
   const shareUrl = String(url || SHARE_ORIGIN);
   let method = 'copy_fallback';
+  const draftRunTextOnly = !blob && (context === 'draft_run_result' || context === 'draft_run_challenge');
+  const nativeData = draftRunTextOnly
+    ? draftRunNativeShareData(payloadText, shareUrl, { userAgent: navigator.userAgent, platform: navigator.platform, maxTouchPoints: navigator.maxTouchPoints })
+    : { title: 'Pack One', text: payloadText, url: shareUrl };
   try {
     const file = blob ? new File([blob], filename || 'pack-one.png', { type: 'image/png' }) : null;
     if (file && navigator.canShare?.({ files: [file] })) {
       await navigator.share({ title: 'Pack One', text: payloadText, url: shareUrl, files: [file] });
       method = 'native_file';
     } else if (navigator.share) {
-      await navigator.share({ title: 'Pack One', text: payloadText, url: shareUrl });
+      await navigator.share(nativeData);
       method = 'native';
     } else {
       await navigator.clipboard.writeText(`${payloadText}\n${shareUrl}`);
