@@ -190,7 +190,7 @@ export function buildDraftingDNA(rows) {
     ...(picked.length?{}:{reason}),primary:picked[0]?clean(picked[0]):null,
     ...(picked.length?{}:{primary_emerging:clean(null)}),
     secondary:[clean(picked[1]),clean(picked[2])],
-    note:'Provisional gates describe recorded decisions, not validated skill ranks. Traits must qualify both now and before the latest eight eligible decisions.'};
+    note:'These patterns describe picks, not skill ratings. A trait must qualify with and without your most recent eight included picks.'};
 }
 
 
@@ -264,9 +264,9 @@ export function buildCardChoiceContext(rows) {
     const first=family.names[0],second=family.names[1];
     const summary=family.id==='card-type'
       ?'When both creatures and noncreatures had competitive saved model support, you chose a creature in '+
-        selected[first]+' of '+count+' decisions.'
+        selected[first]+' of '+count+' picks.'
       :'When rare/mythic and common/uncommon cards both had competitive saved model support, you chose a rare or mythic in '+
-        selected[first]+' of '+count+' decisions.';
+        selected[first]+' of '+count+' picks.';
     return {id:family.id,title:family.title,status:ready?'ready':'developing',
       opportunities:count,selected,availability,cohort,examples:ready?examples:[],
       ...(ready?{summary}:{}),other_version_opportunities:ordered.slice(1).reduce((n,x)=>n+x[1].length,0)};
