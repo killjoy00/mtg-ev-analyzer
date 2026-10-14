@@ -16,7 +16,7 @@ function highlightExplanation(row) {
   if(row.reason_code==='saved-support-gap'&&typeof evidence.leader_id==='string'&&
     typeof evidence.leader_name==='string'&&evidence.leader_name.trim()&&
     evidence.leader_id!==(row.preview?.selected?.id||'')){
-    return evidence.leader_id===(row.preview?.trophy?.id||row.historical_id)
+    return evidence.leader_is_trophy===1||Boolean(row.preview?.trophy?.id&&e.leader_id===row.preview.trophy.id)
       ?'The saved model supported the trophy pick more strongly than your choice.'
       :'The saved model favored '+evidence.leader_name+' — a different card from the trophy pick.';
   }
