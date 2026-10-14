@@ -89,18 +89,18 @@ function Section({ title, caption, children, compact=false, onLayout }: {
 }
 
 function Metrics({ rows }: { rows: (InsightGroup & { label: string })[] }) {
-  if (!rows.length) return <Text style={styles.caption}>No eligible decisions in this group yet.</Text>;
+  if (!rows.length) return <Text style={styles.caption}>No picks in this group yet.</Text>;
   return <View style={styles.metricList}>{rows.map((row, index) => <View key={row.label + index} style={styles.metric}>
     <View style={styles.metricHead}>
       <Text style={styles.metricName}>{row.label}</Text>
       <Text style={styles.metricScore}>{row.average_score === null ? 'Need 5 picks' : score(row.average_score) + ' / 100'}</Text>
     </View>
-    <View accessibilityLabel={row.label + ', ' + row.count + ' decisions, ' +
+    <View accessibilityLabel={row.label + ', ' + row.count + ' picks, ' +
       (row.average_score === null ? 'not enough to average' : score(row.average_score) + ' average points')}
       style={styles.track}>
       <View style={[styles.trackFill, { width: (Math.max(0, Math.min(100, Number(row.average_score ?? 0))) + '%') as '100%' }]} />
     </View>
-    <Text style={styles.meta}>{num(row.count)} decisions</Text>
+    <Text style={styles.meta}>{num(row.count)} picks</Text>
   </View>)}</View>;
 }
 
@@ -523,7 +523,7 @@ export default function InsightsScreen() {
 
   const loadMore=async()=>{
     const epoch=requestId.current,owner=activeOwner.current;
-    if(!data?.highlights?.has_more?.best&&!data?.highlights?.has_more?.misses)return;
+    if(morePhase==='loading'||(!data?.highlights?.has_more?.best&&!data?.highlights?.has_more?.misses))return;
     setMorePhase('loading');
     try{
       const before=await readSession();
@@ -554,14 +554,13 @@ export default function InsightsScreen() {
     <ScrollView contentContainerStyle={styles.page}>
       <Text style={styles.eyebrow}>MY PACK ONE</Text>
       <MyPackSectionTabs active="insights" />
-      <Text accessibilityRole="header" style={styles.heading}>Your Drafting Insights</Text>
-      {phase==='ready'&&data?.drafting_dna?<DNASummary dna={data.drafting_dna}
-        cardChoices={data.card_choices} onReview={reviewDetail}/>:null}
+      <Text accessibilityRole="header" style={styles.heading}>Your picks</Text>
       <View style={styles.filters}>
-        <ChoiceRow name="Environment" values={environments} selected={environment} onChange={value=>{manualEnvironment.current=true;setEnvironment(value);}} />
+        <ChoiceRow name="Format" values={environments} selected={environment} onChange={value=>{manualEnvironment.current=true;setEnvironment(value);}} />
         <ChoiceRow name="Time period" values={periods} selected={period} onChange={setPeriod} />
       </View>
-      {phase === 'loading' ? <View style={styles.notice}><ActivityIndicator accessibilityLabel="Loading Insights" /><Text style={styles.body}>Loading your private drafting decisions…</Text></View> : null}
+      <Text style={styles.caption}>Mixed sets is its own format, not a combination of Latest Set and Powered Cube.</Text>
+      {phase === 'loading' ? <View style={styles.notice}><ActivityIndicator accessibilityLabel="Loading your picks" /><Text style={styles.body}>Loading your picks…</Text></View> : null}
       {phase === 'signed-out' ? <Section title="Sign in to see your Insights">
         <Text style={styles.body}>Your private analysis requires a linked Pack One account.</Text>
         <Pressable accessibilityRole="button" onPress={() => router.push('/account')} style={styles.primaryButton}><Text style={styles.primaryText}>Sign in</Text></Pressable>
@@ -571,8 +570,8 @@ export default function InsightsScreen() {
         <Pressable accessibilityRole="button" onPress={() => void load()} style={styles.secondaryButton}><Text style={styles.secondaryText}>Retry Insights</Text></Pressable>
       </Section> : null}
       {phase === 'ready' && data ? <>
-        <Text style={styles.summary}>{num(data.eligible_decisions)} eligible decisions · {data.environment_label} · {periods.find(p => p.value === period)?.label}</Text>
-        <InsightSections data={data} onReview={reviewDetail}
+        <Text style={styles.summary}>{num(data.eligible_decisions)} picks included · {environment==='mixed'?'Mixed sets':data.environment_label} · {periods.find(p => p.value === period)?.label}</Text>
+        <InsightSections key={activeOwner.current+'|'+environment+'|'+period} data={data} onReview={reviewDetail}
           onLoadMore={()=>void loadMore()} morePhase={morePhase}/>
       </> : null}
       <Pressable accessibilityRole="button" onPress={() => void load()} style={styles.secondaryButton}><Text style={styles.secondaryText}>Refresh Insights</Text></Pressable>
@@ -584,15 +583,15 @@ export default function InsightsScreen() {
         <ScrollView contentContainerStyle={styles.page}>
           {detailPhase==='loading'?<View style={styles.notice}>
             <ActivityIndicator accessibilityLabel="Loading saved decision"/>
-            <Text style={styles.body}>Loading your original pack…</Text>
+            <Text style={styles.body}>Loading your pick…</Text>
             <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={closeDetail}>
               <Text style={styles.secondaryText}>Cancel review</Text>
             </Pressable>
           </View>:null}
           {detailPhase==='error'?<View style={styles.section}>
-            <Text accessibilityRole="alert" style={styles.body}>This original decision could not be loaded.</Text>
+            <Text accessibilityRole="alert" style={styles.body}>This pick could not be loaded.</Text>
             <Pressable accessibilityRole="button" style={styles.secondaryButton} onPress={closeDetail}>
-              <Text style={styles.secondaryText}>Close original pack</Text>
+              <Text style={styles.secondaryText}>Close</Text>
             </Pressable>
           </View>:null}
           {detailPhase==='ready'&&detail?<SavedDecisionDetail detail={detail} onClose={closeDetail}/>:null}
@@ -683,6 +682,15 @@ const styles = StyleSheet.create({
   contextWrap: {gap:spacing.xs,borderTopWidth:1,borderColor:colors.line,paddingTop:spacing.sm},
   contextFact: {gap:spacing.xs,paddingVertical:spacing.xs,borderBottomWidth:1,borderColor:colors.line},
   exampleLink: {borderWidth:1,borderColor:colors.accent,padding:spacing.sm,minHeight:44,justifyContent:'center'},
+  patternTrait: {gap:spacing.xs,paddingHorizontal:spacing.sm,paddingVertical:spacing.sm,
+    borderLeftWidth:3,borderLeftColor:colors.accent,backgroundColor:colors.surfaceSoft},
+  patternTitle: {fontSize:20,fontWeight:'800',color:colors.ink},
+  reviewContext: {gap:spacing.lg},
+  reviewPart: {gap:spacing.sm,minWidth:0},
+  reviewTab: {flexGrow:1,flexShrink:1,minWidth:0},
+  cardArtSmall: {minHeight:72},
+  cardImageSmall: {height:100},
+  windowScore: {fontSize:16,fontWeight:'800',color:colors.ink},
   reportLead: {color:colors.ink,fontSize:14,lineHeight:21},
   highlightCompact: {padding:spacing.sm,gap:spacing.xs},
   highlightArtWrap: {flex:1,minWidth:0,gap:spacing.xs},
