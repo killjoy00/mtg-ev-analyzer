@@ -104,7 +104,7 @@ test('native Insights keeps hierarchy, breakdowns collapsed and navigation intac
  }
  assert.ok(!content.includes('Pick-by-pick breakdown'),'Charts start collapsed');
  await ui.choose('More stats');
- for(const piece of ['Pick-by-pick breakdown','Difficulty breakdown','Format breakdown','P1P1','74.0','78.0']){
+ for(const piece of ['Scores by source pick position','Model-support closeness','Scores by format','P1P1','74.0','78.0']){
    assert.ok(ui.text().includes(piece),'Missing expanded chart: '+piece);
  }
  assert.equal(ui.calls[0][1],'mixed');
@@ -271,8 +271,8 @@ test('older native API still shows scores without inventing unsupported review c
   assert.ok(text.includes('Picks to review'));
   assert.ok(text.includes('Pick examples aren’t available from this version yet.'));
   assert.ok(text.includes('Your scores over time'));
-  assert.ok(text.includes('Your last 40 picks averaged 83.0/100'));
-  assert.ok(text.includes('previous 40 (70.0/100)'));
+  assert.match(text,/Your last 40 picks averaged 83\\.0\\s*\\/100/);
+  assert.match(text,/previous 40 \\(70\\.0\\s*\\/100\\)/);
   assert.ok(text.includes('2026-09'));
   assert.ok(!text.includes('Recent picks averaged 13.0 points higher'),
     'older API observations are not automatically promoted into a player diagnosis');
@@ -371,10 +371,12 @@ test('native review tabs prefer picks to revisit and fall back to high-scoring p
     misses:[p],note:''}};
   const ui=await mount(t,{respond:async()=>first});
   assert.ok(ui.text().includes('No clear pick pattern')===false);
-  let tabs=ui.root.root.findAll(n=>n.type==='Pressable'&&n.props.accessibilityRole==='tab');
+  const reviewTabs=()=>ui.root.root.findAll(n=>n.type==='Pressable'&&n.props.accessibilityRole==='tab'&&
+    ['Picks to revisit','High-scoring picks'].includes(n.props.accessibilityLabel));
+  let tabs=reviewTabs();
   assert.equal(tabs[0].props.accessibilityState.selected,true,'revisit is the default');
   await ui.choose('High-scoring picks');
-  tabs=ui.root.root.findAll(n=>n.type==='Pressable'&&n.props.accessibilityRole==='tab');
+  tabs=reviewTabs();
   assert.equal(tabs[1].props.accessibilityState.selected,true);
   await ui.switchAccount(null);
 });
