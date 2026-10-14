@@ -35,7 +35,7 @@ test('account and profile entry modules use release-versioned imports', async ()
   assert.match(progression, /growth\.mjs\?v=10/);
   assert.match(draft, /growth\.mjs\?v=10/);
   assert.match(draft, /share-cards\.mjs\?v=7/);
-  assert.match(patreonHtml, /patreon-page\.mjs\?v=4/);
+  assert.match(patreonHtml, /patreon-page\.mjs\?v=5/);
   assert.match(patreonPage, /patreon-activation\.mjs\?v=2/);
   assert.match(practiceHtml, /bootstrap\.mjs\?v=17/);
   assert.match(practiceHtml, /growth\.mjs\?v=13/);
