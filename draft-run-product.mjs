@@ -1,6 +1,6 @@
 import {draftRunLength} from './draft-run-format.mjs';
 import { accountCsrfToken, ensurePackSession, firstPartyAuthEnabled, hasAccountSession, loadDailyStatus, storedAccountToken } from './growth-api.mjs';
-import { shareDraftRunCard } from './share-cards.mjs?v=7';
+import { draftRunShareText, shareDraftRunCard } from './share-cards.mjs?v=8';
 import { trackEvent } from './retention-events.mjs';
 import {decisionClock} from './decision-clock.mjs';
 import { sortPackByRarity } from './replay-data.mjs';
@@ -43,7 +43,7 @@ async function loadSetNames() {
 const app=()=>document.querySelector('#app');
 function styles() {
   if(document.querySelector('[data-draft-run-style]')) return;
-  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=13';link.dataset.draftRunStyle='1';document.head.appendChild(link);
+  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=14';link.dataset.draftRunStyle='1';document.head.appendChild(link);
 }
 async function api(path,body,auth=true) {
   const method=body===undefined?'GET':'POST',headers={'content-type':'application/json'};
@@ -325,12 +325,13 @@ function renderResult() {
     ${rankingStateMarkup(run)}
     ${run.comparison&&run.comparison.kind!=='creator'?`<p class="run-friend">${run.comparison.exact?`You: ${run.score} · ${esc(run.comparison.name)}: ${run.comparison.score}`:'These scores came from different decisions.'}</p>`:''}
     ${creator?.creator_post_run_note?`<blockquote class="run-friend"><strong>${esc(creator.name)} after the run:</strong> “${esc(creator.creator_post_run_note)}”</blockquote>`:''}
-    <div class="run-result-actions"><a class="button primary" data-next-daily-action href="${repeat.href}">${repeat.label}</a><button class="button secondary" id="run-share">${run.day?'Share result':'Share this run and compare'}</button><a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">${run.day&&!run.leaderboard_eligible?(['username_taken','username_required','name_not_allowed'].includes(run.ranking_identity?.reason)?'Choose display name to add score':hasAccountSession()?'Add score to leaderboard':'Sign in to add score'):'View your career'}</button></div>
+    <div class="run-result-actions"><a class="button primary" data-next-daily-action href="${repeat.href}">${repeat.label}</a><button class="button secondary" id="run-share">${run.day?'Share result':'Share this run and compare'}</button><button class="button secondary" id="run-copy-result" type="button">Copy result + dots</button><a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">${run.day&&!run.leaderboard_eligible?(['username_taken','username_required','name_not_allowed'].includes(run.ranking_identity?.reason)?'Choose display name to add score':hasAccountSession()?'Add score to leaderboard':'Sign in to add score'):'View your career'}</button></div>
     ${run.day?'<p data-all-dailies hidden><a class="text-button" href="./">All Dailies</a></p>':''}
     <h2>Your ${runLength()} picks</h2><ol class="run-review-list">${run.answers.map((a,i)=>`<li><button data-review="${i}"><span>${i+1}</span><div><strong>${esc(setName(a.puzzle.set_id))} · Pick ${a.pickNumber}</strong><small>${esc(a.selectedName)}${a.historicalMatch?' · Trophy match':''}</small></div><b>${a.score}</b></button></li>`).join('')}</ol>
-    <p class="run-note">Your final score is the rounded average of ${runLength()} decisions. Trophy picks earn 100; other picks can earn up to 95 based on broader drafting evidence.</p><p id="run-share-status" role="status"></p><p id="run-error" role="alert"></p></section>`;
+    <p class="run-note">Your final score is the rounded average of ${runLength()} decisions. Trophy picks earn 100; other picks can earn up to 95 based on broader drafting evidence.</p><div id="run-share-status" role="status"></div><p id="run-error" role="alert"></p></section>`;
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render();window.scrollTo({top:0,behavior:'instant'});});
   document.querySelector('#run-share').onclick=()=>shareResult();
+  document.querySelector('#run-copy-result').onclick=()=>shareResult({copy:true});
   document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=10')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
   if(run.day)void renderDailyResultCue(run.id);
   document.dispatchEvent(new CustomEvent('pack1:result-visible',{detail:{id:`draft-run:${run.id}`,score:run.score,mode:'draft_run',set_id:run.environment,daily:Boolean(run.day)}}));
@@ -349,8 +350,11 @@ export async function returnToValidatedDaily(runId,{standing=null,confirmed=true
   window.scrollTo({top:0,behavior:'instant'});
 }
 
-async function shareResult() {
-  const button=document.querySelector('#run-share');button.disabled=true;
+async function shareResult({copy=false}={}) {
+  const buttons=[...document.querySelectorAll('#run-share,#run-copy-result')];
+  buttons.forEach(button=>{button.disabled=true;});
+  const status=document.querySelector('#run-share-status');
+  status.replaceChildren();
   try {
     const share=run.day?null:await api(`/v1/runs/${run.id}/share`,{});
     if(!run.day&&!share?.creator) {
@@ -369,13 +373,34 @@ async function shareResult() {
         : share?.url
           ? new URL(share.url,location.origin).toString()
           : `${location.origin}${location.pathname}${gameUrl('shared='+share.id)}`;
-    trackEvent('share_click',{surface:'draft_run_result'});
+    trackEvent('share_click',{surface:'draft_run_result',method:copy?'copy_button':'native'});
+    if(copy) {
+      const payload=`${draftRunShareText(run)}\n${url}`;
+      try {
+        if(!navigator.clipboard?.writeText)throw new Error('Clipboard unavailable');
+        await navigator.clipboard.writeText(payload);
+        status.textContent='Score, colored squares and link copied. Paste into Messages.';
+        document.dispatchEvent(new CustomEvent('pack1:share-completed',{detail:{method:'copy_button',context:'draft_run_result',challenge:false}}));
+        trackEvent(run.day?'daily_result_shared':'shared_run_shared',{mode:'draft_run',method:'copy_button'});
+      } catch {
+        status.textContent='Automatic copy unavailable. Select and copy this complete result:';
+        const field=document.createElement('textarea');
+        field.className='run-copy-fallback';
+        field.readOnly=true;
+        field.rows=6;
+        field.value=payload;
+        field.setAttribute('aria-label','Complete result with colored squares and link');
+        status.append(field);
+        field.focus();
+        field.select();
+      }
+      return;
+    }
     const result=await shareDraftRunCard(run,url);
-    const status=document.querySelector('#run-share-status');
     if(result.failed) {status.textContent='Copy this link: ';const a=document.createElement('a');a.href=url;a.textContent=url;status.append(a);}
     else if(!result.cancelled) {status.textContent=result.method==='copy_fallback'?'Result and run link copied.':'';trackEvent(run.day?'daily_result_shared':'shared_run_shared',{mode:'draft_run',method:result.method});}
-  } catch(e) {document.querySelector('#run-share-status').textContent=e.message;}
-  finally {button.disabled=false;}
+  } catch(e) {status.textContent=e.message;}
+  finally {buttons.forEach(button=>{button.disabled=false;});}
 }
 async function showBoard(period='daily') {
   period=canonicalBoardPeriod(period);
