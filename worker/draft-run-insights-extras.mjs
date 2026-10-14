@@ -278,28 +278,36 @@ export function buildCardChoiceContext(rows) {
 const reasonEvidence=row=>{
   const ranks=asArray(row.choice_ranking).filter(r=>r&&typeof r.id==='string'&&
     typeof r.support==='number'&&Number.isFinite(r.support)&&r.support>=0);
+  // A comparison can only name a model alternative when the chosen card and
+  // the named leader both exist in the saved ranking.
+  const ids=new Set(ranks.map(r=>r.id));
+  if(ids.size!==ranks.length)return {gap:false};
   const leader=ranks.reduce((a,b)=>!a||b.support>a.support?b:a,null);
   const chosen=ranks.find(r=>r.id===row.selected_id);
   if(leader&&chosen&&leader.id!==chosen.id&&leader.support>0&&
-    chosen.support/leader.support<=0.5)
-    return {gap:true,selected_support:chosen.support,leader_support:leader.support,leader_name:leader.name||'another card'};
+    chosen.support/leader.support<=0.5&&typeof leader.name==='string'&&leader.name.trim())
+    return {gap:true,leader_id:leader.id,leader_name:leader.name.slice(0,140),
+      selected_support:chosen.support,leader_support:leader.support};
   return {gap:false};
 };
 function highlightReason(row) {
   const support=reasonEvidence(row);
-  if(row.trophy_match&&row.difficulty_band==='hard')
-    return {reason_code:'hard-trophy-match',reason_text:'You matched the trophy selection on a historically hard-rated puzzle.',
-      reason_evidence:{difficulty_band:'hard'}};
-  if(!row.trophy_match&&row.score>=80)
-    return {reason_code:'strong-scored-alternative',
-      reason_text:'Your non-trophy choice earned '+row.score+'/100 from the original scoring model.',
-      reason_evidence:{original_score:row.score}};
-  if(!row.trophy_match&&support.gap)
+  if(row.trophy_match)
+    return {reason_code:row.difficulty_band==='hard'?'hard-trophy-match':'trophy-match',
+      reason_text:'You matched the trophy pick.',reason_evidence:{}};
+  if(support.gap)
     return {reason_code:'saved-support-gap',
-      reason_text:'The saved model supported '+support.leader_name+' more strongly than your choice; your original score was '+row.score+'/100.',
+      reason_text:'The saved model favored '+support.leader_name+
+        (support.leader_id===row.historical_id?' (the trophy pick).':' (a different card from the trophy pick).'),
+      reason_evidence:{original_score:row.score,leader_id:support.leader_id,leader_name:support.leader_name,
+        leader_is_trophy:support.leader_id===row.historical_id?1:0,
+        selected_support:support.selected_support,leader_support:support.leader_support}};
+  if(row.score>=80)
+    return {reason_code:'strong-scored-alternative',
+      reason_text:'You chose a different card and scored '+row.score+'/100.',
       reason_evidence:{original_score:row.score}};
   return {reason_code:'low-scored-alternative',
-    reason_text:'Your non-trophy choice earned '+row.score+'/100 in the original scored puzzle; review the saved alternatives.',
+    reason_text:'You chose a different card and scored '+row.score+'/100.',
     reason_evidence:{original_score:row.score}};
 }
 // The finding is computed from two *actual* comparison groups by the
@@ -308,7 +316,7 @@ const matchedFindingGroup=(row,finding)=>{
   if(!finding?.groups?.length)return null;
   return finding.groups.find(group=>{
     if(finding.id==='difficulty')return row.difficulty_band===group.band;
-    if(finding.id==='pick-depth')return row.pick_number===group.pick_number;
+    if(finding.id==='pick-depth')return row.pick_number===group.pick_number&&(!group.cohort||version(row)===group.cohort);
     if(finding.id==='progress')return group.puzzle_ids?.includes(row.puzzle_id);
     if(finding.id.startsWith('format-'))return row.environment===group.environment;
     return false;
