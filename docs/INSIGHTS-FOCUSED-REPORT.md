@@ -32,6 +32,8 @@ A displayed finding requires a saved example from an actual compared group. An e
 
 Only the first included answer to each puzzle counts. The backend uses locked first-encounter observations from up to **1,000 recent, owner-scoped, eligible eight-pick sessions**, excluding QA, with at most two pages of bounded highlights. The exact counting and version rules remain behind optional details. DNA uses this bounded all-format history even when the visible review and score history are filtered. Conditional type/rarity denominators count only packs where both categories had competitive saved support, sufficient card data, and a compatible version cohort; they are not overall selection rates or proof of preference.
 
+Updated clients require the new `comparison_contract: "compatible-source-groups-v1"` marker before promoting server-generated score-position headlines. This prevents a web-first deployment from accidentally promoting old pooled comparisons while the backend is still on a prior release. Older API responses continue to show picks and score history without those headlines.
+
 The API keeps the existing `highlights.best`, `highlights.misses`, `journey`, `drafting_dna` and `card_choices` fields, first-eligible decision route and owner protections. Legacy native clients can ignore added evidence fields; updated web/native clients render a simple fallback when an older server omits a section. Web clears private UI on owner/session/filter refresh; native invalidates stale requests on identity transitions. All art continues through the audited Scryfall HTTPS allowlist.
 
 ## Verification and release boundary

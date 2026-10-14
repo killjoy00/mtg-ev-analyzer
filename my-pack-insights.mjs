@@ -24,7 +24,7 @@ function highlightExplanation(row) {
 }
 function safeFinding(data) {
   const finding=data.leading_finding;
-  if(!['progress','pick-depth'].includes(finding?.id))return null;
+  if(data.comparison_contract!=='compatible-source-groups-v1'||!['progress','pick-depth'].includes(finding?.id))return null;
   const examples=[...(data.highlights?.best||[]).slice(0,3),...(data.highlights?.misses||[]).slice(0,3)];
   return examples.some(row=>row.finding_context)?finding:null;
 }
@@ -371,7 +371,8 @@ function insightsContent(data) {
     '. '+number(data.eligible_decisions)+' of '+number(data.unlock_at)+
     ' picks included for this view.</p>'+
     '<a class="button primary" href="/?game=draft-run&daily=1">Play today’s Daily</a></section></div>';
-  const extras=(data.observations||[]).filter(x=>['progress','pick-depth'].includes(x.id)&&x.id!==safeFinding(data)?.id);
+  const extras=data.comparison_contract==='compatible-source-groups-v1'
+    ?(data.observations||[]).filter(x=>['progress','pick-depth'].includes(x.id)&&x.id!==safeFinding(data)?.id):[];
   return '<div class="my-insights-grid">'+highlightsMarkup(data)+journeyMarkup(data)+dnaMarkup(data)+
     '<details class="my-pack-card my-insights-wide my-insights-explore"><summary>More stats</summary>'+
     '<div class="my-insights-explore-content">'+

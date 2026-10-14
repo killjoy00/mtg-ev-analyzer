@@ -500,6 +500,7 @@ test('aggregate passes exact compared 6/8 groups to highlights but returns no ra
     score:n%2?42:95,sourcePick:n%2?8:6,day:Math.floor(n/2),band:'medium',
   })));
   const result=aggregateDraftRunInsights(rows,{now:new Date('2027-12-01T00:00:00Z')});
+  assert.equal(result.comparison_contract,'compatible-source-groups-v1');
   assert.equal(result.leading_finding?.id,'pick-depth');
   assert.deepEqual(result.leading_finding.compared_groups.map(g=>g.label),
     ['P1P6 source picks','P1P8 source picks']);

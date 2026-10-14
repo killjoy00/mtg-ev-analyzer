@@ -283,6 +283,21 @@ test('older native leading difficulty finding is not presented as a strength or 
   const ui=await mount(t,{respond:async()=>data});
   assert.ok(!ui.text().includes(data.leading_finding.text));
 });
+test('old native API pick-depth comparison is hidden until a version-safe contract exists',async t=>{
+ const item={session_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',round:2,
+   puzzle_id:'old-evidence',set_id:'neo',environment:'mixed',pick_number:3,date:'2026-09-10',
+   score:93,trophy_match:false,selected_name:'Chosen',historical_name:'Trophy',
+   finding_context:'From source P1P3 in this comparison',
+   preview:{selected:{id:'a',name:'Chosen',image_url:null},
+     trophy:{id:'b',name:'Trophy',image_url:null}}};
+ const data={...fixture('mixed'),
+   leading_finding:{id:'pick-depth',text:'Older pooled pick-depth finding.'},
+   highlights:{schema_version:'decision-highlights-v3',best:[item],misses:[],note:''}};
+ const old=await mount(t,{respond:async()=>data});
+ assert.ok(!old.text().includes('Older pooled pick-depth finding.'));
+ const safe=await mount(t,{respond:async()=>({...data,comparison_contract:'compatible-source-groups-v1'})});
+ assert.ok(safe.text().includes('Older pooled pick-depth finding.'));
+});
 test('native Journey visibly marks incomparable versions and the exact cohort boundary',async t=>{
   const data={...fixture('mixed'),
     journey:{version:'drafting-journey-v2',eligible_decisions:80,window_size:40,

@@ -40,7 +40,7 @@ function reviewExplanation(item:InsightHighlight) {
 }
 const safeFinding=(data:DraftInsights)=>{
   const finding=data.leading_finding;
-  if(!['progress','pick-depth'].includes(finding?.id||''))return null;
+  if(data.comparison_contract!=='compatible-source-groups-v1'||!['progress','pick-depth'].includes(finding?.id||''))return null;
   const examples=[...(data.highlights?.best||[]).slice(0,3),...(data.highlights?.misses||[]).slice(0,3)];
   return examples.some(item=>item.finding_context)?finding:null;
 };
@@ -385,7 +385,8 @@ function InsightSections({data,onReview,onLoadMore,morePhase}:{
     </Pressable>
   </Section>;
   const finding=safeFinding(data);
-  const extra=(data.observations||[]).filter(row=>['progress','pick-depth'].includes(row.id)&&row.id!==finding?.id);
+  const extra=data.comparison_contract==='compatible-source-groups-v1'
+    ?(data.observations||[]).filter(row=>['progress','pick-depth'].includes(row.id)&&row.id!==finding?.id):[];
   return <>
     {data.highlights?<HighlightsStory highlights={data.highlights} finding={finding}
       onReview={onReview} onLoadMore={onLoadMore} morePhase={morePhase}/>:

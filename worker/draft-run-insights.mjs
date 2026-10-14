@@ -175,6 +175,7 @@ export function aggregateDraftRunInsights(source,{environment='mixed',period='al
   };
   return {
     environment:filter.environment,period:filter.period,environment_label:LABELS[environment],
+    comparison_contract:'compatible-source-groups-v1',
     eligible_decisions:total,unlocked:total>=INSIGHTS_UNLOCK_MIN,unlock_at:INSIGHTS_UNLOCK_MIN,
     total_eligible_decisions:eligible.length,unknown_difficulty:selected.filter(r=>r.difficulty_band==='unknown').length,
     pick_depth:depth,difficulty,months,formats,progress,observations,versions,
