@@ -32,9 +32,9 @@ function reviewExplanation(item:InsightHighlight) {
   if(item.reason_code==='saved-support-gap'&&
     typeof evidence.leader_id==='string'&&typeof evidence.leader_name==='string'&&
     evidence.leader_name.trim()&&evidence.leader_id!==(item.preview?.selected?.id||'')) {
-    return evidence.leader_id===(item.preview?.trophy?.id||item.historical_id)
+    return evidence.leader_is_trophy===1||Boolean(item.preview?.trophy?.id&&evidence.leader_id===item.preview.trophy.id)
       ?'The saved model supported the trophy pick more strongly than your choice.'
-      :'The saved model favored '+evidence.leader_name+' — a different card from the trophy pick.';
+      :(evidence.leader_is_trophy===0||item.preview?.trophy?.id)?'The saved model favored '+evidence.leader_name+' — a different card from the trophy pick.':'The saved model favored '+evidence.leader_name+' more strongly than your choice.';
   }
   return 'You chose a different card.';
 }
