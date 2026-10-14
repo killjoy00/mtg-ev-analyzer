@@ -1,5 +1,8 @@
 # Insights evolution — Drafting DNA, Best Calls & Biggest Misses, Drafting Journey
 
+> **Presentation superseded October 14, 2026:** The new hierarchy leads with **Picks to review**, then **Your scores over time**, then **Your pick patterns**, followed by collapsed **More stats**. Tabs are **Picks to revisit** and **High-scoring picks**. Previous DNA-first/Best Calls/Biggest Misses wording below describes the older approval and is retained only for background. See [Player-focused Insights](INSIGHTS-FOCUSED-REPORT.md); the original scoring and DNA qualifications are unchanged.
+
+
 **Decision:** Owner approved adding **Your Drafting Journey** and **Your Best Calls & Biggest Misses** alongside the already approved **Drafting DNA** (one primary archetype + two secondary traits), October 11, 2026.
 
 **October 12, 2026 focused-report follow-on:** see [INSIGHTS-FOCUSED-REPORT.md](INSIGHTS-FOCUSED-REPORT.md) for the compact overview, provisional card-choice comparison rule, reason-code contract, privacy boundaries and PR acceptance checklist. This follow-on does not change the approved underlying eligibility or scoring model.
