@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {compactDraftRunFeedback,consensusFeedback,trophyDrafterDetails,trophyDrafterFacts,trophyDrafterSentences,trophyRevealSentence} from '../draft-run-feedback.mjs';
-import {draftRunShareText} from '../share-cards.mjs';
+import {draftRunShareText,draftRunNativeShareData} from '../share-cards.mjs';
 import {escapeHtml} from '../html.mjs';
 
 test('trophy reveal headlines name the pick only, regardless of source-drafter evidence',()=>{
@@ -82,4 +82,19 @@ test('result text is spoiler-free, dated, and distinguishes Cube, practice and t
  const run={day:'2026-09-14',score:65,answers:[{score:100,historicalMatch:true,selectedName:'Secret card'},{score:95},{score:60},{score:25},{score:0}]};
  const text=draftRunShareText(run);assert.match(text,/I scored 65\/100 on today’s Pack One Draft Run\. Can you beat it\?/);assert.match(text,/Daily 2026-09-14/);assert.match(text,/🟩🟦🟨🟧⬛/);assert.doesNotMatch(text,/Secret/);
  assert.match(draftRunShareText({...run,day:null,environment:'powered-cube'}),/Powered Cube · Practice/);
+});
+
+test('Draft Run native shares keep summary, squares and link together on iPhone and iPad',()=>{
+ const run={day:'2026-10-13',environment:'mixed',score:65,answers:[{historicalMatch:true,score:100},{historicalMatch:false,score:95},{historicalMatch:false,score:60}]};
+ const text=draftRunShareText(run),url='https://packone.pro/share/daily/v2/?environment=mixed&ref=result_share';
+ for(const browser of ['Version/27.0 Mobile/15E148 Safari/604.1','CriOS/151.0.7922.25 Mobile/15E148 Safari/604.1','EdgiOS/151.0 Mobile/15E148 Safari/604.1']){
+   const data=draftRunNativeShareData(text,url,{userAgent:'Mozilla/5.0 (iPhone; CPU iPhone OS 27_0_1 like Mac OS X) '+browser});
+   assert.deepEqual(data,{text:`${text}\n${url}`});
+   assert.match(data.text,/🟩🟦🟨/);
+   assert.equal('url' in data,false,'iOS must not receive a competing URL share item');
+ }
+ assert.deepEqual(draftRunNativeShareData(text,url,{userAgent:'Mozilla/5.0 (Macintosh; Intel Mac OS X)',platform:'MacIntel',maxTouchPoints:5}),{text:`${text}\n${url}`},'desktop-UA iPad also uses one share text item');
+ for(const agent of ['Mozilla/5.0 (Linux; Android 16)', 'Mozilla/5.0 (Macintosh; Intel Mac OS X)']){
+   assert.deepEqual(draftRunNativeShareData(text,url,{userAgent:agent}),{title:'Pack One',text,url},'non-iOS targets keep the existing structured share contract');
+ }
 });
