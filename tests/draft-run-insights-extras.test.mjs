@@ -368,7 +368,7 @@ test('Saved type and rarity choices require competitive cross-category options, 
    assert.equal(group.status,'ready');
    assert.equal(group.opportunities,32);
    assert.equal(group.examples.length,2);
-   assert.ok(group.summary.includes('32 decisions'));
+   assert.ok(group.summary.includes('32 picks'));
    assert.equal(group.availability['creature']??group.availability['common-uncommon'],32);
  }
  assert.deepEqual(cardType.selected,{creature:24,noncreature:8});
@@ -504,6 +504,8 @@ test('aggregate passes exact compared 6/8 groups to highlights but returns no ra
   assert.deepEqual(result.leading_finding.compared_groups.map(g=>g.label),
     ['P1P6 source picks','P1P8 source picks']);
   assert.ok(result.highlights.best.slice(0,3).every(r=>[6,8].includes(r.pick_number)));
+  assert.ok([...result.highlights.best.slice(0,3),...result.highlights.misses.slice(0,3)].every(r=>r.finding_context),
+    'the headline is only shown when all visible examples belong to its comparison');
   assert.ok(result.highlights.misses.slice(0,3).every(r=>[6,8].includes(r.pick_number)));
   assert.doesNotMatch(JSON.stringify(result.leading_finding),/puzzle_ids|puzzle_id/);
 });
