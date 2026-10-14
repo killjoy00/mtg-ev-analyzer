@@ -1,5 +1,8 @@
 # Scoring and difficulty
 
+> **Player-facing Insights wording:** "100 means you matched the trophy pick. Other picks earn up to 95 based on the model." Review summaries should not equate the trophy pick with the model's top-supported alternative. The "hard" model-support band is not measured human difficulty and cannot support player strength/weakness claims or cross-version headline comparisons. Source P1P is not the eight-question game round.
+
+
 **100 = you matched the trophy drafter. Other choices receive partial credit based on how strongly the model supports them.** Model disagreement never changes that target.
 
 An alternative receives `round(95 × selected raw model support / strongest raw model support)`, capped at 95. The [six-source frozen-model calibration](../results/rebuild-2026-09-18/SCORING-RESULTS.md) retained that linear curve for both environments. Any future curve change requires explicit versioning and evidence from the exact final model. The run result is the rounded mean of eight integer scores; historical runs retain their original denominator and recorded results.
