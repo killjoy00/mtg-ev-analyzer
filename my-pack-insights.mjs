@@ -81,24 +81,24 @@ function formatsMarkup(rows,current) {
   return '<div class="my-insights-formats">'+rows.map(row=>'<article class="my-insights-format'+
     (row.environment===current?' is-current':'')+'" aria-label="'+esc(rowText(row,row.label))+'">'+
     '<span>'+esc(row.label)+'</span><strong>'+(row.average_score===null?'—':score(row.average_score))+'</strong>'+
-    '<small>'+number(row.count)+' decisions'+(row.average_score===null?' · need 5 to average':' · average / 100')+'</small></article>').join('')+
+    '<small>'+number(row.count)+' picks'+(row.average_score===null?' · need 5 to average':' · average / 100')+'</small></article>').join('')+
     '</div><p class="my-insights-note">Formats use different card pools; these are recorded averages, not comparable skill rankings.</p>';
 }
 
 function progressMarkup(result) {
-  if(!result.progress)return '<p class="my-pack-empty">A progress comparison needs 80 eligible decisions in this environment: the latest 40 and the previous 40. You have '+number(result.eligible_decisions)+'.</p>';
+  if(!result.progress)return '<p class="my-pack-empty">A recent/previous comparison needs two complete 40-pick groups in the same scoring version.</p>';
   const p=result.progress;
   return '<div class="my-insights-progress">'+
     '<div><span>Previous 40 picks</span><strong>'+score(p.previous.average_score)+'</strong><small>'+esc(p.previous.from)+' to '+esc(p.previous.to)+'</small></div>'+
     '<div><span>Most recent 40 picks</span><strong>'+score(p.recent.average_score)+'</strong><small>'+esc(p.recent.from)+' to '+esc(p.recent.to)+'</small></div></div>'+
-    '<p class="my-insights-note">Recorded difference: '+(p.delta>0?'+':'')+Number(p.delta).toFixed(1)+' points. This describes different picks and does not prove improvement or decline.</p>';
+    '<p class="my-insights-note">Difference: '+(p.delta>0?'+':'')+Number(p.delta).toFixed(1)+' points. This describes different picks and does not prove improvement or decline.</p>';
 }
 function monthMarkup(rows) {
-  if(!rows.length)return '<p class="my-pack-empty">Monthly trends become available after 10 eligible decisions in a Pacific calendar month.</p>';
+  if(!rows.length)return '<p class="my-pack-empty">Monthly averages appear when at least 10 picks fall in a Pacific calendar month.</p>';
   return '<div class="my-insights-months">'+rows.map(row=>
     '<div class="my-insights-month"><span>'+esc(row.month)+'</span><strong>'+
     (row.average_score===null?'—':score(row.average_score))+'</strong><small>'+
-    number(row.count)+' decisions'+(row.average_score===null?' · fewer than 10':'')+'</small></div>'
+    number(row.count)+' picks'+(row.average_score===null?' · fewer than 10':'')+'</small></div>'
   ).join('')+'</div>';
 }
 // The private API owns the identity and evidence rules; the browser is purely
@@ -288,17 +288,32 @@ function bindInsightCards(root,state,ticket,gen) {
   const current=()=>gen===generation&&ticket===state.ticket&&root.isConnected;
   const dialog=root.querySelector('#my-insights-decision-dialog');
   const dialogBody=dialog?.querySelector('[data-insights-dialog-body]');
-  root.querySelectorAll('[data-insights-tab]').forEach(button=>button.addEventListener('click',()=>{
+  const tabButtons=[...root.querySelectorAll('[data-insights-tab]')];
+  function chooseTab(button,focus=false){
     const chosen=button.dataset.insightsTab;
-    root.querySelectorAll('[data-insights-tab]').forEach(other=>
-      other.setAttribute('aria-selected',String(other.dataset.insightsTab===chosen)));
+    tabButtons.forEach(other=>{
+      const active=other===button;
+      other.setAttribute('aria-selected',String(active));
+      other.tabIndex=active?0:-1;
+    });
     for(const panel of ['best','misses']){
       const el=root.querySelector('#my-insights-'+panel+'-panel');
       if(el)el.hidden=panel!==chosen;
     }
     state.viewTicket=(state.viewTicket||0)+1;
     if(dialog?.open)dialog.close();
-  }));
+    if(focus)button.focus();
+  }
+  tabButtons.forEach((button,index)=>{
+    button.addEventListener('click',()=>chooseTab(button));
+    button.addEventListener('keydown',event=>{
+      if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;
+      event.preventDefault();
+      const next=event.key==='Home'?0:event.key==='End'?tabButtons.length-1:
+        (index+(event.key==='ArrowRight'?1:-1)+tabButtons.length)%tabButtons.length;
+      chooseTab(tabButtons[next],true);
+    });
+  });
   const bindReviews=scope=>scope.querySelectorAll('[data-insights-review]').forEach(button=>{
     if(button.dataset.insightsBound)return;
     button.dataset.insightsBound='1';
@@ -306,7 +321,7 @@ function bindInsightCards(root,state,ticket,gen) {
       if(!dialog||!dialogBody||!current())return;
       state.returnFocus=button;
       const viewTicket=(state.viewTicket=(state.viewTicket||0)+1);
-      dialogBody.innerHTML='<p role="status">Loading your saved pack…</p>'+
+      dialogBody.innerHTML='<p role="status">Loading your pick…</p>'+
         '<button type="button" class="button secondary" data-insights-close>Close</button>';
       dialogBody.querySelector('[data-insights-close]')?.addEventListener('click',()=>dialog.close());
       if(typeof dialog.showModal==='function')dialog.showModal();
@@ -320,7 +335,7 @@ function bindInsightCards(root,state,ticket,gen) {
         dialogBody.querySelector('[data-insights-close]')?.focus({preventScroll:true});
       }catch{
         if(current()&&viewTicket===state.viewTicket&&dialog.open)
-          dialogBody.innerHTML='<p role="alert">That original pack could not be loaded. Close and try again.</p>'+
+          dialogBody.innerHTML='<p role="alert">That pick could not be loaded. Close and try again.</p>'+
             '<button type="button" class="button secondary" data-insights-close>Close</button>';
         dialogBody.querySelector('[data-insights-close]')?.addEventListener('click',()=>dialog.close());
       }
@@ -333,10 +348,11 @@ function bindInsightCards(root,state,ticket,gen) {
     const panel=root.querySelector('#my-insights-'+kind+'-panel');
     panel?.querySelectorAll('[data-insights-extra]').forEach(el=>{el.hidden=false;});
     if(button.dataset.insightsPage2!=='true'){button.remove();return;}
-    button.disabled=true;button.textContent='Loading more saved picks…';
+    const viewTicket=state.viewTicket;
+    button.disabled=true;button.textContent='Loading more picks…';
     try{
       const response=await loadMyInsights({environment:state.environment,period:state.period,page:2});
-      if(!current())return;
+      if(!current()||viewTicket!==state.viewTicket)return;
       const rows=response.highlights?.[kind]||[];
       if(rows.length&&panel){
         button.insertAdjacentHTML('beforebegin',highlightCards(rows,kind,true));
@@ -344,49 +360,47 @@ function bindInsightCards(root,state,ticket,gen) {
       }
       button.remove();
     }catch{
-      if(current()){button.disabled=false;button.textContent='Retry seeing more picks';}
+      if(current()){button.disabled=false;button.textContent='Retry loading picks';}
     }
   }));
 }
 
 function insightsContent(data) {
   if(data.unlocked!==true)return '<div class="my-insights-grid"><section class="my-pack-card my-insights-wide">'+
-    '<h2>Unlock your Drafting Insights</h2><p>Play a few more runs in '+esc(data.environment_label)+
-    '. You have '+number(data.eligible_decisions)+' of '+number(data.unlock_at)+
-    ' eligible first-time decisions in this period.</p>'+
+    '<h2>Picks to review</h2><p>Play a few more puzzles in '+esc(labelOf(data.environment))+
+    '. '+number(data.eligible_decisions)+' of '+number(data.unlock_at)+
+    ' picks included for this view.</p>'+
     '<a class="button primary" href="/?game=draft-run&daily=1">Play today’s Daily</a></section></div>';
-  const extras=data.observations?.slice(1)||[];
-  return '<div class="my-insights-grid">'+highlightsMarkup(data)+journeyMarkup(data)+
-    '<details class="my-pack-card my-insights-wide my-insights-explore"><summary>Explore your data</summary>'+
+  const extras=(data.observations||[]).filter(x=>['progress','pick-depth'].includes(x.id)&&x.id!==safeFinding(data)?.id);
+  return '<div class="my-insights-grid">'+highlightsMarkup(data)+journeyMarkup(data)+dnaMarkup(data)+
+    '<details class="my-pack-card my-insights-wide my-insights-explore"><summary>More stats</summary>'+
     '<div class="my-insights-explore-content">'+
-    '<section><h3>Pick-by-pick breakdown</h3><p class="my-insights-note">Actual source P1P positions; averages require 5 picks.</p>'+
+    '<section><h3>Scores by source pick position</h3><p class="my-insights-note">P1P positions are from the source draft, not the question number in this game. Averages require five picks.</p>'+
       barRows(data.pick_depth||[])+'</section>'+
-    '<section><h3>Difficulty breakdown</h3>'+
+    '<section><h3>Model-support closeness</h3>'+
+      '<p class="my-insights-note">“Hard” means the model gave two cards similar support. It does not measure how hard people found the pick.</p>'+
       barRows((data.difficulty||[]).map(row=>({...row,label:row.band==='unknown'?'Unknown':row.band[0].toUpperCase()+row.band.slice(1)})))+
-      (data.unknown_difficulty?'<p class="my-insights-note">'+number(data.unknown_difficulty)+' unknown difficulty ratings.</p>':'')+
+      (data.unknown_difficulty?'<p class="my-insights-note">'+number(data.unknown_difficulty)+' picks have no rating.</p>':'')+
       '</section>'+
-    '<section><h3>Format breakdown</h3>'+formatsMarkup(data.formats||[],data.environment)+'</section>'+
-    '<section><h3>Additional observations</h3>'+
-      (extras.length?'<ul class="my-insights-observations">'+extras.map(x=>'<li>'+esc(x.text)+'</li>').join('')+'</ul>':
-      '<p class="my-insights-note">No other comparison cleared the minimum sample and score-gap rules.</p>')+
-      '</section>'+
-    '<section><h3>Methodology</h3><p class="my-insights-note">'+
-       esc(data.methodology||'Original first-encounter scored decisions only.')+'</p></section>'+
+    '<section><h3>Scores by format</h3>'+formatsMarkup(data.formats||[],data.environment)+'</section>'+
+    (extras.length?'<section><h3>Other within-format comparisons</h3><ul class="my-insights-observations">'+
+      extras.map(x=>'<li>'+esc(x.text)+'</li>').join('')+'</ul></section>':'')+
+    '<section><h3>How this works</h3><p class="my-insights-note">'+
+       esc(data.methodology||'Only your first included answer to each puzzle counts. Scores are not a skill rating.')+'</p></section>'+
     '</div></details></div>';
 }
-
 function shell(root,state) {
   root.innerHTML='<div class="my-insights-page">'+
-    '<header class="my-insights-heading"><p class="eyebrow">Your game, examined</p><h2>Your Drafting Insights</h2></header>'+
-    '<div id="my-insights-dna"></div>'+
-    '<div class="my-insights-controls" aria-label="Filter the decision report and Journey">'+
-      '<label for="my-insights-environment">Environment<select id="my-insights-environment">'+ENVIRONMENTS.map(([key,label])=>
+    '<header class="my-insights-heading"><h2>Your picks</h2></header>'+
+    '<div class="my-insights-controls" aria-label="Filter pick reviews and score history">'+
+      '<label for="my-insights-environment">Format<select id="my-insights-environment">'+ENVIRONMENTS.map(([key,label])=>
         '<option value="'+key+'"'+(state.environment===key?' selected':'')+'>'+label+'</option>').join('')+'</select></label>'+
       '<label for="my-insights-period">Time period<select id="my-insights-period">'+PERIODS.map(([key,label])=>
         '<option value="'+key+'"'+(state.period===key?' selected':'')+'>'+label+'</option>').join('')+'</select></label>'+
-      '<button class="button secondary" type="button" id="my-insights-refresh">Refresh</button></div>'+
-    '<div id="my-insights-result" aria-live="polite"><section class="my-pack-card"><p>Loading your private drafting decisions…</p></section></div>'+
-    '<dialog id="my-insights-decision-dialog" class="my-insights-dialog" aria-label="Original saved pack">'+
+      '<button class="button secondary" type="button" id="my-insights-refresh">Refresh</button>'+
+      '<p class="my-insights-format-explainer">Mixed sets is its own format, not a combination of Latest Set and Powered Cube.</p></div>'+
+    '<div id="my-insights-result" aria-live="polite"><section class="my-pack-card"><p>Loading your picks…</p></section></div>'+
+    '<dialog id="my-insights-decision-dialog" class="my-insights-dialog" aria-label="Review pick">'+
       '<div data-insights-dialog-body></div></dialog></div>';
   const dialog=root.querySelector('#my-insights-decision-dialog');
   dialog?.addEventListener('close',()=>{
@@ -404,18 +418,16 @@ function shell(root,state) {
   });
   root.querySelector('#my-insights-refresh')?.addEventListener('click',()=>void refresh(root,state));
 }
-
 async function refresh(root,state) {
   const ticket=++state.ticket,gen=generation;
   const dialog=root.querySelector('#my-insights-decision-dialog');
   if(dialog?.open)dialog.close();
   // Fail closed on owner/session transitions and rejected requests; never retain
   // private DNA from an earlier successfully loaded account.
-  const previousDna=root.querySelector('#my-insights-dna');if(previousDna)previousDna.innerHTML='';
-  if(state.lastGen!==gen){const node=root.querySelector('#my-insights-dna');if(node)node.innerHTML='';state.lastGen=gen;state.autoMatched=false;}
+  if(state.lastGen!==gen){state.lastGen=gen;state.autoMatched=false;}
   // Preserve keyboard focus in filters rather than replacing the whole panel.
   const result=root.querySelector('#my-insights-result');
-  if(result)result.innerHTML='<section class="my-pack-card"><p role="status">Loading your private drafting decisions…</p></section>';
+  if(result)result.innerHTML='<section class="my-pack-card"><p role="status">Loading your picks…</p></section>';
   try {
     const response=await loadMyInsights({environment:state.environment,period:state.period});
     if(gen!==generation||ticket!==state.ticket||!root.isConnected)return;
@@ -425,16 +437,15 @@ async function refresh(root,state) {
       const picker=root.querySelector('#my-insights-environment');if(picker)picker.value=state.environment;
       void refresh(root,state);return;
     }
-    const dna=root.querySelector('#my-insights-dna');if(dna)dna.innerHTML=dnaMarkup(response);
     const target=root.querySelector('#my-insights-result');
-    if(target)target.innerHTML='<p class="my-insights-sample">'+number(response.eligible_decisions)+' eligible decisions · '+
+    if(target)target.innerHTML='<p class="my-insights-sample">'+number(response.eligible_decisions)+' picks included · '+
       esc(labelOf(response.environment))+' · '+esc(periodLabel(response.period))+'</p>'+insightsContent(response);
     if(target)bindInsightCards(root,state,ticket,gen);
   } catch {
     if(gen!==generation||ticket!==state.ticket||!root.isConnected)return;
     const target=root.querySelector('#my-insights-result');
     if(target)target.innerHTML='<section class="my-pack-card" role="alert"><h2>Insights unavailable</h2>'+
-      '<p>Your Stats and Account settings are still available. Try again to load the private analysis.</p>'+
+      '<p>Your Stats and Account settings are still available. Try again to load your picks.</p>'+
       '<button class="button secondary" type="button" id="my-insights-retry">Retry Insights</button></section>';
     root.querySelector('#my-insights-retry')?.addEventListener('click',()=>void refresh(root,state));
   }
