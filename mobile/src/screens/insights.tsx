@@ -572,7 +572,7 @@ export default function InsightsScreen() {
       </Section> : null}
       {phase === 'ready' && data ? <>
         <Text style={styles.summary}>{num(data.eligible_decisions)} picks included · {data.environment==='mixed'?'Mixed sets':data.environment_label} · {periods.find(p => p.value === period)?.label}</Text>
-        <InsightSections key={activeOwner.current+'|'+environment+'|'+period} data={data} onReview={reviewDetail}
+        <InsightSections key={environment+'|'+period} data={data} onReview={reviewDetail}
           onLoadMore={()=>void loadMore()} morePhase={morePhase}/>
       </> : null}
       <Pressable accessibilityRole="button" onPress={() => void load()} style={styles.secondaryButton}><Text style={styles.secondaryText}>Refresh Insights</Text></Pressable>

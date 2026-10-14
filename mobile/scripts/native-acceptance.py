@@ -401,6 +401,7 @@ if platform == 'android':
         xml, _ = snapshot('insights-high-scoring')
         require('Hero in Training' in xml, 'High-scoring picks did not switch')
         tap('Review pick')
+        reveal('Trophy drafter')
         xml, _ = snapshot('insights-readonly-trophy-pool')
         require('Trophy drafter' in xml and 'earlier picks' in xml,
                 'Read-only review does not identify the source drafter pool')
@@ -433,6 +434,7 @@ if platform == 'android':
 
     def native_insights_sparse():
         launch('member-insights-sparse', 'insights', 320, 1.5)
+        reveal('Your pick patterns')
         xml, logs = snapshot('insights-sparse-320dp-large-text')
         require('PACKONE_INSIGHTS_READY' in logs, 'Sparse pick-review fixture did not render')
         require('No clear pick pattern to show yet' in xml,

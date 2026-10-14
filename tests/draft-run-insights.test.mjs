@@ -189,6 +189,6 @@ test('Source-pick positions are the headline comparison, not game round',()=>{
  assert.equal(view.leading_finding,null,'no headline without a reviewable saved example');
  assert.ok(view.observations.some(x=>x.id==='pick-depth'));
  assert.match(view.observations.find(x=>x.id==='pick-depth').text,/P1P2 source picks/);
- assert.doesNotMatch(view.observations.find(x=>x.id==='pick-depth').text,/game round/i);
+ assert.match(view.observations.find(x=>x.id==='pick-depth').text,/not eight-question game rounds/i);
  assert.match(view.methodology,/Hard|hard/);
 });
