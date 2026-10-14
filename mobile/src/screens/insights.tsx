@@ -279,7 +279,7 @@ function HighlightsStory({highlights,finding,onReview,onLoadMore,morePhase}:{
         <Text style={styles.body}>Your pick: {ownName}</Text>
         <Text style={styles.body}>Trophy pick: {trophyName}</Text>
         <Text style={styles.meta}>{setName(item.set_id)} · Source P1P{item.pick_number} · {shortDate(item.date)} · Score {item.score}/100</Text>
-        {item.finding_context?<Text style={styles.contextNote}>{item.finding_context}</Text>:null}
+        {finding&&item.finding_context?<Text style={styles.contextNote}>{item.finding_context}</Text>:null}
         <Text style={styles.body}>{reviewExplanation(item)}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel={'Review pick: '+ownName}
           onPress={()=>onReview(item)} style={styles.compactAction}>
