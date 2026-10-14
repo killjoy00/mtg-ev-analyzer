@@ -199,69 +199,72 @@ function highlightsMarkup(data) {
 }
 function journeyMarkup(data) {
   const journey=data.journey;
-  if(!journey)return '<section class="my-pack-card my-insights-wide">'+
-    '<div class="my-card-heading"><h2>Your Drafting Journey</h2></div>'+
-    progressMarkup(data)+'<details><summary>View journey details</summary>'+
-    '<h3>Pacific calendar months</h3>'+monthMarkup(data.months)+'</details></section>';
-  const windows=journey.windows||[];
-  const chart=windows.length?'<div class="my-insights-journey-timeline" role="list" aria-label="Recorded score windows">'+
-    windows.map(w=>'<div class="my-insights-journey-point" role="listitem" aria-label="'+
-      esc(insightLocalRange(w)+', '+w.count+' decisions, average '+(w.average_score??'unavailable')+
-      (w.complete?'':' incomplete'))+'">'+
-      '<strong>'+esc(w.average_score==null?'—':score(w.average_score))+'</strong>'+
+  if(!journey)return '<section class="my-pack-card my-insights-wide my-insights-journey">'+
+    '<div class="my-card-heading"><h2>Your scores over time</h2></div>'+
+    progressMarkup(data)+'<details><summary>More score details</summary><h3>Monthly scores</h3>'+
+    monthMarkup(data.months||[])+'</details></section>';
+  const windows=journey.windows||[],compatible=journey.progress_compatible!==false;
+  const versionBoundary=new Set(windows.map(w=>w.cohort)).size>1;
+  const chart=windows.length?'<div class="my-insights-journey-timeline" role="list" aria-label="Score averages over time">'+
+    windows.map((w,i)=>(i>0&&windows[i-1].cohort!==w.cohort?
+      '<span class="my-insights-journey-break" role="note">Scoring or card pool changed</span>':'')+
+      '<div class="my-insights-journey-point" role="listitem" aria-label="'+
+      esc(insightLocalRange(w)+', '+w.count+' picks, average '+(w.average_score??'unavailable')+
+      ' out of 100'+(w.complete?'':' incomplete group'))+'">'+
+      '<strong>'+esc(w.average_score==null?'—':score(w.average_score)+'/100')+'</strong>'+
       '<div class="my-insights-journey-track" aria-hidden="true"><i style="height:'+
       Math.max(0,Math.min(100,Number(w.average_score||0)))+'%"></i></div>'+
-      '<small>'+esc(shortInsightRange(w))+'<span>'+w.count+(w.complete?'':'*')+' picks</span></small></div>').join('')+
-    '</div>':'<p class="my-pack-empty">Your timeline will grow with original scored decisions.</p>';
-  const milestone=(journey.milestones||[]).map(m=>'<li><strong>'+esc(m.text)+'</strong> · '+
-    esc(insightLocalRange(m,m.date,m.date))+(m.average_score!=null?' · '+score(m.average_score)+'/100':'')+'</li>').join('');
-  const compatible=journey.progress_compatible!==false;
-  const versionBoundary=new Set((journey.windows||[]).map(w=>w.cohort)).size>1;
-  const boundaryWarning=!compatible||versionBoundary?
-    '<p class="my-insights-journey-warning" role="note">These saved picks cross different scoring or card-pool versions. The windows are not a continuous progress trend.</p>':'';
-  const progress=compatible&&data.progress?'<p class="my-insights-journey-summary">Recent 40: '+
-    score(data.progress.recent.average_score)+'/100 · Previous 40: '+
-    score(data.progress.previous.average_score)+'/100 · Difference '+
-    (data.progress.delta>0?'+':'')+score(data.progress.delta)+' points (descriptive, not proof of improvement).</p>':'';
+      '<small>'+esc(shortInsightRange(w))+'<span>'+w.count+' picks'+(w.complete?'':' · partial')+'</span></small></div>').join('')+
+    '</div>':'<p class="my-pack-empty">Your score history will appear as you play.</p>';
+  const change=data.progress?.delta;
+  const progress=compatible&&data.progress?'<p class="my-insights-journey-summary">Your last 40 picks averaged '+
+    score(data.progress.recent.average_score)+'/100, '+
+    (change===0?'the same as':(change>0?'up ':'down ')+score(Math.abs(change))+' points from')+
+    ' the previous 40 ('+score(data.progress.previous.average_score)+'/100).</p>':'';
+  const warning=!compatible||versionBoundary?
+    '<p class="my-insights-journey-warning" role="note">Scoring or card-pool versions changed. These windows cannot be read as one continuous trend.</p>':'';
+  const milestones=(journey.milestones||[]).map(m=>'<li>'+esc(m.text)+' · '+esc(insightLocalRange(m,m.date,m.date))+'</li>').join('');
   return '<section class="my-pack-card my-insights-wide my-insights-journey">'+
-    '<div class="my-card-heading"><h2>Your Drafting Journey</h2><span>Original scores · 40-pick windows</span></div>'+
-    chart+boundaryWarning+progress+
-    '<details class="my-insights-journey-details"><summary>View journey details</summary>'+
-    '<p class="my-insights-note">'+esc(journey.note||'Historical versions may differ.')+
-    ' Incomplete windows are marked with an asterisk.</p>'+
-    (journey.total_windows>windows.length?'<p class="my-insights-note">Latest '+windows.length+
-       ' of '+journey.total_windows+' windows shown.</p>':'')+
+    '<div class="my-card-heading"><h2>Your scores over time</h2><span>40-pick groups · Average points out of 100</span></div>'+
+    warning+progress+chart+
+    '<p class="my-insights-note">These averages describe the picks you played; they do not prove a change in drafting skill.</p>'+
+    '<details class="my-insights-journey-details"><summary>More score details</summary>'+
+    '<p class="my-insights-note">'+esc(journey.note||'')+
+    ' Partial groups are shown with their actual pick counts.</p>'+
+    (journey.total_windows>windows.length?'<p class="my-insights-note">Showing the latest '+
+      windows.length+' of '+journey.total_windows+' groups.</p>':'')+
     '<ol>'+windows.map(w=>'<li>'+esc(insightLocalRange(w))+' · '+w.count+' picks · '+
-      (w.complete?'complete':'incomplete')+' · '+score(w.average_score)+'/100</li>').join('')+'</ol>'+
-    (!compatible?'<p>Historical model and card-pool versions differ; recent-versus-previous comparison unavailable.</p>':
-      '<h3>Previous and recent pick windows</h3>'+progressMarkup(data))+
-    (milestone?'<h3>Your milestones</h3><ol class="my-insights-milestones">'+milestone+'</ol>':'')+
-    '<h3>Pacific calendar months</h3>'+monthMarkup(data.months)+'</details></section>';
+      (w.complete?'complete':'partial')+' · '+score(w.average_score)+'/100</li>').join('')+'</ol>'+
+    (!compatible?'<p>Different scoring or card-pool versions prevent a recent/previous comparison.</p>':
+      '<h3>Last 40 versus previous 40</h3>'+progressMarkup(data))+
+    (milestones?'<h3>Milestones</h3><ol class="my-insights-milestones">'+milestones+'</ol>':'')+
+    '<h3>Pacific calendar months</h3>'+monthMarkup(data.months||[])+'</details></section>';
 }
 function lockedDecisionMarkup(value) {
-  const chosen=value.selected,trophy=value.trophy,other=trophy?.id!==chosen?.id;
-  const pack=value.candidates||[];
-  return '<section class="my-insights-locked-pack" aria-label="Original saved draft pack">'+
-    '<div class="my-card-heading"><h3>Review original pack</h3><button type="button" class="button secondary" data-insights-close>Close</button></div>'+
-    '<p>'+esc(value.set_id)+' · P1P'+Number(value.pick_number)+' · '+number(value.score)+'/100 · '+
-      esc(value.answered_at?.slice(0,10)||'')+'</p>'+
-    '<div class="my-insights-locked-choices"><figure>'+cardVisual(chosen,'Your pick')+
-      '<figcaption>Your pick: '+esc(chosen?.name||'Unknown')+'</figcaption></figure>'+
-      (other?'<figure>'+cardVisual(trophy,'Trophy pick')+'<figcaption>Trophy pick: '+
-        esc(trophy?.name||'Unknown')+'</figcaption></figure>':'')+'</div>'+
-    '<h4>The original pack</h4><div class="my-insights-original-pack">'+pack.map(c=>
+  const chosen=value.selected,trophy=value.trophy,pack=value.candidates||[],pool=value.prior_picks||[];
+  const figure=(card,label)=>'<figure>'+cardVisual(card,label)+'<figcaption>'+esc(card?.name||'Card name unavailable')+'</figcaption></figure>';
+  return '<section class="my-insights-locked-pack" aria-label="Read-only pack review">'+
+    '<div class="my-card-heading"><h3>Review pick</h3><button type="button" class="button secondary" data-insights-close>Close</button></div>'+
+    '<p class="my-insights-note">'+esc(readableSet(value.set_id))+' · Source P1P'+Number(value.pick_number)+
+      ' · Score '+number(value.score)+'/100 · '+esc(shortInsightDate(value.answered_at))+'</p>'+
+    '<p class="my-insights-review-question">Which card fits this pool?</p>'+
+    '<div class="my-insights-review-context"><div><h4>Your pick and the trophy pick</h4>'+
+      '<div class="my-insights-locked-choices"><div><strong>Your pick</strong>'+figure(chosen,'Your pick')+'</div>'+
+      '<div><strong>Trophy pick</strong>'+figure(trophy,'Trophy pick')+'</div></div></div>'+
+      '<div><h4>Trophy drafter’s earlier picks</h4>'+
+      (pool.length?'<div class="my-insights-original-pool">'+pool.map(c=>figure(c,c.name)).join('')+'</div>':
+        '<p class="my-insights-note">Earlier picks aren’t available for this puzzle.</p>')+'</div></div>'+
+    '<h4>Full pack</h4><div class="my-insights-original-pack">'+pack.map(c=>
       '<figure>'+cardVisual(c,c.name)+'<figcaption>'+esc(c.name)+
       (c.id===chosen?.id?' · Your pick':'')+(c.id===trophy?.id?' · Trophy pick':'')+'</figcaption></figure>'
     ).join('')+'</div>'+
-    (value.prior_picks?.length?'<h4>Original drafter’s previous selections</h4><div class="my-insights-original-pool">'+
-      value.prior_picks.map(c=>'<span>'+esc(c.name)+'</span>').join('')+'</div>':'')+
-    '<details class="my-insights-original-analysis"><summary>Why this score? Saved alternatives</summary>'+
+    '<details class="my-insights-original-analysis"><summary>Saved alternative scores</summary>'+
       '<ol>'+((value.ranking||[]).filter(r=>r.score!=null).map(r=>'<li>'+esc(r.name)+
       ': '+number(r.score)+'/100'+(r.id===chosen?.id?' · Your pick':'')+
       (r.id===trophy?.id?' · Trophy pick':'')+'</li>').join(''))+'</ol></details>'+
-    '<p class="my-insights-note">This is a read-only record of your original selection. Its awarded score is unchanged.</p>'+
-    (value.trophy_drafter?.record?'<p class="my-insights-note">The verified source trophy draft finished '+esc(value.trophy_drafter.record)+'.</p>':'')+
-    (value.trophy_drafter?.win_rate!=null?'<p class="my-insights-note">The archived drafter’s overall game win rate was about '+
+    '<p class="my-insights-note">Read-only review. Your pick and score will not change.</p>'+
+    (value.trophy_drafter?.record?'<p class="my-insights-note">The trophy draft finished '+esc(value.trophy_drafter.record)+'.</p>':'')+
+    (value.trophy_drafter?.win_rate!=null?'<p class="my-insights-note">The trophy drafter’s overall game win rate was about '+
       esc(String(value.trophy_drafter.win_rate))+'%; that is not this card’s win rate.</p>':'')+'</section>';
 }
 async function loadSavedInsightDecision({session_id,round,puzzle_id}) {
