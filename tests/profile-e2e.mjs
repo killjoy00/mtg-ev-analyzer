@@ -275,6 +275,25 @@ await page.route(`${growthOrigin}/**`, async (route) => {
           },
         };
       }
+      if(insightsMode==='no-examples'||insightsMode==='no-revisit'||insightsMode==='no-best'){
+        body={...body,leading_finding:null,observations:[],highlights:{...body.highlights,
+          best:insightsMode==='no-examples'||insightsMode==='no-best'?[]:body.highlights.best,
+          misses:insightsMode==='no-examples'||insightsMode==='no-revisit'?[]:body.highlights.misses,
+          has_more:{best:false,misses:false}}};
+      }
+      if(insightsMode==='sparse'){
+        body={...body,eligible_decisions:9,total_eligible_decisions:9,
+          leading_finding:null,observations:[],progress:null,
+          drafting_dna:{...body.drafting_dna,eligible_decisions:9,primary:null,secondary:[],note:'No qualified traits.'},
+          card_choices:{...body.card_choices,choices:[]},
+          highlights:{...body.highlights,best:[],misses:[],has_more:{best:false,misses:false}}};
+      }
+      if(insightsMode==='versions'){
+        body={...body,progress:null,leading_finding:null,observations:[],
+          journey:{...body.journey,progress_compatible:false,
+            windows:[{...body.journey.windows[0],cohort:'old-version'},
+              {...body.journey.windows[1],cohort:'new-version'}]}};
+      }
     }
   } else if (url.pathname === '/v1/profile/insights/decision') {
     assert.equal(route.request().headers()['x-pack1-auth-session'],'profile-auth-fixture');
