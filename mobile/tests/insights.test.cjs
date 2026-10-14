@@ -336,8 +336,10 @@ test('native compact choice rows show the result first and hide method/examples 
   const text=ui.text();
   assert.ok(text.includes('The Independent Thinker'));
   assert.ok(text.includes('Across formats · All available history'));
-  assert.ok(text.includes('19 of 26 qualifying picks'));
-  assert.ok(text.includes('8 of 26 qualifying picks'));
+  assert.ok(!text.includes('19 of 26 qualifying picks'),'conditional denominators stay collapsed');
+  await ui.choose('Card type and rarity counts');
+  assert.ok(ui.text().includes('19 of 26 qualifying picks'));
+  assert.ok(ui.text().includes('8 of 26 qualifying picks'));
   assert.ok(!text.includes('When both creatures and noncreatures were competitive'));
   assert.ok(!text.includes('Threshold rules stay behind a disclosure'));
   await ui.choose('Examples and counts');
