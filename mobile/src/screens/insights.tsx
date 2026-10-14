@@ -15,7 +15,7 @@ import { colors, spacing } from '@/src/theme';
 import { config } from '@/src/config';
 
 const environments: { value: InsightsEnvironment; label: string }[] = [
-  { value: 'mixed', label: 'Mixed' }, { value: 'latest', label: 'Latest Set' }, { value: 'powered-cube', label: 'Powered Cube' },
+  { value: 'mixed', label: 'Mixed sets' }, { value: 'latest', label: 'Latest Set' }, { value: 'powered-cube', label: 'Powered Cube' },
 ];
 const periods: { value: InsightsPeriod; label: string }[] = [
   { value: 'all', label: 'All available' }, { value: '90d', label: 'Last 90 days' }, { value: '365d', label: 'Last year' },
@@ -24,6 +24,27 @@ const identity = (session: MobileSession | null) => session
   ? JSON.stringify([session.playerToken, session.accountToken ?? '', session.subjectId ?? '', session.accountUser?.id ?? '']) : '';
 const score = (value: number | null) => value === null ? '—' : Number(value).toFixed(1);
 const num = (value: number) => Number(value || 0).toLocaleString();
+const setNames:Record<string,string> = {"stx":"Strixhaven: School of Mages","mid":"Innistrad: Midnight Hunt","vow":"Innistrad: Crimson Vow","neo":"Kamigawa: Neon Dynasty","snc":"Streets of New Capenna","hbg":"Alchemy Horizons: Baldur's Gate","dmu":"Dominaria United","bro":"The Brothers' War","one":"Phyrexia: All Will Be One","sir":"Shadows over Innistrad Remastered","mom":"March of the Machine","ltr":"The Lord of the Rings: Tales of Middle-earth","woe":"Wilds of Eldraine","lci":"The Lost Caverns of Ixalan","ktk":"Khans of Tarkir","mkm":"Murders at Karlov Manor","otj":"Outlaws of Thunder Junction","mh3":"Modern Horizons 3","blb":"Bloomburrow","sos":"Secrets of Strixhaven","dsk":"Duskmourn: House of Horror","fdn":"Foundations","pio":"Pioneer Masters","dft":"Aetherdrift","tdm":"Tarkir: Dragonstorm","fin":"Final Fantasy","eoe":"Edge of Eternities","tla":"Avatar: The Last Airbender","hob":"The Hobbit","msh":"Marvel Super Heroes","tmt":"Teenage Mutant Ninja Turtles","ecl":"Lorwyn Eclipsed","fra":"Reality Fracture","powered-cube":"Powered Cube"};
+const setName=(id:string)=>setNames[id?.toLowerCase()]||id?.toUpperCase()||'Unknown set';
+function reviewExplanation(item:InsightHighlight) {
+  if(item.trophy_match)return 'You matched the trophy pick.';
+  const evidence=item.reason_evidence||{};
+  if(item.reason_code==='saved-support-gap'&&
+    typeof evidence.leader_id==='string'&&typeof evidence.leader_name==='string'&&
+    evidence.leader_name.trim()&&evidence.leader_id!==(item.preview?.selected?.id||'')) {
+    return evidence.leader_id===(item.preview?.trophy?.id||item.historical_id)
+      ?'The saved model supported the trophy pick more strongly than your choice.'
+      :'The saved model favored '+evidence.leader_name+' — a different card from the trophy pick.';
+  }
+  return 'You chose a different card.';
+}
+const safeFinding=(data:DraftInsights)=>{
+  const finding=data.leading_finding;
+  if(!['progress','pick-depth'].includes(finding?.id||''))return null;
+  const examples=[...(data.highlights?.best||[]).slice(0,3),...(data.highlights?.misses||[]).slice(0,3)];
+  return examples.some(item=>item.finding_context)?finding:null;
+};
+
 const shortDate = (value?:string) => {
   if (!value || !/^\d{4}-\d{2}-\d{2}/.test(value)) return value||'';
   const n=Number(value.slice(5,7)),date=Number(value.slice(8,10));
@@ -95,25 +116,18 @@ function insightLocalRange(value:{from_at?:string;to_at?:string;from?:string;to?
     value.from&&value.to?value.from+' to '+value.to:value.date||value.to||'';
 }
 
-function DNATrait({trait,primary=false}: {trait:DnaTrait|null;primary?:boolean}) {
+function DNATrait({trait}: {trait:DnaTrait}) {
   const [expanded,setExpanded]=useState(false);
-  if (!trait || trait.status!=='qualified') {
-    return primary?<View style={[styles.dnaTrait,styles.dnaPrimary]}>
-      <Text style={styles.dnaTitle}>Your Drafting DNA is taking shape</Text>
-      <Text style={styles.caption}>No clear pattern has qualified yet.</Text>
-    </View>:<Text style={styles.dnaDeveloping}>Another trait is taking shape</Text>;
-  }
-  return <View style={[styles.dnaTrait,primary?styles.dnaPrimary:styles.dnaCompact]}>
-    {primary?<><Text style={styles.dnaTitle}>{trait.title}</Text>
-      <Text style={styles.body}>{trait.summary}</Text></>:null}
+  return <View style={styles.patternTrait}>
+    <Text style={styles.patternTitle}>{trait.title}</Text>
+    <Text style={styles.body}>{trait.summary}</Text>
     <Pressable accessibilityRole="button" accessibilityState={{expanded}}
-      style={styles.dnaDisclosure} onPress={()=>setExpanded(current=>!current)}>
-      <Text style={styles.summary}>{primary?'Why this fits':trait.title+' · '+(expanded?'Hide details':'Why this fits')}</Text>
+      style={styles.dnaDisclosure} onPress={()=>setExpanded(v=>!v)}>
+      <Text style={styles.summary}>{expanded?'Hide evidence':'Why this fits'}</Text>
     </Pressable>
     {expanded?<View style={styles.evidence}>
-      {!primary?<Text style={styles.caption}>{trait.summary}</Text>:null}
-      <Text style={styles.meta}>From {trait.supporting_decisions} saved decisions</Text>
-      {trait.evidence.map((entry,index)=><Text key={entry.label+index} style={styles.caption}>
+      <Text style={styles.caption}>{num(trait.supporting_decisions)} picks included in this pattern.</Text>
+      {(trait.evidence||[]).map((entry,index)=><Text key={entry.label+index} style={styles.caption}>
         {entry.label}: {String(entry.value)}
       </Text>)}
     </View>:null}
@@ -123,51 +137,52 @@ function DNASummary({dna,cardChoices,onReview}:{
   dna:DraftingDNA;cardChoices?:CardChoices;onReview:(item:InsightDecisionLocator)=>void;
 }) {
   const [showRules,setShowRules]=useState(false);
+  const [showChoices,setShowChoices]=useState(false);
   const [expandedChoices,setExpandedChoices]=useState<string[]>([]);
+  const traits=[dna.primary,...(dna.secondary||[])].filter((trait):trait is DnaTrait=>
+    trait?.status==='qualified');
+  const qualified=[...new Map(traits.map(trait=>[trait.id,trait])).values()];
   const ready=(cardChoices?.choices||[]).filter(choice=>choice.status==='ready');
-  return <Section title="Your Drafting DNA" caption={'All available history · '+num(dna.eligible_decisions)+' saved decisions'} compact>
-    <DNATrait trait={dna.primary||dna.primary_emerging||null} primary/>
-    <View style={styles.dnaSecondary}>
-      {(dna.secondary||[{status:'emerging',label:'Developing'},{status:'emerging',label:'Developing'}] as DnaTrait[]).slice(0,2).map((trait,index)=>
-        <View key={'trait-'+index} style={styles.dnaHalf}><DNATrait trait={trait}/></View>)}
-    </View>
+  return <Section title="Your pick patterns" caption="Across formats · All available history" compact>
+    {qualified.length?qualified.map(trait=><DNATrait key={trait.id} trait={trait}/>):
+      <Text style={styles.caption}>No clear pick pattern to show yet.</Text>}
     {ready.length?<View style={styles.contextWrap}>
-      <Text style={styles.contextTitle}>When both kinds of cards were competitive</Text>
-      {ready.map(choice=>{
-        const isType=choice.id==='card-type';
-        const chosen=num(choice.selected[isType?'creature':'rare-mythic']||0);
-        const label=isType?'Creature choices':'Rare or mythic choices';
-        const expanded=expandedChoices.includes(choice.id);
-        return <View key={choice.id} style={styles.contextFact}>
-          <View style={styles.contextLine}>
-            <Text style={styles.body}>{label}</Text>
-            <Text style={styles.contextCount}>{chosen} of {num(choice.opportunities)} picks</Text>
-          </View>
-          <Pressable accessibilityRole="button" accessibilityState={{expanded}}
-            style={styles.dnaDisclosure} onPress={()=>setExpandedChoices(prev=>prev.includes(choice.id)?
-              prev.filter(id=>id!==choice.id):[...prev,choice.id])}>
-            <Text style={styles.summary}>Options and real examples</Text>
-          </Pressable>
-          {expanded?<View style={styles.evidence}>
-            <Text style={styles.caption}>{choice.summary}</Text>
-            <Text style={styles.caption}>Competitive cards: {Object.entries(choice.availability).map(([name,count])=>name+': '+count).join(' · ')}</Text>
-            <Text style={styles.caption}>Your picks: {Object.entries(choice.selected).map(([name,count])=>name+': '+count).join(' · ')}</Text>
-            {(choice.examples||[]).map(example=><Pressable key={example.puzzle_id}
-              accessibilityRole="button" style={styles.exampleLink} onPress={()=>onReview(example)}>
-              <Text style={styles.secondaryText}>Review {example.selected_name||'saved pick'} · {example.set_id} P1P{example.pick_number} · {shortDate(example.date)}</Text>
-            </Pressable>)}
-          </View>:null}
-        </View>;
-      })}
+      <Pressable accessibilityRole="button" accessibilityState={{expanded:showChoices}}
+        style={styles.disclosure} onPress={()=>setShowChoices(v=>!v)}>
+        <Text style={styles.summary}>Card type and rarity counts</Text>
+      </Pressable>
+      {showChoices?<View style={styles.evidence}>
+        <Text style={styles.caption}>These counts only include packs where both categories had competitive model support, with known card details and one compatible scoring version. They are not rates for all picks or proof of preference.</Text>
+        {ready.map(choice=>{
+          const isType=choice.id==='card-type',count=num(choice.selected[isType?'creature':'rare-mythic']||0);
+          const expanded=expandedChoices.includes(choice.id);
+          return <View key={choice.id} style={styles.contextFact}>
+            <Text style={styles.body}>{isType?'Creature choices':'Rare or mythic choices'}: {count} of {num(choice.opportunities)} qualifying picks</Text>
+            <Pressable accessibilityRole="button" accessibilityState={{expanded}}
+              style={styles.dnaDisclosure} onPress={()=>setExpandedChoices(prev=>prev.includes(choice.id)?
+                prev.filter(id=>id!==choice.id):[...prev,choice.id])}>
+              <Text style={styles.summary}>Examples and counts</Text>
+            </Pressable>
+            {expanded?<View style={styles.evidence}>
+              <Text style={styles.caption}>{choice.summary}</Text>
+              <Text style={styles.caption}>Competitive options: {Object.entries(choice.availability).map(([n,c])=>n+': '+c).join(' · ')}</Text>
+              <Text style={styles.caption}>Your picks: {Object.entries(choice.selected).map(([n,c])=>n+': '+c).join(' · ')}</Text>
+              {(choice.examples||[]).map(example=><Pressable key={example.puzzle_id}
+                accessibilityRole="button" style={styles.exampleLink} onPress={()=>onReview(example)}>
+                <Text style={styles.secondaryText}>Review pick · {setName(example.set_id)} P1P{example.pick_number} · {shortDate(example.date)}</Text>
+              </Pressable>)}
+            </View>:null}
+          </View>;
+        })}
+      </View>:null}
     </View>:null}
     <Pressable accessibilityRole="button" accessibilityState={{expanded:showRules}}
-      style={styles.dnaDisclosure} onPress={()=>setShowRules(value=>!value)}>
-      <Text style={styles.summary}>How these patterns are counted</Text>
+      style={styles.dnaDisclosure} onPress={()=>setShowRules(v=>!v)}>
+      <Text style={styles.summary}>How this works</Text>
     </Pressable>
     {showRules?<View style={styles.evidence}>
-      <Text style={styles.caption}>These patterns describe saved decisions, not skill. Each needs enough comparable records.</Text>
-      {cardChoices&&!ready.length?<Text style={styles.caption}>Card-choice patterns need more comparable saved packs.</Text>:null}
-      <Text style={styles.caption}>{dna.note}</Text>
+      <Text style={styles.caption}>{num(dna.eligible_decisions)} picks included independent of the Format and time filters. Only the first included answer per puzzle counts. History is bounded to recent qualifying runs, so older picks may not appear.</Text>
+      <Text style={styles.caption}>Traits describe patterns in your picks, not measured skill. {dna.note}</Text>
       {cardChoices?<Text style={styles.caption}>{cardChoices.note}</Text>:null}
     </View>:null}
   </Section>;
