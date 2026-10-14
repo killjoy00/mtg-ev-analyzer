@@ -116,7 +116,8 @@ function insightLocalRange(value:{from_at?:string;to_at?:string;from?:string;to?
     value.from&&value.to?value.from+' to '+value.to:value.date||value.to||'';
 }
 
-function DNATrait({trait}: {trait:DnaTrait}) {
+type QualifiedTrait=Extract<DnaTrait,{status:'qualified'}>;
+function DNATrait({trait}: {trait:QualifiedTrait}) {
   const [expanded,setExpanded]=useState(false);
   return <View style={styles.patternTrait}>
     <Text style={styles.patternTitle}>{trait.title}</Text>
@@ -139,7 +140,7 @@ function DNASummary({dna,cardChoices,onReview}:{
   const [showRules,setShowRules]=useState(false);
   const [showChoices,setShowChoices]=useState(false);
   const [expandedChoices,setExpandedChoices]=useState<string[]>([]);
-  const traits=[dna.primary,...(dna.secondary||[])].filter((trait):trait is DnaTrait=>
+  const traits=[dna.primary,...(dna.secondary||[])].filter((trait):trait is QualifiedTrait=>
     trait?.status==='qualified');
   const qualified=[...new Map(traits.map(trait=>[trait.id,trait])).values()];
   const ready=(cardChoices?.choices||[]).filter(choice=>choice.status==='ready');
