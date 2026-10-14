@@ -187,42 +187,58 @@ function DNASummary({dna,cardChoices,onReview}:{
     </View>:null}
   </Section>;
 }
-function CardArtwork({card,label}: {card:InsightCard|null|undefined;label:string}) {
+function CardArtwork({card,label,small=false}: {card:InsightCard|null|undefined;label:string;small?:boolean}) {
   const url=safeCardImageUrl(card?.image_url);
-  return <View style={styles.cardArt}>
+  return <View style={[styles.cardArt,small&&styles.cardArtSmall]}>
     {url?<Image source={{uri:url}}
-      accessibilityLabel={label+': '+card?.name}
-      resizeMode="contain" style={styles.cardImage}/>:
-      <Text style={styles.caption}>{card?.name||'Card image unavailable'}</Text>}
+      accessibilityLabel={label+': '+(card?.name||'Card')}
+      resizeMode="contain" style={[styles.cardImage,small&&styles.cardImageSmall]}/>:
+      <Text style={styles.caption}>Art unavailable</Text>}
   </View>;
 }
 function SavedDecisionDetail({detail,onClose}: {detail:InsightDecision;onClose:()=>void}) {
+  const pool=detail.prior_picks||[];
   return <View style={styles.decisionDetail}>
-    <Text accessibilityRole="header" style={styles.sectionTitle}>Original saved pack</Text>
-    <Text style={styles.meta}>{detail.set_id} · P1P{detail.pick_number} · {score(detail.score)}/100 · {detail.answered_at.slice(0,10)}</Text>
-    <View style={styles.decisionChoices}>
-      <View style={styles.decisionChoice}><CardArtwork card={detail.selected} label="Your pick"/><Text style={styles.summary}>Your pick: {detail.selected.name}</Text></View>
-      {detail.trophy.id!==detail.selected.id?<View style={styles.decisionChoice}><CardArtwork card={detail.trophy} label="Trophy pick"/><Text style={styles.summary}>Trophy pick: {detail.trophy.name}</Text></View>:null}
+    <Text accessibilityRole="header" style={styles.sectionTitle}>Review pick</Text>
+    <Text style={styles.meta}>{setName(detail.set_id)} · Source P1P{detail.pick_number} · Score {detail.score}/100 · {shortDate(detail.answered_at)}</Text>
+    <Text style={styles.subheading}>Which card fits this pool?</Text>
+    <View style={styles.reviewContext}>
+      <View style={styles.reviewPart}>
+        <Text style={styles.subheading}>Your pick and the trophy pick</Text>
+        <View style={styles.decisionChoices}>
+          <View style={styles.decisionChoice}><CardArtwork card={detail.selected} label="Your pick"/>
+            <Text style={styles.summary}>Your pick</Text><Text style={styles.body}>{detail.selected.name}</Text></View>
+          <View style={styles.decisionChoice}><CardArtwork card={detail.trophy} label="Trophy pick"/>
+            <Text style={styles.summary}>Trophy pick</Text><Text style={styles.body}>{detail.trophy.name}</Text></View>
+        </View>
+      </View>
+      <View style={styles.reviewPart}>
+        <Text style={styles.subheading}>Trophy drafter’s earlier picks</Text>
+        {pool.length?<View style={styles.savedPack}>
+          {pool.map((card,index)=><View key={card.id+'-'+index} style={styles.savedCard}>
+            <CardArtwork card={card} label="Trophy drafter’s earlier pick" small/>
+            <Text style={styles.meta}>{card.name}</Text>
+          </View>)}
+        </View>:<Text style={styles.caption}>Earlier picks aren’t available for this puzzle.</Text>}
+      </View>
     </View>
-    <Text style={styles.subheading}>All original cards</Text>
+    <Text style={styles.subheading}>Full pack</Text>
     <View style={styles.savedPack}>
-      {detail.candidates.map(card=><View key={card.id} style={styles.savedCard}>
-        <CardArtwork card={card} label="Saved pack card"/>
+      {(detail.candidates||[]).map((card,index)=><View key={card.id+'-'+index} style={styles.savedCard}>
+        <CardArtwork card={card} label="Pack card" small/>
         <Text style={styles.meta}>{card.name}{card.id===detail.selected.id?' · Your pick':''}{card.id===detail.trophy.id?' · Trophy pick':''}</Text>
       </View>)}
     </View>
-    {detail.prior_picks.length?<><Text style={styles.subheading}>Original drafter’s prior picks</Text>
-      <Text style={styles.caption}>{detail.prior_picks.map(c=>c.name).join(' · ')}</Text></>:null}
-    {detail.trophy_drafter?.record?<Text style={styles.caption}>This verified trophy draft finished {detail.trophy_drafter.record}.</Text>:null}
-    {detail.trophy_drafter?.win_rate!=null?<Text style={styles.caption}>The original drafter’s approximate overall game win rate was {detail.trophy_drafter.win_rate}%, not this card’s win rate.</Text>:null}
-    {detail.ranking?.length?<><Text style={styles.subheading}>Why this score? Saved alternatives</Text>
+    {detail.ranking?.length?<><Text style={styles.subheading}>Saved alternative scores</Text>
       {detail.ranking.filter(r=>r.score!=null).map(r=><Text key={r.id} style={styles.caption}>
-        {r.name}: {r.score}/100{r.support!=null?' · saved support '+r.support:''}{r.id===detail.selected.id?' · Your pick':''}
+        {r.name}: {r.score}/100{r.support!=null?' · model support '+r.support:''}{r.id===detail.selected.id?' · Your pick':''}
         {r.id===detail.trophy.id?' · Trophy pick':''}
       </Text>)}</>:null}
-    <Text style={styles.caption}>Read-only historical results. Your original score and pick are unchanged.</Text>
+    {detail.trophy_drafter?.record?<Text style={styles.caption}>The trophy draft finished {detail.trophy_drafter.record}.</Text>:null}
+    {detail.trophy_drafter?.win_rate!=null?<Text style={styles.caption}>The trophy drafter’s approximate overall game win rate was {detail.trophy_drafter.win_rate}%, not this card’s win rate.</Text>:null}
+    <Text style={styles.caption}>Read-only review. Your pick and score will not change.</Text>
     <Pressable accessibilityRole="button" onPress={onClose} style={styles.secondaryButton}>
-      <Text style={styles.secondaryText}>Close original pack</Text>
+      <Text style={styles.secondaryText}>Close</Text>
     </Pressable>
   </View>;
 }
@@ -230,48 +246,56 @@ function HighlightsStory({highlights,finding,onReview,onLoadMore,morePhase}:{
   highlights:InsightHighlights;finding?:{id:string;text:string}|null;
   onReview:(item:InsightHighlight)=>void;onLoadMore:()=>void;morePhase:'idle'|'loading'|'error';
 }) {
-  const [selected,setSelected]=useState<'best'|'misses'>('best');
+  const [selected,setSelected]=useState<'best'|'misses'>(highlights.misses?.length?'misses':'best');
   const [expanded,setExpanded]=useState(false);
   const rows=selected==='best'?highlights.best:highlights.misses;
-  const show=expanded?rows:rows.slice(0,3);
-  return <Section title="Decision report" caption={num(rows.length)+' saved highlights available in '+(selected==='best'?'Best Calls':'Biggest Misses')}
+  const show=expanded?rows:(rows||[]).slice(0,3);
+  return <Section title="Picks to review" caption="Only your first included answer to each puzzle counts."
     onLayout={config.screenshots.fixtures?()=>console.info('PACKONE_INSIGHTS_READY'):undefined}>
-    <Text style={styles.reportLead}>
-      <Text style={styles.summary}>{finding?'Leading finding: ':'Your recent decisions: '}</Text>
-      {finding?.text||'No standout comparison has qualified in this environment and time period. These saved picks are factual examples.'}
-    </Text>
+    {finding?<Text style={styles.reportLead}>{finding.text} Individual examples illustrate the comparison, not its cause.</Text>:
+      <Text style={styles.caption}>Open a pick to see the full pack and the trophy drafter’s earlier picks.</Text>}
     <View style={styles.choices}>
-      {(['best','misses'] as const).map(kind=><Pressable key={kind} accessibilityRole="button"
+      {(['misses','best'] as const).map(kind=><Pressable key={kind} accessibilityRole="tab"
         accessibilityState={{selected:selected===kind}}
+        accessibilityLabel={kind==='misses'?'Picks to revisit':'High-scoring picks'}
         onPress={()=>{setSelected(kind);setExpanded(false);}}
-        style={[styles.choice,selected===kind&&styles.choiceActive]}>
-        <Text style={[styles.choiceText,selected===kind&&styles.choiceTextActive]}>{kind==='best'?'Best Calls':'Biggest Misses'}</Text>
+        style={[styles.choice,selected===kind&&styles.choiceActive,styles.reviewTab]}>
+        <Text style={[styles.choiceText,selected===kind&&styles.choiceTextActive]}>
+          {kind==='misses'?'Picks to revisit':'High-scoring picks'}</Text>
       </Pressable>)}
     </View>
-    {show.length?show.map((item,index)=><View key={item.puzzle_id} style={[styles.highlightCard,index>0&&styles.highlightCompact]}>
-      {index===0?<View style={styles.highlightVisual}>
-        <View style={styles.highlightArtWrap}><Text style={styles.meta}>Your pick</Text><CardArtwork card={item.preview?.selected} label="Your pick"/></View>
-        {!item.trophy_match?<View style={styles.highlightArtWrap}><Text style={styles.meta}>Trophy pick</Text><CardArtwork card={item.preview?.trophy} label="Trophy pick"/></View>:null}
-      </View>:null}
-      <Text style={styles.summary}>Your pick: {item.preview?.selected?.name||item.selected_name||'Saved selection'}</Text>
-      <Text style={styles.meta}>{item.trophy_match?'Trophy pick matched':'Trophy pick: '+(item.preview?.trophy?.name||item.historical_name||'Original trophy selection')}</Text>
-      <Text style={styles.meta}>{item.set_id} · P1P{item.pick_number} · {shortDate(item.date)} · Original score {item.score}/100</Text>
-      {item.finding_context?<Text style={styles.contextNote}>{item.finding_context}</Text>:null}
-      <Text style={styles.body}>{item.reason_text||(
-        item.trophy_match?'You matched the original trophy selection.':
-          'Your original non-trophy decision earned '+item.score+'/100.')}</Text>
-      <Pressable accessibilityRole="button" onPress={()=>onReview(item)} style={styles.compactAction}>
-        <Text style={styles.secondaryText}>Review original pack</Text>
-      </Pressable>
-    </View>):<Text style={styles.caption}>No qualifying saved picks in this group for these filters.</Text>}
-    {!expanded&&(rows.length>3||highlights.has_more?.[selected])?<Pressable accessibilityRole="button" style={styles.secondaryButton}
-      onPress={()=>setExpanded(true)}><Text style={styles.secondaryText}>See more</Text></Pressable>:null}
+    {show.length?show.map((item,index)=>{
+      const own=item.preview?.selected,archived=item.preview?.trophy;
+      const ownName=own?.name||item.selected_name||'Card name unavailable';
+      const trophyName=archived?.name||item.historical_name||'Card name unavailable';
+      return <View key={item.puzzle_id} style={[styles.highlightCard,index>0&&styles.highlightCompact]}>
+        <View style={styles.highlightVisual}>
+          <View style={styles.highlightArtWrap}><Text style={styles.meta}>Your pick</Text>
+            <CardArtwork card={own} label="Your pick" small={index>0}/></View>
+          <View style={styles.highlightArtWrap}><Text style={styles.meta}>Trophy pick</Text>
+            <CardArtwork card={archived} label="Trophy pick" small={index>0}/></View>
+        </View>
+        <Text style={styles.body}>Your pick: {ownName}</Text>
+        <Text style={styles.body}>Trophy pick: {trophyName}</Text>
+        <Text style={styles.meta}>{setName(item.set_id)} · Source P1P{item.pick_number} · {shortDate(item.date)} · Score {item.score}/100</Text>
+        {item.finding_context?<Text style={styles.contextNote}>{item.finding_context}</Text>:null}
+        <Text style={styles.body}>{reviewExplanation(item)}</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel={'Review pick: '+ownName}
+          onPress={()=>onReview(item)} style={styles.compactAction}>
+          <Text style={styles.secondaryText}>Review pick</Text>
+        </Pressable>
+      </View>;
+    }):<Text style={styles.caption}>No {selected==='misses'?'picks to revisit':'high-scoring picks'} here. This doesn’t mean you drafted badly.</Text>}
+    {!expanded&&((rows||[]).length>3||highlights.has_more?.[selected])?<Pressable accessibilityRole="button"
+      style={styles.secondaryButton} onPress={()=>setExpanded(true)}>
+      <Text style={styles.secondaryText}>See more picks</Text></Pressable>:null}
     {expanded&&highlights.has_more?.[selected]?<Pressable accessibilityRole="button" disabled={morePhase==='loading'}
       onPress={onLoadMore} style={styles.secondaryButton}>
-      <Text style={styles.secondaryText}>{morePhase==='loading'?'Loading saved picks…':
-        morePhase==='error'?'Retry loading more picks':'See more saved decisions'}</Text>
+      <Text style={styles.secondaryText}>{morePhase==='loading'?'Loading more picks…':
+        morePhase==='error'?'Retry loading picks':'Load more picks'}</Text>
     </Pressable>:null}
-    <Text style={styles.caption}>These are historical scored calls, not proof of objectively right or wrong Magic choices.</Text>
+    <Text style={styles.caption}>100 means you matched the trophy pick. Other picks earn up to 95 based on the model.</Text>
+    <Text style={styles.caption}>Scores describe picks; they don’t prove a choice was objectively right or wrong.</Text>
   </Section>;
 }
 function JourneyStory({journey,progress,months}:{
