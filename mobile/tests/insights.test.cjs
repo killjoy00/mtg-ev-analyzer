@@ -271,8 +271,8 @@ test('older native API still shows scores without inventing unsupported review c
   assert.ok(text.includes('Picks to review'));
   assert.ok(text.includes('Pick examples aren’t available from this version yet.'));
   assert.ok(text.includes('Your scores over time'));
-  assert.match(text,/Your last 40 picks averaged 83\\.0\\s*\\/100/);
-  assert.match(text,/previous 40 \\(70\\.0\\s*\\/100\\)/);
+  assert.ok(text.replace(/\s/g,'').includes('Yourlast40picksaveraged83.0/100'));
+  assert.ok(text.replace(/\s/g,'').includes('previous40(70.0/100)'));
   assert.ok(text.includes('2026-09'));
   assert.ok(!text.includes('Recent picks averaged 13.0 points higher'),
     'older API observations are not automatically promoted into a player diagnosis');
