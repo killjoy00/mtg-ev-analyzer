@@ -25,7 +25,7 @@ import { trackEvent } from './retention-events.mjs';
 import { nextMilestones } from './progression.mjs?v=10';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { eliteSource } from './membership-source.mjs';
-import { renderAccount, renderDeletionState } from './growth.mjs?v=13';
+import { renderAccount, renderDeletionState } from './growth.mjs?v=14';
 import {
   bestPercentile,
   environmentProgress,
