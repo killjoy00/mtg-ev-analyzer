@@ -67,20 +67,23 @@ test('route scope rejects malformed public keys rather than falling back to priv
   assert.deepEqual(model.activityScope(KEY), { kind: 'public', key: KEY });
   for (const key of ['', null, [], [KEY], 'b'.repeat(24), 'https://example.invalid']) assert.throws(() => model.activityScope(key));
 });
-test('archive uses the published catalog, excludes fixtures, and does not count out-of-catalog results', () => {
-  const entries = model.checkedArchive({ sets: [{ id: 'msh', name: 'Marvel' }, { id: 'vow', name: 'Crimson Vow' }, { id: 'qa', is_fixture: true }] });
+test('archive contains only currently Live environments, never inactive historical sets', () => {
+  const entries = model.checkedArchive({ sets: [
+    { set_id: 'msh', set_name: 'Marvel' },
+    { set_id: 'powered-cube', set_name: 'Powered Cube' },
+  ] });
   const record = profile();
-  record.by_set.push({ set_id: 'other', games: 100, average_score: 90, best_score: 100 });
+  record.by_set.push({ set_id: 'vow', games: 100, average_score: 90, best_score: 100 });
   const rows = model.archiveProgress(entries, record);
   assert.equal(rows.length, 2);
-  assert.equal(rows.filter((entry) => entry.played).length, 1);
+  assert.equal(rows.filter(entry => entry.played).length, 1);
   assert.equal(rows[0].favorite, true);
-  assert.deepEqual(model.filterArchive(rows, 'unplayed', 'VOW').map((row) => row.id), ['vow']);
-  assert.equal(model.filterArchive(rows, 'played', 'crimson').length, 0);
+  assert.deepEqual(model.filterArchive(rows, 'unplayed', 'CUBE').map(row => row.id), ['powered-cube']);
+  assert.deepEqual(model.filterArchive(rows, 'all', 'VOW'), []);
   assert.equal(model.filterArchive(rows, 'all', 'unknown').length, 0);
 });
 test('invalid and duplicate catalog identifiers fail closed', () => {
-  for (const sets of [[{ id: '../secret' }], [{ id: 'msh' }, { id: 'msh' }], [{ id: 'msh', name: {} }]]) assert.throws(() => model.checkedArchive({ sets }));
+  for (const sets of [[{ set_id: '../secret' }], [{ set_id: 'msh' }, { set_id: 'msh' }], [{ set_id: 'msh', set_name: {} }], [{ id: 'vow', name: 'Crimson Vow' }]]) assert.throws(() => model.checkedArchive({ sets }));
   assert.throws(() => model.checkedArchive({}));
 });
 test('daily copy preserves zero, date, Live versus Final, mode, and privacy', () => {
@@ -230,14 +233,25 @@ test('catalog requests are deduplicated and cannot resurrect private data after 
   assert.equal(reads, 1); assert.equal(h.state().phase, 'guest'); assert.equal(h.state().profile, null);
 });
 
-test('archive adapter uses fixed public destinations and never accepts manifest or identity inputs', async () => {
-  const calls = []; const old = globalThis.fetch;
-  globalThis.fetch = async (url, options) => { calls.push([url, options]); return { ok: true, text: async () => JSON.stringify({ sets: [{ id: 'msh', manifest_path: 'https://evil.invalid' }] }) }; };
-  const api = compile('src/api/profileArchive.ts', { '@/src/api/client': { requestJson: async (...args) => { calls.push(args); return { corpus_version: 'fixture', sets: [] }; } } });
+test('native adapter uses only the serving catalog and deduplicates concurrent requests', async () => {
+  const calls = [];
+  const old = globalThis.fetch;
+  globalThis.fetch = async () => { throw Error('Historical catalog must never be fetched.'); };
+  const api = compile('src/api/profileArchive.ts', {
+    '@/src/api/client': { requestJson: async (...args) => {
+      calls.push(args);
+      return { corpus_version: 'fixture', sets: [{
+        set_id: 'msh', set_name: 'Marvel', verified_decisions: 3,
+        qualified_trophy_drafts: 2, training_drafts: 5,
+      }] };
+    } },
+  });
   try {
-    assert.equal((await api.loadProfileArchive())[0].id, 'msh'); await api.loadProfileCoverage();
-    assert.equal(calls[0][0], 'https://packone.pro/data/catalog.json'); assert.equal(calls[0][1].credentials, 'omit');
-    assert.equal(calls[1][0], '/draft/v1/set-catalog'); assert.equal(calls[1][1].credentials, 'omit');
-    assert.equal(calls.length, 2);
+    const [archive, coverage] = await Promise.all([api.loadProfileArchive(),api.loadProfileCoverage()]);
+    assert.deepEqual(archive.map(row => row.id), ['msh']);
+    assert.equal(coverage.sets.length, 1);
+    assert.equal(calls.length, 1, 'concurrent archive and coverage use one Live serving request');
+    assert.equal(calls[0][0], '/draft/v1/set-catalog');
+    assert.equal(calls[0][1].credentials, 'omit');
   } finally { globalThis.fetch = old; }
 });
