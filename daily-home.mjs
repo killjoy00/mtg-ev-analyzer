@@ -49,9 +49,9 @@ export function renderDailyHome(profile = null, state = 'ready') {
   }
   lastDay = gameDateKey();
   document.querySelector('#app').innerHTML = dailyHomeMarkup(profile, lastDay, state);
-  document.querySelector('[data-home-account]')?.addEventListener('click', async () => (await import('./growth.mjs?v=13')).renderAccount());
+  document.querySelector('[data-home-account]')?.addEventListener('click', async () => (await import('./growth.mjs?v=14')).renderAccount());
   document.querySelector('[data-home-username]')?.addEventListener('click', async () => {
-    if(!profile?.player?.claimed){await (await import('./growth.mjs?v=13')).renderAccount({notice:'Choose a display name to join Daily leaderboards.'});return;}
+    if(!profile?.player?.claimed){await (await import('./growth.mjs?v=14')).renderAccount({notice:'Choose a display name to join Daily leaderboards.'});return;}
     const profiles=await import('./profile-product.mjs?v=13');
     await profiles.renderMyProfile();
     document.querySelector('#profile-account-tab')?.click();
