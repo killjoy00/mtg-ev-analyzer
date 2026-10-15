@@ -1,7 +1,7 @@
 {
   "operation": "deploy",
-  "request_id": "issue-984-privacy-retirement-prod-20261006",
-  "reason": "Owner-authorized production promotion of the exact Issue #984 creator privacy-retirement fix after development deploy run 37479069935 passed revision coverage, all three unranked Daily flows, and live v5 account-linked Practice. Promote only commit 6b29a11715415aef137c403c20e165b1490c5c3f.",
-  "commit": "6b29a11715415aef137c403c20e165b1490c5c3f",
-  "target": "production"
+  "request_id": "pack1-live-env-dev-20261015-e8dd335",
+  "reason": "Deploy reviewed Pack One Live-only environment progress and player-first Insights backend from PRs #1206 and #1205 to development. Exact merged source e8dd335; CI and backend integration gates passed. Require existing development release acceptance before production.",
+  "commit": "e8dd335c0b70919df594f26a76aa339c310ea2f0",
+  "target": "development"
 }
