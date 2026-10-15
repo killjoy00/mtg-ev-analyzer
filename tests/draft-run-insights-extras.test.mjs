@@ -368,7 +368,7 @@ test('Saved type and rarity choices require competitive cross-category options, 
    assert.equal(group.status,'ready');
    assert.equal(group.opportunities,32);
    assert.equal(group.examples.length,2);
-   assert.ok(group.summary.includes('32 decisions'));
+   assert.ok(group.summary.includes('32 picks'));
    assert.equal(group.availability['creature']??group.availability['common-uncommon'],32);
  }
  assert.deepEqual(cardType.selected,{creature:24,noncreature:8});
@@ -500,10 +500,58 @@ test('aggregate passes exact compared 6/8 groups to highlights but returns no ra
     score:n%2?42:95,sourcePick:n%2?8:6,day:Math.floor(n/2),band:'medium',
   })));
   const result=aggregateDraftRunInsights(rows,{now:new Date('2027-12-01T00:00:00Z')});
+  assert.equal(result.comparison_contract,'compatible-source-groups-v1');
   assert.equal(result.leading_finding?.id,'pick-depth');
   assert.deepEqual(result.leading_finding.compared_groups.map(g=>g.label),
-    ['P1P6 decisions','P1P8 decisions']);
+    ['P1P6 source picks','P1P8 source picks']);
   assert.ok(result.highlights.best.slice(0,3).every(r=>[6,8].includes(r.pick_number)));
+  assert.ok([...result.highlights.best.slice(0,3),...result.highlights.misses.slice(0,3)].every(r=>r.finding_context),
+    'the headline is only shown when all visible examples belong to its comparison');
   assert.ok(result.highlights.misses.slice(0,3).every(r=>[6,8].includes(r.pick_number)));
   assert.doesNotMatch(JSON.stringify(result.leading_finding),/puzzle_ids|puzzle_id/);
+});
+
+test('Pick-position headline examples come from the same scoring cohort',()=>{
+ const old=Array.from({length:80},(_,n)=>raw(pick(n,{score:n%2?25:98,sourcePick:n%2?8:6,
+   version:'old-source'})));
+ const newer=Array.from({length:25},(_,n)=>raw(pick(200+n,{score:12,sourcePick:6,
+   version:'new-source',day:100+n})));
+ const result=aggregateDraftRunInsights([...old,...newer],{now:new Date('2027-12-01T00:00:00Z')});
+ assert.equal(result.leading_finding?.id,'pick-depth');
+ // The only eligible comparison is the old compatible scoring cohort.
+ assert.ok(result.highlights.best.filter(r=>r.finding_context).every(r=>r.puzzle_id.startsWith('p')&&
+   Number(r.puzzle_id.slice(1))<200));
+ assert.ok(result.highlights.misses.filter(r=>r.finding_context).every(r=>Number(r.puzzle_id.slice(1))<200));
+});
+test('Saved model alternative must distinguish the trophy from a third card',()=>{
+ const a=pick(1100,{score:30});
+ a.selected_id='mine';a.historical_id='trophy';a.choice_ranking=[
+   {id:'mine',name:'Your Card',support:.12},
+   {id:'third',name:'Model Leader',support:.9},
+   {id:'trophy',name:'Trophy Card',support:.55},
+ ];
+ const out=selectInsightHighlights([a]).misses[0];
+ assert.equal(out.reason_code,'saved-support-gap');
+ assert.equal(out.reason_evidence.leader_id,'third');
+ assert.equal(out.reason_evidence.leader_is_trophy,0);
+ assert.match(out.reason_text,/different card from the trophy pick/);
+ const same={...a,choice_ranking:[
+   {id:'mine',name:'Your Card',support:.12},
+   {id:'third',name:'Model Leader',support:.55},
+   {id:'trophy',name:'Trophy Card',support:.9},
+ ]};
+ const trophy=selectInsightHighlights([same]).misses[0];
+ assert.equal(trophy.reason_evidence.leader_is_trophy,1);
+ assert.match(trophy.reason_text,/the trophy pick/);
+});
+test('Format and raw model-difficulty differences never become headline advice',()=>{
+ const rows=[...Array.from({length:40},(_,n)=>raw(pick(n,{score:20,
+   band:'easy',sourcePick:n%2?3:5}))),
+   ...Array.from({length:40},(_,n)=>raw(pick(n+100,{score:95,
+     band:'hard',sourcePick:n%2?3:5}))),
+   ...Array.from({length:40},(_,n)=>raw(pick(n+300,{score:90,
+     environment:'latest',band:'easy',sourcePick:3})))];
+ const agg=aggregateDraftRunInsights(rows,{now:new Date('2027-12-01T00:00:00Z')});
+ assert.ok(!['difficulty','format-latest'].includes(agg.leading_finding?.id));
+ assert.ok(agg.observations.every(o=>o.id!=='difficulty'&&!o.id.startsWith('format-')));
 });

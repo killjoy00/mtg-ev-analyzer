@@ -87,7 +87,7 @@ function comparison(rows,labelA,labelB,a,b,id,note='',groups=[]) {
   return {id,count:Math.min(a.count,b.count),gap:Math.abs(gap),
     groups:groups.map((group,index)=>({...group,relation:(index===0)===(gap>0)?'higher':'lower'})),
     text:labelA+' averaged '+Math.abs(gap).toFixed(1)+' points '+(gap>0?'higher':'lower')+
-    ' than '+labelB+' ('+a.count+' vs '+b.count+' decisions).'+(note?' '+note:'')};
+    ' than '+labelB+' ('+a.count+' vs '+b.count+' picks).'+(note?' '+note:'')};
 }
 
 // Chart-ready, private, bounded aggregation. No raw decision rows leave the server.
@@ -128,51 +128,46 @@ export function aggregateDraftRunInsights(source,{environment='mixed',period='al
         {label:'the previous 40 picks',puzzle_ids:prior.map(r=>r.puzzle_id)}]);
     if(result)proposals.push(result);
   }
-  // Only large cohorts may trigger copy; 5-answer chart groups remain descriptive.
-  const goodPicks=depth.filter(p=>p.count>=40);
-  if(goodPicks.length>=2){
-    const higher=[...goodPicks].sort((a,b)=>b.average_score-a.average_score)[0];
-    const lower=[...goodPicks].sort((a,b)=>a.average_score-b.average_score)[0];
-    if(higher.pick_number!==lower.pick_number){
-      const result=comparison(selected,higher.label,lower.label,higher,lower,'pick-depth','',[
-        {label:higher.label+' decisions',pick_number:higher.pick_number},
-        {label:lower.label+' decisions',pick_number:lower.pick_number}]);
-      if(result)proposals.push(result);
-    }
+  // Only comparisons within a single scoring, selection and corpus revision
+  // may become pick-position headlines. Mixed versions still appear in
+  // descriptive charts, never in a blended claim about the player.
+  const cohorts=new Map();
+  for(const pick of selected){
+    const key=[pick.scoring_version,pick.selection_version,pick.corpus_version].join('|');
+    if(!cohorts.has(key))cohorts.set(key,[]);
+    cohorts.get(key).push(pick);
   }
-  const goodBands=difficulty.filter(p=>p.count>=40&&p.band!=='unknown');
-  if(goodBands.length>=2){
-    const higher=[...goodBands].sort((a,b)=>b.average_score-a.average_score)[0];
-    const lower=[...goodBands].sort((a,b)=>a.average_score-b.average_score)[0];
-    if(higher.band!==lower.band){
-      const result=comparison(selected,higher.band+' decisions',lower.band+' decisions',higher,lower,'difficulty',
-        'The puzzle difficulty groups are different.',[
-          {label:higher.band+'-rated decisions',band:higher.band},
-          {label:lower.band+'-rated decisions',band:lower.band}]);
-      if(result)proposals.push(result);
-    }
-  }
-  const main=formats.find(f=>f.environment===environment);
-  for(const other of formats){
-    if(other.environment===environment)continue;
-    const result=comparison(selected,main.label+' drafts',other.label+' drafts',main,other,
-      'format-'+other.environment,'The card pools differ between formats.',[
-        {label:main.label+' drafts',environment:main.environment},
-        {label:other.label+' drafts',environment:other.environment}]);
+  for(const [cohortKey,cohort] of cohorts){
+    const positions=grouped(cohort,r=>r.pick_number).filter(p=>p.count>=INSIGHTS_COMPARISON_MIN);
+    if(positions.length<2)continue;
+    const higher=[...positions].sort((a,b)=>b.average_score-a.average_score||a.value-b.value)[0];
+    const lower=[...positions].sort((a,b)=>a.average_score-b.average_score||a.value-b.value)[0];
+    if(higher.value===lower.value)continue;
+    const result=comparison(cohort,'P1P'+higher.value+' source picks','P1P'+lower.value+' source picks',
+      higher,lower,'pick-depth','Source draft positions, not eight-question game rounds.',[
+        {label:'P1P'+higher.value+' source picks',pick_number:higher.value,cohort:cohortKey},
+        {label:'P1P'+lower.value+' source picks',pick_number:lower.value,cohort:cohortKey}]);
     if(result)proposals.push(result);
   }
+  // Difficulty measures closeness of model support, not measured human
+  // difficulty. Formats have distinct card pools. Neither is a headline.
   proposals.sort((a,b)=>b.count-a.count||b.gap-a.gap||a.id.localeCompare(b.id));
   const observations=proposals.slice(0,3).map(({id,text})=>({id,text}));
   // DNA uses the complete bounded first-encounter history, not chart filters.
   const drafting_dna=buildDraftingDNA(all);
   const card_choices=buildCardChoiceContext(all);
   const journey={...buildDraftingJourney(selected),progress_compatible};
-  const featured=proposals[0]||null;
-  // Only public labels leave this function. Progress group puzzle IDs remain
-  // private selector inputs rather than another way to reconstruct history.
+  const proposed=proposals[0]||null;
+  const candidateHighlights=selectInsightHighlights(selected,{page,finding:proposed});
+  const examples=[...candidateHighlights.best.slice(0,3),...candidateHighlights.misses.slice(0,3)];
+  // The headline accompanies both visible example tabs. Avoid implying that
+  // unrelated picks illustrate the comparison if either tab must be padded.
+  const featured=proposed&&examples.length>0&&examples.every(example=>example.finding_context)?proposed:null;
+  // Re-select without comparison-driven priorities when the proposed finding
+  // has no accompanying saved example from either compared group.
+  const highlights=featured?candidateHighlights:selectInsightHighlights(selected,{page});
   const leading_finding=featured?{id:featured.id,text:featured.text,
     compared_groups:featured.groups.map(({label,relation})=>({label,relation}))}:null;
-  const highlights=selectInsightHighlights(selected,{page,finding:featured});
   const versions={
     scoring:[...new Set(selected.map(r=>r.scoring_version))].sort(),
     selection:[...new Set(selected.map(r=>r.selection_version))].sort(),
@@ -180,15 +175,17 @@ export function aggregateDraftRunInsights(source,{environment='mixed',period='al
   };
   return {
     environment:filter.environment,period:filter.period,environment_label:LABELS[environment],
+    comparison_contract:'compatible-source-groups-v1',
     eligible_decisions:total,unlocked:total>=INSIGHTS_UNLOCK_MIN,unlock_at:INSIGHTS_UNLOCK_MIN,
     total_eligible_decisions:eligible.length,unknown_difficulty:selected.filter(r=>r.difficulty_band==='unknown').length,
     pick_depth:depth,difficulty,months,formats,progress,observations,versions,
     drafting_dna,card_choices,journey,highlights,leading_finding,
     default_environment:all[0]?.environment||'mixed',
     range:oldestNewest(selected),session_limit:INSIGHTS_SESSION_LIMIT,
-    methodology:'Original awarded pick scores; first answer to each puzzle in up to 1,000 recent eight-pick non-QA runs. '+
-      'Pick numbers are real source pick positions. Group averages require 5 picks; months need 10; progress needs two sets of 40; '+
-      'written comparisons need at least 40 per group and a 10-point gap. Historical card pools and models may differ.',
+    methodology:'Only your first included answer to each puzzle counts. We use scored picks from up to 1,000 recent eight-pick runs, excluding test runs. '+
+      'Pick positions come from the source draft, not the eight questions. Averages need 5 picks (monthly groups need 10). '+
+      'Comparisons need at least 40 in each group and a 10-point gap within compatible versions. '+
+      'The hard rating measures how close the model support was between cards, not how difficult humans found the pick.',
   };
 }
 
