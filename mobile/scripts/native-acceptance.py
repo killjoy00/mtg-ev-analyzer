@@ -402,6 +402,8 @@ if platform == 'android':
         require('Picks to revisit' in xml and 'High-scoring picks' in xml,
                 'Review tabs are missing after scrolling to them')
         tap('High-scoring picks', exact=True)
+        # The selected example starts below the tab row on short phones.
+        reveal('Hero in Training')
         xml, _ = snapshot('insights-high-scoring')
         require('Hero in Training' in xml, 'High-scoring picks did not switch')
         tap('Review pick')
@@ -409,6 +411,8 @@ if platform == 'android':
         xml, _ = snapshot('insights-readonly-trophy-pool')
         require('Trophy drafter' in xml and 'earlier picks' in xml,
                 'Read-only review does not identify the source drafter pool')
+        reveal('Hero in Training')
+        xml, _ = snapshot('insights-readonly-selected-card')
         require('Hero in Training' in xml, 'Review did not load the chosen card')
         adb('shell', 'input', 'keyevent', '4')
         time.sleep(2)
@@ -419,10 +423,13 @@ if platform == 'android':
         xml, _ = snapshot('insights-scores-over-time')
         require('Your scores over time' in xml, 'Score history is missing')
         reveal('Your pick patterns')
+        xml, _ = snapshot('insights-patterns-heading')
+        require('Your pick patterns' in xml and 'All available history' in xml,
+                'Pick patterns heading and all-history scope are missing')
+        reveal('The Independent Thinker')
         xml, _ = snapshot('insights-qualified-patterns')
-        require('Your pick patterns' in xml and 'The Independent Thinker' in xml,
+        require('The Independent Thinker' in xml,
                 'Qualified traits are missing below the score history')
-        require('All available history' in xml, 'DNA scope must remain visible')
 
     attempt('insights-default-revisit-high-scores-pool-and-history', native_insights)
 
