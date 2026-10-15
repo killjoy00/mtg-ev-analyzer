@@ -1,7 +1,7 @@
 {
   "operation": "deploy",
-  "request_id": "pack1-live-env-dev-20261015-e8dd335",
-  "reason": "Deploy reviewed Pack One Live-only environment progress and player-first Insights backend from PRs #1206 and #1205 to development. Exact merged source e8dd335; CI and backend integration gates passed. Require existing development release acceptance before production.",
+  "request_id": "pack1-live-env-prod-20261015-e8dd335",
+  "reason": "Owner-authorized production promotion of merged Pack One PR #1206 Live-only player environment progress and #1205 Insights backend at the same exact reviewed source as development, e8dd335c0b70919df594f26a76aa339c310ea2f0. Require successful development release run 38745022888 with live Daily and Practice acceptance before merging this request; production workflow independently verifies exact development revision, schema prerequisites and public frontend.",
   "commit": "e8dd335c0b70919df594f26a76aa339c310ea2f0",
-  "target": "development"
+  "target": "production"
 }
