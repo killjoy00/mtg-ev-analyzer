@@ -395,8 +395,12 @@ if platform == 'android':
         require('PACKONE_INSIGHTS_READY' in logs, 'Native pick review did not render')
         require('Your picks' in xml and 'Picks to review' in xml,
                 'Picks are no longer the first Insights feature')
+        # The phone's initial viewport ends at the review heading. Scroll to
+        # the actual tab controls before asserting their accessibility labels.
+        reveal('Picks to revisit')
+        xml, _ = snapshot('insights-review-tabs')
         require('Picks to revisit' in xml and 'High-scoring picks' in xml,
-                'Review tabs are missing')
+                'Review tabs are missing after scrolling to them')
         tap('High-scoring picks', exact=True)
         xml, _ = snapshot('insights-high-scoring')
         require('Hero in Training' in xml, 'High-scoring picks did not switch')
