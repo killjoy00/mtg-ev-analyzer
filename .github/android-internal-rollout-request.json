@@ -1,7 +1,7 @@
 {
   "operation": "rollout-android-internal",
-  "reason": "Owner-authorized 2026-10-13 Pack One Android rollout to existing Google Play Internal Testing. Authenticated live status run 38449709824 found exact two releases: new signed 100810 in draft and older 100015 completed. Supersede only the existing active Internal Testing 100015 with the already uploaded 100810; do not rebuild or introduce a new bundle. Guard exact prior release and require a completed post-commit read from Google Play. Preserve the separate production-access Closed Testing completed version 100772, its uninterrupted 14-day tester qualification, tester groups, countries, all unrelated tracks and Production. If Play denies activation, stop safely.",
+  "reason": "Owner-authorized 2026-10-15 activation of already-uploaded signed Pack One Android build 100846 (commit 0d51b5b) on Google Play Internal Testing only. Upload workflow 38745953083 verified this build as draft. Accept only the 100846 draft internal release, optionally alongside the prior completed internal 100810, and refuse all unexpected releases or version codes. Verify bundle presence and the unchanged production-access Closed Testing completed 100772 qualification release before staging; validate, commit, and re-read the completed internal release. Do not rebuild or upload. Preserve the uninterrupted 14-day Closed Testing qualification, tester lists, countries, all unrelated tracks, and Production. Stop safely if Google Play rejects activation.",
   "track": "internal",
-  "version_code": "100810",
+  "version_code": "100846",
   "preserve_closed_version_code": "100772"
 }

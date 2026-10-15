@@ -3,12 +3,12 @@ import assert from 'node:assert/strict';
 import { rolloutInternalRelease } from '../mobile/scripts/play-internal-rollout.mjs';
 
 function playFixture({
-  internalVersion = '100810',
+  internalVersion = '100846',
   internalStatus = 'draft',
   closedVersion = '100772',
   closedStatus = 'completed',
   includePriorInternal = true,
-  priorInternalVersion = '100015',
+  priorInternalVersion = '100810',
   priorInternalStatus = 'completed',
   duplicateInternal = false,
   rejectValidation = false,
@@ -90,17 +90,17 @@ const run = (fixture, options = {}) => rolloutInternalRelease({
   token: 'test-credential', fetchImpl: fixture.fetchImpl, ...options,
 });
 
-test('activates exactly 100810, verifies completed, and preserves all other Play tracks', async () => {
+test('activates exactly 100846, verifies completed, and preserves all other Play tracks', async () => {
   const fixture = playFixture();
   const before = structuredClone(fixture.state.live.tracks.slice(1));
   const result = await run(fixture);
-  assert.equal(result.versionCode, '100810');
+  assert.equal(result.versionCode, '100846');
   assert.equal(result.releaseStatus, 'completed');
   assert.equal(result.verifiedAfterCommit, true);
   assert.equal(result.committed, true);
-  assert.equal(result.replacedInternalCode, '100015');
+  assert.equal(result.replacedInternalCode, '100810');
   assert.equal(fixture.state.live.tracks[0].releases.length, 1,
-    '100810 must supersede only the authenticated older internal release');
+    '100846 must supersede only the authenticated older internal release');
   assert.equal(fixture.state.live.tracks[0].releases[0].status, 'completed');
   assert.deepEqual(fixture.state.live.tracks.slice(1), before);
   assert.deepEqual(fixture.state.calls.filter((call) => call.method === 'PUT').map((call) => call.path),
@@ -108,20 +108,33 @@ test('activates exactly 100810, verifies completed, and preserves all other Play
   assert.equal(fixture.state.calls.filter((call) => call.path.endsWith(':commit')).length, 1);
 });
 
+test('activates a single draft 100846 without requiring a prior active internal release', async () => {
+  const fixture = playFixture({ includePriorInternal: false });
+  const before = structuredClone(fixture.state.live.tracks.slice(1));
+  const result = await run(fixture);
+  assert.equal(result.versionCode, '100846');
+  assert.equal(result.committed, true);
+  assert.equal(result.verifiedAfterCommit, true);
+  assert.equal(result.replacedInternalCode, null);
+  assert.equal(fixture.state.live.tracks[0].releases.length, 1);
+  assert.equal(fixture.state.live.tracks[0].releases[0].status, 'completed');
+  assert.deepEqual(fixture.state.live.tracks.slice(1), before);
+});
+
 test('already completed release is idempotent, with no committed edit or other writes', async () => {
   const fixture = playFixture({ internalStatus: 'completed', includePriorInternal: false });
   const result = await run(fixture);
   assert.equal(result.alreadyActive, true);
   assert.equal(result.committed, false);
-  assert.deepEqual(fixture.state.live.tracks[0].releases[0].versionCodes, ['100810']);
+  assert.deepEqual(fixture.state.live.tracks[0].releases[0].versionCodes, ['100846']);
   assert.ok(fixture.state.calls.every((call) => call.method !== 'PUT' && !call.path.endsWith(':commit')));
   assert.equal(fixture.state.edits.size, 0);
 });
 
 test('rejects missing target bundle and leaves the existing tracks untouched', async () => {
-  const fixture = playFixture({ internalVersion: '100809' });
+  const fixture = playFixture({ internalVersion: '100845' });
   const before = structuredClone(fixture.state.live);
-  await assert.rejects(run(fixture), /Reviewed 100810 AAB is missing/);
+  await assert.rejects(run(fixture), /Reviewed 100846 AAB is missing/);
   assert.deepEqual(fixture.state.live, before);
   assert.equal(fixture.state.edits.size, 0);
 });
@@ -156,7 +169,7 @@ test('rejects changed closed track detected before edit commit', async () => {
 
 test('rejects unreviewed release code before contacting Google Play', async () => {
   const fixture = playFixture();
-  await assert.rejects(run(fixture, { expectedVersionCode: '100811' }), /Only the reviewed Android 100810/);
+  await assert.rejects(run(fixture, { expectedVersionCode: '100847' }), /Only the reviewed Android 100846/);
   assert.equal(fixture.state.calls.length, 0);
 });
 
@@ -169,6 +182,6 @@ test('rejects a different active internal version instead of silently replacing 
 
 test('rejects previous internal release if not currently completed', async () => {
   const fixture = playFixture({ priorInternalStatus: 'halted' });
-  await assert.rejects(run(fixture), /historical internal fallback is not currently completed/);
+  await assert.rejects(run(fixture), /previous internal release is not currently completed/);
   assert.equal(fixture.state.calls.filter((call) => call.method === 'PUT').length, 0);
 });
