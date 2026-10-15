@@ -30,26 +30,35 @@ export function environmentProgress(catalog, bySet = []) {
   };
 }
 
-// The public Draft Run catalog contains only environments with Live serving status.
-// Keep this separate from the historical replay catalog so retired/Candidate plays
-// remain part of a player's archive without inflating currently playable progress.
+// This catalog is issued by Draft Run's Live-only serving API. Never replace a
+// failed Live catalog with the historical replay catalog on a player surface.
 export function liveEnvironmentProgress(liveCatalog, bySet = []) {
   const sets = liveCatalog?.sets;
   if (!Array.isArray(sets) || !sets.length || sets.length > 500) return null;
+  const stats = new Map((bySet || []).map(row => [String(row.set_id || '').toLowerCase(), row]));
   const ids = new Set();
+  const environments = [];
   for (const entry of sets) {
     const id = entry?.set_id;
-    if (typeof id !== 'string' || !/^[a-z0-9][a-z0-9-]{1,39}$/.test(id) || ids.has(id)) return null;
+    if (typeof id !== 'string' || !/^[a-z0-9][a-z0-9-]{1,39}$/.test(id) || ids.has(id)
+      || (entry.set_name != null && typeof entry.set_name !== 'string')) return null;
     ids.add(id);
+    const row = stats.get(id);
+    environments.push({
+      id,
+      name: String(entry.set_name || id.toUpperCase()).trim() || id.toUpperCase(),
+      isCube: id === 'powered-cube',
+      dataDate: entry.data_date || null,
+      played: Number(row?.games || 0) > 0,
+      games: Number(row?.games || 0),
+      averageScore: Number(row?.average_score || 0),
+      bestScore: Number(row?.best_score || 0),
+      dailyGames: Number(row?.daily_games || 0),
+      lastPlayedAt: row?.last_played_at || null,
+    });
   }
-  const playedIds = new Set((bySet || [])
-    .filter(row => Number(row?.games || 0) > 0)
-    .map(row => String(row.set_id || '').toLowerCase()));
-  return {
-    total: ids.size,
-    played: [...ids].filter(id => playedIds.has(id)).length,
-    ids,
-  };
+  return { environments, total: environments.length,
+    played: environments.filter(entry => entry.played).length, ids };
 }
 
 export function modeName(mode, { cube = false } = {}) {
