@@ -1,5 +1,5 @@
 {
   "operation": "read-pack-one-testflight-status",
-  "reason": "Read-only owner-authorized status check for iOS 1.1 build 100789 after the #1182 upload workflow's processing/attachment step timed out contacting App Store Connect. Report the exact build's processing and TestFlight availability only; do not change testers, groups, review state, metadata, version attachment or release state.",
-  "build_number": "100789"
+  "reason": "Read-only exact-build verification for native Insights iOS 1.1 build 100879 uploaded and processed VALID / APP_STORE_ELIGIBLE by guarded run 38762377593. Finalizer observed READY_FOR_BETA_TESTING, not internal TestFlight availability. Verify processing, current internal beta status, and existing group association without changing reviewers, testers, group membership, version attachments, public App Review, metadata, signing, or release state.",
+  "build_number": "100879"
 }
