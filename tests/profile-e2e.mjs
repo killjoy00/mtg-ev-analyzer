@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
+import { selectInsightHighlights } from '../worker/draft-run-insights-extras.mjs';
 
 const base = process.env.PACK1_E2E_URL || 'http://127.0.0.1:4173';
 const growthOrigin = 'https://br-twilight-hill-ayffyd2b-pack1growth.compute.c-5.us-east-2.aws.neon.tech';
@@ -14,6 +15,7 @@ let updateMode = 'success';
 let shareCalls = 0;
 let accountMode = 'signed-in';
 let insightsMode = 'ready';
+let releaseDelayedPageTwo = null;
 
 await page.addInitScript(() => {
   localStorage.setItem('pack1-auth-session-v1','profile-auth-fixture');
@@ -233,7 +235,7 @@ await page.route(`${growthOrigin}/**`, async (route) => {
               trophy:{id:'card-trophy',name:'Frost Lynx',image_url:null}}}]},
         methodology:'First answer to each puzzle, original points, 1,000-session cap.',
       };
-      if(insightsMode==='v2') {
+      if(insightsMode==='v2'||insightsMode==='v2-delayed') {
         body={...body,
           drafting_dna:{schema_version:'drafting-dna-v2',status:'emerging',scope:'all-eligible-history',
             eligible_decisions:38,picks_needed:42,primary:null,
@@ -256,6 +258,38 @@ await page.route(`${growthOrigin}/**`, async (route) => {
                 trophy:{id:'card-trophy',name:'Scryfall Art',image_url:'https://cards.scryfall.io/normal/front/x.jpg'}}}],
           },
         };
+      }
+      if(insightsMode==='third-card'){
+        // Use the real backend reason builder, not a fabricated reason object.
+        const saved=(id,leader)=>({
+          session_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          round:3,puzzle_id:id,set_id:'neo',environment:'mixed',
+          pick_number:5,answered_at:'2026-09-16T12:00:00.000Z',
+          score:32,trophy_match:false,selected_id:'card-mine',
+          historical_id:'card-trophy',selected_name:'Daring Skyjek',
+          historical_name:'Frost Lynx',difficulty_band:'medium',
+          choice_ranking:[
+            {id:'card-mine',name:'Daring Skyjek',support:.1},
+            {id:'card-trophy',name:'Frost Lynx',support:leader==='trophy'?.9:.5},
+            {id:'card-third',name:'Goblin Electromancer',support:leader==='third'?.9:.5},
+          ],
+        });
+        const misses=selectInsightHighlights([
+          saved('fixture-leader-third','third'),saved('fixture-leader-trophy','trophy'),
+          saved('fixture-leader-unknown','third'),
+        ]).misses.map(item=>({...item,preview:{
+          selected:{id:'card-mine',name:'Daring Skyjek',image_url:null},
+          trophy:{id:'card-trophy',name:'Frost Lynx',image_url:null},
+        }}));
+        const incomplete=misses.find(item=>item.puzzle_id==='fixture-leader-unknown');
+        incomplete.reason_evidence={leader_id:'card-third',leader_name:'Goblin Electromancer'};
+        incomplete.preview.trophy=null;
+        body={...body,leading_finding:null,comparison_contract:'compatible-source-groups-v1',
+          highlights:{...body.highlights,best:[],misses,has_more:{best:false,misses:false}}};
+      }
+      if(insightsMode==='sparse-filter'){
+        body={...body,eligible_decisions:0,unlocked:false,progress:null,leading_finding:null,
+          highlights:{...body.highlights,best:[],misses:[],has_more:{best:false,misses:false}}};
       }
       if(insightsMode==='descriptive') {
         // 237 real-looking eligible decisions with no qualifying 10-point gap.
@@ -350,6 +384,10 @@ await page.route(`${growthOrigin}/**`, async (route) => {
     body = { dates:['2026-09-09','2026-09-08'] };
   } else if (url.pathname === '/v1/events') {
     body = { ok:true, accepted:1 };
+  }
+  if(url.pathname==='/v1/profile/insights'&&insightsMode==='v2-delayed'&&
+      url.searchParams.get('page')==='2'){
+    await new Promise(resolve=>{releaseDelayedPageTwo=resolve;});
   }
   await route.fulfill({ status, contentType:'application/json', body:JSON.stringify(body) });
 });
@@ -473,6 +511,40 @@ try {
   assert.equal(await page.locator('#my-insights-best-panel .my-insights-pick').count(),2);
   assert.equal(await page.getByRole('button',{name:'See more picks'}).count(),0);
 
+
+  // Actual new-backend reason evidence must render, including a third leader.
+  insightsMode='third-card';
+  await page.locator('#my-insights-refresh').click();
+  const reasonFor=id=>page.locator('#my-insights-misses-panel .my-insights-pick:has(button[data-puzzle="'+id+'"]) .my-insights-reason');
+  await reasonFor('fixture-leader-third').waitFor();
+  assert.match(await reasonFor('fixture-leader-third').textContent(),
+    /saved model favored Goblin Electromancer.*different card from the trophy pick/i);
+  assert.match(await reasonFor('fixture-leader-trophy').textContent(),
+    /saved model supported the trophy pick more strongly/i);
+  assert.match(await reasonFor('fixture-leader-unknown').textContent(),
+    /saved model favored Goblin Electromancer more strongly than your choice/i);
+  assert.equal(await page.getByText('Insights unavailable',{exact:true}).count(),0);
+
+  // Switching tabs or using the review dialog must not strand page-two loading.
+  insightsMode='v2-delayed';
+  await page.locator('#my-insights-refresh').click();
+  await high.click();
+  await page.locator('#my-insights-best-panel').getByText(/First Page Card/).first().waitFor();
+  await page.locator('#my-insights-best-panel [data-insights-more]').click();
+  const pending=page.locator('#my-insights-best-panel [data-insights-more]');
+  assert.equal(await pending.isDisabled(),true);
+  await revisit.click();
+  await page.locator('#my-insights-misses-panel [data-insights-review]').first().click();
+  await page.locator('#my-insights-decision-dialog[open] .my-insights-locked-pack').waitFor();
+  await page.locator('#my-insights-decision-dialog').getByRole('button',{name:'Close'}).click();
+  await high.click();
+  for(let tries=0;!releaseDelayedPageTwo&&tries<100;tries++)
+    await new Promise(resolve=>setTimeout(resolve,25));
+  assert.equal(typeof releaseDelayedPageTwo,'function','the page-two fetch was delayed');
+  releaseDelayedPageTwo();releaseDelayedPageTwo=null;
+  await page.locator('#my-insights-best-panel').getByText(/Second Page Card/).first().waitFor();
+  assert.equal(await pending.count(),0,'completed pagination must not remain disabled');
+
   insightsMode='ready';
   await page.locator('#my-insights-refresh').click();
   await page.locator('.my-insights-dna').getByText('The Independent Thinker').waitFor();
@@ -530,6 +602,14 @@ try {
   await page.locator('.my-insights-sample').getByText(/9 picks included/).waitFor();
   assert.match(await page.locator('.my-insights-dna').textContent(),/No clear pick pattern/);
   assert.equal(await page.locator('.my-insights-qualified-trait').count(),0);
+  insightsMode='sparse-filter';
+  await page.locator('#my-insights-refresh').click();
+  await page.locator('#my-insights-result').getByText(/0 of 8 picks included/).waitFor();
+  assert.match(await page.locator('.my-insights-dna').textContent(),/The Independent Thinker/,
+    'qualified all-history traits remain visible when a filtered view is locked');
+  assert.equal(await page.locator('.my-insights-journey').count(),0,
+    'selected-filter score sections remain locked');
+
   insightsMode='versions';
   await page.locator('#my-insights-refresh').click();
   assert.match(await page.locator('.my-insights-journey-warning').textContent(),/cannot be read as one continuous trend/);
