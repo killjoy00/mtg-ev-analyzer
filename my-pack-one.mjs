@@ -1,6 +1,6 @@
 import {escapeHtml as esc} from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
-import {environmentProgress,formatChallengeRecord,modeName,unlockedAchievements} from './profile-core.mjs';
+import {environmentProgress,liveEnvironmentProgress,formatChallengeRecord,modeName,unlockedAchievements} from './profile-core.mjs';
 import {PATREON_POLICY} from './patreon-policy.mjs';
 import {invalidateMyPackInsights,mountMyPackInsights} from './my-pack-insights.mjs?v=3';
 import {eliteSource} from './membership-source.mjs';
@@ -105,12 +105,17 @@ function dailyDetailRow(row,names,index) {
   return '<li><div><strong>'+esc(environmentName(names,row.set_id))+' · '+esc(modeName(row.mode,{cube:row.set_id==='powered-cube'}))+'</strong><span>'+esc(row.date||'')+(row.final===false?' · Still open':'')+'</span></div><b>'+num(row.score)+'</b><em>'+(pct?'Top '+pct+'%'+(row.final===false?' so far':'')+' · #'+num(row.rank)+' of '+num(row.total):num(row.total)+' ranked players')+'</em><button type="button" class="text-button" data-share-daily="'+index+'">Share</button></li>';
 }
 
-function archiveMarkup(progress) {
+function archiveMarkup(progress,live) {
   const pct=progress.total?Math.round((progress.played/progress.total)*100):0;
-  return '<div class="my-archive-summary"><div><strong>'+progress.played+'/'+progress.total+'</strong><span>environments played</span></div><b>'+pct+'%</b></div>'+
+  const archivedOnly=live?progress.environments.filter(entry=>!live.ids.has(entry.id)).length:null;
+  const note=live
+    ? live.total+' live now · '+archivedOnly+' archive-only'
+    : 'Archive includes environments that may not be live.';
+  return '<div class="my-archive-summary"><div><strong>'+progress.played+'/'+progress.total+'</strong><span>archive environments played</span></div><b>'+pct+'%</b></div>'+
     '<div class="my-archive-track" role="progressbar" aria-label="Archive progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+pct+'"><i style="width:'+pct+'%"></i></div>'+
+    '<p class="my-archive-note">'+note+'</p>'+
     '<details class="my-pack-details" data-profile-section="archive"><summary>View full archive progress</summary><div class="my-archive-grid">'+progress.environments.map(entry=>
-      '<a class="my-archive-item '+(entry.played?'is-played':'is-unplayed')+'" data-environment-id="'+esc(entry.id)+'" href="/sets/#'+encodeURIComponent(entry.id)+'"><strong>'+esc(entry.name)+'</strong><span>'+(entry.played?entry.games+' games · '+entry.averageScore.toFixed(1)+' avg':'Not played yet')+'</span></a>'
+      '<a class="my-archive-item '+(entry.played?'is-played':'is-unplayed')+'" data-environment-id="'+esc(entry.id)+'" href="/sets/#'+encodeURIComponent(entry.id)+'"><strong>'+esc(entry.name)+'</strong><span>'+(entry.played?entry.games+' games · '+entry.averageScore.toFixed(1)+' avg':'Not played yet')+(live&&!live.ids.has(entry.id)?' · Not live':'')+'</span></a>'
     ).join('')+'</div></details>';
 }
 
@@ -155,9 +160,10 @@ function shareAside(profile) {
   '</section>';
 }
 
-function statsMarkup(profile,catalog,account,patreon) {
+function statsMarkup(profile,catalog,account,patreon,liveCatalog) {
   const names=catalogNames(catalog);
   const progress=environmentProgress(catalog,profile.by_set||[]);
+  const live=liveEnvironmentProgress(liveCatalog,profile.by_set||[]);
   const summary=profile.summary||{};
   const recent=(profile.recent||[]).slice(0,20);
   const daily=(profile.daily_history||[]).slice(0,12);
@@ -174,7 +180,7 @@ function statsMarkup(profile,catalog,account,patreon) {
     ['Best',num(summary.best_score)],
     ['Daily streak',num(summary.current_streak)],
     ['Shared W–L',esc(formatChallengeRecord(summary))],
-    ['Environments',progress.played+'/'+progress.total],
+    [live?'Live environments':'Archive environments',live?live.played+'/'+live.total:progress.played+'/'+progress.total],
   ];
   const metricHtml=metrics.map(([label,value])=>'<div><strong>'+value+'</strong><span>'+label+'</span></div>').join('');
   const recentPreview=recent.slice(0,5).map(row=>gamePreviewRow(row,names)).join('');
@@ -188,7 +194,7 @@ function statsMarkup(profile,catalog,account,patreon) {
       (recent.length?'<details class="my-pack-details"><summary>View all game history</summary><ol class="profile-history-list" id="profile-history-list">'+recent.map(row=>historyRow(row,names)).join('')+'</ol><button type="button" class="button secondary" id="profile-load-more" '+(recent.length<20?'hidden':'')+'>Load more</button></details>':'')+'</section>'+
     '<div class="my-two-up"><section class="my-pack-card"><div class="my-card-heading"><h2>Daily History</h2></div>'+(dailyPreview?'<ol class="my-daily-preview">'+dailyPreview+'</ol>':'<p class="my-pack-empty">No ranked Daily history yet.</p>')+
       (daily.length?'<details class="my-pack-details"><summary>View Daily finishes</summary><ol class="profile-daily-list">'+daily.map((row,index)=>dailyDetailRow(row,names,index)).join('')+'</ol></details>':'')+'</section>'+
-    '<section class="my-pack-card"><div class="my-card-heading"><h2>Archive Progress</h2></div>'+archiveMarkup(progress)+'</section></div>'+
+    '<section class="my-pack-card"><div class="my-card-heading"><h2>Archive Progress</h2></div>'+archiveMarkup(progress,live)+'</section></div>'+
   '</main><aside class="my-pack-one-aside">'+profileAside(profile,progress,account,patreon)+membershipAside(patreon)+shareAside(profile)+'</aside></div>';
 }
 
@@ -251,7 +257,7 @@ export function bindMyPackOneTabs() {
   });
 }
 
-export function myPackOneMarkup(profile,catalog,{account=null,patreon=null,settingsMarkup}={}) {
+export function myPackOneMarkup(profile,catalog,{account=null,patreon=null,settingsMarkup,liveCatalog=null}={}) {
   const owner=String(profile?.player?.profile_key||'unclaimed');
   if(previousOwner!==owner){activeTab='stats';previousOwner=owner;invalidateMyPackInsights();}
   const progress=environmentProgress(catalog,profile.by_set||[]);
@@ -263,7 +269,7 @@ export function myPackOneMarkup(profile,catalog,{account=null,patreon=null,setti
       '<button type="button" role="tab" id="profile-stats-tab" aria-controls="profile-stats-panel" aria-selected="'+String(activeTab==='stats')+'" tabindex="'+(activeTab==='stats'?'0':'-1')+'">Stats</button>'+
       '<button type="button" role="tab" id="profile-insights-tab" aria-controls="profile-insights-panel" aria-selected="'+String(activeTab==='insights')+'" tabindex="'+(activeTab==='insights'?'0':'-1')+'">Insights</button>'+
       '<button type="button" role="tab" id="profile-account-tab" aria-controls="profile-account-panel" aria-selected="'+String(activeTab==='account')+'" tabindex="'+(activeTab==='account'?'0':'-1')+'">Account settings</button></div>'+
-    '<section class="my-pack-one-panel" id="profile-stats-panel" role="tabpanel" tabindex="0" aria-labelledby="profile-stats-tab" data-profile-panel="stats" '+(activeTab==='stats'?'':'hidden')+'>'+statsMarkup(profile,catalog,account,patreon)+'</section>'+
+    '<section class="my-pack-one-panel" id="profile-stats-panel" role="tabpanel" tabindex="0" aria-labelledby="profile-stats-tab" data-profile-panel="stats" '+(activeTab==='stats'?'':'hidden')+'>'+statsMarkup(profile,catalog,account,patreon,liveCatalog)+'</section>'+
     '<section class="my-pack-one-panel" id="profile-insights-panel" role="tabpanel" tabindex="0" aria-labelledby="profile-insights-tab" data-profile-panel="insights" '+(activeTab==='insights'?'':'hidden')+'></section>'+
     '<section class="my-pack-one-panel my-pack-one-account-panel" id="profile-account-panel" role="tabpanel" aria-labelledby="profile-account-tab" data-profile-panel="account" '+(!accountSelected?'hidden':'')+'>'+
       '<div class="my-account-heading"><h2>Account settings</h2><p>Manage your profile, membership, and sign-in.</p></div>'+
