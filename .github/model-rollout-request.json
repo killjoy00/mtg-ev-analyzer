@@ -1,7 +1,7 @@
 {
   "operation": "deploy",
-  "request_id": "pack1-live-env-prod-20261015-e8dd335",
-  "reason": "Owner-authorized production promotion of merged Pack One PR #1206 Live-only player environment progress and #1205 Insights backend at the same exact reviewed source as development, e8dd335c0b70919df594f26a76aa339c310ea2f0. Require successful development release run 38745022888 with live Daily and Practice acceptance before merging this request; production workflow independently verifies exact development revision, schema prerequisites and public frontend.",
-  "commit": "e8dd335c0b70919df594f26a76aa339c310ea2f0",
-  "target": "production"
+  "request_id": "pack1-insights-fix-dev-20261015-d7108d",
+  "reason": "Deploy reviewed and merged Pack One Insights bugfix PR #1210 at exact main commit d7108d12f8c666085516d7e5ffcf4ca2fd884a68 to Neon development. Repairs third-card explanation crash, unstable highlight pagination, loading state and all-history pattern display. Require green unit, browser, backend checks and live Pages publication; validate live Daily, Practice, schema, bundling and release marker before requesting a separate production promotion of this same exact revision.",
+  "commit": "d7108d12f8c666085516d7e5ffcf4ca2fd884a68",
+  "target": "development"
 }
