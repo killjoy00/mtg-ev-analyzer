@@ -379,11 +379,14 @@ try {
   assert.equal((await page.locator('.my-pack-one-heading h1').textContent())?.trim(), 'My Pack One');
   assert.equal((await page.locator('.my-career-metrics > div:last-child strong').textContent())?.trim(), '3/3',
     'the career snapshot counts the Live catalog, not the 30-set archive');
-  assert.equal((await page.locator('.my-career-metrics > div:last-child span').textContent())?.trim(), 'Live environments');
-  assert.match(await page.locator('.my-archive-summary').textContent(), /archive environments played/);
-  assert.match(await page.locator('.my-archive-note').textContent(), /3 live now/);
-  assert.match(await page.locator('[data-environment-id="pio"]').textContent(), /Not live/,
-    'archive-only sets stay visible as historical entries');
+  assert.equal((await page.locator('.my-career-metrics > div:last-child span').textContent())?.trim(), 'Environments');
+  assert.match(await page.locator('.my-archive-summary').textContent(), /3\/3\s*environments played/);
+  assert.equal(await page.locator('[data-environment-id="pio"]').count(), 0,
+    'Candidate environments must not be visible to players');
+  assert.equal(await page.locator('[data-environment-id="vow"]').count(), 0,
+    'archived but inactive environments must not be visible');
+  assert.equal(await page.locator('.my-archive-note').count(), 0,
+    'do not display inactive-set explanations to players');
   assert.equal((await page.locator('.my-profile-card h2').textContent())?.trim(), 'Profile Tester');
   assert.equal(await page.locator('.my-profile-card h2 [data-achievement-mark="explorer5"]').count(),1,'showcased badge sits beside the player name');
   assert.equal(await page.locator('#profile-stats-tab').getAttribute('aria-selected'),'true');
@@ -572,15 +575,13 @@ try {
   assert.equal(await page.locator('#profile-insights-panel').isHidden(),true);
 
 
-  const catalogIds = await page.evaluate(async () => {
-    const response = await fetch('/data/catalog.json', { cache:'no-store' });
-    const data = await response.json();
-    return (data.sets || []).filter((entry) => entry?.id && !entry.is_fixture).map((entry) => entry.id);
-  });
-  const catalogTotal = catalogIds.length;
-  const activePlayed = fixture.by_set.filter((row) => catalogIds.includes(row.set_id)).length;
-  assert.equal(await page.locator('.my-archive-item').count(), catalogTotal, 'My Pack One archive must follow the production catalog dynamically');
-  assert.match((await page.locator('.my-archive-summary').textContent()) || '', new RegExp(`${activePlayed}/${catalogTotal}\\s*environments played`));
+  const liveIds = ['neo','ktk','powered-cube'];
+  const activePlayed = fixture.by_set.filter(row => liveIds.includes(row.set_id)).length;
+  assert.equal(await page.locator('.my-archive-item').count(), liveIds.length, 'Only Live sets appear in the player archive');
+  assert.match((await page.locator('.my-archive-summary').textContent()) || '',
+    new RegExp(`${activePlayed}/${liveIds.length}\\s*environments played`));
+  assert.equal(await page.locator('#profile-settings-form select[name="favoriteSetId"] option').count(),
+    liveIds.length + 1, 'favorite choices must be Live-only');
   assert.equal(await page.locator('[data-environment-id="powered-cube"].is-played').count(), 1, 'Powered Cube must be part of archive progression');
   assert.match((await page.locator('.my-daily-preview li').first().textContent()) || '', /Top 7%/i);
   assert.match((await page.locator('.my-daily-preview li').first().textContent()) || '', /NEO/i);
