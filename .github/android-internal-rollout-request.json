@@ -1,7 +1,7 @@
 {
   "operation": "rollout-android-internal",
-  "reason": "Owner-authorized 2026-10-15 activation of already-uploaded signed Pack One Android build 100846 (commit 0d51b5b) on Google Play Internal Testing only. Upload workflow 38745953083 verified this build as draft. Accept only the 100846 draft internal release, optionally alongside the prior completed internal 100810, and refuse all unexpected releases or version codes. Verify bundle presence and the unchanged production-access Closed Testing completed 100772 qualification release before staging; validate, commit, and re-read the completed internal release. Do not rebuild or upload. Preserve the uninterrupted 14-day Closed Testing qualification, tester lists, countries, all unrelated tracks, and Production. Stop safely if Google Play rejects activation.",
+  "reason": "Reviewed internal-only activation of the new native Insights build from merged #1214 and signed upload #1215. Authorize versionCode 100849 only after Android Internal Testing build run 38762377649 verifies exact signed 100849 in Google Play. Replace only prior completed Internal Testing 100846, preserving the separate production-access Closed Testing 100772, testers, groups, geography, 14-day qualification and Production. Do not rebuild, change tracks or publish publicly; fail closed if the uploaded version or previous active version differs.",
   "track": "internal",
-  "version_code": "100846",
+  "version_code": "100849",
   "preserve_closed_version_code": "100772"
 }
