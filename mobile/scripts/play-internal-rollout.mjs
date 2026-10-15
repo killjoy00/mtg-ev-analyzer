@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 const PACKAGE = 'pro.packone.app';
 const INTERNAL = 'internal';
 const CLOSED = 'production-access';
-const TARGET_CODE = '100846';
+const TARGET_CODE = '100849';
 const CLOSED_CODE = '100772';
 
 function releasesFor(track) {
@@ -19,7 +19,7 @@ function singleRelease(track, versionCode) {
     'Refusing an unexpected multi-release internal track.');
   const target = releases.filter((release) =>
     JSON.stringify((release.versionCodes || []).map(String)) === JSON.stringify([versionCode]));
-  assert.equal(target.length, 1, 'Expected exactly one reviewed 100846 internal release.');
+  assert.equal(target.length, 1, 'Expected exactly one reviewed 100849 internal release.');
   const release = target[0];
   assert.ok(['draft', 'completed'].includes(release.status),
     'Internal target release has an unexpected status.');
@@ -27,12 +27,12 @@ function singleRelease(track, versionCode) {
   const existing = releases.filter((candidate) => candidate !== release);
   if (existing.length) {
     assert.equal(existing.length, 1, 'Refusing multiple old internal releases.');
-    assert.deepEqual((existing[0].versionCodes || []).map(String), ['100810'],
+    assert.deepEqual((existing[0].versionCodes || []).map(String), ['100846'],
       'Refusing to displace an unreviewed previous internal release.');
     assert.equal(existing[0].status, 'completed',
       'The previous internal release is not currently completed.');
     assert.equal(release.status, 'draft',
-      'Refusing to rewrite a completed 100846 release alongside a fallback.');
+      'Refusing to rewrite a completed 100849 release alongside a fallback.');
   }
   return release;
 }
@@ -60,7 +60,7 @@ export async function rolloutInternalRelease({
   expectedClosedVersionCode = CLOSED_CODE,
 } = {}) {
   assert.ok(token && typeof token === 'string', 'Google Play access token required.');
-  assert.equal(expectedVersionCode, TARGET_CODE, 'Only the reviewed Android 100846 rollout is authorized.');
+  assert.equal(expectedVersionCode, TARGET_CODE, 'Only the reviewed Android 100849 rollout is authorized.');
   assert.equal(expectedClosedVersionCode, CLOSED_CODE,
     'Do not change the approved production-access Closed Testing baseline.');
   const base = 'https://androidpublisher.googleapis.com/androidpublisher/v3/applications/' + PACKAGE;
@@ -114,13 +114,13 @@ export async function rolloutInternalRelease({
     ]);
     assert.ok((bundles?.bundles || []).some((bundle) =>
       String(bundle.versionCode) === expectedVersionCode),
-    'Reviewed 100846 AAB is missing from Google Play; refusing a rebuild or substitution.');
+    'Reviewed 100849 AAB is missing from Google Play; refusing a rebuild or substitution.');
     assertClosedPreserved(inventory, expectedClosedVersionCode);
     beforeOther = otherTracks(inventory);
     assert.ok(inventory.tracks.some((track) => track.track === INTERNAL),
       'Refusing to create a new internal track.');
     const release = singleRelease(internal, expectedVersionCode);
-    replacedInternalCode = releasesFor(internal).length === 2 ? '100810' : null;
+    replacedInternalCode = releasesFor(internal).length === 2 ? '100846' : null;
     releaseName = release.name;
     priorStatus = release.status;
 
