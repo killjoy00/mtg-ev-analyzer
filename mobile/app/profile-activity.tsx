@@ -100,11 +100,11 @@ function ActivityRecord({ scope, initialTab }: { scope: ActivityScope; initialTa
 
         {tab === 'archive' ? <>
           <Text style={styles.heading}>Archive progress</Text>
-          <Text style={styles.body}>Published archive environments, including those not currently in live serving coverage. An unplayed environment is not an access grant.</Text>
-          {state.catalogBusy ? <ActivityIndicator accessibilityLabel="Loading archive catalog" /> : null}
+          <Text style={styles.body}>Only environments currently available to play are listed here.</Text>
+          {state.catalogBusy ? <ActivityIndicator accessibilityLabel="Loading environments" /> : null}
           {state.catalogError ? <Text accessibilityRole="alert" style={styles.error}>{state.catalogError}</Text> : null}
-          {archive === null ? <Text style={styles.body}>The archive catalog is not available. Progress cannot be determined from live sets alone.</Text> : <>
-            <Text accessibilityLabel="Published archive progress" style={styles.heading}>{archive.filter((entry) => entry.played).length} / {archive.length} environments played</Text>
+          {archive === null ? <Text style={styles.body}>Live environments are temporarily unavailable. Refresh to try again.</Text> : <>
+            <Text accessibilityLabel="Live environment progress" style={styles.heading}>{archive.filter((entry) => entry.played).length} / {archive.length} environments played</Text>
             <TextInput accessibilityLabel="Search archive environments" placeholder="Search by set name or code" value={search} onChangeText={setSearch} style={styles.search} />
             <View style={styles.actions}>
               {(['all', 'played', 'unplayed'] as const).map((item) => <Pressable key={item} accessibilityRole="button"
@@ -125,7 +125,7 @@ function ActivityRecord({ scope, initialTab }: { scope: ActivityScope; initialTa
                     <Text style={styles.body}>{record.games} games · {record.average_score.toFixed(1)} average · {record.best_score} best</Text>
                     {record.daily_games != null ? <Text style={styles.meta}>{record.daily_games} Daily games</Text> : null}
                     {record.last_played_at ? <Text style={styles.meta}>Last played {record.last_played_at}</Text> : null}
-                  </> : <Text style={styles.body}>No recorded games in this archive environment.</Text>}
+                  </> : <Text style={styles.body}>No recorded games in this environment.</Text>}
                   <Pressable accessibilityRole="button" accessibilityLabel={`View ${entry.name} set details`}
                     accessibilityState={{ expanded: expanded === entry.id }} onPress={() => setExpanded((previous) => previous === entry.id ? null : entry.id)} style={styles.button}>
                     <Text style={styles.buttonText}>{expanded === entry.id ? 'Hide set details' : 'View set details'}</Text>
@@ -137,7 +137,7 @@ function ActivityRecord({ scope, initialTab }: { scope: ActivityScope; initialTa
                       <Text style={styles.body}>{live.verified_decisions.toLocaleString()} verified decisions · {live.qualified_trophy_drafts.toLocaleString()} qualified trophy drafts</Text>
                       <Text style={styles.body}>{live.training_drafts.toLocaleString()} training drafts{live.data_date ? ` · data through ${live.data_date}` : ''}</Text>
                       <Text style={styles.meta}>Serving corpus: {state.coverage.corpus_version}</Text>
-                    </> : <Text style={styles.body}>Not present in the current live serving catalog. Historical progress is retained.</Text>}
+                    </> : <Text style={styles.body}>Live coverage is temporarily unavailable.</Text>}
                   </View> : null}
                 </View>;
               })}
@@ -146,7 +146,7 @@ function ActivityRecord({ scope, initialTab }: { scope: ActivityScope; initialTa
           </>}
           {state.coverageError ? <Text accessibilityRole="alert" style={styles.error}>Live coverage: {state.coverageError}</Text> : null}
           <Pressable accessibilityRole="button" disabled={state.catalogBusy} onPress={() => void controller.catalog()} style={styles.button}>
-            <Text style={styles.buttonText}>Refresh archive catalog</Text>
+            <Text style={styles.buttonText}>Refresh environments</Text>
           </Pressable>
         </> : tab === 'achievements' ? <>
           <Text style={styles.heading}>Achievements · {unlocked} / {profile.achievements.length} unlocked</Text>
