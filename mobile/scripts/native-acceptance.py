@@ -479,9 +479,11 @@ if platform == 'android':
         reveal('Your pick patterns')
         xml, logs = snapshot('insights-sparse-320dp-large-text')
         require('PACKONE_INSIGHTS_READY' in logs, 'Sparse pick-review fixture did not render')
-        require('No clear pick pattern to show yet' in xml,
-                'Sparse history invented a qualified identity')
         require('All available history' in xml, 'Sparse pattern scope is missing')
+        reveal('No clear pick pattern to show yet.')
+        xml, _ = snapshot('insights-sparse-empty-pattern')
+        require('No clear pick pattern to show yet.' in xml,
+                'Sparse history invented a qualified identity')
 
     attempt('insights-sparse-narrow-large-text', native_insights_sparse)
 
