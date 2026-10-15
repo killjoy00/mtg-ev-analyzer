@@ -46,6 +46,10 @@ test('live coverage excludes non-live archive sets but preserves historical prog
   assert.deepEqual({ played: archive.played, total: archive.total }, { played: 3, total: 4 });
   assert.deepEqual({ played: live.played, total: live.total }, { played: 2, total: 2 });
   assert.equal(live.ids.has('pio'), false);
+  assert.deepEqual(live.environments.map(entry => entry.id), ['neo','powered-cube']);
+  assert.equal(live.environments[0].games, 4);
+  assert.equal(live.environments[0].played, true);
+  assert.equal(live.environments[1].isCube, true);
   assert.equal(liveEnvironmentProgress(null, bySet), null);
   assert.equal(liveEnvironmentProgress({ sets: [] }, bySet), null);
   assert.equal(liveEnvironmentProgress({ sets: [{ set_id: 'neo' }, { set_id: 'neo' }] }, bySet), null);
