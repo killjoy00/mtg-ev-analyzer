@@ -182,6 +182,30 @@ test('Highlights pages fail closed beyond two and preview at most twelve owner s
  assert.equal(reads.length,before,'invalid pages are rejected before DB access');
 });
 
+test('aggregated pagination retains first-page qualification and disjoint picks',()=>{
+  // Forty compatible picks per source group but only five qualifying review
+  // examples each; page two cannot re-rank by dropping the comparison.
+  const records=[
+    ...Array.from({length:40},(_,n)=>row(n,{pick:2,score:n<5?92:70})),
+    ...Array.from({length:40},(_,n)=>row(n+40,{pick:7,score:n<5?35:65})),
+    ...Array.from({length:25},(_,n)=>row(n+80,{pick:9,score:n%2?45:90})),
+  ].map((item,n)=>({...item,
+    session_id:'00000000-0000-4000-8000-'+n.toString(16).padStart(12,'0'),
+    answer_round:n%8+1,selected_id:'selected-'+n,historical_id:'trophy-'+n,
+    selected_name:'Selected '+n,historical_name:'Trophy '+n,set_id:'neo',
+  }));
+  const first=result(records,{page:1});
+  const second=result(records,{page:2});
+  assert.equal(first.leading_finding?.id,'pick-depth');
+  assert.equal(second.leading_finding?.id,first.leading_finding?.id,
+    'second page cannot disqualify the first-page selection strategy');
+  assert.deepEqual(first.highlights.has_more,{best:true,misses:true});
+  const all=[...first.highlights.best,...first.highlights.misses,
+    ...second.highlights.best,...second.highlights.misses];
+  assert.equal(new Set(all.map(x=>x.puzzle_id)).size,all.length,
+    'unchanged history cannot repeat picks across highlight pages');
+});
+
 test('Source-pick positions are the headline comparison, not game round',()=>{
  const items=[...Array.from({length:40},(_,n)=>row(n,{score:95,pick:2})),
    ...Array.from({length:40},(_,n)=>row(n+100,{score:50,pick:8}))];

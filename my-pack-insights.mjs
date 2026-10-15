@@ -16,9 +16,11 @@ function highlightExplanation(row) {
   if(row.reason_code==='saved-support-gap'&&typeof evidence.leader_id==='string'&&
     typeof evidence.leader_name==='string'&&evidence.leader_name.trim()&&
     evidence.leader_id!==(row.preview?.selected?.id||'')){
-    return evidence.leader_is_trophy===1||Boolean(row.preview?.trophy?.id&&e.leader_id===row.preview.trophy.id)
+    return evidence.leader_is_trophy===1||Boolean(row.preview?.trophy?.id&&evidence.leader_id===row.preview.trophy.id)
       ?'The saved model supported the trophy pick more strongly than your choice.'
-      :'The saved model favored '+evidence.leader_name+' — a different card from the trophy pick.';
+      :(evidence.leader_is_trophy===0||row.preview?.trophy?.id)
+        ?'The saved model favored '+evidence.leader_name+' — a different card from the trophy pick.'
+        :'The saved model favored '+evidence.leader_name+' more strongly than your choice.';
   }
   return 'You chose a different card.';
 }
@@ -348,11 +350,11 @@ function bindInsightCards(root,state,ticket,gen) {
     const panel=root.querySelector('#my-insights-'+kind+'-panel');
     panel?.querySelectorAll('[data-insights-extra]').forEach(el=>{el.hidden=false;});
     if(button.dataset.insightsPage2!=='true'){button.remove();return;}
-    const viewTicket=state.viewTicket;
+    // Tab switches and read-only review do not invalidate the owner/filter request.
     button.disabled=true;button.textContent='Loading more picks…';
     try{
       const response=await loadMyInsights({environment:state.environment,period:state.period,page:2});
-      if(!current()||viewTicket!==state.viewTicket)return;
+      if(!current())return;
       const rows=response.highlights?.[kind]||[];
       if(rows.length&&panel){
         button.insertAdjacentHTML('beforebegin',highlightCards(rows,kind,true,Boolean(state.finding)));
@@ -370,7 +372,8 @@ function insightsContent(data) {
     '<h2>Picks to review</h2><p>Play a few more puzzles in '+esc(labelOf(data.environment))+
     '. '+number(data.eligible_decisions)+' of '+number(data.unlock_at)+
     ' picks included for this view.</p>'+
-    '<a class="button primary" href="/?game=draft-run&daily=1">Play today’s Daily</a></section></div>';
+    '<a class="button primary" href="/?game=draft-run&daily=1">Play today’s Daily</a></section>'+
+    dnaMarkup(data)+'</div>';
   const extras=data.comparison_contract==='compatible-source-groups-v1'
     ?(data.observations||[]).filter(x=>['progress','pick-depth'].includes(x.id)&&x.id!==safeFinding(data)?.id):[];
   return '<div class="my-insights-grid">'+highlightsMarkup(data)+journeyMarkup(data)+dnaMarkup(data)+

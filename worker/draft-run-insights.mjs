@@ -158,14 +158,15 @@ export function aggregateDraftRunInsights(source,{environment='mixed',period='al
   const card_choices=buildCardChoiceContext(all);
   const journey={...buildDraftingJourney(selected),progress_compatible};
   const proposed=proposals[0]||null;
-  const candidateHighlights=selectInsightHighlights(selected,{page,finding:proposed});
-  const examples=[...candidateHighlights.best.slice(0,3),...candidateHighlights.misses.slice(0,3)];
+  // Qualify the comparison and its ranking strategy from page one, regardless
+  // of the requested page. Page two must not change sorting and repeat cards.
+  const firstPage=selectInsightHighlights(selected,{page:1,finding:proposed});
+  const examples=[...firstPage.best.slice(0,3),...firstPage.misses.slice(0,3)];
   // The headline accompanies both visible example tabs. Avoid implying that
   // unrelated picks illustrate the comparison if either tab must be padded.
   const featured=proposed&&examples.length>0&&examples.every(example=>example.finding_context)?proposed:null;
-  // Re-select without comparison-driven priorities when the proposed finding
-  // has no accompanying saved example from either compared group.
-  const highlights=featured?candidateHighlights:selectInsightHighlights(selected,{page});
+  const highlights=page===1&&(featured||!proposed)?firstPage:
+    selectInsightHighlights(selected,{page,finding:featured});
   const leading_finding=featured?{id:featured.id,text:featured.text,
     compared_groups:featured.groups.map(({label,relation})=>({label,relation}))}:null;
   const versions={
