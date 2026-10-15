@@ -4,6 +4,7 @@ import {
   bestPercentile,
   catalogEnvironments,
   environmentProgress,
+  liveEnvironmentProgress,
   formatChallengeRecord,
   profileShareSummary,
   recentForm,
@@ -26,6 +27,29 @@ test('environment progress is catalog driven and includes special modes', () => 
   assert.equal(progress.played, 2);
   assert.equal(progress.environments.find((row)=>row.id==='vow').played, false);
   assert.equal(progress.environments.find((row)=>row.id==='powered-cube').isCube, true);
+});
+
+test('live coverage excludes non-live archive sets but preserves historical progress', () => {
+  const catalog = { sets: [
+    { id: 'neo' }, { id: 'pio' }, { id: 'sir' }, { id: 'powered-cube' },
+  ] };
+  const bySet = [
+    { set_id: 'neo', games: 4 },
+    { set_id: 'pio', games: 2 },
+    { set_id: 'sir', games: 0 },
+    { set_id: 'powered-cube', games: 1 },
+  ];
+  const archive = environmentProgress(catalog, bySet);
+  const live = liveEnvironmentProgress({ sets: [
+    { set_id: 'neo' }, { set_id: 'powered-cube' },
+  ] }, bySet);
+  assert.deepEqual({ played: archive.played, total: archive.total }, { played: 3, total: 4 });
+  assert.deepEqual({ played: live.played, total: live.total }, { played: 2, total: 2 });
+  assert.equal(live.ids.has('pio'), false);
+  assert.equal(liveEnvironmentProgress(null, bySet), null);
+  assert.equal(liveEnvironmentProgress({ sets: [] }, bySet), null);
+  assert.equal(liveEnvironmentProgress({ sets: [{ set_id: 'neo' }, { set_id: 'neo' }] }, bySet), null);
+  assert.equal(liveEnvironmentProgress({ sets: [{ set_id: '__bad' }] }, bySet), null);
 });
 
 test('profile percentile history uses the strongest final percentile', () => {
