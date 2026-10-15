@@ -1,7 +1,7 @@
 {
   "operation": "rollout-android-internal",
-  "reason": "Reviewed internal-only activation of the new native Insights build from merged #1214 and signed upload #1215. Authorize versionCode 100849 only after Android Internal Testing build run 38762377649 verifies exact signed 100849 in Google Play. Replace only prior completed Internal Testing 100846, preserving the separate production-access Closed Testing 100772, testers, groups, geography, 14-day qualification and Production. Do not rebuild, change tracks or publish publicly; fail closed if the uploaded version or previous active version differs.",
+  "reason": "Owner-authorized Pack One Insights review-polish internal-only rollout for signed AAB from merged #1219 at source c811b4b0 and original Insights UI merge #1218. Activate exactly Google Play Internal Testing versionCode 100853 ONLY after signed upload workflow 38793384532 confirms its existence, replacing only the prior 100849 Internal Testing release. Keep the separate production-access Closed Testing version 100772 completed, preserve all testers, groups, countries, the 14-day qualification and all Production tracks. Fail closed on missing or differing versions; never publish to public production or alter any other track.",
   "track": "internal",
-  "version_code": "100849",
+  "version_code": "100853",
   "preserve_closed_version_code": "100772"
 }
