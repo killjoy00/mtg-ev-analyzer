@@ -150,7 +150,7 @@ function cardVisual(card,label) {
 }
 function highlightCards(rows,kind,expanded=false,showFinding=false) {
   if(!rows?.length)return '<p class="my-pack-empty">No '+(kind==='misses'?'picks to revisit':'high-scoring picks')+
-    ' in this view. This doesn’t mean you drafted badly.</p>';
+    ' in this view.</p>';
   return '<div class="my-insights-card-row">'+rows.map((row,index)=>{
     const pick=row.preview?.selected,trophy=row.preview?.trophy,featured=index===0&&!expanded;
     const name=pick?.name||row.selected_name||'Card name unavailable';
@@ -195,9 +195,9 @@ function highlightsMarkup(data) {
     '<div id="my-insights-best-panel" role="tabpanel" aria-labelledby="my-insights-best-tab"'+
       (selected==='best'?'':' hidden')+'>'+
       highlightCards(data.highlights.best,'best',false,Boolean(finding))+more('best')+'</div>'+
-    '<p class="my-insights-note">100 means you matched the trophy pick. Other picks earn up to 95 based on the model.</p>'+
-    '<details class="my-insights-how"><summary>How this works</summary>'+
-    '<p>Only the first included answer to each puzzle counts. Scores describe picks, not drafting skill.</p></details></section>';
+    '<details class="my-insights-how"><summary>How scores work</summary>'+
+    '<p>Matching the trophy pick earns 100 points. Other picks earn up to 95 based on the model. Scores reflect the original result, not a measure of drafting skill.</p>'+
+    '<p>Only the first included answer to each puzzle counts.</p></details></section>';
 }
 function journeyMarkup(data) {
   const journey=data.journey;

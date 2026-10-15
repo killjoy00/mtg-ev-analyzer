@@ -17,6 +17,8 @@ let shareCalls = 0;
 let accountMode = 'signed-in';
 let insightsMode = 'ready';
 let releaseDelayedPageTwo = null;
+const savedDecisions = new Map();
+const decisionKey = (session, round, puzzle) => JSON.stringify([session, String(round), puzzle]);
 
 await page.addInitScript(() => {
   localStorage.setItem('pack1-auth-session-v1','profile-auth-fixture');
@@ -341,18 +343,10 @@ await page.route(`${growthOrigin}/**`, async (route) => {
     }
   } else if (url.pathname === '/v1/profile/insights/decision') {
     assert.equal(route.request().headers()['x-pack1-auth-session'],'profile-auth-fixture');
-    assert.equal(url.searchParams.get('session_id'),'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
-    assert.ok(['2','3','4','5','6','7'].includes(url.searchParams.get('round')));
-    assert.ok(['fixture-pack-1','fixture-pack-2','fixture-pack-4','fixture-pack-5','fixture-pack-6','fixture-pack-7'].includes(url.searchParams.get('puzzle_id')));
-    body={set_id:'neo',pick_number:3,score:92,trophy_match:false,
-      selected:{id:'card-mine',name:'Daring Skyjek',image_url:null},
-      trophy:{id:'card-trophy',name:'Frost Lynx',image_url:null},
-      candidates:[{id:'card-mine',name:'Daring Skyjek',image_url:null},
-        {id:'card-trophy',name:'Frost Lynx',image_url:null},
-        {id:'card-third',name:'Goblin Electromancer',image_url:null}],
-      prior_picks:[{id:'previous-card',name:'Counterspell',image_url:null}],
-      trophy_drafter:{record:'7–1',win_rate:63},
-      answered_at:'2026-09-15T18:00:00.000Z',scoring_version:'v1',corpus_version:'c1'};
+    const key=decisionKey(url.searchParams.get('session_id'),url.searchParams.get('round'),
+      url.searchParams.get('puzzle_id'));
+    assert.ok(savedDecisions.has(key),'Review must request the exact saved session/round/puzzle tuple');
+    body=savedDecisions.get(key);
   } else if (url.pathname === '/v1/profile/me') {
     body = fixture;
   } else if (url.pathname === `/v1/profile/${profileKey}`) {
@@ -394,6 +388,20 @@ await page.route(`${growthOrigin}/**`, async (route) => {
     body = { dates:['2026-09-09','2026-09-08'] };
   } else if (url.pathname === '/v1/events') {
     body = { ok:true, accepted:1 };
+  }
+  if(url.pathname==='/v1/profile/insights'&&body.highlights){
+    // Each served summary has its own saved detail; mismatched tuple parts fail.
+    for(const row of [...body.highlights.best,...body.highlights.misses]){
+      const selected=row.preview?.selected,trophy=row.preview?.trophy;
+      savedDecisions.set(decisionKey(row.session_id,row.round,row.puzzle_id),{
+        set_id:row.set_id,pick_number:row.pick_number,score:row.score,trophy_match:row.trophy_match,
+        selected,trophy,candidates:[selected,trophy,
+          {id:'card-third',name:'Goblin Electromancer',image_url:null}].filter(Boolean),
+        prior_picks:[{id:'previous-card',name:'Counterspell',image_url:null}],
+        trophy_drafter:{record:'7–1',win_rate:63},answered_at:row.date,
+        scoring_version:'v1',corpus_version:'c1',
+      });
+    }
   }
   if(url.pathname==='/v1/profile/insights'&&insightsMode==='v2-delayed'&&
       url.searchParams.get('page')==='2'){
@@ -490,6 +498,32 @@ try {
   await noOverflow();
   await page.screenshot({path:'artifacts/ui-profile-insights-populated-desktop.png',fullPage:true});
   await page.setViewportSize({width:390,height:844});
+
+  // Different cards/scores must open their own saved decisions, including a miss.
+  for(const [tab,panel,index] of [[high,'best',0],[high,'best',1],[revisit,'misses',0]]){
+    await tab.click();
+    const card=page.locator('#my-insights-'+panel+'-panel .my-insights-pick').nth(index);
+    const names=await card.locator('.my-insights-pick-names strong').allTextContents();
+    const summary=await card.textContent();
+    const scoreText=summary.match(/Score \d+\/100/)[0];
+    const position=summary.match(/Source P1P\d+/)[0];
+    await card.getByRole('button',{name:'Review pick'}).click();
+    const detail=page.locator('#my-insights-decision-dialog[open] .my-insights-locked-pack');
+    await detail.waitFor();
+    assert.deepEqual(await detail.locator('.my-insights-locked-choices figcaption').allTextContents(),names,
+      'the opened selected and trophy cards match the clicked summary');
+    const metadata=await detail.locator(':scope > .my-insights-note').first().textContent();
+    assert.ok(metadata.includes(scoreText),'the opened original score matches the clicked summary');
+    assert.ok(metadata.includes(position),'the opened source position matches the clicked summary');
+    await detail.getByRole('button',{name:'Close',exact:true}).click();
+  }
+  await high.click();
+  const scoringHelp=page.locator('.my-insights-how');
+  assert.equal(await scoringHelp.locator('summary').textContent(),'How scores work');
+  assert.equal(await scoringHelp.getAttribute('open'),null);
+  await scoringHelp.locator('summary').click();
+  assert.equal(await scoringHelp.getByText(/Matching the trophy pick earns 100 points/).isVisible(),true);
+  await scoringHelp.locator('summary').click();
 
   const reviewButton=page.getByRole('button',{name:'Review pick'}).first();
   await reviewButton.click();

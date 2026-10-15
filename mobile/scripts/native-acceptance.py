@@ -388,6 +388,28 @@ if platform == 'android':
 
     attempt('member-tabs-profile-settings-and-hardware-back', member_navigation)
 
+    def require_review_tab(xml, selected):
+        root = ET.fromstring(xml)
+        for label in ('Picks to revisit', 'High-scoring picks'):
+            nodes = [node for node in root.iter() if node.get('content-desc') == label]
+            require(len(nodes) == 1, f'Missing or ambiguous review tab: {label}')
+            require(nodes[0].get('selected') == str(label == selected).lower(),
+                    f'Wrong selected state for review tab: {label}')
+
+    def require_highlight(xml, puzzle, name, score):
+        root = ET.fromstring(xml)
+        cards = [node for node in root.iter()
+                 if node.get('resource-id', '').split('/')[-1] == 'insights-pick-' + puzzle]
+        require(len(cards) == 1, f'Missing saved pick card: {puzzle}')
+        texts = [node.get('text', '') for node in cards[0].iter()]
+        require('Your pick: ' + name in texts, f'Wrong selected card for {puzzle}')
+        require(any(f'Score {score}/100' in text for text in texts),
+                f'Wrong original score for {puzzle}')
+
+    def has_review_modal(xml):
+        return any(node.get('resource-id', '').split('/')[-1] == 'insights-review-modal'
+                   for node in ET.fromstring(xml).iter())
+
     def native_insights():
         # Synthetic signed-in preview; never a physical device or real owner.
         launch('member-insights', 'insights', 390)
@@ -399,14 +421,17 @@ if platform == 'android':
         # the actual tab controls before asserting their accessibility labels.
         reveal('Picks to revisit')
         xml, _ = snapshot('insights-review-tabs')
-        require('Picks to revisit' in xml and 'High-scoring picks' in xml,
-                'Review tabs are missing after scrolling to them')
+        require_review_tab(xml, 'Picks to revisit')
         tap('High-scoring picks', exact=True)
-        # The selected example starts below the tab row on short phones.
-        reveal('Hero in Training')
+        xml, _ = snapshot('insights-high-scoring-tab')
+        require_review_tab(xml, 'High-scoring picks')
+        # A trophy card elsewhere must not satisfy the selected-card assertion.
+        reveal('Review pick: Hero in Training', exact=True)
         xml, _ = snapshot('insights-high-scoring')
-        require('Hero in Training' in xml, 'High-scoring picks did not switch')
-        tap('Review pick')
+        require_highlight(xml, 'screenshot-insight-1', 'Hero in Training', 92)
+        tap('Review pick: Hero in Training', exact=True, scroll=False)
+        xml, _ = snapshot('insights-review-open')
+        require(has_review_modal(xml), 'Read-only review modal did not open')
         reveal('Trophy drafter')
         xml, _ = snapshot('insights-readonly-trophy-pool')
         require('Trophy drafter' in xml and 'earlier picks' in xml,
@@ -416,9 +441,15 @@ if platform == 'android':
         require('Hero in Training' in xml, 'Review did not load the chosen card')
         adb('shell', 'input', 'keyevent', '4')
         time.sleep(2)
+        xml, _ = snapshot('insights-modal-back-dismissed')
+        require(not has_review_modal(xml), 'Native hardware back did not dismiss review')
+        reveal('High-scoring picks', exact=True)
         xml, _ = snapshot('insights-modal-back-restores-report')
-        require('Trophy drafter' not in xml or 'Full pack' not in xml,
-                'Native hardware back did not dismiss review')
+        require_review_tab(xml, 'High-scoring picks')
+        require(not has_review_modal(xml), 'Review modal remains over the report')
+        reveal('Review pick: Hero in Training', exact=True)
+        xml, _ = snapshot('insights-modal-back-restores-pick')
+        require_highlight(xml, 'screenshot-insight-1', 'Hero in Training', 92)
         reveal('Your scores over time')
         xml, _ = snapshot('insights-scores-over-time')
         require('Your scores over time' in xml, 'Score history is missing')
