@@ -23,7 +23,7 @@ const profile = () => ({
   player: { display_name: 'Player A', profile_public: false, profile_key: KEY, favorite_set_id: 'msh', showcase_achievement: 'first' },
   summary: { games: 3, average_score: 80, best_score: 100, daily_games: 2, current_streak: 1, best_streak: 1, environments_played: 1,
     challenge_wins: 0, challenge_losses: 0, challenge_ties: 0 },
-  environment_total: 3, by_mode: [], best_environments: [], current_season: null, recent: [], trend: [],
+  environment_total: 2, by_mode: [], best_environments: [], current_season: null, recent: [], trend: [],
   by_set: [{ set_id: 'msh', games: 3, average_score: 80, best_score: 100, daily_games: 2 }],
   achievements: [
     { id: 'first', label: 'First Pack', unlocked: true, current: 1, target: 1, description: 'Complete a game.', earned_at: '2026-09-25' },
@@ -63,11 +63,11 @@ async function mount(t, options = {}) {
     public: options.public || (async (key) => ({ ...record, player: { ...record.player, profile_key: key, profile_public: true, display_name: key === OTHER_KEY ? 'Player B' : 'Player A' } })),
     archive: options.archive || (async () => [
       { id: 'msh', name: 'Marvel', dataDate: '2026-09-01' },
-      { id: 'vow', name: 'Crimson Vow', dataDate: null },
       { id: 'powered-cube', name: 'Powered Cube', dataDate: null },
     ]),
     coverage: options.coverage || (async () => ({ corpus_version: 'serving-fixture', sets: [
       { set_id: 'msh', set_name: 'Marvel', verified_decisions: 1200, qualified_trophy_drafts: 300, training_drafts: 5000, data_date: '2026-09-24' },
+      { set_id: 'powered-cube', set_name: 'Powered Cube', verified_decisions: 30, qualified_trophy_drafts: 5, training_drafts: 50 },
     ] })),
     share: options.share || (async () => ({ action: 'sharedAction' })),
   };
@@ -111,35 +111,45 @@ async function mount(t, options = {}) {
   };
 }
 
-test('archive exposes played/unplayed/favorite/special rows and the exact selected live coverage', async (t) => {
+test('only active environments appear in native archive with their actual serving data', async (t) => {
   const h = await mount(t);
-  assert.match(h.text(), /1\s*\/\s*3\s*environments played/);
+  assert.match(h.text(), /1\\s*\\/\\s*2\\s*environments played/);
   assert.match(h.text(), /Favorite/); assert.match(h.text(), /Special environment/);
-  await h.press('View Marvel set details'); assert.match(h.text(), /1,200\s*verified decisions/); assert.match(h.text(), /serving-fixture/);
-  await h.press('View Crimson Vow set details'); assert.match(h.text(), /Not present in the current live serving catalog/);
+  assert.doesNotMatch(h.text(), /Crimson Vow|not currently live|historical progress/i);
+  await h.press('View Marvel set details');
+  assert.match(h.text(), /1,200\\s*verified decisions/); assert.match(h.text(), /serving-fixture/);
   assert.equal(h.calls.filter(([kind]) => kind === 'archive').length, 1);
 });
-test('archive search and played filters operate on the actual rendered records', async (t) => {
+test('archive search and played filters only use Live environment records', async (t) => {
   const h = await mount(t);
   await h.press('Show unplayed environments'); assert.doesNotMatch(h.text(), /3 games/);
-  const field = h.root.root.findAll((node) => node.type === 'TextInput' && node.props.accessibilityLabel === 'Search archive environments')[0];
-  await act(async () => field.props.onChangeText('CRIMSON'));
-  assert.match(h.text(), /Crimson Vow/); assert.doesNotMatch(h.text(), /Powered Cube/);
+  const field = h.root.root.findAll(node => node.type === 'TextInput' && node.props.accessibilityLabel === 'Search archive environments')[0];
+  await act(async () => field.props.onChangeText('CUBE'));
+  assert.match(h.text(), /Powered Cube/); assert.doesNotMatch(h.text(), /Marvel/);
   await h.press('Show played environments'); assert.match(h.text(), /No environments match/);
 });
-test('a failed live catalog does not erase archive progress and retry recovers the optional details', async (t) => {
-  const h = await mount(t, { coverage: async () => { throw new Error('live offline'); } });
-  assert.match(h.text(), /1\s*\/\s*3/); assert.match(h.text(), /live offline/);
-  await h.press('View Marvel set details'); assert.match(h.text(), /Live coverage has not been verified/);
-  h.api.coverage = async () => ({ corpus_version: 'new', sets: [] });
-  await h.press('Refresh archive catalog'); assert.doesNotMatch(h.text(), /live offline/);
+test('Live catalog failure never exposes inactive sets and retry recovers', async (t) => {
+  const h = await mount(t, {
+    archive: async () => { throw new Error('live offline'); },
+    coverage: async () => { throw new Error('live offline'); },
+  });
+  assert.match(h.text(), /Live environments are temporarily unavailable/);
+  assert.doesNotMatch(h.text(), /1\\s*\\/\\s*2|Crimson Vow/);
+  h.api.archive = async () => [{ id: 'msh', name: 'Marvel', dataDate: null }];
+  h.api.coverage = async () => ({ corpus_version: 'new', sets: [
+    { set_id: 'msh', set_name: 'Marvel', verified_decisions: 1200, qualified_trophy_drafts: 300, training_drafts: 5000 },
+  ] });
+  await h.press('Refresh environments');
+  assert.match(h.text(), /1\\s*\\/\\s*1\\s*environments played/);
+  assert.doesNotMatch(h.text(), /live offline/);
 });
-test('missing published catalog is explicitly unavailable rather than zero of zero complete', async (t) => {
+test('missing Live catalog is unavailable rather than zero of zero complete', async (t) => {
   const h = await mount(t, { archive: async () => { throw new Error('archive offline'); } });
-  assert.match(h.text(), /Progress cannot be determined from live sets alone/);
-  assert.doesNotMatch(h.text(), /0\s*\/\s*0/);
+  assert.match(h.text(), /Live environments are temporarily unavailable/);
+  assert.doesNotMatch(h.text(), /0\\s*\\/\\s*0/);
   await h.press('Achievements'); assert.match(h.text(), /First Pack/);
 });
+
 test('unlocked achievement sharing revalidates server data while locked awards have no share action', async (t) => {
   const h = await mount(t, { params: { tab: 'achievements' } });
   assert.equal(h.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Share achievement Settling In').length, 0);
@@ -188,9 +198,9 @@ test('archive cards adapt to tablet width but return to one column for large tex
   const h = await mount(t);
   const count = (width) => h.root.root.findAll((node) => node.type === 'View' && Array.isArray(node.props.style)
     && node.props.style.some((item) => item?.width === width)).length;
-  assert.equal(count('100%'), 3);
-  await h.dimensions({ width: 1024, fontScale: 1 }); assert.equal(count('48.5%'), 3);
-  await h.dimensions({ width: 1024, fontScale: 1.8 }); assert.equal(count('100%'), 3);
+  assert.equal(count('100%'), 2);
+  await h.dimensions({ width: 1024, fontScale: 1 }); assert.equal(count('48.5%'), 2);
+  await h.dimensions({ width: 1024, fontScale: 1.8 }); assert.equal(count('100%'), 2);
 });
 test('the existing ProfileOverview entry points preserve private versus exact public scope', async (t) => {
   const h = await mount(t); const Overview = compile('src/components/ProfileOverview.tsx', h.mocks).ProfileOverview;
