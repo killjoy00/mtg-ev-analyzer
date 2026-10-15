@@ -38,11 +38,9 @@ const ACCOUNT_RETURN='https://packone.pro/';
 const PASSWORD_ACCOUNT_NAME='Pack One Player';
 const MOBILE_GOOGLE_CALLBACK='https://api.packone.pro/growth/v1/mobile/account/google/callback';
 const MOBILE_GOOGLE_RETURN='packone://account';
-const STATIC_ORIGIN = 'https://packone.pro';
 const PROFILE_KEY_RE = /^[a-f0-9]{16}$/;
 const DAILY_RUN_ID_RE = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const DELETION_TRIGGER_NAMES=new Set(['pack1-account-deletion-maintenance']);
-let catalogCache = { at: 0, data: null };
 let signingKeyCache = { at: 0, key: null };
 
 function json(value, status = 200) {
@@ -354,17 +352,11 @@ function computeStreak(dateKeys, todayKey = gameDateKey()) {
   return streak;
 }
 
-async function loadCatalog() {
-  if (catalogCache.data && Date.now() - catalogCache.at < 5 * 60 * 1000) return catalogCache.data;
-  try {
-    const response = await fetch(`${STATIC_ORIGIN}/data/catalog.json`, { headers: { accept: 'application/json' } });
-    if (!response.ok) throw new Error(`Catalog request failed (${response.status}).`);
-    const data = await response.json();
-    catalogCache = { at: Date.now(), data };
-    return data;
-  } catch {
-    return { sets: [] };
-  }
+async function liveEnvironmentIds() {
+  // This is the lifecycle authority also used by Admin and the serving catalog.
+  // Never silently switch back to the static historical replay list.
+  const result = await query("SELECT set_id FROM draft_run_environment_policy WHERE status='Live' ORDER BY set_id");
+  return new Set(result.rows.map(row => String(row.set_id)));
 }
 
 function countAchievement(id, label, description, current, target) {
@@ -521,7 +513,7 @@ async function currentSeasonForProfile(playerId) {
 }
 
 async function buildProfile(playerId, meta, { own = false } = {}) {
-  const [summaryResult, bySetResult, byModeResult, recentResult, dailyHistory, catalog, streakDates, currentSeason] = await Promise.all([
+  const [summaryResult, bySetResult, byModeResult, recentResult, dailyHistory, liveIds, streakDates, currentSeason] = await Promise.all([
     query(
       `SELECT count(*) games,round(avg(score),1) average_score,max(score) best_score,
               count(*) FILTER (WHERE outcome='win') challenge_wins,
@@ -563,7 +555,7 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
       [playerId],
     ),
     dailyHistoryFor(playerId),
-    loadCatalog(),
+    liveEnvironmentIds(),
     query('SELECT DISTINCT challenge_date::text date FROM scores WHERE player_id=$1::uuid ORDER BY date',[playerId]),
     currentSeasonForProfile(playerId),
   ]);
@@ -597,9 +589,8 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
   const streak = computeStreak(dates);
   let longestStreak=0,chain=0,previous=null;
   for(const date of dates){chain=previous===previousDateKey(date)?chain+1:1;longestStreak=Math.max(longestStreak,chain);previous=date;}
-  const catalogSets = (catalog.sets || []).filter((entry) => entry?.id && !entry.is_fixture);
-  const environmentTotal = catalogSets.length;
-  const reportedEnvironmentTotal = environmentTotal || Math.max(num(summary.environments_played), 0);
+  const visibleBySet = bySet.filter(row => liveIds.has(row.set_id));
+  const environmentTotal = liveIds.size;
   const normalizedSummary = {
     games: num(summary.games),
     average_score: num(summary.average_score),
@@ -608,13 +599,13 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
     challenge_losses: num(summary.challenge_losses),
     challenge_ties: num(summary.challenge_ties),
     daily_games: num(summary.daily_games),
-    environments_played: bySet.filter(row=>catalogSets.some(set=>set.id===row.set_id)).length,
+    environments_played: visibleBySet.length,
     current_streak: streak,
     best_streak:longestStreak,
   };
   const achievements = buildAchievements({
     summary: normalizedSummary,
-    bySet,
+    bySet: visibleBySet,
     byMode,
     streak:longestStreak,
     dailyHistory,
@@ -631,11 +622,11 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
       WHERE achievement_id LIKE 'streak%' OR achievement_id LIKE 'explorer%' OR achievement_id='archive_complete') n`,[playerId,JSON.stringify(newlyEarned)]);
   const earned=await query('SELECT achievement_id,earned_at FROM player_achievements WHERE player_id=$1::uuid',[playerId]);
   for(const a of achievements){const saved=earned.rows.find(r=>r.achievement_id===a.id);if(saved){a.unlocked=true;a.earned_at=saved.earned_at;a.current=a.target;a.progress_text='Unlocked';}}
-  const bestEnvironments = bySet
+  const bestEnvironments = visibleBySet
     .filter((row) => row.games >= 3)
     .sort((a, b) => b.average_score - a.average_score || b.games - a.games || a.set_id.localeCompare(b.set_id))
     .slice(0, 5);
-  const cube = bySet.find((row) => row.set_id === 'powered-cube') || null;
+  const cube = visibleBySet.find((row) => row.set_id === 'powered-cube') || null;
   const finalPercentiles=dailyHistory.filter(r=>r.final&&r.percentile).map(r=>r.percentile);
   const rankingIdentity=own?publicIdentityEligibility({...meta,auth_user_id:bool(meta.claimed)?'linked':null,is_placeholder:isPlaceholderUsername(meta.display_name)}):null;
 
@@ -644,7 +635,7 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
       display_name: meta.display_name,
       profile_key: meta.profile_key,
       profile_public: bool(meta.profile_public),
-      favorite_set_id: meta.favorite_set_id || null,
+      favorite_set_id: liveIds.has(meta.favorite_set_id) ? meta.favorite_set_id : null,
       showcase_achievement: meta.showcase_achievement || null,
       ...(own ? {
         claimed: bool(meta.claimed),
@@ -658,8 +649,8 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
     },
     ...(own?{ranking_identity:{eligible:Boolean(rankingIdentity?.eligible),reason:rankingIdentity?.reason||null}}:{}),
     summary: normalizedSummary,
-    environment_total: reportedEnvironmentTotal,
-    by_set: bySet,
+    environment_total: environmentTotal,
+    by_set: visibleBySet,
     by_mode: byMode,
     best_environments: bestEnvironments,
     cube,
@@ -2323,8 +2314,7 @@ async function handleProfileUpdate(request,{mobile=false}={}) {
   const payload = await readJson(request);
 
   const current = await buildProfile(id, meta, { own: true });
-  const catalog = await loadCatalog();
-  const allowedSets = new Set((catalog.sets || []).map((entry) => String(entry?.id || '')).filter(Boolean));
+  const allowedSets = await liveEnvironmentIds();
   const unlocked = new Set(current.achievements.filter((item) => item.unlocked).map((item) => item.id));
 
   const displayName = payload.displayName === undefined ? meta.display_name : normalizeName(payload.displayName);
@@ -2339,7 +2329,7 @@ async function handleProfileUpdate(request,{mobile=false}={}) {
   // separate checkbox and acceptance never gates ranking.
   const recordsAcceptance=!hidden&&(acceptsTerms||wantsOwned||profilePublic)&&!publicIdentityTermsCurrent(meta);
 
-  if (favorite && !allowedSets.has(favorite)) throw Object.assign(new Error('Choose a playable environment.'), { status: 400 });
+  if (payload.favoriteSetId !== undefined && favorite && !allowedSets.has(favorite)) throw Object.assign(new Error('Choose a playable environment.'), { status: 400 });
   if (showcase && !unlocked.has(showcase)) throw Object.assign(new Error('Showcase an achievement you have unlocked.'), { status: 400 });
   if(hidden&&(payload.displayName!==undefined||payload.profilePublic===true||acceptsTerms)) {
     throw Object.assign(new Error('This display name is unavailable. Contact Pack One support if you believe this is a mistake.'),{status:403,code:'PUBLIC_IDENTITY_MODERATED'});
