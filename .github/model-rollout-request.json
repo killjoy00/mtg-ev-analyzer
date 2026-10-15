@@ -1,7 +1,7 @@
 {
   "operation": "deploy",
-  "request_id": "pack1-insights-fix-dev-20261015-d7108d",
-  "reason": "Deploy reviewed and merged Pack One Insights bugfix PR #1210 at exact main commit d7108d12f8c666085516d7e5ffcf4ca2fd884a68 to Neon development. Repairs third-card explanation crash, unstable highlight pagination, loading state and all-history pattern display. Require green unit, browser, backend checks and live Pages publication; validate live Daily, Practice, schema, bundling and release marker before requesting a separate production promotion of this same exact revision.",
+  "request_id": "pack1-insights-fix-prod-20261015-d7108d",
+  "reason": "Production promotion request for exact reviewed Pack One Insights fix commit d7108d12f8c666085516d7e5ffcf4ca2fd884a68, the same revision deployed to development by #1211. DO NOT MERGE this production request until protected development run verifies the exact release marker, schema/index checks, live Daily and Practice acceptance, and matching published website. Protected production workflow independently rechecks development marker, schema and public frontend before deploying all functions.",
   "commit": "d7108d12f8c666085516d7e5ffcf4ca2fd884a68",
-  "target": "development"
+  "target": "production"
 }
