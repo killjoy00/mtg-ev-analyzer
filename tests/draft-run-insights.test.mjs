@@ -181,3 +181,14 @@ test('Highlights pages fail closed beyond two and preview at most twelve owner s
    await assert.rejects(loadDraftRunInsights(query,owner,{page}),e=>e.status===400);
  assert.equal(reads.length,before,'invalid pages are rejected before DB access');
 });
+
+test('Source-pick positions are the headline comparison, not game round',()=>{
+ const items=[...Array.from({length:40},(_,n)=>row(n,{score:95,pick:2})),
+   ...Array.from({length:40},(_,n)=>row(n+100,{score:50,pick:8}))];
+ const view=result(items);
+ assert.equal(view.leading_finding,null,'no headline without a reviewable saved example');
+ assert.ok(view.observations.some(x=>x.id==='pick-depth'));
+ assert.match(view.observations.find(x=>x.id==='pick-depth').text,/P1P2 source picks/);
+ assert.match(view.observations.find(x=>x.id==='pick-depth').text,/not eight-question game rounds/i);
+ assert.match(view.methodology,/Hard|hard/);
+});
