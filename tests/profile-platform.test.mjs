@@ -56,7 +56,13 @@ test('signed-in progression uses My Pack One stats and Account settings tabs', (
   assert.match(myPack, /profile-account-tab/);
   assert.match(myPack, /my-pack-one-grid/);
   assert.match(myPack, /data-profile-panel="account"/);
-  assert.match(myPack, /environmentProgress/);
+  assert.match(myPack, /liveEnvironmentProgress/);
+  assert.match(product, /liveEnvironmentProgress/);
+  assert.doesNotMatch(myPack, /environmentProgress\(catalog/);
+  assert.match(worker, /SELECT set_id FROM draft_run_environment_policy WHERE status='Live'/);
+  assert.doesNotMatch(worker, /loadCatalog\(/);
+  assert.match(worker, /by_set: visibleBySet/);
+  assert.match(worker, /environment_total: environmentTotal/);
   assert.match(myPack, /data-share-achievement/);
   assert.match(myPack, /data-share-daily/);
   assert.match(product, /profile-account/);

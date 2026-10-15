@@ -19,16 +19,15 @@ import {
   sendEvents,
   updateProfile,
 } from './growth-api.mjs';
-import { loadReplayJson } from './replay-data.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
 import { trackEvent } from './retention-events.mjs';
 import { nextMilestones } from './progression.mjs?v=10';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { eliteSource } from './membership-source.mjs';
-import { renderAccount, renderDeletionState } from './growth.mjs?v=13';
+import { renderAccount, renderDeletionState } from './growth.mjs?v=14';
 import {
   bestPercentile,
-  environmentProgress,
+  liveEnvironmentProgress,
   formatChallengeRecord,
   modeName,
   recentForm,
@@ -39,9 +38,8 @@ import {
   shareProfileCard,
   shareResultCard,
 } from './share-cards.mjs';
-import {bindMyPackOneTabs,currentSeasonMarkup,myPackOneMarkup,resetMyPackOneTab} from './my-pack-one.mjs?v=5';
+import {bindMyPackOneTabs,currentSeasonMarkup,myPackOneMarkup,resetMyPackOneTab} from './my-pack-one.mjs?v=6';
 
-let catalogPromise = null;
 let profileRendering = false;
 let navInstalled = false;
 let routeRendered = false;
@@ -56,20 +54,28 @@ function ensureProfileStyles() {
   if (document.querySelector('link[data-pack1-profile-css]')) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = new URL('./profile.css?v=10', import.meta.url).href;
+  link.href = new URL('./profile.css?v=11', import.meta.url).href;
   link.dataset.pack1ProfileCss = '1';
   document.head.appendChild(link);
 }
 
-async function loadCatalog() {
-  if (!catalogPromise) {
-    catalogPromise = loadReplayJson('./data/catalog.json', 'catalog').catch(() => {catalogPromise=null;return {sets:[]};});
-  }
-  return catalogPromise;
+async function loadLiveCatalog() {
+  const base = String(window.PACK1_API?.draftRunUrl || '').replace(/\/$/, '');
+  if (!base) return null;
+  try {
+    const response = await fetch(`${base}/v1/set-catalog`, {
+      cache:'no-store', credentials:'omit', signal:AbortSignal.timeout(5000),
+    });
+    if (!response.ok) return null;
+    return await response.json();
+  } catch { return null; }
 }
 
 function catalogNames(catalog) {
-  return new Map((catalog?.sets || []).map((entry) => [String(entry.id || '').toLowerCase(), String(entry.name || entry.id || '').trim()]));
+  return new Map((catalog?.sets || []).map(entry => [
+    String(entry.set_id || '').toLowerCase(),
+    String(entry.set_name || entry.set_id || '').trim(),
+  ]));
 }
 
 function sparkline(values, { invert = false, empty = 'Play more games to build this chart.' } = {}) {
@@ -213,7 +219,7 @@ function settingsMarkup(profile, progress, account, patreon) {
         <label class="profile-leaderboard-name" id="profile-display-name"><span>Display name</span><input class="select" type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(profile.player.display_name)}" required ${identityHidden?'disabled':''} aria-describedby="profile-display-name-help profile-display-name-error"><small id="profile-display-name-help">${identityHidden?'This display name is hidden by moderation.':'Shown on Daily leaderboards and your public profile.'}</small><small class="profile-field-error" id="profile-display-name-error" role="alert">${esc(identityHidden?`Display name hidden. ${profile.player.public_identity_hidden_reason||'Contact Pack One support if you believe this is a mistake.'}`:nameAttention)}</small></label>
         ${!identityHidden?`<p class="profile-identity-rules"><small>Display names and public profiles follow the <a href="/terms/#public-identity-rules" target="_blank" rel="noopener">Pack One Public Identity rules</a>.</small></p>`:''}
         <label class="profile-toggle"><input type="checkbox" name="profilePublic" ${profile.player.profile_public ? 'checked' : ''} ${identityHidden?'disabled':''}><span><strong>Public profile</strong> <small>Let players view your Pack One record from leaderboards and shared links.</small></span></label>
-        <label><span>Favorite environment</span><select class="select" name="favoriteSetId"><option value="">No favorite selected</option>${progress.environments.map((entry) => `<option value="${esc(entry.id)}" ${entry.id === profile.player.favorite_set_id ? 'selected' : ''}>${esc(entry.name)}</option>`).join('')}</select></label>
+        ${progress ? `<label><span>Favorite environment</span><select class="select" name="favoriteSetId"><option value="">No favorite selected</option>${progress.environments.map((entry) => `<option value="${esc(entry.id)}" ${entry.id === profile.player.favorite_set_id ? 'selected' : ''}>${esc(entry.name)}</option>`).join('')}</select></label>` : '<p class="profile-empty">Favorite environments are temporarily unavailable.</p>'}
         <label><span>Showcase achievement</span><select class="select" name="showcaseAchievement"><option value="">No showcase selected</option>${unlocked.map((item) => `<option value="${esc(item.id)}" ${item.id === profile.player.showcase_achievement ? 'selected' : ''}>${esc(item.label)}</option>`).join('')}</select></label>
         <div class="profile-settings-actions"><button class="button primary" type="submit">Save profile</button><span class="profile-settings-status profile-save-status" id="profile-save-status" aria-live="polite"></span></div>
       </form>
@@ -262,10 +268,10 @@ function settingsMarkup(profile, progress, account, patreon) {
     </section>`:''}
   </section>`;
 }
-function profileMarkup(profile, catalog, { own = false, publicKey = null, account = null, patreon = null } = {}) {
-  if (own && profile.player.claimed) return myPackOneMarkup(profile,catalog,{account,patreon,settingsMarkup});
-  const names = catalogNames(catalog);
-  const progress = environmentProgress(catalog, profile.by_set || []);
+function profileMarkup(profile, liveCatalog, { own = false, publicKey = null, account = null, patreon = null } = {}) {
+  if (own && profile.player.claimed) return myPackOneMarkup(profile,liveCatalog,{account,patreon,settingsMarkup});
+  const names = catalogNames(liveCatalog);
+  const progress = liveEnvironmentProgress(liveCatalog, profile.by_set || []);
   const summary = profile.summary || {};
   if(own&&!profile.player.claimed&&Number(summary.games||0)===0) {
     return `<section class="player-profile-page growth-page first-run-profile" data-profile-key="${esc(profile.player.profile_key||'')}">
@@ -274,13 +280,13 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null, accoun
       <aside class="profile-claim" id="profile-account"><div><span>Save your progress</span><strong>Keep this record across devices.</strong><p>Create a free account or sign in when you’re ready. Your guest progress stays here until you claim it.</p></div><button type="button" class="button secondary" id="profile-claim-account">Sign in or create account</button></aside>
     </section>`;
   }
-  const favorite = progress.environments.find((entry) => entry.id === profile.player.favorite_set_id);
+  const favorite = progress?.environments.find((entry) => entry.id === profile.player.favorite_set_id);
   const showcased = (profile.achievements || []).find((item) => item.id === profile.player.showcase_achievement && item.unlocked);
   const bestPct = bestPercentile(profile);
   const form = recentForm(profile);
   const showLeaderboardName = own && Boolean(profile.player.claimed);
   const next = nextMilestones(profile,2);
-  const bestRows = (profile.best_environments || []).slice(0, 5);
+  const bestRows = progress ? (profile.best_environments || []).filter(row=>progress.ids.has(row.set_id)).slice(0, 5) : [];
   const daily = (profile.daily_history || []).slice(0, 12);
   const recent = (profile.recent || []).slice(0, 20);
   const publicUrl = profile.player.profile_public && profile.player.profile_key ? `${location.origin}${location.pathname}?profile=${encodeURIComponent(profile.player.profile_key)}` : '';
@@ -302,7 +308,7 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null, accoun
       <div><span>Best</span><strong>${Number(summary.games||0)>0?Number(summary.best_score||0):'Not yet'}</strong></div>
       <div><span>Daily streak</span><strong>${Number(summary.current_streak || 0)}</strong></div>
       <div title="Shared run wins and losses"><span>Shared W–L</span><strong>${esc(formatChallengeRecord(summary))}</strong></div>
-      <div><span>Environments</span><strong>${progress.played}/${progress.total}</strong></div>
+      <div><span>Environments</span><strong>${progress ? `${progress.played}/${progress.total}` : 'Unavailable'}</strong></div>
     </div>
 
     ${currentSeasonMarkup(profile,{surface:'public'})}
@@ -321,9 +327,8 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null, accoun
     ${publicUrl ? `<p class="profile-public-url">Public profile: <button type="button" class="text-button" id="profile-copy-link">Copy link</button></p>` : ''}
 
     <section class="profile-section archive-progress-section">
-      <div class="profile-section-heading"><div><p class="eyebrow">Archive progress</p><h2>${progress.played}/${progress.total} environments played</h2></div><strong>${progress.total ? Math.round((progress.played / progress.total) * 100) : 0}%</strong></div>
-      <div class="archive-progress-track"><i style="width:${progress.total ? (progress.played / progress.total) * 100 : 0}%"></i></div>
-      <details class="profile-disclosure" data-profile-section="archive"><summary>Explore the archive</summary><div class="environment-progress-grid">${progress.environments.map((entry) => environmentCard(entry, profile.player.favorite_set_id)).join('')}</div></details>
+      <div class="profile-section-heading"><div><p class="eyebrow">Archive progress</p><h2>${progress ? `${progress.played}/${progress.total} environments played` : 'Live environments unavailable'}</h2></div>${progress ? `<strong>${Math.round((progress.played / progress.total) * 100)}%</strong>` : ''}</div>
+      ${progress ? `<div class="archive-progress-track"><i style="width:${(progress.played / progress.total) * 100}%"></i></div><details class="profile-disclosure" data-profile-section="archive"><summary>Explore environments</summary><div class="environment-progress-grid">${progress.environments.map(entry => environmentCard(entry, profile.player.favorite_set_id)).join('')}</div></details>` : '<p class="profile-empty">Refresh to see currently available environments.</p>'}
     </section>
 
     <section class="profile-grid-two">
@@ -346,7 +351,7 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null, accoun
 }
 
 async function bindProfile(profile, catalog, { own = false, publicKey = null } = {}) {
-  const progress = environmentProgress(catalog, profile.by_set || []);
+  const progress = liveEnvironmentProgress(catalog, profile.by_set || []);
   const names = catalogNames(catalog);
   const profileKey = publicKey || profile.player.profile_key || null;
 
@@ -477,7 +482,7 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
     try { await navigator.clipboard.writeText(url); event.currentTarget.textContent = 'Copied'; } catch {}
   });
   document.querySelector('#profile-share')?.addEventListener('click', async (event) => {
-    await performShare(event.currentTarget,()=>shareProfileCard(profile, progress, names),'profile_share',{public:profile.player.profile_public,environments:progress.played});
+    await performShare(event.currentTarget,()=>{if(!progress)throw Error('Live environments unavailable');return shareProfileCard({...profile,best_environments:(profile.best_environments||[]).filter(row=>progress.ids.has(row.set_id))}, progress, names);},'profile_share',{public:profile.player.profile_public,environments:progress?.played});
   });
   document.querySelector('#profile-report')?.addEventListener('click',async()=>{
     const status=document.querySelector('#profile-safety-status');
@@ -533,7 +538,7 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
       const updated = await updateProfile({
         displayName: data.get('displayName') || '',
         profilePublic: data.get('profilePublic') === 'on',
-        favoriteSetId: data.get('favoriteSetId') || null,
+        ...(data.has('favoriteSetId') ? {favoriteSetId: data.get('favoriteSetId') || null} : {}),
         showcaseAchievement: data.get('showcaseAchievement') || null,
         acceptPublicIdentityTerms: true,
       });
@@ -612,16 +617,16 @@ async function renderProfile(profile, { own = false, publicKey = null } = {}) {
   try {
     document.body.classList.remove('is-game');
     ensureProfileStyles();
-    const [catalog,account,patreon] = await Promise.all([
-      loadCatalog(),
+    const [liveCatalog,account,patreon] = await Promise.all([
+      loadLiveCatalog(),
       own?getAuthSession().catch(()=>({unavailable:true})):null,
       own?loadPatreonStatus().catch(()=>null):null,
     ]);
     const app = document.querySelector('#app');
     if (!app) return;
-    app.innerHTML = profileMarkup(profile, catalog, { own, publicKey, account, patreon });
+    app.innerHTML = profileMarkup(profile, liveCatalog, { own, publicKey, account, patreon });
     window.PACK1_LAST_PROFILE = profile;
-    await bindProfile(profile, catalog, { own, publicKey });
+    await bindProfile(profile, liveCatalog, { own, publicKey });
     if (own && profile.player.claimed) bindMyPackOneTabs();
     track('profile_view', { own, public: profile.player?.profile_public || false });
     window.scrollTo?.({ top: 0, behavior: 'smooth' });

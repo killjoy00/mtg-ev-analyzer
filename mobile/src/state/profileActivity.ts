@@ -26,15 +26,18 @@ export function activitySessionKey(session: MobileSession | null) {
 }
 
 export function checkedArchive(value: unknown): ArchiveEntry[] {
+  // The Draft Run API returns only Live serving sets. Never use static
+  // historical replay data to populate a player-facing environment list.
   const sets = value && typeof value === 'object' ? (value as { sets?: unknown }).sets : null;
-  if (!Array.isArray(sets) || sets.length > 500) throw new Error('The published archive catalog is unavailable.');
+  if (!Array.isArray(sets) || sets.length > 500) throw new Error('Live environments are unavailable.');
   const seen = new Set<string>();
-  return sets.filter((entry) => entry?.is_fixture !== true).map((entry) => {
-    if (!entry || typeof entry.id !== 'string' || !SET.test(entry.id) || seen.has(entry.id)
-      || (entry.name != null && typeof entry.name !== 'string')) throw new Error('The published archive catalog could not be verified.');
-    seen.add(entry.id);
-    return { id: entry.id, name: entry.name?.trim() || entry.id.toUpperCase(),
-      dataDate: typeof entry.data_date === 'string' ? entry.data_date : null };
+  return sets.map((entry) => {
+    if (!entry || typeof entry.set_id !== 'string' || !SET.test(entry.set_id) || seen.has(entry.set_id)
+      || (entry.set_name != null && typeof entry.set_name !== 'string')
+      || (entry.data_date != null && typeof entry.data_date !== 'string')) throw new Error('Live environments could not be verified.');
+    seen.add(entry.set_id);
+    return { id: entry.set_id, name: entry.set_name?.trim() || entry.set_id.toUpperCase(),
+      dataDate: entry.data_date || null };
   });
 }
 

@@ -152,8 +152,8 @@ export function createProfileActivityController(scope: ActivityScope, io: Profil
     metadataLoading = true;
     const request = ++metadataGeneration;
     publish({ ...state, catalogBusy: true, catalogError: null, coverageError: null });
-    // Archive progress does not become unavailable just because live serving
-    // metadata failed, and a missing catalog is never an empty/complete archive.
+    // Archive and coverage are both derived from Live serving metadata. A failed
+    // request never falls back to historical sets or zero-of-zero progress.
     const [archive, coverage] = await Promise.allSettled([Promise.resolve().then(io.loadArchive), Promise.resolve().then(io.loadCoverage)]);
     if (!alive || request !== metadataGeneration) return;
     metadataLoading = false;

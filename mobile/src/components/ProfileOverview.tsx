@@ -191,7 +191,7 @@ export function ProfileOverview({ profile, publicView = false }: { profile: Care
 
       <Section title="Archive Progress">
         <Text style={styles.archiveNumber}>{played} / {total || 0}</Text>
-        <Text style={styles.body}>Pack One environments played.</Text>
+        <Text style={styles.body}>Currently available environments played.</Text>
         {activityLink('archive', 'Explore archive progress')}
         {total > 0 ? (
           <View style={styles.archiveTrack}>
