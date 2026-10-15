@@ -49,6 +49,7 @@ export type InsightDecision = {set_id:string;pick_number:number;score:number;tro
   scoring_version:string;corpus_version:string;answered_at:string};
 
 export type DraftInsights = {
+  comparison_contract?: 'compatible-source-groups-v1';
   environment: InsightsEnvironment;
   period: InsightsPeriod;
   environment_label: string;
