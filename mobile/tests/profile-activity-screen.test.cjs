@@ -113,11 +113,11 @@ async function mount(t, options = {}) {
 
 test('only active environments appear in native archive with their actual serving data', async (t) => {
   const h = await mount(t);
-  assert.match(h.text(), /1\\s*\\/\\s*2\\s*environments played/);
+  assert.match(h.text(), /1\s*\/\s*2\s*environments played/);
   assert.match(h.text(), /Favorite/); assert.match(h.text(), /Special environment/);
   assert.doesNotMatch(h.text(), /Crimson Vow|not currently live|historical progress/i);
   await h.press('View Marvel set details');
-  assert.match(h.text(), /1,200\\s*verified decisions/); assert.match(h.text(), /serving-fixture/);
+  assert.match(h.text(), /1,200\s*verified decisions/); assert.match(h.text(), /serving-fixture/);
   assert.equal(h.calls.filter(([kind]) => kind === 'archive').length, 1);
 });
 test('archive search and played filters only use Live environment records', async (t) => {
@@ -134,19 +134,19 @@ test('Live catalog failure never exposes inactive sets and retry recovers', asyn
     coverage: async () => { throw new Error('live offline'); },
   });
   assert.match(h.text(), /Live environments are temporarily unavailable/);
-  assert.doesNotMatch(h.text(), /1\\s*\\/\\s*2|Crimson Vow/);
+  assert.doesNotMatch(h.text(), /1\s*\/\s*2|Crimson Vow/);
   h.api.archive = async () => [{ id: 'msh', name: 'Marvel', dataDate: null }];
   h.api.coverage = async () => ({ corpus_version: 'new', sets: [
     { set_id: 'msh', set_name: 'Marvel', verified_decisions: 1200, qualified_trophy_drafts: 300, training_drafts: 5000 },
   ] });
   await h.press('Refresh environments');
-  assert.match(h.text(), /1\\s*\\/\\s*1\\s*environments played/);
+  assert.match(h.text(), /1\s*\/\s*1\s*environments played/);
   assert.doesNotMatch(h.text(), /live offline/);
 });
 test('missing Live catalog is unavailable rather than zero of zero complete', async (t) => {
   const h = await mount(t, { archive: async () => { throw new Error('archive offline'); } });
   assert.match(h.text(), /Live environments are temporarily unavailable/);
-  assert.doesNotMatch(h.text(), /0\\s*\\/\\s*0/);
+  assert.doesNotMatch(h.text(), /0\s*\/\s*0/);
   await h.press('Achievements'); assert.match(h.text(), /First Pack/);
 });
 
