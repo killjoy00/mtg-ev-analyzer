@@ -389,53 +389,68 @@ if platform == 'android':
     attempt('member-tabs-profile-settings-and-hardware-back', member_navigation)
 
     def native_insights():
-        # Isolated, signed-in preview records; no production API or owner history.
+        # Synthetic signed-in preview; never a physical device or real owner.
         launch('member-insights', 'insights', 390)
-        xml, logs = snapshot('insights-populated-dna')
-        require('PACKONE_INSIGHTS_READY' in logs, 'Native Insights did not render its decision report')
-        require('Your Drafting DNA' in xml and 'The Independent Thinker' in xml,
-                'Populated DNA identity is missing')
-        require('All available history' in xml, 'DNA does not identify its independent all-history scope')
-        reveal('Decision report')
-        xml, _ = snapshot('insights-populated-decisions')
-        require('Decision report' in xml and 'Best Calls' in xml, 'Decision report is not visible')
-        tap('Biggest Misses', exact=True)
-        reveal('Your pick: Cosmic Cube')
-        xml, _ = snapshot('insights-biggest-misses')
-        require('Your pick: Cosmic Cube' in xml, 'Switching highlight category retained Best Calls')
-        top()
-        tap('Best Calls', exact=True)
-        tap('Review original pack', exact=True)
-        xml, _ = snapshot('insights-readonly-original-pack')
-        require('Original saved pack' in xml and 'Hero in Training' in xml,
-                'Original saved pack modal failed to load')
+        xml, logs = snapshot('insights-default-revisit')
+        require('PACKONE_INSIGHTS_READY' in logs, 'Native pick review did not render')
+        require('Your picks' in xml and 'Picks to review' in xml,
+                'Picks are no longer the first Insights feature')
+        # The phone's initial viewport ends at the review heading. Scroll to
+        # the actual tab controls before asserting their accessibility labels.
+        reveal('Picks to revisit')
+        xml, _ = snapshot('insights-review-tabs')
+        require('Picks to revisit' in xml and 'High-scoring picks' in xml,
+                'Review tabs are missing after scrolling to them')
+        tap('High-scoring picks', exact=True)
+        # The selected example starts below the tab row on short phones.
+        reveal('Hero in Training')
+        xml, _ = snapshot('insights-high-scoring')
+        require('Hero in Training' in xml, 'High-scoring picks did not switch')
+        tap('Review pick')
+        reveal('Trophy drafter')
+        xml, _ = snapshot('insights-readonly-trophy-pool')
+        require('Trophy drafter' in xml and 'earlier picks' in xml,
+                'Read-only review does not identify the source drafter pool')
+        reveal('Hero in Training')
+        xml, _ = snapshot('insights-readonly-selected-card')
+        require('Hero in Training' in xml, 'Review did not load the chosen card')
         adb('shell', 'input', 'keyevent', '4')
         time.sleep(2)
         xml, _ = snapshot('insights-modal-back-restores-report')
-        require('Original saved pack' not in xml, 'Native back did not dismiss the saved pack modal')
-        reveal('Your Drafting Journey')
-        xml, _ = snapshot('insights-journey')
-        require('Your Drafting Journey' in xml, 'Journey is missing after compact highlights')
+        require('Trophy drafter' not in xml or 'Full pack' not in xml,
+                'Native hardware back did not dismiss review')
+        reveal('Your scores over time')
+        xml, _ = snapshot('insights-scores-over-time')
+        require('Your scores over time' in xml, 'Score history is missing')
+        reveal('Your pick patterns')
+        xml, _ = snapshot('insights-patterns-heading')
+        require('Your pick patterns' in xml and 'All available history' in xml,
+                'Pick patterns heading and all-history scope are missing')
+        reveal('The Independent Thinker')
+        xml, _ = snapshot('insights-qualified-patterns')
+        require('The Independent Thinker' in xml,
+                'Qualified traits are missing below the score history')
 
-    attempt('insights-populated-highlights-original-pack-and-journey', native_insights)
+    attempt('insights-default-revisit-high-scores-pool-and-history', native_insights)
 
     def native_insights_versions():
         launch('member-insights-versions', 'insights', 390)
-        reveal('Historical card-pool or scoring rules changed')
-        xml, logs = snapshot('insights-noncomparable-journey')
-        require('PACKONE_INSIGHTS_READY' in logs, 'Version-boundary report never rendered')
-        require('These windows are not one continuous progress trend' in xml,
-                'Native Journey hides a material version boundary')
+        reveal('Scoring or card-pool versions changed')
+        xml, logs = snapshot('insights-noncomparable-scores')
+        require('PACKONE_INSIGHTS_READY' in logs, 'Version-boundary review never rendered')
+        require('cannot be read as one continuous trend' in xml,
+                'Incompatible score history is not marked')
 
     attempt('insights-visible-historical-version-limitation', native_insights_versions)
 
     def native_insights_sparse():
         launch('member-insights-sparse', 'insights', 320, 1.5)
+        reveal('Your pick patterns')
         xml, logs = snapshot('insights-sparse-320dp-large-text')
-        require('PACKONE_INSIGHTS_READY' in logs, 'Sparse Insights fixture did not render')
-        require('Your Drafting DNA is taking shape' in xml,
-                'Sparse history unexpectedly names a qualified identity')
-        require('All available history' in xml, 'Sparse DNA loses the history scope')
+        require('PACKONE_INSIGHTS_READY' in logs, 'Sparse pick-review fixture did not render')
+        require('No clear pick pattern to show yet' in xml,
+                'Sparse history invented a qualified identity')
+        require('All available history' in xml, 'Sparse pattern scope is missing')
 
     attempt('insights-sparse-narrow-large-text', native_insights_sparse)
 
