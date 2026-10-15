@@ -378,12 +378,22 @@ function InsightSections({data,onReview,onLoadMore,morePhase}:{
   onLoadMore:()=>void;morePhase:'idle'|'loading'|'error';
 }) {
   const [explore,setExplore]=useState(false);
-  if (!data.unlocked) return <Section title="Picks to review">
-    <Text style={styles.body}>Play a few more puzzles in {data.environment_label}. You have {num(data.eligible_decisions)} of {data.unlock_at} picks included for this view.</Text>
-    <Pressable accessibilityRole="button" onPress={() => router.push('/')} style={styles.primaryButton}>
-      <Text style={styles.primaryText}>Play today&apos;s Daily</Text>
-    </Pressable>
-  </Section>;
+  // DNA and qualifying card-choice counts are all-history, not filtered-view data.
+  // Keep them visible even before this format/time range unlocks its report.
+  const dnaSection=data.drafting_dna?<DNASummary dna={data.drafting_dna}
+    cardChoices={data.card_choices} onReview={onReview}/>:
+    <Section title="Your pick patterns" caption="Across formats · All available history">
+      <Text style={styles.caption}>Pattern details aren’t available from this version yet.</Text>
+    </Section>;
+  if (!data.unlocked) return <>
+    <Section title="Picks to review">
+      <Text style={styles.body}>Play a few more puzzles in {data.environment_label}. You have {num(data.eligible_decisions)} of {data.unlock_at} picks included for this view.</Text>
+      <Pressable accessibilityRole="button" onPress={() => router.push('/')} style={styles.primaryButton}>
+        <Text style={styles.primaryText}>Play today&apos;s Daily</Text>
+      </Pressable>
+    </Section>
+    {dnaSection}
+  </>;
   const finding=safeFinding(data);
   const extra=data.comparison_contract==='compatible-source-groups-v1'
     ?(data.observations||[]).filter(row=>['progress','pick-depth'].includes(row.id)&&row.id!==finding?.id):[];
@@ -393,11 +403,7 @@ function InsightSections({data,onReview,onLoadMore,morePhase}:{
       <Section title="Picks to review"><Text style={styles.caption}>Pick examples aren’t available from this version yet.</Text></Section>}
     {data.journey?<JourneyStory journey={data.journey} progress={data.progress} months={data.months||[]}/>:
       <LegacyJourney progress={data.progress} months={data.months||[]}/>}
-    {data.drafting_dna?<DNASummary dna={data.drafting_dna} cardChoices={data.card_choices}
-      onReview={onReview}/>:
-      <Section title="Your pick patterns" caption="Across formats · All available history">
-        <Text style={styles.caption}>Pattern details aren’t available from this version yet.</Text>
-      </Section>}
+    {dnaSection}
     <Section title="More stats">
       <Pressable accessibilityRole="button" accessibilityState={{expanded:explore}}
         style={styles.disclosure} onPress={()=>setExplore(v=>!v)}>

@@ -407,3 +407,20 @@ test('native sparse history and both empty highlight categories stay neutral',as
  assert.ok(!ui.text().includes('Trait still developing'));
  assert.ok(!ui.text().includes('You drafted badly'));
 });
+
+test('native filtered unlock never hides qualified all-history pick patterns',async t=>{
+  const data={...fixture('mixed'),eligible_decisions:0,unlocked:false,progress:null,
+    drafting_dna:{schema_version:'drafting-dna-v2',status:'ready',scope:'all-eligible-history',
+      eligible_decisions:120,primary:{status:'qualified',id:'independent-thinker',
+        title:'The Independent Thinker',summary:'Your original alternatives were often strong.',
+        supporting_decisions:120,evidence_family:'alternatives',
+        evidence:[{label:'Strong alternatives',value:51}]},secondary:[],
+      note:'These patterns describe picks, not skill.'},
+  };
+  const ui=await mount(t,{respond:async()=>data});
+  assert.ok(ui.text().includes('You have 0 of 8 picks included for this view'));
+  assert.ok(ui.text().includes('The Independent Thinker'));
+  assert.ok(ui.text().includes('Across formats · All available history'));
+  assert.ok(!ui.text().includes('Your scores over time'),
+    'the selected-format score report remains locked');
+});
