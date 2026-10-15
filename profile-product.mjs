@@ -29,6 +29,7 @@ import { renderAccount, renderDeletionState } from './growth.mjs?v=13';
 import {
   bestPercentile,
   environmentProgress,
+  liveEnvironmentProgress,
   formatChallengeRecord,
   modeName,
   recentForm,
@@ -39,9 +40,10 @@ import {
   shareProfileCard,
   shareResultCard,
 } from './share-cards.mjs';
-import {bindMyPackOneTabs,currentSeasonMarkup,myPackOneMarkup,resetMyPackOneTab} from './my-pack-one.mjs?v=5';
+import {bindMyPackOneTabs,currentSeasonMarkup,myPackOneMarkup,resetMyPackOneTab} from './my-pack-one.mjs?v=6';
 
 let catalogPromise = null;
+let liveCatalogPromise = null;
 let profileRendering = false;
 let navInstalled = false;
 let routeRendered = false;
@@ -66,6 +68,20 @@ async function loadCatalog() {
     catalogPromise = loadReplayJson('./data/catalog.json', 'catalog').catch(() => {catalogPromise=null;return {sets:[]};});
   }
   return catalogPromise;
+}
+
+async function loadLiveCatalog() {
+  if (!liveCatalogPromise) {
+    const base = String(window.PACK1_API?.draftRunUrl || '').replace(/\/$/, '');
+    if (!base) return null;
+    liveCatalogPromise = fetch(`${base}/v1/set-catalog`, {
+      cache: 'no-store', credentials: 'omit', signal: AbortSignal.timeout(5000),
+    }).then(response => {
+      if (!response.ok) throw Error('Live catalog unavailable');
+      return response.json();
+    }).catch(() => null);
+  }
+  return liveCatalogPromise;
 }
 
 function catalogNames(catalog) {
@@ -262,10 +278,11 @@ function settingsMarkup(profile, progress, account, patreon) {
     </section>`:''}
   </section>`;
 }
-function profileMarkup(profile, catalog, { own = false, publicKey = null, account = null, patreon = null } = {}) {
-  if (own && profile.player.claimed) return myPackOneMarkup(profile,catalog,{account,patreon,settingsMarkup});
+function profileMarkup(profile, catalog, { own = false, publicKey = null, account = null, patreon = null, liveCatalog = null } = {}) {
+  if (own && profile.player.claimed) return myPackOneMarkup(profile,catalog,{account,patreon,settingsMarkup,liveCatalog});
   const names = catalogNames(catalog);
   const progress = environmentProgress(catalog, profile.by_set || []);
+  const live = liveEnvironmentProgress(liveCatalog, profile.by_set || []);
   const summary = profile.summary || {};
   if(own&&!profile.player.claimed&&Number(summary.games||0)===0) {
     return `<section class="player-profile-page growth-page first-run-profile" data-profile-key="${esc(profile.player.profile_key||'')}">
@@ -302,7 +319,7 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null, accoun
       <div><span>Best</span><strong>${Number(summary.games||0)>0?Number(summary.best_score||0):'Not yet'}</strong></div>
       <div><span>Daily streak</span><strong>${Number(summary.current_streak || 0)}</strong></div>
       <div title="Shared run wins and losses"><span>Shared W–L</span><strong>${esc(formatChallengeRecord(summary))}</strong></div>
-      <div><span>Environments</span><strong>${progress.played}/${progress.total}</strong></div>
+      <div><span>${live ? 'Live environments' : 'Archive environments'}</span><strong>${live ? `${live.played}/${live.total}` : `${progress.played}/${progress.total}`}</strong></div>
     </div>
 
     ${currentSeasonMarkup(profile,{surface:'public'})}
@@ -323,6 +340,7 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null, accoun
     <section class="profile-section archive-progress-section">
       <div class="profile-section-heading"><div><p class="eyebrow">Archive progress</p><h2>${progress.played}/${progress.total} environments played</h2></div><strong>${progress.total ? Math.round((progress.played / progress.total) * 100) : 0}%</strong></div>
       <div class="archive-progress-track"><i style="width:${progress.total ? (progress.played / progress.total) * 100 : 0}%"></i></div>
+       <p class="profile-chart-note">Archive totals include environments that are not currently live.</p>
       <details class="profile-disclosure" data-profile-section="archive"><summary>Explore the archive</summary><div class="environment-progress-grid">${progress.environments.map((entry) => environmentCard(entry, profile.player.favorite_set_id)).join('')}</div></details>
     </section>
 
@@ -612,14 +630,15 @@ async function renderProfile(profile, { own = false, publicKey = null } = {}) {
   try {
     document.body.classList.remove('is-game');
     ensureProfileStyles();
-    const [catalog,account,patreon] = await Promise.all([
+    const [catalog,liveCatalog,account,patreon] = await Promise.all([
       loadCatalog(),
+      loadLiveCatalog(),
       own?getAuthSession().catch(()=>({unavailable:true})):null,
       own?loadPatreonStatus().catch(()=>null):null,
     ]);
     const app = document.querySelector('#app');
     if (!app) return;
-    app.innerHTML = profileMarkup(profile, catalog, { own, publicKey, account, patreon });
+    app.innerHTML = profileMarkup(profile, catalog, { own, publicKey, account, patreon, liveCatalog });
     window.PACK1_LAST_PROFILE = profile;
     await bindProfile(profile, catalog, { own, publicKey });
     if (own && profile.player.claimed) bindMyPackOneTabs();
