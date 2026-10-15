@@ -123,7 +123,7 @@ test('237 decisions without standout finding keep neutral copy, not a manufactur
  const ui=await mount(t,{respond:async()=>data});
  const view=ui.text();
  assert.ok(view.includes('237 picks included'));
- assert.ok(view.includes('No high-scoring picks here'));
+ assert.ok(view.includes('No high-scoring picks in this view.'));
  assert.ok(!view.includes('Leading finding'));
  assert.ok(!view.includes('hard-rated decisions averaged'));
  assert.ok(!view.includes('Your most-recorded source pick position'));
@@ -402,10 +402,21 @@ test('native sparse history and both empty highlight categories stay neutral',as
      eligible_decisions:9,primary:null,secondary:[],note:'Needs support.'},
    highlights:{schema_version:'decision-highlights-v3',best:[],misses:[],note:''}};
  const ui=await mount(t,{respond:async()=>data});
- assert.ok(ui.text().includes('No high-scoring picks here'));
+ assert.ok(ui.text().includes('No high-scoring picks in this view.'));
  assert.ok(ui.text().includes('No clear pick pattern to show yet.'));
  assert.ok(!ui.text().includes('Trait still developing'));
- assert.ok(!ui.text().includes('You drafted badly'));
+ assert.ok(!ui.text().includes('drafted badly'));
+ await ui.choose('Picks to revisit');
+ assert.ok(ui.text().includes('No picks to revisit in this view.'));
+ const help=()=>ui.root.root.findAll(n=>n.type==='Pressable'&&labels(n)==='How scores work');
+ assert.equal(help().length,1);
+ assert.equal(help()[0].props.accessibilityState.expanded,false);
+ assert.ok(!ui.text().includes('Matching the trophy pick earns'));
+ await ui.choose('How scores work');
+ assert.equal(help()[0].props.accessibilityState.expanded,true);
+ assert.equal(ui.text().split('Matching the trophy pick earns').length-1,1);
+ await ui.choose('How scores work');
+ assert.ok(!ui.text().includes('Matching the trophy pick earns'));
 });
 
 test('native filtered unlock never hides qualified all-history pick patterns',async t=>{

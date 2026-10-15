@@ -249,6 +249,7 @@ function HighlightsStory({highlights,finding,onReview,onLoadMore,morePhase}:{
 }) {
   const [selected,setSelected]=useState<'best'|'misses'>(highlights.misses?.length?'misses':'best');
   const [expanded,setExpanded]=useState(false);
+  const [showScoring,setShowScoring]=useState(false);
   const rows=selected==='best'?highlights.best:highlights.misses;
   const show=expanded?rows:(rows||[]).slice(0,3);
   return <Section title="Picks to review" caption="Only your first included answer to each puzzle counts."
@@ -269,7 +270,8 @@ function HighlightsStory({highlights,finding,onReview,onLoadMore,morePhase}:{
       const own=item.preview?.selected,archived=item.preview?.trophy;
       const ownName=own?.name||item.selected_name||'Card name unavailable';
       const trophyName=archived?.name||item.historical_name||'Card name unavailable';
-      return <View key={item.puzzle_id} style={[styles.highlightCard,index>0&&styles.highlightCompact]}>
+      return <View key={item.puzzle_id} testID={'insights-pick-'+item.puzzle_id} collapsable={false}
+        style={[styles.highlightCard,index>0&&styles.highlightCompact]}>
         <View style={styles.highlightVisual}>
           <View style={styles.highlightArtWrap}><Text style={styles.meta}>Your pick</Text>
             <CardArtwork card={own} label="Your pick" small={index>0}/></View>
@@ -286,7 +288,7 @@ function HighlightsStory({highlights,finding,onReview,onLoadMore,morePhase}:{
           <Text style={styles.secondaryText}>Review pick</Text>
         </Pressable>
       </View>;
-    }):<Text style={styles.caption}>No {selected==='misses'?'picks to revisit':'high-scoring picks'} here. This doesn’t mean you drafted badly.</Text>}
+    }):<Text style={styles.caption}>No {selected==='misses'?'picks to revisit':'high-scoring picks'} in this view.</Text>}
     {!expanded&&((rows||[]).length>3||highlights.has_more?.[selected])?<Pressable accessibilityRole="button"
       style={styles.secondaryButton} onPress={()=>setExpanded(true)}>
       <Text style={styles.secondaryText}>See more picks</Text></Pressable>:null}
@@ -295,8 +297,11 @@ function HighlightsStory({highlights,finding,onReview,onLoadMore,morePhase}:{
       <Text style={styles.secondaryText}>{morePhase==='loading'?'Loading more picks…':
         morePhase==='error'?'Retry loading picks':'Load more picks'}</Text>
     </Pressable>:null}
-    <Text style={styles.caption}>100 means you matched the trophy pick. Other picks earn up to 95 based on the model.</Text>
-    <Text style={styles.caption}>Scores describe picks; they don’t prove a choice was objectively right or wrong.</Text>
+    <Pressable accessibilityRole="button" accessibilityState={{expanded:showScoring}}
+      onPress={()=>setShowScoring(value=>!value)} style={styles.disclosure}>
+      <Text style={styles.secondaryText}>How scores work</Text>
+    </Pressable>
+    {showScoring?<Text style={styles.caption}>Matching the trophy pick earns 100 points. Other picks earn up to 95 based on the model. Scores reflect the original result, not a measure of drafting skill.</Text>:null}
   </Section>;
 }
 function JourneyStory({journey,progress,months}:{
@@ -588,7 +593,7 @@ export default function InsightsScreen() {
     {detailPhase!=='idle'?<Modal visible animationType="slide" onRequestClose={closeDetail}
       presentationStyle="pageSheet" accessibilityViewIsModal>
       <SafeAreaView style={styles.safe}>
-        <ScrollView contentContainerStyle={styles.page}>
+        <ScrollView testID="insights-review-modal" contentContainerStyle={styles.page}>
           {detailPhase==='loading'?<View style={styles.notice}>
             <ActivityIndicator accessibilityLabel="Loading saved decision"/>
             <Text style={styles.body}>Loading your pick…</Text>
