@@ -4,6 +4,7 @@ import { chromium } from 'playwright';
 
 const base = process.env.PACK1_E2E_URL || 'http://127.0.0.1:4173';
 const growthOrigin = 'https://br-twilight-hill-ayffyd2b-pack1growth.compute.c-5.us-east-2.aws.neon.tech';
+const draftOrigin = 'https://br-twilight-hill-ayffyd2b-draftrunapi.compute.c-5.us-east-2.aws.neon.tech';
 const profileKey = '0123456789abcdef';
 await mkdir('artifacts', { recursive: true });
 
@@ -110,6 +111,15 @@ const fixture = {
     { id:'top10', label:'Top Ten Percent', description:'Finish in the top 10% of a Daily leaderboard with at least 10 players.', unlocked:true, current:1, target:1, progress_text:'Top 7% best' },
   ],
 };
+
+// Serving metadata has a different lifecycle than the published archive.
+await page.route(`${draftOrigin}/v1/set-catalog`, async route => {
+  await route.fulfill({ status:200, contentType:'application/json', body:JSON.stringify({
+    corpus_version:'fixture', sets:[
+      { set_id:'neo' }, { set_id:'ktk' }, { set_id:'powered-cube' },
+    ],
+  }) });
+});
 
 await page.route(`${growthOrigin}/**`, async (route) => {
   const url = new URL(route.request().url());
@@ -348,6 +358,13 @@ try {
   await page.locator('#account-nav').click();
   await page.locator('.my-pack-one-page').waitFor({ timeout:10000 });
   assert.equal((await page.locator('.my-pack-one-heading h1').textContent())?.trim(), 'My Pack One');
+  assert.equal((await page.locator('.my-career-metrics > div:last-child strong').textContent())?.trim(), '3/3',
+    'the career snapshot counts the Live catalog, not the 30-set archive');
+  assert.equal((await page.locator('.my-career-metrics > div:last-child span').textContent())?.trim(), 'Live environments');
+  assert.match(await page.locator('.my-archive-summary').textContent(), /archive environments played/);
+  assert.match(await page.locator('.my-archive-note').textContent(), /3 live now/);
+  assert.match(await page.locator('[data-environment-id="pio"]').textContent(), /Not live/,
+    'archive-only sets stay visible as historical entries');
   assert.equal((await page.locator('.my-profile-card h2').textContent())?.trim(), 'Profile Tester');
   assert.equal(await page.locator('.my-profile-card h2 [data-achievement-mark="explorer5"]').count(),1,'showcased badge sits beside the player name');
   assert.equal(await page.locator('#profile-stats-tab').getAttribute('aria-selected'),'true');
