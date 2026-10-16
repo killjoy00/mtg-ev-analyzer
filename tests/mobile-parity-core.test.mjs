@@ -70,7 +70,7 @@ test('native Draft Run keeps web feedback and result-review parity', () => {
   assert.match(draftScreen, /Model&apos;s strongest choice/);
   assert.match(draftScreen, /Compare all/);
   assert.match(draftScreen, /Your \{run\.run_length\} picks/);
-  assert.match(draftScreen, /shared=\$\{/);
+  assert.match(draftScreen, /\/open\/shared\/\?id=\$\{/);
   assert.match(draftScreen, /🟩/);
   assert.match(draftScreen, /Play this run and compare/);
 });

@@ -283,7 +283,8 @@ try{
     const resultTouches=events.filter(event=>event.name==='acquisition_touch'&&event.props.source==='result_share');
     assert.ok(resultTouches.length>=1,'result_share still records the shared-link first-touch source independently of any sharer attribution');
   }else{
-    assert.match(shared.url,new RegExp('shared='+shareId));
+    assert.equal(new URL(shared.url).pathname,'/open/shared/');
+    assert.equal(new URL(shared.url).searchParams.get('id'),shareId);
     assert.equal(sharedReadCalls,2,'native share and explicit copy both verify the recipient-facing link');
     await page.evaluate(()=>{window.__runShare=null;});
     failSharedRead=true;
@@ -293,7 +294,14 @@ try{
     assert.equal(sharedReadCalls,3);
     failSharedRead=false;
     await page.goto(shared.url);await page.locator('#accept-run-challenge').waitFor();assert.match(await page.locator('.run-invite').innerText(),/Play this run and compare/);await noOverflow();
+    assert.equal(new URL(page.url()).searchParams.get('shared'),shareId,'browser fallback retains the exact invitation');
     await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-invite-mobile.png`,fullPage:true});
+    failSharedRead=true;
+    await page.reload();
+    await page.getByRole('heading',{name:'This challenge is no longer available.',exact:true}).waitFor();
+    assert.match(await page.locator('.message-card').innerText(),/Ask your friend for a new challenge link/);
+    assert.equal(await page.getByRole('button',{name:'Try again',exact:true}).count(),0,'missing invitations do not offer an endless server retry');
+    failSharedRead=false;
   }
   await page.goto(base+'/?game=draft-run&board=daily'+(cube?'&set=powered-cube':''));await page.locator('.run-board').waitFor();
   assert.equal(await page.locator('.run-board-games a').count(),3);
