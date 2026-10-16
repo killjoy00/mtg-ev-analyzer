@@ -1,7 +1,7 @@
 {
   "operation": "rollout-android-internal",
-  "reason": "Owner-authorized Pack One Insights review-polish internal-only rollout for signed AAB from merged #1219 at source c811b4b0 and original Insights UI merge #1218. Activate exactly Google Play Internal Testing versionCode 100853 ONLY after signed upload workflow 38793384532 confirms its existence, replacing only the prior 100849 Internal Testing release. Keep the separate production-access Closed Testing version 100772 completed, preserve all testers, groups, countries, the 14-day qualification and all Production tracks. Fail closed on missing or differing versions; never publish to public production or alter any other track.",
+  "reason": "Owner requested completing the friend-challenge fixes from merged PR #1224. Activate exactly Android 1.0 versionCode 100858, uploaded and committed as an Internal Testing draft by signed workflow 38980662709 from source 073011d95624d1bee8b040bec55155307af88c9f after exact-main RC 38979253869 passed. Replace only prior Internal Testing 100853. Preserve production-access Closed Testing 100772, qualification continuity, testers, groups, countries and Production. Require completed status and a fresh store read before treating delivery as complete.",
   "track": "internal",
-  "version_code": "100853",
+  "version_code": "100858",
   "preserve_closed_version_code": "100772"
 }
