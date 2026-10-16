@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   rollout:
-    name: activate verified Android 100853 internal test
+    name: activate verified Android 100858 internal test
     if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
     runs-on: ubuntu-latest
     environment: pack-one-mobile-release
@@ -37,13 +37,13 @@ jobs:
               raise SystemExit('Unexpected Android internal rollout request keys: '+str(sorted(request)))
           if request['operation'] != 'rollout-android-internal':
               raise SystemExit('Unsupported operation.')
-          if request['track'] != 'internal' or request['version_code'] != '100853':
-              raise SystemExit('Only reviewed internal version 100853 is authorized.')
+          if request['track'] != 'internal' or request['version_code'] != '100858':
+              raise SystemExit('Only reviewed internal version 100858 is authorized.')
           if request['preserve_closed_version_code'] != '100772':
               raise SystemExit('Do not change the existing production-access release baseline.')
           if not isinstance(request['reason'],str) or not request['reason'].strip():
               raise SystemExit('Rollout requires an owner-authorized reason.')
-          print('version_code=100853')
+          print('version_code=100858')
           PY
 
       - name: Require approved current main revision
@@ -81,15 +81,15 @@ jobs:
           echo "$result"
           RESULT="$result" node <<'NODE' >> "$GITHUB_STEP_SUMMARY"
           const data=JSON.parse(process.env.RESULT);
-          if(data.track!=='internal'||data.versionCode!=='100853'||
+          if(data.track!=='internal'||data.versionCode!=='100858'||
               data.releaseStatus!=='completed'||!data.closedTrackPreserved||
               (!data.verifiedAfterCommit&&!data.alreadyActive)||
-              (!data.alreadyActive&&data.replacedInternalCode&&data.replacedInternalCode!=='100849')) {
+              (!data.alreadyActive&&data.replacedInternalCode&&data.replacedInternalCode!=='100853')) {
             throw Error('Google Play rollout evidence did not satisfy internal-only completion.');
           }
           console.log('## Pack One Android internal rollout');
           console.log('- Package: `'+data.packageName+'`');
-          console.log('- Target: `internal`, version code `100853`');
+          console.log('- Target: `internal`, version code `100858`');
           console.log('- Google Play release status: `completed`');
           if(data.replacedInternalCode) console.log('- Replaced prior Internal Testing version: `'+data.replacedInternalCode+'`');
           console.log('- Already active before operation: `'+Boolean(data.alreadyActive)+'`');
