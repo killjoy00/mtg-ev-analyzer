@@ -340,11 +340,14 @@ export async function renderAccount({ validateDailyRunId = null, sharedRunId: in
   pendingSharedRunId=intent||pendingDailyRunValidation||activeAdminReturn()||source==='profile_safety'
     ? null
     : invitationId!==undefined?sharedRunId(invitationId):sharedRunInvitationId(location.href);
-  const sharedReturn=pendingSharedRunId;
+  let sharedReturn=pendingSharedRunId;
   document.body.classList.remove('is-game');
   const app=document.querySelector('#app'); if(!app) return;
   try {
     currentAccount=await getAuthSession();
+    // Opening Account while already signed in is ordinary navigation. Only an
+    // explicit authentication continuation should return to an invitation.
+    if(currentAccount?.user&&invitationId===undefined&&!reauthenticate)sharedReturn=pendingSharedRunId=null;
     currentAccountState=currentAccount?.user?'signed-in':'signed-out';
     currentAccountError=null;
     syncAccountNav();
