@@ -1,4 +1,4 @@
 {
   "operation": "upload-testflight-app-store-eligible",
-  "reason": "Owner requested deploying PR #1218 Insights review wording and selection/detail acceptance fixes to existing internal TestFlight after the patch is merged and all browser, native simulator/emulator and exact-main validation pass. Create a new monotonic signed iOS 1.1 candidate through the protected release workflow, verify its processing and internal TestFlight availability separately, and preserve testers, beta groups, App Store versions, review submissions and public release state. This request does not authorize public App Review submission or physical-device acceptance waiver."
+  "reason": "Owner requested completing the friend-challenge fixes from merged PR #1224. After successful exact-main RC validation of c72325af0c493e80f2a312e49183d16c6f820c6b and required checks, build and upload a new monotonic signed iOS 1.1 candidate to existing internal TestFlight. Verify Apple processing and internal availability separately. Preserve testers, beta groups, App Store versions, review submissions and public release state. Physical-device acceptance remains a separate requirement."
 }

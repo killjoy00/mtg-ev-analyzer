@@ -1,4 +1,4 @@
 {
   "operation": "upload-android-internal",
-  "reason": "Owner requested deploying PR #1218 Insights review wording and selection/detail acceptance fixes to existing Google Play Internal Testing after the patch is merged and all browser, native simulator/emulator and exact-main validation pass. Sign and upload a new monotonic Android 1.0 candidate using the protected Pack One release workflow; preserve the separate production-access Closed Testing release, testers, groups, countries, its 14-day qualification, and Production. This request does not authorize a public Play rollout or physical-device acceptance waiver."
+  "reason": "Owner requested completing the friend-challenge fixes from merged PR #1224. After successful exact-main RC validation of c72325af0c493e80f2a312e49183d16c6f820c6b and required checks, build and upload a new monotonic signed Android 1.0 candidate to existing Google Play Internal Testing. Verify the exact uploaded version before activating it. Preserve production-access Closed Testing 100772, testers, groups, countries, qualification continuity and Production. Physical-device acceptance remains a separate requirement."
 }
