@@ -521,7 +521,8 @@ try {
     assert.equal(saved.returnUrl,undefined);
     googleStartFails=false;friendStarts=[];
     nextLinkNewlyClaimed=provider==='verify';
-    const suffix=provider==='apple'?'&appleHandoff=fixture-handoff':'';
+    const suffix=provider==='apple'?'&appleHandoff=fixture-handoff'
+      : provider==='google'?'&neon_auth_session_verifier=fixture-verifier':'';
     await page.goto(base+'/?auth='+provider+suffix);
     if(provider==='verify')await page.locator('#account-ready-skip').click();
     await page.locator('#accept-run-challenge').waitFor();
@@ -542,7 +543,7 @@ try {
   assert.equal(await page.evaluate(()=>JSON.parse(sessionStorage.getItem('pack1-auth-flow-v1')).sharedRunId),undefined);
   googleStartFails=false;
   await page.evaluate(()=>sessionStorage.setItem('pack1-auth-flow-v1',JSON.stringify({sharedRunId:'https://example.invalid/',source:'practice_gate'})));
-  await page.goto(base+'/?auth=google');
+  await page.goto(base+'/?auth=google&neon_auth_session_verifier=fixture-verifier');
   await page.locator('.my-pack-one-page').waitFor();
   assert.equal(new URL(page.url()).origin,new URL(base).origin,'untrusted stored destinations never become redirects');
 
