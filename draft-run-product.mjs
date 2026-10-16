@@ -10,6 +10,7 @@ import { compactDraftRunFeedback, consensusFeedback, trophyDrafterDetails, troph
 import { tcgplayerUrl } from './tcgplayer.mjs';
 import { dailyResetCue } from './game-date.mjs';
 import {nextUnfinishedDaily} from './today-status.mjs';
+import {sharedRunAppPath,sharedRunInvitationId} from './shared-run-links.mjs';
 
 const base = () => String(window.PACK1_API?.draftRunUrl||'').replace(/\/$/,'');
 const webClientBuild=()=>new URL(import.meta.url).searchParams.get('v')||null;
@@ -332,7 +333,7 @@ function renderResult() {
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render();window.scrollTo({top:0,behavior:'instant'});});
   document.querySelector('#run-share').onclick=()=>shareResult();
   document.querySelector('#run-copy-result').onclick=()=>shareResult({copy:true});
-  document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=10')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
+  document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=15')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
   if(run.day)void renderDailyResultCue(run.id);
   document.dispatchEvent(new CustomEvent('pack1:result-visible',{detail:{id:`draft-run:${run.id}`,score:run.score,mode:'draft_run',set_id:run.environment,daily:Boolean(run.day)}}));
 }
@@ -370,9 +371,7 @@ async function shareResult({copy=false}={}) {
       ? `${location.origin}/share/daily/v2/?environment=${encodeURIComponent(run.environment||environment)}&ref=result_share`
       : share?.creator&&share.url
         ? new URL(share.url,location.origin).toString()
-        : share?.url
-          ? new URL(share.url,location.origin).toString()
-          : `${location.origin}${location.pathname}${gameUrl('shared='+share.id)}`;
+        : new URL(sharedRunAppPath(share.id),location.origin).toString();
     trackEvent('share_click',{surface:'draft_run_result',method:copy?'copy_button':'native'});
     if(copy) {
       const payload=`${draftRunShareText(run)}\n${url}`;
@@ -451,9 +450,16 @@ function renderLoadFailure(error,isBoard) {
   if(error.capability||error.status===401){
     const premium=['custom_corpus','unlimited_cube_practice'].includes(error.capability);
     const signedIn=hasAccountSession();
-    app().innerHTML=`<section class="message-card"><h1>${premium?'Elite practice':signedIn?'Practice access':'Keep drafting with a free account'}</h1><p>${esc(error.message)}</p>${premium?'<p>Elite membership includes custom sets and unlimited Cube practice.</p>':''}<div class="button-row">${premium?'<button class="button primary" id="practice-membership">'+(signedIn?'Become Elite':'Sign in to become Elite')+'</button>':''}${!premium&&!signedIn?'<button class="button primary" id="practice-account">Sign in or create an account</button>':''}<a class="button secondary" href="./">Back to Dailies</a></div></section>`;
-    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=10')).beginEliteUpgrade({source:'practice_gate'});});
-    document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=10')).renderAccount();});return;
+    const friendSignIn=!signedIn&&sharedRunInvitationId(location.href);
+    app().innerHTML=`<section class="message-card"><h1>${premium?'Elite practice':signedIn?'Practice access':'Keep drafting with a free account'}</h1><p>${esc(error.message)}</p>${premium?'<p>Elite membership includes custom sets and unlimited Cube practice.</p>':''}<div class="button-row">${premium&&!friendSignIn?'<button class="button primary" id="practice-membership">'+(signedIn?'Become Elite':'Sign in to become Elite')+'</button>':''}${friendSignIn||!premium&&!signedIn?'<button class="button primary" id="practice-account">'+(friendSignIn?'Sign in to play this run':'Sign in or create an account')+'</button>':''}<a class="button secondary" href="./">Back to Dailies</a></div></section>`;
+    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=15')).beginEliteUpgrade({source:'practice_gate'});});
+    document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=15')).renderAccount({sharedRunId:sharedRunInvitationId(location.href),source:'practice_gate'});});return;
+  }
+  const params=new URLSearchParams(location.search);
+  if(!params.has('run')&&(params.has('shared')||params.has('challenge'))&&[400,404,410].includes(error.status)) {
+    const invalid=error.status===400;
+    app().innerHTML=`<section class="message-card"><h1>${invalid?'This challenge link is invalid.':'This challenge is no longer available.'}</h1><p>${invalid?'Check that you copied the full link, or ask your friend to send it again.':'Ask your friend for a new challenge link. You can still play today’s Daily Runs.'}</p><a class="button primary" href="./">Back to Dailies</a></section>`;
+    return;
   }
   console.warn('Draft Run page failed to load',error?.message);
   const retry=`<button class="button primary" type="button" data-run-retry="1">Try again</button>`;

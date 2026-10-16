@@ -860,13 +860,16 @@ export default function DraftRunScreen({
     )).join('');
     setShareError(null);
     try {
-      const setParam = resultEnvironment === 'powered-cube' || resultEnvironment === 'latest' ? `&set=${resultEnvironment}` : '';
       const share = state.run.day ? null : (shared ? await shared.createShare() : await createDraftRunShare(state.run.id, state.session));
+      if (!state.run.day && !share?.creator && !/^[a-f0-9]{24}$/.test(share?.id ?? '')) {
+        setShareError('Could not create this challenge link. Try sharing again.');
+        return;
+      }
       const url = state.run.day
         ? `https://packone.pro/share/daily/v2/?environment=${encodeURIComponent(resultEnvironment)}&ref=result_share`
         : share?.creator && share.url
           ? share.url
-          : `https://packone.pro/?game=draft-run${setParam}&shared=${share?.id}`;
+          : `https://packone.pro/open/shared/?id=${share?.id}`;
       const creator = state.run.comparison?.kind === 'creator' ? state.run.comparison : null;
       const text = state.run.day
         ? `I scored ${state.run.score ?? 0}/100 on today’s Pack One ${label}. Can you beat it?\n${squares}\n${matches}/${state.run.run_length} trophy picks matched · Daily ${state.run.day}`

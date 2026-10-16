@@ -421,8 +421,18 @@ test('a completed result uses server comparison and server environment in sharin
     await h.press('Share Pack One result');
     const payload = h.calls.find(([kind]) => kind === 'share')[1].message;
     assert.match(payload, /Powered Cube/);
-    assert.match(payload, new RegExp(`shared=${SHARE}`));
+    const link = payload.split('\n').at(-1);
+    assert.equal(link, `https://packone.pro/open/shared/?id=${SHARE}`);
     assert.equal(h.count('start'), 0);
+  } finally { await h.close(); }
+});
+
+test('malformed share responses do not send a broken challenge to the share sheet', async () => {
+  const h = await fixture({ checkpoint: true, run: run(8, true), shareResponse: { id: 'invalid' } });
+  try {
+    await h.press('Share Pack One result');
+    assert.match(h.text(), /Could not create this challenge link/);
+    assert.equal(h.count('share'), 0);
   } finally { await h.close(); }
 });
 

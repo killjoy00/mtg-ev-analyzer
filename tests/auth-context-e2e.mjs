@@ -3,6 +3,9 @@ import {chromium} from 'playwright';
 
 const base=process.env.PACK1_E2E_URL||'http://127.0.0.1:4173';
 const runId='11111111-1111-4111-8111-111111111111';
+const friendShare='1234567890abcdef12345678';
+let friendStarts=[];
+let friendEnvironment='mixed';
 const browser=await chromium.launch(process.env.CI?{headless:true,channel:'chrome'}:{headless:true});
 const page=await browser.newPage({viewport:{width:390,height:844}});
 const errors=[];
@@ -99,6 +102,9 @@ await page.route('https://api.packone.pro/growth/**',async route=>{
   } else if(path==='/v1/account/migrate') {
     signed=true;
     body={ok:true};
+  } else if(path==='/v1/account/apple/finish') {
+    signed=true;
+    body={ok:true,user:accountUser};
   } else if(path==='/v1/events') {
     body={ok:true};
   } else if(path==='/v1/profile/me') {
@@ -111,6 +117,13 @@ await page.route('https://api.packone.pro/growth/**',async route=>{
 
 await page.route('https://api.packone.pro/draft/**',async route=>{
   const path=new URL(route.request().url()).pathname.replace(/^\/draft/,'');
+  if(path==='/v1/shared-runs/'+friendShare)return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({id:friendShare,name:'A friend',score:82,scores:[],run_length:8,environment:friendEnvironment})});
+  if(path==='/v1/runs'&&route.request().method()==='POST') {
+    const body=route.request().postDataJSON();friendStarts.push(body);
+    if(!signed)return route.fulfill({status:403,contentType:'application/json',body:JSON.stringify({error:'Sign in to use this practice option.',capability:friendEnvironment==='powered-cube'?'unlimited_cube_practice':'unlimited_regular_practice'})});
+    assert.equal(body.challenge,friendShare);
+    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({...completedRun,environment:friendEnvironment,day:null,leaderboard_eligible:false,standing:null,comparison:{kind:'friend',name:'A friend',score:82,exact:true}})});
+  }
   if(path===`/v1/runs/${runId}`) {
     // Deliberately return a standing here. Phase 3 must not display it because
     // linkAccount does not expose standing and the product may not fetch it just
@@ -464,6 +477,75 @@ try {
   assert.equal((await page.locator('#account-nav').textContent())?.trim(),'My Pack One');
   assert.equal(await page.locator('[data-daily-validation-confirmation] span').count(),0);
   assert.deepEqual(linkBodies.at(-1),{validateDailyRunId:runId});
+
+  // The actual signed-out invitation gate must return to preview after email
+  // sign-in. Authentication alone must never accept or replace the challenge.
+  for(friendEnvironment of ['mixed','powered-cube']) {
+    signed=false;friendStarts=[];
+    await page.goto(base+'/?game=draft-run&shared='+friendShare);
+    await page.locator('#accept-run-challenge').click();
+    await page.locator('#practice-account').click();
+    const friendSignin=page.locator('#account-signin');
+    await friendSignin.locator('[name="email"]').fill('qa@example.invalid');
+    await friendSignin.locator('[name="password"]').fill('fixture-password-123');
+    await friendSignin.getByRole('button',{name:'Sign in',exact:true}).click();
+    await page.locator('#accept-run-challenge').waitFor();
+    assert.equal(new URL(page.url()).searchParams.get('shared'),friendShare);
+    assert.equal(friendStarts.length,1,'sign-in returns to preview without accepting a run');
+    await page.locator('#accept-run-challenge').click();
+    await page.locator('.run-result-page').waitFor();
+    assert.equal(friendStarts.length,2);
+    assert.equal(friendStarts.at(-1).challenge,friendShare);
+    assert.equal(friendStarts.at(-1).daily,false);
+  }
+  friendEnvironment='mixed';
+
+  // Signed-in Account navigation from an invitation still opens My Pack One.
+  await page.goto(base+'/?game=draft-run&shared='+friendShare);
+  await page.locator('#accept-run-challenge').waitFor();
+  await page.locator('#account-nav').click();
+  await page.locator('.my-pack-one-page').waitFor();
+
+  // A full reload after provider/verification handoff keeps only a validated
+  // invitation ID. It returns to the same preview, with no gameplay POST.
+  for(const provider of ['google','apple','verify']) {
+    await fresh();
+    await page.evaluate(async id=>{
+      await window.__renderAccount({sharedRunId:id,source:'practice_gate'});
+    },friendShare);
+    googleStartFails=true;
+    await page.locator('#account-google').click();
+    await page.getByText('Google unavailable fixture',{exact:true}).waitFor();
+    const saved=await page.evaluate(()=>JSON.parse(sessionStorage.getItem('pack1-auth-flow-v1')));
+    assert.equal(saved.sharedRunId,friendShare);
+    assert.equal(saved.returnUrl,undefined);
+    googleStartFails=false;friendStarts=[];
+    nextLinkNewlyClaimed=provider==='verify';
+    const suffix=provider==='apple'?'&appleHandoff=fixture-handoff'
+      : provider==='google'?'&neon_auth_session_verifier=fixture-verifier':'';
+    await page.goto(base+'/?auth='+provider+suffix);
+    if(provider==='verify')await page.locator('#account-ready-skip').click();
+    await page.locator('#accept-run-challenge').waitFor();
+    assert.equal(new URL(page.url()).searchParams.get('shared'),friendShare);
+    assert.equal(friendStarts.length,0,provider+' return waits for explicit acceptance');
+  }
+
+  // Invalid stored destinations cannot become auth redirects or linger into
+  // a later unrelated sign-in flow.
+  await fresh();
+  await page.evaluate(async id=>{
+    await window.__renderAccount({sharedRunId:id});
+    await window.__renderAccount({source:'nav'});
+  },friendShare);
+  googleStartFails=true;
+  await page.locator('#account-google').click();
+  await page.getByText('Google unavailable fixture',{exact:true}).waitFor();
+  assert.equal(await page.evaluate(()=>JSON.parse(sessionStorage.getItem('pack1-auth-flow-v1')).sharedRunId),undefined);
+  googleStartFails=false;
+  await page.evaluate(()=>sessionStorage.setItem('pack1-auth-flow-v1',JSON.stringify({sharedRunId:'https://example.invalid/',source:'practice_gate'})));
+  await page.goto(base+'/?auth=google&neon_auth_session_verifier=fixture-verifier');
+  await page.locator('.my-pack-one-page').waitFor();
+  assert.equal(new URL(page.url()).origin,new URL(base).origin,'untrusted stored destinations never become redirects');
 
   assert.deepEqual(errors,[]);
   console.log('Auth context browser contract passed: single-mode forms, verification recovery, first-claim account-ready across email/OAuth/verification, pending controls, and Daily return.');

@@ -3,12 +3,14 @@ import {sanitizeAdminDestination} from './admin/admin-return.mjs';
 import { accountAuthCompleted, completeAppleDeletion, completeAppleSignIn, completeEmailVerification, completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, linkAccount, loadMyProfile, requestPasswordReset, requestVerificationEmail, signInAccount, signOutAccount, signUpAccount, startAppleSignIn, startGoogleSignIn, updateProfile } from './growth-api.mjs';
 import { clearPatreonActivation, hasPatreonActivationIntent, rememberPatreonActivation, renderPatreonActivation as renderPatreonActivationPage } from './patreon-activation.mjs?v=2';
 import { flushEvents, trackEvent as event } from './retention-events.mjs';
+import {sharedRunId,sharedRunInvitationId,sharedRunInvitationPath} from './shared-run-links.mjs';
 
 let currentAccount = null;
 let currentAccountState = 'checking';
 let currentAccountError = null;
 let pendingDailyRunValidation = null;
 let pendingSignupNamePrompt = null;
+let pendingSharedRunId = null;
 const AUTH_FLOW_KEY='pack1-auth-flow-v1';
 const ADMIN_RETURN_KEY='pack1-admin-return-v1';
 const ADMIN_RETURN_TTL_MS=15*60*1000;
@@ -33,7 +35,7 @@ function finishAdminReturn(){
 const PROFILE_SAFETY_KEY='pack1-profile-safety-intent-v1';
 
 function saveAuthFlow(intent,source) {
-  try {sessionStorage.setItem(AUTH_FLOW_KEY,JSON.stringify({intent,source,validateDailyRunId:pendingDailyRunValidation||null}));} catch {}
+  try {sessionStorage.setItem(AUTH_FLOW_KEY,JSON.stringify({intent,source,validateDailyRunId:pendingDailyRunValidation||null,...(pendingSharedRunId?{sharedRunId:pendingSharedRunId}:{})}));} catch {}
 }
 function takeAuthFlow() {
   try {const raw=sessionStorage.getItem(AUTH_FLOW_KEY);sessionStorage.removeItem(AUTH_FLOW_KEY);return raw?JSON.parse(raw):null;} catch {return null;}
@@ -68,6 +70,12 @@ async function resumeProfileSafetyIntent() {
 
 async function renderSignedInHome(source='account') {
   if(source==='profile_safety'&&await resumeProfileSafetyIntent())return;
+  if(pendingSharedRunId) {
+    const invitation=pendingSharedRunId;
+    pendingSharedRunId=null;
+    location.assign(sharedRunInvitationPath(invitation));
+    return;
+  }
   const profiles=await import('./profile-product.mjs?v=14');
   profiles.installProfileProductLayer();
   (await import('./profile-polish.mjs?v=6')).installProfilePolish();
@@ -239,7 +247,7 @@ function setFormPending(form,pending,label) {
 
 async function returnToValidatedDaily(validationRunId,linked,source,{confirmed=true}={}) {
   if(confirmed)event('daily_score_validated',{source});
-  const draft=await import('./draft-run-product.mjs?v=16');
+  const draft=await import('./draft-run-product.mjs?v=17');
   await draft.returnToValidatedDaily(validationRunId,{standing:linked?.standing||null,confirmed});
 }
 
@@ -324,15 +332,22 @@ document.addEventListener('pack1:profile-updated',async eventObject=>{
   } catch {}
 });
 
-export async function renderAccount({ validateDailyRunId = null, intent = null, source = 'account', notice = '', mode = null, reauthenticate = false } = {}) {
+export async function renderAccount({ validateDailyRunId = null, sharedRunId: invitationId = undefined, intent = null, source = 'account', notice = '', mode = null, reauthenticate = false } = {}) {
   rememberAdminReturn();
   if(!intent&&hasPatreonActivationIntent())intent='patreon-activate';
   if(intent==='patreon-activate')rememberPatreonActivation(source);
   if(validateDailyRunId) pendingDailyRunValidation=validateDailyRunId;
+  pendingSharedRunId=intent||pendingDailyRunValidation||activeAdminReturn()||source==='profile_safety'
+    ? null
+    : invitationId!==undefined?sharedRunId(invitationId):sharedRunInvitationId(location.href);
+  let sharedReturn=pendingSharedRunId;
   document.body.classList.remove('is-game');
   const app=document.querySelector('#app'); if(!app) return;
   try {
     currentAccount=await getAuthSession();
+    // Opening Account while already signed in is ordinary navigation. Only an
+    // explicit authentication continuation should return to an invitation.
+    if(currentAccount?.user&&invitationId===undefined&&!reauthenticate)sharedReturn=pendingSharedRunId=null;
     currentAccountState=currentAccount?.user?'signed-in':'signed-out';
     currentAccountError=null;
     syncAccountNav();
@@ -342,8 +357,8 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
     currentAccountError=error;
     syncAccountNav();
     renderAccountError(app,error,
-      ()=>renderAccount({validateDailyRunId:pendingDailyRunValidation,intent,source,mode}),
-      ()=>renderAccount({validateDailyRunId:pendingDailyRunValidation,intent,source,mode:'signin',reauthenticate:true}));
+      ()=>renderAccount({validateDailyRunId:pendingDailyRunValidation,sharedRunId:sharedReturn,intent,source,mode}),
+      ()=>renderAccount({validateDailyRunId:pendingDailyRunValidation,sharedRunId:sharedReturn,intent,source,mode:'signin',reauthenticate:true}));
     return;
   }
   if(currentAccount?.user&&!reauthenticate) {
@@ -354,8 +369,8 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       linked=await linkAccount(undefined,{validateDailyRunId:validationRunId});
     } catch(error) {
       renderAccountError(app,error,
-        ()=>renderAccount({validateDailyRunId:validationRunId,intent,source,mode}),
-        ()=>renderAccount({validateDailyRunId:validationRunId,intent,source,mode:'signin',reauthenticate:true}));
+        ()=>renderAccount({validateDailyRunId:validationRunId,sharedRunId:sharedReturn,intent,source,mode}),
+        ()=>renderAccount({validateDailyRunId:validationRunId,sharedRunId:sharedReturn,intent,source,mode:'signin',reauthenticate:true}));
       return;
     }
     if(linked?.newlyClaimed) {
@@ -417,6 +432,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
 
   document.querySelector('#account-mode-toggle')?.addEventListener('click',()=>void renderAccount({
     validateDailyRunId:pendingDailyRunValidation,
+    sharedRunId:sharedReturn,
     intent,source,
     mode:authMode==='signin'?'signup':'signin',
   }));
@@ -482,7 +498,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
             setVerificationRequestStatus(status,{error});
           } finally {button.disabled=false;}
         });
-        document.querySelector('#account-verification-signin')?.addEventListener('click',()=>void renderAccount({validateDailyRunId:pendingDailyRunValidation,intent,source,mode:'signin'}));
+        document.querySelector('#account-verification-signin')?.addEventListener('click',()=>void renderAccount({validateDailyRunId:pendingDailyRunValidation,sharedRunId:sharedReturn,intent,source,mode:'signin'}));
         return;
       }
       const claimed=await claimCurrentSession();
@@ -565,6 +581,7 @@ function shareCompletedAnalytics(eventObject) {
 
 export async function resumeAccountAuth(status) {
   const flow=takeAuthFlow()||{};
+  pendingSharedRunId=flow.intent||flow.validateDailyRunId?null:sharedRunId(flow.sharedRunId);
   if(status==='verify') {
     const current=new URL(location.href);
     const error=current.searchParams.get('error');
@@ -602,6 +619,7 @@ export async function resumeAccountAuth(status) {
     if(!verifiedSession) {
       return renderAccount({
         validateDailyRunId:flow.validateDailyRunId||null,
+        sharedRunId:pendingSharedRunId,
         intent:flow.intent||null,
         source:flow.source||'account',
         mode:'signin',
@@ -691,7 +709,7 @@ export async function resumeAccountAuth(status) {
   clean.searchParams.delete('appleDeleteHandoff');
   history.replaceState({},'',clean.pathname+(clean.searchParams.size?'?'+clean.searchParams:''));
 
-  await renderAccount({validateDailyRunId:flow.validateDailyRunId||null,intent:flow.intent||null,source:flow.source||'account'});
+  await renderAccount({validateDailyRunId:flow.validateDailyRunId||null,sharedRunId:pendingSharedRunId,intent:flow.intent||null,source:flow.source||'account'});
   if(failure?.provider==='apple')appleError(failure.message);
   if(failure?.provider==='google')googleError(failure.message);
 }
