@@ -33,6 +33,8 @@ const result=await query(`SELECT
   to_regclass('draft_run_source_measurements') IS NOT NULL source_measurements,
   to_regclass('draft_run_decision_reports') IS NOT NULL decision_reports,
   to_regclass('draft_run_decision_report_summary') IS NOT NULL decision_report_summary,
+  EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='draft_run_decision_reports' AND column_name='review_status') decision_report_review_status,
+  EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='draft_run_decision_reports_review_queue_idx') decision_report_review_index,
   to_regclass('creator_challenges') IS NOT NULL creator_challenges,
   to_regclass('creator_challenge_audit') IS NOT NULL creator_challenge_audit,
   (SELECT count(*)=2 FROM information_schema.columns WHERE table_name='draft_run_sessions' AND column_name IN ('creator_challenge_id','creator_participant_auth_user_id')) creator_challenge_session_columns,
