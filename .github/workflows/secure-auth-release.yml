@@ -131,6 +131,7 @@ jobs:
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0057_admin_owner_invitations.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0058_owner_guard_admin_deletion.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0059_daily_peer_stats.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0060_player_report_review.sql
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
 
@@ -209,6 +210,7 @@ jobs:
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0057_admin_owner_invitations.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0058_owner_guard_admin_deletion.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0059_daily_peer_stats.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0060_player_report_review.sql
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
 
