@@ -30,6 +30,17 @@ export function queryFamily(sql) {
   return 'other';
 }
 
+// A log-safe failure line: stage names, coarse error classes, query families
+// and timings only. Never SQL, parameters, rows or connection details.
+export function failureSummary(report) {
+  const queries=[...(report.cache_build?.queries||[]),...(report.discovery?.queries||[]),
+    ...(report.cases||[]).flatMap(c=>(c.samples||[]).flatMap(s=>s.queries||[]))];
+  const failed=queries.filter(q=>q&&q.ok===false).at(-1);
+  return {stage:report.stage||null,error:report.error||null,assertion:report.assertion||null,
+    cache_build:report.cache_build?{ok:report.cache_build.ok,ms:report.cache_build.ms??null,timeout_ms:report.cache_build.timeout_ms}:null,
+    failed_query:failed?{family:failed.family,ms:failed.ms,error:failed.error}:null};
+}
+
 export function summarize(values) {
   if(!values.length)return {samples:0,p50_ms:null,p95_ms:null,p99_ms:null};
   const sorted=[...values].sort((a,b)=>a-b),pct=p=>sorted[Math.ceil(sorted.length*p)-1];
@@ -114,12 +125,14 @@ export async function main() {
     for(const [family,statement] of recorder.statements)if(['group_counts','custom_coverage','candidate_and_trajectory'].includes(family))plans.set(prefix+'-'+family,statement);
   };
   try {
+    report.stage='database_metadata';
     report.database=(await query("SELECT current_setting('server_version') server_version,current_setting('work_mem') work_mem,current_database() database")).rows[0];
     // Activity counters reset on a fresh Neon branch. Planner reltuples survive
     // the clone and are the useful estimate; keep zeroed counters separately.
     report.table_estimates=(await query("SELECT s.relname,c.reltuples::bigint::text estimated_rows,s.n_live_tup::text branch_activity_live_rows,s.last_analyze::text,s.last_autoanalyze::text FROM pg_stat_user_tables s JOIN pg_class c ON c.oid=s.relid WHERE s.schemaname='public' AND s.relname IN ('draft_run_verified_puzzles','draft_run_puzzle_ratings','corpus_components','corpus_source_exclusions') ORDER BY s.relname")).rows;
     let cachedSnapshot=null;
     if(cached) {
+      report.stage='cache_build';
       // A fresh production-sized clone rebuilds over a million inventory rows.
       // Give this setup operation bounded headroom without relaxing the 90s
       // deadline for discovery, measured selection, parity or query plans.
@@ -129,6 +142,7 @@ export async function main() {
         cachedSnapshot=await loadServingSnapshot(build.query,DRAFT_RUN_CORPUS_VERSION);
         Object.assign(report.cache_build,{id:cachedSnapshot.id,revision:cachedSnapshot.revision,groups:cachedSnapshot.groups.length,ok:true});
       } finally {report.cache_build.ms=elapsed(start);}
+      report.stage='cache_storage';
       report.cache_storage=(await query(`SELECT
         pg_total_relation_size('draft_run_serving_inventory')::text inventory_bytes,
         pg_total_relation_size('draft_run_serving_source_groups')::text source_group_bytes,
@@ -137,6 +151,7 @@ export async function main() {
         (SELECT count(*)::text FROM draft_run_serving_source_groups WHERE snapshot_id=$1::bigint) source_group_sources`,[cachedSnapshot.id])).rows[0];
       assert.equal(report.cache_storage.source_group_sources,report.cache_storage.inventory_sources,'Serving source-group cache is incomplete.');
     }
+    report.stage='discovery';
     const discovery=recordQueries(query),started=performance.now();
     const custom=await (cached?loadCachedCustomSetMetadata:loadCustomSetMetadata)(discovery.query,DRAFT_RUN_CORPUS_VERSION,day);
     const discoveryMs=elapsed(started);
@@ -156,6 +171,7 @@ export async function main() {
       for(let i=0;i<=repetitions;i++) {
         const seed='practice-baseline-v1:'+configuration.name+':'+i,recorder=recordQueries(query),start=performance.now();
         const sample={seed,phase:i===0?'first_observed':'repeat',queries:recorder.records,ok:false};entry.samples.push(sample);
+        report.stage='case:'+configuration.name+':'+i;
         try {
           const selected=await (cached?selectCachedDatabaseRun:selectDatabaseRun)(recorder.query,DRAFT_RUN_CORPUS_VERSION,seed,configuration.environment,{day,setIds:configuration.setIds});
           sample.selection_ms=elapsed(start);
@@ -176,6 +192,7 @@ export async function main() {
       }
       entry.repeat_summary=summarize(entry.samples.filter(s=>s.phase==='repeat').map(s=>s.selection_and_reload_ms));
     }
+    report.stage='plans';
     // Plans run after the timing samples, so EXPLAIN ANALYZE does not prime them.
     for(const [name,{sql,params}] of plans) {
       const result=await query('EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) '+sql,params);
@@ -185,10 +202,16 @@ export async function main() {
       report.plans.push(name+'.plan.json');
     }
     report.ok=true;
-  } catch(error) {report.error=errorCode(error);throw error;}
+  } catch(error) {
+    report.error=errorCode(error);
+    // Assertion messages are repository literals; keep only the first line.
+    if(error instanceof assert.AssertionError)report.assertion=String(error.message).split('\n')[0].slice(0,200);
+    throw error;
+  }
   finally {
     report.finished_at=new Date().toISOString();
     fs.writeFileSync(path.join(root,'report.json'),JSON.stringify(report,null,2)+'\n');
+    if(!report.ok)console.error('Practice benchmark failure: '+JSON.stringify(failureSummary(report)));
   }
   console.log('Practice SQL baseline saved; '+report.cases.length+' cases, '+report.plans.length+' plans.');
 }
