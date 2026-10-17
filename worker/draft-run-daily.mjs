@@ -2,11 +2,53 @@ import {SERVING_POLICY_VERSION} from '../serving-quality.mjs';
 import {DRAFT_RUN_CORPUS_VERSION,DRAFT_RUN_SCORING_VERSION} from '../draft-run.mjs';
 import {DRAFT_RUN_DIFFICULTY_VERSION} from '../draft-run-difficulty.mjs';
 import {DRAFT_RUN_SELECTION_VERSION} from '../draft-run-policy.mjs';
-import {loadLiveSetMetadata,selectDatabaseRun} from './draft-run-selection.mjs';
+import {decisionKey,loadLiveSetMetadata,selectDatabaseRun} from './draft-run-selection.mjs';
 
 export const DAILY_SCHEDULE_SELECT='SELECT puzzle_ids,corpus_version,scoring_version,difficulty_version,selection_version,daily_featured_sets,serving_policy_version FROM draft_run_schedules WHERE day=$1::date AND environment=$2';
 
 const unavailable=message=>Object.assign(new Error(message),{status:503});
+
+// A Daily never repeats an exact decision scheduled by any Daily in the last
+// 14 days, nor reuses a source draft scheduled in the last 7 days. Days are
+// inclusive of today, so other environments already generated today count.
+export const DAILY_REPEAT_WINDOW_DAYS=Object.freeze({decision:14,source:7});
+export const RECENT_DAILY_DECISIONS=`SELECT DISTINCT p.source_draft_hash,p.pick_number,(s.day>=$1::date-$3::int) recent_source
+  FROM draft_run_schedules s
+  CROSS JOIN LATERAL jsonb_array_elements_text(s.puzzle_ids) scheduled(puzzle_id)
+  JOIN draft_run_verified_puzzles p ON p.puzzle_id=scheduled.puzzle_id
+  WHERE s.day BETWEEN $1::date-$2::int AND $1::date`;
+
+export function dailyRepeatExclusion(rows) {
+  const decisions=new Set(),sources=new Set();
+  for(const row of rows) {
+    decisions.add(decisionKey(row));
+    if(row.recent_source===true||row.recent_source==='t')sources.add(row.source_draft_hash);
+  }
+  return {sources:[...sources].sort(),decisions:[...decisions].sort()};
+}
+
+// A small new set may be unable to honour both windows. Relax the source
+// window first, then the decision window, rather than publish no Daily.
+export function dailyRepeatTiers(exclusion) {
+  return [
+    {tier:'decision_and_source',exclude:exclusion},
+    {tier:'decision_only',exclude:{sources:[],decisions:exclusion.decisions}},
+    {tier:'none',exclude:null},
+  ];
+}
+
+export async function selectDailyWithoutRepeats(select,exclusion,{environment,day,warn=console.warn}={}) {
+  const tiers=dailyRepeatTiers(exclusion);
+  for(let i=0;i<tiers.length;i++) {
+    try {
+      const selected=await select(tiers[i].exclude);
+      if(i)warn('Daily repeat exclusion relaxed',JSON.stringify({environment,day,tier:tiers[i].tier}));
+      return selected;
+    } catch(error) {
+      if(Number(error?.status)!==503||i===tiers.length-1)throw error;
+    }
+  }
+}
 
 async function buildDailySchedule(query,day,environment) {
   let schedule=(await query(DAILY_SCHEDULE_SELECT,[day,environment])).rows[0];
@@ -18,7 +60,10 @@ async function buildDailySchedule(query,day,environment) {
       .slice(0,environment==='latest'?1:4).map(p=>p.set_id)
     :[];
   const seed=`daily:${environment}:${day}:${DRAFT_RUN_CORPUS_VERSION}:${DRAFT_RUN_SELECTION_VERSION}`;
-  const selected=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,environment,{daily:true,day});
+  const recent=(await query(RECENT_DAILY_DECISIONS,[day,DAILY_REPEAT_WINDOW_DAYS.decision-1,DAILY_REPEAT_WINDOW_DAYS.source-1])).rows;
+  const selected=await selectDailyWithoutRepeats(
+    exclude=>selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,environment,{daily:true,day,exclude}),
+    dailyRepeatExclusion(recent),{environment,day});
   if(!selected.length)throw unavailable('Daily schedule unavailable.');
   const plan=selected.map(p=>p.puzzle_id);
   if(environment==='latest')featuredSets=[selected[0].set_id];
