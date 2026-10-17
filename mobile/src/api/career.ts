@@ -90,6 +90,8 @@ export type CareerProfile = {
       environment: string;
       rank: number;
       average: number;
+      rating?: number;
+      average_score?: number;
       days: number;
     })[];
   } | null;

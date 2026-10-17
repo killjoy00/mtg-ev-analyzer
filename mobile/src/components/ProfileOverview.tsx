@@ -148,7 +148,7 @@ export function ProfileOverview({ profile, publicView = false }: { profile: Care
             {profile.current_season.standings.map((row) => (
               <View key={row.environment} style={styles.row}>
                 <Text style={styles.rowTitle}>{environmentLabel(row.environment)}</Text>
-                <Text style={styles.rowValue}>#{row.rank} · {Number(row.average || 0).toFixed(1)} · {row.days} days</Text>
+                <Text style={styles.rowValue}>#{row.rank} · {row.rating == null ? Number(row.average || 0).toFixed(1) : `${row.rating.toFixed(1)} rating · ${Number(row.average_score).toFixed(1)} avg`} · {row.days} days</Text>
               </View>
             ))}
           </View>

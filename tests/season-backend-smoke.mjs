@@ -4,6 +4,7 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
+import {seasonRatingPolicy,conservativeSeasonRating} from '../worker/season-rating.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 
 const connection=process.argv[2];
@@ -191,8 +192,10 @@ const profileSeason=await currentSeasonForPlayer(query,targetPlayer,{today:'2026
 assert.equal(profileSeason.set_id,'hob');
 assert.deepEqual(profileSeason.standings.map(row=>row.environment),['mixed','powered-cube','latest']);
 assert.equal(profileSeason.standings.find(row=>row.environment==='mixed').rank,106);
-// Season standings rank the best 10 Dailies; one day of 10 scores 10/10.
-assert.equal(profileSeason.standings.find(row=>row.environment==='mixed').average,1);
+// The first Daily qualifies, and low scores cannot be raised by the baseline.
+assert.equal(profileSeason.standings.find(row=>row.environment==='mixed').average,0);
+assert.equal(profileSeason.standings.find(row=>row.environment==='mixed').average_score,10);
+assert.equal(profileSeason.standings.find(row=>row.environment==='mixed').rating,0);
 assert.equal(profileSeason.standings.find(row=>row.environment==='mixed').days,1);
 
 const seasonBoards=[];
@@ -204,10 +207,11 @@ for(const environment of ['mixed','powered-cube','latest']){
 const oldClient=await board('month','mixed');
 assert.equal(oldClient.period,'season');assert.equal(oldClient.season.set_id,'hob');
 assert.deepEqual(oldClient.rows,seasonBoards[0].rows);
-assert.equal(seasonBoards[0].best_of,10);
+assert.equal(seasonBoards[0].best_of,null);
+assert.equal(seasonBoards[0].scoring.version,'conservative-season-v1');
 // The all-time board is retired; old links and installed apps get the season.
 const retiredAll=await board('all','mixed');
-assert.equal(retiredAll.period,'season');assert.equal(retiredAll.best_of,10);
+assert.equal(retiredAll.period,'season');assert.equal(retiredAll.best_of,null);
 assert.deepEqual(retiredAll.rows,seasonBoards[0].rows);
 assert.equal((await board('week','mixed')).best_of,3);
 assert.equal((await board('daily','mixed')).best_of,null);
@@ -218,9 +222,38 @@ await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade
 const bestRow=async bestOf=>(await draftRunLeaderboardRows(query,{start:'2026-09-01',end:'2026-09-07',environment:'mixed',playerId:bestPeer,limit:1,bestOf}))[0];
 assert.equal((await bestRow(3)).score,60,'best 3 of 20/90/60/30');
 assert.equal((await bestRow(3)).days,4);
-assert.equal((await bestRow(10)).score,20,'best 10 counts six unplayed days as 0');
+const ratingPolicy=seasonRatingPolicy('mixed','2026-09-01');
+const seasonRow=(await draftRunLeaderboardRows(query,{start:'2026-09-01',end:'2026-09-07',environment:'mixed',playerId:bestPeer,limit:1,ratingPolicy}))[0];
+assert.equal(seasonRow.average_score,50);
+assert.ok(Math.abs(seasonRow.rating-conservativeSeasonRating({sum:200,days:4},ratingPolicy))<1e-9);
+assert.equal(seasonRow.days,4);
 assert.equal((await bestRow(null)).score,50,'daily boards keep the plain average');
 await query("DELETE FROM scores WHERE player_id=$1::uuid AND challenge_date BETWEEN '2026-09-02' AND '2026-09-04'",[bestPeer]);
+
+
+// Full precision ranking, one-day eligibility and exact ties use real SQL.
+const cubePolicy=seasonRatingPolicy('powered-cube','2026-09-01');
+for(const [peer,days,score] of [[peers[1],1,40],[peers[2],30,65],[peers[3],31,65],[peers[4],30,65]]) {
+  await query(`INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json,details_json)
+    SELECT $1::uuid,'2026-09-01'::date+day,'powered-cube','draft_run',$3,'B','[]'::jsonb,
+      jsonb_build_object('corpus_version',$4::text) FROM generate_series(0,$2::int-1) day`,
+    [peer.id,days,score,DRAFT_RUN_CORPUS_VERSION]);
+}
+const cubeRows=async end=>draftRunLeaderboardRows(query,{start:'2026-09-01',end,environment:'powered-cube',ratingPolicy:cubePolicy});
+const rated=await cubeRows('2026-10-01');
+const low=rated.find(row=>row.player_id===peers[1].id),veteran=rated.find(row=>row.player_id===peers[2].id);
+const extra=rated.find(row=>row.player_id===peers[3].id),tie=rated.find(row=>row.player_id===peers[4].id);
+assert.equal(low.days,1);
+assert.ok(veteran.rank<low.rank);
+assert.equal(veteran.score,extra.score,'displayed rounding ties do not collapse ranks');
+assert.ok(extra.rank<veteran.rank);
+assert.equal(tie.rank,veteran.rank,'exact equal ratings share a rank');
+for(const row of rated)assert.ok(Math.abs(row.rating-conservativeSeasonRating({sum:row.average_score*row.days,days:row.days},cubePolicy))<1e-9);
+assert.deepEqual(await cubeRows('2026-11-23'),rated,'missing days and a longer window do not change evidence');
+const profileCube=(await currentSeasonForPlayer(query,peers[3].id,{today:'2026-10-01'})).standings.find(row=>row.environment==='powered-cube');
+assert.equal(profileCube.rank,extra.rank);
+assert.equal(profileCube.rating,extra.rating);
+assert.equal(profileCube.average_score,extra.average_score);
 
 // A genuinely later persisted release advances B -> C; editing mutable policy
 // afterward cannot move the stored season release or reopen B.

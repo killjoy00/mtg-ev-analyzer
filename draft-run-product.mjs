@@ -45,7 +45,7 @@ async function loadSetNames() {
 const app=()=>document.querySelector('#app');
 function styles() {
   if(document.querySelector('[data-draft-run-style]')) return;
-  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=14';link.dataset.draftRunStyle='1';document.head.appendChild(link);
+  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=15';link.dataset.draftRunStyle='1';document.head.appendChild(link);
 }
 async function api(path,body,auth=true) {
   const method=body===undefined?'GET':'POST',headers={'content-type':'application/json'};
@@ -347,7 +347,7 @@ function renderResult() {
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render();window.scrollTo({top:0,behavior:'instant'});});
   document.querySelector('#run-share').onclick=()=>shareResult();
   document.querySelector('#run-copy-result').onclick=()=>shareResult({copy:true});
-  document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=17')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
+  document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=18')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
   if(run.day)void renderDailyResultCue(run.id);
   document.dispatchEvent(new CustomEvent('pack1:result-visible',{detail:{id:`draft-run:${run.id}`,score:run.score,mode:'draft_run',set_id:run.environment,daily:Boolean(run.day)}}));
 }
@@ -435,10 +435,11 @@ async function showBoard(period='daily') {
   const seasonContext=period==='season'&&data.season
     ? `<p class="run-board-season">${esc(data.season.name)} Season · ${esc(seasonDate(data.season.start_date))}–${data.season.end_date?esc(seasonDate(data.season.end_date)):'present'}</p>`
     : '';
+  const seasonRating=period==='season'&&Boolean(data.scoring);
   const empty=period==='season'&&!data.season
     ? '<p class="run-empty">Season standings aren\'t available yet.</p>'
     : `<p class="run-empty">A fresh board. Finish today’s ${title()} to set the score to beat.</p>`;
-  app().innerHTML=`<section class="run-board"><p class="eyebrow">Leaderboards</p><h1>${environment==='latest'?'Latest Set':cube()?'Cube':'Draft Run'}</h1><nav class="run-board-games" aria-label="Leaderboard game"><a class="${environment==='mixed'?'active':''}" href="${boardUrl('mixed',period)}">Draft Run</a><a class="${cube()?'active':''}" href="${boardUrl('powered-cube',period)}">Cube</a><a class="${environment==='latest'?'active':''}" href="${boardUrl('latest',period)}">Latest Set</a></nav><nav class="run-board-periods" aria-label="Leaderboard period">${[['daily','Today'],['week','This week'],['season','This season']].map(([id,name])=>`<a class="${period===id?'active':''}" href="${gameUrl('board='+id)}">${name}</a>`).join('')}</nav>${seasonContext}<p>${period==='daily'?'First attempts on today’s shared starting packs.':`Average of your best ${data.best_of||(period==='week'?3:10)} first-attempt Daily scores ${period==='week'?'this week':'this season'}; days not played count as 0. Days played are shown alongside.`}</p>${data.rows.length?`<ol>${data.rows.map(r=>`<li><b>${r.rank}</b><span class="run-board-player">${r.profile_key?`<a href="?profile=${esc(r.profile_key)}">${esc(r.display_name)}</a>`:`<span>${esc(r.display_name)}</span>`}${achievementMark(r.showcase_achievement,{compact:true})}</span><small>${r.days} ${r.days===1?'day':'days'}</small><strong>${r.score}</strong></li>`).join('')}</ol>`:empty}<div class="run-board-actions"><a class="button primary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a>${practiceAction}</div></section>`;
+  app().innerHTML=`<section class="run-board"><p class="eyebrow">Leaderboards</p><h1>${environment==='latest'?'Latest Set':cube()?'Cube':'Draft Run'}</h1><nav class="run-board-games" aria-label="Leaderboard game"><a class="${environment==='mixed'?'active':''}" href="${boardUrl('mixed',period)}">Draft Run</a><a class="${cube()?'active':''}" href="${boardUrl('powered-cube',period)}">Cube</a><a class="${environment==='latest'?'active':''}" href="${boardUrl('latest',period)}">Latest Set</a></nav><nav class="run-board-periods" aria-label="Leaderboard period">${[['daily','Today'],['week','This week'],['season','This season']].map(([id,name])=>`<a class="${period===id?'active':''}" href="${gameUrl('board='+id)}">${name}</a>`).join('')}</nav>${seasonContext}<p>${seasonRating?'Season rating uses every first-attempt Daily score, with a larger deduction when you have played fewer days. You rank after your first Daily; missed days do not count as zero.':period==='daily'?'First attempts on today’s shared starting packs.':`Average of your best ${data.best_of||(period==='week'?3:10)} first-attempt Daily scores ${period==='week'?'this week':'this season'}; days not played count as 0. Days played are shown alongside.`}</p>${data.rows.length?`<ol>${data.rows.map(r=>`<li><b>${r.rank}</b><span><span class="run-board-player">${r.profile_key?`<a href="?profile=${esc(r.profile_key)}">${esc(r.display_name)}</a>`:`<span>${esc(r.display_name)}</span>`}${achievementMark(r.showcase_achievement,{compact:true})}</span>${seasonRating?`<small class="run-board-average">Avg ${Number(r.average_score).toFixed(1)}</small>`:''}</span><small>${r.days} ${r.days===1?'day':'days'}</small><strong>${seasonRating?`<small>Rating</small>${Number(r.rating).toFixed(1)}`:r.score}</strong></li>`).join('')}</ol>`:empty}<div class="run-board-actions"><a class="button primary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a>${practiceAction}</div></section>`;
   trackEvent('leaderboard_view',{mode:'draft_run',set_id:environment,period,season_id:data.season?.id,season_set_id:data.season?.set_id});
 }
 async function launch(options={}) {
@@ -466,8 +467,8 @@ function renderLoadFailure(error,isBoard) {
     const signedIn=hasAccountSession();
     const friendSignIn=!signedIn&&sharedRunInvitationId(location.href);
     app().innerHTML=`<section class="message-card"><h1>${premium?'Elite practice':signedIn?'Practice access':'Keep drafting with a free account'}</h1><p>${esc(error.message)}</p>${premium?'<p>Elite membership includes custom sets and unlimited Cube practice.</p>':''}<div class="button-row">${premium&&!friendSignIn?'<button class="button primary" id="practice-membership">'+(signedIn?'Become Elite':'Sign in to become Elite')+'</button>':''}${friendSignIn||!premium&&!signedIn?'<button class="button primary" id="practice-account">'+(friendSignIn?'Sign in to play this run':'Sign in or create an account')+'</button>':''}<a class="button secondary" href="./">Back to Dailies</a></div></section>`;
-    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=17')).beginEliteUpgrade({source:'practice_gate'});});
-    document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=17')).renderAccount({sharedRunId:sharedRunInvitationId(location.href),source:'practice_gate'});});return;
+    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=18')).beginEliteUpgrade({source:'practice_gate'});});
+    document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=18')).renderAccount({sharedRunId:sharedRunInvitationId(location.href),source:'practice_gate'});});return;
   }
   const params=new URLSearchParams(location.search);
   if(!params.has('run')&&(params.has('shared')||params.has('challenge'))&&[400,404,410].includes(error.status)) {

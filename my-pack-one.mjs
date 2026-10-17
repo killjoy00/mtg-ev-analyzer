@@ -32,7 +32,7 @@ export function currentSeasonMarkup(profile,{surface='my-pack'}={}) {
   if(!season||!rows.length)return '';
   const cls=surface==='public'?'profile-section profile-current-season':'my-pack-card profile-current-season';
   return '<section class="'+cls+'" aria-labelledby="current-season-title"><div class="current-season-heading"><p class="eyebrow">Current season</p><h2 id="current-season-title">'+esc(season.name)+' Season <span>· Current</span></h2></div><ol class="current-season-standings">'+rows.map(row=>
-    '<li><strong>'+esc(seasonEnvironmentName(row.environment))+'</strong><span>#'+num(row.rank)+' · '+num(row.average).toFixed(1)+' · '+num(row.days)+' '+(num(row.days)===1?'day':'days')+'</span></li>'
+    '<li><strong>'+esc(seasonEnvironmentName(row.environment))+'</strong><span>#'+num(row.rank)+' · '+(row.rating==null?num(row.average).toFixed(1):num(row.rating).toFixed(1)+' rating · '+num(row.average_score).toFixed(1)+' avg')+' · '+num(row.days)+' '+(num(row.days)===1?'day':'days')+'</span></li>'
   ).join('')+'</ol></section>';
 }
 

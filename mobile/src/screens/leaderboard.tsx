@@ -31,7 +31,6 @@ const periods: { id: LeaderboardPeriod; label: string }[] = [
   { id: 'daily', label: 'Today' },
   { id: 'week', label: 'This week' },
   { id: 'season', label: 'This season' },
-  { id: 'all', label: 'All time' },
 ];
 
 function isLeaderboardPeriod(value: string): value is LeaderboardPeriod {
@@ -39,7 +38,7 @@ function isLeaderboardPeriod(value: string): value is LeaderboardPeriod {
 }
 
 function canonicalLeaderboardPeriod(value: string) {
-  return value === 'month' ? 'season' : value;
+  return value === 'month' || value === 'all' ? 'season' : value;
 }
 
 function shortDate(value?: string | null) {
@@ -79,19 +78,27 @@ function FilterButton({
 function RankingRow({
   item,
   showDays,
+  seasonRating,
 }: {
   item: LeaderboardRow;
   showDays: boolean;
+  seasonRating: boolean;
 }) {
   const daysLabel = showDays
     ? `, ${item.days} day${item.days === 1 ? '' : 's'}`
     : '';
+  const scoreLabel = seasonRating
+    ? `rating ${Number(item.rating).toFixed(1)}, average ${Number(item.average_score).toFixed(1)}`
+    : `score ${item.score}`;
 
   const row = (
     <>
       <Text style={styles.rank}>{item.rank}</Text>
-      <Text style={styles.player}>{item.display_name}</Text>
-      <Text style={styles.score}>{item.score}</Text>
+      <View style={styles.player}>
+        <Text style={styles.playerName}>{item.display_name}</Text>
+        {seasonRating ? <Text style={styles.range}>Avg {Number(item.average_score).toFixed(1)}</Text> : null}
+      </View>
+      <Text style={styles.score}>{seasonRating ? Number(item.rating).toFixed(1) : item.score}</Text>
       {showDays ? <Text style={styles.days}>{item.days}</Text> : null}
     </>
   );
@@ -100,7 +107,7 @@ function RankingRow({
     return (
       <View
         accessible
-        accessibilityLabel={`Rank ${item.rank}, ${item.display_name}, score ${item.score}${daysLabel}`}
+        accessibilityLabel={`Rank ${item.rank}, ${item.display_name}, ${scoreLabel}${daysLabel}`}
         style={[styles.rankingRow, item.rank <= 3 && styles.topRankingRow]}
       >
         {row}
@@ -111,7 +118,7 @@ function RankingRow({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel={`Rank ${item.rank}, ${item.display_name}, score ${item.score}${daysLabel}. Open public profile.`}
+      accessibilityLabel={`Rank ${item.rank}, ${item.display_name}, ${scoreLabel}${daysLabel}. Open public profile.`}
       onPress={() => router.push({ pathname: '/profile', params: { key: item.profile_key } })}
       style={({ pressed }) => [
         styles.rankingRow,
@@ -194,6 +201,7 @@ export default function LeaderboardScreen() {
   };
 
   const showDays = period !== 'daily';
+  const seasonRating = state.status === 'ready' && state.data.period === 'season' && Boolean(state.data.scoring);
 
   const header = (
     <View style={styles.header}>
@@ -237,15 +245,16 @@ export default function LeaderboardScreen() {
               {state.data.season.end_date ? `–${shortDate(state.data.season.end_date)}` : '–present'}
             </Text>
           ) : null}
+          {seasonRating ? <Text style={styles.body}>Season rating uses every first-attempt Daily score, with a larger deduction when you have played fewer days. You rank after your first Daily; missed days do not count as zero.</Text> : null}
           <Text style={styles.range}>
-            {state.data.start === state.data.today
+            {!state.data.start ? '' : state.data.start === state.data.today
               ? state.data.today
               : `${state.data.start} – ${state.data.today}`}
           </Text>
           <View style={styles.tableHeader}>
             <Text style={styles.rankHeader}>#</Text>
             <Text style={styles.playerHeader}>PLAYER</Text>
-            <Text style={styles.scoreHeader}>SCORE</Text>
+            <Text style={styles.scoreHeader}>{seasonRating ? 'RATING' : 'SCORE'}</Text>
             {showDays ? <Text style={styles.daysHeader}>DAYS</Text> : null}
           </View>
         </>
@@ -287,7 +296,7 @@ export default function LeaderboardScreen() {
       <FlatList
         data={state.data.rows}
         keyExtractor={(item) => item.profile_key ?? `${item.rank}:${item.display_name}`}
-        renderItem={({ item }) => <RankingRow item={item} showDays={showDays} />}
+        renderItem={({ item }) => <RankingRow item={item} showDays={showDays} seasonRating={seasonRating} />}
         ListHeaderComponent={header}
         ListEmptyComponent={(
           <Text style={styles.empty}>
@@ -351,7 +360,8 @@ const styles = StyleSheet.create({
   topRankingRow: { borderLeftWidth: 3, borderLeftColor: colors.accent },
   pressed: { opacity: 0.72 },
   rank: { width: 39, color: colors.ink, fontSize: 16, fontWeight: '800' },
-  player: { flex: 1, minWidth: 0, color: colors.ink, fontSize: 15, fontWeight: '700' },
+  player: { flex: 1, minWidth: 0 },
+  playerName: { color: colors.ink, fontSize: 15, fontWeight: '700' },
   score: { width: 64, textAlign: 'right', color: colors.ink, fontSize: 16, fontWeight: '800' },
   days: { width: 52, textAlign: 'right', color: colors.muted, fontSize: 14 },
   center: { flex: 1, padding: spacing.xl, alignItems: 'center', justifyContent: 'center', gap: spacing.md },

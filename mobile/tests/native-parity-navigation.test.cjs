@@ -51,6 +51,43 @@ function compiler(mocks) {
   return load;
 }
 
+test('season leaderboard renders rating, average and one-day eligibility while retaining old response support',async()=>{
+  for(const scored of [true,false]) {
+    const calls=[];
+    const native=Object.fromEntries(['Pressable','Text','View','ActivityIndicator'].map(name=>[name,host(name)]));
+    const load=compiler({
+      'react-native':{...native,StyleSheet:{create:x=>x},FlatList:props=>React.createElement('FlatList',props,
+        props.ListHeaderComponent,props.data.map(item=>React.createElement(React.Fragment,{key:item.rank},props.renderItem({item}))))},
+      'expo-router':{useLocalSearchParams:()=>({period:'all'}),router:{push:()=>{}}},
+      '@/src/components/Text':{Text:native.Text},
+      '@/src/components/ScreenArea':{ScreenArea:host('SafeAreaView')},
+      '@/src/components/AboutLink':{AboutLink:()=>null},
+      '@/src/hooks/useAppResume':{useAppResume:()=>{}},
+      '@/src/theme':{colors:{},spacing:{}},
+      '@/src/api/draftRun':{DAILY_ENVIRONMENTS:['mixed'],DAILY_ENVIRONMENT_META:{mixed:{title:'Draft Run'}},isDailyEnvironment:()=>true},
+      '@/src/api/leaderboard':{loadDraftRunLeaderboard:async period=>{
+        calls.push(period);
+        return {period:'season',start:'2026-09-01',today:'2026-10-01',scoring:scored?{version:'conservative-season-v1'}:null,
+          rows:[{rank:1,display_name:'Example Player',score:34.6,days:1,...(scored?{rating:34.627,average_score:40}:{})}]};
+      }},
+    });
+    const Screen=load('src/screens/leaderboard.tsx').default;
+    let root;
+    try {
+      await act(async()=>{root=Renderer.create(React.createElement(Screen));await flush();});
+      const rendered=text(root.toJSON());
+      assert.deepEqual(calls,['season']);
+      assert.doesNotMatch(rendered,/All time|NaN/);
+      if(scored) {
+        assert.match(rendered,/RATING/);
+        assert.match(rendered,/Avg\s+40.0/);
+        assert.match(rendered,/You rank after your first Daily/);
+        assert.ok(root.root.findAllByType('View').some(node=>/rating 34.6, average 40.0, 1 day/.test(node.props.accessibilityLabel||'')));
+      } else assert.match(rendered,/SCORE/);
+    } finally {if(root)await act(async()=>root.unmount());}
+  }
+});
+
 async function fixture(options = {}) {
   let current = options.session || session('guest');
   let daily = options.daily || status();

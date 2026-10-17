@@ -134,6 +134,13 @@ async function fixture(t, options = {}) {
 
 const missing = () => Response.json({ error: 'Profile not found or private.' }, { status: 404 });
 
+test('season profile labels conservative rating and raw average separately', async (t) => {
+  const data=profile();
+  data.current_season={name:'Example',standings:[{environment:'mixed',rank:1,average:34.6,rating:34.627,average_score:40,days:1}]};
+  const f=await fixture(t,{profile:()=>data});
+  assert.match(f.text(),/34.6 rating · 40.0 avg/);
+});
+
 test('public profile uses an existing account session for block-aware identity lookup without creating a new session', async (t) => {
   const f = await fixture(t);
   assert.match(f.text(), /Public Alice/); assert.match(f.text(), /Favorite environment:.*MSH/);

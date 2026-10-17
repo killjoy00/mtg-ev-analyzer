@@ -34,9 +34,9 @@ test('a new corpus rejects old or missing model labels while historical payloads
     assert.equal(validateDraftRunPuzzle({...candidate,model_version},V5_CORPUS_VERSION),false);
 });
 
-test('multi-day boards rank the best N days, counting unplayed days as zero',async()=>{
+test('weekly boards retain best 3 scoring and daily boards retain plain averages',async()=>{
   const {LEADERBOARD_BEST_OF}=await import('../worker/draft-run-season.mjs');
-  assert.deepEqual({...LEADERBOARD_BEST_OF},{week:3,season:10});
+  assert.deepEqual({...LEADERBOARD_BEST_OF},{week:3});
   let captured;
   await draftRunLeaderboardRows(async(sql,params)=>{captured={sql,params};return {rows:[]};},
     {start:'2026-10-12',end:'2026-10-18',environment:'mixed',bestOf:3});
