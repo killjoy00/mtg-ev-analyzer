@@ -4,6 +4,10 @@ import {corpusDatabase} from './neon-corpus-db.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 const query=corpusDatabase(process.argv[2]),records=JSON.parse(fs.readFileSync('generated/corpus-operations/discovery.json')).sets;
 const pending=[];
+// Historical-frozen environments are never rebuilt into first-class snapshots
+// (import_all_trophies.py HISTORICAL_FROZEN_SETS). Queuing one makes the
+// importer refuse the whole batch, which would also block every new set.
+const HISTORICAL_FROZEN_SETS=new Set(['stx','mid','vow']);
 for(const s of records) {
  if(!/^[a-z0-9-]{2,40}$/.test(s.set_id)||s.event_type!=='PremierDraft')throw Error('Invalid discovered identity');
  await query(`INSERT INTO corpus_sources(
@@ -17,7 +21,7 @@ for(const s of records) {
  game_archive_last_modified=EXCLUDED.game_archive_last_modified,last_checked_at=now(),last_error=EXCLUDED.last_error`,
  [s.set_id,s.event_type,s.set_name||null,s.release_date||null,s.archive_url||null,s.archive_available,s.archive_etag||null,s.archive_last_modified||null,
   s.game_archive_url||null,s.game_archive_available,s.game_archive_etag||null,s.game_archive_last_modified||null,s.error||null]);
- if(s.error||!s.archive_available||!s.game_archive_available)continue;
+ if(s.error||!s.archive_available||!s.game_archive_available||HISTORICAL_FROZEN_SETS.has(s.set_id))continue;
  const existing=(await query('SELECT v.manifest,p.status FROM corpus_set_versions v LEFT JOIN draft_run_environment_policy p USING(set_id) WHERE v.set_id=$1 AND v.corpus_version=$2',[s.set_id,DRAFT_RUN_CORPUS_VERSION])).rows[0];
  const latest=(await query(`SELECT draft_etag,game_etag,draft_last_modified,game_last_modified
   FROM corpus_source_snapshots WHERE set_id=$1 AND corpus_version=$2 AND event_type='PremierDraft'
