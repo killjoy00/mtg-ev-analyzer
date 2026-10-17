@@ -128,3 +128,14 @@ test('secure Auth release applies migration 0032 before schema verification in b
   for(const block of workflow.split('DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs').slice(0,-1))
     assert.ok(block.lastIndexOf(migration)>block.lastIndexOf('migrations/0031_account_deletion.sql'),'0032 must run after 0031 before verification');
 });
+
+test('secure Auth release re-widens the evidence rule for v5 components after 0032',()=>{
+  // 0032 drops and recreates draft_run_source_evidence_required for v3/v4 only.
+  // Without 0048 after it, every release reverted the rule and live v5
+  // Traditional puzzle rows could no longer be updated.
+  const workflow=fs.readFileSync(new URL('../.github/workflows/secure-auth-release.yml',import.meta.url),'utf8');
+  const v4='migrations/0032_traditional_v4_components.sql',v5='migrations/0048_uncapped_v5_components.sql';
+  assert.equal(workflow.split(v5).length-1,2,'0048 must be applied once in development and once in production');
+  for(const block of workflow.split('DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs').slice(0,-1))
+    assert.ok(block.lastIndexOf(v5)>block.lastIndexOf(v4),'0048 must run after 0032 before verification');
+});
