@@ -100,7 +100,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
 } else if (historicalShare) {
   const { installHistoricalShare } = await import('./historical-share.mjs');
   await installHistoricalShare();
-  const growth=await import('./growth.mjs?v=15');
+  const growth=await import('./growth.mjs?v=16');
   syncPrimaryNavState(growth.accountState());
   if(account)account.onclick=()=>void growth.renderAccount({source:'nav'});
 } else {
@@ -109,7 +109,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
   const home = params.get('game') !== 'draft-run' && !params.has('profile') && !params.has('account') && !params.has('patreon')
     ? await import('./daily-home.mjs?v=15') : null;
   home?.renderDailyHome(null,'checking');
-  const growthReady = import('./growth.mjs?v=15');
+  const growthReady = import('./growth.mjs?v=16');
   const identityReady = growthReady.then(m => m.installGrowthLayer());
 
   if(account)account.onclick = async () => {
@@ -159,7 +159,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     await identityReady;
     (await import('./profile-product.mjs?v=14')).installProfileProductLayer();
   } else {
-    const game = await import('./draft-run-product.mjs?v=17');
+    const game = await import('./draft-run-product.mjs?v=18');
     await identityReady;
     await refreshPrimaryNav();
     await game.installDraftRunPage();

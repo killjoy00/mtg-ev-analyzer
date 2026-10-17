@@ -62,6 +62,18 @@ async function publicApi(path) {
   const r=await fetch(base()+path,{method:'GET',headers:{accept:'application/json'},credentials:'omit',signal:AbortSignal.timeout(30000)});
   const data=await r.json();if(!r.ok)throw Object.assign(new Error(data.error||'Could not reach the game. Try again.'),{status:r.status});return data;
 }
+// While a pick's reveal is on screen, the next pack is already known
+// (run.current). Fetch its images then, so Next shows the pack immediately
+// and the decision clock does not count image download time.
+const prefetchedImages=new Set();
+function prefetchPackImages(p) {
+  for(const card of p?.candidates||[]) {
+    const url=/^https:\/\//.test(card.image_url||'')?card.image_url:'';
+    if(!url||prefetchedImages.has(url))continue;
+    prefetchedImages.add(url);
+    const img=new Image();img.decoding='async';img.src=url;
+  }
+}
 function image(card,extra='') {
   const url=/^https:\/\//.test(card.image_url||'')?card.image_url:'';
   return url?`<img src="${esc(url)}" alt="${esc(card.name)}" decoding="async" ${extra}>`:`<span class="run-card-fallback">${esc(card.name)}</span>`;
@@ -177,6 +189,7 @@ function render() {
   if(answer||run.complete){clock.clear();viewKey=null;}
   if(run.complete&&!answer) {renderResult();return;}
   const p=answer?.puzzle||run.current;
+  if(answer&&!run.complete)prefetchPackImages(run.current);
   const compactSentence=answer?compactDraftRunFeedback(answer):'';
   document.body.classList.add('is-game');
   app().innerHTML=`<section class="draft-run-page"><header class="run-heading"><div><p class="eyebrow">${run.day?'Daily ':''}${title()} · ${run.day||'Practice'}</p><h1>${esc(setName(p.set_id))} <span>Round ${answer?review+1:run.round}/${runLength()} · Pack 1 · Pick ${p.pick_number}${answer?' · revealed':''}</span></h1></div><a class="text-button" href="./">Leave run</a></header>${steps()}
@@ -333,7 +346,7 @@ function renderResult() {
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render();window.scrollTo({top:0,behavior:'instant'});});
   document.querySelector('#run-share').onclick=()=>shareResult();
   document.querySelector('#run-copy-result').onclick=()=>shareResult({copy:true});
-  document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=15')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
+  document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=16')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
   if(run.day)void renderDailyResultCue(run.id);
   document.dispatchEvent(new CustomEvent('pack1:result-visible',{detail:{id:`draft-run:${run.id}`,score:run.score,mode:'draft_run',set_id:run.environment,daily:Boolean(run.day)}}));
 }
@@ -452,8 +465,8 @@ function renderLoadFailure(error,isBoard) {
     const signedIn=hasAccountSession();
     const friendSignIn=!signedIn&&sharedRunInvitationId(location.href);
     app().innerHTML=`<section class="message-card"><h1>${premium?'Elite practice':signedIn?'Practice access':'Keep drafting with a free account'}</h1><p>${esc(error.message)}</p>${premium?'<p>Elite membership includes custom sets and unlimited Cube practice.</p>':''}<div class="button-row">${premium&&!friendSignIn?'<button class="button primary" id="practice-membership">'+(signedIn?'Become Elite':'Sign in to become Elite')+'</button>':''}${friendSignIn||!premium&&!signedIn?'<button class="button primary" id="practice-account">'+(friendSignIn?'Sign in to play this run':'Sign in or create an account')+'</button>':''}<a class="button secondary" href="./">Back to Dailies</a></div></section>`;
-    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=15')).beginEliteUpgrade({source:'practice_gate'});});
-    document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=15')).renderAccount({sharedRunId:sharedRunInvitationId(location.href),source:'practice_gate'});});return;
+    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=16')).beginEliteUpgrade({source:'practice_gate'});});
+    document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=16')).renderAccount({sharedRunId:sharedRunInvitationId(location.href),source:'practice_gate'});});return;
   }
   const params=new URLSearchParams(location.search);
   if(!params.has('run')&&(params.has('shared')||params.has('challenge'))&&[400,404,410].includes(error.status)) {
