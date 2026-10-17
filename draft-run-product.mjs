@@ -63,6 +63,18 @@ async function publicApi(path) {
   const r=await fetch(base()+path,{method:'GET',headers:{accept:'application/json'},credentials:'omit',signal:AbortSignal.timeout(30000)});
   const data=await r.json();if(!r.ok)throw Object.assign(new Error(data.error||'Could not reach the game. Try again.'),{status:r.status});return data;
 }
+// While a pick's reveal is on screen, the next pack is already known
+// (run.current). Fetch its images then, so Next shows the pack immediately
+// and the decision clock does not count image download time.
+const prefetchedImages=new Set();
+function prefetchPackImages(p) {
+  for(const card of p?.candidates||[]) {
+    const url=/^https:\/\//.test(card.image_url||'')?card.image_url:'';
+    if(!url||prefetchedImages.has(url))continue;
+    prefetchedImages.add(url);
+    const img=new Image();img.decoding='async';img.src=url;
+  }
+}
 function image(card,extra='') {
   const url=/^https:\/\//.test(card.image_url||'')?card.image_url:'';
   return url?`<img src="${esc(url)}" alt="${esc(card.name)}" decoding="async" ${extra}>`:`<span class="run-card-fallback">${esc(card.name)}</span>`;
@@ -178,6 +190,7 @@ function render() {
   if(answer||run.complete){clock.clear();viewKey=null;}
   if(run.complete&&!answer) {renderResult();return;}
   const p=answer?.puzzle||run.current;
+  if(answer&&!run.complete)prefetchPackImages(run.current);
   const compactSentence=answer?compactDraftRunFeedback(answer):'';
   document.body.classList.add('is-game');
   app().innerHTML=`<section class="draft-run-page"><header class="run-heading"><div><p class="eyebrow">${run.day?'Daily ':''}${title()} · ${run.day||'Practice'}</p><h1>${esc(setName(p.set_id))} <span>Round ${answer?review+1:run.round}/${runLength()} · Pack 1 · Pick ${p.pick_number}${answer?' · revealed':''}</span></h1></div><a class="text-button" href="./">Leave run</a></header>${steps()}

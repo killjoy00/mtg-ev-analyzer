@@ -1,7 +1,8 @@
 name: Corpus Operations
 on:
   schedule:
-    - cron: '23 7 * * *'
+    # Weekly: 17Lands archives change far less often than daily.
+    - cron: '23 7 * * 1'
   workflow_dispatch:
     inputs:
       target:
