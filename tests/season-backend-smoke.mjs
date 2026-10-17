@@ -15,7 +15,7 @@ process.env.DATABASE_URL=fs.readFileSync(connection,'utf8').trim();
 const {default:growth,query,gameDateKey}=await import('../worker/growth-function.js');
 const {default:runApi}=await import('../worker/draft-run-function.mjs');
 const {ensureDailySchedule}=await import('../worker/draft-run-daily.mjs');
-const {currentSeasonForPlayer,reconcilePersistedSeasons,resolveCurrentSeason}=await import('../worker/draft-run-season.mjs');
+const {currentSeasonForPlayer,draftRunLeaderboardRows,reconcilePersistedSeasons,resolveCurrentSeason}=await import('../worker/draft-run-season.mjs');
 
 const parse=value=>typeof value==='string'?JSON.parse(value):value;
 async function board(period,environment='mixed'){
@@ -191,7 +191,8 @@ const profileSeason=await currentSeasonForPlayer(query,targetPlayer,{today:'2026
 assert.equal(profileSeason.set_id,'hob');
 assert.deepEqual(profileSeason.standings.map(row=>row.environment),['mixed','powered-cube','latest']);
 assert.equal(profileSeason.standings.find(row=>row.environment==='mixed').rank,106);
-assert.equal(profileSeason.standings.find(row=>row.environment==='mixed').average,10);
+// Season standings rank the best 10 Dailies; one day of 10 scores 10/10.
+assert.equal(profileSeason.standings.find(row=>row.environment==='mixed').average,1);
 assert.equal(profileSeason.standings.find(row=>row.environment==='mixed').days,1);
 
 const seasonBoards=[];
@@ -203,6 +204,23 @@ for(const environment of ['mixed','powered-cube','latest']){
 const oldClient=await board('month','mixed');
 assert.equal(oldClient.period,'season');assert.equal(oldClient.season.set_id,'hob');
 assert.deepEqual(oldClient.rows,seasonBoards[0].rows);
+assert.equal(seasonBoards[0].best_of,10);
+// The all-time board is retired; old links and installed apps get the season.
+const retiredAll=await board('all','mixed');
+assert.equal(retiredAll.period,'season');assert.equal(retiredAll.best_of,10);
+assert.deepEqual(retiredAll.rows,seasonBoards[0].rows);
+assert.equal((await board('week','mixed')).best_of,3);
+assert.equal((await board('daily','mixed')).best_of,null);
+
+// Best-of-N: the average of a player's best N days, with unplayed days as 0.
+const bestPeer=peers[0].id;
+await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json,details_json) SELECT $1::uuid,day::date,'mixed','draft_run',score,'B','[]'::jsonb,jsonb_build_object('corpus_version',$2::text) FROM (VALUES ('2026-09-02',90),('2026-09-03',60),('2026-09-04',30)) x(day,score)",[bestPeer,DRAFT_RUN_CORPUS_VERSION]);
+const bestRow=async bestOf=>(await draftRunLeaderboardRows(query,{start:'2026-09-01',end:'2026-09-07',environment:'mixed',playerId:bestPeer,limit:1,bestOf}))[0];
+assert.equal((await bestRow(3)).score,60,'best 3 of 20/90/60/30');
+assert.equal((await bestRow(3)).days,4);
+assert.equal((await bestRow(10)).score,20,'best 10 counts six unplayed days as 0');
+assert.equal((await bestRow(null)).score,50,'daily boards keep the plain average');
+await query("DELETE FROM scores WHERE player_id=$1::uuid AND challenge_date BETWEEN '2026-09-02' AND '2026-09-04'",[bestPeer]);
 
 // A genuinely later persisted release advances B -> C; editing mutable policy
 // afterward cannot move the stored season release or reopen B.
@@ -218,4 +236,4 @@ await query("UPDATE draft_run_environment_policy SET release_date=$1::date,statu
 season=await reconcilePersistedSeasons(query);
 assert.equal(season.set_id,'tmt');assert.equal(season.set_release_date,laterDay);
 
-console.log('Pack One season backend smoke passed: no-season 200, month alias, inaugural backfill, retry repair, idempotency, concurrency, settled fallback watermarking, profile fail-open, A -> B -> A monotonicity, B -> C advancement, shared windows and profile rank >100.');
+console.log('Pack One season backend smoke passed: no-season 200, month and all aliases, best-of-N standings, inaugural backfill, retry repair, idempotency, concurrency, settled fallback watermarking, profile fail-open, A -> B -> A monotonicity, B -> C advancement, shared windows and profile rank >100.');

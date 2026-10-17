@@ -6,8 +6,13 @@ const textDate=value=>value==null?null:String(value).slice(0,10);
 
 export const DRAFT_RUN_LEADERBOARD_ENVIRONMENTS=['mixed','powered-cube','latest'];
 
+// Multi-day boards rank the average of a player's best N Daily scores in the
+// period; days not played count as 0, so N days are needed for a full score.
+// The all-time board is retired: old links and installed apps get the season.
+export const LEADERBOARD_BEST_OF=Object.freeze({week:3,season:10});
+
 export function normalizeLeaderboardPeriod(value='daily') {
-  return value==='month'?'season':value;
+  return value==='month'||value==='all'?'season':value;
 }
 
 export function normalizeSeason(row) {
@@ -40,9 +45,9 @@ export async function resolveCurrentSeason(query,{today=gameDateKey(),ensureSche
   return reconcilePersistedSeasons(query);
 }
 
-export async function draftRunLeaderboardRows(query,{start,end,environment,playerId=null,blockedByPlayerId=null,limit=100,corpusVersion=DRAFT_RUN_CORPUS_VERSION}={}) {
-  const result=await query(`WITH results AS (
-      SELECT player_id,round(avg(score),1) score,count(*) days
+export async function draftRunLeaderboardRows(query,{start,end,environment,playerId=null,blockedByPlayerId=null,limit=100,corpusVersion=DRAFT_RUN_CORPUS_VERSION,bestOf=null}={}) {
+  const result=await query(`WITH day_scores AS (
+      SELECT player_id,score,row_number() OVER(PARTITION BY player_id ORDER BY score DESC,challenge_date) best_rank
       FROM scores
       WHERE mode='draft_run' AND set_id=$3
         AND ($7::text IS NULL OR details_json->>'corpus_version'=$7)
@@ -56,6 +61,12 @@ export async function draftRunLeaderboardRows(query,{start,end,environment,playe
           SELECT 1 FROM public_identity_blocks b WHERE b.blocker_player_id=$6::uuid AND b.target_player_id=scores.player_id
         ))
         AND challenge_date BETWEEN $1::date AND $2::date
+    ), results AS (
+      SELECT player_id,
+        CASE WHEN $8::int IS NULL THEN round(avg(score),1)
+          ELSE round(coalesce(sum(score) FILTER(WHERE best_rank<=$8::int),0)::numeric/$8::int,1) END score,
+        count(*) days
+      FROM day_scores
       GROUP BY player_id
     ), ranked AS (
       SELECT rank() OVER(ORDER BY r.score DESC) rank,r.player_id,r.score,r.days,p.display_name,p.showcase_achievement,
@@ -75,7 +86,7 @@ export async function draftRunLeaderboardRows(query,{start,end,environment,playe
     FROM ranked
     WHERE ($4::uuid IS NULL OR player_id=$4::uuid)
     ORDER BY score DESC,days DESC,display_name
-    LIMIT $5::int`,[start,end,environment,playerId,limit,blockedByPlayerId,corpusVersion===V5_CORPUS_VERSION?V5_CORPUS_VERSION:null]);
+    LIMIT $5::int`,[start,end,environment,playerId,limit,blockedByPlayerId,corpusVersion===V5_CORPUS_VERSION?V5_CORPUS_VERSION:null,bestOf]);
   return result.rows.map(row=>({
     ...row,
     rank:num(row.rank),
@@ -89,7 +100,7 @@ export async function currentSeasonForPlayer(query,playerId,{today=gameDateKey()
   if(!season)return null;
   const standings=[];
   for(const environment of DRAFT_RUN_LEADERBOARD_ENVIRONMENTS) {
-    const row=(await draftRunLeaderboardRows(query,{start:season.start_date,end:today,environment,playerId,limit:1}))[0];
+    const row=(await draftRunLeaderboardRows(query,{start:season.start_date,end:today,environment,playerId,limit:1,bestOf:LEADERBOARD_BEST_OF.season}))[0];
     if(row)standings.push({environment,rank:row.rank,average:row.score,days:row.days});
   }
   return {...season,standings};
