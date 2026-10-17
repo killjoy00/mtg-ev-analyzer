@@ -33,3 +33,17 @@ test('a new corpus rejects old or missing model labels while historical payloads
   for(const model_version of [versions.v4.model_version,undefined])
     assert.equal(validateDraftRunPuzzle({...candidate,model_version},V5_CORPUS_VERSION),false);
 });
+
+test('multi-day boards rank the best N days, counting unplayed days as zero',async()=>{
+  const {LEADERBOARD_BEST_OF}=await import('../worker/draft-run-season.mjs');
+  assert.deepEqual({...LEADERBOARD_BEST_OF},{week:3,season:10});
+  let captured;
+  await draftRunLeaderboardRows(async(sql,params)=>{captured={sql,params};return {rows:[]};},
+    {start:'2026-10-12',end:'2026-10-18',environment:'mixed',bestOf:3});
+  assert.equal(captured.params[7],3);
+  assert.match(captured.sql,/row_number\(\) OVER\(PARTITION BY player_id ORDER BY score DESC,challenge_date\) best_rank/);
+  assert.match(captured.sql,/sum\(score\) FILTER\(WHERE best_rank<=\$8::int\),0\)::numeric\/\$8::int/);
+  await draftRunLeaderboardRows(async(sql,params)=>{captured={sql,params};return {rows:[]};},
+    {start:'2026-10-18',end:'2026-10-18',environment:'mixed'});
+  assert.equal(captured.params[7],null,'the daily board keeps its plain average');
+});

@@ -21,9 +21,11 @@ const [migration,hardeningMigration,seasonModule,backend,client,legacyWorker,leg
 test('current leaderboard canonicalizes old month clients to season',()=>{
   assert.equal(normalizeLeaderboardPeriod('month'),'season');
   assert.equal(normalizeLeaderboardPeriod('season'),'season');
+  assert.equal(normalizeLeaderboardPeriod('all'),'season','the retired all-time board resolves to the season');
   assert.match(backend,/normalizeLeaderboardPeriod/);
-  assert.match(backend,/\['daily','week','season','all'\]/);
-  assert.match(client,/value==='month'\?'season':value/);
+  assert.match(backend,/\['daily','week','season'\]\.includes\(period\)/);
+  assert.match(client,/value==='month'\|\|value==='all'\?'season':value/);
+  assert.doesNotMatch(client,/All time/);
   assert.match(client,/This season/);
   assert.doesNotMatch(client,/This month/);
 });
