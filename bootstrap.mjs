@@ -30,16 +30,14 @@ if(resultShare) {
   params.delete('ref');
 }
 if(hadAttributionParams||resultShare)history.replaceState({},'',`${location.pathname}${params.size?'?'+params:''}${location.hash}`);
-// Arrival analytics must not hold the page: identity and the game start now.
-void import('./retention-events.mjs').then(({trackEvent:trackArrivalEvent})=>{
-  trackArrivalEvent('acquisition_touch',{
-    source:resultShare?'result_share':utmSource||referrerHost||'direct',
-    ...(campaign?{campaign}:{}),
-    ...(medium?{medium}:{}),
-    ...(referrerHost?{referrer_host:referrerHost}:{})
-  });
-  if(resultShare)trackArrivalEvent('daily_share_arrival',{source:'result_share',daily:true});
-}).catch(()=>{});
+const {trackEvent:trackArrivalEvent}=await import('./retention-events.mjs');
+trackArrivalEvent('acquisition_touch',{
+  source:resultShare?'result_share':utmSource||referrerHost||'direct',
+  ...(campaign?{campaign}:{}),
+  ...(medium?{medium}:{}),
+  ...(referrerHost?{referrer_host:referrerHost}:{})
+});
+if(resultShare)trackArrivalEvent('daily_share_arrival',{source:'result_share',daily:true});
 // Only previously published stored links load the historical game reader.
 const historicalShare = params.has('challenge') && params.get('game') !== 'draft-run';
 if (!historicalShare && (params.has('legacy-board') || params.has('mode') || params.has('seed') || (params.get('set') === 'powered-cube' && params.get('game') !== 'draft-run'))) {
