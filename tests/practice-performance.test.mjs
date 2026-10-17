@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {verifyTarget,recordQueries,summarize,queryFamily,sqlQuery} from '../scripts/practice-performance.mjs';
+import {verifyTarget,recordQueries,summarize,queryFamily,sqlQuery,failureSummary} from '../scripts/practice-performance.mjs';
 import {currentPracticeBatchPlan} from '../worker/draft-run-selection.mjs';
 import {PRACTICE_RECENCY_HALF_LIFE,practiceSetWeight,chooseRunSet} from '../draft-run-policy.mjs';
 
@@ -104,4 +104,20 @@ test('practice recency migration is wired into performance and both guarded rele
   assert.match(performance,/migrations\/0050_practice_recency_bias\.sql/);
   const release=fs.readFileSync('.github/workflows/secure-auth-release.yml','utf8');
   assert.equal((release.match(/migrations\/0050_practice_recency_bias\.sql/g)||[]).length,2);
+});
+
+test('benchmark failure line names the stage and failing query family without SQL or data',()=>{
+  const report={stage:'cache_build',error:'timeout',cache_build:{ok:false,ms:180012.5,timeout_ms:180000,
+    queries:[{family:'serving_snapshot',ms:180010,ok:false,error:'timeout'}]},
+    database:{server_version:'17'},cases:[{samples:[{seed:'secret-seed',puzzle_ids:['p'],queries:[]}]}]};
+  const summary=failureSummary(report);
+  assert.deepEqual(summary,{stage:'cache_build',error:'timeout',assertion:null,
+    cache_build:{ok:false,ms:180012.5,timeout_ms:180000},failed_query:{family:'serving_snapshot',ms:180010,error:'timeout'}});
+  assert.doesNotMatch(JSON.stringify(summary),/secret-seed|server_version|puzzle_ids/);
+  // The live comparison selection's queries are part of the summary too.
+  assert.deepEqual(failureSummary({stage:'case:mixed:0',error:'timeout',cases:[{samples:[{queries:[{family:'other',ms:5,ok:true}],
+    baseline_queries:[{family:'candidate_and_trajectory',ms:90001,ok:false,error:'timeout'}]}]}]}).failed_query,
+    {family:'candidate_and_trajectory',ms:90001,error:'timeout'});
+  assert.deepEqual(failureSummary({stage:'discovery',error:'query_or_selection_failed',assertion:'Cached custom-set metadata differs.'}),
+    {stage:'discovery',error:'query_or_selection_failed',assertion:'Cached custom-set metadata differs.',cache_build:null,failed_query:null});
 });
