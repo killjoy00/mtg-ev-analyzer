@@ -39,8 +39,8 @@ async function listReports(query,url) {
   const count=await query('SELECT count(*)::int total FROM '+from+where,params);
   const fields=isDecision
     ? 'r.id, r.created_at, r.review_status status, r.reviewed_at, r.review_note, r.reason, r.comment, r.puzzle_id, r.set_id, r.pick_number, r.round_number, r.selected_card_name, r.recommended_card_name, r.recommended_card_score, r.environment, r.daily_date, r.corpus_version, r.model_version, r.scoring_version, r.backend_release, r.client_platform, r.client_version, r.client_build, (SELECT count(*)::int FROM draft_run_decision_reports x WHERE x.puzzle_id=r.puzzle_id) reports_on_decision, (SELECT count(DISTINCT x.player_id)::int FROM draft_run_decision_reports x WHERE x.puzzle_id=r.puzzle_id) independent_reporters'
-    : 'r.id, r.created_at, r.updated_at, r.status, r.reason, r.details, r.target_player_id, p.display_name target_name, p.public_identity_hidden_at';
-  const join=isDecision?'':' JOIN players p ON p.id=r.target_player_id';
+    : 'r.id, r.created_at, r.updated_at, r.status, r.reason, r.details, r.target_player_id, p.display_name target_name, p.public_identity_hidden_at, a.auth_user_id target_auth_user_id';
+  const join=isDecision?'':' JOIN players p ON p.id=r.target_player_id LEFT JOIN LATERAL (SELECT auth_user_id FROM account_links al WHERE al.player_id=r.target_player_id LIMIT 1) a ON true';
   const rows=await query('SELECT '+fields+' FROM '+from+join+where+' ORDER BY r.created_at DESC,r.id DESC LIMIT $3::int OFFSET $4::int',[...params,limit,offset]);
   return {filters:{kind,status,reason,page:filters.page},page_size:limit,total:count.rows[0]?.total||0,rows:rows.rows};
 }
