@@ -1,5 +1,6 @@
 const esc=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;");
 const fmt=value=>value==null?'N/A':Number(value).toLocaleString(undefined,{maximumFractionDigits:1});
+const pct=value=>value==null?'N/A':`${fmt(value)}%`;
 const dateTime=value=>value?new Intl.DateTimeFormat(undefined,{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(value)):'N/A';
 const dateOnly=value=>value?new Intl.DateTimeFormat(undefined,{year:'numeric',month:'short',day:'numeric'}).format(new Date(value)):'N/A';
 const capabilityLabel=value=>({unlimited_cube_practice:'Cube practice',custom_corpus:'Custom sets'})[value]||value;
@@ -19,15 +20,31 @@ const deletionStateLabel=value=>({
 
 export async function renderUsers(root,request,growthRequest=request,viewerRole='admin') {
   const prefill=new URLSearchParams(location.search).get('search')||'';
-  let data=null,filters={search:prefill.length<=100?prefill:'',status:'all'},detailLoadSerial=0;
+  let data=null,filters={search:prefill.length<=100?prefill:'',status:'all'},activityWindow={from:'',to:''},detailLoadSerial=0;
 
   async function load() {
     root.innerHTML='<p>Loading users…</p>';
     const query=new URLSearchParams();
     if(filters.search)query.set('search',filters.search);
     if(filters.status!=='all')query.set('status',filters.status);
+    if(activityWindow.from)query.set('activity_from',activityWindow.from);
+    if(activityWindow.to)query.set('activity_to',activityWindow.to);
     data=await request('/v1/admin/users?'+query);
     render();
+  }
+
+  function playActivity() {
+    const activity=data.play_activity;
+    const heading='<h2 id="play-activity-heading">Signed out vs signed in</h2>';
+    if(!activity)return `${heading}<p class="muted">Available after the next Pack One backend release.</p>`;
+    const form=`<form id="play-activity-filters" class="filters"><label>From<input type="date" name="from" value="${esc(activity.start)}" required></label><label>Through<input type="date" name="to" value="${esc(activity.end)}" required></label><button>Update dates</button></form>`;
+    if(activity.unavailable)return `${heading}${form}<p class="error" role="alert">Signed-out activity is temporarily unavailable.</p>`;
+    const labels={signed_out:'Signed out',signed_in:'Signed in'};
+    return `${heading}${form}
+      <div class="scroll"><table class="play-activity-table"><thead><tr><th>Status</th><th>Players</th><th>Completed runs</th><th>First Daily in range</th><th>Next-day return</th></tr></thead><tbody>
+        ${(activity.groups||[]).map(row=>`<tr><th>${esc(labels[row.group]||row.group)}</th><td>${fmt(row.players)}</td><td>${fmt(row.completed_runs)}</td><td>${fmt(row.first_daily_people)}</td><td>${pct(row.next_day_rate)}<br><small>${fmt(row.next_day_returned)} / ${fmt(row.next_day_mature)} returned · ${fmt(row.next_day_immature)} too new</small></td></tr>`).join('')||'<tr><td colspan="5">No completed runs in this range.</td></tr>'}
+      </tbody></table></div>
+      <p class="note">Pacific dates. Completed Daily and practice runs on the current corpus; QA and admin players excluded. Signed-out players count once per browser, so one person on two devices counts twice. A signed-out player who later creates an account moves to Signed in, including earlier runs. Next-day return: of people whose first-ever Daily falls in the range, how many completed a Daily the next day. “Too new” means the next day hasn’t finished yet.</p>`;
   }
 
   function access(user) {
@@ -62,6 +79,7 @@ export async function renderUsers(root,request,growthRequest=request,viewerRole=
           <td class="user-access">${access(user)}</td><td>${user.is_admin?badge('Admin','candidate'):'N/A'}</td>
         </tr>`).join('')||'<tr><td colspan="8">No authenticated accounts match these filters.</td></tr>'}
       </tbody></table></div>
+      <section class="play-activity" aria-labelledby="play-activity-heading">${playActivity()}</section>
       <dialog id="user-detail" aria-label="User details"><div id="user-detail-body"></div></dialog>
       <p id="status" role="status"></p>
     </section>`;
@@ -69,6 +87,15 @@ export async function renderUsers(root,request,growthRequest=request,viewerRole=
       event.preventDefault();
       const form=new FormData(event.currentTarget);
       filters={search:String(form.get('search')||'').trim(),status:String(form.get('status')||'all')};
+      await load();
+    };
+    const activityForm=document.querySelector('#play-activity-filters');
+    if(activityForm)activityForm.onsubmit=async event=>{
+      event.preventDefault();
+      const form=new FormData(event.currentTarget);
+      const next={from:String(form.get('from')||''),to:String(form.get('to')||'')};
+      if(next.from&&next.to&&(next.to<next.from||(Date.parse(next.to)-Date.parse(next.from))/86400000>365)){document.querySelector('#status').textContent='Choose a range of up to one year, with Through on or after From.';return;}
+      activityWindow=next;
       await load();
     };
     document.querySelectorAll('[data-user]').forEach(button=>button.onclick=()=>openDetail(button.dataset.user));

@@ -162,6 +162,16 @@ Use the habit cohorts to ask:
 
 Do not expect the new acquisition logic to rewrite the existing result-share funnel.
 
+## 6a. Signed-out vs signed-in players
+
+**Admin → Users** lists signed-in accounts only. Under that list, **Signed out vs signed in** shows both groups for the From/Through Pacific dates (last 14 days by default):
+
+- **Players** and **Completed runs**: completed Daily and practice runs on those dates.
+- **First Daily in range**: people whose first-ever Daily falls in the range.
+- **Next-day return**: the same definition as the Daily habit cohorts, shown as `returned / mature` plus the count that is still too new.
+
+It uses the habit report's exclusions (QA and admin players) and current-corpus runs only. A signed-out player counts once per browser. Signed in means linked to an account today, so a player who signs up later moves to Signed in with their earlier runs. If the query fails, the account list still loads and the section says it is unavailable.
+
 ## 7. Understand the new player-facing streak cue
 
 Players do not need to configure anything.
