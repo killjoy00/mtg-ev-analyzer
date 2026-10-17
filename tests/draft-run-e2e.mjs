@@ -26,6 +26,7 @@ const browser=await chromium.launch({headless:true});
 const page=await browser.newPage({viewport:{width:390,height:844}});
 await page.clock.setFixedTime(new Date(fixtureDay+'T18:00:00Z'));
 page.on('pageerror',e=>errors.push(e.message));
+const imageRequests=new Set();page.on('request',r=>imageRequests.add(r.url()));
 await page.addInitScript(()=>{Object.defineProperty(navigator,'share',{configurable:true,value:async value=>{window.__runShare=value;}});Object.defineProperty(navigator,'canShare',{configurable:true,value:()=>false});Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async value=>{if(window.__denyClipboard)throw new Error('Clipboard permission denied');window.__runCopied=value;}}});});
 await page.route('**/*-pack1growth.compute.c-5.us-east-2.aws.neon.tech/**',async route=>{
   const path=new URL(route.request().url()).pathname;let body={ok:true};
@@ -154,6 +155,12 @@ try{
     const selected=round===0?weakChoice.id:round===strongRound?strongChoice.id:p.historical_pick_id;
     const expectedGrade=gradeDraftRunPick(withSourceDraftRecord(p,round%3),selected);
     await page.locator(`[data-pick="${selected}"]`).click();await page.locator('#run-lock').click();await page.locator('#run-next').waitFor();
+    if(round<puzzles.length-1) {
+      // The reveal already knows the next pack; its images load before Next.
+      const nextImages=puzzles[round+1].candidates.map(c=>c.image_url).filter(u=>/^https:\/\//.test(u||''));
+      for(const until=Date.now()+3000;nextImages.some(u=>!imageRequests.has(u))&&Date.now()<until;)await new Promise(r=>setTimeout(r,50));
+      assert.ok(nextImages.length&&nextImages.every(u=>imageRequests.has(u)),'next pack images are requested while the reveal is shown');
+    }
     assert.equal(views.at(-1).puzzleId,p.puzzle_id,'Feedback must not record the next decision as viewed');
     assert.equal(Number.parseInt(await page.locator('.run-feedback-score').innerText(),10),expectedGrade.score,'visible pick score matches gradeDraftRunPick');
     assert.equal(await page.locator('#run-feedback-result').innerText(),trophyRevealSentence(expectedGrade),'visible trophy reveal is a complete sentence for matched and unmatched picks');

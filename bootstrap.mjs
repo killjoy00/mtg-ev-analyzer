@@ -30,14 +30,16 @@ if(resultShare) {
   params.delete('ref');
 }
 if(hadAttributionParams||resultShare)history.replaceState({},'',`${location.pathname}${params.size?'?'+params:''}${location.hash}`);
-const {trackEvent:trackArrivalEvent}=await import('./retention-events.mjs');
-trackArrivalEvent('acquisition_touch',{
-  source:resultShare?'result_share':utmSource||referrerHost||'direct',
-  ...(campaign?{campaign}:{}),
-  ...(medium?{medium}:{}),
-  ...(referrerHost?{referrer_host:referrerHost}:{})
-});
-if(resultShare)trackArrivalEvent('daily_share_arrival',{source:'result_share',daily:true});
+// Arrival analytics must not hold the page: identity and the game start now.
+void import('./retention-events.mjs').then(({trackEvent:trackArrivalEvent})=>{
+  trackArrivalEvent('acquisition_touch',{
+    source:resultShare?'result_share':utmSource||referrerHost||'direct',
+    ...(campaign?{campaign}:{}),
+    ...(medium?{medium}:{}),
+    ...(referrerHost?{referrer_host:referrerHost}:{})
+  });
+  if(resultShare)trackArrivalEvent('daily_share_arrival',{source:'result_share',daily:true});
+}).catch(()=>{});
 // Only previously published stored links load the historical game reader.
 const historicalShare = params.has('challenge') && params.get('game') !== 'draft-run';
 if (!historicalShare && (params.has('legacy-board') || params.has('mode') || params.has('seed') || (params.get('set') === 'powered-cube' && params.get('game') !== 'draft-run'))) {
@@ -100,7 +102,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
 } else if (historicalShare) {
   const { installHistoricalShare } = await import('./historical-share.mjs');
   await installHistoricalShare();
-  const growth=await import('./growth.mjs?v=15');
+  const growth=await import('./growth.mjs?v=16');
   syncPrimaryNavState(growth.accountState());
   if(account)account.onclick=()=>void growth.renderAccount({source:'nav'});
 } else {
@@ -109,7 +111,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
   const home = params.get('game') !== 'draft-run' && !params.has('profile') && !params.has('account') && !params.has('patreon')
     ? await import('./daily-home.mjs?v=15') : null;
   home?.renderDailyHome(null,'checking');
-  const growthReady = import('./growth.mjs?v=15');
+  const growthReady = import('./growth.mjs?v=16');
   const identityReady = growthReady.then(m => m.installGrowthLayer());
 
   if(account)account.onclick = async () => {
@@ -159,7 +161,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     await identityReady;
     (await import('./profile-product.mjs?v=14')).installProfileProductLayer();
   } else {
-    const game = await import('./draft-run-product.mjs?v=17');
+    const game = await import('./draft-run-product.mjs?v=18');
     await identityReady;
     await refreshPrimaryNav();
     await game.installDraftRunPage();
