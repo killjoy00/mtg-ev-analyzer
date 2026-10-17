@@ -114,6 +114,10 @@ test('benchmark failure line names the stage and failing query family without SQ
   assert.deepEqual(summary,{stage:'cache_build',error:'timeout',assertion:null,
     cache_build:{ok:false,ms:180012.5,timeout_ms:180000},failed_query:{family:'serving_snapshot',ms:180010,error:'timeout'}});
   assert.doesNotMatch(JSON.stringify(summary),/secret-seed|server_version|puzzle_ids/);
+  // The live comparison selection's queries are part of the summary too.
+  assert.deepEqual(failureSummary({stage:'case:mixed:0',error:'timeout',cases:[{samples:[{queries:[{family:'other',ms:5,ok:true}],
+    baseline_queries:[{family:'candidate_and_trajectory',ms:90001,ok:false,error:'timeout'}]}]}]}).failed_query,
+    {family:'candidate_and_trajectory',ms:90001,error:'timeout'});
   assert.deepEqual(failureSummary({stage:'discovery',error:'query_or_selection_failed',assertion:'Cached custom-set metadata differs.'}),
     {stage:'discovery',error:'query_or_selection_failed',assertion:'Cached custom-set metadata differs.',cache_build:null,failed_query:null});
 });

@@ -34,7 +34,7 @@ export function queryFamily(sql) {
 // and timings only. Never SQL, parameters, rows or connection details.
 export function failureSummary(report) {
   const queries=[...(report.cache_build?.queries||[]),...(report.discovery?.queries||[]),
-    ...(report.cases||[]).flatMap(c=>(c.samples||[]).flatMap(s=>s.queries||[]))];
+    ...(report.cases||[]).flatMap(c=>(c.samples||[]).flatMap(s=>[...(s.queries||[]),...(s.baseline_queries||[])]))];
   const failed=queries.filter(q=>q&&q.ok===false).at(-1);
   return {stage:report.stage||null,error:report.error||null,assertion:report.assertion||null,
     cache_build:report.cache_build?{ok:report.cache_build.ok,ms:report.cache_build.ms??null,timeout_ms:report.cache_build.timeout_ms}:null,
@@ -142,6 +142,15 @@ export async function main() {
         cachedSnapshot=await loadServingSnapshot(build.query,DRAFT_RUN_CORPUS_VERSION);
         Object.assign(report.cache_build,{id:cachedSnapshot.id,revision:cachedSnapshot.revision,groups:cachedSnapshot.groups.length,ok:true});
       } finally {report.cache_build.ms=elapsed(start);}
+      // The clone just rebuilt over a million inventory rows that production
+      // has long had statistics for. Analyze them so the measured plans match
+      // a settled production table rather than a freshly loaded one.
+      report.stage='cache_analyze';
+      const analyzeStart=performance.now();
+      execFileSync('psql',['-X','-d',connection,'-v','ON_ERROR_STOP=1','-c','ANALYZE draft_run_serving_inventory; ANALYZE draft_run_serving_source_groups;'],{
+        env:process.env,stdio:['ignore','ignore','pipe'],timeout:120000,
+      });
+      report.cache_analyze_ms=elapsed(analyzeStart);
       report.stage='cache_storage';
       report.cache_storage=(await query(`SELECT
         pg_total_relation_size('draft_run_serving_inventory')::text inventory_bytes,
@@ -182,7 +191,8 @@ export async function main() {
           if(i===0)capture(configuration.name,recorder);
           if(cached) {
             const baselineStart=performance.now();
-            const baseline=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,configuration.environment,{day,setIds:configuration.setIds,snapshot:cachedSnapshot});
+            const baselineRecorder=recordQueries(query);sample.baseline_queries=baselineRecorder.records;
+            const baseline=await selectDatabaseRun(baselineRecorder.query,DRAFT_RUN_CORPUS_VERSION,seed,configuration.environment,{day,setIds:configuration.setIds,snapshot:cachedSnapshot});
             sample.live_selection_ms=elapsed(baselineStart);
             assert.deepEqual(selected,baseline,'Cached selection metadata or RNG parity mismatch.');
             sample.exact_parity=true;
