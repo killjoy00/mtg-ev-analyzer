@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import test from 'node:test';
 import {handlePlayerReports} from '../worker/admin-player-reports.mjs';
 import {adminPath} from '../edge/gateway.mjs';
+import {sanitizeAdminDestination} from '../admin/admin-return.mjs';
 
 const ADMIN='22222222-2222-4222-8222-222222222222';
 const DECISION='11111111-1111-4111-8111-111111111111';
@@ -127,4 +128,11 @@ test('admin frontend exposes a private player reports area and inserts untrusted
   assert.match(inbox,/el.textContent=String\(text\)/);
   assert.doesNotMatch(inbox,/innerHTML\s*=/);
   assert.match(inbox,/Hide public identity/);
+});
+
+test('admin sign-in safely preserves the reports route and profile-search context',()=>{
+  assert.equal(sanitizeAdminDestination('/admin/?area=reports'),'/admin/?area=reports');
+  assert.equal(sanitizeAdminDestination('/admin/?area=users&search=Friendly+Player'),'/admin/?area=users&search=Friendly+Player');
+  assert.equal(sanitizeAdminDestination('/admin/?area=reports&kind=profiles'),'/admin/?area=reports&kind=profiles');
+  assert.equal(sanitizeAdminDestination('/admin/?area=reports&redirect=https://evil.example'),null);
 });
