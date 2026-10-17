@@ -70,7 +70,7 @@ const fixture = {
     end_date:null,
     established_by_day:'2026-09-19',
     standings:[
-      {environment:'mixed',rank:312,average:88.4,days:17},
+      {environment:'mixed',rank:312,average:88.4,rating:88.42,average_score:94.8,days:17},
       {environment:'powered-cube',rank:7,average:91.1,days:11},
       {environment:'latest',rank:18,average:86.9,days:8},
     ],
@@ -700,7 +700,7 @@ try {
   assert.match((await page.locator('.my-daily-preview li').first().textContent()) || '', /Top 7%/i);
   assert.match((await page.locator('.my-daily-preview li').first().textContent()) || '', /NEO/i);
   assert.match((await page.locator('.profile-current-season').textContent()) || '', /The Hobbit Season.*Current/i);
-  assert.match((await page.locator('.profile-current-season').textContent()) || '', /Draft Run.*#312.*88\.4.*17 days/i);
+  assert.match((await page.locator('.profile-current-season').textContent()) || '', /Draft Run.*#312.*88\.4 rating.*94\.8 avg.*17 days/i);
   assert.equal(await page.locator('#profile-edit').count(),0,'Stats sidebar does not duplicate the Account-tab edit action');
   assert.equal(await page.locator('.my-achievement-badge').count(), fixture.achievements.length);
   assert.equal(await page.locator('.my-achievement-badge.is-locked').count(), 1);

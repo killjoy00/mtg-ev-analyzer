@@ -7,6 +7,8 @@ export type LeaderboardPeriod = 'daily' | 'week' | 'season' | 'all';
 export type LeaderboardRow = {
   rank: number;
   score: number;
+  rating?: number;
+  average_score?: number;
   days: number;
   display_name: string;
   profile_key?: string | null;
@@ -15,7 +17,8 @@ export type LeaderboardRow = {
 export type DraftRunLeaderboard = {
   period: LeaderboardPeriod;
   environment: DailyEnvironment;
-  start: string;
+  start: string | null;
+  scoring?: { version: string } | null;
   today: string;
   rows: LeaderboardRow[];
   season?: {

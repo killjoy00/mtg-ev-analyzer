@@ -218,8 +218,8 @@ const careerProfile: CareerProfile = {
     start_date: '2026-09-01',
     end_date: '2026-09-30',
     standings: [
-      { environment: 'mixed', rank: 37, average: 91.4, days: 22 },
-      { environment: 'powered-cube', rank: 18, average: 94.1, days: 19 },
+      { environment: 'mixed', rank: 37, average: 82.7, rating: 82.7, average_score: 91.4, days: 22 },
+      { environment: 'powered-cube', rank: 18, average: 88.5, rating: 88.5, average_score: 94.1, days: 19 },
     ],
   },
   daily_history: [

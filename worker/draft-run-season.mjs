@@ -1,15 +1,15 @@
 import {gameDateKey} from '../game-date.mjs';
 import {DRAFT_RUN_CORPUS_VERSION,V5_CORPUS_VERSION} from '../draft-run.mjs';
+import {seasonRatingPolicy} from './season-rating.mjs';
 
 const num=value=>Number(value||0);
 const textDate=value=>value==null?null:String(value).slice(0,10);
 
 export const DRAFT_RUN_LEADERBOARD_ENVIRONMENTS=['mixed','powered-cube','latest'];
 
-// Multi-day boards rank the average of a player's best N Daily scores in the
-// period; days not played count as 0, so N days are needed for a full score.
+// Weekly scoring is unchanged. Season scoring uses all eligible Daily scores.
 // The all-time board is retired: old links and installed apps get the season.
-export const LEADERBOARD_BEST_OF=Object.freeze({week:3,season:10});
+export const LEADERBOARD_BEST_OF=Object.freeze({week:3});
 
 export function normalizeLeaderboardPeriod(value='daily') {
   return value==='month'||value==='all'?'season':value;
@@ -45,7 +45,8 @@ export async function resolveCurrentSeason(query,{today=gameDateKey(),ensureSche
   return reconcilePersistedSeasons(query);
 }
 
-export async function draftRunLeaderboardRows(query,{start,end,environment,playerId=null,blockedByPlayerId=null,limit=100,corpusVersion=DRAFT_RUN_CORPUS_VERSION,bestOf=null}={}) {
+export async function draftRunLeaderboardRows(query,{start,end,environment,playerId=null,blockedByPlayerId=null,limit=100,corpusVersion=DRAFT_RUN_CORPUS_VERSION,bestOf=null,ratingPolicy=null}={}) {
+  if(bestOf!==null&&ratingPolicy)throw new Error('Choose weekly or season scoring.');
   const result=await query(`WITH day_scores AS (
       SELECT player_id,score,row_number() OVER(PARTITION BY player_id ORDER BY score DESC,challenge_date) best_rank
       FROM scores
@@ -63,13 +64,18 @@ export async function draftRunLeaderboardRows(query,{start,end,environment,playe
         AND challenge_date BETWEEN $1::date AND $2::date
     ), results AS (
       SELECT player_id,
-        CASE WHEN $8::int IS NULL THEN round(avg(score),1)
+        CASE WHEN $9::float8 IS NOT NULL THEN
+          greatest(0,least(avg(score)::float8,
+            (sum(score)::float8+$10::float8*$9::float8)/(count(*)+$10::float8))
+            -$11::float8/sqrt(count(*)+$10::float8))
+          WHEN $8::int IS NULL THEN round(avg(score),1)
           ELSE round(coalesce(sum(score) FILTER(WHERE best_rank<=$8::int),0)::numeric/$8::int,1) END score,
+        round(avg(score),1) average_score,
         count(*) days
       FROM day_scores
       GROUP BY player_id
     ), ranked AS (
-      SELECT rank() OVER(ORDER BY r.score DESC) rank,r.player_id,r.score,r.days,p.display_name,p.showcase_achievement,
+      SELECT rank() OVER(ORDER BY r.score DESC) rank,r.player_id,r.score,r.average_score,r.days,p.display_name,p.showcase_achievement,
         CASE WHEN p.profile_public AND p.username_owned
           AND p.public_identity_hidden_at IS NULL
           AND (SELECT count(*) FROM players x
@@ -82,15 +88,21 @@ export async function draftRunLeaderboardRows(query,{start,end,environment,playe
         AND p.username_owned=true
         AND p.public_identity_hidden_at IS NULL
     )
-    SELECT rank,player_id::text,score,days,display_name,showcase_achievement,profile_key
+    SELECT rank,player_id::text,score,average_score,days,display_name,showcase_achievement,profile_key
     FROM ranked
     WHERE ($4::uuid IS NULL OR player_id=$4::uuid)
     ORDER BY score DESC,days DESC,display_name
-    LIMIT $5::int`,[start,end,environment,playerId,limit,blockedByPlayerId,corpusVersion===V5_CORPUS_VERSION?V5_CORPUS_VERSION:null,bestOf]);
+    LIMIT $5::int`,[start,end,environment,playerId,limit,blockedByPlayerId,corpusVersion===V5_CORPUS_VERSION?V5_CORPUS_VERSION:null,bestOf,
+      ratingPolicy?.baseline??null,ratingPolicy?.prior_days??null,
+      ratingPolicy?ratingPolicy.penalty_multiplier*ratingPolicy.variability:null]);
   return result.rows.map(row=>({
     ...row,
     rank:num(row.rank),
-    score:num(row.score),
+    // Old clients still receive their ranking value in score. Rank/order above
+    // use the unrounded season rating, even when displayed values are equal.
+    score:ratingPolicy?Number(num(row.score).toFixed(1)):num(row.score),
+    average_score:num(row.average_score),
+    ...(ratingPolicy?{rating:num(row.score)}:{}),
     days:num(row.days),
   }));
 }
@@ -100,8 +112,10 @@ export async function currentSeasonForPlayer(query,playerId,{today=gameDateKey()
   if(!season)return null;
   const standings=[];
   for(const environment of DRAFT_RUN_LEADERBOARD_ENVIRONMENTS) {
-    const row=(await draftRunLeaderboardRows(query,{start:season.start_date,end:today,environment,playerId,limit:1,bestOf:LEADERBOARD_BEST_OF.season}))[0];
-    if(row)standings.push({environment,rank:row.rank,average:row.score,days:row.days});
+    const scoring=seasonRatingPolicy(environment,season.start_date);
+    const row=(await draftRunLeaderboardRows(query,{start:season.start_date,end:today,environment,playerId,limit:1,ratingPolicy:scoring}))[0];
+    // average is the legacy ranking-value field; average_score is the raw mean.
+    if(row)standings.push({environment,rank:row.rank,average:row.score,rating:row.rating,average_score:row.average_score,days:row.days,scoring});
   }
   return {...season,standings};
 }

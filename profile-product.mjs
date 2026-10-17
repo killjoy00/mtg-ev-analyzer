@@ -38,7 +38,7 @@ import {
   shareProfileCard,
   shareResultCard,
 } from './share-cards.mjs';
-import {bindMyPackOneTabs,currentSeasonMarkup,myPackOneMarkup,resetMyPackOneTab} from './my-pack-one.mjs?v=6';
+import {bindMyPackOneTabs,currentSeasonMarkup,myPackOneMarkup,resetMyPackOneTab} from './my-pack-one.mjs?v=7';
 
 let profileRendering = false;
 let navInstalled = false;

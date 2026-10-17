@@ -59,8 +59,8 @@ await page.route('**/*-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/**',async
     answers.push({...grade,puzzle:publicDraftRunPuzzle(p),ranking:[...p.candidates].sort((a,b)=>b.model_probability-a.model_probability).map(c=>({id:c.id,name:c.name,support:calibrated.get(c.id),score:gradeDraftRunPick(p,c.id).score}))});revision++;body=snapshot();
   }else if(path==='/v1/daily-status')body=eliteAccess?{day:fixtureDay,daily_history:[],player:{claimed:true},capabilities:['account','custom_corpus','unlimited_cube_practice'],daily_streak:daily?3:0}:{day:fixtureDay,daily_history:[],player:{claimed:false},capabilities:[],daily_streak:daily?3:0};
   else if(path==='/v1/leaderboard'){
-    const requested=requestUrl.searchParams.get('period')||'daily',period=requested==='month'?'season':requested;
-    body={rows:[],period,season:period==='season'&&seasonAvailable?{id:'hob',set_id:'hob',name:'The Hobbit',set_release_date:'2026-08-14',start_date:'2026-09-10',end_date:null,established_by_day:'2026-09-19'}:null};
+    const requested=requestUrl.searchParams.get('period')||'daily',period=requested==='month'||requested==='all'?'season':requested;
+    body={rows:period==='season'&&seasonAvailable?[{rank:1,display_name:'Synthetic Player',score:77.96,rating:77.9607858308,average_score:100,days:1}]:[],scoring:period==='season'?{version:'conservative-season-v1'}:null,period,season:period==='season'&&seasonAvailable?{id:'hob',set_id:'hob',name:'The Hobbit',set_release_date:'2026-08-14',start_date:'2026-09-10',end_date:null,established_by_day:'2026-09-19'}:null};
   }
   else body=snapshot();
   await route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
@@ -326,6 +326,10 @@ try{
   assert.equal((await page.locator('.run-board-periods a.active').innerText()).trim(),'This season');
   assert.equal(await page.getByRole('link',{name:'This month',exact:true}).count(),0);
   assert.match((await page.locator('.run-board-season').innerText()).trim(),/The Hobbit Season · Sep 10–present/);
+  assert.match(await page.locator('.run-board').innerText(),/You rank after your first Daily/);
+  assert.match(await page.locator('.run-board li').innerText(),/Avg 100.0/);
+  assert.match(await page.locator('.run-board li strong').innerText(),/Rating\s*78.0/);
+  assert.match(await page.locator('.run-board li').innerText(),/1 day/);
   for(const link of await page.locator('.run-board-games a').evaluateAll(nodes=>nodes.map(node=>node.getAttribute('href'))))assert.match(link,/board=season/);
   await noOverflow();
   await page.screenshot({path:`artifacts/ui-${cube?'cube':'draft-run'}-season-board-mobile.png`,fullPage:true});

@@ -12,6 +12,7 @@ import {DAILY_ENVIRONMENTS,generateDailyEnvironmentResults} from './daily-genera
 import {ensureDailySchedule as ensureDailyScheduleForQuery} from './draft-run-daily.mjs';
 import {DAILY_PEER_STATS_SQL,lockedDailyPeerAnswer,summarizeDailyPeers} from './daily-peer-stats.mjs';
 import {draftRunLeaderboardRows,LEADERBOARD_BEST_OF,normalizeLeaderboardPeriod,resolveCurrentSeason} from './draft-run-season.mjs';
+import {seasonRatingPolicy} from './season-rating.mjs';
 import {consumePlayerLimit} from './request-limits.mjs';
 import {draftStartTiming} from './draft-start-timing.mjs';
 import {digest} from './account-session.mjs';
@@ -537,12 +538,13 @@ async function leaderboard(request) {
   let environment;try{environment=draftRunEnvironment(url.searchParams.get('environment')||'mixed');}catch{fail('Invalid Draft Run environment.');}
   const today=gameDateKey();
   const season=period==='season'?await resolveCurrentSeason(query,{today,ensureSchedule:ensureDailyScheduleForQuery}):null;
-  if(period==='season'&&!season)return json({period:'season',environment,start:null,today,best_of:LEADERBOARD_BEST_OF.season,season:null,rows:[]});
+  if(period==='season'&&!season)return json({period:'season',environment,start:null,today,best_of:null,scoring:null,season:null,rows:[]});
   const start=period==='daily'?today:period==='season'?season.start_date:(()=>{const d=new Date(today+'T12:00:00Z');d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7));return d.toISOString().slice(0,10);})();
   const bestOf=LEADERBOARD_BEST_OF[period]||null;
+  const scoring=period==='season'?seasonRatingPolicy(environment,season.start_date):null;
   const blockedByPlayerId=await player(request,false);
-  const rows=await draftRunLeaderboardRows(query,{start,end:today,environment,blockedByPlayerId,limit:100,bestOf});
-  return json({period,environment,start,today,best_of:bestOf,season:period==='season'?season:null,rows});
+  const rows=await draftRunLeaderboardRows(query,{start,end:today,environment,blockedByPlayerId,limit:100,bestOf,ratingPolicy:scoring});
+  return json({period,environment,start,today,best_of:bestOf,scoring,season:period==='season'?season:null,rows});
 }
 async function route(request) {
   const url=new URL(request.url),path=url.pathname;
