@@ -1,6 +1,6 @@
 // A return destination is a path, never an arbitrary URL or an OAuth state value.
-const AREAS=new Set(['corpus','users','campaign-links','team']);
-const FILTERS=new Set(['from','to','environment','type','set','version','difficulty','pick']);
+const AREAS=new Set(['corpus','users','campaign-links','team','reports']);
+const FILTERS=new Set(['from','to','environment','type','set','version','difficulty','pick','kind']);
 export function sanitizeAdminDestination(value,origin='https://packone.pro') {
   if(typeof value!=='string'||value.length>1000||!value.startsWith('/')||value.startsWith('//')||/[\\\u0000-\u001f]/.test(value))return null;
   let url;
@@ -10,7 +10,9 @@ export function sanitizeAdminDestination(value,origin='https://packone.pro') {
   for(const [key,value] of url.searchParams) {
     if(clean.has(key))return null;
     if(key==='area'){if(!AREAS.has(value))return null;}
-    else if(FILTERS.has(key)) {
+    else if(key==='search') {
+      if(value.length>100||/[\u0000-\u001f]/.test(value))return null;
+    } else if(FILTERS.has(key)) {
       if(!/^[a-zA-Z0-9_-]{1,60}$/.test(value))return null;
     } else return null;
     clean.set(key,value);

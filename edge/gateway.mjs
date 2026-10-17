@@ -35,6 +35,8 @@ export function adminPath(path,method) {
   if(method==='POST'&&/^\/v1\/admin\/team\/invitations\/[a-f0-9-]{36}\/revoke$/.test(path))return true;
   if(method==='POST'&&/^\/v1\/admin\/team\/members\/[a-f0-9-]{36}\/revoke$/.test(path))return true;
   if(method==='GET'&&/^\/v1\/admin\/measurements(?:\/(?:habits|reviews))?$/.test(path))return true;
+  if(method==='GET'&&/^\/v1\/admin\/player-reports(?:\/summary)?$/.test(path))return true;
+  if(method==='POST'&&/^\/v1\/admin\/player-reports\/(?:decisions\/[a-f0-9-]{36}|profiles\/[1-9][0-9]{0,17})$/.test(path))return true;
   if(method==='GET'&&/^\/v1\/admin\/decisions\/[a-z0-9_-]{6,120}$/.test(path))return true;
   if(/^\/v1\/admin\/users(?:\/[a-f0-9-]{36})?$/.test(path)&&method==='GET')return true;
   if(/^\/v1\/admin\/users\/[a-f0-9-]{36}\/public-identity$/.test(path)&&method==='POST')return true;

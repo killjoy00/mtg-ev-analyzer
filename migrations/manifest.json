@@ -63,7 +63,8 @@
     "0056_snapshot_aware_reroll_covering_index.sql",
     "0057_admin_owner_invitations.sql",
     "0058_owner_guard_admin_deletion.sql",
-    "0059_daily_peer_stats.sql"
+    "0059_daily_peer_stats.sql",
+    "0060_player_report_review.sql"
   ],
   "same_prefix_order": {
     "0037": [
@@ -174,7 +175,8 @@
         "0056_snapshot_aware_reroll_covering_index.sql",
         "0057_admin_owner_invitations.sql",
         "0058_owner_guard_admin_deletion.sql",
-        "0059_daily_peer_stats.sql"
+        "0059_daily_peer_stats.sql",
+        "0060_player_report_review.sql"
       ]
     },
     "daily-calendar": {
@@ -228,7 +230,8 @@
         "0056_snapshot_aware_reroll_covering_index.sql",
         "0057_admin_owner_invitations.sql",
         "0058_owner_guard_admin_deletion.sql",
-        "0059_daily_peer_stats.sql"
+        "0059_daily_peer_stats.sql",
+        "0060_player_report_review.sql"
       ]
     },
     "launch-load": {
@@ -257,7 +260,8 @@
         "0056_snapshot_aware_reroll_covering_index.sql",
         "0057_admin_owner_invitations.sql",
         "0058_owner_guard_admin_deletion.sql",
-        "0059_daily_peer_stats.sql"
+        "0059_daily_peer_stats.sql",
+        "0060_player_report_review.sql"
       ]
     },
     "launch-distributed": {
@@ -288,7 +292,8 @@
         "0056_snapshot_aware_reroll_covering_index.sql",
         "0057_admin_owner_invitations.sql",
         "0058_owner_guard_admin_deletion.sql",
-        "0059_daily_peer_stats.sql"
+        "0059_daily_peer_stats.sql",
+        "0060_player_report_review.sql"
       ]
     }
   }

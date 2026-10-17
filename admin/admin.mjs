@@ -2,6 +2,7 @@ import {renderCorpus} from './corpus.mjs';
 import {renderUsers} from './users.mjs';
 import {renderAdminTeam} from './team.mjs';
 import {renderCampaignLinks} from './campaign-links.mjs?v=20261009-delete';
+import {renderPlayerReports} from './player-reports.mjs?v=20261016';
 import {ADMIN_API_VERSION} from '../admin-api-contract.mjs';
 import {accountCsrfToken,firstPartyAuthEnabled,getAuthSession,storedAccountToken,signOutAccount} from '../growth-api.mjs';
 import {sanitizeAdminDestination} from './admin-return.mjs';
@@ -239,7 +240,17 @@ async function load() {
     setAuthorized(true,access.role);
     const authorizedRequest=async (...args)=>{const data=await request(...args);if(loadId!==deferredLoad)throw Error('Administrator account changed.');return data;};
     const authorizedGrowthRequest=async (...args)=>{const data=await growthRequest(...args);if(loadId!==deferredLoad)throw Error('Administrator account changed.');return data;};
+    const navReports=document.querySelector('#admin-reports-link');
+    navReports.textContent='Player reports';
+    void authorizedRequest('/v1/admin/player-reports/summary').then(({summary})=>{
+      if(loadId!==deferredLoad)return;
+      const total=Number(summary?.decisions?.open||0)+Number(summary?.profiles?.open||0);
+      const broken=Number(summary?.decisions?.broken_open||0);
+      navReports.textContent='Player reports'+(total?' ('+total+')':'');
+      navReports.title=broken?broken+' open reports say something is broken.':'';
+    }).catch(()=>{});
     const area=new URLSearchParams(location.search).get('area');
+    if(area==='reports'){await renderPlayerReports(root,authorizedRequest);return;}
     if(area==='corpus'){await renderCorpus(root,authorizedRequest);return;}
     if(area==='users'){await renderUsers(root,authorizedRequest,authorizedGrowthRequest,access.role);return;}
     if(area==='team'){if(access.role!=='owner'){denied(session?.user);return;}await renderAdminTeam(root,authorizedRequest);return;}

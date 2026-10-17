@@ -14,6 +14,10 @@ deleted, while the decision-quality report remains useful in aggregate.
 
 ## Operator review
 
+Open [Pack One Admin → Player reports](https://packone.pro/admin/?area=reports) using an authenticated admin account. The **Draft decisions** inbox shows every player report (including prior submissions), the stated reason and comment, actual and model-recommended cards, set/pick, client platform, versions, and report counts for the same decision. The **Open** filter is the default; broken reports are highlighted and counted separately. Reviewers can mark reports **Reviewed**, **Dismissed**, or **Reopened**, with optional private notes. Review status and reviewer attribution persist in `draft_run_decision_reports` through additive migration `0060_player_report_review.sql`; reports are never deleted by these actions. Admin navigation also shows the current open count. Existing reports start in the Open queue.
+
+The same private inbox has a **Player profiles** tab for public-identity reports. Its Dismiss and Reopen controls do not change the reported player's public identity. The **Hide public identity** action requires a reason and calls the existing audited moderation handler; it does not create an untracked direct database mutation. Ordinary players and non-admin accounts cannot load this page or its API. This is not an email alert service: urgent reports are flagged inside the admin view.
+
 The fastest answer to “Which decisions are receiving multiple reports, and
 why?” is the summary view:
 

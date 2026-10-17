@@ -1,5 +1,6 @@
 import {accountSession} from './account-session.mjs';
 import {acceptAdminInvitation,handleAdminTeam} from './admin-invitations.mjs';
+import {handlePlayerReports} from './admin-player-reports.mjs';
 import {handleCorpusAdmin} from './corpus-admin.mjs';
 import {handleUserAdmin} from './user-admin.mjs';
 import {handleCreatorChallengeAdmin} from './creator-challenges.mjs';
@@ -173,6 +174,7 @@ export async function handleAdmin(request,query,readJson) {
   if(url.pathname.startsWith('/v1/admin/users'))return handleUserAdmin(request,query,url,{readJson,adminAuthUserId:id});
   if(url.pathname.startsWith('/v1/admin/corpus'))return handleCorpusAdmin(request,query,readJson,id);
   if(url.pathname.startsWith('/v1/admin/creator-challenges'))return handleCreatorChallengeAdmin(request,query,readJson,id);
+  if(url.pathname.startsWith('/v1/admin/player-reports'))return handlePlayerReports(request,query,readJson,id);
   if(request.method!=='GET')fail('Method not allowed.',405);
   const filters=reportFilters(url);
   if(url.pathname==='/v1/admin/measurements/habits') {
