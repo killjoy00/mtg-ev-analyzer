@@ -18,7 +18,8 @@ const deletionStateLabel=value=>({
 })[value]||value||'Unknown';
 
 export async function renderUsers(root,request,growthRequest=request,viewerRole='admin') {
-  let data=null,filters={search:'',status:'all'},detailLoadSerial=0;
+  const prefill=new URLSearchParams(location.search).get('search')||'';
+  let data=null,filters={search:prefill.length<=100?prefill:'',status:'all'},detailLoadSerial=0;
 
   async function load() {
     root.innerHTML='<p>Loading users…</p>';
