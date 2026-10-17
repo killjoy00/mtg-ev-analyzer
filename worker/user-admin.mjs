@@ -1,3 +1,6 @@
+import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
+import {gameDateKey} from '../game-date.mjs';
+
 const UUID=/^[a-f0-9-]{36}$/i;
 const fail=(message,status=400,code=null)=>{throw Object.assign(Error(message),{status,...(code?{code}:{})});};
 const bool=value=>value===true||value==='t'||value==='true'||value===1||value==='1';
@@ -19,6 +22,80 @@ export function userAdminFilters(url) {
   if(search.length>100)fail('Search is too long.');
   if(!['all','paid','patreon','admin'].includes(status))fail('Invalid user filter.');
   return {search,status};
+}
+
+const DATE_KEY=/^\d{4}-\d{2}-\d{2}$/;
+const validDateKey=value=>DATE_KEY.test(value)&&Number.isFinite(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value;
+
+export function playActivityWindow(url,now=new Date()) {
+  const end=url.searchParams.get('activity_to')||gameDateKey(now);
+  if(!validDateKey(end))fail('Choose a valid activity date range of at most one year.');
+  const defaultStart=new Date(end+'T12:00:00Z');defaultStart.setUTCDate(defaultStart.getUTCDate()-13);
+  const start=url.searchParams.get('activity_from')||defaultStart.toISOString().slice(0,10);
+  if(!validDateKey(start)||end<start||(Date.parse(end)-Date.parse(start))/86400000>365)
+    fail('Choose a valid activity date range of at most one year.');
+  return {start,end};
+}
+
+// Same people, exclusions and next-day maturity as the Daily habit cohorts report, split by
+// whether the player is linked to an account today. Guests count once per browser identity.
+const PLAY_ACTIVITY_SQL=`WITH eligible AS (
+  SELECT coalesce(a.auth_user_id::text,'guest:'||s.player_id::text) person_id,s.day,
+    coalesce(s.day,(s.created_at AT TIME ZONE 'America/Los_Angeles')::date) play_day
+  FROM draft_run_sessions s
+  JOIN players p ON p.id=s.player_id
+  LEFT JOIN account_links a ON a.player_id=s.player_id
+  WHERE s.corpus_version=$3
+    AND jsonb_array_length(s.answers)=jsonb_array_length(s.puzzle_ids)
+    AND NOT s.measurement_qa
+    AND NOT coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
+    AND NOT EXISTS (
+      SELECT 1 FROM account_links admin_link JOIN pack1_admins admin ON admin.auth_user_id=admin_link.auth_user_id
+      WHERE admin_link.player_id=s.player_id
+    )
+), grouped AS (
+  SELECT CASE WHEN person_id LIKE 'guest:%' THEN 'signed_out' ELSE 'signed_in' END grp,* FROM eligible
+), played AS (
+  SELECT grp,count(DISTINCT person_id)::int players,count(*)::int completed_runs
+  FROM grouped WHERE play_day BETWEEN $1::date AND $2::date GROUP BY grp
+), daily_days AS (
+  SELECT DISTINCT grp,person_id,day FROM grouped WHERE day IS NOT NULL
+), cohort AS (
+  SELECT f.grp,f.first_day,next_day.person_id IS NOT NULL returned
+  FROM (SELECT grp,person_id,min(day) first_day FROM daily_days GROUP BY grp,person_id) f
+  LEFT JOIN daily_days next_day ON next_day.person_id=f.person_id AND next_day.day=f.first_day+1
+  WHERE f.first_day BETWEEN $1::date AND $2::date
+), today AS (
+  SELECT (now() AT TIME ZONE 'America/Los_Angeles')::date AS current_day
+), cohort_summary AS (
+  SELECT grp,count(*)::int first_daily_people,
+    count(*) FILTER(WHERE first_day+1<today.current_day)::int next_day_mature,
+    count(*) FILTER(WHERE first_day+1<today.current_day AND returned)::int next_day_returned,
+    count(*) FILTER(WHERE first_day+1>=today.current_day)::int next_day_immature,
+    round(100.0*count(*) FILTER(WHERE first_day+1<today.current_day AND returned)/nullif(count(*) FILTER(WHERE first_day+1<today.current_day),0),1) next_day_rate
+  FROM cohort CROSS JOIN today GROUP BY grp
+)
+SELECT g.grp "group",coalesce(pl.players,0) players,coalesce(pl.completed_runs,0) completed_runs,
+  coalesce(c.first_daily_people,0) first_daily_people,coalesce(c.next_day_mature,0) next_day_mature,
+  coalesce(c.next_day_returned,0) next_day_returned,coalesce(c.next_day_immature,0) next_day_immature,c.next_day_rate
+FROM (VALUES ('signed_out',1),('signed_in',2)) g(grp,position)
+LEFT JOIN played pl ON pl.grp=g.grp
+LEFT JOIN cohort_summary c ON c.grp=g.grp
+ORDER BY g.position`;
+
+async function playActivity(query,window) {
+  try {
+    const result=await query(PLAY_ACTIVITY_SQL,[window.start,window.end,DRAFT_RUN_CORPUS_VERSION]);
+    return {...window,corpus_version:DRAFT_RUN_CORPUS_VERSION,groups:result.rows.map(row=>({
+      group:row.group,players:num(row.players),completed_runs:num(row.completed_runs),
+      first_daily_people:num(row.first_daily_people),next_day_mature:num(row.next_day_mature),
+      next_day_returned:num(row.next_day_returned),next_day_immature:num(row.next_day_immature),
+      next_day_rate:row.next_day_rate==null?null:Number(row.next_day_rate),
+    }))};
+  } catch(error) {
+    console.error(JSON.stringify({event:'admin_play_activity_failed',message:String(error?.message||error).slice(0,200)}));
+    return {...window,unavailable:true};
+  }
 }
 
 function normalizeUser(row) {
@@ -223,7 +300,7 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
   }
 
   if(url.pathname!=='/v1/admin/users')fail('Not found.',404);
-  const filters=userAdminFilters(url),params=[filters.search,filters.status];
+  const filters=userAdminFilters(url),activityWindow=playActivityWindow(url),params=[filters.search,filters.status];
   const where=`WHERE ($1='' OR coalesce(u.name,'') ILIKE '%'||$1||'%' OR coalesce(u.email,'') ILIKE '%'||$1||'%'
       OR EXISTS(
         SELECT 1 FROM account_links search_link JOIN players search_player ON search_player.id=search_link.player_id
@@ -233,7 +310,7 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
       OR ($2='paid' AND EXISTS(SELECT 1 FROM entitlement_grants eg WHERE eg.auth_user_id=u.id AND eg.revoked_at IS NULL AND (eg.expires_at IS NULL OR eg.expires_at>now())))
       OR ($2='patreon' AND EXISTS(SELECT 1 FROM provider_accounts pc WHERE pc.auth_user_id=u.id AND pc.provider='patreon'))
       OR ($2='admin' AND EXISTS(SELECT 1 FROM pack1_admins pa WHERE pa.auth_user_id=u.id)))`;
-  const [summary,count,rows]=await Promise.all([
+  const [summary,count,rows,activity]=await Promise.all([
     query(`WITH activity AS (
         SELECT u.id,GREATEST(
           (SELECT max(s.updated_at) FROM account_links a JOIN draft_run_sessions s ON s.player_id=a.player_id WHERE a.auth_user_id=u.id),
@@ -277,6 +354,7 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
       ${where}
       ORDER BY last_active DESC NULLS LAST,u."createdAt" DESC
       LIMIT 100`,params),
+    playActivity(query,activityWindow),
   ]);
   return {
     generated_at:new Date().toISOString(),
@@ -285,5 +363,6 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
     total_matching:num(count.rows[0]?.total),
     truncated:num(count.rows[0]?.total)>100,
     users:rows.rows.map(normalizeUser),
+    play_activity:activity,
   };
 }
