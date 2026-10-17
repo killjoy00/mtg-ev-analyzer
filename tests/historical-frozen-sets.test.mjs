@@ -16,3 +16,18 @@ test('complete import verification exempts exactly the importer frozen sets',()=
   assert.deepEqual([...ids(javascript[1])].sort(),[...ids(python[1])].sort());
   assert.match(verifier,/baseline\.sets\.filter\(s=>!HISTORICAL_FROZEN_SETS\.has\(s\.id\)&&!bySet\.has\(s\.id\)\)/);
 });
+
+test('discovery never queues a historical-frozen set for import',()=>{
+  const importer=read('scripts/import_all_trophies.py');
+  const python=importer.match(/HISTORICAL_FROZEN_SETS = frozenset\(\{([^}]*)\}\)/);
+  assert.ok(python,'importer frozen-set declaration not found');
+  const registrar=read('scripts/register-corpus-sources.mjs');
+  const javascript=registrar.match(/const HISTORICAL_FROZEN_SETS=new Set\(\[([^\]]*)\]\);/);
+  assert.ok(javascript,'register-corpus-sources frozen-set declaration not found');
+  assert.deepEqual([...ids(javascript[1])].sort(),[...ids(python[1])].sort());
+  // The importer rejects the whole batch when any frozen set is requested,
+  // so the skip must happen before a set reaches pending.txt.
+  const skip=registrar.indexOf('HISTORICAL_FROZEN_SETS.has(s.set_id))continue;');
+  assert.ok(skip>0,'frozen sets must be skipped before queuing');
+  assert.ok(skip<registrar.indexOf('pending.push(s.set_id)'));
+});
