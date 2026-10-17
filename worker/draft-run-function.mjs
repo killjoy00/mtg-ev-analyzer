@@ -254,9 +254,11 @@ async function start(request) {
   if(environment!=='mixed'&&setIds.length)fail('Custom sets use regular Draft Runs.');
   if(!daily) {
     const requiredPracticeCapability=practiceCapability(environment,setIds);
-    // Official creator campaigns are intentionally guest-playable for the
-    // standard mixed environment, but must never bypass paid Cube/custom access.
-    if(!creatorState||PAID_CAPABILITIES.has(requiredPracticeCapability))
+    // A friend's shared run is a fixed replay of eight stored decisions, so any
+    // player can accept it: guest or member, mixed or Powered Cube. Official
+    // creator campaigns are guest-playable for the standard mixed environment,
+    // but must never bypass paid Cube/custom access.
+    if(!source&&(!creatorState||PAID_CAPABILITIES.has(requiredPracticeCapability)))
       requireCapability(capabilities,requiredPracticeCapability);
   }
   const rawIdempotency=String(request.headers.get('x-idempotency-key')||'');

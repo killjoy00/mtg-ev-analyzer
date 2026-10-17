@@ -34,7 +34,9 @@ await call('/v1/runs',{environment:'powered-cube'},user,403);
 await call('/v1/runs',{setIds:['hob']},user,403);
 await call('/v1/practice-sets',undefined,user,403);
 await query("INSERT INTO entitlement_grants(auth_user_id,capability,provider,provider_reference) VALUES($1::uuid,'unlimited_cube_practice','test','current'),($1::uuid,'custom_corpus','test','current')",[user.id]);
-assert.equal((await call('/v1/runs',{environment:'powered-cube'},user)).environment,'powered-cube');
+const cubeRun=await finish(await call('/v1/runs',{environment:'powered-cube'},user),user);
+assert.equal(cubeRun.environment,'powered-cube');
+const cubeShare=await call(`/v1/runs/${cubeRun.id}/share`,{},user);
 const {sets}=await call('/v1/practice-sets',undefined,user);
 assert.ok(sets.length>=4,'The isolated corpus must provide four complete custom-Practice sets.');
 // These retained Live archives omit complete P1P1 packs; they remain useful
@@ -77,4 +79,15 @@ await call(`/v1/runs/${replay.id}/reroll`,{revision:replay.revision,round:0,puzz
 replay=await finish(replay,peer);
 assert.equal((await call(`/v1/runs/${replay.id}/share`,{},peer)).id,shared.id,'Sharing a replay preserves the original run identity');
 assert.equal((await call('/v1/shared-runs/'+shared.id)).scores.length,2);
-console.log('Capabilities passed: authoritative identity, unlimited regular practice, future grants, revocation, balanced custom sets, self-share protection and stable shared decisions/scores.');
+// A friend's shared run is guest-playable, while a guest's own practice stays gated.
+const guest=await call('/v1/session',{displayName:'QA shared guest'});
+const guestReplay=await call('/v1/runs',{challenge:shared.id},guest);
+assert.equal(guestReplay.comparison.exact,true);
+assert.equal(guestReplay.current.puzzle_id,run.answers[0].puzzle.puzzle_id);
+await call('/v1/runs',{},guest,403);
+// A shared Powered Cube run is playable without the recipient holding Cube practice.
+const cubeReplay=await call('/v1/runs',{challenge:cubeShare.id},guest);
+assert.equal(cubeReplay.environment,'powered-cube');
+assert.equal(cubeReplay.current.puzzle_id,cubeRun.answers[0].puzzle.puzzle_id);
+await call('/v1/runs',{environment:'powered-cube'},guest,403);
+console.log('Capabilities passed: authoritative identity, unlimited regular practice, future grants, revocation, balanced custom sets, self-share protection, guest-playable shared runs and stable shared decisions/scores.');

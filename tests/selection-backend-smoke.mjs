@@ -5,7 +5,7 @@ import {spawnSync} from 'node:child_process';
 import {verifyRerollIndexSchema,REROLL_INDEX_SCHEMA_SQL} from '../scripts/reroll-index-schema.mjs';
 import {impliedTrophyScore,SERVING_QUALITY_SQL} from '../serving-quality.mjs';
 import {selectDraftRun,selectDraftRunReroll} from '../draft-run.mjs';
-import {loadLiveSetMetadata,decodePuzzleMetadata,selectDatabaseRun,selectDatabaseReroll} from '../worker/draft-run-selection.mjs';
+import {loadLiveSetMetadata,decodePuzzleMetadata,decisionKey,selectDatabaseRun,selectDatabaseReroll} from '../worker/draft-run-selection.mjs';
 import {corpusMembership} from '../worker/corpus-components.mjs';
 if(!process.argv.includes('--dev-fixtures'))throw Error('An isolated development branch is required.');
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
@@ -66,6 +66,16 @@ try {
       assert.equal((await selectDatabaseReroll(fixtureQuery,version,expected[round],options))?.puzzle_id,
         selectDraftRunReroll(pool,expected[round],options)?.puzzle_id,`reroll parity: ${environment}/${type}/${round}`);
     }
+  }
+  // Daily repeat exclusion: an excluded source draft and an excluded exact
+  // decision never return, and the run still fills every round.
+  {
+    const first=await selectDatabaseRun(fixtureQuery,version,'repeat-window','mixed',{daily:true});
+    const exclude={sources:[first[0].source_draft_hash],decisions:[decisionKey(first[1])]};
+    const next=await selectDatabaseRun(fixtureQuery,version,'repeat-window','mixed',{daily:true,exclude});
+    assert.equal(next.length,first.length);
+    assert.ok(next.every(p=>p.source_draft_hash!==first[0].source_draft_hash),'excluded source draft is not reused');
+    assert.ok(next.every(p=>!exclude.decisions.includes(decisionKey(p))),'excluded exact decision is not repeated');
   }
   // One corrupt/unrated entry cannot take otherwise eligible rounds offline.
   await query(`DELETE FROM ${rTable} WHERE puzzle_id=(SELECT puzzle_id FROM ${rTable} LIMIT 1)`);

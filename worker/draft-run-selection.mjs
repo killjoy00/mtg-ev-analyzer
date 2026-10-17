@@ -64,14 +64,28 @@ export async function loadCustomSetMetadata(query,version,day=gameDateKey(),requ
 // Return compact group counts once, then one source trajectory per round. Every
 // eligible puzzle participates: there is no random prefix or candidate cap.
 // This consumes the same PRNG draws and sorted candidate order as selectDraftRun.
-export async function selectDatabaseRun(query,version,seed,environment='mixed',{daily=false,day=gameDateKey(),selectionVersion=DRAFT_RUN_SELECTION_VERSION,setIds=[],snapshot=null}={}) {
+// Repeat exclusion for Daily schedules: whole source drafts and exact
+// decisions (source_draft_hash:pick_number). Applied identically to the group
+// counts and to every round's candidate query, so offsets always land on a row.
+function repeatExclusionSql(exclude,params) {
+  let sql='';
+  if(exclude.sources.length){params.push(toPgArray(exclude.sources));sql+=` AND p.source_draft_hash<>ALL($${params.length}::text[])`;}
+  if(exclude.decisions.size){params.push(toPgArray([...exclude.decisions]));sql+=` AND (p.source_draft_hash||':'||p.pick_number)<>ALL($${params.length}::text[])`;}
+  return sql;
+}
+export const decisionKey=p=>`${p.source_draft_hash}:${Number(p.pick_number)}`;
+
+export async function selectDatabaseRun(query,version,seed,environment='mixed',{daily=false,day=gameDateKey(),selectionVersion=DRAFT_RUN_SELECTION_VERSION,setIds=[],snapshot=null,exclude=null}={}) {
   const random=seededRandom(seed),bands=runDifficultyBands(random,selectionVersion),selected=[],sources=[],sets=new Set();
   const windows=runPickWindows(environment,selectionVersion),released=new Set(releasedRunSets(day));
   const metadata=selectionVersion===DAILY_SELECTION_VERSION?(snapshot?snapshot.metadata:await loadLiveSetMetadata(query,version)):null;
   const live=metadata?new Set(metadata.filter(s=>environment==='powered-cube'?s.set_id==='powered-cube':s.regular_run&&s.release_date&&s.release_date<=day).map(s=>s.set_id)):null;
   const required=environment==='latest'?latestSetPlan(metadata,day):setIds.length?balancedSetPlan(setIds,random):daily&&environment==='mixed'&&selectionVersion===DAILY_SELECTION_VERSION?dailySetPlan(metadata,day,random):daily&&environment==='mixed'&&isEightPickVersion(selectionVersion)?dailyRequiredSets(day):[];
+  const repeat={sources:[...new Set(exclude?.sources||[])],decisions:new Set(exclude?.decisions||[])};
+  if(snapshot&&(repeat.sources.length||repeat.decisions.size))throw Error('Repeat exclusion requires live selection.');
   const groupParams=[version];
   let groupWhere=`${servingBase} AND ${environmentFilter(environment,groupParams)}`;
+  groupWhere+=repeatExclusionSql(repeat,groupParams);
   // Current Daily/custom plans assign every set slot before availability checks.
   // Unrelated sets cannot affect these draws. Preserve historical partial plans.
   if(environment==='latest'||setIds.length||daily&&environment==='mixed'&&selectionVersion===DAILY_SELECTION_VERSION){
@@ -91,7 +105,7 @@ export async function selectDatabaseRun(query,version,seed,environment='mixed',{
   for(let round=0;round<windows.length;round++) {
     const window=windows[round];
     const params=[version,window[0],window[1],toPgArray(sources)];
-    const where=`${servingBase} AND p.pick_number BETWEEN $2::int AND $3::int AND p.source_draft_hash<>ALL($4::text[]) AND ${environmentFilter(environment,params)}`;
+    const where=`${servingBase} AND p.pick_number BETWEEN $2::int AND $3::int AND p.source_draft_hash<>ALL($4::text[]) AND ${environmentFilter(environment,params)}${repeatExclusionSql(repeat,params)}`;
     const availableFor=band=>{
       const counts=new Map();
       for(const g of groups)if(g.band===band&&g.pick_number>=window[0]&&g.pick_number<=window[1]&&g.n>0&&(forced.has(round)?g.set_id===forced.get(round):!required.includes(g.set_id)))counts.set(g.set_id,(counts.get(g.set_id)||0)+g.n);
@@ -130,7 +144,8 @@ export async function selectDatabaseRun(query,version,seed,environment='mixed',{
     selected.push(p);sources.push(p.source_draft_hash);sets.add(p.set_id);
     // Once a source is used, every one of its decisions disappears from future
     // counts. This preserves exact source exclusion without per-round recounts.
-    for(const sibling of trajectory){const group=remaining.get(key(sibling));if(group)group.n--;}
+    // An excluded sibling decision was never counted, so it is not decremented.
+    for(const sibling of trajectory){if(repeat.decisions.has(decisionKey(sibling)))continue;const group=remaining.get(key(sibling));if(group)group.n--;}
 
   }
   return selected;
