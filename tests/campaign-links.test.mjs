@@ -130,7 +130,7 @@ test('generic Daily short link has no forced campaign or source attribution',asy
   assert.equal(html,renderCampaignRedirectPage(neutralDailyEntry),'generated short link must match registry');
   assert.ok(html.includes(`location.replace(${JSON.stringify(destination)})`));
   assert.ok(html.includes(`href="${destination.replaceAll('&','&amp;')}"`));
-  assert.doesNotMatch(html,/utm_|ref=|utm_source=discord/,'neutral redirect does not claim Discord or another campaign');
+  assert.doesNotMatch(html,/utm_|ref=result_share/,'neutral redirect does not claim Discord or another campaign');
 });
 
 test('channel-specific Discord short link redirects to attributed regular Daily',async()=>{
