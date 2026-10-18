@@ -16,7 +16,9 @@ The current published example is:
 - vanity URL: `https://packone.pro/go/reddit-launch/`
 - tracked destination: `https://packone.pro/?utm_source=reddit&utm_campaign=launch-week&utm_medium=social`
 
-The redirect page is intentionally static. It does not call the backend, load analytics, or load advertising code. It redirects the browser to the tracked Pack One destination, where the existing acquisition logic records the visit.
+The redirect page is intentionally static. It does not call the backend, load analytics, or load advertising code. It redirects the browser to the Pack One destination, where the existing acquisition logic records the visit.
+
+**Neutral public Daily link:** `https://packone.pro/go/daily/` redirects to the regular Daily Draft Run **without UTM parameters**, so it does not force attribution to Discord or another campaign. The client can use an external referrer if one survives the redirect; otherwise a previously unattributed first visit is classified as direct. `https://packone.pro/go/discord/` remains specifically tracked to `source=discord`, `campaign=daily_post`, `medium=social`. The neutral registry entry is explicitly marked `untracked: true` in `campaign-links.json`; the ordinary Admin builder still requires source and campaign for newly published marketing links.
 
 ## 2. Open the Admin Link Builder
 
