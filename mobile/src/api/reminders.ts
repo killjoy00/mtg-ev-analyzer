@@ -14,10 +14,12 @@ export type ReminderSchedule = {
 };
 export type ReminderSnapshot = {
   schedule: ReminderSchedule;
-  email: { enabled: boolean; eligible: boolean; suppressed: boolean; consentedAt: string | null; deliveredAt: string | null };
-  push: { enabled: boolean; consentedAt: string | null; providerAcceptedAt: string | null };
+  email: { enabled: boolean; eligible: boolean; suppressed: boolean; consentedAt: string | null; deliveredAt: string | null; lastAttempt?:{state:string;acceptedAt:string|null;deliveredAt:string|null}|null };
+  push: { enabled: boolean; consentedAt: string | null; providerAcceptedAt: string | null; lastAttempt?:{state:string;acceptedAt:string|null;platformReceipt:string|null}|null };
   nextAt: string | null;
   deliveryActive: boolean;
+  // Provider acceptance and platform receipt are not equivalent to confirmed device display.
+  // Email delivery is confirmed only by an authenticated Resend event.
 };
 export type ReminderChannel = 'email' | 'push';
 

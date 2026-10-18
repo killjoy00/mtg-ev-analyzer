@@ -43,6 +43,9 @@ function renderSetting(mount,state) {
     (state.nextAt?' · Next scheduled: '+safe(statusDate(state.nextAt)):'')+'</p>'+
     (!state.deliveryActive?'<p class="profile-empty">Delivery is not active yet. Your saved choices will not send reminders until activation.</p>':'')+
     (email.suppressed?'<p role="alert">Email paused due to a bounce or complaint. Contact support before opting in again.</p>':'')+
+    '<p><small>Latest email attempt: '+safe(email.lastAttempt?.state||'none')+
+      '; latest push attempt: '+safe(push.lastAttempt?.state||'none')+
+      (push.lastAttempt?.platformReceipt?' ('+safe(push.lastAttempt.platformReceipt)+' at platform, not device display)':'')+'.</small></p>'+ 
     '<p><small>Last confirmed email delivery: '+safe(statusDate(email.deliveredAt))+
       '. Last push provider acceptance: '+safe(statusDate(push.providerAcceptedAt))+' (not device delivery).</small></p>'+
     '<form id="daily-reminder-form" class="profile-settings-form">'+

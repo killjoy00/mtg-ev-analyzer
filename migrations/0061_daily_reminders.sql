@@ -39,12 +39,14 @@ CREATE TABLE IF NOT EXISTS daily_reminder_devices (
   auth_user_id uuid NOT NULL REFERENCES neon_auth."user"(id) ON DELETE CASCADE,
   session_hash text NOT NULL REFERENCES account_sessions(session_hash) ON DELETE CASCADE,
   platform text NOT NULL CHECK(platform IN ('ios','android')),
-  token_hash char(64) NOT NULL UNIQUE,
+  token_hash char(64) NOT NULL,
   token_ciphertext text NOT NULL,
   revoked_at timestamptz,
   registered_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE UNIQUE INDEX IF NOT EXISTS daily_reminder_devices_live_token_uq
+ ON daily_reminder_devices(token_hash) WHERE revoked_at IS NULL;
 CREATE INDEX IF NOT EXISTS daily_reminder_devices_owner_idx ON daily_reminder_devices(auth_user_id)
  WHERE revoked_at IS NULL;
 

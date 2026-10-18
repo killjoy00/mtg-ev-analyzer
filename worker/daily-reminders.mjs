@@ -71,15 +71,20 @@ async function setting(query,authId) {
   return result.rows[0]||null;
 }
 export async function reminderSnapshot(query,authId,{env=process.env}={}) {
-  const [row,email]=await Promise.all([setting(query,authId),deletionEmailForAuth(query,authId)]);
+  const [row,email,recent]=await Promise.all([setting(query,authId),deletionEmailForAuth(query,authId),
+    query('SELECT DISTINCT ON (channel) channel,state,accepted_at,delivered_at,push_receipt_result FROM daily_reminder_deliveries WHERE auth_user_id=$1::uuid ORDER BY channel,created_at DESC LIMIT 2',[authId])]);
+  const status=Object.fromEntries(recent.rows.map(item=>[item.channel,{
+    state:item.state,acceptedAt:item.accepted_at||null,deliveredAt:item.delivered_at||null,
+    platformReceipt:item.push_receipt_result||null}]));
   const config=scheduleFromRow(row);
   const suppressed=Boolean(email&&row?.suppressed_email_hash===emailFingerprint(email,env));
   return {
     schedule:config,
     email:{enabled:yes(row?.email_enabled),eligible:Boolean(email),suppressed,
-      consentedAt:row?.email_consented_at||null,deliveredAt:row?.last_email_delivered_at||null},
+      consentedAt:row?.email_consented_at||null,deliveredAt:row?.last_email_delivered_at||null,
+      lastAttempt:status.email||null},
     push:{enabled:yes(row?.push_enabled),consentedAt:row?.push_consented_at||null,
-      providerAcceptedAt:row?.last_push_accepted_at||null},
+      providerAcceptedAt:row?.last_push_accepted_at||null,lastAttempt:status.push||null},
     nextAt:row?.next_due_at||null,
     // A stored opt-in alone is never evidence of a functioning scheduler.
     deliveryActive:env.PACK1_DAILY_REMINDERS_ENABLED==='1',

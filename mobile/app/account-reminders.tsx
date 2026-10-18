@@ -96,6 +96,8 @@ export default function AccountRemindersScreen() {
       <Text style={styles.body}>Email: {snapshot.email.enabled?'On':'Off'} · Push: {snapshot.push.enabled?'On':'Off'}</Text>
       <Text style={styles.body}>Next reminder: {formatDate(snapshot.nextAt)}</Text>
       {!snapshot.deliveryActive?<Text style={styles.alert}>Delivery is not active yet. Saved choices will not send reminders until activation.</Text>:null}
+      <Text style={styles.help}>Latest email attempt: {snapshot.email.lastAttempt?.state||'none'}. Latest push attempt: {snapshot.push.lastAttempt?.state||'none'}.</Text>
+      {snapshot.push.lastAttempt?.platformReceipt?<Text style={styles.help}>Push platform receipt: {snapshot.push.lastAttempt.platformReceipt} (not proof of display).</Text>:null}
       <Text style={styles.help}>Last confirmed email delivery: {formatDate(snapshot.email.deliveredAt)}</Text>
       <Text style={styles.help}>Last push provider acceptance: {formatDate(snapshot.push.providerAcceptedAt)}. This is not proof of device display.</Text>
     </View>:null}
