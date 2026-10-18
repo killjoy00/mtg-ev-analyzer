@@ -150,17 +150,20 @@ export async function unregisterReminderDevice(query,auth,payload) {
 export async function revokeReminderSessionDevices(query,auth) {
   if(auth?.session_hash)await query('UPDATE daily_reminder_devices SET revoked_at=now(),updated_at=now() WHERE session_hash=$1',[auth.session_hash]);
 }
-async function emailSuppressedOrComplete(query,row,env=process.env) {
-  const verifiedEmail=await deletionEmailForAuth(query,row.auth_user_id);
-  if(!verifiedEmail||emailFingerprint(verifiedEmail,env)===row.suppressed_email_hash)return {suppress:true,email:null};
-  // Three fully persisted, current-Pacific-date results are required. If any
-  // data is unavailable, do not invent completion from a partial signal.
+async function eligibilityAndCompletion(query,row,env=process.env) {
+  let email=null;
+  if(row.channel==='email') {
+    email=await deletionEmailForAuth(query,row.auth_user_id);
+    if(!email||emailFingerprint(email,env)===row.suppressed_email_hash)return {suppress:true,email:null};
+  }
+  // A push subscription does not require email verification; only the email
+  // channel is bound to the verified Auth email.
   const completed=await query(
     'SELECT count(DISTINCT s.set_id)::int completed FROM scores s '+
     'JOIN account_links a ON a.player_id=s.player_id WHERE a.auth_user_id=$1::uuid '+
     'AND s.challenge_date=$2::date AND s.mode=\'draft_run\' AND s.set_id IN (\'mixed\',\'powered-cube\',\'latest\')',
     [row.auth_user_id,row.pacificDay]);
-  return {suppress:Number(completed.rows[0]?.completed)===3,email:verifiedEmail};
+  return {suppress:Number(completed.rows[0]?.completed)===3,email};
 }
 async function suppressDelivery(query,id) {
   await query('UPDATE daily_reminder_deliveries SET state=\'suppressed\',updated_at=now() WHERE id=$1::uuid AND state IN (\'queued\',\'retry\')',[id]);
@@ -182,7 +185,7 @@ async function deliverOne(query,id,clock,{env=process.env,fetcher=fetch,pacificD
   if(!allowed||account.rows.length||!Number.isFinite(inDate)||clock-inDate>MAX_LATENESS_MS) {
     await suppressDelivery(query,id);return 'suppressed';
   }
-  const {suppress,email}=await emailSuppressedOrComplete(query,{...row,pacificDay},env);
+  const {suppress,email}=await eligibilityAndCompletion(query,{...row,pacificDay},env);
   if(suppress){await suppressDelivery(query,id);return 'suppressed';}
   if(row.channel==='push') {
     const session=await query('SELECT 1 FROM account_sessions WHERE session_hash=(SELECT session_hash FROM daily_reminder_devices WHERE installation_id=$1::uuid) AND revoked_at IS NULL AND expires_at>now() LIMIT 1',[row.installation_id]);

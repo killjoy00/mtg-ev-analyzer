@@ -459,7 +459,7 @@ export async function gateway(request,env,fetcher=fetch) {
       body=await request.text();
       if(body.length>20000)throw Object.assign(Error('Apple callback is invalid.'),{status:413});
       headers.set('content-type','application/x-www-form-urlencoded');
-    } else if(['POST','PATCH','DELETE'].includes(method)) {
+    } else if(['POST','PATCH'].includes(method)||(method==='DELETE'&&match[1]==='growth'&&match[2]==='/v1/mobile/account/reminders/devices')) {
       body=JSON.stringify(await readJson(request));
       headers.set('content-type','application/json');
     }

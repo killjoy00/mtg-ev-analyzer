@@ -62,9 +62,9 @@ export const privacySections: ArticleSection[] = [
   {
     title: 'Optional Daily reminders',
     body: [
-      'Daily reminders by email and native push are off by default. Email and push require separate explicit consent, and you can select days, local time, and timezone, then disable either channel at any time. Emails go only to the verified account address; push requires device permission.',
-      'Pack One stores account-owned reminder settings, consent timestamps and change records, device registrations with protected push tokens, and delivery and bounce status. Resend handles opted-in emails; Expo and mobile push providers handle device tokens and messages. Provider acceptance does not prove device display.',
-      'Unsubscribing from email leaves push preferences unchanged. Signing out or switching accounts revokes the associated device registration. Account deletion removes preferences, delivery records, and device registrations.',
+      'Daily email and mobile push reminders are disabled by default and require separate explicit choices. You control the days, local time and timezone, and can disable either channel in Account settings. Email reminders go only to the verified email on your Pack One account, and include unsubscribe and management links. Device notifications require an additional device permission and use a device-specific push token. Granting email consent does not grant push consent.',
+      'To deliver reminders, Pack One stores your schedule, channel-specific consent times, a minimal change history, device registrations with protected push tokens, delivery attempts and provider receipt states. Resend receives the verified email and email contents for subscribed messages; Expo and device push providers handle native notification tokens and message content. A provider accepting an email or push does not guarantee its appearance or delivery. Bounce and complaint events can disable email reminders.',
+      'Pack One removes reminder preferences, send records, and device registrations when your account is deleted. Changing accounts or signing out revokes the corresponding device registration. Unsubscribing from email does not affect push. Pack One does not sell reminder destinations or publicly report individual reminder activity.'
     ],
   },
   {
