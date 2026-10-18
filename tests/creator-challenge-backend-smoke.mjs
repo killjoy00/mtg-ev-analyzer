@@ -402,28 +402,87 @@ try {
   assert.equal(reloaded.comparison.outcome,replay.comparison.outcome);
   console.log('All eight creator picks, final comparison, result persistence, reload and Daily isolation verified against real PostgreSQL.');
 
-  // Paid creator sources keep the same paid capability gate as ordinary Practice.
-  const paidSourceId=crypto.randomUUID(),paidChallenge=crypto.randomUUID(),paidSlug=`paid-${tag}`;
-  await query(`INSERT INTO draft_run_sessions
-    SELECT (jsonb_populate_record(NULL::draft_run_sessions,
-      to_jsonb(source)||jsonb_build_object(
-        'id',$2::text,'environment','powered-cube','seed',$3::text,
-        'created_at',now(),'updated_at',now()
-      )
-    )).* FROM draft_run_sessions source WHERE source.id=$1::uuid`,[
-    template.id,paidSourceId,`creator-paid-${tag}`,
-  ]);
-  await query(`INSERT INTO creator_challenges(
-      id,slug,source_session_id,source_owner_player_id,source_type,source_day,source_environment,
-      creator_public_name,headline,acquisition_source,acquisition_campaign,status,
-      created_by_admin_auth_user_id,published_at,publication_detail
-    ) VALUES($1::uuid,$2,$3::uuid,$4::uuid,'practice',NULL,'powered-cube',
-      'Runtime Creator','Paid creator challenge','creator',$2,'published',
-      $5::uuid,now(),'{"live_verified":true}'::jsonb)`,[
-    paidChallenge,paidSlug,paidSourceId,creator.playerId,targetAuth,
-  ]);
-  const paidDenied=await directCall(runApi,'/v1/runs',{creatorChallenge:paidChallenge},paidModeGuest.token,403);
-  assert.equal(paidDenied.capability,'unlimited_cube_practice');
+  // Published creator challenges are open to guests, free accounts and Elite
+  // accounts, including real Cube and custom-set sources. Use direct requests:
+  // the general practice helper injects temporary grants and cannot prove this.
+  const creatorHeaders={'x-pack1-auth-session':creatorAccountToken};
+  const participants=[{...paidModeGuest,label:'guest',headers:{}}];
+  for(const label of ['free','elite']) {
+    const participant=await directCall(growth,'/v1/session',{displayName:`Creator ${label} participant ${tag}`});
+    const authId=crypto.randomUUID(),authToken=crypto.randomUUID()+crypto.randomUUID();
+    await query(`INSERT INTO neon_auth."user"(id,name,email,"emailVerified")
+      VALUES($1::uuid,$2,$3,true)`,[authId,`Creator ${label} fixture`,`${label}-${tag}@example.invalid`]);
+    await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[authId,participant.playerId]);
+    await query(`INSERT INTO neon_auth.session(token,"userId","expiresAt","updatedAt")
+      VALUES($1,$2::uuid,now()+interval '1 hour',now())`,[authToken,authId]);
+    if(label==='elite')await query(`INSERT INTO entitlement_grants(auth_user_id,capability,provider,provider_reference)
+      VALUES($1::uuid,'unlimited_cube_practice','test',$2),($1::uuid,'custom_corpus','test',$2)`,[authId,`creator-replay-${tag}`]);
+    participants.push({...participant,label,headers:{'x-pack1-auth-session':authToken}});
+  }
+  const {sets:creatorPracticeSets}=await directCall(runApi,'/v1/practice-sets',undefined,creator.token,200,creatorHeaders);
+  assert.ok(creatorPracticeSets.length,'custom creator replay needs a complete historical set');
+  const accessChallenges=[];
+  for(const [label,options,capability] of [
+    ['cube',{environment:'powered-cube'},'unlimited_cube_practice'],
+    ['custom',{setIds:[creatorPracticeSets[0].set_id]},'custom_corpus'],
+  ]) {
+    let sourceRun=await directCall(runApi,'/v1/runs',options,creator.token,200,creatorHeaders);
+    while(!sourceRun.complete)sourceRun=await directCall(runApi,`/v1/runs/${sourceRun.id}/pick`,{
+      revision:sourceRun.revision,round:sourceRun.answers.length,
+      puzzleId:sourceRun.current.puzzle_id,cardId:sourceRun.current.candidates[0].id,
+    },creator.token,200,creatorHeaders);
+    const sourceShare=await directCall(runApi,`/v1/runs/${sourceRun.id}/share`,{},creator.token,200,creatorHeaders);
+    const challenge=await createCreatorChallenge(query,{
+      source_type:'practice',share:sourceShare.id,slug:`public-${label}-${tag}`,
+      creator_public_name:'Runtime Creator',acquisition_source:'creator',acquisition_campaign:`public-${label}`,
+    },creatorAuth);
+    accessChallenges.push(challenge.id);
+    await directCall(runApi,'/v1/runs',{creatorChallenge:challenge.id},paidModeGuest.token,410);
+    await query(`UPDATE creator_challenges SET status='published',published_at=now(),
+      publication_detail='{"live_verified":true}'::jsonb WHERE id=$1::uuid`,[challenge.id]);
+    const publicChallenge=await directCall(runApi,`/v1/creator-challenges/${challenge.slug}`);
+    assert.equal(publicChallenge.environment,sourceRun.environment);
+    for(const participant of participants) {
+      const {token,headers}=participant;
+      if(participant.label!=='elite') {
+        const denied=await directCall(runApi,'/v1/runs',options,token,403,headers);
+        assert.equal(denied.capability,capability,'ordinary practice remains gated');
+      }
+      let attempt=await directCall(runApi,'/v1/runs',{creatorChallenge:challenge.id},token,200,headers);
+      const attemptId=attempt.id;
+      assert.equal(attempt.environment,sourceRun.environment);
+      assert.deepEqual(attempt.custom_set_ids,sourceRun.custom_set_ids);
+      assert.equal(attempt.creator_challenge_id,challenge.id);
+      assert.equal(attempt.day,null);
+      assert.equal(attempt.leaderboard_eligible,false);
+      assert.deepEqual(attempt.rerolls,{set:0,pack:0});
+      assert.equal((await directCall(runApi,'/v1/runs',{creatorChallenge:challenge.slug},token,200,headers)).id,attemptId,
+        'reopening the public link resumes the same attempt');
+      await directCall(runApi,`/v1/runs/${attemptId}/reroll`,{
+        revision:attempt.revision,round:0,puzzleId:attempt.current.puzzle_id,type:'pack',
+      },token,409,headers);
+      while(!attempt.complete) {
+        const round=attempt.answers.length;
+        assert.equal(attempt.current.puzzle_id,sourceRun.answers[round].puzzle.puzzle_id,'creator decisions stay fixed');
+        attempt=await directCall(runApi,`/v1/runs/${attemptId}/pick`,{
+          revision:attempt.revision,round,puzzleId:attempt.current.puzzle_id,cardId:attempt.current.candidates[0].id,
+        },token,200,headers);
+      }
+      assert.equal(attempt.answers.length,8);
+      assert.equal(attempt.comparison.kind,'creator');
+      assert.ok(['win','tie','loss'].includes(attempt.comparison.outcome));
+      const saved=await directCall(runApi,`/v1/runs/${attemptId}`,undefined,token,200,headers);
+      assert.equal(saved.complete,true);
+      assert.equal(saved.score,attempt.score);
+      const resultCount=(await query(`SELECT count(*)::int n FROM game_results
+        WHERE player_id=$1::uuid AND creator_challenge_id=$2::uuid AND NOT is_daily`,[participant.playerId,challenge.id])).rows[0].n;
+      assert.equal(Number(resultCount),1,'each completed public creator attempt is saved once');
+      if(participant.label!=='elite')await directCall(runApi,'/v1/runs',options,token,403,headers);
+    }
+    await query("UPDATE creator_challenges SET status='retired' WHERE id=$1::uuid",[challenge.id]);
+    await directCall(runApi,'/v1/runs',{creatorChallenge:challenge.id},concurrentGuest.token,410);
+  }
+  console.log('Guest, free and Elite accounts completed fixed Cube and custom-set creator replays; ordinary practice and publication gates remain enforced.');
 
   await query(`INSERT INTO neon_auth."user"(id,name,email,"emailVerified")
     VALUES($1::uuid,$2,$3,true)`,[
@@ -672,7 +731,7 @@ try {
   // infrastructure in this isolated database. The merge/result associations
   // must remain internally consistent when creator identity is scrubbed.
   const creatorOwnedChallenges=[
-    creation.id,runtimeChallenge,legacyChallenge,paidChallenge,challengeCompletedGuest,challengePartialGuest,
+    creation.id,runtimeChallenge,legacyChallenge,...accessChallenges,challengeCompletedGuest,challengePartialGuest,
   ];
   await query(`UPDATE creator_challenges
     SET status='draft',published_at=NULL,publication_operation_ref=NULL,publication_detail='{}'::jsonb
