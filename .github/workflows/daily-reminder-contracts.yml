@@ -5,7 +5,8 @@ on:
     paths:
       - '*reminder*'
       - 'worker/*reminder*'
-      - 'migrations/0061_daily_reminders.sql'
+      - 'worker/account-deletion*'
+      - 'migrations/**'
       - 'tests/*reminder*'
       - 'mobile/**'
       - '.github/workflows/daily-reminder-contracts.yml'
@@ -20,20 +21,20 @@ concurrency:
 jobs:
   isolated:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     services:
       postgres:
         image: postgres:17.6
         env:
-          POSTGRES_DB: pack1_reminder_test
-          POSTGRES_USER: pack1_test
+          POSTGRES_DB: pack1
+          POSTGRES_USER: pack1_ci
           POSTGRES_PASSWORD: fixture-only
         ports: ['5432:5432']
         options: >-
-          --health-cmd "pg_isready -U pack1_test -d pack1_reminder_test"
+          --health-cmd "pg_isready -U pack1_ci -d pack1"
           --health-interval 5s --health-timeout 5s --health-retries 12
     env:
-      PACK1_TEST_DATABASE_URL: postgresql://pack1_test:fixture-only@127.0.0.1:5432/pack1_reminder_test
+      PACK1_TEST_DATABASE_URL: postgresql://pack1_ci:fixture-only@127.0.0.1:5432/pack1
     steps:
       - uses: actions/checkout@v4
         with:
@@ -45,24 +46,23 @@ jobs:
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
           npm ci --prefix mobile --ignore-scripts --no-audit --no-fund
-      - name: Retain pinned public database tools for isolated offline review
+      - name: Retain public, credential-free reproduction inputs
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/reminder-db-tools"
-          npm pack @embedded-postgres/linux-x64@18.4.0-beta.17 --ignore-scripts --pack-destination "$RUNNER_TEMP/reminder-db-tools"
-          npm view @embedded-postgres/linux-x64@18.4.0-beta.17 dist --json > "$RUNNER_TEMP/reminder-db-tools/postgres-dist.json"
-          npm view expo-notifications@57.0.18 dist --json > "$RUNNER_TEMP/reminder-db-tools/notifications-dist.json"
-          npm view badgin@1.2.3 dist --json > "$RUNNER_TEMP/reminder-db-tools/badgin-dist.json"
+          mkdir -p "$RUNNER_TEMP/reminder-reproduction"
+          git archive --format=tar HEAD | gzip -1 > "$RUNNER_TEMP/reminder-reproduction/source.tar.gz"
+          tar -czf "$RUNNER_TEMP/reminder-reproduction/dependencies.tar.gz" node_modules mobile/node_modules
+          npm pack @embedded-postgres/linux-x64@18.4.0-beta.17 --ignore-scripts --pack-destination "$RUNNER_TEMP/reminder-reproduction"
+          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/reminder-reproduction/revision.txt"
       - uses: actions/upload-artifact@v4
         with:
-          name: reminder-db-tools-${{ github.event.pull_request.head.sha }}
-          path: ${{ runner.temp }}/reminder-db-tools/
+          name: reminder-reproduction-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/reminder-reproduction/
           retention-days: 1
       - name: Exercise consent, schedule and provider contracts
         run: node --test tests/daily-reminder-schedule.test.mjs tests/daily-reminders.test.mjs
-      - name: Exercise actual PostgreSQL reminder contracts when present
-        run: |
-          if test -f tests/daily-reminders-postgres.mjs; then
-            node tests/daily-reminders-postgres.mjs
-          fi
+      - name: Apply real migrations to an isolated PostgreSQL database
+        run: node scripts/prepare-test-database.mjs
+      - name: Require actual PostgreSQL reminder and concurrency contracts
+        run: node tests/daily-reminders-postgres.mjs
