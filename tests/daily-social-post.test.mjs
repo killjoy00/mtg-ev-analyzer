@@ -61,8 +61,8 @@ test('Daily copy includes separate campaign attribution and UTF-8 facets',()=>{
   }
   assert.equal(blue.linkText,'packone.pro','Bluesky shows a short link label instead of the tracking URL');
   assert.doesNotMatch(blue.text,/utm_/);
-  assert.equal(discord.linkText,'https://packone.pro/go/daily/','Discord shows a short Pack One link');
-  assert.ok(discord.text.endsWith('\n\nhttps://packone.pro/go/daily/'));
+  assert.equal(discord.linkText,'https://packone.pro/go/discord/','Discord shows a short Pack One link');
+  assert.ok(discord.text.endsWith('\n\nhttps://packone.pro/go/discord/'));
   assert.doesNotMatch(discord.text,/utm_/,'tracking parameters should not clutter Discord');
   assert.match(blue.url,/utm_source=bluesky/);
   assert.match(discord.url,/utm_source=discord/);
