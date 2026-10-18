@@ -59,6 +59,8 @@ CREATE TABLE IF NOT EXISTS daily_reminder_deliveries (
     'queued','sending','retry','accepted','delivered','suppressed','uncertain','failed')),
   attempts smallint NOT NULL DEFAULT 0 CHECK(attempts BETWEEN 0 AND 3),
   provider_id text UNIQUE,
+  push_receipt_checked_at timestamptz,
+  push_receipt_result text CHECK(push_receipt_result IN ('platform_accepted','invalid_token','provider_rejected','receipt_expired')),
   next_retry_at timestamptz,
   started_at timestamptz,
   accepted_at timestamptz,
@@ -74,3 +76,6 @@ CREATE INDEX IF NOT EXISTS daily_reminder_deliveries_retry_idx
  ON daily_reminder_deliveries(next_retry_at) WHERE state='retry';
 CREATE INDEX IF NOT EXISTS daily_reminder_deliveries_owner_idx
  ON daily_reminder_deliveries(auth_user_id,created_at DESC);
+
+CREATE INDEX IF NOT EXISTS daily_reminder_deliveries_receipt_idx
+ ON daily_reminder_deliveries(accepted_at) WHERE channel='push' AND state='accepted' AND push_receipt_checked_at IS NULL;

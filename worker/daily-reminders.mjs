@@ -127,6 +127,8 @@ export async function registerReminderDevice(query,auth,payload,{env=process.env
   if(!payload||!validId(payload.installationId)||!TOKEN.test(String(payload.token||''))||
     !['ios','android'].includes(payload.platform)||auth.source!=='mobile'||!/^[a-f0-9]{64}$/.test(String(auth.session_hash||'')))
     throw apiError('Invalid notification device registration.');
+  const count=await query('SELECT count(*)::int count FROM daily_reminder_devices WHERE auth_user_id=$1::uuid AND revoked_at IS NULL AND installation_id<>$2::uuid', [auth.user_id,payload.installationId]);
+  if(Number(count.rows[0]?.count||0)>=5)throw apiError('You can register up to five devices. Disable notifications on an old device first.',409);
   const fingerprint=hash(payload.token);
   const ciphertext=protectToken(payload.token,env);
   await query('UPDATE daily_reminder_devices SET revoked_at=now(),updated_at=now() WHERE token_hash=$1 AND installation_id<>$2::uuid',
@@ -136,9 +138,10 @@ export async function registerReminderDevice(query,auth,payload,{env=process.env
     'SELECT $1::uuid,$2::uuid,$3,$4,$5,$6 WHERE pack1_identity_attachment_allowed($2::uuid) '+
     'ON CONFLICT(installation_id) DO UPDATE SET auth_user_id=EXCLUDED.auth_user_id,session_hash=EXCLUDED.session_hash,'+
     'platform=EXCLUDED.platform,token_hash=EXCLUDED.token_hash,token_ciphertext=EXCLUDED.token_ciphertext,'+
-    'revoked_at=NULL,updated_at=now() WHERE pack1_identity_attachment_allowed($2::uuid) RETURNING installation_id',
+    'revoked_at=NULL,updated_at=now() WHERE pack1_identity_attachment_allowed($2::uuid) AND ' +
+'(daily_reminder_devices.auth_user_id=EXCLUDED.auth_user_id OR daily_reminder_devices.revoked_at IS NOT NULL) RETURNING installation_id',
     [payload.installationId,auth.user_id,auth.session_hash,payload.platform,fingerprint,ciphertext]);
-  if(!changed.rows.length)throw apiError('Account is being deleted.',409);
+  if(!changed.rows.length)throw apiError('This installation is registered to a different account. Sign out on that account first.',409);
   return {ok:true};
 }
 export async function unregisterReminderDevice(query,auth,payload) {
@@ -259,8 +262,51 @@ async function deliverOne(query,id,clock,{env=process.env,fetcher=fetch,pacificD
     return 'uncertain';
   }
 }
+export async function refreshPushReceipts(query,{env=process.env,fetcher=fetch,clock=Date.now()}={}) {
+  // Tickets are acceptance receipts. Expo push receipts validate delivery to
+  // APNs/FCM, not display on the user's screen; never call them 'delivered'.
+  const pending=await query(
+    "SELECT id,provider_id,auth_user_id,installation_id,accepted_at FROM daily_reminder_deliveries "+
+    "WHERE channel='push' AND state='accepted' AND push_receipt_checked_at IS NULL "+
+    "AND accepted_at<now()-interval '15 minutes' AND accepted_at>now()-interval '2 hours' "+
+    "ORDER BY accepted_at LIMIT 50");
+  if(!pending.rows.length)return {checked:0,invalidated:0};
+  let response;
+  try {
+    response=await fetcher('https://exp.host/--/api/v2/push/getReceipts',{
+      method:'POST',headers:{'content-type':'application/json',accept:'application/json',
+        ...(env.PACK1_EXPO_PUSH_ACCESS_TOKEN?{authorization:'Bearer '+env.PACK1_EXPO_PUSH_ACCESS_TOKEN}:{})},
+      body:JSON.stringify({ids:pending.rows.map(row=>row.provider_id)}),
+      redirect:'error',signal:AbortSignal.timeout(10000)});
+    if(!response.ok)return {checked:0,invalidated:0};
+  }catch{return {checked:0,invalidated:0};}
+  const payload=await response.json().catch(()=>({}));
+  const receipts=payload?.data&&typeof payload.data==='object'&&!Array.isArray(payload.data)?payload.data:{};
+  let checked=0,invalidated=0;
+  for(const row of pending.rows) {
+    const receipt=receipts[row.provider_id];
+    if(!receipt||!['ok','error'].includes(receipt.status))continue;
+    const error=String(receipt.details?.error||'').slice(0,80);
+    await query(
+      "UPDATE daily_reminder_deliveries SET push_receipt_checked_at=now(),"+
+      "push_receipt_result=$2,updated_at=now() WHERE id=$1::uuid AND state='accepted' AND push_receipt_checked_at IS NULL",
+      [row.id,receipt.status==='ok'?'platform_accepted':error==='DeviceNotRegistered'?'invalid_token':'provider_rejected']);
+    checked++;
+    if(error==='DeviceNotRegistered') {
+      await query('UPDATE daily_reminder_devices SET revoked_at=now(),updated_at=now() WHERE installation_id=$1::uuid AND auth_user_id=$2::uuid',
+        [row.installation_id,row.auth_user_id]);
+      invalidated++;
+    }
+  }
+  await query(
+    "UPDATE daily_reminder_deliveries SET push_receipt_checked_at=now(),"+
+    "push_receipt_result='receipt_expired',updated_at=now() WHERE channel='push' AND state='accepted' "+
+    "AND push_receipt_checked_at IS NULL AND accepted_at<=now()-interval '2 hours'");
+  return {checked,invalidated};
+}
 export async function dispatchReminderTick(query,scheduledAt,{env=process.env,clock=Date.now(),fetcher=fetch,pacificDay}={}) {
   if(env.PACK1_DAILY_REMINDERS_ENABLED!=='1')return {active:false,scanned:0,accepted:0};
+  await refreshPushReceipts(query,{env,fetcher,clock});
   if(!pacificDay)throw Error('Pacific day is required.');
   const due=await query('SELECT * FROM daily_reminder_settings WHERE (email_enabled OR push_enabled) '+
     'AND next_due_at<=now() ORDER BY next_due_at LIMIT 50');
