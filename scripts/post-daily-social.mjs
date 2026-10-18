@@ -237,11 +237,11 @@ export async function postDaily({
   const wall=pacificClock(now);
   const {day}=triggered;
   const live=event==='schedule'||env.MANUAL_LIVE==='true';
-  // In winter the 15:10 UTC trigger is 07:10 PST and skips; 16:10 posts and
-  // 17:10 retries. In summer 15:10 posts and both later triggers retry.
+  // In winter the 14:10 UTC trigger is 06:10 PST and skips; 15:10 posts and
+  // 16:10 retries. In summer 14:10 posts and both later triggers retry.
   // Receipts and the deterministic Bluesky record deduplicate every retry.
-  if(event==='schedule'&&(triggered.hour<8||triggered.day!==wall.day))
-    return {day,skipped:true,reason:'before Daily reset or expired scheduled day'};
+  if(event==='schedule'&&(triggered.hour<7||triggered.day!==wall.day))
+    return {day,skipped:true,reason:'before morning posting window or expired scheduled day'};
   if(live&&env.GITHUB_REF!=='refs/heads/main')
     throw Error('Live Daily posting is restricted to the reviewed main branch.');
   const blue=dailyCopy(day,'bluesky');
