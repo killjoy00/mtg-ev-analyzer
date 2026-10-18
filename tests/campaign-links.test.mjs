@@ -22,6 +22,13 @@ const productionEntry={
   campaign:'launch-week',
   medium:'social'
 };
+const discordDailyEntry={
+  slug:'daily',
+  destination:'/?game=draft-run&daily=1',
+  source:'discord',
+  campaign:'daily_post',
+  medium:'social'
+};
 
 test('acquisition values share runtime normalization and canonical config rules',()=>{
   assert.equal(normalizeAcquisitionValue('a'),'a');
@@ -74,10 +81,14 @@ test('campaign config rejects duplicates, unsafe slugs, invalid acquisition fiel
   assert.throws(()=>validateCampaignEntries([{...productionEntry,destination:'/practice/'}]),/destination .* is not supported/);
 });
 
-test('campaign links can land on the Daily Powered Cube or Daily Latest Set',()=>{
+test('campaign links can land on Daily Draft Run, Powered Cube or Latest Set',()=>{
   const cube=buildCampaignDraft({slug:'cube-push',source:'discord',campaign:'cube-week',destination:'/?game=draft-run&set=powered-cube&daily=1'});
   assert.equal(cube.valid,true);
   assert.equal(cube.trackedUrl,'https://packone.pro/?game=draft-run&set=powered-cube&daily=1&utm_source=discord&utm_campaign=cube-week');
+  const daily=buildCampaignDraft(discordDailyEntry);
+  assert.equal(daily.valid,true);
+  assert.equal(daily.vanityUrl,'https://packone.pro/go/daily/');
+  assert.equal(daily.trackedUrl,'https://packone.pro/?game=draft-run&daily=1&utm_source=discord&utm_campaign=daily_post&utm_medium=social');
   const latest={slug:'fra-lrcast',destination:'/?game=draft-run&set=latest&daily=1',source:'reddit',campaign:'fra-lrcast',medium:'social'};
   assert.deepEqual(validateCampaignEntries([latest]),[latest]);
   const tracked='https://packone.pro/?game=draft-run&set=latest&daily=1&utm_source=reddit&utm_campaign=fra-lrcast&utm_medium=social';
@@ -85,7 +96,7 @@ test('campaign links can land on the Daily Powered Cube or Daily Latest Set',()=
   const page=renderCampaignRedirectPage(latest);
   assert.ok(page.includes(`location.replace(${JSON.stringify(tracked)})`));
   assert.ok(page.includes(`href="${tracked.replaceAll('&','&amp;')}"`));
-  for(const destination of ['/?game=draft-run&set=fra&daily=1','/?game=draft-run&daily=1','/?set=latest&daily=1&game=draft-run','https://packone.pro/?game=draft-run&set=latest&daily=1']) {
+  for(const destination of ['/?game=draft-run&set=fra&daily=1','/?set=latest&daily=1&game=draft-run','https://packone.pro/?game=draft-run&set=latest&daily=1']) {
     assert.throws(()=>validateCampaignEntries([{...latest,destination}]),/destination .* is not supported/);
     assert.equal(buildCampaignDraft({...latest,destination}).errors.destination,'Choose a supported destination.');
   }
@@ -95,8 +106,17 @@ test('checked-in production campaign config retains the canonical reddit-launch 
   const config=validateCampaignEntries(JSON.parse(await readFile('campaign-links.json','utf8')));
   assert.ok(config.length>=1);
   assert.deepEqual(config.find(entry=>entry.slug===productionEntry.slug),productionEntry);
+  assert.deepEqual(config.find(entry=>entry.slug===discordDailyEntry.slug),discordDailyEntry);
   assert.equal(buildCampaignTrackingUrl(productionEntry),'https://packone.pro/?utm_source=reddit&utm_campaign=launch-week&utm_medium=social');
   assert.equal(buildCampaignVanityUrl(productionEntry.slug),'https://packone.pro/go/reddit-launch/');
+});
+
+test('generated Discord Daily short link redirects to the attributed regular Daily',async()=>{
+  const html=await readFile('go/daily/index.html','utf8');
+  const tracked=buildCampaignTrackingUrl(discordDailyEntry);
+  assert.equal(html,renderCampaignRedirectPage(discordDailyEntry),'generated short link must match registry');
+  assert.ok(html.includes(`location.replace(${JSON.stringify(tracked)})`));
+  assert.ok(html.includes(`href="${tracked.replaceAll('&','&amp;')}"`));
 });
 
 test('generated reddit launch page is static crawler-friendly redirect HTML',async()=>{
