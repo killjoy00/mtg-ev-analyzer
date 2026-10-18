@@ -32,7 +32,7 @@ The builder contains:
 - **Source** — where the visitor came from;
 - **Campaign** — the initiative or push being measured;
 - **Medium** — optional broad channel type;
-- **Destination** — the Pack One homepage, the Daily Powered Cube or the Daily Latest Set.
+- **Destination** — the Pack One homepage, the Daily Draft Run, the Daily Powered Cube or the Daily Latest Set.
 
 As you type, the builder shows canonical normalized values, validation messages, the tracked UTM URL, the intended vanity URL, and the JSON entry that belongs in `campaign-links.json`.
 
@@ -89,11 +89,12 @@ Do not put names, email addresses, account IDs, usernames, or other personal inf
 
 ### Destination
 
-Choose one of three destinations:
+Choose one of four destinations:
 
 | Builder option | Destination | Lands on |
 | --- | --- | --- |
 | Homepage | `/` | the Pack One homepage |
+| Daily Draft Run | `/?game=draft-run&daily=1` | today's regular Daily Draft Run |
 | Daily Powered Cube | `/?game=draft-run&set=powered-cube&daily=1` | today's Powered Cube Daily |
 | Daily Latest Set | `/?game=draft-run&set=latest&daily=1` | today's Latest Set Daily (the newest Live set) |
 
