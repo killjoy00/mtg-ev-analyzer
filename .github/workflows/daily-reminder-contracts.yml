@@ -1,0 +1,67 @@
+name: Daily reminder contracts
+
+on:
+  pull_request:
+    paths:
+      - '*reminder*'
+      - 'worker/*reminder*'
+      - 'migrations/0061_daily_reminders.sql'
+      - 'tests/*reminder*'
+      - 'mobile/**'
+      - '.github/workflows/daily-reminder-contracts.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reminder-contracts-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  isolated:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17.6
+        env:
+          POSTGRES_DB: pack1_reminder_test
+          POSTGRES_USER: pack1_test
+          POSTGRES_PASSWORD: fixture-only
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd 'pg_isready -U pack1_test -d pack1_reminder_test'
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      PACK1_TEST_DATABASE_URL: postgresql://pack1_test:fixture-only@127.0.0.1:5432/pack1_reminder_test
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install locked test dependencies
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          npm ci --prefix mobile --ignore-scripts --no-audit --no-fund
+      - name: Retain public source and locked dependency fixture for reproducible offline review
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/reminder-review"
+          git archive --format=tar HEAD | gzip > "$RUNNER_TEMP/reminder-review/source.tar.gz"
+          tar -czf "$RUNNER_TEMP/reminder-review/dependencies.tar.gz" node_modules mobile/node_modules
+          git rev-parse HEAD > "$RUNNER_TEMP/reminder-review/source-sha.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reminder-offline-review-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/reminder-review/
+          retention-days: 1
+      - name: Exercise consent, schedule and provider contracts
+        run: node --test tests/daily-reminder-schedule.test.mjs tests/daily-reminders.test.mjs
+      - name: Exercise actual PostgreSQL reminder contracts when present
+        run: |
+          if test -f tests/daily-reminders-postgres.mjs; then
+            node tests/daily-reminders-postgres.mjs
+          fi
