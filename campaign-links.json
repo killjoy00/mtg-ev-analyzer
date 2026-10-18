@@ -12,5 +12,12 @@
     "source": "discord",
     "campaign": "daily_post",
     "medium": "social"
+  },
+  {
+    "slug": "discord",
+    "destination": "/?game=draft-run&daily=1",
+    "source": "discord",
+    "campaign": "daily_post",
+    "medium": "social"
   }
 ]
