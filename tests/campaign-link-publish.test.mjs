@@ -59,6 +59,21 @@ test('campaign publish payload is canonicalized and rejects unsupported fields',
   assert.throws(()=>normalizeCampaignPublishPayload({...entry,slug:'bad/slug'}),error=>error?.status===400&&error?.code==='CAMPAIGN_LINK_INVALID');
 });
 
+test('campaign publish accepts the Daily destinations and the prepared source redirects there',async()=>{
+  const latest={...entry,slug:'fra-lrcast',destination:'/?game=draft-run&set=latest&daily=1'};
+  const result=normalizeCampaignPublishPayload(latest);
+  assert.deepEqual(result.entry,latest);
+  assert.equal(result.trackedUrl,'https://packone.pro/?game=draft-run&set=latest&daily=1&utm_source=newsletter&utm_campaign=launch-week&utm_medium=email');
+  assert.throws(()=>normalizeCampaignPublishPayload({...latest,destination:'/?game=draft-run&set=fra&daily=1'}),error=>error?.status===400&&error?.code==='CAMPAIGN_LINK_INVALID');
+  const root=await mkdtemp(path.join(os.tmpdir(),'pack1-campaign-daily-'));
+  try {
+    await writeFile(path.join(root,'campaign-links.json'),'[]\n');
+    await prepareCampaignLinkPublish({root,entry:{...latest,destination:'/?game=draft-run&set=powered-cube&daily=1'}});
+    const page=await readFile(path.join(root,'go','fra-lrcast','index.html'),'utf8');
+    assert.ok(page.includes('location.replace("https://packone.pro/?game=draft-run&set=powered-cube&daily=1&utm_source=newsletter&utm_campaign=launch-week&utm_medium=email")'));
+  } finally {await rm(root,{recursive:true,force:true});}
+});
+
 test('campaign publish dispatch is fixed to the reviewed workflow and main',async()=>{
   const calls=[];
   await dispatchCampaignLinkPublish(entry,{

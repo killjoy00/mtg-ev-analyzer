@@ -1,4 +1,4 @@
-import {buildCampaignDraft,buildCampaignTrackingUrl,SUPPORTED_CAMPAIGN_DESTINATIONS,validateCampaignEntries,normalizeCampaignSlug} from '../campaign-links.mjs';
+import {buildCampaignDraft,buildCampaignTrackingUrl,CAMPAIGN_DESTINATION_LABELS,SUPPORTED_CAMPAIGN_DESTINATIONS,validateCampaignEntries,normalizeCampaignSlug} from '../campaign-links.mjs';
 
 const valueOf=(form,name)=>form.elements.namedItem(name)?.value??'';
 const show=value=>value||'—';
@@ -233,7 +233,7 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
         <label>Source<input name="source" autocomplete="off" spellcheck="false" placeholder="reddit"><small data-error="source" class="error" hidden></small></label>
         <label>Campaign<input name="campaign" autocomplete="off" spellcheck="false" placeholder="launch-week"><small data-error="campaign" class="error" hidden></small></label>
         <label>Medium (optional)<input name="medium" autocomplete="off" spellcheck="false" placeholder="social"><small data-error="medium" class="error" hidden></small></label>
-        <label>Destination<select name="destination">${SUPPORTED_CAMPAIGN_DESTINATIONS.map(value=>`<option value="${value}">Homepage (${value})</option>`).join('')}</select><small data-error="destination" class="error" hidden></small></label>
+        <label>Destination<select name="destination">${SUPPORTED_CAMPAIGN_DESTINATIONS.map(value=>`<option value="${esc(value)}">${esc(CAMPAIGN_DESTINATION_LABELS[value])}</option>`).join('')}</select><small data-error="destination" class="error" hidden></small></label>
       </form>
       <div class="campaign-normalized" aria-label="Canonical normalized values">
         <div><span>Canonical slug</span><output id="canonical-slug">—</output></div>
@@ -366,7 +366,7 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
     existingStatus.textContent=entries.length?`${entries.length} published campaign link(s).`:'No published campaign links yet.';
     existingList.replaceChildren(...entries.map(entry=>{
       const item=document.createElement('li');
-      item.textContent=`${entry.slug} → ${entry.destination} · source=${entry.source} · campaign=${entry.campaign}${entry.medium?` · medium=${entry.medium}`:''}`;
+      item.textContent=`${entry.slug} → ${CAMPAIGN_DESTINATION_LABELS[entry.destination]||entry.destination} · source=${entry.source} · campaign=${entry.campaign}${entry.medium?` · medium=${entry.medium}`:''}`;
       return item;
     }));
   }

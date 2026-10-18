@@ -331,6 +331,12 @@ try {
   assert.equal(await campaignPanel.getByRole('button',{name:/Publish/}).isDisabled(),true);
   await campaignPanel.getByRole('button',{name:'Copy tracked URL'}).click();
   assert.equal(await page.evaluate(()=>window.__copiedText),tracked);
+  assert.deepEqual(await campaignPanel.locator('select[name="destination"] option').allInnerTexts(),['Homepage','Daily Powered Cube','Daily Latest Set']);
+  await campaignPanel.getByLabel('Destination').selectOption({label:'Daily Latest Set'});
+  assert.equal(await campaignPanel.getByLabel('Tracked UTM URL').inputValue(),'https://packone.pro/?game=draft-run&set=latest&daily=1&utm_source=reddit&utm_campaign=launch-week&utm_medium=social');
+  await campaignPanel.getByLabel('Destination').selectOption({label:'Daily Powered Cube'});
+  assert.equal(await campaignPanel.getByLabel('Tracked UTM URL').inputValue(),'https://packone.pro/?game=draft-run&set=powered-cube&daily=1&utm_source=reddit&utm_campaign=launch-week&utm_medium=social');
+  await campaignPanel.getByLabel('Destination').selectOption({label:'Homepage'});
   await campaignPanel.locator('input[name="slug"]').fill('New-Launch');
   assert.equal(await page.locator('#canonical-slug').innerText(),'new-launch');
   assert.equal(await campaignPanel.getByLabel('Intended vanity URL').inputValue(),'https://packone.pro/go/new-launch/');
