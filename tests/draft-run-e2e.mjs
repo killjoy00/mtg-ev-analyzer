@@ -136,6 +136,7 @@ try{
   await page.locator('.set-refresher-popover').getByRole('button',{name:'Open set guide'}).click();
   await page.locator('.set-guide-dialog .guide-archetype').first().waitFor();
   await page.getByRole('button',{name:'Close set guide',exact:true}).click();
+  await page.locator('.set-guide-dialog').waitFor({state:'detached'});
   assert.ok(await guideTrigger.evaluate(el=>document.activeElement===el),'popover click returns focus to the original trigger');
   await page.setViewportSize({width:390,height:844});
   }else assert.equal(await guideTrigger.count(),0,'unreviewed sets have no guide trigger');
