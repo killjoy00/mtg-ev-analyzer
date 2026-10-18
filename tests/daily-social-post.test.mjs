@@ -6,8 +6,8 @@ import {
   postDaily,blueskyPublish,discordPublish,linkCardImage,
 } from '../scripts/post-daily-social.mjs';
 
-const summer=new Date('2026-07-10T15:10:00Z');
-const winter=new Date('2026-01-10T16:10:00Z');
+const summer=new Date('2026-07-10T14:10:00Z');
+const winter=new Date('2026-01-10T15:10:00Z');
 const webhook='https://discord.com/api/webhooks/123456789/token_ABC-def';
 const liveEnv={GITHUB_EVENT_NAME:'schedule',GITHUB_REF:'refs/heads/main',DISCORD_WEBHOOK_URLS:webhook};
 function memoryLedger() {
@@ -38,9 +38,9 @@ function memoryLedger() {
 }
 
 test('Pacific clock handles daylight and standard time',()=>{
-  assert.deepEqual(pacificClock(summer),{day:'2026-07-10',hour:8});
-  assert.deepEqual(pacificClock(winter),{day:'2026-01-10',hour:8});
-  assert.deepEqual(pacificClock(new Date('2026-01-10T15:10:00Z')),{day:'2026-01-10',hour:7});
+  assert.deepEqual(pacificClock(summer),{day:'2026-07-10',hour:7});
+  assert.deepEqual(pacificClock(winter),{day:'2026-01-10',hour:7});
+  assert.deepEqual(pacificClock(new Date('2026-01-10T14:10:00Z')),{day:'2026-01-10',hour:6});
   assert.deepEqual(pacificClock(new Date('2026-07-10T16:10:00Z')),{day:'2026-07-10',hour:9});
 });
 
@@ -123,9 +123,9 @@ test('the schedule is a quiet no-op until a destination is configured',async()=>
     /Configure a Bluesky account or Discord webhooks/,'an explicit live run still reports missing destinations');
 });
 
-test('Redundant winter 7 AM cron skips; delayed 8 AM run and retry are eligible',async()=>{
+test('Redundant winter 6 AM cron skips; delayed 7 AM run and retry are eligible',async()=>{
   const forbidden=()=>{throw Error('Off-hours scheduled traffic');};
-  const early=await postDaily({now:new Date('2026-01-10T15:10:00Z'),env:liveEnv,fetchImpl:forbidden});
+  const early=await postDaily({now:new Date('2026-01-10T14:10:00Z'),env:liveEnv,fetchImpl:forbidden});
   assert.equal(early.skipped,true);
   const elapsed=await postDaily({now:new Date('2026-07-10T18:10:00Z'),
     scheduledAt:summer,env:{...liveEnv,GITHUB_RUN_ATTEMPT:'2'},
@@ -327,7 +327,7 @@ test('one invalid Discord entry is reported by position and does not block other
   assert.doesNotMatch(error.message,/secret_TOKEN|ptb\.discord/);
 });
 
-test('winter schedule has a retry trigger after the 08:10 PST run',()=>{
+test('winter schedule has a retry trigger after the 07:10 PST run',()=>{
   const yml=readFileSync('.github/workflows/daily-social-post.yml','utf8');
-  for(const cron of ['10 15 * * *','10 16 * * *','10 17 * * *'])assert.ok(yml.includes(`cron: '${cron}'`),cron);
+  for(const cron of ['10 14 * * *','10 15 * * *','10 16 * * *'])assert.ok(yml.includes(`cron: '${cron}'`),cron);
 });
