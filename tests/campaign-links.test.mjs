@@ -74,6 +74,23 @@ test('campaign config rejects duplicates, unsafe slugs, invalid acquisition fiel
   assert.throws(()=>validateCampaignEntries([{...productionEntry,destination:'/practice/'}]),/destination .* is not supported/);
 });
 
+test('campaign links can land on the Daily Powered Cube or Daily Latest Set',()=>{
+  const cube=buildCampaignDraft({slug:'cube-push',source:'discord',campaign:'cube-week',destination:'/?game=draft-run&set=powered-cube&daily=1'});
+  assert.equal(cube.valid,true);
+  assert.equal(cube.trackedUrl,'https://packone.pro/?game=draft-run&set=powered-cube&daily=1&utm_source=discord&utm_campaign=cube-week');
+  const latest={slug:'fra-lrcast',destination:'/?game=draft-run&set=latest&daily=1',source:'reddit',campaign:'fra-lrcast',medium:'social'};
+  assert.deepEqual(validateCampaignEntries([latest]),[latest]);
+  const tracked='https://packone.pro/?game=draft-run&set=latest&daily=1&utm_source=reddit&utm_campaign=fra-lrcast&utm_medium=social';
+  assert.equal(buildCampaignTrackingUrl(latest),tracked);
+  const page=renderCampaignRedirectPage(latest);
+  assert.ok(page.includes(`location.replace(${JSON.stringify(tracked)})`));
+  assert.ok(page.includes(`href="${tracked.replaceAll('&','&amp;')}"`));
+  for(const destination of ['/?game=draft-run&set=fra&daily=1','/?game=draft-run&daily=1','/?set=latest&daily=1&game=draft-run','https://packone.pro/?game=draft-run&set=latest&daily=1']) {
+    assert.throws(()=>validateCampaignEntries([{...latest,destination}]),/destination .* is not supported/);
+    assert.equal(buildCampaignDraft({...latest,destination}).errors.destination,'Choose a supported destination.');
+  }
+});
+
 test('checked-in production campaign config retains the canonical reddit-launch baseline',async()=>{
   const config=validateCampaignEntries(JSON.parse(await readFile('campaign-links.json','utf8')));
   assert.ok(config.length>=1);

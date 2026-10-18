@@ -32,7 +32,7 @@ The builder contains:
 - **Source** — where the visitor came from;
 - **Campaign** — the initiative or push being measured;
 - **Medium** — optional broad channel type;
-- **Destination** — currently the Pack One homepage only.
+- **Destination** — the Pack One homepage, the Daily Powered Cube or the Daily Latest Set.
 
 As you type, the builder shows canonical normalized values, validation messages, the tracked UTM URL, the intended vanity URL, and the JSON entry that belongs in `campaign-links.json`.
 
@@ -89,11 +89,15 @@ Do not put names, email addresses, account IDs, usernames, or other personal inf
 
 ### Destination
 
-The only supported destination today is:
+Choose one of three destinations:
 
-`/`
+| Builder option | Destination | Lands on |
+| --- | --- | --- |
+| Homepage | `/` | the Pack One homepage |
+| Daily Powered Cube | `/?game=draft-run&set=powered-cube&daily=1` | today's Powered Cube Daily |
+| Daily Latest Set | `/?game=draft-run&set=latest&daily=1` | today's Latest Set Daily (the newest Live set) |
 
-That means every static campaign link currently lands on the Pack One homepage after adding the UTM parameters.
+The UTM parameters are added after the destination, for example `https://packone.pro/?game=draft-run&set=latest&daily=1&utm_source=reddit&utm_campaign=fra-lrcast&utm_medium=social`. Attribution works the same for all three. Any other destination is rejected by the builder, the publish backend and the registry check.
 
 ## 4. Fast workflow: create a tracked link without a deploy
 
