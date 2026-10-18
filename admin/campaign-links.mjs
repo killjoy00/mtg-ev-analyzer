@@ -366,7 +366,8 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
     existingStatus.textContent=entries.length?`${entries.length} published campaign link(s).`:'No published campaign links yet.';
     existingList.replaceChildren(...entries.map(entry=>{
       const item=document.createElement('li');
-      item.textContent=`${entry.slug} → ${CAMPAIGN_DESTINATION_LABELS[entry.destination]||entry.destination} · source=${entry.source} · campaign=${entry.campaign}${entry.medium?` · medium=${entry.medium}`:''}`;
+      const attribution=entry.untracked?'no forced attribution':`source=${entry.source} · campaign=${entry.campaign}${entry.medium?` · medium=${entry.medium}`:''}`;
+      item.textContent=`${entry.slug} → ${CAMPAIGN_DESTINATION_LABELS[entry.destination]||entry.destination} · ${attribution}`;
       return item;
     }));
   }
