@@ -90,8 +90,13 @@ export async function updateReminderSettings(query,auth,payload,{env=process.env
   if(!['email','push'].includes(payload.channel)||typeof payload.enabled!=='boolean')
     throw apiError('Choose email or push and an explicit enabled state.');
   const config=validateReminderSchedule(payload);
-  if(payload.enabled&&payload.channel==='email'&&!await deletionEmailForAuth(query,auth.user_id))
-    throw apiError('Verify your account email before enabling email reminders.',403);
+  if(payload.enabled&&payload.channel==='email') {
+    const destination=await deletionEmailForAuth(query,auth.user_id);
+    if(!destination)throw apiError('Verify your account email before enabling email reminders.',403);
+    const previous=await setting(query,auth.user_id);
+    if(previous?.suppressed_email_hash===emailFingerprint(destination,env))
+      throw apiError('Email delivery is suppressed after a bounce or complaint. Contact support.',409);
+  }
   if(payload.enabled&&payload.channel==='push') {
     const devices=await query('SELECT 1 FROM daily_reminder_devices WHERE auth_user_id=$1::uuid AND revoked_at IS NULL AND session_hash IN (SELECT session_hash FROM account_sessions WHERE revoked_at IS NULL AND expires_at>now()) LIMIT 1',[auth.user_id]);
     if(!devices.rows.length)throw apiError('Enable notifications on a device first.',409);
@@ -212,7 +217,7 @@ async function deliverOne(query,id,clock,{env=process.env,fetcher=fetch,pacificD
         method:'POST',headers:{'content-type':'application/json',accept:'application/json',
           ...(env.PACK1_EXPO_PUSH_ACCESS_TOKEN?{authorization:'Bearer '+env.PACK1_EXPO_PUSH_ACCESS_TOKEN}:{})},
         body:JSON.stringify({to:token,title:'Your Pack One Dailies are ready',
-          body:'Three fresh Daily challenges are waiting.',data:{screen:'daily'},channelId:'daily-reminders'}),
+          body:'Three fresh Daily challenges are waiting.',data:{screen:'daily',owner:row.auth_user_id},channelId:'daily-reminders'}),
         redirect:'error',signal:AbortSignal.timeout(10000)});
     }
     if(response.status===429) {

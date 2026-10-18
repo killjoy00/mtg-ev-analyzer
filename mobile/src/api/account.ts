@@ -2,6 +2,7 @@ import { requestJson } from '@/src/api/client';
 import {
   clearSession,
   writeSession,
+  readSession,
   type MobileAccountUser,
   type MobileSession,
 } from '@/src/storage/session';
@@ -54,6 +55,14 @@ async function persistAccount(result: MobileAuthResponse) {
     accountExpiresAt: result.session.expiresAt,
     accountUser: result.user,
   };
+  const previous=await readSession();
+  if(previous?.accountToken&&previous.accountUser?.id&&previous.accountUser.id!==result.user.id){
+    const {unregisterReminderDevice}=await import('@/src/api/reminders');
+    try{await unregisterReminderDevice(previous);}catch(error){
+      if(!(error&&typeof error==='object'&&'status' in error&&error.status===401))
+        throw Error('Could not revoke the previous account\'s device notifications. Try switching accounts again.');
+    }
+  }
   await writeSession(next);
   return next;
 }

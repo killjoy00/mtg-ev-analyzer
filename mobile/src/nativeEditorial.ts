@@ -61,7 +61,7 @@ export const privacySections: ArticleSection[] = [
   },
   {
     title: 'Optional Daily reminders',
-    paragraphs: [
+    body: [
       'Daily reminders by email and native push are off by default. Email and push require separate explicit consent, and you can select days, local time, and timezone, then disable either channel at any time. Emails go only to the verified account address; push requires device permission.',
       'Pack One stores account-owned reminder settings, consent timestamps and change records, device registrations with protected push tokens, and delivery and bounce status. Resend handles opted-in emails; Expo and mobile push providers handle device tokens and messages. Provider acceptance does not prove device display.',
       'Unsubscribing from email leaves push preferences unchanged. Signing out or switching accounts revokes the associated device registration. Account deletion removes preferences, delivery records, and device registrations.',

@@ -18,6 +18,7 @@ export function validateReminderSchedule(value) {
   if(!Array.isArray(weekdays)||weekdays.length<1||weekdays.length>7||
     weekdays.some(day=>!Number.isInteger(day)||day<0||day>6)||new Set(weekdays).size!==weekdays.length)
     throw Error('Choose one or more weekdays.');
+  if(frequency==='weekly'&&weekdays.length!==1)throw Error('Weekly reminders require exactly one weekday.');
   return {frequency,weekdays:[...weekdays].sort((a,b)=>a-b),localTime,timeZone:canonical};
 }
 function localParts(at,timeZone) {
