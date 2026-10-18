@@ -6,6 +6,7 @@ import {createGithubReceiptLedger,discordReceiptKey} from './daily-social-ledger
 
 const SITE='https://packone.pro';
 const DAILY_URL=SITE+'/?game=draft-run&daily=1';
+const DISCORD_DAILY_URL=SITE+'/go/daily/';
 const PACIFIC='America/Los_Angeles';
 const MAX_IMAGE_BYTES=1_000_000;
 // The site's existing share banner, centered on its own background at the
@@ -27,9 +28,9 @@ export function dailyCopy(day,channel='bluesky') {
     .format(new Date(day+'T12:00:00Z'));
   // One stable campaign so launch reports group every Daily post together.
   const url=DAILY_URL+'&utm_source='+channel+'&utm_medium=social&utm_campaign=daily_post';
-  // Bluesky shows post text verbatim, so it gets a short link label that
-  // still points at the tracked URL. Discord unfurls the raw link itself.
-  const linkText=channel==='bluesky'?'packone.pro':url;
+  // Bluesky has a short linked label; Discord uses our short, tracked vanity
+  // redirect so the webhook displays a readable URL and still unfurls it.
+  const linkText=channel==='bluesky'?'packone.pro':DISCORD_DAILY_URL;
   const text='Pack One Daily · '+title+'\n\n'+
     'Three new MTG draft challenges: Draft Run, Powered Cube and Latest Set. '+
     'Make your picks, then compare with the trophy drafter.\n\n'+linkText;

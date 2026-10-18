@@ -3,6 +3,7 @@ export const CAMPAIGN_SLUG_MAX_LENGTH=64;
 export const CAMPAIGN_SLUG_PATTERN=/^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
 export const CAMPAIGN_DESTINATION_LABELS=Object.freeze({
   '/':'Homepage',
+  '/?game=draft-run&daily=1':'Daily Draft Run',
   '/?game=draft-run&set=powered-cube&daily=1':'Daily Powered Cube',
   '/?game=draft-run&set=latest&daily=1':'Daily Latest Set',
 });
