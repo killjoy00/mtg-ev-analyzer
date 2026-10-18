@@ -53,7 +53,7 @@ export default function AccountRemindersScreen() {
   };
   const chooseFrequency=(frequency:ReminderSchedule['frequency'])=>{
     setSchedule(value=>value?{
-      ...value,frequency,weekdays:frequency==='weekly'?(value.weekdays.length?[value.weekdays[0]]:[1]):value.weekdays,
+      ...value,frequency,weekdays:frequency==='weekly'?(value.weekdays.length?[value.weekdays[0] ?? 1]:[1]):value.weekdays,
     }:value);
   };
   const save=async(channel:ReminderChannel,enabled:boolean)=>{
