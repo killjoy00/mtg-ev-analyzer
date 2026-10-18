@@ -1,0 +1,115 @@
+{
+  "id": "hob",
+  "name": "The Hobbit",
+  "reviewedAt": "2026-10-18",
+  "notes": [
+    "Five color pairs anchor this format.",
+    "Creature types identify themes; read each payoff’s actual requirements.",
+    "Support your early board before adding expensive finishers."
+  ],
+  "archetypes": [
+    {
+      "colors": "WU",
+      "name": "Humans",
+      "plan": "Draw extra cards and recruit.",
+      "detail": "Turn card flow into a wider board."
+    },
+    {
+      "colors": "BR",
+      "name": "Goblins",
+      "plan": "Amass and sacrifice creatures.",
+      "detail": "Death triggers extract value from expendable bodies."
+    },
+    {
+      "colors": "BG",
+      "name": "Wolves",
+      "plan": "Reach four power.",
+      "detail": "Ramp and larger creatures enable ferocious."
+    },
+    {
+      "colors": "RW",
+      "name": "Dwarves",
+      "plan": "Enable storied.",
+      "detail": "Artifacts, legendary permanents, and Sagas build your count."
+    },
+    {
+      "colors": "GU",
+      "name": "Elves",
+      "plan": "Ramp into landfall value.",
+      "detail": "Extra lands support a controlling finish."
+    }
+  ],
+  "mechanics": [],
+  "sources": [
+    {
+      "label": "Wizards of the Coast",
+      "url": "https://magic.wizards.com/en/news/feature/the-hobbit-prerelease-guide"
+    }
+  ],
+  "results": {
+    "format": "PremierDraft",
+    "formatLabel": "Premier Draft (BO1)",
+    "colorCount": 2,
+    "retrievedAt": "2026-10-18T16:55:16.677038+00:00",
+    "period": "ALL_TIME",
+    "userGroup": "all",
+    "splashes": false,
+    "sourceUrl": "https://www.17lands.com/deck_color_data?expansion=HOB&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true",
+    "rows": [
+      {
+        "colors": "WU",
+        "wins": 46811,
+        "games": 83275
+      },
+      {
+        "colors": "UB",
+        "wins": 6579,
+        "games": 12344
+      },
+      {
+        "colors": "BR",
+        "wins": 66995,
+        "games": 116609
+      },
+      {
+        "colors": "RG",
+        "wins": 1367,
+        "games": 2541
+      },
+      {
+        "colors": "WG",
+        "wins": 654,
+        "games": 1272
+      },
+      {
+        "colors": "WB",
+        "wins": 3203,
+        "games": 5607
+      },
+      {
+        "colors": "BG",
+        "wins": 44234,
+        "games": 77632
+      },
+      {
+        "colors": "UG",
+        "wins": 12015,
+        "games": 22984
+      },
+      {
+        "colors": "UR",
+        "wins": 2328,
+        "games": 4148
+      },
+      {
+        "colors": "WR",
+        "wins": 41717,
+        "games": 74172
+      }
+    ],
+    "baseline": {
+      "wins": 225903,
+      "games": 400584
+    }
+  }
+}

@@ -1,0 +1,145 @@
+{
+  "id": "blb",
+  "name": "Bloomburrow",
+  "reviewedAt": "2026-10-18",
+  "notes": [
+    "Ten animal types carry overlapping mechanical themes.",
+    "Creature type matters most when you have the payoffs.",
+    "Small creatures become threatening through synergy."
+  ],
+  "archetypes": [
+    {
+      "colors": "WU",
+      "name": "Birds",
+      "plan": "Attack with flyers.",
+      "detail": "Support your ground creatures too."
+    },
+    {
+      "colors": "UB",
+      "name": "Rats",
+      "plan": "Fill the graveyard.",
+      "detail": "Threshold rewards seven cards there."
+    },
+    {
+      "colors": "BR",
+      "name": "Lizards",
+      "plan": "Make opponents lose life.",
+      "detail": "Keep damage sources available."
+    },
+    {
+      "colors": "RG",
+      "name": "Raccoons",
+      "plan": "Spend mana for expend.",
+      "detail": "Plan turns around four mana."
+    },
+    {
+      "colors": "GW",
+      "name": "Rabbits",
+      "plan": "Build a wide board.",
+      "detail": "Tokens multiply team bonuses."
+    },
+    {
+      "colors": "WB",
+      "name": "Bats",
+      "plan": "Change your life total.",
+      "detail": "Combine lifegain with evasive threats."
+    },
+    {
+      "colors": "UR",
+      "name": "Otters",
+      "plan": "Chain noncreature spells.",
+      "detail": "Support your spell payoffs."
+    },
+    {
+      "colors": "BG",
+      "name": "Squirrels",
+      "plan": "Forage for value.",
+      "detail": "Food and graveyard cards provide fuel."
+    },
+    {
+      "colors": "RW",
+      "name": "Mice",
+      "plan": "Target your creatures.",
+      "detail": "Valiant rewards your first targeting each turn."
+    },
+    {
+      "colors": "GU",
+      "name": "Frogs",
+      "plan": "Reuse entering effects.",
+      "detail": "Bounce and blink supply value."
+    }
+  ],
+  "mechanics": [],
+  "sources": [
+    {
+      "label": "Wizards of the Coast",
+      "url": "https://magic.wizards.com/en/news/feature/bloomburrow-prerelease-guide"
+    }
+  ],
+  "results": {
+    "format": "PremierDraft",
+    "formatLabel": "Premier Draft (BO1)",
+    "colorCount": 2,
+    "retrievedAt": "2026-10-18T16:56:00.804914+00:00",
+    "period": "ALL_TIME",
+    "userGroup": "all",
+    "splashes": false,
+    "sourceUrl": "https://www.17lands.com/deck_color_data?expansion=BLB&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true",
+    "rows": [
+      {
+        "colors": "WU",
+        "wins": 12640,
+        "games": 23794
+      },
+      {
+        "colors": "UB",
+        "wins": 26673,
+        "games": 48928
+      },
+      {
+        "colors": "BR",
+        "wins": 45268,
+        "games": 79897
+      },
+      {
+        "colors": "RG",
+        "wins": 21273,
+        "games": 38628
+      },
+      {
+        "colors": "WG",
+        "wins": 54711,
+        "games": 95817
+      },
+      {
+        "colors": "WB",
+        "wins": 51951,
+        "games": 92915
+      },
+      {
+        "colors": "BG",
+        "wins": 56073,
+        "games": 99049
+      },
+      {
+        "colors": "UG",
+        "wins": 45662,
+        "games": 81374
+      },
+      {
+        "colors": "UR",
+        "wins": 21724,
+        "games": 41425
+      },
+      {
+        "colors": "WR",
+        "wins": 40591,
+        "games": 73852
+      }
+    ],
+    "baseline": {
+      "wins": 376566,
+      "games": 675679
+    }
+  }
+}

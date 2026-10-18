@@ -1,0 +1,145 @@
+{
+  "id": "fin",
+  "name": "Final Fantasy",
+  "reviewedAt": "2026-10-18",
+  "notes": [
+    "Artifacts and legendary creatures appear across themes.",
+    "Equipment decks need bodies as well as Equipment.",
+    "Ramp decks still need early plays."
+  ],
+  "archetypes": [
+    {
+      "colors": "WU",
+      "name": "Artifacts",
+      "plan": "Generate artifact value.",
+      "detail": "Tokens help supply artifact counts."
+    },
+    {
+      "colors": "UB",
+      "name": "Control",
+      "plan": "Trade and draw cards.",
+      "detail": "Win after stabilizing the board."
+    },
+    {
+      "colors": "BR",
+      "name": "Black Mages",
+      "plan": "Apply aggressive pressure.",
+      "detail": "Use removal to maintain attacks."
+    },
+    {
+      "colors": "RG",
+      "name": "Landfall",
+      "plan": "Turn land drops into damage.",
+      "detail": "Keep deploying threats alongside lands."
+    },
+    {
+      "colors": "GW",
+      "name": "Go wide",
+      "plan": "Build a large team.",
+      "detail": "Tokens support team bonuses."
+    },
+    {
+      "colors": "WB",
+      "name": "Sacrifice",
+      "plan": "Convert bodies into value.",
+      "detail": "Use expendable creatures and tokens."
+    },
+    {
+      "colors": "UR",
+      "name": "Big noncreatures",
+      "plan": "Cast expensive noncreature spells.",
+      "detail": "Support them with early interaction."
+    },
+    {
+      "colors": "BG",
+      "name": "Graveyard",
+      "plan": "Reuse creatures and resources.",
+      "detail": "Self-mill supports recursion."
+    },
+    {
+      "colors": "RW",
+      "name": "Equipment",
+      "plan": "Equip aggressive creatures.",
+      "detail": "Balance Equipment with carriers."
+    },
+    {
+      "colors": "GU",
+      "name": "Town ramp",
+      "plan": "Build mana with Towns.",
+      "detail": "Use that mana on substantial payoffs."
+    }
+  ],
+  "mechanics": [],
+  "sources": [
+    {
+      "label": "Wizards of the Coast",
+      "url": "https://magic.wizards.com/en/news/feature/final-fantasy-prerelease-guide"
+    }
+  ],
+  "results": {
+    "format": "PremierDraft",
+    "formatLabel": "Premier Draft (BO1)",
+    "colorCount": 2,
+    "retrievedAt": "2026-10-18T16:55:37.041022+00:00",
+    "period": "ALL_TIME",
+    "userGroup": "all",
+    "splashes": false,
+    "sourceUrl": "https://www.17lands.com/deck_color_data?expansion=FIN&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true",
+    "rows": [
+      {
+        "colors": "WU",
+        "wins": 72577,
+        "games": 127802
+      },
+      {
+        "colors": "UB",
+        "wins": 50756,
+        "games": 91148
+      },
+      {
+        "colors": "BR",
+        "wins": 40576,
+        "games": 73148
+      },
+      {
+        "colors": "RG",
+        "wins": 15786,
+        "games": 29488
+      },
+      {
+        "colors": "WG",
+        "wins": 28693,
+        "games": 50684
+      },
+      {
+        "colors": "WB",
+        "wins": 63400,
+        "games": 111400
+      },
+      {
+        "colors": "BG",
+        "wins": 55191,
+        "games": 97087
+      },
+      {
+        "colors": "UG",
+        "wins": 12120,
+        "games": 21860
+      },
+      {
+        "colors": "UR",
+        "wins": 96604,
+        "games": 167869
+      },
+      {
+        "colors": "WR",
+        "wins": 65735,
+        "games": 114934
+      }
+    ],
+    "baseline": {
+      "wins": 501438,
+      "games": 885420
+    }
+  }
+}

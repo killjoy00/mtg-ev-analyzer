@@ -1,0 +1,145 @@
+{
+  "id": "dsk",
+  "name": "Duskmourn: House of Horror",
+  "reviewedAt": "2026-10-18",
+  "notes": [
+    "Enchantments and Rooms enable eerie.",
+    "Delirium needs different card types in your graveyard.",
+    "Manifest dread helps develop the board while filling the graveyard."
+  ],
+  "archetypes": [
+    {
+      "colors": "WU",
+      "name": "Eerie tempo",
+      "plan": "Pressure with enchantment triggers.",
+      "detail": "Use evasive threats."
+    },
+    {
+      "colors": "UB",
+      "name": "Eerie control",
+      "plan": "Accumulate enchantment value.",
+      "detail": "Defend and trade resources."
+    },
+    {
+      "colors": "BR",
+      "name": "Sacrifice",
+      "plan": "Spend expendable permanents.",
+      "detail": "Use fodder that replaces itself."
+    },
+    {
+      "colors": "RG",
+      "name": "Delirium stompy",
+      "plan": "Enable delirium and attack.",
+      "detail": "Diversify your card types."
+    },
+    {
+      "colors": "GW",
+      "name": "Survival",
+      "plan": "Keep creatures tapped safely.",
+      "detail": "Attack or use other tapping effects."
+    },
+    {
+      "colors": "WB",
+      "name": "Reanimator",
+      "plan": "Return expensive creatures.",
+      "detail": "Include ways to discard or mill them."
+    },
+    {
+      "colors": "UR",
+      "name": "Rooms",
+      "plan": "Unlock room advantages.",
+      "detail": "Manage your mana carefully."
+    },
+    {
+      "colors": "BG",
+      "name": "Delirium grind",
+      "plan": "Use graveyard diversity.",
+      "detail": "Trade into a stronger late game."
+    },
+    {
+      "colors": "RW",
+      "name": "Aggro",
+      "plan": "Deploy cheap attackers.",
+      "detail": "Maintain pressure with interaction."
+    },
+    {
+      "colors": "GU",
+      "name": "Manifest dread",
+      "plan": "Build hidden threats.",
+      "detail": "Support face-down creatures."
+    }
+  ],
+  "mechanics": [],
+  "sources": [
+    {
+      "label": "Wizards of the Coast",
+      "url": "https://magic.wizards.com/en/news/feature/duskmourn-house-of-horror-prerelease-and-draft-guide"
+    }
+  ],
+  "results": {
+    "format": "PremierDraft",
+    "formatLabel": "Premier Draft (BO1)",
+    "colorCount": 2,
+    "retrievedAt": "2026-10-18T16:55:53.820933+00:00",
+    "period": "ALL_TIME",
+    "userGroup": "all",
+    "splashes": false,
+    "sourceUrl": "https://www.17lands.com/deck_color_data?expansion=DSK&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true",
+    "rows": [
+      {
+        "colors": "WU",
+        "wins": 92156,
+        "games": 160903
+      },
+      {
+        "colors": "UB",
+        "wins": 19145,
+        "games": 36916
+      },
+      {
+        "colors": "BR",
+        "wins": 51626,
+        "games": 92748
+      },
+      {
+        "colors": "RG",
+        "wins": 54596,
+        "games": 97251
+      },
+      {
+        "colors": "WG",
+        "wins": 22026,
+        "games": 41373
+      },
+      {
+        "colors": "WB",
+        "wins": 28764,
+        "games": 54409
+      },
+      {
+        "colors": "BG",
+        "wins": 32963,
+        "games": 59842
+      },
+      {
+        "colors": "UG",
+        "wins": 48459,
+        "games": 86451
+      },
+      {
+        "colors": "UR",
+        "wins": 26391,
+        "games": 49789
+      },
+      {
+        "colors": "WR",
+        "wins": 98833,
+        "games": 171980
+      }
+    ],
+    "baseline": {
+      "wins": 474959,
+      "games": 851662
+    }
+  }
+}
