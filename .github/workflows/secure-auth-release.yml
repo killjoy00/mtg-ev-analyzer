@@ -38,6 +38,7 @@ jobs:
       APPLE_TOKEN_ENCRYPTION_KEY_V1: ${{ secrets.APPLE_TOKEN_ENCRYPTION_KEY_V1 }}
       PACK1_REMINDER_TOKEN_KEY: ${{ secrets.PACK1_REMINDER_TOKEN_KEY }}
       PACK1_REMINDER_RESEND_WEBHOOK_SECRET: ${{ secrets.PACK1_REMINDER_RESEND_WEBHOOK_SECRET }}
+      PACK1_REMINDER_DELIVERY_APPROVED: ${{ vars.PACK1_REMINDER_DELIVERY_APPROVED }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -158,7 +159,12 @@ jobs:
                 --env "APPLE_SIGN_IN_KEY_P8=$APPLE_SIGN_IN_KEY_P8"
                 --env "APPLE_TOKEN_ENCRYPTION_KEY_V1=$APPLE_TOKEN_ENCRYPTION_KEY_V1")
               # Ship source and schema dormant. Activation is a separate approved operation.
-              extra+=(--env "PACK1_DAILY_REMINDERS_ENABLED=0")
+              # Only a separately approved environment variable may activate sending.
+              if [[ "${PACK1_REMINDER_DELIVERY_APPROVED:-0}" == "1" ]]; then
+                [[ "$PACK1_REMINDER_TOKEN_KEY" =~ ^[a-fA-F0-9]{64}$ ]] || { echo '::error::Push token encryption key is unavailable.'; exit 1; }
+                [[ "$PACK1_REMINDER_RESEND_WEBHOOK_SECRET" == whsec_* ]] || { echo '::error::Reminder provider webhook verification unavailable.'; exit 1; }
+                extra+=(--env "PACK1_DAILY_REMINDERS_ENABLED=1")
+              else extra+=(--env "PACK1_DAILY_REMINDERS_ENABLED=0"); fi
               if [[ -n "$PACK1_REMINDER_TOKEN_KEY" ]]; then extra+=(--env "PACK1_REMINDER_TOKEN_KEY=$PACK1_REMINDER_TOKEN_KEY"); fi
               if [[ -n "$PACK1_REMINDER_RESEND_WEBHOOK_SECRET" ]]; then extra+=(--env "PACK1_REMINDER_RESEND_WEBHOOK_SECRET=$PACK1_REMINDER_RESEND_WEBHOOK_SECRET"); fi
             fi
@@ -248,7 +254,12 @@ jobs:
                 --env "APPLE_SIGN_IN_KEY_P8=$APPLE_SIGN_IN_KEY_P8"
                 --env "APPLE_TOKEN_ENCRYPTION_KEY_V1=$APPLE_TOKEN_ENCRYPTION_KEY_V1")
               # Ship source and schema dormant. Activation is a separate approved operation.
-              extra+=(--env "PACK1_DAILY_REMINDERS_ENABLED=0")
+              # Only a separately approved environment variable may activate sending.
+              if [[ "${PACK1_REMINDER_DELIVERY_APPROVED:-0}" == "1" ]]; then
+                [[ "$PACK1_REMINDER_TOKEN_KEY" =~ ^[a-fA-F0-9]{64}$ ]] || { echo '::error::Push token encryption key is unavailable.'; exit 1; }
+                [[ "$PACK1_REMINDER_RESEND_WEBHOOK_SECRET" == whsec_* ]] || { echo '::error::Reminder provider webhook verification unavailable.'; exit 1; }
+                extra+=(--env "PACK1_DAILY_REMINDERS_ENABLED=1")
+              else extra+=(--env "PACK1_DAILY_REMINDERS_ENABLED=0"); fi
               if [[ -n "$PACK1_REMINDER_TOKEN_KEY" ]]; then extra+=(--env "PACK1_REMINDER_TOKEN_KEY=$PACK1_REMINDER_TOKEN_KEY"); fi
               if [[ -n "$PACK1_REMINDER_RESEND_WEBHOOK_SECRET" ]]; then extra+=(--env "PACK1_REMINDER_RESEND_WEBHOOK_SECRET=$PACK1_REMINDER_RESEND_WEBHOOK_SECRET"); fi
               if [[ "$PATREON_RUNTIME_ENABLED" == true ]]; then

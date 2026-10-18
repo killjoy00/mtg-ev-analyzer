@@ -7,7 +7,7 @@ on:
         description: 'Enable the approved reminder scheduler or disable it'
         type: choice
         options: [enable, disable]
-        default: enable
+        default: disable
         required: true
       commit:
         description: 'Exact current main SHA required when enabling'
@@ -23,6 +23,7 @@ concurrency:
 
 jobs:
   schedulers:
+    environment: pack-one-mobile-release
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -46,7 +47,6 @@ jobs:
           git checkout --detach "$RELEASE_COMMIT"
           test -f scripts/reconcile-neon-reminder-scheduler.mjs
           grep -F "pack1-daily-reminders" worker/daily-reminders.mjs >/dev/null
-          test -f scripts/reconcile-neon-reminder-scheduler.mjs
 
       - name: Verify scheduler-aware production functions are live
         if: env.ACTION == 'enable'
