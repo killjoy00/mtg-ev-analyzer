@@ -45,18 +45,19 @@ jobs:
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
           npm ci --prefix mobile --ignore-scripts --no-audit --no-fund
-      - name: Retain public source and locked dependency fixture for reproducible offline review
+      - name: Retain pinned public database tools for isolated offline review
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/reminder-review"
-          git archive --format=tar HEAD | gzip > "$RUNNER_TEMP/reminder-review/source.tar.gz"
-          tar -czf "$RUNNER_TEMP/reminder-review/dependencies.tar.gz" node_modules mobile/node_modules
-          git rev-parse HEAD > "$RUNNER_TEMP/reminder-review/source-sha.txt"
+          mkdir -p "$RUNNER_TEMP/reminder-db-tools"
+          npm pack @embedded-postgres/linux-x64@18.4.0-beta.17 --ignore-scripts --pack-destination "$RUNNER_TEMP/reminder-db-tools"
+          npm view @embedded-postgres/linux-x64@18.4.0-beta.17 dist --json > "$RUNNER_TEMP/reminder-db-tools/postgres-dist.json"
+          npm view expo-notifications@57.0.18 dist --json > "$RUNNER_TEMP/reminder-db-tools/notifications-dist.json"
+          npm view badgin@1.2.3 dist --json > "$RUNNER_TEMP/reminder-db-tools/badgin-dist.json"
       - uses: actions/upload-artifact@v4
         with:
-          name: reminder-offline-review-${{ github.event.pull_request.head.sha }}
-          path: ${{ runner.temp }}/reminder-review/
+          name: reminder-db-tools-${{ github.event.pull_request.head.sha }}
+          path: ${{ runner.temp }}/reminder-db-tools/
           retention-days: 1
       - name: Exercise consent, schedule and provider contracts
         run: node --test tests/daily-reminder-schedule.test.mjs tests/daily-reminders.test.mjs
