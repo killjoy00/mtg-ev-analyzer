@@ -36,6 +36,8 @@ jobs:
       APPLE_SIGN_IN_KEY_P8: ${{ secrets.APPLE_SIGN_IN_KEY_P8 }}
       APPLE_SIGN_IN_KEY_ID: ${{ secrets.APPLE_SIGN_IN_KEY_ID }}
       APPLE_TOKEN_ENCRYPTION_KEY_V1: ${{ secrets.APPLE_TOKEN_ENCRYPTION_KEY_V1 }}
+      PACK1_REMINDER_TOKEN_KEY: ${{ secrets.PACK1_REMINDER_TOKEN_KEY }}
+      PACK1_REMINDER_RESEND_WEBHOOK_SECRET: ${{ secrets.PACK1_REMINDER_RESEND_WEBHOOK_SECRET }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -134,6 +136,7 @@ jobs:
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0058_owner_guard_admin_deletion.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0059_daily_peer_stats.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0060_player_report_review.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0061_daily_reminders.sql
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
 
@@ -154,6 +157,10 @@ jobs:
                 --env "APPLE_SIGN_IN_KEY_ID=$APPLE_SIGN_IN_KEY_ID"
                 --env "APPLE_SIGN_IN_KEY_P8=$APPLE_SIGN_IN_KEY_P8"
                 --env "APPLE_TOKEN_ENCRYPTION_KEY_V1=$APPLE_TOKEN_ENCRYPTION_KEY_V1")
+              # Ship source and schema dormant. Activation is a separate approved operation.
+              extra+=(--env "PACK1_DAILY_REMINDERS_ENABLED=0")
+              if [[ -n "$PACK1_REMINDER_TOKEN_KEY" ]]; then extra+=(--env "PACK1_REMINDER_TOKEN_KEY=$PACK1_REMINDER_TOKEN_KEY"); fi
+              if [[ -n "$PACK1_REMINDER_RESEND_WEBHOOK_SECRET" ]]; then extra+=(--env "PACK1_REMINDER_RESEND_WEBHOOK_SECRET=$PACK1_REMINDER_RESEND_WEBHOOK_SECRET"); fi
             fi
             "$neon" functions deploy "$slug" --src "$RUNNER_TEMP/pack1-bundles/$slug" --no-bundle               --project-id "$PROJECT_ID" --branch "$DEV_BRANCH" --runtime nodejs24 --wait "${extra[@]}"
           done < .github/neon-functions.txt
@@ -215,6 +222,7 @@ jobs:
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0058_owner_guard_admin_deletion.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0059_daily_peer_stats.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0060_player_report_review.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0061_daily_reminders.sql
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
 
@@ -239,6 +247,10 @@ jobs:
                 --env "APPLE_SIGN_IN_KEY_ID=$APPLE_SIGN_IN_KEY_ID"
                 --env "APPLE_SIGN_IN_KEY_P8=$APPLE_SIGN_IN_KEY_P8"
                 --env "APPLE_TOKEN_ENCRYPTION_KEY_V1=$APPLE_TOKEN_ENCRYPTION_KEY_V1")
+              # Ship source and schema dormant. Activation is a separate approved operation.
+              extra+=(--env "PACK1_DAILY_REMINDERS_ENABLED=0")
+              if [[ -n "$PACK1_REMINDER_TOKEN_KEY" ]]; then extra+=(--env "PACK1_REMINDER_TOKEN_KEY=$PACK1_REMINDER_TOKEN_KEY"); fi
+              if [[ -n "$PACK1_REMINDER_RESEND_WEBHOOK_SECRET" ]]; then extra+=(--env "PACK1_REMINDER_RESEND_WEBHOOK_SECRET=$PACK1_REMINDER_RESEND_WEBHOOK_SECRET"); fi
               if [[ "$PATREON_RUNTIME_ENABLED" == true ]]; then
                 extra+=(--env "PATREON_CLIENT_ID=$PATREON_CLIENT_ID" --env "PATREON_CLIENT_SECRET=$PATREON_CLIENT_SECRET" --env "PATREON_WEBHOOK_SECRET=$PATREON_WEBHOOK_SECRET")
               fi

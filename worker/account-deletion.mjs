@@ -168,6 +168,11 @@ export async function cleanupPackOne(query,operation,{recoveryKey=null}={}) {
   await query('DELETE FROM apple_subscription_entitlements WHERE auth_user_id=$1::uuid',[auth]);
   await query('DELETE FROM entitlement_grants WHERE auth_user_id=$1::uuid',[auth]);
   await query('DELETE FROM pack1_admins WHERE auth_user_id=$1::uuid',[auth]);
+  // Remove consent, changes, delivery evidence, and registrations before Auth removal.
+  await query('DELETE FROM daily_reminder_deliveries WHERE auth_user_id=$1::uuid',[auth]);
+  await query('DELETE FROM daily_reminder_devices WHERE auth_user_id=$1::uuid',[auth]);
+  await query('DELETE FROM daily_reminder_changes WHERE auth_user_id=$1::uuid',[auth]);
+  await query('DELETE FROM daily_reminder_settings WHERE auth_user_id=$1::uuid',[auth]);
   await query('DELETE FROM account_deletion_verifications WHERE auth_user_id=$1::uuid',[auth]);
   await query('DELETE FROM account_credential_rate_limits WHERE auth_user_id=$1::uuid',[auth]);
   if(recoveryKey)await query('DELETE FROM account_recovery_rate_limits WHERE limit_key=$1',[recoveryKey]);

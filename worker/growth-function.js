@@ -1,4 +1,5 @@
 import {createHmac} from 'node:crypto';
+import {reminderRoute,revokeReminderSessionDevices} from './daily-reminders.mjs';
 import {retryRolledBackQuery} from './database-retry.mjs';
 import {releaseMetadata} from './release.mjs';
 import {guardIngress} from './ingress-auth.mjs';
@@ -1650,6 +1651,7 @@ async function handleMobileMyHistory(request) {
 
 async function handleMobileSignout(request) {
   const {auth}=await mobileAccountIdentity(request);
+  await revokeReminderSessionDevices(query,auth);
   await revokeAccountSession(query,auth);
   return json({ok:true});
 }
@@ -2186,7 +2188,7 @@ async function handleSignout(request) {
   // the session behind them is already expired or revoked. A live session is
   // still CSRF-checked, so this stays a deliberate first-party request.
   const auth = await authSession(request,{required:false});
-  if(auth)await revokeAccountSession(query,auth);
+  if(auth){await revokeReminderSessionDevices(query,auth);await revokeAccountSession(query,auth);}
   return clearPlayerCookie(clearAccountCookies(json({ ok: true })));
 }
 
@@ -2456,6 +2458,8 @@ async function route(request) {
   if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, profiles: true, account_deletion_enabled:deletionEnabled(), verification_sweep_enabled:verificationSweepEnabled(), deletion_email_configured:deletionEmailConfigured(), launch_watcher_recovery_configured:launchWatcherRecoveryConfigured(), campaign_link_publish_configured:campaignLinkPublishConfigured(), apple_sign_in_configured:appleConfigured() });
   if (url.pathname === '/internal/account-deletion-maintenance') return handleDeletionMaintenance(request);
   if (url.pathname === '/internal/account-deletion-maintenance-status') return handleDeletionMaintenanceStatus(request);
+  if (url.pathname === '/internal/daily-reminders' || url.pathname === '/v1/reminders/unsubscribe' || url.pathname === '/v1/reminders/provider-event' || /^\/v1\/(?:mobile\/)?account\/reminders(?:\/devices)?$/.test(url.pathname))
+    return reminderRoute(request,{query,json,readJson,authBrowser:(r)=>authSession(r,{required:true,allowLegacy:false,csrf:false}),authMutation:accountMutationAuth,authMobile:mobileAccountIdentity,trigger:verifyNeonScheduleTrigger,pacificDay:gameDateKey()});
   if (request.method === 'GET' && url.pathname === '/v1/account/google/callback') return handleGoogleCallback(request);
   if (request.method === 'GET' && url.pathname === '/v1/mobile/account/google/callback') return handleMobileGoogleCallback(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/apple/callback') return handleAppleCallback(request);
@@ -2552,7 +2556,7 @@ async function route(request) {
 
 export default {
   async fetch(request) {
-    const internalMaintenance=new Set(['/internal/account-deletion-maintenance','/internal/account-deletion-maintenance-status']).has(new URL(request.url).pathname);
+    const internalMaintenance=new Set(['/internal/account-deletion-maintenance','/internal/account-deletion-maintenance-status','/internal/daily-reminders']).has(new URL(request.url).pathname);
     if(!internalMaintenance){const denied=guardIngress(request);if(denied)return denied;}
     try {
       return withCors(await route(request), request);

@@ -64,7 +64,8 @@
     "0057_admin_owner_invitations.sql",
     "0058_owner_guard_admin_deletion.sql",
     "0059_daily_peer_stats.sql",
-    "0060_player_report_review.sql"
+    "0060_player_report_review.sql",
+    "0061_daily_reminders.sql"
   ],
   "same_prefix_order": {
     "0037": [
@@ -177,7 +178,8 @@
         "0057_admin_owner_invitations.sql",
         "0058_owner_guard_admin_deletion.sql",
         "0059_daily_peer_stats.sql",
-        "0060_player_report_review.sql"
+        "0060_player_report_review.sql",
+        "0061_daily_reminders.sql"
       ]
     },
     "daily-calendar": {
@@ -232,7 +234,8 @@
         "0057_admin_owner_invitations.sql",
         "0058_owner_guard_admin_deletion.sql",
         "0059_daily_peer_stats.sql",
-        "0060_player_report_review.sql"
+        "0060_player_report_review.sql",
+        "0061_daily_reminders.sql"
       ]
     },
     "launch-load": {
@@ -262,7 +265,8 @@
         "0057_admin_owner_invitations.sql",
         "0058_owner_guard_admin_deletion.sql",
         "0059_daily_peer_stats.sql",
-        "0060_player_report_review.sql"
+        "0060_player_report_review.sql",
+        "0061_daily_reminders.sql"
       ]
     },
     "launch-distributed": {
@@ -294,7 +298,8 @@
         "0057_admin_owner_invitations.sql",
         "0058_owner_guard_admin_deletion.sql",
         "0059_daily_peer_stats.sql",
-        "0060_player_report_review.sql"
+        "0060_player_report_review.sql",
+        "0061_daily_reminders.sql"
       ]
     }
   }
