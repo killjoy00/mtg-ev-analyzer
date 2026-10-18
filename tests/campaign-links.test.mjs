@@ -22,14 +22,18 @@ const productionEntry={
   campaign:'launch-week',
   medium:'social'
 };
-const discordDailyEntry={
+const neutralDailyEntry={
   slug:'daily',
+  destination:'/?game=draft-run&daily=1',
+  untracked:true
+};
+const discordChannelEntry={
+  slug:'discord',
   destination:'/?game=draft-run&daily=1',
   source:'discord',
   campaign:'daily_post',
   medium:'social'
 };
-const discordChannelEntry={...discordDailyEntry,slug:'discord'};
 
 test('acquisition values share runtime normalization and canonical config rules',()=>{
   assert.equal(normalizeAcquisitionValue('a'),'a');
@@ -80,17 +84,22 @@ test('campaign config rejects duplicates, unsafe slugs, invalid acquisition fiel
   assert.throws(()=>validateCampaignEntries([{...productionEntry,medium:'x'.repeat(41)}]),/medium must already be canonical/);
   assert.throws(()=>validateCampaignEntries([{...productionEntry,source:'Reddit'}]),/source must already be canonical/);
   assert.throws(()=>validateCampaignEntries([{...productionEntry,destination:'/practice/'}]),/destination .* is not supported/);
+  assert.deepEqual(validateCampaignEntries([neutralDailyEntry]),[neutralDailyEntry]);
+  assert.throws(()=>validateCampaignEntries([{...neutralDailyEntry,source:'discord'}]),/untracked entries must not carry campaign attribution/);
+  assert.throws(()=>validateCampaignEntries([{...productionEntry,untracked:false}]),/untracked must be true/);
+  assert.throws(()=>validateCampaignEntries([{...neutralDailyEntry,untracked:'yes'}]),/untracked must be true/);
 });
 
 test('campaign links can land on Daily Draft Run, Powered Cube or Latest Set',()=>{
   const cube=buildCampaignDraft({slug:'cube-push',source:'discord',campaign:'cube-week',destination:'/?game=draft-run&set=powered-cube&daily=1'});
   assert.equal(cube.valid,true);
   assert.equal(cube.trackedUrl,'https://packone.pro/?game=draft-run&set=powered-cube&daily=1&utm_source=discord&utm_campaign=cube-week');
-  const daily=buildCampaignDraft(discordDailyEntry);
-  assert.equal(daily.valid,true);
-  assert.equal(daily.vanityUrl,'https://packone.pro/go/daily/');
-  assert.equal(buildCampaignDraft(discordChannelEntry).vanityUrl,'https://packone.pro/go/discord/');
-  assert.equal(daily.trackedUrl,'https://packone.pro/?game=draft-run&daily=1&utm_source=discord&utm_campaign=daily_post&utm_medium=social');
+  assert.equal(buildCampaignVanityUrl(neutralDailyEntry.slug),'https://packone.pro/go/daily/');
+  assert.equal(buildCampaignTrackingUrl(neutralDailyEntry),'https://packone.pro/?game=draft-run&daily=1','neutral generic link carries no UTMs');
+  const discord=buildCampaignDraft(discordChannelEntry);
+  assert.equal(discord.valid,true);
+  assert.equal(discord.vanityUrl,'https://packone.pro/go/discord/');
+  assert.equal(discord.trackedUrl,'https://packone.pro/?game=draft-run&daily=1&utm_source=discord&utm_campaign=daily_post&utm_medium=social');
   const latest={slug:'fra-lrcast',destination:'/?game=draft-run&set=latest&daily=1',source:'reddit',campaign:'fra-lrcast',medium:'social'};
   assert.deepEqual(validateCampaignEntries([latest]),[latest]);
   const tracked='https://packone.pro/?game=draft-run&set=latest&daily=1&utm_source=reddit&utm_campaign=fra-lrcast&utm_medium=social';
@@ -108,18 +117,20 @@ test('checked-in production campaign config retains the canonical reddit-launch 
   const config=validateCampaignEntries(JSON.parse(await readFile('campaign-links.json','utf8')));
   assert.ok(config.length>=1);
   assert.deepEqual(config.find(entry=>entry.slug===productionEntry.slug),productionEntry);
-  assert.deepEqual(config.find(entry=>entry.slug===discordDailyEntry.slug),discordDailyEntry);
+  assert.deepEqual(config.find(entry=>entry.slug===neutralDailyEntry.slug),neutralDailyEntry);
   assert.deepEqual(config.find(entry=>entry.slug===discordChannelEntry.slug),discordChannelEntry);
   assert.equal(buildCampaignTrackingUrl(productionEntry),'https://packone.pro/?utm_source=reddit&utm_campaign=launch-week&utm_medium=social');
   assert.equal(buildCampaignVanityUrl(productionEntry.slug),'https://packone.pro/go/reddit-launch/');
 });
 
-test('legacy Discord Daily alias remains valid',async()=>{
+test('generic Daily short link has no forced campaign or source attribution',async()=>{
   const html=await readFile('go/daily/index.html','utf8');
-  const tracked=buildCampaignTrackingUrl(discordDailyEntry);
-  assert.equal(html,renderCampaignRedirectPage(discordDailyEntry),'generated short link must match registry');
-  assert.ok(html.includes(`location.replace(${JSON.stringify(tracked)})`));
-  assert.ok(html.includes(`href="${tracked.replaceAll('&','&amp;')}"`));
+  const destination=buildCampaignTrackingUrl(neutralDailyEntry);
+  assert.equal(destination,'https://packone.pro/?game=draft-run&daily=1');
+  assert.equal(html,renderCampaignRedirectPage(neutralDailyEntry),'generated short link must match registry');
+  assert.ok(html.includes(`location.replace(${JSON.stringify(destination)})`));
+  assert.ok(html.includes(`href="${destination.replaceAll('&','&amp;')}"`));
+  assert.doesNotMatch(html,/utm_|ref=|utm_source=discord/,'neutral redirect does not claim Discord or another campaign');
 });
 
 test('channel-specific Discord short link redirects to attributed regular Daily',async()=>{
