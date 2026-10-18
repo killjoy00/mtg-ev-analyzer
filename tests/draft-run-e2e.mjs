@@ -8,6 +8,7 @@ import {trophyDrafterFacts,trophyDrafterSentences,trophyRevealSentence} from '..
 import policy from '../data/selection-policy.json' with {type:'json'};
 import {regularRunSet} from '../draft-run-policy.mjs';
 import {latestSetPlan} from '../daily-selection.mjs';
+import {hasSetGuide} from '../set-guides.mjs';
 
 const base=process.env.PACK1_E2E_URL||'http://127.0.0.1:4173';
 const corpus=fs.readdirSync('corpus/draft-run').filter(f=>f.endsWith('.gz')).flatMap(f=>JSON.parse(gunzipSync(fs.readFileSync('corpus/draft-run/'+f)))).filter(interestingDraftRunPuzzle);
@@ -113,6 +114,31 @@ try{
   assert.doesNotMatch(await page.locator('.run-heading').innerText(),/difficulty/i);
   const displayNames=JSON.parse(fs.readFileSync('data/set-display-names.json','utf8')).names;
   await page.waitForFunction(name=>document.querySelector('.run-heading')?.textContent.includes(name),displayNames[puzzles[0].set_id]);
+  const guideTrigger=page.locator('.run-heading [data-set-refresher]');
+  if(hasSetGuide(puzzles[0].set_id)){
+  assert.equal(await guideTrigger.getAttribute('data-set-refresher'),puzzles[0].set_id);
+  const beforeGuide={revision,answers:answers.length,starts:runStarts.length,views:views.length};
+  await page.route('**/sets/guides/data/*.json',route=>route.fulfill({status:503,body:'unavailable'}),{times:1});
+  await guideTrigger.click();
+  await page.getByRole('button',{name:'Try again',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Try again',exact:true}).click();
+  await page.locator('.set-guide-dialog .guide-archetype').first().waitFor();
+  assert.equal(await page.locator('.set-guide-dialog h2').innerText(),displayNames[puzzles[0].set_id]);
+  await page.getByRole('tab',{name:'Results',exact:true}).click();
+  await noOverflow();
+  await page.keyboard.press('Escape');
+  await page.locator('.set-guide-dialog').waitFor({state:'detached'});
+  assert.ok(await guideTrigger.evaluate(el=>document.activeElement===el),'closing the guide restores focus');
+  assert.deepEqual({revision,answers:answers.length,starts:runStarts.length,views:views.length},beforeGuide,'the guide preserves the current decision and creates no run activity');
+  await page.setViewportSize({width:1440,height:1000});
+  await guideTrigger.hover();
+  await page.locator('.set-refresher-popover').waitFor();
+  await page.locator('.set-refresher-popover').getByRole('button',{name:'Open set guide'}).click();
+  await page.locator('.set-guide-dialog .guide-archetype').first().waitFor();
+  await page.getByRole('button',{name:'Close set guide',exact:true}).click();
+  assert.ok(await guideTrigger.evaluate(el=>document.activeElement===el),'popover click returns focus to the original trigger');
+  await page.setViewportSize({width:390,height:844});
+  }else assert.equal(await guideTrigger.count(),0,'unreviewed sets have no guide trigger');
   assert.equal(await page.locator('#home-editorial').count(),0);
   if(daily){assert.equal(await page.locator('[data-reroll]').count(),0,'No Daily rerolls');assert.equal(await page.locator('.run-ranking-state').innerText(),'Ranked as QA ranked player');}
   if(!daily){
@@ -126,6 +152,8 @@ try{
     assert.notEqual(puzzles[0].set_id,originalSet);
   }
   const replacementSet=puzzles[0].set_id;
+  if(hasSetGuide(replacementSet))assert.equal(await guideTrigger.getAttribute('data-set-refresher'),replacementSet,'guide follows the rerolled set');
+  else assert.equal(await guideTrigger.count(),0);
   await page.locator('[data-reroll="pack"]').click();await page.getByRole('button',{name:'Reroll pack · 0',exact:true}).waitFor();
   assert.equal(puzzles[0].set_id,replacementSet);
   }

@@ -1,0 +1,145 @@
+{
+  "id": "mom",
+  "name": "March of the Machine",
+  "reviewedAt": "2026-10-18",
+  "notes": [
+    "Battles compete with opponents for your combat damage.",
+    "Convoke rewards cheap creatures and tokens.",
+    "Incubators need additional mana to become creatures."
+  ],
+  "archetypes": [
+    {
+      "colors": "WU",
+      "name": "Knights",
+      "plan": "Attack with Knight support.",
+      "detail": "Use tempo to clear blockers."
+    },
+    {
+      "colors": "UB",
+      "name": "Graveyard control",
+      "plan": "Trade and reuse resources.",
+      "detail": "Removal buys time."
+    },
+    {
+      "colors": "BR",
+      "name": "Sacrifice",
+      "plan": "Spend expendable creatures.",
+      "detail": "Tokens supply fodder."
+    },
+    {
+      "colors": "RG",
+      "name": "Battles",
+      "plan": "Attack and defeat battles.",
+      "detail": "Use strong combat creatures."
+    },
+    {
+      "colors": "GW",
+      "name": "Counters",
+      "plan": "Grow your board.",
+      "detail": "Protect upgraded threats."
+    },
+    {
+      "colors": "WB",
+      "name": "Phyrexians",
+      "plan": "Build Phyrexian synergies.",
+      "detail": "Incubation supplies creatures."
+    },
+    {
+      "colors": "UR",
+      "name": "Convoke",
+      "plan": "Turn creatures into mana.",
+      "detail": "Token makers support spells."
+    },
+    {
+      "colors": "BG",
+      "name": "Incubate",
+      "plan": "Build and transform Incubators.",
+      "detail": "Plan your mana expenditure."
+    },
+    {
+      "colors": "RW",
+      "name": "Backup",
+      "plan": "Support an aggressive curve.",
+      "detail": "Use temporary abilities in combat."
+    },
+    {
+      "colors": "GU",
+      "name": "Transform",
+      "plan": "Reward transforming permanents.",
+      "detail": "Incubators help enable payoffs."
+    }
+  ],
+  "mechanics": [],
+  "sources": [
+    {
+      "label": "Draftsim format guide",
+      "url": "https://draftsim.com/mtg-mom-draft-guide/"
+    }
+  ],
+  "results": {
+    "format": "PremierDraft",
+    "formatLabel": "Premier Draft (BO1)",
+    "colorCount": 2,
+    "retrievedAt": "2026-10-18T16:56:32.972932+00:00",
+    "period": "ALL_TIME",
+    "userGroup": "all",
+    "splashes": false,
+    "sourceUrl": "https://www.17lands.com/deck_color_data?expansion=MOM&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true",
+    "rows": [
+      {
+        "colors": "WU",
+        "wins": 86704,
+        "games": 148093
+      },
+      {
+        "colors": "UB",
+        "wins": 85181,
+        "games": 147891
+      },
+      {
+        "colors": "BR",
+        "wins": 44144,
+        "games": 81339
+      },
+      {
+        "colors": "RG",
+        "wins": 19936,
+        "games": 36633
+      },
+      {
+        "colors": "WG",
+        "wins": 34545,
+        "games": 61880
+      },
+      {
+        "colors": "WB",
+        "wins": 29511,
+        "games": 55654
+      },
+      {
+        "colors": "BG",
+        "wins": 26999,
+        "games": 48731
+      },
+      {
+        "colors": "UG",
+        "wins": 19420,
+        "games": 35070
+      },
+      {
+        "colors": "UR",
+        "wins": 36879,
+        "games": 66386
+      },
+      {
+        "colors": "WR",
+        "wins": 34300,
+        "games": 61924
+      }
+    ],
+    "baseline": {
+      "wins": 417619,
+      "games": 743601
+    }
+  }
+}

@@ -12,7 +12,7 @@ const regular=[
     qualified_trophy_drafts:617,verified_decisions:6787,
   },
   ...Array.from({length:27},(_,i)=>({
-    set_id:`set-${String(i+1).padStart(2,'0')}`,
+    set_id:i===0?'ecl':`set-${String(i+1).padStart(2,'0')}`,
     set_name:`Archive Set ${String(i+1).padStart(2,'0')}`,
     release_date:`2025-${String(12-(i%12)).padStart(2,'0')}-01`,
     regular_run:true,data_date:'2026-08-01',training_drafts:2000+i,
@@ -52,8 +52,40 @@ try {
   const cubeCta=page.locator('#special-format-grid').getByRole('link',{name:'Elite Cube Practice'});
   assert.equal(await cubeCta.getAttribute('href'),'/?game=draft-run&set=powered-cube');
   assert.ok(await page.locator('#special-formats').isVisible());
+  assert.equal(await page.getByRole('link',{name:'Set guide',exact:true}).count(),2,'only reviewed sets and Cube receive guide links');
+  assert.equal(await page.locator('a[href="/sets/ecl/guide/"]').count(),1);
 
   await page.screenshot({path:'artifacts/sets-archive-mobile.png',fullPage:true});
+  assert.deepEqual(errors,[]);
+
+  await page.goto(base+'/sets/ecl/');
+  await page.getByRole('link',{name:/Open set guide/}).click();
+  await page.getByRole('tab',{name:'Refresher',exact:true}).waitFor();
+  assert.equal(await page.locator('.guide-archetype').count(),5);
+  await page.locator('.guide-archetype summary').first().click();
+  assert.ok(await page.locator('.guide-archetype[open] p').isVisible());
+  await page.getByRole('tab',{name:'Refresher',exact:true}).focus();
+  await page.keyboard.press('ArrowRight');
+  assert.equal(await page.getByRole('tab',{name:'Results',exact:true}).getAttribute('aria-selected'),'true');
+  assert.equal(await page.locator('.guide-results-table tbody tr').count(),10);
+  assert.match(await page.locator('.guide-results-lead').innerText(),/Black–Green/);
+  for(const width of [320,390,1440]){
+    await page.setViewportSize({width,height:900});
+    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1),`guide fits ${width}px`);
+  }
+  await page.getByRole('tab',{name:'Refresher',exact:true}).click();
+  await page.screenshot({path:'artifacts/set-guide-desktop.png',fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:'artifacts/set-guide-mobile.png',fullPage:true});
+  await page.goto(base+'/sets/powered-cube/guide/#results');
+  await page.getByRole('tab',{name:'Results',exact:true}).waitFor();
+  assert.equal(await page.getByRole('tab',{name:'Results',exact:true}).getAttribute('aria-selected'),'true');
+  assert.match(await page.locator('[role="tabpanel"]:visible').innerText(),/cube lists change/);
+  const noScript=await browser.newPage({javaScriptEnabled:false});
+  await noScript.goto(base+'/sets/neo/guide/');
+  assert.equal(await noScript.locator('.guide-archetype').count(),10,'standalone guides remain readable without JavaScript');
+  assert.ok(await noScript.locator('.guide-results-table').isVisible());
+  await noScript.close();
   assert.deepEqual(errors,[]);
 
   const failurePage=await browser.newPage({viewport:{width:390,height:844}});

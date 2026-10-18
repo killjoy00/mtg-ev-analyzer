@@ -1,0 +1,115 @@
+{
+  "id": "tdm",
+  "name": "Tarkir: Dragonstorm",
+  "reviewedAt": "2026-10-18",
+  "notes": [
+    "Five three-color clans share overlapping two-color bases.",
+    "Draft fixing alongside spells, not after them.",
+    "Choose expensive Dragons your mana can actually cast."
+  ],
+  "archetypes": [
+    {
+      "colors": "WBG",
+      "name": "Abzan endure",
+      "plan": "Choose counters or more bodies.",
+      "detail": "Endure adapts your board to the matchup."
+    },
+    {
+      "colors": "WUR",
+      "name": "Jeskai flurry",
+      "plan": "Cast a second spell.",
+      "detail": "Cheap spells help maintain tempo."
+    },
+    {
+      "colors": "UBG",
+      "name": "Sultai renew",
+      "plan": "Turn the graveyard into counters.",
+      "detail": "Renew gives spent creatures another use."
+    },
+    {
+      "colors": "WBR",
+      "name": "Mardu mobilize",
+      "plan": "Attack with temporary reinforcements.",
+      "detail": "Warrior tokens support aggressive and sacrifice plans."
+    },
+    {
+      "colors": "URG",
+      "name": "Temur harmonize",
+      "plan": "Reuse expensive spells.",
+      "detail": "Tapping a creature can reduce harmonize costs."
+    }
+  ],
+  "mechanics": [],
+  "sources": [
+    {
+      "label": "Wizards of the Coast",
+      "url": "https://magic.wizards.com/en/news/feature/tarkir-dragonstorm-prerelease-guide"
+    }
+  ],
+  "results": {
+    "format": "PremierDraft",
+    "formatLabel": "Premier Draft (BO1)",
+    "colorCount": 3,
+    "retrievedAt": "2026-10-18T16:55:42.684995+00:00",
+    "period": "ALL_TIME",
+    "userGroup": "all",
+    "splashes": false,
+    "sourceUrl": "https://www.17lands.com/deck_color_data?expansion=TDM&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true",
+    "rows": [
+      {
+        "colors": "WUR",
+        "wins": 52626,
+        "games": 96753
+      },
+      {
+        "colors": "UBG",
+        "wins": 41348,
+        "games": 75902
+      },
+      {
+        "colors": "WBR",
+        "wins": 72708,
+        "games": 130541
+      },
+      {
+        "colors": "URG",
+        "wins": 44032,
+        "games": 79820
+      },
+      {
+        "colors": "WBG",
+        "wins": 35804,
+        "games": 66581
+      },
+      {
+        "colors": "WUB",
+        "wins": 135,
+        "games": 276
+      },
+      {
+        "colors": "UBR",
+        "wins": 25,
+        "games": 50
+      },
+      {
+        "colors": "BRG",
+        "wins": 13,
+        "games": 39
+      },
+      {
+        "colors": "WRG",
+        "wins": 70,
+        "games": 163
+      },
+      {
+        "colors": "WUG",
+        "wins": 131,
+        "games": 269
+      }
+    ],
+    "baseline": {
+      "wins": 246892,
+      "games": 450394
+    }
+  }
+}

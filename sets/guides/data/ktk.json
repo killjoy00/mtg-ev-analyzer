@@ -1,0 +1,115 @@
+{
+  "id": "ktk",
+  "name": "Khans of Tarkir",
+  "reviewedAt": "2026-10-18",
+  "notes": [
+    "Five three-color clans overlap through two-color bases.",
+    "Take fixing seriously; taplands cost tempo.",
+    "Morph makes three-mana plays flexible and combat uncertain."
+  ],
+  "archetypes": [
+    {
+      "colors": "WBG",
+      "name": "Abzan outlast",
+      "plan": "Grow creatures over time.",
+      "detail": "Counters unlock shared combat abilities."
+    },
+    {
+      "colors": "WUR",
+      "name": "Jeskai prowess",
+      "plan": "Mix threats and noncreature spells.",
+      "detail": "Time spells for profitable attacks."
+    },
+    {
+      "colors": "UBG",
+      "name": "Sultai delve",
+      "plan": "Fill the graveyard to reduce costs.",
+      "detail": "Balance delve spells with enough fuel."
+    },
+    {
+      "colors": "WBR",
+      "name": "Mardu raid",
+      "plan": "Attack to unlock rewards.",
+      "detail": "Develop an early board."
+    },
+    {
+      "colors": "URG",
+      "name": "Temur ferocious",
+      "plan": "Control a four-power creature.",
+      "detail": "Large bodies enable extra effects."
+    }
+  ],
+  "mechanics": [],
+  "sources": [
+    {
+      "label": "Draftsim format guide",
+      "url": "https://draftsim.com/mtg-ktk-draft-guide/"
+    }
+  ],
+  "results": {
+    "format": "PremierDraft",
+    "formatLabel": "Premier Draft (BO1)",
+    "colorCount": 3,
+    "retrievedAt": "2026-10-18T16:56:14.912929+00:00",
+    "period": "ALL_TIME",
+    "userGroup": "all",
+    "splashes": false,
+    "sourceUrl": "https://www.17lands.com/deck_color_data?expansion=KTK&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true",
+    "rows": [
+      {
+        "colors": "WUR",
+        "wins": 10643,
+        "games": 19910
+      },
+      {
+        "colors": "UBG",
+        "wins": 8061,
+        "games": 15302
+      },
+      {
+        "colors": "WBR",
+        "wins": 18555,
+        "games": 33314
+      },
+      {
+        "colors": "URG",
+        "wins": 8504,
+        "games": 15721
+      },
+      {
+        "colors": "WBG",
+        "wins": 17403,
+        "games": 30883
+      },
+      {
+        "colors": "WUB",
+        "wins": 84,
+        "games": 154
+      },
+      {
+        "colors": "UBR",
+        "wins": 19,
+        "games": 37
+      },
+      {
+        "colors": "BRG",
+        "wins": 9,
+        "games": 21
+      },
+      {
+        "colors": "WRG",
+        "wins": 19,
+        "games": 36
+      },
+      {
+        "colors": "WUG",
+        "wins": 39,
+        "games": 68
+      }
+    ],
+    "baseline": {
+      "wins": 63336,
+      "games": 115446
+    }
+  }
+}

@@ -1,0 +1,115 @@
+{
+  "id": "tmt",
+  "name": "Teenage Mutant Ninja Turtles",
+  "reviewedAt": "2026-10-18",
+  "notes": [
+    "Five enemy-color pairs define the main themes.",
+    "Cheap evasive creatures enable sneak.",
+    "Artifact tokens can serve several different synergies."
+  ],
+  "archetypes": [
+    {
+      "colors": "WB",
+      "name": "Sneaky Ninjas",
+      "plan": "Connect with evasive attackers.",
+      "detail": "Sneak reuses creatures while deploying new threats."
+    },
+    {
+      "colors": "UR",
+      "name": "Machines",
+      "plan": "Build around artifacts.",
+      "detail": "Artifact creatures and tokens supply your payoffs."
+    },
+    {
+      "colors": "BG",
+      "name": "Disappear",
+      "plan": "Have your permanents leave play.",
+      "detail": "Sacrifice and sneak can both enable disappear."
+    },
+    {
+      "colors": "RW",
+      "name": "Alliance",
+      "plan": "Keep creatures entering.",
+      "detail": "Tokens and blink effects add more triggers."
+    },
+    {
+      "colors": "GU",
+      "name": "Mutagen",
+      "plan": "Grow creatures with counters.",
+      "detail": "Mutagen tokens connect artifact and counter synergies."
+    }
+  ],
+  "mechanics": [],
+  "sources": [
+    {
+      "label": "Wizards of the Coast",
+      "url": "https://magic.wizards.com/en/news/feature/teenage-mutant-ninja-turtles-prerelease-guide"
+    }
+  ],
+  "results": {
+    "format": "PremierDraft",
+    "formatLabel": "Premier Draft (BO1)",
+    "colorCount": 2,
+    "retrievedAt": "2026-10-18T16:55:22.448908+00:00",
+    "period": "ALL_TIME",
+    "userGroup": "all",
+    "splashes": false,
+    "sourceUrl": "https://www.17lands.com/deck_color_data?expansion=TMT&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true",
+    "rows": [
+      {
+        "colors": "WU",
+        "wins": 1117,
+        "games": 1953
+      },
+      {
+        "colors": "UB",
+        "wins": 704,
+        "games": 1338
+      },
+      {
+        "colors": "BR",
+        "wins": 316,
+        "games": 675
+      },
+      {
+        "colors": "RG",
+        "wins": 295,
+        "games": 668
+      },
+      {
+        "colors": "WG",
+        "wins": 1091,
+        "games": 2023
+      },
+      {
+        "colors": "WB",
+        "wins": 37549,
+        "games": 63836
+      },
+      {
+        "colors": "BG",
+        "wins": 12656,
+        "games": 23390
+      },
+      {
+        "colors": "UG",
+        "wins": 6369,
+        "games": 12457
+      },
+      {
+        "colors": "UR",
+        "wins": 36164,
+        "games": 62500
+      },
+      {
+        "colors": "WR",
+        "wins": 14039,
+        "games": 25200
+      }
+    ],
+    "baseline": {
+      "wins": 110300,
+      "games": 194040
+    }
+  }
+}

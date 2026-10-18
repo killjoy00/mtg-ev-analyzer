@@ -1,0 +1,145 @@
+{
+  "id": "tla",
+  "name": "Avatar: The Last Airbender",
+  "reviewedAt": "2026-10-18",
+  "notes": [
+    "Allies and Lessons connect several color pairs.",
+    "Earthbending gives lands a combat role.",
+    "Choose a coherent aggressive or ramp plan."
+  ],
+  "archetypes": [
+    {
+      "colors": "WU",
+      "name": "Flyers",
+      "plan": "Attack through the air.",
+      "detail": "Use ground creatures to defend."
+    },
+    {
+      "colors": "UB",
+      "name": "Draw two",
+      "plan": "Draw extra cards.",
+      "detail": "Build around repeatable card flow."
+    },
+    {
+      "colors": "BR",
+      "name": "Fire Nation",
+      "plan": "Apply early pressure.",
+      "detail": "Use firebending to support attacks."
+    },
+    {
+      "colors": "RG",
+      "name": "Earth Rumble",
+      "plan": "Ramp into large threats.",
+      "detail": "Earthbending supports your combat plan."
+    },
+    {
+      "colors": "GW",
+      "name": "Allies",
+      "plan": "Develop an Ally team.",
+      "detail": "Prioritize creatures that reinforce the board."
+    },
+    {
+      "colors": "WB",
+      "name": "Sacrifice",
+      "plan": "Spend expendable creatures.",
+      "detail": "Tokens supply sacrifice outlets."
+    },
+    {
+      "colors": "UR",
+      "name": "Combat Lessons",
+      "plan": "Cast spells during combat.",
+      "detail": "Lessons support spell-based payoffs."
+    },
+    {
+      "colors": "BG",
+      "name": "Counters",
+      "plan": "Grow creatures permanently.",
+      "detail": "Combine counters with durable threats."
+    },
+    {
+      "colors": "RW",
+      "name": "Go wide",
+      "plan": "Attack with many creatures.",
+      "detail": "Team boosts turn numbers into damage."
+    },
+    {
+      "colors": "GU",
+      "name": "Ramp and Lessons",
+      "plan": "Build mana and card advantage.",
+      "detail": "Lessons keep resources flowing."
+    }
+  ],
+  "mechanics": [],
+  "sources": [
+    {
+      "label": "Wizards of the Coast",
+      "url": "https://magic.wizards.com/en/news/feature/avatar-the-last-airbender-prerelease-guide"
+    }
+  ],
+  "results": {
+    "format": "PremierDraft",
+    "formatLabel": "Premier Draft (BO1)",
+    "colorCount": 2,
+    "retrievedAt": "2026-10-18T16:55:30.696862+00:00",
+    "period": "ALL_TIME",
+    "userGroup": "all",
+    "splashes": false,
+    "sourceUrl": "https://www.17lands.com/deck_color_data?expansion=TLA&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true",
+    "rows": [
+      {
+        "colors": "WU",
+        "wins": 53011,
+        "games": 92726
+      },
+      {
+        "colors": "UB",
+        "wins": 35290,
+        "games": 62408
+      },
+      {
+        "colors": "BR",
+        "wins": 17242,
+        "games": 31877
+      },
+      {
+        "colors": "RG",
+        "wins": 11299,
+        "games": 20388
+      },
+      {
+        "colors": "WG",
+        "wins": 20717,
+        "games": 36105
+      },
+      {
+        "colors": "WB",
+        "wins": 21168,
+        "games": 37855
+      },
+      {
+        "colors": "BG",
+        "wins": 13596,
+        "games": 24413
+      },
+      {
+        "colors": "UG",
+        "wins": 3569,
+        "games": 6654
+      },
+      {
+        "colors": "UR",
+        "wins": 29755,
+        "games": 52643
+      },
+      {
+        "colors": "WR",
+        "wins": 36880,
+        "games": 64356
+      }
+    ],
+    "baseline": {
+      "wins": 242527,
+      "games": 429425
+    }
+  }
+}

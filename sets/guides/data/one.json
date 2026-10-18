@@ -1,0 +1,145 @@
+{
+  "id": "one",
+  "name": "Phyrexia: All Will Be One",
+  "reviewedAt": "2026-10-18",
+  "notes": [
+    "Early board presence is crucial.",
+    "Corrupted turns on at three poison counters.",
+    "Oil and poison require different supporting cards."
+  ],
+  "archetypes": [
+    {
+      "colors": "WU",
+      "name": "Artifacts",
+      "plan": "Attack with artifact synergy.",
+      "detail": "Build a sufficient artifact count."
+    },
+    {
+      "colors": "UB",
+      "name": "Proliferate control",
+      "plan": "Add counters while defending.",
+      "detail": "Establish poison or oil first."
+    },
+    {
+      "colors": "BR",
+      "name": "Sacrifice",
+      "plan": "Spend expendable artifacts.",
+      "detail": "Use value-producing fodder."
+    },
+    {
+      "colors": "RG",
+      "name": "Oil",
+      "plan": "Build oil-based pressure.",
+      "detail": "Support efficient attackers."
+    },
+    {
+      "colors": "GW",
+      "name": "Toxic swarm",
+      "plan": "Attack with multiple toxic creatures.",
+      "detail": "Mites help overwhelm blocks."
+    },
+    {
+      "colors": "WB",
+      "name": "Corrupted",
+      "plan": "Reach three poison counters.",
+      "detail": "Then exploit corrupted bonuses."
+    },
+    {
+      "colors": "UR",
+      "name": "Spells",
+      "plan": "Cast spells for rewards.",
+      "detail": "Support oil and spell payoffs."
+    },
+    {
+      "colors": "BG",
+      "name": "Toxic threats",
+      "plan": "Connect with substantial toxic creatures.",
+      "detail": "Use tricks and removal."
+    },
+    {
+      "colors": "RW",
+      "name": "Equipment",
+      "plan": "Attack with equipped creatures.",
+      "detail": "For Mirrodin! supplies bodies."
+    },
+    {
+      "colors": "GU",
+      "name": "Proliferate tempo",
+      "plan": "Grow counters and maintain pressure.",
+      "detail": "Start your counters early."
+    }
+  ],
+  "mechanics": [],
+  "sources": [
+    {
+      "label": "Draftsim format guide",
+      "url": "https://draftsim.com/mtg-one-draft-guide/"
+    }
+  ],
+  "results": {
+    "format": "PremierDraft",
+    "formatLabel": "Premier Draft (BO1)",
+    "colorCount": 2,
+    "retrievedAt": "2026-10-18T16:56:31.052919+00:00",
+    "period": "ALL_TIME",
+    "userGroup": "all",
+    "splashes": false,
+    "sourceUrl": "https://www.17lands.com/deck_color_data?expansion=ONE&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true",
+    "rows": [
+      {
+        "colors": "WU",
+        "wins": 37476,
+        "games": 67242
+      },
+      {
+        "colors": "UB",
+        "wins": 24802,
+        "games": 47157
+      },
+      {
+        "colors": "BR",
+        "wins": 13965,
+        "games": 25582
+      },
+      {
+        "colors": "RG",
+        "wins": 108956,
+        "games": 186509
+      },
+      {
+        "colors": "WG",
+        "wins": 35932,
+        "games": 64254
+      },
+      {
+        "colors": "WB",
+        "wins": 55255,
+        "games": 98725
+      },
+      {
+        "colors": "BG",
+        "wins": 23123,
+        "games": 44290
+      },
+      {
+        "colors": "UG",
+        "wins": 10244,
+        "games": 19730
+      },
+      {
+        "colors": "UR",
+        "wins": 26189,
+        "games": 49260
+      },
+      {
+        "colors": "WR",
+        "wins": 74913,
+        "games": 130596
+      }
+    ],
+    "baseline": {
+      "wins": 410855,
+      "games": 733345
+    }
+  }
+}

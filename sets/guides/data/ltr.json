@@ -1,0 +1,145 @@
+{
+  "id": "ltr",
+  "name": "The Lord of the Rings: Tales of Middle-earth",
+  "reviewedAt": "2026-10-18",
+  "notes": [
+    "The Ring connects decks across colors.",
+    "Food and Army tokens serve different plans.",
+    "Legendary creatures can anchor synergy packages."
+  ],
+  "archetypes": [
+    {
+      "colors": "WU",
+      "name": "Draw two",
+      "plan": "Draw extra cards.",
+      "detail": "Win with evasive creatures."
+    },
+    {
+      "colors": "UB",
+      "name": "Amass control",
+      "plan": "Grow an Army while defending.",
+      "detail": "Use interaction to stabilize."
+    },
+    {
+      "colors": "BR",
+      "name": "Amass aggro",
+      "plan": "Attack with Orc support.",
+      "detail": "Keep pressure on opponents."
+    },
+    {
+      "colors": "RG",
+      "name": "Powerful creatures",
+      "plan": "Build substantial attackers.",
+      "detail": "Large threats lead combat."
+    },
+    {
+      "colors": "GW",
+      "name": "Food",
+      "plan": "Generate and spend Food.",
+      "detail": "Support your lifegain payoffs."
+    },
+    {
+      "colors": "WB",
+      "name": "Legends and the Ring",
+      "plan": "Build around legendary creatures.",
+      "detail": "The Ring can make your Ring-bearer legendary."
+    },
+    {
+      "colors": "UR",
+      "name": "Spells",
+      "plan": "Chain instants and sorceries.",
+      "detail": "Use spell-triggered rewards."
+    },
+    {
+      "colors": "BG",
+      "name": "Food and sacrifice",
+      "plan": "Spend resources for value.",
+      "detail": "Food supplies sacrifice material."
+    },
+    {
+      "colors": "RW",
+      "name": "Humans",
+      "plan": "Build an attacking team.",
+      "detail": "Use Human synergies."
+    },
+    {
+      "colors": "GU",
+      "name": "Scry",
+      "plan": "Improve draws with scry.",
+      "detail": "Pair enablers with scry payoffs."
+    }
+  ],
+  "mechanics": [],
+  "sources": [
+    {
+      "label": "Wizards of the Coast",
+      "url": "https://magic.wizards.com/en/news/making-magic/crafting-the-ring-part-2"
+    }
+  ],
+  "results": {
+    "format": "PremierDraft",
+    "formatLabel": "Premier Draft (BO1)",
+    "colorCount": 2,
+    "retrievedAt": "2026-10-18T16:56:23.953099+00:00",
+    "period": "ALL_TIME",
+    "userGroup": "all",
+    "splashes": false,
+    "sourceUrl": "https://www.17lands.com/deck_color_data?expansion=LTR&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true",
+    "rows": [
+      {
+        "colors": "WU",
+        "wins": 15591,
+        "games": 29139
+      },
+      {
+        "colors": "UB",
+        "wins": 53587,
+        "games": 93504
+      },
+      {
+        "colors": "BR",
+        "wins": 105434,
+        "games": 177773
+      },
+      {
+        "colors": "RG",
+        "wins": 6767,
+        "games": 12353
+      },
+      {
+        "colors": "WG",
+        "wins": 13680,
+        "games": 26182
+      },
+      {
+        "colors": "WB",
+        "wins": 50100,
+        "games": 87046
+      },
+      {
+        "colors": "BG",
+        "wins": 18309,
+        "games": 32397
+      },
+      {
+        "colors": "UG",
+        "wins": 11293,
+        "games": 22394
+      },
+      {
+        "colors": "UR",
+        "wins": 78715,
+        "games": 137602
+      },
+      {
+        "colors": "WR",
+        "wins": 46149,
+        "games": 81623
+      }
+    ],
+    "baseline": {
+      "wins": 399625,
+      "games": 700013
+    }
+  }
+}
