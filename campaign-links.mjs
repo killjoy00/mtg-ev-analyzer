@@ -41,6 +41,12 @@ export function isCanonicalCampaignSlug(input) {
 function validateCampaignTrackingFields(entry,label='campaign link',{allowCreator=false}={}) {
   if(!entry||typeof entry!=='object'||Array.isArray(entry))throw new Error(`${label} must be an object.`);
   if(!SUPPORTED_CAMPAIGN_DESTINATIONS.includes(entry.destination)&&!(allowCreator&&CREATOR_CAMPAIGN_DESTINATION_PATTERN.test(entry.destination)))throw new Error(`${label} destination "${entry.destination}" is not supported.`);
+  if(entry.untracked===true) {
+    if(['source','campaign','medium'].some(key=>Object.hasOwn(entry,key)))
+      throw new Error(`${label} untracked entries must not carry campaign attribution.`);
+    return {destination:entry.destination,untracked:true};
+  }
+  if(Object.hasOwn(entry,'untracked'))throw new Error(`${label} untracked must be true when supplied.`);
   for(const key of ['source','campaign']) {
     if(!isCanonicalAcquisitionValue(entry[key]))throw new Error(`${label} ${key} must already be canonical and match ${ACQUISITION_PATTERN}.`);
   }
@@ -56,7 +62,7 @@ function validateCampaignTrackingFields(entry,label='campaign link',{allowCreato
 export function validateCampaignEntries(input) {
   if(!Array.isArray(input))throw new Error('campaign-links.json must contain an array.');
   const seen=new Set();
-  const allowedKeys=new Set(['slug','destination','source','campaign','medium']);
+  const allowedKeys=new Set(['slug','destination','source','campaign','medium','untracked']);
   return input.map((entry,index)=>{
     const label=`campaign-links.json entry ${index+1}`;
     if(!entry||typeof entry!=='object'||Array.isArray(entry))throw new Error(`${label} must be an object.`);
@@ -73,9 +79,11 @@ export function validateCampaignEntries(input) {
 export function buildCampaignTrackingUrl(entry,{allowCreator=false}={}) {
   const valid=validateCampaignTrackingFields(entry,'campaign link',{allowCreator});
   const url=new URL(valid.destination,PACK_ONE_ORIGIN);
-  url.searchParams.set('utm_source',valid.source);
-  url.searchParams.set('utm_campaign',valid.campaign);
-  if(valid.medium)url.searchParams.set('utm_medium',valid.medium);
+  if(!valid.untracked) {
+    url.searchParams.set('utm_source',valid.source);
+    url.searchParams.set('utm_campaign',valid.campaign);
+    if(valid.medium)url.searchParams.set('utm_medium',valid.medium);
+  }
   return url.toString();
 }
 
