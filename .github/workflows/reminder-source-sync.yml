@@ -1,0 +1,53 @@
+name: Apply reviewed reminder source patch
+
+on:
+  push:
+    branches: ['feat/1151-daily-reminders']
+    paths: ['.github/workflows/reminder-source-sync.yml']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: reminder-source-sync
+  cancel-in-progress: false
+
+jobs:
+  source:
+    if: github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/feat/1151-daily-reminders'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Verify and apply only the reviewed source patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib,json,pathlib,subprocess
+          manifest=json.loads(pathlib.Path('scripts/reminder-source-sync.json').read_text())
+          patch=pathlib.Path('scripts/reminder-source-sync.patch')
+          allowed={'worker/growth-function.js','mobile/package-lock.json','worker/account-deletion.mjs','my-pack-one.mjs','mobile/src/nativeEditorial.ts','privacy/index.html','docs/mobile-release-runbook.md','mobile/scripts/audit-android-manifest.py','mobile/src/api/account.ts','mobile/app.config.ts'}
+          assert manifest['base']=='60658d01e45e8501835eebea40ec79965a65ad22'
+          assert {row['path'] for row in manifest['files']}==allowed
+          assert len(manifest['files'])==len(allowed)
+          assert hashlib.sha256(patch.read_bytes()).hexdigest()==manifest['patch_sha256']
+          subprocess.run(['git','merge-base','--is-ancestor',manifest['base'],'HEAD'],check=True)
+          for row in manifest['files']:
+            assert subprocess.check_output(['git','hash-object',row['path']],text=True).strip()==row['before'],row['path']
+          subprocess.run(['git','apply','--index',str(patch)],check=True)
+          changed=set(subprocess.check_output(['git','diff','--cached','--name-only'],text=True).splitlines())
+          assert changed==allowed
+          for row in manifest['files']:
+            assert subprocess.check_output(['git','hash-object',row['path']],text=True).strip()==row['after'],row['path']
+          subprocess.run(['git','diff','--cached','--check'],check=True)
+          print('Verified exact source hashes for all ten allowed files.')
+          PY
+          git fetch --no-tags origin feat/1151-daily-reminders
+          test "$(git rev-parse FETCH_HEAD)" = "$GITHUB_SHA"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(reminders): publish tested ownership, notification configuration and privacy hardening'
+          git push origin HEAD:refs/heads/feat/1151-daily-reminders
