@@ -30,7 +30,7 @@ jobs:
           POSTGRES_PASSWORD: fixture-only
         ports: ['5432:5432']
         options: >-
-          --health-cmd 'pg_isready -U pack1_test -d pack1_reminder_test'
+          --health-cmd "pg_isready -U pack1_test -d pack1_reminder_test"
           --health-interval 5s --health-timeout 5s --health-retries 12
     env:
       PACK1_TEST_DATABASE_URL: postgresql://pack1_test:fixture-only@127.0.0.1:5432/pack1_reminder_test
