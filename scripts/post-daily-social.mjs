@@ -6,7 +6,7 @@ import {createGithubReceiptLedger,discordReceiptKey} from './daily-social-ledger
 
 const SITE='https://packone.pro';
 const DAILY_URL=SITE+'/?game=draft-run&daily=1';
-const DISCORD_DAILY_URL=SITE+'/go/daily/';
+const DISCORD_DAILY_URL=SITE+'/go/discord/';
 const PACIFIC='America/Los_Angeles';
 const MAX_IMAGE_BYTES=1_000_000;
 // The site's existing share banner, centered on its own background at the
