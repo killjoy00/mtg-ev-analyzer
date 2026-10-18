@@ -7,7 +7,7 @@ const TOKEN=/^(?:Expo|Exponent)PushToken\[[A-Za-z0-9_-]{10,192}\]$/;
 const TRIGGERS=new Set(['pack1-daily-reminders']);
 const MAX_LATENESS_MS=20*60*1000;
 const DEFAULT={frequency:'daily',weekdays:[1],localTime:'09:00',timeZone:'Etc/UTC'};
-const URL='https://api.packone.pro/growth/v1/reminders/unsubscribe';
+const UNSUBSCRIBE_URL='https://api.packone.pro/growth/v1/reminders/unsubscribe';
 const DEFAULT_EMAIL='Pack One <accounts@packone.pro>';
 const apiError=(message,status=400)=>Object.assign(Error(message),{status});
 const yes=value=>value===true||value==='t'||value==='true'||value==='1'||value===1;
@@ -211,7 +211,7 @@ async function deliverOne(query,id,clock,{env=process.env,fetcher=fetch,pacificD
     if(row.channel==='email') {
       const key=String(env.PACK1_ACCOUNT_DELETE_RESEND_API_KEY||'');
       if(!key.startsWith('re_'))throw apiError('Email provider not configured.',503);
-      const unsubscribe=URL+'?token='+encodeURIComponent(unsubscribeToken(row.auth_user_id,row.unsubscribe_nonce,env));
+      const unsubscribe=UNSUBSCRIBE_URL+'?token='+encodeURIComponent(unsubscribeToken(row.auth_user_id,row.unsubscribe_nonce,env));
       const text=['Your Pack One Dailies are ready.','',
         'Play today: https://packone.pro/','','You receive this because you enabled email Daily reminders.',
         'Manage reminders: https://packone.pro/ (My Pack One → Account settings)',

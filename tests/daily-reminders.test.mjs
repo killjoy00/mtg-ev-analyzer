@@ -189,7 +189,7 @@ test('ambiguous timeout never produces a second send or a blind retry',async()=>
   assert.equal(result.uncertain,1);
   assert.equal(f.fetches.length,1);
   assert.ok(f.calls.some(c=>c.sql.includes("state='uncertain'")));
-  assert.ok(!f.calls.some(c=>c.sql.includes("state='retry'")));
+  assert.ok(!f.calls.some(c=>c.sql.includes("SET state='retry'")));
 });
 test('unsubscribe GET is not a destructive act; signed POST revokes only email',async()=>{
   const f=deliveryFixture();

@@ -27,20 +27,30 @@ export default function AccountRemindersScreen() {
   const [saving,setSaving]=useState(false);
   const [notice,setNotice]=useState<string|null>(null);
   const [permissionBlocked,setPermissionBlocked]=useState(false);
+  const ownerId=session?.accountUser?.id||null;
+  const [loadedFor,setLoadedFor]=useState<string|null>(null);
   useEffect(()=>{
     let active=true;
-    setSnapshot(null);setSchedule(null);setLoading(true);setNotice(null);
-    if(!session?.accountToken){setLoading(false);return ()=>{active=false;};}
-    void loadNativeReminders(session).then(value=>{
+    // Deferred state updates avoid cascading renders during effect setup.
+    // The owner-key render guard prevents even a frame of the old account's UI.
+    void Promise.resolve().then(async()=>{
       if(!active)return;
-      setSnapshot(value);
-      setSchedule({...value.schedule,timeZone:
-        !value.nextAt&&!value.email.consentedAt&&!value.push.consentedAt?deviceTimezone():value.schedule.timeZone});
-    }).catch(err=>{
-      if(active)setNotice(err instanceof Error?err.message:'Could not load reminders.');
-    }).finally(()=>{if(active)setLoading(false);});
+      setSnapshot(null);setSchedule(null);setLoading(true);setNotice(null);
+      if(!session?.accountToken){setLoading(false);setLoadedFor(null);return;}
+      try {
+        const value=await loadNativeReminders(session);
+        if(!active)return;
+        setSnapshot(value);
+        setSchedule({...value.schedule,timeZone:
+          !value.nextAt&&!value.email.consentedAt&&!value.push.consentedAt?deviceTimezone():value.schedule.timeZone});
+      }catch(err){
+        if(active)setNotice(err instanceof Error?err.message:'Could not load reminders.');
+      }finally{
+        if(active){setLoading(false);setLoadedFor(session.accountUser?.id||null);}
+      }
+    });
     return ()=>{active=false;};
-  },[session?.accountToken,session?.accountUser?.id]);
+  },[session]);
 
   const toggleDay=(day:number)=>{
     if(!schedule)return;
@@ -79,7 +89,7 @@ export default function AccountRemindersScreen() {
     }finally{setSaving(false);}
   };
   const disabled=saving||loading||accountBusy;
-  if(accountBusy||loading)return <SafeAreaView style={styles.safe}><View style={styles.center}>
+  if(accountBusy||loading||(Boolean(session?.accountToken)&&loadedFor!==ownerId))return <SafeAreaView style={styles.safe}><View style={styles.center}>
     <ActivityIndicator color={colors.accent}/><Text style={styles.body}>Loading reminders…</Text>
   </View></SafeAreaView>;
   if(!account||!session?.accountToken)return <SafeAreaView style={styles.safe}><View style={styles.center}>

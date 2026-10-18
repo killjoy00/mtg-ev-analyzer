@@ -25,8 +25,6 @@ export function ReminderPushBridge() {
   const root=useRootNavigationState();
   const ready=Boolean(root?.key);
   const previous=useRef<MobileSession|null>(null);
-  const readyRef=useRef(false);
-  readyRef.current=ready;
   useEffect(()=>{
     if(config.screenshots.fixtures)return;
     let mounted=true;
@@ -59,7 +57,7 @@ export function ReminderPushBridge() {
     if(config.screenshots.fixtures||!ready)return;
     let mounted=true;
     async function handle(response:Notifications.NotificationResponse|null|undefined) {
-      if(!response||!mounted||!readyRef.current)return;
+      if(!response||!mounted||!ready)return;
       const data=response.notification.request.content.data;
       const session=await readSession().catch(()=>null);
       if(!belongsToCurrentAccount(data,session)) {
