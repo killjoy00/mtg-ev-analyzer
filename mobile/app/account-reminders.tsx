@@ -68,16 +68,17 @@ export default function AccountRemindersScreen() {
   };
   const save=async(channel:ReminderChannel,enabled:boolean)=>{
     if(!session?.accountToken||!schedule||saving||!snapshot)return;
-    if(!/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/.test(schedule.localTime)) {
+    const effectiveSchedule=enabled?schedule:snapshot.schedule;
+    if(enabled&&!/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/.test(effectiveSchedule.localTime)) {
       setNotice('Use 24-hour local time (HH:mm).');return;
     }
-    if(!schedule.weekdays.length||(schedule.frequency==='weekly'&&schedule.weekdays.length!==1)){
+    if(enabled&&(!effectiveSchedule.weekdays.length||(effectiveSchedule.frequency==='weekly'&&effectiveSchedule.weekdays.length!==1))){
       setNotice('Select one weekday for weekly reminders, or at least one for custom reminders.');return;
     }
     setSaving(true);setNotice(null);setPermissionBlocked(false);
     try {
       if(channel==='push'&&enabled&&!snapshot.push.enabled)await enablePushOnDevice(session);
-      const updated=await saveNativeReminders(session,channel,enabled,schedule);
+      const updated=await saveNativeReminders(session,channel,enabled,effectiveSchedule);
       if(channel==='push'&&!enabled)await unregisterReminderDevice(session);
       setSnapshot(updated);setSchedule(updated.schedule);
       setNotice(channel==='email'

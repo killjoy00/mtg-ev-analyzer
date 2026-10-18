@@ -113,7 +113,7 @@ export async function bindDailyReminderSettings() {
       }
       void send(value);
     });
-    mount.querySelector('#daily-reminder-optout')?.addEventListener('click',()=>void send({...snapshot(),enabled:false}));
+    mount.querySelector('#daily-reminder-optout')?.addEventListener('click',()=>void send({...current.schedule,channel:'email',enabled:false}));
   }catch(error) {
     if(generation===ownerGeneration&&mount.isConnected)
       mount.innerHTML='<p role="alert">Could not load reminders. '+safe(error?.message||'Please try again.')+
