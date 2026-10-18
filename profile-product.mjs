@@ -25,6 +25,7 @@ import { nextMilestones } from './progression.mjs?v=10';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { eliteSource } from './membership-source.mjs';
 import { renderAccount, renderDeletionState } from './growth.mjs?v=14';
+import {dailyReminderSettingsMarkup,bindDailyReminderSettings} from './daily-reminder-settings.mjs?v=1';
 import {
   bestPercentile,
   liveEnvironmentProgress,
@@ -213,6 +214,7 @@ function settingsMarkup(profile, progress, account, patreon) {
   const membershipUrl=elite?supportUrl:'/patreon/';
   return `<section class="profile-settings profile-account" id="profile-account" aria-labelledby="profile-account-title">
     <header class="profile-account-session"><div><p class="eyebrow" id="profile-account-title">${account?.user?'Signed in':account?.unavailable?'Account unavailable':'Signed out'}</p><p class="profile-account-session-copy">${account?.unavailable?'Account status is temporarily unavailable. Your career is still here.':account?.user?.email?`<strong>${esc(account.user.email)}</strong>`:'Your saved profile and preferences.'}</p></div>${account?.unavailable?'<button type="button" class="button secondary" id="account-status-retry">Retry account</button>':account?.user?'<button type="button" class="button secondary" id="account-signout">Sign out</button>':'<button type="button" class="button secondary" id="profile-claim-account">Sign in</button>'}</header>
+    ${dailyReminderSettingsMarkup({signedIn:Boolean(account?.user)})}
     ${account?.user?`<section class="profile-settings-group profile-settings-profile" aria-labelledby="profile-visibility-title">
       <div class="profile-settings-heading-row"><div><p class="eyebrow">Profile</p><h3 id="profile-visibility-title">Profile &amp; visibility</h3><p class="profile-settings-intro">Choose your public name and what appears on your Pack One profile.</p></div></div>
       <form id="profile-settings-form">
@@ -357,6 +359,7 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
 
   document.querySelector('#profile-home')?.addEventListener('click', () => { window.location.href = './'; });
   document.querySelector('#account-status-retry')?.addEventListener('click',()=>void renderMyProfile());
+  void bindDailyReminderSettings();
   document.querySelector('#account-signout')?.addEventListener('click',async e=>{e.currentTarget.disabled=true;await signOutAccount();track('auth_sign_out');await renderAccount();});
   document.querySelector('#account-password-change')?.addEventListener('submit',async e=>{
     e.preventDefault();

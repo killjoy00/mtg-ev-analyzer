@@ -60,6 +60,14 @@ export const privacySections: ArticleSection[] = [
     ],
   },
   {
+    title: 'Optional Daily reminders',
+    paragraphs: [
+      'Daily reminders by email and native push are off by default. Email and push require separate explicit consent, and you can select days, local time, and timezone, then disable either channel at any time. Emails go only to the verified account address; push requires device permission.',
+      'Pack One stores account-owned reminder settings, consent timestamps and change records, device registrations with protected push tokens, and delivery and bounce status. Resend handles opted-in emails; Expo and mobile push providers handle device tokens and messages. Provider acceptance does not prove device display.',
+      'Unsubscribing from email leaves push preferences unchanged. Signing out or switching accounts revokes the associated device registration. Account deletion removes preferences, delivery records, and device registrations.',
+    ],
+  },
+  {
     title: 'Gameplay, analytics, and decision reports',
     body: [
       'Pack One stores gameplay inputs and results needed to score runs, preserve progress, show history, support Daily leaderboards, and operate account features. Pack One also records product events such as page views, game starts, reveals, challenge opens and completions, shares, and outbound commerce clicks so it can understand whether the product works and where players stop in the experience.',
