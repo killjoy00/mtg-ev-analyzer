@@ -191,3 +191,7 @@ Record in the mobile tracker:
 - store submission/review status
 - final release time and countries
 - any rollback/hotfix action
+
+## Optional Daily reminders (#1151)
+
+See [Daily reminder implementation and release](DAILY-REMINDERS.md) for per-device consent, notification credentials, automated validation and signed physical-device acceptance. This feature does not authorize replacing pending submissions, changing testers/tracks or restarting any testing clock. The existing reviewed signed-build controls are unchanged.

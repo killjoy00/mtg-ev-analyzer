@@ -73,11 +73,17 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ? optionalMarketingVersion('PACKONE_IOS_MARKETING_VERSION')
     : undefined;
   const androidVersionCode = production ? optionalAndroidVersionCode() : undefined;
+  const notificationProjectId=process.env.EXPO_PUBLIC_PACKONE_EXPO_PROJECT_ID?.trim();
+  if(notificationProjectId&&!/^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i.test(notificationProjectId))throw Error('Notification project ID must be a UUID.');
+  const googleServicesFile=process.env.PACKONE_ANDROID_GOOGLE_SERVICES_FILE?.trim();
 
   return {
     ...config,
     name: displayName,
     slug: 'pack-one',
+    plugins: config.plugins?.map(plugin => Array.isArray(plugin)&&plugin[0]==='expo-notifications'
+      ? [plugin[0], {...plugin[1], mode:production?'production':'development', enableBackgroundRemoteNotifications:false}]
+      : plugin),
     ...(iosMarketingVersion ? { version: iosMarketingVersion } : {}),
     description: 'Practice real draft decisions, compare trophy picks, and track your Pack One career.',
     backgroundColor: '#f7f8fa',
@@ -85,6 +91,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     extra: {
       ...config.extra,
       buildProfile: profile,
+      notifications: {projectId: notificationProjectId || null, androidConfigured: Boolean(googleServicesFile)},
     },
     ios: {
       ...config.ios,
@@ -102,6 +109,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     android: {
       ...config.android,
       package: identifier,
+      ...(googleServicesFile ? {googleServicesFile} : {}),
       ...(production
         ? {
             blockedPermissions: [

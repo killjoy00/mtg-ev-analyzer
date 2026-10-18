@@ -1,5 +1,5 @@
 import {createHmac} from 'node:crypto';
-import {reminderRoute,revokeReminderSessionDevices} from './daily-reminders.mjs';
+import {reminderRoute,revokeReminderSessionDevices,reminderReadiness} from './daily-reminders.mjs';
 import {retryRolledBackQuery} from './database-retry.mjs';
 import {releaseMetadata} from './release.mjs';
 import {guardIngress} from './ingress-auth.mjs';
@@ -1650,9 +1650,11 @@ async function handleMobileMyHistory(request) {
 }
 
 async function handleMobileSignout(request) {
-  const {auth}=await mobileAccountIdentity(request);
-  await revokeReminderSessionDevices(query,auth);
-  await revokeAccountSession(query,auth);
+  // Logout authenticates the account session itself. A stale game-player token
+  // must not prevent its owner from revoking notification routing and signing out.
+  const auth=await authSession(request,{required:false,allowLegacy:false,csrf:false});
+  if(auth&&auth.source!=='mobile')throw Object.assign(Error('Native account session required.'),{status:401});
+  if(auth){await revokeReminderSessionDevices(query,auth);await revokeAccountSession(query,auth);}
   return json({ok:true});
 }
 
@@ -2455,7 +2457,7 @@ async function handleProfileLookup(request) {
 async function route(request) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(request) });
   const url = new URL(request.url);
-  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, profiles: true, account_deletion_enabled:deletionEnabled(), verification_sweep_enabled:verificationSweepEnabled(), deletion_email_configured:deletionEmailConfigured(), launch_watcher_recovery_configured:launchWatcherRecoveryConfigured(), campaign_link_publish_configured:campaignLinkPublishConfigured(), apple_sign_in_configured:appleConfigured(), reminder_delivery_active:process.env.PACK1_DAILY_REMINDERS_ENABLED==='1', reminder_delivery_ready: String(process.env.PACK1_RATE_LIMIT_SECRET||'').length>=32 && String(process.env.PACK1_ACCOUNT_DELETE_RESEND_API_KEY||'').startsWith('re_') && /^[a-f0-9]{64}$/i.test(String(process.env.PACK1_REMINDER_TOKEN_KEY||'')) && String(process.env.PACK1_REMINDER_RESEND_WEBHOOK_SECRET||'').startsWith('whsec_') });
+  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, profiles: true, account_deletion_enabled:deletionEnabled(), verification_sweep_enabled:verificationSweepEnabled(), deletion_email_configured:deletionEmailConfigured(), launch_watcher_recovery_configured:launchWatcherRecoveryConfigured(), campaign_link_publish_configured:campaignLinkPublishConfigured(), apple_sign_in_configured:appleConfigured(), reminder_delivery_active:reminderReadiness().emailActive||reminderReadiness().pushActive, reminder_delivery_ready:reminderReadiness().emailReady, reminder_email_active:reminderReadiness().emailActive, reminder_push_active:reminderReadiness().pushActive });
   if (url.pathname === '/internal/account-deletion-maintenance') return handleDeletionMaintenance(request);
   if (url.pathname === '/internal/account-deletion-maintenance-status') return handleDeletionMaintenanceStatus(request);
   if (url.pathname === '/internal/daily-reminders' || url.pathname === '/v1/reminders/unsubscribe' || url.pathname === '/v1/reminders/provider-event' || /^\/v1\/(?:mobile\/)?account\/reminders(?:\/devices)?$/.test(url.pathname))

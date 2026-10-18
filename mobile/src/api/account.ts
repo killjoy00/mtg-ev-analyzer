@@ -57,11 +57,18 @@ async function persistAccount(result: MobileAuthResponse) {
   };
   const previous=await readSession();
   if(previous?.accountToken&&previous.accountUser?.id&&previous.accountUser.id!==result.user.id){
-    const {unregisterReminderDevice}=await import('@/src/api/reminders');
-    try{await unregisterReminderDevice(previous);}catch(error){
+    // Revoke the old per-device account session, not just its current token row:
+    // a late registration request using that session must also become invalid.
+    try {
+      await requestJson('/growth/v1/mobile/account/signout',{
+        method:'POST',mobileSessionToken:previous.playerToken,mobileAccountToken:previous.accountToken,body:{},
+      });
+    }catch(error){
       if(!(error&&typeof error==='object'&&'status' in error&&error.status===401))
-        throw Error('Could not revoke the previous account\'s device notifications. Try switching accounts again.');
+        throw Error('Could not revoke the previous account session. Retry switching accounts.');
     }
+    const {clearLocalReminderConsent}=await import('@/src/api/reminders');
+    await clearLocalReminderConsent();
   }
   await writeSession(next);
   return next;
@@ -213,6 +220,8 @@ export async function loadMobileAccount(session: MobileSession) {
 }
 
 export async function forgetAccountLocally(session: MobileSession) {
+  const {clearLocalReminderConsent}=await import('@/src/api/reminders');
+  await clearLocalReminderConsent();
   const next: MobileSession = {
     playerToken: session.playerToken,
     subjectId: session.subjectId,
