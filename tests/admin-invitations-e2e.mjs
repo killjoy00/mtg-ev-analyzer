@@ -30,6 +30,11 @@ async function pageFor({signedIn=true,role='owner',acceptStatus=200,accountEmail
       share_funnel:{},groups:[],sets:[],reviews:[],
     }});
 
+    if(path==='/v1/admin/player-reports/summary')return route.fulfill({json:{summary:{decisions:{open:0,broken_open:0},profiles:{open:0}}}});
+    if(path==='/v1/admin/users')return route.fulfill({json:{summary:{total:1,new_30d:0,active_30d:1,paid:0,username_attention:0}}});
+    if(path==='/v1/admin/corpus')return route.fulfill({json:{sets:[],readiness:{ready:true,current:true}}});
+    if(path==='/v1/admin/creator-challenges')return route.fulfill({json:{challenges:[]}});
+    if(path==='/v1/admin/measurements/habits')return route.fulfill({json:{habit_metrics:{cohorts:[]}}});
     if(path==='/v1/admin/team')return route.fulfill({json:{ok:true,members:[
       {id:ownerId,email:'owner@example.invalid',role:'owner',name:'Owner'},
       ...(!revokedMember?[{id:memberId,email:'member@example.invalid',role:'admin',name:'Member'}]:[])],
@@ -46,7 +51,7 @@ try {
   const owner=await pageFor();
   await owner.page.goto('http://127.0.0.1:4173/admin/?area=team');
   await owner.page.getByRole('heading',{name:'Administrator access'}).waitFor();
-  assert.equal(await owner.page.locator('#admin-team-link').isVisible(),true);
+  assert.equal(await owner.page.locator('#admin-overview-link').isVisible(),true);
   assert.equal(await owner.page.getByText('Owner-only:',{exact:false}).count(),1);
   await owner.page.getByRole('textbox',{name:'Verified account email'}).fill('invited@example.invalid');
   await owner.page.getByRole('button',{name:'Create invitation'}).click();
@@ -80,7 +85,7 @@ try {
   assert.equal(invitee.requests.some(r=>r.path==='/v1/admin/invitations/accept'),false,
     'Reloading the invitation must not trigger POST acceptance');
   await invitee.page.getByRole('button',{name:'Accept admin invitation'}).click();
-  await invitee.page.getByRole('heading',{name:'How the decisions play'}).waitFor();
+  await invitee.page.getByRole('heading',{name:'Overview',exact:true}).waitFor();
   const claims=invitee.requests.filter(r=>r.path==='/v1/admin/invitations/accept');
   assert.equal(claims.length,1,'Exactly one POST after affirmative button click');
   assert.equal(claims[0].method,'POST');assert.deepEqual(claims[0].body,{token});
