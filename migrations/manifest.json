@@ -65,7 +65,8 @@
     "0058_owner_guard_admin_deletion.sql",
     "0059_daily_peer_stats.sql",
     "0060_player_report_review.sql",
-    "0061_daily_reminders.sql"
+    "0061_daily_reminders.sql",
+    "0062_daily_email_reminder_admission.sql"
   ],
   "same_prefix_order": {
     "0037": [
@@ -179,7 +180,8 @@
         "0058_owner_guard_admin_deletion.sql",
         "0059_daily_peer_stats.sql",
         "0060_player_report_review.sql",
-        "0061_daily_reminders.sql"
+        "0061_daily_reminders.sql",
+        "0062_daily_email_reminder_admission.sql"
       ]
     },
     "daily-calendar": {
@@ -235,7 +237,8 @@
         "0058_owner_guard_admin_deletion.sql",
         "0059_daily_peer_stats.sql",
         "0060_player_report_review.sql",
-        "0061_daily_reminders.sql"
+        "0061_daily_reminders.sql",
+        "0062_daily_email_reminder_admission.sql"
       ]
     },
     "launch-load": {
@@ -266,7 +269,8 @@
         "0058_owner_guard_admin_deletion.sql",
         "0059_daily_peer_stats.sql",
         "0060_player_report_review.sql",
-        "0061_daily_reminders.sql"
+        "0061_daily_reminders.sql",
+        "0062_daily_email_reminder_admission.sql"
       ]
     },
     "launch-distributed": {
@@ -299,7 +303,8 @@
         "0058_owner_guard_admin_deletion.sql",
         "0059_daily_peer_stats.sql",
         "0060_player_report_review.sql",
-        "0061_daily_reminders.sql"
+        "0061_daily_reminders.sql",
+        "0062_daily_email_reminder_admission.sql"
       ]
     }
   }

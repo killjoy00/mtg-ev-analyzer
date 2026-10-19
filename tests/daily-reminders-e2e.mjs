@@ -7,7 +7,7 @@ const browser=await chromium.launch(process.env.CI?{headless:true,channel:'chrom
 const page=await browser.newPage({viewport:{width:390,height:844},timezoneId:'America/Chicago'});
 const owner='11111111-1111-4111-8111-111111111111';
 const user={id:owner,name:'Reminder fixture',email:'reminder-fixture@example.invalid'};
-const state={schedule:{frequency:'daily',weekdays:[1],localTime:'09:00',timeZone:'America/Chicago'},
+const state={schedule:{frequency:'daily',weekdays:[0,1,2,3,4,5,6],localTime:'23:05',timeZone:'Etc/UTC'},
   email:{enabled:false,eligible:true,suppressed:false,consentedAt:null,deliveredAt:null,deliveryActive:true},
   push:{enabled:false,consentedAt:null,providerAcceptedAt:null,deliveryActive:false},nextAt:null};
 const errors=[],assets=[],saves=[];let signed=true,available=true;
@@ -25,9 +25,10 @@ await page.route('https://api.packone.pro/**',async route=>{
     else if(!signed){status=401;value={error:'Account session required.'};}
     else {
       if(request.method()==='PATCH'){
-        const input=request.postDataJSON();assert.equal(input.expectedAccountId,owner);assert.equal(input.channel,'email');assert.equal(Object.hasOwn(input,'email'),false);
+        const input=request.postDataJSON();assert.deepEqual(Object.keys(input).sort(),['channel','enabled','expectedAccountId']);
+        assert.equal(input.expectedAccountId,owner);assert.equal(input.channel,'email');
         saves.push(input);state.email.enabled=input.enabled;state.email.consentedAt='2026-10-18T12:00:00Z';
-        state.schedule={frequency:input.frequency,weekdays:input.weekdays,localTime:input.localTime,timeZone:input.timeZone};
+        state.nextAt=input.enabled?'2026-10-19T23:05:00Z':null;
       }
       value=state;
     }
@@ -37,27 +38,25 @@ await page.route('https://api.packone.pro/**',async route=>{
 });
 try {
   await page.goto(base+'/tests/auth-context-harness.html');
-  await page.locator('#profile-account-tab').click();await page.locator('#daily-reminder-edit').waitFor();
-  assert.equal(await page.locator('#daily-reminder-settings').count(),1,'My Pack One must render one reminder editor');
+  await page.locator('#profile-account-tab').click();await page.locator('#daily-reminder-enable').waitFor();
+  assert.equal(await page.locator('#daily-reminder-settings').count(),1,'My Pack One must render one reminder setting');
   const order=await page.$$eval('#profile-account h3',items=>items.map(item=>item.id));
   assert.equal(order.indexOf('daily-reminder-heading'),order.indexOf('delete-account-title')-1,'reminders sit directly above Delete account');
   assert.ok(order.indexOf('daily-reminder-heading')>order.indexOf('credential-settings-title'),'reminders come after Sign-in & security');
-  assert.equal(await page.locator('#daily-reminder-form').isHidden(),true,'schedule editor is collapsed until requested');
+  assert.doesNotMatch(await page.locator('#daily-reminder-settings').innerText(),/push|notification|device/i,'web settings never mention push');
   assert.equal(saves.length,0);
-  assert.ok(assets.includes('/daily-reminder-settings.mjs?v=3'),'new settings asset is loaded');
+  assert.ok(assets.includes('/daily-reminder-settings.mjs?v=4'),'new settings asset is loaded');
   assert.ok(assets.includes('/growth-api.mjs?v=2'),'new reminder API exports cannot come from a stale cached module');
-  await page.getByRole('button',{name:'Turn on',exact:true}).click();await page.getByRole('button',{name:'Save reminder',exact:true}).click();
-  await page.getByText('Reminder saved.',{exact:true}).waitFor();assert.equal(saves.length,1);assert.equal(state.push.enabled,false);
-  assert.equal(saves[0].enabled,true);assert.deepEqual(saves[0].weekdays,[0,1,2,3,4,5,6]);
-  await page.getByRole('button',{name:'Change',exact:true}).click();
-  await page.locator('[name="timeZone"]').selectOption('America/Denver');await page.locator('[name="localTime"]').fill('');
+  await page.getByRole('button',{name:'Turn on',exact:true}).click();
+  await page.getByText('Email reminders turned on.',{exact:true}).waitFor();assert.equal(saves.length,1);assert.equal(state.push.enabled,false);
+  assert.equal(saves[0].enabled,true);assert.match(await page.locator('#daily-reminder-settings').innerText(),/Next email:/);
   await page.getByRole('button',{name:'Turn off',exact:true}).click();await page.getByText('Email reminders turned off.',{exact:true}).waitFor();
-  assert.equal(saves.at(-1).enabled,false);assert.equal(saves.at(-1).timeZone,'America/Chicago');
-  available=false;await page.evaluate(async()=>{await (await import('/daily-reminder-settings.mjs?v=3')).bindDailyReminderSettings();});
-  await page.getByRole('button',{name:'Retry',exact:true}).waitFor();assert.equal(await page.locator('#daily-reminder-form').count(),0);
-  available=true;await page.getByRole('button',{name:'Retry',exact:true}).click();await page.locator('#daily-reminder-edit').waitFor();
+  assert.equal(saves.at(-1).enabled,false);
+  available=false;await page.evaluate(async()=>{await (await import('/daily-reminder-settings.mjs?v=4')).bindDailyReminderSettings();});
+  await page.getByRole('button',{name:'Retry',exact:true}).waitFor();assert.equal(await page.locator('#daily-reminder-enable').count(),0);
+  available=true;await page.getByRole('button',{name:'Retry',exact:true}).click();await page.locator('#daily-reminder-enable').waitFor();
   for(const width of [320,390,1440]){await page.setViewportSize({width,height:900});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));}
   signed=false;await page.evaluate(()=>window.dispatchEvent(new Event('packone-account-changed')));
-  await page.waitForFunction(()=>!document.querySelector('#daily-reminder-form')&&!document.querySelector('#daily-reminder-edit'));assert.deepEqual(errors,[]);
-  console.log('Routed My Pack One reminder settings, fresh assets, separate consent, opt-out, retry, responsive layout and logout passed (synthetic APIs).');
+  await page.waitForFunction(()=>!document.querySelector('#daily-reminder-enable')&&!document.querySelector('#daily-reminder-optout'));assert.deepEqual(errors,[]);
+  console.log('Routed My Pack One reminder setting, fresh assets, email-only consent, opt-out, retry, responsive layout and logout passed (synthetic APIs).');
 }finally{await browser.close();}

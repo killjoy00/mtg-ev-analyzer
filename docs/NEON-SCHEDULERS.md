@@ -12,6 +12,7 @@ All triggers belong to Neon project `patient-shadow-91417882`, production branch
 | `pack1-daily-retry` | `draftrunapi` | `/internal/daily-generation` | `37 7,8 * * *` | Idempotent retry at 00:37 Pacific |
 | `pack1-account-deletion-maintenance` | `pack1growth` | `/internal/account-deletion-maintenance` | `9,19,29,39,49,59 * * * *` | Resume bounded deletion work and sweep expired verification state |
 | `pack1-daily-social-dispatch` | `pack1growth` | `/internal/daily-social-dispatch` | `10,20,40 14,15 * * *` | Independent 07:10 Pacific Daily social publication, plus 07:20 and 07:40 recovery dispatch |
+| `pack1-daily-reminders` | `pack1growth` | `/internal/daily-reminders` | `5 23 * * *` | Once-daily Daily reminder email to opted-in accounts (15:05 PST / 16:05 PDT), skipped for accounts that finished all three Dailies |
 
 The Daily social trigger uses Neon edge-attested schedule identity and Pacific DST gating. It dispatches the existing reviewed GitHub Daily-social workflow on main with a fixed source date and live=true; delivery stays in GitHub Actions, where Discord receipts and Bluesky deterministic keys prevent duplicates. It uses the existing protected production repository-scoped Actions-write token, with two fixed workflow targets now allowed: launch-alert and Daily social. This does not allow arbitrary workflow names or repos. Activate only after the exact reviewed production pack1growth revision is live. Disable the single social trigger as its rollback; existing maintenance/Daily triggers are independent.
 
@@ -39,7 +40,7 @@ The public Cloudflare gateway exposes neither internal maintenance route.
 
 Use the reviewed rollout operation `neon-schedulers`, which dispatches `.github/workflows/neon-scheduler-release.yml`.
 
-Enabling requires the exact deployed SHA. The release workflow proves that SHA is a reviewed ancestor of current `main`, contains the scheduler-aware handlers/reconciler, and is the exact release marker served by production `draftrunapi` and `pack1growth`; this deliberately permits the reviewed activation-request commit itself to advance `main`. It then reconciles only the four named production triggers. Unrelated Neon triggers are left untouched. A same-name inherited trigger is refused rather than silently localized.
+Enabling requires the exact deployed SHA. The release workflow proves that SHA is a reviewed ancestor of current `main`, contains the scheduler-aware handlers/reconciler, and is the exact release marker served by production `draftrunapi` and `pack1growth`; this deliberately permits the reviewed activation-request commit itself to advance `main`. It then reconciles only the five named production triggers. Unrelated Neon triggers are left untouched. A same-name inherited trigger is refused rather than silently localized.
 
 Disable is the immediate rollback: it preserves each definition but stops future scheduled runs. GitHub manual recovery remains available. A trigger already queued for the imminent minute can still fire, so all mutating handlers remain idempotent or bounded.
 
