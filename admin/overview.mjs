@@ -108,11 +108,11 @@ export async function renderOverview(root,request,{role='admin',isCurrent=()=>tr
       const newest=live.filter(s=>yes(s.regular_run)&&s.release_date&&s.release_date<=day).sort((a,b)=>b.release_date.localeCompare(a.release_date)||a.set_id.localeCompare(b.set_id))[0];
       return `<p class="overview-status ${status.kind}">${escape(status.text)}</p><p>${count(live.length)} live ${live.length===1?'set':'sets'} &middot; ${count(data.sets.filter(s=>s.status==='Candidate').length)} candidates</p>${newest?`<p>Newest eligible live set: <strong>${escape(newest.set_name||newest.set_id)}</strong></p>`:''}<p class="muted">Live-set metadata does not change today\'s fixed Dailies.</p>`;
     }),
-    section('overview-creators','/v1/admin/creator-challenges',data=>{
+    section('overview-creators','/v1/admin/creator-challenges?limit=100',data=>{
       if(!Array.isArray(data.challenges))throw Error('Missing creator summary');
       const challenges=data.challenges,failed=challenges.filter(c=>c.status==='failed'||c.status==='retired'&&c.publication_detail?.live_verified!==true).length;
       const pending=challenges.filter(c=>['draft','publishing'].includes(c.status)).length;
-      return `<p class="overview-status ${failed?'warning':'ready'}">${failed?`${count(failed)} publication ${failed===1?'operation needs':'operations need'} attention`:'No failed publication operations'}</p><p>${count(challenges.filter(c=>c.status==='published').length)} published &middot; ${count(pending)} draft or publishing</p>`;
+      return `<p class="overview-status ${failed?'warning':'ready'}">${failed?`${count(failed)} publication ${failed===1?'operation needs':'operations need'} attention`:'No failed publication operations'}</p><p>${count(challenges.filter(c=>c.status==='published').length)} published &middot; ${count(pending)} draft or publishing</p><p class="muted">Most recent 100 challenges.</p>`;
     }),
     section('overview-accounts','/v1/admin/users',data=>{
       const s=data.summary;if(!s)throw Error('Missing account summary');

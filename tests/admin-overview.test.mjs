@@ -48,3 +48,9 @@ test('overview is read-only and does not fetch owner membership or cache private
   assert.doesNotMatch(js,/request\([^\n]*,\s*\{|localStorage|sessionStorage|\/v1\/admin\/team/);
   assert.match(js,/error\?\.status===401\|\|error\?\.status===403/);
 });
+
+test('creator summary makes its bounded reporting scope explicit',()=>{
+  const js=fs.readFileSync('admin/overview.mjs','utf8');
+  assert.ok(js.includes('/v1/admin/creator-challenges?limit=100'));
+  assert.ok(js.includes('Most recent 100 challenges.'));
+});
