@@ -48,7 +48,10 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
     await page.goto(base+'/tests/credential-management-harness.html');
     await page.locator('.my-pack-one-page').waitFor();
     await page.locator('#profile-account-tab').click();
+    assert.equal(await page.locator('#account-password-change').isHidden(),true,'password form stays closed until requested');
+    await page.locator('#account-password-toggle').click();
     await page.locator('#account-password-change').waitFor();
+    assert.equal(await page.locator('#account-password-toggle').getAttribute('aria-expanded'),'true');
     assert.equal(await page.locator('body').getAttribute('data-harness-error'),null,name+' harness failed');
     assert.match(await page.getByRole('region',{name:'Sign-in & security'}).textContent(),/Change password/);
 

@@ -62,9 +62,9 @@ try {
     window.reminderFixture=h;
   },source);
   await check('defaults off with one Turn on control, no push wording and no automatic request',async()=>{
-    await render();assert.match(await text(),/^Off/);assert.match(await text(),/one email a day/i);
+    await render();assert.match(await text(),/^Off/);assert.match(await page.locator('#daily-reminder-settings').innerText(),/one email a day/i);
     assert.equal(await page.locator('#daily-reminder-content form, #daily-reminder-content select, #daily-reminder-content input').count(),0);
-    assert.doesNotMatch(await text(),/push|notification|device|time ?zone/i);assert.equal(await page.evaluate(()=>reminderFixture.saves.length),0);
+    assert.doesNotMatch(await page.locator('#daily-reminder-settings').innerText(),/push|notification|device|time ?zone/i);assert.equal(await page.evaluate(()=>reminderFixture.saves.length),0);
   });
   await check('Turn on saves email only and shows the next send',async()=>{
     await turnOn();await page.getByText('Email reminders turned on.',{exact:true}).waitFor();

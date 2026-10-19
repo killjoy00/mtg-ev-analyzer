@@ -12,10 +12,11 @@ function installOwnerIsolation() {
 }
 
 export function dailyReminderSettingsMarkup({signedIn=false}={}) {
-  return '<section class="profile-settings-group profile-reminders" aria-labelledby="daily-reminder-heading" id="daily-reminder-settings">'+
-    '<h3 id="daily-reminder-heading">Daily reminders</h3>'+
-    (signedIn?'<div id="daily-reminder-content" aria-live="polite"><p class="profile-settings-intro">Loading reminder settings…</p></div>':
-      '<p class="profile-settings-intro">Sign in and verify your account email to get email reminders.</p>')+
+  return '<section class="settings-row profile-settings-group profile-reminders" aria-labelledby="daily-reminder-heading" id="daily-reminder-settings">'+
+    '<div class="settings-row-label"><h3 id="daily-reminder-heading">Daily reminders</h3>'+
+    '<p class="profile-settings-intro">One email a day while the Dailies are open. Skipped on days you’ve finished all three.</p></div>'+
+    '<div class="settings-row-body">'+(signedIn?'<div id="daily-reminder-content" aria-live="polite"><p class="profile-settings-intro">Loading reminder settings…</p></div>':
+      '<p class="profile-settings-intro">Sign in and verify your account email to get email reminders.</p>')+'</div>'+
     '</section>';
 }
 function nextText(value) {
@@ -27,9 +28,9 @@ function renderSetting(mount,state) {
   const email=state.email||{};
   const verified=email.eligible===true,canEnable=verified&&!email.suppressed;
   const status=email.enabled
-    ?'<p class="reminder-status"><strong>On</strong> · One email a day, skipped on days you’ve finished all three Dailies.'+
-      (state.nextAt?'<small>Next email: '+safe(nextText(state.nextAt))+'</small>':'')+'</p>'
-    :'<p class="reminder-status"><strong>Off</strong> · Get one email a day to play the Dailies, skipped on days you’ve finished all three.</p>';
+    ?'<p class="reminder-status"><span class="reminder-state is-on">On</span>'+
+      (state.nextAt?'<span>Next email: '+safe(nextText(state.nextAt))+'</span>':'<span>Email reminders are on.</span>')+'</p>'
+    :'<p class="reminder-status"><span class="reminder-state">Off</span><span>No reminder emails.</span></p>';
   const action=!canEnable?'':email.enabled
     ?'<button class="button secondary" type="button" id="daily-reminder-optout">Turn off</button>'
     :'<button class="button secondary" type="button" id="daily-reminder-enable">Turn on</button>';

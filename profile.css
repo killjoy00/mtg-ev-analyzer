@@ -268,14 +268,12 @@
 .my-pack-one-aside { display:grid; gap:16px; min-width:0; }
 .my-pack-one-aside { position:sticky; top:18px; }
 .my-pack-card,
-.my-side-card,
-.my-account-heading { border:1px solid var(--line); border-radius:12px; background:var(--surface); box-shadow:0 2px 10px rgb(26 52 41 / 5%); }
+.my-side-card { border:1px solid var(--line); border-radius:12px; background:var(--surface); box-shadow:0 2px 10px rgb(26 52 41 / 5%); }
 .my-pack-card { padding:20px; min-width:0; }
 .my-side-card { padding:18px; }
 .my-card-heading { display:flex; align-items:center; justify-content:space-between; gap:14px; margin-bottom:16px; }
 .my-card-heading h2,
-.my-side-card h2,
-.my-account-heading h2 { margin:0; font-size:19px; line-height:1.2; }
+.my-side-card h2 { margin:0; font-size:19px; line-height:1.2; }
 .my-card-heading > span { color:var(--muted); font-size:12px; }
 .my-pack-empty { margin:8px 0 0; color:var(--muted); font-size:13px; line-height:1.5; }
 
@@ -390,70 +388,125 @@
 .my-share-url .text-button { flex:0 0 auto; min-height:34px; }
 .my-share-card > .button { width:100%; margin-top:10px; }
 
-.my-account-heading { margin-bottom:18px; padding:20px; }
-.my-account-heading p { margin:6px 0 0; color:var(--muted); }
+.visually-hidden { position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0; }
+/* Account settings: one card of label/control rows. */
 .my-pack-one-account-panel .profile-account {
-  display:flex;
-  flex-direction:column;
-  gap:16px;
+  display:block;
+  max-width:880px;
   margin:0;
   padding:0;
-  border:0;
-  background:transparent;
-  overflow:visible;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:var(--surface);
+  overflow:hidden;
 }
 .my-pack-one-account-panel .profile-account > header {
-  order:0;
+  display:grid;
+  grid-template-columns:44px minmax(0,1fr) auto;
+  align-items:center;
+  gap:14px;
   margin:0;
-  padding:16px 18px;
-  border:1px solid var(--line);
-  border-radius:10px;
+  padding:20px 24px;
+  border-bottom:1px solid var(--line);
   background:var(--surface-soft);
 }
-.my-pack-one-account-panel .profile-account-session-copy { margin:4px 0 0; }
-.my-pack-one-account-panel .profile-account-session-copy strong { font-weight:700; overflow-wrap:anywhere; }
-.my-pack-one-account-panel .profile-settings-profile { order:1; }
-.my-pack-one-account-panel .profile-settings-membership { order:2; }
-.my-pack-one-account-panel .profile-account > .profile-credentials:not(.profile-danger) { order:3; }
-.my-pack-one-account-panel .profile-account > .profile-reminders { order:4; }
-.my-pack-one-account-panel .profile-account > .profile-danger { order:5; }
-.my-pack-one-account-panel .profile-settings-group h3 { margin:0 0 4px; font-size:19px; line-height:1.25; }
-.my-pack-one-account-panel .profile-membership h3 + p,
-.my-pack-one-account-panel .profile-credentials h3 + p { margin-top:8px; }
-.my-pack-one-account-panel .profile-credentials .account-form { grid-template-columns:minmax(0,1fr); max-width:420px; gap:14px; margin-top:14px; }
-.my-pack-one-account-panel .profile-credentials .account-form .button { justify-self:start; }
-.my-pack-one-account-panel .profile-reminders { padding:16px 20px; }
-.my-pack-one-account-panel #profile-settings-form { gap:16px; }
-.my-pack-one-account-panel .profile-identity-rules { grid-column:1/-1; margin:-8px 0 0; }
-.reminder-summary { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px 16px; }
-.reminder-status { flex:1 1 280px; margin:0; font-size:14px; line-height:1.5; }
-.reminder-status small { display:block; color:var(--muted); font-size:13px; }
+.account-avatar { display:grid; place-items:center; width:44px; height:44px; border-radius:50%; background:var(--blue); color:#fff; font-family:var(--display); font-size:22px; font-weight:700; line-height:1; }
+.account-identity { min-width:0; }
+.account-name { display:block; font-size:17px; line-height:1.3; overflow-wrap:anywhere; }
+.my-pack-one-account-panel .profile-account-session-copy { margin:2px 0 0; color:var(--muted); font-size:14px; line-height:1.45; overflow-wrap:anywhere; }
+.account-email { color:var(--muted); }
+.my-pack-one-account-panel .settings-row {
+  display:grid;
+  grid-template-columns:minmax(0,220px) minmax(0,1fr);
+  gap:12px 40px;
+  margin:0;
+  padding:24px;
+  border:0;
+  border-top:1px solid var(--line);
+  border-radius:0;
+  background:transparent;
+}
+.my-pack-one-account-panel .profile-account > header + .settings-row { border-top:0; }
+.my-pack-one-account-panel .settings-row-label h3 { margin:0; font-size:17px; line-height:1.3; }
+.my-pack-one-account-panel .settings-row-label .profile-settings-intro { max-width:none; margin:6px 0 0; color:var(--muted); font-size:14px; line-height:1.5; }
+.my-pack-one-account-panel .settings-row-body { min-width:0; font-size:15px; line-height:1.5; }
+.my-pack-one-account-panel .settings-row-body p { margin:0; }
+.my-pack-one-account-panel .settings-row-body p span { color:var(--muted); font-size:14px; }
+.my-pack-one-account-panel .settings-row-body > * + * { margin-top:14px; }
+
+/* Profile form */
+.my-pack-one-account-panel #profile-settings-form { grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px 16px; }
+.my-pack-one-account-panel #profile-settings-form label > span { margin-bottom:6px; font-size:13px; }
+.my-pack-one-account-panel #profile-settings-form label > small { margin-top:6px; font-size:13px; }
+.my-pack-one-account-panel .profile-leaderboard-name input { max-width:360px; }
+.my-pack-one-account-panel .profile-identity-rules { grid-column:1/-1; margin:-10px 0 0; color:var(--muted); }
+.my-pack-one-account-panel .profile-identity-rules a,
+.my-pack-one-account-panel .profile-deletion-billing-warning a { color:var(--blue); }
+.my-pack-one-account-panel .profile-empty { grid-column:1/-1; margin:0; color:var(--muted); font-size:13px; }
+.my-pack-one-account-panel .profile-toggle { min-height:0; padding:0; background:transparent; }
+.my-pack-one-account-panel .profile-toggle strong { font-size:15px; }
+.my-pack-one-account-panel .profile-toggle:has(input[role="switch"]) { grid-template-columns:44px minmax(0,1fr); gap:12px; }
+.my-pack-one-account-panel .profile-toggle input[role="switch"] {
+  appearance:none;
+  position:relative;
+  width:44px;
+  height:26px;
+  margin:0;
+  border-radius:999px;
+  background:var(--line-strong);
+  cursor:pointer;
+  transition:background-color .15s ease;
+}
+.my-pack-one-account-panel .profile-toggle input[role="switch"]::before {
+  content:"";
+  position:absolute;
+  top:3px;
+  left:3px;
+  width:20px;
+  height:20px;
+  border-radius:50%;
+  background:#fff;
+  box-shadow:0 1px 2px rgb(16 24 32 / 25%);
+  transition:transform .15s ease;
+}
+.my-pack-one-account-panel .profile-toggle input[role="switch"]:checked { background:var(--blue); }
+.my-pack-one-account-panel .profile-toggle input[role="switch"]:checked::before { transform:translateX(18px); }
+.my-pack-one-account-panel .profile-toggle input[role="switch"]:focus-visible { outline:2px solid var(--blue); outline-offset:2px; }
+.my-pack-one-account-panel .profile-toggle input[role="switch"]:disabled { opacity:.5; cursor:not-allowed; }
+.my-pack-one-account-panel .profile-settings-actions { align-items:center; justify-content:flex-start; flex-wrap:wrap; gap:12px; margin:0; }
+.my-pack-one-account-panel .profile-save-status { text-align:left; }
+
+/* Membership, sign-in, reminders */
+.my-pack-one-account-panel .profile-membership,
+.my-pack-one-account-panel .profile-credentials { display:grid; align-items:start; }
+.my-pack-one-account-panel .profile-membership-actions { justify-content:flex-start; gap:10px; }
+.my-pack-one-account-panel .profile-membership-note { flex-basis:100%; max-width:none; text-align:left; }
+.my-pack-one-account-panel .profile-membership-actions #patreon-status:empty { display:none; }
+.settings-inline { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px 20px; }
+.settings-inline > p { flex:1 1 240px; }
+.my-pack-one-account-panel .profile-credentials .account-form { grid-template-columns:minmax(0,1fr); max-width:360px; gap:14px; }
+.my-pack-one-account-panel .profile-credentials .account-form[hidden] { display:none; }
+.my-pack-one-account-panel .account-form .profile-settings-status:empty { display:none; }
+.reminder-summary { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px 20px; }
+.reminder-status { display:flex; align-items:center; flex-wrap:wrap; gap:6px 10px; flex:1 1 180px; margin:0; font-size:15px; line-height:1.5; }
+.reminder-status > span:not(.reminder-state) { color:var(--muted); font-size:14px; }
+.reminder-state { display:inline-flex; align-items:center; min-height:24px; padding:0 10px; border-radius:999px; background:var(--surface-soft); color:var(--muted); font-size:13px; font-weight:750; }
+.reminder-state.is-on { background:var(--blue-soft); color:var(--blue); }
 .reminder-actions { display:flex; flex-wrap:wrap; gap:8px; }
-.reminder-actions .button { min-height:40px; padding-top:8px; padding-bottom:8px; }
-.reminder-note { margin:8px 0 0; color:var(--muted); font-size:13px; line-height:1.5; }
+.reminder-note { margin:12px 0 0; color:var(--muted); font-size:13px; line-height:1.5; }
 .reminder-note .text-button { padding:0; font-size:13px; }
 #daily-reminder-status:empty { display:none; }
-#daily-reminder-status { margin:8px 0 0; }
-.my-pack-one-account-panel .profile-settings-group {
-  margin:0;
-  padding:20px;
-  border:1px solid var(--line);
-  border-radius:10px;
-  background:var(--surface);
-}
-.my-pack-one-account-panel .profile-settings-heading-row { margin:0 0 18px; }
-.my-pack-one-account-panel .profile-settings-intro { max-width:620px; margin:6px 0 0; color:var(--muted); font-size:13px; line-height:1.5; }
-.my-pack-one-account-panel .profile-settings-actions { align-items:center; justify-content:flex-start; margin-top:2px; }
-.my-pack-one-account-panel .profile-save-status { text-align:left; }
-.my-pack-one-account-panel .profile-membership,
-.my-pack-one-account-panel .profile-credentials { align-items:flex-start; }
-.my-pack-one-account-panel .profile-danger {
-  margin-top:8px;
-  border-color:color-mix(in srgb,var(--red) 35%,var(--line));
-  background:color-mix(in srgb,var(--red) 3%,var(--surface));
-}
+#daily-reminder-status { margin:10px 0 0; }
+
+/* Danger zone */
+.my-pack-one-account-panel .profile-danger { border-color:color-mix(in srgb,var(--red) 30%,var(--line)); background:color-mix(in srgb,var(--red) 3%,var(--surface)); }
+.my-pack-one-account-panel .profile-delete-title { margin:0; color:var(--red); font-size:17px; }
+.my-pack-one-account-panel .profile-danger .account-form { max-width:360px; gap:14px; }
+.my-pack-one-account-panel .profile-danger .profile-toggle { grid-template-columns:20px minmax(0,1fr); gap:10px; }
+.my-pack-one-account-panel .profile-danger .profile-toggle strong { font-size:15px; font-weight:500; }
 .my-pack-one-account-panel .profile-danger .button.destructive,
-.my-pack-one-account-panel .profile-danger .button.secondary { border-color:var(--red); color:var(--red); }
+.my-pack-one-account-panel .profile-danger .button.secondary { justify-self:start; border-color:var(--red); color:var(--red); background:var(--surface); }
+.my-pack-one-account-panel .profile-deletion-billing-warning { margin:0; padding:12px 14px; border-left:3px solid var(--red); background:var(--surface); color:var(--ink); font-size:13px; line-height:1.5; }
 
 @media (max-width:980px) {
   .my-pack-one-grid { grid-template-columns:minmax(0,1fr) 260px; }
@@ -469,12 +522,16 @@
   .my-pack-one-aside { position:static; }
   .my-two-up { grid-template-columns:1fr; }
   .my-achievement-preview { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .my-pack-one-account-panel .profile-settings-group { padding:16px; }
-  .my-pack-one-account-panel .profile-account > header { align-items:stretch; flex-direction:column; }
-  .my-pack-one-account-panel .profile-account > header .button { align-self:flex-start; }
+  .my-pack-one-account-panel .settings-row { grid-template-columns:minmax(0,1fr); gap:14px; padding:20px 16px; }
+  .my-pack-one-account-panel .profile-account > header { grid-template-columns:40px minmax(0,1fr) auto; gap:12px; padding:16px; }
+  .my-pack-one-account-panel .profile-account > header .button { min-height:40px; padding:8px 14px; }
+  .my-pack-one-account-panel .account-avatar { width:40px; height:40px; font-size:20px; }
+  .my-pack-one-account-panel #profile-settings-form { grid-template-columns:minmax(0,1fr); }
+  .my-pack-one-account-panel .profile-leaderboard-name input { max-width:none; }
+  .my-pack-one-account-panel .profile-credentials .account-form,
+  .my-pack-one-account-panel .profile-danger .account-form { max-width:none; }
+  .my-pack-one-account-panel .profile-membership-actions .button { flex:1 1 100%; }
   .my-pack-one-account-panel .profile-settings-actions .button { width:100%; }
-  .my-pack-one-account-panel .profile-membership-actions { width:100%; justify-content:flex-start; }
-  .my-pack-one-account-panel .profile-membership-note { max-width:none; text-align:left; }
   .my-game-preview li,
   .my-daily-preview li { grid-template-columns:72px minmax(0,1fr) 42px; gap:8px; }
   .my-game-preview small,
@@ -483,8 +540,7 @@
 
 @media (max-width:430px) {
   .my-pack-card,
-  .my-side-card,
-  .my-account-heading { padding:16px; }
+  .my-side-card { padding:16px; }
   .my-career-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .my-career-metrics > div { border-right:1px solid var(--line); border-top:1px solid var(--line); }
   .my-career-metrics > div:nth-child(odd) { border-left:0; }
