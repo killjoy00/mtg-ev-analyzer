@@ -37,8 +37,11 @@ jobs:
       APPLE_SIGN_IN_KEY_ID: ${{ secrets.APPLE_SIGN_IN_KEY_ID }}
       APPLE_TOKEN_ENCRYPTION_KEY_V1: ${{ secrets.APPLE_TOKEN_ENCRYPTION_KEY_V1 }}
       PACK1_REMINDER_TOKEN_KEY: ${{ secrets.PACK1_REMINDER_TOKEN_KEY }}
+      PACK1_REMINDER_RESEND_API_KEY: ${{ secrets.PACK1_REMINDER_RESEND_API_KEY }}
       PACK1_REMINDER_RESEND_WEBHOOK_SECRET: ${{ secrets.PACK1_REMINDER_RESEND_WEBHOOK_SECRET }}
-      PACK1_REMINDER_DELIVERY_APPROVED: ${{ vars.PACK1_REMINDER_DELIVERY_APPROVED }}
+      PACK1_EXPO_PUSH_ACCESS_TOKEN: ${{ secrets.PACK1_EXPO_PUSH_ACCESS_TOKEN }}
+      PACK1_REMINDER_EMAIL_APPROVED: ${{ vars.PACK1_REMINDER_EMAIL_APPROVED }}
+      PACK1_REMINDER_PUSH_APPROVED: ${{ vars.PACK1_REMINDER_PUSH_APPROVED }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -88,6 +91,25 @@ jobs:
           [[ "$APPLE_SIGN_IN_KEY_ID" =~ ^[A-Z0-9]{10}$ ]] || { echo '::error::APPLE_SIGN_IN_KEY_ID is missing or malformed.'; exit 1; }
           [[ "$APPLE_SIGN_IN_KEY_P8" == *"BEGIN PRIVATE KEY"* ]] || { echo '::error::APPLE_SIGN_IN_KEY_P8 is missing or malformed.'; exit 1; }
           [[ "$APPLE_TOKEN_ENCRYPTION_KEY_V1" =~ ^[A-Fa-f0-9]{64}$ ]] || { echo '::error::APPLE_TOKEN_ENCRYPTION_KEY_V1 must be a 32-byte hex key.'; exit 1; }
+
+      # Independent channel authorization belongs to the protected release job.
+      # A missing approval never grants delivery; neither channel depends on
+      # the other's credentials. This does not activate the separate scheduler.
+      - name: Validate independently approved Daily reminder channels
+        shell: bash
+        run: |
+          set -euo pipefail
+          for approval in "${PACK1_REMINDER_EMAIL_APPROVED:-}" "${PACK1_REMINDER_PUSH_APPROVED:-}"; do
+            [[ -z "$approval" || "$approval" == 0 || "$approval" == 1 ]] || { echo '::error::Reminder approval must be 0 or 1.'; exit 1; }
+          done
+          if [[ "${PACK1_REMINDER_EMAIL_APPROVED:-0}" == 1 ]]; then
+            sender_key="${PACK1_REMINDER_RESEND_API_KEY:-$PACK1_ACCOUNT_DELETE_RESEND_API_KEY}"
+            [[ "$sender_key" == re_* && ${#sender_key} -gt 3 ]] || { echo '::error::Reminder email sender credentials are unavailable.'; exit 1; }
+            [[ "$PACK1_REMINDER_RESEND_WEBHOOK_SECRET" == whsec_* && ${#PACK1_REMINDER_RESEND_WEBHOOK_SECRET} -gt 5 ]] || { echo '::error::Dedicated reminder webhook verification is unavailable.'; exit 1; }
+          fi
+          if [[ "${PACK1_REMINDER_PUSH_APPROVED:-0}" == 1 ]]; then
+            [[ "$PACK1_REMINDER_TOKEN_KEY" =~ ^[a-fA-F0-9]{64}$ ]] || { echo '::error::Reminder push token encryption key is unavailable.'; exit 1; }
+          fi
 
       - name: Build exact Neon function revision
         env:
@@ -158,15 +180,22 @@ jobs:
                 --env "APPLE_SIGN_IN_KEY_ID=$APPLE_SIGN_IN_KEY_ID"
                 --env "APPLE_SIGN_IN_KEY_P8=$APPLE_SIGN_IN_KEY_P8"
                 --env "APPLE_TOKEN_ENCRYPTION_KEY_V1=$APPLE_TOKEN_ENCRYPTION_KEY_V1")
-              # Ship source and schema dormant. Activation is a separate approved operation.
-              # Only a separately approved environment variable may activate sending.
-              if [[ "${PACK1_REMINDER_DELIVERY_APPROVED:-0}" == "1" ]]; then
-                [[ "$PACK1_REMINDER_TOKEN_KEY" =~ ^[a-fA-F0-9]{64}$ ]] || { echo '::error::Push token encryption key is unavailable.'; exit 1; }
-                [[ "$PACK1_REMINDER_RESEND_WEBHOOK_SECRET" == whsec_* ]] || { echo '::error::Reminder provider webhook verification unavailable.'; exit 1; }
-                extra+=(--env "PACK1_DAILY_REMINDERS_ENABLED=1")
-              else extra+=(--env "PACK1_DAILY_REMINDERS_ENABLED=0"); fi
+              # Deploy default-off switches for each channel. Only protected
+              # per-channel approval can enable delivery; the scheduler has its
+              # own reviewed release gate and is never enabled here.
+              email_enabled=0
+              push_enabled=0
+              if [[ "${PACK1_REMINDER_EMAIL_APPROVED:-0}" == 1 ]]; then email_enabled=1; fi
+              if [[ "${PACK1_REMINDER_PUSH_APPROVED:-0}" == 1 ]]; then push_enabled=1; fi
+              extra+=(--env "PACK1_REMINDER_EMAIL_ENABLED=$email_enabled"
+                --env "PACK1_REMINDER_PUSH_ENABLED=$push_enabled")
               if [[ -n "$PACK1_REMINDER_TOKEN_KEY" ]]; then extra+=(--env "PACK1_REMINDER_TOKEN_KEY=$PACK1_REMINDER_TOKEN_KEY"); fi
               if [[ -n "$PACK1_REMINDER_RESEND_WEBHOOK_SECRET" ]]; then extra+=(--env "PACK1_REMINDER_RESEND_WEBHOOK_SECRET=$PACK1_REMINDER_RESEND_WEBHOOK_SECRET"); fi
+              if [[ -n "$PACK1_REMINDER_RESEND_API_KEY" ]]; then extra+=(--env "PACK1_REMINDER_RESEND_API_KEY=$PACK1_REMINDER_RESEND_API_KEY"); fi
+              if [[ "$email_enabled" == 1 && -z "$PACK1_REMINDER_RESEND_API_KEY" ]]; then
+                extra+=(--env "PACK1_REMINDER_RESEND_API_KEY=$PACK1_ACCOUNT_DELETE_RESEND_API_KEY")
+              fi
+              if [[ -n "$PACK1_EXPO_PUSH_ACCESS_TOKEN" ]]; then extra+=(--env "PACK1_EXPO_PUSH_ACCESS_TOKEN=$PACK1_EXPO_PUSH_ACCESS_TOKEN"); fi
             fi
             "$neon" functions deploy "$slug" --src "$RUNNER_TEMP/pack1-bundles/$slug" --no-bundle               --project-id "$PROJECT_ID" --branch "$DEV_BRANCH" --runtime nodejs24 --wait "${extra[@]}"
           done < .github/neon-functions.txt
@@ -253,15 +282,22 @@ jobs:
                 --env "APPLE_SIGN_IN_KEY_ID=$APPLE_SIGN_IN_KEY_ID"
                 --env "APPLE_SIGN_IN_KEY_P8=$APPLE_SIGN_IN_KEY_P8"
                 --env "APPLE_TOKEN_ENCRYPTION_KEY_V1=$APPLE_TOKEN_ENCRYPTION_KEY_V1")
-              # Ship source and schema dormant. Activation is a separate approved operation.
-              # Only a separately approved environment variable may activate sending.
-              if [[ "${PACK1_REMINDER_DELIVERY_APPROVED:-0}" == "1" ]]; then
-                [[ "$PACK1_REMINDER_TOKEN_KEY" =~ ^[a-fA-F0-9]{64}$ ]] || { echo '::error::Push token encryption key is unavailable.'; exit 1; }
-                [[ "$PACK1_REMINDER_RESEND_WEBHOOK_SECRET" == whsec_* ]] || { echo '::error::Reminder provider webhook verification unavailable.'; exit 1; }
-                extra+=(--env "PACK1_DAILY_REMINDERS_ENABLED=1")
-              else extra+=(--env "PACK1_DAILY_REMINDERS_ENABLED=0"); fi
+              # Deploy default-off switches for each channel. Only protected
+              # per-channel approval can enable delivery; the scheduler has its
+              # own reviewed release gate and is never enabled here.
+              email_enabled=0
+              push_enabled=0
+              if [[ "${PACK1_REMINDER_EMAIL_APPROVED:-0}" == 1 ]]; then email_enabled=1; fi
+              if [[ "${PACK1_REMINDER_PUSH_APPROVED:-0}" == 1 ]]; then push_enabled=1; fi
+              extra+=(--env "PACK1_REMINDER_EMAIL_ENABLED=$email_enabled"
+                --env "PACK1_REMINDER_PUSH_ENABLED=$push_enabled")
               if [[ -n "$PACK1_REMINDER_TOKEN_KEY" ]]; then extra+=(--env "PACK1_REMINDER_TOKEN_KEY=$PACK1_REMINDER_TOKEN_KEY"); fi
               if [[ -n "$PACK1_REMINDER_RESEND_WEBHOOK_SECRET" ]]; then extra+=(--env "PACK1_REMINDER_RESEND_WEBHOOK_SECRET=$PACK1_REMINDER_RESEND_WEBHOOK_SECRET"); fi
+              if [[ -n "$PACK1_REMINDER_RESEND_API_KEY" ]]; then extra+=(--env "PACK1_REMINDER_RESEND_API_KEY=$PACK1_REMINDER_RESEND_API_KEY"); fi
+              if [[ "$email_enabled" == 1 && -z "$PACK1_REMINDER_RESEND_API_KEY" ]]; then
+                extra+=(--env "PACK1_REMINDER_RESEND_API_KEY=$PACK1_ACCOUNT_DELETE_RESEND_API_KEY")
+              fi
+              if [[ -n "$PACK1_EXPO_PUSH_ACCESS_TOKEN" ]]; then extra+=(--env "PACK1_EXPO_PUSH_ACCESS_TOKEN=$PACK1_EXPO_PUSH_ACCESS_TOKEN"); fi
               if [[ "$PATREON_RUNTIME_ENABLED" == true ]]; then
                 extra+=(--env "PATREON_CLIENT_ID=$PATREON_CLIENT_ID" --env "PATREON_CLIENT_SECRET=$PATREON_CLIENT_SECRET" --env "PATREON_WEBHOOK_SECRET=$PATREON_WEBHOOK_SECRET")
               fi
