@@ -45,20 +45,39 @@ function openToken(value,env=process.env) {
   decipher.setAuthTag(tag);
   return Buffer.concat([decipher.update(data),decipher.final()]).toString('utf8');
 }
-function unsubscribeToken(authId,nonce,env=process.env) {
+function legacyUnsubscribeToken(authId,nonce,env=process.env) {
   if(!validId(authId)||!validId(nonce))throw Error('Unsubscribe identity invalid.');
   const payload=authId+'.'+nonce;
   const signature=createHmac('sha256',hmacKey(env)).update('pack1-daily-unsubscribe:'+payload).digest('base64url');
   return Buffer.from(payload).toString('base64url')+'.'+signature;
 }
+const shortUnsubscribeMac=(nonce,env)=>createHmac('sha256',hmacKey(env)).update('pack1-daily-unsubscribe-v2:'+nonce).digest().subarray(0,12);
+// 38 characters: the account's random unsubscribe nonce plus a 96-bit HMAC.
+// The account is looked up from the nonce when the link is used.
+function unsubscribeToken(nonce,env=process.env) {
+  if(!validId(nonce))throw Error('Unsubscribe identity invalid.');
+  const id=String(nonce).toLowerCase();
+  return Buffer.concat([Buffer.from(id.replaceAll('-',''),'hex'),shortUnsubscribeMac(id,env)]).toString('base64url');
+}
 function verifyUnsubscribeToken(token,env=process.env) {
-  const [encoded,signature,...rest]=String(token||'').split('.');
+  const value=String(token||'');
+  if(/^[A-Za-z0-9_-]{38}$/.test(value)) {
+    const raw=Buffer.from(value,'base64url');
+    const hex=raw.subarray(0,16).toString('hex');
+    const nonce=[hex.slice(0,8),hex.slice(8,12),hex.slice(12,16),hex.slice(16,20),hex.slice(20)].join('-');
+    // Only the canonical spelling is accepted (the last character has unused bits).
+    if(raw.length!==28||raw.toString('base64url')!==value||!validId(nonce)||!timingSafeEqual(raw.subarray(16),shortUnsubscribeMac(nonce,env)))
+      throw apiError('Invalid unsubscribe link.',400);
+    return {authId:null,nonce};
+  }
+  // Links in emails sent before October 20, 2026 carry the account ID as well.
+  const [encoded,signature,...rest]=value.split('.');
   if(String(token||'').length>256||rest.length||!encoded||!/^[A-Za-z0-9_-]{43}$/.test(signature||''))throw apiError('Invalid unsubscribe link.',400);
   let payload;
   try {payload=Buffer.from(encoded,'base64url').toString('utf8');} catch {throw apiError('Invalid unsubscribe link.',400);}
   const [authId,nonce,...extra]=payload.split('.');
   if(extra.length||!validId(authId)||!validId(nonce))throw apiError('Invalid unsubscribe link.',400);
-  const expected=unsubscribeToken(authId,nonce,env).split('.')[1];
+  const expected=legacyUnsubscribeToken(authId,nonce,env).split('.')[1];
   if(!timingSafeEqual(Buffer.from(expected),Buffer.from(signature)))throw apiError('Invalid unsubscribe link.',400);
   return {authId,nonce};
 }
@@ -272,13 +291,38 @@ export async function refreshPushReceipts(query,{env=process.env,fetcher=fetch}=
   await query("UPDATE daily_reminder_deliveries SET push_receipt_checked_at=now(),push_receipt_result='receipt_expired',updated_at=now() WHERE id IN (SELECT id FROM daily_reminder_deliveries WHERE channel='push' AND state='accepted' AND push_receipt_checked_at IS NULL AND accepted_at<=now()-interval '2 hours' LIMIT 100)");
   return {checked,invalidated};
 }
-function dailyEmail(id,email,authId,nonce,env) {
-  const unsubscribe=UNSUBSCRIBE_URL+'?token='+encodeURIComponent(unsubscribeToken(authId,nonce,env));
+const PLAY_URL='https://packone.pro/';
+const MANAGE_URL='https://packone.pro/?account=reminders';
+const htmlText=value=>String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
+// Same layout and P¹ mark as the account emails in edge/auth-webhook.mjs.
+function dailyEmailHtml(unsubscribe) {
+  const font='font-family:Arial,Helvetica,sans-serif;';
+  const footerLink=(href,label)=>'<a href="'+htmlText(href)+'" style="'+font+'font-size:13px;line-height:20px;color:#555555;text-decoration:underline;">'+label+'</a>';
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta http-equiv="X-UA-Compatible" content="IE=edge"></head>'+
+    '<body style="margin:0;padding:0;background-color:#f5f5f5;">'+
+    '<div style="display:none;max-height:0;overflow:hidden;">Three fresh draft decisions. They close at midnight Pacific.</div>'+
+    '<table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation"><tr><td align="center" style="padding-top:32px;padding-right:16px;padding-bottom:32px;padding-left:16px;background-color:#f5f5f5;">'+
+    '<table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="max-width:600px;background-color:#ffffff;">'+
+    '<tr><td style="padding-top:32px;padding-right:32px;padding-bottom:16px;padding-left:32px;"><table cellpadding="0" cellspacing="0" border="0" role="presentation"><tr>'+
+    '<td width="40" height="40" align="center" valign="middle" bgcolor="#171918" style="width:40px;height:40px;background-color:#171918;border-radius:10px;'+font+'font-size:13px;line-height:40px;color:#ffffff;font-weight:800;letter-spacing:-0.2px;text-align:center;">P<sup style="font-size:8px;line-height:0;vertical-align:5px;">1</sup></td>'+
+    '<td style="padding-left:11px;'+font+'font-size:16px;line-height:18px;color:#171918;font-weight:700;">Pack One</td></tr></table></td></tr>'+
+    '<tr><td style="padding-top:0;padding-right:32px;padding-bottom:16px;padding-left:32px;'+font+'font-size:18px;line-height:28px;color:#111111;font-weight:700;">Today’s Dailies are waiting</td></tr>'+
+    '<tr><td style="padding-top:0;padding-right:32px;padding-bottom:24px;padding-left:32px;'+font+'font-size:16px;line-height:24px;color:#333333;">Your three Pack One Dailies are ready. They close at midnight Pacific.</td></tr>'+
+    '<tr><td align="center" style="padding-top:0;padding-right:32px;padding-bottom:32px;padding-left:32px;"><table cellpadding="0" cellspacing="0" border="0" role="presentation"><tr><td bgcolor="#111111" style="background-color:#111111;">'+
+    '<a href="'+PLAY_URL+'" style="display:inline-block;padding-top:14px;padding-right:24px;padding-bottom:14px;padding-left:24px;'+font+'font-size:16px;line-height:20px;color:#ffffff;text-decoration:none;font-weight:700;">Play today’s Dailies</a></td></tr></table></td></tr>'+
+    '<tr><td style="padding-top:20px;padding-right:32px;padding-bottom:12px;padding-left:32px;border-top:1px solid #e5e5e5;'+font+'font-size:13px;line-height:20px;color:#777777;">You get this because you turned on Daily email reminders. It comes once a day and is skipped on days you’ve finished all three Dailies.</td></tr>'+
+    '<tr><td style="padding-top:0;padding-right:32px;padding-bottom:32px;padding-left:32px;'+font+'font-size:13px;line-height:20px;color:#777777;">'+footerLink(MANAGE_URL,'Manage reminders')+' &nbsp;·&nbsp; '+footerLink(unsubscribe,'Unsubscribe')+'</td></tr>'+
+    '</table></td></tr></table></body></html>';
+}
+function dailyEmail(id,email,nonce,env) {
+  const unsubscribe=UNSUBSCRIBE_URL+'?token='+unsubscribeToken(nonce,env);
   return {from:REMINDER_EMAIL_FROM,to:[email],subject:'Today\'s Pack One Dailies are waiting',
     text:['Today\'s three Pack One Dailies are waiting. They close at midnight Pacific.','',
-      'Play now: https://packone.pro/','',
-      'You get this because you turned on Daily email reminders. It comes once a day and is skipped on days you have finished all three Dailies.',
-      'Manage reminders: https://packone.pro/?account=reminders','Unsubscribe: '+unsubscribe].join('\n'),
+      'Play now: '+PLAY_URL,'','',
+      'You get this because you turned on Daily email reminders. It comes once a day and is skipped on days you have finished all three Dailies.','',
+      'Manage reminders: '+MANAGE_URL,'',
+      'Unsubscribe: '+unsubscribe].join('\n'),
+    html:dailyEmailHtml(unsubscribe),
     headers:{'List-Unsubscribe':'<'+unsubscribe+'>','List-Unsubscribe-Post':'List-Unsubscribe=One-Click'},
     tags:[{name:'pack1_reminder',value:id}]};
 }
@@ -340,7 +384,7 @@ async function sendDailyEmails(query,{env,fetcher,pacificDay,pause,began,metrics
       if(!destination||destination!==row.email_destination_hash){metrics.skipped++;continue;}
       const id=(await query('SELECT pack1_reminder_admit_daily_email($1::uuid,$2::text,$3::date) id',[row.auth_user_id,destination,pacificDay])).rows[0]?.id;
       if(!id){metrics.skipped++;continue;}
-      admitted.push({id,message:dailyEmail(id,email,row.auth_user_id,row.unsubscribe_nonce,env)});
+      admitted.push({id,message:dailyEmail(id,email,row.unsubscribe_nonce,env)});
     }
     if(!admitted.length)continue;
     metrics.admitted+=admitted.length;
@@ -392,12 +436,22 @@ export async function dispatchDailyReminders(query,{env=process.env,clock=Date.n
 }
 const UNSUB_HEADERS={'content-type':'text/html; charset=utf-8','cache-control':'no-store','referrer-policy':'no-referrer',
   'content-security-policy':"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"};
+const unsubscribePage=(title,body)=>'<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+title+'</title>'+
+  '<body style="margin:0;background:#f5f5f5;font:16px/1.5 Arial,Helvetica,sans-serif;color:#333"><main style="max-width:30rem;margin:3rem auto;padding:2rem;background:#fff">'+
+  '<p style="margin:0 0 1.5rem;font-weight:700;color:#171918"><span style="display:inline-block;width:40px;height:40px;margin-right:11px;border-radius:10px;background:#171918;color:#fff;font-size:13px;font-weight:800;line-height:40px;text-align:center;vertical-align:middle">P<sup style="font-size:8px">1</sup></span>Pack One</p>'+
+  body+'</main></body></html>';
 async function unsubscribeRequest(request,query,env) {
   if(!['GET','POST'].includes(request.method))throw apiError('Not found.',404);
-  const {authId,nonce}=verifyUnsubscribeToken(new URL(request.url).searchParams.get('token'),env);
-  if(request.method==='GET')return new Response('<!doctype html><html lang="en"><meta name="viewport" content="width=device-width"><title>Pack One reminders</title><main style="max-width:34rem;margin:4rem auto;font:1rem system-ui"><h1>Stop Daily email reminders?</h1><p>You can turn them back on anytime in My Pack One.</p><form method="POST"><button type="submit">Unsubscribe</button></form></main></html>',{headers:UNSUB_HEADERS});
-  await query('SELECT pack1_reminder_unsubscribe($1::uuid,$2::uuid)',[authId,nonce]);
-  return new Response('<!doctype html><html lang="en"><title>Unsubscribed</title><main style="font:1rem system-ui"><h1>Email reminders are off</h1><p>You won’t get Daily reminder emails anymore.</p><a href="https://packone.pro/">Back to Pack One</a></main></html>',{headers:UNSUB_HEADERS});
+  const verified=verifyUnsubscribeToken(new URL(request.url).searchParams.get('token'),env);
+  if(request.method==='GET')return new Response(unsubscribePage('Pack One reminders','<h1 style="margin:0 0 .5rem;font-size:20px;color:#111">Stop Daily email reminders?</h1><p style="margin:0 0 1.5rem">You can turn them back on anytime in My Pack One.</p><form method="POST"><button type="submit" style="padding:12px 22px;border:0;background:#111;color:#fff;font:700 16px Arial,Helvetica,sans-serif;cursor:pointer">Unsubscribe</button></form>'),{headers:UNSUB_HEADERS});
+  let authId=verified.authId;
+  if(!authId) {
+    const owners=(await query('SELECT auth_user_id FROM daily_reminder_settings WHERE unsubscribe_nonce=$1::uuid LIMIT 2',[verified.nonce])).rows;
+    authId=owners.length===1?owners[0].auth_user_id:null;
+  }
+  // A deleted account has no settings row; the link stays a harmless success.
+  if(authId)await query('SELECT pack1_reminder_unsubscribe($1::uuid,$2::uuid)',[authId,verified.nonce]);
+  return new Response(unsubscribePage('Unsubscribed','<h1 style="margin:0 0 .5rem;font-size:20px;color:#111">Email reminders are off</h1><p style="margin:0 0 1.5rem">You won’t get Daily reminder emails anymore.</p><a href="https://packone.pro/" style="color:#111;font-weight:700">Back to Pack One</a>'),{headers:UNSUB_HEADERS});
 }
 export function verifyReminderWebhook(request,raw,env=process.env,clock=Date.now()) {
   const secret=String(env.PACK1_REMINDER_RESEND_WEBHOOK_SECRET||'');
