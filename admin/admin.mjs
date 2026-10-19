@@ -1,7 +1,8 @@
+import {renderOverview,adminArea,ADMIN_AREAS} from './overview.mjs?v=20261019';
 import {renderCorpus} from './corpus.mjs';
 import {renderUsers} from './users.mjs';
 import {renderAdminTeam} from './team.mjs';
-import {renderCampaignLinks} from './campaign-links.mjs?v=20261009-delete';
+import {renderCampaignLinks} from './campaign-links.mjs?v=20261019-overview';
 import {renderPlayerReports} from './player-reports.mjs?v=20261016';
 import {ADMIN_API_VERSION} from '../admin-api-contract.mjs';
 import {accountCsrfToken,firstPartyAuthEnabled,getAuthSession,storedAccountToken,signOutAccount} from '../growth-api.mjs';
@@ -12,7 +13,8 @@ const fmt=x=>x==null?'N/A':Number(x).toLocaleString(undefined,{maximumFractionDi
 const pct=x=>x==null?'N/A':`${fmt(x)}%`;
 const draftBase=window.PACK1_API.draftRunUrl;
 const growthBase=window.PACK1_API.growthUrl;
-let report,params=new URLSearchParams(),deferredLoad=0,adminContractVerified=false,switching=false;
+let report,params=new URLSearchParams(location.search),deferredLoad=0,adminContractVerified=false,switching=false;
+params.delete('area');
 const INVITE_STORAGE='pack1-pending-admin-invite-v2';
 const INVITE_TTL_MS=15*60*1000;
 function pendingInvitation(){
@@ -30,7 +32,9 @@ if(invitationHash.has('invite')){
 const areaNavigation=document.querySelector('#admin-area-nav');
 function setAuthorized(authorized,role='admin'){
   areaNavigation.hidden=!authorized;
-  document.querySelector('#admin-team-link').hidden=!authorized||role!=='owner';
+  const area=adminArea(location.search);
+  document.querySelector('#admin-overview-link').hidden=!authorized||area==='overview';
+  document.querySelector('#admin-section-label').textContent=authorized?(ADMIN_AREAS[area]||'Admin home'):'';
 }
 async function requestAt(base,path,body,method=body?'POST':'GET') {
   const headers={'content-type':'application/json'};
@@ -76,8 +80,8 @@ function denied(account,message='This account does not have administrator access
   root.innerHTML=`<section class="login"><h1>Administrator access required</h1><p>${esc(message)}</p><p class="muted">Signed in as ${esc(account?.email||'your current account')}.</p><button id="admin-switch" type="button">Switch account</button> <a href="/">Back to Pack One</a></section>`;
   document.querySelector('#admin-switch').onclick=()=>void switchAccount();
 }
-function unavailable(error){
-  setAuthorized(false);
+function unavailable(error,authorized=false){
+  if(!authorized)setAuthorized(false);
   const message=error?.message||'Administration is temporarily unavailable.';
   root.innerHTML=`<section class="login"><h1>Administration unavailable</h1><p class="error" role="alert">${esc(message)}</p><button type="button" id="retry">Retry</button> <a href="/">Back to Pack One</a></section>`;
   document.querySelector('#retry').onclick=()=>void load();
@@ -223,7 +227,7 @@ async function load() {
   const loadId=++deferredLoad;
   setAuthorized(false);
   root.innerHTML='<p>Checking administrator access…</p>';
-  let session=null;
+  let session=null,authorized=false;
   try {
     session=await getAuthSession();
     if(loadId!==deferredLoad)return;
@@ -237,24 +241,17 @@ async function load() {
     }
     const access=await request('/v1/admin/access');
     if(loadId!==deferredLoad)return;
+    authorized=true;
     setAuthorized(true,access.role);
     const authorizedRequest=async (...args)=>{const data=await request(...args);if(loadId!==deferredLoad)throw Error('Administrator account changed.');return data;};
     const authorizedGrowthRequest=async (...args)=>{const data=await growthRequest(...args);if(loadId!==deferredLoad)throw Error('Administrator account changed.');return data;};
-    const navReports=document.querySelector('#admin-reports-link');
-    navReports.textContent='Player reports';
-    void authorizedRequest('/v1/admin/player-reports/summary').then(({summary})=>{
-      if(loadId!==deferredLoad)return;
-      const total=Number(summary?.decisions?.open||0)+Number(summary?.profiles?.open||0);
-      const broken=Number(summary?.decisions?.broken_open||0);
-      navReports.textContent='Player reports'+(total?' ('+total+')':'');
-      navReports.title=broken?broken+' open reports say something is broken.':'';
-    }).catch(()=>{});
-    const area=new URLSearchParams(location.search).get('area');
+    const area=adminArea(location.search);
+    if(area==='overview'){await renderOverview(root,authorizedRequest,{role:access.role,isCurrent:()=>loadId===deferredLoad,onRefresh:()=>void load()});return;}
     if(area==='reports'){await renderPlayerReports(root,authorizedRequest);return;}
     if(area==='corpus'){await renderCorpus(root,authorizedRequest);return;}
     if(area==='users'){await renderUsers(root,authorizedRequest,authorizedGrowthRequest,access.role);return;}
     if(area==='team'){if(access.role!=='owner'){denied(session?.user);return;}await renderAdminTeam(root,authorizedRequest);return;}
-    if(area==='campaign-links'){await renderCampaignLinks(root,authorizedGrowthRequest,authorizedRequest);return;}
+    if(area==='campaign-links'||area==='creator-challenges'){await renderCampaignLinks(root,authorizedGrowthRequest,authorizedRequest,{mode:area==='creator-challenges'?'creator':'campaign'});return;}
     const queryString=params.toString();
     const nextReport=await authorizedRequest('/v1/admin/measurements'+(queryString?'?'+queryString:''));
     if(loadId!==deferredLoad)return;
@@ -263,7 +260,7 @@ async function load() {
     if(loadId!==deferredLoad)return;
     if(error?.status===401){login('Your session expired. Sign in again to continue.');return;}
     if(error?.status===403){denied(session?.user);return;}
-    unavailable(error);
+    unavailable(error,authorized);
   }
 }
 document.querySelector('#admin-signout').onclick=()=>void switchAccount();
