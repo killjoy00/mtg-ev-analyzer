@@ -238,6 +238,15 @@ export async function postDaily({
   const wall=pacificClock(now);
   const {day}=triggered;
   const live=event==='schedule'||env.MANUAL_LIVE==='true';
+  // A Neon-triggered workflow_dispatch carries the original Pacific day.
+  // If GitHub delays the job past reset, it must never post tomorrow early.
+  if(event==='workflow_dispatch'&&env.SOURCE_PACIFIC_DAY) {
+    const sourceDay=String(env.SOURCE_PACIFIC_DAY);
+    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(sourceDay))
+      throw Error('Invalid independently scheduled Daily date.');
+    if(sourceDay!==wall.day||wall.hour<7)
+      return {day:sourceDay,skipped:true,reason:'stale or early independent schedule'};
+  }
   // In winter the 14:10 UTC trigger is 06:10 PST and skips; 15:10 posts and
   // 16:10 retries. In summer 14:10 posts and both later triggers retry.
   // Receipts and the deterministic Bluesky record deduplicate every retry.
