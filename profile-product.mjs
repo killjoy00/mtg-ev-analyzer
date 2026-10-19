@@ -24,8 +24,8 @@ import { trackEvent } from './retention-events.mjs';
 import { nextMilestones } from './progression.mjs?v=10';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { eliteSource } from './membership-source.mjs';
-import { renderAccount, renderDeletionState } from './growth.mjs?v=21';
-import {dailyReminderSettingsMarkup,bindDailyReminderSettings} from './daily-reminder-settings.mjs?v=3';
+import { renderAccount, renderDeletionState } from './growth.mjs?v=22';
+import {dailyReminderSettingsMarkup,bindDailyReminderSettings} from './daily-reminder-settings.mjs?v=4';
 import {
   bestPercentile,
   liveEnvironmentProgress,
@@ -55,7 +55,7 @@ function ensureProfileStyles() {
   if (document.querySelector('link[data-pack1-profile-css]')) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = new URL('./profile.css?v=12', import.meta.url).href;
+  link.href = new URL('./profile.css?v=13', import.meta.url).href;
   link.dataset.pack1ProfileCss = '1';
   document.head.appendChild(link);
 }

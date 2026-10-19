@@ -47,6 +47,7 @@ jobs:
           test -f scripts/reconcile-neon-schedulers.mjs
           grep -F "pack1-daily-primary" worker/draft-run-function.mjs >/dev/null
           grep -F "pack1-account-deletion-maintenance" worker/growth-function.js >/dev/null
+          grep -F "pack1-daily-reminders" worker/daily-reminders.mjs >/dev/null
 
       - name: Verify scheduler-aware production functions are live
         if: env.ACTION == 'enable'

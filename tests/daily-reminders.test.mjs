@@ -6,9 +6,9 @@ import {createHash,createHmac,randomUUID} from 'node:crypto';
 import fs from 'node:fs';
 import {
   reminderSnapshot,updateReminderSettings,registerReminderDevice,unregisterReminderDevice,
-  revokeReminderSessionDevices,dispatchReminderTick,verifyReminderWebhook,reminderRoute,reminderReadiness,
+  revokeReminderSessionDevices,dispatchDailyReminders,verifyReminderWebhook,reminderRoute,reminderReadiness,DAILY_REMINDER_CRON,
 } from '../worker/daily-reminders.mjs';
-import {NEON_REMINDER_SCHEDULERS} from '../scripts/reconcile-neon-reminder-scheduler.mjs';
+import {NEON_SCHEDULERS} from '../scripts/reconcile-neon-schedulers.mjs';
 import {gameDateKey} from '../game-date.mjs';
 const user='11111111-1111-4111-8111-111111111111',installation='22222222-2222-4222-8222-222222222222';
 const sessionHash='a'.repeat(64);
@@ -80,22 +80,28 @@ test('atomic device cap and stale-version errors are actionable without leaking 
     await assert.rejects(registerReminderDevice(f.query,auth,{installationId:installation,token:'ExpoPushToken['+'x'.repeat(32)+']',platform:'ios'},{env}),e=>e.status===409&&e.code===code&&!e.message.includes('ExpoPushToken'));
   }
 });
-function deliveryFixture({stale=false,admission='claimed',providerFailure=false,responseStatus=200}={}) {
-  const id=randomUUID(),calls=[],fetches=[],now=Date.now();let state='queued';
-  const row={id,auth_user_id:user,channel:'email',state,schedule_version:1,unsubscribe_nonce:installation};
+const fingerprint=createHmac('sha256',env.PACK1_RATE_LIMIT_SECRET).update('pack1-reminder-email:fixture@example.invalid').digest('hex');
+// One opted-in account; the daily job admits it in SQL, then sends one provider batch.
+function deliveryFixture({admission='claimed',providerFailure=false,responses=[200],destination=fingerprint,data}={}) {
+  const id=randomUUID(),calls=[],fetches=[],now=Date.now();let state='none';
   const query=async(sql,args=[])=>{
     calls.push({sql,args});
-    if(sql.startsWith('SELECT id,channel FROM daily_reminder_deliveries'))return {rows:!stale&&state==='queued'?[{id,channel:'email'}]:[]};
-    if(sql.startsWith('SELECT d.*,s.unsubscribe_nonce'))return {rows:[{...row,state}]};
-    if(sql.includes('FROM neon_auth."user"'))return {rows:[{email:'fixture@example.invalid',email_verified:true}]};
-    if(sql.includes('pack1_reminder_claim')){if(state!=='queued')return {rows:[{result:{result:'not_claimed'}}]};state=admission==='claimed'?'sending':'suppressed';return {rows:[{result:{result:admission,attempts:1}}]};}
+    if(sql.startsWith('SELECT s.auth_user_id,s.email_destination_hash'))
+      return {rows:state==='none'?[{auth_user_id:user,email_destination_hash:destination,unsubscribe_nonce:installation,email:'fixture@example.invalid'}]:[]};
+    if(sql.includes('pack1_reminder_admit_daily_email')){if(admission!=='claimed'||state!=='none')return {rows:[{id:null}]};state='sending';return {rows:[{id}]};}
     if(sql.includes('pack1_reminder_provider_accepted')){state='accepted';return {rows:[]};}
-    if(sql.startsWith('UPDATE daily_reminder_deliveries SET state=$2'))state=args[1];
+    if(sql.startsWith('UPDATE daily_reminder_deliveries SET state=$2')&&state==='sending')state=args[1];
     return {rows:[]};
   };
-  const fetcher=async(url,options)=>{fetches.push({url:String(url),options});if(providerFailure)throw Error('controlled timeout');return Response.json({id:'synthetic-provider-id'},{status:responseStatus});};
-  const tick=(overrides={})=>dispatchReminderTick(query,new Date(now).toISOString(),{env,clock:now,pacificDay:gameDateKey(),fetcher,pause:async()=>{},...overrides});
-  return {query,calls,fetches,tick,id,state:()=>state};
+  const fetcher=async(url,options)=>{
+    fetches.push({url:String(url),options});
+    if(providerFailure)throw Error('controlled timeout');
+    const status=responses[Math.min(fetches.length,responses.length)-1];
+    return Response.json({data:data??JSON.parse(options.body).map(()=>({id:'synthetic-provider-id'}))},{status,headers:status===429?{'retry-after':'2'}:{}});
+  };
+  const pauses=[];
+  const run=(overrides={})=>dispatchDailyReminders(query,{env,clock:now,pacificDay:gameDateKey(),fetcher,pause:async ms=>{pauses.push(ms);},...overrides});
+  return {query,calls,fetches,run,id,pauses,state:()=>state};
 }
 test('email and push activation are independent and legacy combined switch cannot enable either',()=>{
   assert.equal(reminderReadiness({...env,PACK1_REMINDER_TOKEN_KEY:''}).emailActive,true);
@@ -103,31 +109,67 @@ test('email and push activation are independent and legacy combined switch canno
   assert.equal(reminderReadiness({...env,PACK1_REMINDER_EMAIL_ENABLED:'0',PACK1_REMINDER_PUSH_ENABLED:'1',PACK1_REMINDER_RESEND_WEBHOOK_SECRET:''}).pushActive,true);
   assert.equal(reminderReadiness({PACK1_DAILY_REMINDERS_ENABLED:'1'}).emailActive,false);
 });
-test('disabled delivery performs safe reconciliation but never enqueues or sends',async()=>{
-  const f=deliveryFixture();const result=await f.tick({env:{...env,PACK1_REMINDER_EMAIL_ENABLED:'0'}});
+test('disabled delivery performs safe reconciliation but never admits or sends',async()=>{
+  const f=deliveryFixture();const result=await f.run({env:{...env,PACK1_REMINDER_EMAIL_ENABLED:'0'}});
   assert.equal(result.active,false);assert.equal(f.fetches.length,0);
-  assert.ok(!f.calls.some(c=>c.sql.includes('pack1_reminder_enqueue')));
+  assert.ok(!f.calls.some(c=>c.sql.includes('pack1_reminder_admit_daily_email')||c.sql.includes('pack1_reminder_enqueue')));
 });
-test('provider request uses homepage, unsubscribe headers, stable key and precommitted correlation tag',async()=>{
-  const f=deliveryFixture();const result=await f.tick();assert.equal(result.accepted,1);assert.equal(f.fetches.length,1);
-  const {url,options}=f.fetches[0],body=JSON.parse(options.body);assert.equal(url,'https://api.resend.com/emails');
-  assert.deepEqual(body.to,['fixture@example.invalid']);assert.ok(body.text.includes('Play today: https://packone.pro/'));
+test('one batch request carries homepage, unsubscribe headers, stable key and precommitted correlation tag',async()=>{
+  const f=deliveryFixture();const result=await f.run();assert.equal(result.email.accepted,1);assert.equal(f.fetches.length,1);
+  const {url,options}=f.fetches[0],batch=JSON.parse(options.body),body=batch[0];assert.equal(url,'https://api.resend.com/emails/batch');
+  assert.equal(batch.length,1);assert.equal(body.from,'Pack One <reminders@packone.pro>');
+  assert.deepEqual(body.to,['fixture@example.invalid']);assert.ok(body.text.includes('Play now: https://packone.pro/'));
   assert.ok(body.text.includes('https://packone.pro/?account=reminders'));assert.equal(body.headers['List-Unsubscribe-Post'],'List-Unsubscribe=One-Click');
-  assert.equal(options.headers['Idempotency-Key'],'pack1-daily-'+f.id);assert.deepEqual(body.tags,[{name:'pack1_reminder',value:f.id}]);
+  assert.match(options.headers['Idempotency-Key'],new RegExp('^pack1-daily-'+gameDateKey()+'-[a-f0-9]{40}$'));assert.deepEqual(body.tags,[{name:'pack1_reminder',value:f.id}]);
   assert.equal(f.state(),'accepted');assert.ok(!f.calls.some(c=>c.sql.includes("SET state='delivered'")));
+  assert.ok(!/push|notification/i.test(body.subject+body.text));
 });
-test('atomic suppression and expired queued work never reach the provider',async()=>{
-  for(const options of [{admission:'suppressed'},{stale:true}]){const f=deliveryFixture(options);await f.tick();assert.equal(f.fetches.length,0);}
+test('admission is decided in SQL for today’s Pacific Daily with the current address fingerprint',async()=>{
+  const f=deliveryFixture();await f.run();
+  const admit=f.calls.find(c=>c.sql.includes('pack1_reminder_admit_daily_email'));
+  assert.deepEqual(admit.args,[user,fingerprint,gameDateKey()]);
 });
-test('ambiguous timeout remains uncertain on subsequent ticks',async()=>{
-  const f=deliveryFixture({providerFailure:true});const first=await f.tick();await f.tick();
-  assert.equal(first.uncertain,1);assert.equal(f.fetches.length,1);assert.equal(f.state(),'uncertain');
+test('database admission refusal and a changed sign-in email never reach the provider',async()=>{
+  const refused=deliveryFixture({admission:'refused'});const first=await refused.run();
+  assert.equal(refused.fetches.length,0);assert.equal(first.email.skipped,1);
+  const changed=deliveryFixture({destination:'0'.repeat(64)});const second=await changed.run();
+  assert.equal(changed.fetches.length,0);assert.equal(second.email.skipped,1);
+  assert.ok(!changed.calls.some(c=>c.sql.includes('pack1_reminder_admit_daily_email')));
 });
-test('explicit rate rejection is retryable, permanent rejection is not',async()=>{
-  for(const [status,state] of [[429,'retry'],[403,'failed'],[503,'uncertain']]){const f=deliveryFixture({responseStatus:status});await f.tick();assert.equal(f.state(),state);}
+test('ambiguous timeout stays uncertain and the same Daily is never resent',async()=>{
+  const f=deliveryFixture({providerFailure:true});const first=await f.run();await f.run();
+  assert.equal(first.email.uncertain,1);assert.equal(f.fetches.length,1);assert.equal(f.state(),'uncertain');
+});
+test('rate limit gets one bounded wait; permanent rejection fails and 5xx stays uncertain',async()=>{
+  const recovered=deliveryFixture({responses:[429,200]});await recovered.run();
+  assert.equal(recovered.fetches.length,2);assert.equal(recovered.state(),'accepted');assert.ok(recovered.pauses.includes(2000));
+  assert.equal(recovered.fetches[0].options.headers['Idempotency-Key'],recovered.fetches[1].options.headers['Idempotency-Key']);
+  for(const [responses,state,requests] of [[[429,429],'failed',2],[[403],'failed',1],[[503],'uncertain',1]]){
+    const f=deliveryFixture({responses});await f.run();assert.equal(f.state(),state);assert.equal(f.fetches.length,requests);
+  }
+});
+test('a provider response that cannot be matched to the batch leaves rows uncertain',async()=>{
+  const f=deliveryFixture({data:[]});const result=await f.run();assert.equal(result.email.uncertain,1);assert.equal(f.state(),'uncertain');
+});
+test('settings save the shared once-daily send and report the next send time',async()=>{
+  const f=accountFixture();await updateReminderSettings(f.query,auth,{...schedule,channel:'email',enabled:true},{env});
+  const write=f.calls.find(c=>c.sql.includes('pack1_reminder_save_settings'));
+  assert.deepEqual(write.args.slice(1,5),['daily','{0,1,2,3,4,5,6}','23:05','Etc/UTC']);
+  const enabled=recorder(sql=>sql.startsWith('SELECT * FROM daily_reminder_settings')?{rows:[{email_enabled:true}]}:{rows:[]});
+  assert.equal((await reminderSnapshot(enabled.query,user,{env,clock:Date.UTC(2026,9,19,12)})).nextAt,'2026-10-19T23:05:00.000Z');
+  assert.equal((await reminderSnapshot(enabled.query,user,{env,clock:Date.UTC(2026,9,19,23,30)})).nextAt,'2026-10-20T23:05:00.000Z');
+  assert.equal(NEON_SCHEDULERS.find(row=>row.name==='pack1-daily-reminders').schedule.cron,DAILY_REMINDER_CRON);
+  assert.equal(DAILY_REMINDER_CRON,'5 23 * * *');
+});
+test('a trigger delivered hours late does no reminder work',async()=>{
+  const q=recorder(),scheduledAt=new Date(Date.now()-4*60*60*1000).toISOString();
+  const response=await reminderRoute(new Request('https://api.test/internal/daily-reminders',{method:'POST',body:'{}'}),{
+    query:q.query,json:Response.json,readJson:r=>r.json(),trigger:()=>({scheduledAt}),env,pacificDay:gameDateKey(),
+  });
+  assert.deepEqual(await response.json(),{ok:true,stale:true});assert.equal(q.calls.length,0);
 });
 test('unsubscribe GET has no mutation; repeated signed POST uses the stable capability',async()=>{
-  const f=deliveryFixture();await f.tick();const body=JSON.parse(f.fetches[0].options.body);
+  const f=deliveryFixture();await f.run();const body=JSON.parse(f.fetches[0].options.body)[0];
   const link=body.headers['List-Unsubscribe'].slice(1,-1).replace('/growth/v1/','/v1/'),q=recorder();
   const args={query:q.query,json:Response.json,env};
   const get=await reminderRoute(new Request(link),args);assert.equal(get.status,200);assert.equal(q.calls.length,0);
@@ -172,7 +214,7 @@ test('private schema and deletion cleanup include durable claims, suppression an
   assert.match(migration,/UNIQUE NULLS NOT DISTINCT\(auth_user_id,channel,installation_id,game_day\)/);
   for(const table of ['daily_reminder_deliveries','daily_reminder_settings','daily_reminder_devices','daily_reminder_changes','daily_reminder_dispatch_claims','daily_reminder_provider_events','daily_reminder_email_suppressions'])
     assert.ok(deletion.includes('DELETE FROM '+table),table);
-  assert.deepEqual(NEON_REMINDER_SCHEDULERS.map(row=>row.name),['pack1-daily-reminders']);
+  assert.equal(NEON_SCHEDULERS.filter(row=>row.function_path==='/internal/daily-reminders').length,1);
 });
 
 test('HTTP reminder editor identity is mandatory before any account mutation',async()=>{

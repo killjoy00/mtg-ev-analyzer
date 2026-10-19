@@ -1,14 +1,19 @@
 import {createCipheriv,createDecipheriv,createHash,createHmac,randomBytes,timingSafeEqual} from 'node:crypto';
-import {nextReminderOccurrence,localReminderDay,validateReminderSchedule} from './daily-reminder-schedule.mjs';
+import {nextReminderOccurrence,localReminderDay} from './daily-reminder-schedule.mjs';
 import {deletionEmailForAuth} from './account-deletion-verification.mjs';
 
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-[1-5][a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/i;
 const TOKEN=/^(?:Expo|Exponent)PushToken\[[A-Za-z0-9_-]{10,192}\]$/;
 const TRIGGERS=new Set(['pack1-daily-reminders']);
-const MAX_LATENESS_MS=20*60*1000;
-const DEFAULT={frequency:'daily',weekdays:[1],localTime:'09:00',timeZone:'Etc/UTC'};
+// One reminder a day for everyone, sent by the pack1-daily-reminders trigger.
+export const DAILY_REMINDER_CRON='5 23 * * *';
+export const DAILY_REMINDER_SCHEDULE=Object.freeze({frequency:'daily',weekdays:Object.freeze([0,1,2,3,4,5,6]),localTime:'23:05',timeZone:'Etc/UTC'});
+const MAX_TRIGGER_LATENESS_MS=3*60*60*1000;
+const EMAIL_BATCH_SIZE=100;
+const DISPATCH_BUDGET_MS=90000;
+const MAX_DAILY_EMAIL_CANDIDATES=5000;
 const UNSUBSCRIBE_URL='https://api.packone.pro/growth/v1/reminders/unsubscribe';
-const DEFAULT_EMAIL='Pack One <accounts@packone.pro>';
+const REMINDER_EMAIL_FROM='Pack One <reminders@packone.pro>';
 const apiError=(message,status=400)=>Object.assign(Error(message),{status,reminderSafe:true});
 const yes=value=>value===true||value==='t'||value==='true'||value==='1'||value===1;
 const hash=value=>createHash('sha256').update(String(value)).digest('hex');
@@ -57,15 +62,6 @@ function verifyUnsubscribeToken(token,env=process.env) {
   if(!timingSafeEqual(Buffer.from(expected),Buffer.from(signature)))throw apiError('Invalid unsubscribe link.',400);
   return {authId,nonce};
 }
-function scheduleFromRow(row) {
-  return validateReminderSchedule({
-    frequency:row?.frequency||DEFAULT.frequency,
-    weekdays:Array.isArray(row?.weekdays)?row.weekdays:(typeof row?.weekdays==='string'?
-      row.weekdays.replace(/[{}]/g,'').split(',').filter(Boolean).map(Number):DEFAULT.weekdays),
-    localTime:row?.local_time||DEFAULT.localTime,
-    timeZone:row?.time_zone||DEFAULT.timeZone,
-  });
-}
 async function setting(query,authId) {
   const result=await query('SELECT * FROM daily_reminder_settings WHERE auth_user_id=$1::uuid',[authId]);
   return result.rows[0]||null;
@@ -87,9 +83,7 @@ export function reminderReadiness(env=process.env) {
   return {emailReady:email.ready,pushReady:push.ready,emailActive:email.active,pushActive:push.active};
 }
 const object=value=>typeof value==='string'?JSON.parse(value):value;
-function scheduleInput(value) {
-  try {return validateReminderSchedule(value);} catch {throw apiError('Choose a valid frequency, weekdays, local time and IANA timezone.');}
-}
+export const nextDailyReminderAt=(clock=Date.now())=>nextReminderOccurrence(DAILY_REMINDER_SCHEDULE,Number(clock)).dueAt;
 const errors={
   REMINDER_INVALID_SCHEDULE:['Choose a valid reminder schedule.',400],
   REMINDER_EMAIL_UNVERIFIED:['Verify your account email before enabling email reminders.',403],
@@ -116,7 +110,7 @@ function sessionAuth(auth) {
   if(!validId(auth?.user_id)||auth?.source!=='mobile'||!/^[a-f0-9]{64}$/.test(String(auth.session_hash||'')))
     throw apiError('Native account session required.',401);
 }
-export async function reminderSnapshot(query,authId,{env=process.env}={}) {
+export async function reminderSnapshot(query,authId,{env=process.env,clock=Date.now()}={}) {
   if(!validId(authId))throw apiError('Account session required.',401);
   const [row,email,recent,devices]=await Promise.all([setting(query,authId),deletionEmailForAuth(query,authId),
     query('SELECT DISTINCT ON (channel) channel,state,accepted_at,delivered_at,push_receipt_result FROM daily_reminder_deliveries WHERE auth_user_id=$1::uuid ORDER BY channel,created_at DESC LIMIT 2',[authId]),
@@ -128,13 +122,13 @@ export async function reminderSnapshot(query,authId,{env=process.env}={}) {
   }]));
   const active=reminderDeliveryConfiguration(env);
   return {
-    schedule:scheduleFromRow(row),
+    schedule:{...DAILY_REMINDER_SCHEDULE,weekdays:[...DAILY_REMINDER_SCHEDULE.weekdays]},
     email:{enabled:yes(row?.email_enabled),eligible:Boolean(email),suppressed:Boolean(blocked.rows.length||fingerprint&&row?.suppressed_email_hash===fingerprint),
       addressChanged:Boolean(yes(row?.email_enabled)&&fingerprint!==row?.email_destination_hash),
       consentedAt:row?.email_consented_at||null,deliveredAt:row?.last_email_delivered_at||null,lastAttempt:status.email||null,deliveryActive:active.email.active},
     push:{enabled:yes(row?.push_enabled),consentedAt:row?.push_consented_at||null,providerAcceptedAt:row?.last_push_accepted_at||null,
       lastAttempt:status.push||null,registeredDevices:Number(devices.rows[0]?.count||0),deliveryActive:active.push.active},
-    nextAt:row?.next_due_at||null,deliveryActive:active.email.active||active.push.active,
+    nextAt:yes(row?.email_enabled)||yes(row?.push_enabled)?nextDailyReminderAt(clock):null,deliveryActive:active.email.active||active.push.active,
   };
 }
 export async function updateReminderSettings(query,auth,payload,{env=process.env,clock=Date.now()}={}) {
@@ -144,15 +138,15 @@ export async function updateReminderSettings(query,auth,payload,{env=process.env
   const allowed=new Set(['channel','enabled','frequency','weekdays','localTime','timeZone','expectedAccountId']);
   if(payload.expectedAccountId!==undefined&&payload.expectedAccountId!==auth.user_id)throw apiError('Account changed. Reload reminder settings.',409);
   if(Object.keys(payload).some(key=>!allowed.has(key)))throw apiError('Unexpected reminder settings field.');
-  // Opt-out must not depend on an unsaved/invalid editor value.
-  const config=payload.enabled?scheduleInput(payload):scheduleFromRow(await setting(query,auth.user_id));
+  // Everyone shares the once-daily send; any client schedule fields are ignored.
+  const config=DAILY_REMINDER_SCHEDULE;
   const email=payload.enabled&&payload.channel==='email'?await deletionEmailForAuth(query,auth.user_id):null;
   if(payload.enabled&&payload.channel==='email'&&!email)throw domainError('REMINDER_EMAIL_UNVERIFIED');
   const next=nextReminderOccurrence(config,Number(clock));
   const saved=await store(query,'SELECT * FROM pack1_reminder_save_settings($1::uuid,$2::text,$3::integer[],$4::text,$5::text,$6::text,$7::boolean,$8::timestamptz,$9::text,$10::text)',
     [auth.user_id,config.frequency,'{'+config.weekdays.join(',')+'}',config.localTime,config.timeZone,payload.channel,String(payload.enabled),next.dueAt,email?emailFingerprint(email,env):null,email]);
   if(!saved.rows.length)throw domainError('ACCOUNT_DELETING');
-  return reminderSnapshot(query,auth.user_id,{env});
+  return reminderSnapshot(query,auth.user_id,{env,clock});
 }
 export async function registerReminderDevice(query,auth,payload,{env=process.env}={}) {
   sessionAuth(auth);
@@ -194,49 +188,32 @@ async function finishSending(query,id,state,reason,nextRetryAt=null) {
   // Never overwrite an authenticated event that already advanced the row.
   await query("UPDATE daily_reminder_deliveries SET state=$2,failure_reason=$3,next_retry_at=$4::timestamptz,updated_at=now() WHERE id=$1::uuid AND state='sending'",[id,state,reason,nextRetryAt]);
 }
+// Push sends are per device and claimed one at a time; email uses daily batches below.
 async function deliverOne(query,id,{env,fetcher,clock,pacificDay,active}={}) {
-  const result=await query('SELECT d.*,s.unsubscribe_nonce,v.token_ciphertext FROM daily_reminder_deliveries d JOIN daily_reminder_settings s ON s.auth_user_id=d.auth_user_id LEFT JOIN daily_reminder_devices v ON v.installation_id=d.installation_id WHERE d.id=$1::uuid',[id]);
+  const result=await query('SELECT d.*,v.token_ciphertext FROM daily_reminder_deliveries d LEFT JOIN daily_reminder_devices v ON v.installation_id=d.installation_id WHERE d.id=$1::uuid',[id]);
   const row=result.rows[0];
-  if(!row||!['queued','retry'].includes(row.state))return 'not_claimed';
-  let email=null,destination=null,body,endpoint,headers;
-  if(row.channel==='email') {
-    if(!active.email.active)return 'inactive';
-    email=await deletionEmailForAuth(query,row.auth_user_id);
-    destination=email?emailFingerprint(email,env):null;
-    const unsubscribe=UNSUBSCRIBE_URL+'?token='+encodeURIComponent(unsubscribeToken(row.auth_user_id,row.unsubscribe_nonce,env));
-    body={from:DEFAULT_EMAIL,to:email?[email]:[],subject:'Your Pack One Dailies are ready',
-      text:['Your Pack One Dailies are ready.','','Play today: https://packone.pro/','',
-        'You receive this because you enabled email Daily reminders.',
-        'Manage reminders: https://packone.pro/?account=reminders','Unsubscribe: '+unsubscribe].join('\n'),
-      headers:{'List-Unsubscribe':'<'+unsubscribe+'>','List-Unsubscribe-Post':'List-Unsubscribe=One-Click'},
-      tags:[{name:'pack1_reminder',value:id}]};
-    endpoint='https://api.resend.com/emails';
-    headers={authorization:'Bearer '+String(env.PACK1_REMINDER_RESEND_API_KEY||env.PACK1_ACCOUNT_DELETE_RESEND_API_KEY),
-      'content-type':'application/json','Idempotency-Key':'pack1-daily-'+id};
-  } else {
-    if(!active.push.active)return 'inactive';
-    // An obsolete registration is rejected in the atomic admission function.
-    // Never attempt to decrypt a deliberately erased revoked token.
-    let token='';
-    if(row.token_ciphertext)try {token=openToken(row.token_ciphertext,env);} catch {
-      await query("UPDATE daily_reminder_deliveries SET state='failed',failure_reason='device_configuration',updated_at=now() WHERE id=$1::uuid AND state IN ('queued','retry')",[id]);
-      return 'failed';
-    }
-    body={to:token,title:'Your Pack One Dailies are ready',body:'Three fresh Daily challenges are waiting.',
-      data:{screen:'daily',owner:row.auth_user_id,registrationVersion:Number(row.device_version)},channelId:'daily-reminders',ttl:60};
-    endpoint='https://exp.host/--/api/v2/push/send';
-    headers={'content-type':'application/json',accept:'application/json',
-      ...(env.PACK1_EXPO_PUSH_ACCESS_TOKEN?{authorization:'Bearer '+env.PACK1_EXPO_PUSH_ACCESS_TOKEN}:{})};
+  if(!row||row.channel!=='push'||!['queued','retry'].includes(row.state))return 'not_claimed';
+  if(!active.push.active)return 'inactive';
+  // An obsolete registration is rejected in the atomic admission function.
+  // Never attempt to decrypt a deliberately erased revoked token.
+  let token='';
+  if(row.token_ciphertext)try {token=openToken(row.token_ciphertext,env);} catch {
+    await query("UPDATE daily_reminder_deliveries SET state='failed',failure_reason='device_configuration',updated_at=now() WHERE id=$1::uuid AND state IN ('queued','retry')",[id]);
+    return 'failed';
   }
+  const body={to:token,title:'Your Pack One Dailies are ready',body:'Three fresh Daily challenges are waiting.',
+    data:{screen:'daily',owner:row.auth_user_id,registrationVersion:Number(row.device_version)},channelId:'daily-reminders',ttl:60};
+  const headers={'content-type':'application/json',accept:'application/json',
+    ...(env.PACK1_EXPO_PUSH_ACCESS_TOKEN?{authorization:'Bearer '+env.PACK1_EXPO_PUSH_ACCESS_TOKEN}:{})};
   const serialized=JSON.stringify(body);
   // This is the final database operation before dispatch. The function locks
-  // with consent/deletion/device mutations and rechecks the actual destination,
-  // current Pacific game, ownership, version, suppression and daily admission.
+  // with consent/deletion/device mutations and rechecks ownership, version,
+  // the current Pacific game and daily admission.
   const claimed=object((await query('SELECT pack1_reminder_claim($1::uuid,$2::text,$3::text,$4::text,$5::date,$6::boolean,$7::boolean) result',
-    [id,email,destination,hash(serialized),pacificDay,String(active.email.active),String(active.push.active)])).rows[0]?.result);
+    [id,null,null,hash(serialized),pacificDay,'false',String(active.push.active)])).rows[0]?.result);
   if(claimed?.result!=='claimed')return claimed?.result||'not_claimed';
   try {
-    const response=await fetcher(endpoint,{method:'POST',headers,body:serialized,redirect:'error',signal:timeoutSignal()});
+    const response=await fetcher('https://exp.host/--/api/v2/push/send',{method:'POST',headers,body:serialized,redirect:'error',signal:timeoutSignal()});
     if(response.status===429) {
       const retrySeconds=Math.min(900,Math.max(30,Number(response.headers.get('retry-after'))||300));
       const next=new Date(Number(clock)+retrySeconds*1000).toISOString();
@@ -246,21 +223,19 @@ async function deliverOne(query,id,{env,fetcher,clock,pacificDay,active}={}) {
     if(!response.ok) {
       const permanent=response.status>=400&&response.status<500;
       // 5xx/transport ambiguity can mean the provider accepted the message.
-      // Do not resend blindly, even after the provider's idempotency TTL.
       await finishSending(query,id,permanent?'failed':'uncertain',permanent?'provider_rejected':'provider_ambiguous');
       return permanent?'failed':'uncertain';
     }
     const value=await response.json();
-    const ticket=row.channel==='push'?(Array.isArray(value.data)?value.data[0]:value.data):null;
+    const ticket=Array.isArray(value.data)?value.data[0]:value.data;
     if(ticket?.status==='error') {
       if(ticket.details?.error==='DeviceNotRegistered')await revokeInvalidDeliveryDevice(query,row);
       await finishSending(query,id,'failed','push_rejected');
       return 'failed';
     }
-    const providerId=row.channel==='email'?value.id:ticket?.id;
+    const providerId=ticket?.id;
     if(typeof providerId!=='string'||!providerId||providerId.length>200)throw Error('Provider response could not be confirmed.');
     await query('SELECT pack1_reminder_provider_accepted($1::uuid,$2::text)',[id,providerId]);
-    if(row.channel==='email')await reconcileReminderEvents(query,{providerId});
     return 'accepted';
   }catch {
     await finishSending(query,id,'uncertain','provider_ambiguous');
@@ -297,43 +272,122 @@ export async function refreshPushReceipts(query,{env=process.env,fetcher=fetch}=
   await query("UPDATE daily_reminder_deliveries SET push_receipt_checked_at=now(),push_receipt_result='receipt_expired',updated_at=now() WHERE id IN (SELECT id FROM daily_reminder_deliveries WHERE channel='push' AND state='accepted' AND push_receipt_checked_at IS NULL AND accepted_at<=now()-interval '2 hours' LIMIT 100)");
   return {checked,invalidated};
 }
-export async function dispatchReminderTick(query,scheduledAt,{env=process.env,clock=Date.now(),fetcher=fetch,pacificDay,pause=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}) {
+function dailyEmail(id,email,authId,nonce,env) {
+  const unsubscribe=UNSUBSCRIBE_URL+'?token='+encodeURIComponent(unsubscribeToken(authId,nonce,env));
+  return {from:REMINDER_EMAIL_FROM,to:[email],subject:'Today\'s Pack One Dailies are waiting',
+    text:['Today\'s three Pack One Dailies are waiting. They close at midnight Pacific.','',
+      'Play now: https://packone.pro/','',
+      'You get this because you turned on Daily email reminders. It comes once a day and is skipped on days you have finished all three Dailies.',
+      'Manage reminders: https://packone.pro/?account=reminders','Unsubscribe: '+unsubscribe].join('\n'),
+    headers:{'List-Unsubscribe':'<'+unsubscribe+'>','List-Unsubscribe-Post':'List-Unsubscribe=One-Click'},
+    tags:[{name:'pack1_reminder',value:id}]};
+}
+async function markEmails(query,ids,state,reason) {
+  // Never overwrite a row that an authenticated provider event already advanced.
+  await query("UPDATE daily_reminder_deliveries SET state=$2,failure_reason=$3,updated_at=now() WHERE id=ANY($1::uuid[]) AND state='sending'",[ids,state,reason]);
+}
+async function sendEmailBatch(query,admitted,{env,fetcher,pacificDay,pause,metrics}) {
+  const ids=admitted.map(item=>item.id);
+  const body=JSON.stringify(admitted.map(item=>item.message));
+  const headers={authorization:'Bearer '+String(env.PACK1_REMINDER_RESEND_API_KEY||env.PACK1_ACCOUNT_DELETE_RESEND_API_KEY),
+    'content-type':'application/json','Idempotency-Key':'pack1-daily-'+pacificDay+'-'+hash(ids.join(',')).slice(0,40)};
+  for(let attempt=0;attempt<2;attempt++) {
+    let response;
+    try {response=await fetcher('https://api.resend.com/emails/batch',{method:'POST',headers,body,redirect:'error',signal:AbortSignal.timeout(20000)});}
+    catch {await markEmails(query,ids,'uncertain','provider_ambiguous');metrics.uncertain+=ids.length;return;}
+    if(response.status===429&&attempt===0) {
+      await pause(Math.min(30,Math.max(1,Number(response.headers.get('retry-after'))||5))*1000);
+      continue;
+    }
+    if(!response.ok) {
+      // 5xx can mean the provider accepted the batch; never resend it blindly.
+      const permanent=response.status>=400&&response.status<500;
+      await markEmails(query,ids,permanent?'failed':'uncertain',response.status===429?'provider_rate_limit':permanent?'provider_rejected':'provider_ambiguous');
+      metrics[permanent?'failed':'uncertain']+=ids.length;
+      return;
+    }
+    const data=await response.json().then(value=>value?.data).catch(()=>null);
+    if(!Array.isArray(data)||data.length!==ids.length) {
+      await markEmails(query,ids,'uncertain','provider_unconfirmed');metrics.uncertain+=ids.length;return;
+    }
+    for(let i=0;i<ids.length;i++) {
+      const providerId=data[i]?.id;
+      if(typeof providerId==='string'&&providerId&&providerId.length<=200) {
+        // The provider took it; a failed write here must not stop later batches.
+        try {await query('SELECT pack1_reminder_provider_accepted($1::uuid,$2::text)',[ids[i],providerId]);metrics.accepted++;}
+        catch {await markEmails(query,[ids[i]],'uncertain','provider_ambiguous');metrics.uncertain++;}
+      } else {
+        await markEmails(query,[ids[i]],'uncertain','provider_unconfirmed');metrics.uncertain++;
+      }
+    }
+    return;
+  }
+}
+async function sendDailyEmails(query,{env,fetcher,pacificDay,pause,began,metrics}) {
+  const candidates=await query(`SELECT s.auth_user_id,s.email_destination_hash,s.unsubscribe_nonce,u.email
+    FROM daily_reminder_settings s JOIN neon_auth."user" u ON u.id=s.auth_user_id
+    WHERE s.email_enabled AND u."emailVerified" IS TRUE
+      AND NOT EXISTS(SELECT 1 FROM daily_reminder_deliveries d WHERE d.auth_user_id=s.auth_user_id AND d.channel='email' AND d.game_day=$1::date)
+    ORDER BY s.auth_user_id LIMIT $2::int`,[pacificDay,MAX_DAILY_EMAIL_CANDIDATES]);
+  metrics.candidates=candidates.rows.length;
+  for(let start=0;start<candidates.rows.length;start+=EMAIL_BATCH_SIZE) {
+    if(Date.now()-began>DISPATCH_BUDGET_MS){metrics.deferred+=candidates.rows.length-start;break;}
+    const admitted=[];
+    for(const row of candidates.rows.slice(start,start+EMAIL_BATCH_SIZE)) {
+      const email=String(row.email||'').trim();
+      const destination=email?emailFingerprint(email,env):null;
+      // Consent belongs to the address it was given for; a changed address needs a fresh opt-in.
+      if(!destination||destination!==row.email_destination_hash){metrics.skipped++;continue;}
+      const id=(await query('SELECT pack1_reminder_admit_daily_email($1::uuid,$2::text,$3::date) id',[row.auth_user_id,destination,pacificDay])).rows[0]?.id;
+      if(!id){metrics.skipped++;continue;}
+      admitted.push({id,message:dailyEmail(id,email,row.auth_user_id,row.unsubscribe_nonce,env)});
+    }
+    if(!admitted.length)continue;
+    metrics.admitted+=admitted.length;
+    await sendEmailBatch(query,admitted,{env,fetcher,pacificDay,pause,metrics});
+    await pause(600);
+  }
+}
+async function sendDuePush(query,{env,fetcher,clock,pacificDay,pause,began,active,metrics}) {
+  const due=await query('SELECT * FROM daily_reminder_settings WHERE push_enabled AND next_due_at<=now() ORDER BY next_due_at LIMIT 100');
+  for(const row of due.rows) {
+    const next=nextReminderOccurrence(DAILY_REMINDER_SCHEDULE,Math.max(Number(clock),Date.parse(row.next_due_at)));
+    await query('SELECT pack1_reminder_enqueue($1::uuid,$2::bigint,$3::timestamptz,$4::timestamptz,$5::date,$6::boolean,$7::boolean) id',
+      [row.auth_user_id,row.schedule_version,row.next_due_at,next.dueAt,localReminderDay(row.next_due_at,DAILY_REMINDER_SCHEDULE),'false','true']);
+    if(Date.now()-began>DISPATCH_BUDGET_MS)break;
+  }
+  const queued=await query("SELECT id FROM daily_reminder_deliveries WHERE channel='push' AND state IN ('queued','retry') AND due_at<=now() AND due_at>=now()-interval '20 minutes' AND (next_retry_at IS NULL OR next_retry_at<=now()) ORDER BY due_at,id LIMIT 200");
+  for(const row of queued.rows) {
+    if(Date.now()-began>DISPATCH_BUDGET_MS)break;
+    const outcome=await deliverOne(query,row.id,{env,fetcher,clock:Date.now(),pacificDay,active});
+    if(typeof metrics[outcome]==='number')metrics[outcome]++;
+    if(outcome==='rate_limited')break;
+    if(['accepted','uncertain','retry','failed'].includes(outcome))await pause(60);
+  }
+}
+// The once-daily job: housekeeping, then one email per opted-in account for today's
+// Pacific Daily. Push runs only when its channel is switched on.
+export async function dispatchDailyReminders(query,{env=process.env,clock=Date.now(),fetcher=fetch,pacificDay,pause=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}) {
   const active=reminderDeliveryConfiguration(env);
   if(!pacificDay||!/^\d{4}-\d{2}-\d{2}$/.test(pacificDay))throw Error('Pacific day is required.');
-  // Receipt/event reconciliation and abandoned-work classification run even
-  // when send flags are off. Turning off consent does not erase late bounces.
+  // Event reconciliation and cleanup run even when sending is off; late bounces still apply.
   await reconcileReminderEvents(query);
   await refreshPushReceipts(query,{env,fetcher});
-  await query("UPDATE daily_reminder_deliveries SET state='uncertain',failure_reason='abandoned_send',updated_at=now() WHERE id IN (SELECT id FROM daily_reminder_deliveries WHERE state='sending' AND last_attempt_at<now()-interval '2 minutes' LIMIT 200)");
+  await query("UPDATE daily_reminder_deliveries SET state='uncertain',failure_reason='abandoned_send',updated_at=now() WHERE id IN (SELECT id FROM daily_reminder_deliveries WHERE state='sending' AND last_attempt_at<now()-interval '2 minutes' LIMIT 500)");
   await query("UPDATE daily_reminder_deliveries SET state='suppressed',failure_reason='expired',updated_at=now() WHERE id IN (SELECT id FROM daily_reminder_deliveries WHERE state IN ('queued','retry') AND due_at<now()-interval '20 minutes' LIMIT 500)");
   await query("DELETE FROM daily_reminder_provider_events WHERE event_id IN (SELECT event_id FROM daily_reminder_provider_events WHERE created_at<now()-interval '7 days' LIMIT 500)");
   await query("DELETE FROM daily_reminder_deliveries WHERE id IN (SELECT id FROM daily_reminder_deliveries WHERE created_at<now()-interval '90 days' AND state NOT IN ('queued','retry','sending') LIMIT 500)");
   await query("DELETE FROM daily_reminder_rate_limits WHERE bucket<now()-interval '1 hour'");
   await query("DELETE FROM daily_reminder_changes WHERE id IN (SELECT id FROM daily_reminder_changes WHERE created_at<now()-interval '365 days' LIMIT 500)");
   await query("DELETE FROM daily_reminder_devices WHERE installation_id IN (SELECT installation_id FROM daily_reminder_devices WHERE revoked_at<now()-interval '30 days' AND updated_at<now()-interval '30 days' LIMIT 100)");
-  const metrics={active:active.email.active||active.push.active,scanned:0,accepted:0,suppressed:0,uncertain:0,retry:0,failed:0,rateLimited:0};
+  const metrics={active:active.email.active||active.push.active,
+    email:{candidates:0,admitted:0,accepted:0,uncertain:0,failed:0,skipped:0,deferred:0},
+    push:{accepted:0,uncertain:0,retry:0,failed:0,suppressed:0}};
   if(!metrics.active)return metrics;
-  const due=await query('SELECT * FROM daily_reminder_settings WHERE ((email_enabled AND $1::boolean) OR (push_enabled AND $2::boolean)) AND next_due_at<=now() ORDER BY next_due_at LIMIT 100',[String(active.email.active),String(active.push.active)]);
   const began=Date.now();
-  for(const row of due.rows) {
-    const schedule=scheduleFromRow(row);
-    const next=nextReminderOccurrence(schedule,Math.max(Number(clock),Date.parse(row.next_due_at)));
-    await query('SELECT pack1_reminder_enqueue($1::uuid,$2::bigint,$3::timestamptz,$4::timestamptz,$5::date,$6::boolean,$7::boolean) id',
-      [row.auth_user_id,row.schedule_version,row.next_due_at,next.dueAt,localReminderDay(row.next_due_at,schedule),String(active.email.active),String(active.push.active)]);
-    metrics.scanned++;
-    if(Date.now()-began>90000)break;
-  }
-  // Always recover prior queued work, not just IDs returned by this tick's
-  // enqueue. The atomic dispatch function arbitrates concurrent recoverers.
-  const queued=await query("SELECT id,channel FROM daily_reminder_deliveries WHERE state IN ('queued','retry') AND due_at<=now() AND due_at>=now()-interval '20 minutes' AND (next_retry_at IS NULL OR next_retry_at<=now()) AND ((channel='email' AND $1::boolean) OR (channel='push' AND $2::boolean)) ORDER BY due_at,id LIMIT 200",
-    [String(active.email.active),String(active.push.active)]);
-  for(const row of queued.rows) {
-    if(Date.now()-began>90000)break;
-    const outcome=await deliverOne(query,row.id,{env,fetcher,clock:Date.now(),pacificDay,active});
-    if(Object.hasOwn(metrics,outcome)&&typeof metrics[outcome]==='number')metrics[outcome]++;
-    if(outcome==='rate_limited'){metrics.rateLimited++;break;}
-    if(['accepted','uncertain','retry','failed'].includes(outcome))await pause(row.channel==='email'?550:60);
-  }
+  if(active.email.active)await sendDailyEmails(query,{env,fetcher,pacificDay,pause,began,metrics:metrics.email});
+  if(active.push.active)await sendDuePush(query,{env,fetcher,clock,pacificDay,pause,began,active,metrics:metrics.push});
+  await reconcileReminderEvents(query);
   return metrics;
 }
 const UNSUB_HEADERS={'content-type':'text/html; charset=utf-8','cache-control':'no-store','referrer-policy':'no-referrer',
@@ -341,9 +395,9 @@ const UNSUB_HEADERS={'content-type':'text/html; charset=utf-8','cache-control':'
 async function unsubscribeRequest(request,query,env) {
   if(!['GET','POST'].includes(request.method))throw apiError('Not found.',404);
   const {authId,nonce}=verifyUnsubscribeToken(new URL(request.url).searchParams.get('token'),env);
-  if(request.method==='GET')return new Response('<!doctype html><html lang="en"><meta name="viewport" content="width=device-width"><title>Pack One reminders</title><main style="max-width:34rem;margin:4rem auto;font:1rem system-ui"><h1>Stop Daily email reminders?</h1><p>This only affects email. Push consent stays separate.</p><form method="POST"><button type="submit">Unsubscribe from email</button></form></main></html>',{headers:UNSUB_HEADERS});
+  if(request.method==='GET')return new Response('<!doctype html><html lang="en"><meta name="viewport" content="width=device-width"><title>Pack One reminders</title><main style="max-width:34rem;margin:4rem auto;font:1rem system-ui"><h1>Stop Daily email reminders?</h1><p>You can turn them back on anytime in My Pack One.</p><form method="POST"><button type="submit">Unsubscribe</button></form></main></html>',{headers:UNSUB_HEADERS});
   await query('SELECT pack1_reminder_unsubscribe($1::uuid,$2::uuid)',[authId,nonce]);
-  return new Response('<!doctype html><html lang="en"><title>Unsubscribed</title><main style="font:1rem system-ui"><h1>Email reminders are off</h1><p>Push settings are unchanged.</p><a href="https://packone.pro/">Pack One</a></main></html>',{headers:UNSUB_HEADERS});
+  return new Response('<!doctype html><html lang="en"><title>Unsubscribed</title><main style="font:1rem system-ui"><h1>Email reminders are off</h1><p>You won’t get Daily reminder emails anymore.</p><a href="https://packone.pro/">Back to Pack One</a></main></html>',{headers:UNSUB_HEADERS});
 }
 export function verifyReminderWebhook(request,raw,env=process.env,clock=Date.now()) {
   const secret=String(env.PACK1_REMINDER_RESEND_WEBHOOK_SECRET||'');
@@ -404,8 +458,8 @@ export async function reminderRoute(request,{query,json,readJson,authBrowser,aut
     if(method!=='POST')throw apiError('Not found.',404);
     const body=await readJson(request),checked=trigger(request,body,{names:TRIGGERS});
     if(!checked)throw apiError('Neon scheduler identity required.',403);
-    if(Math.abs(Date.now()-Date.parse(checked.scheduledAt))>MAX_LATENESS_MS)return json({ok:true,stale:true});
-    return json(await dispatchReminderTick(query,checked.scheduledAt,{env,pacificDay}));
+    if(Math.abs(Date.now()-Date.parse(checked.scheduledAt))>MAX_TRIGGER_LATENESS_MS)return json({ok:true,stale:true});
+    return json(await dispatchDailyReminders(query,{env,pacificDay}));
   }
   if(path==='/v1/reminders/unsubscribe')return unsubscribeRequest(request,query,env);
   if(path==='/v1/reminders/provider-event') {

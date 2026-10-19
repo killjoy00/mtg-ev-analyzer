@@ -3,30 +3,27 @@
 Tracks issue #1151 and PR #1247. This document describes the implementation and
 release checks; it is not a production-deployment or delivery receipt.
 
-**Source/schema and gateway are deployed, with delivery still default-off.**
-Reviewed PRs #1247 and #1250 merged on October 19, 2026. The protected
-secure-auth release succeeded on commit
-`11df2732f5837532097374c8a71635aa4a7a4305`, including development
-and production migration 0061, exact-revision functions and gateway checks.
-The full native simulator acceptance/screenshot workflow passed, but this is
-not physical-device receipt evidence.
+**Once-daily email design (migration 0062).** Everyone who turns on email
+reminders gets at most one email a day from a single Neon trigger,
+`pack1-daily-reminders`, at 23:05 UTC (15:05 PST / 16:05 PDT). There is no
+per-account day, time or timezone choice. The web Account settings page offers
+only an email On/Off control and does not mention push. Push code (backend,
+schema and the mobile app) is kept unchanged for the mobile launch and stays off
+until its own approval; the daily job sends push only when the push channel is
+switched on.
 
-A dedicated Resend webhook now exists for
+Earlier state: reviewed PRs #1247 and #1250 shipped migration 0061, the
+gateway and default-off delivery on October 19, 2026. The protected release
+does not by itself prove a real email arrives; acceptance evidence is listed
+at the end of this document.
+
+A dedicated Resend webhook exists for
 `https://api.packone.pro/growth/v1/reminders/provider-event`, subscribed to
-the four supported email events. **It is disabled** pending secure signing
-secret provisioning and deployment. The existing unrelated account webhook
-is unchanged. This branch includes a narrowly scoped guard that drops
-unrelated account-wide email events before writing reminder metadata.
+the four supported email events. The existing unrelated account webhook is
+unchanged. The handler drops unrelated account-wide email events before writing
+reminder metadata.
 
-At the time of this update, production has **zero** opted-in reminder
-settings, registered devices, deliveries or provider events, and the
-dedicated scheduler trigger does not exist. Do not treat a code deployment,
-simulator screenshot, or signed provider event fixture as real delivery.
-Do not enable either channel or the scheduler before its matching credentials,
-independent approval and opted-in test-account receipt evidence are available.
-No native store submission or track change is included.
-
-## Consent and scheduling
+## Consent and schedule
 
 Email and push consent are independent and default off. Web email goes only to
 the authenticated account's verified address. Native push additionally requires
@@ -36,51 +33,50 @@ browser cookie or native session change cannot silently save account A's form
 into account B. The identifier is compared with authenticated ownership, not used
 as authorization.
 
-The schedule stores daily, once-weekly, or selected weekdays, a 24-hour local
-wall time, and a validated IANA timezone. The first occurrence of a repeated
-wall time is used at autumn fallback. A nonexistent spring wall time advances
-to the first valid minute after that time. A skipped civil day is skipped.
-Routine edits recalculate a future occurrence without changing the unsubscribe
-capability. The shared preferred schedule does not imply shared channel consent.
+The schedule is fixed in source (`DAILY_REMINDER_SCHEDULE` and
+`DAILY_REMINDER_CRON` in `worker/daily-reminders.mjs`, matched by the
+`pack1-daily-reminders` entry in `scripts/reconcile-neon-schedulers.mjs`).
+Settings writes store that shared schedule and ignore any client schedule
+fields. `nextAt` in the settings response is the next 23:05 UTC. To move the
+send time, change both constants and the scheduler entry in one reviewed PR,
+release, and re-run the scheduler enable.
 
-Game identity and the all-three-completed suppression check use the existing
-America/Los_Angeles Daily date. Reminder wall time does not change the game
-calendar, immutable game schedules, scoring, or rankings.
+Game identity and the all-three-completed check use the existing
+America/Los_Angeles Daily date. 23:05 UTC is always mid-afternoon Pacific, well
+inside one Pacific Daily.
 
-## Durable dispatch
+## Daily email dispatch
 
-Migration `0061_daily_reminders.sql` adds the private account-owned state and
-PostgreSQL functions. It is additive; do not patch a live database by hand.
-The scheduler atomically advances a due schedule and inserts delivery work.
-Later invocations recover existing queued work as well as eligible retries.
-Work more than 20 minutes late, for a previous Pacific Daily, or invalidated by
-an edit, opt-out, deletion, device rotation, or session change is suppressed.
-An outage does not create a multi-day catch-up backlog.
+The trigger calls `/internal/daily-reminders` once a day. A trigger delivered
+more than three hours late does nothing. The job first runs housekeeping
+(event reconciliation, push receipts, abandoned-send and expiry sweeps,
+retention deletes), then, when email is active:
 
-Before a provider request, one atomic database operation checks current consent,
-verified destination/suppression, deletion state, device/session version,
-freshness, all-three-Daily completion, rate admission, and dispatch claims.
-The account lock is shared with the existing deletion guard. Claims enforce both
-account/channel/device/local-day and account/channel/device/Pacific-day
-uniqueness, independent of schedule version. This deliberately prevents a
-routine timezone edit from granting another reminder for the same Daily.
+1. Selects accounts with email on, a verified Auth email, and no email delivery
+   row for today's Pacific Daily (bounded to 5,000 per run).
+2. Skips an account whose current email fingerprint differs from the address
+   it consented with; a changed address needs a fresh opt-in.
+3. Calls `pack1_reminder_admit_daily_email` (migration 0062) per account. Under
+   the account lock shared with deletion and consent writes, it rechecks
+   deletion state, today's Pacific date, current consent and address,
+   suppression, an existing email row for today, and completion of all three
+   Dailies. Completion is read from finished `draft_run_sessions` owned by a
+   linked player or by the account itself, so unranked completed runs count.
+   It inserts one `sending` delivery row, unique per account and Pacific Daily.
+4. Sends admitted rows to Resend's batch endpoint, up to 100 emails per request,
+   about 0.6 seconds apart, within a 90-second budget; accounts not reached are
+   reported as `deferred` and are not retried that day.
 
-Provider requests have a stable per-delivery idempotency key and a stored payload
-hash. An explicit 429 can retry at most three attempts, within the freshness
-window, with the same payload. Ambiguous timeouts, 5xx responses, and abandoned
-sending leases become uncertain, not blindly retryable. A database failure after
-provider acceptance cannot authorize another unbounded send. Email tags carry
-the opaque delivery identifier for matching an event that arrives before the
-provider identifier is saved.
+Each batch has a stable idempotency key. An explicit 429 gets one bounded wait
+(at most 30 seconds) and one identical retry; a second 429 or any other 4xx marks
+the batch `failed`. A timeout, 5xx, or a response that cannot be matched to the
+batch marks rows `uncertain`, never resent. A crash after admission leaves the row
+`sending`, later swept to `uncertain`; that Daily is never sent twice. Email tags
+carry the opaque delivery identifier for matching an event that arrives before
+the provider identifier is saved.
 
-The dedicated trigger remains separate from Daily generation and account
-maintenance. Its checked-in cadence is every five minutes. Dispatch is bounded
-by a 90-second tick budget and a 20-minute occurrence-freshness window. Shared
-database rate admission limits email to two requests per second and 60 per
-minute, and push to 20 per second and 120 per minute. These are safety ceilings,
-not a throughput guarantee. Before broad activation, validate the due-account
-cohort and provider limits in development; change capacity only through reviewed
-source and the existing scheduler release. Never use an unbounded catch-up loop.
+Push keeps its 0061 per-device path (enqueue, atomic claim, one request per
+device) and runs in the same daily job only when the push channel is active.
 
 ## Email events and unsubscribe
 
@@ -102,7 +98,7 @@ delivery must not be recreated by a delayed tagged event.
 
 Email contains the homepage play URL, a My Pack One management link, and a signed
 unsubscribe URL with one-click headers. GET shows a confirmation page without
-mutating consent; POST disables only email. Ordinary schedule or push edits do
+mutating consent; POST disables only email. Ordinary settings or push edits do
 not rotate the capability, and repeat POSTs are harmless. Preserve the existing
 signing secret during routine deployments. A separate security-key rotation
 requires a reviewed old-link verification/retirement policy; do not silently
@@ -171,31 +167,25 @@ or the existing deletion-sender fallback) and a dedicated provider-event
 verification secret, but does not require a push-token encryption key. Push
 approval requires the 64-hex-character token-encryption key without requiring
 email credentials. The old shared delivery flag has no effect. The scheduler
-remains independently protected and disabled until its explicit release.
+trigger is enabled separately through the shared scheduler release.
 Existing Apple sign-in and secure-auth prerequisites remain intact.
 
 Health exposes independent active/readiness fields. A stored opt-in or an active
 flag does not prove the provider endpoint, trigger, or delivery works.
 
-## Remaining private provisioning and acceptance
+## Remaining acceptance
 
-1. Privately provision the new dedicated webhook's Resend signing secret as
-   `PACK1_REMINDER_RESEND_WEBHOOK_SECRET` in the protected GitHub release
-   environment. Never copy the `whsec_` value to a public issue, PR,
-   repository, build artifact or chat response. Provision a dedicated sender
-   key separately if needed; preserve unrelated recovery/deletion email keys.
-2. Review and merge the provider-event isolation fix in PR #1251. Reapply
-   the protected source release with email approved only after the webhook
-   credential is verified and an explicitly opted-in, verified test account
-   is ready. Independently verify the production readiness flags.
-3. Enable the dedicated Resend webhook only after the exact configured
-   release reports ready. Confirm an actual test email arrives, and that
-   delivery events reconcile, an old email's unsubscribe succeeds and
-   later ticks do not send again. Non-opted-in accounts must remain untouched.
-4. Enable the Neon reminder trigger only through the existing protected
-   manual scheduler workflow for the verified deployed revision. Its normal
-   five-minute cadence and resource limits are documented above.
-5. Push requires separate protected credentials, channel approval and
+1. Confirm the dedicated Resend webhook for the provider-event endpoint is
+   enabled, so deliveries, bounces and complaints reconcile.
+2. After the release that carries migration 0062, enable the scheduler through
+   `.github/workflows/neon-scheduler-release.yml` with the exact released SHA.
+   Confirm `pack1-daily-reminders` is enabled with cron `5 23 * * *` and a next
+   run time, and that the other scheduler definitions are unchanged.
+3. With an explicitly opted-in, verified test account, confirm one real email
+   arrives after 23:05 UTC, its delivery event reconciles, its unsubscribe link
+   works, and no second email arrives that Pacific day. Keep account details
+   private.
+4. Push requires separate protected credentials, channel approval and
    authorized signed physical-device testing. Do not upload mobile builds,
    change tracks/testers or restart pending testing clocks without approval.
 
@@ -215,10 +205,10 @@ flag does not prove the provider endpoint, trigger, or delivery works.
    verification/recovery handling. Use an explicitly opted-in verified test
    account, keep its details private, and confirm the actual email plus signed
    event reconciliation. Controlled provider fixtures do not satisfy this step.
-5. Activate the dedicated reminder scheduler only through its protected manual
-   release for the exact deployed commit. Confirm its enabled definition, next
-   invocation, and successful dispatch. Verify an older email's unsubscribe
-   link and that a later tick sends no further email to that account. Confirm
+5. Activate the reminder trigger only through the shared scheduler release for
+   the exact deployed commit. Confirm its enabled definition, next invocation,
+   and successful dispatch. Verify an older email's unsubscribe link and that a
+   later run sends no further email to that account the same day. Confirm
    non-opted-in accounts remain untouched. Preserve existing Daily/deletion
    trigger definitions.
 6. Prepare an authorized signed native candidate separately. Record its source

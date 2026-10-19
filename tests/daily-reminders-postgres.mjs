@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {randomUUID,randomBytes,createHmac,createHash} from 'node:crypto';
 import {fixturePool,textTypes,postgresTransport,SQL_CONNECTION} from './support/postgres-fixture.mjs';
-import {reminderSnapshot,updateReminderSettings,dispatchReminderTick,reminderRoute,registerReminderDevice,unregisterReminderDevice,revokeReminderSessionDevices,reconcileReminderEvents} from '../worker/daily-reminders.mjs';
+import {reminderSnapshot,updateReminderSettings,dispatchDailyReminders,reminderRoute,registerReminderDevice,unregisterReminderDevice,revokeReminderSessionDevices,reconcileReminderEvents} from '../worker/daily-reminders.mjs';
 import {cleanupPackOne} from '../worker/account-deletion.mjs';
 import {gameDateKey} from '../game-date.mjs';
 import {gateway} from '../edge/gateway.mjs';
@@ -28,8 +28,29 @@ async function enable(auth,changes={}){
 async function due(auth){
   await query("UPDATE daily_reminder_settings SET next_due_at=now()-interval '1 minute' WHERE auth_user_id=$1::uuid",[auth.user_id]);
 }
-function provider(){const calls=[];return {calls,fetcher:async(url,options)=>{calls.push({url:String(url),options});return Response.json({id:randomUUID()});}};}
-async function tick(q,send){return dispatchReminderTick(q,new Date().toISOString(),{env,fetcher:send.fetcher,pacificDay:gameDateKey(),pause:async()=>{}});}
+// Records each email of each batch request, and accepts every one.
+function provider(){
+  const calls=[],batches=[];
+  return {calls,batches,fetcher:async(url,options)=>{
+    const batch=JSON.parse(options.body);batches.push({url:String(url),options});
+    for(const email of batch)calls.push({url:String(url),options,email});
+    return Response.json({data:batch.map(()=>({id:randomUUID()}))});
+  }};
+}
+const dispatch=(q,{fetcher,...options}={})=>dispatchDailyReminders(q,{env,fetcher,pacificDay:gameDateKey(),pause:async()=>{},...options});
+async function tick(q,send){return dispatch(q,{fetcher:send.fetcher});}
+async function completeDaily(player,{day=gameDateKey(),environments=['mixed','powered-cube','latest'],answered=10,account=null}={}) {
+  const puzzles=JSON.stringify(Array.from({length:10},(_,i)=>'fixture-puzzle-'+i));
+  for(const environment of environments)await query(`INSERT INTO draft_run_sessions(player_id,day,environment,seed,corpus_version,scoring_version,puzzle_ids,answers,seen_sources,daily_account_id)
+    VALUES($1::uuid,$2::date,$3,'fixture','fixture','fixture',$4::jsonb,$5::jsonb,'[]'::jsonb,$6::uuid)`,
+    [player,day,environment,puzzles,JSON.stringify(Array.from({length:answered},(_,i)=>i)),account]);
+}
+async function linkedPlayer(a) {
+  const player=randomUUID();players.push(player);
+  await query("INSERT INTO players(id,display_name) VALUES($1::uuid,'Fixture player')",[player]);
+  await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[a.user_id,player]);
+  return player;
+}
 async function isolate(){await query('UPDATE daily_reminder_settings SET email_enabled=false,push_enabled=false,next_due_at=NULL');await query('DELETE FROM daily_reminder_rate_limits');}
 const routeArgs={query,json:Response.json,readJson:r=>r.json(),env};
 const pushEnv={...env,PACK1_REMINDER_PUSH_ENABLED:'1',PACK1_REMINDER_TOKEN_KEY:'b'.repeat(64)};
@@ -92,7 +113,7 @@ try {
       assert.equal((await (await request('/v1/account/reminders',{session:tokenB})).json()).email.enabled,false);
       assert.equal((await request('/v1/account/reminders',{session:null})).status,401);
       await due(a);const send=provider();await tick(query,send);assert.equal(send.calls.length,1);
-      const email=JSON.parse(send.calls[0].options.body),url=new URL(email.text.split('Unsubscribe: ')[1].trim());
+      const email=send.calls[0].email,url=new URL(email.text.split('Unsubscribe: ')[1].trim());
       const path=url.pathname.replace('/growth','')+url.search;
       const get=await request(path,{session:null});assert.equal(get.status,200);assert.match(get.headers.get('content-security-policy'),/form-action 'self'/);
       assert.equal((await reminderSnapshot(query,a.user_id,{env})).email.enabled,true);
@@ -121,32 +142,36 @@ try {
     await Promise.all([tick(query,send),tick(query,send),tick(query,send)]);
     assert.equal(send.calls.length,1);
   });
-  await test('crash after queue insertion is recovered on the next tick',async()=>{
-    await isolate();const a=await account();await enable(a);await due(a);const send=provider();let crashed=false;
-    const crash=async(sql,args)=>{const result=await query(sql,args);if(!crashed&&sql.includes('SELECT pack1_reminder_enqueue(')){crashed=true;throw Error('simulated process exit');}return result;};
+  await test('a crash between admission and send never sends that Daily twice',async()=>{
+    await isolate();const a=await account();await enable(a);const send=provider();let crashed=false;
+    const crash=async(sql,args)=>{const result=await query(sql,args);if(!crashed&&sql.includes('pack1_reminder_admit_daily_email')){crashed=true;throw Error('simulated process exit');}return result;};
     await assert.rejects(()=>tick(crash,send),/simulated process exit/);
-    assert.equal(send.calls.length,0);assert.equal(crashed,true);
-    await tick(query,send);assert.equal(send.calls.length,1);
-    await tick(query,send);assert.equal(send.calls.length,1);
+    assert.equal(send.calls.length,0);assert.equal(crashed,true);assert.equal((await delivery(a)).state,'sending');
+    await tick(query,send);assert.equal(send.calls.length,0);
+    await query("UPDATE daily_reminder_deliveries SET last_attempt_at=now()-interval '3 minutes' WHERE auth_user_id=$1::uuid",[a.user_id]);
+    await tick(query,send);assert.equal(send.calls.length,0);assert.equal((await delivery(a)).state,'uncertain');
   });
-  await test('routine schedule edits cannot send twice on one day',async()=>{
-    await isolate();const a=await account();await enable(a);await due(a);const send=provider();await tick(query,send);
-    await enable(a,{localTime:'15:00'});await due(a);await tick(query,send);
+  await test('turning reminders off and on cannot send twice on one Daily',async()=>{
+    await isolate();const a=await account();await enable(a);const send=provider();await tick(query,send);
+    await updateReminderSettings(query,a,{channel:'email',enabled:false},{env});await enable(a);await tick(query,send);
     assert.equal(send.calls.length,1);
   });
-  await test('timezone date changes cannot resend the same Daily reminder',async()=>{
-    await isolate();const a=await account();await enable(a,{timeZone:'Pacific/Kiritimati'});await due(a);const send=provider();await tick(query,send);
-    await enable(a,{timeZone:'Pacific/Honolulu'});await due(a);await tick(query,send);
-    assert.equal(send.calls.length,1);
+  await test('client schedule fields are ignored; every account shares the once-daily send',async()=>{
+    await isolate();const a=await account();await enable(a,{timeZone:'Pacific/Kiritimati',localTime:'06:00',weekdays:[2]});
+    const row=(await query('SELECT frequency,local_time,time_zone FROM daily_reminder_settings WHERE auth_user_id=$1::uuid',[a.user_id])).rows[0];
+    assert.deepEqual({...row},{frequency:'daily',local_time:'23:05',time_zone:'Etc/UTC'});
+    assert.equal(new Date((await reminderSnapshot(query,a.user_id,{env})).nextAt).toISOString().slice(11,16),'23:05');
   });
   await test('old email link and repeated one-click unsubscribe remain harmless',async()=>{
-    await isolate();const a=await account();await enable(a);await due(a);const send=provider();await tick(query,send);
-    const email=JSON.parse(send.calls[0].options.body);
+    await isolate();const a=await account();await enable(a);const send=provider();await tick(query,send);
+    const email=send.calls[0].email;
     const link=email.headers['List-Unsubscribe'].slice(1,-1).replace('/growth/v1/','/v1/');
-    await enable(a,{localTime:'11:00'});
+    await enable(a);
     for(let i=0;i<2;i++)assert.equal((await reminderRoute(new Request(link,{method:'POST'}),routeArgs)).status,200);
     assert.equal((await reminderSnapshot(query,a.user_id,{env})).email.enabled,false);
-    await due(a);await tick(query,send);assert.equal(send.calls.length,1);
+    // Next Daily: the account is no longer a candidate.
+    await query('DELETE FROM daily_reminder_deliveries WHERE auth_user_id=$1::uuid',[a.user_id]);
+    await tick(query,send);assert.equal(send.calls.length,1);
   });
   await test('deletion tombstone wins a concurrently waiting preference write',async()=>{
     await isolate();const a=await account();const client=await pool.connect();
@@ -175,45 +200,46 @@ try {
     assert.equal(send.calls.length,1);assert.equal(env.PACK1_REMINDER_TOKEN_KEY,undefined);
     assert.equal((await query('SELECT 1 FROM daily_reminder_settings WHERE auth_user_id=$1::uuid',[no.user_id])).rows.length,0);
   });
-  await test('delayed outage skips directly into the future without making catch-up occurrences',async()=>{
+  await test('a long outage sends only today’s Daily, never catch-up emails',async()=>{
     await isolate();const a=await account();await enable(a);
     await query("UPDATE daily_reminder_settings SET next_due_at=now()-interval '40 days' WHERE auth_user_id=$1::uuid",[a.user_id]);
-    const send=provider();await tick(query,send);assert.equal(send.calls.length,0);
-    assert.equal((await query('SELECT 1 FROM daily_reminder_deliveries WHERE auth_user_id=$1::uuid',[a.user_id])).rows.length,0);
+    const send=provider();await tick(query,send);await tick(query,send);assert.equal(send.calls.length,1);
+    assert.deepEqual((await query('SELECT game_day::text FROM daily_reminder_deliveries WHERE auth_user_id=$1::uuid',[a.user_id])).rows.map(row=>row.game_day),[gameDateKey()]);
     assert.ok(Date.parse((await reminderSnapshot(query,a.user_id,{env})).nextAt)>Date.now());
   });
-  await test('stale queued work expires without attempting the provider',async()=>{
+  await test('legacy queued email work expires without attempting the provider',async()=>{
     await isolate();const a=await account();await enable(a);const d=await enqueue(a);
     await query("UPDATE daily_reminder_deliveries SET due_at=now()-interval '21 minutes' WHERE id=$1::uuid",[d.id]);
     const send=provider();await tick(query,send);assert.equal(send.calls.length,0);assert.equal((await delivery(a)).state,'suppressed');
   });
-  await test('changing a queued schedule cancels obsolete work',async()=>{
-    await isolate();const a=await account();await enable(a);await enqueue(a);await enable(a,{localTime:'13:00'});
-    const send=provider();await tick(query,send);assert.equal(send.calls.length,0);assert.equal((await delivery(a)).state,'suppressed');
-  });
   await test('explicit opt-out ignores invalid editor values and immediately cancels queued work',async()=>{
-    await isolate();const a=await account();await enable(a);await enqueue(a);
+    await isolate();const a=await account();await enable(a);
     await updateReminderSettings(query,a,{channel:'email',enabled:false,timeZone:'bad',localTime:'99:99',weekdays:[]},{env});
     const send=provider();await tick(query,send);assert.equal(send.calls.length,0);
     assert.equal((await reminderSnapshot(query,a.user_id,{env})).email.enabled,false);
   });
-  await test('parallel queue recovery has only one provider acceptance',async()=>{
-    await isolate();const a=await account();await enable(a);await enqueue(a);const send=provider();
-    await Promise.all(Array.from({length:5},()=>tick(query,send)));assert.equal(send.calls.length,1);
-    assert.equal((await query('SELECT count(*) n FROM daily_reminder_dispatch_claims WHERE auth_user_id=$1::uuid',[a.user_id])).rows[0].n,'1');
+  await test('parallel daily jobs admit exactly one email per account',async()=>{
+    await isolate();const all=await Promise.all(Array.from({length:3},()=>account()));
+    for(const a of all)await enable(a);const send=provider();
+    await Promise.all(Array.from({length:5},()=>tick(query,send)));assert.equal(send.calls.length,3);
+    assert.equal(new Set(send.calls.map(call=>call.email.to[0])).size,3);
   });
-  await test('provider 429 retries are bounded and use one immutable idempotency key',async()=>{
-    await isolate();const a=await account();await enable(a);await due(a);const requests=[];
+  await test('provider 429 gets one bounded wait with the same batch and idempotency key',async()=>{
+    await isolate();const a=await account();await enable(a);const requests=[];
     const send={fetcher:async(url,options)=>{requests.push(options);return new Response('{}',{status:429,headers:{'retry-after':'30'}});}};
-    for(let attempt=0;attempt<4;attempt++){
-      await tick(query,send);await query("UPDATE daily_reminder_deliveries SET next_retry_at=now()-interval '1 second' WHERE auth_user_id=$1::uuid",[a.user_id]);
-      await query('DELETE FROM daily_reminder_rate_limits');
-    }
-    assert.equal(requests.length,3);assert.equal(new Set(requests.map(r=>r.headers['Idempotency-Key'])).size,1);
+    await tick(query,send);await tick(query,send);
+    assert.equal(requests.length,2);assert.equal(new Set(requests.map(r=>r.headers['Idempotency-Key'])).size,1);
     assert.equal(new Set(requests.map(r=>r.body)).size,1);assert.equal((await delivery(a)).state,'failed');
   });
+  await test('one job sends many accounts in provider batches of at most 100',async()=>{
+    await isolate();const all=await Promise.all(Array.from({length:120},()=>account()));
+    for(const a of all)await enable(a);const send=provider();const result=await tick(query,send);
+    assert.deepEqual(send.batches.map(batch=>JSON.parse(batch.options.body).length),[100,20]);
+    assert.equal(result.email.accepted,120);
+    assert.equal((await query("SELECT count(*) n FROM daily_reminder_deliveries WHERE auth_user_id=ANY($1::uuid[]) AND state='accepted'",[all.map(a=>a.user_id)])).rows[0].n,'120');
+  });
   await test('ambiguous provider timeout remains uncertain across later invocations',async()=>{
-    await isolate();const a=await account();await enable(a);await due(a);let sends=0;
+    await isolate();const a=await account();await enable(a);let sends=0;
     const send={fetcher:async()=>{sends++;throw Error('controlled transport timeout');}};
     await tick(query,send);await tick(query,send);assert.equal(sends,1);assert.equal((await delivery(a)).state,'uncertain');
   });
@@ -232,9 +258,9 @@ try {
   await test('a webhook arriving before the provider response preserves confirmed delivery',async()=>{
     await isolate();const a=await account();await enable(a);await due(a);const providerId=randomUUID();
     const send={fetcher:async(url,options)=>{
-      const payload=JSON.parse(options.body);
+      const [payload]=JSON.parse(options.body);
       await event('email.delivered',providerId,{hint:payload.tags[0].value,recipient:payload.to[0]});
-      return Response.json({id:providerId});
+      return Response.json({data:[{id:providerId}]});
     }};
     await tick(query,send);const d=await delivery(a);assert.equal(d.state,'delivered');assert.equal(d.provider_id,providerId);assert.ok(d.delivered_at);
   });
@@ -243,10 +269,10 @@ try {
     let sends=0;
     const send={fetcher:async(url,options)=>{
       sends++;
-      const payload=JSON.parse(options.body);
+      const [payload]=JSON.parse(options.body);
       await event('email.delivered',providerId,{id:eventId,hint:payload.tags[0].value,recipient:payload.to[0]});
       assert.equal((await query('SELECT state FROM daily_reminder_provider_events WHERE event_id=$1',[eventId])).rows[0].state,'applied');
-      return Response.json({id:providerId});
+      return Response.json({data:[{id:providerId}]});
     }};
     await tick(query,send);await tick(query,send);
     const d=await delivery(a);
@@ -271,9 +297,10 @@ try {
     assert.equal(suppression.destination_hash,d.destination_hash);assert.equal((await delivery(a)).state,'failed');
   });
   await test('email address changes require a fresh explicit email consent before dispatch',async()=>{
-    await isolate();const a=await account();await enable(a);await enqueue(a);
+    await isolate();const a=await account();await enable(a);
     await query('UPDATE neon_auth."user" SET email=$2 WHERE id=$1::uuid',[a.user_id,'new-'+a.user_id+'@example.invalid']);
     const send=provider();await tick(query,send);assert.equal(send.calls.length,0);
+    assert.equal((await query('SELECT 1 FROM daily_reminder_deliveries WHERE auth_user_id=$1::uuid',[a.user_id])).rows.length,0);
     assert.equal((await reminderSnapshot(query,a.user_id,{env})).email.addressChanged,true);
   });
   await test('duplicate and out-of-order events cannot regress status, consent or timestamps',async()=>{
@@ -312,7 +339,7 @@ try {
     await assert.rejects(enable(a),error=>error.status===409);
   });
   await test('a tombstone committed while dispatch waits prevents provider access',async()=>{
-    await isolate();const a=await account();await enable(a);await enqueue(a);const lock=await pool.connect();const send=provider();
+    await isolate();const a=await account();await enable(a);const lock=await pool.connect();const send=provider();
     try {
       await lock.query('BEGIN');await lock.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[a.user_id]);
       const pending=tick(query,send);
@@ -321,7 +348,7 @@ try {
     }finally{await lock.query('ROLLBACK');lock.release();}
   });
   await test('unsubscribe committed while dispatch waits prevents provider access',async()=>{
-    await isolate();const a=await account();await enable(a);await enqueue(a);const lock=await pool.connect(),send=provider();
+    await isolate();const a=await account();await enable(a);const lock=await pool.connect(),send=provider();
     try {
       await lock.query('BEGIN');await lock.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))',[a.user_id]);
       const pending=tick(query,send);
@@ -335,7 +362,7 @@ try {
     await query("UPDATE daily_reminder_deliveries SET state='accepted',provider_id=$2,accepted_at=now()-interval '16 minutes' WHERE id=$1::uuid",[d.id,'old_push_receipt']);
     const rotated=await device(a,{installationId:registered.installationId,bindingSecret:registered.bindingSecret,registrationVersion:registered.registrationVersion});
     const fetcher=async()=>Response.json({data:{old_push_receipt:{status:'error',details:{error:'DeviceNotRegistered'}}}});
-    await dispatchReminderTick(query,new Date().toISOString(),{env,fetcher,pacificDay:gameDateKey(),pause:async()=>{}});
+    await dispatch(query,{fetcher});
     const row=(await query('SELECT * FROM daily_reminder_devices WHERE installation_id=$1::uuid',[registered.installationId])).rows[0];
     assert.equal(row.revoked_at,null);assert.equal(Number(row.registration_version),rotated.registrationVersion);
   });
@@ -351,8 +378,8 @@ try {
     const revoked=await unregisterReminderDevice(query,a,{installationId:registered.installationId});
     const switched=await device(b,{installationId:registered.installationId,bindingSecret:registered.bindingSecret,registrationVersion:Number(revoked.registrationVersion)});
     await assert.rejects(device(a,{...registered}),error=>error.code==='DEVICE_VERSION_CHANGED');
-    const send=provider();await dispatchReminderTick(query,new Date().toISOString(),{env:pushEnv,fetcher:send.fetcher,pacificDay:gameDateKey(),pause:async()=>{}});
-    assert.equal(send.calls.length,0);assert.equal((await delivery(a)).state,'suppressed');assert.ok(switched.registrationVersion>registered.registrationVersion);
+    const send=provider();await dispatch(query,{env:pushEnv,fetcher:send.fetcher});
+    assert.equal(send.batches.length,0);assert.equal((await delivery(a)).state,'suppressed');assert.ok(switched.registrationVersion>registered.registrationVersion);
   });
   await test('logout clears protected token material and cancels queued device eligibility',async()=>{
     await isolate();const a=await native(await account()),registered=await device(a);
@@ -360,7 +387,7 @@ try {
     await revokeReminderSessionDevices(query,a);
     const row=(await query('SELECT * FROM daily_reminder_devices WHERE installation_id=$1::uuid',[registered.installationId])).rows[0];
     assert.equal(row.token_ciphertext,'');assert.ok(row.revoked_at);
-    const send=provider();await dispatchReminderTick(query,new Date().toISOString(),{env:pushEnv,fetcher:send.fetcher,pacificDay:gameDateKey(),pause:async()=>{}});assert.equal(send.calls.length,0);
+    const send=provider();await dispatch(query,{env:pushEnv,fetcher:send.fetcher});assert.equal(send.batches.length,0);
   });
   await test('registration blocked on deletion lock cannot attach after deletion begins',async()=>{
     await isolate();const a=await native(await account()),lock=await pool.connect();
@@ -380,17 +407,6 @@ try {
       assert.equal((await query('SELECT 1 FROM '+table+' WHERE auth_user_id=$1::uuid',[a.user_id])).rows.length,0);
     assert.equal((await query('SELECT 1 FROM daily_reminder_provider_events WHERE delivery_hint=$1::uuid',[d.id])).rows.length,0);
   });
-  await test('global rate admission applies to concurrent workers rather than per-process counters',async()=>{
-    await isolate();const all=await Promise.all(Array.from({length:4},()=>account()));
-    for(const a of all){await enable(a);await enqueue(a);}
-    const channel='email';await query("INSERT INTO daily_reminder_rate_limits(channel,period,bucket,used) VALUES($1,'minute',date_trunc('minute',clock_timestamp()),60)",[channel]);
-    const send=provider();await Promise.all([tick(query,send),tick(query,send)]);assert.equal(send.calls.length,0);
-    for(const a of all)assert.equal((await delivery(a)).state,'queued');
-    await query('DELETE FROM daily_reminder_rate_limits');
-    await tick(query,send);assert.ok(send.calls.length>=1&&send.calls.length<=4);
-  });
-
-
   await test('independent channel changes preserve the other channel and original consent timestamps',async()=>{
     await isolate();const a=await native(await account());await device(a);await enable(a);
     const before=await reminderSnapshot(query,a.user_id,{env:pushEnv});
@@ -404,7 +420,7 @@ try {
     await isolate();const a=await native(await account());await query('UPDATE neon_auth."user" SET "emailVerified"=false WHERE id=$1::uuid',[a.user_id]);
     await device(a);const onlyPush={PACK1_REMINDER_PUSH_ENABLED:'1',PACK1_REMINDER_TOKEN_KEY:pushEnv.PACK1_REMINDER_TOKEN_KEY};
     await updateReminderSettings(query,a,{...schedule,channel:'push',enabled:true},{env:onlyPush});await due(a);let sends=0;
-    await dispatchReminderTick(query,new Date().toISOString(),{env:onlyPush,pacificDay:gameDateKey(),pause:async()=>{},fetcher:async(url,options)=>{
+    await dispatch(query,{env:onlyPush,fetcher:async(url,options)=>{
       assert.equal(String(url),'https://exp.host/--/api/v2/push/send');const payload=JSON.parse(options.body);assert.equal(payload.data.owner,a.user_id);assert.ok(payload.data.registrationVersion);
       sends++;return Response.json({data:{status:'ok',id:'push-only-fixture'}});
     }});assert.equal(sends,1);assert.equal((await delivery(a)).state,'accepted');assert.equal((await delivery(a)).delivered_at,null);
@@ -432,19 +448,34 @@ try {
     await assert.rejects(device(a,{...registered,explicitEnable:false}),e=>e.code==='DEVICE_VERSION_CHANGED');
     const enabled=await device(a,{...registered,explicitEnable:true});assert.ok(enabled.registrationVersion>registered.registrationVersion);
   });
-  for(const count of [2,3])await test(count+' current Pacific completions '+(count===3?'suppress':'do not suppress')+' reminders regardless of local timezone',async()=>{
-    await isolate();const a=await account(),player=randomUUID();players.push(player);
-    await query("INSERT INTO players(id,display_name) VALUES($1::uuid,'Fixture player')",[player]);
-    await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[a.user_id,player]);
-    for(const set of ['mixed','powered-cube','latest'].slice(0,count))await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) VALUES($1::uuid,$2::date,$3,'draft_run',75,'B','[]'::jsonb)",[player,gameDateKey(),set]);
-    await enable(a,{timeZone:'Pacific/Kiritimati'});await due(a);const send=provider();await tick(query,send);assert.equal(send.calls.length,count===3?0:1);
+  for(const count of [2,3])await test(count+' completed Dailies today '+(count===3?'skip':'do not skip')+' the email, ranked or not',async()=>{
+    await isolate();const a=await account(),player=await linkedPlayer(a);
+    await completeDaily(player,{environments:['mixed','powered-cube','latest'].slice(0,count)});
+    await enable(a);const send=provider();await tick(query,send);assert.equal(send.calls.length,count===3?0:1);
+    assert.equal((await query('SELECT 1 FROM scores WHERE player_id=$1::uuid',[player])).rows.length,0);
   });
-  await test('past Daily completions do not suppress a new Pacific Daily',async()=>{
-    await isolate();const a=await account(),player=randomUUID();players.push(player);
-    await query("INSERT INTO players(id,display_name) VALUES($1::uuid,'Fixture player')",[player]);
-    await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[a.user_id,player]);
-    for(const set of ['mixed','powered-cube','latest'])await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) VALUES($1::uuid,$2::date-1,$3,'draft_run',75,'B','[]'::jsonb)",[player,gameDateKey(),set]);
-    await enable(a,{timeZone:'Pacific/Honolulu'});await due(a);const send=provider();await tick(query,send);assert.equal(send.calls.length,1);
+  await test('runs owned by the account itself count, and unfinished runs do not',async()=>{
+    await isolate();const owned=await account(),ownedPlayer=randomUUID();players.push(ownedPlayer);
+    await query("INSERT INTO players(id,display_name) VALUES($1::uuid,'Fixture player')",[ownedPlayer]);
+    await completeDaily(ownedPlayer,{account:owned.user_id});
+    const partial=await account(),partialPlayer=await linkedPlayer(partial);
+    await completeDaily(partialPlayer,{environments:['mixed','powered-cube']});await completeDaily(partialPlayer,{environments:['latest'],answered:9});
+    await enable(owned);await enable(partial);const send=provider();await tick(query,send);
+    assert.deepEqual(send.calls.map(call=>call.email.to[0]),[partial.user_id+'@example.invalid']);
+  });
+  await test('past Daily completions do not skip a new Pacific Daily',async()=>{
+    await isolate();const a=await account(),player=await linkedPlayer(a);
+    const yesterday=new Date(Date.parse(gameDateKey()+'T12:00:00Z')-86400000).toISOString().slice(0,10);
+    await completeDaily(player,{day:yesterday});
+    await enable(a);const send=provider();await tick(query,send);assert.equal(send.calls.length,1);
+  });
+  await test('admission accepts only today’s Pacific Daily, the consented address, and once',async()=>{
+    await isolate();const a=await account();await enable(a);
+    const hash=(await query('SELECT email_destination_hash h FROM daily_reminder_settings WHERE auth_user_id=$1::uuid',[a.user_id])).rows[0].h;
+    const admit=async(destination,day)=>(await query('SELECT pack1_reminder_admit_daily_email($1::uuid,$2::text,$3::date) id',[a.user_id,destination,day])).rows[0].id;
+    const yesterday=new Date(Date.parse(gameDateKey()+'T12:00:00Z')-86400000).toISOString().slice(0,10);
+    assert.equal(await admit(hash,yesterday),null);assert.equal(await admit('0'.repeat(64),gameDateKey()),null);
+    assert.match(await admit(hash,gameDateKey()),/^[0-9a-f-]{36}$/);assert.equal(await admit(hash,gameDateKey()),null);
   });
   await test('bounce after delivered recomputes last successful delivery instead of keeping a stale cache',async()=>{
     await isolate();const a=await account();await enable(a);await due(a);await tick(query,provider());const d=await delivery(a);
@@ -462,7 +493,7 @@ try {
   });
 
 }finally{
-  for(const id of players)await query('DELETE FROM players WHERE id=$1::uuid',[id]);
+  for(const id of players){await query('DELETE FROM draft_run_sessions WHERE player_id=$1::uuid',[id]);await query('DELETE FROM players WHERE id=$1::uuid',[id]);}
   for(const id of users){await query('DELETE FROM neon_auth."user" WHERE id=$1::uuid',[id]);await query('DELETE FROM account_deletion_operations WHERE auth_user_id=$1::uuid',[id]);}
   await pool.end();
 }

@@ -72,6 +72,7 @@ const result=await query(`SELECT
   to_regclass('daily_reminder_email_suppressions') IS NOT NULL daily_reminder_email_suppressions,
   to_regprocedure('pack1_reminder_claim(uuid,text,text,text,date,boolean,boolean)') IS NOT NULL daily_reminder_atomic_claim,
   to_regprocedure('pack1_reminder_apply_event(text)') IS NOT NULL daily_reminder_event_reconcile,
+  to_regprocedure('pack1_reminder_admit_daily_email(uuid,text,date)') IS NOT NULL daily_reminder_daily_email_admission,
   EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid=to_regclass('daily_reminder_dispatch_claims') AND contype='u' AND pg_get_constraintdef(oid) LIKE '%game_day%') daily_reminder_game_day_unique,
   EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='daily_reminder_deliveries_receipt_idx') daily_reminder_receipt_index,
   to_regclass('account_recovery_rate_limits') IS NOT NULL account_recovery_rate_limits,
