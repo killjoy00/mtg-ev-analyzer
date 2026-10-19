@@ -57,6 +57,7 @@ test('production scheduler definitions are narrow, UTC and point only at reviewe
     {name:'pack1-daily-primary',slug:'draftrunapi',path:'/internal/daily-generation',cron:'7 7,8 * * *'},
     {name:'pack1-daily-retry',slug:'draftrunapi',path:'/internal/daily-generation',cron:'37 7,8 * * *'},
     {name:'pack1-account-deletion-maintenance',slug:'pack1growth',path:'/internal/account-deletion-maintenance',cron:'9,19,29,39,49,59 * * * *'},
+    {name:'pack1-daily-social-dispatch',slug:'pack1growth',path:'/internal/daily-social-dispatch',cron:'10,20,40 14,15 * * *'},
   ]);
 });
 
@@ -82,12 +83,12 @@ test('scheduler reconciliation prepares every definition disabled before enablin
   };
   const result=await reconcileNeonSchedulers({enabled:true,apiKey:'napi_'+'x'.repeat(40),fetcher});
   assert.equal(result.enabled,true);
-  assert.equal(result.results.length,3);
-  assert.equal(calls.filter(call=>call.method==='POST').length,2);
-  assert.equal(calls.filter(call=>call.method==='PATCH').length,4);
+  assert.equal(result.results.length,4);
+  assert.equal(calls.filter(call=>call.method==='POST').length,3);
+  assert.equal(calls.filter(call=>call.method==='PATCH').length,5);
   const mutations=calls.filter(call=>call.method!=='GET');
-  assert.deepEqual(mutations.slice(0,3).map(call=>call.body.enabled),[false,false,false]);
-  assert.deepEqual(mutations.slice(3).map(call=>call.body.enabled),[true,true,true]);
+  assert.deepEqual(mutations.slice(0,4).map(call=>call.body.enabled),[false,false,false,false]);
+  assert.deepEqual(mutations.slice(4).map(call=>call.body.enabled),[true,true,true,true]);
   assert.equal(calls.some(call=>JSON.stringify(call.body||{}).includes('unrelated-trigger')),false);
 });
 
@@ -106,7 +107,7 @@ test('scheduler activation rolls every prepared trigger back to disabled when an
     /Neon trigger control failed/,
   );
   const afterFailure=calls.slice(calls.findIndex(call=>call.body?.enabled===true)+2);
-  assert.equal(afterFailure.length,3);
+  assert.equal(afterFailure.length,4);
   assert.ok(afterFailure.every(call=>call.method==='PATCH'&&call.body.enabled===false));
 });
 

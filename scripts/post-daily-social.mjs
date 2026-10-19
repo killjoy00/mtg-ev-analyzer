@@ -13,6 +13,31 @@ const MAX_IMAGE_BYTES=1_000_000;
 // 1200x630 shape Bluesky crops link-card images to, so nothing is cut off.
 export const LINK_CARD_IMAGE=new URL('../social-card-v1.png',import.meta.url);
 
+// A GitHub job re-run uses its original checkout, not current main. A past
+// recovery accidentally republished obsolete long-form Discord links. Block
+// both reruns and stale checkouts before contacting social providers.
+export async function assertCurrentLivePublisher({env=process.env,fetchImpl=fetch}={}) {
+  const live=env.GITHUB_EVENT_NAME==='schedule'||env.MANUAL_LIVE==='true';
+  if(!live)return {checked:false};
+  if(env.GITHUB_REF!=='refs/heads/main')throw Error('Live Daily posting requires main.');
+  if(!/^\d+$/.test(String(env.GITHUB_RUN_ATTEMPT||''))||
+    Number(env.GITHUB_RUN_ATTEMPT)!==1)
+    throw Error('Live Daily job re-runs are forbidden; dispatch a fresh run on current main.');
+  if(env.GITHUB_REPOSITORY!=='killjoy00/mtg-ev-analyzer'||
+    !/^[a-f0-9]{40}$/.test(String(env.GITHUB_SHA||''))||
+    !String(env.GITHUB_TOKEN||''))
+    throw Error('Live Daily revision attestation is incomplete.');
+  const response=await fetchImpl('https://api.github.com/repos/killjoy00/mtg-ev-analyzer/git/ref/heads/main',{
+    headers:{authorization:'Bearer '+env.GITHUB_TOKEN,accept:'application/vnd.github+json'},
+    redirect:'error',signal:AbortSignal.timeout(15000),
+  });
+  if(!response.ok)throw Error('Cannot verify live Daily publisher revision.');
+  const ref=await response.json();
+  if(ref?.object?.sha!==env.GITHUB_SHA)
+    throw Error('Stale Daily publisher revision; dispatch a fresh run on current main.');
+  return {checked:true};
+}
+
 export function pacificClock(now=new Date()) {
   const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{
     timeZone:PACIFIC,year:'numeric',month:'2-digit',day:'2-digit',
@@ -238,6 +263,15 @@ export async function postDaily({
   const wall=pacificClock(now);
   const {day}=triggered;
   const live=event==='schedule'||env.MANUAL_LIVE==='true';
+  // A Neon-triggered workflow_dispatch carries the original Pacific day.
+  // If GitHub delays the job past reset, it must never post tomorrow early.
+  if(event==='workflow_dispatch'&&env.SOURCE_PACIFIC_DAY) {
+    const sourceDay=String(env.SOURCE_PACIFIC_DAY);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(sourceDay))
+      throw Error('Invalid independently scheduled Daily date.');
+    if(sourceDay!==wall.day||wall.hour<7)
+      return {day:sourceDay,skipped:true,reason:'stale or early independent schedule'};
+  }
   // In winter the 14:10 UTC trigger is 06:10 PST and skips; 15:10 posts and
   // 16:10 retries. In summer 14:10 posts and both later triggers retry.
   // Receipts and the deterministic Bluesky record deduplicate every retry.
@@ -319,6 +353,7 @@ if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]) {
       if(Number.isNaN(scheduledAt.getTime())||run.event!=='schedule')
         throw Error('Invalid scheduled run timestamp.');
     }
+    await assertCurrentLivePublisher();
     const result=await postDaily({scheduledAt});
     // Do not print the (secret-bearing) environment, webhook addresses, or JWTs.
     console.log(JSON.stringify(result));

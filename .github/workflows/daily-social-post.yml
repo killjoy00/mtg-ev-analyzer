@@ -22,6 +22,11 @@ on:
         type: boolean
         default: false
         required: true
+      source_day:
+        description: 'Pacific Daily date from the independent Neon scheduler (empty for owner runs)'
+        type: string
+        default: ''
+        required: false
 
 permissions:
   contents: read
@@ -44,12 +49,13 @@ jobs:
         with:
           node-version: '24'
       - name: Verify offline publishing contracts
-        run: node --test tests/daily-social-post.test.mjs tests/daily-social-ledger.test.mjs
+        run: node --test tests/daily-social-post.test.mjs tests/daily-social-ledger.test.mjs tests/daily-social-dispatch.test.mjs
       - name: Publish or preview Daily
         if: github.event_name != 'pull_request'
         run: node scripts/post-daily-social.mjs
         env:
           MANUAL_LIVE: ${{ inputs.live }}
+          SOURCE_PACIFIC_DAY: ${{ inputs.source_day }}
           GITHUB_TOKEN: ${{ github.token }}
           SOCIAL_LEDGER_ISSUE: '1135'
           BLUESKY_HANDLE: ${{ secrets.PACKONE_BLUESKY_HANDLE }}

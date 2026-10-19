@@ -21,6 +21,12 @@ export const NEON_SCHEDULERS=Object.freeze([
     function_path:'/internal/account-deletion-maintenance',
     schedule:Object.freeze({cron:'9,19,29,39,49,59 * * * *'}),
   }),
+  Object.freeze({
+    name:'pack1-daily-social-dispatch',
+    function_slug:'pack1growth',
+    function_path:'/internal/daily-social-dispatch',
+    schedule:Object.freeze({cron:'10,20,40 14,15 * * *'}),
+  }),
 ]);
 
 const API='https://console.neon.tech/api/v2';
@@ -90,7 +96,7 @@ export async function reconcileNeonSchedulers({enabled,apiKey,fetcher=fetch,proj
     results:prepared.map(({trigger})=>({name:trigger.name,trigger_id:trigger.trigger_id,enabled:false,next_run_at:trigger.next_run_at||null})),
   };
 
-  // Phase 2: enable only after all three definitions are safe. If any enable
+  // Phase 2: enable only after all reviewed definitions are safe. If any enable
   // fails, make a bounded best-effort pass to return every prepared trigger to
   // disabled before surfacing the original error.
   const active=[];
