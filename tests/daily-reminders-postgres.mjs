@@ -238,15 +238,25 @@ try {
     }};
     await tick(query,send);const d=await delivery(a);assert.equal(d.state,'delivered');assert.equal(d.provider_id,providerId);assert.ok(d.delivered_at);
   });
-  await test('an unmatched early event is retained and reconciled when provider ID is persisted',async()=>{
+  await test('an unmatched early tagged reminder event is retained and reconciled after provider persistence',async()=>{
     await isolate();const a=await account();await enable(a);await due(a);const providerId=randomUUID(),eventId='msg_'+randomBytes(12).toString('hex');
     const send={fetcher:async(url,options)=>{
-      await event('email.delivered',providerId,{id:eventId,recipient:JSON.parse(options.body).to[0]});
+      const payload=JSON.parse(options.body);
+      await event('email.delivered',providerId,{id:eventId,hint:payload.tags[0].value,recipient:payload.to[0]});
       assert.equal((await query('SELECT state FROM daily_reminder_provider_events WHERE event_id=$1',[eventId])).rows[0].state,'pending');
       return Response.json({id:providerId});
     }};
     await tick(query,send);assert.equal((await delivery(a)).state,'delivered');
     assert.equal((await query('SELECT state FROM daily_reminder_provider_events WHERE event_id=$1',[eventId])).rows[0].state,'applied');
+  });
+  await test('account-wide webhook ignores unrelated and unknown untagged email without retention',async()=>{
+    await isolate();const unrelated=randomUUID(),eventId='msg_'+randomBytes(12).toString('hex');
+    const ignored=await event('email.delivered',unrelated,{id:eventId,recipient:'other@example.invalid'});
+    assert.deepEqual(await ignored.json(),{ok:true,ignored:true});
+    assert.equal((await query('SELECT 1 FROM daily_reminder_provider_events WHERE event_id=$1',[eventId])).rows.length,0);
+    const a=await account();await enable(a);await due(a);await tick(query,provider());const d=await delivery(a);
+    await event('email.delivered',d.provider_id,{recipient:a.user_id+'@example.invalid'});
+    assert.equal((await delivery(a)).state,'delivered');
   });
   await test('an old bounce suppresses only the destination that was actually sent',async()=>{
     await isolate();const a=await account();await enable(a);await due(a);await tick(query,provider());const d=await delivery(a);
