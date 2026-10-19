@@ -32,7 +32,7 @@ test('Dispatch always targets the reviewed Daily social workflow and Pacific day
   assert.equal(calls.length,1);
   assert.equal(calls[0].url,'https://api.github.com/repos/killjoy00/mtg-ev-analyzer/actions/workflows/daily-social-post.yml/dispatches');
   assert.equal(calls[0].options.headers.authorization,'Bearer '+TOKEN);
-  assert.deepEqual(JSON.parse(calls[0].options.body),{ref:'main',inputs:{live:true,source_day:'2026-10-19'}});
+  assert.deepEqual(JSON.parse(calls[0].options.body),{ref:'main',inputs:{live:'true',source_day:'2026-10-19'}});
 });
 
 test('Untrusted, stale, off-hour or missing credentials never dispatch',async()=>{
