@@ -24,8 +24,8 @@ import { trackEvent } from './retention-events.mjs';
 import { nextMilestones } from './progression.mjs?v=10';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { eliteSource } from './membership-source.mjs';
-import { renderAccount, renderDeletionState } from './growth.mjs?v=20';
-import {dailyReminderSettingsMarkup,bindDailyReminderSettings} from './daily-reminder-settings.mjs?v=2';
+import { renderAccount, renderDeletionState } from './growth.mjs?v=21';
+import {dailyReminderSettingsMarkup,bindDailyReminderSettings} from './daily-reminder-settings.mjs?v=3';
 import {
   bestPercentile,
   liveEnvironmentProgress,
@@ -55,7 +55,7 @@ function ensureProfileStyles() {
   if (document.querySelector('link[data-pack1-profile-css]')) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = new URL('./profile.css?v=11', import.meta.url).href;
+  link.href = new URL('./profile.css?v=12', import.meta.url).href;
   link.dataset.pack1ProfileCss = '1';
   document.head.appendChild(link);
 }
@@ -214,9 +214,8 @@ function settingsMarkup(profile, progress, account, patreon) {
   const membershipUrl=elite?supportUrl:'/patreon/';
   return `<section class="profile-settings profile-account" id="profile-account" aria-labelledby="profile-account-title">
     <header class="profile-account-session"><div><p class="eyebrow" id="profile-account-title">${account?.user?'Signed in':account?.unavailable?'Account unavailable':'Signed out'}</p><p class="profile-account-session-copy">${account?.unavailable?'Account status is temporarily unavailable. Your career is still here.':account?.user?.email?`<strong>${esc(account.user.email)}</strong>`:'Your saved profile and preferences.'}</p></div>${account?.unavailable?'<button type="button" class="button secondary" id="account-status-retry">Retry account</button>':account?.user?'<button type="button" class="button secondary" id="account-signout">Sign out</button>':'<button type="button" class="button secondary" id="profile-claim-account">Sign in</button>'}</header>
-    ${dailyReminderSettingsMarkup({signedIn:Boolean(account?.user)})}
     ${account?.user?`<section class="profile-settings-group profile-settings-profile" aria-labelledby="profile-visibility-title">
-      <div class="profile-settings-heading-row"><div><p class="eyebrow">Profile</p><h3 id="profile-visibility-title">Profile &amp; visibility</h3><p class="profile-settings-intro">Choose your public name and what appears on your Pack One profile.</p></div></div>
+      <div class="profile-settings-heading-row"><div><h3 id="profile-visibility-title">Profile &amp; visibility</h3><p class="profile-settings-intro">Choose your public name and what appears on your Pack One profile.</p></div></div>
       <form id="profile-settings-form">
         <label class="profile-leaderboard-name" id="profile-display-name"><span>Display name</span><input class="select" type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(profile.player.display_name)}" required ${identityHidden?'disabled':''} aria-describedby="profile-display-name-help profile-display-name-error"><small id="profile-display-name-help">${identityHidden?'This display name is hidden by moderation.':'Shown on Daily leaderboards and your public profile.'}</small><small class="profile-field-error" id="profile-display-name-error" role="alert">${esc(identityHidden?`Display name hidden. ${profile.player.public_identity_hidden_reason||'Contact Pack One support if you believe this is a mistake.'}`:nameAttention)}</small></label>
         ${!identityHidden?`<p class="profile-identity-rules"><small>Display names and public profiles follow the <a href="/terms/#public-identity-rules" target="_blank" rel="noopener">Pack One Public Identity rules</a>.</small></p>`:''}
@@ -227,7 +226,7 @@ function settingsMarkup(profile, progress, account, patreon) {
       </form>
     </section>`:`<p class="profile-empty">${account?.unavailable?'Profile settings are temporarily unavailable.':'Sign in to edit your profile settings.'}</p>`}
     ${account?.user?`<section class="profile-membership profile-settings-membership profile-settings-group" aria-labelledby="patreon-membership-title">
-      <div><p class="eyebrow">Membership</p><h3 id="patreon-membership-title">Membership</h3>
+      <div><h3 id="patreon-membership-title">Membership</h3>
         ${source==='apple'
           ? `<p><strong>Elite active</strong><br><span>Powered Cube practice and custom-set practice are unlocked through your Apple App Store subscription.</span></p><p>Ad-free browsing is included. Manage or cancel the subscription in your Apple subscription settings.</p>`
           : source==='other'
@@ -249,7 +248,7 @@ function settingsMarkup(profile, progress, account, patreon) {
       </div>
     </section>`:''}
     ${account?.user?`<section class="profile-credentials profile-settings-group" aria-labelledby="credential-settings-title">
-      <div><p class="eyebrow">Security</p><h3 id="credential-settings-title">Sign-in &amp; security</h3>
+      <div><h3 id="credential-settings-title">Sign-in &amp; security</h3>
         ${account?.credentials?.password
           ? `<p><strong>Change password</strong><br><span>Changing your password signs out every device.</span></p>
              <form class="account-form" id="account-password-change">
@@ -262,8 +261,9 @@ function settingsMarkup(profile, progress, account, patreon) {
           : `<p><strong>Password</strong><br><span>${account?.credentials?.apple?'This account signs in with Apple and does not have a Pack One password to change.':account?.credentials?.google?'This account signs in with Google and does not have a Pack One password to change.':'This account does not have a password to change.'}</span></p>`}
       </div>
     </section>`:''}
+    ${dailyReminderSettingsMarkup({signedIn:Boolean(account?.user)})}
     ${account?.user?`<section class="profile-credentials profile-danger profile-settings-group" aria-labelledby="delete-account-title">
-      <div><p class="eyebrow">Account</p><h3 class="profile-delete-title" id="delete-account-title">Delete account</h3>
+      <div><h3 class="profile-delete-title" id="delete-account-title">Delete account</h3>
         <p>Permanently deletes your Pack One account and profile and signs you out everywhere. This cannot be undone.</p>
         ${deletionControlMarkup(account,patreon)}
       </div>

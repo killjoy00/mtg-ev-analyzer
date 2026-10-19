@@ -415,7 +415,36 @@
 .my-pack-one-account-panel .profile-settings-profile { order:1; }
 .my-pack-one-account-panel .profile-settings-membership { order:2; }
 .my-pack-one-account-panel .profile-account > .profile-credentials:not(.profile-danger) { order:3; }
-.my-pack-one-account-panel .profile-account > .profile-danger { order:4; }
+.my-pack-one-account-panel .profile-account > .profile-reminders { order:4; }
+.my-pack-one-account-panel .profile-account > .profile-danger { order:5; }
+.my-pack-one-account-panel .profile-settings-group h3 { margin:0 0 4px; font-size:19px; line-height:1.25; }
+.my-pack-one-account-panel .profile-membership h3 + p,
+.my-pack-one-account-panel .profile-credentials h3 + p { margin-top:8px; }
+.my-pack-one-account-panel .profile-credentials .account-form { grid-template-columns:minmax(0,1fr); max-width:420px; gap:14px; margin-top:14px; }
+.my-pack-one-account-panel .profile-credentials .account-form .button { justify-self:start; }
+.my-pack-one-account-panel .profile-reminders { padding:16px 20px; }
+.my-pack-one-account-panel #profile-settings-form { gap:16px; }
+.my-pack-one-account-panel .profile-identity-rules { grid-column:1/-1; margin:-8px 0 0; }
+.reminder-summary { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px 16px; }
+.reminder-status { flex:1 1 280px; margin:0; font-size:14px; line-height:1.5; }
+.reminder-status small { display:block; color:var(--muted); font-size:13px; }
+.reminder-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.reminder-actions .button { min-height:40px; padding-top:8px; padding-bottom:8px; }
+.reminder-note { margin:8px 0 0; color:var(--muted); font-size:13px; line-height:1.5; }
+.reminder-note .text-button { padding:0; font-size:13px; }
+.profile-account .reminder-editor { grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }
+.profile-account .reminder-editor[hidden],
+.profile-account .reminder-days[hidden] { display:none; }
+.profile-account .reminder-editor label { gap:6px; font-size:13px; font-weight:750; color:var(--muted); }
+.profile-account .reminder-editor .select { color:var(--ink); font-size:15px; font-weight:400; }
+@media (max-width:640px) { .profile-account .reminder-editor { grid-template-columns:minmax(0,1fr); } }
+.reminder-days { grid-column:1/-1; display:flex; flex-wrap:wrap; gap:6px; margin:0; padding:0; border:0; }
+.reminder-days legend { margin:0 0 6px; padding:0; color:var(--muted); font-size:13px; font-weight:750; }
+.profile-account .reminder-day { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border:1px solid var(--line); border-radius:999px; color:var(--ink); font-size:13px; font-weight:600; cursor:pointer; }
+.profile-settings .reminder-day > span { display:inline; margin:0; color:inherit; font-size:inherit; }
+.reminder-day input { margin:0; }
+#daily-reminder-status:empty { display:none; }
+#daily-reminder-status { margin:8px 0 0; }
 .my-pack-one-account-panel .profile-settings-group {
   margin:0;
   padding:20px;

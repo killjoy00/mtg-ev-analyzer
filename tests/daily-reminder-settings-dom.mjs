@@ -18,7 +18,9 @@ const checked=[];
 async function check(name,fn){await fn();checked.push(name);console.log('PASS '+name);}
 const input=name=>page.locator('#daily-reminder-form [name="'+name+'"]');
 const text=()=>page.locator('#daily-reminder-content').innerText();
-async function ready(){await page.locator('#daily-reminder-form').waitFor();}
+async function ready(){await page.locator('#daily-reminder-content .reminder-summary').waitFor();}
+const openEditor=async()=>{await page.locator('#daily-reminder-edit').click();await page.locator('#daily-reminder-form').waitFor();};
+const save=()=>page.getByRole('button',{name:'Save reminder',exact:true}).click();
 async function render(changes={}){await page.evaluate(async changes=>window.reminderFixture.render(changes),changes);await ready();}
 try {
   await page.setContent('<!doctype html><html lang="en"><head><meta name="viewport" content="width=device-width"></head><body><main class="my-pack-one-page my-pack-one-account-panel" style="max-width:960px;margin:24px auto;padding:16px"><h1>Account settings</h1><div class="profile-account" id="settings-test"></div></main></body></html>');
@@ -58,39 +60,43 @@ try {
     h.release=()=>{for(const resolve of h.releases.splice(0))resolve();};
     window.reminderFixture=h;
   },source);
-  await check('both channels default off, no arbitrary destination or automatic request',async()=>{
-    await render();assert.equal(await input('emailEnabled').isChecked(),false);
-    assert.equal(await page.locator('#daily-reminder-form [name="email"]').count(),0);
-    assert.match(await text(),/Push: Off/);assert.equal(await page.evaluate(()=>reminderFixture.saves.length),0);
+  await check('both channels default off, editor collapsed, no arbitrary destination or automatic request',async()=>{
+    await render();assert.match(await text(),/^Off/);assert.equal(await page.locator('#daily-reminder-form').isHidden(),true);
+    assert.equal(await page.locator('#daily-reminder-content [name="email"]').count(),0);
+    assert.doesNotMatch(await text(),/Push reminders are on/);assert.equal(await page.evaluate(()=>reminderFixture.saves.length),0);
   });
   await check('email activation does not require push readiness or enable push',async()=>{
-    await input('emailEnabled').check();await page.getByRole('button',{name:'Save email reminders',exact:true}).click();
-    await page.getByText('Email reminder schedule saved.',{exact:true}).waitFor();
-    assert.match(await text(),/Push: Off/);assert.equal(await page.evaluate(()=>reminderFixture.states[reminderFixture.owner].push.enabled),false);
+    await openEditor();await save();
+    await page.getByText('Reminder saved.',{exact:true}).waitFor();
+    assert.match(await text(),/Email on/);assert.equal(await page.evaluate(()=>reminderFixture.states[reminderFixture.owner].push.enabled),false);
+    assert.equal(await page.evaluate(()=>reminderFixture.saves[0].enabled),true);
     assert.deepEqual(await page.evaluate(()=>reminderFixture.saves[0].weekdays),[0,1,2,3,4,5,6]);
+    assert.equal(await page.locator('#daily-reminder-form').isHidden(),true,'editor closes after saving');
   });
   await check('weekly validation and saved local schedule survive reload',async()=>{
-    await input('frequency').selectOption('weekly');await page.getByRole('button',{name:'Save email reminders',exact:true}).click();
-    await page.getByText('Select exactly one day for weekly reminders.',{exact:true}).waitFor();
+    await openEditor();assert.equal(await page.locator('.reminder-days').isHidden(),true,'days hidden for every day');
+    await input('frequency').selectOption('weekly');assert.equal(await page.locator('.reminder-days').isVisible(),true);
+    await save();await page.getByText('Select exactly one day for a weekly reminder.',{exact:true}).waitFor();
     for(const item of await input('weekdays').all())await item.uncheck();
-    await page.locator('[name="weekdays"][value="3"]').check();await input('localTime').fill('18:30');await input('timeZone').fill('America/Denver');
-    await page.getByRole('button',{name:'Save email reminders',exact:true}).click();await page.getByText('Email reminder schedule saved.',{exact:true}).waitFor();
-    await render();assert.match(await text(),/Saved: Wed at 18:30 \(America\/Denver\)/);
+    await page.locator('[name="weekdays"][value="3"]').check();await input('localTime').fill('18:30');await input('timeZone').selectOption('America/Denver');
+    await save();await page.getByText('Reminder saved.',{exact:true}).waitFor();
+    await render();assert.match(await text(),/Wed at 6:30\sPM \(America\/Denver\)/);
   });
-  await check('immediate opt-out uses persisted schedule despite invalid editor fields',async()=>{
-    await input('timeZone').fill('Not/AZone');await input('localTime').fill('');
-    await page.getByRole('button',{name:'Turn off email now',exact:true}).click();await page.getByText('Email reminders turned off.',{exact:true}).waitFor();
-    assert.equal(await input('emailEnabled').isChecked(),false);
+  await check('immediate opt-out uses persisted schedule despite unsaved editor fields',async()=>{
+    await openEditor();await input('timeZone').selectOption('America/New_York');await input('localTime').fill('');
+    await page.getByRole('button',{name:'Turn off',exact:true}).click();await page.getByText('Email reminders turned off.',{exact:true}).waitFor();
+    assert.match(await text(),/^Off/);
+    assert.equal(await page.evaluate(()=>reminderFixture.saves.at(-1).enabled),false);
     assert.equal(await page.evaluate(()=>reminderFixture.saves.at(-1).timeZone),'America/Denver');
   });
-  await check('unverified account has disabled opt-in and explicit account-bound verification',async()=>{
-    await render({email:{eligible:false}});assert.equal(await input('emailEnabled').isDisabled(),true);
+  await check('unverified account cannot opt in and gets explicit account-bound verification',async()=>{
+    await render({email:{eligible:false}});assert.equal(await page.locator('#daily-reminder-edit').count(),0);assert.equal(await page.locator('#daily-reminder-form').count(),0);
     await page.getByRole('button',{name:'Send verification email',exact:true}).click();await page.getByText('Verification requested. Check your account email.',{exact:true}).waitFor();
     assert.equal(await page.evaluate(()=>reminderFixture.verifications.at(-1)),await page.evaluate(()=>reminderFixture.owner+'@example.invalid'));
   });
   await check('bounce suppression blocks re-opt-in and changed address requires reconsent guidance',async()=>{
-    await render({email:{eligible:true,suppressed:true}});assert.equal(await input('emailEnabled').isDisabled(),true);assert.match(await text(),/bounce or complaint/);
-    await render({email:{suppressed:false,addressChanged:true}});assert.match(await text(),/new verified address/);
+    await render({email:{eligible:true,suppressed:true}});assert.equal(await page.locator('#daily-reminder-edit').count(),0);assert.match(await text(),/bounce or complaint/);
+    await render({email:{suppressed:false,addressChanged:true}});assert.match(await text(),/new address/);
   });
   await check('backend-first/frontend-first rollout failure gives a retry, not a silent successful save',async()=>{
     await page.evaluate(async()=>{reminderFixture.error=true;await reminderFixture.render({});});
@@ -98,24 +104,25 @@ try {
     await page.evaluate(()=>{reminderFixture.error=false;});await page.getByRole('button',{name:'Retry',exact:true}).click();await ready();
   });
   await check('account switch clears an in-flight previous-account save and cannot overwrite B',async()=>{
-    await render({email:{addressChanged:false}});await input('emailEnabled').check();await page.evaluate(()=>{reminderFixture.delay='save';});
-    await page.getByRole('button',{name:'Save email reminders',exact:true}).click();await page.waitForFunction(()=>reminderFixture.releases.length===1);
+    await render({email:{addressChanged:false}});await openEditor();await page.evaluate(()=>{reminderFixture.delay='save';});
+    await save();await page.waitForFunction(()=>reminderFixture.releases.length===1);
     await page.evaluate(()=>reminderFixture.switchOwner(reminderFixture.B));await ready();await page.evaluate(()=>reminderFixture.release());
     await page.waitForFunction(()=>document.querySelector('[name="timeZone"]').value==='America/Chicago');
-    assert.equal(await input('emailEnabled').isChecked(),false);assert.doesNotMatch(await text(),/Email reminder schedule saved\./);
+    assert.match(await text(),/^Off/);assert.doesNotMatch(await text(),/Reminder saved\./);
   });
   await check('post-save reload racing account switch cannot attach A success to B',async()=>{
     await page.evaluate(()=>reminderFixture.switchOwner(reminderFixture.A));await ready();await page.evaluate(()=>{reminderFixture.delay='load';});
-    await page.getByRole('button',{name:'Save email reminders',exact:true}).click();await page.waitForFunction(()=>reminderFixture.releases.length===1);
+    await openEditor();await save();await page.waitForFunction(()=>reminderFixture.releases.length===1);
     await page.evaluate(()=>reminderFixture.switchOwner(reminderFixture.B));await ready();await page.evaluate(()=>reminderFixture.release());
-    await page.waitForTimeout(50);assert.equal(await input('emailEnabled').isChecked(),false);assert.doesNotMatch(await text(),/Email reminder schedule saved\./);
+    await page.waitForTimeout(50);assert.match(await text(),/^Off/);assert.doesNotMatch(await text(),/Reminder saved\./);
   });
   await check('responsive controls remain in the viewport at 320, 390 and 1440 pixels',async()=>{
     await fs.promises.mkdir('artifacts/reminders',{recursive:true});
+    await openEditor();await input('frequency').selectOption('custom');
     for(const width of [320,390,1440]){
       await page.setViewportSize({width,height:900});await page.evaluate(()=>document.fonts.ready);
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),'overflow at '+width);
-      for(const item of await page.locator('#daily-reminder-form input, #daily-reminder-form select, #daily-reminder-form button').all()){
+      for(const item of await page.locator('#daily-reminder-content input:visible, #daily-reminder-content select:visible, #daily-reminder-content button:visible').all()){
         const box=await item.boundingBox();assert.ok(box&&box.x>=-1&&box.x+box.width<=width+1,'control out of bounds');
       }
       await page.screenshot({path:'artifacts/reminders/settings-'+width+'.png',fullPage:true});
