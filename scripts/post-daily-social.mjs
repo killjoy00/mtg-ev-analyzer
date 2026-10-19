@@ -20,7 +20,7 @@ export async function assertCurrentLivePublisher({env=process.env,fetchImpl=fetc
   const live=env.GITHUB_EVENT_NAME==='schedule'||env.MANUAL_LIVE==='true';
   if(!live)return {checked:false};
   if(env.GITHUB_REF!=='refs/heads/main')throw Error('Live Daily posting requires main.');
-  if(!/^\\d+$/.test(String(env.GITHUB_RUN_ATTEMPT||''))||
+  if(!/^\d+$/.test(String(env.GITHUB_RUN_ATTEMPT||''))||
     Number(env.GITHUB_RUN_ATTEMPT)!==1)
     throw Error('Live Daily job re-runs are forbidden; dispatch a fresh run on current main.');
   if(env.GITHUB_REPOSITORY!=='killjoy00/mtg-ev-analyzer'||
