@@ -242,7 +242,7 @@ export async function postDaily({
   // If GitHub delays the job past reset, it must never post tomorrow early.
   if(event==='workflow_dispatch'&&env.SOURCE_PACIFIC_DAY) {
     const sourceDay=String(env.SOURCE_PACIFIC_DAY);
-    if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(sourceDay))
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(sourceDay))
       throw Error('Invalid independently scheduled Daily date.');
     if(sourceDay!==wall.day||wall.hour<7)
       return {day:sourceDay,skipped:true,reason:'stale or early independent schedule'};
