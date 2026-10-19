@@ -35,6 +35,15 @@ test('Dispatch always targets the reviewed Daily social workflow and Pacific day
   assert.deepEqual(JSON.parse(calls[0].options.body),{ref:'main',inputs:{live:'true',source_day:'2026-10-19'}});
 });
 
+test('GitHub current workflow dispatch HTTP 200 response is accepted',async()=>{
+  const result=await dispatchDailySocialFromNeon({
+    trigger:trigger(summer),now:'2026-10-19T14:10:10Z',
+    env:{PACK1_LAUNCH_WATCHER_GITHUB_TOKEN:TOKEN},
+    fetcher:async()=>Response.json({workflow_run_id:1}),
+  });
+  assert.equal(result.action,'dispatched');
+});
+
 test('Untrusted, stale, off-hour or missing credentials never dispatch',async()=>{
   const fetcher=()=>{throw Error('Unexpected network');};
   await assert.rejects(dispatchDailySocialFromNeon({
