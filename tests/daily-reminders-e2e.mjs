@@ -37,22 +37,27 @@ await page.route('https://api.packone.pro/**',async route=>{
 });
 try {
   await page.goto(base+'/tests/auth-context-harness.html');
-  await page.locator('#profile-account-tab').click();await page.locator('#daily-reminder-form').waitFor();
+  await page.locator('#profile-account-tab').click();await page.locator('#daily-reminder-edit').waitFor();
   assert.equal(await page.locator('#daily-reminder-settings').count(),1,'My Pack One must render one reminder editor');
-  assert.equal(await page.locator('[name="emailEnabled"]').isChecked(),false);assert.equal(saves.length,0);
-  assert.ok(assets.includes('/daily-reminder-settings.mjs?v=2'),'new settings asset is loaded');
+  const order=await page.$$eval('#profile-account h3',items=>items.map(item=>item.id));
+  assert.equal(order.indexOf('daily-reminder-heading'),order.indexOf('delete-account-title')-1,'reminders sit directly above Delete account');
+  assert.ok(order.indexOf('daily-reminder-heading')>order.indexOf('credential-settings-title'),'reminders come after Sign-in & security');
+  assert.equal(await page.locator('#daily-reminder-form').isHidden(),true,'schedule editor is collapsed until requested');
+  assert.equal(saves.length,0);
+  assert.ok(assets.includes('/daily-reminder-settings.mjs?v=3'),'new settings asset is loaded');
   assert.ok(assets.includes('/growth-api.mjs?v=2'),'new reminder API exports cannot come from a stale cached module');
-  await page.locator('[name="emailEnabled"]').check();await page.getByRole('button',{name:'Save email reminders',exact:true}).click();
-  await page.getByText('Email reminder schedule saved.',{exact:true}).waitFor();assert.equal(saves.length,1);assert.equal(state.push.enabled,false);
+  await page.getByRole('button',{name:'Turn on',exact:true}).click();await page.getByRole('button',{name:'Save reminder',exact:true}).click();
+  await page.getByText('Reminder saved.',{exact:true}).waitFor();assert.equal(saves.length,1);assert.equal(state.push.enabled,false);
   assert.equal(saves[0].enabled,true);assert.deepEqual(saves[0].weekdays,[0,1,2,3,4,5,6]);
-  await page.locator('[name="timeZone"]').fill('Not/AZone');await page.locator('[name="localTime"]').fill('');
-  await page.getByRole('button',{name:'Turn off email now',exact:true}).click();await page.getByText('Email reminders turned off.',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Change',exact:true}).click();
+  await page.locator('[name="timeZone"]').selectOption('America/Denver');await page.locator('[name="localTime"]').fill('');
+  await page.getByRole('button',{name:'Turn off',exact:true}).click();await page.getByText('Email reminders turned off.',{exact:true}).waitFor();
   assert.equal(saves.at(-1).enabled,false);assert.equal(saves.at(-1).timeZone,'America/Chicago');
-  available=false;await page.evaluate(async()=>{await (await import('/daily-reminder-settings.mjs?v=2')).bindDailyReminderSettings();});
+  available=false;await page.evaluate(async()=>{await (await import('/daily-reminder-settings.mjs?v=3')).bindDailyReminderSettings();});
   await page.getByRole('button',{name:'Retry',exact:true}).waitFor();assert.equal(await page.locator('#daily-reminder-form').count(),0);
-  available=true;await page.getByRole('button',{name:'Retry',exact:true}).click();await page.locator('#daily-reminder-form').waitFor();
+  available=true;await page.getByRole('button',{name:'Retry',exact:true}).click();await page.locator('#daily-reminder-edit').waitFor();
   for(const width of [320,390,1440]){await page.setViewportSize({width,height:900});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));}
   signed=false;await page.evaluate(()=>window.dispatchEvent(new Event('packone-account-changed')));
-  await page.waitForFunction(()=>!document.querySelector('#daily-reminder-form'));assert.deepEqual(errors,[]);
+  await page.waitForFunction(()=>!document.querySelector('#daily-reminder-form')&&!document.querySelector('#daily-reminder-edit'));assert.deepEqual(errors,[]);
   console.log('Routed My Pack One reminder settings, fresh assets, separate consent, opt-out, retry, responsive layout and logout passed (synthetic APIs).');
 }finally{await browser.close();}
