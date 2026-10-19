@@ -1,5 +1,5 @@
 import {SERVING_POLICY_VERSION,LEGACY_SERVING_POLICY_VERSION,SERVING_QUALITY_SQL} from '../serving-quality.mjs';
-import {accountCapabilities,PAID_CAPABILITIES,requireCapability,practiceCapability} from './capabilities.mjs';
+import {accountCapabilities,requireCapability,practiceCapability} from './capabilities.mjs';
 import {componentBelongsTo,corpusMembership} from './corpus-components.mjs';
 import {liveRegularSets,recencyWeight} from '../daily-selection.mjs';
 import {accountIdentity,linkedPlayerIdentity,rankingIdentityStatus} from './account-identity.mjs';
@@ -255,11 +255,10 @@ async function start(request) {
   if(environment!=='mixed'&&setIds.length)fail('Custom sets use regular Draft Runs.');
   if(!daily) {
     const requiredPracticeCapability=practiceCapability(environment,setIds);
-    // A friend's shared run is a fixed replay of eight stored decisions, so any
-    // player can accept it: guest or member, mixed or Powered Cube. Official
-    // creator campaigns are guest-playable for the standard mixed environment,
-    // but must never bypass paid Cube/custom access.
-    if(!source&&(!creatorState||PAID_CAPABILITIES.has(requiredPracticeCapability)))
+    // Shared runs and published creator challenges replay fixed decisions, so
+    // everyone can accept them, including guests playing Cube or custom sets.
+    // Fresh practice runs still require their normal account or Elite access.
+    if(!source&&!creatorState)
       requireCapability(capabilities,requiredPracticeCapability);
   }
   const rawIdempotency=String(request.headers.get('x-idempotency-key')||'');

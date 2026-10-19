@@ -169,6 +169,10 @@ export async function cleanupPackOne(query,operation,{recoveryKey=null}={}) {
   await query('DELETE FROM entitlement_grants WHERE auth_user_id=$1::uuid',[auth]);
   await query('DELETE FROM pack1_admins WHERE auth_user_id=$1::uuid',[auth]);
   // Remove consent, changes, delivery evidence, and registrations before Auth removal.
+  await query(`DELETE FROM daily_reminder_provider_events WHERE auth_user_id=$1::uuid
+    OR delivery_hint IN (SELECT id FROM daily_reminder_deliveries WHERE auth_user_id=$1::uuid)
+    OR provider_id IN (SELECT provider_id FROM daily_reminder_deliveries WHERE auth_user_id=$1::uuid AND provider_id IS NOT NULL)`,[auth]);
+  await query('DELETE FROM daily_reminder_dispatch_claims WHERE auth_user_id=$1::uuid',[auth]);
   await query('DELETE FROM daily_reminder_deliveries WHERE auth_user_id=$1::uuid',[auth]);
   await query('DELETE FROM daily_reminder_devices WHERE auth_user_id=$1::uuid',[auth]);
   await query('DELETE FROM daily_reminder_changes WHERE auth_user_id=$1::uuid',[auth]);

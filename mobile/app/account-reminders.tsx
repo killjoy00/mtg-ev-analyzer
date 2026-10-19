@@ -4,7 +4,7 @@ import { Text } from '@/src/components/Text';
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 import { useAccountState } from '@/src/hooks/useAccountState';
 import {
-  enablePushOnDevice,loadNativeReminders,PushPermissionDenied,saveNativeReminders,unregisterReminderDevice,
+  enablePushOnDevice,loadNativeReminders,PushPermissionDenied,saveNativeReminders,unregisterReminderDevice,reminderDeviceEnabled,assertReminderAccount,
   type ReminderChannel,type ReminderSchedule,type ReminderSnapshot,
 } from '@/src/api/reminders';
 import { colors,spacing } from '@/src/theme';
@@ -25,6 +25,7 @@ export default function AccountRemindersScreen() {
   const [schedule,setSchedule]=useState<ReminderSchedule|null>(null);
   const [loading,setLoading]=useState(true);
   const [saving,setSaving]=useState(false);
+  const [deviceEnabled,setDeviceEnabled]=useState(false);
   const [notice,setNotice]=useState<string|null>(null);
   const [permissionBlocked,setPermissionBlocked]=useState(false);
   const ownerId=session?.accountUser?.id||null;
@@ -35,12 +36,12 @@ export default function AccountRemindersScreen() {
     // The owner-key render guard prevents even a frame of the old account's UI.
     void Promise.resolve().then(async()=>{
       if(!active)return;
-      setSnapshot(null);setSchedule(null);setLoading(true);setNotice(null);
+      setSnapshot(null);setSchedule(null);setLoading(true);setNotice(null);setSaving(false);setDeviceEnabled(false);setPermissionBlocked(false);
       if(!session?.accountToken){setLoading(false);setLoadedFor(null);return;}
       try {
-        const value=await loadNativeReminders(session);
+        const [value,registered]=await Promise.all([loadNativeReminders(session),reminderDeviceEnabled(session)]);
         if(!active)return;
-        setSnapshot(value);
+        setSnapshot(value);setDeviceEnabled(registered);
         setSchedule({...value.schedule,timeZone:
           !value.nextAt&&!value.email.consentedAt&&!value.push.consentedAt?deviceTimezone():value.schedule.timeZone});
       }catch(err){
@@ -63,10 +64,10 @@ export default function AccountRemindersScreen() {
   };
   const chooseFrequency=(frequency:ReminderSchedule['frequency'])=>{
     setSchedule(value=>value?{
-      ...value,frequency,weekdays:frequency==='weekly'?(value.weekdays.length?[value.weekdays[0] ?? 1]:[1]):value.weekdays,
+      ...value,frequency,weekdays:frequency==='weekly'?(value.weekdays.length?[value.weekdays[0] ?? 1]:[1]):frequency==='daily'?[0,1,2,3,4,5,6]:value.weekdays,
     }:value);
   };
-  const save=async(channel:ReminderChannel,enabled:boolean)=>{
+  const save=async(channel:ReminderChannel,enabled:boolean,registerDevice=false)=>{
     if(!session?.accountToken||!schedule||saving||!snapshot)return;
     const effectiveSchedule=enabled?schedule:snapshot.schedule;
     if(enabled&&!/^(?:[01][0-9]|2[0-3]):[0-5][0-9]$/.test(effectiveSchedule.localTime)) {
@@ -77,17 +78,29 @@ export default function AccountRemindersScreen() {
     }
     setSaving(true);setNotice(null);setPermissionBlocked(false);
     try {
-      if(channel==='push'&&enabled&&!snapshot.push.enabled)await enablePushOnDevice(session);
+      if(channel==='push'&&enabled&&(registerDevice||!deviceEnabled))await enablePushOnDevice(session);
       const updated=await saveNativeReminders(session,channel,enabled,effectiveSchedule);
       if(channel==='push'&&!enabled)await unregisterReminderDevice(session);
-      setSnapshot(updated);setSchedule(updated.schedule);
+      const registered=await reminderDeviceEnabled(session);
+      await assertReminderAccount(session);
+      setSnapshot(updated);setSchedule(updated.schedule);setDeviceEnabled(registered);
       setNotice(channel==='email'
         ? enabled?'Email reminders saved.':'Email reminders turned off.'
         : enabled?'Push reminders saved.':'Push reminders turned off.');
     }catch(error){
+      try {await assertReminderAccount(session);} catch {return;}
+      if(channel==='push'&&enabled&&!deviceEnabled)await unregisterReminderDevice(session).catch(()=>{});
+      try {await assertReminderAccount(session);} catch {return;}
       if(error instanceof PushPermissionDenied)setPermissionBlocked(true);
       setNotice(error instanceof Error?error.message:'Could not update reminder settings. Your current choices were not changed.');
-    }finally{setSaving(false);}
+    }finally{try{await assertReminderAccount(session);setSaving(false);}catch{ /* The new account owns its loading state. */ }}
+  };
+  const disableThisDevice=async()=>{
+    if(!session?.accountToken||saving)return;
+    setSaving(true);
+    try{await unregisterReminderDevice(session);await assertReminderAccount(session);setDeviceEnabled(false);setNotice('Reminders are off on this device. Other devices are unchanged.');}
+    catch(error){try{await assertReminderAccount(session);setNotice(error instanceof Error?error.message:'Could not unregister this device.');}catch{}}
+    finally{try{await assertReminderAccount(session);setSaving(false);}catch{}}
   };
   const disabled=saving||loading||accountBusy;
   if(accountBusy||loading||(Boolean(session?.accountToken)&&loadedFor!==ownerId))return <SafeAreaView style={styles.safe}><View style={styles.center}>
@@ -105,8 +118,10 @@ export default function AccountRemindersScreen() {
     {snapshot?<View style={styles.panel}>
       <Text style={styles.heading}>Your saved channels</Text>
       <Text style={styles.body}>Email: {snapshot.email.enabled?'On':'Off'} · Push: {snapshot.push.enabled?'On':'Off'}</Text>
+      <Text style={styles.body}>Saved: {snapshot.schedule.frequency==='daily'?'Every day':snapshot.schedule.weekdays.map(day=>DAYS[day]).join(', ')} at {snapshot.schedule.localTime} ({snapshot.schedule.timeZone})</Text>
       <Text style={styles.body}>Next reminder: {formatDate(snapshot.nextAt)}</Text>
-      {!snapshot.deliveryActive?<Text style={styles.alert}>Delivery is not active yet. Saved choices will not send reminders until activation.</Text>:null}
+      {snapshot.email.deliveryActive===false?<Text style={styles.alert}>Email delivery is not active yet.</Text>:null}
+      {snapshot.push.deliveryActive===false?<Text style={styles.alert}>Push delivery is not active yet.</Text>:null}
       <Text style={styles.help}>Latest email attempt: {snapshot.email.lastAttempt?.state||'none'}. Latest push attempt: {snapshot.push.lastAttempt?.state||'none'}.</Text>
       {snapshot.push.lastAttempt?.platformReceipt?<Text style={styles.help}>Push platform receipt: {snapshot.push.lastAttempt.platformReceipt} (not proof of display).</Text>:null}
       <Text style={styles.help}>Last confirmed email delivery: {formatDate(snapshot.email.deliveredAt)}</Text>
@@ -139,10 +154,11 @@ export default function AccountRemindersScreen() {
     {snapshot&&schedule?<View style={styles.panel}>
       <Text style={styles.heading}>Email reminders</Text>
       <Text style={styles.body}>Sent only to the verified email on your Pack One account. Push consent is not affected.</Text>
+      {snapshot.email.addressChanged?<Text style={styles.alert}>Your account email changed. Save email reminders again to confirm consent for the new verified address.</Text>:null}
       {!snapshot.email.eligible?<Text style={styles.alert}>Verify your sign-in email before enabling email reminders.</Text>:null}
       {snapshot.email.suppressed?<Text style={styles.alert}>Email reminders are suppressed following a bounce or complaint. Contact support to resolve.</Text>:null}
-      <Pressable accessibilityRole="button" disabled={disabled||!snapshot.email.eligible||snapshot.email.suppressed}
-        onPress={()=>void save('email',!snapshot.email.enabled)} style={[styles.button,(disabled||!snapshot.email.eligible||snapshot.email.suppressed)&&styles.disabled]}>
+      <Pressable accessibilityRole="button" disabled={disabled||(!snapshot.email.enabled&&(!snapshot.email.eligible||snapshot.email.suppressed))}
+        onPress={()=>void save('email',!snapshot.email.enabled)} style={[styles.button,(disabled||(!snapshot.email.enabled&&(!snapshot.email.eligible||snapshot.email.suppressed)))&&styles.disabled]}>
         <Text style={styles.buttonLabel}>{snapshot.email.enabled?'Turn email off now':'Enable email reminders'}</Text>
       </Pressable>
       {snapshot.email.enabled?<Pressable accessibilityRole="button" disabled={disabled}
@@ -151,14 +167,21 @@ export default function AccountRemindersScreen() {
     {snapshot&&schedule?<View style={styles.panel}>
       <Text style={styles.heading}>Push notifications</Text>
       <Text style={styles.body}>Requires this device’s explicit permission. Each phone or tablet can be registered independently. Email consent stays separate.</Text>
+      <Text style={styles.help}>This device: {deviceEnabled?'registered':'not registered'}. The schedule is shared across your opted-in channels.</Text>
       <Pressable accessibilityRole="button" disabled={disabled}
-        onPress={()=>void save('push',!snapshot.push.enabled)} style={[styles.button,disabled&&styles.disabled]}>
-        <Text style={styles.buttonLabel}>{snapshot.push.enabled?'Turn push off now':'Enable push notifications'}</Text>
+        onPress={()=>void save('push',true,true)} style={[styles.button,disabled&&styles.disabled]}>
+        <Text style={styles.buttonLabel}>{deviceEnabled?'Refresh this device registration':'Enable push on this device'}</Text>
       </Pressable>
-      {snapshot.push.enabled?<Pressable accessibilityRole="button" disabled={disabled}
-        onPress={()=>void save('push',true)} style={styles.secondary}><Text style={styles.buttonLabel}>Save push schedule</Text></Pressable>:null}
-      {permissionBlocked?<Pressable accessibilityRole="link" onPress={()=>void Linking.openSettings()} style={styles.secondary}>
-        <Text style={styles.buttonLabel}>Open device notification settings</Text></Pressable>:null}
+      {deviceEnabled?<Pressable accessibilityRole="button" disabled={disabled} onPress={()=>void disableThisDevice()} style={styles.secondary}>
+        <Text style={styles.buttonLabel}>Turn off this device</Text></Pressable>:null}
+      {snapshot.push.enabled?<>
+        <Pressable accessibilityRole="button" disabled={disabled} onPress={()=>void save('push',true)} style={styles.secondary}>
+          <Text style={styles.buttonLabel}>Save push schedule</Text></Pressable>
+        <Pressable accessibilityRole="button" disabled={disabled} onPress={()=>void save('push',false)} style={styles.secondary}>
+          <Text style={styles.buttonLabel}>Turn push off on all devices</Text></Pressable>
+      </>:null}
+      <Pressable accessibilityRole="link" onPress={()=>void Linking.openSettings().catch(()=>setNotice('Open Pack One notification permissions in device Settings.'))} style={styles.secondary}>
+        <Text style={styles.buttonLabel}>{permissionBlocked?'Allow notifications in device Settings':'Open device notification settings'}</Text></Pressable>
     </View>:null}
     {notice?<Text accessibilityRole="alert" style={styles.alert}>{notice}</Text>:null}
   </ScrollView></SafeAreaView>;

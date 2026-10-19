@@ -365,7 +365,7 @@ export async function gateway(request,env,fetcher=fetch) {
       return finish(response(503,'Gateway not configured.'));
     if(url.protocol!=='https:'||url.hostname!==expectedHost)return finish(response(404,'Not found.'));
     const appleCallbackOrigin=request.method==='POST'&&url.pathname==='/growth/v1/account/apple/callback'&&origin==='https://appleid.apple.com';
-    if(origin&&!ORIGINS.has(origin)&&!appleCallbackOrigin)return finish(response(403,'Origin not allowed.'));
+    if(origin&&!ORIGINS.has(origin)&&!appleCallbackOrigin&&!(request.method==='POST'&&url.pathname==='/growth/v1/reminders/unsubscribe'&&origin==='https://'+expectedHost))return finish(response(403,'Origin not allowed.'));
     const match=url.pathname.match(/^\/(legacy|growth|draft)(\/.*)$/);
     const method=request.method==='OPTIONS'?request.headers.get('access-control-request-method'):request.method;
     if(!match||!permitted(match[1],match[2],method,url.search,mode))return finish(response(404,'Not found.'));
@@ -482,7 +482,7 @@ export async function gateway(request,env,fetcher=fetch) {
     }
 
     const publicHeaders=new Headers();
-    for(const name of ['content-type','retry-after'])if(result.headers.has(name))publicHeaders.set(name,result.headers.get(name));
+    for(const name of ['content-type','retry-after','referrer-policy','content-security-policy'])if(result.headers.has(name))publicHeaders.set(name,result.headers.get(name));
     if(preview&&match[1]==='draft'&&method==='POST') {
       const timingHeader=match[2]==='/v1/runs'?'x-pack1-start-timing':
         /^\/v1\/runs\/[a-f0-9-]+\/reroll$/.test(match[2])?'x-pack1-reroll-timing':

@@ -63,7 +63,7 @@ jobs:
             if(!response.ok)throw Error('Production scheduler health check failed.');
             const data=await response.json();
             if(data.release_commit!==commit)throw Error('Production reminder worker revision does not match reviewed main.');
-            if(data.reminder_delivery_active!==true||data.reminder_delivery_ready!==true)
+            if(!((data.reminder_email_active===true&&data.reminder_delivery_ready===true)||(data.reminder_push_active===true&&data.reminder_push_ready===true)))
               throw Error('Reminder delivery is not explicitly active and fully configured.');
           }
           NODE

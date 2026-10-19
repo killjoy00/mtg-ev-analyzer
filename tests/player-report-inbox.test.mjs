@@ -120,10 +120,10 @@ test('migration and release keep old reports and verify new triage columns',()=>
 });
 
 test('admin frontend exposes a private player reports area and inserts untrusted report text safely',()=>{
-  const html=fs.readFileSync('admin/index.html','utf8');
+  const overview=fs.readFileSync('admin/overview.mjs','utf8');
   const admin=fs.readFileSync('admin/admin.mjs','utf8');
   const inbox=fs.readFileSync('admin/player-reports.mjs','utf8');
-  assert.match(html,/href="\?area=reports">Player reports/);
+  assert.match(overview,/href="\?area=reports" id="admin-reports-link">Review player reports/);
   assert.match(admin,/renderPlayerReports\(root,authorizedRequest\)/);
   assert.match(inbox,/All user-supplied text is inserted with textContent/);
   assert.match(inbox,/el.textContent=String\(text\)/);

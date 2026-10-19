@@ -24,8 +24,8 @@ import { trackEvent } from './retention-events.mjs';
 import { nextMilestones } from './progression.mjs?v=10';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { eliteSource } from './membership-source.mjs';
-import { renderAccount, renderDeletionState } from './growth.mjs?v=14';
-import {dailyReminderSettingsMarkup,bindDailyReminderSettings} from './daily-reminder-settings.mjs?v=1';
+import { renderAccount, renderDeletionState } from './growth.mjs?v=20';
+import {dailyReminderSettingsMarkup,bindDailyReminderSettings} from './daily-reminder-settings.mjs?v=2';
 import {
   bestPercentile,
   liveEnvironmentProgress,
@@ -39,7 +39,7 @@ import {
   shareProfileCard,
   shareResultCard,
 } from './share-cards.mjs';
-import {bindMyPackOneTabs,currentSeasonMarkup,myPackOneMarkup,resetMyPackOneTab} from './my-pack-one.mjs?v=7';
+import {bindMyPackOneTabs,currentSeasonMarkup,myPackOneMarkup,resetMyPackOneTab} from './my-pack-one.mjs?v=8';
 
 let profileRendering = false;
 let navInstalled = false;

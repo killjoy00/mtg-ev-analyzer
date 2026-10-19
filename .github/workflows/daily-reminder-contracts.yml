@@ -5,6 +5,15 @@ on:
     paths:
       - '*reminder*'
       - 'worker/*reminder*'
+      - 'worker/growth-function.js'
+      - 'worker/account-session.mjs'
+      - 'edge/gateway.mjs'
+      - 'growth-api.mjs'
+      - 'game-date.mjs'
+      - 'scripts/reconcile-neon-reminder-scheduler.mjs'
+      - 'tests/support/**'
+      - '.github/workflows/secure-auth-release.yml'
+      - '.github/workflows/neon-reminder-scheduler-release.yml'
       - 'worker/account-deletion*'
       - 'migrations/**'
       - 'tests/*reminder*'
@@ -46,20 +55,6 @@ jobs:
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
           npm ci --prefix mobile --ignore-scripts --no-audit --no-fund
-      - name: Retain public, credential-free reproduction inputs
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p "$RUNNER_TEMP/reminder-reproduction"
-          git archive --format=tar HEAD | gzip -1 > "$RUNNER_TEMP/reminder-reproduction/source.tar.gz"
-          tar -czf "$RUNNER_TEMP/reminder-reproduction/dependencies.tar.gz" node_modules mobile/node_modules
-          npm pack @embedded-postgres/linux-x64@18.4.0-beta.17 --ignore-scripts --pack-destination "$RUNNER_TEMP/reminder-reproduction"
-          printf '%s\n' "$GITHUB_SHA" > "$RUNNER_TEMP/reminder-reproduction/revision.txt"
-      - uses: actions/upload-artifact@v4
-        with:
-          name: reminder-reproduction-${{ github.event.pull_request.head.sha }}
-          path: ${{ runner.temp }}/reminder-reproduction/
-          retention-days: 1
       - name: Exercise consent, schedule and provider contracts
         run: node --test tests/daily-reminder-schedule.test.mjs tests/daily-reminders.test.mjs
       - name: Apply real migrations to an isolated PostgreSQL database

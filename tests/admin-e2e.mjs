@@ -1,5 +1,6 @@
 // Browser contract runs in CI against the local static site and synthetic data.
 import {chromium} from 'playwright';
+import {runOverviewChecks} from './admin-overview-e2e.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {ADMIN_API_VERSION} from '../admin-api-contract.mjs';
@@ -30,7 +31,7 @@ try {
   let renamedPublicUsername='Test Member',deletionFixture=null,deletionStatusFailure=false;
   let failNextCreatorRetirement=false;
   let holdDeletionStatus=false,releaseDeletionStatus=null,failDeleteAfterCommit=false;
-  let holdHabitReport=true,releaseHabitReport=null,holdStaleCore=false,releaseStaleCore=null;
+  let holdHabitReport=false,releaseHabitReport=null,holdStaleCore=false,releaseStaleCore=null;
   let markStaleCoreHeld;const staleCoreHeld=new Promise(resolve=>{markStaleCoreHeld=resolve;});
   await page.route('**/v1/admin/team',route=>route.fulfill({json:{ok:true,members:[],invitations:[],audit:[]}}));
   await page.route('**/v1/account/session',route=>route.fulfill({json:{user:{id:'22222222-2222-4222-8222-222222222222',email:'admin@example.com'}}}));
@@ -140,6 +141,11 @@ try {
     return route.fulfill({json:fixture});
   });
   await page.reload();
+  await page.getByRole('heading',{name:'Overview',exact:true}).waitFor();
+  await page.locator('#overview-retention').getByText('37.5%',{exact:false}).waitFor();
+  assert.equal(await page.locator('#admin-overview-link').isVisible(),false);
+  holdHabitReport=true;
+  await page.getByRole('link',{name:'Insights',exact:true}).click();
   await page.getByRole('heading',{name:'How the decisions play'}).waitFor();
   await page.getByRole('heading',{name:'Daily result-share funnel'}).waitFor();
   assert.match(await page.locator('.share-funnel').innerText(),/20[\s\S]*17[\s\S]*12[\s\S]*9/);
@@ -195,7 +201,8 @@ try {
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),'Mobile page must not overflow horizontally');
   fs.mkdirSync('artifacts',{recursive:true});
   await page.screenshot({path:'artifacts/ui-admin-mobile.png',fullPage:true});
-  await page.getByRole('link',{name:'Corpus',exact:true}).click();
+  await page.getByRole('link',{name:'Overview',exact:true}).click();
+  await page.getByRole('link',{name:'Operations',exact:true}).click();
   await page.getByRole('heading',{name:'Corpus operations'}).waitFor();
   assert.equal(await page.locator('.corpus-table tbody tr').count(),7);
   await page.getByLabel('Find a set').fill('missing');assert.ok((await page.locator('#corpus-rows').innerText()).includes('No sets match'));
@@ -208,6 +215,7 @@ try {
   await page.getByRole('button',{name:'Close set details'}).click();
   await page.getByLabel('Find a set').fill('');
   for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:`artifacts/ui-corpus-${width}.png`,fullPage:true});}
+  await page.getByRole('link',{name:'Overview',exact:true}).click();
   await page.getByRole('link',{name:'Users',exact:true}).click();
   await page.getByRole('heading',{name:'Users',exact:true}).waitFor();
   assert.ok((await page.getByText('Authenticated Pack One accounts only.',{exact:false}).innerText()).includes('Anonymous and guest gameplay identities'));
@@ -310,8 +318,9 @@ try {
 
   for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:`artifacts/ui-users-${width}.png`,fullPage:true});}
   await page.getByRole('button',{name:'Close'}).click();
+  await page.getByRole('link',{name:'Overview',exact:true}).click();
   await page.getByRole('link',{name:'Campaign Links',exact:true}).click();
-  await page.getByRole('heading',{name:'Campaign Links / Creator Challenges'}).waitFor();
+  await page.getByRole('heading',{name:'Campaign Links',exact:true}).waitFor();
   const campaignPanel=page.locator('[data-panel="campaign"]');
   const publishedCampaigns=JSON.parse(fs.readFileSync(new URL('../campaign-links.json',import.meta.url),'utf8'));
   await page.getByText(`${publishedCampaigns.length} published campaign link(s).`,{exact:true}).waitFor();
@@ -356,7 +365,9 @@ try {
   assert.match(await page.locator('#slug-warning').innerText(),/already exists in campaign-links\.json/);
   assert.equal(await campaignPanel.getByRole('button',{name:'Copy JSON entry'}).isDisabled(),true);
 
-  await page.getByRole('tab',{name:'Beat the Creator'}).click();
+  await page.getByRole('link',{name:'Overview',exact:true}).click();
+  await page.getByRole('link',{name:'Creator Challenges',exact:true}).click();
+  await page.getByRole('heading',{name:'Creator Challenges',exact:true}).waitFor();
   const creatorPanel=page.locator('[data-panel="creator"]');
   await creatorPanel.getByText('2 creator challenge(s).',{exact:true}).waitFor();
 
@@ -476,5 +487,6 @@ try {
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),'Campaign link builder must not overflow horizontally');
   await page.screenshot({path:'artifacts/ui-campaign-links-mobile.png',fullPage:true});
   assert.deepEqual(errors,[]);
+  await runOverviewChecks(browser);
   console.log('Admin mobile layout, locked state, filters, review details and CSV export passed.');
 } finally {await browser.close();}

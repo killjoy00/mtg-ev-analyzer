@@ -4,19 +4,14 @@ import { useEffect, useRef } from 'react';
 import { AppState } from 'react-native';
 
 import { config } from '@/src/config';
-import { refreshGrantedPushRegistration,unregisterReminderDevice } from '@/src/api/reminders';
+import { refreshGrantedPushRegistration,unregisterReminderDevice,acceptsReminderNotification } from '@/src/api/reminders';
 import { readSession,subscribeSession,type MobileSession } from '@/src/storage/session';
 
-function belongsToCurrentAccount(data:unknown,session:MobileSession|null) {
-  if(!data||typeof data!=='object'||!session?.accountToken||!session.accountUser?.id)return false;
-  const body=data as {screen?:unknown;owner?:unknown};
-  return body.screen==='daily'&&body.owner===session.accountUser.id;
-}
 if(!config.screenshots.fixtures) {
   Notifications.setNotificationHandler({
     handleNotification:async notification=>{
       const session=await readSession().catch(()=>null);
-      const show=belongsToCurrentAccount(notification.request.content.data,session);
+      const show=await acceptsReminderNotification(notification.request.content.data,session).catch(()=>false);
       return {shouldShowBanner:show,shouldShowList:show,shouldPlaySound:false,shouldSetBadge:false};
     },
   });
@@ -60,14 +55,15 @@ export function ReminderPushBridge() {
       if(!response||!mounted||!ready)return;
       const data=response.notification.request.content.data;
       const session=await readSession().catch(()=>null);
-      if(!belongsToCurrentAccount(data,session)) {
+      if(!await acceptsReminderNotification(data,session).catch(()=>false)) {
         await Notifications.clearLastNotificationResponseAsync().catch(()=>{});
         return;
       }
+      if(!mounted)return;
       router.navigate('/');
       await Notifications.clearLastNotificationResponseAsync().catch(()=>{});
     }
-    const listener=Notifications.addNotificationResponseReceivedListener(response=>{void handle(response);});
+    const listener=Notifications.addNotificationResponseReceivedListener(response=>{void handle(response).catch(()=>{});});
     void Notifications.getLastNotificationResponseAsync().then(handle).catch(()=>{});
     return ()=>{mounted=false;listener.remove();};
   },[ready]);

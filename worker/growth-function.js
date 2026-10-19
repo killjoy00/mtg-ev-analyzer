@@ -1927,7 +1927,7 @@ async function handleAccountDelete(request,{mobile=false}={}) {
       authUserId:auth.user_id,purpose:'account_delete_verify',
       limit:DELETE_VERIFY_LIMIT,seconds:DELETE_LIMIT_SECONDS,
     });
-    if(verifyLimit.limited)return credentialThrottle('Too many verification attempts. Please try again later.',verifyLimit);
+    if(verifyLimit.limited)return credentialThrottle('Too many deletion attempts. Please try again later.',verifyLimit);
     const network=trustedCredentialNetwork(request);
     const networkLimit=await consumeCredentialLimit(query,{
       authUserId:auth.user_id,purpose:'account_delete_network',networkHash:network,
@@ -2457,7 +2457,7 @@ async function handleProfileLookup(request) {
 async function route(request) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(request) });
   const url = new URL(request.url);
-  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, profiles: true, account_deletion_enabled:deletionEnabled(), verification_sweep_enabled:verificationSweepEnabled(), deletion_email_configured:deletionEmailConfigured(), launch_watcher_recovery_configured:launchWatcherRecoveryConfigured(), campaign_link_publish_configured:campaignLinkPublishConfigured(), apple_sign_in_configured:appleConfigured(), reminder_delivery_active:reminderReadiness().emailActive||reminderReadiness().pushActive, reminder_delivery_ready:reminderReadiness().emailReady, reminder_email_active:reminderReadiness().emailActive, reminder_push_active:reminderReadiness().pushActive });
+  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, profiles: true, account_deletion_enabled:deletionEnabled(), verification_sweep_enabled:verificationSweepEnabled(), deletion_email_configured:deletionEmailConfigured(), launch_watcher_recovery_configured:launchWatcherRecoveryConfigured(), campaign_link_publish_configured:campaignLinkPublishConfigured(), apple_sign_in_configured:appleConfigured(), reminder_delivery_active:reminderReadiness().emailActive||reminderReadiness().pushActive, reminder_delivery_ready:reminderReadiness().emailReady, reminder_email_active:reminderReadiness().emailActive, reminder_push_active:reminderReadiness().pushActive, reminder_push_ready:reminderReadiness().pushReady });
   if (url.pathname === '/internal/account-deletion-maintenance') return handleDeletionMaintenance(request);
   if (url.pathname === '/internal/account-deletion-maintenance-status') return handleDeletionMaintenanceStatus(request);
   if (url.pathname === '/internal/daily-reminders' || url.pathname === '/v1/reminders/unsubscribe' || url.pathname === '/v1/reminders/provider-event' || /^\/v1\/(?:mobile\/)?account\/reminders(?:\/devices)?$/.test(url.pathname))
@@ -2563,6 +2563,12 @@ export default {
     try {
       return withCors(await route(request), request);
     } catch (error) {
+      if(new URL(request.url).pathname.includes('reminders')) {
+        const status=error?.reminderSafe?Number(error.status||400):[401,403].includes(Number(error?.status))?Number(error.status):503;
+        console.error(JSON.stringify({event:'reminder_request_rejected',status,code:error?.reminderSafe?String(error.code||'REMINDER_REQUEST'):'REMINDER_UNAVAILABLE'}));
+        return withCors(json({error:error?.reminderSafe?error.message:status===401?'Sign in to manage reminders.':status===403?'Account request could not be verified.':'Reminder settings are temporarily unavailable.',
+          ...(error?.reminderSafe&&error.code?{code:error.code}:{})},status),request);
+      }
       // Expected guest- and account-session 401s become one structured line
       // naming why, instead of an untyped stack trace per request (#803).
       if(error?.status===401&&error?.playerSessionReason)console.log(JSON.stringify(playerSessionRejection(request,error.playerSessionReason)));

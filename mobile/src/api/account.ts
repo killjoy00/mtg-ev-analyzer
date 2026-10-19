@@ -231,6 +231,8 @@ export async function forgetAccountLocally(session: MobileSession) {
 }
 
 export async function signOutMobileAccount(session: MobileSession) {
+  const {unregisterReminderDevice}=await import('@/src/api/reminders');
+  await unregisterReminderDevice(session);
   if (session.accountToken) {
     await requestJson<{ ok: boolean }>('/growth/v1/mobile/account/signout', {
       method: 'POST',

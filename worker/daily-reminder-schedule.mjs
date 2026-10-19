@@ -21,10 +21,15 @@ export function validateReminderSchedule(value) {
   if(frequency==='weekly'&&weekdays.length!==1)throw Error('Weekly reminders require exactly one weekday.');
   return {frequency,weekdays:[...weekdays].sort((a,b)=>a-b),localTime,timeZone:canonical};
 }
+const formatters=new Map();
+function localFormatter(timeZone) {
+  if(formatters.has(timeZone))return formatters.get(timeZone);
+  if(formatters.size>=128)formatters.delete(formatters.keys().next().value);
+  const formatter=new Intl.DateTimeFormat('en-CA',{timeZone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'});
+  formatters.set(timeZone,formatter);return formatter;
+}
 function localParts(at,timeZone) {
-  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{
-    timeZone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23',
-  }).formatToParts(at).filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
+  const parts=Object.fromEntries(localFormatter(timeZone).formatToParts(at).filter(x=>x.type!=='literal').map(x=>[x.type,x.value]));
   return {day:parts.year+'-'+parts.month+'-'+parts.day,minute:Number(parts.hour)*60+Number(parts.minute)};
 }
 function dayOffset(day,offset) {

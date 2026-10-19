@@ -217,15 +217,15 @@ function renderCreatorKit(target,challenge,status) {
   target.querySelector('[data-copy-creator-short]').onclick=()=>copy(shortCopy,status);
 }
 
-export async function renderCampaignLinks(root,publishRequest,draftRequest) {
+export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode=null}={}) {
   root.innerHTML=`<section class="campaign-link-builder">
-    <h1>Campaign Links / Creator Challenges</h1>
-    <div class="campaign-mode-tabs" role="tablist" aria-label="Creation mode">
+    <h1>${mode==='creator'?'Creator Challenges':mode==='campaign'?'Campaign Links':'Campaign Links / Creator Challenges'}</h1>
+    <div class="campaign-mode-tabs" role="tablist" aria-label="Creation mode" ${mode?'hidden':''}>
       <button type="button" class="secondary" data-mode="campaign" role="tab" aria-selected="true">Campaign Link</button>
       <button type="button" class="secondary" data-mode="creator" role="tab" aria-selected="false">Beat the Creator</button>
     </div>
 
-    <section data-panel="campaign">
+    <section data-panel="campaign" ${mode==='creator'?'hidden':''}>
       <p class="muted">Build a tracked campaign URL immediately, or add a slug when you also want a static vanity route.</p>
       <p class="note"><strong>One-click publish.</strong> The tracked URL works immediately. For a vanity URL, Publish opens a protected site PR, runs the required checks, merges it, and waits for the Pages route to go live.</p>
       <form id="campaign-link-form" class="campaign-form" novalidate>
@@ -260,7 +260,7 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest) {
       <ul id="existing-campaign-links" class="campaign-existing"></ul>
     </section>
 
-    <section data-panel="creator" hidden>
+    <section data-panel="creator" ${mode==='creator'?'':'hidden'}>
       <p class="muted">Promote one authentic completed Pack One run. The source session remains the gameplay authority; creator score, answers, and serving versions are never entered here.</p>
       <form id="creator-source-form" class="campaign-form">
         <fieldset class="creator-source-kind"><legend>Source run</legend>
