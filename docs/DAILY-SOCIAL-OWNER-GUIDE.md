@@ -10,6 +10,8 @@ Each Neon request carries the original Pacific date. A queued GitHub job skips i
 
 The new Neon trigger must be enabled **only after the guarded secure-auth production release** serves the matching code revision; a Git merge alone does not activate it. Keep the three legacy maintenance/Daily triggers enabled. To roll back only Daily social, disable `pack1-daily-social-dispatch` in Neon; the existing GitHub schedule and manual Run workflow continue working. Never print or move private webhook or PAT values into public issues.
 
+**Do not use GitHub Actions "Re-run jobs" to recover a Daily social post.** Re-running an old workflow uses the original checkout, which can contain outdated Discord copy or URLs. A current live publisher refuses job attempts greater than one and checks its checkout SHA against current `main` before posting. Recover by starting a **new** live `workflow_dispatch` on current `main` (after verifying today's Daily and existing receipts), or rely on the independent Neon dispatch. The freshness check cannot retroactively change or block historical runs created before this guard was added. The displayed Discord link remains `https://packone.pro/go/discord/`; it intentionally redirects to the tracked Draft Run Daily URL.
+
 ## Configure destinations privately
 
 In GitHub **Settings → Secrets and variables → Actions**, configure the destinations you want:
