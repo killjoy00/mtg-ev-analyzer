@@ -55,8 +55,8 @@ jobs:
         run: |
           npm ci --ignore-scripts --no-audit --no-fund
           npm ci --prefix mobile --ignore-scripts --no-audit --no-fund
-      - name: Exercise consent, schedule and provider contracts
-        run: node --test tests/daily-reminder-schedule.test.mjs tests/daily-reminders.test.mjs
+      - name: Exercise consent, schedule, provider and protected release contracts
+        run: node --test tests/daily-reminder-schedule.test.mjs tests/daily-reminders.test.mjs tests/daily-reminder-release-controls.test.mjs
       - name: Apply real migrations to an isolated PostgreSQL database
         run: node scripts/prepare-test-database.mjs
       - name: Require actual PostgreSQL reminder and concurrency contracts
