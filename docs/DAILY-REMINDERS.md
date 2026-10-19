@@ -3,15 +3,28 @@
 Tracks issue #1151 and PR #1247. This document describes the implementation and
 release checks; it is not a production-deployment or delivery receipt.
 
-**Independent release integration is published for review, not deployed.**
-The initial secure-auth workflow edit was rejected by an upload safety check
-(the exact rejection reason was not recovered). Following explicit owner
-authorization, PR #1247 now includes an updated
-`.github/workflows/secure-auth-release.yml` with separate protected channel
-approvals. It must pass new-head CI, review, and the normal protected release
-before becoming live. Source/schema release remains dormant by default;
-provider configuration, scheduler activation, and real receipt are separate
-gates. Do not bypass the protected process or deploy directly.
+**Source/schema and gateway are deployed, with delivery still default-off.**
+Reviewed PRs #1247 and #1250 merged on October 19, 2026. The protected
+secure-auth release succeeded on commit
+`11df2732f5837532097374c8a71635aa4a7a4305`, including development
+and production migration 0061, exact-revision functions and gateway checks.
+The full native simulator acceptance/screenshot workflow passed, but this is
+not physical-device receipt evidence.
+
+A dedicated Resend webhook now exists for
+`https://api.packone.pro/growth/v1/reminders/provider-event`, subscribed to
+the four supported email events. **It is disabled** pending secure signing
+secret provisioning and deployment. The existing unrelated account webhook
+is unchanged. This branch includes a narrowly scoped guard that drops
+unrelated account-wide email events before writing reminder metadata.
+
+At the time of this update, production has **zero** opted-in reminder
+settings, registered devices, deliveries or provider events, and the
+dedicated scheduler trigger does not exist. Do not treat a code deployment,
+simulator screenshot, or signed provider event fixture as real delivery.
+Do not enable either channel or the scheduler before its matching credentials,
+independent approval and opted-in test-account receipt evidence are available.
+No native store submission or track change is included.
 
 ## Consent and scheduling
 
@@ -163,6 +176,28 @@ Existing Apple sign-in and secure-auth prerequisites remain intact.
 
 Health exposes independent active/readiness fields. A stored opt-in or an active
 flag does not prove the provider endpoint, trigger, or delivery works.
+
+## Remaining private provisioning and acceptance
+
+1. Privately provision the new dedicated webhook's Resend signing secret as
+   `PACK1_REMINDER_RESEND_WEBHOOK_SECRET` in the protected GitHub release
+   environment. Never copy the `whsec_` value to a public issue, PR,
+   repository, build artifact or chat response. Provision a dedicated sender
+   key separately if needed; preserve unrelated recovery/deletion email keys.
+2. Review and merge the provider-event isolation fix in PR #1251. Reapply
+   the protected source release with email approved only after the webhook
+   credential is verified and an explicitly opted-in, verified test account
+   is ready. Independently verify the production readiness flags.
+3. Enable the dedicated Resend webhook only after the exact configured
+   release reports ready. Confirm an actual test email arrives, and that
+   delivery events reconcile, an old email's unsubscribe succeeds and
+   later ticks do not send again. Non-opted-in accounts must remain untouched.
+4. Enable the Neon reminder trigger only through the existing protected
+   manual scheduler workflow for the verified deployed revision. Its normal
+   five-minute cadence and resource limits are documented above.
+5. Push requires separate protected credentials, channel approval and
+   authorized signed physical-device testing. Do not upload mobile builds,
+   change tracks/testers or restart pending testing clocks without approval.
 
 ## Protected release and acceptance
 

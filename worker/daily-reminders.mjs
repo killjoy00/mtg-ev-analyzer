@@ -377,6 +377,17 @@ async function providerEvent(request,query,env) {
   const recipients=event?.data?.to;
   if(recipients!==undefined&&(!Array.isArray(recipients)||recipients.length!==1||typeof recipients[0]!=='string'||recipients[0].length>320))
     throw apiError('Invalid reminder event destination.');
+  // Validate the entire event shape before making *any* database query. This
+  // preserves the malformed-destination rejection even when an unrelated
+  // provider event is correctly ignored.
+  // Provider webhooks are account-wide: unrelated verification, recovery and
+  // account-deletion messages must not be retained as reminder event records.
+  // Our reminder sender always tags its email with the immutable delivery ID.
+  // For older untagged events, retain only a delivery we can already identify.
+  if(hinted===undefined) {
+    const known=await query("SELECT 1 FROM daily_reminder_deliveries WHERE channel='email' AND provider_id=$1::text LIMIT 1",[providerId]);
+    if(!known.rows.length)return {ok:true,ignored:true};
+  }
   const eventId=request.headers.get('svix-id'),digest=hash(raw);
   // Store only minimal provider metadata and an HMAC of the actual recipient.
   // Address and raw webhook payload never enter tables or public diagnostics.
