@@ -238,16 +238,19 @@ try {
     }};
     await tick(query,send);const d=await delivery(a);assert.equal(d.state,'delivered');assert.equal(d.provider_id,providerId);assert.ok(d.delivered_at);
   });
-  await test('an unmatched early tagged reminder event is retained and reconciled after provider persistence',async()=>{
+  await test('an early tagged reminder event reconciles before the provider response without a resend',async()=>{
     await isolate();const a=await account();await enable(a);await due(a);const providerId=randomUUID(),eventId='msg_'+randomBytes(12).toString('hex');
+    let sends=0;
     const send={fetcher:async(url,options)=>{
+      sends++;
       const payload=JSON.parse(options.body);
       await event('email.delivered',providerId,{id:eventId,hint:payload.tags[0].value,recipient:payload.to[0]});
-      assert.equal((await query('SELECT state FROM daily_reminder_provider_events WHERE event_id=$1',[eventId])).rows[0].state,'pending');
+      assert.equal((await query('SELECT state FROM daily_reminder_provider_events WHERE event_id=$1',[eventId])).rows[0].state,'applied');
       return Response.json({id:providerId});
     }};
-    await tick(query,send);assert.equal((await delivery(a)).state,'delivered');
-    assert.equal((await query('SELECT state FROM daily_reminder_provider_events WHERE event_id=$1',[eventId])).rows[0].state,'applied');
+    await tick(query,send);await tick(query,send);
+    const d=await delivery(a);
+    assert.equal(d.state,'delivered');assert.equal(d.provider_id,providerId);assert.equal(sends,1);
   });
   await test('account-wide webhook ignores unrelated and unknown untagged email without retention',async()=>{
     await isolate();const unrelated=randomUUID(),eventId='msg_'+randomBytes(12).toString('hex');
