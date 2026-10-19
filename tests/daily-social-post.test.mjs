@@ -100,6 +100,19 @@ test('Manual preview is offline, with no network access or GitHub receipt writes
   assert.equal(result.discord_servers,1);
 });
 
+test('Neon-dispatched live jobs reject a stale Pacific date and 6 AM early run',async()=>{
+  const env={...liveEnv,GITHUB_EVENT_NAME:'workflow_dispatch',MANUAL_LIVE:'true',
+    SOURCE_PACIFIC_DAY:'2026-10-19'};
+  const forbidden=()=>{throw Error('Stale dispatch touched provider network');};
+  const next=await postDaily({now:new Date('2026-10-20T14:12:00Z'),env,fetchImpl:forbidden});
+  assert.equal(next.skipped,true);
+  assert.equal(next.day,'2026-10-19');
+  const before=await postDaily({now:new Date('2026-10-19T12:55:00Z'),env,fetchImpl:forbidden});
+  assert.equal(before.skipped,true);
+  await assert.rejects(postDaily({now:new Date('2026-10-19T14:11:00Z'),
+    env:{...env,SOURCE_PACIFIC_DAY:'bad'},fetchImpl:forbidden}),/Invalid independently scheduled Daily date/);
+});
+
 test('Live posts reject unreviewed refs; preview remains available',async()=>{
   const forbidden=()=>{throw Error('Unexpected network access');};
   await assert.rejects(postDaily({now:summer,env:{
