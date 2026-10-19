@@ -245,6 +245,7 @@ export function bindMyPackOneTabs() {
       selectTab(choices[next],{focus:true});
     });
   });
+  if(new URL(window.location.href).searchParams.get('reminders')==='1')selectTab('account');
   if(activeTab==='insights')mountMyPackInsights(document.querySelector('#profile-insights-panel'));
   document.querySelector('#profile-edit')?.addEventListener('click',()=>selectTab('account',{focus:true}));
   document.querySelector('#profile-username-fix')?.addEventListener('click',()=>{

@@ -9,6 +9,8 @@ test('domain browser groups avoid unrelated suites',()=>{
   assert.ok(!practice.includes('tests/account-e2e.mjs'));
   const account=selectedBrowserTests({groups:['account']}).map(x=>x.file);
   assert.ok(account.includes('tests/account-deletion-e2e.mjs'));
+  assert.ok(account.includes('tests/daily-reminders-e2e.mjs'));
+  assert.ok(account.includes('tests/daily-reminder-settings-dom.mjs'));
   assert.ok(!account.includes('tests/practice-e2e.mjs'));
 });
 

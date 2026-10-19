@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { Linking, Platform, Settings, } from 'react-native';
 
 import { AppleSubscriptionSync } from '@/src/components/AppleSubscriptionSync';
+import { ReminderPushBridge } from '@/src/components/ReminderPushBridge';
 import { ScreenErrorBoundary } from '@/src/components/ScreenErrorBoundary';
 import { VersionGate } from '@/src/components/VersionGate';
 import { config } from '@/src/config';
@@ -65,6 +66,7 @@ export default function RootLayout() {
         <StatusBar style="dark" />
         <ScreenshotFixtureEntry />
         <AppleSubscriptionSync />
+        <ReminderPushBridge />
         <Stack
           unstable_screenErrorBoundary={ScreenErrorBoundary}
           screenOptions={{
@@ -92,6 +94,7 @@ export default function RootLayout() {
           <Stack.Screen name="insights" options={{ title: 'My Pack One' }} />
           <Stack.Screen name="account" options={{ title: 'Account settings' }} />
           <Stack.Screen name="account-profile" options={{ title: 'Profile & visibility' }} />
+          <Stack.Screen name="account-reminders" options={{ title: 'Daily reminders' }} />
           <Stack.Screen name="about" options={{ title: 'About' }} />
           <Stack.Screen name="support" options={{ title: 'Support & contact' }} />
           <Stack.Screen name="privacy" options={{ title: 'Privacy' }} />

@@ -21,7 +21,6 @@ FORBIDDEN_PERMISSIONS = {
     "android.permission.READ_MEDIA_AUDIO",
     "android.permission.READ_EXTERNAL_STORAGE",
     "android.permission.WRITE_EXTERNAL_STORAGE",
-    "android.permission.POST_NOTIFICATIONS",
     "android.permission.READ_PHONE_STATE",
     "android.permission.CALL_PHONE",
     "android.permission.READ_CALL_LOG",
@@ -37,6 +36,28 @@ FORBIDDEN_PERMISSIONS = {
     "android.permission.USE_BIOMETRIC",
     "android.permission.USE_FINGERPRINT",
 }
+
+# #1151 explicitly adds optional push. The permission is allowed only alongside
+# the expected non-exported Expo components; every other sensitive permission
+# stays forbidden. This is not a general permission allowlist relaxation.
+NOTIFICATION_COMPONENTS = {
+    ("activity", "expo.modules.notifications.service.NotificationForwarderActivity"),
+    ("receiver", "expo.modules.notifications.service.NotificationsService"),
+    ("service", "expo.modules.notifications.service.ExpoFirebaseMessagingService"),
+}
+
+def notification_failures(permissions, components):
+    if "android.permission.POST_NOTIFICATIONS" not in permissions:
+        return []
+    failures = []
+    actual = {(item["type"], item["name"]): item for item in components}
+    for identity in sorted(NOTIFICATION_COMPONENTS):
+        if identity not in actual or actual[identity]["exported"] != "false":
+            failures.append("notification component must exist and remain non-exported: " + identity[1])
+    receiver = actual.get(("receiver", "com.google.firebase.iid.FirebaseInstanceIdReceiver"))
+    if receiver and receiver["permission"] != "com.google.android.c2dm.permission.SEND":
+        failures.append("Firebase push receiver must require the system sender permission")
+    return failures
 
 def attr(node, name):
     return node.attrib.get(ANDROID + name)
@@ -90,6 +111,7 @@ def main():
 
     forbidden = sorted(set(permissions) & FORBIDDEN_PERMISSIONS)
     cleartext = attr(application, "usesCleartextTraffic") if application is not None else None
+    notification_errors = notification_failures(permissions, components)
     report = {
         "manifest": str(manifest_path),
         "package": root.attrib.get("package"),
@@ -97,6 +119,7 @@ def main():
         "forbidden_permissions_present": forbidden,
         "uses_cleartext_traffic": cleartext,
         "features": features,
+        "notification_component_errors": notification_errors,
         "components": sorted(components, key=lambda item: (item["type"], item["name"] or "")),
     }
     Path(args.output).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
@@ -104,6 +127,9 @@ def main():
 
     if forbidden:
         print("Forbidden/unexpected Pack One permissions are present: " + ", ".join(forbidden), file=sys.stderr)
+        return 1
+    if notification_errors:
+        print("; ".join(notification_errors), file=sys.stderr)
         return 1
     if cleartext == "true":
         print("Pack One release manifest unexpectedly enables cleartext traffic.", file=sys.stderr)

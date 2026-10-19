@@ -483,6 +483,13 @@ export default function AccountScreen() {
                 </View>
                 <Text style={styles.rowArrow}>›</Text>
               </Pressable>
+              <Pressable accessibilityRole="button" onPress={() => router.push('/account-reminders')} style={styles.row}>
+                <View style={styles.rowCopy}>
+                  <Text style={styles.rowTitle}>Daily reminders</Text>
+                  <Text style={styles.fieldHelp}>Email and push consent, local time and weekdays</Text>
+                </View>
+                <Text style={styles.rowArrow}>›</Text>
+              </Pressable>
               <Pressable accessibilityRole="button" onPress={() => router.push('/membership')} style={styles.row}>
                 <View style={styles.rowCopy}>
                   <Text style={styles.rowTitle}>Membership</Text>

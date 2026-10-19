@@ -16,7 +16,14 @@
           "faceIDPermission": false
         }
       ],
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "expo-notifications",
+        {
+          "color": "#1E4D7A",
+          "defaultChannel": "daily-reminders"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

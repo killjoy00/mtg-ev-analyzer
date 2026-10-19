@@ -23,7 +23,7 @@ export const BROWSER_GROUPS={
   account:[
     spec('tests/account-e2e.mjs'),spec('tests/auth-context-e2e.mjs'),spec('tests/email-verification-e2e.mjs'),
     spec('tests/patreon-activation-e2e.mjs'),spec('tests/password-recovery-e2e.mjs'),spec('tests/credential-management-e2e.mjs'),
-    spec('tests/account-deletion-e2e.mjs'),
+    spec('tests/account-deletion-e2e.mjs'),spec('tests/daily-reminders-e2e.mjs'),spec('tests/daily-reminder-settings-dom.mjs'),
   ],
   ads:[spec('tests/ads-e2e.mjs')],
   admin:[spec('tests/admin-e2e.mjs'),spec('tests/corpus-readiness-e2e.mjs'),spec('tests/admin-invitations-e2e.mjs')],

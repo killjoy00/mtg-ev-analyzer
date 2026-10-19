@@ -1,4 +1,5 @@
 import {createHmac} from 'node:crypto';
+import {reminderRoute,revokeReminderSessionDevices,reminderReadiness} from './daily-reminders.mjs';
 import {retryRolledBackQuery} from './database-retry.mjs';
 import {releaseMetadata} from './release.mjs';
 import {guardIngress} from './ingress-auth.mjs';
@@ -1649,8 +1650,11 @@ async function handleMobileMyHistory(request) {
 }
 
 async function handleMobileSignout(request) {
-  const {auth}=await mobileAccountIdentity(request);
-  await revokeAccountSession(query,auth);
+  // Logout authenticates the account session itself. A stale game-player token
+  // must not prevent its owner from revoking notification routing and signing out.
+  const auth=await authSession(request,{required:false,allowLegacy:false,csrf:false});
+  if(auth&&auth.source!=='mobile')throw Object.assign(Error('Native account session required.'),{status:401});
+  if(auth){await revokeReminderSessionDevices(query,auth);await revokeAccountSession(query,auth);}
   return json({ok:true});
 }
 
@@ -1923,7 +1927,7 @@ async function handleAccountDelete(request,{mobile=false}={}) {
       authUserId:auth.user_id,purpose:'account_delete_verify',
       limit:DELETE_VERIFY_LIMIT,seconds:DELETE_LIMIT_SECONDS,
     });
-    if(verifyLimit.limited)return credentialThrottle('Too many verification attempts. Please try again later.',verifyLimit);
+    if(verifyLimit.limited)return credentialThrottle('Too many deletion attempts. Please try again later.',verifyLimit);
     const network=trustedCredentialNetwork(request);
     const networkLimit=await consumeCredentialLimit(query,{
       authUserId:auth.user_id,purpose:'account_delete_network',networkHash:network,
@@ -2186,7 +2190,7 @@ async function handleSignout(request) {
   // the session behind them is already expired or revoked. A live session is
   // still CSRF-checked, so this stays a deliberate first-party request.
   const auth = await authSession(request,{required:false});
-  if(auth)await revokeAccountSession(query,auth);
+  if(auth){await revokeReminderSessionDevices(query,auth);await revokeAccountSession(query,auth);}
   return clearPlayerCookie(clearAccountCookies(json({ ok: true })));
 }
 
@@ -2453,9 +2457,11 @@ async function handleProfileLookup(request) {
 async function route(request) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(request) });
   const url = new URL(request.url);
-  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, profiles: true, account_deletion_enabled:deletionEnabled(), verification_sweep_enabled:verificationSweepEnabled(), deletion_email_configured:deletionEmailConfigured(), launch_watcher_recovery_configured:launchWatcherRecoveryConfigured(), campaign_link_publish_configured:campaignLinkPublishConfigured(), apple_sign_in_configured:appleConfigured() });
+  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, profiles: true, account_deletion_enabled:deletionEnabled(), verification_sweep_enabled:verificationSweepEnabled(), deletion_email_configured:deletionEmailConfigured(), launch_watcher_recovery_configured:launchWatcherRecoveryConfigured(), campaign_link_publish_configured:campaignLinkPublishConfigured(), apple_sign_in_configured:appleConfigured(), reminder_delivery_active:reminderReadiness().emailActive||reminderReadiness().pushActive, reminder_delivery_ready:reminderReadiness().emailReady, reminder_email_active:reminderReadiness().emailActive, reminder_push_active:reminderReadiness().pushActive, reminder_push_ready:reminderReadiness().pushReady });
   if (url.pathname === '/internal/account-deletion-maintenance') return handleDeletionMaintenance(request);
   if (url.pathname === '/internal/account-deletion-maintenance-status') return handleDeletionMaintenanceStatus(request);
+  if (url.pathname === '/internal/daily-reminders' || url.pathname === '/v1/reminders/unsubscribe' || url.pathname === '/v1/reminders/provider-event' || /^\/v1\/(?:mobile\/)?account\/reminders(?:\/devices)?$/.test(url.pathname))
+    return reminderRoute(request,{query,json,readJson,authBrowser:(r)=>authSession(r,{required:true,allowLegacy:false,csrf:false}),authMutation:accountMutationAuth,authMobile:mobileAccountIdentity,trigger:verifyNeonScheduleTrigger,pacificDay:gameDateKey()});
   if (request.method === 'GET' && url.pathname === '/v1/account/google/callback') return handleGoogleCallback(request);
   if (request.method === 'GET' && url.pathname === '/v1/mobile/account/google/callback') return handleMobileGoogleCallback(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/apple/callback') return handleAppleCallback(request);
@@ -2552,11 +2558,17 @@ async function route(request) {
 
 export default {
   async fetch(request) {
-    const internalMaintenance=new Set(['/internal/account-deletion-maintenance','/internal/account-deletion-maintenance-status']).has(new URL(request.url).pathname);
+    const internalMaintenance=new Set(['/internal/account-deletion-maintenance','/internal/account-deletion-maintenance-status','/internal/daily-reminders']).has(new URL(request.url).pathname);
     if(!internalMaintenance){const denied=guardIngress(request);if(denied)return denied;}
     try {
       return withCors(await route(request), request);
     } catch (error) {
+      if(new URL(request.url).pathname.includes('reminders')) {
+        const status=error?.reminderSafe?Number(error.status||400):[401,403].includes(Number(error?.status))?Number(error.status):503;
+        console.error(JSON.stringify({event:'reminder_request_rejected',status,code:error?.reminderSafe?String(error.code||'REMINDER_REQUEST'):'REMINDER_UNAVAILABLE'}));
+        return withCors(json({error:error?.reminderSafe?error.message:status===401?'Sign in to manage reminders.':status===403?'Account request could not be verified.':'Reminder settings are temporarily unavailable.',
+          ...(error?.reminderSafe&&error.code?{code:error.code}:{})},status),request);
+      }
       // Expected guest- and account-session 401s become one structured line
       // naming why, instead of an untyped stack trace per request (#803).
       if(error?.status===401&&error?.playerSessionReason)console.log(JSON.stringify(playerSessionRejection(request,error.playerSessionReason)));

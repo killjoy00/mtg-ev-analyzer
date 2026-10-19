@@ -68,6 +68,10 @@ function permitted(service,path,method,search,mode) {
   if(service==='growth'&&(nativePatreonAction(path,method)||appleSubscriptionAction(path,method)))return true;
   if(method==='GET'&&path==='/health')return search==='?quick=1';
   if(service==='growth') {
+    if((path==='/v1/account/reminders'||path==='/v1/mobile/account/reminders')&&['GET','PATCH'].includes(method))return true;
+    if(path==='/v1/mobile/account/reminders/devices'&&['POST','DELETE'].includes(method))return true;
+    if(path==='/v1/reminders/unsubscribe'&&['GET','POST'].includes(method))return true;
+    if(path==='/v1/reminders/provider-event'&&method==='POST')return true;
     if(adminGrowthPath(path,method,mode))return true;
     if(mode==='production'&&method==='POST'&&path==='/v1/admin/campaign-links/publish')return true;
     if(method==='POST'&&[
@@ -164,6 +168,8 @@ function validMobileAccount(value) {
 function mobileSessionRoute(service,path,method) {
   if(service==='growth'&&(nativePatreonAction(path,method)||nativeAppleSubscriptionAction(path,method)))return true;
   if(service==='growth') {
+    if((path==='/v1/mobile/account/reminders'&&['GET','PATCH'].includes(method))||
+      (path==='/v1/mobile/account/reminders/devices'&&['POST','DELETE'].includes(method)))return true;
     if(method==='POST'&&[
       '/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/link','/v1/mobile/account/apple/start',
       '/v1/mobile/account/apple/finish','/v1/mobile/account/apple/native','/v1/mobile/account/google/start',
@@ -188,6 +194,8 @@ function mobileSessionRoute(service,path,method) {
 function mobileAccountRoute(service,path,method) {
   if(service==='growth'&&(nativePatreonAction(path,method)||nativeAppleSubscriptionAction(path,method)))return true;
   if(service==='growth') {
+    if((path==='/v1/mobile/account/reminders'&&['GET','PATCH'].includes(method))||
+      (path==='/v1/mobile/account/reminders/devices'&&['POST','DELETE'].includes(method)))return true;
     if(method==='POST'&&['/v1/mobile/account/link','/v1/mobile/account/signout','/v1/mobile/account/password-change','/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete/apple/start','/v1/mobile/account/delete/apple/finish','/v1/mobile/account/delete'].includes(path))return true;
     if(method==='PATCH'&&path==='/v1/mobile/profile')return true;
     if(method==='POST'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}\/(report|block)$/.test(path))return true;
@@ -357,7 +365,7 @@ export async function gateway(request,env,fetcher=fetch) {
       return finish(response(503,'Gateway not configured.'));
     if(url.protocol!=='https:'||url.hostname!==expectedHost)return finish(response(404,'Not found.'));
     const appleCallbackOrigin=request.method==='POST'&&url.pathname==='/growth/v1/account/apple/callback'&&origin==='https://appleid.apple.com';
-    if(origin&&!ORIGINS.has(origin)&&!appleCallbackOrigin)return finish(response(403,'Origin not allowed.'));
+    if(origin&&!ORIGINS.has(origin)&&!appleCallbackOrigin&&!(request.method==='POST'&&url.pathname==='/growth/v1/reminders/unsubscribe'&&origin==='https://'+expectedHost))return finish(response(403,'Origin not allowed.'));
     const match=url.pathname.match(/^\/(legacy|growth|draft)(\/.*)$/);
     const method=request.method==='OPTIONS'?request.headers.get('access-control-request-method'):request.method;
     if(!match||!permitted(match[1],match[2],method,url.search,mode))return finish(response(404,'Not found.'));
@@ -433,15 +441,25 @@ export async function gateway(request,env,fetcher=fetch) {
       headers.set('x-pack1-player-session',request.headers.get('x-pack1-player-session'));
 
     let body;
+    const reminderProviderEvent=method==='POST'&&match[1]==='growth'&&match[2]==='/v1/reminders/provider-event';
+    const reminderUnsubscribe=method==='POST'&&match[1]==='growth'&&match[2]==='/v1/reminders/unsubscribe';
+    if(reminderProviderEvent) {
+      body=await request.text();
+      if(body.length>32768)throw Object.assign(Error('Payload too large.'),{status:413});
+      for(const name of ['svix-id','svix-timestamp','svix-signature'])if(request.headers.has(name))headers.set(name,request.headers.get(name));
+      headers.set('content-type','application/json');
+    }
     const appleCallback=method==='POST'&&match[1]==='growth'&&match[2]==='/v1/account/apple/callback';
-    if(appleCallback) {
+    if(reminderProviderEvent||reminderUnsubscribe) {
+      // Webhook signature requires unmodified bytes; one-click POST has no JSON body.
+    } else if(appleCallback) {
       const contentType=String(request.headers.get('content-type')||'').toLowerCase();
       if(!contentType.includes('application/x-www-form-urlencoded'))
         throw Object.assign(Error('Apple callback is invalid.'),{status:415});
       body=await request.text();
       if(body.length>20000)throw Object.assign(Error('Apple callback is invalid.'),{status:413});
       headers.set('content-type','application/x-www-form-urlencoded');
-    } else if(['POST','PATCH'].includes(method)) {
+    } else if(['POST','PATCH'].includes(method)||(method==='DELETE'&&match[1]==='growth'&&match[2]==='/v1/mobile/account/reminders/devices')) {
       body=JSON.stringify(await readJson(request));
       headers.set('content-type','application/json');
     }
@@ -464,7 +482,7 @@ export async function gateway(request,env,fetcher=fetch) {
     }
 
     const publicHeaders=new Headers();
-    for(const name of ['content-type','retry-after'])if(result.headers.has(name))publicHeaders.set(name,result.headers.get(name));
+    for(const name of ['content-type','retry-after','referrer-policy','content-security-policy'])if(result.headers.has(name))publicHeaders.set(name,result.headers.get(name));
     if(preview&&match[1]==='draft'&&method==='POST') {
       const timingHeader=match[2]==='/v1/runs'?'x-pack1-start-timing':
         /^\/v1\/runs\/[a-f0-9-]+\/reroll$/.test(match[2])?'x-pack1-reroll-timing':

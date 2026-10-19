@@ -584,10 +584,24 @@ if platform == 'android':
         tap('Account settings', exact=True)
         tap('Sign out', exact=True)
         xml, _ = snapshot('signed-out-settings')
-        require('Sign in to Pack One' in xml and 'PackOneReviewer' not in xml, 'Sign-out retained private account details')
+        # Verify the actual signed-out form and confirmation, rather than an
+        # obsolete page heading. Keep the privacy assertion independent so a
+        # visible sign-in form cannot mask retained account A details.
+        root = ET.fromstring(xml)
+        require(
+            all(any(node.get('class') == 'android.widget.EditText'
+                        and node.get('content-desc') == label for node in root.iter())
+                for label in ('Email', 'Password'))
+            and any(node.get('content-desc') == 'Sign in with email' for node in root.iter())
+            and any(node.get('text') == 'Signed out.' for node in root.iter()),
+            'Sign-out did not show a completed signed-out email sign-in form')
+        require('PackOneReviewer' not in xml and 'reviewer@packone.example' not in xml,
+                'Sign-out retained account A identity')
         sign_in('second@packone.example')
         xml, _ = snapshot('account-b-career')
-        require('SecondReviewer' in xml and 'PackOneReviewer' not in xml, 'Account B retained account A profile')
+        require('SecondReviewer' in xml, 'Account B profile did not load')
+        require('PackOneReviewer' not in xml and 'reviewer@packone.example' not in xml,
+                'Account B retained account A identity')
     attempt('sign-out-and-account-switch', account_switch)
 
 elif platform == 'ios':

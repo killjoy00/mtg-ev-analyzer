@@ -293,6 +293,14 @@ export async function authRequest(path,{method='GET',body}={}) {
   return data;
 }
 
+export async function loadDailyReminders() {
+  await ensureMigrations();
+  return api('/v1/account/reminders',{auth:false});
+}
+export async function saveDailyReminders(settings) {
+  await ensureMigrations();
+  return api('/v1/account/reminders',{method:'PATCH',body:settings,auth:false});
+}
 export async function getAuthSession() {
   if(firstPartyAuthEnabled()) {
     try {
