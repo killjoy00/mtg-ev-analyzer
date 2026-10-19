@@ -43,14 +43,14 @@ export async function dispatchDailySocialFromNeon({
         'x-github-api-version':'2022-11-28',
         'user-agent':'pack1-daily-social-scheduler',
       },
-      body:JSON.stringify({ref:'main',inputs:{live:true,source_day:eligible.day}}),
+      body:JSON.stringify({ref:'main',inputs:{live:'true',source_day:eligible.day}}),
       redirect:'error',
       signal:AbortSignal.timeout(15000),
     });
   } catch {
     throw Error('Daily social workflow dispatch request failed');
   }
-  if(response.status!==204)
+  if(![200,204].includes(response.status))
     throw Error('Daily social workflow dispatch rejected (HTTP '+Number(response.status||0)+')');
   return {action:'dispatched',day:eligible.day};
 }
