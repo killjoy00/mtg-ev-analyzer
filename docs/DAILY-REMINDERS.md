@@ -3,12 +3,15 @@
 Tracks issue #1151 and PR #1247. This document describes the implementation and
 release checks; it is not a production-deployment or delivery receipt.
 
-**Release integration is pending.** The independent operational controls below
-are the proposed release contract, not an activated deployment. An upload safety
-check blocked the corresponding secure-auth workflow edit. The existing
-`.github/workflows/secure-auth-release.yml` has been retained; an authorized
-owner must review and apply that integration through the protected process
-before email activation. Do not work around this gate or deploy directly.
+**Independent release integration is published for review, not deployed.**
+The initial secure-auth workflow edit was rejected by an upload safety check
+(the exact rejection reason was not recovered). Following explicit owner
+authorization, PR #1247 now includes an updated
+`.github/workflows/secure-auth-release.yml` with separate protected channel
+approvals. It must pass new-head CI, review, and the normal protected release
+before becoming live. Source/schema release remains dormant by default;
+provider configuration, scheduler activation, and real receipt are separate
+gates. Do not bypass the protected process or deploy directly.
 
 ## Consent and scheduling
 
@@ -134,7 +137,7 @@ a public issue or workflow artifact.
 
 ## Independent activation
 
-The proposed protected secure-account release integration uses separate controls:
+The owner-authorized secure-account release integration in PR #1247 uses separate controls. These approvals default off and apply only to the protected secure-auth release job:
 
 | Control | Purpose |
 | --- | --- |
@@ -146,12 +149,17 @@ The proposed protected secure-account release integration uses separate controls
 | `PACK1_REMINDER_TOKEN_KEY` | Push-token encryption key, required only for push |
 | `PACK1_EXPO_PUSH_ACCESS_TOKEN` | Push-service authorization when enabled on the Expo project |
 
-Once reviewed and applied, the release sets `PACK1_REMINDER_EMAIL_ENABLED` and
-`PACK1_REMINDER_PUSH_ENABLED` independently in the function environment.
-The old shared delivery flag does not activate either channel. Email can be
-released with push disabled and without a push-token encryption key. Existing
-Apple sign-in and other secure-auth release prerequisites remain intact; this
-feature does not weaken those unrelated protections.
+Once reviewed and applied, the protected release sets
+`PACK1_REMINDER_EMAIL_ENABLED` and `PACK1_REMINDER_PUSH_ENABLED` explicitly
+and independently in development and production. A missing approval sets the
+corresponding flag to `0`; `1` is accepted only after its own credential
+validation. An email approval requires a valid sender key (a dedicated key
+or the existing deletion-sender fallback) and a dedicated provider-event
+verification secret, but does not require a push-token encryption key. Push
+approval requires the 64-hex-character token-encryption key without requiring
+email credentials. The old shared delivery flag has no effect. The scheduler
+remains independently protected and disabled until its explicit release.
+Existing Apple sign-in and secure-auth prerequisites remain intact.
 
 Health exposes independent active/readiness fields. A stored opt-in or an active
 flag does not prove the provider endpoint, trigger, or delivery works.
