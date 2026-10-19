@@ -96,8 +96,11 @@ out-of-order events preserve stable timestamps and adverse-event precedence.
 Unmatched authenticated events can be reconciled later; a deleted account or
 delivery must not be recreated by a delayed tagged event.
 
-Email contains the homepage play URL, a My Pack One management link, and a signed
-unsubscribe URL with one-click headers. GET shows a confirmation page without
+Email is branded HTML (same layout and P¹ mark as the account emails) with a plain-text
+part. It contains the homepage play URL, a My Pack One management link, and a signed
+unsubscribe URL with one-click headers. The unsubscribe token is 38 characters: the
+account's unsubscribe nonce plus a 96-bit HMAC; the account is looked up from the
+nonce. Longer links in emails sent before October 20, 2026 stay valid. GET shows a confirmation page without
 mutating consent; POST disables only email. Ordinary settings or push edits do
 not rotate the capability, and repeat POSTs are harmless. Preserve the existing
 signing secret during routine deployments. A separate security-key rotation

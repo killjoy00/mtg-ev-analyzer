@@ -124,6 +124,18 @@ test('one batch request carries homepage, unsubscribe headers, stable key and pr
   assert.equal(f.state(),'accepted');assert.ok(!f.calls.some(c=>c.sql.includes("SET state='delivered'")));
   assert.ok(!/push|notification/i.test(body.subject+body.text));
 });
+test('email is branded HTML with readable links and spaced plain text',async()=>{
+  const f=deliveryFixture();await f.run();const body=JSON.parse(f.fetches[0].options.body)[0];
+  const unsubscribe=body.headers['List-Unsubscribe'].slice(1,-1);
+  assert.match(unsubscribe,/^https:\/\/api\.packone\.pro\/growth\/v1\/reminders\/unsubscribe\?token=[A-Za-z0-9_-]{38}$/);
+  assert.ok(body.text.includes('all three Dailies.\n\nManage reminders: https://packone.pro/?account=reminders\n\nUnsubscribe: '+unsubscribe));
+  assert.match(body.html,/P<sup[^>]*>1<\/sup><\/td><td[^>]*>Pack One<\/td>/);
+  assert.ok(body.html.includes('href="https://packone.pro/"'));
+  assert.ok(body.html.includes('href="'+unsubscribe+'"')&&body.html.includes('>Unsubscribe</a>'));
+  assert.ok(body.html.includes('>Manage reminders</a>'));
+  assert.ok(!body.html.includes(unsubscribe+'</a>'),'the unsubscribe URL is never shown as link text');
+  assert.ok(!/push|notification|<script|<img/i.test(body.html));
+});
 test('admission is decided in SQL for today’s Pacific Daily with the current address fingerprint',async()=>{
   const f=deliveryFixture();await f.run();
   const admit=f.calls.find(c=>c.sql.includes('pack1_reminder_admit_daily_email'));
@@ -174,9 +186,27 @@ test('unsubscribe GET has no mutation; repeated signed POST uses the stable capa
   const args={query:q.query,json:Response.json,env};
   const get=await reminderRoute(new Request(link),args);assert.equal(get.status,200);assert.equal(q.calls.length,0);
   assert.equal(get.headers.get('referrer-policy'),'no-referrer');
-  for(let count=0;count<2;count++)assert.equal((await reminderRoute(new Request(link,{method:'POST'}),args)).status,200);
-  assert.ok(q.calls.every(call=>call.sql.includes('pack1_reminder_unsubscribe')&&call.args[0]===user&&call.args[1]===installation));
-  await assert.rejects(reminderRoute(new Request(link.replace('token=','token=bad'),{method:'POST'}),args),e=>e.status===400);
+  const owner=recorder(sql=>sql.includes('unsubscribe_nonce=$1')?{rows:[{auth_user_id:user}]}:{rows:[]});
+  const post={...args,query:owner.query};
+  for(let count=0;count<2;count++)assert.equal((await reminderRoute(new Request(link,{method:'POST'}),post)).status,200);
+  const writes=owner.calls.filter(call=>call.sql.includes('pack1_reminder_unsubscribe'));
+  assert.equal(writes.length,2);assert.ok(writes.every(call=>call.args[0]===user&&call.args[1]===installation));
+  assert.ok(owner.calls.filter(call=>!call.sql.includes('pack1_reminder_unsubscribe')).every(call=>call.args[0]===installation));
+  await assert.rejects(reminderRoute(new Request(link.replace('token=','token=bad'),{method:'POST'}),post),e=>e.status===400);
+  const token=new URL(link).searchParams.get('token'),tampered=token.slice(0,-1)+(token.endsWith('A')?'B':'A');
+  await assert.rejects(reminderRoute(new Request(link.replace(token,tampered),{method:'POST'}),post),e=>e.status===400);
+  // A deleted account has no settings row: still a harmless success, with no write.
+  const gone=recorder();assert.equal((await reminderRoute(new Request(link,{method:'POST'}),{...args,query:gone.query})).status,200);
+  assert.ok(!gone.calls.some(call=>call.sql.includes('pack1_reminder_unsubscribe')));
+});
+test('links in emails sent before short tokens still unsubscribe',async()=>{
+  const payload=user+'.'+installation;
+  const legacy=Buffer.from(payload).toString('base64url')+'.'+createHmac('sha256',env.PACK1_RATE_LIMIT_SECRET).update('pack1-daily-unsubscribe:'+payload).digest('base64url');
+  const q=recorder();
+  const response=await reminderRoute(new Request('https://api.test/v1/reminders/unsubscribe?token='+legacy,{method:'POST'}),{query:q.query,json:Response.json,env});
+  assert.equal(response.status,200);
+  assert.deepEqual(q.calls.map(call=>call.args),[[user,installation]]);
+  await assert.rejects(reminderRoute(new Request('https://api.test/v1/reminders/unsubscribe?token='+legacy.slice(0,-2)+'xx',{method:'POST'}),{query:q.query,json:Response.json,env}),e=>e.status===400);
 });
 function signed(raw,changes={}) {
   const id='msg_test',timestamp=String(Math.floor(Date.now()/1000));
