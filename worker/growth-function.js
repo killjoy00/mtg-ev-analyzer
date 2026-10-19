@@ -18,6 +18,7 @@ import {consumeDeletionVerification,createDeletionVerification,deletionEmailConf
 import {beginDeletion,cleanupPackOne,deletedPlayerTombstone,deletionEnabled,deletionRecoveryKey,finishProviderPhase,loadDeletionOperation,maintenanceBatch,markProviderUserEmailVerified,removeProviderUser,stuckDeletion,sweepExpiredVerification,verificationSweepEnabled} from './account-deletion.mjs';
 import {verifyDeletionMaintenanceToken} from './account-deletion-auth.mjs';
 import {neonTriggerInvocationHeader,verifyNeonScheduleTrigger} from './neon-trigger.mjs';
+import {DAILY_SOCIAL_TRIGGER_NAME,dispatchDailySocialFromNeon} from './daily-social-dispatch.mjs';
 import {inspectLaunchCoverageFreshness} from './launch-watcher-stale.mjs';
 import {reconcileLaunchWatcherAlert} from './launch-watcher-alert.mjs';
 import {launchWatcherRecoveryConfigured,reconcileLaunchWatcherCadence,reconcileLaunchWatcherDispatch} from './launch-watcher-dispatch.mjs';
@@ -42,6 +43,7 @@ const MOBILE_GOOGLE_RETURN='packone://account';
 const PROFILE_KEY_RE = /^[a-f0-9]{16}$/;
 const DAILY_RUN_ID_RE = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const DELETION_TRIGGER_NAMES=new Set(['pack1-account-deletion-maintenance']);
+const SOCIAL_TRIGGER_NAMES=new Set([DAILY_SOCIAL_TRIGGER_NAME]);
 let signingKeyCache = { at: 0, key: null };
 
 function json(value, status = 200) {
@@ -2122,6 +2124,17 @@ async function launchWatcherSignal(trigger,response) {
     launch_watcher_recovery:recoveryDispatch||{action:'failed',reason:'dispatch_state_failed'},
   },503);
 }
+async function handleDailySocialDispatch(request) {
+  if(request.method!=='POST'||!neonTriggerInvocationHeader(request))
+    throw Object.assign(Error('Daily social trigger identity denied'),{status:403});
+  const body=await readJson(request);
+  const trigger=verifyNeonScheduleTrigger(request,body,{names:SOCIAL_TRIGGER_NAMES});
+  const result=await dispatchDailySocialFromNeon({trigger});
+  console.log(JSON.stringify({event:'daily_social_neon_dispatch',action:result.action,day:result.day,
+    release_commit:releaseMetadata().release_commit}));
+  return json(result);
+}
+
 async function handleDeletionMaintenance(request) {
   if(request.method!=='POST')throw Object.assign(Error('Not found.'),{status:404});
   const trigger=await authorizeDeletionMaintenance(request);
@@ -2459,6 +2472,7 @@ async function route(request) {
   const url = new URL(request.url);
   if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, profiles: true, account_deletion_enabled:deletionEnabled(), verification_sweep_enabled:verificationSweepEnabled(), deletion_email_configured:deletionEmailConfigured(), launch_watcher_recovery_configured:launchWatcherRecoveryConfigured(), campaign_link_publish_configured:campaignLinkPublishConfigured(), apple_sign_in_configured:appleConfigured(), reminder_delivery_active:reminderReadiness().emailActive||reminderReadiness().pushActive, reminder_delivery_ready:reminderReadiness().emailReady, reminder_email_active:reminderReadiness().emailActive, reminder_push_active:reminderReadiness().pushActive, reminder_push_ready:reminderReadiness().pushReady });
   if (url.pathname === '/internal/account-deletion-maintenance') return handleDeletionMaintenance(request);
+  if (url.pathname === '/internal/daily-social-dispatch') return handleDailySocialDispatch(request);
   if (url.pathname === '/internal/account-deletion-maintenance-status') return handleDeletionMaintenanceStatus(request);
   if (url.pathname === '/internal/daily-reminders' || url.pathname === '/v1/reminders/unsubscribe' || url.pathname === '/v1/reminders/provider-event' || /^\/v1\/(?:mobile\/)?account\/reminders(?:\/devices)?$/.test(url.pathname))
     return reminderRoute(request,{query,json,readJson,authBrowser:(r)=>authSession(r,{required:true,allowLegacy:false,csrf:false}),authMutation:accountMutationAuth,authMobile:mobileAccountIdentity,trigger:verifyNeonScheduleTrigger,pacificDay:gameDateKey()});
@@ -2558,7 +2572,7 @@ async function route(request) {
 
 export default {
   async fetch(request) {
-    const internalMaintenance=new Set(['/internal/account-deletion-maintenance','/internal/account-deletion-maintenance-status','/internal/daily-reminders']).has(new URL(request.url).pathname);
+    const internalMaintenance=new Set(['/internal/account-deletion-maintenance','/internal/account-deletion-maintenance-status','/internal/daily-reminders','/internal/daily-social-dispatch']).has(new URL(request.url).pathname);
     if(!internalMaintenance){const denied=guardIngress(request);if(denied)return denied;}
     try {
       return withCors(await route(request), request);

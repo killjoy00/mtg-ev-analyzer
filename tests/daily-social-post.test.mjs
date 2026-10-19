@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {
   pacificClock,dailyCopy,blueskyLinkFacets,blueskyDailyRkey,discordWebhookList,discordWebhookEntries,dailyImageUrl,
-  postDaily,blueskyPublish,discordPublish,linkCardImage,
+  postDaily,blueskyPublish,discordPublish,linkCardImage,assertCurrentLivePublisher,
 } from '../scripts/post-daily-social.mjs';
 
 const summer=new Date('2026-07-10T14:10:00Z');
@@ -98,6 +98,61 @@ test('Manual preview is offline, with no network access or GitHub receipt writes
     fetchImpl:()=>{throw Error('Dry run accessed the network.');}});
   assert.equal(result.dry_run,true);
   assert.equal(result.discord_servers,1);
+});
+
+test('Neon-dispatched live jobs reject a stale Pacific date and 6 AM early run',async()=>{
+  const env={...liveEnv,GITHUB_EVENT_NAME:'workflow_dispatch',MANUAL_LIVE:'true',
+    SOURCE_PACIFIC_DAY:'2026-10-19'};
+  const forbidden=()=>{throw Error('Stale dispatch touched provider network');};
+  const next=await postDaily({now:new Date('2026-10-20T14:12:00Z'),env,fetchImpl:forbidden});
+  assert.equal(next.skipped,true);
+  assert.equal(next.day,'2026-10-19');
+  const before=await postDaily({now:new Date('2026-10-19T12:55:00Z'),env,fetchImpl:forbidden});
+  assert.equal(before.skipped,true);
+  await assert.rejects(postDaily({now:new Date('2026-10-19T14:11:00Z'),
+    env:{...env,SOURCE_PACIFIC_DAY:'bad'},fetchImpl:forbidden}),/Invalid independently scheduled Daily date/);
+});
+
+
+test('Live publisher accepts only fresh main, rejects old job reruns and stale checkouts',async()=>{
+  const current='a'.repeat(40);
+  const env={
+    GITHUB_EVENT_NAME:'workflow_dispatch',MANUAL_LIVE:'true',
+    GITHUB_REF:'refs/heads/main',GITHUB_RUN_ATTEMPT:'1',
+    GITHUB_REPOSITORY:'killjoy00/mtg-ev-analyzer',
+    GITHUB_SHA:current,GITHUB_TOKEN:'fixture-token',
+  };
+  const lookups=[];
+  const fetcher=async(url,options)=>{
+    lookups.push({url,options});
+    return Response.json({object:{sha:current}});
+  };
+  assert.deepEqual(await assertCurrentLivePublisher({env,fetchImpl:fetcher}),{checked:true});
+  assert.equal(lookups.length,1);
+  assert.equal(lookups[0].url,
+    'https://api.github.com/repos/killjoy00/mtg-ev-analyzer/git/ref/heads/main');
+  assert.equal(lookups[0].options.headers.authorization,'Bearer fixture-token');
+  const forbidden=()=>{throw Error('Unsafe publisher touched network');};
+  await assert.rejects(assertCurrentLivePublisher({
+    env:{...env,GITHUB_RUN_ATTEMPT:'2'},fetchImpl:forbidden,
+  }),/re-runs are forbidden/);
+  await assert.rejects(assertCurrentLivePublisher({
+    env:{...env,GITHUB_SHA:'b'.repeat(40)},fetchImpl:fetcher,
+  }),/Stale Daily publisher revision/);
+  await assert.rejects(assertCurrentLivePublisher({
+    env:{...env,GITHUB_TOKEN:''},fetchImpl:forbidden,
+  }),/attestation is incomplete/);
+  await assert.rejects(assertCurrentLivePublisher({
+    env:{...env,GITHUB_REF:'refs/heads/feature'},fetchImpl:forbidden,
+  }),/requires main/);
+  await assert.rejects(assertCurrentLivePublisher({
+    env:{...env,GITHUB_EVENT_NAME:'schedule'},
+    fetchImpl:async()=>new Response('error',{status:503}),
+  }),/Cannot verify live Daily publisher revision/);
+  assert.deepEqual(await assertCurrentLivePublisher({
+    env:{...env,MANUAL_LIVE:'false',GITHUB_RUN_ATTEMPT:'2'},
+    fetchImpl:forbidden,
+  }),{checked:false});
 });
 
 test('Live posts reject unreviewed refs; preview remains available',async()=>{
