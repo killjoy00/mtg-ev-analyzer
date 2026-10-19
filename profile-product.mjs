@@ -24,8 +24,8 @@ import { trackEvent } from './retention-events.mjs';
 import { nextMilestones } from './progression.mjs?v=10';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { eliteSource } from './membership-source.mjs';
-import { renderAccount, renderDeletionState } from './growth.mjs?v=22';
-import {dailyReminderSettingsMarkup,bindDailyReminderSettings} from './daily-reminder-settings.mjs?v=4';
+import { renderAccount, renderDeletionState } from './growth.mjs?v=23';
+import {dailyReminderSettingsMarkup,bindDailyReminderSettings} from './daily-reminder-settings.mjs?v=5';
 import {
   bestPercentile,
   liveEnvironmentProgress,
@@ -39,7 +39,7 @@ import {
   shareProfileCard,
   shareResultCard,
 } from './share-cards.mjs';
-import {bindMyPackOneTabs,currentSeasonMarkup,myPackOneMarkup,resetMyPackOneTab} from './my-pack-one.mjs?v=8';
+import {bindMyPackOneTabs,currentSeasonMarkup,myPackOneMarkup,resetMyPackOneTab} from './my-pack-one.mjs?v=9';
 
 let profileRendering = false;
 let navInstalled = false;
@@ -55,7 +55,7 @@ function ensureProfileStyles() {
   if (document.querySelector('link[data-pack1-profile-css]')) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = new URL('./profile.css?v=13', import.meta.url).href;
+  link.href = new URL('./profile.css?v=14', import.meta.url).href;
   link.dataset.pack1ProfileCss = '1';
   document.head.appendChild(link);
 }
@@ -212,21 +212,27 @@ function settingsMarkup(profile, progress, account, patreon) {
   const patreonAdFree=patreon?.patreon_ad_free??patreon?.ad_free;
   const supportUrl=esc(patreon?.support_url||PATREON_POLICY.supportUrl);
   const membershipUrl=elite?supportUrl:'/patreon/';
-  return `<section class="profile-settings profile-account" id="profile-account" aria-labelledby="profile-account-title">
-    <header class="profile-account-session"><div><p class="eyebrow" id="profile-account-title">${account?.user?'Signed in':account?.unavailable?'Account unavailable':'Signed out'}</p><p class="profile-account-session-copy">${account?.unavailable?'Account status is temporarily unavailable. Your career is still here.':account?.user?.email?`<strong>${esc(account.user.email)}</strong>`:'Your saved profile and preferences.'}</p></div>${account?.unavailable?'<button type="button" class="button secondary" id="account-status-retry">Retry account</button>':account?.user?'<button type="button" class="button secondary" id="account-signout">Sign out</button>':'<button type="button" class="button secondary" id="profile-claim-account">Sign in</button>'}</header>
-    ${account?.user?`<section class="profile-settings-group profile-settings-profile" aria-labelledby="profile-visibility-title">
-      <div class="profile-settings-heading-row"><div><h3 id="profile-visibility-title">Profile &amp; visibility</h3><p class="profile-settings-intro">Choose your public name and what appears on your Pack One profile.</p></div></div>
-      <form id="profile-settings-form">
+  const initial=esc((String(profile.player.display_name||account?.user?.email||'P').trim()[0]||'P').toUpperCase());
+  return `<section class="profile-settings profile-account account-settings" id="profile-account" aria-labelledby="profile-account-title">
+    <header class="profile-account-session">
+      <span class="account-avatar" aria-hidden="true">${initial}</span>
+      <div class="account-identity"><strong class="account-name">${esc(profile.player.display_name||'Pack One player')}</strong><p class="profile-account-session-copy"><span id="profile-account-title"${account?.user?.email?' class="visually-hidden"':''}>${account?.user?'Signed in':account?.unavailable?'Account unavailable':'Signed out'}</span>${account?.unavailable?' · Account status is temporarily unavailable. Your career is still here.':account?.user?.email?`<span class="account-email">${esc(account.user.email)}</span>`:' · Your saved profile and preferences.'}</p></div>
+      ${account?.unavailable?'<button type="button" class="button secondary" id="account-status-retry">Retry account</button>':account?.user?'<button type="button" class="button secondary" id="account-signout">Sign out</button>':'<button type="button" class="button secondary" id="profile-claim-account">Sign in</button>'}
+    </header>
+    ${account?.user?`<section class="settings-row profile-settings-group profile-settings-profile" aria-labelledby="profile-visibility-title">
+      <div class="settings-row-label"><h3 id="profile-visibility-title">Profile &amp; visibility</h3><p class="profile-settings-intro">How you appear on Daily leaderboards and your public profile.</p></div>
+      <div class="settings-row-body"><form id="profile-settings-form">
         <label class="profile-leaderboard-name" id="profile-display-name"><span>Display name</span><input class="select" type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(profile.player.display_name)}" required ${identityHidden?'disabled':''} aria-describedby="profile-display-name-help profile-display-name-error"><small id="profile-display-name-help">${identityHidden?'This display name is hidden by moderation.':'Shown on Daily leaderboards and your public profile.'}</small><small class="profile-field-error" id="profile-display-name-error" role="alert">${esc(identityHidden?`Display name hidden. ${profile.player.public_identity_hidden_reason||'Contact Pack One support if you believe this is a mistake.'}`:nameAttention)}</small></label>
         ${!identityHidden?`<p class="profile-identity-rules"><small>Display names and public profiles follow the <a href="/terms/#public-identity-rules" target="_blank" rel="noopener">Pack One Public Identity rules</a>.</small></p>`:''}
-        <label class="profile-toggle"><input type="checkbox" name="profilePublic" ${profile.player.profile_public ? 'checked' : ''} ${identityHidden?'disabled':''}><span><strong>Public profile</strong> <small>Let players view your Pack One record from leaderboards and shared links.</small></span></label>
+        <label class="profile-toggle"><input type="checkbox" role="switch" name="profilePublic" ${profile.player.profile_public ? 'checked' : ''} ${identityHidden?'disabled':''}><span><strong>Public profile</strong> <small>Let players view your Pack One record from leaderboards and shared links.</small></span></label>
         ${progress ? `<label><span>Favorite environment</span><select class="select" name="favoriteSetId"><option value="">No favorite selected</option>${progress.environments.map((entry) => `<option value="${esc(entry.id)}" ${entry.id === profile.player.favorite_set_id ? 'selected' : ''}>${esc(entry.name)}</option>`).join('')}</select></label>` : '<p class="profile-empty">Favorite environments are temporarily unavailable.</p>'}
         <label><span>Showcase achievement</span><select class="select" name="showcaseAchievement"><option value="">No showcase selected</option>${unlocked.map((item) => `<option value="${esc(item.id)}" ${item.id === profile.player.showcase_achievement ? 'selected' : ''}>${esc(item.label)}</option>`).join('')}</select></label>
         <div class="profile-settings-actions"><button class="button primary" type="submit">Save profile</button><span class="profile-settings-status profile-save-status" id="profile-save-status" aria-live="polite"></span></div>
-      </form>
+      </form></div>
     </section>`:`<p class="profile-empty">${account?.unavailable?'Profile settings are temporarily unavailable.':'Sign in to edit your profile settings.'}</p>`}
-    ${account?.user?`<section class="profile-membership profile-settings-membership profile-settings-group" aria-labelledby="patreon-membership-title">
-      <div><h3 id="patreon-membership-title">Membership</h3>
+    ${account?.user?`<section class="settings-row profile-membership profile-settings-membership profile-settings-group" aria-labelledby="patreon-membership-title">
+      <div class="settings-row-label"><h3 id="patreon-membership-title">Membership</h3><p class="profile-settings-intro">Your Pack One Elite access.</p></div>
+      <div class="settings-row-body"><div class="membership-status">
         ${source==='apple'
           ? `<p><strong>Elite active</strong><br><span>Powered Cube practice and custom-set practice are unlocked through your Apple App Store subscription.</span></p><p>Ad-free browsing is included. Manage or cancel the subscription in your Apple subscription settings.</p>`
           : source==='other'
@@ -245,28 +251,27 @@ function settingsMarkup(profile, progress, account, patreon) {
         ${patreon?.configured===true&&!(nonPatreonElite&&!patreon?.connected)?`<button type="button" class="button secondary" id="patreon-connect">${patreon?.connected?'Refresh Patreon access':'Already a member? Connect Patreon'}</button>`:''}
         ${patreon?.connected?'<button type="button" class="button secondary destructive" id="patreon-disconnect">Disconnect Patreon</button><small class="profile-membership-note">Disconnecting Patreon from Pack One does not cancel Patreon billing.</small>':''}
         <span id="patreon-status" aria-live="polite"></span>
-      </div>
+      </div></div>
     </section>`:''}
-    ${account?.user?`<section class="profile-credentials profile-settings-group" aria-labelledby="credential-settings-title">
-      <div><h3 id="credential-settings-title">Sign-in &amp; security</h3>
+    ${account?.user?`<section class="settings-row profile-credentials profile-settings-group" aria-labelledby="credential-settings-title">
+      <div class="settings-row-label"><h3 id="credential-settings-title">Sign-in &amp; security</h3><p class="profile-settings-intro">How you sign in to Pack One.</p></div>
+      <div class="settings-row-body">
         ${account?.credentials?.password
-          ? `<p><strong>Change password</strong><br><span>Changing your password signs out every device.</span></p>
-             <form class="account-form" id="account-password-change">
+          ? `<div class="settings-inline"><p><strong>Password</strong><br><span>Changing your password signs you out on every device.</span></p><button class="button secondary" type="button" id="account-password-toggle" aria-expanded="false" aria-controls="account-password-change">Change password</button></div>
+             <form class="account-form" id="account-password-change" hidden>
                <label>Current password<input required type="password" name="currentPassword" maxlength="256" autocomplete="current-password"></label>
                <label>New password<input required type="password" name="newPassword" minlength="8" maxlength="128" autocomplete="new-password"></label>
                <label>Confirm new password<input required type="password" name="confirmPassword" minlength="8" maxlength="128" autocomplete="new-password"></label>
-               <button class="button secondary" type="submit">Change password</button>
+               <div class="profile-settings-actions"><button class="button primary" type="submit">Change password</button><button class="text-button" type="button" id="account-password-cancel">Cancel</button></div>
                <span class="profile-settings-status" aria-live="polite"></span>
              </form>`
           : `<p><strong>Password</strong><br><span>${account?.credentials?.apple?'This account signs in with Apple and does not have a Pack One password to change.':account?.credentials?.google?'This account signs in with Google and does not have a Pack One password to change.':'This account does not have a password to change.'}</span></p>`}
       </div>
     </section>`:''}
     ${dailyReminderSettingsMarkup({signedIn:Boolean(account?.user)})}
-    ${account?.user?`<section class="profile-credentials profile-danger profile-settings-group" aria-labelledby="delete-account-title">
-      <div><h3 class="profile-delete-title" id="delete-account-title">Delete account</h3>
-        <p>Permanently deletes your Pack One account and profile and signs you out everywhere. This cannot be undone.</p>
-        ${deletionControlMarkup(account,patreon)}
-      </div>
+    ${account?.user?`<section class="settings-row profile-credentials profile-danger profile-settings-group" aria-labelledby="delete-account-title">
+      <div class="settings-row-label"><h3 class="profile-delete-title" id="delete-account-title">Delete account</h3><p class="profile-settings-intro">Permanently deletes your Pack One account and profile and signs you out everywhere. This cannot be undone.</p></div>
+      <div class="settings-row-body">${deletionControlMarkup(account,patreon)}</div>
     </section>`:''}
   </section>`;
 }
@@ -361,6 +366,14 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
   document.querySelector('#account-status-retry')?.addEventListener('click',()=>void renderMyProfile());
   void bindDailyReminderSettings();
   document.querySelector('#account-signout')?.addEventListener('click',async e=>{e.currentTarget.disabled=true;await signOutAccount();track('auth_sign_out');await renderAccount();});
+  const passwordToggle=document.querySelector('#account-password-toggle'),passwordForm=document.querySelector('#account-password-change');
+  const showPasswordForm=open=>{
+    if(!passwordToggle||!passwordForm)return;
+    passwordForm.hidden=!open;passwordToggle.hidden=open;passwordToggle.setAttribute('aria-expanded',String(open));
+    if(open)passwordForm.querySelector('input')?.focus();else{passwordForm.reset();passwordToggle.focus();}
+  };
+  passwordToggle?.addEventListener('click',()=>showPasswordForm(true));
+  document.querySelector('#account-password-cancel')?.addEventListener('click',()=>showPasswordForm(false));
   document.querySelector('#account-password-change')?.addEventListener('submit',async e=>{
     e.preventDefault();
     const form=e.currentTarget,button=form.querySelector('button[type="submit"]'),status=form.querySelector('.profile-settings-status');

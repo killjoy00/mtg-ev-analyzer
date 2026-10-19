@@ -269,7 +269,7 @@ export function myPackOneMarkup(profile,liveCatalog,{account=null,patreon=null,s
     '<section class="my-pack-one-panel" id="profile-stats-panel" role="tabpanel" tabindex="0" aria-labelledby="profile-stats-tab" data-profile-panel="stats" '+(activeTab==='stats'?'':'hidden')+'>'+statsMarkup(profile,liveCatalog,account,patreon)+'</section>'+
     '<section class="my-pack-one-panel" id="profile-insights-panel" role="tabpanel" tabindex="0" aria-labelledby="profile-insights-tab" data-profile-panel="insights" '+(activeTab==='insights'?'':'hidden')+'></section>'+
     '<section class="my-pack-one-panel my-pack-one-account-panel" id="profile-account-panel" role="tabpanel" aria-labelledby="profile-account-tab" data-profile-panel="account" '+(!accountSelected?'hidden':'')+'>'+
-      '<div class="my-account-heading"><h2>Account settings</h2><p>Manage your profile, membership, and sign-in.</p></div>'+
+      '<h2 class="visually-hidden">Account settings</h2>'+
       (typeof settingsMarkup==='function'?settingsMarkup(profile,progress,account,patreon):'')+
     '</section>'+
   '</section>';
