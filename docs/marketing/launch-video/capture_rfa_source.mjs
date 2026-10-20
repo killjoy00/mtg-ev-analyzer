@@ -38,9 +38,13 @@ try {
     if(response.request().method()!=='POST'&&response.request().method()!=='GET')return;
     try {
       const pathname=new URL(response.url()).pathname;
+      if(pathname.includes('/v1/runs'))console.log('RUN_HTTP',response.request().method(),pathname.replace(/[a-f0-9-]{36}/g,'<run-id>'),response.status());
       if(/^\/draft\/v1\/runs(?:\/[a-f0-9-]+(?:\/pick)?)?$/.test(pathname)&&response.ok()) {
         void response.json().then(data=>{
-          if(data?.current||data?.answers)run=data;
+          if(data?.current||data?.answers){
+            run=data;
+            console.log('CAPTURED_STATE',JSON.stringify({round:data.round,candidates:data.current?.candidates?.length,answers:data.answers?.length}));
+          }
         }).catch(()=>{});
       }
     }catch{}
@@ -77,6 +81,8 @@ try {
     // Wait for the matching server state before reading it.
     for(let wait=0;wait<25&&(!run?.current||run?.round!==round+1);wait++)await sleep(200);
     const puzzle=run?.current;
+    console.log('ROUND_STATE',JSON.stringify({round:round+1,server_round:run?.round,
+      captured:!!run,candidates:puzzle?.candidates?.length,dom_cards:await page.locator('.run-card-select img').count()}));
     assert.ok(puzzle?.candidates?.length>=10,'No authoritative puzzle for round '+(round+1));
     const all=puzzle.candidates.map(c=>({
       id:c.id,name:c.name,image_url:c.image_url,rarity:c.rarity,
