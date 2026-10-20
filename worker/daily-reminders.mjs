@@ -294,7 +294,10 @@ export async function refreshPushReceipts(query,{env=process.env,fetcher=fetch}=
 const PLAY_URL='https://packone.pro/';
 const MANAGE_URL='https://packone.pro/?account=reminders';
 const htmlText=value=>String(value).replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
-// Same layout and P¹ mark as the account emails in edge/auth-webhook.mjs.
+// Layout follows the account emails in edge/auth-webhook.mjs. The logo is the app
+// icon; if images are blocked, its navy cell and alt text still read as the mark.
+const MARK_FONT="'Barlow Condensed','Arial Narrow',Arial,Helvetica,sans-serif;";
+const LOGO_URL='https://packone.pro/pack-one-icon-v1.png';
 function dailyEmailHtml(unsubscribe) {
   const font='font-family:Arial,Helvetica,sans-serif;';
   const footerLink=(href,label)=>'<a href="'+htmlText(href)+'" style="'+font+'font-size:13px;line-height:20px;color:#555555;text-decoration:underline;">'+label+'</a>';
@@ -304,8 +307,9 @@ function dailyEmailHtml(unsubscribe) {
     '<table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation"><tr><td align="center" style="padding-top:32px;padding-right:16px;padding-bottom:32px;padding-left:16px;background-color:#f5f5f5;">'+
     '<table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="max-width:600px;background-color:#ffffff;">'+
     '<tr><td style="padding-top:32px;padding-right:32px;padding-bottom:16px;padding-left:32px;"><table cellpadding="0" cellspacing="0" border="0" role="presentation"><tr>'+
-    '<td width="40" height="40" align="center" valign="middle" bgcolor="#171918" style="width:40px;height:40px;background-color:#171918;border-radius:10px;'+font+'font-size:13px;line-height:40px;color:#ffffff;font-weight:800;letter-spacing:-0.2px;text-align:center;">P<sup style="font-size:8px;line-height:0;vertical-align:5px;">1</sup></td>'+
-    '<td style="padding-left:11px;'+font+'font-size:16px;line-height:18px;color:#171918;font-weight:700;">Pack One</td></tr></table></td></tr>'+
+    '<td width="40" height="40" align="center" valign="middle" bgcolor="#1e4d7a" style="width:40px;height:40px;background-color:#1e4d7a;">'+
+    '<img src="'+LOGO_URL+'" width="40" height="40" alt="P¹" style="display:block;width:40px;height:40px;border:0;outline:none;text-decoration:none;'+font+'font-size:16px;font-weight:700;line-height:40px;color:#ffffff;text-align:center;"></td>'+
+    '<td style="padding-left:11px;font-family:'+MARK_FONT+'font-size:20px;line-height:22px;color:#171918;font-weight:700;">Pack One</td></tr></table></td></tr>'+
     '<tr><td style="padding-top:0;padding-right:32px;padding-bottom:16px;padding-left:32px;'+font+'font-size:18px;line-height:28px;color:#111111;font-weight:700;">Today’s Dailies are waiting</td></tr>'+
     '<tr><td style="padding-top:0;padding-right:32px;padding-bottom:24px;padding-left:32px;'+font+'font-size:16px;line-height:24px;color:#333333;">Your three Pack One Dailies are ready. They close at midnight Pacific.</td></tr>'+
     '<tr><td align="center" style="padding-top:0;padding-right:32px;padding-bottom:32px;padding-left:32px;"><table cellpadding="0" cellspacing="0" border="0" role="presentation"><tr><td bgcolor="#111111" style="background-color:#111111;">'+
@@ -438,7 +442,7 @@ const UNSUB_HEADERS={'content-type':'text/html; charset=utf-8','cache-control':'
   'content-security-policy':"default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'"};
 const unsubscribePage=(title,body)=>'<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+title+'</title>'+
   '<body style="margin:0;background:#f5f5f5;font:16px/1.5 Arial,Helvetica,sans-serif;color:#333"><main style="max-width:30rem;margin:3rem auto;padding:2rem;background:#fff">'+
-  '<p style="margin:0 0 1.5rem;font-weight:700;color:#171918"><span style="display:inline-block;width:40px;height:40px;margin-right:11px;border-radius:10px;background:#171918;color:#fff;font-size:13px;font-weight:800;line-height:40px;text-align:center;vertical-align:middle">P<sup style="font-size:8px">1</sup></span>Pack One</p>'+
+  '<p style="margin:0 0 1.5rem;font-weight:700;color:#171918"><span style="display:inline-block;width:36px;height:40px;margin-right:11px;border-radius:2px;background:#1e4d7a;color:#fff;font:600 24px/40px '+MARK_FONT+'text-align:center;vertical-align:middle">P<sup style="font:900 11px/0 Arial,Helvetica,sans-serif;vertical-align:9px">1</sup></span>Pack One</p>'+
   body+'</main></body></html>';
 async function unsubscribeRequest(request,query,env) {
   if(!['GET','POST'].includes(request.method))throw apiError('Not found.',404);

@@ -129,12 +129,14 @@ test('email is branded HTML with readable links and spaced plain text',async()=>
   const unsubscribe=body.headers['List-Unsubscribe'].slice(1,-1);
   assert.match(unsubscribe,/^https:\/\/api\.packone\.pro\/growth\/v1\/reminders\/unsubscribe\?token=[A-Za-z0-9_-]{38}$/);
   assert.ok(body.text.includes('all three Dailies.\n\nManage reminders: https://packone.pro/?account=reminders\n\nUnsubscribe: '+unsubscribe));
-  assert.match(body.html,/P<sup[^>]*>1<\/sup><\/td><td[^>]*>Pack One<\/td>/);
+  assert.match(body.html,/bgcolor="#1e4d7a"[^>]*><img src="https:\/\/packone\.pro\/pack-one-icon-v1\.png" width="40" height="40" alt="P¹"/);
+  assert.match(body.html,/<td[^>]*>Pack One<\/td>/);
   assert.ok(body.html.includes('href="https://packone.pro/"'));
   assert.ok(body.html.includes('href="'+unsubscribe+'"')&&body.html.includes('>Unsubscribe</a>'));
   assert.ok(body.html.includes('>Manage reminders</a>'));
   assert.ok(!body.html.includes(unsubscribe+'</a>'),'the unsubscribe URL is never shown as link text');
-  assert.ok(!/push|notification|<script|<img/i.test(body.html));
+  assert.ok(!/push|notification|<script/i.test(body.html));
+  assert.equal((body.html.match(/<img /g)||[]).length,1,'only the logo is an image');
 });
 test('admission is decided in SQL for today’s Pacific Daily with the current address fingerprint',async()=>{
   const f=deliveryFixture();await f.run();
