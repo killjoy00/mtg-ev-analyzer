@@ -138,7 +138,7 @@ test('shared challenge counts have explicit labels, a visible explanation, and t
   const data = profile();
   data.summary = { ...data.summary, challenge_wins: 5, challenge_losses: 3, challenge_ties: 1 };
   const f = await fixture(t, { profile: () => data });
-  assert.match(f.text(), /Shared challenges played\\s*·\\s*5\\s+beaten\\s*·\\s*3\\s+below target\\s*·\\s*1\\s+tied/);
+  assert.match(f.text(), /Shared challenges played\s*·\s*5\s+beaten\s*·\s*3\s+below target\s*·\s*1\s+tied/);
   assert.match(f.text(), /Results from playing other people’s shared runs/);
 
   const zero = profile();
@@ -157,7 +157,7 @@ test('public and private history translate outcomes without changing API values 
     assert.match(f.text(), /Below shared score/);
     assert.match(f.text(), /Matched shared score/);
     assert.equal((f.text().match(/shared score/g) || []).length, 3);
-    assert.doesNotMatch(f.text(), /·\\s*(win|loss|tie)\\b/);
+    assert.doesNotMatch(f.text(), /·\s*(win|loss|tie)\b/);
     assert.deepEqual(f.rows().map((item) => item.outcome), ['win', 'loss', 'tie', null]);
   }
 });
