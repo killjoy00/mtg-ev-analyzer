@@ -1,0 +1,24 @@
+name: Hobbit Launch Video Review Build
+
+on:
+  push:
+    branches:
+      - content/launch-video-review-20261019
+    paths:
+      - .github/workflows/launch-video-hobbit-review.yml
+      - docs/marketing/launch-video/**
+
+permissions:
+  contents: read
+
+jobs:
+  inspect-production-project:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect editable review project
+        run: |
+          unzip -l docs/marketing/launch-video/pack-one-launch-editable-project.zip | head -100
+          printf '\nDirectory files:\n'
+          find docs/marketing/launch-video -maxdepth 1 -type f -printf '%f %s bytes\n'
