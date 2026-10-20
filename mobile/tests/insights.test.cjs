@@ -103,6 +103,11 @@ test('native Insights keeps hierarchy, breakdowns collapsed and navigation intac
    assert.ok(content.includes(piece),'Expected overview: '+piece);
  }
  assert.ok(!content.includes('Pick-by-pick breakdown'),'Charts start collapsed');
+ assert.ok(content.indexOf('Picks to review') < content.indexOf('Your pick patterns') &&
+   content.indexOf('Your pick patterns') < content.indexOf('Your scores over time'),
+   'Saved pick reviews and drafting patterns precede score history');
+ assert.equal(content.split('More stats').length-1,1,'More stats has one label');
+ assert.ok(!content.includes('Refresh Insights'),'Insights refetches on focus and has an error retry');
  await ui.choose('More stats');
  for(const piece of ['Scores by source pick position','Model-support closeness','Scores by format','P1P1','74.0','78.0']){
    assert.ok(ui.text().includes(piece),'Missing expanded chart: '+piece);

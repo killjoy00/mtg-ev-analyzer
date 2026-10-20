@@ -134,7 +134,7 @@ def sign_in(email):
             'Email sign-in did not finish; account-switch assertions have not run')
 
 
-def swipe_page(up):
+def swipe_page(up, span=0.60, duration=300):
     # Use the actual visible scroll viewport. In a short landscape window the
     # bottom quarter of the display is the fixed Next pick action, so gestures
     # based on display height never reach the ScrollView.
@@ -148,10 +148,10 @@ def swipe_page(up):
             viewports.append(bounds)
     require(viewports, 'No visible scroll viewport is available for the gesture')
     left, top, right, bottom = max(viewports, key=lambda b: (b[2]-b[0])*(b[3]-b[1]))
-    start, end = (0.80, 0.20) if up else (0.20, 0.80)
+    start, end = (0.5+span/2, 0.5-span/2) if up else (0.5-span/2, 0.5+span/2)
     x = str((left+right)//2)
     adb('shell', 'input', 'swipe', x, str(int(top+(bottom-top)*start)),
-        x, str(int(top+(bottom-top)*end)), '300')
+        x, str(int(top+(bottom-top)*end)), str(duration))
 
 
 def top():
@@ -406,6 +406,19 @@ if platform == 'android':
         require(any(f'Score {score}/100' in text for text in texts),
                 f'Wrong original score for {puzzle}')
 
+    def reveal_pick_card(name):
+        # A full-page swipe can stop with only the bottom of a tall pick card on
+        # screen. Nudge slowly until its pick line and Review button both show.
+        reveal('Review pick: ' + name, exact=True)
+        for _ in range(6):
+            _, root = hierarchy()
+            if visible_bounds(root, 'Your pick: ' + name, exact=True) and \
+                    visible_bounds(root, 'Review pick: ' + name, exact=True):
+                return
+            swipe_page(up=not visible_bounds(root, 'Review pick: ' + name, exact=True), span=0.25, duration=900)
+            time.sleep(0.4)
+        raise AssertionError(f'Pick card for {name!r} never fit on screen')
+
     def has_review_modal(xml):
         return any(node.get('resource-id', '').split('/')[-1] == 'insights-review-modal'
                    for node in ET.fromstring(xml).iter())
@@ -426,7 +439,7 @@ if platform == 'android':
         xml, _ = snapshot('insights-high-scoring-tab')
         require_review_tab(xml, 'High-scoring picks')
         # A trophy card elsewhere must not satisfy the selected-card assertion.
-        reveal('Review pick: Hero in Training', exact=True)
+        reveal_pick_card('Hero in Training')
         xml, _ = snapshot('insights-high-scoring')
         require_highlight(xml, 'screenshot-insight-1', 'Hero in Training', 92)
         tap('Review pick: Hero in Training', exact=True, scroll=False)
@@ -447,12 +460,10 @@ if platform == 'android':
         xml, _ = snapshot('insights-modal-back-restores-report')
         require_review_tab(xml, 'High-scoring picks')
         require(not has_review_modal(xml), 'Review modal remains over the report')
-        reveal('Review pick: Hero in Training', exact=True)
+        reveal_pick_card('Hero in Training')
         xml, _ = snapshot('insights-modal-back-restores-pick')
         require_highlight(xml, 'screenshot-insight-1', 'Hero in Training', 92)
-        reveal('Your scores over time')
-        xml, _ = snapshot('insights-scores-over-time')
-        require('Your scores over time' in xml, 'Score history is missing')
+        # Pick patterns come before score history.
         reveal('Your pick patterns')
         xml, _ = snapshot('insights-patterns-heading')
         require('Your pick patterns' in xml and 'All available history' in xml,
@@ -460,7 +471,10 @@ if platform == 'android':
         reveal('The Independent Thinker')
         xml, _ = snapshot('insights-qualified-patterns')
         require('The Independent Thinker' in xml,
-                'Qualified traits are missing below the score history')
+                'Qualified traits are missing below the pick reviews')
+        reveal('Your scores over time')
+        xml, _ = snapshot('insights-scores-over-time')
+        require('Your scores over time' in xml, 'Score history is missing')
 
     attempt('insights-default-revisit-high-scores-pool-and-history', native_insights)
 

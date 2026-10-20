@@ -798,3 +798,21 @@
   .my-insights-original-pack { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .my-insights-dialog { padding:8px; }
 }
+
+/* Insights matches Account settings: one card with a filter strip on top and
+   each section as a divided row, at the same reading width. */
+.my-insights-page { max-width:880px; gap:0; }
+.my-insights-page .my-insights-controls { padding:16px 24px; border-radius:12px 12px 0 0; background:var(--surface-soft); }
+.my-insights-page .my-insights-format-explainer[hidden] { display:none; }
+.my-insights-page #my-insights-result { border:1px solid var(--line); border-top:0; border-radius:0 0 12px 12px; background:var(--surface); overflow:hidden; }
+.my-insights-page .my-insights-sample { margin:0; padding:10px 24px; border-bottom:1px solid var(--line); background:var(--surface-soft); color:var(--muted); font-size:13px; }
+.my-insights-page #my-insights-result .my-insights-grid { display:block; }
+.my-insights-page #my-insights-result .my-pack-card { padding:24px; border:0; border-radius:0; box-shadow:none; background:transparent; }
+.my-insights-page #my-insights-result .my-insights-grid > * + * { border-top:1px solid var(--line); }
+.my-insights-page #my-insights-result .my-card-heading h2,
+.my-insights-page #my-insights-result .my-insights-wide > h2 { font-size:17px; }
+@media(max-width:650px) {
+  .my-insights-page .my-insights-controls { padding:16px; }
+  .my-insights-page .my-insights-sample { padding:10px 16px; }
+  .my-insights-page #my-insights-result .my-pack-card { padding:20px 16px; }
+}

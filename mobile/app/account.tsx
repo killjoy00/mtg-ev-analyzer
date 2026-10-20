@@ -504,6 +504,13 @@ export default function AccountScreen() {
                 </View>
                 <Text style={styles.rowArrow}>›</Text>
               </Pressable>
+              <Pressable accessibilityRole="button" onPress={() => router.push('/about')} style={styles.row}>
+                <View style={styles.rowCopy}>
+                  <Text style={styles.rowTitle}>About Pack One</Text>
+                  <Text style={styles.fieldHelp}>Project details, credits and legal information</Text>
+                </View>
+                <Text style={styles.rowArrow}>›</Text>
+              </Pressable>
               <Pressable accessibilityRole="button" onPress={() => router.push('/account-delete')} style={[styles.row, styles.dangerRow]}>
                 <View style={styles.rowCopy}>
                   <Text style={styles.dangerTitle}>Delete account</Text>
@@ -636,7 +643,7 @@ export default function AccountScreen() {
 
         {message || routeNotice ? <Text accessibilityRole="alert" style={styles.message}>{message || routeNotice}</Text> : null}
         {enrichmentWarning ? <Text accessibilityRole="alert" style={styles.enrichmentWarning}>{enrichmentWarning}</Text> : null}
-        <AboutLink />
+        {account ? null : <AboutLink />}
       </ScrollView>
     </SafeAreaView>
   );

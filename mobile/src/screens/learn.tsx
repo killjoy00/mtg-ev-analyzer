@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/src/components/Text';
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
-import { AboutLink } from '@/src/components/AboutLink';
 
 import { useNavigationSession } from '@/src/navigation/session';
 import HowToScreen from '@/src/screens/how-to';
@@ -16,6 +15,7 @@ const nativeLinks = [
   { kicker: 'POINTS', title: 'Scoring', body: 'See how trophy matches and model-supported alternatives become your run score.', route: '/scoring' as const },
   { kicker: 'BEHIND THE MODEL', title: 'Method', body: 'See how Pack One qualifies evidence and builds the comparison model.', route: '/method' as const },
   { kicker: 'COVERAGE', title: 'Sets', body: 'Browse current Pack One set coverage and supported Draft Run environments.', route: '/sets' as const },
+  { kicker: 'ABOUT', title: 'About Pack One', body: 'Learn about the project, its data sources, and credits.', route: '/about' as const },
 ];
 
 const externalLinks: { key: CanonicalContentKey; title: string; body: string }[] = [
@@ -76,7 +76,6 @@ export default function LearnScreen() {
         <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/draft-run', params: { environment: 'mixed' } })} style={styles.playButton}>
           <Text style={styles.playText}>Play Daily Draft Run</Text>
         </Pressable>
-        <AboutLink />
       </ScrollView>
     </SafeAreaView>
   );

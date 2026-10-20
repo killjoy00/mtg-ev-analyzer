@@ -22,6 +22,7 @@ const [
   careerScreen,
   accountScreen,
   linking,
+  aboutLink,
 ] = await Promise.all([
   readFile(new URL('../about/index.html', import.meta.url), 'utf8'),
   readFile(new URL('../contact/index.html', import.meta.url), 'utf8'),
@@ -42,6 +43,7 @@ const [
   readFile(new URL('../mobile/src/screens/career.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../mobile/app/account.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../mobile/src/linking.ts', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/src/components/AboutLink.tsx', import.meta.url), 'utf8'),
 ]);
 
 function decodeText(value) {
@@ -129,19 +131,25 @@ test('legacy Help redirects to About and font licenses live only at the end of T
   assert.doesNotMatch(privacyScreen, /fontLicenses/);
 });
 
-test('Help is removed from tab headers and About is at the bottom of tab content', () => {
+test('About has discoverable Learn and Account navigation, not loose links on every screen', () => {
   assert.doesNotMatch(tabLayout, /Help and information|router\.push\('\/help'\)|>Help</);
+  assert.match(learnScreen, /title: 'About Pack One'.*route: '\/about' as const/);
+  assert.match(howToScreen, /title: 'About Pack One'[\s\S]*?route: '\/about' as const/);
+  assert.match(accountScreen, /\{account \? null : <AboutLink \/>\}/, 'signed-out Account keeps a standalone About row');
+  assert.ok(accountScreen.indexOf("router.push('/about')") > accountScreen.indexOf("router.push('/account-security')") &&
+    accountScreen.indexOf("router.push('/about')") < accountScreen.indexOf("router.push('/account-delete')"),
+    'signed-in Account lists About with the settings rows, above Delete account');
+  assert.match(aboutLink, /accessibilityLabel="About Pack One"/);
+  assert.match(aboutLink, /styles\.row/);
+  assert.match(aboutLink, /router\.push\('\/about'\)/);
   for (const [name, source] of [
     ['Home', homeScreen],
-    ['Learn', learnScreen],
-    ['How to Play', howToScreen],
-    ['Account/Sign in', accountScreen],
+    ['Practice', practiceScreen],
+    ['Leaders', leaderboardScreen],
+    ['My Pack One', careerScreen],
   ]) {
-    assert.match(source, /<AboutLink \/>/, `${name} should expose About at the bottom of its content`);
+    assert.doesNotMatch(source, /<AboutLink \/>/, name + ' should not show an unrelated bottom About link');
   }
-  assert.equal((practiceScreen.match(/<AboutLink \/>/g) || []).length, 4, 'Practice keeps About in loading, signed-out, error, and ready states');
-  assert.equal((leaderboardScreen.match(/<AboutLink \/>/g) || []).length, 3, 'Leaders keeps About in loading, error, and ready states');
-  assert.equal((careerScreen.match(/<AboutLink \/>/g) || []).length, 2, 'My Pack One keeps About in signed-out/error/loading and ready states');
   assert.doesNotMatch(accountScreen, /Help & information|router\.push\('\/help'\)/);
 });
 
