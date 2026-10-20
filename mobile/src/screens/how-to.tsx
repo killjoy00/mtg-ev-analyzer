@@ -3,7 +3,6 @@ import { Pressable, View } from 'react-native';
 import { Text } from '@/src/components/Text';
 
 import { ArticleScreen, articleStyles, type ArticleSection } from '@/src/components/ArticleScreen';
-import { AboutLink } from '@/src/components/AboutLink';
 
 const sections: ArticleSection[] = [
   {
@@ -69,6 +68,12 @@ const links = [
     body: 'Browse the sets currently supported by Pack One and see the available Draft Run coverage.',
     route: '/sets' as const,
   },
+  {
+    kicker: 'ABOUT',
+    title: 'About Pack One',
+    body: 'Why Pack One exists, its data sources, and project credits.',
+    route: '/about' as const,
+  },
 ];
 
 function PlayDaily() {
@@ -111,7 +116,6 @@ export default function HowToScreen() {
               <Text style={articleStyles.linkAction}>View {link.title.toLowerCase()} →</Text>
             </Pressable>
           ))}
-          <AboutLink />
         </View>
       )}
     />
