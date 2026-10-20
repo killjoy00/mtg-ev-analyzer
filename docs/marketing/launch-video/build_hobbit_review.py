@@ -310,7 +310,7 @@ def render_video(timeline: list[dict], cards: list[tuple[str,Path]]) -> Path:
         call(["ffmpeg","-y","-hide_banner","-loglevel","error",
               "-loop","1","-framerate",str(FPS),"-i",str(frame),
               "-i",str(SOUND/f"{scene['id']}-aligned.wav"),"-t",str(d),
-              "-vf",f"fade=t=in:st=0:d=.2:color=0xf7f8fa,fade=t=out:st={max(0.0,d-.22):.3f}:d=.2:color=0xf7f8fa,format=yuv420p",
+              "-vf",f"fade=t=in:st=0:d=0.20:color=0xf7f8fa,fade=t=out:st={max(0.0,d-.22):.3f}:d=0.20:color=0xf7f8fa,format=yuv420p",
               "-c:v","libx264","-preset","veryfast","-crf","20","-threads","2",
               "-c:a","aac","-b:a","160k","-ar","48000","-r",str(FPS),str(out)])
         parts.append(out)
