@@ -6,22 +6,67 @@ on:
       - content/launch-video-review-20261019
     paths:
       - .github/workflows/launch-video-hobbit-review.yml
-      - docs/marketing/launch-video/**
+      - docs/marketing/launch-video/build_hobbit_review.py
+  workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
+
+concurrency:
+  group: packone-hobbit-review
+  cancel-in-progress: false
 
 jobs:
-  inspect-production-project:
+  render:
+    if: github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/content/launch-video-review-20261019'
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect source renderer and edit timeline
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install local video rendering tools
         run: |
-          echo '===== PACKAGED README ====='
-          unzip -p docs/marketing/launch-video/pack-one-launch-editable-project.zip README.md
-          echo '===== RENDERER ====='
-          unzip -p docs/marketing/launch-video/pack-one-launch-editable-project.zip build_video.py
-          echo '===== TIMELINE ====='
-          unzip -p docs/marketing/launch-video/pack-one-launch-editable-project.zip timeline.json
+          python -m pip install --disable-pip-version-check --quiet 'Pillow>=11,<13' 'numpy>=1.26,<3' 'soundfile>=0.12' 'kokoro-onnx>=0.4,<1'
+          command -v ffmpeg
+          command -v ffprobe
+      - name: Download Kokoro studio voice model (not checked into repo)
+        run: |
+          mkdir -p docs/marketing/launch-video/_hobbit_video_work/voice
+          cd docs/marketing/launch-video/_hobbit_video_work/voice
+          curl --fail --location --show-error --silent --retry 3 \
+            -o kokoro-v1.0.int8.onnx \
+            https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1/kokoro-v1.0.int8.onnx
+          curl --fail --location --show-error --silent --retry 3 \
+            -o voices-v1.0.bin \
+            https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.1/voices-v1.0.bin
+          test "$(stat -c%s kokoro-v1.0.int8.onnx)" -gt 50000000
+          test "$(stat -c%s voices-v1.0.bin)" -gt 10000000
+      - name: Render review video with real HOB card art and different voice
+        run: python docs/marketing/launch-video/build_hobbit_review.py
+      - name: Store review cut and voice assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-hobbit-video-v2
+          path: |
+            docs/marketing/launch-video/pack-one-launch-hobbit-review-v2.mp4
+            docs/marketing/launch-video/pack-one-launch-hobbit-v2.srt
+            docs/marketing/launch-video/pack-one-launch-hobbit-v2.json
+            docs/marketing/launch-video/pack-one-launch-hobbit-v2-contact-sheet.jpg
+            docs/marketing/launch-video/pack-one-launch-hobbit-v2-narration.txt
+          retention-days: 14
+          if-no-files-found: error
+      - name: Keep review output in source branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add docs/marketing/launch-video/pack-one-launch-hobbit-review-v2.mp4 \
+            docs/marketing/launch-video/pack-one-launch-hobbit-v2.srt \
+            docs/marketing/launch-video/pack-one-launch-hobbit-v2.json \
+            docs/marketing/launch-video/pack-one-launch-hobbit-v2-contact-sheet.jpg \
+            docs/marketing/launch-video/pack-one-launch-hobbit-v2-narration.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "Add rendered Hobbit card review v2 with new narration"
+            git push origin HEAD:content/launch-video-review-20261019
+          fi
