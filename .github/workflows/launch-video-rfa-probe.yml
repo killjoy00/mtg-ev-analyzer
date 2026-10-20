@@ -1,0 +1,42 @@
+name: RFA Launch Video Public Source Preflight
+
+on:
+  push:
+    branches:
+      - content/launch-video-review-20261019
+    paths:
+      - .github/workflows/launch-video-rfa-probe.yml
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check public shared invitation, creator landing and RFA card source
+        env:
+          SHARE_ID: e66d6fcfac38470ba719c4f6
+        run: |
+          node --input-type=module <<'NODE'
+          const url=path=>new URL(path,'https://api.packone.pro');
+          async function read(url,options={}) {
+            const response=await fetch(url,{redirect:'follow',headers:{origin:'https://packone.pro'},...options,signal:AbortSignal.timeout(25000)});
+            const text=await response.text();
+            let parsed=null;try{parsed=JSON.parse(text)}catch{}
+            return {status:response.status,json:parsed,head:text.slice(0,110)};
+          }
+          const share=await read(url('/draft/v1/shared-runs/'+process.env.SHARE_ID));
+          console.log('SHARE',JSON.stringify({status:share.status,score:share.json?.score,environment:share.json?.environment,run_length:share.json?.run_length,scores_count:share.json?.scores?.length,error:share.json?.error?.slice(0,80)}));
+          const creator=await read(url('/draft/v1/creator-challenges/504bc34f-bf21-4542-8f86-afd1bd78337b'));
+          console.log('CREATOR',JSON.stringify({status:creator.status,score:creator.json?.score,environment:creator.json?.environment,run_length:creator.json?.run_length,source_type:creator.json?.source_type,error:creator.json?.error?.slice(0,80)}));
+          const catalog=await read('https://packone.pro/data/catalog.json');
+          const fra=catalog.json?.sets?.find(s=>s.id==='fra');
+          console.log('CATALOG',JSON.stringify({status:catalog.status,has_rfa:!!fra,rfa_name:fra?.name,manifest:fra?.manifest||fra?.manifest_path}));
+          const scryfall=await read('https://api.scryfall.com/sets/fra',{headers:{accept:'application/json','user-agent':'PackOneLaunchVideo/1.0'}});
+          console.log('SCRYFALL',JSON.stringify({status:scryfall.status,set_code:scryfall.json?.code,card_count:scryfall.json?.card_count,error:scryfall.json?.details?.slice(0,100)}));
+          const landing=await read('https://packone.pro/creator/realityfracture/');
+          console.log('CREATOR_PAGE',JSON.stringify({status:landing.status,redirect_target:landing.head.includes('DOCTYPE')?'html':'other'}));
+          if(share.status!==200||creator.status!==200||!fra)process.exitCode=1;
+          NODE
