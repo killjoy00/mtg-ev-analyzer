@@ -1,0 +1,68 @@
+name: Publish Approved Reality Fracture Short Once
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/publish-rfa-short-once.yml
+      - scripts/upload-rfa-youtube-short-once.mjs
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/publish-rfa-short-once.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: packone-rfa-short-approved-upload-20261020
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    if: github.repository == 'killjoy00/mtg-ev-analyzer'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Validate one-off publisher syntax
+        run: node --check scripts/upload-rfa-youtube-short-once.mjs
+      - name: Download immutable, approved 27-second video
+        run: |
+          mkdir -p artifacts/rfa-launch-short
+          curl --fail --location --silent --show-error --retry 3 \
+            'https://raw.githubusercontent.com/killjoy00/mtg-ev-analyzer/8d7bd4d7b440d22f347bdda3aa5a68c00d692d51/docs/marketing/launch-video/pack-one-rfa-youtube-short-vertical.mp4' \
+            -o artifacts/rfa-launch-short/pack-one-rfa-youtube-short-vertical.mp4
+          echo 'bf645cd99c8a2bc1e4fd75558e085ea5641ef1bb37c5ff264ce6a90d32123e68  artifacts/rfa-launch-short/pack-one-rfa-youtube-short-vertical.mp4' | sha256sum -c -
+          test "$(stat -c%s artifacts/rfa-launch-short/pack-one-rfa-youtube-short-vertical.mp4)" -eq 1680551
+          node --input-type=module -e "import {readFileSync} from 'node:fs'; const f=readFileSync('artifacts/rfa-launch-short/pack-one-rfa-youtube-short-vertical.mp4'); if(f.toString('ascii',4,8)!=='ftyp')process.exit(1);"
+
+  publish:
+    needs: verify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Download immutable approved Short
+        run: |
+          mkdir -p artifacts/rfa-launch-short
+          curl --fail --location --silent --show-error --retry 3 \
+            'https://raw.githubusercontent.com/killjoy00/mtg-ev-analyzer/8d7bd4d7b440d22f347bdda3aa5a68c00d692d51/docs/marketing/launch-video/pack-one-rfa-youtube-short-vertical.mp4' \
+            -o artifacts/rfa-launch-short/pack-one-rfa-youtube-short-vertical.mp4
+      - name: Upload approved RFA Short exactly once
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PACKONE_YOUTUBE_CLIENT_ID: ${{ secrets.PACKONE_YOUTUBE_CLIENT_ID }}
+          PACKONE_YOUTUBE_CLIENT_SECRET: ${{ secrets.PACKONE_YOUTUBE_CLIENT_SECRET }}
+          PACKONE_YOUTUBE_REFRESH_TOKEN: ${{ secrets.PACKONE_YOUTUBE_REFRESH_TOKEN }}
+        run: node scripts/upload-rfa-youtube-short-once.mjs
