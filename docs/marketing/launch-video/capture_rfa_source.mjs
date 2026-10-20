@@ -78,46 +78,48 @@ try {
     await page.evaluate(async()=>{
       await Promise.all([...document.querySelectorAll('.run-cards .run-card-select img')].map(x=>x.decode()));
     });
-    // Wait for the matching server state before reading it.
-    for(let wait=0;wait<25&&(!run?.current||run?.round!==round+1);wait++)await sleep(200);
-    const puzzle=run?.current;
-    console.log('ROUND_STATE',JSON.stringify({round:round+1,server_round:run?.round,
-      captured:!!run,candidates:puzzle?.candidates?.length,dom_cards:await page.locator('.run-card-select img').count()}));
-    assert.ok(puzzle?.candidates?.length>=10,'No authoritative puzzle for round '+(round+1));
-    const all=puzzle.candidates.map(c=>({
-      id:c.id,name:c.name,image_url:c.image_url,rarity:c.rarity,
-      model_probability:Number(c.model_probability||0)
+    // Read the actual, rendered game cards. This also works if requests are
+    // serviced by a first-party gateway or a service worker.
+    const header=await page.locator('.run-heading h1').innerText();
+    const setId=/reality fracture/i.test(header)?'fra':'other';
+    const pickNumber=Number(header.match(/Pick\\s+(\\d+)/i)?.[1]||0);
+    const all=await page.locator('.run-cards .run-card').evaluateAll(rows=>rows.map(row=>{
+      const button=row.querySelector('[data-pick]');
+      const img=row.querySelector('.run-card-select img');
+      return {id:button?.getAttribute('data-pick')||'',name:row.querySelector('.run-card-name')?.textContent?.trim()||img?.alt||'',
+              image_url:img?.currentSrc||img?.src||'',rarity:null,model_probability:0};
     }));
-    const historical=puzzle.historical_pick_id;
-    const sorted=all.slice().sort((a,b)=>b.model_probability-a.model_probability);
-    // This is an *automated QA preview pick*, not the share creator's pick.
-    // Alternate the top two displayed probability choices to create genuine differences.
-    const chosen=sorted[Math.min(round%2,sorted.length-1)]||all[0];
-    assert.ok(chosen?.id&&all.some(c=>c.id===chosen.id));
-    const prior=(puzzle.prior_picks||[]).map(c=>({name:c.name,image_url:c.image_url}));
+    const prior=await page.locator('.run-pool-cards button').evaluateAll(rows=>rows.map(button=>({
+      name:button.querySelector('img')?.alt||'',
+      image_url:button.querySelector('img')?.currentSrc||button.querySelector('img')?.src||''
+    })));
+    assert.ok(all.length>=10&&all.every(c=>c.id&&c.name&&c.image_url),'Live pack did not expose complete cards');
+    const chosen=all[round%2];
+    console.log('SOURCE_ROUND',round+1,'set',setId,'pack_cards',all.length,'pick',pickNumber);
     // Exact live site screenshot, before selection. No username in the screenshots.
     await page.locator('.run-cards').screenshot({path:path.join(DEST,'r'+(round+1)+'-pack.png')});
     await page.locator('[data-pick="'+chosen.id+'"]').click();
     await page.locator('#run-lock').click();
     await page.locator('#run-next').waitFor({timeout:40000});
-    for(let wait=0;wait<40&&!run?.answers?.[round];wait++)await sleep(175);
-    const answer=run?.answers?.[round];
-    assert.ok(answer,'Missing genuine trophy reveal for round '+(round+1));
-    assert.equal(answer.selectedId,chosen.id);
-    const trophyId=answer.historicalId;
-    const trophy=all.find(c=>c.id===trophyId);
-    assert.ok(trophy,'Trophy choice not in source pack');
+    const scoreText=await page.locator('.run-feedback-score').innerText();
+    const revealedTrophy=page.locator('.run-reveal-pick.is-trophy img');
+    const samePick=await page.locator('.run-reveal-pick.is-shared img').count()>0;
+    const trophyName=samePick?chosen.name:await revealedTrophy.first().getAttribute('alt');
+    const trophy=all.find(c=>c.name===trophyName);
+    assert.ok(trophy, 'Real trophy pick was not visible in the source pack');
+    const demoScore=Number.parseInt(scoreText,10);
+    assert.ok(Number.isInteger(demoScore)&&demoScore>=0&&demoScore<=100);
     await page.locator('.run-feedback').screenshot({path:path.join(DEST,'r'+(round+1)+'-reveal.png')});
     records.push({
-      round:round+1,set_id:puzzle.set_id,pick_number:puzzle.pick_number,
+      round:round+1,set_id:setId,pick_number:pickNumber,
       candidates:all,prior_picks:prior,automated_preview_pick:chosen.name,
       actual_trophy_pick:trophy.name,
-      preview_pick_score:answer.score,
-      historical_match:answer.historicalMatch===true,
+      preview_pick_score:demoScore,
+      historical_match:samePick,
       pack_image:'r'+(round+1)+'-pack.png',
       reveal_image:'r'+(round+1)+'-reveal.png',
     });
-    console.log('Round',round+1,'set',puzzle.set_id,'cards',all.length,'trophy',trophy.name);
+    console.log('Round',round+1,'set',setId,'cards',all.length,'trophy',trophy.name);
     await page.locator('#run-next').click();
     if(round<7)await page.locator('.run-cards').waitFor({timeout:45000});
   }
