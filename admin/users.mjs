@@ -52,9 +52,8 @@ export async function renderUsers(root,request,growthRequest=request,viewerRole=
     const items=[];
     if(user.linked&&!user.username_owned)items.push(badge('Username attention','blocked'));
     if(user.public_identity_hidden_at)items.push(badge('Identity hidden','blocked'));
-    if(user.patreon_connected)items.push(badge('Patreon','candidate'));
     if(user.active_entitlements>0)items.push(badge('Paid','live'),...(user.capabilities||[]).map(value=>badge(capabilityLabel(value))));
-    if(!items.length)items.push(badge('Free account'));
+    if(!user.active_entitlements)items.push(badge('Free account'));
     return items.join(' ');
   }
 
@@ -63,7 +62,7 @@ export async function renderUsers(root,request,growthRequest=request,viewerRole=
     root.innerHTML=`<section class="users-page">
       <div class="users-heading"><div><h1>Users</h1><p class="muted">Authenticated Pack One accounts only. Anonymous and guest gameplay identities are intentionally not listed here.</p></div></div>
       <div class="cards user-cards">
-        ${[['Accounts',s.total],['New · 30d',s.new_30d],['Active · 30d',s.active_30d],['Username attention',s.username_attention],['Patreon',s.patreon],['Paid',s.paid],['Admins',s.admins]].map(([label,value])=>`<div class="card"><span>${esc(label)}</span><strong>${fmt(value)}</strong></div>`).join('')}
+        ${[['Accounts',s.total],['New · 30d',s.new_30d],['Active · 30d',s.active_30d],['Username attention',s.username_attention],['Patreon linked',s.patreon],['Paid',s.paid],['Admins',s.admins]].map(([label,value])=>`<div class="card"><span>${esc(label)}</span><strong>${fmt(value)}</strong></div>`).join('')}
       </div>
       <form id="user-filters" class="filters user-filters">
         <label>Find a user<input type="search" name="search" value="${esc(filters.search)}" placeholder="Account name, email, or public username"></label>
@@ -71,13 +70,13 @@ export async function renderUsers(root,request,growthRequest=request,viewerRole=
         <button>Refresh</button>
       </form>
       <p class="muted users-count">Showing ${fmt(data.users.length)} of ${fmt(data.total_matching)} matching accounts${data.truncated?' · refine the search to see more':''}.</p>
-      <div class="scroll"><table class="user-table"><thead><tr><th>Account</th><th>Public username</th><th>Created</th><th>Last active</th><th>Runs</th><th>Avg.</th><th>Access</th><th>Admin</th></tr></thead><tbody id="user-rows">
+      <div class="scroll"><table class="user-table"><thead><tr><th>Account</th><th>Public username</th><th>Created</th><th>Last active</th><th>Runs</th><th>Avg.</th><th>Access</th><th>Connections</th><th>Admin</th></tr></thead><tbody id="user-rows">
         ${data.users.map(user=>`<tr>
           <th><button type="button" class="user-open" data-user="${esc(user.id)}">${esc(user.name||'Unnamed account')}<small>${esc(user.email||'No email')}</small></button></th>
           <td>${user.linked?esc(user.profile_name||'Pack Player'):'N/A'}${user.linked&&!user.username_owned?' · unowned':''}</td>
           <td>${esc(dateOnly(user.created_at))}</td><td>${esc(dateTime(user.last_active))}</td><td class="corpus-number">${fmt(user.runs)}</td><td class="corpus-number">${fmt(user.average_score)}</td>
-          <td class="user-access">${access(user)}</td><td>${user.is_admin?badge('Admin','candidate'):'N/A'}</td>
-        </tr>`).join('')||'<tr><td colspan="8">No authenticated accounts match these filters.</td></tr>'}
+          <td class="user-access">${access(user)}</td><td class="user-connections">${user.patreon_connected?badge('Patreon linked'):'N/A'}</td><td>${user.is_admin?badge('Admin','candidate'):'N/A'}</td>
+        </tr>`).join('')||'<tr><td colspan="9">No authenticated accounts match these filters.</td></tr>'}
       </tbody></table></div>
       <section class="play-activity" aria-labelledby="play-activity-heading">${playActivity()}</section>
       <dialog id="user-detail" aria-label="User details"><div id="user-detail-body"></div></dialog>
