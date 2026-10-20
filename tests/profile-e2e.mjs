@@ -446,7 +446,7 @@ try {
   assert.equal(await page.locator('#my-insights-environment').evaluate(el=>el.previousSibling?.textContent),'Format');
   const order=await page.locator('#my-insights-result .my-insights-grid > *').evaluateAll(nodes=>
     nodes.map(node=>node.querySelector('h2')?.textContent||node.querySelector('summary')?.textContent));
-  assert.deepEqual(order,['Picks to review','Your scores over time','Your pick patterns','More stats']);
+  assert.deepEqual(order,['Picks to review','Your pick patterns','Your scores over time','More stats']);
   assert.match(await page.locator('.my-insights-dna').textContent(),/Across formats · All available history/);
   assert.match(await page.locator('.my-insights-dna').textContent(),/The Independent Thinker/);
   assert.equal(await page.locator('.my-insights-qualified-trait').count(),2,
