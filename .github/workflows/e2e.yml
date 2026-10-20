@@ -121,7 +121,7 @@ jobs:
           BROWSER_GROUPS: ${{ steps.scope.outputs.browser_groups }}
         run: |
           npm ci --no-audit --no-fund
-          if [[ "$BROWSER_PLAN" == full || ",$BROWSER_GROUPS," == *,account,* ]]; then
+          if [[ "$BROWSER_PLAN" == full || ",$BROWSER_GROUPS," == *,account,* || ",$BROWSER_GROUPS," == *,admin,* ]]; then
             npx playwright install --with-deps chromium webkit
           else
             npx playwright install --with-deps chromium
