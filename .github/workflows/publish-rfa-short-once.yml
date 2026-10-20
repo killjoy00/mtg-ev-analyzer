@@ -38,8 +38,7 @@ jobs:
             -o artifacts/rfa-launch-short/pack-one-rfa-youtube-short-vertical.mp4
           echo 'bf645cd99c8a2bc1e4fd75558e085ea5641ef1bb37c5ff264ce6a90d32123e68  artifacts/rfa-launch-short/pack-one-rfa-youtube-short-vertical.mp4' | sha256sum -c -
           test "$(stat -c%s artifacts/rfa-launch-short/pack-one-rfa-youtube-short-vertical.mp4)" -eq 1680551
-          ffprobe -v error -show_entries stream=codec_type,width,height -show_entries format=duration -of json \
-            artifacts/rfa-launch-short/pack-one-rfa-youtube-short-vertical.mp4
+          node --input-type=module -e "import {readFileSync} from 'node:fs'; const f=readFileSync('artifacts/rfa-launch-short/pack-one-rfa-youtube-short-vertical.mp4'); if(f.toString('ascii',4,8)!=='ftyp')process.exit(1);"
 
   publish:
     needs: verify
