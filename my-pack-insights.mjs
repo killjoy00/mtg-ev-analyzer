@@ -376,7 +376,7 @@ function insightsContent(data) {
     dnaMarkup(data)+'</div>';
   const extras=data.comparison_contract==='compatible-source-groups-v1'
     ?(data.observations||[]).filter(x=>['progress','pick-depth'].includes(x.id)&&x.id!==safeFinding(data)?.id):[];
-  return '<div class="my-insights-grid">'+highlightsMarkup(data)+journeyMarkup(data)+dnaMarkup(data)+
+  return '<div class="my-insights-grid">'+highlightsMarkup(data)+dnaMarkup(data)+journeyMarkup(data)+
     '<details class="my-pack-card my-insights-wide my-insights-explore"><summary>More stats</summary>'+
     '<div class="my-insights-explore-content">'+
     '<section><h3>Scores by source pick position</h3><p class="my-insights-note">P1P positions are from the source draft, not the question number in this game. Averages require five picks.</p>'+
