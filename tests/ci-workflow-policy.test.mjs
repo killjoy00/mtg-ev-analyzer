@@ -48,9 +48,10 @@ test('scoped presentation validation preserves native editorial parity for canon
   }
 });
 
-test('scoped account browser validation installs WebKit for dual-engine contracts', () => {
+test('scoped account and admin browser validation installs WebKit for dual-engine contracts', () => {
   assert.match(browser,/BROWSER_GROUPS/);
   assert.match(browser,/\*,account,\*/);
+  assert.match(browser,/\*,admin,\*/);
   assert.match(browser,/playwright install --with-deps chromium webkit/);
 });
 
