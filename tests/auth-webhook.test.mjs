@@ -143,7 +143,7 @@ test('Pack One recovery template uses only a fragment reset URL and contains no 
     expiresAt:'2026-09-21T21:00:00.000Z',
   });
   assert.equal(rendered.url,'https://packone.pro/reset-password/#token='+token);
-  assert.match(rendered.html,/bgcolor="#171918"/);
+  assert.match(rendered.html,/bgcolor="#1e4d7a"/);
   assert.match(rendered.html,/>P<sup[^>]*>1<\/sup><\/td>/);
   assert.match(rendered.html,/padding-left:11px[^>]*>Pack One<\/td>/);
   assert.doesNotMatch(rendered.html,/<img\b/i);
@@ -166,7 +166,7 @@ test('Pack One verification template uses the exact validated Neon link with Pac
     expiresAt:'2026-09-22T21:00:00.000Z',
   });
   assert.equal(rendered.url,linkUrl);
-  assert.match(rendered.html,/bgcolor="#171918"/);
+  assert.match(rendered.html,/bgcolor="#1e4d7a"/);
   assert.match(rendered.html,/>P<sup[^>]*>1<\/sup><\/td>/);
   assert.match(rendered.html,/Verify your email/i);
   assert.match(rendered.html,/Verify email/);
