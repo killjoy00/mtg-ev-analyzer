@@ -474,11 +474,29 @@ def gate_failure_reasons(report: dict):
     return reasons
 
 
-def measure(sid: str, directory: Path, frozen: Path):
-    if sid not in SETS:
-        raise ValueError("Environment was not in the frozen Phase 2 testable scope")
+def measure(sid: str, directory: Path, frozen: Path, *, premier_pin=None):
+    # Historical callers keep their exact frozen scope and identities. New-set
+    # admission supplies a separately verified current Premier Candidate.
+    if premier_pin is None:
+        if sid not in SETS:
+            raise ValueError("Environment was not in the frozen Phase 2 testable scope")
+        pin = frozen_manifest(frozen, sid)
+        parent, model_version, component = PARENT, MODEL, COMPONENT
+        parity_key = "v8_parity_picks"
+    else:
+        from model_training import V5_MODEL, V5_CORPUS, validate_training_manifest
+        from set_policy import require_supported_set
+        require_supported_set(sid)
+        if sid == CUBE or premier_pin.get("id") != sid:
+            raise ValueError("New-set admission requires an exact regular-set identity")
+        validate_training_manifest(premier_pin)
+        if premier_pin.get("corpus_version") != V5_CORPUS or corpus_version() != V5_CORPUS:
+            raise ValueError("New-set evidence must match the current v5 parent")
+        pin = premier_pin
+        parent, model_version = V5_CORPUS, V5_MODEL
+        component = "traditional-premier-v5-phase2-v1"
+        parity_key = "v5_parity_picks"
     directory.mkdir(parents=True, exist_ok=True)
-    pin = frozen_manifest(frozen, sid)
     draft = directory / "premier.csv.gz"
     game = directory / "premier-game.csv.gz"
     premier_source = pinned_archive(pin["source_archive"], draft)
@@ -604,16 +622,16 @@ def measure(sid: str, directory: Path, frozen: Path):
                 if not first <= pick["pick_number"] <= last:
                     continue
                 pid = hashlib.sha256(
-                    f"{COMPONENT}|{sid}|{event}|{did}|{pick['pick_number']}".encode()
+                    f"{component}|{sid}|{event}|{did}|{pick['pick_number']}".encode()
                 ).hexdigest()[:32]
                 puzzles.append({
                     "puzzle_id": pid,
                     "set_id": sid,
                     "source_draft_hash": source_hash,
                     "source_fingerprint": fingerprint,
-                    "corpus_version": COMPONENT,
-                    "parent_corpus_version": PARENT,
-                    "model_version": MODEL,
+                    "corpus_version": component,
+                    "parent_corpus_version": parent,
+                    "model_version": model_version,
                     "model_input_signature": pin["input_signature"],
                     "model_source_event": "PremierDraft",
                     "source_event_type": event,
@@ -650,12 +668,14 @@ def measure(sid: str, directory: Path, frozen: Path):
 
     tags = {} if sid == CUBE else metadata_for_set(sid, built["models"][0])
     report = {
-        "schema": 3,
+        "schema": "new-set-traditional-v5-v1" if premier_pin is not None else 3,
         "set": sid,
-        "parent_corpus_version": PARENT,
-        "model_version": MODEL,
+        "parent_corpus_version": parent,
+        "model_version": model_version,
         "model_source_event": "PremierDraft",
         "traditional_used_for_training": False,
+        **({"training_mode": pin["training_mode"], "training_cap": pin["training_cap"],
+            "qualified_training_drafts": pin["qualified_training_drafts"]} if premier_pin is not None else {}),
         "source_hashes": {
             EVENTS[0]: {"draft": premier_source, "game": game_source},
             EVENTS[1]: {"draft": trad_source},
@@ -664,7 +684,7 @@ def measure(sid: str, directory: Path, frozen: Path):
         "production_manifest_sha256": pin["_manifest_sha256"],
         "production_puzzle_sha256": pin["puzzle_file_sha256"],
         "fold_training_ids_sha256": [fit["training_ids_sha256"] for fit in built["fits"]],
-        "v8_parity_picks": parity,
+        parity_key: parity,
         "training_drafts": len(built["training"]),
         "training_picks": built["training_picks"],
         "traditional_cohort": trad_cohort,
@@ -755,9 +775,9 @@ def measure(sid: str, directory: Path, frozen: Path):
     )
     atomic_json(directory / "manifest.json", {
         "id": sid,
-        "component_version": COMPONENT,
-        "parent_corpus_version": PARENT,
-        "model_version": MODEL,
+        "component_version": component,
+        "parent_corpus_version": parent,
+        "model_version": model_version,
         "model_input_signature": pin["input_signature"],
         "model_source_event": "PremierDraft",
         "source_event_type": "TradDraft",
@@ -768,7 +788,7 @@ def measure(sid: str, directory: Path, frozen: Path):
         "puzzle_file_sha256": digest(directory / "puzzles.jsonl.gz"),
         "ledger_file_sha256": digest(directory / "trophies.jsonl.gz"),
         "puzzles": len(puzzles),
-        "v8_parity_picks": parity,
+        parity_key: parity,
         "fold_training_ids_sha256": report["fold_training_ids_sha256"],
         "cube_snapshot": snapshot,
     })
@@ -777,8 +797,8 @@ def measure(sid: str, directory: Path, frozen: Path):
         path.unlink(missing_ok=True)
     print(json.dumps({
         "set": sid,
-        "model": MODEL,
-        "v8_parity_picks": parity,
+        "model": model_version,
+        parity_key: parity,
         "traditional_trajectories": trad_cohort["complete_trajectories"],
         "puzzles": len(puzzles),
         "pass": report["pass"],

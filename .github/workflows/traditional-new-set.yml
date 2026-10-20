@@ -1,0 +1,83 @@
+name: Traditional new-set admission
+
+on:
+  pull_request:
+    paths:
+      - '.github/traditional-new-set-request.json'
+      - '.github/workflows/traditional-new-set.yml'
+      - 'scripts/traditional_new_set.py'
+      - 'tests/test_traditional_new_set.py'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: traditional-new-set-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  admission:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      PYTHONPATH: scripts:.
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Verify artifact guards and unchanged Traditional rules
+        run: |
+          python -m unittest discover -s tests -p test_traditional_new_set.py
+          python -m unittest discover -s tests -p test_traditional_v4_revalidation.py
+          python -m unittest discover -s tests -p test_traditional_puzzles.py
+      - name: Wait for the requested Premier artifact
+        id: premier
+        shell: bash
+        run: |
+          set -euo pipefail
+          set_id=$(jq -er '.set | select(test("^[a-z0-9]{2,10}$"))' .github/traditional-new-set-request.json)
+          run_id=$(jq -er '.premier_run_id | select(test("^[1-9][0-9]{4,20}$"))' .github/traditional-new-set-request.json)
+          attempt=$(jq -er '.minimum_run_attempt | select(type=="number" and .>=1)' .github/traditional-new-set-request.json)
+          gh run watch "$run_id" --exit-status --interval 30
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" > "$RUNNER_TEMP/premier-run.json"
+          jq -e --argjson attempt "$attempt" 'select(.name=="Corpus Operations" and .head_branch=="main" and .conclusion=="success" and .run_attempt>=$attempt and (.event=="schedule" or .event=="workflow_dispatch"))' "$RUNNER_TEMP/premier-run.json" >/dev/null
+          run_sha=$(jq -er .head_sha "$RUNNER_TEMP/premier-run.json")
+          echo "set=$set_id" >> "$GITHUB_OUTPUT"
+          echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
+          echo "run_sha=$run_sha" >> "$GITHUB_OUTPUT"
+          gh run download "$run_id" --name "corpus-operations-$run_id" --dir generated/premier-artifact
+      - name: Locate exact Premier Candidate artifact
+        id: artifact
+        shell: bash
+        run: |
+          set -euo pipefail
+          root=generated/premier-artifact
+          if [[ -d "$root/generated" ]]; then root="$root/generated"; fi
+          test -f "$root/corpus-candidates/catalog.json"
+          echo "root=$root/corpus-candidates" >> "$GITHUB_OUTPUT"
+      - name: Reconstruct isolated Premier graders and evaluate Traditional trophies
+        env:
+          SET_ID: ${{ steps.premier.outputs.set }}
+          PREMIER_RUN: ${{ steps.premier.outputs.run_id }}
+          PREMIER_SHA: ${{ steps.premier.outputs.run_sha }}
+          PREMIER_ARTIFACT: ${{ steps.artifact.outputs.root }}
+        run: |
+          python -u scripts/traditional_new_set.py --set "$SET_ID" \
+            --premier "$PREMIER_ARTIFACT" --run-id "$PREMIER_RUN" --run-sha "$PREMIER_SHA"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: traditional-new-set-${{ github.run_id }}
+          retention-days: 90
+          if-no-files-found: warn
+          path: |
+            generated/traditional-new-set/admission.json
+            generated/traditional-new-set/*/manifest.json
+            generated/traditional-new-set/*/summary.json
+            generated/traditional-new-set/*/measurements.json.gz
+            generated/traditional-new-set/*/puzzles.jsonl.gz
+            generated/traditional-new-set/*/trophies.jsonl.gz
