@@ -1,0 +1,62 @@
+name: RFA Video Art Pack
+
+on:
+  push:
+    branches:
+      - content/launch-video-review-20261019
+    paths:
+      - .github/workflows/launch-video-rfa-art.yml
+
+permissions:
+  contents: read
+
+jobs:
+  art:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download authentic RFA card images and original Pack One brand
+        run: |
+          python - <<'PY'
+          import json,time,zipfile,urllib.request,urllib.parse,shutil
+          from pathlib import Path
+          output=Path('artifacts/rfa-launch-video-art');output.mkdir(parents=True,exist_ok=True)
+          names=[
+            'Multiply by Zero','Way of the Pyromancer',"Ajani's Anguish",
+            'Hexhaven Dueling Arena','No Admittance','Rewrite Regrets',
+            'Blossom-Blessed Angel','Shatterwing Pegasus','Hapatra, the Desert Frost',
+            'Command the Stage','Darklight Phoenix','Way of the Cryomancer',
+            'Yargle, Glutton of Urborg','Vigorbloom Vanguard','Winter, Team Player',
+          ]
+          headers={'User-Agent':'PackOne-LaunchVideo/1.0 (Pack One promotional review)','Accept':'application/json,image/jpeg,*/*'}
+          mapping={}
+          for name in names:
+            query=urllib.parse.urlencode({'exact':name,'set':'fra'})
+            with urllib.request.urlopen(urllib.request.Request('https://api.scryfall.com/cards/named?'+query,headers=headers),timeout=25) as response:
+              card=json.load(response)
+            if card.get('set')!='fra':raise RuntimeError('Not real RFA art: '+name)
+            images=card.get('image_uris') or next((f['image_uris'] for f in card.get('card_faces',[]) if f.get('image_uris')), {})
+            url=images.get('large') or images.get('normal')
+            assert url and url.startswith('https://cards.scryfall.io/')
+            filename='%02d.jpg'%len(mapping)
+            with urllib.request.urlopen(urllib.request.Request(url,headers=headers),timeout=30) as response:
+              (output/filename).write_bytes(response.read())
+            mapping[name]={'path':filename,'set':card['set'],'source':card.get('scryfall_uri')}
+            print('Downloaded',name,flush=True)
+            time.sleep(.12)
+          source=Path('docs/marketing/launch-video/pack-one-launch-editable-project.zip')
+          with zipfile.ZipFile(source) as project:
+            for name in project.namelist():
+              if name.startswith('assets/') and name.lower().endswith(('.ttf','.png','.otf')):
+                dest=output/Path(name).name
+                dest.write_bytes(project.read(name))
+          (output/'cards.json').write_text(json.dumps(mapping,indent=2)+'\n')
+          print('Brand assets',sorted(p.name for p in output.iterdir() if not p.name.endswith('.jpg')))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packone-rfa-video-art
+          path: artifacts/rfa-launch-video-art/
+          retention-days: 12
+          if-no-files-found: error
