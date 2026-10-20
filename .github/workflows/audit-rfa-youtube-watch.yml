@@ -1,0 +1,113 @@
+name: Audit Published Pack One RFA YouTube Video
+
+on:
+  push:
+    branches:
+      - content/launch-video-review-20261019
+    paths:
+      - .github/workflows/audit-rfa-youtube-watch.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    if: github.repository == 'killjoy00/mtg-ev-analyzer'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Read YouTube video, creator comments, and thumbnail (no writes)
+        env:
+          PACKONE_YOUTUBE_CLIENT_ID: ${{ secrets.PACKONE_YOUTUBE_CLIENT_ID }}
+          PACKONE_YOUTUBE_CLIENT_SECRET: ${{ secrets.PACKONE_YOUTUBE_CLIENT_SECRET }}
+          PACKONE_YOUTUBE_REFRESH_TOKEN: ${{ secrets.PACKONE_YOUTUBE_REFRESH_TOKEN }}
+          VIDEO_ID: wKoz5ngNL4o
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs/promises';
+          const id=process.env.VIDEO_ID;
+          if(!/^[A-Za-z0-9_-]{11}$/.test(id))throw Error('Invalid id');
+          for(const s of ['PACKONE_YOUTUBE_CLIENT_ID','PACKONE_YOUTUBE_CLIENT_SECRET','PACKONE_YOUTUBE_REFRESH_TOKEN'])
+            if(!process.env[s])throw Error('YouTube publishing credential missing: '+s);
+          const tokenResponse=await fetch('https://oauth2.googleapis.com/token',{
+            method:'POST',headers:{'content-type':'application/x-www-form-urlencoded'},
+            body:new URLSearchParams({client_id:process.env.PACKONE_YOUTUBE_CLIENT_ID,
+              client_secret:process.env.PACKONE_YOUTUBE_CLIENT_SECRET,
+              refresh_token:process.env.PACKONE_YOUTUBE_REFRESH_TOKEN,
+              grant_type:'refresh_token'}),
+            signal:AbortSignal.timeout(18000)});
+          if(!tokenResponse.ok)throw Error('YouTube credential refresh HTTP '+tokenResponse.status);
+          const token=(await tokenResponse.json()).access_token;
+          if(!token)throw Error('No access token returned');
+          const api=async(path,params)=>{
+            const u=new URL('https://www.googleapis.com/youtube/v3/'+path);
+            for(const [k,v] of Object.entries(params))u.searchParams.set(k,v);
+            const res=await fetch(u,{headers:{authorization:'Bearer '+token,accept:'application/json'},
+              signal:AbortSignal.timeout(20000)});
+            const json=await res.json().catch(()=>({}));
+            if(!res.ok)throw Error(path+' HTTP '+res.status+' '+JSON.stringify(json.error?.errors?.map(x=>x.reason)||[]));
+            return json;
+          };
+          const obj=await api('videos',{part:'snippet,status,contentDetails,statistics',id});
+          const v=obj.items?.[0];
+          if(!v)throw Error('Video not visible to connected YouTube channel or not found');
+          const s=v.snippet||{},t=v.status||{},c=v.contentDetails||{},st=v.statistics||{};
+          const output={
+            id,checked_at:new Date().toISOString(),
+            video:{
+              title:s.title,channelTitle:s.channelTitle,channelId:s.channelId,
+              publishedAt:s.publishedAt,description:s.description,
+              tags:s.tags||[],categoryId:s.categoryId,
+              defaultLanguage:s.defaultLanguage,defaultAudioLanguage:s.defaultAudioLanguage,
+              thumbnails:s.thumbnails,liveBroadcastContent:s.liveBroadcastContent
+            },
+            status:{
+              privacyStatus:t.privacyStatus,uploadStatus:t.uploadStatus,
+              madeForKids:t.madeForKids,selfDeclaredMadeForKids:t.selfDeclaredMadeForKids,
+              license:t.license,embeddable:t.embeddable,publicStatsViewable:t.publicStatsViewable
+            },
+            content:{
+              duration:c.duration,dimension:c.dimension,definition:c.definition,
+              caption:c.caption,licensedContent:c.licensedContent,projection:c.projection
+            },
+            stats:{viewCount:st.viewCount,likeCount:st.likeCount,commentCount:st.commentCount},
+            comment_status:'not_checked',creatorComments:[]
+          };
+          try{
+            const comments=await api('commentThreads',{part:'snippet',videoId:id,maxResults:'100',order:'time'});
+            output.comment_status='ok';
+            output.comment_threads_returned=comments.items?.length||0;
+            output.more_comments=!!comments.nextPageToken;
+            output.creatorComments=(comments.items||[])
+              .map(x=>x.snippet?.topLevelComment?.snippet)
+              .filter(x=>x?.authorChannelId?.value===s.channelId)
+              .map(x=>({textOriginal:x.textOriginal,publishedAt:x.publishedAt,updatedAt:x.updatedAt,
+                 likeCount:x.likeCount,authorDisplayName:x.authorDisplayName}));
+          }catch(e){output.comment_status='error: '+e.message}
+          await fs.mkdir('artifacts/longform-youtube-audit',{recursive:true});
+          await fs.writeFile('artifacts/longform-youtube-audit/metadata.json',JSON.stringify(output,null,2));
+          console.log('AUDIT_START');
+          console.log(JSON.stringify({
+            video:output.video,status:output.status,content:output.content,stats:output.stats,
+            comment_status:output.comment_status,creatorComments:output.creatorComments
+          },null,2));
+          console.log('AUDIT_END');
+          const thumbnail=s.thumbnails?.maxres?.url||s.thumbnails?.standard?.url||s.thumbnails?.high?.url;
+          if(thumbnail?.startsWith('https://')){
+            const response=await fetch(thumbnail,{signal:AbortSignal.timeout(15000)});
+            if(response.ok && (response.headers.get('content-type')||'').includes('image')){
+              const bytes=new Uint8Array(await response.arrayBuffer());
+              if(bytes.length>1000){
+                await fs.writeFile('artifacts/longform-youtube-audit/live-thumbnail.jpg',bytes);
+                console.log('THUMBNAIL_BYTES',bytes.length);
+              }
+            }
+          }
+          NODE
+      - name: Save public posting audit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: longform-youtube-posting-audit
+          path: artifacts/longform-youtube-audit/
+          retention-days: 5
+          if-no-files-found: error
