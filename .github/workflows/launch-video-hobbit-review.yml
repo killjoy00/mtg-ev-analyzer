@@ -17,8 +17,11 @@ jobs:
     timeout-minutes: 8
     steps:
       - uses: actions/checkout@v4
-      - name: Inspect editable review project
+      - name: Inspect source renderer and edit timeline
         run: |
-          unzip -l docs/marketing/launch-video/pack-one-launch-editable-project.zip | head -100
-          printf '\nDirectory files:\n'
-          find docs/marketing/launch-video -maxdepth 1 -type f -printf '%f %s bytes\n'
+          echo '===== PACKAGED README ====='
+          unzip -p docs/marketing/launch-video/pack-one-launch-editable-project.zip README.md
+          echo '===== RENDERER ====='
+          unzip -p docs/marketing/launch-video/pack-one-launch-editable-project.zip build_video.py
+          echo '===== TIMELINE ====='
+          unzip -p docs/marketing/launch-video/pack-one-launch-editable-project.zip timeline.json
