@@ -29,8 +29,11 @@ jobs:
       - name: Install local video rendering tools
         run: |
           python -m pip install --disable-pip-version-check --quiet 'Pillow>=11,<13' 'numpy>=1.26,<3' 'soundfile>=0.12' 'kokoro-onnx>=0.4,<1'
-          command -v ffmpeg
-          command -v ffprobe
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y --no-install-recommends ffmpeg
+          fi
+          ffmpeg -version | head -1
       - name: Download Kokoro studio voice model (not checked into repo)
         run: |
           mkdir -p docs/marketing/launch-video/_hobbit_video_work/voice
