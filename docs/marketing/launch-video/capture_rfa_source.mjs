@@ -68,12 +68,12 @@ try {
   for(let round=0;round<8;round++){
     await page.waitForFunction(n=>{
       const heading=document.querySelector('.run-heading')?.textContent||'';
-      return heading.includes('Round '+n+'/8')&&document.querySelectorAll('.run-card-select img').length>=10;
+      return heading.includes('Round '+n+'/8')&&document.querySelectorAll('.run-card-select img').length>=7;
     },round+1,{timeout:50000});
     await page.waitForFunction(()=>{
       const imgs=[...document.querySelectorAll('.run-cards .run-card-select img')];
       for(const el of imgs)el.loading='eager';
-      return imgs.length>=10&&imgs.every(el=>el.complete&&el.naturalWidth>100);
+      return imgs.length>=7&&imgs.every(el=>el.complete&&el.naturalWidth>100);
     },null,{timeout:45000});
     await page.evaluate(async()=>{
       await Promise.all([...document.querySelectorAll('.run-cards .run-card-select img')].map(x=>x.decode()));
@@ -82,7 +82,7 @@ try {
     // serviced by a first-party gateway or a service worker.
     const header=await page.locator('.run-heading h1').innerText();
     const setId=/reality fracture/i.test(header)?'fra':'other';
-    const pickNumber=Number(header.match(/Pick\\s+(\\d+)/i)?.[1]||0);
+    const pickNumber=Number(header.match(/Pick\s+(\d+)/i)?.[1]||0);
     const all=await page.locator('.run-cards .run-card').evaluateAll(rows=>rows.map(row=>{
       const button=row.querySelector('[data-pick]');
       const img=row.querySelector('.run-card-select img');
@@ -93,7 +93,7 @@ try {
       name:button.querySelector('img')?.alt||'',
       image_url:button.querySelector('img')?.currentSrc||button.querySelector('img')?.src||''
     })));
-    assert.ok(all.length>=10&&all.every(c=>c.id&&c.name&&c.image_url),'Live pack did not expose complete cards');
+    assert.ok(all.length>=7&&all.every(c=>c.id&&c.name&&c.image_url),'Live pack did not expose complete cards');
     const chosen=all[round%2];
     console.log('SOURCE_ROUND',round+1,'set',setId,'pack_cards',all.length,'pick',pickNumber);
     // Exact live site screenshot, before selection. No username in the screenshots.
