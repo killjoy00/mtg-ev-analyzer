@@ -46,6 +46,8 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run_id" > "$RUNNER_TEMP/premier-run.json"
           jq -e --argjson attempt "$attempt" 'select(.name=="Corpus Operations" and .head_branch=="main" and .conclusion=="success" and .run_attempt>=$attempt and (.event=="schedule" or .event=="workflow_dispatch"))' "$RUNNER_TEMP/premier-run.json" >/dev/null
           run_sha=$(jq -er .head_sha "$RUNNER_TEMP/premier-run.json")
+          [[ "$run_sha" =~ ^[a-f0-9]{40}$ ]]
+          git fetch --no-tags --depth=1 origin "$run_sha"
           echo "set=$set_id" >> "$GITHUB_OUTPUT"
           echo "run_id=$run_id" >> "$GITHUB_OUTPUT"
           echo "run_sha=$run_sha" >> "$GITHUB_OUTPUT"

@@ -5,11 +5,13 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 
-from traditional_new_set import candidate_pin
+from traditional_new_set import candidate_pin, builder_revision
+from corpus_promotion_provenance import ingestion_revision
 from traditional_v4_revalidation import measure
 from model_training import V5_CORPUS, V5_MODEL
 
@@ -104,6 +106,28 @@ class NewSetCandidateTests(unittest.TestCase):
         self.pin['corpus_version'] = 'elite-trophy-colour-stage-v8'
         with self.assertRaisesRegex(ValueError, 'current v5 parent'):
             measure('fra', self.root / 'output', self.root, premier_pin=self.pin)
+
+
+class BuilderRevisionTests(unittest.TestCase):
+    def test_schema_only_drift_keeps_original_provenance_but_model_drift_fails(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / 'scripts').mkdir()
+            paths = ('scripts/build_replays.py', 'scripts/verify-neon-schema.mjs')
+            for relative in paths:
+                (root / relative).write_text('original')
+            def git(*args):
+                return subprocess.check_output(['git', *args], cwd=root, stderr=subprocess.DEVNULL).decode().strip()
+            git('init')
+            git('add', '.')
+            git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'fixture')
+            commit = git('rev-parse', 'HEAD')
+            expected = ingestion_revision(root=root, paths=paths)
+            (root / paths[1]).write_text('new schema preflight')
+            self.assertEqual(builder_revision(commit, root=root, paths=paths), expected)
+            (root / paths[0]).write_text('changed model')
+            with self.assertRaisesRegex(ValueError, 'grading input changed'):
+                builder_revision(commit, root=root, paths=paths)
 
 
 if __name__ == '__main__':

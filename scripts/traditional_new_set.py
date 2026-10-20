@@ -8,12 +8,37 @@ import argparse
 import json
 from pathlib import Path
 import re
+import subprocess
+import tempfile
 
-from corpus_promotion_provenance import verify_catalog_builder, ingestion_revision
-from import_all_trophies import atomic_json, digest
+from corpus_promotion_provenance import verify_catalog_builder, ingestion_revision, INGESTION_RELEVANT_PATHS
+from import_all_trophies import ROOT, atomic_json, digest
 from model_training import V5_CORPUS, validate_training_manifest
 from set_policy import require_supported_set
 from traditional_v4_revalidation import measure
+
+
+def builder_revision(commit, root=ROOT, paths=INGESTION_RELEVANT_PATHS):
+    """Authenticate the original builder while requiring identical grading inputs.
+
+    A schema-preflight update cannot change this read-only reconstruction. Every
+    other ingestion input must still match byte-for-byte; artifact provenance is
+    checked against the revision independently rebuilt from the original commit.
+    """
+    if not re.fullmatch(r"[a-f0-9]{40}", commit):
+        raise ValueError("A full Premier builder SHA is required")
+    root = Path(root)
+    with tempfile.TemporaryDirectory() as temporary:
+        original = Path(temporary)
+        for relative in paths:
+            content = subprocess.check_output(
+                ["git", "show", f"{commit}:{relative}"], cwd=root)
+            if relative != 'scripts/verify-neon-schema.mjs' and content != (root / relative).read_bytes():
+                raise ValueError(f"Premier grading input changed since builder: {relative}")
+            destination = original / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(content)
+        return ingestion_revision(root=original, paths=paths)
 
 
 def candidate_pin(root, sid, run_id, run_sha, revision):
@@ -48,7 +73,7 @@ def candidate_pin(root, sid, run_id, run_sha, revision):
 
 def run(args):
     pin, builder = candidate_pin(args.premier, args.set, args.run_id,
-                                 args.run_sha, ingestion_revision())
+                                 args.run_sha, builder_revision(args.run_sha))
     directory = args.output / args.set
     measure(args.set, directory, args.premier, premier_pin=pin)
     summary = json.loads((directory / "summary.json").read_text())
