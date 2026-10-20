@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
+import {liveRegularSets} from '../daily-selection.mjs';
 if(!process.argv.includes('--dev-fixtures'))throw Error('Use a disposable branch.');
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 process.env.PACK1_CAPACITY_DIAGNOSTICS='1';
@@ -10,7 +11,7 @@ const growthModule=await import('../worker/growth-function.js');
 const {query}=growthModule, growth=growthModule.default;
 const {default:api}=await import('../worker/draft-run-function.mjs');
 const {DRAFT_RUN_CORPUS_VERSION}=await import('../draft-run.mjs');
-const {loadPuzzleMetadata}=await import('../worker/draft-run-selection.mjs');
+const {loadPuzzleMetadata,loadLiveSetMetadata}=await import('../worker/draft-run-selection.mjs');
 const tag=crypto.randomUUID().slice(0,8),day='2040-01-10';
 const parse=v=>typeof v==='string'?JSON.parse(v):v;
 async function callWith(target,path,body,token,auth,status=200){
@@ -33,7 +34,15 @@ let run=await call('/v1/runs',{daily:true},guest.token);
 const schedule=parse((await query("SELECT puzzle_ids FROM draft_run_schedules WHERE day=$1::date AND environment='mixed'",[day])).rows[0].puzzle_ids);
 const rows=(await query('SELECT set_id,source_draft_hash FROM draft_run_verified_puzzles WHERE puzzle_id=ANY($1::text[])',['{'+schedule.join(',')+'}'])).rows;
 assert.equal(rows.length,8);assert.equal(new Set(rows.map(p=>p.source_draft_hash)).size,8);
-assert.ok(rows.filter(p=>p.set_id==='hob').length>=2);assert.ok(rows.filter(p=>['msh','sos','tmt'].includes(p.set_id)).length>=4);
+// The schedule's required pool comes from currently Live corpus metadata, not
+// a fixed release list. Older sets can be paused without changing this policy.
+const live=liveRegularSets(await loadLiveSetMetadata(query,DRAFT_RUN_CORPUS_VERSION),day);
+assert.ok(live.length>=4,'The mixed Daily requires at least four Live regular releases.');
+const newest=live[0].set_id,previous=new Set(live.slice(1,4).map(s=>s.set_id));
+const selectedSets=rows.map(p=>p.set_id);
+console.log('Fixed Daily composition',JSON.stringify({newest,previous:[...previous],selected:selectedSets}));
+assert.ok(selectedSets.filter(id=>id===newest).length>=2,'The mixed Daily must contain at least two picks from its newest Live set.');
+assert.ok(selectedSets.filter(id=>previous.has(id)).length>=4,'The mixed Daily must contain at least four picks from its previous-three Live pool.');
 assert.deepEqual(run.rerolls,{set:0,pack:0});
 await call(`/v1/runs/${run.id}/reroll`,{revision:run.revision,round:0,puzzleId:run.current.puzzle_id,type:'pack'},guest.token,null,409);
 async function finish(s,token,auth){
@@ -81,20 +90,20 @@ assert.equal((await query('SELECT count(*) n FROM scores WHERE player_id=$1::uui
 // Linked player with no Auth header still cannot use paid or free account practice.
 await call('/v1/runs',{},owner.token,null,403);
 let latest=await call('/v1/runs',{daily:true,environment:'latest'},owner.token);
-assert.equal(latest.leaderboard_eligible,true);assert.deepEqual(latest.daily_featured_sets,['hob']);
+assert.equal(latest.leaderboard_eligible,true);assert.deepEqual(latest.daily_featured_sets,[newest]);
 assert.deepEqual(latest.rerolls,{set:0,pack:0});
 latest=await finish(latest,owner.token);
-assert.ok(latest.answers.every(a=>a.puzzle.set_id==='hob'));
+assert.ok(latest.answers.every(a=>a.puzzle.set_id===newest));
 assert.deepEqual(latest.answers.map(a=>a.puzzle.pick_number),[1,2,3,4,5,6,7,8]);
 assert.equal((await call('/v1/runs',{daily:true,environment:'latest'},owner.token)).id,latest.id);
 assert.match((await call(`/v1/runs/${latest.id}/share`,{},owner.token)).url,/set=latest/);
 assert.ok((await call('/v1/leaderboard?environment=latest')).rows.some(r=>r.display_name==='QA ranked '+tag));
 await call('/v1/runs',{environment:'latest'},owner.token,auth,400);
 // Newly paused data must not invalidate today's already-published schedule.
-await query("UPDATE draft_run_environment_policy SET status='Paused' WHERE set_id='hob'");
+await query("UPDATE draft_run_environment_policy SET status='Paused' WHERE set_id=$1",[newest]);
 const later=await call('/v1/session',{displayName:'QA fixed later '+tag});
 assert.equal((await call('/v1/runs',{daily:true},later.token)).current.puzzle_id,schedule[0]);
-await query("UPDATE draft_run_environment_policy SET status='Live' WHERE set_id='hob'");
+await query("UPDATE draft_run_environment_policy SET status='Live' WHERE set_id=$1",[newest]);
 // A different corpus revision cannot replace an already-published Daily.
 // Replay an actually published retained schedule. A superseded parent is
 // intentionally unavailable for new generation after the serving cutover.
