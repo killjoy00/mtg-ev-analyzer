@@ -136,9 +136,12 @@ export function ProfileOverview({ profile, publicView = false }: { profile: Care
           <Stat label="Best streak" value={summary.best_streak} />
         </View>
         {challengeGames ? (
-          <Text style={styles.meta}>
-            Shared-run record · {summary.challenge_wins} W · {summary.challenge_losses} L · {summary.challenge_ties} T
-          </Text>
+          <>
+            <Text style={styles.meta}>
+              Shared challenges played · {Number(summary.challenge_wins || 0)} beaten · {Number(summary.challenge_losses || 0)} below target · {Number(summary.challenge_ties || 0)} tied
+            </Text>
+            <Text style={styles.meta}>Results from playing other people’s shared runs.</Text>
+          </>
         ) : null}
       </Section>
 

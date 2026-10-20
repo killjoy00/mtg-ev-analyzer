@@ -1,6 +1,6 @@
 import {escapeHtml as esc} from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
-import {liveEnvironmentProgress,formatChallengeRecord,modeName,unlockedAchievements} from './profile-core.mjs';
+import {liveEnvironmentProgress,formatChallengeRecord,challengeOutcomeLabel,modeName,unlockedAchievements} from './profile-core.mjs';
 import {PATREON_POLICY} from './patreon-policy.mjs';
 import {invalidateMyPackInsights,mountMyPackInsights} from './my-pack-insights.mjs?v=4';
 import {eliteSource} from './membership-source.mjs';
@@ -93,7 +93,7 @@ function gamePreviewRow(row,names) {
 
 function historyRow(row,names) {
   const date=row.played_at?new Date(row.played_at).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}):'';
-  return '<li data-history-cursor="'+esc(row.cursor||'')+'"><div><strong>'+esc(environmentName(names,row.set_id))+'</strong><span>'+esc(modeName(row.mode,{cube:row.set_id==='powered-cube'}))+(row.is_daily?' · Daily':'')+(date?' · '+esc(date):'')+'</span></div><b>'+num(row.score)+'</b><em>'+esc(row.grade||'')+(row.outcome?' · '+esc(row.outcome):'')+'</em></li>';
+  return '<li data-history-cursor="'+esc(row.cursor||'')+'"><div><strong>'+esc(environmentName(names,row.set_id))+'</strong><span>'+esc(modeName(row.mode,{cube:row.set_id==='powered-cube'}))+(row.is_daily?' · Daily':'')+(date?' · '+esc(date):'')+'</span></div><b>'+num(row.score)+'</b><em>'+esc(row.grade||'')+(row.outcome?' · '+esc(challengeOutcomeLabel(row.outcome)):'')+'</em></li>';
 }
 
 function dailyPreviewRow(row,names) {
@@ -175,10 +175,12 @@ function statsMarkup(profile,liveCatalog,account,patreon) {
     ['Average',num(summary.average_score).toFixed(1)],
     ['Best',num(summary.best_score)],
     ['Daily streak',num(summary.current_streak)],
-    ['Shared W–L',esc(formatChallengeRecord(summary))],
+    ['Shared challenges played',esc(formatChallengeRecord(summary)),'Results from playing other people’s shared runs.'],
     ['Environments',progress?progress.played+'/'+progress.total:'Unavailable'],
   ];
-  const metricHtml=metrics.map(([label,value])=>'<div><strong>'+value+'</strong><span>'+label+'</span></div>').join('');
+  const metricHtml=metrics.map(([label,value,help])=>
+    '<div'+(help?' class="my-shared-challenge-stat"':'')+'><strong>'+value+'</strong><span>'+label+'</span>'+
+    (help?'<small>'+esc(help)+'</small>':'')+'</div>').join('');
   const recentPreview=recent.slice(0,5).map(row=>gamePreviewRow(row,names)).join('');
   const dailyPreview=daily.slice(0,5).map(row=>dailyPreviewRow(row,names)).join('');
   return '<div class="my-pack-one-grid"><main class="my-pack-one-main">'+

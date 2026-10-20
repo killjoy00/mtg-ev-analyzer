@@ -30,6 +30,7 @@ import {
   bestPercentile,
   liveEnvironmentProgress,
   formatChallengeRecord,
+  challengeOutcomeLabel,
   modeName,
   recentForm,
   unlockedAchievements,
@@ -135,7 +136,7 @@ function achievementCard(achievement, { own = false, showcaseId = null } = {}) {
 function historyRow(row, names) {
   const setName = row.set_id==='latest'?'Latest Set':names.get(String(row.set_id || '').toLowerCase()) || String(row.set_id || '').toUpperCase();
   const date = row.played_at ? new Date(row.played_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
-  return `<li data-history-cursor="${esc(row.cursor || '')}"><div><strong>${esc(setName)}</strong><span>${esc(modeName(row.mode, { cube: row.set_id === 'powered-cube' }))}${row.is_daily ? ' · Daily' : ''}${date ? ` · ${esc(date)}` : ''}</span></div><b>${Number(row.score || 0)}</b><em>${esc(row.grade || '')}${row.outcome ? ` · ${esc(row.outcome)}` : ''}</em></li>`;
+  return `<li data-history-cursor="${esc(row.cursor || '')}"><div><strong>${esc(setName)}</strong><span>${esc(modeName(row.mode, { cube: row.set_id === 'powered-cube' }))}${row.is_daily ? ' · Daily' : ''}${date ? ` · ${esc(date)}` : ''}</span></div><b>${Number(row.score || 0)}</b><em>${esc(row.grade || '')}${row.outcome ? ` · ${esc(challengeOutcomeLabel(row.outcome))}` : ''}</em></li>`;
 }
 
 function dailyRow(row, names, index) {
@@ -314,7 +315,7 @@ function profileMarkup(profile, liveCatalog, { own = false, publicKey = null, ac
       <div><span>Average</span><strong>${Number(summary.games||0)>0?Number(summary.average_score||0).toFixed(1):'Not yet'}</strong></div>
       <div><span>Best</span><strong>${Number(summary.games||0)>0?Number(summary.best_score||0):'Not yet'}</strong></div>
       <div><span>Daily streak</span><strong>${Number(summary.current_streak || 0)}</strong></div>
-      <div title="Shared run wins and losses"><span>Shared W–L</span><strong>${esc(formatChallengeRecord(summary))}</strong></div>
+      <div class="profile-shared-challenge-stat" title="Results from playing other people’s shared runs."><span>Shared challenges played</span><strong>${esc(formatChallengeRecord(summary))}</strong></div>
       <div><span>Environments</span><strong>${progress ? `${progress.played}/${progress.total}` : 'Unavailable'}</strong></div>
     </div>
 

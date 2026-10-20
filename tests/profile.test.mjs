@@ -6,6 +6,7 @@ import {
   environmentProgress,
   liveEnvironmentProgress,
   formatChallengeRecord,
+  challengeOutcomeLabel,
   profileShareSummary,
   recentForm,
   unlockedAchievements,
@@ -69,7 +70,13 @@ test('profile helpers summarize challenges, recent form, unlocks, and share copy
     best_environments:[{ set_id:'neo' },{ set_id:'ktk' }],
     achievements:[{ id:'a', unlocked:true },{ id:'b', unlocked:false }],
   };
-  assert.equal(formatChallengeRecord(profile.summary), '3–2–1');
+  assert.equal(formatChallengeRecord(profile.summary), '3 beaten · 2 below target · 1 tied');
+  assert.equal(formatChallengeRecord({challenge_wins:2,challenge_losses:1}), '2 beaten · 1 below target · 0 tied');
+  assert.equal(formatChallengeRecord(), '0 beaten · 0 below target · 0 tied');
+  assert.equal(challengeOutcomeLabel('win'), 'Beat shared score');
+  assert.equal(challengeOutcomeLabel('loss'), 'Below shared score');
+  assert.equal(challengeOutcomeLabel('tie'), 'Matched shared score');
+  assert.equal(challengeOutcomeLabel(null), '');
   assert.equal(recentForm(profile, 2), 85);
   assert.deepEqual(unlockedAchievements(profile).map((row)=>row.id), ['a']);
   assert.deepEqual(profileShareSummary(profile, { played:5, total:32 }), {

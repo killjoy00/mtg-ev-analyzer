@@ -49,8 +49,13 @@ function playedDate(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.valueOf()) ? value : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
+function challengeOutcomeLabel(outcome: CareerHistoryRow['outcome']) {
+  return outcome === 'win' ? 'Beat shared score'
+    : outcome === 'loss' ? 'Below shared score'
+    : outcome === 'tie' ? 'Matched shared score' : outcome;
+}
 function historyDetail(row: CareerHistoryRow) {
-  return [environment(row.set_id), mode(row.mode), row.is_daily ? 'Daily' : null, row.grade, row.outcome].filter(Boolean).join(' \u00b7 ');
+  return [environment(row.set_id), mode(row.mode), row.is_daily ? 'Daily' : null, row.grade, challengeOutcomeLabel(row.outcome)].filter(Boolean).join(' \u00b7 ');
 }
 
 function PublicRecordDetails({ profile }: { profile: CareerProfile }) {
