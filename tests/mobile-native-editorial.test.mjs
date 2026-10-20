@@ -135,7 +135,10 @@ test('About has discoverable Learn and Account navigation, not loose links on ev
   assert.doesNotMatch(tabLayout, /Help and information|router\.push\('\/help'\)|>Help</);
   assert.match(learnScreen, /title: 'About Pack One'.*route: '\/about' as const/);
   assert.match(howToScreen, /title: 'About Pack One'[\s\S]*?route: '\/about' as const/);
-  assert.match(accountScreen, /<AboutLink \/>/);
+  assert.match(accountScreen, /\{account \? null : <AboutLink \/>\}/, 'signed-out Account keeps a standalone About row');
+  assert.ok(accountScreen.indexOf("router.push('/about')") > accountScreen.indexOf("router.push('/account-security')") &&
+    accountScreen.indexOf("router.push('/about')") < accountScreen.indexOf("router.push('/account-delete')"),
+    'signed-in Account lists About with the settings rows, above Delete account');
   assert.match(aboutLink, /accessibilityLabel="About Pack One"/);
   assert.match(aboutLink, /styles\.row/);
   assert.match(aboutLink, /router\.push\('\/about'\)/);

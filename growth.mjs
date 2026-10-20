@@ -53,7 +53,7 @@ function takeProfileSafetyIntent() {
 async function resumeProfileSafetyIntent() {
   const pending=takeProfileSafetyIntent();
   if(!pending)return false;
-  const profiles=await import('./profile-product.mjs?v=19');
+  const profiles=await import('./profile-product.mjs?v=20');
   profiles.installProfileProductLayer();
   (await import('./profile-polish.mjs?v=6')).installProfilePolish();
   await profiles.renderPublicProfile(pending.profileKey);
@@ -76,7 +76,7 @@ async function renderSignedInHome(source='account') {
     location.assign(sharedRunInvitationPath(invitation));
     return;
   }
-  const profiles=await import('./profile-product.mjs?v=19');
+  const profiles=await import('./profile-product.mjs?v=20');
   profiles.installProfileProductLayer();
   (await import('./profile-polish.mjs?v=6')).installProfilePolish();
   await profiles.renderMyProfile();
@@ -380,7 +380,7 @@ export async function renderAccount({ validateDailyRunId = null, sharedRunId: in
     const displayNameAttention=Boolean(validationRunId&&linked?.rankingIdentity?.eligible===false&&['username_taken','username_required','name_not_allowed'].includes(linked?.rankingIdentity?.reason));
     if(displayNameAttention) {
       pendingDailyRunValidation=validationRunId;
-      const profiles=await import('./profile-product.mjs?v=19');
+      const profiles=await import('./profile-product.mjs?v=20');
       profiles.installProfileProductLayer();
       (await import('./profile-polish.mjs?v=6')).installProfilePolish();
       await profiles.renderMyProfile();
@@ -471,7 +471,7 @@ export async function renderAccount({ validateDailyRunId = null, sharedRunId: in
     }
   });
   document.querySelector('#account-forgot')?.addEventListener('click',()=>void renderForgotPassword());
-  document.querySelector('#account-career')?.addEventListener('click',async()=>{pendingDailyRunValidation=null;if(activatingPatreon)clearPatreonActivation();await (await import('./profile-product.mjs?v=19')).renderMyProfile();});
+  document.querySelector('#account-career')?.addEventListener('click',async()=>{pendingDailyRunValidation=null;if(activatingPatreon)clearPatreonActivation();await (await import('./profile-product.mjs?v=20')).renderMyProfile();});
   document.querySelector('#account-home')?.addEventListener('click',()=>{pendingDailyRunValidation=null;if(activatingPatreon)clearPatreonActivation();document.querySelector('#brand-home')?.click();});
 
   const signup=document.querySelector('#account-signup');

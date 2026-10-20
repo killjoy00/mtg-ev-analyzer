@@ -181,7 +181,7 @@ function highlightsMarkup(data) {
     ' <small>These examples illustrate the comparison; they don’t prove its cause.</small></p>':
     '<p class="my-insights-note">Open a pick to see the full pack and the trophy drafter’s earlier picks.</p>';
   return '<section class="my-pack-card my-insights-wide my-insights-highlights"><div class="my-card-heading">'+
-    '<h2>Picks to review</h2><span>'+number(data.eligible_decisions)+' picks included in this view</span></div>'+
+    '<h2>Picks to review</h2></div>'+
     lead+'<div role="tablist" aria-label="Pick examples" class="my-insights-highlight-tabs">'+
       '<button type="button" role="tab" id="my-insights-misses-tab" aria-selected="'+(selected==='misses')+
       '" aria-controls="my-insights-misses-panel" tabindex="'+(selected==='misses'?0:-1)+
@@ -393,16 +393,21 @@ function insightsContent(data) {
        esc(data.methodology||'Only your first included answer to each puzzle counts. Scores are not a skill rating.')+'</p></section>'+
     '</div></details></div>';
 }
+// The Mixed sets note only applies while that format is selected.
+function syncFormatExplainer(root,state) {
+  const note=root.querySelector('.my-insights-format-explainer');
+  if(note)note.hidden=state.environment!=='mixed';
+}
 function shell(root,state) {
   root.innerHTML='<div class="my-insights-page">'+
-    '<header class="my-insights-heading"><h2>Your picks</h2></header>'+
+    '<header class="my-insights-heading visually-hidden"><h2>Your picks</h2></header>'+
     '<div class="my-insights-controls" aria-label="Filter pick reviews and score history">'+
       '<label for="my-insights-environment">Format<select id="my-insights-environment">'+ENVIRONMENTS.map(([key,label])=>
         '<option value="'+key+'"'+(state.environment===key?' selected':'')+'>'+label+'</option>').join('')+'</select></label>'+
       '<label for="my-insights-period">Time period<select id="my-insights-period">'+PERIODS.map(([key,label])=>
         '<option value="'+key+'"'+(state.period===key?' selected':'')+'>'+label+'</option>').join('')+'</select></label>'+
       '<button class="button secondary" type="button" id="my-insights-refresh">Refresh</button>'+
-      '<p class="my-insights-format-explainer">Mixed sets is its own format, not a combination of Latest Set and Powered Cube.</p></div>'+
+      '<p class="my-insights-format-explainer"'+(state.environment==='mixed'?'':' hidden')+'>Mixed sets is its own format, not a combination of Latest Set and Powered Cube.</p></div>'+
     '<div id="my-insights-result" aria-live="polite"><section class="my-pack-card"><p>Loading your picks…</p></section></div>'+
     '<dialog id="my-insights-decision-dialog" class="my-insights-dialog" aria-label="Review pick">'+
       '<div data-insights-dialog-body></div></dialog></div>';
@@ -415,7 +420,7 @@ function shell(root,state) {
     state.returnFocus=null;
   });
   root.querySelector('#my-insights-environment')?.addEventListener('change',event=>{
-    state.environment=event.target.value;state.userFiltered=true;void refresh(root,state);
+    state.environment=event.target.value;state.userFiltered=true;syncFormatExplainer(root,state);void refresh(root,state);
   });
   root.querySelector('#my-insights-period')?.addEventListener('change',event=>{
     state.period=event.target.value;state.userFiltered=true;void refresh(root,state);
@@ -439,6 +444,7 @@ async function refresh(root,state) {
        response.default_environment!==state.environment){
       state.autoMatched=true;state.environment=response.default_environment;
       const picker=root.querySelector('#my-insights-environment');if(picker)picker.value=state.environment;
+      syncFormatExplainer(root,state);
       void refresh(root,state);return;
     }
     const target=root.querySelector('#my-insights-result');
