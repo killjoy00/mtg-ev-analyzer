@@ -1,6 +1,6 @@
 import {renderOverview,adminArea,ADMIN_AREAS} from './overview.mjs?v=20261019';
 import {renderCorpus} from './corpus.mjs';
-import {renderUsers} from './users.mjs';
+import {renderUsers} from './users.mjs?v=20261020-access';
 import {renderAdminTeam} from './team.mjs';
 import {renderCampaignLinks} from './campaign-links.mjs?v=20261019-overview';
 import {renderPlayerReports} from './player-reports.mjs?v=20261016';
