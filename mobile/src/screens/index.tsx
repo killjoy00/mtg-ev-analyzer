@@ -6,7 +6,6 @@ import { Text } from '@/src/components/Text';
 import { config } from '@/src/config';
 
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
-import { AboutLink } from '@/src/components/AboutLink';
 
 import {
   DAILY_ENVIRONMENT_META,
@@ -269,7 +268,6 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        <AboutLink />
       </ScrollView>
     </SafeAreaView>
   );
