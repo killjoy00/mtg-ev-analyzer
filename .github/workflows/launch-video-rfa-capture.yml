@@ -1,0 +1,38 @@
+name: Capture RFA Shared Run for Video
+
+on:
+  push:
+    branches:
+      - content/launch-video-review-20261019
+    paths:
+      - .github/workflows/launch-video-rfa-capture.yml
+      - docs/marketing/launch-video/capture_rfa_source.mjs
+
+permissions:
+  contents: read
+
+jobs:
+  record-source:
+    if: github.repository == 'killjoy00/mtg-ev-analyzer'
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install browser
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Capture publicly shared RFA decisions with QA-marked preview run
+        env:
+          PACKONE_REVIEW_SHARE_ID: e66d6fcfac38470ba719c4f6
+        run: node docs/marketing/launch-video/capture_rfa_source.mjs
+      - name: Archive sanitized gameplay and picks
+        uses: actions/upload-artifact@v4
+        with:
+          name: packone-rfa-shared-source
+          path: docs/marketing/launch-video/_rfa_capture/
+          retention-days: 10
+          if-no-files-found: error
