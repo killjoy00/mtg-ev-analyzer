@@ -4,7 +4,6 @@ import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, Vie
 import {safeCardImageUrl} from '../../../card-image-policy.mjs';
 import { Text } from '@/src/components/Text';
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
-import { AboutLink } from '@/src/components/AboutLink';
 import { MyPackSectionTabs } from '@/src/components/MyPackSectionTabs';
 import { loadMobileInsights, loadMobileInsightDecision, type DraftInsights, type DraftingDNA, type DnaTrait, type CardChoices, type DraftingJourney, type InsightHighlights, type InsightHighlight, type InsightDecisionLocator, type InsightDecision, type InsightCard, type InsightGroup, type InsightsEnvironment, type InsightsPeriod } from '@/src/api/insights';
 import { ApiError } from '@/src/api/client';
@@ -406,10 +405,10 @@ function InsightSections({data,onReview,onLoadMore,morePhase}:{
     {data.highlights?<HighlightsStory highlights={data.highlights} finding={finding}
       onReview={onReview} onLoadMore={onLoadMore} morePhase={morePhase}/>:
       <Section title="Picks to review"><Text style={styles.caption}>Pick examples aren’t available from this version yet.</Text></Section>}
+    {dnaSection}
     {data.journey?<JourneyStory journey={data.journey} progress={data.progress} months={data.months||[]}/>:
       <LegacyJourney progress={data.progress} months={data.months||[]}/>}
-    {dnaSection}
-    <Section title="More stats">
+    <View style={styles.section}>
       <Pressable accessibilityRole="button" accessibilityState={{expanded:explore}}
         style={styles.disclosure} onPress={()=>setExplore(v=>!v)}>
         <Text style={styles.summary}>More stats</Text>
@@ -435,7 +434,7 @@ function InsightSections({data,onReview,onLoadMore,morePhase}:{
         <Text style={styles.subheading}>How this works</Text>
         <Text style={styles.caption}>{data.methodology||'Only the first included answer to each puzzle counts.'}</Text>
       </View>:null}
-    </Section>
+    </View>
   </>;
 }
 
@@ -572,7 +571,7 @@ export default function InsightsScreen() {
         <ChoiceRow name="Format" values={environments} selected={environment} onChange={value=>{manualEnvironment.current=true;setEnvironment(value);}} />
         <ChoiceRow name="Time period" values={periods} selected={period} onChange={setPeriod} />
       </View>
-      <Text style={styles.caption}>Mixed sets is its own format, not a combination of Latest Set and Powered Cube.</Text>
+      {environment === 'mixed' ? <Text style={styles.caption}>Mixed sets is its own format, not a combination of Latest Set and Powered Cube.</Text> : null}
       {phase === 'loading' ? <View style={styles.notice}><ActivityIndicator accessibilityLabel="Loading your picks" /><Text style={styles.body}>Loading your picks…</Text></View> : null}
       {phase === 'signed-out' ? <Section title="Sign in to see your Insights">
         <Text style={styles.body}>Your private analysis requires a linked Pack One account.</Text>
@@ -587,8 +586,6 @@ export default function InsightsScreen() {
         <InsightSections key={environment+'|'+period} data={data} onReview={reviewDetail}
           onLoadMore={()=>void loadMore()} morePhase={morePhase}/>
       </> : null}
-      <Pressable accessibilityRole="button" onPress={() => void load()} style={styles.secondaryButton}><Text style={styles.secondaryText}>Refresh Insights</Text></Pressable>
-      <AboutLink />
     </ScrollView>
     {detailPhase!=='idle'?<Modal visible animationType="slide" onRequestClose={closeDetail}
       presentationStyle="pageSheet" accessibilityViewIsModal>
