@@ -35,9 +35,14 @@ function formatDate(value: string) {
     : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function challengeOutcomeLabel(outcome: CareerHistoryRow['outcome']) {
+  return outcome === 'win' ? 'Beat shared score'
+    : outcome === 'loss' ? 'Below shared score'
+    : outcome === 'tie' ? 'Matched shared score' : outcome;
+}
 function HistoryRow({ item }: { item: CareerHistoryRow }) {
   const detail = [environmentLabel(item.set_id), item.is_daily ? 'Daily' : null,
-    item.grade || null, item.outcome || null].filter(Boolean).join(' \u00b7 ');
+    item.grade || null, challengeOutcomeLabel(item.outcome) || null].filter(Boolean).join(' \u00b7 ');
   return (
     <View accessible accessibilityLabel={`${formatDate(item.played_at)}, ${detail}, score ${item.score}`} style={styles.historyRow}>
       <View style={styles.historyCopy}>

@@ -67,7 +67,12 @@ test('signed-in progression uses My Pack One stats and Account settings tabs', (
   assert.match(myPack, /data-share-daily/);
   assert.match(product, /profile-account/);
   assert.match(myPack, /Account settings/);
-  assert.match(myPack, /Shared W–L/);
+  assert.match(myPack, /Shared challenges played/);
+  assert.match(product, /Shared challenges played/);
+  assert.match(myPack, /Results from playing other people’s shared runs/);
+  assert.match(product, /Results from playing other people’s shared runs/);
+  assert.match(worker, /Beat the target score in five challenges/);
+  assert.match(worker, /Beat the target score in twenty-five challenges/);
   assert.match(myPack, /Welcome to My Pack One/);
   assert.match(myPack, /Play your first Daily to start your record/);
   assert.doesNotMatch(myPack, /Empty data is not treated as a zero score/);

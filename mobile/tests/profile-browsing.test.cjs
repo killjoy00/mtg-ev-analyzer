@@ -134,6 +134,36 @@ async function fixture(t, options = {}) {
 
 const missing = () => Response.json({ error: 'Profile not found or private.' }, { status: 404 });
 
+test('shared challenge counts have explicit labels and a visible explanation', async (t) => {
+  const data = profile();
+  data.summary = { ...data.summary, challenge_wins: 5, challenge_losses: 3, challenge_ties: 1 };
+  const f = await fixture(t, { profile: () => data });
+  assert.match(f.text(), /Shared challenges played\s*·\s*5\s+beaten\s*·\s*3\s+below target\s*·\s*1\s+tied/);
+  assert.match(f.text(), /Results from playing other people’s shared runs/);
+});
+
+test('shared challenge counts remain hidden when all outcomes are zero', async (t) => {
+  const zero = profile();
+  zero.summary = { ...zero.summary, challenge_wins: 0, challenge_losses: 0, challenge_ties: 0 };
+  const f = await fixture(t, { profile: () => zero });
+  assert.doesNotMatch(f.text(), /Shared challenges played|Results from playing other people’s shared runs/);
+});
+
+for (const privateView of [false, true]) {
+  test((privateView ? 'private' : 'public') + ' history translates outcomes without changing API values or displaying empty outcomes', async (t) => {
+    const rows = ['win', 'loss', 'tie', null].map((outcome, index) => ({ ...row(String(100-index)), outcome }));
+    const f = await fixture(t, privateView
+      ? { privateView: true, privateHistory: () => ({ rows, next_cursor: null }) }
+      : { history: () => ({ rows, next_cursor: null }) });
+    assert.match(f.text(), /Beat shared score/);
+    assert.match(f.text(), /Below shared score/);
+    assert.match(f.text(), /Matched shared score/);
+    assert.equal((f.text().match(/shared score/g) || []).length, 3);
+    assert.doesNotMatch(f.text(), /·\s*(win|loss|tie)\b/);
+    assert.deepEqual(f.rows().map((item) => item.outcome), ['win', 'loss', 'tie', null]);
+  });
+}
+
 test('season profile labels conservative rating and raw average separately', async (t) => {
   const data=profile();
   data.current_season={name:'Example',standings:[{environment:'mixed',rank:1,average:34.6,rating:34.627,average_score:40,days:1}]};

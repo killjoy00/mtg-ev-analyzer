@@ -85,7 +85,16 @@ export function formatChallengeRecord(summary = {}) {
   const wins = Number(summary.challenge_wins || 0);
   const losses = Number(summary.challenge_losses || 0);
   const ties = Number(summary.challenge_ties || 0);
-  return `${wins}–${losses}${ties ? `–${ties}` : ''}`;
+  return `${wins} beaten · ${losses} below target · ${ties} tied`;
+}
+
+export function challengeOutcomeLabel(outcome) {
+  switch (outcome) {
+    case 'win': return 'Beat shared score';
+    case 'loss': return 'Below shared score';
+    case 'tie': return 'Matched shared score';
+    default: return outcome || '';
+  }
 }
 
 export function recentForm(profile, count = 10) {
