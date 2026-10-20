@@ -1,12 +1,5 @@
 [
   {
-    "slug": "reddit-launch",
-    "destination": "/",
-    "source": "reddit",
-    "campaign": "launch-week",
-    "medium": "social"
-  },
-  {
     "slug": "daily",
     "destination": "/?game=draft-run&daily=1",
     "untracked": true
@@ -17,5 +10,18 @@
     "source": "discord",
     "campaign": "daily_post",
     "medium": "social"
+  },
+  {
+    "slug": "reddit-launch",
+    "destination": "/",
+    "source": "reddit",
+    "campaign": "launch-week",
+    "medium": "social"
+  },
+  {
+    "slug": "youtube",
+    "destination": "/",
+    "source": "youtube",
+    "campaign": "rfalaunch"
   }
 ]
