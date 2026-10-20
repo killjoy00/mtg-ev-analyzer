@@ -1,0 +1,122 @@
+{
+  "version": 2,
+  "video_kind": "review",
+  "set": "HOB",
+  "voice_engine": "Kokoro ONNX",
+  "voice": "am_michael",
+  "voice_speed": 1.04,
+  "duration_seconds": 105.38,
+  "illustrative_cards": true,
+  "real_trophy_picks_depicted": false,
+  "real_gameplay_recording": false,
+  "scenes": [
+    {
+      "id": "01",
+      "kind": "hook",
+      "title": "What would\nyou take?",
+      "kicker": "THE FUN PART OF DRAFTING",
+      "blurb": "One pick can get a whole draft group talking.",
+      "narration": "Quick question. When you open a draft pack, how long does it take you to decide what you'd pick? That's the fun part for me.",
+      "hold": 2.1,
+      "duration": 10.552,
+      "start": 0.0,
+      "end": 10.552
+    },
+    {
+      "id": "02",
+      "kind": "thinking",
+      "title": "The fun is\nin the decision.",
+      "kicker": "WHY PACK ONE EXISTS",
+      "blurb": "Look at the options. Make your call. See a different perspective.",
+      "narration": "I love looking at a pack, weighing a couple of options, and finding out what another drafter would have done. It's a surprisingly fun thing to practice.",
+      "hold": 1.0,
+      "duration": 11.004,
+      "start": 10.552,
+      "end": 21.556
+    },
+    {
+      "id": "03",
+      "kind": "brand",
+      "title": "So I built\nPack One.",
+      "kicker": "EIGHT PICKS. YOUR CALL.",
+      "blurb": "A daily drafting game, focused on individual pick decisions.",
+      "narration": "That's why I built Pack One. It's a daily game around those individual decisions, without asking you to sit through an entire draft.",
+      "hold": 1.3,
+      "duration": 10.661,
+      "start": 21.556,
+      "end": 32.217
+    },
+    {
+      "id": "04",
+      "kind": "eight",
+      "title": "8 separate picks.\n8 trophy drafts.",
+      "kicker": "HERE'S HOW IT WORKS",
+      "blurb": "Each decision starts in a different real trophy draft.",
+      "narration": "Each challenge has eight picks from eight different real trophy drafts. Not eight picks from the same draft. Eight separate situations, each with its own context.",
+      "hold": 1.4,
+      "duration": 12.855,
+      "start": 32.217,
+      "end": 45.072
+    },
+    {
+      "id": "05",
+      "kind": "gallery",
+      "title": "Make your pick.\nThen compare.",
+      "kicker": "THE REVEAL",
+      "blurb": "See the pack and the cards the original drafter already took.",
+      "narration": "You see the pack and what that player had already drafted. You make your choice, lock it in, and then find out what the trophy drafter actually picked.",
+      "hold": 1.5,
+      "duration": 11.453,
+      "start": 45.072,
+      "end": 56.525
+    },
+    {
+      "id": "06",
+      "kind": "two",
+      "title": "Disagreement\nis the point.",
+      "kicker": "WHY IT'S INTERESTING",
+      "blurb": "Sometimes you match. Sometimes you'd still take something else.",
+      "narration": "Sometimes you match their pick. Sometimes you still like your own choice better. Either way, there's something to think about, and maybe something to argue about with friends.",
+      "hold": 1.2,
+      "duration": 12.105,
+      "start": 56.525,
+      "end": 68.63
+    },
+    {
+      "id": "07",
+      "kind": "share",
+      "title": "Share your result.",
+      "kicker": "BRING YOUR DRAFT GROUP",
+      "blurb": "A score to compare. A few picks worth discussing.",
+      "narration": "At the end, you get a score and a Share button. Send it to your draft group and see who made the same calls. A different pick doesn't automatically mean it was a bad one.",
+      "hold": 1.4,
+      "duration": 12.19,
+      "start": 68.63,
+      "end": 80.82
+    },
+    {
+      "id": "08",
+      "kind": "daily",
+      "title": "3 new Dailies.\nEvery day.",
+      "kicker": "CHOOSE YOUR TABLE",
+      "blurb": "Draft Run  /  Powered Cube  /  Latest Set",
+      "narration": "There are three new Dailies every day. Draft Run, Powered Cube, and Latest Set. You can play one or try all three.",
+      "hold": 1.5,
+      "duration": 9.943,
+      "start": 80.82,
+      "end": 90.763
+    },
+    {
+      "id": "09",
+      "kind": "cta",
+      "title": "Eight picks.\nYour call.",
+      "kicker": "TRY PACK ONE",
+      "blurb": "packone.pro",
+      "narration": "If you like drafting, give Pack One a try. Pick your cards, share your result, and tell me which decision you found the hardest. I'd really like to hear what you think.",
+      "hold": 3.5,
+      "duration": 14.615,
+      "start": 90.763,
+      "end": 105.378
+    }
+  ]
+}
