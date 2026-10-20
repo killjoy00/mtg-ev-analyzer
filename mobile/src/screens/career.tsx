@@ -3,7 +3,6 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Share, StyleSheet, View } from 'react-native';
 import { Text } from '@/src/components/Text';
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
-import { AboutLink } from '@/src/components/AboutLink';
 import { MyPackSectionTabs } from '@/src/components/MyPackSectionTabs';
 
 import { loadMobileCareer, loadMobileCareerHistory, type CareerHistoryRow, type CareerProfile } from '@/src/api/career';
@@ -250,7 +249,6 @@ export default function CareerScreen() {
           </Pressable>
         </>}
       </View>
-      <View style={styles.stateFooter}><AboutLink /></View>
     </SafeAreaView>
   );
 
@@ -286,7 +284,7 @@ export default function CareerScreen() {
       {!firstRun ? <Text style={styles.sectionTitle}>Recent Games</Text> : null}
     </View>
   );
-  const footer = (
+  const footer = loadingMore || pageError || state.nextCursor ? (
     <View style={styles.footer}>
       {loadingMore ? <ActivityIndicator accessibilityLabel="Loading more games" color={colors.accent} /> : null}
       {pageError ? <Text accessibilityRole="alert" style={styles.error}>{pageError}</Text> : null}
@@ -294,9 +292,8 @@ export default function CareerScreen() {
         onPress={() => void loadMore()} style={styles.secondaryButton}>
         <Text style={styles.secondaryButtonText}>{pageError ? 'Retry history' : 'Load more games'}</Text>
       </Pressable> : null}
-      <AboutLink />
     </View>
-  );
+  ) : null;
   return (
     <SafeAreaView style={styles.safe}>
       <FlatList data={state.rows} keyExtractor={(item) => item.cursor} renderItem={({ item }) => <HistoryRow item={item} />}
@@ -334,5 +331,4 @@ const styles = StyleSheet.create({
   refreshing: { color: colors.muted, fontSize: 12, fontWeight: '700' },
   empty: { color: colors.muted, fontSize: 15, textAlign: 'center', padding: spacing.xl },
   footer: { padding: spacing.lg, gap: spacing.md },
-  stateFooter: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg },
 });
