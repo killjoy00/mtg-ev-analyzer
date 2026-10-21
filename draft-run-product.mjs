@@ -1,6 +1,7 @@
 import {draftRunLength} from './draft-run-format.mjs';
 import { accountCsrfToken, ensurePackSession, firstPartyAuthEnabled, hasAccountSession, loadDailyStatus, storedAccountToken } from './growth-api.mjs';
 import { draftRunShareText, shareDraftRunCard } from './share-cards.mjs?v=8';
+import {openCardViewer,faceIndicatorMarkup} from './card-viewer.mjs?v=1';
 import { trackEvent } from './retention-events.mjs';
 import {decisionClock} from './decision-clock.mjs';
 import { sortPackByRarity } from './replay-data.mjs';
@@ -47,7 +48,7 @@ const app=()=>document.querySelector('#app');
 function styles() {
   installSetGuides();
   if(document.querySelector('[data-draft-run-style]')) return;
-  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=15';link.dataset.draftRunStyle='1';document.head.appendChild(link);
+  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=16';link.dataset.draftRunStyle='1';document.head.appendChild(link);
 }
 async function api(path,body,auth=true) {
   const method=body===undefined?'GET':'POST',headers={'content-type':'application/json'};
@@ -88,7 +89,7 @@ function pool(p) {
   const previous=p.prior_picks||[];
   if(!previous.length) return '<section class="run-pool is-empty" aria-label="Original drafter’s earlier picks"><p class="run-pool-empty">No Previous Cards Selected</p></section>';
   const cardLabel=`${previous.length} card${previous.length===1?'':'s'} · in pick order`;
-  return `<section class="run-pool" aria-label="Original drafter’s earlier picks"><h2>Previous cards <small>${cardLabel}</small></h2><p class="run-pool-note">Already selected by this drafter.</p><div class="run-pool-cards">${previous.map((c,i)=>`<button type="button" data-zoom-prior="${i}" aria-label="View previous pick ${i+1}: ${esc(c.name)}">${image(c)}<span>${i+1}. ${esc(c.name)}</span></button>`).join('')}</div></section>`;
+  return `<section class="run-pool" aria-label="Original drafter’s earlier picks"><h2>Previous cards <small>${cardLabel}</small></h2><p class="run-pool-note">Already selected by this drafter.</p><div class="run-pool-cards">${previous.map((c,i)=>`<button type="button" data-zoom-prior="${i}" aria-label="View previous pick ${i+1}: ${esc(c.name)}">${image(c)}<span>${i+1}. ${esc(c.name)} ${faceIndicatorMarkup(c)}</span></button>`).join('')}</div></section>`;
 }
 // Keep the default reveal visual compact while making the actual comparison
 // visible at a glance. Non-matches pair the player's card with the trophy card;
@@ -162,7 +163,7 @@ async function revealDailyPeers(round,answer) {
 }
 function cardGrid(p,answer=null) {
   const candidates=sortPackByRarity(p.candidates);
-  return `<div class="run-cards">${candidates.map(c=>`<article class="run-card ${selection===c.id?'selected':''} ${answer?.historicalId===c.id?'trophy-pick':''}"><button class="run-card-select" type="button" data-pick="${esc(c.id)}" aria-label="Pick ${esc(c.name)}" aria-pressed="${selection===c.id}" ${answer?'disabled':''}>${image(c)}</button><div class="run-card-caption"><span class="run-card-name">${esc(c.name)}</span><button class="run-zoom" type="button" data-zoom="${esc(c.id)}" aria-label="Enlarge ${esc(c.name)}"><span class="run-zoom-glyph" aria-hidden="true"></span></button></div>${answer&&(answer.historicalId===c.id||answer.selectedId===c.id)?`<span class="run-card-outcome">${answer.historicalId===c.id?'Trophy pick':'Your pick'}</span>`:''}</article>`).join('')}</div>`;
+  return `<div class="run-cards">${candidates.map(c=>`<article class="run-card ${selection===c.id?'selected':''} ${answer?.historicalId===c.id?'trophy-pick':''}"><button class="run-card-select" type="button" data-pick="${esc(c.id)}" aria-label="Pick ${esc(c.name)}" aria-pressed="${selection===c.id}" ${answer?'disabled':''}>${image(c)}</button><div class="run-card-caption"><span class="run-card-name">${esc(c.name)} ${faceIndicatorMarkup(c)}</span><button class="run-zoom" type="button" data-zoom="${esc(c.id)}" aria-label="Enlarge ${esc(c.name)}"><span class="run-zoom-glyph" aria-hidden="true"></span></button></div>${answer&&(answer.historicalId===c.id||answer.selectedId===c.id)?`<span class="run-card-outcome">${answer.historicalId===c.id?'Trophy pick':'Your pick'}</span>`:''}</article>`).join('')}</div>`;
 }
 function rankingStateMarkup(value=run) {
   if(!value?.day)return '';
@@ -248,10 +249,7 @@ function openDecisionReport(answer) {
   };
   dialog.showModal();
 }
-function zoom(card) {
-  const dialog=document.createElement('dialog');dialog.className='run-card-dialog';dialog.innerHTML=`<button class="button secondary" autofocus>Close</button>${image(card)}<p>${esc(card.name)}</p>`;
-  document.body.append(dialog);dialog.querySelector('button').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
-}
+function zoom(card) { return openCardViewer(card); }
 // The earlier-picks strip scrolls horizontally with no visible cue, so the
 // cards past the right edge read as clipped rather than scrollable. Mark it
 // only when it actually overflows.

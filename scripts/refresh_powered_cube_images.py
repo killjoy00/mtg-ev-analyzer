@@ -45,7 +45,7 @@ CATALOG_PATH = ROOT / "corpus" / "draft-run" / "catalog.json"
 CARD_IMAGES_PATH = ROOT / "corpus" / "draft-run" / "card-images.json"
 MAP_PATH = ROOT / "generated" / "powered-cube-standard-images.json"
 REPORT_PATH = ROOT / "generated" / "powered-cube-image-refresh-report.json"
-DISPLAY_FIELDS = ("image_url", "mana_cost", "rarity", "type_line")
+DISPLAY_FIELDS = ("image_url", "mana_cost", "rarity", "type_line", "display_faces")
 
 
 def bulk_download_uri(payload: dict, bulk_type: str) -> str:
@@ -128,6 +128,8 @@ def patch_card(card: dict, records: dict[str, dict]) -> tuple[dict, bool]:
         return card, False
     before_non_display = {k: v for k, v in card.items() if k not in DISPLAY_FIELDS}
     updated = dict(card)
+    if metadata.get('image_url') != card.get('image_url') and 'display_faces' not in metadata:
+        updated.pop('display_faces', None)
     for key in DISPLAY_FIELDS:
         if key in metadata:
             updated[key] = metadata[key]

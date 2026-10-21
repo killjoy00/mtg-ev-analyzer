@@ -346,12 +346,12 @@ def metadata(root, set_id=None):
                 for c in pick['candidates']:
                     c = {**supplemental.get(c['id'], {}), **c}
                     if c.get('image_url','').startswith('https://'):
-                        result[c['name']] = {k:v for k,v in c.items() if k in ('image_url','mana_cost','rarity','type_line')}
+                        result[c['name']] = {k:v for k,v in c.items() if k in ('image_url','mana_cost','rarity','type_line','display_faces')}
     return result
 
 
 def resolve_images(names, known, cache_path, preferred_set=None):
-    cache_policy = f"main-readable-v3:{preferred_set or 'global'}"
+    cache_policy = f"main-readable-v4-faces:{preferred_set or 'global'}"
     raw_cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
     cache = {
         k:v for k,v in raw_cache.items()

@@ -36,6 +36,7 @@ function compile(relative,mocks) {
     if(name==='@/src/components/Text')return {Text:host('Text')};
     if(name==='@/src/components/ScreenArea')return {ScreenArea:host('SafeAreaView')};
     if(name==='@/src/components/MyPackSectionTabs')return compile('src/components/MyPackSectionTabs.tsx',mocks);
+    if(name==='@/src/components/CardFaceViewer')return compile('src/components/CardFaceViewer.tsx',mocks);
     if(Object.prototype.hasOwnProperty.call(mocks,name))return mocks[name];
     if(name.startsWith('@/'))throw Error('Unmocked Insights module: '+name);
     return require(name);
@@ -50,8 +51,11 @@ async function mount(t,{initial=session(),respond=async (_s,env)=>fixture(env)}=
   let stored=initial,listener=()=>{},root;
   const calls=[],routes=[];
   const imagePolicy=await import('../../card-image-policy.mjs');
+  const cardFaces=await import('../../card-faces.mjs');
   const mocks={
     '../../../card-image-policy.mjs':imagePolicy,
+    '../../../card-faces.mjs':cardFaces,
+    'expo-image':{Image:host('Image')},
     'expo-router':{router:{push:v=>routes.push(['push',v]),dismissTo:v=>routes.push(['dismiss',v])},
       Stack:{Screen:host('StackScreen')},useFocusEffect:callback=>React.useEffect(callback,[callback])},
     'react-native':{ActivityIndicator:host('ActivityIndicator'),Image:host('Image'),Pressable:host('Pressable'),
@@ -257,7 +261,8 @@ test('native v2 renders pick distance, bounded page 2, local timestamp ranges an
  const content=ui.text();
  assert.ok(content.includes('How this works'));
  assert.ok(!content.includes('56 more eligible decisions'),'threshold copy stays collapsed');
- assert.match(content,/Oct 31/,'v2 timestamps are rendered in local format');
+ const localEnd=new Date('2026-11-01T00:05:00.000Z').toLocaleDateString(undefined,{month:'short',day:'numeric'});
+ assert.ok(content.includes(localEnd),'v2 timestamps are rendered in the current local timezone');
  const images=ui.root.root.findAll(n=>n.type==='Image');
  assert.equal(images.length,1,'unapproved selected art is a card-name fallback');
  assert.equal(images[0].props.source.uri,'https://cards.scryfall.io/normal/front/card.jpg');

@@ -585,7 +585,7 @@ def render_replay(draft_id: str, picks: Sequence[PickExample], model: OutOfFoldM
             card_id = base_id if used_ids[base_id] == 1 else f"{base_id}-{used_ids[base_id]}"
             metadata = card_metadata.get(card, {})
             candidate = {"id": card_id, "name": card, "model_probability": round(probabilities[card], 6)}
-            for key in ("image_url", "mana_cost", "rarity", "type_line"):
+            for key in ("image_url", "mana_cost", "rarity", "type_line", "display_faces"):
                 if metadata.get(key):
                     candidate[key] = metadata[key]
             candidates.append(candidate)

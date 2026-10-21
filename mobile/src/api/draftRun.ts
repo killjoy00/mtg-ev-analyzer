@@ -1,3 +1,4 @@
+import type { DisplayFace } from '../../../card-faces.mjs';
 import * as Application from 'expo-application';
 import { Platform } from 'react-native';
 import { requestJson } from '@/src/api/client';
@@ -42,6 +43,7 @@ export type DraftRunCard = {
   id: string;
   name: string;
   image_url?: string;
+  display_faces?: DisplayFace[];
   mana_cost?: string;
   rarity?: string;
   type_line?: string;

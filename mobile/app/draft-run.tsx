@@ -22,6 +22,8 @@ import {
   View,
 } from 'react-native';
 import { Text } from '@/src/components/Text';
+import { CardFaceViewer } from '@/src/components/CardFaceViewer';
+import { cardFaceIndicator } from '../../card-faces.mjs';
 
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 
@@ -164,6 +166,7 @@ function CardTile({
         </View>
       )}
       <Text style={styles.cardName}>{card.name}</Text>
+      {cardFaceIndicator(card) ? <Text style={styles.cardName}>{cardFaceIndicator(card)} · Hold to view</Text> : null}
     </Pressable>
   );
 }
@@ -417,6 +420,7 @@ function PackReview({
               </View>
             )}
             <Text style={styles.cardName}>{card.name}</Text>
+            {cardFaceIndicator(card) ? <Text style={styles.cardName}>{cardFaceIndicator(card)} · Hold to view</Text> : null}
             {card.id === answer.selectedId ? <Text style={styles.reviewBadge}>YOUR PICK</Text> : null}
             {card.id === answer.historicalId ? <Text style={styles.reviewBadge}>TROPHY PICK</Text> : null}
           </Pressable>
@@ -1310,32 +1314,7 @@ export default function DraftRunScreen({
           </SafeAreaView>
         </Modal>
 
-        <Modal
-          animationType="fade"
-          onRequestClose={() => setZoomedCard(null)}
-          transparent
-          visible={zoomedCard !== null}
-        >
-          <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={styles.zoomSafe}>
-            <View accessibilityViewIsModal style={styles.zoomPanel}>
-              {zoomedCard?.image_url ? (
-                <CardArtwork key={zoomedCard.image_url} uri={zoomedCard.image_url} name={`${zoomedCard.name} enlarged card`} style={styles.zoomImage} zoom />
-              ) : (
-                <View style={styles.zoomFallback}>
-                  <Text style={styles.zoomFallbackName}>{zoomedCard?.name}</Text>
-                </View>
-              )}
-              <Text style={styles.zoomName}>{zoomedCard?.name}</Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setZoomedCard(null)}
-                style={styles.zoomClose}
-              >
-                <Text style={styles.zoomCloseText}>Close</Text>
-              </Pressable>
-            </View>
-          </SafeAreaView>
-        </Modal>
+        <CardFaceViewer card={zoomedCard} onClose={() => setZoomedCard(null)} />
 
         <View style={styles.actionDock}>
           {mode === 'pick' ? (

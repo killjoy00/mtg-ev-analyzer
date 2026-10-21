@@ -178,7 +178,7 @@ def measure(sid,directory,frozen):
         for line in handle:
             old=json.loads(line)
             for c in old['candidates']+old['prior_picks']:
-                known[c['name']]={k:v for k,v in c.items() if k in ('image_url','mana_cost','rarity','type_line')}
+                known[c['name']]={k:v for k,v in c.items() if k in ('image_url','mana_cost','rarity','type_line','display_faces')}
             if not first<=old['pick_number']<=last:continue
             did=by_hash.get(old['source_draft_hash'])
             if not did:raise ValueError('Frozen source hash not in reconstructed cohort')

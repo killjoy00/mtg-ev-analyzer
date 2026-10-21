@@ -130,7 +130,7 @@ def measure(sid,directory,frozen):
         for line in handle:
             old=json.loads(line)
             for c in old['candidates']+old['prior_picks']:
-                known[c['name']]={k:v for k,v in c.items() if k in ('image_url','mana_cost','rarity','type_line')}
+                known[c['name']]={k:v for k,v in c.items() if k in ('image_url','mana_cost','rarity','type_line','display_faces')}
             if old['pick_number']>8:continue
             did=by_hash[old['source_draft_hash']]
             ps=[p for p in output[did] if p.raw_pick_number==old['pick_number']-1]

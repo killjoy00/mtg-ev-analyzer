@@ -1,3 +1,5 @@
+import { CardFaceViewer } from '@/src/components/CardFaceViewer';
+import { cardFaceIndicator } from '../../../card-faces.mjs';
 import { router, Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -187,18 +189,22 @@ function DNASummary({dna,cardChoices,onReview}:{
     </View>:null}
   </Section>;
 }
-function CardArtwork({card,label,small=false}: {card:InsightCard|null|undefined;label:string;small?:boolean}) {
+function CardArtwork({card,label,small=false,onZoom}: {card:InsightCard|null|undefined;label:string;small?:boolean;onZoom?:(card:InsightCard)=>void}) {
   const url=safeCardImageUrl(card?.image_url);
-  return <View style={[styles.cardArt,small&&styles.cardArtSmall]}>
+  return <Pressable accessibilityRole={onZoom?'button':undefined} accessibilityLabel={onZoom?`Enlarge ${card?.name}`:undefined}
+    disabled={!onZoom||!card} onPress={()=>{if(card)onZoom?.(card);}} style={[styles.cardArt,small&&styles.cardArtSmall]}>
     {url?<Image source={{uri:url}}
       accessibilityLabel={label+': '+(card?.name||'Card')}
       resizeMode="contain" style={[styles.cardImage,small&&styles.cardImageSmall]}/>:
       <Text style={styles.caption}>Art unavailable</Text>}
-  </View>;
+    {onZoom&&cardFaceIndicator(card)?<Text style={styles.caption}>{cardFaceIndicator(card)}</Text>:null}
+  </Pressable>;
 }
 function SavedDecisionDetail({detail,onClose}: {detail:InsightDecision;onClose:()=>void}) {
   const pool=detail.prior_picks||[];
+  const [zoomedCard,setZoomedCard]=useState<InsightCard|null>(null);
   return <View style={styles.decisionDetail}>
+    <CardFaceViewer card={zoomedCard} onClose={()=>setZoomedCard(null)}/>
     <Text accessibilityRole="header" style={styles.sectionTitle}>Review pick</Text>
     <Text style={styles.meta}>{setName(detail.set_id)} · Source P1P{detail.pick_number} · Score {detail.score}/100 · {shortDate(detail.answered_at)}</Text>
     <Text style={styles.subheading}>Which card fits this pool?</Text>
@@ -206,9 +212,9 @@ function SavedDecisionDetail({detail,onClose}: {detail:InsightDecision;onClose:(
       <View style={styles.reviewPart}>
         <Text style={styles.subheading}>Your pick and the trophy pick</Text>
         <View style={styles.decisionChoices}>
-          <View style={styles.decisionChoice}><CardArtwork card={detail.selected} label="Your pick"/>
+          <View style={styles.decisionChoice}><CardArtwork card={detail.selected} label="Your pick" onZoom={setZoomedCard}/>
             <Text style={styles.summary}>Your pick</Text><Text style={styles.body}>{detail.selected.name}</Text></View>
-          <View style={styles.decisionChoice}><CardArtwork card={detail.trophy} label="Trophy pick"/>
+          <View style={styles.decisionChoice}><CardArtwork card={detail.trophy} label="Trophy pick" onZoom={setZoomedCard}/>
             <Text style={styles.summary}>Trophy pick</Text><Text style={styles.body}>{detail.trophy.name}</Text></View>
         </View>
       </View>
@@ -216,7 +222,7 @@ function SavedDecisionDetail({detail,onClose}: {detail:InsightDecision;onClose:(
         <Text style={styles.subheading}>Trophy drafter’s earlier picks</Text>
         {pool.length?<View style={styles.savedPack}>
           {pool.map((card,index)=><View key={card.id+'-'+index} style={styles.savedCard}>
-            <CardArtwork card={card} label="Trophy drafter’s earlier pick" small/>
+            <CardArtwork card={card} label="Trophy drafter’s earlier pick" small onZoom={setZoomedCard}/>
             <Text style={styles.meta}>{card.name}</Text>
           </View>)}
         </View>:<Text style={styles.caption}>Earlier picks aren’t available for this puzzle.</Text>}
@@ -225,7 +231,7 @@ function SavedDecisionDetail({detail,onClose}: {detail:InsightDecision;onClose:(
     <Text style={styles.subheading}>Full pack</Text>
     <View style={styles.savedPack}>
       {(detail.candidates||[]).map((card,index)=><View key={card.id+'-'+index} style={styles.savedCard}>
-        <CardArtwork card={card} label="Pack card" small/>
+        <CardArtwork card={card} label="Pack card" small onZoom={setZoomedCard}/>
         <Text style={styles.meta}>{card.name}{card.id===detail.selected.id?' · Your pick':''}{card.id===detail.trophy.id?' · Trophy pick':''}</Text>
       </View>)}
     </View>
