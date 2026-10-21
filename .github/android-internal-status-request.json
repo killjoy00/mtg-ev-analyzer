@@ -1,4 +1,4 @@
 {
   "operation": "check-android-internal-status",
-  "reason": "Read-only owner-authorized 2026-10-13 Google Play Internal Testing track inspection after guarded rollout run 38449527569 detected two release entries and refused to replace them. Capture both entries, version codes and statuses, while preserving production-access Closed Testing 100772, all tester settings, and Production. No release mutation."
+  "reason": "Read-only preflight for owner-authorized double-faced-card delivery from #1274. Inspect the current Internal Testing releases and version codes before preparing a new signed candidate. Preserve existing production-access Closed Testing, tester settings, countries, qualification continuity and Production. No release mutation."
 }
