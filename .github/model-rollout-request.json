@@ -1,7 +1,7 @@
 {
   "operation": "deploy",
-  "request_id": "pack1-insights-fix-prod-20261015-d7108d",
-  "reason": "Production promotion request for exact reviewed Pack One Insights fix commit d7108d12f8c666085516d7e5ffcf4ca2fd884a68, the same revision deployed to development by #1211. DO NOT MERGE this production request until protected development run verifies the exact release marker, schema/index checks, live Daily and Practice acceptance, and matching published website. Protected production workflow independently rechecks development marker, schema and public frontend before deploying all functions.",
-  "commit": "d7108d12f8c666085516d7e5ffcf4ca2fd884a68",
-  "target": "production"
+  "request_id": "pack1-card-faces-dev-20261021-58ea6af",
+  "reason": "Deploy reviewed double-faced-card support from #1274 to development at exact source 58ea6afcd2882c5e231e289905c7e342359a9118. Use the existing schema, bundle, release-marker, unranked Daily and Practice acceptance gates. This request does not rebuild or replace the corpus and does not rewrite saved picks or scores.",
+  "commit": "58ea6afcd2882c5e231e289905c7e342359a9118",
+  "target": "development"
 }

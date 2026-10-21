@@ -1,4 +1,4 @@
 {
   "operation": "upload-testflight-app-store-eligible",
-  "reason": "Owner requested completing the friend-challenge fixes from merged PR #1224. After successful exact-main RC validation of c72325af0c493e80f2a312e49183d16c6f820c6b and required checks, build and upload a new monotonic signed iOS 1.1 candidate to existing internal TestFlight. Verify Apple processing and internal availability separately. Preserve testers, beta groups, App Store versions, review submissions and public release state. Physical-device acceptance remains a separate requirement."
+  "reason": "Owner requested completing double-faced-card support from merged PR #1274. After exact-main RC validation of 58ea6afcd2882c5e231e289905c7e342359a9118 succeeds, upload a new monotonic signed iOS 1.1 candidate to existing internal TestFlight. This request changes release controls only; shipped app inputs match that source. Verify Apple processing and internal availability separately. Preserve testers, beta groups, App Store versions, review submissions and public release state. Physical-device acceptance remains separate."
 }
