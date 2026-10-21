@@ -8,6 +8,7 @@ const FAST_RULES = [
 ];
 
 const ROOT_NATIVE_INPUTS = [
+  /^card-faces\.(?:mjs|d\.mts)$/,
   /^scripts\/audit-android-manifest\.py$/,
   /^\.github\/scripts\/app-store-[^/]*\.mjs$/,
   /^\.github\/workflows\/(?:android-production-bundle|android-internal-testing|ios-testflight|mobile-exact-main-rc|mobile)\.yml$/,

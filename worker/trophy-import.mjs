@@ -1,4 +1,5 @@
 import {isDeepStrictEqual} from 'node:util';
+import {normalizedDisplayFaces} from '../card-faces.mjs';
 import catalog from '../corpus/draft-run/catalog.json' with {type:'json'};
 import {validateDraftRunPuzzle,interestingDraftRunPuzzle,draftRunDifficulty,DRAFT_RUN_CORPUS_VERSION as VERSION} from '../draft-run.mjs';
 import {verifyImportToken,IMPORT_WORKFLOW,IMAGE_REFRESH_WORKFLOW} from './trophy-import-auth.mjs';
@@ -7,7 +8,7 @@ import {supportedComponent} from '../corpus-components.mjs';
 
 const allowed=new Set(catalog.sets.map(s=>s.id));
 const error=(message,status=400)=>Object.assign(Error(message),{status});
-const DISPLAY_FIELDS=new Set(['image_url','mana_cost','rarity','type_line']);
+const DISPLAY_FIELDS=new Set(['image_url','mana_cost','rarity','type_line','display_faces']);
 
 const parse=value=>typeof value==='string'?JSON.parse(value):value;
 
@@ -32,6 +33,11 @@ function normalizeImageMapping(raw) {
     const name=String(entry.name||'').trim();
     if(!name||name.length>200||mapping.has(name)||typeof entry.image_url!=='string'||!entry.image_url.startsWith('https://'))throw error('Invalid image mapping');
     const display={image_url:entry.image_url};
+    if(entry.display_faces!==undefined) {
+      const faces=normalizedDisplayFaces(entry.display_faces);
+      if(!isDeepStrictEqual(faces,entry.display_faces))throw error('Invalid card face mapping');
+      display.display_faces=faces;
+    }
     for(const key of ['mana_cost','rarity','type_line']) {
       if(entry[key]!==undefined) {
         if(typeof entry[key]!=='string'||entry[key].length>1000)throw error('Invalid image mapping');
@@ -53,8 +59,11 @@ function patchCards(cards,mapping,counters) {
     if(!display)return card;
     let changed=false;
     const next={...card};
+    if(card.image_url!==display.image_url&&!Object.hasOwn(display,'display_faces')&&Object.hasOwn(next,'display_faces')) {
+      delete next.display_faces;changed=true;
+    }
     for(const [key,value] of Object.entries(display)) {
-      if(next[key]!==value){next[key]=value;changed=true;}
+      if(!isDeepStrictEqual(next[key],value)){next[key]=value;changed=true;}
     }
     if(changed)counters.cards++;
     return next;
@@ -102,6 +111,7 @@ export async function refreshTrophyImagePage(query,setId,rawMapping,rawAfter='')
            OR ((d.display ? 'mana_cost') AND (card.value->>'mana_cost') IS DISTINCT FROM (d.display->>'mana_cost'))
            OR ((d.display ? 'rarity') AND (card.value->>'rarity') IS DISTINCT FROM (d.display->>'rarity'))
            OR ((d.display ? 'type_line') AND (card.value->>'type_line') IS DISTINCT FROM (d.display->>'type_line'))
+           OR ((d.display ? 'display_faces') AND (card.value->'display_faces') IS DISTINCT FROM (d.display->'display_faces'))
        )
      ORDER BY p.puzzle_id
      LIMIT $5`,

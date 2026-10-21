@@ -435,7 +435,7 @@ def parity_with_v8(sid: str, frozen: Path, built: dict):
             for card in old.get("candidates", []) + old.get("prior_picks", []):
                 known[card["name"]] = {
                     key: value for key, value in card.items()
-                    if key in ("image_url", "mana_cost", "rarity", "type_line")
+                    if key in ("image_url", "mana_cost", "rarity", "type_line", "display_faces")
                 }
             pick_number = int(old["pick_number"])
             if not first <= pick_number <= last:

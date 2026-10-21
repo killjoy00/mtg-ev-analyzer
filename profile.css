@@ -819,3 +819,6 @@
   .my-insights-page .my-insights-sample { padding:10px 16px; }
   .my-insights-page #my-insights-result .my-pack-card { padding:20px 16px; }
 }
+
+.my-insights-card-zoom{display:block;width:100%;padding:0;background:transparent;border:0;color:inherit;cursor:zoom-in}
+.my-insights-card-zoom .card-face-indicator{display:inline-block;font-size:11px;border:1px solid currentColor;border-radius:4px;padding:1px 5px;margin-top:4px}

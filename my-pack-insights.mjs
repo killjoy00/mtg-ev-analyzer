@@ -1,3 +1,4 @@
+import {openCardViewer,faceIndicatorMarkup} from './card-viewer.mjs?v=1';
 import {escapeHtml as esc} from './html.mjs';
 import {safeCardImageUrl} from './card-image-policy.mjs';
 import {loadMyInsights,firstPartyAuthEnabled,ensurePackSession,storedAccountToken} from './growth-api.mjs';
@@ -142,11 +143,12 @@ function dnaMarkup(data) {
     '</details></section>';
 }
 export function safeCardImage(url) {return safeCardImageUrl(url);}
-function cardVisual(card,label) {
+function cardVisual(card,label,enlarge=false) {
   const safe=safeCardImage(card?.image_url);
-  return '<div class="my-insights-art">'+(safe
+  const visual='<div class="my-insights-art">'+(safe
     ?'<img src="'+esc(safe)+'" alt="'+esc(card?.name||label)+'" loading="lazy">'
     :'<span role="img" aria-label="Artwork unavailable for '+esc(card?.name||label)+'">No art</span>')+'</div>';
+  return enlarge?'<button type="button" class="my-insights-card-zoom" data-insights-card="'+esc(card?.id||'')+'" aria-label="Enlarge '+esc(card?.name||label)+'">'+visual+faceIndicatorMarkup(card)+'</button>':visual;
 }
 function highlightCards(rows,kind,expanded=false,showFinding=false) {
   if(!rows?.length)return '<p class="my-pack-empty">No '+(kind==='misses'?'picks to revisit':'high-scoring picks')+
@@ -244,7 +246,7 @@ function journeyMarkup(data) {
 }
 function lockedDecisionMarkup(value) {
   const chosen=value.selected,trophy=value.trophy,pack=value.candidates||[],pool=value.prior_picks||[];
-  const figure=(card,label)=>'<figure>'+cardVisual(card,label)+'<figcaption>'+esc(card?.name||'Card name unavailable')+'</figcaption></figure>';
+  const figure=(card,label)=>'<figure>'+cardVisual(card,label,true)+'<figcaption>'+esc(card?.name||'Card name unavailable')+'</figcaption></figure>';
   return '<section class="my-insights-locked-pack" aria-label="Read-only pack review">'+
     '<div class="my-card-heading"><h3>Review pick</h3><button type="button" class="button secondary" data-insights-close>Close</button></div>'+
     '<p class="my-insights-note">'+esc(readableSet(value.set_id))+' · Source P1P'+Number(value.pick_number)+
@@ -257,7 +259,7 @@ function lockedDecisionMarkup(value) {
       (pool.length?'<div class="my-insights-original-pool">'+pool.map(c=>figure(c,c.name)).join('')+'</div>':
         '<p class="my-insights-note">Earlier picks aren’t available for this puzzle.</p>')+'</div></div>'+
     '<h4>Full pack</h4><div class="my-insights-original-pack">'+pack.map(c=>
-      '<figure>'+cardVisual(c,c.name)+'<figcaption>'+esc(c.name)+
+      '<figure>'+cardVisual(c,c.name,true)+'<figcaption>'+esc(c.name)+
       (c.id===chosen?.id?' · Your pick':'')+(c.id===trophy?.id?' · Trophy pick':'')+'</figcaption></figure>'
     ).join('')+'</div>'+
     '<details class="my-insights-original-analysis"><summary>Saved alternative scores</summary>'+
@@ -333,6 +335,8 @@ function bindInsightCards(root,state,ticket,gen) {
           round:Number(button.dataset.round),puzzle_id:button.dataset.puzzle});
         if(!current()||viewTicket!==state.viewTicket||!dialog.open)return;
         dialogBody.innerHTML=lockedDecisionMarkup(response);
+        const cards=[...(response.candidates||[]),...(response.prior_picks||[]),response.selected,response.trophy].filter(Boolean);
+        dialogBody.querySelectorAll('[data-insights-card]').forEach(button=>{button.onclick=()=>openCardViewer(cards.find(card=>card.id===button.dataset.insightsCard));});
         dialogBody.querySelector('[data-insights-close]')?.addEventListener('click',()=>dialog.close());
         dialogBody.querySelector('[data-insights-close]')?.focus({preventScroll:true});
       }catch{

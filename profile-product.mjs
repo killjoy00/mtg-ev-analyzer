@@ -24,7 +24,7 @@ import { trackEvent } from './retention-events.mjs';
 import { nextMilestones } from './progression.mjs?v=10';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { eliteSource } from './membership-source.mjs';
-import { renderAccount, renderDeletionState } from './growth.mjs?v=24';
+import { renderAccount, renderDeletionState } from './growth.mjs?v=25';
 import {dailyReminderSettingsMarkup,bindDailyReminderSettings} from './daily-reminder-settings.mjs?v=5';
 import {
   bestPercentile,
@@ -40,7 +40,7 @@ import {
   shareProfileCard,
   shareResultCard,
 } from './share-cards.mjs';
-import {bindMyPackOneTabs,currentSeasonMarkup,myPackOneMarkup,resetMyPackOneTab} from './my-pack-one.mjs?v=10';
+import {bindMyPackOneTabs,currentSeasonMarkup,myPackOneMarkup,resetMyPackOneTab} from './my-pack-one.mjs?v=11';
 
 let profileRendering = false;
 let navInstalled = false;
@@ -56,7 +56,7 @@ function ensureProfileStyles() {
   if (document.querySelector('link[data-pack1-profile-css]')) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = new URL('./profile.css?v=15', import.meta.url).href;
+  link.href = new URL('./profile.css?v=16', import.meta.url).href;
   link.dataset.pack1ProfileCss = '1';
   document.head.appendChild(link);
 }

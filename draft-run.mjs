@@ -1,4 +1,4 @@
-import {effectiveCardMetadata} from './card-metadata.mjs';
+import {publicCardDisplay} from './card-metadata.mjs';
 import modelVersions from './model-versions.json' with {type:'json'};
 import {meetsServingQuality} from './serving-quality.mjs';
 import {DAILY_SELECTION_VERSION,dailySetPlan,liveRegularSets} from './daily-selection.mjs';
@@ -189,9 +189,14 @@ export function withSourceDraftRecord(puzzle,losses) {
 // which older app builds put in the post-pick headline. Responses drop it and
 // send only the structured form.
 export function publicDraftRunAnswer(answer) {
-  if(!answer||typeof answer!=='object'||!Object.hasOwn(answer,'trophyRecord'))return answer;
+  if(!answer||typeof answer!=='object')return answer;
+  if(!Object.hasOwn(answer,'trophyRecord')&&!answer.puzzle)return answer;
   const {trophyRecord,...rest}=answer;
-  return {...rest,trophyDrafter:rest.trophyDrafter??trophyDrafterFacts({trophyRecord})};
+  if(Object.hasOwn(answer,'trophyRecord'))rest.trophyDrafter=rest.trophyDrafter??trophyDrafterFacts({trophyRecord});
+  if(rest.puzzle&&Array.isArray(rest.puzzle.candidates)&&Array.isArray(rest.puzzle.prior_picks)) {
+    rest.puzzle={...rest.puzzle,candidates:rest.puzzle.candidates.map(publicCardDisplay),prior_picks:rest.puzzle.prior_picks.map(publicCardDisplay)};
+  }
+  return rest;
 }
 
 function scoredDraftRunPick(puzzle,selectedId,profile) {
@@ -444,7 +449,7 @@ export function selectDraftRunReroll(pool, source, { type, round, seed, excluded
 }
 
 export function publicDraftRunPuzzle(puzzle) {
-  const card = original => {const c=effectiveCardMetadata(original);return Object.fromEntries(['id','name','image_url','mana_cost','rarity','type_line'].filter(k => c[k]).map(k => [k,c[k]]));};
+  const card = publicCardDisplay;
   return {
     puzzle_id:puzzle.puzzle_id, set_id:puzzle.set_id, pack_number:1, pick_number:Number(puzzle.pick_number),
     prior_picks:puzzle.prior_picks.map(card), candidates:sortPackByRarity(puzzle.candidates.map(card)),

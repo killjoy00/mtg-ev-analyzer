@@ -5,6 +5,8 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - 'mobile/**'
+      - 'card-faces.mjs'
+      - 'card-faces.d.mts'
       - '.github/actions/mobile-validate/**'
       - 'docs/mobile-**'
       - 'docs/parity.md'
@@ -13,6 +15,8 @@ on:
     branches: [main]
     paths:
       - 'mobile/**'
+      - 'card-faces.mjs'
+      - 'card-faces.d.mts'
       - '.github/actions/mobile-validate/**'
       - 'docs/mobile-**'
       - 'docs/parity.md'

@@ -203,7 +203,7 @@ def puzzle_rows(
             "source_draft_time": trophy_meta.get("draft_time"),
         }
 
-        prior_card = {key: value for key, value in historical_card.items() if key in {"id", "name", "image_url", "mana_cost", "rarity", "type_line"}}
+        prior_card = {key: value for key, value in historical_card.items() if key in {"id", "name", "image_url", "mana_cost", "rarity", "type_line", "display_faces"}}
         prior.append(prior_card)
 
 

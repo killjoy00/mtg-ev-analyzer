@@ -1,3 +1,4 @@
+import type { DisplayFace } from '../../../card-faces.mjs';
 import { requestJson } from '@/src/api/client';
 import type { MobileSession } from '@/src/storage/session';
 
@@ -33,7 +34,7 @@ export type DraftingJourney = {version:string;eligible_decisions:number;window_s
   windows:JourneyWindow[];total_windows:number;versions_comparable:boolean;
   milestones:{id:string;date:string;from_at?:string;to_at?:string;text:string;count:number;average_score?:number;hard_decisions?:number}[];
   limited:boolean;note:string;progress_compatible?:boolean};
-export type InsightCard = {id:string;name:string;image_url:string|null;mana_cost?:string|null;rarity?:string|null;type_line?:string|null};
+export type InsightCard = {id:string;name:string;image_url:string|null;display_faces?:DisplayFace[];mana_cost?:string|null;rarity?:string|null;type_line?:string|null};
 export type InsightDecisionLocator = {session_id:string;round:number;puzzle_id:string};
 export type InsightHighlight = {session_id:string;round:number;puzzle_id:string;set_id:string;
   environment:InsightsEnvironment;pick_number:number;date:string;score:number;

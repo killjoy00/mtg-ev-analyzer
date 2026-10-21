@@ -1,0 +1,15 @@
+.card-face-dialog{box-sizing:border-box;border:0;border-radius:12px;padding:16px;background:var(--surface,#fff);color:var(--ink,#17251d);width:min(94vw,520px);max-width:94vw;max-height:94dvh;overflow:auto}
+.card-face-dialog::backdrop{background:#101913dc}
+.card-face-header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:12px}
+.card-face-header strong{font-size:16px;line-height:1.4}
+.card-face-dialog button{min-height:44px;cursor:pointer}
+.card-face-toggle{width:100%;margin-bottom:12px}
+.card-face-panels{display:grid;gap:16px}
+.card-face-panel{margin:0;min-width:0;text-align:center}
+.card-face-panel figcaption{font-size:14px;line-height:1.4;margin-bottom:8px}
+.card-face-dialog .card-face-art img{display:block;margin:0 auto;width:100%;height:auto;max-height:68dvh;object-fit:contain}
+.card-face-dialog [hidden]{display:none!important}
+.card-face-error{padding:32px 12px;background:var(--surface-soft,#eef1eb);border-radius:8px}
+.card-face-note{font-size:13px;line-height:1.5;margin:8px 0 0}
+.card-face-indicator{display:inline-block;font-size:11px;font-weight:700;line-height:1.5;border:1px solid currentColor;border-radius:4px;padding:1px 5px;white-space:nowrap}
+@media(min-width:760px){.card-face-dialog.has-two-faces{width:min(94vw,1040px)}.card-face-dialog.has-two-faces .card-face-panels{grid-template-columns:repeat(2,minmax(0,1fr))}}

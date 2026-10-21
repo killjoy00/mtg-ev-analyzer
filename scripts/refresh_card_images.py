@@ -35,7 +35,7 @@ CATALOG_PATH = CORPUS_DIR / "catalog.json"
 CARD_IMAGES_PATH = CORPUS_DIR / "card-images.json"
 MAP_DIR = ROOT / "generated" / "card-image-refresh"
 REPORT_PATH = ROOT / "generated" / "card-image-refresh-report.json"
-DISPLAY_FIELDS = ("image_url", "mana_cost", "rarity", "type_line")
+DISPLAY_FIELDS = ("image_url", "mana_cost", "rarity", "type_line", "display_faces")
 
 
 def read_corpus(path: Path) -> list[dict]:
@@ -62,6 +62,8 @@ def patch_card(card: dict, metadata: Optional[dict]) -> tuple[dict, bool]:
         return card, False
     before = scrub_card(card)
     updated = dict(card)
+    if metadata.get('image_url') != card.get('image_url') and 'display_faces' not in metadata:
+        updated.pop('display_faces', None)
     for key in DISPLAY_FIELDS:
         if key in metadata:
             updated[key] = metadata[key]

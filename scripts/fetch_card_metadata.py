@@ -18,8 +18,14 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Iterable, Optional, Sequence
+
+try:
+    from card_faces import display_faces
+except ModuleNotFoundError:
+    from scripts.card_faces import display_faces
 
 USER_AGENT = "DraftStudy/1.0 (https://github.com/killjoy00/mtg-ev-analyzer)"
 BAD_FRAME_EFFECTS = {"showcase", "extendedart", "inverted"}
@@ -67,7 +73,18 @@ def metadata_for_alias(card: dict, alias: Optional[str] = None) -> dict:
     url = image_url(card, alias)
     if url:
         result["image_url"] = url
+    faces = display_faces(card, related_card)
+    if faces:
+        result["display_faces"] = faces
     return result
+
+
+@lru_cache(maxsize=128)
+def related_card(scryfall_id: str) -> dict:
+    if not re.fullmatch(r"[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}", scryfall_id):
+        raise ValueError("Invalid related-card identity")
+    time.sleep(0.1)
+    return request_json("https://api.scryfall.com/cards/" + scryfall_id)
 
 
 def compact_card(card: dict) -> dict:

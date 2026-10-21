@@ -16,7 +16,7 @@ process.env.DATABASE_URL=fs.readFileSync(connection,'utf8').trim();
 const {default:growth,query,gameDateKey}=await import('../worker/growth-function.js');
 const {default:runApi}=await import('../worker/draft-run-function.mjs');
 const {ensureDailySchedule}=await import('../worker/draft-run-daily.mjs');
-const {currentSeasonForPlayer,draftRunLeaderboardRows,reconcilePersistedSeasons,resolveCurrentSeason}=await import('../worker/draft-run-season.mjs');
+const {currentSeasonForPlayer,draftRunLeaderboardRows,reconcilePersistedSeasons,resolveCurrentSeason,normalizeSeason}=await import('../worker/draft-run-season.mjs');
 
 const parse=value=>typeof value==='string'?JSON.parse(value):value;
 async function board(period,environment='mixed'){
@@ -38,10 +38,17 @@ async function growthCall(path,body,token,status=200,extra={}) {
 
 if(productionBootstrap){
   const scoreBefore=(await query("SELECT count(*) n,coalesce(sum(score),0)::text score_sum FROM scores WHERE mode='draft_run'")).rows[0];
-  const season=await resolveCurrentSeason(query);
+  const current=await resolveCurrentSeason(query);
   const scoreAfter=(await query("SELECT count(*) n,coalesce(sum(score),0)::text score_sum FROM scores WHERE mode='draft_run'")).rows[0];
   assert.deepEqual(scoreAfter,scoreBefore,'Season bootstrap must not change ranked scores.');
-  assert.ok(season,'Production clone must establish an inaugural season.');
+  assert.ok(current,'Production clone must establish a current season.');
+  // The resolver returns the latest season. Validate inaugural history from
+  // its own row so the bootstrap gate also works after a later set launches.
+  const seasons=(await query('SELECT id,set_id,set_name,set_release_date::text,start_date::text,end_date::text,established_by_day::text FROM draft_run_seasons ORDER BY start_date,id')).rows.map(normalizeSeason);
+  const season=seasons[0];
+  assert.ok(season,'Production clone must retain its inaugural season.');
+  assert.deepEqual(current,seasons.at(-1));
+  assert.equal(current.end_date,null);
   const earliest=(await query("SELECT min(challenge_date)::text AS ranked_day FROM scores WHERE mode='draft_run' AND set_id IN ('mixed','powered-cube','latest')")).rows[0]?.ranked_day||null;
   const first=(await query("SELECT day::text,daily_featured_sets FROM draft_run_schedules WHERE environment='latest' ORDER BY day LIMIT 1")).rows[0];
   assert.ok(earliest,'Production clone must contain ranked Draft Run history.');

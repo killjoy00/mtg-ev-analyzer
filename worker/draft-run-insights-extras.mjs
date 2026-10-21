@@ -1,6 +1,8 @@
 // Drafting Insights follow-up: server-only, deterministic summaries of the
 // already owner-scoped, first-encounter normalized rows. No raw history leaves.
 import {safeCardImageUrl} from '../card-image-policy.mjs';
+import {effectiveCardMetadata} from '../card-metadata.mjs';
+import {normalizedDisplayFaces} from '../card-faces.mjs';
 export const DNA_VERSION='drafting-dna-v2';
 export const JOURNEY_VERSION='drafting-journey-v2';
 export const HIGHLIGHTS_VERSION='decision-highlights-v3';
@@ -391,13 +393,18 @@ export function selectInsightHighlights(rows,{page=1,finding=null}={}) {
     note:'Highlights are selected from originally awarded scores and saved support, not proof of an objectively correct draft strategy.'};
 }
 
-const safeCard=c=>c&&typeof c==='object'&&typeof c.id==='string'?{
+const safeCard=original=>{
+ const c=original&&typeof original==='object'?effectiveCardMetadata(original):null;
+ const faces=normalizedDisplayFaces(c?.display_faces);
+ return c&&typeof c.id==='string'?{
   id:c.id,name:String(c.name||'Unknown card').slice(0,140),
   image_url:safeCardImageUrl(c.image_url),
   mana_cost:typeof c.mana_cost==='string'?c.mana_cost.slice(0,60):null,
   rarity:typeof c.rarity==='string'?c.rarity.slice(0,40):null,
   type_line:typeof c.type_line==='string'?c.type_line.slice(0,140):null,
-}:null;
+  ...(faces.length?{display_faces:faces}:{}),
+ }:null;
+};
 export function publicLockedDecision(answer,extra={}) {
   if(!answer||typeof answer!=='object'||!answer.puzzle||!Array.isArray(answer.puzzle.candidates))return null;
   const original=answer.puzzle,candidates=original.candidates.map(safeCard).filter(Boolean).slice(0,20);
