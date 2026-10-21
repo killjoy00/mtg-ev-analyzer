@@ -349,7 +349,9 @@ export async function requestScreenshotFixture<T>(
       }
     }
     if (scenario.includes('image-error')) {
-      for (const card of answer.puzzle.candidates) card.image_url = 'data:image/png;base64,broken';
+      // Exercise image loading after the shared URL policy accepts the source.
+      // This nonexistent printing returns an HTTP error from the allowed host.
+      for (const card of answer.puzzle.candidates) card.image_url = 'https://cards.scryfall.io/normal/front/0/0/00000000-0000-4000-8000-000000000000.jpg';
     }
     next.answers = [...old.answers, answer];
     next.round = next.answers.length;

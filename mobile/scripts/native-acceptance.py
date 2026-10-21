@@ -579,14 +579,27 @@ if platform == 'android':
     attempt('shared-invitation-auth-accept-kill-relaunch', shared_journey)
 
     def image_failure():
+        def wait_for_image_failure():
+            # A real HTTP image failure is asynchronous; wait for the actual
+            # native error/retry controls instead of assuming a data-URI failure.
+            deadline = time.monotonic() + 30
+            while time.monotonic() < deadline:
+                xml, _ = hierarchy()
+                if 'Image unavailable' in xml and 'Retry image' in xml:
+                    return
+                time.sleep(1)
+            raise AssertionError('Missing image failure and retry state')
+
         launch('member-image-error', 'feedback')
         tap('Your Pick: Hero in Training. Open enlarged card.', exact=True)
+        wait_for_image_failure()
         xml, _ = snapshot('card-image-unavailable')
         require('Image unavailable' in xml and 'Retry image' in xml, 'Missing image failure and retry state')
-        tap('Retry image', exact=True)
+        tap('Retry image for Hero in Training', exact=True, scroll=False)
+        wait_for_image_failure()
         xml, _ = snapshot('card-image-retry')
         require('Image unavailable' in xml, 'Deterministic broken image should remain retryable')
-        tap('Close', exact=True)
+        tap('Close card viewer', exact=True, scroll=False)
         xml, _ = snapshot('card-image-close')
         require('You chose' in xml, 'Closing card zoom lost the run')
     attempt('image-failure-retry-keeps-run', image_failure)
