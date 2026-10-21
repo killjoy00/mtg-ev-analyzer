@@ -45,18 +45,26 @@ checked-in corpus and supplemental card-image map, reads all Scryfall DFC/meld
 printings, and retains only exact matches. Incomplete matched pairs fail the
 generation. The initial inventory contained 10,365 image printings, of which
 396 matched supported double-faced/meld records, with no incomplete matched
-pairs. This is local inventory evidence, not an exhaustive production audit.
+pairs.
 
-Before promotion, supplement the inventory with a reviewed read-only export of
+A read-only production audit on 2026-10-21 also checked active parent snapshots,
+all Live supplemental components, and saved-answer snapshots. It exported only
+distinct card names and image URLs. Three older saved printings were added,
+bringing the registry to 399 printings. Every supported double-faced/meld
+printing identified in that inventory has a complete pair and a matching name
+alias. No database rows, saved evidence, or scores were changed.
+
+For future coverage audits, supplement the inventory with a reviewed read-only export of
 card names and image URLs from the active parent corpus, every Live supplemental
 component, and saved-answer snapshots. Do not export player/account fields.
 Supply that JSON tree via repeatable `--inventory FILE.json` arguments. Review
 any extra printing mappings before release. Unknown printings retain their
 existing single-image fallback until their metadata is resolved.
 
-No database migration or corpus rebuild is required for the overlay. Deploy
-the API additions before the web viewer and native app release; existing
-clients ignore optional fields. Pages deployment alone does not deploy the
+No database migration or corpus rebuild is required for the overlay. Prefer
+deploying the API additions before the web viewer and native app release;
+existing clients ignore optional fields, and new clients retain the single-image
+view until the API supplies faces. Pages deployment alone does not deploy the
 API or update installed native apps. Roll back the viewer/API revision to
 remove the feature without altering saved game results.
 

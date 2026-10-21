@@ -45,6 +45,28 @@
         }
       ]
     },
+    "004524bf-b249-4dac-9c10-44d57143feb9": {
+      "names": [
+        "Growing Rites of Itlimoc",
+        "Growing Rites of Itlimoc // Itlimoc, Cradle of the Sun",
+        "Itlimoc, Cradle of the Sun"
+      ],
+      "layout": "transform",
+      "display_faces": [
+        {
+          "name": "Growing Rites of Itlimoc",
+          "image_url": "https://cards.scryfall.io/normal/front/0/0/004524bf-b249-4dac-9c10-44d57143feb9.jpg?1783913751",
+          "role": "front",
+          "large_image_url": "https://cards.scryfall.io/large/front/0/0/004524bf-b249-4dac-9c10-44d57143feb9.jpg?1783913751"
+        },
+        {
+          "name": "Itlimoc, Cradle of the Sun",
+          "image_url": "https://cards.scryfall.io/normal/back/0/0/004524bf-b249-4dac-9c10-44d57143feb9.jpg?1783913751",
+          "role": "back",
+          "large_image_url": "https://cards.scryfall.io/large/back/0/0/004524bf-b249-4dac-9c10-44d57143feb9.jpg?1783913751"
+        }
+      ]
+    },
     "008782d2-72b0-4554-b1ce-2db99969a4d8": {
       "names": [
         "Kuja, Genome Sorcerer",
@@ -4963,6 +4985,28 @@
         }
       ]
     },
+    "8ceb9356-b7b1-4b86-ace2-39bc726a9155": {
+      "names": [
+        "Jace, Telepath Unbound",
+        "Jace, Vryn's Prodigy",
+        "Jace, Vryn's Prodigy // Jace, Telepath Unbound"
+      ],
+      "layout": "transform",
+      "display_faces": [
+        {
+          "name": "Jace, Vryn's Prodigy",
+          "image_url": "https://cards.scryfall.io/normal/front/8/c/8ceb9356-b7b1-4b86-ace2-39bc726a9155.jpg?1788503483",
+          "role": "front",
+          "large_image_url": "https://cards.scryfall.io/large/front/8/c/8ceb9356-b7b1-4b86-ace2-39bc726a9155.jpg?1788503483"
+        },
+        {
+          "name": "Jace, Telepath Unbound",
+          "image_url": "https://cards.scryfall.io/normal/back/8/c/8ceb9356-b7b1-4b86-ace2-39bc726a9155.jpg?1788503483",
+          "role": "back",
+          "large_image_url": "https://cards.scryfall.io/large/back/8/c/8ceb9356-b7b1-4b86-ace2-39bc726a9155.jpg?1788503483"
+        }
+      ]
+    },
     "8d233bc5-8a08-4d38-abd4-21a112141afd": {
       "names": [
         "Brine Comber",
@@ -8058,6 +8102,28 @@
           "image_url": "https://cards.scryfall.io/normal/back/e/8/e8a51d2a-1582-4bad-995c-e7fe9f810149.jpg?1783923861",
           "role": "back",
           "large_image_url": "https://cards.scryfall.io/large/back/e/8/e8a51d2a-1582-4bad-995c-e7fe9f810149.jpg?1783923861"
+        }
+      ]
+    },
+    "ea164381-1e76-4cfb-ab88-70b97c6285dd": {
+      "names": [
+        "Tibalt, Cosmic Impostor",
+        "Valki, God of Lies",
+        "Valki, God of Lies // Tibalt, Cosmic Impostor"
+      ],
+      "layout": "modal_dfc",
+      "display_faces": [
+        {
+          "name": "Valki, God of Lies",
+          "image_url": "https://cards.scryfall.io/normal/front/e/a/ea164381-1e76-4cfb-ab88-70b97c6285dd.jpg?1788503469",
+          "role": "front",
+          "large_image_url": "https://cards.scryfall.io/large/front/e/a/ea164381-1e76-4cfb-ab88-70b97c6285dd.jpg?1788503469"
+        },
+        {
+          "name": "Tibalt, Cosmic Impostor",
+          "image_url": "https://cards.scryfall.io/normal/back/e/a/ea164381-1e76-4cfb-ab88-70b97c6285dd.jpg?1788503469",
+          "role": "back",
+          "large_image_url": "https://cards.scryfall.io/large/back/e/a/ea164381-1e76-4cfb-ab88-70b97c6285dd.jpg?1788503469"
         }
       ]
     },

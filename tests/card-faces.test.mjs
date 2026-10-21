@@ -66,6 +66,20 @@ test('meld shows the combined result and names the required partner',()=>{
   assert.equal(cardFaceIndicator(card),'Meld result');
 });
 
+test('older saved printings discovered by the serving audit receive their exact reverse face',()=>{
+  for(const [id,name,back] of [
+    ['004524bf-b249-4dac-9c10-44d57143feb9','Growing Rites of Itlimoc','Itlimoc, Cradle of the Sun'],
+    ['8ceb9356-b7b1-4b86-ace2-39bc726a9155',"Jace, Vryn's Prodigy",'Jace, Telepath Unbound'],
+    ['ea164381-1e76-4cfb-ab88-70b97c6285dd','Valki, God of Lies','Tibalt, Cosmic Impostor'],
+  ]) {
+    const image_url=registry.printings[id].display_faces[0].image_url;
+    const card=publicCardDisplay({id,name,image_url});
+    assert.equal(card.image_url,image_url);
+    assert.equal(card.display_faces[1].name,back);
+    assert.ok(card.display_faces[1].image_url.includes(id));
+  }
+});
+
 test('every generated overlay contains a complete validated pair and records exact aliases',()=>{
   assert.ok(Object.keys(registry.printings).length>300);
   for(const [id,record] of Object.entries(registry.printings)) {
