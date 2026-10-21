@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
 import modelVersions from '../model-versions.json' with {type:'json'};
+import rebuiltCatalog from '../corpus/draft-run/catalog.json' with {type:'json'};
 import {corpusDatabase} from '../scripts/neon-corpus-db.mjs';
+import {assertPracticeReleaseCoverage} from '../scripts/practice-release-coverage.mjs';
 
 const [branch,commit,connectionFile]=process.argv.slice(2);
 const allowed=new Set(['br-twilight-hill-ayffyd2b','br-orange-feather-ayps8kep']);
@@ -153,14 +155,16 @@ try {
   assert.equal(readiness?.job_revision,readiness?.current_revision);
   assert.ok(readiness?.snapshot_id);
 
-  const coverage=(await query(`SELECT count(*)::int expected,
-      count(*) FILTER(WHERE s.corpus_version=$1)::int active
+  const coverage=(await query(`SELECT v.set_id,s.corpus_version,s.lifecycle_status
     FROM corpus_set_versions v
-    JOIN draft_run_environment_policy p ON p.set_id=v.set_id
+    LEFT JOIN draft_run_environment_policy p ON p.set_id=v.set_id
     LEFT JOIN corpus_source_snapshots s ON s.source_snapshot_id=p.active_snapshot_id
-    WHERE v.corpus_version=$1`,[modelVersions.v5.corpus_version])).rows[0];
-  assert.equal(Number(coverage.expected),30,'v9 release must contain all 30 rebuilt environments');
-  assert.equal(Number(coverage.active),30,'all rebuilt environments must point at v9 snapshots');
+    WHERE v.corpus_version=$1`,[modelVersions.v5.corpus_version])).rows;
+  assert.equal(rebuiltCatalog.corpus_version,modelVersions.v5.corpus_version);
+  assertPracticeReleaseCoverage(coverage,{
+    requiredSetIds:rebuiltCatalog.sets.map(set=>set.id),
+    corpusVersion:modelVersions.v5.corpus_version,
+  });
 
   const ownerGuest=await guest('owner');
   await call('draftrunapi','/v1/runs',{body:{environment:'mixed',qa:true},playerToken:ownerGuest.token,status:403});
