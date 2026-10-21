@@ -3,13 +3,13 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {loadCustomSetMetadata} from '../worker/draft-run-selection.mjs';
 import {registerHealthyCandidate} from '../scripts/corpus-candidate.mjs';
-test('custom choices require every decision while preserving mixed Live eligibility',async()=>{
- const sets=['complete','missing-opening','missing-hard'];
+test('custom choices require P1P2-P1P8 while an archive without P1P1 stays selectable',async()=>{
+ const sets=['complete','missing-opening','missing-second','missing-hard'];
  const metadata=sets.map(set_id=>({set_id,regular_run:true,status:'Live',release_date:'2026-01-01'}));
- const coverage=sets.flatMap(set_id=>Array.from({length:8},(_,i)=>i+1).flatMap(pick_number=>['medium','hard'].map(band=>({set_id,pick_number,band,sources:20})))).filter(g=>!(g.set_id==='missing-opening'&&g.pick_number===1)&&!(g.set_id==='missing-hard'&&g.pick_number===8&&g.band==='hard'));
+ const coverage=sets.flatMap(set_id=>Array.from({length:8},(_,i)=>i+1).flatMap(pick_number=>['medium','hard'].map(band=>({set_id,pick_number,band,sources:20})))).filter(g=>!(g.set_id==='missing-opening'&&g.pick_number===1)&&!(g.set_id==='missing-second'&&g.pick_number===2)&&!(g.set_id==='missing-hard'&&g.pick_number===8&&g.band==='hard'));
  const query=async sql=>({rows:sql.includes('HAVING')?coverage:metadata});
- assert.deepEqual((await loadCustomSetMetadata(query,'version','2026-09-18')).map(s=>s.set_id),['complete']);
- assert.equal(metadata.length,3);
+ assert.deepEqual((await loadCustomSetMetadata(query,'version','2026-09-18')).map(s=>s.set_id),['complete','missing-opening']);
+ assert.equal(metadata.length,4);
 });
 test('Candidate registration requires current complete health and never changes existing states',async()=>{
  let statement,args;await registerHealthyCandidate(async(sql,p)=>{statement=sql;args=p;return {rows:[]};},'new-set','hash');

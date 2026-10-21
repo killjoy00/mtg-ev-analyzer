@@ -21,6 +21,10 @@ test('v5 live Practice acceptance completes and persists every required Practice
   assert.match(smoke,/cube=await finish\(cube,owner\)/);
   assert.match(smoke,/latestRun=await finish\(latestRun,owner\)/);
   assert.match(smoke,/archiveRun=await finish\(archiveRun,owner\)/);
+  assert.match(smoke,/lateRun=await finish\(lateRun,owner\)/);
+  assert.match(smoke,/mixedLateRun=await finish\(mixedLateRun,owner\)/);
+  assert.match(smoke,/customPracticeCoverage\(servingGroups\)/);
+  assert.doesNotMatch(smoke,/'(tmt|ecl|tla)'/,'P1P2 openings are found from coverage, not set names');
   assert.match(smoke,/client_result_id=\$2/);
   assert.match(smoke,/Number\(ranked\.n\),0/);
   assert.match(smoke,/assertPracticeReleaseCoverage\(coverage/);

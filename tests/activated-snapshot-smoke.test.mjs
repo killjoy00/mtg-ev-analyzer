@@ -37,7 +37,8 @@ test('mixed-only inheritance requires a recorded v8 historical to v9 cutover',as
 test('historical mixed-only rebuild proves mixed selection and reroll with exact snapshot provenance',async()=>{
  const env={set_id:'fra',legacy_coverage_parent:true,puzzle_snapshot_id:ACTIVE};
  const metadata=[{set_id:'fra',status:'Live',regular_run:true,release_date:'2026-10-02'}];
- const groups=Array.from({length:7},(_,i)=>i+2).flatMap(pick_number=>['medium','hard'].map(band=>({set_id:'fra',pick_number,band,sources:16})));
+ // A missing P1P1 alone no longer withholds custom practice; a P1P8 gap does.
+ const groups=Array.from({length:7},(_,i)=>i+1).flatMap(pick_number=>['medium','hard'].map(band=>({set_id:'fra',pick_number,band,sources:16})));
  const bridge={id:1,revision:2,metadata,groups},cache={id:2,revision:2,metadata,groups};
  const practice=Array.from({length:8},(_,i)=>({puzzle_id:'p'+i,set_id:i===2?'fra':'blb',pick_number:i+1,source_draft_hash:'source'+i}));
  Object.defineProperty(practice,'servingRevision',{value:2});
@@ -54,7 +55,7 @@ test('historical mixed-only rebuild proves mixed selection and reroll with exact
  assert.equal(result.practice.mode,'mixed');assert.equal(result.practice.single_set_offered,false);
  assert.equal(result.reroll.round,2);assert.equal(result.reroll.replacement,'replacement');
  await assert.rejects(verifyMixedOnlySnapshot(database({...bridge,revision:3}),env,cache,options),/changed revision/);
- const offered={...bridge,groups:[...groups,...['medium','hard'].map(band=>({set_id:'fra',pick_number:1,band,sources:16}))]};
+ const offered={...bridge,groups:[...groups,...['medium','hard'].map(band=>({set_id:'fra',pick_number:8,band,sources:16}))]};
  await assert.rejects(verifyMixedOnlySnapshot(database(offered),env,cache,options),/removed previously available/);
  await assert.rejects(verifyMixedOnlySnapshot(database(bridge,'b'.repeat(64)),env,cache,options),/not the active/);
  await assert.rejects(verifyMixedOnlySnapshot(database(),env,cache,{...options,selectReroll:async()=>({...reroll,source_draft_hash:'source0'})}),/reused a source/);

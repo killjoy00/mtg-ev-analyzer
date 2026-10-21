@@ -1,16 +1,22 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {customSetsFromSnapshot,selectCachedDatabaseRun,loadCachedCustomSetMetadata} from '../worker/draft-run-selection.mjs';
+import {customSetsFromSnapshot,customPracticeFromSnapshot,selectCachedDatabaseRun,loadCachedCustomSetMetadata} from '../worker/draft-run-selection.mjs';
 
 const snapshot={id:'1',revision:'1',metadata:[{set_id:'hob',release_date:'2020-01-01',status:'Live',regular_run:true,set_name:'HOB'}],
   groups:Array.from({length:8},(_,i)=>['medium','hard'].map(band=>({set_id:'hob',pick_number:i+1,band,n:100,sources:16}))).flat()};
 test('custom coverage uses distinct sources for every pick and band; dates remain request-time policy',()=>{
   assert.equal(customSetsFromSnapshot(snapshot,'2026-09-25').length,1);
   assert.equal(customSetsFromSnapshot(snapshot,'2019-12-31').length,0);
-  const incomplete=structuredClone(snapshot);incomplete.groups[0].sources=15;
+  const incomplete=structuredClone(snapshot);incomplete.groups[2].sources=15;
+  assert.equal(incomplete.groups[2].pick_number,2);
   assert.equal(customSetsFromSnapshot(incomplete,'2026-09-25').length,0);
-  incomplete.groups[0].n=100000;
+  incomplete.groups[2].n=100000;
   assert.equal(customSetsFromSnapshot(incomplete,'2026-09-25').length,0);
+  // A thin opening is never asked, so it no longer withholds the set.
+  const thinOpening=structuredClone(snapshot);thinOpening.groups[0].sources=15;
+  assert.equal(customSetsFromSnapshot(thinOpening,'2026-09-25').length,1);
+  assert.equal(customPracticeFromSnapshot(thinOpening,'2026-09-25').coverage.opensAtP1P1('hob'),false);
+  assert.equal(customPracticeFromSnapshot(snapshot,'2026-09-25').coverage.opensAtP1P1('hob'),true);
 });
 test('builder contention is retryable and never falls back to expensive live aggregates',async()=>{
   let calls=0;

@@ -50,15 +50,38 @@ export async function loadLiveSetMetadata(query,version) {
 }
 
 // A set offered alone must supply all eight decisions, independently of its
-// eligibility to contribute a subset of picks to a mixed Daily.
-export async function loadCustomSetMetadata(query,version,day=gameDateKey(),requestedSetIds=[]) {
+// eligibility to contribute a subset of picks to a mixed Daily. P1P2-P1P8 each
+// need 16 distinct sources at medium and hard. P1P1 meets the same standard or
+// is never asked: some public archives begin at P1P2.
+const CUSTOM_MIN_SOURCES=16;
+export function customPracticeCoverage(groups) {
+  const covered=new Set(groups.filter(g=>Number(g.sources)>=CUSTOM_MIN_SOURCES).map(g=>`${g.set_id}:${Number(g.pick_number)}:${g.band}`));
+  const complete=(setId,pick)=>['medium','hard'].every(band=>covered.has(`${setId}:${pick}:${band}`));
+  return {eligible:setId=>[2,3,4,5,6,7,8].every(pick=>complete(setId,pick)),opensAtP1P1:setId=>complete(setId,1)};
+}
+export const customOpeningPick=(setIds,coverage)=>setIds.some(coverage.opensAtP1P1)?1:2;
+// A custom run opens at P1P1 when one of its sets qualifies there, and only
+// such a set supplies that opening. Otherwise it opens with two P1P2 rounds.
+export function customRunShape(setIds,coverage,groups,environment='mixed',selectionVersion=DRAFT_RUN_SELECTION_VERSION) {
+  return {windows:runPickWindows(environment,selectionVersion,customOpeningPick(setIds,coverage)),
+    groups:groups.filter(g=>Number(g.pick_number)!==1||coverage.opensAtP1P1(g.set_id))};
+}
+function requireCustomSets(custom,setIds) {
+  const eligible=new Set(custom.sets.map(s=>s.set_id));
+  if(setIds.some(s=>!eligible.has(s)))throw Object.assign(Error('Choose Live sets with complete eight-pick practice coverage.'),{status:400});
+  return custom.coverage;
+}
+async function loadCustomPractice(query,version,day,requestedSetIds) {
   const metadata=liveRegularSets(await loadLiveSetMetadata(query,version),day).filter(s=>!requestedSetIds.length||requestedSetIds.includes(s.set_id));
   const params=[version];
   const chosen=requestedSetIds.length?(params.push(toPgArray(requestedSetIds)),' AND p.set_id=ANY($2::text[])'):'';
-  const coverage=(await query(`SELECT p.set_id,p.pick_number,r.band,count(DISTINCT p.source_draft_hash)::int sources ${from}
+  const coverage=customPracticeCoverage((await query(`SELECT p.set_id,p.pick_number,r.band,count(DISTINCT p.source_draft_hash)::int sources ${from}
     WHERE ${servingBase} AND p.pick_number BETWEEN 1 AND 8${chosen}
-    GROUP BY p.set_id,p.pick_number,r.band HAVING count(DISTINCT p.source_draft_hash)>=16`,params)).rows;
-  return metadata.filter(s=>Array.from({length:8},(_,i)=>i+1).every(pick=>['medium','hard'].every(band=>coverage.some(g=>g.set_id===s.set_id&&Number(g.pick_number)===pick&&g.band===band))));
+    GROUP BY p.set_id,p.pick_number,r.band HAVING count(DISTINCT p.source_draft_hash)>=16`,params)).rows);
+  return {coverage,sets:metadata.filter(s=>coverage.eligible(s.set_id))};
+}
+export async function loadCustomSetMetadata(query,version,day=gameDateKey(),requestedSetIds=[]) {
+  return (await loadCustomPractice(query,version,day,requestedSetIds)).sets;
 }
 
 // Return compact group counts once, then one source trajectory per round. Every
@@ -77,7 +100,8 @@ export const decisionKey=p=>`${p.source_draft_hash}:${Number(p.pick_number)}`;
 
 export async function selectDatabaseRun(query,version,seed,environment='mixed',{daily=false,day=gameDateKey(),selectionVersion=DRAFT_RUN_SELECTION_VERSION,setIds=[],snapshot=null,exclude=null}={}) {
   const random=seededRandom(seed),bands=runDifficultyBands(random,selectionVersion),selected=[],sources=[],sets=new Set();
-  const windows=runPickWindows(environment,selectionVersion),released=new Set(releasedRunSets(day));
+  let windows=runPickWindows(environment,selectionVersion);
+  const released=new Set(releasedRunSets(day));
   const metadata=selectionVersion===DAILY_SELECTION_VERSION?(snapshot?snapshot.metadata:await loadLiveSetMetadata(query,version)):null;
   const live=metadata?new Set(metadata.filter(s=>environment==='powered-cube'?s.set_id==='powered-cube':s.regular_run&&s.release_date&&s.release_date<=day).map(s=>s.set_id)):null;
   const required=environment==='latest'?latestSetPlan(metadata,day):setIds.length?balancedSetPlan(setIds,random):daily&&environment==='mixed'&&selectionVersion===DAILY_SELECTION_VERSION?dailySetPlan(metadata,day,random):daily&&environment==='mixed'&&isEightPickVersion(selectionVersion)?dailyRequiredSets(day):[];
@@ -97,8 +121,11 @@ export async function selectDatabaseRun(query,version,seed,environment='mixed',{
     (!(environment==='latest'||setIds.length||daily&&environment==='mixed'&&selectionVersion===DAILY_SELECTION_VERSION)||required.includes(g.set_id))
   ):(await query(`SELECT p.set_id,p.pick_number,r.band,count(*)::int n ${from} WHERE ${groupWhere} GROUP BY p.set_id,p.pick_number,r.band`,groupParams)).rows;
   // Counts are mutable per-run state; never mutate a shared snapshot.
-  const groups=rows.map(g=>({...g,pick_number:Number(g.pick_number),n:Number(g.n)})).filter(g=>(!live||live.has(g.set_id))&&(!daily||selectionVersion===DAILY_SELECTION_VERSION||!isEightPickVersion(selectionVersion)||environment==='powered-cube'||released.has(g.set_id)));
-  if(setIds.length){const eligible=new Set((snapshot?customSetsFromSnapshot(snapshot,day,setIds):await loadCustomSetMetadata(query,version,day,setIds)).map(s=>s.set_id));if(setIds.some(s=>!eligible.has(s)))throw Object.assign(Error('Choose Live sets with complete eight-pick practice coverage.'),{status:400});}
+  let groups=rows.map(g=>({...g,pick_number:Number(g.pick_number),n:Number(g.n)})).filter(g=>(!live||live.has(g.set_id))&&(!daily||selectionVersion===DAILY_SELECTION_VERSION||!isEightPickVersion(selectionVersion)||environment==='powered-cube'||released.has(g.set_id)));
+  if(setIds.length){
+    const coverage=requireCustomSets(snapshot?customPracticeFromSnapshot(snapshot,day,setIds):await loadCustomPractice(query,version,day,setIds),setIds);
+    ({windows,groups}=customRunShape(required,coverage,groups,environment,selectionVersion));
+  }
   const forced=requiredSetRounds(groups,bands,windows,random,required);
   const key=p=>`${p.set_id}:${p.pick_number}:${p.band}`;
   const remaining=new Map(groups.map(g=>[key(g),g]));
@@ -156,18 +183,19 @@ export function currentPracticeBatchPlan(snapshot,seed,environment='mixed',{day=
   if(!snapshot||!Array.isArray(snapshot.groups)||!Array.isArray(snapshot.metadata))throw servingCacheUnavailable();
   let planningDraws=0;
   const seeded=seededRandom(seed),random=()=>{planningDraws++;return seeded();};
-  const bands=runDifficultyBands(random,DRAFT_RUN_SELECTION_VERSION),windows=runPickWindows(environment,DRAFT_RUN_SELECTION_VERSION);
+  const bands=runDifficultyBands(random,DRAFT_RUN_SELECTION_VERSION);
+  let windows=runPickWindows(environment,DRAFT_RUN_SELECTION_VERSION);
   const metadata=snapshot.metadata;
   const live=new Set(metadata.filter(s=>environment==='powered-cube'?s.set_id==='powered-cube':s.regular_run&&s.release_date&&s.release_date<=day).map(s=>s.set_id));
   const required=environment==='latest'?latestSetPlan(metadata,day):setIds.length?balancedSetPlan(setIds,random):[];
-  const groups=snapshot.groups.map(g=>({...g,pick_number:Number(g.pick_number),n:Number(g.n)})).filter(g=>
+  let groups=snapshot.groups.map(g=>({...g,pick_number:Number(g.pick_number),n:Number(g.n)})).filter(g=>
     (g.set_id==='powered-cube')===(environment==='powered-cube') && Number(g.pick_number)<=maxRunPick(environment) &&
     (environment==='powered-cube'||!SELECTABLE_ONLY_SETS.has(g.set_id)) &&
     (!(environment==='latest'||setIds.length)||required.includes(g.set_id))
   ).filter(g=>live.has(g.set_id));
   if(setIds.length) {
-    const eligible=new Set(customSetsFromSnapshot(snapshot,day,setIds).map(s=>s.set_id));
-    if(setIds.some(s=>!eligible.has(s)))throw Object.assign(Error('Choose Live sets with complete eight-pick practice coverage.'),{status:400});
+    const coverage=requireCustomSets(customPracticeFromSnapshot(snapshot,day,setIds),setIds);
+    ({windows,groups}=customRunShape(required,coverage,groups,environment));
   }
   const forced=requiredSetRounds(groups,bands,windows,random,required);
   const setWeights=Object.fromEntries([...live].map(setId=>[setId,practiceSetWeight(setId,DRAFT_RUN_SELECTION_VERSION,day,metadata)]));
@@ -213,7 +241,10 @@ export async function selectDatabaseReroll(query,version,source,options) {
   if(!['set','pack'].includes(type)||environment==='powered-cube'&&type==='set')throw Error('Invalid reroll.');
   if(![LEGACY_DIFFICULTY_VERSION,DRAFT_RUN_DIFFICULTY_VERSION].includes(difficultyVersion))throw Error('Unsupported difficulty version.');
   const previous=selectionVersion===PREVIOUS_SELECTION_VERSION,a=draftRunDifficulty(source),origin=anchor||a;
-  const picks=Array.from({length:12},(_,i)=>i+1).filter(p=>eligiblePickForRound(round,p,environment,selectionVersion)&&Math.abs(p-source.pick_number)<=1);
+  // Only a custom run whose sets lack P1P1 coverage opens at P1P2, and pack
+  // rerolls keep the pick, so the stored opening decision records the opening.
+  const openingPick=options.setIds?.length&&Number(round)===0&&Number(source.pick_number)===2?2:1;
+  const picks=Array.from({length:12},(_,i)=>i+1).filter(p=>eligiblePickForRound(round,p,environment,selectionVersion,openingPick)&&Math.abs(p-source.pick_number)<=1);
   if(!picks.length)return null;
   const params=[version,picks[0],picks.at(-1),toPgArray([...new Set([...(options.excludedSources||[]),source.source_draft_hash])])];
   let ratingWhere=SERVING_QUALITY_SQL;
@@ -253,7 +284,7 @@ export async function selectDatabaseReroll(query,version,source,options) {
     SELECT r.* FROM draft_run_puzzle_ratings r WHERE r.puzzle_id=p.puzzle_id
     AND r.difficulty_version='support-ratio-v1' AND ${ratingWhere} OFFSET 0
   ) r ON true ORDER BY p.distance,p.puzzle_id COLLATE "C" LIMIT 20`,params);
-  return selectDraftRunReroll(result.rows.map(decodePuzzleMetadata),source,options);
+  return selectDraftRunReroll(result.rows.map(decodePuzzleMetadata),source,{...options,openingPick});
 }
 
 
@@ -267,11 +298,11 @@ export async function loadServingSnapshot(query,version,{readiness=false}={}) {
   if(!snapshot)throw servingCacheUnavailable();
   return snapshot;
 }
-export function customSetsFromSnapshot(snapshot,day,requestedSetIds=[]) {
-  const covered=new Set(snapshot.groups.filter(g=>Number(g.sources)>=16).map(g=>`${g.set_id}:${g.pick_number}:${g.band}`));
-  return liveRegularSets(snapshot.metadata,day).filter(s=>(!requestedSetIds.length||requestedSetIds.includes(s.set_id))&&
-    Array.from({length:8},(_,i)=>i+1).every(p=>['medium','hard'].every(b=>covered.has(`${s.set_id}:${p}:${b}`))));
+export function customPracticeFromSnapshot(snapshot,day,requestedSetIds=[]) {
+  const coverage=customPracticeCoverage(snapshot.groups);
+  return {coverage,sets:liveRegularSets(snapshot.metadata,day).filter(s=>(!requestedSetIds.length||requestedSetIds.includes(s.set_id))&&coverage.eligible(s.set_id))};
 }
+export function customSetsFromSnapshot(snapshot,day,requestedSetIds=[]) {return customPracticeFromSnapshot(snapshot,day,requestedSetIds).sets;}
 export async function servingRevisionMatches(query,revision) {
   return String((await query('SELECT revision::text FROM draft_run_serving_revision WHERE singleton')).rows[0]?.revision)===String(revision);
 }

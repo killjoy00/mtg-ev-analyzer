@@ -5,6 +5,9 @@ if(!process.argv.includes('--dev-fixtures'))throw Error('Use an isolated branch.
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 const {query}=await import('../worker/growth-function.js');
 const {default:api}=await import('../worker/draft-run-function.mjs');
+const {loadServingSnapshot,customPracticeFromSnapshot}=await import('../worker/draft-run-selection.mjs');
+const {DRAFT_RUN_CORPUS_VERSION}=await import('../draft-run.mjs');
+const {gameDateKey}=await import('../game-date.mjs');
 const parse=v=>typeof v==='string'?JSON.parse(v):v;
 async function call(path,body,user={},status=200){
   const r=await api.fetch(new Request('https://packone.pro'+path,{method:body===undefined?'GET':'POST',headers:{'content-type':'application/json',...(user.token?{authorization:'Bearer '+user.token}:{}),...(user.auth?{'x-pack1-auth-session':user.auth}:{})},body:body===undefined?undefined:JSON.stringify(body)}));
@@ -39,11 +42,22 @@ assert.equal(cubeRun.environment,'powered-cube');
 const cubeShare=await call(`/v1/runs/${cubeRun.id}/share`,{},user);
 const {sets}=await call('/v1/practice-sets',undefined,user);
 assert.ok(sets.length>=4,'The isolated corpus must provide four complete custom-Practice sets.');
-// These retained Live archives omit complete P1P1 packs; they remain useful
-// in mixed runs but must not be advertised as complete custom-set runs.
-for(const id of ['ecl','tla','tmt']){
- assert.ok(!sets.some(s=>s.set_id===id));
- await call('/v1/runs',{setIds:[id]},user,400);
+// Live archives that begin at P1P2 are offered once P1P2-P1P8 qualify; they
+// are found from serving coverage, not by name. Alone, a run asks P1P2 twice
+// from different source drafts, then P1P3-P1P8, and a round-one pack reroll
+// keeps P1P2.
+const {coverage}=customPracticeFromSnapshot(await loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION),gameDateKey());
+for(const {set_id:id} of sets.filter(s=>!coverage.opensAtP1P1(s.set_id))){
+ let late=await call('/v1/runs',{setIds:[id]},user);
+ assert.equal(late.current.pick_number,2);
+ late=await call(`/v1/runs/${late.id}/reroll`,{revision:late.revision,round:0,puzzleId:late.current.puzzle_id,type:'pack'},user);
+ assert.equal(late.current.pick_number,2);assert.equal(late.current.set_id,id);
+ late=await finish(late,user);
+ assert.deepEqual(late.answers.map(a=>a.puzzle.pick_number),[2,2,3,4,5,6,7,8]);
+ const stored=(await query('SELECT puzzle_ids FROM draft_run_sessions WHERE id=$1::uuid',[late.id])).rows[0];
+ const selected=(await query('SELECT set_id,source_draft_hash FROM draft_run_verified_puzzles WHERE puzzle_id IN (SELECT jsonb_array_elements_text($1::jsonb))',[JSON.stringify(parse(stored.puzzle_ids))])).rows;
+ assert.equal(selected.length,8);assert.equal(new Set(selected.map(s=>s.source_draft_hash)).size,8);
+ assert.ok(selected.every(s=>s.set_id===id));
 }
 for(const n of [1,2,3,4]){
   const ids=sets.slice(0,n).map(s=>s.set_id),custom=await call('/v1/runs',{setIds:ids},user);

@@ -1,8 +1,11 @@
 // Only the disposable backend gate invokes this suite.
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-import {loadServingSnapshot,selectCachedDatabaseRun,selectDatabaseRun,servingRevisionMatches,toPgArray} from '../worker/draft-run-selection.mjs';
+import {loadServingSnapshot,selectCachedDatabaseRun,selectDatabaseRun,selectDatabaseReroll,customPracticeFromSnapshot,servingRevisionMatches,toPgArray} from '../worker/draft-run-selection.mjs';
 import {DRAFT_RUN_CORPUS_VERSION as version} from '../draft-run.mjs';
+import {DRAFT_RUN_SELECTION_VERSION} from '../draft-run-policy.mjs';
+import {DRAFT_RUN_DIFFICULTY_VERSION} from '../draft-run-difficulty.mjs';
+import {gameDateKey} from '../game-date.mjs';
 if(!process.argv.includes('--dev-fixtures'))throw Error('Isolated branch required.');
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 const {query}=await import('../worker/growth-function.js');
@@ -16,6 +19,39 @@ for(const environment of ['mixed','powered-cube']) {
   assert.equal(cached.servingRevision,snapshot.revision);
 }
 console.log('PASS: exact mixed/Cube serving-cache selection parity.');
+
+// Archives that begin at P1P2 are offered for custom practice from coverage,
+// not by name. Prove the batched SQL selector, its unbatched snapshot baseline
+// and the live reference agree on real data, with a usable round-one reroll.
+{
+  const day=gameDateKey(),{sets,coverage}=customPracticeFromSnapshot(snapshot,day);
+  const late=sets.map(s=>s.set_id).filter(id=>!coverage.opensAtP1P1(id)),opener=sets.map(s=>s.set_id).find(coverage.opensAtP1P1);
+  const cases=[late.slice(0,1),late.slice(0,2),[late[0],opener]].filter(c=>c.length&&c.every(Boolean)&&(c.length===1||c[0]!==c[1]));
+  if(!late.length)console.log('No offered set opens at P1P2 on this branch; tests/custom-opening.test.mjs covers the policy.');
+  for(const setIds of cases)for(const seed of ['p1p2-opening-a','p1p2-opening-b']) {
+    const options={setIds,day};
+    const batched=await selectCachedDatabaseRun(query,version,seed,'mixed',options);
+    const baseline=await selectCachedDatabaseRun(query,version,seed,'mixed',{...options,batched:false});
+    const live=await selectDatabaseRun(query,version,seed,'mixed',options);
+    assert.deepEqual(baseline.map(p=>p.puzzle_id),batched.map(p=>p.puzzle_id),'unbatched snapshot selection agrees with the batched selector');
+    assert.deepEqual(live.map(p=>p.puzzle_id),batched.map(p=>p.puzzle_id),'live reference agrees with the batched selector');
+    const opensAtP1P1=setIds.some(coverage.opensAtP1P1);
+    assert.deepEqual(batched.map(p=>Number(p.pick_number)),opensAtP1P1?[1,2,3,4,5,6,7,8]:[2,2,3,4,5,6,7,8],setIds.join('+'));
+    if(opensAtP1P1)assert.ok(coverage.opensAtP1P1(batched[0].set_id),'only a covered set supplies P1P1');
+    assert.equal(new Set(batched.map(p=>p.source_draft_hash)).size,8,'no source draft repeats');
+    assert.ok(batched.every(p=>setIds.includes(p.set_id)));
+    const excludedSources=batched.map(p=>p.source_draft_hash);
+    const reroll=await selectDatabaseReroll(query,version,batched[0],{type:'pack',round:0,seed,environment:'mixed',setIds,excludedSources,
+      difficultyVersion:DRAFT_RUN_DIFFICULTY_VERSION,selectionVersion:DRAFT_RUN_SELECTION_VERSION,daily:false,day});
+    if(reroll) {
+      assert.equal(Number(reroll.pick_number),Number(batched[0].pick_number),'a pack reroll keeps the opening pick');
+      assert.equal(reroll.set_id,batched[0].set_id);
+      assert.ok(!excludedSources.includes(reroll.source_draft_hash),'a reroll never reuses a run source');
+    }
+    console.log(JSON.stringify({set_ids:setIds,seed,picks:batched.map(p=>p.set_id+':'+p.pick_number),round_one_reroll:Boolean(reroll)}));
+  }
+  if(cases.length)console.log('PASS: P1P2-opening custom practice parity for '+late.join(', ')+'.');
+}
 
 // Stage a fixture with complete custom-pick coverage for one Live regular set.
 // Keep up to 32 real sources in every pick/band, including the easy opening
