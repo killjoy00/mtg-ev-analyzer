@@ -59,7 +59,7 @@ Previously reviewed Live sets are grandfathered at migration. Missing modern hea
 
 Premier trophies include 7–0, 7–1 and 7–2 with the existing experience/skill standard. New ledgers store wins/losses separately from immutable puzzle payloads. Imported older ledgers without losses report unknown; they must not be described as audited 7–0-only data. Outcomes and qualified/source/included/excluded totals appear wherever recorded. Post-pick drafter details read a puzzle's loss count from these ledgers when the pick is graded ([`worker/trophy-source-record.mjs`](../worker/trophy-source-record.mjs)), not from the payload: every ledger entry for the source draft that records losses must show 7 wins, 0–2 losses and the same count, or the record is omitted.
 
-Custom-set practice requires complete P1P1–P1P8 coverage with at least 16 independent medium/hard sources at each position. Live sets with incomplete opening-pack archives can still contribute valid later decisions to mixed runs; they are not offered as self-contained custom-set runs. The full historical inventory is retained.
+Custom-set practice requires P1P2–P1P8 coverage with at least 16 independent medium/hard sources at each position. P1P1 is asked only when it meets the same standard: a custom run opens at P1P1 from a selected set that qualifies there, and a run drawn only from sets whose archives begin at P1P2 asks two P1P2 decisions from different source drafts, then P1P3–P1P8. Pack rerolls keep that opening. Daily, Latest Set, Cube and ordinary practice are unchanged. The full historical inventory is retained.
 
 
 ## Card-image maintenance

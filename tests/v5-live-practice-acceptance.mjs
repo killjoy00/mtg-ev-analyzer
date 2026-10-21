@@ -4,6 +4,7 @@ import modelVersions from '../model-versions.json' with {type:'json'};
 import rebuiltCatalog from '../corpus/draft-run/catalog.json' with {type:'json'};
 import {corpusDatabase} from '../scripts/neon-corpus-db.mjs';
 import {assertPracticeReleaseCoverage} from '../scripts/practice-release-coverage.mjs';
+import {customPracticeCoverage} from '../worker/draft-run-selection.mjs';
 
 const [branch,commit,connectionFile]=process.argv.slice(2);
 const allowed=new Set(['br-twilight-hill-ayffyd2b','br-orange-feather-ayps8kep']);
@@ -121,6 +122,15 @@ async function finish(run,user) {
   return persisted;
 }
 
+// Rerolls replace stored decisions, so check the final run, not the start.
+async function assertDistinctSources(run) {
+  const stored=(await query(`SELECT jsonb_array_length(s.puzzle_ids)::int decisions,count(DISTINCT p.source_draft_hash)::int sources
+    FROM draft_run_sessions s JOIN draft_run_verified_puzzles p ON p.puzzle_id IN (SELECT jsonb_array_elements_text(s.puzzle_ids))
+    WHERE s.id=$1::uuid GROUP BY s.puzzle_ids`,[run.id])).rows[0];
+  assert.equal(Number(stored?.decisions),8);
+  assert.equal(Number(stored?.sources),8,'Practice must never repeat a source draft.');
+}
+
 async function cleanup() {
   for(const f of fixtures) {
     assert.match(f.playerId,/^[a-f0-9-]{36}$/i);
@@ -226,6 +236,33 @@ try {
   archiveRun=await finish(archiveRun,owner);
   assert.ok(archiveRun.answers.every(answer=>answer.puzzle.set_id===archive.set_id));
 
+  // Archives that begin at P1P2 are found from serving coverage, never by name.
+  // Alone they ask P1P2 twice, from different drafts; mixed with a set that has
+  // P1P1 coverage, that set supplies the opening.
+  const servingGroups=parse((await query('SELECT groups FROM draft_run_serving_snapshots WHERE id=$1::bigint',[readiness.snapshot_id])).rows[0].groups);
+  const openingCoverage=customPracticeCoverage(servingGroups);
+  const lateSets=practice.sets.map(s=>s.set_id).filter(id=>!openingCoverage.opensAtP1P1(id));
+  for(const setId of lateSets) {
+    let lateRun=await start({environment:'mixed',setIds:[setId]},owner);
+    assert.equal(lateRun.current.pick_number,2,`${setId} must open at P1P2`);
+    lateRun=await reroll(lateRun,'pack',owner);
+    assert.equal(lateRun.current.pick_number,2,`${setId} round-one pack reroll must keep P1P2`);
+    lateRun=await finish(lateRun,owner);
+    assert.deepEqual(lateRun.answers.map(answer=>answer.puzzle.pick_number),[2,2,3,4,5,6,7,8]);
+    assert.ok(lateRun.answers.every(answer=>answer.puzzle.set_id===setId));
+    await assertDistinctSources(lateRun);
+  }
+  const opener=practice.sets.find(s=>openingCoverage.opensAtP1P1(s.set_id));
+  if(lateSets.length&&opener) {
+    let mixedLateRun=await start({environment:'mixed',setIds:[lateSets[0],opener.set_id]},owner);
+    assert.equal(mixedLateRun.current.pick_number,1);
+    assert.equal(mixedLateRun.current.set_id,opener.set_id,'Only a set with P1P1 coverage may supply the opening.');
+    mixedLateRun=await finish(mixedLateRun,owner);
+    assert.deepEqual(mixedLateRun.answers.map(answer=>answer.puzzle.pick_number),[1,2,3,4,5,6,7,8]);
+    assert.ok(mixedLateRun.answers.slice(1).some(answer=>answer.puzzle.set_id===lateSets[0]));
+    await assertDistinctSources(mixedLateRun);
+  }
+
   const ranked=(await query(`SELECT count(*)::int n FROM scores
     WHERE player_id=ANY($1::uuid[]) AND mode='draft_run'`,['{'+fixtures.map(f=>f.playerId).join(',')+'}'])).rows[0];
   assert.equal(Number(ranked.n),0,'QA Practice must not create public leaderboard scores.');
@@ -239,6 +276,8 @@ try {
     readiness_revision:readiness.current_revision,
     latest_set:latest.set_id,
     archive_set:archive.set_id,
+    practice_sets:practice.sets.length,
+    p1p2_opening_sets:lateSets,
     checks:[
       'exact release and v9 health/readiness',
       'guest Practice denied and account Practice granted',
@@ -247,6 +286,8 @@ try {
       'Cube pack reroll, completion and persistence',
       'Latest Set custom Practice completion and persistence',
       'archive set custom Practice completion and persistence',
+      'P1P2-opening custom Practice reroll, completion and distinct sources',
+      'mixed custom Practice opens at P1P1 from a covered set',
       'no public leaderboard score',
     ],
   },null,2));

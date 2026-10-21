@@ -1,8 +1,8 @@
 import {runPickWindows} from '../draft-run.mjs';
 
 // Some official archives begin after the opening pick. Their pinned baseline
-// already declares first_pick=2. They contribute picks 2–8 to mixed runs;
-// custom single-set eligibility still independently requires all picks 1–8.
+// already declares first_pick=2. They contribute picks 2–8 to mixed runs and
+// custom practice, whose own coverage check asks P1P1 only where it qualifies.
 // Never infer this bound from the candidate rows: that could hide missing data.
 export function corpusHealthPicks(setId, baselineEntry) {
   const picks = [...new Set(runPickWindows(setId === 'powered-cube' ? 'powered-cube' : 'mixed').map(window => Number(window[0])))];

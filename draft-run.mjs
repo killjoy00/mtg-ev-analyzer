@@ -55,8 +55,12 @@ const TEN_PICK_WINDOWS = Object.freeze([[1,1],[2,2],[3,3],[4,5],[5,6],[6,7],[7,8
 const HISTORICAL_EIGHT_WINDOWS = Object.freeze([[1,1],[2,2],[3,3],[4,5],[5,6],[6,8],[7,9],[8,10]]);
 export const DRAFT_RUN_PICK_WINDOWS = Object.freeze(Array.from({length:8},(_,i)=>[i+1,i+1]));
 export const CUBE_PICK_WINDOWS = Object.freeze(DRAFT_RUN_PICK_WINDOWS.map(([a,b])=>[a+1,b+1]));
-export function runPickWindows(environment='mixed',version=DRAFT_RUN_SELECTION_VERSION) {
+// Some public archives begin at P1P2. A custom run drawn only from such sets
+// asks two P1P2 decisions (distinct source drafts), then P1P3-P1P8.
+export const P1P2_OPENING_PICK_WINDOWS = Object.freeze([[2,2],...DRAFT_RUN_PICK_WINDOWS.slice(1)]);
+export function runPickWindows(environment='mixed',version=DRAFT_RUN_SELECTION_VERSION,openingPick=1) {
   if(version===PREVIOUS_SELECTION_VERSION)return environment===POWERED_CUBE_ENVIRONMENT?PREVIOUS_CUBE_WINDOWS:PREVIOUS_PICK_WINDOWS;
+  if(openingPick===2&&version===DAILY_SELECTION_VERSION&&environment==='mixed')return P1P2_OPENING_PICK_WINDOWS;
   const windows=version===DAILY_SELECTION_VERSION?DRAFT_RUN_PICK_WINDOWS:version==='eight-pick-v3'?HISTORICAL_EIGHT_WINDOWS:TEN_PICK_WINDOWS;
   return environment===POWERED_CUBE_ENVIRONMENT?windows.map(([a,b])=>[a+1,b+1]):windows;
 }
@@ -335,8 +339,8 @@ export function draftRunRerollDistance(source, candidate) {
   return (pickDistance * 0.35) + (countDistance * 0.15) + (gapDistance * 0.25) + (entropyDistance * 0.15) + (poolDistance * 0.10);
 }
 
-export function eligiblePickForRound(roundIndex, pickNumber, environment = 'mixed', selectionVersion=DRAFT_RUN_SELECTION_VERSION) {
-  const window = runPickWindows(environment,selectionVersion)[Number(roundIndex)];
+export function eligiblePickForRound(roundIndex, pickNumber, environment = 'mixed', selectionVersion=DRAFT_RUN_SELECTION_VERSION, openingPick=1) {
+  const window = runPickWindows(environment,selectionVersion,openingPick)[Number(roundIndex)];
   if (!window) return false;
   const pick = Number(pickNumber);
   return Number.isInteger(pick) && pick >= window[0] && pick <= window[1];
@@ -417,7 +421,7 @@ export function selectDraftRun(pool, seed, environment = 'mixed', {daily=false,d
   return selected;
 }
 
-export function selectDraftRunReroll(pool, source, { type, round, seed, excludedSources = [], environment = 'mixed', difficultyVersion = DRAFT_RUN_DIFFICULTY_VERSION, selectionVersion=DRAFT_RUN_SELECTION_VERSION,daily=false,day=gameDateKey(), anchor = null }) {
+export function selectDraftRunReroll(pool, source, { type, round, seed, excludedSources = [], environment = 'mixed', difficultyVersion = DRAFT_RUN_DIFFICULTY_VERSION, selectionVersion=DRAFT_RUN_SELECTION_VERSION,daily=false,day=gameDateKey(), anchor = null, openingPick = 1 }) {
   if (!['set','pack'].includes(type)) throw new Error('Invalid reroll.');
   if (environment === POWERED_CUBE_ENVIRONMENT && type === 'set') throw new Error('Cube rerolls stay within Powered Cube.');
   const excluded = new Set([...excludedSources,source.source_draft_hash]);
@@ -428,7 +432,7 @@ export function selectDraftRunReroll(pool, source, { type, round, seed, excluded
   const released=new Set(releasedRunSets(day));
   const eligible = poolForEnvironment(pool, environment).filter(meetsServingQuality).filter(p=>previous||(eligibleRunPuzzle(p)&&(environment==='powered-cube'||regularRunSet(p.set_id))&&(round<earlyRoundsForSelection(selectionVersion)||rateDraftRunPuzzle(p).band!=='easy'))).filter(p=>(!daily||selectionVersion===DAILY_SELECTION_VERSION||!isEightPickVersion(selectionVersion)||environment==='powered-cube'||released.has(p.set_id)) && !excluded.has(p.source_draft_hash) &&
     (type === 'set' ? p.set_id !== source.set_id : p.set_id === source.set_id) &&
-    eligiblePickForRound(round,p.pick_number,environment,selectionVersion) && Math.abs(p.pick_number-source.pick_number) <= 1)
+    eligiblePickForRound(round,p.pick_number,environment,selectionVersion,openingPick) && Math.abs(p.pick_number-source.pick_number) <= 1)
     .filter(p => {
       if(difficultyVersion===LEGACY_DIFFICULTY_VERSION)return true;
       const rating=rateDraftRunPuzzle(p);

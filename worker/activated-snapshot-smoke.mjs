@@ -20,7 +20,7 @@ import {DRAFT_RUN_DIFFICULTY_VERSION} from '../draft-run-difficulty.mjs';
 import {liveRegularSets} from '../daily-selection.mjs';
 import {gameDateKey} from '../game-date.mjs';
 import {
- loadLiveSetMetadata,loadServingSnapshot,customSetsFromSnapshot,
+ loadLiveSetMetadata,loadServingSnapshot,customSetsFromSnapshot,customPracticeCoverage,customOpeningPick,
  selectCachedDatabaseRun,selectDatabaseRun,selectDatabaseReroll,servingRevisionMatches,toPgArray
 } from './draft-run-selection.mjs';
 
@@ -149,8 +149,9 @@ export async function runActivatedSnapshotSmoke(query,{setId,snapshotId=null,day
  result.checks.serving_cache={cache_snapshot:cache.id,revision:cache.revision,decisions:Number(inventory.total)};
 
  // Single-set practice through the cached selector used by practice starts. A
- // first-class snapshot passed the P1-P8 coverage gate, so it must be offered;
- // a historical environment with incomplete opening packs legitimately is not.
+ // first-class snapshot passed the P1P2-P1P8 coverage gate, so it must be offered;
+ // it opens at P1P1 only when that pick is covered too. A historical environment
+ // with incomplete packs legitimately is not offered.
  const cube=setId==='powered-cube',environment=cube?'powered-cube':'mixed';
  const eligible=cube||customSetsFromSnapshot(cache,day,[setId]).some(s=>s.set_id===setId);
  if(!eligible&&env.historical) {
@@ -159,9 +160,11 @@ export async function runActivatedSnapshotSmoke(query,{setId,snapshotId=null,day
  } else if(!eligible&&env.legacy_coverage_parent) {
   Object.assign(result.checks,await verifyMixedOnlySnapshot(query,env,cache,{day,seed,readiness}));
  } else {
-  assert.ok(eligible,`${setId}: not offered for single-set practice (needs P1-P8 medium and hard coverage of at least 16 sources)`);
+  assert.ok(eligible,`${setId}: not offered for single-set practice (needs P1P2-P1P8 medium and hard coverage of at least 16 sources)`);
   const practice=await selectCachedDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,environment,{setIds:cube?[]:[setId],day,readiness});
-  assert.deepEqual(practice.map(p=>Number(p.pick_number)),runPickWindows(environment).map(w=>w[0]),`${setId}: practice picks do not follow the run windows`);
+  const openingPick=cube?1:customOpeningPick([setId],customPracticeCoverage(cache.groups));
+  assert.deepEqual(practice.map(p=>Number(p.pick_number)),runPickWindows(environment,DRAFT_RUN_SELECTION_VERSION,openingPick).map(w=>w[0]),`${setId}: practice picks do not follow the run windows`);
+  assert.equal(new Set(practice.map(p=>p.source_draft_hash)).size,practice.length,`${setId}: practice repeated a source draft`);
   assert.equal(String(practice.servingRevision),String(cache.revision),'Practice smoke changed serving revision');
   let snapshots=await puzzleSnapshots(query,practice.map(p=>p.puzzle_id));
   assertFromActiveSnapshot(env,practice,snapshots,'practice');
