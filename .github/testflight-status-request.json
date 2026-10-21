@@ -1,5 +1,5 @@
 {
   "operation": "read-pack-one-testflight-status",
-  "reason": "Owner-authorized read-only App Store Connect verification for exact Pack One Insights review-polish iOS 1.1 build 100883 generated from merged signed release request #1219, workflow 38793384593 and underlying Insights patch #1218. Only run after the signed TestFlight upload succeeds. Verify VALID processing, IN_BETA_TESTING with the existing internal TestFlight beta group, no crash red flags, and no changes to beta group membership, testers, App Store versions, public submission, metadata, signing or live distribution.",
-  "build_number": "100883"
+  "reason": "Read-only post-upload reconciliation for Pack One iOS 1.1 build 100926, successfully uploaded and VALID / APP_STORE_ELIGIBLE during protected workflow 39661277574 attempt 2. Its immediate finalizer observed READY_FOR_BETA_TESTING rather than IN_BETA_TESTING. Check exact Apple processing, current TestFlight internal state and existing beta-group association without uploading again or modifying groups, testers, App Store versions, app metadata, signing credentials, review submission or public release. This verifies the merged double-sided-card native candidate from source 07fd37cabfe1be072f2035ba920ea84e226be2fc.",
+  "build_number": "100926"
 }
