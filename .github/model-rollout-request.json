@@ -1,7 +1,7 @@
 {
   "operation": "deploy",
-  "request_id": "pack1-card-faces-dev-20261021-4732991",
-  "reason": "Deploy exact reviewed source 4732991b4c1c2831463029ba64ae2f7d63157f94, combining double-faced-card support from #1274 with the explicit environment-coverage acceptance correction from #1278. The earlier development deployment passed all Daily flows and stopped at the obsolete fixed environment total. Rerun the complete schema, bundle, revision, Daily and Practice gates with the corrected source before production promotion. No corpus rebuild or saved-score rewrite is requested.",
+  "request_id": "pack1-card-faces-prod-20261021-4732991",
+  "reason": "Promote double-faced-card support at exact reviewed source 4732991b4c1c2831463029ba64ae2f7d63157f94, including the explicit coverage acceptance correction in #1278. Merge only after development request #1279 passes the complete revision, schema/index, Daily and Practice acceptance gates. Production independently rechecks development and frontend compatibility before upload. No corpus rebuild or saved-score rewrite is requested.",
   "commit": "4732991b4c1c2831463029ba64ae2f7d63157f94",
-  "target": "development"
+  "target": "production"
 }
