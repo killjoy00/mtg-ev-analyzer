@@ -1,7 +1,7 @@
 {
   "operation": "deploy",
-  "request_id": "pack1-card-faces-prod-20261021-58ea6af",
-  "reason": "Promote double-faced-card support from #1274 to production at exact source 58ea6afcd2882c5e231e289905c7e342359a9118, the same revision requested for development in #1275. Merge only after development verifies release markers, schema and serving-index prerequisites, all unranked Daily flows and live Practice acceptance. The protected production workflow independently rechecks development and the published frontend before upload. This request does not rebuild the corpus or rewrite saved picks or scores.",
-  "commit": "58ea6afcd2882c5e231e289905c7e342359a9118",
+  "request_id": "pack1-card-faces-prod-20261021-4732991",
+  "reason": "Promote double-faced-card support at exact reviewed source 4732991b4c1c2831463029ba64ae2f7d63157f94, including the explicit coverage acceptance correction in #1278. Merge only after development request #1279 passes the complete revision, schema/index, Daily and Practice acceptance gates. Production independently rechecks development and frontend compatibility before upload. No corpus rebuild or saved-score rewrite is requested.",
+  "commit": "4732991b4c1c2831463029ba64ae2f7d63157f94",
   "target": "production"
 }
