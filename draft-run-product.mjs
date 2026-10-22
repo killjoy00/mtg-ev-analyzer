@@ -108,7 +108,7 @@ function compactRevealCards(p,answer) {
       const ranked=[...(answer.ranking||[])].sort((a,b)=>Number(b.support)-Number(a.support));
       const leaderId=answer.consensusId||ranked[0]?.id;
       const other=byId.get(leaderId!==shared.id?leaderId:ranked.find(c=>c.id!==shared.id)?.id);
-      return `<div class="run-reveal-picks is-match">${cardFigure(shared,'✓ Trophy Match','is-shared')}${other?cardFigure(other,leaderId===other.id?'Highest Ranked':'Next Highest','is-ranked'):''}</div>`;
+      return `<div class="run-reveal-picks is-match">${cardFigure(shared,'✓ Trophy Match','is-shared')}${other?cardFigure(other,'Next Highest','is-ranked'):''}</div>`;
     }
     const cards=`${cardFigure(mine,'Your Pick','is-mine')}${cardFigure(trophy,'Trophy Pick','is-trophy')}`;
     return cards?`<div class="run-reveal-picks">${cards}</div>`:'';

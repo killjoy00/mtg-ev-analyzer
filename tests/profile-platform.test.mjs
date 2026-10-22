@@ -84,3 +84,21 @@ test('signed-in progression uses My Pack One stats and Account settings tabs', (
   assert.match(product, /Sign in or create account/);
   assert.doesNotMatch(product, /Back to game/);
 });
+
+test('Career Snapshot pluralizes shared challenges and the record card sits under Archive Progress', async () => {
+  const { myPackOneMarkup } = await import('../my-pack-one.mjs');
+  const profile = (summary) => ({
+    player:{display_name:'Player',claimed:true}, achievements:[], by_set:[], recent:[], daily_history:[], trend:[],
+    summary:{games:3,average_score:70,best_score:90,current_streak:1,...summary},
+  });
+  const one = myPackOneMarkup(profile({challenge_wins:1}), {sets:[]}, {settingsMarkup:''});
+  assert.match(one, /<strong>1<\/strong><span>Shared challenge played<\/span>/);
+  const many = myPackOneMarkup(profile({challenge_wins:8,challenge_losses:3,challenge_ties:1}), {sets:[]}, {settingsMarkup:''});
+  assert.match(many, /<strong>12<\/strong><span>Shared challenges played<\/span>/);
+  assert.match(many, /<h2>Archive Progress<\/h2>[\s\S]*<\/section><section class="my-pack-card my-challenge-card">/, 'record card follows Archive Progress');
+  assert.match(many, /<strong>8<\/strong><span>Beaten<\/span><\/div><div><strong>3<\/strong><span>Below target<\/span><\/div><div><strong>1<\/strong><span>Tied<\/span>/);
+  const none = myPackOneMarkup(profile({}), {sets:[]}, {settingsMarkup:''});
+  assert.match(none, /<strong>0<\/strong><span>Shared challenges played<\/span>/);
+  assert.match(none, /Play someone’s shared run to start your record\./);
+  assert.doesNotMatch(none, /my-challenge-record/);
+});
