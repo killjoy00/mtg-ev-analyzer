@@ -43,7 +43,7 @@ const DAILY_NEXT_ORDER = [
 
 // Used only after a completed real Daily. Never infer an unfinished game from
 // missing/failed status, a stale Pacific date, or a different player's history.
-export function nextUnfinishedDaily(profile,{completedDay,completedEnvironment,now=new Date()}={}) {
+function completedDailyStatus(profile,{completedDay,completedEnvironment,now=new Date()}={}) {
   const day=gameDateKey(now);
   if(completedDay!==day
     || !DAILY_NEXT_ORDER.some(item=>item.environment===completedEnvironment)
@@ -52,5 +52,13 @@ export function nextUnfinishedDaily(profile,{completedDay,completedEnvironment,n
   const status=todayStatus(profile,day);
   // The result currently on screen is complete even if the history endpoint
   // is briefly behind its final write.
-  return DAILY_NEXT_ORDER.find(item=>item.environment!==completedEnvironment&&!status[item.key].complete)||null;
+  return DAILY_NEXT_ORDER.map(item=>({item,complete:item.environment===completedEnvironment||status[item.key].complete}));
+}
+
+export function nextUnfinishedDaily(profile,options) {
+  return completedDailyStatus(profile,options)?.find(entry=>!entry.complete)?.item||null;
+}
+
+export function completedAllDailies(profile,options) {
+  return completedDailyStatus(profile,options)?.every(entry=>entry.complete)===true;
 }

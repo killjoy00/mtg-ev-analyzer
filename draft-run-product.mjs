@@ -9,8 +9,8 @@ import { escapeHtml as esc } from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
 import { compactDraftRunFeedback, consensusFeedback, trophyDrafterDetails, trophyRevealSentence } from './draft-run-feedback.mjs?v=4';
 import { tcgplayerUrl } from './tcgplayer.mjs';
-import { dailyResetCue } from './game-date.mjs';
-import {nextUnfinishedDaily} from './today-status.mjs';
+import { dailyResetCue, nextGameDateBoundary } from './game-date.mjs';
+import {completedAllDailies,nextUnfinishedDaily} from './today-status.mjs?v=2';
 import {sharedRunAppPath,sharedRunInvitationId} from './shared-run-links.mjs';
 import {dismissSetRefresher,installSetGuides,setRefresherButton} from './set-guides.mjs?v=1';
 
@@ -48,7 +48,7 @@ const app=()=>document.querySelector('#app');
 function styles() {
   installSetGuides();
   if(document.querySelector('[data-draft-run-style]')) return;
-  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=16';link.dataset.draftRunStyle='1';document.head.appendChild(link);
+  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=17';link.dataset.draftRunStyle='1';document.head.appendChild(link);
 }
 async function api(path,body,auth=true) {
   const method=body===undefined?'GET':'POST',headers={'content-type':'application/json'};
@@ -296,6 +296,15 @@ async function mutate(action,body) {
     document.querySelector('#run-error').textContent=message;
   } finally {busy=false;}
 }
+// Hidden until renderDailyResultCue confirms today's three Dailies are done.
+function dailySetCompleteMarkup() {
+  if(!run.day||!run.complete||run.leaderboard_eligible||hasAccountSession())return '';
+  return `<aside class="run-daily-set-complete" data-daily-set-complete aria-labelledby="run-daily-set-complete-title" hidden>
+    <span class="run-daily-set-complete-icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8"/><path d="m6.5 10.2 2.3 2.3 4.7-4.9"/></svg></span>
+    <div><p class="eyebrow">Finished all 3 free dailies</p><h2 id="run-daily-set-complete-title">Sign in to keep playing with unlimited draft runs.</h2><p>Create a free account to save progress, track stats, and compete on the leaderboard.</p></div>
+    <button class="button primary" type="button">Sign in for unlimited runs</button>
+  </aside>`;
+}
 function resultRepeatAction() {
   if(run.day||run.comparison?.kind==='creator')return {href:'./',label:'Back to Dailies'};
   if(run.custom_set_ids?.length)return {href:'?game=draft-run&custom=1',label:'Choose Sets for Another Run'};
@@ -324,6 +333,13 @@ async function renderDailyResultCue(resultId) {
       page.querySelector('[data-all-dailies]')?.removeAttribute('hidden');
     }
   }
+  // A guest sees the sign-in handoff only once today's authoritative history
+  // shows all three Dailies, and never after the Pacific reset.
+  const setComplete=root.closest('.run-result-page')?.querySelector('[data-daily-set-complete]');
+  if(setComplete&&!hasAccountSession()&&completedAllDailies(status,{completedDay:run.day,completedEnvironment:run.environment})) {
+    setComplete.hidden=false;
+    setTimeout(()=>{setComplete.hidden=true;},Math.max(0,nextGameDateBoundary()-Date.now()));
+  }
 }
 function renderResult() {
   document.body.classList.remove('is-game');
@@ -339,6 +355,7 @@ function renderResult() {
     ${run.standing?`<p class="run-standing">#${run.standing.rank} of ${run.standing.total} today${run.standing.percentile?` · Top ${run.standing.percentile}%`:''}. ${run.standing.final?'Final result.':'The board closes at midnight Pacific.'}</p>`:''}
     ${dailyValidationConfirmation?`<div class="run-validation-success" role="status" data-daily-validation-confirmation><strong>Score added to today's leaderboard</strong>${dailyValidationConfirmation.standing?`<span>#${dailyValidationConfirmation.standing.rank} of ${dailyValidationConfirmation.standing.total}${dailyValidationConfirmation.standing.percentile?` · Top ${dailyValidationConfirmation.standing.percentile}%`:''}</span>`:''}<a class="text-button" href="${gameUrl('board=daily')}">View leaderboard</a></div>`:''}
     ${rankingStateMarkup(run)}
+    ${dailySetCompleteMarkup()}
     ${run.comparison&&run.comparison.kind!=='creator'?`<p class="run-friend">${run.comparison.exact?`You: ${run.score} · ${esc(run.comparison.name)}: ${run.comparison.score}`:'These scores came from different decisions.'}</p>`:''}
     ${creator?.creator_post_run_note?`<blockquote class="run-friend"><strong>${esc(creator.name)} after the run:</strong> “${esc(creator.creator_post_run_note)}”</blockquote>`:''}
     <div class="run-result-actions"><a class="button primary" data-next-daily-action href="${repeat.href}">${repeat.label}</a><button class="button secondary" id="run-share">${run.day?'Share result':'Share this run and compare'}</button><button class="button secondary" id="run-copy-result" type="button">Copy result</button><a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">${run.day&&!run.leaderboard_eligible?(['username_taken','username_required','name_not_allowed'].includes(run.ranking_identity?.reason)?'Choose display name to add score':hasAccountSession()?'Add score to leaderboard':'Sign in to add score'):'View your career'}</button></div>
@@ -349,6 +366,8 @@ function renderResult() {
   document.querySelector('#run-share').onclick=()=>shareResult();
   document.querySelector('#run-copy-result').onclick=()=>shareResult({copy:true});
   document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=19')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
+  const setCompleteSignIn=document.querySelector('[data-daily-set-complete] button');
+  if(setCompleteSignIn)setCompleteSignIn.onclick=async()=>(await import('./growth.mjs?v=19')).renderAccount({validateDailyRunId:run.id,source:'daily_set_complete'});
   if(run.day)void renderDailyResultCue(run.id);
   document.dispatchEvent(new CustomEvent('pack1:result-visible',{detail:{id:`draft-run:${run.id}`,score:run.score,mode:'draft_run',set_id:run.environment,daily:Boolean(run.day)}}));
 }
