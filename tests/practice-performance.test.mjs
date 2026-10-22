@@ -102,6 +102,9 @@ test('practice recency migration is wired into performance and both guarded rele
   assert.match(migration,/p_plan->'set_weights'/);
   const performance=fs.readFileSync('.github/workflows/practice-performance.yml','utf8');
   assert.match(performance,/migrations\/0050_practice_recency_bias\.sql/);
+  const manifest=JSON.parse(fs.readFileSync('migrations/manifest.json','utf8'));
+  assert.ok(manifest.release_paths['practice-performance'].migrations.includes('0064_report_linked_pick_removal.sql'));
+  assert.match(performance,/node scripts\/ci-migration-plan\.mjs practice-performance/);
   const release=fs.readFileSync('.github/workflows/secure-auth-release.yml','utf8');
   assert.equal((release.match(/migrations\/0050_practice_recency_bias\.sql/g)||[]).length,2);
 });

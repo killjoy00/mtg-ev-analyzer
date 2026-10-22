@@ -11,6 +11,7 @@ on:
       - 'migrations/0045_batched_practice_selector.sql'
       - 'migrations/0050_practice_recency_bias.sql'
       - 'migrations/0051_exact_pick_draw_index.sql'
+      - 'migrations/0064_report_linked_pick_removal.sql'
       - 'tests/practice-performance.test.mjs'
       - '.github/workflows/practice-performance.yml'
   workflow_dispatch:
@@ -91,12 +92,14 @@ jobs:
           role: pack1_owner
           suspend_timeout: 300
           expires_at: ${{ steps.expiry.outputs.expires_at }}
-      - name: Install batched selector function
+      - name: Install reviewed selector and removal schema
         env:
           DATABASE_URL: ${{ steps.neon.outputs.db_url }}
         run: |
-          psql -X -d "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0045_batched_practice_selector.sql
-          psql -X -d "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0050_practice_recency_bias.sql
+          node scripts/ci-migration-plan.mjs practice-performance > "$RUNNER_TEMP/practice-migrations.txt"
+          while IFS= read -r migration; do
+            psql -X -d "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+          done < "$RUNNER_TEMP/practice-migrations.txt"
       - name: Verify isolated target, build derived cache and compare selection
         env:
           DATABASE_URL: ${{ steps.neon.outputs.db_url }}
