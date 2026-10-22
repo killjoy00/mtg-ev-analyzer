@@ -23,7 +23,7 @@ export function addPickReview(card,report,request) {
   panel.append(n('h4',null,moderation.removed?'Removed from future games':'Available under normal eligibility rules'));
   panel.append(n('p','muted','This action applies to this decision and identical copies across imports. Past results, existing runs, fixed Dailies and shared replays stay available. Restoring does not bypass other eligibility rules.'));
   if(moderation.reason)panel.append(n('p','player-report-note','Last action: '+moderation.reason+' · '+date(moderation.updated_at)+' · '+moderation.copies+' stored copies'));
-  const heading=n('h4',null,'Pack · model scores for this report');panel.append(heading);
+  const heading=n('h4',null,'Pack · scores and model support');panel.append(heading);
   const grid=n('div','player-report-pick-grid');
   for(const c of data.ranking) {
    const item=n('div','player-report-pick-card');

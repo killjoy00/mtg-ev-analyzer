@@ -27,7 +27,7 @@ try {
  await page.getByText('<img src=x onerror=alert(1)>',{exact:true}).waitFor();
  assert.equal(await page.locator('.player-report-comment img').count(),0,'Reported text is not HTML');
  await page.getByRole('button',{name:'Review pick / removal'}).click();
- await page.getByRole('heading',{name:'Pack · model scores for this report'}).waitFor();
+ await page.getByRole('heading',{name:'Pack · scores and model support'}).waitFor();
  await page.getByText('Prior card',{exact:true}).waitFor();
  await page.getByText('Trophy pick',{exact:true}).waitFor();
  await page.getByText('Player pick',{exact:true}).waitFor();

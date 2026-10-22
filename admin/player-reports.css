@@ -24,7 +24,7 @@
 .player-report-note-input{box-sizing:border-box;width:100%;max-width:650px;display:block;margin:10px 0;padding:10px;border:1px solid #999;border-radius:8px}
 .player-report-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:14px}
 .player-report-actions button{min-width:110px}
-.player-report-danger{border:1px solid #b73a24;color:#b73a24}
+.player-report-danger{border:1px solid #b73a24;background:#fff;color:#b73a24}
 .player-report-action-status{margin:8px 0 0}
 .player-report-profile-link{display:inline-block;margin:6px 0}
 .player-report-pages{display:flex;align-items:center;justify-content:center;gap:18px;margin:22px 0}
