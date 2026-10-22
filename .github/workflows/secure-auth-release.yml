@@ -162,6 +162,7 @@ jobs:
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0061_daily_reminders.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0062_daily_email_reminder_admission.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0063_private_creator_consent.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0064_report_linked_pick_removal.sql
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
 
@@ -262,6 +263,7 @@ jobs:
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0061_daily_reminders.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0062_daily_email_reminder_admission.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0063_private_creator_consent.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0064_report_linked_pick_removal.sql
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
 

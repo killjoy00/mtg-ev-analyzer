@@ -1,6 +1,7 @@
+import {addPickReview} from './report-pick-review.mjs?v=20261022';
 // Admin-only decision and public-profile report inbox.
 // All user-supplied text is inserted with textContent, never innerHTML.
-const DECISION_REASONS={all:'All reasons',draft_context:'Draft context',card_or_image:'Card or image',score_recommendation:'Score / recommendation',broken:'Something broken',other:'Other'};
+const DECISION_REASONS={all:'All reasons',draft_context:'Draft context',card_or_image:'Card or image',score_recommendation:'Score / recommendation',uninteresting:'Uninteresting / forced decision',broken:'Something broken',other:'Other'};
 const PROFILE_REASONS={all:'All reasons',offensive_name:'Offensive name',harassment:'Harassment',impersonation:'Impersonation',spam:'Spam',other:'Other'};
 const DECISION_STATUSES={open:'Open',reviewed:'Reviewed',dismissed:'Dismissed',all:'All statuses'};
 const PROFILE_STATUSES={open:'Open',resolved:'Resolved',dismissed:'Dismissed',all:'All statuses'};
@@ -141,6 +142,7 @@ export async function renderPlayerReports(root,request) {
     result.setAttribute('role','status');
     for(const b of actions.querySelectorAll('button'))b.addEventListener('click',()=>takeAction(report,b.dataset.action,card,result));
     card.append(actions,result);
+    addPickReview(card,report,request);
     return card;
   }
 

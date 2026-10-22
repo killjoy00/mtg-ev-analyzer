@@ -1,6 +1,8 @@
+import {advanceServingReadiness} from './corpus-readiness.mjs';
+import {reportedPickContext,moderateReportedPick} from './report-pick-removal.mjs';
 // Admin-only inbox. The caller must authenticate against pack1_admins before
 // entering this handler; never mount these routes on a public/player endpoint.
-const DECISION_REASONS=new Set(['all','draft_context','card_or_image','score_recommendation','broken','other']);
+const DECISION_REASONS=new Set(['all','draft_context','card_or_image','score_recommendation','uninteresting','broken','other']);
 const PROFILE_REASONS=new Set(['all','offensive_name','harassment','impersonation','spam','other']);
 const DECISION_STATES=new Set(['open','reviewed','dismissed']);
 const PROFILE_STATES=new Set(['open','resolved','dismissed']);
@@ -80,6 +82,13 @@ export async function handlePlayerReports(request,query,readJson,adminAuthUserId
     return {summary:await summary(query)};
   if(path==='/v1/admin/player-reports'&&method==='GET')
     return {...await listReports(query,url),summary:await summary(query)};
+  if(path==='/v1/admin/player-reports/serving/warmup'&&method==='POST')
+    return {readiness:await advanceServingReadiness(query)};
+  const pick=path.match(/^\/v1\/admin\/player-reports\/decisions\/([a-f0-9-]{36})\/pick$/i);
+  if(pick&&UUID.test(pick[1])) {
+    if(method==='GET')return reportedPickContext(query,pick[1]);
+    if(method==='POST')return moderateReportedPick(query,pick[1],await readJson(request),adminAuthUserId);
+  }
   if(method==='POST') {
     const decision=path.match(/^\/v1\/admin\/player-reports\/decisions\/([a-f0-9-]{36})$/i);
     const profile=path.match(/^\/v1\/admin\/player-reports\/profiles\/([1-9][0-9]{0,17})$/);

@@ -74,6 +74,7 @@ export async function verifyServingReadiness(query,job,cache) {
   SELECT p.puzzle_id,p.set_id,p.pick_number,r.band,p.source_draft_hash
   FROM draft_run_verified_puzzles p JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version=$3
   WHERE (${corpusMembership({serving:true})}) AND p.interesting AND p.pack_number=1 AND ${SERVING_QUALITY_SQL}
+   AND NOT EXISTS(SELECT 1 FROM draft_run_pick_removal_members m JOIN draft_run_pick_removals q USING(decision_key) WHERE m.puzzle_id=p.puzzle_id AND q.removed)
    AND NOT EXISTS(SELECT 1 FROM corpus_source_exclusions x WHERE x.set_id=p.set_id
     AND x.corpus_version=p.corpus_version AND x.source_draft_hash=p.source_draft_hash)
  ), actual AS MATERIALIZED (

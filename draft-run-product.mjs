@@ -233,6 +233,7 @@ function openDecisionReport(answer) {
     <label><input type="radio" name="reason" value="draft_context" required> Draft context looks wrong</label>
     <label><input type="radio" name="reason" value="card_or_image"> Card or image issue</label>
     <label><input type="radio" name="reason" value="score_recommendation"> Score / recommendation seems wrong</label>
+    <label><input type="radio" name="reason" value="uninteresting"> Uninteresting / forced decision</label>
     <label><input type="radio" name="reason" value="broken"> Something is broken</label>
     <label><input type="radio" name="reason" value="other"> Other</label>
   </fieldset><label class="run-report-comment">Anything else?<textarea name="comment" maxlength="500" rows="3"></textarea></label>

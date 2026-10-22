@@ -29,3 +29,5 @@
 .player-report-profile-link{display:inline-block;margin:6px 0}
 .player-report-pages{display:flex;align-items:center;justify-content:center;gap:18px;margin:22px 0}
 @media(max-width:640px){.player-report-counts{grid-template-columns:1fr}.player-report-details{grid-template-columns:1fr}.player-report-card{padding:14px}.player-report-card-header{flex-wrap:wrap}}
+
+.player-report-pick-open{margin-top:12px}.player-report-pick-review{border-top:1px solid #b9c2ca;margin-top:18px;padding-top:8px}.player-report-pick-review[hidden]{display:none}.player-report-pick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:12px}.player-report-pick-card{display:flex;flex-direction:column;gap:5px;font-size:.82rem;min-width:0}.player-report-pick-card img{width:100%;aspect-ratio:488/680;object-fit:contain;border-radius:7px}.player-report-pick-label{font-weight:700;color:#235e47}.player-report-pool{display:flex;flex-wrap:wrap;gap:8px 24px;padding-left:20px}.player-report-removal-form button{margin:5px 10px 5px 0}.player-report-removal-history{margin-top:18px;overflow-wrap:anywhere}.player-report-removal-history li{margin:12px 0}
