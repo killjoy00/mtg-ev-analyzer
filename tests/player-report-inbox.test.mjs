@@ -112,7 +112,7 @@ test('migration and release keep old reports and verify new triage columns',()=>
   assert.match(migration,/CREATE INDEX IF NOT EXISTS draft_run_decision_reports_review_queue_idx/);
   assert.doesNotMatch(migration,/\b(?:DROP|TRUNCATE|DELETE)\b/i);
   assert.ok(manifest.ordered.includes('0060_player_report_review.sql'));
-  assert.equal(manifest.ordered.at(-1),'0063_private_creator_consent.sql');
+  assert.equal(manifest.ordered.at(-1),'0064_report_linked_pick_removal.sql');
   assert.ok(manifest.release_paths['secure-auth-release'].migrations.includes('0060_player_report_review.sql'));
   assert.equal(release.split('psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0060_player_report_review.sql').length-1,2);
   assert.match(schema,/decision_report_review_status/);
@@ -125,6 +125,8 @@ test('admin frontend exposes a private player reports area and inserts untrusted
   const inbox=fs.readFileSync('admin/player-reports.mjs','utf8');
   assert.match(overview,/href="\?area=reports" id="admin-reports-link">Review player reports/);
   assert.match(admin,/renderPlayerReports\(root,authorizedRequest\)/);
+  assert.match(fs.readFileSync('admin/index.html','utf8'),/admin\.mjs\?v=20261022-pick-removal/);
+  assert.match(admin,/player-reports\.mjs\?v=20261022/);
   assert.match(inbox,/All user-supplied text is inserted with textContent/);
   assert.match(inbox,/el.textContent=String\(text\)/);
   assert.doesNotMatch(inbox,/innerHTML\s*=/);

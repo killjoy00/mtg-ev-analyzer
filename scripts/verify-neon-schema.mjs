@@ -5,6 +5,10 @@ import {verifyCreatorEventSchema} from './creator-event-schema.mjs';
 import {verifyRerollIndexSchema} from './reroll-index-schema.mjs';
 import {verifyServingStatistics} from '../worker/serving-statistics.mjs';
 const result=await query(`SELECT
+  to_regprocedure('pack1_moderate_reported_pick(uuid,boolean,integer,text,uuid)') IS NOT NULL report_pick_removal,
+  to_regclass('draft_run_pick_removal_members') IS NOT NULL report_pick_removal_members,
+  to_regclass('draft_run_pick_removal_events') IS NOT NULL report_pick_removal_audit,
+  EXISTS(SELECT 1 FROM pg_trigger WHERE tgname='map_removed_pick_insert' AND tgenabled='O') report_pick_removal_import_guard,
   EXISTS(SELECT 1 FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid WHERE c.relname='draft_run_reroll_set_window_idx' AND i.indisvalid) reroll_set_window,
   EXISTS(SELECT 1 FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid WHERE c.relname='draft_run_sessions_peer_stats_idx' AND i.indisvalid AND i.indisready) daily_peer_stats_index,
   to_regprocedure('pack1_serving_snapshot(text,text,text)') IS NOT NULL practice_snapshot,

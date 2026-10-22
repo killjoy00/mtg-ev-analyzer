@@ -3,7 +3,7 @@ import {renderCorpus} from './corpus.mjs';
 import {renderUsers} from './users.mjs?v=20261020-access';
 import {renderAdminTeam} from './team.mjs';
 import {renderCampaignLinks} from './campaign-links.mjs?v=20261019-overview';
-import {renderPlayerReports} from './player-reports.mjs?v=20261016';
+import {renderPlayerReports} from './player-reports.mjs?v=20261022';
 import {ADMIN_API_VERSION} from '../admin-api-contract.mjs';
 import {accountCsrfToken,firstPartyAuthEnabled,getAuthSession,storedAccountToken,signOutAccount} from '../growth-api.mjs';
 import {sanitizeAdminDestination} from './admin-return.mjs';
