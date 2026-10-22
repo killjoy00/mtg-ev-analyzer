@@ -10,6 +10,7 @@ import {buildCampaignTrackingUrl,validateCampaignEntries} from '../campaign-link
 import {DRAFT_RUN_SCORING_VERSION,gradeDraftRunPick} from '../draft-run.mjs';
 import {gameDateKey} from '../game-date.mjs';
 import {
+  CREATOR_PRIVACY_WITHDRAWN_SQL,
   creatorRevealState,
   createCreatorChallenge,
   listCompletedDailies,
@@ -786,6 +787,31 @@ test('creator privacy cleanup scrubs retained challenger labels and creator auth
   assert.match(moderation,/UPDATE game_results SET opponent_name='A creator'/);
 });
 
+test('privacy maintenance keeps consented private challenges; deletion and moderation still retire every challenge',async()=>{
+  const player='22222222-2222-4222-8222-222222222222';
+  const selects=[];
+  const query=async sql=>{selects.push(sql);return {rows:[]};};
+  assert.equal(await requestCreatorPrivacyRetirement(query,player,{reason:'privacy_maintenance',withdrawnOnly:true}),true);
+  assert.ok(selects[0].includes(CREATOR_PRIVACY_WITHDRAWN_SQL),'the sweep retires only withdrawn challenges');
+  assert.equal(await requestCreatorPrivacyRetirement(query,player,{reason:'account_deletion'}),true);
+  assert.doesNotMatch(selects[1],/private_profile_consent_attested|profile_public/,'deletion retires consented challenges too');
+  assert.equal(selects.length,2,'nothing to retire issues no scrub');
+  // Consent survives only with the owned username and linked account it required;
+  // removal and moderation always win.
+  assert.match(CREATOR_PRIVACY_WITHDRAWN_SQL,/c\.privacy_removed_at IS NOT NULL OR p\.public_identity_hidden_at IS NOT NULL/);
+  assert.match(CREATOR_PRIVACY_WITHDRAWN_SQL,/NOT p\.profile_public AND NOT \(c\.private_profile_consent_attested AND p\.username_owned/);
+  assert.match(CREATOR_PRIVACY_WITHDRAWN_SQL,/account_links owner_link WHERE owner_link\.player_id=p\.id/);
+  const growth=await readFile('worker/growth-function.js','utf8');
+  const sweep=growth.slice(growth.indexOf('async function handleDeletionMaintenance'),growth.indexOf('if(deletionEnabled())',growth.indexOf('async function handleDeletionMaintenance')));
+  assert.match(sweep,/AND \$\{CREATOR_PRIVACY_WITHDRAWN_SQL\}/);
+  assert.match(sweep,/reason:'privacy_maintenance',withdrawnOnly:true/);
+  assert.doesNotMatch(sweep,/OR NOT p\.profile_public OR/,'the sweep no longer treats every private owner as withdrawn');
+  // A public creator who later hides their profile still retires every challenge.
+  assert.match(growth,/if\(bool\(meta\.profile_public\)&&!profilePublic\) \{\n    await query\(`UPDATE game_results SET opponent_name='A creator'/);
+  const moderation=await readFile('worker/user-admin.mjs','utf8');
+  const hide=moderation.slice(moderation.indexOf('retire_creator_challenges AS ('),moderation.indexOf('creator_audit AS ('));
+  assert.match(hide,/WHERE source_owner_player_id=\$1::uuid\n/,'identity moderation retires every owned challenge, consented or not');
+});
 
 test('creator funnel migration installs a rollout-safe database invariant',async()=>{
   const migration=await readFile('migrations/0054_creator_event_idempotency.sql','utf8');

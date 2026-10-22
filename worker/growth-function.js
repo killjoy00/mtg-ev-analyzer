@@ -24,6 +24,7 @@ import {reconcileLaunchWatcherAlert} from './launch-watcher-alert.mjs';
 import {launchWatcherRecoveryConfigured,reconcileLaunchWatcherCadence,reconcileLaunchWatcherDispatch} from './launch-watcher-dispatch.mjs';
 import {campaignLinkPublishConfigured,handleCampaignLinkPublish} from './campaign-link-publish.mjs';
 import {handleCreatorChallengePublication,handleCreatorChallengePurge,requestCreatorPrivacyRetirement} from './creator-challenge-publish.mjs';
+import {CREATOR_PRIVACY_WITHDRAWN_SQL} from './creator-challenges.mjs';
 import {handleAdminAccountDeletion} from './admin-account-deletion.mjs';
 import {handleAdminUsernameChange} from './admin-username-change.mjs';
 import {maintainServingReadiness} from './corpus-readiness.mjs';
@@ -2145,7 +2146,7 @@ async function handleDeletionMaintenance(request) {
     FROM creator_challenges c
     JOIN players p ON p.id=c.source_owner_player_id
     WHERE c.source_owner_player_id IS NOT NULL
-      AND (c.privacy_removed_at IS NOT NULL OR NOT p.profile_public OR p.public_identity_hidden_at IS NOT NULL)
+      AND ${CREATOR_PRIVACY_WITHDRAWN_SQL}
       AND NOT (
         c.status='retired'
         AND COALESCE(c.publication_detail->>'live_verified','false')='true'
@@ -2154,7 +2155,7 @@ async function handleDeletionMaintenance(request) {
     LIMIT 20`);
   for(const row of privacyRows.rows) {
     try {
-      const ready=await requestCreatorPrivacyRetirement(query,row.player_id,{reason:'privacy_maintenance'});
+      const ready=await requestCreatorPrivacyRetirement(query,row.player_id,{reason:'privacy_maintenance',withdrawnOnly:true});
       creatorPrivacy.push({player_id:row.player_id,ready});
     } catch(error) {
       creatorPrivacy.push({player_id:row.player_id,ready:false,error:String(error?.message||error).slice(0,120)});

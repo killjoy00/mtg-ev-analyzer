@@ -159,6 +159,14 @@ async function sourceSession(query,id,{expectedPlayerId=null,expectedType=null,s
   return source;
 }
 
+// A challenge needs privacy retirement when its owner was removed or moderated,
+// or is private without an eligible consented source: consent stays effective
+// only while the owner keeps the owned username and linked account it required.
+// Callers alias creator_challenges as c and the owning players row as p.
+export const CREATOR_PRIVACY_WITHDRAWN_SQL=`(c.privacy_removed_at IS NOT NULL OR p.public_identity_hidden_at IS NOT NULL
+      OR (NOT p.profile_public AND NOT (c.private_profile_consent_attested AND p.username_owned
+        AND EXISTS(SELECT 1 FROM account_links owner_link WHERE owner_link.player_id=p.id))))`;
+
 export async function resolvePracticeSource(query,input) {
   const shareId=parsePracticeShareReference(input);
   const result=await query('SELECT session_id FROM draft_run_shares WHERE id=$1',[shareId]);

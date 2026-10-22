@@ -183,7 +183,7 @@
         "0060_player_report_review.sql",
         "0061_daily_reminders.sql",
         "0062_daily_email_reminder_admission.sql",
-    "0063_private_creator_consent.sql"
+        "0063_private_creator_consent.sql"
       ]
     },
     "daily-calendar": {
@@ -241,7 +241,7 @@
         "0060_player_report_review.sql",
         "0061_daily_reminders.sql",
         "0062_daily_email_reminder_admission.sql",
-    "0063_private_creator_consent.sql"
+        "0063_private_creator_consent.sql"
       ]
     },
     "launch-load": {
@@ -274,7 +274,7 @@
         "0060_player_report_review.sql",
         "0061_daily_reminders.sql",
         "0062_daily_email_reminder_admission.sql",
-    "0063_private_creator_consent.sql"
+        "0063_private_creator_consent.sql"
       ]
     },
     "launch-distributed": {
@@ -309,7 +309,7 @@
         "0060_player_report_review.sql",
         "0061_daily_reminders.sql",
         "0062_daily_email_reminder_admission.sql",
-    "0063_private_creator_consent.sql"
+        "0063_private_creator_consent.sql"
       ]
     }
   }

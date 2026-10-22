@@ -34,8 +34,13 @@ make the creator's profile public, and it never grants public profile access.
   social image. Private account ID, email, sign-in state and player profile are
   not included in the public page.
 - Existing profile hide/moderation and account-deletion workflows continue to
-  retire and scrub matching challenges. A formerly public creator who switches
-  off public profile triggers the existing privacy-retirement path.
+  retire and scrub every challenge the player owns, consented or not. A creator
+  who switches a public profile to private also retires all of their challenges,
+  including consented ones; republish only with fresh permission.
+- The ten-minute privacy maintenance sweep retires only withdrawn challenges:
+  removed or moderated identities, and private owners without a consented
+  challenge. A consented challenge stays live while its owner keeps the owned
+  username and linked account; losing either withdraws it.
 - A normal Daily "Share result" URL points to the universal Daily, **not**
   to a particular creator's completed session. To create a creator challenge,
   select the authoritative session in Admin instead.

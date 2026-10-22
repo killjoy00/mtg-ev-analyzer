@@ -1,5 +1,5 @@
 import {accountSession,requireTrustedOrigin} from './account-session.mjs';
-import {creatorChallengeById,validateCreatorChallengeSource} from './creator-challenges.mjs';
+import {CREATOR_PRIVACY_WITHDRAWN_SQL,creatorChallengeById,validateCreatorChallengeSource} from './creator-challenges.mjs';
 
 const WORKFLOW_URL='https://api.github.com/repos/killjoy00/mtg-ev-analyzer/actions/workflows/campaign-link-publish.yml';
 const DISPATCH_URL=WORKFLOW_URL+'/dispatches';
@@ -427,8 +427,19 @@ export async function beginCreatorPublicationOperation(query,row,action,{adminAu
   fail('Creator publication changed concurrently. Reload and retry.',409,'CREATOR_PUBLISH_CONFLICT');
 }
 
-export async function requestCreatorPrivacyRetirement(query,playerId,{reason='account_deletion',today=null,env=process.env,fetcher=fetch}={}) {
-  const result=await query(`SELECT id FROM creator_challenges
+// Account deletion and identity moderation retire every challenge the player
+// owns. The privacy maintenance sweep passes withdrawnOnly, so a consented
+// private-profile challenge stays live while its owner remains eligible.
+export async function requestCreatorPrivacyRetirement(query,playerId,{reason='account_deletion',withdrawnOnly=false,today=null,env=process.env,fetcher=fetch}={}) {
+  const result=await query(withdrawnOnly?`SELECT c.id FROM creator_challenges c
+    JOIN players p ON p.id=c.source_owner_player_id
+    WHERE c.source_owner_player_id=$1::uuid
+      AND ${CREATOR_PRIVACY_WITHDRAWN_SQL}
+      AND NOT (
+        c.status='retired'
+        AND COALESCE(c.publication_detail->>'live_verified','false')='true'
+      )
+    ORDER BY c.created_at,c.id`:`SELECT id FROM creator_challenges
     WHERE source_owner_player_id=$1::uuid
       AND NOT (
         status='retired'
