@@ -7,7 +7,7 @@ process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 
 const {default:growth,query}=await import('../worker/growth-function.js');
 const {default:runApi}=await import('../worker/draft-run-function.mjs');
-const {CREATOR_PRIVACY_WITHDRAWN_SQL,creatorChallengeById,createCreatorChallenge,validateCreatorChallengeSource}=await import('../worker/creator-challenges.mjs');
+const {CREATOR_PRIVACY_WITHDRAWN_SQL,creatorChallengeById,createCreatorChallenge,listCompletedDailies,listCreatorPlayers,validateCreatorChallengeSource}=await import('../worker/creator-challenges.mjs');
 const {
   DRAFT_RUN_SCORING_V3_LEGACY_PROFILE,
   DRAFT_RUN_SCORING_V3_LINEAR_PROFILE,
@@ -183,6 +183,23 @@ try {
   // consented challenge. The profile stays private, and the privacy sweep keeps
   // that challenge while still retiring the unconsented one from this source.
   await query('UPDATE players SET profile_public=false WHERE id=$1::uuid',[creator.playerId]);
+  // Admin discovery runs its production SQL here: the private, linked creator is
+  // listed, and so is a completed Daily it can promote.
+  const dailySourceId=crypto.randomUUID();
+  await query(`INSERT INTO draft_run_sessions
+    SELECT (jsonb_populate_record(NULL::draft_run_sessions,
+      to_jsonb(template) || jsonb_build_object(
+        'id',$2::text,'day','2026-01-02','seed','creator-daily-'||$2::text,
+        'start_idempotency_hash',NULL,'start_request_hash',NULL,
+        'created_at',now(),'updated_at',now()
+      )
+    )).*
+    FROM draft_run_sessions template WHERE template.id=$1::uuid`,[template.id,dailySourceId]);
+  const discovered=(await listCreatorPlayers(query,'Merge Creator '+tag)).filter(p=>p.player_id===creator.playerId);
+  assert.deepEqual(discovered.map(p=>[p.profile_public,p.username_owned,p.linked_account]),[[false,true,true]],
+    'Admin search lists a private creator with an owned username and linked account');
+  assert.deepEqual((await listCompletedDailies(query,creator.playerId)).map(d=>[d.session_id,d.day]),[[dailySourceId,'2026-01-02']],
+    'Admin lists the private creator\'s completed Daily');
   const privateInput={
     source_type:'practice',share:creationShare.id,slug:`private-${tag}`,
     creator_public_name:'Private Creator',acquisition_source:'creator',acquisition_campaign:'private-smoke',
