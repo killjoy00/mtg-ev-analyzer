@@ -32,6 +32,8 @@ function creatorEntry(source,form) {
     acquisition_medium:String(valueOf(form,'medium')).trim().toLowerCase(),
     headline:String(valueOf(form,'headline')).trim()||`Can you beat ${creatorName}?`,
     creator_post_run_note:String(valueOf(form,'creator_post_run_note')).trim()||null,
+    private_profile_consent_attested:source?.creator_profile_public===false
+      &&form.elements.namedItem('private_profile_consent_attested')?.checked===true,
   };
 }
 
@@ -290,6 +292,7 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
         <label>Medium<input name="medium" value="creator"></label>
         <label>Headline (optional)<input name="headline" maxlength="160" placeholder="Can you beat this creator?"></label>
         <label>Post-run creator note (optional)<textarea name="creator_post_run_note" maxlength="500" rows="3" placeholder="P3 was the one I really wasn’t sure about."></textarea></label>
+        <label id="creator-private-permission" hidden><input type="checkbox" name="private_profile_consent_attested"> I confirm this creator explicitly approved publishing their eight picks and score under the chosen public creator name. Their Pack One profile will remain private.</label>
       </form>
       <section id="creator-publish-preview" class="campaign-output" hidden></section>
       <div class="campaign-publish-actions">
@@ -435,10 +438,13 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
 
   function setCreatorSource(next) {
     creatorSource=next;creatorDraft=null;
+    const privatePermission=metaForm.elements.namedItem('private_profile_consent_attested');
+    privatePermission.checked=false;
+    root.querySelector('#creator-private-permission').hidden=!next||next.creator_profile_public!==false;
     sourcePreview.hidden=!next;metaForm.hidden=!next;creatorPreview.hidden=!next;
     if(!next){creatorPublish.disabled=true;return;}
     const type=next.source_type==='daily'?`Daily · ${dateLabel(next.day)}`:'Practice';
-    sourcePreview.innerHTML=`<strong>${esc(next.creator_default_name)}</strong><br>${esc(environmentLabel(next.environment))} · ${next.decisions} decisions · Creator score <strong>${Number(next.score)}/100</strong><br>Source: ${esc(type)}<br><small>Authoritative session: ${esc(next.source_session_id)}${next.share_id?` · share ${esc(next.share_id)}`:''}</small>`;
+    sourcePreview.innerHTML=`<strong>${esc(next.creator_default_name)}</strong><br>${esc(environmentLabel(next.environment))} · ${next.decisions} decisions · Creator score <strong>${Number(next.score)}/100</strong><br>Source: ${esc(type)}${next.creator_profile_public===false?' · <strong>Private profile (consent required)</strong>':''}<br><small>Authoritative session: ${esc(next.source_session_id)}${next.share_id?` · share ${esc(next.share_id)}`:''}</small>`;
     metaForm.elements.namedItem('creator_public_name').value=next.creator_default_name||'';
     if(!valueOf(metaForm,'headline'))metaForm.elements.namedItem('headline').value=`Can you beat ${next.creator_default_name}?`;
     renderCreatorPreview();
@@ -448,11 +454,13 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
     if(!creatorSource)return;
     const entry=creatorEntry(creatorSource,metaForm),slug=normalizeCampaignSlug(entry.slug);
     const duplicate=Boolean(slug&&(existing.has(slug)||creatorSlugs.has(slug)));
-    creatorPublish.disabled=creatorBusy||!publishConfigured||!slug||!entry.creator_public_name||(duplicate&&!creatorDraft);
+    creatorPublish.disabled=creatorBusy||!publishConfigured||!slug||!entry.creator_public_name
+      ||(creatorSource.creator_profile_public===false&&!entry.private_profile_consent_attested)
+      ||(duplicate&&!creatorDraft);
     const sourceContext=creatorSource.source_type==='daily'
       ? `${environmentLabel(creatorSource.environment)} Daily · ${dateLabel(creatorSource.day)}`
       : environmentLabel(creatorSource.environment);
-    creatorPreview.innerHTML=`<p class="eyebrow">BEAT THE CREATOR</p><h2>${esc(entry.headline)}</h2><p>${esc(sourceContext)} · 8 decisions<br>Creator score: <strong>${Number(creatorSource.score)}/100</strong></p><p>Public URL: <code>https://packone.pro/creator/${esc(slug||'your-slug')}/</code><br>Attribution: source=${esc(entry.acquisition_source)} · campaign=${esc(entry.acquisition_campaign)}${entry.acquisition_medium?` · medium=${esc(entry.acquisition_medium)}`:''}</p>${duplicate&&!creatorDraft?'<p class="error">That slug is already reserved.</p>':''}`;
+    creatorPreview.innerHTML=`<p class="eyebrow">BEAT THE CREATOR</p><h2>${esc(entry.headline)}</h2><p>${esc(sourceContext)} · 8 decisions<br>Creator score: <strong>${Number(creatorSource.score)}/100</strong></p><p>Public URL: <code>https://packone.pro/creator/${esc(slug||'your-slug')}/</code><br>Attribution: source=${esc(entry.acquisition_source)} · campaign=${esc(entry.acquisition_campaign)}${entry.acquisition_medium?` · medium=${esc(entry.acquisition_medium)}`:''}</p>${creatorSource.creator_profile_public===false?'<p>The selected creator profile stays private. Only the approved challenge name, picks and score are public.</p>':''}${duplicate&&!creatorDraft?'<p class="error">That slug is already reserved.</p>':''}`;
   }
 
   sourceForm.addEventListener('change',event=>{
@@ -479,7 +487,7 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
       const result=await draftRequest('/v1/admin/creator-challenges/players?search='+encodeURIComponent(valueOf(sourceForm,'creator_search')));
       target.replaceChildren(...result.players.map(player=>{
         const button=document.createElement('button');button.type='button';button.className='secondary';
-        button.textContent=player.display_name+(player.linked_account?' · account':'');
+        button.textContent=player.display_name+(player.profile_public?' · public profile':' · private profile')+(player.linked_account?' · account':'');
         button.onclick=async()=>{
           dailyTarget.textContent='Loading recent completed Dailies…';
           try {
@@ -501,7 +509,7 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
         };
         return button;
       }));
-      if(!result.players.length)target.textContent='No matching public creator identity found.';
+      if(!result.players.length)target.textContent='No matching eligible creator account found. Private profiles require an owned username and linked account.';
     }catch(error){target.textContent=error.message||'Creator search failed.';}
   });
 
