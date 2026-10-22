@@ -88,7 +88,7 @@ try {
   await guest.page.locator('[data-account-state="guest"][data-practice-hub]').waitFor();
   await cards(guest.page, 0);
   assert.equal(await guest.page.getByRole('link', { name: 'Sign in to practice', exact: true }).count(), 1);
-  assert.equal(await guest.page.getByRole('button', { name: 'Become Elite to Play', exact: true }).count(), 2);
+  assert.equal(await guest.page.getByRole('button', { name: 'Upgrade to Elite', exact: true }).count(), 2);
   assert.equal(await guest.page.locator('.practice-card-action a:not([href="/?account=1"])').count(), 0);
   assert.equal(await guest.page.locator('[data-nav="practice"]').getAttribute('aria-current'), 'page');
   assert.deepEqual(await guest.page.locator('.top-actions .top-nav-button:visible').allTextContents(), ['Daily Run', 'Practice', 'How To Play', 'Sign in']);
@@ -96,7 +96,7 @@ try {
   await guest.page.goto(base + '/about/');
   await guest.page.getByRole('link', { name: 'Practice', exact: true }).click();
   await guest.page.locator('[data-practice-hub][data-account-state="guest"]').waitFor();
-  await guest.page.getByRole('button', { name: 'Become Elite to Play', exact: true }).first().click();
+  await guest.page.getByRole('button', { name: 'Upgrade to Elite', exact: true }).first().click();
   await guest.page.getByRole('heading', { name: 'Unlock Elite practice.', exact: true }).waitFor();
   assert.equal(guest.requests.some(r => r.method === 'POST' && r.path === '/v1/runs'), false);
   assert.deepEqual(guest.errors, []);
@@ -107,9 +107,9 @@ try {
   await free.page.getByRole('link', { name: 'Start Draft Run', exact: true }).waitFor();
   await cards(free.page, 1);
   assert.equal(await free.page.getByRole('link', { name: 'Start Draft Run', exact: true }).getAttribute('href'), '/?game=draft-run');
-  assert.equal(await free.page.getByRole('button', { name: 'Become Elite to Play', exact: true }).count(), 2);
+  assert.equal(await free.page.getByRole('button', { name: 'Upgrade to Elite', exact: true }).count(), 2);
   await responsive(free.page, 'free');
-  await free.page.getByRole('button', { name: 'Become Elite to Play', exact: true }).last().click();
+  await free.page.getByRole('button', { name: 'Upgrade to Elite', exact: true }).last().click();
   await free.page.waitForURL(base + '/patreon/');
   assert.equal(free.requests.some(r => r.method === 'POST' && r.path === '/v1/runs'), false);
   assert.deepEqual(free.errors, []);
@@ -127,7 +127,7 @@ try {
     if (membership === 'elite') {
       f.state.membership = 'free';
       await f.page.evaluate(() => window.dispatchEvent(new Event('packone-account-changed')));
-      await f.page.getByRole('button', { name: 'Become Elite to Play', exact: true }).first().waitFor();
+      await f.page.getByRole('button', { name: 'Upgrade to Elite', exact: true }).first().waitFor();
       await cards(f.page, 1);
       await f.page.evaluate(() => {
         localStorage.removeItem('pack1-auth-session-v1');
@@ -136,7 +136,7 @@ try {
       await f.page.locator('[data-practice-hub][data-account-state="guest"]').waitFor();
       await cards(f.page, 0);
       assert.equal(await f.page.getByRole('link', { name: 'Sign in to practice', exact: true }).count(), 1);
-      assert.equal(await f.page.getByRole('button', { name: 'Become Elite to Play', exact: true }).count(), 2);
+      assert.equal(await f.page.getByRole('button', { name: 'Upgrade to Elite', exact: true }).count(), 2);
     }
     assert.deepEqual(f.errors, []);
     await f.context.close();
@@ -157,7 +157,7 @@ try {
   await expired.page.locator('[data-practice-hub][data-account-state="guest"]').waitFor();
   await cards(expired.page, 0);
   assert.equal(await expired.page.getByRole('link', { name: 'Sign in to practice', exact: true }).count(), 1);
-  assert.equal(await expired.page.getByRole('button', { name: 'Become Elite to Play', exact: true }).count(), 2);
+  assert.equal(await expired.page.getByRole('button', { name: 'Upgrade to Elite', exact: true }).count(), 2);
   await expired.context.close();
 
   for (const failure of ['account', 'membership']) {
