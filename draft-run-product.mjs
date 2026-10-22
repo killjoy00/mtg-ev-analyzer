@@ -12,7 +12,7 @@ import { tcgplayerUrl } from './tcgplayer.mjs';
 import { dailyResetCue, nextGameDateBoundary } from './game-date.mjs';
 import {completedAllDailies,nextUnfinishedDaily} from './today-status.mjs?v=2';
 import {sharedRunAppPath,sharedRunInvitationId} from './shared-run-links.mjs';
-import {dismissSetRefresher,installSetGuides,setRefresherButton} from './set-guides.mjs?v=1';
+import {dismissSetRefresher,installSetGuides,setRefresherButton} from './set-guides.mjs?v=2';
 
 const base = () => String(window.PACK1_API?.draftRunUrl||'').replace(/\/$/,'');
 const webClientBuild=()=>new URL(import.meta.url).searchParams.get('v')||null;

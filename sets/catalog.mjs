@@ -1,4 +1,4 @@
-import {hasSetGuide,setGuidePath} from '../set-guides.mjs?v=1';
+import {hasSetGuide,setGuidePath} from '../set-guides.mjs?v=2';
 const grid = document.querySelector('#set-archive-grid');
 const summary = document.querySelector('#set-archive-summary');
 const specialSection = document.querySelector('#special-formats');
