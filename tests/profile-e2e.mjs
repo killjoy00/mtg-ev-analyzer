@@ -431,6 +431,10 @@ try {
   assert.equal((await shared.locator('strong').textContent())?.trim(), '12', 'shared challenges read as one number like the other metrics');
   assert.equal(await shared.getAttribute('title'), 'Results from playing other people’s shared runs: 8 beaten · 3 below target · 1 tied.', 'the explanation and record are mouseover text');
   assert.equal(await page.locator('.my-career-metrics small').count(), 0, 'no inline explanation under the snapshot');
+  const record=page.locator('.my-stack .my-challenge-card');
+  assert.equal(await record.locator('h2').innerText(), 'Shared Challenges');
+  assert.deepEqual(await record.locator('.my-challenge-record > div').evaluateAll(nodes=>nodes.map(node=>node.innerText.replace(/\s+/g,' ').trim())), ['8 Beaten','3 Below target','1 Tied'], 'record card lists beaten, below target and tied');
+  assert.equal(await page.locator('.my-stack > section').first().locator('h2').innerText(), 'Archive Progress', 'record sits under Archive Progress');
   assert.deepEqual(await page.locator('.my-career-metrics strong').evaluateAll(nodes=>[...new Set(nodes.map(node=>getComputedStyle(node).fontSize))]), ['25px'], 'every snapshot value uses the same size');
   {const vp=page.viewportSize();await page.setViewportSize({width:390,height:844});
    const tops=await page.locator('.my-career-metrics strong').evaluateAll(nodes=>nodes.map(node=>Math.round(node.getBoundingClientRect().top)));

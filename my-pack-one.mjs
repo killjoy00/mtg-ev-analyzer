@@ -116,6 +116,15 @@ function archiveMarkup(progress) {
     ).join('')+'</div></details>';
 }
 
+function challengeRecordMarkup(summary) {
+  const record=[['Beaten',summary.challenge_wins],['Below target',summary.challenge_losses],['Tied',summary.challenge_ties]];
+  const played=record.some(([,value])=>num(value)>0);
+  return '<section class="my-pack-card my-challenge-card"><div class="my-card-heading"><h2>Shared Challenges</h2><span>Other people’s shared runs</span></div>'+
+    (played
+      ? '<div class="my-challenge-record">'+record.map(([label,value])=>'<div><strong>'+num(value)+'</strong><span>'+label+'</span></div>').join('')+'</div>'
+      : '<p class="my-pack-empty">Play someone’s shared run to start your record.</p>')+'</section>';
+}
+
 function profileAside(profile,progress,account,patreon) {
   const favorite=progress?.environments.find(entry=>entry.id===profile.player.favorite_set_id);
   const showcased=(profile.achievements||[]).find(item=>item.id===profile.player.showcase_achievement&&item.unlocked);
@@ -170,12 +179,13 @@ function statsMarkup(profile,liveCatalog,account,patreon) {
       '<section class="my-pack-card my-first-run-card"><p class="eyebrow">Welcome to My Pack One</p><h2>Start with today’s Daily.</h2><p>Play your first Daily to start your record. Your scores, streaks, environments, achievements, and history will appear here as you play.</p><a class="button primary" href="/?game=draft-run&daily=1">Play Daily</a></section>'+
       '</main><aside class="my-pack-one-aside">'+profileAside(profile,progress,account,patreon)+membershipAside(patreon)+'</aside></div>';
   }
+  const challengesPlayed=num(summary.challenge_wins)+num(summary.challenge_losses)+num(summary.challenge_ties);
   const metrics=[
     ['Games',num(summary.games)],
     ['Average',num(summary.average_score).toFixed(1)],
     ['Best',num(summary.best_score)],
     ['Daily streak',num(summary.current_streak)],
-    ['Shared challenges played',num(summary.challenge_wins)+num(summary.challenge_losses)+num(summary.challenge_ties),
+    [challengesPlayed===1?'Shared challenge played':'Shared challenges played',challengesPlayed,
       'Results from playing other people’s shared runs: '+formatChallengeRecord(summary)+'.'],
     ['Environments',progress?progress.played+'/'+progress.total:'Unavailable'],
   ];
@@ -194,7 +204,7 @@ function statsMarkup(profile,liveCatalog,account,patreon) {
       (recent.length?'<details class="my-pack-details"><summary>View all game history</summary><ol class="profile-history-list" id="profile-history-list">'+recent.map(row=>historyRow(row,names)).join('')+'</ol><button type="button" class="button secondary" id="profile-load-more" '+(recent.length<20?'hidden':'')+'>Load more</button></details>':'')+'</section>'+
     '<div class="my-two-up"><section class="my-pack-card"><div class="my-card-heading"><h2>Daily History</h2></div>'+(dailyPreview?'<ol class="my-daily-preview">'+dailyPreview+'</ol>':'<p class="my-pack-empty">No ranked Daily history yet.</p>')+
       (daily.length?'<details class="my-pack-details"><summary>View Daily finishes</summary><ol class="profile-daily-list">'+daily.map((row,index)=>dailyDetailRow(row,names,index)).join('')+'</ol></details>':'')+'</section>'+
-    '<section class="my-pack-card"><div class="my-card-heading"><h2>Archive Progress</h2></div>'+archiveMarkup(progress)+'</section></div>'+
+    '<div class="my-stack"><section class="my-pack-card"><div class="my-card-heading"><h2>Archive Progress</h2></div>'+archiveMarkup(progress)+'</section>'+challengeRecordMarkup(summary)+'</div></div>'+
   '</main><aside class="my-pack-one-aside">'+profileAside(profile,progress,account,patreon)+membershipAside(patreon)+shareAside(profile)+'</aside></div>';
 }
 

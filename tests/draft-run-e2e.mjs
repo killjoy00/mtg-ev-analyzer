@@ -211,7 +211,7 @@ try{
       const ranked=[...answers[round].ranking].sort((a,b)=>b.support-a.support),leader=answers[round].consensusId||ranked[0].id;
       const other=leader!==selected?leader:ranked.find(c=>c.id!==selected).id;
       assert.equal(await page.locator('.run-reveal-pick.is-ranked [data-zoom]').getAttribute('data-zoom'),other,'second card is the model’s highest-ranked other card');
-      assert.match(await page.locator('.run-reveal-pick.is-ranked').innerText(),leader===other?/Highest Ranked/i:/Next Highest/i);
+      assert.match(await page.locator('.run-reveal-pick.is-ranked').innerText(),/Next Highest/i,'the second card is always labeled Next Highest');
       assert.equal(await page.locator('.run-feedback-copy p').count(),0,'trophy match needs no filler sentence');
     }else{
       assert.equal(await page.locator('.run-reveal-pick').count(),2,'non-match pairs the player and trophy cards');
