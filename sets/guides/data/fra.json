@@ -1,0 +1,166 @@
+{
+  "id": "fra",
+  "name": "Reality Fracture",
+  "reviewedAt": "2026-10-22",
+  "notes": [
+    "Ten two-color archetypes: ally pairs follow Hexhaven’s colleges, enemy pairs follow major characters.",
+    "Empower Jace adds loyalty to one Jace token that surveils or draws cards.",
+    "Heartwood tokens are mana artifacts that let red-green ramp early."
+  ],
+  "archetypes": [
+    {
+      "colors": "WU",
+      "name": "Fatehold surveil",
+      "plan": "Scry and surveil to set up draws.",
+      "detail": "Payoffs reward a library you have sorted."
+    },
+    {
+      "colors": "UB",
+      "name": "Theorix graveyard",
+      "plan": "Reach seven cards in your graveyard.",
+      "detail": "Self-mill and cheap spells turn on threshold payoffs."
+    },
+    {
+      "colors": "BR",
+      "name": "Stingerquill burn",
+      "plan": "Deal noncombat damage.",
+      "detail": "Burn doubles as removal and enables Stingerquill payoffs."
+    },
+    {
+      "colors": "RG",
+      "name": "Konstrari ramp",
+      "plan": "Make Heartwood tokens for mana.",
+      "detail": "Cast your biggest creatures ahead of schedule."
+    },
+    {
+      "colors": "GW",
+      "name": "Vigorbloom life gain",
+      "plan": "Gain life and grow creatures.",
+      "detail": "Payoffs want life gain and +1/+1 counters together."
+    },
+    {
+      "colors": "WB",
+      "name": "Liliana’s attrition",
+      "plan": "Chip in with small creatures.",
+      "detail": "Their deaths fuel your payoffs."
+    },
+    {
+      "colors": "UR",
+      "name": "Chandra’s prowess",
+      "plan": "Cast cheap noncreature spells.",
+      "detail": "Spell triggers and bounce keep the board clear."
+    },
+    {
+      "colors": "BG",
+      "name": "Garruk’s bestiary",
+      "plan": "Play creatures that bring value.",
+      "detail": "Return the ones that die for more."
+    },
+    {
+      "colors": "RW",
+      "name": "Ajani’s army",
+      "plan": "Go wide with Cadet tokens.",
+      "detail": "+1/+1 counters and Equipment speed up the clock."
+    },
+    {
+      "colors": "GU",
+      "name": "Jace’s mastery",
+      "plan": "Empower your Jace token.",
+      "detail": "Keep drawing value from it all game."
+    }
+  ],
+  "mechanics": [
+    {
+      "name": "Empower Jace",
+      "text": "Put loyalty counters on your Jace token, creating one first if needed. It can surveil 1 or draw a card."
+    },
+    {
+      "name": "Heartwood",
+      "text": "A red and green artifact token that taps for red or green mana."
+    },
+    {
+      "name": "Prepare",
+      "text": "A prepared creature lets you cast a copy of its attached spell; doing so unprepares it."
+    },
+    {
+      "name": "Flashback",
+      "text": "Cast the instant or sorcery from your graveyard for its flashback cost, then exile it."
+    }
+  ],
+  "sources": [
+    {
+      "label": "Wizards of the Coast",
+      "url": "https://magic.wizards.com/en/news/feature/reality-fracture-prerelease-guide"
+    },
+    {
+      "label": "FRA release notes",
+      "url": "https://magic.wizards.com/en/news/feature/reality-fracture-release-notes"
+    }
+  ],
+  "results": {
+    "format": "PremierDraft",
+    "formatLabel": "Premier Draft (BO1)",
+    "colorCount": 2,
+    "retrievedAt": "2026-10-22T18:01:48+00:00",
+    "period": "ALL_TIME",
+    "userGroup": "all",
+    "splashes": false,
+    "sourceUrl": "https://www.17lands.com/deck_color_data?expansion=FRA&format=PremierDraft&time_period=ALL_TIME&separate_splashes=true",
+    "rows": [
+      {
+        "colors": "WU",
+        "wins": 24667,
+        "games": 43194
+      },
+      {
+        "colors": "UB",
+        "wins": 25791,
+        "games": 46399
+      },
+      {
+        "colors": "BR",
+        "wins": 16077,
+        "games": 29656
+      },
+      {
+        "colors": "RG",
+        "wins": 20376,
+        "games": 36427
+      },
+      {
+        "colors": "WG",
+        "wins": 17495,
+        "games": 32074
+      },
+      {
+        "colors": "WB",
+        "wins": 7510,
+        "games": 13954
+      },
+      {
+        "colors": "BG",
+        "wins": 8932,
+        "games": 16437
+      },
+      {
+        "colors": "UG",
+        "wins": 4745,
+        "games": 9196
+      },
+      {
+        "colors": "UR",
+        "wins": 16374,
+        "games": 29111
+      },
+      {
+        "colors": "WR",
+        "wins": 9117,
+        "games": 16853
+      }
+    ],
+    "baseline": {
+      "wins": 151084,
+      "games": 273301
+    }
+  }
+}

@@ -2,7 +2,7 @@ import {escapeHtml as esc} from './html.mjs';
 
 // Editorial coverage is independent of the serving catalog. A future set only
 // receives a guide link after its content has been reviewed and published.
-export const GUIDE_IDS = Object.freeze(['hob','msh','sos','tmt','ecl','tla','eoe','fin','tdm','dft','fdn','dsk','blb','mh3','otj','mkm','ktk','lci','woe','ltr','mom','one','bro','dmu','snc','neo','powered-cube']);
+export const GUIDE_IDS = Object.freeze(['fra','hob','msh','sos','tmt','ecl','tla','eoe','fin','tdm','dft','fdn','dsk','blb','mh3','otj','mkm','ktk','lci','woe','ltr','mom','one','bro','dmu','snc','neo','powered-cube']);
 export const hasSetGuide = id => GUIDE_IDS.includes(String(id || '').toLowerCase());
 export const setGuidePath = id => hasSetGuide(id) ? `/sets/${String(id).toLowerCase()}/guide/` : null;
 const safeLink = value => {try {const url=new URL(value);return url.protocol==='https:'?url.href:'';}catch{return '';}};

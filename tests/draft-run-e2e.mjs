@@ -41,6 +41,7 @@ await page.route('**/*-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/**',async
   const requestUrl=new URL(route.request().url()),path=requestUrl.pathname;let body;
   if(path==='/v1/runs'&&route.request().method()==='POST'){runStarts.push(route.request().postDataJSON());body=snapshot();}
   else if(path.endsWith('/share')){shareCalls++;body={id:shareId};}
+  else if(path.endsWith('/stats')){const round=Number(requestUrl.searchParams.get('round')),a=answers[round];body=daily&&a&&round>0?{available:true,players:12,matching_pick_pct:50,trophy_pick_pct:a.historicalMatch?50:25,card_pick_pct:{[a.selectedId]:50,...(a.historicalMatch?{}:{[a.historicalId]:25})}}:{available:false};}
   else if(path.endsWith('/view')){const req=route.request().postDataJSON();assert.equal(req.revision,revision);assert.equal(req.puzzleId,puzzles[answers.length].puzzle_id);views.push(req);body={ok:true};}
   else if(path.includes('/challenges/')||path.includes('/shared-runs/')){
     if(path.includes('/shared-runs/'))sharedReadCalls++;
@@ -204,9 +205,13 @@ try{
     });
     assert.equal(domOrder,true,'continuation precedes analysis and pack review in DOM order');
     if(expectedGrade.historicalMatch){
-      assert.equal(await page.locator('.run-reveal-pick').count(),1,'trophy match still shows the shared card once');
-      assert.match(await page.locator('.run-reveal-picks').innerText(),/Trophy and Your Pick/i);
+      assert.equal(await page.locator('.run-reveal-pick').count(),2,'trophy match pairs the shared card with the highest-ranked other card');
+      assert.match(await page.locator('.run-reveal-pick.is-shared').innerText(),/✓ Trophy Match/i,'the shared card is clearly labeled as a trophy match');
       assert.equal(await page.locator('.run-reveal-pick.is-shared [data-zoom]').getAttribute('data-zoom'),selected,'shared reveal card is the player and trophy pick');
+      const ranked=[...answers[round].ranking].sort((a,b)=>b.support-a.support),leader=answers[round].consensusId||ranked[0].id;
+      const other=leader!==selected?leader:ranked.find(c=>c.id!==selected).id;
+      assert.equal(await page.locator('.run-reveal-pick.is-ranked [data-zoom]').getAttribute('data-zoom'),other,'second card is the model’s highest-ranked other card');
+      assert.match(await page.locator('.run-reveal-pick.is-ranked').innerText(),leader===other?/Highest Ranked/i:/Next Highest/i);
       assert.equal(await page.locator('.run-feedback-copy p').count(),0,'trophy match needs no filler sentence');
     }else{
       assert.equal(await page.locator('.run-reveal-pick').count(),2,'non-match pairs the player and trophy cards');
@@ -249,6 +254,18 @@ try{
     assert.doesNotMatch(await page.locator('.run-consensus-leaders li').first().innerText(),/%/);
     assert.equal(await page.locator('.run-consensus tbody tr').first().locator('td').first().textContent(),'N/A');
     assert.equal(await page.locator('.run-consensus details').count(),0,'analysis does not retain a nested comparison disclosure');
+    if(daily&&round>0){
+      // Peer shares arrive with the "% of players picked this" line and share its threshold.
+      // Round one keeps the existing compact-height budget, measured without peer stats.
+      await page.locator('#run-peer-stats:not([hidden])').waitFor();
+      await page.locator('.run-consensus thead th[data-peer-col]:not([hidden])').waitFor();
+      assert.deepEqual(await page.locator('.run-consensus thead th').allInnerTexts(),['Card','Support','Points','Chosen'],'Chosen is the third data column');
+      const share=async id=>(await page.locator(`.run-consensus [data-peer-card="${id}"]`).innerText()).trim();
+      assert.equal(await share(selected),'50%');
+      if(!expectedGrade.historicalMatch)assert.equal(await share(p.historical_pick_id),'25%');
+      const unpicked=p.candidates.find(c=>c.id!==selected&&c.id!==p.historical_pick_id);
+      if(unpicked)assert.equal(await share(unpicked.id),'0%','cards nobody picked show 0%');
+    }else assert.equal(await page.locator('.run-consensus [data-peer-col]:not([hidden]),.run-consensus [data-peer-card]:not([hidden])').count(),0,'no Chosen column without available peer stats');
     const shops=page.locator('.run-analysis .run-card-shop');
     assert.ok(await shops.count()>=1,'revealed-card commerce links remain in analysis');
     assert.equal(await shops.first().getAttribute('rel'),'sponsored noopener');

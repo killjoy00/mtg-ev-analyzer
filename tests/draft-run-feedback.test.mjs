@@ -57,6 +57,8 @@ test('locked feedback separates the trophy bonus from relative model support',()
  assert.doesNotMatch(text,/<details/);
  assert.doesNotMatch(text,/95 ×/);
  assert.equal(consensusFeedback({}), '');
+ assert.match(text,/<th scope="col" data-peer-col hidden>Chosen<\/th>/,'the Chosen column starts hidden until peer shares arrive');
+ assert.match(text,/<td data-peer-card="leader" hidden><\/td>/);
 });
 
 test('compact feedback reserves target disagreement for the rare server flag',()=>{

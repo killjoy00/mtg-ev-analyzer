@@ -426,6 +426,16 @@ try {
   assert.equal((await page.locator('.my-career-metrics > div:last-child strong').textContent())?.trim(), '3/3',
     'the career snapshot counts the Live catalog, not the 30-set archive');
   assert.equal((await page.locator('.my-career-metrics > div:last-child span').textContent())?.trim(), 'Environments');
+  const shared=page.locator('.my-career-metrics > div[title]');
+  assert.equal(await shared.count(), 1, 'only the shared challenge metric carries an explanation');
+  assert.equal((await shared.locator('strong').textContent())?.trim(), '12', 'shared challenges read as one number like the other metrics');
+  assert.equal(await shared.getAttribute('title'), 'Results from playing other people’s shared runs: 8 beaten · 3 below target · 1 tied.', 'the explanation and record are mouseover text');
+  assert.equal(await page.locator('.my-career-metrics small').count(), 0, 'no inline explanation under the snapshot');
+  assert.deepEqual(await page.locator('.my-career-metrics strong').evaluateAll(nodes=>[...new Set(nodes.map(node=>getComputedStyle(node).fontSize))]), ['25px'], 'every snapshot value uses the same size');
+  {const vp=page.viewportSize();await page.setViewportSize({width:390,height:844});
+   const tops=await page.locator('.my-career-metrics strong').evaluateAll(nodes=>nodes.map(node=>Math.round(node.getBoundingClientRect().top)));
+   for(let i=0;i<tops.length;i+=2)assert.equal(tops[i],tops[i+1],`two-column snapshot row ${i/2+1} is aligned`);
+   await page.setViewportSize(vp);}
   assert.match(await page.locator('.my-archive-summary').textContent(), /3\/3\s*environments played/);
   assert.equal(await page.locator('[data-environment-id="pio"]').count(), 0,
     'Candidate environments must not be visible to players');

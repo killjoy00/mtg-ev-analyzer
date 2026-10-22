@@ -51,7 +51,7 @@ test('Draft Run reveal puts continuation before disclosures and restores result 
   assert.match(render,/focus\(\{preventScroll:true\}\)/);
   assert.doesNotMatch(render,/aria-live=/);
   assert.match(source,/function compactRevealCards/);
-  assert.match(source,/Trophy and Your Pick/);
+  assert.match(source,/✓ Trophy Match/);
   assert.doesNotMatch(source,/compactTrophyThumbnail|run-trophy-thumb/);
   const css = await readFile('draft-run.css', 'utf8');
   assert.match(css, /\.run-reveal-pick\{flex:0 0 108px;width:108px/);
