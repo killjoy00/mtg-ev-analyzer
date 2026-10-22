@@ -486,7 +486,7 @@ export async function listCompletedDailies(query,playerId,{limit=20,before=null}
   if(!UUID.test(String(playerId||'')))fail('Invalid creator.');
   const safeLimit=Math.max(1,Math.min(50,Number(limit)||20));
   const cursor=before&&/^\d{4}-\d{2}-\d{2}$/.test(String(before))?String(before):null;
-  const result=await query(`SELECT s.id session_id,s.day::text day,s.environment,s.score,s.updated_at
+  const result=await query(`SELECT s.id session_id,s.day::text AS day,s.environment,s.score,s.updated_at
     FROM draft_run_sessions s
     JOIN players p ON p.id=s.player_id
     WHERE s.player_id=$1::uuid
