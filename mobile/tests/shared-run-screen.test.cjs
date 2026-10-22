@@ -287,6 +287,8 @@ test('invite requires explicit acceptance and uses the actual gameplay screen wi
   const h = await fixture({ run: { ...run(), rerolls: { set: 2, pack: 2 }, set_reroll_allowed: true } });
   try {
     assert.match(h.text(), /Play this run and compare/);
+    assert.match(h.text(), /A free Pack One account includes this shared run\. Elite membership is not required\./);
+    assert.doesNotMatch(h.text(), /practice access is required/);
     assert.equal(h.count('start'), 0);
     await h.press('Play or resume this run');
     assert.ok(h.button('Pick Card A'));
