@@ -26,6 +26,13 @@ console.log('PASS: exact mixed/Cube serving-cache selection parity.');
 // live reference is compared on the bounded staged fixture below: over the full
 // corpus its aggregates can exceed the CI HTTP timeout once migrations replay.
 {
+  // A migration PR replays the backlog, so an earlier suite may have built this
+  // generation's inventory without statistics. The unbatched reference joins
+  // that inventory to the corpus, so refresh planner statistics first, exactly
+  // as the staged fixture below does.
+  for(const table of ['draft_run_serving_inventory','draft_run_verified_puzzles','draft_run_puzzle_ratings']) {
+    await query('ANALYZE '+table);
+  }
   const day=gameDateKey(),{sets,coverage}=customPracticeFromSnapshot(snapshot,day);
   const late=sets.map(s=>s.set_id).filter(id=>!coverage.opensAtP1P1(id)),opener=sets.map(s=>s.set_id).find(coverage.opensAtP1P1);
   const cases=[late.slice(0,1),late.slice(0,2),[late[0],opener]].filter(c=>c.length&&c.every(Boolean)&&(c.length===1||c[0]!==c[1]));
