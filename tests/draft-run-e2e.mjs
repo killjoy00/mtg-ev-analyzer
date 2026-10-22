@@ -347,6 +347,8 @@ try{
     assert.equal(sharedReadCalls,3);
     failSharedRead=false;
     await page.goto(shared.url);await page.locator('#accept-run-challenge').waitFor();assert.match(await page.locator('.run-invite').innerText(),/Play this run and compare/);await noOverflow();
+    assert.match(await page.locator('.run-invite').innerText(),/This shared run is free to play\. No account or Elite membership required\./);
+    assert.doesNotMatch(await page.locator('.run-invite').innerText(),/practice access is required/);
     assert.equal(new URL(page.url()).searchParams.get('shared'),shareId,'browser fallback retains the exact invitation');
     await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-invite-mobile.png`,fullPage:true});
     failSharedRead=true;
