@@ -36,6 +36,7 @@ const parallel=await Promise.allSettled([act(true,0),act(true,0)]);
 assert.equal(parallel.filter(x=>x.status==='fulfilled').length,1,'Only one competing moderation action commits');
 assert.equal(parallel.filter(x=>x.status==='rejected')[0].reason.pgCode,'40001');
 const removed=await context();assert.equal(removed.moderation.removed,true);assert.equal(removed.moderation.revision,1);
+assert.equal((await query('SELECT review_status FROM draft_run_decision_reports WHERE id=$1::uuid',[report])).rows[0].review_status,'open','Pick removal preserves explicit inbox triage');
 assert.equal(removed.moderation.history.length,1);assert.equal(removed.moderation.history[0].report_id,report);
 assert.equal(await servingRevisionMatches(query,revisionBefore),false,'Removal invalidates an old inventory');
 assert.ok((await loadPuzzleMetadata(query,p.corpus_version,[p.puzzle_id]))[0],'Archived exact pick remains readable');

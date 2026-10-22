@@ -108,10 +108,8 @@ BEGIN
  SELECT count(*) INTO copies FROM draft_run_pick_removal_members WHERE decision_key=k;
  INSERT INTO draft_run_pick_removal_events(decision_key,revision,removed,reason,report_id,actor_id)
   VALUES(k,next_revision,p_removed,btrim(p_reason),p_report,p_actor);
- IF p_removed THEN
-  UPDATE draft_run_decision_reports SET review_status='reviewed',reviewed_at=now(),reviewed_by=p_actor,review_note=btrim(p_reason)
-   WHERE id=p_report AND review_status='open';
- END IF;
+ -- Inbox triage is independent: remove/restore never silently reviews or
+ -- dismisses the report. The admin's explicit review controls remain valid.
  IF EXISTS(SELECT 1 FROM draft_run_pick_removal_members m JOIN draft_run_verified_puzzles v USING(puzzle_id)
   WHERE m.decision_key=k AND pack1_puzzle_can_affect_serving(v.set_id,v.corpus_version,v.source_snapshot_id)) THEN
   PERFORM pack1_bump_serving_revision();
