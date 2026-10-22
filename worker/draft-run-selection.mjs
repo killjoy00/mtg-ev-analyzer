@@ -152,14 +152,20 @@ export async function selectDatabaseRun(query,version,seed,environment='mixed',{
       // Preserve the live selector's C ordering and random offset exactly.
       // Only inventory members can decrement this snapshot's group counts.
       // Retained baseline copies may share a source with its active snapshot.
-      result=await query(`WITH chosen AS (
+      // A new generation has no inventory statistics, so a join keyed by snapshot
+      // can plan to visit its whole inventory. Probe membership per trajectory
+      // puzzle instead; OFFSET 0 keeps the planner from flattening the probe.
+      result=await query(`WITH chosen AS MATERIALIZED (
         SELECT puzzle_id,source_draft_hash FROM draft_run_serving_inventory
         WHERE snapshot_id=$2::bigint AND pick_number BETWEEN $3::int AND $4::int
           AND source_draft_hash<>ALL($5::text[]) AND set_id=$6 AND band=$7
         ORDER BY puzzle_id COLLATE "C" LIMIT 1 OFFSET $8::int
       ) SELECT ${columns},chosen.puzzle_id selected_id ${from}
       JOIN chosen ON chosen.source_draft_hash=p.source_draft_hash
-      JOIN draft_run_serving_inventory inventory ON inventory.snapshot_id=$2::bigint AND inventory.puzzle_id=p.puzzle_id
+      JOIN LATERAL (
+        SELECT 1 FROM draft_run_serving_inventory inventory
+        WHERE inventory.snapshot_id=$2::bigint AND inventory.puzzle_id=p.puzzle_id OFFSET 0
+      ) inventory ON true
       WHERE ${base} AND ${SERVING_QUALITY_SQL}`,
       [version,snapshot.id,window[0],window[1],toPgArray(sources),setId,band,params.at(-1)]);
     } else result=await query(`WITH chosen AS (

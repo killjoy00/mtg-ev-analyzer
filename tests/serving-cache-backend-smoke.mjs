@@ -21,18 +21,11 @@ for(const environment of ['mixed','powered-cube']) {
 console.log('PASS: exact mixed/Cube serving-cache selection parity.');
 
 // Archives that begin at P1P2 are offered for custom practice from coverage,
-// not by name. Prove the batched SQL selector and its unbatched snapshot
-// baseline agree on real data, with a usable round-one reroll. The uncached
-// live reference is compared on the bounded staged fixture below: over the full
-// corpus its aggregates can exceed the CI HTTP timeout once migrations replay.
+// not by name. Prove the batched SQL selector, its unbatched snapshot baseline
+// and the live reference agree on real data, with a usable round-one reroll.
+// A migration PR replays the backlog, so this generation's inventory may have
+// no planner statistics yet; the unbatched reference must not depend on them.
 {
-  // A migration PR replays the backlog, so an earlier suite may have built this
-  // generation's inventory without statistics. The unbatched reference joins
-  // that inventory to the corpus, so refresh planner statistics first, exactly
-  // as the staged fixture below does.
-  for(const table of ['draft_run_serving_inventory','draft_run_verified_puzzles','draft_run_puzzle_ratings']) {
-    await query('ANALYZE '+table);
-  }
   const day=gameDateKey(),{sets,coverage}=customPracticeFromSnapshot(snapshot,day);
   const late=sets.map(s=>s.set_id).filter(id=>!coverage.opensAtP1P1(id)),opener=sets.map(s=>s.set_id).find(coverage.opensAtP1P1);
   const cases=[late.slice(0,1),late.slice(0,2),[late[0],opener]].filter(c=>c.length&&c.every(Boolean)&&(c.length===1||c[0]!==c[1]));
@@ -43,7 +36,10 @@ console.log('PASS: exact mixed/Cube serving-cache selection parity.');
     const batched=await selectCachedDatabaseRun(query,version,seed,'mixed',options);
     console.log(JSON.stringify({p1p2_opening:setIds,seed,phase:'unbatched-snapshot-reference'}));
     const baseline=await selectCachedDatabaseRun(query,version,seed,'mixed',{...options,batched:false});
+    console.log(JSON.stringify({p1p2_opening:setIds,seed,phase:'live-reference'}));
+    const live=await selectDatabaseRun(query,version,seed,'mixed',options);
     assert.deepEqual(baseline.map(p=>p.puzzle_id),batched.map(p=>p.puzzle_id),'unbatched snapshot selection agrees with the batched selector');
+    assert.deepEqual(live.map(p=>p.puzzle_id),batched.map(p=>p.puzzle_id),'live reference agrees with the batched selector');
     const opensAtP1P1=setIds.some(coverage.opensAtP1P1);
     assert.deepEqual(batched.map(p=>Number(p.pick_number)),opensAtP1P1?[1,2,3,4,5,6,7,8]:[2,2,3,4,5,6,7,8],setIds.join('+'));
     if(opensAtP1P1)assert.ok(coverage.opensAtP1P1(batched[0].set_id),'only a covered set supplies P1P1');
