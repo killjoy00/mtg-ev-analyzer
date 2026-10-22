@@ -67,7 +67,8 @@
     "0060_player_report_review.sql",
     "0061_daily_reminders.sql",
     "0062_daily_email_reminder_admission.sql",
-    "0063_private_creator_consent.sql"
+    "0063_private_creator_consent.sql",
+    "0064_traditional_p1p6_component.sql"
   ],
   "same_prefix_order": {
     "0037": [
@@ -143,7 +144,8 @@
         "0026_provider_accounts.sql",
         "0032_traditional_v4_components.sql",
         "0048_uncapped_v5_components.sql",
-        "0049_cross_version_corpus_cutover.sql"
+        "0049_cross_version_corpus_cutover.sql",
+        "0064_traditional_p1p6_component.sql"
       ]
     },
     "secure-auth-release": {
@@ -183,7 +185,8 @@
         "0060_player_report_review.sql",
         "0061_daily_reminders.sql",
         "0062_daily_email_reminder_admission.sql",
-        "0063_private_creator_consent.sql"
+        "0063_private_creator_consent.sql",
+        "0064_traditional_p1p6_component.sql"
       ]
     },
     "daily-calendar": {
@@ -241,7 +244,8 @@
         "0060_player_report_review.sql",
         "0061_daily_reminders.sql",
         "0062_daily_email_reminder_admission.sql",
-        "0063_private_creator_consent.sql"
+        "0063_private_creator_consent.sql",
+        "0064_traditional_p1p6_component.sql"
       ]
     },
     "launch-load": {
@@ -274,7 +278,8 @@
         "0060_player_report_review.sql",
         "0061_daily_reminders.sql",
         "0062_daily_email_reminder_admission.sql",
-        "0063_private_creator_consent.sql"
+        "0063_private_creator_consent.sql",
+        "0064_traditional_p1p6_component.sql"
       ]
     },
     "launch-distributed": {
@@ -309,7 +314,8 @@
         "0060_player_report_review.sql",
         "0061_daily_reminders.sql",
         "0062_daily_email_reminder_admission.sql",
-        "0063_private_creator_consent.sql"
+        "0063_private_creator_consent.sql",
+        "0064_traditional_p1p6_component.sql"
       ]
     }
   }

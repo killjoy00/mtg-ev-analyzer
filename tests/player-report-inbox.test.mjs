@@ -112,7 +112,7 @@ test('migration and release keep old reports and verify new triage columns',()=>
   assert.match(migration,/CREATE INDEX IF NOT EXISTS draft_run_decision_reports_review_queue_idx/);
   assert.doesNotMatch(migration,/\b(?:DROP|TRUNCATE|DELETE)\b/i);
   assert.ok(manifest.ordered.includes('0060_player_report_review.sql'));
-  assert.equal(manifest.ordered.at(-1),'0063_private_creator_consent.sql');
+  assert.equal(manifest.ordered.at(-1),'0064_traditional_p1p6_component.sql');
   assert.ok(manifest.release_paths['secure-auth-release'].migrations.includes('0060_player_report_review.sql'));
   assert.equal(release.split('psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0060_player_report_review.sql').length-1,2);
   assert.match(schema,/decision_report_review_status/);
