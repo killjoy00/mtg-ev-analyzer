@@ -29,10 +29,10 @@ function updateAccess({ state = 'checking', patreon = null, membershipUnavailabl
       action = '<button class="button secondary" type="button" disabled>Checking access…</button>';
     } else if (state === 'unavailable' || mode.premium && membershipUnavailable) {
       action = '<button class="button secondary" type="button" disabled>Access unavailable</button>';
-    } else if (!signedIn) {
-      action = '<a class="button secondary" href="/?account=1">Sign in to practice</a>';
     } else if (!canStart) {
-      action = '<button class="button secondary" type="button" data-practice-upgrade>Upgrade to Elite</button>';
+      action = mode.premium
+        ? '<button class="button secondary" type="button" data-practice-upgrade>Become Elite to Play</button>'
+        : '<a class="button secondary" href="/?account=1">Sign in to practice</a>';
     } else {
       action = `<a class="button ${mode.premium ? 'secondary' : 'primary'}" href="${mode.href}">${mode.cta}</a>`;
     }
