@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 
 from import_all_trophies import atomic_json, digest, write_gzip_jsonl
+from model_training import V5_CORPUS as PARENT, V5_MODEL as MODEL
 from traditional_puzzles import THRESHOLDS, compare
 from traditional_v4_revalidation import interesting
 
@@ -23,8 +24,6 @@ SOURCE_RUN = 39451056661
 RESEARCH_COMPONENT = "traditional-premier-v5-phase2-v1"
 COMPONENT = "traditional-premier-v5-p1p6-v1"
 POLICY = "new-set-p1p6-v5-admission-v1"
-PARENT = "elite-trophy-colour-stage-v9"
-MODEL = "strong-player-colour-stage-v5"
 FIRST_PICK, LAST_PICK = 1, 6
 EXCLUDED_PICKS = [7, 8]
 # Exact bytes of the reviewed artifact; any other evidence is refused.
