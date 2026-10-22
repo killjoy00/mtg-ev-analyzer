@@ -143,7 +143,11 @@ async function sourceSession(query,id,{expectedPlayerId=null,expectedType=null,s
   const type=source.day?'daily':'practice';
   if(expectedType&&type!==expectedType)fail(`This source is not a completed ${expectedType==='daily'?'Daily':'Practice'} run.`,409,'CREATOR_SOURCE_TYPE');
   if(source.measurement_qa)fail('QA-only runs cannot become public creator challenges.',409,'CREATOR_SOURCE_QA');
-  if(source.public_identity_hidden_at||!source.profile_public)fail('This creator is not currently eligible for public promotion.',409,'CREATOR_IDENTITY_PRIVATE');
+  // A private profile can supply an explicitly consented public challenge without
+  // making its account/profile public. Anonymous or moderated sources remain blocked.
+  if(source.public_identity_hidden_at)fail('This creator is not currently eligible for public promotion.',409,'CREATOR_IDENTITY_PRIVATE');
+  if(!source.profile_public&&(!source.username_owned||!source.source_owner_auth_user_id))
+    fail('A private creator source requires an owned username and linked account.',409,'CREATOR_IDENTITY_PRIVATE');
   if(!SOURCE_ENVIRONMENTS.has(source.environment||'mixed'))fail('Creator source environment is unsupported.',409,'CREATOR_SOURCE_ENVIRONMENT');
   if(type==='practice'&&source.challenge_id)fail('A replay of another shared run cannot be promoted as the creator source.',409,'CREATOR_SOURCE_INELIGIBLE');
   if(type==='practice'&&source.creator_challenge_id)fail('A creator-challenge replay cannot be promoted as a new creator source.',409,'CREATOR_SOURCE_INELIGIBLE');
@@ -215,7 +219,10 @@ function normalizeMetadata(payload,source) {
   const handle=plain(payload.creator_handle,{max:80,label:'Creator handle'});
   const headline=plain(payload.headline??`Can you beat ${creatorName}?`,{max:160,label:'Headline'});
   const note=plain(payload.creator_post_run_note,{max:500,label:'Creator note'});
-  return {slug,source:sourceValue,campaign,medium,creatorName,handle,headline,note};
+  const privateProfileConsentAttested=!source.profile_public&&payload.private_profile_consent_attested===true;
+  if(!source.profile_public&&!privateProfileConsentAttested)
+    fail('Confirm the private-profile creator explicitly authorized publishing this challenge.',409,'CREATOR_CONSENT_REQUIRED');
+  return {slug,source:sourceValue,campaign,medium,creatorName,handle,headline,note,privateProfileConsentAttested};
 }
 
 function num(value){return value==null?null:Number(value);}
@@ -303,7 +310,7 @@ export async function creatorChallengeBySlug(query,slug) {
 export async function validateCreatorChallengeSource(query,row,{today=gameDateKey(),requireClosed=true}={}) {
   if(!row||!row.source_session_id||!row.authoritative_owner_player_id||row.source_score==null)
     fail('This creator challenge is no longer available.',410,'CREATOR_CHALLENGE_UNAVAILABLE');
-  if(row.public_identity_hidden_at||!bool(row.profile_public)||bool(row.measurement_qa))
+  if(row.public_identity_hidden_at||(!bool(row.profile_public)&&!bool(row.private_profile_consent_attested))||bool(row.measurement_qa))
     fail('This creator is not currently eligible for public promotion.',409,'CREATOR_IDENTITY_PRIVATE');
   if(row.source_type==='daily'&&String(row.authoritative_source_day)!==String(row.source_day))
     fail('Creator challenge source no longer matches its frozen Daily.',409,'CREATOR_SOURCE_MISMATCH');
@@ -373,7 +380,7 @@ export async function loadCreatorChallengeForExistingSession(query,id) {
     fail('This creator challenge is no longer available.',410,'CREATOR_CHALLENGE_UNAVAILABLE');
   if(!challenge.source_session_id||!challenge.authoritative_owner_player_id||challenge.source_score==null)
     fail('This creator challenge is no longer available.',410,'CREATOR_CHALLENGE_UNAVAILABLE');
-  if(challenge.public_identity_hidden_at||!bool(challenge.profile_public)||bool(challenge.measurement_qa))
+  if(challenge.public_identity_hidden_at||(!bool(challenge.profile_public)&&!bool(challenge.private_profile_consent_attested))||bool(challenge.measurement_qa))
     fail('This creator challenge is no longer available.',410,'CREATOR_CHALLENGE_UNAVAILABLE');
   const source=await sourceSession(query,challenge.source_session_id,{
     expectedPlayerId:challenge.source_owner_player_id,
@@ -428,18 +435,18 @@ export async function createCreatorChallenge(query,payload,adminAuthUserId) {
   const inserted=await query(`INSERT INTO creator_challenges(
       slug,source_session_id,source_owner_player_id,source_owner_auth_user_id,source_share_id,source_type,source_day,source_environment,
       creator_public_name,creator_handle,headline,creator_post_run_note,
-      acquisition_source,acquisition_campaign,acquisition_medium,status,created_by_admin_auth_user_id
-    ) VALUES($1,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7::date,$8,$9,$10,$11,$12,$13,$14,$15,'draft',$16::uuid)
+      acquisition_source,acquisition_campaign,acquisition_medium,status,created_by_admin_auth_user_id,private_profile_consent_attested
+    ) VALUES($1,$2::uuid,$3::uuid,$4::uuid,$5,$6,$7::date,$8,$9,$10,$11,$12,$13,$14,$15,'draft',$16::uuid,$17::boolean)
     ON CONFLICT(slug) DO NOTHING RETURNING id`,[
       meta.slug,resolved.source.id,resolved.source.player_id,resolved.source.source_owner_auth_user_id||null,resolved.shareId,
       resolved.source.day?'daily':'practice',resolved.source.day||null,resolved.source.environment||'mixed',
-      meta.creatorName,meta.handle,meta.headline,meta.note,meta.source,meta.campaign,meta.medium,adminAuthUserId,
+      meta.creatorName,meta.handle,meta.headline,meta.note,meta.source,meta.campaign,meta.medium,adminAuthUserId,meta.privateProfileConsentAttested,
     ]);
   if(!inserted.rows[0])fail('That slug is already reserved by another creator challenge.',409,'CREATOR_SLUG_TAKEN');
   const id=inserted.rows[0].id;
   await query(`INSERT INTO creator_challenge_audit(creator_challenge_id,admin_auth_user_id,action,detail)
-    VALUES($1::uuid,$2::uuid,'created',jsonb_build_object('source_type',$3::text,'source_session_id',$4::text))`,
-    [id,adminAuthUserId,resolved.source.day?'daily':'practice',resolved.source.id]);
+    VALUES($1::uuid,$2::uuid,'created',jsonb_build_object('source_type',$3::text,'source_session_id',$4::text,'private_profile_consent_attested',$5::boolean))`,
+    [id,adminAuthUserId,resolved.source.day?'daily':'practice',resolved.source.id,meta.privateProfileConsentAttested]);
   return creatorChallengeById(query,id);
 }
 
@@ -454,7 +461,7 @@ export async function listCreatorPlayers(query,search,{limit=20,offset=0}={}) {
     LEFT JOIN account_links a ON a.player_id=p.id
     LEFT JOIN neon_auth."user" u ON u.id=a.auth_user_id
     WHERE p.public_identity_hidden_at IS NULL
-      AND p.profile_public=true
+      AND (p.profile_public=true OR (p.username_owned=true AND a.auth_user_id IS NOT NULL))
       AND (p.display_name ILIKE '%'||$1||'%' OR coalesce(u.email,'') ILIKE '%'||$1||'%')
     ORDER BY (lower(p.display_name)=lower($1)) DESC,p.updated_at DESC,p.id
     LIMIT $2::int OFFSET $3::int`,[q,safeLimit,safeOffset]);
@@ -481,7 +488,7 @@ export async function listCompletedDailies(query,playerId,{limit=20,before=null}
       AND jsonb_array_length(s.answers)=8
       AND NOT s.measurement_qa
       AND p.public_identity_hidden_at IS NULL
-      AND p.profile_public=true
+      AND (p.profile_public=true OR (p.username_owned=true AND EXISTS (SELECT 1 FROM account_links a WHERE a.player_id=p.id)))
       AND ($3::date IS NULL OR s.day<$3::date)
     ORDER BY s.day DESC,s.environment,s.created_at
     LIMIT $2::int`,[playerId,safeLimit,cursor]);
