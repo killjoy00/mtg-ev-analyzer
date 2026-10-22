@@ -29,8 +29,8 @@ test('account and profile entry modules use release-versioned imports', async ()
   assert.match(growth, /patreon-activation\.mjs\?v=2/);
   assert.match(profile, /progression\.mjs\?v=10/);
   assert.match(profile, /growth\.mjs\?v=27/);
-  assert.match(profile, /my-pack-one\.mjs\?v=11/);
-  assert.match(profile, /profile\.css\?v=16/);
+  assert.match(profile, /my-pack-one\.mjs\?v=12/);
+  assert.match(profile, /profile\.css\?v=17/);
   assert.match(profile, /daily-reminder-settings\.mjs\?v=5/);
   assert.match(await readFile('daily-reminder-settings.mjs','utf8'), /growth-api\.mjs\?v=2/);
   assert.match(myPackOne, /my-pack-insights\.mjs\?v=5/);
@@ -39,12 +39,13 @@ test('account and profile entry modules use release-versioned imports', async ()
   assert.match(draft, /share-cards\.mjs\?v=8/);
   assert.match(draft, /today-status\.mjs\?v=2/);
   assert.match(draft, /set-guides\.mjs\?v=2/);
+  assert.match(draft, /draft-run-feedback\.mjs\?v=5/);
   assert.match(patreonHtml, /patreon-page\.mjs\?v=5/);
   assert.match(patreonPage, /patreon-activation\.mjs\?v=2/);
   assert.match(practiceHtml, /bootstrap\.mjs\?v=33/);
   assert.match(practiceHtml, /growth\.mjs\?v=27/);
   assert.match(practiceHtml, /draft-run-product\.mjs\?v=24/);
-  assert.match(practiceHtml, /draft-run\.css\?v=17/);
+  assert.match(practiceHtml, /draft-run\.css\?v=18/);
   assert.match(practiceJs, /growth\.mjs\?v=10/);
   assert.match(patreonPage, /growth\.mjs\?v=10/);
 });

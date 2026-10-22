@@ -16,7 +16,9 @@ export const DAILY_PEER_STATS_SQL=`WITH daily_decisions AS (
 )
 SELECT count(*)::int players,
        count(*) FILTER (WHERE selected_id=$5)::int matching_pick,
-       count(*) FILTER (WHERE selected_id=$6)::int trophy_pick
+       count(*) FILTER (WHERE selected_id=$6)::int trophy_pick,
+       COALESCE((SELECT jsonb_object_agg(selected_id,picks)
+         FROM (SELECT selected_id,count(*)::int picks FROM daily_decisions GROUP BY selected_id) card_counts),'{}'::jsonb) card_picks
 FROM daily_decisions`;
 
 export function lockedDailyPeerAnswer(session,round) {
@@ -35,5 +37,15 @@ export function summarizeDailyPeers(row) {
   const validCount=value=>Number.isSafeInteger(Number(value))&&Number(value)>=0&&Number(value)<=players;
   if(!validCount(row.matching_pick)||!validCount(row.trophy_pick))return {available:false};
   const percentage=count=>Math.round(100*Number(count)/players);
-  return {available:true,players,matching_pick_pct:percentage(row.matching_pick),trophy_pick_pct:percentage(row.trophy_pick)};
+  const summary={available:true,players,matching_pick_pct:percentage(row.matching_pick),trophy_pick_pct:percentage(row.trophy_pick)};
+  // Per-card shares use the same threshold as the summary. A malformed
+  // breakdown is dropped rather than shown, without hiding the summary.
+  let cards=row.card_picks;
+  try {if(typeof cards==='string')cards=JSON.parse(cards);} catch {cards=null;}
+  if(cards&&typeof cards==='object'&&!Array.isArray(cards)) {
+    const entries=Object.entries(cards);
+    if(entries.every(([,count])=>validCount(count))&&entries.reduce((sum,[,count])=>sum+Number(count),0)<=players)
+      summary.card_pick_pct=Object.fromEntries(entries.map(([id,count])=>[id,percentage(count)]));
+  }
+  return summary;
 }

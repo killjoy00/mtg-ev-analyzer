@@ -7,7 +7,7 @@ import {decisionClock} from './decision-clock.mjs';
 import { sortPackByRarity } from './replay-data.mjs';
 import { escapeHtml as esc } from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
-import { compactDraftRunFeedback, consensusFeedback, trophyDrafterDetails, trophyRevealSentence } from './draft-run-feedback.mjs?v=4';
+import { compactDraftRunFeedback, consensusFeedback, trophyDrafterDetails, trophyRevealSentence } from './draft-run-feedback.mjs?v=5';
 import { tcgplayerUrl } from './tcgplayer.mjs';
 import { dailyResetCue, nextGameDateBoundary } from './game-date.mjs';
 import {completedAllDailies,nextUnfinishedDaily} from './today-status.mjs?v=2';
@@ -48,7 +48,7 @@ const app=()=>document.querySelector('#app');
 function styles() {
   installSetGuides();
   if(document.querySelector('[data-draft-run-style]')) return;
-  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=17';link.dataset.draftRunStyle='1';document.head.appendChild(link);
+  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=18';link.dataset.draftRunStyle='1';document.head.appendChild(link);
 }
 async function api(path,body,auth=true) {
   const method=body===undefined?'GET':'POST',headers={'content-type':'application/json'};
@@ -93,7 +93,7 @@ function pool(p) {
 }
 // Keep the default reveal visual compact while making the actual comparison
 // visible at a glance. Non-matches pair the player's card with the trophy card;
-// matches still show the shared card once.
+// matches pair the shared card with the model's highest-ranked other card.
 function compactRevealCards(p,answer) {
   const byId=new Map((p.candidates||[]).map(c=>[c.id,c]));
   const mine=byId.get(answer.selectedId),trophy=byId.get(answer.historicalId);
@@ -104,7 +104,11 @@ function compactRevealCards(p,answer) {
   if(run?.comparison?.kind!=='creator') {
     if(answer.historicalMatch) {
       const shared=mine||trophy;
-      return shared?`<div class="run-reveal-picks is-match">${cardFigure(shared,'Trophy and Your Pick','is-shared')}</div>`:'';
+      if(!shared)return '';
+      const ranked=[...(answer.ranking||[])].sort((a,b)=>Number(b.support)-Number(a.support));
+      const leaderId=answer.consensusId||ranked[0]?.id;
+      const other=byId.get(leaderId!==shared.id?leaderId:ranked.find(c=>c.id!==shared.id)?.id);
+      return `<div class="run-reveal-picks is-match">${cardFigure(shared,'✓ Trophy Match','is-shared')}${other?cardFigure(other,leaderId===other.id?'Highest Ranked':'Next Highest','is-ranked'):''}</div>`;
     }
     const cards=`${cardFigure(mine,'Your Pick','is-mine')}${cardFigure(trophy,'Trophy Pick','is-trophy')}`;
     return cards?`<div class="run-reveal-picks">${cards}</div>`:'';
@@ -153,6 +157,16 @@ async function revealDailyPeers(round,answer) {
     if(!node)return;
     node.textContent=`${stats.matching_pick_pct}% of players picked this · ${stats.trophy_pick_pct}% matched the trophy drafter (${stats.players} players)`;
     node.hidden=false;
+    // Same threshold as the line above: the server sends per-card shares only
+    // with an available summary. Cards nobody picked show 0%.
+    const shares=stats.card_pick_pct;
+    if(shares&&typeof shares==='object') {
+      document.querySelectorAll('[data-peer-card]').forEach(cell=>{
+        const pct=Number(shares[cell.dataset.peerCard]);
+        cell.textContent=`${Number.isFinite(pct)?pct:0}%`;cell.hidden=false;
+      });
+      document.querySelectorAll('[data-peer-col]').forEach(item=>{item.hidden=false;});
+    }
   };
   if(dailyPeerCache.has(key)){show(dailyPeerCache.get(key));return;}
   try {

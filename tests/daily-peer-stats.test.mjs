@@ -41,3 +41,17 @@ test('Daily peer SQL scopes date/environment/exact puzzle, locked rounds and ded
   assert.doesNotMatch(DAILY_PEER_STATS_SQL,/answers/,'never read full answers documents per reveal');
   assert.match(DAILY_PEER_STATS_SQL,/DISTINCT ON \(COALESCE\(s\.daily_account_id::text,s\.player_id::text\)\)/);
 });
+
+test('per-card pick shares follow the same ten-player threshold and drop malformed breakdowns',()=>{
+  assert.match(DAILY_PEER_STATS_SQL,/jsonb_object_agg\(selected_id,picks\)/);
+  assert.match(DAILY_PEER_STATS_SQL,/FROM daily_decisions GROUP BY selected_id/,'shares come from the same deduped decisions');
+  assert.deepEqual(summarizeDailyPeers({players:9,matching_pick:3,trophy_pick:2,card_picks:{a:3,b:6}}),{available:false});
+  assert.deepEqual(summarizeDailyPeers({players:12,matching_pick:6,trophy_pick:4,card_picks:{a:6,b:4,c:2}}),
+    {available:true,players:12,matching_pick_pct:50,trophy_pick_pct:33,card_pick_pct:{a:50,b:33,c:17}});
+  assert.deepEqual(summarizeDailyPeers({players:10,matching_pick:5,trophy_pick:5,card_picks:'{"a":5,"b":5}'}).card_pick_pct,{a:50,b:50},'JSON text from the driver is accepted');
+  for(const card_picks of [{a:11},{a:6,b:6},{a:-1},{a:'x'},[3],'not json',null,undefined]) {
+    const result=summarizeDailyPeers({players:10,matching_pick:5,trophy_pick:5,card_picks});
+    assert.equal(result.available,true,'the summary survives a bad breakdown');
+    assert.equal('card_pick_pct' in result,false);
+  }
+});

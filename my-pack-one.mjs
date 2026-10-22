@@ -175,12 +175,14 @@ function statsMarkup(profile,liveCatalog,account,patreon) {
     ['Average',num(summary.average_score).toFixed(1)],
     ['Best',num(summary.best_score)],
     ['Daily streak',num(summary.current_streak)],
-    ['Shared challenges played',esc(formatChallengeRecord(summary)),'Results from playing other people’s shared runs.'],
+    ['Shared challenges played',num(summary.challenge_wins)+num(summary.challenge_losses)+num(summary.challenge_ties),
+      'Results from playing other people’s shared runs: '+formatChallengeRecord(summary)+'.'],
     ['Environments',progress?progress.played+'/'+progress.total:'Unavailable'],
   ];
+  // Explanations are mouseover text so every metric reads as number + label.
   const metricHtml=metrics.map(([label,value,help])=>
-    '<div'+(help?' class="my-shared-challenge-stat"':'')+'><strong>'+value+'</strong><span>'+label+'</span>'+
-    (help?'<small>'+esc(help)+'</small>':'')+'</div>').join('');
+    '<div'+(help?' title="'+esc(help)+'"':'')+'><strong>'+value+'</strong><span>'+label+'</span>'+
+    (help?'<span class="visually-hidden">'+esc(help)+'</span>':'')+'</div>').join('');
   const recentPreview=recent.slice(0,5).map(row=>gamePreviewRow(row,names)).join('');
   const dailyPreview=daily.slice(0,5).map(row=>dailyPreviewRow(row,names)).join('');
   return '<div class="my-pack-one-grid"><main class="my-pack-one-main">'+
