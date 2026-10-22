@@ -34,6 +34,20 @@
     "medium": "text"
   },
   {
+    "id": "431c548a-feef-4377-922a-6e3ca8cd5a77",
+    "slug": "lordsoflimited",
+    "status": "published",
+    "creator_name": "Lordtupperware",
+    "headline": "Reality Fracture live - can you beat this score?",
+    "score": 81,
+    "environment": "latest",
+    "source_type": "daily",
+    "source_day": "2026-10-21",
+    "source": "creator",
+    "campaign": "beat-the-creator",
+    "medium": "creator"
+  },
+  {
     "id": "504bc34f-bf21-4542-8f86-afd1bd78337b",
     "slug": "realityfracture",
     "status": "published",
