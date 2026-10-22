@@ -1,40 +1,34 @@
 .practice-main {
-  width: min(1188px, 100%);
+  width: min(var(--content), 100%);
   margin: 0 auto;
-  padding: 58px 24px 90px;
+  padding: 52px 24px 80px;
 }
 
 .practice-shell {
-  max-width: 1040px;
+  max-width: var(--entry-content);
   margin: 0 auto;
 }
 
 .practice-hero {
   max-width: 760px;
-  margin-bottom: 34px;
+  margin-bottom: 32px;
 }
 
-.practice-hero h1,
-.practice-error h1 {
-  margin: 0 0 14px;
-  font-family: var(--display);
-  font-size: clamp(42px, 5vw, 60px);
-  font-weight: 700;
-  line-height: 1;
+.practice-page > .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
 }
 
-.practice-hero > p:not(.kicker),
-.practice-error > p:not(.kicker) {
+.practice-hero .eyebrow {
+  margin-bottom: 14px;
+}
+
+.practice-hero > p:not(.eyebrow) {
   margin: 0;
   color: var(--muted);
   font-size: 18px;
   line-height: 1.55;
-}
-
-.practice-loading {
-  padding: 28px 0;
-  border-top: 1px solid var(--line);
-  color: var(--muted);
 }
 
 .practice-grid {
@@ -45,12 +39,12 @@
 
 .practice-card {
   min-height: 310px;
-  padding: 26px;
+  padding: 24px;
   display: flex;
   flex-direction: column;
   border: 1px solid var(--line);
   border-top: 3px solid var(--green);
-  background: #fff;
+  background: var(--surface);
 }
 
 .practice-card.is-elite {
@@ -58,7 +52,7 @@
 }
 
 .practice-card.is-locked {
-  background: #fafaf8;
+  background: var(--page);
 }
 
 .practice-card-top {
@@ -66,15 +60,15 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 28px;
+  margin-bottom: 24px;
 }
 
 .practice-label {
   margin: 0;
   color: var(--muted);
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: .12em;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .1em;
   text-transform: uppercase;
 }
 
@@ -82,9 +76,9 @@
   padding: 4px 7px;
   border: 1px solid var(--line-strong);
   color: var(--muted);
-  font-size: 10px;
-  font-weight: 800;
-  line-height: 1;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
   text-transform: uppercase;
   letter-spacing: .08em;
 }
@@ -97,9 +91,9 @@
 .practice-card h2 {
   margin: 0 0 10px;
   font-family: var(--display);
-  font-size: 32px;
-  font-weight: 650;
-  line-height: 1;
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1.1;
 }
 
 .practice-card > p {
@@ -110,11 +104,12 @@
 
 .practice-card-action {
   margin-top: auto;
-  padding-top: 28px;
+  padding-top: 24px;
 }
 
 .practice-card-action .button {
   width: 100%;
+  min-height: 48px;
 }
 
 .practice-membership-note {
@@ -123,28 +118,32 @@
   font-size: 13px;
 }
 
-.practice-gate,
 .practice-error {
-  max-width: 700px;
-  padding: 28px;
+  margin-top: 18px;
+  padding: 20px;
   border: 1px solid var(--line);
   border-top: 2px solid var(--green);
-  background: #fff;
+  background: var(--surface);
 }
 
-.practice-gate {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
+.practice-error[hidden] {
+  display: none;
 }
 
-.practice-error .button {
-  margin: 18px 10px 0 0;
+.practice-error p {
+  margin: 0 0 12px;
 }
 
-@media (max-width: 760px) {
+.practice-back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  margin-top: 16px;
+}
+
+@media (max-width: 900px) {
   .practice-main {
-    padding: 44px 18px 68px;
+    padding: 30px 16px 64px;
   }
 
   .practice-grid {
@@ -159,7 +158,7 @@
     margin-bottom: 26px;
   }
 
-  .practice-gate {
-    display: grid;
+  .practice-card h2 {
+    font-size: 30px;
   }
 }

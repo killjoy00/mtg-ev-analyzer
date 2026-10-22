@@ -12,7 +12,7 @@ test('Practice copy and Learn guide cleanup are present',async()=>{
     read('learn/card-strength-vs-fit/index.html'),
   ]);
   assert.doesNotMatch(practice,/included with your free account/);
-  assert.match(practice,/Eight-decision runs from real trophy drafts\.'/);
+  assert.match(practiceHtml,/Unlimited eight-decision runs from real trophy drafts\./);
   assert.match(practiceHtml,/Regular Draft Run practice is free/);
   assert.match(learn,/Card strength vs\. deck fit: know what changed/);
   assert.match(learn,/\/learn\/card-strength-vs-fit\//);

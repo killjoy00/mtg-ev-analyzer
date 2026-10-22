@@ -37,6 +37,7 @@ export function syncSiteNavigation({doc=document}={}){
       ]
     : [
         link('/?game=draft-run&daily=1','Daily Run','daily'),
+        link('/practice/','Practice','practice',currentFor('practice')),
         link('/how-it-works/','How To Play','how',currentFor('how')),
         link('/?account=1','Sign in','account'),
       ];
