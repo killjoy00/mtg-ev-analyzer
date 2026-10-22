@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { gameDateKey, todayStatus, nextUnfinishedDaily } from '../today-status.mjs';
+import { gameDateKey, todayStatus, nextUnfinishedDaily, completedAllDailies } from '../today-status.mjs';
 
 test('Today uses the same Pacific calendar boundary as ranked Dailies', () => {
   assert.equal(gameDateKey(new Date('2026-09-14T06:59:59Z')), '2026-09-13');
@@ -74,4 +74,33 @@ test('missing, stale or untrusted progress keeps the safe Back to Dailies fallba
   assert.equal(nextUnfinishedDaily({day:today},opts),null);
   assert.equal(nextUnfinishedDaily({day:'2026-10-10',daily_history:[]},opts),null);
   assert.equal(nextUnfinishedDaily({day:today,daily_history:[]},{...opts,completedEnvironment:'untrusted'}),null);
+});
+
+const allDoneFor=(daily_history,completedEnvironment='mixed',options={})=>completedAllDailies(
+  {day:today,daily_history},
+  {completedDay:today,completedEnvironment,now,...options},
+);
+
+test('all three Dailies are complete only on the result that finishes today\'s set',()=>{
+  assert.equal(allDoneFor([finished('mixed')]),false,'one of three');
+  assert.equal(allDoneFor([finished('mixed'),finished('powered-cube')],'powered-cube'),false,'two of three');
+  assert.equal(allDoneFor([finished('mixed'),finished('powered-cube'),finished('latest')],'latest'),true,'three of three');
+});
+
+test('the set completes in any order and counts the result on screen if history lags',()=>{
+  assert.equal(allDoneFor([finished('latest'),finished('mixed'),finished('powered-cube')],'powered-cube'),true);
+  assert.equal(allDoneFor([finished('latest'),finished('powered-cube')],'mixed'),true);
+  assert.equal(allDoneFor([finished('latest')],'mixed'),false);
+});
+
+test('yesterday, other modes, a past result or a stale status never complete today\'s set',()=>{
+  const yesterday=environment=>({...finished(environment),date:'2026-10-10'});
+  assert.equal(allDoneFor([yesterday('mixed'),yesterday('powered-cube'),finished('latest')],'latest'),false);
+  assert.equal(allDoneFor([{...finished('mixed'),mode:'top3'},finished('powered-cube')],'latest'),false);
+  const all=[finished('mixed'),finished('powered-cube'),finished('latest')];
+  assert.equal(allDoneFor(all,'latest',{completedDay:'2026-10-10'}),false,'a previous day\'s result');
+  assert.equal(allDoneFor(all,'latest',{now:new Date('2026-10-12T07:00:00Z')}),false,'Pacific midnight resets it');
+  assert.equal(completedAllDailies({day:'2026-10-10',daily_history:all},{completedDay:today,completedEnvironment:'latest',now}),false);
+  assert.equal(completedAllDailies(null,{completedDay:today,completedEnvironment:'latest',now}),false);
+  assert.equal(allDoneFor(all,'untrusted'),false);
 });

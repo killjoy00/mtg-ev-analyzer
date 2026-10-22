@@ -13,13 +13,14 @@ const draftRun=[
   spec('tests/draft-run-e2e.mjs',{PACK1_TEST_SELECTION_VERSION:'eight-pick-v3'}),
   spec('tests/draft-run-e2e.mjs',{PACK1_TEST_SELECTION_VERSION:'first-pack-v2'}),
   spec('tests/card-faces-e2e.mjs'),
+  spec('tests/daily-set-complete-e2e.mjs'),
 ];
 export const BROWSER_GROUPS={
   core:[spec('tests/e2e.mjs')],
   sets:[spec('tests/sets-e2e.mjs')],
   practice:[spec('tests/practice-e2e.mjs'),spec('tests/practice-hub-e2e.mjs'),spec('tests/practice-access-e2e.mjs')],
   profile:[spec('tests/profile-e2e.mjs')],
-  daily:[spec('tests/e2e.mjs'),spec('tests/home-today-e2e.mjs'),spec('tests/home-auth-hydration-e2e.mjs'),...draftRun.slice(0,5)],
+  daily:[spec('tests/e2e.mjs'),spec('tests/home-today-e2e.mjs'),spec('tests/home-auth-hydration-e2e.mjs'),...draftRun.slice(0,5),spec('tests/daily-set-complete-e2e.mjs')],
   draft_run:[...draftRun],
   account:[
     spec('tests/account-e2e.mjs'),spec('tests/auth-context-e2e.mjs'),spec('tests/email-verification-e2e.mjs'),
