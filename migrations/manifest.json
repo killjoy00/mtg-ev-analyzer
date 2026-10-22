@@ -66,7 +66,8 @@
     "0059_daily_peer_stats.sql",
     "0060_player_report_review.sql",
     "0061_daily_reminders.sql",
-    "0062_daily_email_reminder_admission.sql"
+    "0062_daily_email_reminder_admission.sql",
+    "0063_private_creator_consent.sql"
   ],
   "same_prefix_order": {
     "0037": [
@@ -181,7 +182,8 @@
         "0059_daily_peer_stats.sql",
         "0060_player_report_review.sql",
         "0061_daily_reminders.sql",
-        "0062_daily_email_reminder_admission.sql"
+        "0062_daily_email_reminder_admission.sql",
+        "0063_private_creator_consent.sql"
       ]
     },
     "daily-calendar": {
@@ -238,7 +240,8 @@
         "0059_daily_peer_stats.sql",
         "0060_player_report_review.sql",
         "0061_daily_reminders.sql",
-        "0062_daily_email_reminder_admission.sql"
+        "0062_daily_email_reminder_admission.sql",
+        "0063_private_creator_consent.sql"
       ]
     },
     "launch-load": {
@@ -270,7 +273,8 @@
         "0059_daily_peer_stats.sql",
         "0060_player_report_review.sql",
         "0061_daily_reminders.sql",
-        "0062_daily_email_reminder_admission.sql"
+        "0062_daily_email_reminder_admission.sql",
+        "0063_private_creator_consent.sql"
       ]
     },
     "launch-distributed": {
@@ -304,7 +308,8 @@
         "0059_daily_peer_stats.sql",
         "0060_player_report_review.sql",
         "0061_daily_reminders.sql",
-        "0062_daily_email_reminder_admission.sql"
+        "0062_daily_email_reminder_admission.sql",
+        "0063_private_creator_consent.sql"
       ]
     }
   }

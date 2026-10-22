@@ -7,7 +7,7 @@ process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 
 const {default:growth,query}=await import('../worker/growth-function.js');
 const {default:runApi}=await import('../worker/draft-run-function.mjs');
-const {creatorChallengeById,createCreatorChallenge}=await import('../worker/creator-challenges.mjs');
+const {CREATOR_PRIVACY_WITHDRAWN_SQL,creatorChallengeById,createCreatorChallenge,validateCreatorChallengeSource}=await import('../worker/creator-challenges.mjs');
 const {
   DRAFT_RUN_SCORING_V3_LEGACY_PROFILE,
   DRAFT_RUN_SCORING_V3_LINEAR_PROFILE,
@@ -178,6 +178,46 @@ try {
   assert.equal(auditDetail.source_type,'practice');
   assert.equal(auditDetail.source_session_id,template.id);
   console.log('Creator challenge creation and audit persistence verified against real PostgreSQL.');
+
+  // A private, linked creator with an owned username can supply one explicitly
+  // consented challenge. The profile stays private, and the privacy sweep keeps
+  // that challenge while still retiring the unconsented one from this source.
+  await query('UPDATE players SET profile_public=false WHERE id=$1::uuid',[creator.playerId]);
+  const privateInput={
+    source_type:'practice',share:creationShare.id,slug:`private-${tag}`,
+    creator_public_name:'Private Creator',acquisition_source:'creator',acquisition_campaign:'private-smoke',
+  };
+  await assert.rejects(createCreatorChallenge(query,privateInput,creatorAuth),
+    error=>error?.code==='CREATOR_CONSENT_REQUIRED','a private source never publishes without explicit consent');
+  const consented=await createCreatorChallenge(query,{...privateInput,private_profile_consent_attested:true},creatorAuth);
+  assert.ok([true,'t'].includes(consented.private_profile_consent_attested),'the consent bit is stored on the challenge');
+  const consentAudit=(await query(`SELECT admin_auth_user_id::text admin,detail FROM creator_challenge_audit
+    WHERE creator_challenge_id=$1::uuid AND action='created'`,[consented.id])).rows[0];
+  const consentDetail=typeof consentAudit.detail==='string'?JSON.parse(consentAudit.detail):consentAudit.detail;
+  assert.equal(consentAudit.admin,creatorAuth,'consent is attributed to the attesting admin');
+  assert.equal(consentDetail.private_profile_consent_attested,true);
+  assert.equal((await validateCreatorChallengeSource(query,consented,{requireClosed:true})).id,template.id,
+    'a consented private source replays from the same authoritative run');
+  const withdrawn=(await query(`SELECT c.id::text id FROM creator_challenges c JOIN players p ON p.id=c.source_owner_player_id
+    WHERE c.source_owner_player_id=$1::uuid AND ${CREATOR_PRIVACY_WITHDRAWN_SQL}`,[creator.playerId])).rows.map(row=>row.id);
+  assert.ok(withdrawn.includes(creation.id),'an unconsented challenge from a now-private owner is withdrawn');
+  assert.ok(!withdrawn.includes(consented.id),'a consented private challenge is not treated as withdrawn');
+  assert.equal(await requestCreatorPrivacyRetirement(query,creator.playerId,{reason:'privacy_maintenance',withdrawnOnly:true}),true);
+  const afterSweep=new Map((await query(`SELECT id::text id,status,creator_public_name,privacy_removed_at
+    FROM creator_challenges WHERE id=ANY($1::uuid[])`,['{'+creation.id+','+consented.id+'}'])).rows.map(row=>[row.id,row]));
+  assert.equal(afterSweep.get(creation.id).status,'retired');
+  assert.equal(afterSweep.get(creation.id).creator_public_name,'A creator');
+  assert.equal(afterSweep.get(consented.id).status,'draft');
+  assert.equal(afterSweep.get(consented.id).creator_public_name,'Private Creator');
+  assert.equal(afterSweep.get(consented.id).privacy_removed_at,null);
+  const stillPrivate=(await query('SELECT profile_public FROM players WHERE id=$1::uuid',[creator.playerId])).rows[0];
+  assert.equal(stillPrivate.profile_public===false||stillPrivate.profile_public==='f',true,'consent never changes profile privacy');
+  // Losing the owned username withdraws consent eligibility as well.
+  await query('UPDATE players SET username_owned=false WHERE id=$1::uuid',[creator.playerId]);
+  assert.ok((await query(`SELECT 1 FROM creator_challenges c JOIN players p ON p.id=c.source_owner_player_id
+    WHERE c.id=$1::uuid AND ${CREATOR_PRIVACY_WITHDRAWN_SQL}`,[consented.id])).rows[0]);
+  await query('UPDATE players SET profile_public=true,username_owned=true WHERE id=$1::uuid',[creator.playerId]);
+  console.log('Consented private-profile creator source, audit and privacy sweep scope verified against real PostgreSQL.');
 
 
   // Route-level creator behavior: standard campaigns remain guest-playable,
@@ -731,7 +771,7 @@ try {
   // infrastructure in this isolated database. The merge/result associations
   // must remain internally consistent when creator identity is scrubbed.
   const creatorOwnedChallenges=[
-    creation.id,runtimeChallenge,legacyChallenge,...accessChallenges,challengeCompletedGuest,challengePartialGuest,
+    creation.id,consented.id,runtimeChallenge,legacyChallenge,...accessChallenges,challengeCompletedGuest,challengePartialGuest,
   ];
   await query(`UPDATE creator_challenges
     SET status='draft',published_at=NULL,publication_operation_ref=NULL,publication_detail='{}'::jsonb

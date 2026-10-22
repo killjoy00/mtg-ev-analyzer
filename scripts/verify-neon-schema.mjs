@@ -37,6 +37,7 @@ const result=await query(`SELECT
   EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='draft_run_decision_reports_review_queue_idx') decision_report_review_index,
   to_regclass('creator_challenges') IS NOT NULL creator_challenges,
   to_regclass('creator_challenge_audit') IS NOT NULL creator_challenge_audit,
+  EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='creator_challenges' AND column_name='private_profile_consent_attested' AND data_type='boolean' AND is_nullable='NO') creator_private_profile_consent,
   (SELECT count(*)=2 FROM information_schema.columns WHERE table_name='draft_run_sessions' AND column_name IN ('creator_challenge_id','creator_participant_auth_user_id')) creator_challenge_session_columns,
   EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='draft_run_creator_challenge_participant_uq') creator_challenge_participant_idempotency,
   EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='game_results' AND column_name='creator_challenge_id') creator_challenge_result_attribution,

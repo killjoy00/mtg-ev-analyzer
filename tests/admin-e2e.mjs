@@ -19,6 +19,9 @@ try {
   const userId='11111111-1111-4111-8111-111111111111';
   const creatorSourceSession='33333333-3333-4333-8333-333333333333';
   const creatorId='44444444-4444-4444-8444-444444444444';
+  const privateCreatorId='aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const privateSourcePlayerId='bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+  const privateSourceSessionId='cccccccc-cccc-4ccc-8ccc-cccccccccccc';
   const retryCreatorId='55555555-5555-4555-8555-555555555555';
   const existingDailyCreatorId='66666666-6666-4666-8666-666666666666';
   const creatorPublicationBodies=[];
@@ -52,13 +55,37 @@ try {
     if(path.startsWith(`/v1/admin/users/${userId}`))adminControlRequests.push({url:route.request().url(),path,method});
     if(path==='/v1/admin/creator-challenges/resolve'&&method==='POST') {
       const body=route.request().postDataJSON();
+      if(body.source_type==='daily'){
+        assert.equal(body.creator_player_id,privateSourcePlayerId);
+        assert.equal(body.source_session_id,privateSourceSessionId);
+        return route.fulfill({json:{source:{source_session_id:privateSourceSessionId,source_type:'daily',
+          creator_player_id:privateSourcePlayerId,creator_auth_user_id:'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+          creator_default_name:'Private Creator',creator_profile_public:false,creator_username_owned:true,
+          score:83,environment:'latest',day:'2026-10-05',decisions:8,share_id:null,
+          corpus_version:DRAFT_RUN_CORPUS_VERSION,scoring_version:'support-ratio-v1'}}});
+      }
       assert.equal(body.source_type,'practice');
       return route.fulfill({json:{source:{source_session_id:creatorSourceSession,source_type:'practice',creator_player_id:'77777777-7777-4777-8777-777777777777',creator_auth_user_id:null,creator_default_name:'Practice Creator',creator_profile_public:true,creator_username_owned:true,score:87,environment:'mixed',day:null,decisions:8,share_id:'abcdefabcdefabcdefabcdef',corpus_version:DRAFT_RUN_CORPUS_VERSION,scoring_version:'support-ratio-v1',difficulty_version:'draft-run-difficulty-v1',selection_version:'draft-run-selection-v1',serving_policy_version:'draft-run-serving-v1',source_components:[]}}});
     }
+    if(path==='/v1/admin/creator-challenges/players'&&method==='GET')
+      return route.fulfill({json:{players:[{player_id:privateSourcePlayerId,display_name:'Private Creator',
+        profile_public:false,username_owned:true,linked_account:true}]}});
+    if(path===`/v1/admin/creator-challenges/players/${privateSourcePlayerId}/dailies`&&method==='GET')
+      return route.fulfill({json:{dailies:[{session_id:privateSourceSessionId,day:'2026-10-05',environment:'latest',score:83}]}});
     if(path==='/v1/admin/creator-challenges'&&method==='GET')return route.fulfill({json:{challenges:creatorChallenges}});
     if(path==='/v1/admin/creator-challenges'&&method==='POST') {
       const body=route.request().postDataJSON();
-      const created={id:creatorId,slug:body.slug,creator_public_name:body.creator_public_name,creator_handle:body.creator_handle,headline:body.headline,creator_post_run_note:body.creator_post_run_note,source_type:'practice',source_day:null,source_environment:'mixed',source_score:87,acquisition_source:body.acquisition_source,acquisition_campaign:body.acquisition_campaign,acquisition_medium:body.acquisition_medium,status:'draft',publication_detail:{},created_at:'2026-09-12T02:00:00Z',opens:0,starts:0,attempts:0,completions:0,wins:0,ties:0,losses:0};
+      const isPrivate=body.source_type==='daily';
+      if(isPrivate)assert.equal(body.private_profile_consent_attested,true);
+      const created={id:isPrivate?privateCreatorId:creatorId,slug:body.slug,
+        creator_public_name:body.creator_public_name,creator_handle:body.creator_handle,
+        headline:body.headline,creator_post_run_note:body.creator_post_run_note,
+        source_type:body.source_type,source_day:isPrivate?'2026-10-05':null,
+        source_environment:isPrivate?'latest':'mixed',source_score:isPrivate?83:87,
+        private_profile_consent_attested:body.private_profile_consent_attested===true,
+        acquisition_source:body.acquisition_source,acquisition_campaign:body.acquisition_campaign,
+        acquisition_medium:body.acquisition_medium,status:'draft',publication_detail:{},
+        created_at:'2026-09-12T02:00:00Z',opens:0,starts:0,attempts:0,completions:0,wins:0,ties:0,losses:0};
       creatorChallenges=[created,...creatorChallenges];
       return route.fulfill({json:{challenge:created}});
     }
@@ -451,6 +478,27 @@ try {
   assert.match(await freshKit.getByLabel('Image alt text').inputValue(),/Practice Creator[\s\S]*87 out of 100[\s\S]*Draft Run Practice/);
   assert.equal((await freshKit.innerText()).includes('P3 was the one I really wasn’t sure about.'),false,'post-run creator note must not enter social kit assets/copy');
   assert.ok(creatorPublicationBodies.some(body=>body.id===creatorId&&body.action==='publish'));
+
+  // A private, linked creator can supply an older completed Daily. Publishing
+  // remains disabled until the admin explicitly attests consent for that one challenge.
+  await creatorPanel.getByRole('radio',{name:'Completed Daily'}).check();
+  await creatorPanel.getByLabel('Find creator').fill('Private Creator');
+  await creatorPanel.getByRole('button',{name:'Find creator'}).click();
+  await creatorPanel.getByRole('button',{name:/Private Creator · private profile · account/}).click();
+  await creatorPanel.getByRole('button',{name:/Use this run/}).click();
+  await creatorPanel.getByText('Source resolved.',{exact:true}).waitFor();
+  await creatorPanel.locator('#creator-meta-form input[name="slug"]').fill('private-creator');
+  await creatorPanel.locator('#creator-meta-form input[name="campaign"]').fill('private-creator');
+  const consent=creatorPanel.getByLabel(/I confirm this creator explicitly approved publishing/);
+  await consent.waitFor();
+  assert.equal(await consent.isChecked(),false);
+  assert.equal(await creatorPanel.getByRole('button',{name:'Publish creator challenge'}).isDisabled(),true);
+  await consent.check();
+  assert.equal(await creatorPanel.getByRole('button',{name:'Publish creator challenge'}).isDisabled(),false);
+  await creatorPanel.getByRole('button',{name:'Publish creator challenge'}).click();
+  await creatorPanel.getByText('Published: https://packone.pro/creator/private-creator/',{exact:true}).waitFor();
+  assert.ok(creatorPublicationBodies.some(body=>body.id===privateCreatorId&&body.action==='publish'));
+  assert.equal(creatorChallenges.find(challenge=>challenge.id===privateCreatorId)?.private_profile_consent_attested,true);
 
   // Deletion must hide a normal published challenge after live verification.
   page.once('dialog',dialog=>dialog.accept());

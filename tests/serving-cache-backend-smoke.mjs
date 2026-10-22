@@ -23,6 +23,8 @@ console.log('PASS: exact mixed/Cube serving-cache selection parity.');
 // Archives that begin at P1P2 are offered for custom practice from coverage,
 // not by name. Prove the batched SQL selector, its unbatched snapshot baseline
 // and the live reference agree on real data, with a usable round-one reroll.
+// A migration PR replays the backlog, so this generation's inventory may have
+// no planner statistics yet; the unbatched reference must not depend on them.
 {
   const day=gameDateKey(),{sets,coverage}=customPracticeFromSnapshot(snapshot,day);
   const late=sets.map(s=>s.set_id).filter(id=>!coverage.opensAtP1P1(id)),opener=sets.map(s=>s.set_id).find(coverage.opensAtP1P1);
@@ -30,8 +32,11 @@ console.log('PASS: exact mixed/Cube serving-cache selection parity.');
   if(!late.length)console.log('No offered set opens at P1P2 on this branch; tests/custom-opening.test.mjs covers the policy.');
   for(const setIds of cases)for(const seed of ['p1p2-opening-a','p1p2-opening-b']) {
     const options={setIds,day};
+    console.log(JSON.stringify({p1p2_opening:setIds,seed,phase:'batched'}));
     const batched=await selectCachedDatabaseRun(query,version,seed,'mixed',options);
+    console.log(JSON.stringify({p1p2_opening:setIds,seed,phase:'unbatched-snapshot-reference'}));
     const baseline=await selectCachedDatabaseRun(query,version,seed,'mixed',{...options,batched:false});
+    console.log(JSON.stringify({p1p2_opening:setIds,seed,phase:'live-reference'}));
     const live=await selectDatabaseRun(query,version,seed,'mixed',options);
     assert.deepEqual(baseline.map(p=>p.puzzle_id),batched.map(p=>p.puzzle_id),'unbatched snapshot selection agrees with the batched selector');
     assert.deepEqual(live.map(p=>p.puzzle_id),batched.map(p=>p.puzzle_id),'live reference agrees with the batched selector');
@@ -41,6 +46,7 @@ console.log('PASS: exact mixed/Cube serving-cache selection parity.');
     assert.equal(new Set(batched.map(p=>p.source_draft_hash)).size,8,'no source draft repeats');
     assert.ok(batched.every(p=>setIds.includes(p.set_id)));
     const excludedSources=batched.map(p=>p.source_draft_hash);
+    console.log(JSON.stringify({p1p2_opening:setIds,seed,phase:'round-one-reroll'}));
     const reroll=await selectDatabaseReroll(query,version,batched[0],{type:'pack',round:0,seed,environment:'mixed',setIds,excludedSources,
       difficultyVersion:DRAFT_RUN_DIFFICULTY_VERSION,selectionVersion:DRAFT_RUN_SELECTION_VERSION,daily:false,day});
     if(reroll) {
