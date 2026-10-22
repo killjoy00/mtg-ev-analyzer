@@ -1,4 +1,4 @@
-import { getAuthSession, loadPatreonStatus } from '/growth-api.mjs';
+import { ACCOUNT_SIGNAL_KEY, getAuthSession, loadPatreonStatus } from '/growth-api.mjs';
 import { eliteSource } from '/membership-source.mjs';
 
 const modes = {
@@ -64,6 +64,7 @@ function updateAccess({ state = 'checking', patreon = null, membershipUnavailabl
 }
 
 async function render() {
+  if (!document.querySelector('[data-practice-hub]')) return;
   const version = ++generation;
   updateAccess();
   let account;
@@ -93,6 +94,11 @@ document.querySelector('[data-practice-hub]')?.addEventListener('click', async e
   } finally {
     button.disabled = false;
   }
+});
+
+globalThis.addEventListener('packone-account-changed', () => void render());
+globalThis.addEventListener('storage', event => {
+  if (event.key === 'pack1-auth-session-v1' || event.key === ACCOUNT_SIGNAL_KEY || event.key === null) void render();
 });
 
 void render();

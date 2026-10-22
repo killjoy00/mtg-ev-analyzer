@@ -118,6 +118,19 @@ try {
     assert.equal(await f.page.getByRole('link', { name: 'Start Powered Cube', exact: true }).getAttribute('href'), '/?game=draft-run&set=powered-cube');
     assert.equal(await f.page.getByRole('link', { name: 'Choose your sets', exact: true }).getAttribute('href'), '/?game=draft-run&custom=1');
     if (membership === 'elite') await responsive(f.page, 'elite');
+    if (membership === 'elite') {
+      f.state.membership = 'free';
+      await f.page.evaluate(() => window.dispatchEvent(new Event('packone-account-changed')));
+      await f.page.getByRole('button', { name: 'Upgrade to Elite', exact: true }).first().waitFor();
+      await cards(f.page, 1);
+      await f.page.evaluate(() => {
+        localStorage.removeItem('pack1-auth-session-v1');
+        window.dispatchEvent(new StorageEvent('storage', { key: 'pack1-account-signal-v1', newValue: 'signed-out-fixture' }));
+      });
+      await f.page.locator('[data-practice-hub][data-account-state="guest"]').waitFor();
+      await cards(f.page, 0);
+      assert.equal(await f.page.getByRole('link', { name: 'Sign in to practice', exact: true }).count(), 3);
+    }
     assert.deepEqual(f.errors, []);
     await f.context.close();
   }
