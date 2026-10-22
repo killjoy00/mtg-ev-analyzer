@@ -1,8 +1,7 @@
 /* Daily tournament sheet. */
-.daily-home{max-width:900px;margin:0 auto 12px}
+.daily-home{max-width:var(--entry-content);margin:0 auto 12px}
 .daily-home-heading{padding:14px 0 0;margin-bottom:0}
-.daily-home-heading .eyebrow{font-size:13px;letter-spacing:.14em;margin:0 0 14px}
-.daily-home-heading h1{font-family:var(--display);font-size:clamp(44px,6vw,72px);font-weight:600;line-height:1.03;letter-spacing:-.01em;margin:0 0 14px}
+.daily-home-heading .eyebrow{font-size:12px;letter-spacing:.12em;margin:0 0 14px}
 .daily-home-heading>p:not(.eyebrow){font-size:18px;color:var(--muted);margin:0 0 32px}
 .daily-home-heading time{display:block;padding:13px 0;border-top:2px solid var(--ink);border-bottom:1px solid var(--line);font-size:14px;font-weight:600;letter-spacing:.025em}
 .daily-home-status{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;border-bottom:1px solid var(--line);font-size:16px;line-height:1.35}

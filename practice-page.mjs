@@ -1,111 +1,98 @@
 import { getAuthSession, loadPatreonStatus } from '/growth-api.mjs';
 import { eliteSource } from '/membership-source.mjs';
 
-function practiceCard({label,title,description,href,cta,badge=null,locked=false,elite=false}) {
-  const action=locked
-    ? '<button class="button secondary" type="button" data-practice-upgrade>Upgrade to Elite</button>'
-    : `<a class="button ${elite?'secondary':'primary'}" href="${href}">${cta}</a>`;
-  return `<article class="practice-card${elite?' is-elite':''}${locked?' is-locked':''}">
-    <div class="practice-card-top">
-      <p class="practice-label">${label}</p>
-      <span class="practice-badge">${badge|| (elite?'Elite':'Included')}</span>
-    </div>
-    <h2>${title}</h2>
-    <p>${description}</p>
-    <div class="practice-card-action">${action}</div>
-  </article>`;
-}
+const modes = {
+  regular: { href: '/?game=draft-run', cta: 'Start Draft Run', premium: false },
+  cube: { href: '/?game=draft-run&set=powered-cube', cta: 'Start Powered Cube', premium: true },
+  custom: { href: '/?game=draft-run&custom=1', cta: 'Choose your sets', premium: true },
+};
+let generation = 0;
 
-function signedOutMarkup() {
-  return `<section class="practice-shell">
-    <header class="practice-hero">
-      <p class="kicker">Practice</p>
-      <h1>Keep drafting.</h1>
-      <p>Practice is available with a free Pack One account. Sign in or create one to start unlimited regular Draft Runs.</p>
-    </header>
-    <div class="practice-gate">
-      <a class="button primary" href="/?account=1">Sign in or create an account</a>
-      <a class="button secondary" href="/">Back to Dailies</a>
-    </div>
-  </section>`;
-}
+function updateAccess({ state = 'checking', patreon = null, membershipUnavailable = false } = {}) {
+  const hub = document.querySelector('[data-practice-hub]');
+  if (!hub) return;
+  const signedIn = state === 'signed-in';
+  // Membership can come from Patreon, Apple, or another account grant.
+  // The server continues to enforce access when a run starts.
+  const source = signedIn ? eliteSource(patreon) : null;
+  const elite = Boolean(source);
+  hub.dataset.accountState = state;
+  hub.dataset.elite = elite ? '1' : '0';
+  hub.setAttribute('aria-busy', String(state === 'checking'));
 
-function practiceMarkup(patreon) {
-  // Any Elite source unlocks the modes; the server enforces the same capabilities.
-  const source=eliteSource(patreon);
-  const elite=Boolean(source);
-  const membershipConnected=Boolean(patreon?.connected);
-  const eliteNote=source==='apple'
-    ? 'Elite is active through your Apple App Store subscription. Powered Cube and custom-set practice are unlocked.'
-    : elite
-    ? 'Elite is active. Powered Cube and custom-set practice are unlocked.'
-    : membershipConnected
-      ? 'Your Patreon account is connected. Upgrade to Elite to unlock both premium practice modes.'
-      : 'Elite unlocks Powered Cube and custom-set practice.';
-  return `<section class="practice-shell" data-practice-hub data-elite="${elite?'1':'0'}">
-    <header class="practice-hero">
-      <p class="kicker">Practice</p>
-      <h1>Keep drafting.</h1>
-      <p>Choose the kind of run you want. Practice gives you more reps so you can become a better drafter and do better in future Daily Challenges.</p>
-    </header>
-    <div class="practice-grid">
-      ${practiceCard({
-        label:'Free practice',
-        title:'Regular Draft Run',
-        description:'Eight-decision runs from real trophy drafts.',
-        href:'/?game=draft-run',
-        cta:'Start Draft Run',
-        badge:'Unlimited',
-      })}
-      ${practiceCard({
-        label:'Powered practice',
-        title:'Powered Cube',
-        description:'Eight decisions from Powered Cube trophy drafts, available whenever you want another run.',
-        href:'/?game=draft-run&set=powered-cube',
-        cta:'Start Powered Cube',
-        locked:!elite,
-        elite:true,
-      })}
-      ${practiceCard({
-        label:'Custom practice',
-        title:'Choose your sets',
-        description:'Build a random eight-decision run from the regular sets you want to practice.',
-        href:'/?game=draft-run&custom=1',
-        cta:'Choose your sets',
-        locked:!elite,
-        elite:true,
-      })}
-    </div>
-    <p class="practice-membership-note">${eliteNote}</p>
-  </section>`;
+  for (const card of hub.querySelectorAll('[data-practice-mode]')) {
+    const mode = modes[card.dataset.practiceMode];
+    const canStart = signedIn && (!mode.premium || elite);
+    card.classList.toggle('is-locked', !canStart);
+    let action;
+    if (state === 'checking') {
+      action = '<button class="button secondary" type="button" disabled>Checking access…</button>';
+    } else if (state === 'unavailable' || mode.premium && membershipUnavailable) {
+      action = '<button class="button secondary" type="button" disabled>Access unavailable</button>';
+    } else if (!signedIn) {
+      action = '<a class="button secondary" href="/?account=1">Sign in to practice</a>';
+    } else if (!canStart) {
+      action = '<button class="button secondary" type="button" data-practice-upgrade>Upgrade to Elite</button>';
+    } else {
+      action = `<a class="button ${mode.premium ? 'secondary' : 'primary'}" href="${mode.href}">${mode.cta}</a>`;
+    }
+    card.querySelector('.practice-card-action').innerHTML = action;
+  }
+
+  const note = hub.querySelector('[data-practice-note]');
+  note.textContent = state === 'checking'
+    ? 'Checking your practice access…'
+    : state === 'unavailable'
+      ? 'Your practice options will be available after your account can be checked.'
+      : !signedIn
+        ? 'Sign in or create a free account for unlimited regular Draft Runs. Elite adds Powered Cube and custom-set practice.'
+        : source === 'apple'
+          ? 'Elite is active through your Apple App Store subscription. All three practice modes are unlocked.'
+          : elite
+            ? 'Elite is active. All three practice modes are unlocked.'
+            : membershipUnavailable
+              ? 'Regular Draft Runs are available. Elite practice is unavailable until your membership can be checked.'
+              : patreon?.connected
+                ? 'Your Patreon account is connected. Upgrade to Elite to unlock Powered Cube and custom-set practice.'
+                : 'Your free account includes unlimited regular Draft Runs. Elite adds Powered Cube and custom-set practice.';
+
+  const error = hub.querySelector('[data-practice-error]');
+  error.hidden = state !== 'unavailable' && !membershipUnavailable;
+  error.querySelector('p').textContent = state === 'unavailable'
+    ? 'Pack One could not check your account right now.'
+    : membershipUnavailable ? 'Pack One could not check your Elite membership right now.' : '';
 }
 
 async function render() {
-  const app=document.querySelector('#app');
-  if(!app)return;
-  let account=null;
-  try { account=await getAuthSession(); }
+  const version = ++generation;
+  updateAccess();
+  let account;
+  try { account = await getAuthSession(); }
   catch {
-    app.innerHTML=`<section class="practice-shell"><div class="practice-error"><p class="kicker">Practice</p><h1>Practice is temporarily unavailable.</h1><p>Pack One could not check your account right now.</p><button class="button primary" type="button" data-practice-retry>Try again</button><a class="button secondary" href="/">Back to Dailies</a></div></section>`;
-    app.querySelector('[data-practice-retry]')?.addEventListener('click',()=>void render());
+    if (version === generation) updateAccess({ state: 'unavailable' });
     return;
   }
-  if(!account?.user) {
-    app.innerHTML=signedOutMarkup();
-    return;
+  let patreon = null, membershipUnavailable = false;
+  if (account?.user) {
+    try { patreon = await loadPatreonStatus(); }
+    catch { membershipUnavailable = true; }
   }
-  let patreon={configured:false,connected:false,capabilities:[]};
-  try { patreon=await loadPatreonStatus(); } catch {}
-  app.innerHTML=practiceMarkup(patreon);
-  app.querySelectorAll('[data-practice-upgrade]').forEach(button=>button.addEventListener('click',async()=>{
-    button.disabled=true;
-    try {
-      const { beginEliteUpgrade }=await import('/growth.mjs?v=10');
-      await beginEliteUpgrade({source:'practice_hub'});
-    } finally {
-      button.disabled=false;
-    }
-  }));
+  if (version === generation) updateAccess({
+    state: account?.user ? 'signed-in' : 'guest', patreon, membershipUnavailable,
+  });
 }
+
+document.querySelector('[data-practice-retry]')?.addEventListener('click', () => void render());
+document.querySelector('[data-practice-hub]')?.addEventListener('click', async event => {
+  const button = event.target.closest('[data-practice-upgrade]');
+  if (!button || button.disabled) return;
+  button.disabled = true;
+  try {
+    const { beginEliteUpgrade } = await import('/growth.mjs?v=28');
+    await beginEliteUpgrade({ source: 'practice_hub' });
+  } finally {
+    button.disabled = false;
+  }
+});
 
 void render();

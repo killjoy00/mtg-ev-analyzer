@@ -27,12 +27,17 @@ Mobile play controls remain at least 44 pixels high,
 keyboard focus is visible, and prior cards retain the established 85% size relationship
 to pack cards.
 
-Guest primary navigation stays intentionally narrow: Daily Run, How To Play, and
-Sign in. Signed-in desktop navigation is Daily Run, Practice, Leaders, Learn, and
+Guest primary navigation is Daily Run, Practice, How To Play, and Sign in.
+Practice remains visible while account status is being checked or unavailable.
+Signed-in desktop navigation is Daily Run, Practice, Leaders, Learn, and
 My Pack One. On narrow signed-in screens Daily Run is omitted from the nav because
 the Pack One brand returns to Daily home; Practice, Leaders, Learn, and My Pack One
 remain visible. Practice is a dedicated hub with unlimited regular Draft Run practice plus Elite
-Powered Cube and custom-set practice. How To Play is the beginner manual; Learn is
+Powered Cube and custom-set practice. Its three cards remain visible for guests,
+free accounts, Elite accounts, and loading/error states. Guests must sign in for
+any practice; free accounts can start only regular Draft Runs; Elite accounts can
+start all three. Loading or failed access checks never expose a start action for
+an unverified capability. How To Play is the beginner manual; Learn is
 the broader hub for scoring, method, set coverage, and drafting guides.
 
 Fonts are self-hosted WOFF2 files with their SIL Open Font Licenses. The same
@@ -40,6 +45,12 @@ typography is used in gameplay, editorial pages, profile settings, and admin.
 Future work should preserve this structure and avoid introducing gradients,
 glass panels, decorative AI imagery, unrelated fantasy/card illustration, or an
 unrelated typeface system.
+
+Daily home, Practice, and the custom-set picker share a 900px content column and
+a 600-weight display heading (60px desktop, 48px on phones). Mode labels use
+12px, 700-weight reading type. Entry actions are centered, fill their card, and
+are at least 48px high. The set picker uses selectable rows with the shared blue,
+surface, and border tokens. Gameplay retains its wider card layout.
 
 Verification includes responsive layouts at 320, 390, 768, and 1440 pixels and
 direct visual inspection of the published homepage and gameplay.

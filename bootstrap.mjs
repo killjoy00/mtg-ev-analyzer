@@ -58,7 +58,7 @@ document.querySelector('#daily-nav').onclick = () => location.href = '?game=draf
 const topActions=document.querySelector('.top-actions');
 const howNav=document.querySelector('#how-nav');
 const account=document.querySelector('#account-nav');
-const dynamicNavIds=['practice-nav','leaderboard-nav','learn-nav'];
+const dynamicNavIds=['leaderboard-nav','learn-nav'];
 function syncPrimaryNavState(state) {
   const signed=state==='signed-in',checking=state==='checking',unavailable=state==='unavailable';
   topActions.dataset.accountState=state;
@@ -107,7 +107,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
   // Paint the real Daily layout immediately, but keep account/progress-specific
   // claims neutral until the cookie-backed session and Daily status resolve.
   const home = params.get('game') !== 'draft-run' && !params.has('profile') && !params.has('account') && !params.has('patreon')
-    ? await import('./daily-home.mjs?v=24') : null;
+    ? await import('./daily-home.mjs?v=25') : null;
   home?.renderDailyHome(null,'checking');
   const growthReady = import('./growth.mjs?v=28');
   const identityReady = growthReady.then(m => m.installGrowthLayer());
@@ -160,7 +160,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     await identityReady;
     (await import('./profile-product.mjs?v=24')).installProfileProductLayer();
   } else {
-    const game = await import('./draft-run-product.mjs?v=25');
+    const game = await import('./draft-run-product.mjs?v=26');
     await identityReady;
     await refreshPrimaryNav();
     await game.installDraftRunPage();
