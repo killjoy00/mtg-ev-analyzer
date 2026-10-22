@@ -1,10 +1,10 @@
 name: gateway runtime tests
 on:
   pull_request:
-    paths: ['edge/**', 'worker/ingress-auth.mjs', 'tests/ingress.test.mjs', 'tests/edge-runtime.mjs', 'scripts/edge-*.mjs', '.github/workflows/edge-*.yml']
+    paths: ['edge/**', 'launch-alert-policy.mjs', 'worker/ingress-auth.mjs', 'tests/ingress.test.mjs', 'tests/edge-runtime.mjs', 'scripts/edge-*.mjs', '.github/workflows/edge-*.yml']
   push:
     branches: [main]
-    paths: ['edge/**', 'worker/ingress-auth.mjs', 'tests/ingress.test.mjs', 'tests/edge-runtime.mjs', 'scripts/edge-*.mjs', '.github/workflows/edge-*.yml']
+    paths: ['edge/**', 'launch-alert-policy.mjs', 'worker/ingress-auth.mjs', 'tests/ingress.test.mjs', 'tests/edge-runtime.mjs', 'scripts/edge-*.mjs', '.github/workflows/edge-*.yml']
 permissions:
   contents: read
 jobs:

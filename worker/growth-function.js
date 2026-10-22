@@ -5,6 +5,7 @@ import {releaseMetadata} from './release.mjs';
 import {guardIngress} from './ingress-auth.mjs';
 import {classifyRejectedOrigin} from './origin-telemetry.mjs';
 import {consumePlayerLimit} from './request-limits.mjs';
+import {AUTH_LIMIT_CLASS,RATE_LIMIT_CLASS_HEADER} from '../launch-alert-policy.mjs';
 import {readJson} from './request-json.mjs';
 import {gameDateKey} from '../game-date.mjs';
 import {currentSeasonForPlayer} from './draft-run-season.mjs';
@@ -2604,6 +2605,11 @@ export default {
         }:{}),
       },status);
       if(error.retryAfter)response.headers.set('retry-after',String(error.retryAfter));
+      // Internal finite classification, never a player id or an input header.
+      // The gateway consumes it only on these auth endpoints and strips it.
+      if(status===429&&error?.rateLimitScope==='mobile-account-auth'&&request.method==='POST'&&
+        /^\/v1\/mobile\/account\/(?:signin|signup)$/.test(new URL(request.url).pathname))
+        response.headers.set(RATE_LIMIT_CLASS_HEADER,AUTH_LIMIT_CLASS);
       return withCors(response, request);
     }
   },

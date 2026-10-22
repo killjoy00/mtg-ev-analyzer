@@ -4,6 +4,7 @@ import {PROD_ORIGINS} from '../worker/account-config.mjs';
 import {nativePatreonAction} from '../worker/patreon-mobile-policy.mjs';
 import {appleSubscriptionAction,nativeAppleSubscriptionAction} from '../worker/apple-subscription-policy.mjs';
 import {ADMIN_API_VERSION} from '../admin-api-contract.mjs';
+import {productionSampleRate,TAIL_SAMPLING_VERSION,RATE_LIMIT_CLASS_HEADER,confirmedAuthLimit} from '../launch-alert-policy.mjs';
 
 const SERVICES={legacy:'pack1api',growth:'pack1growth',draft:'draftrunapi'};
 const PROD_BRANCH='br-orange-feather-ayps8kep';
@@ -14,8 +15,9 @@ const response=(status,error,headers={})=>Response.json({error},{status,headers:
 const secret=value=>/^[a-f0-9]{64}$/.test(value||'');
 const encode=new TextEncoder();
 // The finite private preview retains every success so quiet active minutes
-// cannot randomly lack positive telemetry. Production sampling is unchanged.
-export const gatewaySampleRate=(mode,status)=>mode==='preview'||status>=400?1:.1;
+// cannot randomly lack positive telemetry. Production fully retains rare slow
+// events and errors while sampling other successes at their declared rate.
+export const gatewaySampleRate=(mode,status,timing={})=>mode==='preview'?1:productionSampleRate(status,timing);
 
 export function ipNetwork(value) {
   if(isIP(value)===4)return value;
@@ -306,7 +308,7 @@ export function routeFamily(path) {
 export async function gateway(request,env,fetcher=fetch) {
   const url=new URL(request.url),origin=request.headers.get('origin'),mode=env.MODE;
   const started=performance.now(),metric={event:'gateway_request',route:routeFamily(url.pathname),method:['GET','POST','PATCH','DELETE','OPTIONS'].includes(request.method)?request.method:'other',
-    release:/^[a-f0-9]{40}$/.test(env.RELEASE_COMMIT||'')?env.RELEASE_COMMIT:'unknown',quota_ms:0,quota_attempts:0,quota_retryable:false,quota_overloaded:false,quota_remote:false,upstream_ms:0,upstream_calls:0,upstream_status:null,quota_scope:null,error:null};
+    release:/^[a-f0-9]{40}$/.test(env.RELEASE_COMMIT||'')?env.RELEASE_COMMIT:'unknown',quota_ms:0,quota_attempts:0,quota_retryable:false,quota_overloaded:false,quota_remote:false,upstream_ms:0,upstream_calls:0,upstream_status:null,quota_scope:null,rate_limit_class:null,error:null};
   const upstreamFetch=async(...args)=>{
     const began=performance.now();metric.upstream_calls++;
     try {const result=await fetcher(...args);metric.upstream_status=result.status;return result;}
@@ -331,8 +333,8 @@ export async function gateway(request,env,fetcher=fetch) {
   const expectedHost=mode==='production'?'api.packone.pro':'api-preview.packone.pro';
   const finish=result=>{
     const duration=Math.round(performance.now()-started),quota=Math.round(metric.quota_ms),upstream=Math.round(metric.upstream_ms);
-    const sampleRate=gatewaySampleRate(mode,result.status);
-    if(Math.random()<sampleRate)console.log(JSON.stringify({...metric,status:result.status,sample_rate:sampleRate,
+    const sampleRate=gatewaySampleRate(mode,result.status,{duration_ms:duration,quota_ms:quota});
+    if(Math.random()<sampleRate)console.log(JSON.stringify({...metric,status:result.status,sample_rate:sampleRate,tail_sampling_version:TAIL_SAMPLING_VERSION,
       duration_ms:duration,quota_ms:quota,upstream_ms:upstream}));
     const headers=new Headers(result.headers);
     headers.set('cache-control','no-store');headers.set('vary','Origin');
@@ -481,6 +483,7 @@ export async function gateway(request,env,fetcher=fetch) {
       result=await upstreamFetch(upstreamOrigin+match[2]+url.search,{method,headers,body,redirect:'manual',signal});
     }
 
+    if(confirmedAuthLimit(url.pathname,method,result.status,result.headers.get(RATE_LIMIT_CLASS_HEADER)))metric.rate_limit_class='player_auth';
     const publicHeaders=new Headers();
     for(const name of ['content-type','retry-after','referrer-policy','content-security-policy'])if(result.headers.has(name))publicHeaders.set(name,result.headers.get(name));
     if(preview&&match[1]==='draft'&&method==='POST') {

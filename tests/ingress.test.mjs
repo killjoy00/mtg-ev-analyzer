@@ -17,11 +17,30 @@ const env={MODE:'preview',NEON_BRANCH_ID:'br-isolated-preview',ORIGIN_SECRET:key
   NETWORK_QUOTA:{idFromName(name){assert.match(name,/^[a-f0-9]{64}$/);return name;},get(){return {fetch:async()=>new Response(null,{status:204})};}}};
 const req=(path='/growth/v1/session',options={})=>new Request('https://api-preview.packone.pro'+path,{method:'POST',body:'{}',...options,headers:{'content-type':'application/json','x-pack1-preview-key':env.PREVIEW_KEY,'cf-connecting-ip':'192.0.2.1',...options.headers}});
 
-test('finite private preview retains successes without changing production sampling',()=>{
+test('preview retains successes and production retains rare slow events with truthful weights',()=>{
   assert.equal(gatewaySampleRate('preview',200),1);
   assert.equal(gatewaySampleRate('preview',503),1);
   assert.equal(gatewaySampleRate('production',200),.1);
   assert.equal(gatewaySampleRate('production',503),1);
+  assert.equal(gatewaySampleRate('production',200,{duration_ms:5001}),1);
+  assert.equal(gatewaySampleRate('production',200,{quota_ms:1001}),1);
+});
+test('gateway auth classification trusts only the origin marker on an auth route and never relays it',async()=>{
+ const saved=console.log,logs=[];console.log=line=>{try{logs.push(JSON.parse(line));}catch{}};
+ try {
+  for(const [path,originMarker,expected] of [
+   ['/growth/v1/mobile/account/signin','player_auth','player_auth'],
+   ['/growth/v1/mobile/account/signin',null,null],
+   ['/draft/v1/runs','player_auth',null],
+  ]) {
+   const result=await gateway(req(path,{headers:{'x-pack1-rate-limit-class':'player_auth'}}),env,async(_url,options)=>{
+    assert.equal(options.headers.get('x-pack1-rate-limit-class'),null);
+    return Response.json({error:'Limited'},{status:429,headers:originMarker?{'x-pack1-rate-limit-class':originMarker}:{}});
+   });
+   assert.equal(result.status,429);assert.equal(result.headers.get('x-pack1-rate-limit-class'),null);
+   assert.equal(logs.at(-1).rate_limit_class,expected);
+  }
+ }finally{console.log=saved;}
 });
 
 test('all three real handlers block direct URLs before health, preflight or database work',async()=>{
