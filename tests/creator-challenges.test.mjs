@@ -11,8 +11,13 @@ import {DRAFT_RUN_SCORING_VERSION,gradeDraftRunPick} from '../draft-run.mjs';
 import {gameDateKey} from '../game-date.mjs';
 import {
   creatorRevealState,
+  createCreatorChallenge,
+  listCompletedDailies,
+  listCreatorPlayers,
+  loadCreatorChallengeForExistingSession,
   parsePracticeShareReference,
   publicCreatorChallenge,
+  resolveCreatorSourceInput,
   validateCreatorChallengeSource,
 } from '../worker/creator-challenges.mjs';
 import {
@@ -137,7 +142,20 @@ test('completed Daily remains previewable but cannot publish/start until the Pac
     scoring_version:DRAFT_RUN_SCORING_VERSION,
   };
   const byId=new Map(puzzles.map(p=>[p.puzzle_id,p]));
+  let savedCreate=null,savedAudit=null;
   const query=async(sql,params=[])=>{
+    if(sql.startsWith('INSERT INTO creator_challenges(')){
+      savedCreate=params;
+      return {rows:[{id:CHALLENGE}]};
+    }
+    if(sql.startsWith('INSERT INTO creator_challenge_audit')){
+      savedAudit=params;
+      return {rows:[]};
+    }
+    if(sql.includes('FROM creator_challenges c'))return {rows:[{
+      id:CHALLENGE,status:'draft',
+      private_profile_consent_attested:params?Boolean(savedCreate?.[16]):false,
+    }]};
     if(sql.includes('FROM draft_run_sessions s'))return {rows:[source]};
     if(sql.includes('FROM draft_run_verified_puzzles'))return {rows:[{payload:byId.get(params[0])}]};
     if(sql.includes('FROM corpus_components'))return {rows:[{ok:true}]};
@@ -160,6 +178,58 @@ test('completed Daily remains previewable but cannot publish/start until the Pac
   assert.equal(resolved.id,sessionId);
   assert.equal(resolved.answers.length,8);
 
+  // A creator may opt into an individual challenge without exposing their profile.
+  source.profile_public=false;
+  source.source_owner_auth_user_id='44444444-4444-4444-8444-444444444444';
+  challenge.profile_public=false;
+  await assert.rejects(
+    validateCreatorChallengeSource(query,challenge,{today:'2026-10-06',requireClosed:true}),
+    error=>error?.code==='CREATOR_IDENTITY_PRIVATE',
+    'an unconsented private profile must never be replayable',
+  );
+  const preview=await resolveCreatorSourceInput(query,{
+    source_type:'daily',creator_player_id:playerId,source_session_id:sessionId,
+  });
+  assert.equal(preview.summary.creator_profile_public,false);
+  await assert.rejects(
+    createCreatorChallenge(query,{
+      source_type:'daily',creator_player_id:playerId,source_session_id:sessionId,
+      slug:'private-test',creator_public_name:'Consenting Creator',
+    },'55555555-5555-4555-8555-555555555555'),
+    error=>error?.code==='CREATOR_CONSENT_REQUIRED',
+  );
+  assert.equal(savedCreate,null,'a missing consent attestation cannot insert a challenge');
+  const created=await createCreatorChallenge(query,{
+    source_type:'daily',creator_player_id:playerId,source_session_id:sessionId,
+    slug:'private-test',creator_public_name:'Consenting Creator',
+    private_profile_consent_attested:true,
+  },'55555555-5555-4555-8555-555555555555');
+  assert.equal(created.id,CHALLENGE);
+  assert.equal(savedCreate[16],true,'the consent bit is durable and not just an HTML checkbox');
+  assert.equal(savedAudit[4],true,'the admin attestation is audited');
+  assert.equal(source.profile_public,false,'publication may not silently change creator profile privacy');
+
+  challenge.private_profile_consent_attested=true;
+  const privateReplay=await validateCreatorChallengeSource(query,challenge,{today:'2026-10-06',requireClosed:true});
+  assert.equal(privateReplay.id,sessionId);
+  source.username_owned=false;
+  await assert.rejects(
+    validateCreatorChallengeSource(query,challenge,{today:'2026-10-06',requireClosed:true}),
+    error=>error?.code==='CREATOR_IDENTITY_PRIVATE',
+    'private anonymous/unowned identities never receive a consent bypass',
+  );
+  source.username_owned=true;
+  source.public_identity_hidden_at='2026-10-05T21:00:00Z';
+  await assert.rejects(
+    validateCreatorChallengeSource(query,challenge,{today:'2026-10-06',requireClosed:true}),
+    error=>error?.code==='CREATOR_IDENTITY_PRIVATE',
+    'moderation always overrides creator consent',
+  );
+  source.public_identity_hidden_at=null;
+  challenge.private_profile_consent_attested=false;
+  source.profile_public=true;
+  challenge.profile_public=true;
+
   const originalVersion=source.scoring_version;
   const originalRanking=source.answers[0].ranking;
   source.answers[0].ranking=[{id:source.answers[0].selectedId,score:Number(source.answers[0].score)-1}];
@@ -175,6 +245,29 @@ test('completed Daily remains previewable but cannot publish/start until the Pac
     error=>error?.code==='CREATOR_SOURCE_SCORING_VERSION',
   );
   source.scoring_version=originalVersion;
+});
+
+test('Admin creator discovery includes private account owners, not anonymous or hidden profiles',async()=>{
+  const playerId='33333333-3333-4333-8333-333333333333';
+  let queries=0;
+  const query=async(sql,params)=>{
+    queries++;
+    assert.match(sql,/p\.public_identity_hidden_at IS NULL/);
+    assert.match(sql,/p\.profile_public=true OR \(p\.username_owned=true AND/);
+    if(sql.includes('FROM players p')){
+      assert.match(sql,/a\.auth_user_id IS NOT NULL/,'private discovery requires a linked account');
+      assert.equal(params[0],'private-creator');
+      return {rows:[{player_id:playerId,display_name:'Private Creator',profile_public:false,username_owned:true,auth_user_id:'44444444-4444-4444-8444-444444444444'}]};
+    }
+    assert.match(sql,/EXISTS \(SELECT 1 FROM account_links a WHERE a\.player_id=p\.id\)/);
+    assert.equal(params[0],playerId);
+    return {rows:[{session_id:'22222222-2222-4222-8222-222222222222',day:'2026-10-21',environment:'latest',score:83}]};
+  };
+  const players=await listCreatorPlayers(query,'private-creator');
+  assert.deepEqual(players,[{player_id:playerId,display_name:'Private Creator',profile_public:false,username_owned:true,linked_account:true}]);
+  const dailies=await listCompletedDailies(query,playerId);
+  assert.equal(dailies[0].score,83);
+  assert.equal(queries,2);
 });
 
 test('creator public payload uses existing acquisition tracking without weakening normal campaign destinations',()=>{
