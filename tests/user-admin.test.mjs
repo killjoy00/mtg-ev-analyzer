@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {handleUserAdmin,playActivityWindow,userAdminFilters} from '../worker/user-admin.mjs';
+import {handleUserAdmin,playActivityWindow,userAdminFilters,userAdminPage} from '../worker/user-admin.mjs';
 
 const ADMIN='11111111-1111-4111-8111-111111111111';
 const TARGET='22222222-2222-4222-8222-222222222222';
@@ -75,4 +75,31 @@ test('a failed signed-out activity query does not take down the users list',asyn
     assert.deepEqual(result.users,[]);
   } finally {console.error=original;}
   assert.match(errors.join('\n'),/admin_play_activity_failed/);
+});
+
+test('account pages validate bounds and preserve a stable list order',async()=>{
+  assert.equal(userAdminPage(new URL('https://packone.pro/v1/admin/users')),1);
+  assert.equal(userAdminPage(new URL('https://packone.pro/v1/admin/users?page=3')),3);
+  for(const invalid of ['0','-1','2.1','1e3','10000','abc'])
+    assert.throws(()=>userAdminPage(new URL('https://packone.pro/v1/admin/users?page='+invalid)),error=>error.status===400);
+
+  const calls=[];
+  const query=async(sql,params)=>{
+    calls.push({sql,params});
+    if(sql.includes('SELECT count(*)::int total FROM neon_auth."user" u'))return {rows:[{total:'245'}]};
+    if(sql.includes('SELECT count(*)::int total,'))return {rows:[{total:'260'}]};
+    if(sql.includes('LIMIT 100 OFFSET $3'))return {rows:[]};
+    return {rows:[]};
+  };
+  const result=await handleUserAdmin(new Request('https://packone.pro/v1/admin/users?page=3&search=test'),query,undefined,{adminAuthUserId:ADMIN});
+  assert.equal(result.page,3);
+  assert.equal(result.page_size,100);
+  assert.equal(result.total_matching,245);
+  assert.equal(result.truncated,false);
+  const listCall=calls.find(call=>call.sql.includes('LIMIT 100 OFFSET $3'));
+  assert.ok(listCall);
+  assert.deepEqual(listCall.params,['test','all',200]);
+  assert.match(listCall.sql,/ORDER BY last_active DESC NULLS LAST,u\."createdAt" DESC,u\.id/);
+  const countCall=calls.find(call=>call.sql.includes('SELECT count(*)::int total FROM neon_auth."user" u'));
+  assert.deepEqual(countCall.params,['test','all']);
 });
