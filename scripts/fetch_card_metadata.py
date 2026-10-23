@@ -113,6 +113,69 @@ def special_flags(card: dict) -> list[str]:
     return flags
 
 
+# Bonus-sheet collector ranges are the canonical/basic treatment for those
+# sheets, *not* every numbered variant Scryfall associates with that set code.
+# For example, OTP 1-65 are the standard newspaper-style cards; OTP 66-80 are
+# alternate anime art. BRR's later schematic printings and WOT/MUL's later
+# collector versions likewise do not become Pack One's default art. The
+# underlying set's normal printings are still chosen by printing_rank.
+# SPG/MAR span unrelated releases; TLE also includes non-booster products.
+# Keep their eligibility bounded to each environment's actual base sheet.
+# Source references and excluded treatments: docs/CARD-IMAGE-MAINTENANCE.md.
+DRAFT_BONUS_PRINTINGS = {
+    "bro": (("brr", (1, 63)),),     # Retro Artifacts; schematic starts at 64.
+    "mom": (("mul", (1, 65)),),     # Multiverse Legends; etched starts at 66.
+    "sir": (("sis", None),),       # Digital Shadows of the Past.
+    "woe": (("wot", (1, 63)),),     # Enchanting Tales; anime starts at 64.
+    "mkm": (("spg", (19, 28)),),
+    "otj": (("otp", (1, 65)), ("big", (1, 30)), ("spg", (29, 38))),
+    "mh3": (("spg", (39, 48)),),   # Textured foil Elementals start at 49.
+    "blb": (("spg", (54, 63)),),
+    "dsk": (("spg", (64, 73)),),
+    "fdn": (("spg", (74, 83)),),
+    "dft": (("spg", (84, 93)),),   # First-place foil box toppers start at 94.
+    "tdm": (("spg", (104, 113)),), # Dragonscale foil fetch lands start at 114.
+    "fin": (("fca", (1, 64)),),
+    "eoe": (("eos", (1, 45)), ("spg", (119, 128))),
+    "tla": (("tle", (1, 61)),),   # Source material only, not scene/Jumpstart cards.
+    "ecl": (("spg", (129, 148)),),
+    "tmt": (("pza", (1, 20)),),
+    "sos": (("soa", (1, 65)), ("spg", (149, 158))),
+    "msh": (("mar", (41, 100)),), # MAR 1-40 belong to Marvel's Spider-Man.
+}
+
+
+def draft_printing_priority(card: dict, draft_set: Optional[str]) -> int:
+    """0: main set, 1: verified draft bonus sheet, 2: other printing.
+
+    17Lands' draft rows identify pack cards by name, not the exact art variant.
+    Within the appropriate source set we therefore still prefer readable/base
+    art. An unrecognized printing never wins just because it is newer.
+    """
+    if not draft_set:
+        return 0  # Powered Cube/global lookup retains the original-art policy.
+    if card.get("set_type") in BAD_SET_TYPES:
+        return 2  # Token, art-series and playtest names are not draft cards.
+    # A source-set promo or known variant is not its base printing, even if a
+    # publisher omitted ordinary-card cosmetic flags from the art metadata.
+    # Do not exclude borderless/showcase here: OTP's *base* frame uses both.
+    if any(card.get(flag) for flag in ("variation", "promo", "textless", "oversized")):
+        return 2
+    source = str(card.get("set") or "").lower()
+    intended = draft_set.lower()
+    if source == intended:
+        return 0
+    for bonus_set, number_range in DRAFT_BONUS_PRINTINGS.get(intended, ()):
+        if source != bonus_set:
+            continue
+        if number_range is not None:
+            number = str(card.get("collector_number") or "")
+            if not number.isdigit() or not number_range[0] <= int(number) <= number_range[1]:
+                continue
+        return 1
+    return 2
+
+
 def collector_number_rank(value: object) -> tuple[int, int, str]:
     text = str(value or "")
     match = re.fullmatch(r"(\d+)(.*)", text)
@@ -122,7 +185,7 @@ def collector_number_rank(value: object) -> tuple[int, int, str]:
 
 
 def printing_rank(card: dict, alias: Optional[str] = None, preferred_set: Optional[str] = None) -> tuple:
-    """Lower is better: base readable art, then the intended set, then earliest printing."""
+    """Lower is better: draft-source printing, base treatment, then earliest art."""
     if not image_url(card, alias):
         return (1_000_000, 1_000_000, 1, 1, 99_999_999, (9, 1_000_000_000, ""), "")
     language_penalty = 0 if card.get("lang") in (None, "en") else 1_000_000
@@ -143,7 +206,7 @@ def printing_rank(card: dict, alias: Optional[str] = None, preferred_set: Option
         penalty += 20_000
     if set(card.get("frame_effects") or []) & BAD_FRAME_EFFECTS:
         penalty += 10_000
-    set_rank = 0 if not preferred_set or str(card.get("set") or "").lower() == preferred_set.lower() else 1
+    set_rank = draft_printing_priority(card, preferred_set)
     digital_rank = 1 if card.get("digital") else 0
     released = str(card.get("released_at") or "9999-99-99").replace("-", "")
     try:
@@ -152,8 +215,8 @@ def printing_rank(card: dict, alias: Optional[str] = None, preferred_set: Option
         release_rank = 99_999_999
     return (
         language_penalty,
-        penalty,
         set_rank,
+        penalty,
         digital_rank,
         release_rank,
         collector_number_rank(card.get("collector_number")),

@@ -7,7 +7,7 @@ import urllib.error
 from unittest import mock
 from pathlib import Path
 
-from scripts.fetch_card_metadata import aliases, choose_main_printing, compact_card, discover_draft_data, draft_candidate_names, fetch_named, fetch_set, image_url, request_json
+from scripts.fetch_card_metadata import aliases, choose_main_printing, draft_printing_priority, compact_card, discover_draft_data, draft_candidate_names, fetch_named, fetch_set, image_url, request_json
 
 
 class CardMetadataTests(unittest.TestCase):
@@ -28,6 +28,165 @@ class CardMetadataTests(unittest.TestCase):
         alternate = {"id":"alt","name":"Alpha","set":"new","lang":"en","released_at":"2026-01-01","collector_number":"301","variation":True,"image_uris":{"normal":"https://img/alt.jpg"}}
         chosen = choose_main_printing([alternate, old_print, base], "Alpha", "new")
         self.assertEqual(chosen["id"], "base")
+
+    def test_otj_pack_uses_breaking_news_printing_not_older_art(self):
+        old = {"id": "ktk-ride-down", "name": "Ride Down", "set": "ktk",
+               "lang": "en", "released_at": "2014-09-26", "collector_number": "194",
+               "image_uris": {"normal": "https://img/ktk-ride-down.jpg"}}
+        otp = {"id": "otp-ride-down", "name": "Ride Down", "set": "otp",
+               "lang": "en", "released_at": "2024-04-19", "collector_number": "52",
+               "border_color": "borderless", "frame_effects": ["inverted"],
+               "image_uris": {"normal": "https://img/otp-ride-down.jpg"}}
+        collector_only = {**otp, "id": "otp-special", "collector_number": "92",
+                          "variation": True, "image_uris": {"normal": "https://img/special.jpg"}}
+        self.assertEqual(choose_main_printing([old, collector_only, otp], "Ride Down", "otj")["id"], "otp-ride-down")
+        self.assertEqual(choose_main_printing([old, collector_only, otp], "Ride Down")["id"], "ktk-ride-down")
+        self.assertEqual(draft_printing_priority(otp, "otj"), 1)
+
+    def test_only_verified_bonus_sheets_count_as_draft_sources(self):
+        base = {"id": "old", "name": "Alpha", "set": "old", "lang": "en",
+                "released_at": "2000-01-01", "collector_number": "1",
+                "image_uris": {"normal": "https://img/old.jpg"}}
+        for draft_set, bonus_set in (("bro", "brr"), ("mom", "mul"), ("sir", "sis"),
+                                     ("woe", "wot"), ("otj", "big")):
+            with self.subTest(draft_set=draft_set):
+                bonus = {**base, "id": bonus_set, "set": bonus_set, "released_at": "2024-04-19",
+                         "border_color": "borderless", "image_uris": {"normal": f"https://img/{bonus_set}.jpg"}}
+                self.assertEqual(choose_main_printing([base, bonus], "Alpha", draft_set)["id"], bonus_set)
+                self.assertEqual(draft_printing_priority(bonus, draft_set), 1)
+        commander = {**base, "id": "commander", "set": "otc", "released_at": "2024-04-19"}
+        self.assertEqual(draft_printing_priority(commander, "otj"), 2)
+        self.assertEqual(choose_main_printing([base, commander], "Alpha", "otj")["id"], "old")
+        token = {**base, "id": "token", "set": "otj", "set_type": "token",
+                 "released_at": "2024-04-19"}
+        self.assertEqual(draft_printing_priority(token, "otj"), 2)
+        self.assertEqual(choose_main_printing([base, token], "Alpha", "otj")["id"], "old")
+
+    def test_bonus_sheet_base_numbers_win_even_if_variant_looks_plainer(self):
+        # Scryfall's special-frame metadata is not by itself a reliable signal:
+        # a bonus sheet's default art may itself be borderless/showcase.
+        old = {"id": "old", "name": "Alpha", "set": "old",
+               "lang": "en", "released_at": "2000-01-01", "collector_number": "1",
+               "image_uris": {"normal": "https://img/old.jpg"}}
+        cases = (
+            ("bro", "brr", 63),
+            ("mom", "mul", 65),
+            ("woe", "wot", 63),
+            ("otj", "otp", 65),
+            ("otj", "big", 30),
+            ("fin", "fca", 64),
+            ("eoe", "eos", 45),
+            ("tla", "tle", 61),
+            ("tmt", "pza", 20),
+            ("sos", "soa", 65),
+        )
+        for draft_set, source_set, max_base in cases:
+            with self.subTest(draft_set=draft_set, source_set=source_set):
+                base = {**old, "id": "source-base", "set": source_set,
+                        "collector_number": str(max_base), "released_at": "2024-04-19",
+                        "border_color": "borderless", "frame_effects": ["showcase"],
+                        "image_uris": {"normal": "https://img/base.jpg"}}
+                alternate = {**old, "id": "alternate", "set": source_set,
+                             "collector_number": str(max_base + 1),
+                             "released_at": "2024-04-19",
+                             "image_uris": {"normal": "https://img/alternate.jpg"}}
+                self.assertEqual(draft_printing_priority(base, draft_set), 1)
+                self.assertEqual(draft_printing_priority(alternate, draft_set), 2)
+                self.assertEqual(
+                    choose_main_printing([old, alternate, base], "Alpha", draft_set)["id"],
+                    "source-base",
+                )
+                # If the bonus sheet has no official base art for this name,
+                # never choose its collector-only printing instead of plain art.
+                self.assertEqual(
+                    choose_main_printing([old, alternate], "Alpha", draft_set)["id"],
+                    "old",
+                )
+
+    def test_shared_bonus_set_codes_are_scoped_to_the_correct_release(self):
+        old = {"id": "old", "name": "Alpha", "set": "old", "lang": "en",
+               "released_at": "2000-01-01", "collector_number": "1",
+               "image_uris": {"normal": "https://img/old.jpg"}}
+        cases = (
+            ("mkm", "spg", 19, 28), ("otj", "spg", 29, 38),
+            ("mh3", "spg", 39, 48), ("blb", "spg", 54, 63),
+            ("dsk", "spg", 64, 73), ("fdn", "spg", 74, 83),
+            ("dft", "spg", 84, 93), ("tdm", "spg", 104, 113),
+            ("eoe", "spg", 119, 128), ("ecl", "spg", 129, 148),
+            ("sos", "spg", 149, 158), ("msh", "mar", 41, 100),
+        )
+        for draft_set, source, first, last in cases:
+            with self.subTest(draft_set=draft_set):
+                base = {**old, "id": "base", "set": source,
+                        "collector_number": str(first), "released_at": "2026-01-01",
+                        "border_color": "borderless", "frame_effects": ["inverted"]}
+                for number in (first, last):
+                    self.assertEqual(draft_printing_priority(
+                        {**base, "collector_number": str(number)}, draft_set), 1)
+                for number in (first - 1, last + 1, f"{first}z", "", "invalid"):
+                    outside = {**old, "id": "outside", "set": source,
+                               "collector_number": str(number), "released_at": "2026-01-01"}
+                    self.assertEqual(draft_printing_priority(outside, draft_set), 2)
+                    for options in ([outside, old, base], [base, old, outside]):
+                        self.assertEqual(choose_main_printing(options, "Alpha", draft_set)["id"], "base")
+                        self.assertEqual(choose_main_printing(options, "Alpha")["id"], "old")
+                primary = {**base, "id": "primary", "set": draft_set}
+                self.assertEqual(choose_main_printing([old, base, primary], "Alpha", draft_set)["id"], "primary")
+
+    def test_non_draft_products_do_not_gain_bonus_source_priority(self):
+        card = {"set": "spg", "collector_number": "1"}
+        self.assertEqual(draft_printing_priority(card, "lci"), 2)  # Set Boosters only.
+        self.assertEqual(draft_printing_priority({"set": "tle", "collector_number": "155"}, "tla"), 2)
+        self.assertEqual(draft_printing_priority({"set": "mar", "collector_number": "9"}, "msh"), 2)
+
+    def test_same_set_normal_printing_wins_over_cosmetic_alternates(self):
+        base = {"id": "base", "name": "Alpha", "set": "otj",
+                "lang": "en", "released_at": "2024-04-19", "collector_number": "12",
+                "image_uris": {"normal": "https://img/base.jpg"}}
+        for flags in ({"variation": True}, {"textless": True},
+                      {"promo": True}, {"oversized": True},
+                      {"full_art": True}, {"frame_effects": ["extendedart"]},
+                      {"border_color": "borderless"}):
+            with self.subTest(flags=flags):
+                alt = {**base, "id": "alternate", "collector_number": "300",
+                       "image_uris": {"normal": "https://img/alternate.jpg"},
+                       **flags}
+                self.assertEqual(
+                    choose_main_printing([alt, base], "Alpha", "otj")["id"],
+                    "base",
+                )
+
+    def test_source_only_promo_falls_back_to_simple_other_set_art(self):
+        old = {"id": "old", "name": "Alpha", "set": "ktk", "lang": "en",
+               "released_at": "2014-09-26", "collector_number": "1",
+               "image_uris": {"normal": "https://img/old.jpg"}}
+        promo = {**old, "id": "promo", "set": "otj", "released_at": "2024-04-19",
+                 "promo": True, "image_uris": {"normal": "https://img/promo.jpg"}}
+        self.assertEqual(draft_printing_priority(promo, "otj"), 2)
+        self.assertEqual(
+            choose_main_printing([promo, old], "Alpha", "otj")["id"], "old"
+        )
+
+    def test_otj_special_guests_are_limited_to_the_2024_collector_range(self):
+        old = {"id": "old", "name": "Stoneforge Mystic", "set": "wwk", "lang": "en",
+               "released_at": "2010-02-05", "collector_number": "20",
+               "image_uris": {"normal": "https://img/old.jpg"}}
+        guest = {**old, "id": "guest-29", "set": "spg", "collector_number": "29",
+                 "border_color": "borderless", "released_at": "2024-04-19"}
+        unrelated = {**old, "id": "guest-200", "set": "spg", "collector_number": "200",
+                     "released_at": "2026-01-01"}
+        self.assertEqual(draft_printing_priority(guest, "otj"), 1)
+        self.assertEqual(draft_printing_priority(unrelated, "otj"), 2)
+        self.assertEqual(choose_main_printing([old, guest, unrelated], "Stoneforge Mystic", "otj")["id"], "guest-29")
+        self.assertEqual(choose_main_printing([old, unrelated], "Stoneforge Mystic", "otj")["id"], "old")
+
+    def test_main_draft_set_wins_before_cosmetic_penalty(self):
+        old = {"id": "old", "name": "Alpha", "set": "old", "lang": "en",
+               "released_at": "2001-01-01", "collector_number": "1",
+               "image_uris": {"normal": "https://img/old.jpg"}}
+        drafted = {**old, "id": "current", "set": "abc", "released_at": "2026-01-01",
+                   "full_art": True, "image_uris": {"normal": "https://img/current.jpg"}}
+        self.assertEqual(choose_main_printing([old, drafted], "Alpha", "abc")["id"], "current")
 
     def test_requested_digital_set_beats_unrelated_paper_reprint(self):
         draft_set = {"id":"digital","name":"Alpha","set":"hbg","lang":"en","released_at":"2022-01-01","collector_number":"1","digital":True,"image_uris":{"normal":"https://img/hbg.jpg"}}

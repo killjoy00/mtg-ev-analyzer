@@ -1,20 +1,48 @@
 # Card image maintenance
 
-Pack One card-image maintenance is an explicit, display-only corpus operation. It normalizes every currently served card to deterministic Scryfall main art without changing puzzle identity, candidate identity, scoring evidence, model support, provenance, source trajectories, schedules, sessions, or historical scores.
+Pack One card-image maintenance is an explicit, display-only corpus operation. It chooses canonical Scryfall card images from the actual draft-booster source set when that source can be identified, otherwise a deterministic ordinary printing. It does not change puzzle identity, candidate identity, scoring evidence, model support, provenance, source trajectories, schedules, sessions, or historical scores.
 
 ## Selection policy
 
 The shared resolver in `scripts/fetch_card_metadata.py` owns card identity, aliases, face selection, and printing rank.
 
-- Regular draft environments prefer an ordinary/base printing from the intended draft set.
-- If the intended set has no ordinary printing for that exact identity, resolution may fall back to the earliest ordinary printing for the identity.
-- Powered Cube uses the global earliest ordinary/base printing policy directly.
-- Cosmetic/special treatments are penalized and rejected when a cleaner ordinary printing exists. Current special signals include variation, textless, full-art, promo, oversized, borderless, showcase/extended-art/inverted frame effects, and non-card set types such as art-series or tokens.
-- A special-framed printing is allowed when it is the original/only official printing and no ordinary alternative exists. The refresh report records these separately as unavoidable special printings; they are not publication blockers.
+- **Use the simplest base/non-variant printing for each card in its draft set.** First prefer the main set, then a verified bonus sheet that was actually draftable in that environment. Within the eligible source, prefer an ordinary, readable version over promos, showcases, extended-art, textless or other cosmetic alternatives.
+- Bonus sheets explicitly restrict **source eligibility to their standard/base printings**. The registry below covers the bonus-sheet sources in the checked-in draft catalog, including newer source-material sheets and release-specific Special Guests. Commander products, unrelated releases sharing a set code, and collector-only variants do not get draft-source priority.
+- **The basic style of a bonus sheet may itself be special.** For example, OTP's standard newspaper-style printing is tagged `borderless`/`showcase` in Scryfall. That is the correct *base* OTP printing, not an invitation to pick its alternate anime version or a KTK reprint.
+- In every set, the existing printing rank favors normal/non-variant art within the same source, and treats variation, promo, textless or oversized versions as ineligible for draft-source priority. If no suitable source printing exists, prefer the earliest ordinary/base printing from elsewhere; Powered Cube retains its separate globally earliest ordinary-printing policy.
+- 17Lands' draft archives identify the **card by name, not its exact artwork**. This policy consistently shows the default version of the source set, regardless of which cosmetic variant the original player may have opened.
 - Digital/rebalanced identities omitted from Scryfall's `default_cards` bulk export are resolved through the same exact-name resolver and their `prints_search_uri`. The HBG `A-Monster Manual` draft name is canonicalized to Scryfall's full rebalanced Adventure identity before lookup.
 - Double-faced aliases, flavor/printed names, and the Prepare-card collision rule remain part of the shared identity contract.
 
-The resolver must be deterministic with respect to API ordering. Ranking is based on language, special-treatment penalty, preferred set, paper/digital tie-breaking after the set anchor, release date, collector number, and card ID.
+The resolver must be deterministic with respect to API ordering. Ranking is based on language, verified main-set/standard-bonus-printing priority (including known collector bounds), cosmetic-treatment penalty within that source, paper/digital tie-breaking, release date, collector number, and card ID. A standard source-set frame can be inherently borderless/showcase, but an avoidable variant should never displace the simplest eligible base printing.
+
+### Verified bonus sources
+
+| Draft environment | Base bonus printings | Excluded variants/products |
+| --- | --- | --- |
+| BRO | BRR #1–63 | Schematic art and serialized variants |
+| MOM | MUL #1–65 | Etched, halo and serialized variants |
+| SIR | SIS | Digital Shadows of the Past |
+| WOE | WOT #1–63 | Anime/confetti variants |
+| MKM | SPG #19–28 | Other SPG releases |
+| OTJ | OTP #1–65, BIG #1–30, SPG #29–38 | Anime, vault and extended art |
+| MH3 | SPG #39–48 | Textured Elementals #49–53 |
+| BLB | SPG #54–63 | Other SPG releases |
+| DSK | SPG #64–73 | Other SPG releases |
+| FDN | SPG #74–83 | Other SPG releases |
+| DFT | SPG #84–93 | First-place foil box toppers #94–103 |
+| TDM | SPG #104–113 | Dragonscale fetch lands #114–118 |
+| FIN | FCA #1–64 | Suffixed/other printings |
+| EOE | EOS #1–45, SPG #119–128 | Poster and galaxy-foil EOS printings |
+| TLA | TLE #1–61 | Scene, Jumpstart and other Eternal-product cards |
+| ECL | SPG #129–148 | Other SPG releases |
+| TMT | PZA #1–20 | Non-source-material products |
+| SOS | SOA #1–65, SPG #149–158 | Japanese/silver-scroll SOA variants |
+| MSH | MAR #41–100 | Spider-Man's MAR #1–40 |
+
+Collector bounds were checked against Scryfall's printing records. Booster-source and variant distinctions are documented in Wizards' collecting guides for [MH3](https://magic.wizards.com/en/news/feature/collecting-modern-horizons-3), [DFT](https://magic.wizards.com/en/news/feature/collecting-aetherdrift), [TDM](https://magic.wizards.com/en/news/feature/collecting-tarkir-dragonstorm), [FIN](https://magic.wizards.com/en/news/feature/collecting-final-fantasy), [EOE](https://magic.wizards.com/en/news/feature/collecting-edge-of-eternities), [TLA](https://magic.wizards.com/en/news/feature/collecting-avatar-the-last-airbender), [ECL](https://magic.wizards.com/en/news/feature/collecting-lorwyn-eclipsed), [TMT](https://magic.wizards.com/en/news/feature/collecting-teenage-mutant-ninja-turtles), [SOS](https://magic.wizards.com/en/news/feature/collecting-secrets-of-strixhaven), and [MSH](https://magic.wizards.com/en/news/feature/collecting-marvel-super-heroes).
+
+LCI's Special Guests were not in Draft Boosters, so LCI does not receive SPG priority. The List's reused `plst` code is not broadly eligible: unregistered inserts retain the ordinary-printing fallback and appear in the cross-set report. PIO's rotating sheets use PIO itself and already receive main-set priority.
 
 Future trophy/component imports must seed card metadata from the environment being built, not from an arbitrary other environment that happens to contain the same card name. Retained per-build image caches may fill missing metadata but may not override current environment-scoped shard metadata. Any true miss is resolved through the shared exact-name selector with that environment as the preferred set (or with no preferred set for Powered Cube).
 
@@ -26,6 +54,7 @@ Image maintenance may change only:
 - `mana_cost`
 - `rarity`
 - `type_line`
+- `display_faces`
 
 `scripts/refresh_card_images.py` scrubs those fields before comparison and fails if any other card or puzzle metadata changes. This is not a model, scoring, selection, or corpus-admission release.
 
@@ -39,13 +68,13 @@ The all-Pack-One refresh refuses publication when any of the following remain:
 - test-suite or production-data audit failures;
 - backend releases that do not match the reviewed code revision.
 
-Unavoidable original/only special-frame printings are reported but do not fail the release.
+Unavoidable original/only special-frame printings and intentionally drafted main-set/bonus-sheet frames are reported separately and do not fail the release. The report distinguishes verified draft bonus-sheet selections from genuine cross-set fallbacks.
 
 The refresh always uploads `generated/card-image-refresh-report.json` and per-environment mappings as retained Actions diagnostics, including on failure. Inspect these first for unresolved names, avoidable special selections, unavoidable special selections, cross-set fallbacks, and card-ID/name collisions.
 
 ## Targeted repair vs full refresh
 
-Use targeted repair for a known, isolated display regression on an exact served card name and explicit environment list when the shared selector/policy itself has not changed. Use the full refresh for resolver or printing-policy changes, bulk drift, audits, uncertain scope, or any case where more than a bounded named repair is intended.
+Use targeted repair for a known, isolated display regression on an exact served card name and explicit environment list when the shared selector/policy itself has not changed. Use the full refresh for resolver or printing-policy changes (including adding bonus-sheet sources), bulk drift, audits, uncertain scope, or any case where more than a bounded named repair is intended.
 
 Run the targeted repair dry-run before dispatching live mutation. Hydrate all replay shards read-only so the repair can apply the same global card-id/name collision check as the full refresh, then resolve and inspect the retained report without changing shards or checked-in source:
 
