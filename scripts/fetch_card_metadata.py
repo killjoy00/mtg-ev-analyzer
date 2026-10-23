@@ -113,16 +113,19 @@ def special_flags(card: dict) -> list[str]:
     return flags
 
 
-# These are printings that can appear in a regular draft booster but have a
-# different Scryfall set code. Never infer this from nearby release dates or
-# Commander products. SPG reuses its set code across releases, so its OTJ
-# collector-number range must be constrained to that specific draft.
+# Bonus-sheet collector ranges are the canonical/basic treatment for those
+# sheets, *not* every numbered variant Scryfall associates with that set code.
+# For example, OTP 1-65 are the standard newspaper-style cards; OTP 66-80 are
+# alternate anime art. BRR's later schematic printings and WOT/MUL's later
+# collector versions likewise do not become Pack One's default art. The
+# underlying set's normal printings are still chosen by printing_rank.
+# SPG spans unrelated releases, so only OTJ's verified SPG #29-38 qualify.
 DRAFT_BONUS_PRINTINGS = {
-    "bro": (("brr", None),),  # Retro Artifacts
-    "mom": (("mul", None),),  # Multiverse Legends
-    "sir": (("sis", None),),  # Shadows of the Past
-    "woe": (("wot", None),),  # Enchanting Tales
-    "otj": (("otp", None), ("big", None), ("spg", (29, 38))),
+    "bro": (("brr", (1, 63)),),     # Retro Artifacts; schematic starts at 64.
+    "mom": (("mul", (1, 65)),),     # Multiverse Legends; etched starts at 66.
+    "sir": (("sis", None),),       # Digital Shadows of the Past.
+    "woe": (("wot", (1, 63)),),     # Enchanting Tales; anime starts at 64.
+    "otj": (("otp", (1, 65)), ("big", (1, 30)), ("spg", (29, 38))),
 }
 
 
@@ -137,6 +140,11 @@ def draft_printing_priority(card: dict, draft_set: Optional[str]) -> int:
         return 0  # Powered Cube/global lookup retains the original-art policy.
     if card.get("set_type") in BAD_SET_TYPES:
         return 2  # Token, art-series and playtest names are not draft cards.
+    # A source-set promo or known variant is not its base printing, even if a
+    # publisher omitted ordinary-card cosmetic flags from the art metadata.
+    # Do not exclude borderless/showcase here: OTP's *base* frame uses both.
+    if any(card.get(flag) for flag in ("variation", "promo", "textless", "oversized")):
+        return 2
     source = str(card.get("set") or "").lower()
     intended = draft_set.lower()
     if source == intended:
