@@ -7,9 +7,9 @@ import {decisionClock} from './decision-clock.mjs';
 import { sortPackByRarity } from './replay-data.mjs';
 import { escapeHtml as esc } from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
-import { compactDraftRunFeedback, consensusFeedback, trophyDrafterDetails, trophyDrafterFacts, trophyRevealSentence } from './draft-run-feedback.mjs?v=6';
+import { compactDraftRunFeedback, consensusFeedback, trophyDrafterDetails, trophyDrafterFacts, trophyRevealSentence } from './draft-run-feedback.mjs?v=7';
 import { tcgplayerUrl } from './tcgplayer.mjs';
-import {revealCardChoices,modelSupportLabel} from './draft-run-reveal.mjs?v=1';
+import {revealCardChoices,modelSupportLabel} from './draft-run-reveal.mjs?v=2';
 import {openTrophyDeck} from './trophy-deck-dialog.mjs?v=1';
 import { dailyResetCue, nextGameDateBoundary } from './game-date.mjs';
 import {completedAllDailies,nextUnfinishedDaily} from './today-status.mjs?v=2';
@@ -104,7 +104,7 @@ function revealComparison(p,answer) {
     const score=ranked?.score??(card.id===answer.historicalId?100:card.id===answer.selectedId?answer.score:null);
     const mine=card.id===answer.selectedId,trophy=card.id===answer.historicalId;
     const label=choice.label+(creatorName&&card.id===answer.creatorId?` · ${creatorName}’s pick`:'');
-    return `<figure class="run-choice-card ${mine?'is-mine':''} ${trophy?'is-trophy':''} ${mine&&trophy?'is-match':''}" data-choice-id="${esc(card.id)}"><div class="run-choice-label">${esc(label)}</div><button type="button" class="run-choice-image" data-zoom="${esc(card.id)}" aria-label="Enlarge ${esc(card.name)}">${image(card)}</button><figcaption>${esc(card.name)}</figcaption><dl class="run-choice-stats"><div class="run-choice-points"><dt>Score</dt><dd>${score==null?'N/A':Number(score)}<small>/100</small></dd></div><div class="run-choice-support"><dt>Model support</dt><dd>${modelSupportLabel(ranked?.support,answer.consensusSupport)}</dd></div><div class="run-choice-peer" data-peer-col hidden><dt>Players’ picks</dt><dd data-peer-card="${esc(card.id)}" hidden></dd></div></dl><a class="run-card-shop" href="${esc(tcgplayerUrl(card.name))}" target="_blank" rel="sponsored noopener" data-tcgplayer-card="${esc(card.name)}" data-tcgplayer-surface="draft_run_reveal">Find on TCGplayer (affiliate link)</a></figure>`;
+    return `<figure class="run-choice-card ${mine?'is-mine':''} ${trophy?'is-trophy':''} ${mine&&trophy?'is-match':''}" data-choice-id="${esc(card.id)}"><div class="run-choice-label">${esc(label)}</div><button type="button" class="run-choice-image" data-zoom="${esc(card.id)}" aria-label="Enlarge ${esc(card.name)}">${image(card)}</button><figcaption>${esc(card.name)}</figcaption><dl class="run-choice-stats"><div class="run-choice-points"><dt>Score</dt><dd>${score==null?'N/A':Number(score)}<small>/100</small></dd></div><div class="run-choice-support"><dt>Model support</dt><dd>${modelSupportLabel(ranked?.support,answer.consensusSupport,trophy)}</dd></div><div class="run-choice-peer" data-peer-col hidden><dt>Players’ picks</dt><dd data-peer-card="${esc(card.id)}" hidden></dd></div></dl><a class="run-card-shop" href="${esc(tcgplayerUrl(card.name))}" target="_blank" rel="sponsored noopener" data-tcgplayer-card="${esc(card.name)}" data-tcgplayer-surface="draft_run_reveal">Find on TCGplayer (affiliate link)</a></figure>`;
   }).join('');
   const creator=creatorName&&answer.creatorId&&!choices.some(c=>c.id===answer.creatorId)?byId.get(answer.creatorId):null;
   return `<div class="run-reveal-choices">${figures}</div>${creator?`<p class="run-creator-pick">${esc(creatorName)} picked <button type="button" class="text-button" data-zoom="${esc(creator.id)}">${esc(creator.name)}</button>.</p>`:''}`;
@@ -365,9 +365,9 @@ function renderResult() {
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render();window.scrollTo({top:0,behavior:'instant'});});
   document.querySelector('#run-share').onclick=()=>shareResult();
   document.querySelector('#run-copy-result').onclick=()=>shareResult({copy:true});
-  document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=30')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
+  document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=31')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
   const setCompleteSignIn=document.querySelector('[data-daily-set-complete] button');
-  if(setCompleteSignIn)setCompleteSignIn.onclick=async()=>(await import('./growth.mjs?v=30')).renderAccount({validateDailyRunId:run.id,source:'daily_set_complete'});
+  if(setCompleteSignIn)setCompleteSignIn.onclick=async()=>(await import('./growth.mjs?v=31')).renderAccount({validateDailyRunId:run.id,source:'daily_set_complete'});
   if(run.day)void renderDailyResultCue(run.id);
   document.dispatchEvent(new CustomEvent('pack1:result-visible',{detail:{id:`draft-run:${run.id}`,score:run.score,mode:'draft_run',set_id:run.environment,daily:Boolean(run.day)}}));
 }
@@ -487,8 +487,8 @@ function renderLoadFailure(error,isBoard) {
     const signedIn=hasAccountSession();
     const friendSignIn=!signedIn&&sharedRunInvitationId(location.href);
     app().innerHTML=`<section class="message-card"><h1>${premium?'Elite practice':signedIn?'Practice access':'Keep drafting with a free account'}</h1><p>${esc(error.message)}</p>${premium?'<p>Elite membership includes custom sets and unlimited Cube practice.</p>':''}<div class="button-row">${premium&&!friendSignIn?'<button class="button primary" id="practice-membership">'+(signedIn?'Become Elite':'Sign in to become Elite')+'</button>':''}${friendSignIn||!premium&&!signedIn?'<button class="button primary" id="practice-account">'+(friendSignIn?'Sign in to play this run':'Sign in or create an account')+'</button>':''}<a class="button secondary" href="./">Back to Dailies</a></div></section>`;
-    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=30')).beginEliteUpgrade({source:'practice_gate'});});
-    document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=30')).renderAccount({sharedRunId:sharedRunInvitationId(location.href),source:'practice_gate'});});return;
+    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=31')).beginEliteUpgrade({source:'practice_gate'});});
+    document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=31')).renderAccount({sharedRunId:sharedRunInvitationId(location.href),source:'practice_gate'});});return;
   }
   const params=new URLSearchParams(location.search);
   if(!params.has('run')&&(params.has('shared')||params.has('challenge'))&&[400,404,410].includes(error.status)) {
