@@ -152,7 +152,18 @@ try {
       return route.fulfill({status:202,json:{ok:true,deletion:'accepted',operationId:deletionFixture.operation_id,operation:deletionFixture}});
     }
     if(path===`/v1/admin/users/${userId}`)return route.fulfill({json:{user:{id:userId,name:'Test Member',email:'member@example.com',email_verified:true,created_at:'2026-09-01T12:00:00Z',last_active:'2026-09-18T18:00:00Z',linked:true,profile_name:renamedPublicUsername,username_owned:true,profile_public:false,is_admin:false,is_self:false,banned:false},stats:{runs:12,completed_runs:10,dailies:4,practice_runs:8,cube_runs:2,custom_runs:1,average_score:84.5,best_score:100},providers:[{provider:'patreon',membership_status:'active_patron',currently_entitled_amount_cents:500,is_free_trial:false,is_gifted:false,last_synced_at:'2026-09-18T18:00:00Z'}],entitlements:[{capability:'custom_corpus',provider:'patreon',granted_at:'2026-09-10T00:00:00Z',expires_at:null,revoked_at:null,active:true}],recent_runs:[{environment:'mixed',run_type:'Practice',answered:8,total:8,score:86,updated_at:'2026-09-18T18:00:00Z'}],recent_events:[{event_name:'game_started',event_props:{mode:'draft_run',set_id:'mixed'},created_at:'2026-09-18T17:58:00Z'}],moderation_actions:[]}});
-    if(path==='/v1/admin/users')return route.fulfill({json:{generated_at:'2026-09-18T19:00:00Z',filters:{search:'',status:'all'},summary:{total:2,new_30d:2,active_30d:1,patreon:2,paid:1,admins:1},total_matching:2,truncated:false,users:[{id:userId,name:'Test Member',email:'member@example.com',profile_name:renamedPublicUsername,username_owned:true,email_verified:true,created_at:'2026-09-01T12:00:00Z',last_active:'2026-09-18T18:00:00Z',linked:true,is_admin:false,patreon_connected:true,banned:false,active_entitlements:1,capabilities:['custom_corpus'],runs:12,completed_runs:10,average_score:84.5,best_score:100},{id:'22222222-2222-4222-8222-222222222222',name:'Pack One Admin',email:'admin@example.com',email_verified:true,created_at:'2026-09-02T12:00:00Z',last_active:'2026-09-18T19:00:00Z',linked:false,is_admin:true,patreon_connected:true,banned:false,active_entitlements:0,capabilities:[],runs:0,completed_runs:0,average_score:null,best_score:null}],play_activity:new URL(route.request().url()).searchParams.get('activity_from')==='2026-10-01'?{start:'2026-10-01',end:'2026-10-02',corpus_version:'test',groups:[{group:'signed_out',players:1,completed_runs:1,first_daily_people:0,next_day_mature:0,next_day_returned:0,next_day_immature:0,next_day_rate:null},{group:'signed_in',players:0,completed_runs:0,first_daily_people:0,next_day_mature:0,next_day_returned:0,next_day_immature:0,next_day_rate:null}]}:{start:'2026-09-05',end:'2026-09-18',corpus_version:'test',groups:[{group:'signed_out',players:41,completed_runs:77,first_daily_people:30,next_day_mature:24,next_day_returned:9,next_day_immature:6,next_day_rate:37.5},{group:'signed_in',players:6,completed_runs:20,first_daily_people:2,next_day_mature:2,next_day_returned:2,next_day_immature:0,next_day_rate:100}]}}});
+    if(path==='/v1/admin/users'&&requestUrl.searchParams.get('page')==='2')return route.fulfill({json:{
+      generated_at:'2026-09-18T19:00:00Z',summary:{total:2,new_30d:2,active_30d:1,patreon:2,paid:1,admins:1},
+      total_matching:101,truncated:false,page:2,page_size:100,
+      users:[{id:'99999999-9999-4999-8999-999999999999',name:'Page two member',email:'page2@example.com',
+        created_at:'2026-09-01T12:00:00Z',linked:false,is_admin:false,patreon_connected:false,
+        banned:false,active_entitlements:0,capabilities:[],runs:1,average_score:80}],
+      play_activity:{start:'2026-09-05',end:'2026-09-18',groups:[
+        {group:'signed_out',players:41,completed_runs:77,first_daily_people:30,next_day_mature:24,next_day_returned:9,next_day_immature:6,next_day_rate:37.5},
+        {group:'signed_in',players:6,completed_runs:20,first_daily_people:2,next_day_mature:2,next_day_returned:2,next_day_immature:0,next_day_rate:100}
+      ]}
+    }});
+    if(path==='/v1/admin/users')return route.fulfill({json:{generated_at:'2026-09-18T19:00:00Z',filters:{search:'',status:'all'},summary:{total:2,new_30d:2,active_30d:1,patreon:2,paid:1,admins:1},total_matching:101,truncated:true,page:1,page_size:100,users:[{id:userId,name:'Test Member',email:'member@example.com',profile_name:renamedPublicUsername,username_owned:true,email_verified:true,created_at:'2026-09-01T12:00:00Z',last_active:'2026-09-18T18:00:00Z',linked:true,is_admin:false,patreon_connected:true,banned:false,active_entitlements:1,capabilities:['custom_corpus'],runs:12,completed_runs:10,average_score:84.5,best_score:100},{id:'22222222-2222-4222-8222-222222222222',name:'Pack One Admin',email:'admin@example.com',email_verified:true,created_at:'2026-09-02T12:00:00Z',last_active:'2026-09-18T19:00:00Z',linked:false,is_admin:true,patreon_connected:true,banned:false,active_entitlements:0,capabilities:[],runs:0,completed_runs:0,average_score:null,best_score:null}],play_activity:new URL(route.request().url()).searchParams.get('activity_from')==='2026-10-01'?{start:'2026-10-01',end:'2026-10-02',corpus_version:'test',groups:[{group:'signed_out',players:1,completed_runs:1,first_daily_people:0,next_day_mature:0,next_day_returned:0,next_day_immature:0,next_day_rate:null},{group:'signed_in',players:0,completed_runs:0,first_daily_people:0,next_day_mature:0,next_day_returned:0,next_day_immature:0,next_day_rate:null}]}:{start:'2026-09-05',end:'2026-09-18',corpus_version:'test',groups:[{group:'signed_out',players:41,completed_runs:77,first_daily_people:30,next_day_mature:24,next_day_returned:9,next_day_immature:6,next_day_rate:37.5},{group:'signed_in',players:6,completed_runs:20,first_daily_people:2,next_day_mature:2,next_day_returned:2,next_day_immature:0,next_day_rate:100}]}}});
     if(route.request().url().includes('/corpus'))return route.fulfill({json:{corpus_version:'fixture-version',gate_version:'corpus-gates-v1',thresholds:{healthMaxAgeDays:7},transitions:{Candidate:['Live','Retired']},history:[],sets:[...['Bloomburrow','Aetherdrift','Final Fantasy','Powered Cube','The Hobbit','Kamigawa: Neon Dynasty'].map((set_name,i)=>({set_id:['blb','dft','fin','powered-cube','hob','neo'][i],set_name,status:i===4?'Paused':'Live',release_date:'2026-08-01',serving_count:10000-i*456,under_floor_count:200+i*19,import_status:'complete',health_current:true,ready:i!==4,manifest:{}})),{set_id:'test',set_name:'Candidate test set',status:'Candidate',source_event_type:'PremierDraft',release_date:'2026-09-01',manifest:{},report:{gates:[{id:'images',pass:false,requirement:'100% HTTPS image references',actual:.9}]},health_current:true,ready:false}]}});
     if(path.includes('/decisions/')){
       if(requestUrl.searchParams.get('difficulty')==='hard')await new Promise(resolve=>setTimeout(resolve,100));
@@ -247,6 +258,14 @@ try {
   await page.getByRole('heading',{name:'Users',exact:true}).waitFor();
   assert.ok((await page.getByText('Authenticated Pack One accounts only.',{exact:false}).innerText()).includes('Anonymous and guest gameplay identities'));
   assert.equal(await page.locator('#user-rows tr').count(),2);
+  assert.equal(await page.getByText('Page 1 of 2',{exact:true}).count(),1);
+  await page.getByRole('button',{name:'Next',exact:true}).click();
+  await page.getByText('Page 2 of 2',{exact:true}).waitFor();
+  assert.equal(await page.locator('#user-rows tr').count(),1);
+  assert.ok((await page.locator('#user-rows').innerText()).includes('Page two member'));
+  await page.getByRole('button',{name:'Previous',exact:true}).click();
+  await page.getByText('Page 1 of 2',{exact:true}).waitFor();
+  assert.equal(await page.locator('#user-rows tr').count(),2);
   // A linked Patreon account can have no active premium entitlements.
   // Access must describe current grants, not provider-account linkage.
   const memberRow=page.locator('#user-rows tr').filter({hasText:'Test Member'});
@@ -257,9 +276,17 @@ try {
   assert.equal(await expiredLinkedRow.locator('.user-access').innerText(),'Free account');
   assert.equal(await expiredLinkedRow.locator('.user-connections').innerText(),'Patreon linked');
   await page.getByRole('heading',{name:'Signed out vs signed in'}).waitFor();
+  assert.ok((await page.locator('.user-activity-cards').innerText()).includes('Completed-run players'));
+  assert.ok((await page.locator('.user-activity-cards').innerText()).includes('47'));
   const activity=await page.locator('.play-activity-table').innerText();
   assert.ok(activity.includes('Signed out')&&activity.includes('41')&&activity.includes('37.5%')&&activity.includes('9 / 24 returned · 6 too new'),activity);
   for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:`artifacts/ui-users-activity-${width}.png`,fullPage:true});}
+  const todayRequest=page.waitForRequest(request=>{
+    const url=new URL(request.url()),from=url.searchParams.get('activity_from');
+    return url.pathname==='/v1/admin/users'&&/^\\d{4}-\\d{2}-\\d{2}$/.test(from||'')&&from===url.searchParams.get('activity_to');
+  });
+  await page.getByRole('button',{name:'Today',exact:true}).click();
+  await todayRequest;
   await page.getByLabel('From').fill('2026-10-01');
   await page.getByLabel('Through').fill('2026-10-02');
   const activityRange=page.waitForRequest(request=>request.url().includes('activity_from=2026-10-01&activity_to=2026-10-02'));
