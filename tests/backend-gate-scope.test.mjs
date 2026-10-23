@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {readFileSync, readdirSync} from 'node:fs';
 import { ALWAYS_STEPS, classifyBackendChanges, filterBackendChangedPaths, loadBackendMap, matchesGlob } from '../scripts/backend-gate-scope.mjs';
 
 const map = loadBackendMap();
@@ -76,7 +76,7 @@ test('gate infrastructure, migrations, shared core, unmapped files, and empty di
     ['worker/request-json.mjs'],
     ['worker/ingress-auth.mjs'],
     ['game-date.mjs'],
-    ['worker/launch-watcher-alert.mjs'],
+    ['worker/path-model.mjs'],
     [],
   ]) {
     const result = classifyBackendChanges(paths, { map });
@@ -101,24 +101,54 @@ test('neutral files are removed before backend classification and mixed PR noise
   assert.deepEqual(result.domains, ['draft_run']);
 });
 
-test('modules reached through full-path handlers are shared and force the full suite', () => {
-  for (const path of [
-    'worker/capabilities.mjs',
-    'worker/draft-run-season.mjs',
-    'worker/account-deletion.mjs',
-    'worker/patreon.mjs',
-    'worker/public-identity-safety.mjs',
+test('modules behind the full-path function routers select only their owning domain', () => {
+  for (const [path, domain] of [
+    ['worker/capabilities.mjs', 'subscriptions'],
+    ['worker/draft-run-season.mjs', 'seasons'],
+    ['worker/account-deletion.mjs', 'account'],
+    ['worker/patreon.mjs', 'subscriptions'],
+    ['worker/public-identity-safety.mjs', 'account'],
   ]) {
     const result = classifyBackendChanges([path], { map });
-    assert.equal(result.fullSuite, true, path);
-    assert.match(result.reasons.join('\n'), /shared across domains/, path);
+    assert.equal(result.fullSuite, false, path);
+    assert.deepEqual(result.domains, [domain], path);
   }
 });
 
-test('a module reached from more than one mapped domain is treated as shared and forces full', () => {
+test('a module imported by several domains selects each of them without broadening to full', () => {
   const result = classifyBackendChanges(['worker/account-session.mjs'], { map });
-  assert.equal(result.fullSuite, true);
-  assert.match(result.reasons.join('\n'), /shared across domains/);
+  assert.equal(result.fullSuite, false);
+  assert.deepEqual(result.domains, ['account', 'draft_run', 'subscriptions']);
+  assert.match(result.reasons.join('\n'), /shared across domains account,draft_run,subscriptions/);
+});
+
+test('every worker module has an owning domain unless only full-path files import it', () => {
+  const unowned = readdirSync('worker')
+    .filter((name) => /\.(?:mjs|js)$/.test(name))
+    .map((name) => `worker/${name}`)
+    .filter((path) => !map.full_paths.some((glob) => matchesGlob(path, glob)))
+    .filter((path) => classifyBackendChanges([path], { map }).reasons.some((reason) => reason.startsWith('unmapped:')));
+  assert.deepEqual(unowned, ['worker/path-model.mjs'], 'Assign new worker modules to a domain in scripts/backend-gate-map.json');
+});
+
+test('files the backend gate never runs or names stay out of the domain selection', () => {
+  for (const path of ['bootstrap.mjs', 'admin/index.html']) {
+    const result = classifyBackendChanges(['worker/draft-run-pool.mjs', path], { map });
+    assert.equal(result.fullSuite, false, path);
+    assert.deepEqual(result.domains, ['draft_run'], path);
+    assert.ok(result.reasons.includes(`not used by the backend gate: ${path}`), path);
+  }
+  const alone = classifyBackendChanges(['bootstrap.mjs'], { map });
+  assert.equal(alone.fullSuite, true);
+  assert.ok(alone.reasons.includes('no backend domain selected'));
+});
+
+test('unowned files the backend gate imports or names still force the full suite', () => {
+  for (const path of ['edge/gateway.mjs', 'worker/path-model.mjs']) {
+    const result = classifyBackendChanges(['worker/draft-run-pool.mjs', path], { map });
+    assert.equal(result.fullSuite, true, path);
+    assert.ok(result.reasons.includes(`unmapped: ${path}`), path);
+  }
 });
 
 test('narrow routes are limited to backend smoke tests or mapped modules outside handler imports', () => {
