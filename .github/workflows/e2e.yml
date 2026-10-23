@@ -126,6 +126,9 @@ jobs:
           playwright_install() {
             timeout --kill-after=30 480 "$@" && return 0
             echo '::warning::Playwright system packages did not install within 8 minutes; retrying against archive.ubuntu.com.'
+            # timeout stops npx, but the apt-get it started through sudo can outlive it and keep the dpkg lock.
+            sudo pkill -KILL -x apt-get || true
+            for _ in $(seq 60); do pgrep -x 'apt-get|dpkg' >/dev/null || break; sleep 1; done
             sudo dpkg --configure -a || true
             { sudo grep -rlZ 'azure\.archive\.ubuntu\.com' /etc/apt || true; } | xargs -0r sudo sed -i 's#azure\.archive\.ubuntu\.com#archive.ubuntu.com#g'
             timeout --kill-after=30 600 "$@"
