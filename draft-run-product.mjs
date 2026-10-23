@@ -7,8 +7,10 @@ import {decisionClock} from './decision-clock.mjs';
 import { sortPackByRarity } from './replay-data.mjs';
 import { escapeHtml as esc } from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
-import { compactDraftRunFeedback, consensusFeedback, trophyDrafterDetails, trophyRevealSentence } from './draft-run-feedback.mjs?v=5';
+import { compactDraftRunFeedback, consensusFeedback, trophyDrafterDetails, trophyDrafterFacts, trophyRevealSentence } from './draft-run-feedback.mjs?v=6';
 import { tcgplayerUrl } from './tcgplayer.mjs';
+import {revealCardChoices,modelSupportLabel} from './draft-run-reveal.mjs?v=1';
+import {openTrophyDeck} from './trophy-deck-dialog.mjs?v=1';
 import { dailyResetCue, nextGameDateBoundary } from './game-date.mjs';
 import {completedAllDailies,nextUnfinishedDaily} from './today-status.mjs?v=2';
 import {sharedRunAppPath,sharedRunInvitationId} from './shared-run-links.mjs';
@@ -16,10 +18,11 @@ import {dismissSetRefresher,installSetGuides,setRefresherButton} from './set-gui
 
 const base = () => String(window.PACK1_API?.draftRunUrl||'').replace(/\/$/,'');
 const webClientBuild=()=>new URL(import.meta.url).searchParams.get('v')||null;
-const reportSentText='Thanks \u2014 report sent.';
+const reportSentText='Thanks for letting us know.';
 let run=null,selection=null,review=null,busy=false,dailyValidationConfirmation=null;
 const reportedDecisions=new Set();
 const dailyPeerCache=new Map();
+const trophyDeckCache=new Map();
 const clock=decisionClock();let viewPromise=Promise.resolve(),viewKey=null;
 document.addEventListener('visibilitychange',()=>{if(document.hidden)clock.pause();else if(run?.current&&review==null&&!busy)recordView(true);});
 function recordView(touch=false) {
@@ -48,7 +51,7 @@ const app=()=>document.querySelector('#app');
 function styles() {
   installSetGuides();
   if(document.querySelector('[data-draft-run-style]')) return;
-  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=19';link.dataset.draftRunStyle='1';document.head.appendChild(link);
+  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=20';link.dataset.draftRunStyle='1';document.head.appendChild(link);
 }
 async function api(path,body,auth=true) {
   const method=body===undefined?'GET':'POST',headers={'content-type':'application/json'};
@@ -91,58 +94,27 @@ function pool(p) {
   const cardLabel=`${previous.length} card${previous.length===1?'':'s'} · in pick order`;
   return `<section class="run-pool" aria-label="Original drafter’s earlier picks"><h2>Previous cards <small>${cardLabel}</small></h2><p class="run-pool-note">Already selected by this drafter.</p><div class="run-pool-cards">${previous.map((c,i)=>`<button type="button" data-zoom-prior="${i}" aria-label="View previous pick ${i+1}: ${esc(c.name)}">${image(c)}<span>${i+1}. ${esc(c.name)} ${faceIndicatorMarkup(c)}</span></button>`).join('')}</div></section>`;
 }
-// Keep the default reveal visual compact while making the actual comparison
-// visible at a glance. Non-matches pair the player's card with the trophy card;
-// matches pair the shared card with the model's highest-ranked other card.
-function compactRevealCards(p,answer) {
-  const byId=new Map((p.candidates||[]).map(c=>[c.id,c]));
-  const mine=byId.get(answer.selectedId),trophy=byId.get(answer.historicalId);
-  const cardFigure=(card,label,cls)=>card
-    ? `<figure class="run-reveal-pick ${cls}"><span>${esc(label)}</span><button type="button" data-zoom="${esc(card.id)}" aria-label="Enlarge ${esc(label)}: ${esc(card.name)}">${image(card)}</button></figure>`
-    : '';
-
-  if(run?.comparison?.kind!=='creator') {
-    if(answer.historicalMatch) {
-      const shared=mine||trophy;
-      if(!shared)return '';
-      const ranked=[...(answer.ranking||[])].sort((a,b)=>Number(b.support)-Number(a.support));
-      const leaderId=answer.consensusId||ranked[0]?.id;
-      const other=byId.get(leaderId!==shared.id?leaderId:ranked.find(c=>c.id!==shared.id)?.id);
-      return `<div class="run-reveal-picks is-match">${cardFigure(shared,'✓ Trophy Match','is-shared')}${other?cardFigure(other,'Next Highest','is-ranked'):''}</div>`;
-    }
-    const cards=`${cardFigure(mine,'Your Pick','is-mine')}${cardFigure(trophy,'Trophy Pick','is-trophy')}`;
-    return cards?`<div class="run-reveal-picks">${cards}</div>`:'';
-  }
-
-  const roles=[
-    ['Your Pick',answer.selectedId,'is-mine'],
-    ...(answer.creatorId?[[run.comparison.name+"'s Pick",answer.creatorId,'is-creator']]:[]),
-    ['Trophy Pick',answer.historicalId,'is-trophy'],
-  ].filter(([,id])=>id);
-  const grouped=new Map();
-  for(const [label,id,cls] of roles) {
-    const item=grouped.get(id)||{id,labels:[],classes:[]};
-    item.labels.push(label);item.classes.push(cls);grouped.set(id,item);
-  }
-  const cards=[...grouped.values()].map(item=>{
-    const card=byId.get(item.id);if(!card)return '';
-    const label=item.labels.join(' · ');
-    return cardFigure(card,label,item.classes.join(' '));
-  }).join('');
-  return cards?`<div class="run-reveal-picks ${grouped.size===1?'is-match':''}">${cards}</div>`:'';
-}
 function revealComparison(p,answer) {
-  const byId=new Map((p.candidates||[]).map(c=>[c.id,c]));
-  const mine=byId.get(answer.selectedId),trophy=byId.get(answer.historicalId);
-  if(!mine) return '';
-  const cell=(card,label,cls)=>`<figure class="run-compare-card ${cls}"><span>${label}</span><button type="button" data-zoom="${esc(card.id)}" aria-label="Enlarge ${esc(card.name)}">${image(card)}</button><figcaption>${esc(card.name)}</figcaption><a class="run-card-shop" href="${esc(tcgplayerUrl(card.name))}" target="_blank" rel="sponsored noopener" data-tcgplayer-card="${esc(card.name)}" data-tcgplayer-surface="draft_run_reveal">Find on TCGplayer (affiliate link)</a></figure>`;
-  if(answer.historicalMatch||!trophy||trophy.id===mine.id)
-    return `<div class="run-compare is-match">${cell(mine,'Your pick · trophy pick','is-mine')}</div>`;
-  return `<div class="run-compare">${cell(mine,'Your pick','is-mine')}${cell(trophy,'Trophy pick','is-trophy')}</div>`;
+  const byId=new Map((p.candidates||[]).map(card=>[card.id,card]));
+  const choices=revealCardChoices(answer);
+  const creatorName=run?.comparison?.kind==='creator'?run.comparison.name:null;
+  const figures=choices.map(choice=>{
+    const card=byId.get(choice.id);if(!card)return '';
+    const ranked=answer.ranking?.find(item=>item.id===card.id);
+    const score=ranked?.score??(card.id===answer.historicalId?100:card.id===answer.selectedId?answer.score:null);
+    const mine=card.id===answer.selectedId,trophy=card.id===answer.historicalId;
+    const label=choice.label+(creatorName&&card.id===answer.creatorId?` · ${creatorName}’s pick`:'');
+    return `<figure class="run-choice-card ${mine?'is-mine':''} ${trophy?'is-trophy':''} ${mine&&trophy?'is-match':''}" data-choice-id="${esc(card.id)}"><div class="run-choice-label">${esc(label)}</div><button type="button" class="run-choice-image" data-zoom="${esc(card.id)}" aria-label="Enlarge ${esc(card.name)}">${image(card)}</button><figcaption>${esc(card.name)}</figcaption><dl class="run-choice-stats"><div class="run-choice-points"><dt>Score</dt><dd>${score==null?'N/A':Number(score)}<small>/100</small></dd></div><div class="run-choice-support"><dt>Model support</dt><dd>${modelSupportLabel(ranked?.support,answer.consensusSupport)}</dd></div><div class="run-choice-peer" data-peer-col hidden><dt>Players’ picks</dt><dd data-peer-card="${esc(card.id)}" hidden></dd></div></dl><a class="run-card-shop" href="${esc(tcgplayerUrl(card.name))}" target="_blank" rel="sponsored noopener" data-tcgplayer-card="${esc(card.name)}" data-tcgplayer-surface="draft_run_reveal">Find on TCGplayer (affiliate link)</a></figure>`;
+  }).join('');
+  const creator=creatorName&&answer.creatorId&&!choices.some(c=>c.id===answer.creatorId)?byId.get(answer.creatorId):null;
+  return `<div class="run-reveal-choices">${figures}</div>${creator?`<p class="run-creator-pick">${esc(creatorName)} picked <button type="button" class="text-button" data-zoom="${esc(creator.id)}">${esc(creator.name)}</button>.</p>`:''}`;
 }
 function revealAnalysis(p,answer) {
+  return `<section class="run-analysis" aria-labelledby="run-analysis-title"><h2 id="run-analysis-title">Why this score?</h2><div class="run-analysis-body">${revealComparison(p,answer)}${consensusFeedback(answer,trophyDrafterDetails(answer))}</div></section>`;
+}
+function reportDecisionMarkup(answer) {
   const sent=reportedDecisions.has(answer.puzzle.puzzle_id);
-  return `<details class="run-analysis"><summary>Why this score?</summary><div class="run-analysis-body">${revealComparison(p,answer)}${trophyDrafterDetails(answer)}${consensusFeedback(answer)}<div class="run-decision-report"><button type="button" class="text-button" data-report-decision>Report this decision</button><span id="run-report-status" role="status">${sent?esc(reportSentText):''}</span></div></div></details>`;
+  return `<div class="run-decision-report"><button type="button" class="run-report-prompt" data-report-decision aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V3m0 1c5-4 10 4 15 0v10c-5 4-10-4-15 0"/></svg><span>Does something look wrong? <u>Let us know.</u></span><span aria-hidden="true">→</span></button><span id="run-report-status" role="status">${sent?esc(reportSentText):''}</span></div>`;
 }
 function compactResultLabel(answer,sentence='') {
   return `${answer.score} out of 100. ${trophyRevealSentence(answer)}${sentence?` ${sentence}`:''}`;
@@ -215,9 +187,10 @@ function render() {
     ${rankingStateMarkup(run)}
     ${run.comparison?run.comparison.kind==='creator'?`<aside class="run-friend"><strong>BEAT THE CREATOR</strong> · ${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. You’re playing the same ${runLength()} decisions.</aside>`:`<aside class="run-friend">${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. ${run.comparison.exact?`You’re playing the same ${runLength()} packs.`:'Packs changed. This result counts as practice.'}</aside>`:''}
     ${answer?'':pool(p)}
-    ${answer?`<section class="run-feedback"><strong class="run-feedback-score">${answer.score}<small>/100</small></strong>${compactRevealCards(p,answer)}<div class="run-feedback-copy"><h2 id="run-feedback-result" tabindex="-1" aria-label="${esc(compactResultLabel(answer,compactSentence))}">${esc(trophyRevealSentence(answer))}</h2>${compactSentence?`<p>${esc(compactSentence)}</p>`:''}<div id="run-peer-stats" class="run-peer-stats" role="status" hidden></div></div><div class="run-next-dock"><button class="button primary" id="run-next">${run.complete?'See result':'Next pick'}</button></div></section>${revealAnalysis(p,answer)}`:
+    ${answer?`<section class="run-feedback ${answer.historicalMatch?'is-match':'is-miss'}"><strong class="run-feedback-score">${answer.score}<small>/100</small></strong><div class="run-feedback-copy"><h2 id="run-feedback-result" tabindex="-1" aria-label="${esc(compactResultLabel(answer,compactSentence))}">${esc(trophyRevealSentence(answer))}</h2>${compactSentence?`<p>${esc(compactSentence)}</p>`:''}<div id="run-peer-stats" class="run-peer-stats" role="status" hidden></div></div></section>${revealAnalysis(p,answer)}`:
     ''}
     ${answer?`<details class="run-pack-review"><summary>Review the pack</summary>${pool(p)}${cardGrid(p,answer)}</details>`:cardGrid(p)}
+    ${answer?`${reportDecisionMarkup(answer)}<div class="run-next-dock"><button class="button primary" id="run-next">${run.complete?'See result':'Next pick'}</button></div>`:''}
     ${answer?'':`<div class="run-lock"><div class="run-lock-choice"><span id="run-selection-label">Choose a card</span><button class="button primary" id="run-lock" disabled>Lock pick</button></div>${run.day||run.comparison?.exact?'':`<div class="run-tools"><div>${cube()||run.custom_set_ids?.length?'':`<button class="button secondary" data-reroll="set" ${!run.rerolls.set||run.set_reroll_allowed===false?'disabled':''}>Reroll set · ${run.rerolls.set}</button>`}<button class="button secondary" data-reroll="pack" ${!run.rerolls.pack?'disabled':''}>Reroll pack · ${run.rerolls.pack}</button></div></div>`}</div>`}
     <p class="run-error" id="run-error" role="alert"></p></section>`;
   bind(p,answer);
@@ -229,12 +202,12 @@ function openDecisionReport(answer) {
   if(!Number.isInteger(round)||!run?.answers?.[round])return;
   const dialog=document.createElement('dialog');
   dialog.className='run-report-dialog';
-  dialog.innerHTML=`<form method="dialog" class="run-report-form"><h2>What seems wrong?</h2><fieldset>
-    <label><input type="radio" name="reason" value="draft_context" required> Draft context looks wrong</label>
-    <label><input type="radio" name="reason" value="card_or_image"> Card or image issue</label>
-    <label><input type="radio" name="reason" value="score_recommendation"> Score / recommendation seems wrong</label>
-    <label><input type="radio" name="reason" value="uninteresting"> Uninteresting / forced decision</label>
-    <label><input type="radio" name="reason" value="broken"> Something is broken</label>
+  dialog.innerHTML=`<form method="dialog" class="run-report-form"><h2>Does something look wrong?</h2><p>Tell us what you noticed.</p><fieldset>
+    <label><input type="radio" name="reason" value="draft_context" required> The draft context looks wrong</label>
+    <label><input type="radio" name="reason" value="card_or_image"> The card or image looks wrong</label>
+    <label><input type="radio" name="reason" value="score_recommendation"> The pick or score looks wrong</label>
+    <label><input type="radio" name="reason" value="uninteresting"> This isn’t an interesting decision</label>
+    <label><input type="radio" name="reason" value="broken"> Something isn’t working</label>
     <label><input type="radio" name="reason" value="other"> Other</label>
   </fieldset><label class="run-report-comment">Anything else?<textarea name="comment" maxlength="500" rows="3"></textarea></label>
   <p class="run-report-error" role="alert"></p><div class="run-report-actions"><button type="submit" class="button primary">Send report</button><button type="button" class="button secondary" data-report-cancel>Cancel</button></div></form>`;
@@ -282,7 +255,19 @@ function bind(p,answer) {
   markPoolOverflow();
   app().querySelectorAll('[data-zoom]').forEach(b=>b.onclick=()=>zoom(p.candidates.find(c=>c.id===b.dataset.zoom)));
   app().querySelectorAll('[data-zoom-prior]').forEach(b=>b.onclick=()=>zoom(p.prior_picks[Number(b.dataset.zoomPrior)]));
-  if(answer) {document.querySelector('#run-next').onclick=()=>{review=null;selection=null;render();window.scrollTo({top:0,behavior:'instant'});};const report=app().querySelector('[data-report-decision]');if(report)report.onclick=()=>openDecisionReport(answer);return;}
+  if(answer) {
+    document.querySelector('#run-next').onclick=()=>{review=null;selection=null;render();window.scrollTo({top:0,behavior:'instant'});};
+    const report=app().querySelector('[data-report-decision]');if(report)report.onclick=()=>openDecisionReport(answer);
+    const deck=app().querySelector('[data-trophy-deck]');
+    if(deck)deck.onclick=()=>{
+      const id=run.id,round=review,key=`${id}:${round}`;
+      openTrophyDeck(async()=>{
+        if(!trophyDeckCache.has(key))trophyDeckCache.set(key,await api(`/v1/runs/${id}/deck?round=${round}`));
+        return trophyDeckCache.get(key);
+      },{record:trophyDrafterFacts(answer)?.record,trophyName:answer.historicalName,priorNames:(answer.puzzle.prior_picks||[]).map(card=>card.name)});
+    };
+    return;
+  }
   app().querySelectorAll('[data-pick]').forEach(b=>b.onclick=()=>{
     if(busy)return;selection=b.dataset.pick;
     app().querySelectorAll('[data-pick]').forEach(c=>{c.setAttribute('aria-pressed',String(c.dataset.pick===selection));c.closest('.run-card').classList.toggle('selected',c.dataset.pick===selection);});
@@ -380,9 +365,9 @@ function renderResult() {
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render();window.scrollTo({top:0,behavior:'instant'});});
   document.querySelector('#run-share').onclick=()=>shareResult();
   document.querySelector('#run-copy-result').onclick=()=>shareResult({copy:true});
-  document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=19')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
+  document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=29')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
   const setCompleteSignIn=document.querySelector('[data-daily-set-complete] button');
-  if(setCompleteSignIn)setCompleteSignIn.onclick=async()=>(await import('./growth.mjs?v=19')).renderAccount({validateDailyRunId:run.id,source:'daily_set_complete'});
+  if(setCompleteSignIn)setCompleteSignIn.onclick=async()=>(await import('./growth.mjs?v=29')).renderAccount({validateDailyRunId:run.id,source:'daily_set_complete'});
   if(run.day)void renderDailyResultCue(run.id);
   document.dispatchEvent(new CustomEvent('pack1:result-visible',{detail:{id:`draft-run:${run.id}`,score:run.score,mode:'draft_run',set_id:run.environment,daily:Boolean(run.day)}}));
 }
@@ -502,8 +487,8 @@ function renderLoadFailure(error,isBoard) {
     const signedIn=hasAccountSession();
     const friendSignIn=!signedIn&&sharedRunInvitationId(location.href);
     app().innerHTML=`<section class="message-card"><h1>${premium?'Elite practice':signedIn?'Practice access':'Keep drafting with a free account'}</h1><p>${esc(error.message)}</p>${premium?'<p>Elite membership includes custom sets and unlimited Cube practice.</p>':''}<div class="button-row">${premium&&!friendSignIn?'<button class="button primary" id="practice-membership">'+(signedIn?'Become Elite':'Sign in to become Elite')+'</button>':''}${friendSignIn||!premium&&!signedIn?'<button class="button primary" id="practice-account">'+(friendSignIn?'Sign in to play this run':'Sign in or create an account')+'</button>':''}<a class="button secondary" href="./">Back to Dailies</a></div></section>`;
-    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=19')).beginEliteUpgrade({source:'practice_gate'});});
-    document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=19')).renderAccount({sharedRunId:sharedRunInvitationId(location.href),source:'practice_gate'});});return;
+    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=29')).beginEliteUpgrade({source:'practice_gate'});});
+    document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=29')).renderAccount({sharedRunId:sharedRunInvitationId(location.href),source:'practice_gate'});});return;
   }
   const params=new URLSearchParams(location.search);
   if(!params.has('run')&&(params.has('shared')||params.has('challenge'))&&[400,404,410].includes(error.status)) {

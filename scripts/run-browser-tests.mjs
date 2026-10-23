@@ -12,6 +12,7 @@ const draftRun=[
   spec('tests/draft-run-e2e.mjs',{PACK1_TEST_DAILY:'1',PACK1_TEST_ENVIRONMENT:'latest'}),
   spec('tests/draft-run-e2e.mjs',{PACK1_TEST_SELECTION_VERSION:'eight-pick-v3'}),
   spec('tests/draft-run-e2e.mjs',{PACK1_TEST_SELECTION_VERSION:'first-pack-v2'}),
+  spec('tests/trophy-deck-e2e.mjs'),
   spec('tests/card-faces-e2e.mjs'),
   spec('tests/daily-set-complete-e2e.mjs'),
 ];

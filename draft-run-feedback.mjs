@@ -1,7 +1,8 @@
 import { escapeHtml as esc } from './html.mjs';
+import {modelSupportLabel} from './draft-run-reveal.mjs';
 
 export function trophyRevealSentence(answer) {
-  if(answer?.historicalMatch)return 'You matched the trophy drafter.';
+  if(answer?.historicalMatch)return 'You matched the trophy pick.';
   return `The trophy drafter took ${answer?.historicalName||'another card'}.`;
 }
 
@@ -36,8 +37,8 @@ export function trophyDrafterFacts(answer) {
 export function trophyDrafterSentences(facts) {
   if(!facts)return [];
   return [
-    facts.record&&`This trophy draft finished ${facts.record}.`,
-    facts.winRate!=null&&`17Lands reports the trophy drafter’s overall game win rate as about ${facts.winRate}%. It describes the drafter, not this draft or this card.`,
+    facts.record&&`This trophy draft finished ${facts.record.replace('–','-')}.`,
+    facts.winRate!=null&&`The drafter wins about ${facts.winRate}% of their games on 17Lands.`,
     facts.rank&&`The trophy drafter reached ${facts.rank} rank.`,
   ].filter(Boolean);
 }
@@ -46,40 +47,26 @@ export function trophyDrafterSentences(facts) {
 // in the primary decision headline. The record is unrelated to card win rate.
 export function trophyDrafterDetails(answer) {
   const lines=trophyDrafterSentences(trophyDrafterFacts(answer));
-  return lines.length?`<div class="run-trophy-record">${lines.map(line=>`<p>${esc(line)}</p>`).join('')}</div>`:'';
+  const link=answer?.deckAvailable===true?'<button type="button" class="text-button run-deck-link" data-trophy-deck aria-haspopup="dialog">Click here to see the drafter’s deck.</button>':'';
+  if(!lines.length&&!link)return '';
+  return `<div class="run-trophy-record">${lines.length?`<p>${esc(lines[0])}${link?` ${link}`:''}</p>${lines.slice(1).map(line=>`<p>${esc(line)}</p>`).join('')}`:`<p>${link}</p>`}</div>`;
 }
 
 export function compactDraftRunFeedback(answer) {
-  if (!answer || answer.historicalMatch) return '';
-  const selectedName=String(answer.selectedName||'').trim();
-  const withChoice=message=>selectedName
-    ? `You chose ${selectedName}. ${message}`
-    : message;
-  if (answer.modelTargetDisagreement) return withChoice('The trophy drafter made an unusual choice relative to the model.');
-  const score=Number(answer.score);
-  if (Number.isFinite(score) && score>=85) return withChoice('A strongly supported alternative.');
-  if (Number.isFinite(score) && score>=60) return withChoice('A plausible alternative.');
-  return withChoice('The model found less support for this choice.');
+  if(!answer||answer.historicalMatch)return '';
+  return answer.selectedName?`You picked ${answer.selectedName}.`:'';
 }
 
-// Only call with a locked answer. A support ratio is a comparative model
-// signal, not the probability that a card is correct or its expected win rate.
-export function consensusFeedback(answer) {
-  if (!answer?.consensusName) return '';
-  const leader = Number(answer.consensusSupport);
-  const relative = support => support != null && Number.isFinite(Number(support)) && leader > 0
-    ? `${Math.round(100 * Number(support) / leader)}%` : 'Unavailable';
-  const ranking = [...(answer.ranking || [])].sort((a, b) => Number(b.id===answer.historicalId)-Number(a.id===answer.historicalId)||Number(b.support)-Number(a.support));
-  const name = card => `<button type="button" class="text-button" data-zoom="${esc(card.id)}">${esc(card.name)}</button>`;
-  const trophyName=answer.historicalName||ranking.find(c=>c.id===answer.historicalId)?.name;
-  const modelLeader=[...(answer.ranking||[])].sort((a,b)=>Number(b.support)-Number(a.support))[0];
-  const disagreement=(answer.consensusId||modelLeader?.id)!==answer.historicalId;
-  return `<section class="run-consensus" aria-label="Trophy pick and model support">
-    <h3>Model’s strongest choice: ${esc(answer.consensusName)}</h3>
-    ${trophyName?`<p><strong>Trophy drafter: ${esc(trophyName)}: 100.</strong>${disagreement?`<br>Model’s strongest alternative: ${esc(answer.consensusName)}: 95. This was an excellent alternative according to the model; ${esc(trophyName)} was the choice in this successful trophy draft.`:''}</p>`:''}
-    <p>${answer.historicalId&&answer.selectedId===answer.historicalId?'You matched the trophy pick.':`Your pick has ${relative(answer.selectedSupport)} of the leading model support.`} Matching the trophy drafter is the goal of this game: trophy matches earn 100 regardless of model support. Other choices receive partial credit, up to 95, based on how strongly the model supports them.</p>
-    ${ranking.length ? `<ol class="run-consensus-leaders">${ranking.slice(0, 3).map(c => `<li>${name(c)} <span>${c.id===answer.historicalId?'Trophy pick · 100 points':`${relative(c.support)} of leader · ${Number(c.score)} points`}</span></li>`).join('')}</ol>
-    <section class="run-consensus-all" aria-label="All choices by model support"><h4>Compare all ${ranking.length} choices</h4><div class="run-consensus-table-wrap"><table><caption>Model support relative to the leader. The trophy match earns 100; alternative points use a separate partial-credit curve.<span data-peer-col hidden> Chosen is the share of today’s players who picked each card.</span></caption><thead><tr><th scope="col">Card</th><th scope="col">Support</th><th scope="col">Points</th><th scope="col" data-peer-col hidden>Chosen</th></tr></thead><tbody>${ranking.map(c => `<tr><th scope="row">${name(c)}${c.id === answer.selectedId ? ' · Your pick' : ''}${c.id === answer.historicalId ? ' · Trophy pick' : ''}</th><td>${c.id===answer.historicalId?'N/A':relative(c.support)}</td><td>${Number(c.score)}</td><td data-peer-card="${esc(c.id)}" hidden></td></tr>`).join('')}</tbody></table></div></section>` : ''}
-    <p class="run-model-note">Model support reflects held-out strong-player choices. It does not establish a correct pick or predict a win rate.</p>
+// Support is a relative model signal. Points remain the saved, version-pinned
+// game scores; displaying a new explanation must never regrade an old run.
+export function consensusFeedback(answer,context='') {
+  if(!answer?.consensusName)return '';
+  const ranking=[...(answer.ranking||[])].sort((a,b)=>Number(b.id===answer.historicalId)-Number(a.id===answer.historicalId)||Number(b.support)-Number(a.support));
+  const name=card=>`<button type="button" class="text-button" data-zoom="${esc(card.id)}">${esc(card.name)}</button>`;
+  return `<section class="run-consensus" aria-label="How scoring works">
+    <p class="run-scoring-copy">Matching the trophy pick earns 100 points. Other picks earn up to 95, based on the model.</p>
+    <p class="run-model-note">Support compares each card with the model’s top choice. It isn’t a win rate.</p>
+    ${context}
+    ${ranking.length?`<details class="run-consensus-all"><summary>Compare all ${ranking.length} cards</summary><div class="run-consensus-table-wrap"><table><caption>Model support is relative to the model’s top choice.<span data-peer-col hidden> Players’ picks shows how today’s players chose.</span></caption><thead><tr><th scope="col">Card</th><th scope="col">Model support</th><th scope="col">Score</th><th scope="col" data-peer-col hidden>Players’ picks</th></tr></thead><tbody>${ranking.map(card=>`<tr><th scope="row">${name(card)}${card.id===answer.selectedId?' · Your pick':''}${card.id===answer.historicalId?' · Trophy pick':''}</th><td>${modelSupportLabel(card.support,answer.consensusSupport)}</td><td>${Number(card.score)}</td><td data-peer-card="${esc(card.id)}" hidden></td></tr>`).join('')}</tbody></table></div></details>`:''}
   </section>`;
 }
