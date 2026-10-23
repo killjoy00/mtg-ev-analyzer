@@ -55,6 +55,15 @@ test('scoped account and admin browser validation installs WebKit for dual-engin
   assert.match(browser,/playwright install --with-deps chromium webkit/);
 });
 
+test('browser dependency installs are bounded and retried once on another mirror', () => {
+  assert.match(browser,/playwright_install npx playwright install --with-deps chromium webkit/);
+  assert.match(browser,/playwright_install npx playwright install --with-deps chromium\n/);
+  assert.match(browser,/timeout --kill-after=30 480 "\$@" && return 0/);
+  assert.match(browser,/s#azure\\\.archive\\\.ubuntu\\\.com#archive\.ubuntu\.com#g/);
+  assert.match(browser,/timeout --kill-after=30 600 "\$@"/);
+  assert.match(browser,/timeout-minutes: 30/);
+});
+
 test('required checks cannot pass by silently skipping their selected validation', () => {
   assert.match(unit,/Verify selected test validation completed/);
   assert.match(unit,/test-validation-complete/);

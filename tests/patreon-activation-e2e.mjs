@@ -155,8 +155,10 @@ try {
   patreonStatus=elite;
   await page.goto(base+'/?patreon=connected');
   await page.getByText('Elite is active.',{exact:true}).waitFor();
-  await page.waitForTimeout(250);
-  assert.ok(eventNames.includes('patreon_activation_succeeded'));
+  // Events flush on a 180 ms batch timer and then post asynchronously; a fixed
+  // 250 ms wait left too little margin on a loaded runner.
+  for(let waited=0;!eventNames.includes('patreon_activation_succeeded')&&waited<5000;waited+=50)await page.waitForTimeout(50);
+  assert.ok(eventNames.includes('patreon_activation_succeeded'),'activation success event was not sent within 5 seconds');
   assert.equal(await page.getByRole('link',{name:'Choose your sets',exact:true}).count(),1);
   assert.equal(await page.getByRole('link',{name:'Start Powered Cube practice',exact:true}).count(),1);
   assert.equal(await page.evaluate(()=>sessionStorage.getItem('pack1-patreon-activation-v1')),null,'terminal success clears activation intent');
