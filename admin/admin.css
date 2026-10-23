@@ -61,3 +61,10 @@ body{font-family:"Source Sans 3","Segoe UI",sans-serif;background:#f7f8fa;color:
   .user-directory .user-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
   .users-list-meta{align-items:flex-start}
 }
+
+.user-table .user-sort{display:inline-flex;align-items:center;gap:7px;padding:3px 1px;border:0;border-radius:2px;background:transparent;color:inherit;font:inherit;font-weight:700;line-height:1.25;text-align:left;cursor:pointer}
+.user-table .user-sort:hover{background:transparent;color:#1e4d7a;text-decoration:underline;text-underline-offset:2px}
+.user-table .user-sort:focus-visible{outline:2px solid #1e4d7a;outline-offset:3px}
+.user-table .user-sort-icon{color:#748494;font-size:13px;min-width:12px;text-align:center}
+.user-table .user-sort-icon.active{color:#1e4d7a}
+.user-table th[aria-sort] .user-sort{color:#123e65}
