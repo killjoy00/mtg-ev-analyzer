@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import {gunzipSync} from 'node:zlib';
+import {brotliDecompressSync} from 'node:zlib';
 import {chromium} from 'playwright';
 import {encoded} from '../corpus/trophy-decks/fra.mjs';
 import {trophyDeckForRound} from '../worker/trophy-decks.mjs';
-const catalog=JSON.parse(gunzipSync(Buffer.from(encoded,'base64')));
+const catalog=JSON.parse(brotliDecompressSync(Buffer.from(encoded,'base64')));
 const deck=await trophyDeckForRound(async()=>({rows:[{set_id:'fra',source_draft_hash:Object.keys(catalog.sources)[0]}]}),{answers:[{puzzle:{puzzle_id:'test'}}],puzzle_ids:['test']},'0');
 const base=process.env.PACK1_E2E_URL||'http://127.0.0.1:4173';
 const browser=await chromium.launch({headless:true});

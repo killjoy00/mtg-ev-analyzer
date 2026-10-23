@@ -1,4 +1,4 @@
-import {gunzipSync} from 'node:zlib';
+import {brotliDecompressSync} from 'node:zlib';
 import {catalogLoaders} from '../corpus/trophy-decks/index.mjs';
 
 const catalogs=new Map();
@@ -18,7 +18,7 @@ async function catalogFor(set) {
   if(!registered(set))return null;
   const existing=cached(catalogs,set);if(existing)return existing;
   const promise=catalogLoaders[set]().then(({encoded})=>{
-    const catalog=JSON.parse(gunzipSync(Buffer.from(encoded,'base64')));
+    const catalog=JSON.parse(brotliDecompressSync(Buffer.from(encoded,'base64')));
     if(catalog.set_id!==set)throw Error('Trophy deck catalog identity mismatch');
     return catalog;
   }).catch(error=>{if(catalogs.get(set)===promise)catalogs.delete(set);throw error;});
