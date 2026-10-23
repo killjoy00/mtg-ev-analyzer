@@ -53,7 +53,11 @@ Release-secret provisioning checks belong in the release/control workflows that 
   - A test fails if a new worker module has no domain.
 - **Runs all six nightly** (07:17 UTC) against `main`. This catches coupling with no static import, such as one domain's suite calling another domain's HTTP route.
 - **Waits for `postgres-contract`** before creating any branch.
-- **Caps branch compute at 2 CU.** The project default allows 8. Each domain job samples `num_cpus()` every 5 seconds and writes the allocation to its job summary, so the cap can be lowered per domain. `num_cpus()` rounds up to whole CPUs. Neon's own branch counters lag 15–60 minutes, longer than most CI branches live.
+- **Caps branch compute per domain.** The project default allows 8 CU.
+  - draft_run and corpus are capped at 2 CU. On their first capped run (#1323) they sat at the cap 74% and 92% of the time and took about 11 and 28 minutes against a 40-minute limit.
+  - account, seasons, daily and subscriptions are capped at 1 CU. At 2 CU they used more than 1 CU for between 0% and 21% of the time.
+  - Each domain job samples `num_cpus()` every 5 seconds and writes the allocation to its job summary. `num_cpus()` rounds up to whole CPUs.
+  - Neon's own branch counters lag 15–60 minutes, longer than most CI branches live, so they can't be used for this.
 
 On the 100 gate runs from October 14 to 23, the new selection creates 523 branches instead of 595, 12% fewer. In 75 of those runs the change touched a full-path file, mostly `worker/growth-function.js` or migrations, and still needs all six domains.
 
