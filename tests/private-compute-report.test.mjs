@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {privateStore,reportWindows,branchInventory,runPrivateReport} from '../scripts/private-compute-report.mjs';
+import {privateStore,reportWindows,branchInventory,runPrivateReport,publicFailureCode} from '../scripts/private-compute-report.mjs';
 import {PROJECT} from '../scripts/neon-compute-history.mjs';
 const now=Date.parse('2026-10-23T19:40:00Z'),sha='a'.repeat(40);
 function fixture({publicBucket=false,customDomains=[],hangUpload=false,corrupt=false,denied=false}={}) {
@@ -38,6 +38,11 @@ test('a public or custom-domain destination fails before any usage read or write
    await assert.rejects(runPrivateReport({neonKey:'private-neon-key',cloudflareToken:'private-storage-key',runId:'123',attempt:'1',sha,now,fetcher:f.fetcher}),/verification/);
    assert.ok(f.calls.every(c=>c.url.hostname==='api.cloudflare.com'&&c.method==='GET'));
  }
+});
+test('storage capability failures reveal only allowlisted HTTP categories',async()=>{
+ try {await privateStore({token:'fixture',fetcher:async()=>new Response('private error',{status:403})}).verify();assert.fail('Expected rejection');}
+ catch(error){assert.equal(publicFailureCode(error),'storage_read_http_403');}
+ assert.equal(publicFailureCode({privateCode:'secret',message:'private'}),'collection_unavailable');
 });
 test('private report uses only Neon reads, one private write and verified readback, without credentials in output',async()=>{
  const f=fixture();const result=await runPrivateReport({neonKey:'private-neon-key',cloudflareToken:'private-storage-key',runId:'123',attempt:'1',sha,now,fetcher:f.fetcher});
