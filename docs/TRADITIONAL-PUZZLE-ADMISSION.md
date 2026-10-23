@@ -44,7 +44,7 @@ Production publication is complete. Twenty-one regular v4 components are Live; S
 
 Publication is supplemental, not a replacement or separate mode. For eligible regular environments, current new-game selection can draw Live Traditional or retained Premier puzzles from the same serving universe under the ordinary set, pick, difficulty, source-uniqueness and serving-quality rules. Powered Cube Traditional inventory joins only the Powered Cube environment.
 
-The reviewed lifecycle is development stage -> development publish -> production stage -> production publish. Production publish requires matching development publication eligibility; a development Candidate under a Live parent must block production publication. This prerequisite stopped run 35678284122 before production mutation and was preserved rather than weakened.
+The v4 release ran development stage -> production stage -> development publish -> production publish. At the time, production staging required the development copy to still be a Candidate, so publishing development first blocked production staging (Live cannot return to Candidate). Since #1310 production staging also accepts a development copy already published under a Live parent, so development stage -> development publish -> production stage -> production publish works too. Production publish requires matching development publication eligibility; a development Candidate under a Live parent must block production publication. This prerequisite stopped run 35678284122 before production mutation and was preserved rather than weakened.
 
 Final accepted runs:
 - development stage: 35675750660 (regular), 35676281911 (Cube)

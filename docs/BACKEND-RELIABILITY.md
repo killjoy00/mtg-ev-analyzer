@@ -23,6 +23,12 @@ Rerolls filter by environment, pick window, seen sources, band and rating anchor
 
 The API no longer caches or downloads the million-row pool. `loadVerifiedPool` remains an offline audit/reference utility. Missing ratings are excluded by the serving join; `/health` separately reports `unrated_puzzles` and `missing_sets` and returns 503 for incomplete coverage. `missing_sets` lists Live environments with nothing to serve; Candidate, Paused and Retired catalog sets are intentionally non-serving and are reported in `non_serving_sets` without failing health. This makes data failures observable without taking every healthy run offline. Missing metadata for a specific stored challenge still fails explicitly.
 
+## Serving cache membership parity
+
+Two SQL functions decide which puzzles the practice serving cache holds. `pack1_build_serving_snapshot` builds the cache. `pack1_serving_snapshot_matches_current` decides whether a verified cache can be carried to a new serving revision without a rebuild. Both must apply exactly the same membership filters. A filter added to one must be added to the other in the same migration.
+
+Migration 0064 added the report-removed-pick filter only to the builder. After production's first removal (October 23, 01:36 UTC) the comparison never matched. Every serving change then forced a full rebuild, and the corpus-readiness backend smoke failed on every PR because CI branches copy production. Migration 0066 (#1319, released in run 39902051595) added the same filter to the comparison. `tests/report-pick-removal.test.mjs` requires the newest definition of both functions to exclude removed picks.
+
 ## Planner statistics
 
 Migration 0015 explicitly analyzes the scalar serving metadata on both puzzle and rating tables. Existing auto-analyze timestamps are not proof that a newly defaulted column has statistics: `pack_number` was missing them in both development and production during the September 15 follow-up. The mixed eligibility query underestimated its input and performed hundreds of thousands of rating-index probes. Development-only refresh of that column changed the query to a parallel hash join and reduced two warm-query observations from 4.53 seconds before to 1.92/1.67 seconds after. These are SQL timings, not full HTTP response times or a load-test SLO.
