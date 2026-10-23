@@ -3,23 +3,24 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {gunzipSync} from 'node:zlib';
 import {withPracticeAccess} from './practice-access-fixture.mjs';
-import {encoded} from '../corpus/trophy-decks/fra.mjs';
+import {catalogLoaders} from '../corpus/trophy-decks/index.mjs';
 import {corpusMembership} from '../worker/corpus-components.mjs';
 import {DRAFT_RUN_CORPUS_VERSION,DRAFT_RUN_SCORING_VERSION} from '../draft-run.mjs';
 if(!process.argv.includes('--dev-fixtures'))throw Error('Use an isolated database and --dev-fixtures.');
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 const {default:growth,query}=await import('../worker/growth-function.js');
 const {default:api}=await import('../worker/draft-run-function.mjs');
-const catalog=JSON.parse(gunzipSync(Buffer.from(encoded,'base64')));
 async function call(service,path,body,token,status=200) {
   const request=new Request('https://packone.pro'+path,{method:body===undefined?'GET':'POST',headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{})},body:body===undefined?undefined:JSON.stringify(body)});
   const result=await withPracticeAccess(request,query,r=>service.fetch(r));
-  const value=await result.json();assert.equal(result.status,status,path+': '+JSON.stringify(value));return value;
+  const value=await result.json();assert.equal(result.status,status,path+' HTTP status');return value;
 }
 const owner=await call(growth,'/v1/session',{displayName:'QA deck owner'});
 const other=await call(growth,'/v1/session',{displayName:'QA deck other'});
-const rows=(await query(`SELECT p.puzzle_id,p.source_draft_hash FROM draft_run_verified_puzzles p WHERE p.set_id='fra' AND p.source_draft_hash IN(SELECT jsonb_array_elements_text($1::jsonb)) AND ${corpusMembership({parameter:2})} LIMIT 8`,[JSON.stringify(Object.keys(catalog.sources)),DRAFT_RUN_CORPUS_VERSION])).rows;
-assert.equal(rows.length,8,'Real FRA source fixtures are available');
+for(const set of ['fra','hob','powered-cube']) {
+const {encoded}=await catalogLoaders[set](),catalog=JSON.parse(gunzipSync(Buffer.from(encoded,'base64')));
+const rows=(await query(`SELECT p.puzzle_id,p.source_draft_hash FROM draft_run_verified_puzzles p WHERE p.set_id=$3 AND p.source_draft_hash IN(SELECT jsonb_array_elements_text($1::jsonb)) AND ${corpusMembership({parameter:2})} LIMIT 8`,[JSON.stringify(Object.keys(catalog.sources)),DRAFT_RUN_CORPUS_VERSION,set])).rows;
+assert.equal(rows.length,8,'Real source fixtures are available for '+set);
 // Seed only this isolated session. Deck authorization does not depend on the
 // mutable selection cache left by other integration suites.
 let run=(await query(`INSERT INTO draft_run_sessions(player_id,seed,corpus_version,scoring_version,puzzle_ids,seen_sources,measurement_qa)
@@ -32,8 +33,12 @@ run=await call(api,`/v1/runs/${run.id}/pick`,{revision:run.revision,round:0,puzz
 assert.equal(run.answers[0].deckAvailable,true);assert.equal(run.answers[0].deck,undefined);
 const deck=await call(api,`/v1/runs/${run.id}/deck?round=0`,undefined,owner.token);
 assert.equal(deck.deck.reduce((sum,card)=>sum+card.count,0),deck.size);
-assert.ok(deck.size>=40);assert.ok(deck.sideboard.length>0);
+assert.ok(deck.size>=40);
+const expected=catalog.decks[catalog.sources[rows[0].source_draft_hash]];
+assert.deepEqual(deck.deck,expected.deck.map(([card,count])=>({...catalog.cards[card],count})));
+assert.deepEqual(deck.sideboard,expected.sideboard.map(([card,count])=>({...catalog.cards[card],count})));
 await call(api,`/v1/runs/${run.id}/deck?round=1`,undefined,owner.token,403);
 await call(api,`/v1/runs/${run.id}/deck?round=-1`,undefined,owner.token,400);
 await call(api,`/v1/runs/${run.id}/deck?round=0`,undefined,other.token,404);
-console.log('Trophy decks verified: owner-only access, locked-round gating, archived source lookup, exact card counts, and lazy payloads.');
+}
+console.log('FRA, Hobbit and Cube decks verified: owner-only access, locked-round gating, exact main/sideboard counts, and lazy payloads.');

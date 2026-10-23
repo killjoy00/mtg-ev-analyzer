@@ -9,31 +9,60 @@ import gzip
 import hashlib
 import json
 from pathlib import Path
+import re
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--decks', required=True)
 parser.add_argument('--cards', required=True)
 parser.add_argument('--output', required=True)
+parser.add_argument('--set-id', default='fra')
+parser.add_argument('--version')
+parser.add_argument('--supplemental-cards', action='append', default=[])
 args = parser.parse_args()
 decks = json.loads(Path(args.decks).read_text())
+assert re.fullmatch('[a-z0-9]+(?:-[a-z0-9]+)*', args.set_id), 'Invalid set identity'
+assert all(deck['set_id'] == args.set_id for deck in decks), 'Mixed set identities'
+version = args.version or ('fra-2026-10-17-v1' if args.set_id == 'fra' else None)
+assert version, 'Provide a version for this catalog'
 metadata = {}
-for card in json.loads(Path(args.cards).read_text()):
+card_inputs = json.loads(Path(args.cards).read_text())
+for path in args.supplemental_cards:
+    card_inputs.extend(json.loads(Path(path).read_text()))
+for card in card_inputs:
     metadata[card['name']] = card
     for face in card.get('card_faces', []):
         metadata[face['name']] = {**card, **face}
+casefold_metadata = {name.casefold(): card for name, card in metadata.items()}
 names = sorted({card['name'] for deck in decks for card in deck['deck'] + deck['sideboard']})
 cards = []
 for index, name in enumerate(names):
-    card = metadata[name]
+    card = metadata.get(name) or casefold_metadata[name.casefold()]
     front = card.get('card_faces', [card])[0]
     image = (card.get('image_uris') or front.get('image_uris') or {}).get('normal')
     assert image and image.startswith('https://cards.scryfall.io/'), name
-    cards.append({'id': f'deck-{index}', 'name': name, 'image_url': image,
+    display = {'id': f'deck-{index}' if args.set_id == 'fra' else f'deck-{args.set_id}-{index}', 'name': name, 'image_url': image,
                   'mana_cost': card.get('mana_cost', front.get('mana_cost', '')),
-                  'type_line': front.get('type_line', card.get('type_line', '')),
-                  'mana_value': card['cmc']})
+                  'type_line': card.get('type_line', front.get('type_line', '')).split(' // ')[0],
+                  'mana_value': card['cmc']}
+    faces = card.get('card_faces', [])
+    if len(faces) == 2 and all(face.get('image_uris', {}).get('normal') for face in faces):
+        display['display_faces'] = [{'name': face['name'], 'role': 'front' if i == 0 else 'back',
+                                    'image_url': face['image_uris']['normal'],
+                                    'large_image_url': face['image_uris'].get('large', face['image_uris']['normal'])}
+                                   for i, face in enumerate(faces)]
+    elif card.get('layout') == 'meld':
+        parts = card.get('all_parts', [])
+        result = next((part for part in parts if part.get('component') == 'meld_result'), None)
+        partner = next((part for part in parts if part.get('component') == 'meld_part' and part['name'] != card['name']), None)
+        result_card = metadata.get(result['name']) if result else None
+        result_image = result_card.get('image_uris', {}).get('normal') if result_card else None
+        if partner and result_image:
+            display['display_faces'] = [{'name': name, 'role': 'front', 'image_url': image},
+                                       {'name': result['name'], 'role': 'meld_result', 'image_url': result_image,
+                                        'partner_name': partner['name']}]
+    cards.append(display)
 card_index = {name: index for index, name in enumerate(names)}
-catalog = {'version': 'fra-2026-10-17-v1', 'set_id': 'fra', 'sources': {}, 'cards': cards, 'decks': []}
+catalog = {'version': version, 'set_id': args.set_id, 'sources': {}, 'cards': cards, 'decks': []}
 for deck in sorted(decks, key=lambda d: (d['event_type'], d['draft_id'])):
     def quantities(values):
         assert len({c['name'] for c in values}) == len(values)
