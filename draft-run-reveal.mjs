@@ -17,7 +17,9 @@ export function revealCardChoices(answer) {
   return choices;
 }
 
-export function modelSupportLabel(support,leader) {
+export function modelSupportLabel(support,leader,isTrophy=false) {
+  // Trophy model support is intentionally not displayed.
+  if(isTrophy)return '-';
   return support!=null&&Number.isFinite(Number(support))&&Number(leader)>0
     ?`${Math.round(100*Number(support)/Number(leader))}%`:'Unavailable';
 }

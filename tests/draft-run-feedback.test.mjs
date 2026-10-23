@@ -43,15 +43,18 @@ test('the win rate is labeled as 17Lands\u2019 overall figure, never this format
  assert.deepEqual(trophyDrafterSentences(null),[]);
 });
 
-test('the explanation shows actual trophy support separately from its 100-point score',()=>{
+test('trophy model support stays a dash for matches and non-matches',()=>{
  const answer={consensusName:'Leader',consensusSupport:.5,selectedId:'trophy',historicalId:'trophy',ranking:[{id:'trophy',name:'Trophy',support:.05,score:100},{id:'leader',name:'Leader',support:.5,score:95}]};
- const text=consensusFeedback(answer);
- assert.match(text,/<td>10%<\/td><td>100<\/td>/);
+ for(const selectedId of ['trophy','leader']) {
+ const text=consensusFeedback({...answer,selectedId});
+ assert.match(text,/<td>-<\/td><td>100<\/td>/);
+ assert.doesNotMatch(text,/<td>10%<\/td>/);
  assert.match(text,/<td>100%<\/td><td>95<\/td>/);
  assert.match(text,/Matching the trophy pick earns 100 points/);
  assert.match(text,/It isn’t a win rate/);assert.match(text,/<details class="run-consensus-all">/);
  assert.match(text,/data-peer-col hidden>Players’ picks/);
  assert.equal(consensusFeedback({}),'');
+ }
 });
 
 test('compact feedback names the player’s pick without grading adjectives or filler',()=>{
