@@ -22,10 +22,10 @@ from pathlib import Path
 from typing import Optional
 
 try:
-    from fetch_card_metadata import aliases, fetch_named, image_url, metadata_for_alias, printing_rank, special_flags
+    from fetch_card_metadata import aliases, fetch_named, image_url, metadata_for_alias, printing_rank, special_flags, draft_printing_priority
     from refresh_powered_cube_images import all_printings
 except ModuleNotFoundError:
-    from scripts.fetch_card_metadata import aliases, fetch_named, image_url, metadata_for_alias, printing_rank, special_flags
+    from scripts.fetch_card_metadata import aliases, fetch_named, image_url, metadata_for_alias, printing_rank, special_flags, draft_printing_priority
     from scripts.refresh_powered_cube_images import all_printings
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -218,6 +218,10 @@ def resolve_inventory(
                     "collector_number": card.get("collector_number"),
                     "special_flags": flags,
                     "special_unavoidable": bool(flags) and (sid, name) not in set_has_ordinary,
+                    # The pack may contain an intentionally nonstandard bonus-sheet
+                    # frame even when an older ordinary printing exists.
+                    "draft_source_bonus": sid != "powered-cube" and draft_printing_priority(card, sid) == 1,
+                    "draft_source_special": bool(flags) and sid != "powered-cube" and draft_printing_priority(card, sid) < 2,
                 }
         records_by_set[sid] = records
         selection_details[sid] = details
@@ -298,7 +302,7 @@ def main() -> int:
     MAP_DIR.mkdir(parents=True, exist_ok=True)
 
     report = {
-        "policy": "main-readable-v3-bulk",
+        "policy": "draft-booster-art-v1-bulk",
         "unique_card_names": len({name for names in names_by_set.values() for name in names}),
         "sets": {},
         "card_id_name_collisions": {},
@@ -316,17 +320,31 @@ def main() -> int:
         special = {
             name: detail
             for name, detail in selection_details.get(sid, {}).items()
-            if detail.get("special_flags") and not detail.get("special_unavoidable")
+            if detail.get("special_flags")
+            and not detail.get("special_unavoidable")
+            and not detail.get("draft_source_special")
         }
         unavoidable_special = {
             name: detail
             for name, detail in selection_details.get(sid, {}).items()
             if detail.get("special_flags") and detail.get("special_unavoidable")
+            and not detail.get("draft_source_special")
+        }
+        draft_source_special = {
+            name: detail
+            for name, detail in selection_details.get(sid, {}).items()
+            if detail.get("draft_source_special")
+        }
+        draft_bonus = {
+            name: detail
+            for name, detail in selection_details.get(sid, {}).items()
+            if detail.get("draft_source_bonus")
         }
         cross_set = {
             name: detail
             for name, detail in selection_details.get(sid, {}).items()
-            if sid != "powered-cube" and str(detail.get("selected_set") or "").lower() != sid.lower()
+            if sid != "powered-cube" and not detail.get("draft_source_bonus")
+            and str(detail.get("selected_set") or "").lower() != sid.lower()
         }
         if not unresolved and not special:
             entry["unresolved_image_names"] = []
@@ -337,6 +355,8 @@ def main() -> int:
             "mapping_entries": len(mapping),
             "remaining_special_printings": special,
             "unavoidable_special_printings": unavoidable_special,
+            "draft_source_special_printings": draft_source_special,
+            "draft_bonus_printings": draft_bonus,
             "cross_set_fallbacks": cross_set,
             "shards": shard_files,
             "shard_card_changes": shard_changes,
