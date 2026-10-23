@@ -43,8 +43,8 @@ export async function renderUsers(root,request,growthRequest=request,viewerRole=
       if(serial!==loadSerial)return;
       // Search results may have shrunk between page requests.
       if(page>1&&!next.users.length) {
-        page=Math.max(1,Math.ceil(Number(next.total_matching)/(Number(next.page_size)||100))||1);
-        return load();
+        const lastAvailablePage=Math.max(1,Math.ceil(Number(next.total_matching)/(Number(next.page_size)||100))||1);
+        if(page>lastAvailablePage){page=lastAvailablePage;return load();}
       }
       data=next;
       render();
