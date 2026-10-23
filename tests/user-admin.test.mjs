@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {handleUserAdmin,playActivityWindow,userAdminFilters,userAdminPage} from '../worker/user-admin.mjs';
+import {handleUserAdmin,playActivityWindow,userAdminFilters,userAdminPage,userAdminSort} from '../worker/user-admin.mjs';
 
 const ADMIN='11111111-1111-4111-8111-111111111111';
 const TARGET='22222222-2222-4222-8222-222222222222';
@@ -132,4 +132,38 @@ test('account-only reads keep account summary but skip expensive play cohorts',a
   assert.equal(result.play_activity,null);
   assert.equal(result.page,1);
   assert.equal(result.total_matching,1);
+});
+
+test('account column sorting is whitelisted, global, and stable across pages',async()=>{
+  const cases=[
+    ['account','asc',/ORDER BY lower\(coalesce\(nullif\(u.name,''\),'Unnamed account'\)\) ASC NULLS LAST,u.id/],
+    ['username','asc',/ORDER BY username_sort ASC NULLS LAST,u.id/],
+    ['created','desc',/ORDER BY u\."createdAt" DESC NULLS LAST,u.id/],
+    ['last_active','desc',/ORDER BY last_active DESC NULLS LAST,u\."createdAt" DESC,u.id/],
+    ['runs','desc',/ORDER BY rs.runs DESC NULLS LAST,u.id/],
+    ['average_score','asc',/ORDER BY rs.average_score ASC NULLS LAST,u.id/],
+    ['access','asc',/ORDER BY access_sort ASC NULLS LAST,u.id/],
+    ['connections','desc',/ORDER BY patreon_connected DESC NULLS LAST,u.id/],
+    ['admin','desc',/ORDER BY is_admin DESC NULLS LAST,u.id/],
+  ];
+  for(const [column,direction,order] of cases) {
+    let list=null;
+    const query=async(sql,params)=>{
+      if(sql.includes('LIMIT 100 OFFSET $3')){list={sql,params};return {rows:[]};}
+      if(sql.includes('SELECT count(*)::int total FROM neon_auth."user" u'))return {rows:[{total:150}]};
+      return {rows:[{total:150}]};
+    };
+    const url=new URL('https://packone.pro/v1/admin/users?activity=0&page=2');
+    url.searchParams.set('sort',column);url.searchParams.set('direction',direction);
+    const result=await handleUserAdmin(new Request(url),query,undefined,{adminAuthUserId:ADMIN});
+    assert.ok(list,column+' should use the paginated account SQL');
+    assert.match(list.sql,order,column);
+    assert.deepEqual(list.params,['','all',100],column+' must offset the globally sorted result');
+    assert.deepEqual(result.sort,{column,direction});
+    assert.equal(result.page,2);
+  }
+  assert.deepEqual(userAdminSort(new URL('https://packone.pro/v1/admin/users')),{column:'last_active',direction:'desc'});
+  assert.deepEqual(userAdminSort(new URL('https://packone.pro/v1/admin/users?sort=username')),{column:'username',direction:'asc'});
+  for(const query of ['sort=id','sort=last_active%3BDROP%20TABLE%20users','direction=ascending','direction=DESC','sort=admin&direction=foo'])
+    assert.throws(()=>userAdminSort(new URL('https://packone.pro/v1/admin/users?'+query)),error=>error.status===400);
 });
