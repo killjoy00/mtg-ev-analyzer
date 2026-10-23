@@ -74,6 +74,12 @@ try {
  await assert.rejects(applyReleaseMigrations(client,{root,baseline,manifest:failedManifest}));
  assert.equal((await q("SELECT to_regclass('fixture_rollback') table_name")).rows[0].table_name,null);
  assert.equal((await q('SELECT name FROM pack1_applied_migrations WHERE name=$1',[failed])).rows.length,0);
+ const escape='9997_fixture_transaction_escape.sql';
+ const escapePlan=add(escape,'CREATE TABLE fixture_early_commit(id int); COMMIT; -- would split a naive wrapper\nSELECT 1/0;');
+ await assert.rejects(applyReleaseMigrations(client,{root,baseline,manifest:escapePlan}));
+ assert.equal((await q("SELECT to_regclass('fixture_early_commit') name")).rows[0].name,null,'Transaction control cannot escape DDL/ledger atomicity');
+ const include='9996_fixture_include.sql',includePlan=add(include,'\\ir ../unhashed.sql');
+ await assert.rejects(applyReleaseMigrations(client,{root,baseline,manifest:includePlan,runNontransactional:()=>{throw Error('Must not execute');}}),/psql meta-commands/);
  const nontransaction='9999_fixture_concurrent.sql',concurrent=add(nontransaction,'CREATE INDEX CONCURRENTLY fixture_index ON players(id);');
  let attempts=0;await assert.rejects(applyReleaseMigrations(client,{root,baseline,manifest:concurrent,runNontransactional:()=>{attempts++;throw Error('interrupted build');}}));
  await assert.rejects(applyReleaseMigrations(client,{root,baseline,manifest:concurrent,runNontransactional:()=>{attempts++;}}),/Incomplete migration/);assert.equal(attempts,1);

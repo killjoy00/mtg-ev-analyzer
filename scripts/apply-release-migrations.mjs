@@ -54,7 +54,8 @@ export async function applyReleaseMigrations(client,{plan='secure-auth-release',
    for(const name of selected) {
      if(ledger.has(name)){skipped++;continue;}
      const sql=fs.readFileSync(`${root}/migrations/${name}`,'utf8');
-     const concurrent=/\b(?:CREATE|DROP)\s+(?:UNIQUE\s+)?INDEX\s+CONCURRENTLY\b/i.test(sql)||/^\\/m.test(sql);
+     if(/^[ \t]*\\/m.test(sql))throw Error('Migration contains unreviewed psql meta-commands');
+     const concurrent=/\b(?:CREATE|DROP)\s+(?:UNIQUE\s+)?INDEX\s+CONCURRENTLY\b/i.test(sql);
      if(concurrent) {
        if(!runNontransactional)throw Error('Nontransactional migration runner unavailable');
        // An interrupted concurrent build is never silently marked applied or
@@ -66,7 +67,14 @@ export async function applyReleaseMigrations(client,{plan='secure-auth-release',
      } else {
        await query('BEGIN');
        try {
-         await query(transactionalSQL(sql,name));
+         // SPI executes DDL atomically inside the outer transaction. Even a
+         // transaction command hidden behind SQL comments cannot commit DDL
+         // separately from the ledger (Postgres rejects transaction control
+         // in this atomic execution context). Do not rely on a regex parser.
+         const body=transactionalSQL(sql,name),tag='$pack1_sql_'+identities[name]+'$';
+         const block='$pack1_atomic_'+identities[name]+'$';
+         if(body.includes(tag)||body.includes(block))throw Error('Migration delimiter collision');
+         await query(`DO ${block} BEGIN EXECUTE ${tag}${body}${tag}; END ${block};`);
          await query("INSERT INTO public.pack1_applied_migrations(name,sha256,state,method) VALUES($1,$2,'applied','executed')",[name,identities[name]]);
          await query('COMMIT');
        } catch(error){await query('ROLLBACK');throw error;}

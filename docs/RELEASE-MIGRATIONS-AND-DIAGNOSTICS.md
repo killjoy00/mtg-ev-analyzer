@@ -27,7 +27,9 @@ is retained. Baseline drift fails closed; do not regenerate fingerprints from
 an unknown database merely to make a release pass.
 
 A session advisory lock serializes runners. Transactional migration DDL and its
-ledger entry commit together. Concurrent-index/psql migrations record `running`
+ledger entry commit together. An atomic PostgreSQL execution block prevents
+embedded transaction control from splitting that commit. New psql meta-commands
+(including external script includes) are rejected. Concurrent-index migrations record `running`
 before execution. Failure records `failed`; an interrupted or failed entry blocks
 later release attempts. Review the database privately, repair or roll back the
 specific incomplete operation, validate its schema and identity, then explicitly
