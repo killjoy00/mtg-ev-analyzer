@@ -164,7 +164,7 @@ Do not expect the new acquisition logic to rewrite the existing result-share fun
 
 ## 6a. Signed-out vs signed-in players
 
-**Admin → Users** opens with **Signed out vs signed in**, showing players who completed runs for the From/Through Pacific dates (last 14 days by default). Use Today, 7 days, or 14 days for a quick range. The separate **Account directory** lists authenticated accounts only, supports 100 results per page, and has its own search and status filters:
+**Admin → Users** opens with **Signed out vs signed in**, showing players who completed runs for the From/Through Pacific dates (last 14 days by default). Use Today, 7 days, or 14 days for a quick range. The separate **Account directory** lists authenticated accounts only, supports 100 results per page, has its own search and status filters, and sorts the entire directory when any column header is selected (click again to reverse):
 
 - **Players** and **Completed runs**: completed Draft Runs (including shared challenges) on those dates.
 - **First Daily in range**: people whose first-ever Daily falls in the range.
