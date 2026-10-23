@@ -13,6 +13,25 @@ from import_all_trophies import (eligible_trophies, trajectory, rows, collect_le
 from build_replays import PickExample
 
 class FullTrophyTests(unittest.TestCase):
+    def test_old_printing_policy_cache_cannot_preserve_cross_set_art(self):
+        from unittest.mock import patch
+        from import_all_trophies import resolve_images
+        card = {'name': 'Ride Down', 'type_line': 'Instant', 'mana_cost': '{R}{W}',
+                'rarity': 'uncommon', 'image_uris': {'normal': 'https://example.com/otp.jpg'}}
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = Path(tmp) / 'images.json'
+            cache.write_text(json.dumps({
+                '__packone_cache_policy__': 'main-readable-v4-faces:otj',
+                'Ride Down': {'image_url': 'https://example.com/ktk.jpg', 'type_line': 'Instant'},
+            }))
+            with patch('import_all_trophies.fetch_named', return_value=card) as fetch_named, patch('import_all_trophies.time.sleep'):
+                known = resolve_images({'Ride Down'}, {}, cache, 'otj')
+            fetch_named.assert_called_once_with('Ride Down', 'otj')
+            self.assertEqual(known['Ride Down']['image_url'], 'https://example.com/otp.jpg')
+            # A refreshed cache remains usable without another network lookup.
+            with patch('import_all_trophies.fetch_named', side_effect=AssertionError('Cache should be reused')):
+                self.assertEqual(resolve_images({'Ride Down'}, {}, cache, 'otj'), known)
+
     def test_existing_image_does_not_hide_missing_card_metadata(self):
         from unittest.mock import patch
         from import_all_trophies import resolve_images
