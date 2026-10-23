@@ -164,13 +164,13 @@ Do not expect the new acquisition logic to rewrite the existing result-share fun
 
 ## 6a. Signed-out vs signed-in players
 
-**Admin → Users** lists signed-in accounts only. Under that list, **Signed out vs signed in** shows both groups for the From/Through Pacific dates (last 14 days by default):
+**Admin → Users** opens with **Signed out vs signed in**, showing players who completed runs for the From/Through Pacific dates (last 14 days by default). Use Today, 7 days, or 14 days for a quick range. The separate **Account directory** lists authenticated accounts only, supports 100 results per page, and has its own search and status filters:
 
 - **Players** and **Completed runs**: completed Daily and practice runs on those dates.
 - **First Daily in range**: people whose first-ever Daily falls in the range.
 - **Next-day return**: the same definition as the Daily habit cohorts, shown as `returned / mature` plus the count that is still too new.
 
-It uses the habit report's exclusions (QA and admin players) and current-corpus runs only. A signed-out player counts once per browser. Signed in means linked to an account today, so a player who signs up later moves to Signed in with their earlier runs. If the query fails, the account list still loads and the section says it is unavailable.
+It uses the habit report's exclusions (QA and admin players) and current-corpus runs only. Dailies use their assigned Daily day, whereas practice uses its creation date. This is different from Overview's **Observed players** (first-encounter decision views, including unfinished runs), so the difference is not a meaningful abandonment count. A signed-out player counts once per browser. Signed in means linked to an account today, so a player who signs up later moves to Signed in with their earlier runs. If the query fails, the account list still loads and the section says it is unavailable.
 
 ## 7. Understand the new player-facing streak cue
 
