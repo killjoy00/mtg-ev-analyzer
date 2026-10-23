@@ -1,4 +1,4 @@
 {
   "operation": "collect-private-compute-history",
-  "reason": "Owner approved private storage and completion of compute attribution. Verify existing credentials against only the approved private destination, then collect retained daily and hourly compute history. Do not inspect token inventories, change credentials, mutate databases, change schedules or publish usage details."
+  "reason": "Verify the newly provisioned dedicated private reporting credential and collect retained daily and hourly compute history on reviewed main. Keep provider data in the verified private destination. Preserve production credentials, schedules, database state and public-log sanitization."
 }
