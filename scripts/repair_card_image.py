@@ -292,6 +292,7 @@ def run_repair(card_name: str, raw_environments: str, *, dry_run: bool = False) 
         for sid in environments
         if (selection_details.get(sid, {}).get(card_name) or {}).get("special_flags")
         and not (selection_details.get(sid, {}).get(card_name) or {}).get("special_unavoidable")
+        and not (selection_details.get(sid, {}).get(card_name) or {}).get("draft_source_special")
     }
     if avoidable_special:
         raise ValueError(
