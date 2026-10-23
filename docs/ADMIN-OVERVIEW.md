@@ -31,6 +31,7 @@ entry pages but reuse the existing publishing implementation and safety gates.
   guests remain per browser, Daily runs use their assigned Daily date, and practice
   uses run creation time. The two metrics cannot be subtracted to estimate abandonment.
 - Account totals and 30-day counts retain the Users report's definitions.
+- Users account-directory column headers sort the **entire filtered account list**, not only the displayed 100-account page. Sorting resets pagination and reverses when the same column is selected again.
 - Return rates aggregate mature cohort denominators, not averages of percentages.
 - Corpus readiness is healthy only when both current and verified. Live-set metadata
   does not prove or change the contents of an already-fixed Daily.
