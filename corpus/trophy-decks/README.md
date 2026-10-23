@@ -1,9 +1,10 @@
 # Trophy deck context
 
-The versioned, server-only catalogs cover **110,232 of 110,413 source drafts
-(99.8361%) across all 31 current environments**, including Powered Cube.
+The versioned, server-only catalogs cover **110,373 of 110,554 source drafts
+(99.8363%) across all 31 current environments**, including Powered Cube.
 `coverage.json` records source counts, archive hashes and unavailable-record
-reasons. The original FRA catalog remains unchanged: 1,029 of 1,030 sources.
+reasons. FRA includes the separately approved Traditional supplement from
+#1303. Including its deck data does not activate or publish that component.
 
 Each entry contains one exact main deck and sideboard from the last observed
 game. When the archive publishes game times, ordering uses game time, match,
@@ -29,7 +30,7 @@ differences are matched without changing the name in the game archive.
 ## Build
 
 1. Export distinct set, format and source-hash metadata for the current parent
-   corpus and its Live components. Do not export player identities or puzzle
+   corpus, its Live components, and the approved FRA Traditional supplement. Do not export player identities or puzzle
    payloads. Store each set's inventory as `SET_ID.json`.
 2. Pin official game archive URLs, sizes and ETags from the 17Lands dataset
    catalog in a manifest, then run:
