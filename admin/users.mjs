@@ -90,7 +90,7 @@ export async function renderUsers(root,request,growthRequest=request,viewerRole=
     const items=[];
     if(user.linked&&!user.username_owned)items.push(badge('Username attention','blocked'));
     if(user.public_identity_hidden_at)items.push(badge('Identity hidden','blocked'));
-    if(user.active_entitlements>0)items.push(badge('Paid','live'),...(user.capabilities||[]).map(value=>badge(capabilityLabel(value))));
+    if(user.active_entitlements>0)items.push(badge('Premium access','live'),...(user.capabilities||[]).map(value=>badge(capabilityLabel(value))));
     if(!user.active_entitlements)items.push(badge('Free account'));
     return items.join(' ');
   }
@@ -105,11 +105,11 @@ function render() {
       <section class="user-directory" aria-labelledby="user-directory-heading">
         <div class="users-section-heading"><div><p class="users-kicker">ACCOUNT MANAGEMENT</p><h2 id="user-directory-heading">Account directory</h2><p class="muted">Search and account status filters apply only to this directory, not to the activity report above. Totals below describe all authenticated accounts.</p></div></div>
         <div class="cards user-cards">
-          ${[['Accounts',summary.total],['New · 30d',summary.new_30d],['Active · 30d',summary.active_30d],['Username attention',summary.username_attention],['Patreon linked',summary.patreon],['Paid',summary.paid],['Admins',summary.admins]].map(([label,value])=>`<div class="card"><span>${esc(label)}</span><strong>${fmt(value)}</strong></div>`).join('')}
+          ${[['Accounts',summary.total],['New · 30d',summary.new_30d],['Active · 30d',summary.active_30d],['Username attention',summary.username_attention],['Patreon linked',summary.patreon],['Premium access',summary.paid],['Admins',summary.admins]].map(([label,value])=>`<div class="card"><span>${esc(label)}</span><strong>${fmt(value)}</strong></div>`).join('')}
         </div>
         <form id="user-filters" class="filters user-filters">
           <label>Find a user<input type="search" name="search" value="${esc(filters.search)}" maxlength="100" placeholder="Account name, email, or public username"></label>
-          <label>Status<select name="status"><option value="all" ${filters.status==='all'?'selected':''}>All accounts</option><option value="paid" ${filters.status==='paid'?'selected':''}>Paid</option><option value="patreon" ${filters.status==='patreon'?'selected':''}>Patreon connected</option><option value="admin" ${filters.status==='admin'?'selected':''}>Admins</option></select></label>
+          <label>Status<select name="status"><option value="all" ${filters.status==='all'?'selected':''}>All accounts</option><option value="paid" ${filters.status==='paid'?'selected':''}>Premium access</option><option value="patreon" ${filters.status==='patreon'?'selected':''}>Patreon connected</option><option value="admin" ${filters.status==='admin'?'selected':''}>Admins</option></select></label>
           <button>Refresh</button>
         </form>
         <div class="users-list-meta">
