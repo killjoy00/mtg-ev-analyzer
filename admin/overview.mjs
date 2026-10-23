@@ -114,7 +114,7 @@ export async function renderOverview(root,request,{role='admin',isCurrent=()=>tr
       const pending=challenges.filter(c=>['draft','publishing'].includes(c.status)).length;
       return `<p class="overview-status ${failed?'warning':'ready'}">${failed?`${count(failed)} publication ${failed===1?'operation needs':'operations need'} attention`:'No failed publication operations'}</p><p>${count(challenges.filter(c=>c.status==='published').length)} published &middot; ${count(pending)} draft or publishing</p><p class="muted">Most recent 100 challenges.</p>`;
     }),
-    section('overview-accounts','/v1/admin/users',data=>{
+    section('overview-accounts','/v1/admin/users?summary_only=1',data=>{
       const s=data.summary;if(!s)throw Error('Missing account summary');
       return `<dl class="overview-facts"><dt>Accounts</dt><dd>${count(s.total)}</dd><dt>New in 30 days</dt><dd>${count(s.new_30d)}</dd><dt>Active in 30 days</dt><dd>${count(s.active_30d)}</dd><dt>Paid access</dt><dd>${count(s.paid)}</dd><dt>Username attention</dt><dd>${count(s.username_attention)}</dd></dl>`;
     }),
