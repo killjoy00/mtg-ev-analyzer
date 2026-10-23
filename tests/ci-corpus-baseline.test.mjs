@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {clonedCorpusMatchesCatalog} from '../scripts/ci-corpus-baseline.mjs';
+import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 
-const version='elite-trophy-colour-stage-v9';
+const version=DRAFT_RUN_CORPUS_VERSION;
 const legacy='a'.repeat(64),upgraded='b'.repeat(64);
 const catalog={corpus_version:version,sets:[{id:'ktk',sha256:legacy},{id:'mom',sha256:legacy}]};
 const legacyRow=(set_id)=>({set_id,checksum:legacy,active_version:version});
