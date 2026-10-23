@@ -316,8 +316,8 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
       OR ($2='paid' AND EXISTS(SELECT 1 FROM entitlement_grants eg WHERE eg.auth_user_id=u.id AND eg.revoked_at IS NULL AND (eg.expires_at IS NULL OR eg.expires_at>now())))
       OR ($2='patreon' AND EXISTS(SELECT 1 FROM provider_accounts pc WHERE pc.auth_user_id=u.id AND pc.provider='patreon'))
       OR ($2='admin' AND EXISTS(SELECT 1 FROM pack1_admins pa WHERE pa.auth_user_id=u.id)))`;
-  const [summary,count,rows,activity]=await Promise.all([
-    query(`WITH activity AS (
+  // Overview only needs global account totals; avoid scanning directory rows or lifetime play cohorts.
+  const summaryRequest=query(`WITH activity AS (
         SELECT u.id,GREATEST(
           (SELECT max(s.updated_at) FROM account_links a JOIN draft_run_sessions s ON s.player_id=a.player_id WHERE a.auth_user_id=u.id),
           (SELECT max(e.created_at) FROM account_links a JOIN analytics_events e ON e.player_id=a.player_id WHERE a.auth_user_id=u.id),
@@ -335,7 +335,15 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
           SELECT 1 FROM account_links a JOIN players p ON p.id=a.player_id
           WHERE a.auth_user_id=u.id AND NOT p.username_owned
         ))::int username_attention
-      FROM neon_auth."user" u JOIN activity ON activity.id=u.id`),
+      FROM neon_auth."user" u JOIN activity ON activity.id=u.id`);
+  if(url.searchParams.get('summary_only')==='1') {
+    const summary=await summaryRequest;
+    return {generated_at:new Date().toISOString(),
+      summary:Object.fromEntries(Object.entries(summary.rows[0]||{}).map(([key,value])=>[key,num(value)]))};
+  }
+  const includeActivity=url.searchParams.get('activity')!=='0';
+  const [summary,count,rows,activity]=await Promise.all([
+    summaryRequest,
     query(`SELECT count(*)::int total FROM neon_auth."user" u ${where}`,params),
     query(`SELECT u.id,u.name,u.email,u."emailVerified" email_verified,u."createdAt" created_at,u.banned,
         a.claimed_at,p.display_name profile_name,p.username_owned,p.public_identity_hidden_at,
@@ -360,7 +368,7 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
       ${where}
       ORDER BY last_active DESC NULLS LAST,u."createdAt" DESC,u.id
       LIMIT 100 OFFSET $3`,[...params,(page-1)*100]),
-    playActivity(query,activityWindow),
+    includeActivity?playActivity(query,activityWindow):Promise.resolve(null),
   ]);
   return {
     generated_at:new Date().toISOString(),
