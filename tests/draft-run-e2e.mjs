@@ -230,7 +230,7 @@ try{
     await page.locator('.run-consensus-all>summary').click();
     assert.equal(await page.locator('.run-consensus tbody tr').first().locator('td').first().innerText(),'-','full comparison keeps the trophy dash');
     assert.equal(await page.locator('.run-consensus tbody tr').count(),p.candidates.length);
-    assert.match(await page.locator('.run-consensus tbody tr').first().locator('td').first().textContent(),/%/);
+    assert.match(await page.locator('.run-consensus tbody tr').nth(1).locator('td').first().textContent(),/%/,'other cards retain their model support');
     if(daily&&round>0){
       // Peer shares arrive with the "% of players picked this" line and share its threshold.
       // Round one keeps the existing compact-height budget, measured without peer stats.
