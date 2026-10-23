@@ -25,7 +25,7 @@ export async function renderUsers(root,request,growthRequest=request,viewerRole=
   let data=null,filters={search:prefill.length<=100?prefill:'',status:'all'},
     activityWindow={from:'',to:''},page=1,detailLoadSerial=0,loadSerial=0;
 
-  async function load() {
+  async function load({accountsOnly=false}={}) {
     const serial=++loadSerial;
     if(!data)root.innerHTML='<p role="status">Loading users…</p>';
     else {
@@ -36,6 +36,7 @@ export async function renderUsers(root,request,growthRequest=request,viewerRole=
     if(filters.search)query.set('search',filters.search);
     if(filters.status!=='all')query.set('status',filters.status);
     if(page>1)query.set('page',String(page));
+    if(accountsOnly&&data)query.set('activity','0');
     if(activityWindow.from)query.set('activity_from',activityWindow.from);
     if(activityWindow.to)query.set('activity_to',activityWindow.to);
     try {
@@ -44,9 +45,9 @@ export async function renderUsers(root,request,growthRequest=request,viewerRole=
       // Search results may have shrunk between page requests.
       if(page>1&&!next.users.length) {
         const lastAvailablePage=Math.max(1,Math.ceil(Number(next.total_matching)/(Number(next.page_size)||100))||1);
-        if(page>lastAvailablePage){page=lastAvailablePage;return load();}
+        if(page>lastAvailablePage){page=lastAvailablePage;return load({accountsOnly});}
       }
-      data=next;
+      data=accountsOnly&&data?{...next,play_activity:data.play_activity}:next;
       render();
     } catch(error) {
       if(serial!==loadSerial)return;
@@ -81,7 +82,7 @@ export async function renderUsers(root,request,growthRequest=request,viewerRole=
       <div class="scroll"><table class="play-activity-table"><thead><tr><th>Status</th><th>Players</th><th>Completed runs</th><th>First Daily in range</th><th>Next-day return</th></tr></thead><tbody>
         ${rows.map(row=>`<tr><th>${esc(labels[row.group]||row.group)}</th><td>${fmt(row.players)}</td><td>${fmt(row.completed_runs)}</td><td>${fmt(row.first_daily_people)}</td><td>${pct(row.next_day_rate)}<br><small>${fmt(row.next_day_returned)} / ${fmt(row.next_day_mature)} returned · ${fmt(row.next_day_immature)} too new</small></td></tr>`).join('')||'<tr><td colspan="5">No completed runs in this range.</td></tr>'}
       </tbody></table></div>
-      <p class="users-activity-note">Pacific dates; current-corpus completed Daily and practice runs only, with QA and admin players excluded. Dailies use their assigned Daily date; practice uses the run creation date. Guests count per browser; linked players count by account, including earlier runs. These totals are not directly subtractable from Overview’s first-encounter observations. Next-day return counts first-ever Daily players who completed another Daily the next day; “too new” means that next day is not fully over.</p>`;
+      <p class="users-activity-note">Pacific dates; current-corpus completed Draft Runs (Daily, practice, and shared challenges) only, with QA and admin players excluded. Dailies use their assigned Daily date; practice uses the run creation date. Guests count per browser; linked players count by account, including earlier runs. These totals are not directly subtractable from Overview’s first-encounter observations. Next-day return counts first-ever Daily players who completed another Daily the next day; “too new” means that next day is not fully over.</p>`;
   }
 
   function access(user) {
@@ -137,7 +138,7 @@ function render() {
       const form=new FormData(event.currentTarget);
       filters={search:String(form.get('search')||'').trim(),status:String(form.get('status')||'all')};
       page=1;
-      await load();
+      await load({accountsOnly:true});
     };
     const activityForm=root.querySelector('#play-activity-filters');
     if(activityForm)activityForm.onsubmit=async event=>{
@@ -159,7 +160,7 @@ function render() {
     root.querySelectorAll('[data-user-page]').forEach(button=>button.onclick=async()=>{
       page+=button.dataset.userPage==='next'?1:-1;
       page=Math.max(1,Math.min(page,lastPage));
-      await load();
+      await load({accountsOnly:true});
     });
     root.querySelectorAll('[data-user]').forEach(button=>button.onclick=()=>openDetail(button.dataset.user));
   }
