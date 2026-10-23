@@ -199,7 +199,7 @@ test('backend Neon branches are capped, sampled, gated on the local contract and
   assert.match(backend, /schedule:\n    - cron: '[^']+'/);
   assert.match(domain, /needs: \[precheck, postgres-contract\]/);
   assert.match(domain, /if: \$\{\{ !cancelled\(\) && needs\.postgres-contract\.result == 'success' && \(\(github\.event_name == 'schedule' && github\.repository == 'killjoy00\/mtg-ev-analyzer'\) \|\| /);
-  assert.match(domain, /    env:\n(?:      #.*\n)*      CI_BRANCH_MAX_CU: 2\n/);
+  assert.match(domain, /    env:\n(?:      #.*\n)*      CI_BRANCH_MAX_CU: \$\{\{ \(matrix\.domain == 'draft_run' \|\| matrix\.domain == 'corpus'\) && 2 \|\| 1 \}\}\n/);
   assert.match(domain, /CI_BRANCH_PREFIX: ci-pr-\$\{\{ github\.event\.pull_request\.number \|\| 0 \}\}/);
   assert.doesNotMatch(domain, /HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
   const summary = domain.indexOf('name: Summarize Neon compute allocation');

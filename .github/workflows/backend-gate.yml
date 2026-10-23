@@ -167,9 +167,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
-      # Routine suites stay below the project's 8 CU ceiling. The sampler
-      # summary shows whether each domain needs this much.
-      CI_BRANCH_MAX_CU: 2
+      # Routine suites stay below the project's 8 CU ceiling. At 2 CU on #1323,
+      # draft_run and corpus sat at the cap 74% and 92% of the time; the other
+      # domains rarely needed more than 1 CU. The sampler summary shows this.
+      CI_BRANCH_MAX_CU: ${{ (matrix.domain == 'draft_run' || matrix.domain == 'corpus') && 2 || 1 }}
     steps:
       - uses: actions/checkout@v4
         with:
