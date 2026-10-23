@@ -62,6 +62,70 @@ class CardMetadataTests(unittest.TestCase):
         self.assertEqual(draft_printing_priority(token, "otj"), 2)
         self.assertEqual(choose_main_printing([base, token], "Alpha", "otj")["id"], "old")
 
+    def test_bonus_sheet_base_numbers_win_even_if_variant_looks_plainer(self):
+        # Scryfall's special-frame metadata is not by itself a reliable signal:
+        # a bonus sheet's default art may itself be borderless/showcase.
+        old = {"id": "old", "name": "Alpha", "set": "old",
+               "lang": "en", "released_at": "2000-01-01", "collector_number": "1",
+               "image_uris": {"normal": "https://img/old.jpg"}}
+        cases = (
+            ("bro", "brr", 63),
+            ("mom", "mul", 65),
+            ("woe", "wot", 63),
+            ("otj", "otp", 65),
+            ("otj", "big", 30),
+        )
+        for draft_set, source_set, max_base in cases:
+            with self.subTest(draft_set=draft_set, source_set=source_set):
+                base = {**old, "id": "source-base", "set": source_set,
+                        "collector_number": str(max_base), "released_at": "2024-04-19",
+                        "border_color": "borderless", "frame_effects": ["showcase"],
+                        "image_uris": {"normal": "https://img/base.jpg"}}
+                alternate = {**old, "id": "alternate", "set": source_set,
+                             "collector_number": str(max_base + 1),
+                             "released_at": "2024-04-19",
+                             "image_uris": {"normal": "https://img/alternate.jpg"}}
+                self.assertEqual(draft_printing_priority(base, draft_set), 1)
+                self.assertEqual(draft_printing_priority(alternate, draft_set), 2)
+                self.assertEqual(
+                    choose_main_printing([old, alternate, base], "Alpha", draft_set)["id"],
+                    "source-base",
+                )
+                # If the bonus sheet has no official base art for this name,
+                # never choose its collector-only printing instead of plain art.
+                self.assertEqual(
+                    choose_main_printing([old, alternate], "Alpha", draft_set)["id"],
+                    "old",
+                )
+
+    def test_same_set_normal_printing_wins_over_cosmetic_alternates(self):
+        base = {"id": "base", "name": "Alpha", "set": "otj",
+                "lang": "en", "released_at": "2024-04-19", "collector_number": "12",
+                "image_uris": {"normal": "https://img/base.jpg"}}
+        for flags in ({"variation": True}, {"textless": True},
+                      {"promo": True}, {"oversized": True},
+                      {"full_art": True}, {"frame_effects": ["extendedart"]},
+                      {"border_color": "borderless"}):
+            with self.subTest(flags=flags):
+                alt = {**base, "id": "alternate", "collector_number": "300",
+                       "image_uris": {"normal": "https://img/alternate.jpg"},
+                       **flags}
+                self.assertEqual(
+                    choose_main_printing([alt, base], "Alpha", "otj")["id"],
+                    "base",
+                )
+
+    def test_source_only_promo_falls_back_to_simple_other_set_art(self):
+        old = {"id": "old", "name": "Alpha", "set": "ktk", "lang": "en",
+               "released_at": "2014-09-26", "collector_number": "1",
+               "image_uris": {"normal": "https://img/old.jpg"}}
+        promo = {**old, "id": "promo", "set": "otj", "released_at": "2024-04-19",
+                 "promo": True, "image_uris": {"normal": "https://img/promo.jpg"}}
+        self.assertEqual(draft_printing_priority(promo, "otj"), 2)
+        self.assertEqual(
+            choose_main_printing([promo, old], "Alpha", "otj")["id"], "old"
+        )
+
     def test_otj_special_guests_are_limited_to_the_2024_collector_range(self):
         old = {"id": "old", "name": "Stoneforge Mystic", "set": "wwk", "lang": "en",
                "released_at": "2010-02-05", "collector_number": "20",
