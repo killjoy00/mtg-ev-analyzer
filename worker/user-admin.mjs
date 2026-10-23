@@ -24,6 +24,12 @@ export function userAdminFilters(url) {
   return {search,status};
 }
 
+export function userAdminPage(url) {
+  const raw=url.searchParams.get('page')||'1';
+  if(!/^[1-9][0-9]{0,3}$/.test(raw))fail('Choose a valid account page.');
+  return Number(raw);
+}
+
 const DATE_KEY=/^\d{4}-\d{2}-\d{2}$/;
 const validDateKey=value=>DATE_KEY.test(value)&&Number.isFinite(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value;
 
@@ -300,7 +306,7 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
   }
 
   if(url.pathname!=='/v1/admin/users')fail('Not found.',404);
-  const filters=userAdminFilters(url),activityWindow=playActivityWindow(url),params=[filters.search,filters.status];
+  const filters=userAdminFilters(url),page=userAdminPage(url),activityWindow=playActivityWindow(url),params=[filters.search,filters.status];
   const where=`WHERE ($1='' OR coalesce(u.name,'') ILIKE '%'||$1||'%' OR coalesce(u.email,'') ILIKE '%'||$1||'%'
       OR EXISTS(
         SELECT 1 FROM account_links search_link JOIN players search_player ON search_player.id=search_link.player_id
@@ -352,8 +358,8 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
       LEFT JOIN LATERAL (SELECT max(created_at) last_event FROM analytics_events e WHERE e.player_id=a.player_id) ev ON true
       LEFT JOIN LATERAL (SELECT max("updatedAt") last_auth FROM neon_auth.session ns WHERE ns."userId"=u.id) au ON true
       ${where}
-      ORDER BY last_active DESC NULLS LAST,u."createdAt" DESC
-      LIMIT 100`,params),
+      ORDER BY last_active DESC NULLS LAST,u."createdAt" DESC,u.id
+      LIMIT 100 OFFSET $3`,[...params,(page-1)*100]),
     playActivity(query,activityWindow),
   ]);
   return {
@@ -361,7 +367,8 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
     filters,
     summary:Object.fromEntries(Object.entries(summary.rows[0]||{}).map(([key,value])=>[key,num(value)])),
     total_matching:num(count.rows[0]?.total),
-    truncated:num(count.rows[0]?.total)>100,
+    page,page_size:100,
+    truncated:num(count.rows[0]?.total)>page*100,
     users:rows.rows.map(normalizeUser),
     play_activity:activity,
   };
