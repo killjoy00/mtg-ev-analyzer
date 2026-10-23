@@ -42,6 +42,9 @@ jobs:
         with:
           node-version: 24
 
+      - name: Install full-test Python dependencies
+        run: python3 -m pip install --quiet 'Pillow==11.3.0' 'fonttools[woff]==4.60.1'
+
       - name: Hydrate the normalized replay shards from R2
         run: bash scripts/r2_replay_shards.sh hydrate
 
