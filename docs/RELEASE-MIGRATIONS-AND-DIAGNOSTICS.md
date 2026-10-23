@@ -81,13 +81,28 @@ node scripts/neon-compute-history.mjs FROM_UTC TO_UTC daily /private/history.jso
 Output is created exclusively with mode 0600; stdout contains no usage details.
 The reviewed `private compute history` workflow runs only from main in the
 existing protected environment, on manual dispatch or a merged request change.
-It uses the existing approved credentials and `scripts/private-compute-report.mjs`
+It uses the existing approved `NEON_API_KEY` and a separate
+`CLOUDFLARE_PRIVATE_REPORT_TOKEN` through `scripts/private-compute-report.mjs`
 to write into the private operations bucket. It verifies that r2.dev access is
 disabled and no custom domains exist, rechecks before the write, then verifies
 the saved bytes by SHA-256 readback. There is no public artifact or usage output,
 and no new schedule. Each run/attempt has its own object. Credentials are never
 copied into reports. A missing capability or validation failure remains explicit;
 raw usage pages needed to diagnose schema/coverage failures stay private.
+
+The separate storage credential must be installed as a secret in the existing
+`pack-one-mobile-release` GitHub environment by an authorized secret administrator.
+It needs Cloudflare REST access to read the configured bucket's managed/custom
+public-domain settings and read/write its report objects. An S3 access key alone
+does not provide the privacy-configuration verification this collector requires.
+Use the narrowest provider-supported scope for that bucket. Do not expand,
+replace or reuse production gateway, audit, replay-storage or deployment
+credentials. The workflow has no fallback to those credentials. If dedicated
+access is missing or rejected, collection fails closed without publishing data.
+After provisioning, manually dispatch `private compute history` and
+`Egress recovery evidence` from reviewed main. Both must complete with verified
+private readback before reporting collection as enabled. The storage capability
+probe publishes only an allowlisted status; it never enumerates account tokens.
 
 Default collection covers completed UTC days this month and the latest 167
 complete UTC hours, leaving room inside the hourly retention boundary. Live and

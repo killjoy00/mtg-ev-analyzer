@@ -20,17 +20,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Verify existing credentials against the approved private bucket
+      - name: Verify dedicated storage and existing history access
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
-          CLOUDFLARE_AUDIT_TOKEN: ${{ secrets.CLOUDFLARE_AUDIT_TOKEN }}
-          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          CLOUDFLARE_PRIVATE_REPORT_TOKEN: ${{ secrets.CLOUDFLARE_PRIVATE_REPORT_TOKEN }}
         run: node scripts/private-storage-capability.mjs
       - name: Collect read-only history into verified private storage
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+          CLOUDFLARE_PRIVATE_REPORT_TOKEN: ${{ secrets.CLOUDFLARE_PRIVATE_REPORT_TOKEN }}
         run: node scripts/private-compute-report.mjs
       # No upload-artifact, job-summary data or provider payload logging.
