@@ -270,7 +270,7 @@ try {
   // Access must describe current grants, not provider-account linkage.
   const memberRow=page.locator('#user-rows tr').filter({hasText:'Test Member'});
   const expiredLinkedRow=page.locator('#user-rows tr').filter({hasText:'Pack One Admin'});
-  assert.match(await memberRow.locator('.user-access').innerText(),/Paid/);
+  assert.match(await memberRow.locator('.user-access').innerText(),/Premium access/);
   assert.doesNotMatch(await memberRow.locator('.user-access').innerText(),/Patreon/);
   assert.equal(await memberRow.locator('.user-connections').innerText(),'Patreon linked');
   assert.equal(await expiredLinkedRow.locator('.user-access').innerText(),'Free account');
