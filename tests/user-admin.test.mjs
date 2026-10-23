@@ -103,3 +103,33 @@ test('account pages validate bounds and preserve a stable list order',async()=>{
   const countCall=calls.find(call=>call.sql.includes('SELECT count(*)::int total FROM neon_auth."user" u'));
   assert.deepEqual(countCall.params,['test','all']);
 });
+
+test('overview account summary skips directory and completed-run queries',async()=>{
+  const calls=[];
+  const query=async sql=>{
+    calls.push(sql);
+    return {rows:[{total:'5',new_30d:'2',active_30d:'4',patreon:'1',paid:'1',admins:'1',username_attention:'0'}]};
+  };
+  const result=await handleUserAdmin(new Request('https://packone.pro/v1/admin/users?summary_only=1'),query,undefined,{adminAuthUserId:ADMIN});
+  assert.equal(calls.length,1);
+  assert.match(calls[0],/WITH activity AS/);
+  assert.equal(result.summary.total,5);
+  assert.equal(result.users,undefined);
+  assert.equal(result.play_activity,undefined);
+});
+
+test('account-only reads keep account summary but skip expensive play cohorts',async()=>{
+  const calls=[];
+  const query=async(sql,params)=>{
+    calls.push({sql,params});
+    if(sql.includes('SELECT count(*)::int total FROM neon_auth."user" u'))return {rows:[{total:1}]};
+    if(sql.includes('LIMIT 100 OFFSET $3'))return {rows:[]};
+    return {rows:[{total:1}]};
+  };
+  const result=await handleUserAdmin(new Request('https://packone.pro/v1/admin/users?activity=0&page=1'),query,undefined,{adminAuthUserId:ADMIN});
+  assert.equal(calls.length,3);
+  assert.equal(calls.some(call=>call.sql.includes("'signed_out'")),false);
+  assert.equal(result.play_activity,null);
+  assert.equal(result.page,1);
+  assert.equal(result.total_matching,1);
+});
