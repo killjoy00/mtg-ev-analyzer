@@ -55,6 +55,12 @@ Normal stack progression is:
 
 Do not merge `main` into a feature branch, create a sync pull request, or add a no-op commit only to retrigger CI. Merge or rebase `main` into the feature branch only when the branch actually needs those commits to resolve a conflict or consume a dependency.
 
+## Known failure modes
+
+- **Slow browser dependency install.** `browser` installs Playwright's Chromium and WebKit system packages from the runner's Ubuntu mirror (`npx playwright install --with-deps`). That normally takes 40–60 seconds. Between October 21 and 23, at least five runs spent 19–30+ minutes downloading packages. Three hit the 30-minute job timeout before tests finished. Recognize it by an `Install browser test dependency` step that runs for several minutes. It is not a test result: re-run the job once.
+- **The backend gate copies production.** Isolated backend domains branch from production, so a production data change can expose a latent bug with no code change. On October 23 the first report-linked removal made `backend corpus` fail on every PR until migration 0066 (see [serving cache membership parity](BACKEND-RELIABILITY.md#serving-cache-membership-parity)). When the same failure appears on unrelated PRs, investigate the base and production state before the PR.
+- **Intermittent browser assertions.** `tests/patreon-activation-e2e.mjs` waits a fixed 250 ms for an analytics event that is sent asynchronously. A `tests/e2e.mjs` Daily-home completion assertion failed once and is not root-caused. Re-run once; a second failure on the same commit is real.
+
 ## Optional and path-specific checks
 
 A check being visible in the pull-request UI does not make it a branch-protection requirement. Long-running native build, store-access, backend-schema, or other specialized workflows should be judged by whether they validate paths changed by that pull request.

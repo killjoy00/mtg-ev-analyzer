@@ -1,6 +1,15 @@
 # Current state
 
-Updated October 12, 2026 for the exact trophy-record release and the iOS 1.1/100765 and Android 100772 candidates, after the My Pack One Insights release and the Daily peer-stats, trophy-evidence and account-recovery releases; the October 10 mobile and October 8 Admin/Owner sections below are historical snapshots. Implementation, backend deployment, gateway deployment, Pages deployment, database publication and provider activation remain separate. Older reviews are historical evidence.
+Updated October 23, 2026 for the Reality Fracture Traditional supplement, the trophy decklist import check and the serving-cache carry-forward fix (first section below). The October 12 update covered the exact trophy-record release and the iOS 1.1/100765 and Android 100772 candidates, after the My Pack One Insights release and the Daily peer-stats, trophy-evidence and account-recovery releases; the October 10 mobile and October 8 Admin/Owner sections below are historical snapshots. Implementation, backend deployment, gateway deployment, Pages deployment, database publication and provider activation remain separate. Older reviews are historical evidence.
+
+## October 23, 2026 — Reality Fracture Traditional supplement, decklist check and serving-cache fix
+
+| Change | Production state | Evidence |
+| --- | --- | --- |
+| Reality Fracture Traditional P1P1-P1P6 (`traditional-premier-v5-p1p6-v1`) | **Live** since 03:40 UTC: 846 puzzles at picks 1–6, 805 usable, 775 of them in the serving cache. P1P7-P1P8 stay Premier-only. All 141 source drafts have trophy decklists. | #1303. Runs: secure-auth 39881241236; development stage 39882733722 and publish 39883495249; production stage 39886235358 and publish 39896218920. |
+| Production-stage guard | Production staging accepts a development copy that is staged or already published under a Live parent. The identical artifact, counts and ratings are still required. | #1310. Run 39884213428 stopped at the old guard before any production change. |
+| Trophy decklist import check | Every puzzle import reports per-set decklist coverage before writing. Decklists are optional; the check is not. CI fails any import path that skips it. | #1318. [Corpus operations](CORPUS-OPERATIONS.md#trophy-decklist-check-required-for-every-puzzle-import). |
+| Serving-cache carry-forward | Migration 0066 is applied on development and production. The current production cache passes the carry-forward comparison again. | #1319, #1320, release run 39902051595. [Backend reliability](BACKEND-RELIABILITY.md#serving-cache-membership-parity). |
 
 ## October 12, 2026 — exact trophy records and new store candidates
 
