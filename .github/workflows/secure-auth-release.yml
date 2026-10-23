@@ -325,6 +325,7 @@ jobs:
       - name: Verify retained gateway timings for this production release
         env:
           PACK1_EXPECT_RELEASE: ${{ github.sha }}
+          PACK1_WORKERS_PLAN: ${{ vars.PACK1_WORKERS_PLAN }}
         run: node scripts/launch-alert.mjs check
 
       - uses: actions/upload-artifact@v4

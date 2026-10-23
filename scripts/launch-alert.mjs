@@ -1,5 +1,7 @@
 import fs from 'node:fs';
 import {pathToFileURL} from 'node:url';
+import {SLOW_REQUEST_MS,SLOW_QUOTA_MS,alertSeverity} from '../launch-alert-policy.mjs';
+import {reconcileIncidents,persistentLatencyConditions} from './launch-incident-state.mjs';
 import {
   COVERAGE_ISSUE_NUMBER,COVERAGE_ISSUE_TITLE,WINDOW_MS,STEP_MS,
   normalizeCoverageState,parseCoverageState,renderCoverageState,mergeCoverageState,planCoverage,withWindowAlerts,
@@ -10,7 +12,7 @@ const CONTINUATION_WORKFLOW='launch-alert.yml';
 export const MAX_CONTINUATION_DEPTH=12;
 export const GATEWAY_PAGE_SIZE=2000,GATEWAY_MAX_PAGES=32;
 const RECOVERABLE_ALERTS=new Set(['coverage_pending','coverage_continuation_failed','telemetry_unavailable']);
-export const thresholds={window_minutes:15,minimum_errors:5,estimated_error_fraction:.01,minimum_429:10,minimum_slow_samples:3,slow_ms:5000,quota_ms:1000,requests_per_day:100000,compute_cu_hours_per_billing_period:200,egress_bytes_per_billing_period:50*1024**3};
+export const thresholds={window_minutes:15,minimum_errors:5,estimated_error_fraction:.01,minimum_429:10,minimum_slow_samples:3,slow_ms:SLOW_REQUEST_MS,quota_ms:SLOW_QUOTA_MS,requests_per_day:100000,free_requests_warning:80000,free_requests_alert:95000,compute_cu_hours_per_billing_period:200,egress_bytes_per_billing_period:50*1024**3};
 
 async function json(fetcher,url,token,body,method=body?'POST':'GET') {
   const r=await fetcher(url,{method,headers:{authorization:'Bearer '+token,'content-type':'application/json',accept:'application/json'},body:body?JSON.stringify(body):undefined,redirect:'error',signal:AbortSignal.timeout(20000)});
@@ -23,8 +25,16 @@ export function parseGatewayEvent(row) {
   let p=row?.source;
   if(typeof p==='string')try{p=JSON.parse(p);}catch{return null;}
   if(!p||typeof p!=='object')try{p=JSON.parse(row?.$metadata?.message);}catch{return null;}
-  if(p.event!=='gateway_request'||![.1,1].includes(p.sample_rate)||!Number.isFinite(p.status)||!Number.isFinite(p.duration_ms))return null;
-  return {id:row?.$metadata?.id,route:/^[a-z_]{1,40}$/.test(p.route)?p.route:'other',status:p.status,sample_rate:p.sample_rate,duration_ms:p.duration_ms,quota_ms:Number(p.quota_ms)||0,upstream_ms:Number(p.upstream_ms)||0,quota_scope:['request','session','request,session'].includes(p.quota_scope)?p.quota_scope:null,release:/^[a-f0-9]{40}$/.test(p.release)?p.release:'unknown'};
+  if(!p||typeof p!=='object'||p.event!=='gateway_request'||![.1,1].includes(p.sample_rate)||!Number.isInteger(p.status)||p.status<100||p.status>599||!Number.isFinite(p.duration_ms)||p.duration_ms<0)return null;
+  const duration=value=>Number.isFinite(value)&&value>=0?value:0;
+  const integer=value=>Number.isInteger(value)&&value>=0&&value<=100?value:null;
+  const event={id:row?.$metadata?.id,route:/^[a-z_]{1,40}$/.test(p.route)?p.route:'other',status:p.status,sample_rate:p.sample_rate,duration_ms:p.duration_ms,quota_ms:duration(p.quota_ms),upstream_ms:duration(p.upstream_ms),quota_scope:['request','session','request,session'].includes(p.quota_scope)?p.quota_scope:null,release:/^[a-f0-9]{40}$/.test(p.release)?p.release:'unknown',
+    tail_sampling_version:p.tail_sampling_version===1?1:0,rate_limit_class:p.rate_limit_class==='player_auth'&&p.status===429&&p.route==='account'&&p.upstream_status===429&&p.upstream_calls===1&&!p.quota_scope?'player_auth':null,
+    upstream_calls:integer(p.upstream_calls),upstream_status:Number.isInteger(p.upstream_status)&&p.upstream_status>=100&&p.upstream_status<=599?p.upstream_status:null,
+    quota_attempts:integer(p.quota_attempts),quota_retryable:p.quota_retryable===true,quota_overloaded:p.quota_overloaded===true,quota_remote:p.quota_remote===true,
+    error:['timeout','invalid_body','gateway_failure'].includes(p.error)?p.error:null};
+  if(event.tail_sampling_version===1&&(event.duration_ms>thresholds.slow_ms||event.quota_ms>thresholds.quota_ms)&&event.sample_rate!==1)return null;
+  return event;
 }
 
 export function evaluate(events,usage) {
@@ -32,14 +42,39 @@ export function evaluate(events,usage) {
   const slow=events.filter(e=>e.duration_ms>thresholds.slow_ms).length,quotaSlow=events.filter(e=>e.quota_ms>thresholds.quota_ms).length;
   const alerts=[];
   if(errors>=thresholds.minimum_errors&&errors/Math.max(1,estimated)>thresholds.estimated_error_fraction)alerts.push('gateway_5xx');
-  if(limited>=thresholds.minimum_429)alerts.push('network_or_application_429');
+  const authLimited=events.filter(e=>e.status===429&&e.rate_limit_class==='player_auth').length;
+  if(limited-authLimited>=thresholds.minimum_429)alerts.push('network_or_application_429');
+  if(authLimited>=thresholds.minimum_429)alerts.push('authentication_429');
   if(slow>=thresholds.minimum_slow_samples)alerts.push('slow_requests');
   if(quotaSlow>=thresholds.minimum_slow_samples)alerts.push('slow_quota');
-  if(usage.worker_requests>=thresholds.requests_per_day)alerts.push('worker_daily_usage');
+  // Unknown plans retain a warning; Paid traffic volume is report-only.
+  // Free headroom uses current UTC-day, account-wide usage, not yesterday's gateway.
+  if(!['free','paid'].includes(usage.worker_plan)&&usage.worker_requests>=thresholds.requests_per_day)alerts.push('worker_daily_usage');
+  if(usage.worker_plan==='free'&&usage.worker_account_requests_today>=thresholds.free_requests_alert)alerts.push('worker_daily_limit_risk');
+  else if(usage.worker_plan==='free'&&usage.worker_account_requests_today>=thresholds.free_requests_warning)alerts.push('worker_daily_headroom');
   // Daily Neon history is whole-project (production, development, and CI), so keep it in reports but do not route it as a production incident.
   if(usage.billing_period_compute_cu_hours>=thresholds.compute_cu_hours_per_billing_period)alerts.push('neon_compute_billing_period_usage');
   if(usage.billing_period_egress_bytes>=thresholds.egress_bytes_per_billing_period)alerts.push('neon_egress_billing_period_usage');
-  return {alerts,sampled_events:events.length,estimated_requests:estimated,errors,limited,slow_samples:slow,slow_quota_samples:quotaSlow,releases:[...new Set(events.map(e=>e.release))],usage};
+  const diagnostic_categories=new Set();
+  for(const e of events.filter(e=>e.status>=500||e.status===429||e.duration_ms>thresholds.slow_ms||e.quota_ms>thresholds.quota_ms)) {
+    diagnostic_categories.add(e.route?.startsWith('draft_')?'draft':e.route==='account'?'account':e.route?.startsWith('admin_')?'admin':'other');
+    if(e.status>=500)diagnostic_categories.add(e.upstream_calls===0?'quota_or_gateway':e.upstream_status>=500?'origin_failure':'unattributed_failure');
+    if(e.quota_overloaded)diagnostic_categories.add('quota_overloaded');
+    if(e.error==='timeout')diagnostic_categories.add('timeout');
+    if(e.quota_scope)diagnostic_categories.add('network_quota');
+    if(e.rate_limit_class==='player_auth')diagnostic_categories.add('player_auth_limit');
+  }
+  const gameplay=e=>/^draft_(?:start|view|pick|reroll|read|daily_status|shared_read|creator_challenge_read)$/.test(e.route||'')||e.route==='player_session';
+  const persistent_candidates=[];
+  if(events.filter(e=>gameplay(e)&&e.duration_ms>thresholds.slow_ms).length>=thresholds.minimum_slow_samples)persistent_candidates.push('slow_requests_gameplay');
+  if(events.filter(e=>gameplay(e)&&e.quota_ms>thresholds.quota_ms).length>=thresholds.minimum_slow_samples)persistent_candidates.push('slow_quota_gameplay');
+  return {alerts,persistent_candidates,severities:Object.fromEntries(alerts.map(c=>[c,alertSeverity(c)])),diagnostic_categories:[...diagnostic_categories].sort(),latency_sampling:events.length&&events.every(e=>e.tail_sampling_version===1)?'complete_tail':'legacy_or_mixed',sampled_events:events.length,estimated_requests:estimated,errors,limited,slow_samples:slow,slow_quota_samples:quotaSlow,releases:[...new Set(events.map(e=>e.release))],usage};
+}
+
+export function parseBillingPeriodUsage(project,now=Date.now()) {
+  const p=project,from=Date.parse(p?.consumption_period_start),to=Date.parse(p?.consumption_period_end);
+  if(p?.id!==PROJECT||!Number.isFinite(p.compute_time_seconds)||p.compute_time_seconds<0||!Number.isSafeInteger(p.data_transfer_bytes)||p.data_transfer_bytes<0||!Number.isFinite(from)||!Number.isFinite(to)||from>=to||now<from||now>=to)throw Error('Neon billing-period counters unavailable or stale');
+  return {billing_period_compute_cu_hours:p.compute_time_seconds/3600,billing_period_egress_bytes:p.data_transfer_bytes,billing_period_start:new Date(from).toISOString(),billing_period_end:new Date(to).toISOString(),billing_period_scope:'entire-project/all-branches/public-and-private-network-transfer',billing_period_source:'project counters; observation time is not a consumption watermark'};
 }
 
 export function parseNeonUsage(data) {
@@ -62,7 +97,7 @@ export async function queryEvents(fetcher,token,account,from,to) {
     if(offset){body.offset=offset;body.offsetDirection='next';}
     const d=await json(fetcher,url,token,body);
     const rows=d.result?.events?.events;if(!Array.isArray(rows))throw Error('Unexpected gateway log schema');
-    for(const row of rows){const event=parseGatewayEvent(row);if(event?.id)seen.set(event.id,event);}
+    for(const row of rows){const event=parseGatewayEvent(row);if(!event?.id)throw Error('Unexpected gateway event schema');seen.set(event.id,event);}
     if(rows.length<GATEWAY_PAGE_SIZE)return [...seen.values()];
     const next=rows.at(-1)?.$metadata?.id;
     if(typeof next!=='string'||!next||next.length>512||next===offset)throw Error('Gateway telemetry cursor invalid');
@@ -85,6 +120,9 @@ function dedupeEvents(events) {
 function gatewaySummary(summary) {
   return {
     alerts:summary.alerts,
+    severities:summary.severities,
+    diagnostic_categories:summary.diagnostic_categories,
+    latency_sampling:summary.latency_sampling,
     sampled_events:summary.sampled_events,
     estimated_requests:summary.estimated_requests,
     errors:summary.errors,
@@ -114,7 +152,7 @@ export async function inspectGatewayCoverage({state,now=Date.now(),loadWindow}) 
       // Durable window evidence must never suppress a retry if GitHub issue routing failed.
       // Open category issues remain the authoritative cross-run alert dedupe layer.
       for(const alert of summary.alerts)routed.add(alert);
-      next=withWindowAlerts(next,end,summary.alerts);
+      next=withWindowAlerts(next,end,[...summary.alerts,...summary.persistent_candidates]);
       if(newEnds.has(end))next.covered_through=endIso;
       windows.push({from:new Date(from).toISOString(),to:endIso,replay:!newEnds.has(end),...gatewaySummary(summary)});
     } catch(error) {
@@ -126,16 +164,18 @@ export async function inspectGatewayCoverage({state,now=Date.now(),loadWindow}) 
   const remainingNewWindows=coveredAfter===null
     ?plan.allNewEnds.length
     :Math.max(0,Math.ceil((plan.target-coveredAfter)/STEP_MS));
-  return {state:next,plan,windows,alerts:[...routed],failed,unrecoverable:false,remainingNewWindows};
+  const persistent=persistentLatencyConditions(next.alerted_windows,plan.target);
+  return {state:next,plan,windows,alerts:[...routed],persistent,failed,unrecoverable:false,remainingNewWindows};
 }
 
-async function usage(fetcher,env,account,now) {
+export async function usage(fetcher,env,account,now) {
   // Complete UTC day avoids treating partially reported current-hour metrics as complete.
   const to=new Date(now);to.setUTCHours(0,0,0,0);const from=new Date(to-86400000);
   const cf=await json(fetcher,'https://api.cloudflare.com/client/v4/graphql',env.CLOUDFLARE_EDGE_TOKEN,{query:'query($account: string, $from: string, $to: string) { viewer { accounts(filter: {accountTag: $account}) { workersInvocationsAdaptive(limit: 1, filter: {scriptName: "pack1-gateway", datetime_geq: $from, datetime_lt: $to}) { sum { requests errors } } } } }',variables:{account,from:from.toISOString(),to:to.toISOString()}});
   const rows=cf.data?.viewer?.accounts?.[0]?.workersInvocationsAdaptive;
   if(!Array.isArray(rows))throw Error('Unexpected Worker usage schema');
   const project=await json(fetcher,'https://console.neon.tech/api/v2/projects/'+PROJECT,env.NEON_API_KEY);
+  const billing=parseBillingPeriodUsage(project.project,now);
   const org=project.project?.org_id;if(!/^[a-z0-9-]{1,60}$/.test(org||''))throw Error('Neon project organization unavailable');
   const params=new URLSearchParams({org_id:org,project_ids:PROJECT,from:from.toISOString(),to:to.toISOString(),granularity:'daily',metrics:'compute_unit_seconds,public_network_transfer_bytes'});
   let neon;
@@ -157,7 +197,15 @@ async function usage(fetcher,env,account,now) {
       neon={billing_period_compute_cu_hours:p.compute_time_seconds/3600,billing_period_egress_bytes:p.data_transfer_bytes,billing_period_start:p.consumption_period_start,source:'project billing-period counters; daily Neon history unavailable'};
     }
   }
-  return {day:from.toISOString().slice(0,10),scope:'entire Neon project including CI branches; production gateway only',worker_requests:rows.reduce((n,r)=>n+(r.sum?.requests||0),0),...neon};
+  const worker_plan=['free','paid'].includes(env.PACK1_WORKERS_PLAN)?env.PACK1_WORKERS_PLAN:'unknown';
+  let worker_account_requests_today;
+  if(worker_plan==='free') {
+    const current=await json(fetcher,'https://api.cloudflare.com/client/v4/graphql',env.CLOUDFLARE_EDGE_TOKEN,{query:'query($account: string, $from: string, $to: string) { viewer { accounts(filter: {accountTag: $account}) { workersInvocationsAdaptive(limit: 1, filter: {datetime_geq: $from, datetime_lt: $to}) { sum { requests } } } } }',variables:{account,from:to.toISOString(),to:new Date(now).toISOString()}});
+    const currentRows=current.data?.viewer?.accounts?.[0]?.workersInvocationsAdaptive;
+    if(!Array.isArray(currentRows)||currentRows.some(r=>!Number.isFinite(r.sum?.requests)||r.sum.requests<0))throw Error('Current account Worker usage unavailable');
+    worker_account_requests_today=currentRows.reduce((n,r)=>n+r.sum.requests,0);
+  }
+  return {day:from.toISOString().slice(0,10),scope:'entire Neon project including CI branches; production gateway only',worker_requests:rows.reduce((n,r)=>n+(r.sum?.requests||0),0),worker_plan,...(worker_plan==='free'?{worker_account_requests_today,worker_usage_observed_at:new Date(now).toISOString(),worker_current_usage_scope:'all account Workers; current UTC day; provider accounting may lag'}:{}),...neon,...billing};
 }
 
 function coverageIssueUrl(env) {
@@ -183,18 +231,17 @@ export async function saveCoverageState(fetcher,env,proposed,{now=Date.now()}={}
 export async function routeAlert(fetcher,env,report) {
   if(!/^[\w.-]+\/[\w.-]+$/.test(env.GITHUB_REPOSITORY||''))throw Error('Invalid alert repository');
   const base='https://api.github.com/repos/'+env.GITHUB_REPOSITORY;
-  const issues=await json(fetcher,base+'/issues?state=open&per_page=100',env.GITHUB_TOKEN);
-  const active=new Set(report.alerts||[]);
-  let created=false,existing=false,recovered=false;
-  for(const condition of active) {
-    const title=TITLE+' ('+condition+')';
-    // A long-lived usage warning must not suppress a new outage/quota alert.
-    // Reuse the initial legacy incident only for the category it actually contains.
-    const match=issues.find(i=>!i.pull_request&&(i.title===title||i.title===TITLE&&String(i.body||'').includes('"'+condition+'"')));
-    if(match){existing=true;continue;}
-    const body='Production launch threshold: '+condition+'. Follow https://github.com/'+env.GITHUB_REPOSITORY+'/blob/main/docs/LAUNCH-OPERATIONS.md.\\n\\n'+JSON.stringify(report,null,2)+'\\n\\nClose this category incident after investigation and recovery. Other categories alert independently.';
-    await json(fetcher,base+'/issues',env.GITHUB_TOKEN,{title,body});created=true;
+  const issues=[];
+  for(let page=1;page<=10;page++) {
+    const batch=await json(fetcher,base+`/issues?state=open&per_page=100${page===1?'':'&page='+page}`,env.GITHUB_TOKEN);
+    if(!Array.isArray(batch))throw Error('Invalid launch incident list');
+    issues.push(...batch);
+    if(batch.length<100)break;
+    if(page===10)throw Error('Launch incident list exceeds bounded pagination');
   }
+  const active=new Set(report.alerts||[]);
+  let {created,existing}=await reconcileIncidents({issues,base,report,request:(url,body,method)=>json(fetcher,url,env.GITHUB_TOKEN,body,method)});
+  let recovered=false;
   for(const condition of RECOVERABLE_ALERTS) {
     if(active.has(condition))continue;
     const persisted=report.coverage?.state_persisted===true;
@@ -209,7 +256,7 @@ export async function routeAlert(fetcher,env,report) {
           &&!(report.errors?.length);
     if(!resolved)continue;
     const title=TITLE+' ('+condition+')';
-    const match=issues.find(i=>!i.pull_request&&i.title===title);
+    const match=issues.find(i=>!i.pull_request&&(i.title===title||/^\[launch (?:alert|warning|recovered)\]/.test(i.title||'')&&i.title.endsWith(`(${condition})`)));
     if(!match)continue;
     await json(fetcher,base+'/issues/'+match.number,env.GITHUB_TOKEN,{state:'closed',state_reason:'completed'},'PATCH');
     recovered=true;
@@ -284,6 +331,7 @@ async function alertCoverageCheck(fetcher,env,account,now,report) {
     failed_window:inspected.failed,
   };
   report.windows=inspected.windows;
+  report.severities=Object.fromEntries(inspected.alerts.map(c=>[c,alertSeverity(c,{persistent:inspected.persistent?.includes(c)})]));
   report.alerts.push(...inspected.alerts);
   if(inspected.unrecoverable)report.alerts.push('coverage_unrecoverable');
   if(!inspected.unrecoverable&&inspected.remainingNewWindows>0)report.alerts.push('coverage_pending');
@@ -293,6 +341,7 @@ async function alertCoverageCheck(fetcher,env,account,now,report) {
     const usageReport=evaluate([],await usage(fetcher,env,account,now));
     report.usage=usageReport.usage;
     report.alerts.push(...usageReport.alerts);
+    Object.assign(report.severities,usageReport.severities);
   } catch(error) {
     report.alerts.push('telemetry_unavailable');pushError(report,error);
   }
@@ -365,6 +414,11 @@ export async function run({fetcher=fetch,env=process.env,now=Date.now(),mode='ch
       report.coverage.continuation={status:'not_needed',pending_windows:Number(report.coverage.pending_windows||0)};
     }
     report.alerts=[...new Set(report.alerts)];
+    report.severities??={};
+    for(const c of report.alerts)report.severities[c]??=alertSeverity(c);
+    const latest=report.windows?.at(-1);
+    report.active_alerts=[...new Set([...(latest?.alerts||[]),...report.alerts.filter(c=>!['gateway_5xx','network_or_application_429','authentication_429','slow_requests','slow_quota'].includes(c))])];
+    report.pause_outreach=report.active_alerts.some(c=>report.severities[c]==='alert');
     try {
       report.alert_route=await routeAlert(fetcher,env,report);
     } catch(error) {
@@ -372,6 +426,7 @@ export async function run({fetcher=fetch,env=process.env,now=Date.now(),mode='ch
     }
   }
   report.alerts=[...new Set(report.alerts)];
+  if(mode==='alert'&&report.alerts.some(c=>['telemetry_unavailable','coverage_unrecoverable','coverage_continuation_failed','gateway_probe_failed'].includes(c)))report.pause_outreach=true;
   fs.mkdirSync('artifacts/launch-alert',{recursive:true});fs.writeFileSync('artifacts/launch-alert/report.json',JSON.stringify(report,null,2));
   console.log(JSON.stringify(report));
   if(mode==='alert')console.log('Launch alert route: '+(report.alert_route||'none'));

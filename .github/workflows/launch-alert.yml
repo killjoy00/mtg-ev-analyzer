@@ -16,10 +16,10 @@ on:
         type: string
   push:
     branches: [main]
-    paths: ['scripts/launch-alert.mjs', 'launch-monitoring.mjs', '.github/workflows/launch-alert.yml']
+    paths: ['scripts/launch-alert.mjs', 'scripts/launch-incident-state.mjs', 'launch-alert-policy.mjs', 'launch-monitoring.mjs', 'tests/launch-alert*.test.mjs', '.github/workflows/launch-alert.yml']
   pull_request:
     branches: [main]
-    paths: ['scripts/launch-alert.mjs', 'launch-monitoring.mjs', '.github/workflows/launch-alert.yml']
+    paths: ['scripts/launch-alert.mjs', 'scripts/launch-incident-state.mjs', 'launch-alert-policy.mjs', 'launch-monitoring.mjs', 'tests/launch-alert*.test.mjs', '.github/workflows/launch-alert.yml']
 permissions:
   contents: read
 concurrency:
@@ -40,7 +40,7 @@ jobs:
       - name: Check the watcher offline
         run: |
           node --check scripts/launch-alert.mjs
-          node --test tests/launch-alert.test.mjs tests/launch-watcher-*.test.mjs
+          node --test tests/launch-alert*.test.mjs tests/launch-watcher-*.test.mjs
   alert:
     if: github.event_name != 'pull_request'
     permissions:
@@ -55,6 +55,9 @@ jobs:
       GITHUB_TOKEN: ${{ github.token }}
       PACK1_LAUNCH_CONTINUATION_DEPTH: ${{ inputs.continuation_depth || '0' }}
       PACK1_LAUNCH_CONTINUATION_ROOT_RUN_ID: ${{ inputs.continuation_root_run_id || github.run_id }}
+      # Set only after checking the account's actual Workers subscription.
+      # Unconfigured accounts retain the existing volume warning.
+      PACK1_WORKERS_PLAN: ${{ vars.PACK1_WORKERS_PLAN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
