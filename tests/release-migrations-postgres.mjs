@@ -22,6 +22,18 @@ const state=async()=>JSON.stringify((await q(`SELECT revision,
  FROM draft_run_serving_revision`)).rows);
 const revision=async()=>BigInt((await q('SELECT revision FROM draft_run_serving_revision')).rows[0].revision);
 try {
+ // Retain a legacy stored replay of a completed fixture run, so preservation
+ // cannot pass vacuously against an empty shares table.
+ await q(`INSERT INTO draft_run_shares(id,session_id,display_name,score,puzzle_ids)
+   SELECT 'dddddddddddddddddddddddd',id,'Fixture replay',score,puzzle_ids
+   FROM draft_run_sessions WHERE score IS NOT NULL ORDER BY id LIMIT 1
+   ON CONFLICT(session_id) DO NOTHING`);
+ const histories=(await q(`SELECT
+   EXISTS(SELECT 1 FROM draft_run_sessions) runs,
+   EXISTS(SELECT 1 FROM draft_run_schedules) dailies,
+   EXISTS(SELECT 1 FROM game_results) scores,
+   EXISTS(SELECT 1 FROM draft_run_shares) replays`)).rows[0];
+ assert.ok(Object.values(histories).every(Boolean),'All preserved history fixtures must be populated');
  const before=await state();
  const first=await applyReleaseMigrations(client,{baseline});
  assert.equal(first.applied,1);
