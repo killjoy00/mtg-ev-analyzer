@@ -262,7 +262,6 @@ jobs:
           import fs from 'node:fs';
           import {DRAFT_RUN_CORPUS_VERSION,V5_CORPUS_VERSION} from './draft-run.mjs';
           import {corpusDatabase} from './scripts/neon-corpus-db.mjs';
-          import {clonedCorpusMatchesCatalog} from './scripts/ci-corpus-baseline.mjs';
           if(DRAFT_RUN_CORPUS_VERSION===V5_CORPUS_VERSION) {
             const query=corpusDatabase(process.env.PACK1_CI_CONNECTION);
             const active=(await query(`SELECT count(*)::int n FROM draft_run_environment_policy p
@@ -317,6 +316,7 @@ jobs:
           current_baseline=$(node --input-type=module - <<'NODE'
           import fs from 'node:fs';
           import {corpusDatabase} from './scripts/neon-corpus-db.mjs';
+          import {clonedCorpusMatchesCatalog} from './scripts/ci-corpus-baseline.mjs';
           const catalog=JSON.parse(fs.readFileSync('corpus/draft-run/catalog.json','utf8'));
           const query=corpusDatabase(process.env.PACK1_CI_CONNECTION);
           const rows=(await query(`SELECT v.set_id,v.manifest->>'sha256' checksum,s.corpus_version active_version,
