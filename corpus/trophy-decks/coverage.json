@@ -11,7 +11,8 @@
       "matched_sources": 4025,
       "decks": 4025,
       "unavailable": 0,
-      "unavailable_reasons": {}
+      "unavailable_reasons": {},
+      "serving_sources": 4025
     },
     {
       "set_id": "bro",
@@ -21,7 +22,8 @@
       "unavailable": 1,
       "unavailable_reasons": {
         "no_game_record": 1
-      }
+      },
+      "serving_sources": 2189
     },
     {
       "set_id": "dft",
@@ -29,7 +31,8 @@
       "matched_sources": 4361,
       "decks": 4361,
       "unavailable": 0,
-      "unavailable_reasons": {}
+      "unavailable_reasons": {},
+      "serving_sources": 4361
     },
     {
       "set_id": "dmu",
@@ -39,7 +42,8 @@
       "unavailable": 4,
       "unavailable_reasons": {
         "no_game_record": 4
-      }
+      },
+      "serving_sources": 6565
     },
     {
       "set_id": "dsk",
@@ -49,7 +53,8 @@
       "unavailable": 2,
       "unavailable_reasons": {
         "no_game_record": 2
-      }
+      },
+      "serving_sources": 4775
     },
     {
       "set_id": "ecl",
@@ -57,7 +62,8 @@
       "matched_sources": 2395,
       "decks": 2395,
       "unavailable": 0,
-      "unavailable_reasons": {}
+      "unavailable_reasons": {},
+      "serving_sources": 2395
     },
     {
       "set_id": "eoe",
@@ -67,7 +73,8 @@
       "unavailable": 1,
       "unavailable_reasons": {
         "no_game_record": 1
-      }
+      },
+      "serving_sources": 3403
     },
     {
       "set_id": "fdn",
@@ -77,7 +84,8 @@
       "unavailable": 1,
       "unavailable_reasons": {
         "no_game_record": 1
-      }
+      },
+      "serving_sources": 3507
     },
     {
       "set_id": "fin",
@@ -87,7 +95,8 @@
       "unavailable": 4,
       "unavailable_reasons": {
         "no_game_record": 4
-      }
+      },
+      "serving_sources": 5612
     },
     {
       "set_id": "fra",
@@ -97,7 +106,8 @@
       "unavailable": 1,
       "unavailable_reasons": {
         "no_game_record": 1
-      }
+      },
+      "serving_sources": 1170
     },
     {
       "set_id": "hbg",
@@ -107,7 +117,8 @@
       "unavailable": 43,
       "unavailable_reasons": {
         "no_game_record": 43
-      }
+      },
+      "serving_sources": 762
     },
     {
       "set_id": "hob",
@@ -115,7 +126,8 @@
       "matched_sources": 1119,
       "decks": 1119,
       "unavailable": 0,
-      "unavailable_reasons": {}
+      "unavailable_reasons": {},
+      "serving_sources": 1119
     },
     {
       "set_id": "ktk",
@@ -123,7 +135,8 @@
       "matched_sources": 489,
       "decks": 489,
       "unavailable": 0,
-      "unavailable_reasons": {}
+      "unavailable_reasons": {},
+      "serving_sources": 489
     },
     {
       "set_id": "lci",
@@ -134,7 +147,8 @@
       "unavailable_reasons": {
         "deck_below_40_cards": 1,
         "no_game_record": 2
-      }
+      },
+      "serving_sources": 5387
     },
     {
       "set_id": "ltr",
@@ -144,7 +158,8 @@
       "unavailable": 1,
       "unavailable_reasons": {
         "no_game_record": 1
-      }
+      },
+      "serving_sources": 6306
     },
     {
       "set_id": "mh3",
@@ -154,7 +169,8 @@
       "unavailable": 3,
       "unavailable_reasons": {
         "no_game_record": 3
-      }
+      },
+      "serving_sources": 4485
     },
     {
       "set_id": "mkm",
@@ -164,7 +180,8 @@
       "unavailable": 1,
       "unavailable_reasons": {
         "no_game_record": 1
-      }
+      },
+      "serving_sources": 5529
     },
     {
       "set_id": "mom",
@@ -174,7 +191,8 @@
       "unavailable": 1,
       "unavailable_reasons": {
         "no_game_record": 1
-      }
+      },
+      "serving_sources": 6513
     },
     {
       "set_id": "msh",
@@ -184,7 +202,8 @@
       "unavailable": 3,
       "unavailable_reasons": {
         "no_game_record": 3
-      }
+      },
+      "serving_sources": 2425
     },
     {
       "set_id": "neo",
@@ -194,7 +213,8 @@
       "unavailable": 10,
       "unavailable_reasons": {
         "no_game_record": 10
-      }
+      },
+      "serving_sources": 4892
     },
     {
       "set_id": "one",
@@ -202,7 +222,8 @@
       "matched_sources": 2889,
       "decks": 2889,
       "unavailable": 0,
-      "unavailable_reasons": {}
+      "unavailable_reasons": {},
+      "serving_sources": 2889
     },
     {
       "set_id": "otj",
@@ -212,7 +233,8 @@
       "unavailable": 11,
       "unavailable_reasons": {
         "no_game_record": 11
-      }
+      },
+      "serving_sources": 5564
     },
     {
       "set_id": "pio",
@@ -222,7 +244,8 @@
       "unavailable": 26,
       "unavailable_reasons": {
         "deck_below_40_cards": 26
-      }
+      },
+      "serving_sources": 1380
     },
     {
       "set_id": "powered-cube",
@@ -230,7 +253,8 @@
       "matched_sources": 1463,
       "decks": 1463,
       "unavailable": 0,
-      "unavailable_reasons": {}
+      "unavailable_reasons": {},
+      "serving_sources": 1463
     },
     {
       "set_id": "sir",
@@ -240,7 +264,8 @@
       "unavailable": 30,
       "unavailable_reasons": {
         "no_game_record": 30
-      }
+      },
+      "serving_sources": 1001
     },
     {
       "set_id": "snc",
@@ -250,7 +275,8 @@
       "unavailable": 26,
       "unavailable_reasons": {
         "no_game_record": 26
-      }
+      },
+      "serving_sources": 5507
     },
     {
       "set_id": "sos",
@@ -260,7 +286,8 @@
       "unavailable": 3,
       "unavailable_reasons": {
         "no_game_record": 3
-      }
+      },
+      "serving_sources": 3779
     },
     {
       "set_id": "tdm",
@@ -270,7 +297,8 @@
       "unavailable": 1,
       "unavailable_reasons": {
         "no_game_record": 1
-      }
+      },
+      "serving_sources": 2997
     },
     {
       "set_id": "tla",
@@ -278,7 +306,8 @@
       "matched_sources": 3408,
       "decks": 3408,
       "unavailable": 0,
-      "unavailable_reasons": {}
+      "unavailable_reasons": {},
+      "serving_sources": 3408
     },
     {
       "set_id": "tmt",
@@ -286,7 +315,8 @@
       "matched_sources": 701,
       "decks": 701,
       "unavailable": 0,
-      "unavailable_reasons": {}
+      "unavailable_reasons": {},
+      "serving_sources": 701
     },
     {
       "set_id": "woe",
@@ -296,7 +326,8 @@
       "unavailable": 5,
       "unavailable_reasons": {
         "no_game_record": 5
-      }
+      },
+      "serving_sources": 5775
     }
   ],
   "archives": [
@@ -1057,5 +1088,7 @@
       "decks": 1281
     }
   ],
-  "source_inventory_scope": "Current parent corpus, Live components, and the approved FRA Traditional supplement."
+  "source_inventory_scope": "Current parent corpus, Live components, and the approved FRA Traditional supplement.",
+  "serving_sources": 110373,
+  "serving_source_scope": "Exact hashes present in all stored corpus versions for the covered sets; unused compatibility hash forms are omitted. Deck records and coverage are unchanged."
 }

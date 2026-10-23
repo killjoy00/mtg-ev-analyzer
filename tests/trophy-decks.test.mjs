@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {gunzipSync} from 'node:zlib';
+import {brotliDecompressSync} from 'node:zlib';
 import {createHash} from 'node:crypto';
 import {encoded,sha256} from '../corpus/trophy-decks/fra.mjs';
 import {withTrophyDeckAvailability,trophyDeckForRound} from '../worker/trophy-decks.mjs';
@@ -11,7 +11,7 @@ import coverage from '../corpus/trophy-decks/coverage.json' with {type:'json'};
 import {normalizedDisplayFaces} from '../card-faces.mjs';
 import {safeCardImageUrl} from '../card-image-policy.mjs';
 
-const bytes=gunzipSync(Buffer.from(encoded,'base64')),catalog=JSON.parse(bytes);
+const bytes=brotliDecompressSync(Buffer.from(encoded,'base64')),catalog=JSON.parse(bytes);
 const source=Object.keys(catalog.sources)[0];
 const answer={puzzle:{puzzle_id:'locked',set_id:'fra'}};
 
@@ -32,7 +32,7 @@ test('every match and non-match keeps three distinct role-appropriate cards',()=
 
 test('curated public decks retain exact quantities, aliases and complete display metadata',()=>{
   assert.equal(createHash('sha256').update(bytes).digest('hex'),sha256);
-  assert.equal(catalog.decks.length,1170);assert.equal(Object.keys(catalog.sources).length,3510);
+  assert.equal(catalog.decks.length,1170);assert.equal(Object.keys(catalog.sources).length,1170);
   for(const deck of catalog.decks) {
     assert.equal(deck.deck.reduce((sum,[,count])=>sum+count,0),deck.size);assert.ok(deck.size>=40);
     for(const [index,count] of [...deck.deck,...deck.sideboard]) {
@@ -48,10 +48,12 @@ test('all published set catalogs have verified hashes, exact lists and complete 
   assert.deepEqual(Object.keys(catalogLoaders).sort(),coverage.sets.map(set=>set.set_id).sort());
   let total=0;
   for(const [set,load] of Object.entries(catalogLoaders)) {
-    const {encoded,sha256}=await load(),bytes=gunzipSync(Buffer.from(encoded,'base64'));
+    const {encoded,sha256}=await load(),bytes=brotliDecompressSync(Buffer.from(encoded,'base64'));
     assert.equal(createHash('sha256').update(bytes).digest('hex'),sha256,set);
     const current=JSON.parse(bytes),expected=coverage.sets.find(row=>row.set_id===set);
     assert.equal(current.set_id,set);assert.equal(current.decks.length,expected.decks);total+=current.decks.length;
+    assert.equal(Object.keys(current.sources).length,expected.serving_sources,set);
+    assert.equal(new Set(Object.values(current.sources)).size,current.decks.length,set+' retains every deck');
     for(const [source,index] of Object.entries(current.sources)) {
       assert.match(source,/^[a-f0-9]{32}$/);assert.ok(current.decks[index]);
     }
@@ -74,7 +76,7 @@ test('all published set catalogs have verified hashes, exact lists and complete 
 test('deck and availability caches cannot mix sets or sources with the same local index',async()=>{
   const session={answers:[answer],puzzle_ids:['locked']};
   for(const set of ['fra','hob','powered-cube','fra']) {
-    const {encoded}=await catalogLoaders[set](),current=JSON.parse(gunzipSync(Buffer.from(encoded,'base64')));
+    const {encoded}=await catalogLoaders[set](),current=JSON.parse(brotliDecompressSync(Buffer.from(encoded,'base64')));
     const source=Object.keys(current.sources).find(source=>current.sources[source]===0);
     const query=async()=>({rows:[{puzzle_id:'locked',set_id:set,source_draft_hash:source}]});
     const value=await trophyDeckForRound(query,session,'0');

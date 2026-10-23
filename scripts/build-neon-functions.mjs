@@ -16,5 +16,7 @@ for(const line of fs.readFileSync('.github/neon-functions.txt','utf8').trim().sp
   const response=await loaded.default.fetch(new Request('https://packone.pro/health?quick=1'));
   if(response.status!==200||(await response.json()).release_commit!==commit)throw Error(`${slug} lacks the embedded release marker`);
   execFileSync('python3',['-c',"import sys,zipfile; p=sys.argv[1]; z=zipfile.ZipFile(p+'.zip','w',zipfile.ZIP_DEFLATED); z.write(p+'/index.mjs','index.mjs'); z.close()",folder]);
-  console.log(`${slug}: bundle and release marker verified`);
+  const archiveBytes=fs.statSync(folder+'.zip').size;
+  if(archiveBytes>10*1024*1024)throw Error(`${slug}: compressed function exceeds the pinned deployment tool's 10 MiB limit`);
+  console.log(`${slug}: bundle, release marker and compressed size verified (${archiveBytes} bytes)`);
 }

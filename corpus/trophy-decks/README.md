@@ -50,19 +50,24 @@ differences are matched without changing the name in the game archive.
    ```sh
    python scripts/build-trophy-deck-catalog.py --set-id SET_ID \
      --version SET_ID-SOURCE_DATE-v1 --decks MATCHED_DECKS.json \
-     --cards SCRYFALL_CARDS.json \
+     --cards SCRYFALL_CARDS.json --sources ALL_STORED_SET_SOURCES.json \
      --supplemental-cards corpus/trophy-decks/card-name-variants.json \
      --output corpus/trophy-decks/SET_ID.mjs
    ```
 
    Include only sources matched to Pack One. The builder validates quantities,
-   minimum sizes, source aliases, card metadata and set identity. It strips raw
-   draft identifiers from the serving output.
+   minimum sizes, source aliases, card metadata and set identity. The source
+   inventory must include all stored corpus versions, so older runs keep their
+   deck links. Unused hash forms are omitted to keep the function deployable.
+   It strips raw draft identifiers from the serving output.
 4. Update the lazy registry and aggregate coverage. Run the catalog integrity,
    source isolation, owned-run and locked-pick checks before the normal
    development-then-production release.
 
-Catalogs are imported and decoded by set when needed. Bounded caches retain
+Catalogs use Node's built-in Brotli compression and are imported and decoded
+by set when needed. Building them requires Node.js as well as Python. The
+function build verifies its compressed archive against the pinned deployment
+tool's 10 MiB limit before any deployment. Bounded caches retain
 at most six decoded catalogs, 1,024 availability results and 128 expanded decks.
 Answers contain only an availability flag. Full decklists are returned only
 after the owning player locks the corresponding pick. Refreshes do not change

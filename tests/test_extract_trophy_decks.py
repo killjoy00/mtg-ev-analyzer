@@ -1,7 +1,11 @@
+import base64
 import csv
 import gzip
 import importlib.util
 import json
+import re
+import subprocess
+import sys
 from pathlib import Path
 import tempfile
 import unittest
@@ -12,6 +16,42 @@ spec.loader.exec_module(extractor)
 
 
 class FinalDeckExtractionTests(unittest.TestCase):
+    def test_serving_catalog_retains_current_and_historical_sources_without_unused_aliases(self):
+        builder = Path(__file__).parents[1] / 'scripts/build-trophy-deck-catalog.py'
+        current, historical, unused = 'a' * 32, 'b' * 32, 'c' * 32
+        deck = {'set_id': 'fra', 'draft_id': 'private-build-input', 'event_type': 'PremierDraft',
+                'deck': [{'name': 'Forest', 'count': 40}], 'sideboard': [{'name': 'Forest', 'count': 1}],
+                'deck_size': 40, 'last_game_time': None, 'main_colors': ['G'], 'splash_colors': [],
+                'source_hashes': [current, historical, unused]}
+        card = {'name': 'Forest', 'cmc': 0, 'mana_cost': '', 'type_line': 'Basic Land — Forest',
+                'image_uris': {'normal': 'https://cards.scryfall.io/normal/fixture.jpg'}}
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            for name, value in [('decks', [deck]), ('cards', [card]),
+                                ('sources', [{'source_draft_hash': source} for source in [current, historical]])]:
+                (root / (name + '.json')).write_text(json.dumps(value))
+            output = root / 'catalog.mjs'
+            command = [sys.executable, str(builder), '--decks', str(root / 'decks.json'),
+                       '--cards', str(root / 'cards.json'), '--sources', str(root / 'sources.json'),
+                       '--output', str(output)]
+            result = subprocess.run(command, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            text = output.read_text()
+            encoded = json.loads(re.search(r'export const encoded=(.*);', text).group(1))
+            decoded = subprocess.run(['node', '-e', "process.stdout.write(require('node:zlib').brotliDecompressSync(require('node:fs').readFileSync(0)))"],
+                                     input=base64.b64decode(encoded), capture_output=True, check=True)
+            catalog = json.loads(decoded.stdout)
+            self.assertEqual(catalog['sources'], {current: 0, historical: 0})
+            self.assertEqual(catalog['decks'][0]['deck'], [[0, 40]])
+            self.assertEqual(catalog['decks'][0]['sideboard'], [[0, 1]])
+            self.assertNotIn(deck['draft_id'], text)
+            output.unlink()
+            (root / 'sources.json').write_text(json.dumps([{'source_draft_hash': 'd' * 32}]))
+            rejected = subprocess.run(command, capture_output=True, text=True)
+            self.assertNotEqual(rejected.returncode, 0)
+            self.assertIn('Every bundled deck must have a stored source', rejected.stderr)
+            self.assertFalse(output.exists())
+
     def run_extract(self, rows, set_id='hob', event='PremierDraft', draft_id='sample', with_time=True):
         inventory = [{'set_id': set_id, 'event_type': event, 'source_draft_hash': source}
                      for source in extractor.source_aliases(set_id, event, draft_id)]

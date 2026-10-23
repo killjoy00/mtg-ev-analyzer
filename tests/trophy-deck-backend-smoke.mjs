@@ -1,7 +1,7 @@
 // Owned-run and locked-pick authorization against an isolated database.
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-import {gunzipSync} from 'node:zlib';
+import {brotliDecompressSync} from 'node:zlib';
 import {withPracticeAccess} from './practice-access-fixture.mjs';
 import {catalogLoaders} from '../corpus/trophy-decks/index.mjs';
 import {corpusMembership} from '../worker/corpus-components.mjs';
@@ -18,7 +18,7 @@ async function call(service,path,body,token,status=200) {
 const owner=await call(growth,'/v1/session',{displayName:'QA deck owner'});
 const other=await call(growth,'/v1/session',{displayName:'QA deck other'});
 for(const set of ['fra','hob','powered-cube']) {
-const {encoded}=await catalogLoaders[set](),catalog=JSON.parse(gunzipSync(Buffer.from(encoded,'base64')));
+const {encoded}=await catalogLoaders[set](),catalog=JSON.parse(brotliDecompressSync(Buffer.from(encoded,'base64')));
 const rows=(await query(`SELECT p.puzzle_id,p.source_draft_hash FROM draft_run_verified_puzzles p WHERE p.set_id=$3 AND p.source_draft_hash IN(SELECT jsonb_array_elements_text($1::jsonb)) AND ${corpusMembership({parameter:2})} LIMIT 8`,[JSON.stringify(Object.keys(catalog.sources)),DRAFT_RUN_CORPUS_VERSION,set])).rows;
 assert.equal(rows.length,8,'Real source fixtures are available for '+set);
 // Seed only this isolated session. Deck authorization does not depend on the
