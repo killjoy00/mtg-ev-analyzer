@@ -64,6 +64,10 @@ differences are matched without changing the name in the game archive.
    source isolation, owned-run and locked-pick checks before the normal
    development-then-production release.
 
+Puzzle imports must check deck coverage every time; see "Trophy decklist check" in
+`docs/CORPUS-OPERATIONS.md`. When an import reports puzzles without decks, rebuild
+the affected set's catalog from this procedure.
+
 Catalogs use Node's built-in Brotli compression and are imported and decoded
 by set when needed. Building them requires Node.js as well as Python. The
 function build verifies its compressed archive against the pinned deployment

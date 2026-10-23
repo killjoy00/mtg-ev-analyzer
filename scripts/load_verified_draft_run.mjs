@@ -8,6 +8,7 @@ import {insertTrophyBatch} from '../worker/trophy-import.mjs';
 import {corpusDatabase} from './neon-corpus-db.mjs';
 
 import {stageCorpusManifest} from './stage-corpus-manifest.mjs';
+import {checkTrophyDecks,sourcePuzzleCounts} from './trophy-deck-coverage.mjs';
 const query=corpusDatabase(process.argv[2]);
 if (process.argv.includes('--schema')) {
   for(const sql of fs.readFileSync('migrations/0004_draft_run_product.sql','utf8').split('-- statement')) await query(sql);
@@ -24,6 +25,7 @@ const prepared=catalog.sets.map(set=>{
   if(rows.length!==set.puzzles||rows.some(p=>!validateDraftRunPuzzle(p)||p.set_id!==set.id||[...p.candidates,...p.prior_picks].some(c=>!c.image_url?.startsWith('https://')))) throw new Error('Invalid puzzle in '+set.id);
   return {set,rows};
 });
+for(const {set,rows} of prepared)await checkTrophyDecks(set.id,sourcePuzzleCounts(rows),catalog.corpus_version);
 async function loadSet({set,rows}) {
   await stageCorpusManifest(query,set.id,catalog.corpus_version,{...set,model_version:catalog.model_version},{preserveServing:process.argv.includes('--stage-only')});
   for(let i=0;i<rows.length;i+=250) {

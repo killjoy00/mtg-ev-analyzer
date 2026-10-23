@@ -16,6 +16,7 @@ import {insertTrophyBatch} from '../worker/trophy-import.mjs';
 import {refreshServingStatistics} from '../worker/serving-statistics.mjs';
 import {effectiveCardMetadata} from '../card-metadata.mjs';
 import {corpusDatabase} from './neon-corpus-db.mjs';
+import {checkTrophyDecks} from './trophy-deck-coverage.mjs';
 const hash=file=>createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const parse=x=>typeof x==='string'?JSON.parse(x):x;
 const files=root=>fs.readdirSync(root,{withFileTypes:true}).flatMap(e=>e.isDirectory()?files(path.join(root,e.name)):[path.join(root,e.name)]);
@@ -115,20 +116,21 @@ export async function validateComponents(root) {
    const q=d.qualified??true;qualified+=Number(q);included+=Number(d.status==='included');ledger.set(d.source_draft_hash,{...d,qualified:q});
   }
   if(!s.traditional_cohort||ledger.size!==s.traditional_cohort.trophy_outcomes['3-0']||qualified!==s.traditional_cohort.qualified_trophies||included*width!==manifest.puzzles)throw Error('Traditional trophy accounting mismatch');
-  const groups=new Map(),ids=new Set();let puzzles=0,usable=0,metadataComplete=0,storedMetadataComplete=0,imagesComplete=0;
+  const groups=new Map(),ids=new Set(),deckSources=new Map();let puzzles=0,usable=0,metadataComplete=0,storedMetadataComplete=0,imagesComplete=0;
   for await(const p of records(path.join(dir,'puzzles.jsonl.gz'))) {
    const source=ledger.get(p.source_draft_hash);
    if(!validateDraftRunPuzzle(p,component)||p.set_id!==sid||ids.has(p.puzzle_id)||source?.status!=='included'||source.source_fingerprint!==p.source_fingerprint||p.player_win_rate_bucket<s.traditional_cohort.cutoff||Math.abs(p.candidates.reduce((n,c)=>n+c.model_probability,0)-1)>.00005)throw Error('Invalid component puzzle or support evidence');
    ids.add(p.puzzle_id);const prior=groups.get(p.source_draft_hash)||(cube?p.prior_picks.slice(0,1).map(c=>c.name):[]);
    if(p.pick_number!==prior.length+1||JSON.stringify(p.prior_picks.map(c=>c.name))!==JSON.stringify(prior))throw Error('Broken Traditional trajectory');
    prior.push(p.candidates.find(c=>c.id===p.historical_pick_id).name);groups.set(p.source_draft_hash,prior);
-   puzzles++;usable+=Number(interestingDraftRunPuzzle(p));
+   puzzles++;usable+=Number(interestingDraftRunPuzzle(p));deckSources.set(p.source_draft_hash,(deckSources.get(p.source_draft_hash)||0)+1);
    const cards=[...p.candidates,...p.prior_picks];storedMetadataComplete+=Number(cards.every(c=>c.name&&c.rarity&&c.type_line));metadataComplete+=Number(cards.map(effectiveCardMetadata).every(c=>c.name&&c.rarity&&c.type_line));imagesComplete+=Number(cards.every(c=>c.image_url?.startsWith('https://')));
   }
   if(puzzles!==manifest.puzzles||groups.size!==included||[...groups.values()].some(p=>p.length!==(cube?7:p1p6?6:8)))throw Error('Incomplete first-eight source accounting');
+  const trophyDecks=await checkTrophyDecks(sid,deckSources,component);
   const health=sourceQuality(report,sid,{puzzles,usable,metadataComplete,storedMetadataComplete,imagesComplete},s);
   if(phase2&&health.ready!==passing.includes(sid))throw Error('Phase 2 pass status differs from reconstructed component health');
-  prepared.push({sid,dir,ledger,health,manifest:{...manifest,model_source_corpus:expectedModel===V4_CONTEXT_MODEL_VERSION?modelVersions.v4.corpus_version:parent,research_report_sha256:hash(reports[0]),qualified_trophies:qualified,included_trophies:included,excluded_trophies:ledger.size-included,source_trophies:ledger.size}});
+  prepared.push({sid,dir,ledger,health,trophyDecks,manifest:{...manifest,model_source_corpus:expectedModel===V4_CONTEXT_MODEL_VERSION?modelVersions.v4.corpus_version:parent,research_report_sha256:hash(reports[0]),qualified_trophies:qualified,included_trophies:included,excluded_trophies:ledger.size-included,source_trophies:ledger.size}});
  }
  if(!sameSet(seen,expectedSets)||!sameSet(prepared.map(s=>s.sid),preparedSets))throw Error('Complete reviewed component artifact set required');
  return prepared;
@@ -162,7 +164,7 @@ export async function importComponents(query,prepared) {
    SELECT set_id,corpus_version,md5(manifest::text),$3,$4::boolean,$5::jsonb FROM corpus_set_versions WHERE set_id=$1 AND corpus_version=$2`,[s.sid,component,gate,s.health.ready,JSON.stringify(s.health)]);
   const a=s.manifest.source_archive;
   await query("INSERT INTO corpus_sources(set_id,event_type,archive_url,archive_available,archive_etag,archive_last_modified,import_status) VALUES($1,'TradDraft',$2,true,$3,$4,'complete') ON CONFLICT(set_id,event_type) DO UPDATE SET import_status='complete',archive_url=EXCLUDED.archive_url,archive_etag=EXCLUDED.archive_etag,archive_last_modified=EXCLUDED.archive_last_modified",[s.sid,a.url,a.etag,a.last_modified]);
-  console.log(JSON.stringify({set:s.sid,status:'Candidate',ready:s.health.ready,puzzles:s.manifest.puzzles,usable:s.health.usable_puzzles}));
+  console.log(JSON.stringify({set:s.sid,status:'Candidate',ready:s.health.ready,puzzles:s.manifest.puzzles,usable:s.health.usable_puzzles,trophy_decks:s.trophyDecks}));
  }
  await refreshServingStatistics(query);
 }
@@ -170,6 +172,6 @@ const sorted=value=>Array.isArray(value)?value.map(sorted):value&&typeof value==
 const hashObject=value=>createHash('sha256').update(JSON.stringify(sorted(value))).digest('hex');
 if(process.argv[1]?.endsWith('/load-traditional-components.mjs')) {
  const prepared=await validateComponents(process.argv[3]);
- if(process.argv.includes('--validate-only'))console.log(JSON.stringify(prepared.map(s=>({set:s.sid,...s.health}))));
+ if(process.argv.includes('--validate-only'))console.log(JSON.stringify(prepared.map(s=>({set:s.sid,...s.health,trophy_decks:s.trophyDecks}))));
  else await importComponents(corpusDatabase(process.argv[2]),prepared);
 }
