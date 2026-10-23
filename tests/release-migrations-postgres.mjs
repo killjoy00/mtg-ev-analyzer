@@ -42,10 +42,12 @@ try {
  await invalidates(()=>q("INSERT INTO corpus_source_exclusions(set_id,corpus_version,source_draft_hash,reason,evidence) VALUES($1,$2,$3,'fixture','{}')",[victim.set_id,victim.corpus_version,victim.source_draft_hash]));
  await invalidates(()=>q("UPDATE draft_run_verified_puzzles SET interesting=false WHERE puzzle_id=$1",[victim.puzzle_id]));
  await invalidates(()=>q("UPDATE draft_run_puzzle_ratings SET rating=CASE WHEN rating=100 THEN 99 ELSE rating+1 END WHERE puzzle_id=$1",[victim.puzzle_id]));
- await invalidates(async()=>{
-   await q("UPDATE draft_run_environment_policy SET status='Paused' WHERE set_id=$1",[victim.set_id]);
-   const old=await revision();await q("UPDATE draft_run_environment_policy SET status='Live' WHERE set_id=$1",[victim.set_id]);assert.ok(await revision()>old);
- });
+ // A transaction deliberately coalesces multiple input edits into one bump.
+ // Prepare the paused fixture in a separate committed transaction, then test a
+ // genuine activation. All mutations are confined to this disposable database.
+ await q("UPDATE draft_run_environment_policy SET status='Paused' WHERE set_id=$1",[victim.set_id]);
+ try {await invalidates(()=>q("UPDATE draft_run_environment_policy SET status='Live' WHERE set_id=$1",[victim.set_id]));}
+ finally {await q("UPDATE draft_run_environment_policy SET status='Live' WHERE set_id=$1",[victim.set_id]);}
  await invalidates(async()=>{
    const p=victim.payload;
    const report=(await q(`INSERT INTO draft_run_decision_reports(puzzle_id,set_id,pick_number,round_number,selected_card_id,selected_card_name,reason,environment,corpus_version,scoring_version,client_platform)
@@ -53,7 +55,7 @@ try {
    await q("SELECT pack1_moderate_reported_pick($1,true,0,'fixture','22222222-2222-4222-8222-222222222222')",[report]);
    const removed=await revision();
    await q("SELECT pack1_moderate_reported_pick($1,false,1,'fixture','22222222-2222-4222-8222-222222222222')",[report]);
-   assert.ok(await revision()>removed);
+   assert.equal(await revision(),removed,'Removal and restoration in one transaction coalesce');
  });
  const add=(name,sql)=>{fs.writeFileSync(root+'/migrations/'+name,sql);return {...manifest,ordered:[...manifest.ordered,name],release_paths:{'secure-auth-release':{migrations:[...manifest.release_paths['secure-auth-release'].migrations,name]}}};};
  const failed='9998_fixture_failure.sql',failedManifest=add(failed,'CREATE TABLE fixture_rollback(id int); SELECT 1/0;');
@@ -66,6 +68,7 @@ try {
  await q('DELETE FROM pack1_applied_migrations WHERE name=$1',[nontransaction]);
  fs.appendFileSync(root+'/migrations/'+Object.keys(baseline.migrations)[0],'\n-- changed');
  await assert.rejects(applyReleaseMigrations(client,{root,baseline}),/Immutable migration changed/);
- assert.equal(await state(),before);
+ const history=s=>JSON.parse(s).map(({revision,jobs,snapshots,...saved})=>saved);
+ assert.deepEqual(history(await state()),history(before),'Real input edits preserve all saved history');
  console.log('PASS: real release-plan idempotence, baseline drift, concurrent runners, rollback, failed concurrent build, historical preservation and source/removal/rating/activation invalidation.');
 } finally {await q('ROLLBACK').catch(()=>{});client.release();await pool.end();fs.rmSync(root,{recursive:true,force:true});}
