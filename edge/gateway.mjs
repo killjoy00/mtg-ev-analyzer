@@ -1,3 +1,4 @@
+import {TRACE_HEADER,REASON_HEADER,traceId,backendReason,failureIndicators,milliseconds,boundedSignalCall} from './private-diagnostics.mjs';
 import {isIP} from 'node:net';
 import {readJson} from '../worker/request-json.mjs';
 import {PROD_ORIGINS} from '../worker/account-config.mjs';
@@ -230,10 +231,18 @@ function safeRedirect(value,{mobileOAuth=false}={}) {
 // active network instead of on every request.
 const QUOTA_STATE='buckets',LEGACY_QUOTA_KEYS=['request','request_burst','session'],QUOTA_CLEANUP_MS=660000;
 export class NetworkQuota {
-  constructor(state) {this.storage=state.storage;}
+  constructor(state) {this.storage=state.storage;this.inflight=0;}
   async fetch(request) {
     const kind=new URL(request.url).pathname;
     if(request.method!=='POST'||!['/request','/session','/session-only'].includes(kind))return response(400,'Invalid quota request.');
+    const began=performance.now(),trace=traceId(request.headers.get(TRACE_HEADER));
+    const metric={event:'quota_handler',trace,object_tag:traceId(request.headers.get('x-pack1-quota-tag')),
+      attempt:Number(request.headers.get('x-pack1-quota-attempt'))===2?2:1,
+      concurrency:++this.inflight,location_source:'provider_metadata',get_ms:0,put_ms:0,
+      alarm_get_ms:0,alarm_set_ms:0,transaction_ms:0,transaction_callbacks:0};
+    const timed=async(name,call)=>{const at=performance.now();try{return await call();}finally{metric[name]+=performance.now()-at;}};
+    if(trace)console.log(JSON.stringify({event:'quota_handler_start',trace,object_tag:metric.object_tag,attempt:metric.attempt,concurrency:metric.concurrency}));
+    try {
     const now=Date.now();
     // /session-only follows a charged /request and an origin refresh that
     // proved the browser has no valid identity. Do not charge the request twice.
@@ -241,10 +250,11 @@ export class NetworkQuota {
     // complete run. The short bucket bounds bursts; the minute bucket bounds
     // sustained load. Session creation remains independently limited.
     const limits=[...(kind!=='/session-only'?[['request',3600,60000],['request_burst',600,10000]]:[]),...(kind!=='/request'?[['session',120,600000]]:[])];
-    const {retry,scopes}=await this.storage.transaction(async tx=>{
+    const {retry,scopes}=await timed('transaction_ms',()=>this.storage.transaction(async tx=>{
+      metric.transaction_callbacks++;
       // Counters persisted under the earlier one-row-per-bucket layout stay
       // authoritative until this network's first write in the single row.
-      const stored=await tx.get(QUOTA_STATE)||Object.fromEntries(await tx.get(LEGACY_QUOTA_KEYS));
+      const stored=await timed('get_ms',()=>tx.get(QUOTA_STATE))||Object.fromEntries(await timed('get_ms',()=>tx.get(LEGACY_QUOTA_KEYS)));
       const next={...stored},scopes=[];let retry=0;
       for(const [key,limit,period] of limits) {
         let row=stored[key];
@@ -253,19 +263,34 @@ export class NetworkQuota {
         next[key]={...row,count:row.count+1};
       }
       if(retry)return {retry,scopes};
-      await tx.put(QUOTA_STATE,next);
-      if(await tx.getAlarm()===null)await tx.setAlarm(now+QUOTA_CLEANUP_MS);
+      await timed('put_ms',()=>tx.put(QUOTA_STATE,next));
+      if(await timed('alarm_get_ms',()=>tx.getAlarm())===null)await timed('alarm_set_ms',()=>tx.setAlarm(now+QUOTA_CLEANUP_MS));
       return {retry:0,scopes};
-    });
-    return retry?Response.json({error:'Too many requests.',code:'network_rate_limited',scopes},
+    }));
+    metric.status=retry?429:204;
+    const result=retry?Response.json({error:'Too many requests.',code:'network_rate_limited',scopes},
       {status:429,headers:{'cache-control':'no-store','retry-after':String(retry)}}):new Response(null,{status:204});
+    result.headers.set('x-pack1-quota-handler-ms',String(milliseconds(performance.now()-began)));
+    return result;
+    } catch(error){Object.assign(metric,failureIndicators(error));metric.status=503;throw error;}
+    finally {
+      this.inflight--;metric.handler_ms=milliseconds(performance.now()-began);
+      for(const k of ['get_ms','put_ms','alarm_get_ms','alarm_set_ms','transaction_ms'])metric[k]=milliseconds(metric[k]);
+      if(trace)console.log(JSON.stringify(metric));
+    }
   }
   // The alarm is armed at a network's first request, not its last, so a window
   // may still be open when it fires. Deleting an open window would reset it.
   async alarm() {
-    const now=Date.now(),state=await this.storage.get(QUOTA_STATE)||{};
-    if(Object.values(state).some(row=>row.until>now))await this.storage.setAlarm(now+QUOTA_CLEANUP_MS);
-    else await this.storage.deleteAll();
+    const began=performance.now(),metric={event:'quota_alarm',get_ms:0,set_alarm_ms:0,delete_all_ms:0};
+    const timed=async(name,call)=>{const at=performance.now();try{return await call();}finally{metric[name]=milliseconds(performance.now()-at);}};
+    try {
+      const now=Date.now(),state=await timed('get_ms',()=>this.storage.get(QUOTA_STATE))||{};
+      if(Object.values(state).some(row=>row.until>now))await timed('set_alarm_ms',()=>this.storage.setAlarm(now+QUOTA_CLEANUP_MS));
+      else await timed('delete_all_ms',()=>this.storage.deleteAll());
+      metric.ok=true;
+    } catch(error){Object.assign(metric,failureIndicators(error));metric.ok=false;throw error;}
+    finally {metric.duration_ms=milliseconds(performance.now()-began);console.log(JSON.stringify(metric));}
   }
 }
 
@@ -274,13 +299,17 @@ export class NetworkQuota {
 // A committed-but-unacknowledged debit may be charged again: conservatively
 // overcounting preserves limits. Never retry overload, HTTP denial or a timeout.
 export async function chargeNetworkQuota(namespace,id,kind,{signal=AbortSignal.timeout(5000),
-  sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),onAttempt=()=>{},onFailure=()=>{}}={}) {
+  sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),onAttempt=()=>{},onFailure=()=>{},trace=null,objectTag=null}={}) {
   for(let attempt=0;attempt<2;attempt++) {
     signal.throwIfAborted();onAttempt();
-    try {return await namespace.get(id).fetch(new Request('https://quota/'+kind,{method:'POST',signal}));}
+    const headers=new Headers();
+    if(traceId(trace))headers.set(TRACE_HEADER,trace);
+    if(traceId(objectTag))headers.set('x-pack1-quota-tag',objectTag);
+    headers.set('x-pack1-quota-attempt',String(attempt+1));
+    try {return await boundedSignalCall(()=>namespace.get(id).fetch(new Request('https://quota/'+kind,{method:'POST',signal,headers})),signal);}
     catch(error) {
-      onFailure({retryable:error?.retryable===true,overloaded:error?.overloaded===true,remote:error?.remote===true});
-      if(attempt!==0||error?.retryable!==true||error?.overloaded===true||['TimeoutError','AbortError'].includes(error?.name)||signal.aborted)throw error;
+      const failure=failureIndicators(error);onFailure(failure);
+      if(attempt!==0||!failure.retryable||failure.overloaded||failure.timeout||failure.aborted||signal.aborted)throw error;
       await sleep(50+Math.floor(Math.random()*50));
     }
   }
@@ -310,21 +339,29 @@ export function routeFamily(path) {
 }
 export async function gateway(request,env,fetcher=fetch) {
   const url=new URL(request.url),origin=request.headers.get('origin'),mode=env.MODE;
-  const started=performance.now(),metric={event:'gateway_request',route:routeFamily(url.pathname),method:['GET','POST','PATCH','DELETE','OPTIONS'].includes(request.method)?request.method:'other',
+  const trace=crypto.randomUUID().replaceAll('-','');
+  const started=performance.now(),metric={event:'gateway_request',trace,quota_handler_ms:null,quota_transport_wait_ms:null,quota_tag:null,quota_timeout:false,quota_aborted:false,quota_provider_reset:false,backend_reason:null,ingress_colo:/^[A-Z]{3}$/.test(request.cf?.colo||'')?request.cf.colo:null,route:routeFamily(url.pathname),method:['GET','POST','PATCH','DELETE','OPTIONS'].includes(request.method)?request.method:'other',
     release:/^[a-f0-9]{40}$/.test(env.RELEASE_COMMIT||'')?env.RELEASE_COMMIT:'unknown',quota_ms:0,quota_attempts:0,quota_retryable:false,quota_overloaded:false,quota_remote:false,upstream_ms:0,upstream_calls:0,upstream_status:null,quota_scope:null,rate_limit_class:null,error:null};
   const upstreamFetch=async(...args)=>{
     const began=performance.now();metric.upstream_calls++;
-    try {const result=await fetcher(...args);metric.upstream_status=result.status;return result;}
+    try {const result=await fetcher(...args);metric.upstream_status=result.status;metric.backend_reason=backendReason(result.headers.get(REASON_HEADER));return result;}
     finally {metric.upstream_ms+=performance.now()-began;}
   };
   const quotaFetch=async(quotaId,kind)=>{
     const began=performance.now();
     try {
-      const result=await chargeNetworkQuota(env.NETWORK_QUOTA,quotaId,kind,{
+      const result=await chargeNetworkQuota(env.NETWORK_QUOTA,quotaId,kind,{trace,objectTag:metric.quota_tag,
         onAttempt:()=>metric.quota_attempts++,onFailure:failure=>{
-          metric.quota_retryable ||= failure.retryable;metric.quota_overloaded ||= failure.overloaded;metric.quota_remote ||= failure.remote;
+          metric.quota_retryable ||= failure.retryable;metric.quota_overloaded ||= failure.overloaded;metric.quota_remote ||= failure.remote;metric.quota_timeout ||= failure.timeout;metric.quota_aborted ||= failure.aborted;metric.quota_provider_reset ||= failure.provider_reset;
         },
       });
+      const handler=result.headers.get('x-pack1-quota-handler-ms');
+      if(handler!==null&&/^\d{1,6}$/.test(handler)) {
+        metric.quota_handler_ms=(metric.quota_handler_ms||0)+Number(handler);
+        // Residual includes transport, queueing and output-gate acknowledgement;
+        // it is not a pure network latency measurement.
+        metric.quota_transport_wait_ms=(metric.quota_transport_wait_ms||0)+Math.max(0,milliseconds(performance.now()-began)-Number(handler));
+      }
       if(result.status===429) {
         const data=await result.clone().json();
         metric.quota_scope=(data.scopes||[]).filter(s=>s==='request'||s==='session').join(',')||'unknown';
@@ -340,6 +377,7 @@ export async function gateway(request,env,fetcher=fetch) {
     if(Math.random()<sampleRate)console.log(JSON.stringify({...metric,status:result.status,sample_rate:sampleRate,tail_sampling_version:TAIL_SAMPLING_VERSION,
       duration_ms:duration,quota_ms:quota,upstream_ms:upstream}));
     const headers=new Headers(result.headers);
+    headers.delete('x-pack1-quota-handler-ms');
     headers.set('cache-control','no-store');headers.set('vary','Origin');
     if(ORIGINS.has(origin)) {
       headers.set('access-control-allow-origin',origin);
@@ -412,12 +450,15 @@ export async function gateway(request,env,fetcher=fetch) {
     const network=ipNetwork(request.headers.get('cf-connecting-ip')||'');
     const key=await crypto.subtle.importKey('raw',encode.encode(env.QUOTA_KEY),{name:'HMAC',hash:'SHA-256'},false,['sign']);
     const digest=Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',key,encode.encode(network)))).map(x=>x.toString(16).padStart(2,'0')).join('');
+    metric.quota_tag=Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',key,
+      encode.encode('private-quota-diagnostic:'+new Date().toISOString().slice(0,10)+':'+digest))))
+      .map(x=>x.toString(16).padStart(2,'0')).join('').slice(0,32);
     if(preview)previewNetwork=digest;
     const quotaId=env.NETWORK_QUOTA.idFromName(digest);
     const limited=await quotaFetch(quotaId,sessionCreation?'session':'request');
     if(limited.status!==204)return finish(limited.status===429?limited:response(503,'Gateway unavailable.'));
 
-    const headers=new Headers({'accept':'application/json'});
+    const headers=new Headers({'accept':'application/json',[TRACE_HEADER]:trace});
     // The persisted network dimension is already HMAC-SHA-256 under the
     // gateway-only QUOTA_KEY. Authenticate that digest for the worker as well:
     // direct-origin callers can invent a digest header but cannot forge this

@@ -1,3 +1,4 @@
+import {assertSecurePlan} from './support/release-plan.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -105,7 +106,7 @@ test('only successful callers explicitly clear a selected limiter bucket',async(
 test('migration 0030 is applied in both secure-auth release schema stages and verified everywhere',()=>{
   const workflow=readFileSync('.github/workflows/secure-auth-release.yml','utf8');
   const migration='migrations/0030_account_credential_limits.sql';
-  assert.equal(workflow.split(migration).length-1,2,'0030 must appear once in development and once in production');
+  assertSecurePlan(workflow,migration);
   const schema=readFileSync('worker/schema.sql','utf8');
   const verify=readFileSync('scripts/verify-neon-schema.mjs','utf8');
   assert.match(schema,/CREATE TABLE IF NOT EXISTS account_credential_rate_limits/);

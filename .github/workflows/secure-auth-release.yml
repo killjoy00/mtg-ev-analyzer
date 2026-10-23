@@ -56,7 +56,9 @@ jobs:
         run: node scripts/edge-production-control.mjs request
 
       - name: Install pinned release tools
-        run: node .github/scripts/install-wrangler-tool.mjs "$RUNNER_TEMP/edge-tools" neon@4.17.4 esbuild@0.28.2
+        run: |
+          node .github/scripts/install-wrangler-tool.mjs "$RUNNER_TEMP/edge-tools" neon@4.17.4 esbuild@0.28.2
+          npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Verify production gateway ownership before backend changes
         env:
@@ -126,45 +128,7 @@ jobs:
           neon="$RUNNER_TEMP/edge-tools/node_modules/.bin/neon"
           connection=$("$neon" connection-string "$DEV_BRANCH" --project-id "$PROJECT_ID" --database-name pack1 --role-name pack1_owner)
           echo "::add-mask::$connection"
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0028_account_sessions.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0029_account_recovery.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0030_account_credential_limits.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0031_account_deletion.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0032_traditional_v4_components.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0034_account_deletion_verification.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0037_mobile_oauth_handoffs.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0038_mobile_practice_idempotency.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0039_practice_serving_cache.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0040_mobile_minimum_version.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0040_practice_reroll_index.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0041_corpus_source_snapshots.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0041_apple_auth.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0042_serving_revision_snapshot_staging.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0043_corpus_activation_readiness.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0044_snapshot_scoped_puzzle_uniqueness.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0045_batched_practice_selector.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0045_apple_subscriptions.sql
-          bash .github/scripts/apply-identity-migration.sh "$connection" migrations/0046_public_identity_safety.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0047_admin_user_account_controls.sql
-          # 0032 above redefines the evidence rule for v4 only; 0048 re-widens it for the live v5 components.
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0048_uncapped_v5_components.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0050_practice_recency_bias.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0051_exact_pick_draw_index.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0052_decision_reports.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0053_creator_challenges.sql
-          bash .github/scripts/apply-identity-migration.sh "$connection" migrations/0054_creator_event_idempotency.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0055_creator_event_write_safety.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0056_snapshot_aware_reroll_covering_index.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0057_admin_owner_invitations.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0058_owner_guard_admin_deletion.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0059_daily_peer_stats.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0060_player_report_review.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0061_daily_reminders.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0062_daily_email_reminder_admission.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0063_private_creator_consent.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0064_report_linked_pick_removal.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0065_traditional_p1p6_component.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0066_removal_aware_serving_carry.sql
+          DATABASE_URL="$connection" node scripts/apply-release-migrations.mjs secure-auth-release
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
 
@@ -229,45 +193,7 @@ jobs:
           neon="$RUNNER_TEMP/edge-tools/node_modules/.bin/neon"
           connection=$("$neon" connection-string "$PROD_BRANCH" --project-id "$PROJECT_ID" --database-name pack1 --role-name pack1_owner)
           echo "::add-mask::$connection"
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0028_account_sessions.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0029_account_recovery.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0030_account_credential_limits.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0031_account_deletion.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0032_traditional_v4_components.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0034_account_deletion_verification.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0037_mobile_oauth_handoffs.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0038_mobile_practice_idempotency.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0039_practice_serving_cache.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0040_mobile_minimum_version.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0040_practice_reroll_index.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0041_corpus_source_snapshots.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0041_apple_auth.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0042_serving_revision_snapshot_staging.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0043_corpus_activation_readiness.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0044_snapshot_scoped_puzzle_uniqueness.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0045_batched_practice_selector.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0045_apple_subscriptions.sql
-          bash .github/scripts/apply-identity-migration.sh "$connection" migrations/0046_public_identity_safety.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0047_admin_user_account_controls.sql
-          # 0032 above redefines the evidence rule for v4 only; 0048 re-widens it for the live v5 components.
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0048_uncapped_v5_components.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0050_practice_recency_bias.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0051_exact_pick_draw_index.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0052_decision_reports.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0053_creator_challenges.sql
-          bash .github/scripts/apply-identity-migration.sh "$connection" migrations/0054_creator_event_idempotency.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0055_creator_event_write_safety.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0056_snapshot_aware_reroll_covering_index.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0057_admin_owner_invitations.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0058_owner_guard_admin_deletion.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0059_daily_peer_stats.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0060_player_report_review.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0061_daily_reminders.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0062_daily_email_reminder_admission.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0063_private_creator_consent.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0064_report_linked_pick_removal.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0065_traditional_p1p6_component.sql
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0066_removal_aware_serving_carry.sql
+          DATABASE_URL="$connection" node scripts/apply-release-migrations.mjs secure-auth-release
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
 

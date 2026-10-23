@@ -9,7 +9,7 @@ const {query}=await import('../worker/growth-function.js');
 const {default:api}=await import('../worker/draft-run-function.mjs');
 const {DRAFT_RUN_CORPUS_VERSION}=await import('../draft-run.mjs');
 const {DRAFT_RUN_SELECTION_VERSION}=await import('../draft-run-policy.mjs');
-const health=async()=>{const r=await api.fetch(new Request('https://packone.pro/health'));return {status:r.status,body:await r.json()};};
+const health=async()=>{const r=await api.fetch(new Request('https://packone.pro/health?deep=1'));return {status:r.status,body:await r.json()};};
 const statuses=async ids=>new Map((await query('SELECT set_id,status FROM draft_run_environment_policy WHERE set_id=ANY($1::text[])',
  [`{${ids.map(id=>`"${id}"`).join(',')}}`])).rows.map(r=>[r.set_id,r.status]));
 

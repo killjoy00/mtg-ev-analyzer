@@ -27,7 +27,8 @@
     ".github/scripts/apply-identity-migration.sh",
     "scripts/create-ci-neon-branch.mjs",
     "scripts/control-read.mjs",
-    "scripts/reroll-index-schema.mjs"
+    "scripts/reroll-index-schema.mjs",
+    "worker/backend-diagnostics.mjs"
   ],
   "domains": {
     "account": {
@@ -123,7 +124,8 @@
         "worker/draft-run-health.mjs",
         "worker/trophy-import*.mjs",
         "scripts/*corpus*manifest.mjs",
-        "scripts/load*tro*.mjs"
+        "scripts/load*tro*.mjs",
+        "worker/revision-summary.mjs"
       ],
       "suites": [
         "tests/staged-manifest-backend-smoke.mjs",

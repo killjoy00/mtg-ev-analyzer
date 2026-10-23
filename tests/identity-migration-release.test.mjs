@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 
-test('both secure release environments execute fail-closed 0046 and 0054 replay guards',()=>{
+test('legacy identity helper fails closed; ledger release does not call it',()=>{
   const directory=fs.mkdtempSync(path.join(os.tmpdir(),'identity-release-'));
   const log=path.join(directory,'calls');
   fs.writeFileSync(path.join(directory,'psql'),`#!/bin/bash
@@ -21,8 +21,9 @@ fi
       const block=workflow.split(`- name: Apply additive secure-${environment==='development'?'session':'account'} schema to ${environment}`)[1]?.split('\n      - name:')[0];
       assert.ok(block,environment+' schema step exists');
       for(const migration of ['0046_public_identity_safety.sql','0054_creator_event_idempotency.sql']) {
-        const command=block.split('\n').map(x=>x.trim()).find(x=>x.includes('migrations/'+migration));
-        assert.ok(command,environment+' contains the identity migration command');
+        assert.ok(block.includes('node scripts/apply-release-migrations.mjs secure-auth-release'));
+        assert.ok(!block.includes('apply-identity-migration.sh'));
+        const command='bash .github/scripts/apply-identity-migration.sh "$connection" migrations/'+migration;
         for(const marker of ['t','f','error','invalid']) {
           fs.writeFileSync(log,'');
           const result=spawnSync('bash',['-c','connection=fixture\n'+command],{encoding:'utf8',env:{...process.env,PATH:directory+':'+process.env.PATH,PSQL_MARKER:marker,PSQL_LOG:log}});

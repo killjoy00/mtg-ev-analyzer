@@ -1,3 +1,4 @@
+import {observedRoute,tagBackendResponse} from './backend-diagnostics.mjs';
 import {releaseMetadata} from './release.mjs';
 import {guardIngress} from './ingress-auth.mjs';
 import {readJson} from './request-json.mjs';
@@ -477,11 +478,11 @@ export default {
   async fetch(request) {
     const denied=guardIngress(request);if(denied)return denied;
     try {
-      return withCors(await route(request), request);
+      return withCors(await observedRoute(request,'legacy',route), request);
     } catch (error) {
       console.error(error);
       const status=Number(error?.status||500);
-      return withCors(json({ error: status===500?'Request failed. Please try again.':error.message },status), request);
+      return withCors(tagBackendResponse(json({ error: status===500?'Request failed. Please try again.':error.message },status),error), request);
     }
   },
 };
