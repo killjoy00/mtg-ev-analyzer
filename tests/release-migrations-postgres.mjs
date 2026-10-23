@@ -40,7 +40,8 @@ try {
  const invalidates=async(action)=>{await q('BEGIN');try{const old=await revision();await action();assert.ok(await revision()>old);}finally{await q('ROLLBACK');}};
  await invalidates(()=>q("UPDATE draft_run_environment_policy SET status='Paused' WHERE set_id=$1",[victim.set_id]));
  await invalidates(()=>q("INSERT INTO corpus_source_exclusions(set_id,corpus_version,source_draft_hash,reason,evidence) VALUES($1,$2,$3,'fixture','{}')",[victim.set_id,victim.corpus_version,victim.source_draft_hash]));
- await invalidates(()=>q("UPDATE draft_run_puzzle_ratings SET rating=rating+0.001 WHERE puzzle_id=$1",[victim.puzzle_id]));
+ await invalidates(()=>q("UPDATE draft_run_verified_puzzles SET interesting=false WHERE puzzle_id=$1",[victim.puzzle_id]));
+ await invalidates(()=>q("UPDATE draft_run_puzzle_ratings SET rating=CASE WHEN rating=100 THEN 99 ELSE rating+1 END WHERE puzzle_id=$1",[victim.puzzle_id]));
  await invalidates(async()=>{
    await q("UPDATE draft_run_environment_policy SET status='Paused' WHERE set_id=$1",[victim.set_id]);
    const old=await revision();await q("UPDATE draft_run_environment_policy SET status='Live' WHERE set_id=$1",[victim.set_id]);assert.ok(await revision()>old);
@@ -50,6 +51,9 @@ try {
    const report=(await q(`INSERT INTO draft_run_decision_reports(puzzle_id,set_id,pick_number,round_number,selected_card_id,selected_card_name,reason,environment,corpus_version,scoring_version,client_platform)
     VALUES($1,$2,$3,1,$4,$5,'uninteresting','mixed',$6,'fixture','web') RETURNING id`,[victim.puzzle_id,victim.set_id,victim.pick_number,p.candidates[0].id,p.candidates[0].name,victim.corpus_version])).rows[0].id;
    await q("SELECT pack1_moderate_reported_pick($1,true,0,'fixture','22222222-2222-4222-8222-222222222222')",[report]);
+   const removed=await revision();
+   await q("SELECT pack1_moderate_reported_pick($1,false,1,'fixture','22222222-2222-4222-8222-222222222222')",[report]);
+   assert.ok(await revision()>removed);
  });
  const add=(name,sql)=>{fs.writeFileSync(root+'/migrations/'+name,sql);return {...manifest,ordered:[...manifest.ordered,name],release_paths:{'secure-auth-release':{migrations:[...manifest.release_paths['secure-auth-release'].migrations,name]}}};};
  const failed='9998_fixture_failure.sql',failedManifest=add(failed,'CREATE TABLE fixture_rollback(id int); SELECT 1/0;');
