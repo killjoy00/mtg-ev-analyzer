@@ -308,8 +308,8 @@ export async function chargeNetworkQuota(namespace,id,kind,{signal=AbortSignal.t
     headers.set('x-pack1-quota-attempt',String(attempt+1));
     try {return await boundedSignalCall(()=>namespace.get(id).fetch(new Request('https://quota/'+kind,{method:'POST',signal,headers})),signal);}
     catch(error) {
-      onFailure(failureIndicators(error));
-      if(attempt!==0||error?.retryable!==true||error?.overloaded===true||['TimeoutError','AbortError'].includes(error?.name)||signal.aborted)throw error;
+      const failure=failureIndicators(error);onFailure(failure);
+      if(attempt!==0||!failure.retryable||failure.overloaded||failure.timeout||failure.aborted||signal.aborted)throw error;
       await sleep(50+Math.floor(Math.random()*50));
     }
   }

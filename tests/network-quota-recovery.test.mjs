@@ -13,7 +13,10 @@ test('retryable quota exception recreates the broken stub, with one bounded back
 });
 test('overload, non-retryable failures, timeouts and HTTP responses are never retried',async()=>{
   for(const error of [Error('unknown'),Object.assign(Error('overloaded'),{retryable:true,overloaded:true}),
-    Object.assign(new DOMException('timed out','TimeoutError'),{retryable:true}),Object.assign(new DOMException('aborted','AbortError'),{retryable:true})]) {
+    Object.assign(new DOMException('timed out','TimeoutError'),{retryable:true}),
+    Object.assign(Error('socket failure'),{retryable:true,code:'ETIMEDOUT'}),
+    Object.assign(Error('provider request timed out'),{retryable:true}),
+    Object.assign(Error('cancelled'),{retryable:true,code:'ABORT_ERR'}),Object.assign(new DOMException('aborted','AbortError'),{retryable:true})]) {
     let calls=0;const namespace={get:()=>({fetch:async()=>{calls++;throw error;}})};
     await assert.rejects(chargeNetworkQuota(namespace,'network','request'),e=>e===error);assert.equal(calls,1);
   }

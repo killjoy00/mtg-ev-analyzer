@@ -4,7 +4,8 @@ export const backendReason=value=>['practice_refreshing','corpus_unavailable','b
 export function failureIndicators(error) {
  // Classify only; never publish arbitrary provider messages or stacks.
  const message=String(error?.message||'');
- return {timeout:error?.name==='TimeoutError',aborted:error?.name==='AbortError',
+ return {timeout:error?.name==='TimeoutError'||error?.code==='ETIMEDOUT'||error?.timeout===true||/\b(?:timed out|timeout)\b/i.test(message),
+   aborted:error?.name==='AbortError'||error?.code==='ABORT_ERR',
    retryable:error?.retryable===true,overloaded:error?.overloaded===true,
    remote:error?.remote===true,provider_reset:/Durable Object reset|object to be reset|disconnected|network connection lost/i.test(message)};
 }
