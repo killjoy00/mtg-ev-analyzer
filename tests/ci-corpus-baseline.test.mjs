@@ -1,4 +1,5 @@
 import test from 'node:test';
+import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {clonedCorpusMatchesCatalog} from '../scripts/ci-corpus-baseline.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
@@ -41,4 +42,13 @@ test('upgraded import cannot pass on mismatched version, unverified schema or ch
   for(const change of bad)
     assert.equal(clonedCorpusMatchesCatalog(catalog,[upgradedRow('ktk'),{...upgradedRow('mom'),...change}]),false,
       JSON.stringify(change));
+});
+
+test('backend CI imports the validator in the same heredoc that uses it',()=>{
+  const workflow=fs.readFileSync(new URL('../.github/workflows/backend-gate.yml',import.meta.url),'utf8');
+  const marker="current_baseline=$(node --input-type=module - <<'NODE'";
+  assert.ok(workflow.includes(marker));
+  const script=workflow.split(marker)[1].split('\n          NODE')[0];
+  assert.match(script,/import \{clonedCorpusMatchesCatalog\} from '\.\/scripts\/ci-corpus-baseline\.mjs'/);
+  assert.match(script,/console\.log\(clonedCorpusMatchesCatalog\(catalog,rows\)\)/);
 });
