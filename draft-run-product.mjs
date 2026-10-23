@@ -7,7 +7,7 @@ import {decisionClock} from './decision-clock.mjs';
 import { sortPackByRarity } from './replay-data.mjs';
 import { escapeHtml as esc } from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
-import { compactDraftRunFeedback, consensusFeedback, trophyDrafterDetails, trophyRevealSentence } from './draft-run-feedback.mjs?v=6';
+import { compactDraftRunFeedback, consensusFeedback, trophyDrafterDetails, trophyDrafterFacts, trophyRevealSentence } from './draft-run-feedback.mjs?v=6';
 import { tcgplayerUrl } from './tcgplayer.mjs';
 import {revealCardChoices,modelSupportLabel} from './draft-run-reveal.mjs?v=1';
 import {openTrophyDeck} from './trophy-deck-dialog.mjs?v=1';
@@ -264,7 +264,7 @@ function bind(p,answer) {
       openTrophyDeck(async()=>{
         if(!trophyDeckCache.has(key))trophyDeckCache.set(key,await api(`/v1/runs/${id}/deck?round=${round}`));
         return trophyDeckCache.get(key);
-      });
+      },{record:trophyDrafterFacts(answer)?.record,trophyName:answer.historicalName,priorNames:(answer.puzzle.prior_picks||[]).map(card=>card.name)});
     };
     return;
   }

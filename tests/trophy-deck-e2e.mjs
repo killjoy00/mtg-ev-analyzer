@@ -10,7 +10,7 @@ const browser=await chromium.launch({headless:true});
 try {
  const page=await browser.newPage({viewport:{width:390,height:844}}),errors=[];
  page.on('pageerror',e=>errors.push(e.message));
- await page.route(base+'/__deck-test',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/visual-c.css"><link rel="stylesheet" href="/draft-run.css"></head><body><button id="open">Click here to see the drafter’s deck.</button><script type="module">import{openTrophyDeck}from'/trophy-deck-dialog.mjs';window.loads=0;document.querySelector('#open').onclick=()=>openTrophyDeck(async()=>{window.loads++;if(window.fail)throw Error('retry');return ${JSON.stringify(deck)}});</script></body></html>`}));
+ await page.route(base+'/__deck-test',route=>route.fulfill({contentType:'text/html',body:`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/visual-c.css"><link rel="stylesheet" href="/draft-run.css"></head><body><button id="open">Click here to see the drafter’s deck.</button><script type="module">import{openTrophyDeck}from'/trophy-deck-dialog.mjs';window.loads=0;document.querySelector('#open').onclick=()=>openTrophyDeck(async()=>{window.loads++;if(window.fail)throw Error('retry');return ${JSON.stringify(deck)}},{trophyName:${JSON.stringify(deck.deck[0].name)},priorNames:[${JSON.stringify(deck.deck[1].name)}],record:'7–1'});</script></body></html>`}));
  await page.goto(base+'/__deck-test');
  assert.equal(await page.locator('.run-deck-dialog').count(),0);
  await page.waitForFunction(()=>typeof window.loads==='number');assert.equal(await page.evaluate(()=>window.loads),0);
@@ -18,6 +18,9 @@ try {
  await page.getByRole('heading',{name:'Trophy Drafter’s Decklist',exact:true}).waitFor();
  await page.locator('.run-deck-group').first().waitFor();
  assert.equal(await page.evaluate(()=>window.loads),1);
+ assert.equal(await page.locator('.run-deck-row.is-trophy').count(),1);
+ assert.equal(await page.locator('.run-deck-row i').count(),1);
+ assert.match(await page.locator('.run-deck-meta').innerText(),/7-1/);
  assert.equal(await page.locator('.run-deck-group .run-deck-row>span:first-child').evaluateAll(nodes=>nodes.reduce((sum,n)=>sum+Number(n.textContent),0)),deck.size);
  for(const width of [390,320,1440]) {
   await page.setViewportSize({width,height:844});
