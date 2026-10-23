@@ -7,7 +7,7 @@ import urllib.error
 from unittest import mock
 from pathlib import Path
 
-from scripts.fetch_card_metadata import aliases, choose_main_printing, compact_card, discover_draft_data, draft_candidate_names, fetch_named, fetch_set, image_url, request_json
+from scripts.fetch_card_metadata import aliases, choose_main_printing, draft_printing_priority, compact_card, discover_draft_data, draft_candidate_names, fetch_named, fetch_set, image_url, request_json
 
 
 class CardMetadataTests(unittest.TestCase):
@@ -28,6 +28,56 @@ class CardMetadataTests(unittest.TestCase):
         alternate = {"id":"alt","name":"Alpha","set":"new","lang":"en","released_at":"2026-01-01","collector_number":"301","variation":True,"image_uris":{"normal":"https://img/alt.jpg"}}
         chosen = choose_main_printing([alternate, old_print, base], "Alpha", "new")
         self.assertEqual(chosen["id"], "base")
+
+    def test_otj_pack_uses_breaking_news_printing_not_older_art(self):
+        old = {"id": "ktk-ride-down", "name": "Ride Down", "set": "ktk",
+               "lang": "en", "released_at": "2014-09-26", "collector_number": "194",
+               "image_uris": {"normal": "https://img/ktk-ride-down.jpg"}}
+        otp = {"id": "otp-ride-down", "name": "Ride Down", "set": "otp",
+               "lang": "en", "released_at": "2024-04-19", "collector_number": "52",
+               "border_color": "borderless", "frame_effects": ["inverted"],
+               "image_uris": {"normal": "https://img/otp-ride-down.jpg"}}
+        collector_only = {**otp, "id": "otp-special", "collector_number": "92",
+                          "variation": True, "image_uris": {"normal": "https://img/special.jpg"}}
+        self.assertEqual(choose_main_printing([old, collector_only, otp], "Ride Down", "otj")["id"], "otp-ride-down")
+        self.assertEqual(choose_main_printing([old, collector_only, otp], "Ride Down")["id"], "ktk-ride-down")
+        self.assertEqual(draft_printing_priority(otp, "otj"), 1)
+
+    def test_only_verified_bonus_sheets_count_as_draft_sources(self):
+        base = {"id": "old", "name": "Alpha", "set": "old", "lang": "en",
+                "released_at": "2000-01-01", "collector_number": "1",
+                "image_uris": {"normal": "https://img/old.jpg"}}
+        for draft_set, bonus_set in (("bro", "brr"), ("mom", "mul"), ("sir", "sis"),
+                                     ("woe", "wot"), ("otj", "big")):
+            with self.subTest(draft_set=draft_set):
+                bonus = {**base, "id": bonus_set, "set": bonus_set, "released_at": "2024-04-19",
+                         "border_color": "borderless", "image_uris": {"normal": f"https://img/{bonus_set}.jpg"}}
+                self.assertEqual(choose_main_printing([base, bonus], "Alpha", draft_set)["id"], bonus_set)
+                self.assertEqual(draft_printing_priority(bonus, draft_set), 1)
+        commander = {**base, "id": "commander", "set": "otc", "released_at": "2024-04-19"}
+        self.assertEqual(draft_printing_priority(commander, "otj"), 2)
+        self.assertEqual(choose_main_printing([base, commander], "Alpha", "otj")["id"], "old")
+
+    def test_otj_special_guests_are_limited_to_the_2024_collector_range(self):
+        old = {"id": "old", "name": "Stoneforge Mystic", "set": "wwk", "lang": "en",
+               "released_at": "2010-02-05", "collector_number": "20",
+               "image_uris": {"normal": "https://img/old.jpg"}}
+        guest = {**old, "id": "guest-29", "set": "spg", "collector_number": "29",
+                 "border_color": "borderless", "released_at": "2024-04-19"}
+        unrelated = {**old, "id": "guest-200", "set": "spg", "collector_number": "200",
+                     "released_at": "2026-01-01"}
+        self.assertEqual(draft_printing_priority(guest, "otj"), 1)
+        self.assertEqual(draft_printing_priority(unrelated, "otj"), 2)
+        self.assertEqual(choose_main_printing([old, guest, unrelated], "Stoneforge Mystic", "otj")["id"], "guest-29")
+        self.assertEqual(choose_main_printing([old, unrelated], "Stoneforge Mystic", "otj")["id"], "old")
+
+    def test_main_draft_set_wins_before_cosmetic_penalty(self):
+        old = {"id": "old", "name": "Alpha", "set": "old", "lang": "en",
+               "released_at": "2001-01-01", "collector_number": "1",
+               "image_uris": {"normal": "https://img/old.jpg"}}
+        drafted = {**old, "id": "current", "set": "abc", "released_at": "2026-01-01",
+                   "full_art": True, "image_uris": {"normal": "https://img/current.jpg"}}
+        self.assertEqual(choose_main_printing([old, drafted], "Alpha", "abc")["id"], "current")
 
     def test_requested_digital_set_beats_unrelated_paper_reprint(self):
         draft_set = {"id":"digital","name":"Alpha","set":"hbg","lang":"en","released_at":"2022-01-01","collector_number":"1","digital":True,"image_uris":{"normal":"https://img/hbg.jpg"}}
