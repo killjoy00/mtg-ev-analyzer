@@ -35,7 +35,7 @@ const verify=async()=>{
 };
 await verify();
 const publicAttempt=await fetch(base+'/growth/health?quick=1',{redirect:'error'});assert.equal(publicAttempt.status,403);
-const h=await fetch(`https://${branch}-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/health`,{headers:{'x-pack1-ingress-secret':origin},redirect:'error',signal:AbortSignal.timeout(120000)});
+const h=await fetch(`https://${branch}-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/health?deep=1`,{headers:{'x-pack1-ingress-secret':origin},redirect:'error',signal:AbortSignal.timeout(120000)});
 assert.equal(h.status,200);const health=await h.json();assert.equal(health.unrated_puzzles,0);assert.deepEqual(health.missing_sets,[]);
 const guest=await call('growth','/v1/session',{displayName:'QA gateway '+commit.slice(0,7)});
 const friendGuest=await call('growth','/v1/session',{displayName:'QA gateway peer '+commit.slice(0,7)});

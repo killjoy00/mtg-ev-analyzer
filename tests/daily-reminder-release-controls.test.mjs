@@ -1,3 +1,4 @@
+import {assertSecurePlan} from './support/release-plan.mjs';
 // The protected secure-auth workflow is the only activation boundary for
 // independently approved Daily email/push channels. Exercise its actual shell
 // bodies with synthetic values, without running a deployment or using secrets.
@@ -57,8 +58,8 @@ test('both release branches use identical, default-off independent channel contr
   assert.equal(dev,prod);
   assert.match(workflow,/environment: pack-one-mobile-release/);
   assert.match(workflow,/paths: \['\.github\/secure-auth-release-request\.json'\]/);
-  assert.equal((workflow.match(/migrations\/0061_daily_reminders\.sql/g)||[]).length,2);
-  assert.equal((workflow.match(/migrations\/0062_daily_email_reminder_admission\.sql/g)||[]).length,2);
+  assertSecurePlan(workflow,'0061_daily_reminders.sql');
+  assertSecurePlan(workflow,'0062_daily_email_reminder_admission.sql');
   assert.doesNotMatch(workflow,/PACK1_REMINDER_DELIVERY_APPROVED|PACK1_DAILY_REMINDERS_ENABLED/);
   assert.deepEqual(run(dev,{},true).values.PACK1_REMINDER_EMAIL_ENABLED,'0');
   assert.deepEqual(run(prod,{},true).values.PACK1_REMINDER_PUSH_ENABLED,'0');

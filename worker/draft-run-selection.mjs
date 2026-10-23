@@ -294,7 +294,7 @@ export async function selectDatabaseReroll(query,version,source,options) {
 }
 
 
-export const servingCacheUnavailable=()=>Object.assign(Error('Practice is refreshing. Please retry shortly.'),{status:503,retryAfter:2});
+export const servingCacheUnavailable=()=>Object.assign(Error('Practice is refreshing. Please retry shortly.'),{status:503,retryAfter:2,diagnosticReason:'practice_refreshing'});
 export async function loadServingSnapshot(query,version,{readiness=false}={}) {
   let row;
   try {row=(await query(readiness?'SELECT pack1_build_serving_snapshot($1,$2,$3) snapshot':'SELECT pack1_serving_snapshot($1,$2,$3) snapshot',

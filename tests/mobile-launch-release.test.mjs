@@ -1,3 +1,4 @@
+import {assertSecurePlan} from './support/release-plan.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -365,7 +366,7 @@ test('v1 cold-start gate keeps navigation mounted across foreground revalidation
   assert.match(policy, /apps\.apple\.com/);
   assert.match(policy, /play\.google\.com/);
   assert.match(gateway, /'\/v1\/mobile\/version'/);
-  assert.match(releaseWorkflow, /migrations\/0040_mobile_minimum_version\.sql/g);
+  assertSecurePlan(releaseWorkflow,'0040_mobile_minimum_version.sql');
 });
 
 
@@ -397,7 +398,7 @@ test('v1 implements Sign in with Apple across native iOS, Android/web handoff, a
   assert.match(apple, /pro\.packone\.app/);
   assert.match(apple, /pro\.packone\.web/);
   assert.match(gateway, /'\/v1\/mobile\/account\/apple\/native'/);
-  assert.match(releaseWorkflow, /migrations\/0041_apple_auth\.sql/g);
+  assertSecurePlan(releaseWorkflow,'0041_apple_auth.sql');
   assert.match(releaseWorkflow, /APPLE_SIGN_IN_KEY_P8/);
   assert.doesNotMatch(integrity, /Sign in with Apple is not currently exposed/);
 });

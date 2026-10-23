@@ -58,6 +58,11 @@ test('release workflows match their registered migration plans and order',()=>{
   for(const [name,plan] of Object.entries(releasePaths)) {
     assert.ok(plan.workflow&&Array.isArray(plan.migrations)&&plan.migrations.length,`invalid release path: ${name}`);
     const workflow=fs.readFileSync(plan.workflow,'utf8');
+    if(workflow.includes(`node scripts/apply-release-migrations.mjs ${name}`)) {
+      assert.doesNotMatch(workflow,/psql .* -f migrations\//,'Ledger release must not replay historical files');
+      assert.deepEqual(plan.migrations,ordered.filter(m=>plan.migrations.includes(m)));
+      continue;
+    }
     if(workflow.includes(`node scripts/ci-migration-plan.mjs ${name}`)) {
       assert.ok(workflow.includes('ON_ERROR_STOP=1 -f "$migration"'));
       const orderedPlan=ordered.filter(migration=>plan.migrations.includes(migration));

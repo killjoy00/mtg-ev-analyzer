@@ -75,7 +75,7 @@ async function waitForStableMarkers() {
   }
   assert.deepEqual(last,{draftrunapi:commit,pack1growth:commit,pack1api:commit},'release markers did not stabilize');
 }
-const health=await call('draftrunapi','/health');
+const health=await call('draftrunapi','/health?deep=1');
 assert.equal(health.ok,true);assert.equal(health.admin_api_version,ADMIN_API_VERSION);assert.equal(health.run_length,8);assert.equal(health.selection_version,'eight-pick-v4');
 assert.equal(health.unrated_puzzles,0);assert.deepEqual(health.missing_sets,[]);assert.equal(health.daily_featured_sets.length,4);
 await call('pack1growth','/v1/events',{events:[{event:'page_view',props:{}}]},null,401);

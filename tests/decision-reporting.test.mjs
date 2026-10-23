@@ -1,3 +1,4 @@
+import {assertSecurePlan} from './support/release-plan.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import test from 'node:test';
@@ -45,7 +46,7 @@ test('decision report route is classified and migration is on a guarded release 
   assert.equal(routeFamily('/draft/v1/runs/11111111-1111-4111-8111-111111111111/report'),'draft_report');
   assert.ok(manifest.ordered.includes('0052_decision_reports.sql'));
   assert.ok(manifest.release_paths['secure-auth-release'].migrations.includes('0052_decision_reports.sql'));
-  assert.equal(secureRelease.split('migrations/0052_decision_reports.sql').length-1,2);
+  assertSecurePlan(secureRelease,'0052_decision_reports.sql');
 });
 
 test('the production gateway forwards decision reports from web and native sessions',async()=>{

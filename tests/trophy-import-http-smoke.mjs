@@ -14,7 +14,7 @@ function assertPrivatePuzzle(p){
   assert.ok(p.candidates.every(c=>c.model_probability===undefined));
 }
 // Every Live environment serves; Candidate catalog sets are intentionally non-serving.
-const health=await call('/health');assert.deepEqual(health.missing_sets,[]);assert.equal(health.sets,health.live_sets);assert.ok(health.sets>=4);assert.ok(health.puzzles>20000);
+const health=await call('/health?deep=1');assert.deepEqual(health.missing_sets,[]);assert.equal(health.sets,health.live_sets);assert.ok(health.sets>=4);assert.ok(health.puzzles>20000);
 const guest=await call('/v1/session',{displayName:'Import check'});
 const friendGuest=await call('/v1/session',{displayName:'Import check peer'});
 for(const environment of ['mixed','powered-cube']) {

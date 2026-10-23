@@ -1,3 +1,4 @@
+import {observedRoute,tagBackendResponse} from './backend-diagnostics.mjs';
 import {createHmac} from 'node:crypto';
 import {reminderRoute,revokeReminderSessionDevices,reminderReadiness} from './daily-reminders.mjs';
 import {retryRolledBackQuery} from './database-retry.mjs';
@@ -2577,7 +2578,7 @@ export default {
     const internalMaintenance=new Set(['/internal/account-deletion-maintenance','/internal/account-deletion-maintenance-status','/internal/daily-reminders','/internal/daily-social-dispatch']).has(new URL(request.url).pathname);
     if(!internalMaintenance){const denied=guardIngress(request);if(denied)return denied;}
     try {
-      return withCors(await route(request), request);
+      return withCors(await observedRoute(request,'growth',route), request);
     } catch (error) {
       if(new URL(request.url).pathname.includes('reminders')) {
         const status=error?.reminderSafe?Number(error.status||400):[401,403].includes(Number(error?.status))?Number(error.status):503;
@@ -2610,7 +2611,7 @@ export default {
       if(status===429&&error?.rateLimitScope==='mobile-account-auth'&&request.method==='POST'&&
         /^\/v1\/mobile\/account\/(?:signin|signup)$/.test(new URL(request.url).pathname))
         response.headers.set(RATE_LIMIT_CLASS_HEADER,AUTH_LIMIT_CLASS);
-      return withCors(response, request);
+      return withCors(tagBackendResponse(response,error), request);
     }
   },
 };

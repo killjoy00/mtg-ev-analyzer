@@ -1,3 +1,6 @@
+import {revisionSummary} from './revision-summary.mjs';
+const healthSummary=revisionSummary();
+import {observedRoute,tagBackendResponse} from './backend-diagnostics.mjs';
 import {SERVING_POLICY_VERSION,LEGACY_SERVING_POLICY_VERSION,SERVING_QUALITY_SQL} from '../serving-quality.mjs';
 import {accountCapabilities,requireCapability,practiceCapability} from './capabilities.mjs';
 import {componentBelongsTo,corpusMembership} from './corpus-components.mjs';
@@ -554,12 +557,12 @@ async function route(request) {
   if(path.startsWith('/v1/admin/')) return json(await handleAdmin(request,query,readJson));
   if(request.method==='GET'&&path==='/health') {
     if(url.searchParams.get('quick')==='1')return json({ok:true,service:'draft-run',admin_api_version:ADMIN_API_VERSION,...releaseMetadata()});
-    const result=await query(`SELECT p.set_id,count(*)::int archived,
+    const result=await healthSummary(query,()=>query(`SELECT p.set_id,count(*)::int archived,
       count(*) FILTER(WHERE r.puzzle_id IS NULL)::int unrated,
       count(*) FILTER(WHERE r.puzzle_id IS NOT NULL AND ${SERVING_QUALITY_SQL} AND p.pick_number BETWEEN CASE WHEN p.set_id='powered-cube' THEN 2 ELSE 1 END AND CASE WHEN p.set_id='powered-cube' THEN 9 ELSE 8 END)::int decisions,
       count(DISTINCT p.source_draft_hash) FILTER(WHERE r.puzzle_id IS NOT NULL AND ${SERVING_QUALITY_SQL} AND p.pick_number BETWEEN CASE WHEN p.set_id='powered-cube' THEN 2 ELSE 1 END AND CASE WHEN p.set_id='powered-cube' THEN 9 ELSE 8 END)::int drafts
       FROM draft_run_verified_puzzles p LEFT JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version=$2
-      WHERE (${corpusMembership({serving:true})}) AND p.interesting AND p.pack_number=1 AND NOT EXISTS(SELECT 1 FROM corpus_source_exclusions x WHERE x.set_id=p.set_id AND x.corpus_version=p.corpus_version AND x.source_draft_hash=p.source_draft_hash) GROUP BY p.set_id`,[DRAFT_RUN_CORPUS_VERSION,DRAFT_RUN_DIFFICULTY_VERSION]);
+      WHERE (${corpusMembership({serving:true})}) AND p.interesting AND p.pack_number=1 AND NOT EXISTS(SELECT 1 FROM corpus_source_exclusions x WHERE x.set_id=p.set_id AND x.corpus_version=p.corpus_version AND x.source_draft_hash=p.source_draft_hash) AND NOT EXISTS(SELECT 1 FROM draft_run_pick_removal_members rm JOIN draft_run_pick_removals pr USING(decision_key) WHERE rm.puzzle_id=p.puzzle_id AND pr.removed) GROUP BY p.set_id`,[DRAFT_RUN_CORPUS_VERSION,DRAFT_RUN_DIFFICULTY_VERSION]),{deep:url.searchParams.get('deep')==='1'});
     const rows=result.rows,sets=new Set(rows.map(p=>p.set_id)),unrated=rows.reduce((n,p)=>n+Number(p.unrated),0);
     const live=await loadLiveSetMetadata(query,DRAFT_RUN_CORPUS_VERSION),regular=liveRegularSets(live,gameDateKey()).map(s=>s.set_id);
     // Only a Live environment is expected to serve. Candidate, Paused and
@@ -663,6 +666,6 @@ async function route(request) {
 export default {async fetch(request) {
   const internal=new URL(request.url).pathname===DAILY_GENERATION_PATH;
   if(!internal){const denied=guardIngress(request);if(denied)return denied;}
-  try {const response=await route(request);response.headers.set('cache-control','no-store');return withCors(response,request);}
-  catch(error) {const status=Number(error.status)||500;if(status===500) console.error('Draft Run request failed',error.message);const response=json({error:status===500?'Could not save your run. Please retry.':error.message,...(error.capability?{capability:error.capability}:{}),...(error.code?{code:String(error.code)}:{})},status);if(error.retryAfter)response.headers.set('retry-after',String(error.retryAfter));return withCors(response,request);}
+  try {const response=await observedRoute(request,'draft',route);response.headers.set('cache-control','no-store');return withCors(response,request);}
+  catch(error) {const status=Number(error.status)||500;if(status===500) console.error('Draft Run request failed',error.message);const response=json({error:status===500?'Could not save your run. Please retry.':error.message,...(error.capability?{capability:error.capability}:{}),...(error.code?{code:String(error.code)}:{})},status);if(error.retryAfter)response.headers.set('retry-after',String(error.retryAfter));return withCors(tagBackendResponse(response,error),request);}
 }};

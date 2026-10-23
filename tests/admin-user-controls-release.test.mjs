@@ -1,3 +1,4 @@
+import {assertSecurePlan} from './support/release-plan.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -94,7 +95,7 @@ test('0047 is registered in secure auth and isolated backend release paths',()=>
   for(const key of ['secure-auth-release','backend-gate-backlog','launch-load','launch-distributed'])
     assert.ok(manifest.release_paths[key].migrations.includes('0047_admin_user_account_controls.sql'),key);
   const secure=fs.readFileSync('.github/workflows/secure-auth-release.yml','utf8');
-  assert.equal((secure.match(/migrations\/0047_admin_user_account_controls\.sql/g)||[]).length,2);
+  assertSecurePlan(secure,'0047_admin_user_account_controls.sql');
   const verify=fs.readFileSync('scripts/verify-neon-schema.mjs','utf8');
   assert.match(verify,/pack1_admin_rename_public_username/);
   assert.match(verify,/pack1_begin_admin_account_deletion/);

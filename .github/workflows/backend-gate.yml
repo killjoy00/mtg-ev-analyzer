@@ -20,6 +20,9 @@ on:
       - 'tests/creator-event-*.mjs'
       - 'tests/measurement-report-math.mjs'
       - 'scripts/ci-migration-plan.mjs'
+      - 'scripts/apply-release-migrations.mjs'
+      - 'scripts/migration-schema.mjs'
+      - 'tests/release-migrations-postgres.mjs'
       - 'scripts/prepare-test-database.mjs'
       - 'tests/support/**'
       - 'tests/fixtures/**'
@@ -82,6 +85,8 @@ jobs:
         run: node tests/admin-invitations-postgres.mjs
       - name: Verify the serving cache carries forward after a removed decision
         run: node tests/serving-carry-postgres.mjs
+      - name: Verify reviewed release plan, ledger and serving invalidation
+        run: node tests/release-migrations-postgres.mjs
       - name: Check migration rollout, concurrent writes and rollback safety
         run: |
           printf '%s' "$PACK1_TEST_DATABASE_URL" > "$RUNNER_TEMP/pack1-postgres.connection"
