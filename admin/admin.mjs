@@ -1,4 +1,4 @@
-import {renderOverview,adminArea,ADMIN_AREAS} from './overview.mjs?v=20261019';
+import {renderOverview,adminArea,ADMIN_AREAS} from './overview.mjs?v=20261023-activity';
 import {renderCorpus} from './corpus.mjs';
 import {renderUsers} from './users.mjs?v=20261023-activity';
 import {renderAdminTeam} from './team.mjs';
