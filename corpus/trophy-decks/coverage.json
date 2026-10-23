@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "catalog_snapshot_date": "2026-10-20",
-  "matched_sources": 110232,
-  "source_drafts": 110413,
-  "decks": 110232,
+  "matched_sources": 110373,
+  "source_drafts": 110554,
+  "decks": 110373,
   "sets": [
     {
       "set_id": "blb",
@@ -91,9 +91,9 @@
     },
     {
       "set_id": "fra",
-      "source_drafts": 1030,
-      "matched_sources": 1029,
-      "decks": 1029,
+      "source_drafts": 1171,
+      "matched_sources": 1170,
+      "decks": 1170,
       "unavailable": 1,
       "unavailable_reasons": {
         "no_game_record": 1
@@ -551,6 +551,20 @@
       "wanted_sources": 1030,
       "matched_sources": 1029,
       "decks": 1029
+    },
+    {
+      "set_id": "fra",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.FRA.TradDraft.csv.gz",
+      "archive_etag": "\"6b133ba3ad9cad83e76087d35c574295\"",
+      "archive_sha256": "e06bef9b8300a5ec2a1cb79ac740c2122d265a0c72906a99424d4800bf7f37cf",
+      "archive_bytes": 2283549,
+      "archive_updated": "2026-10-17",
+      "ordering": "game_time_then_event_sequence",
+      "game_rows": 28232,
+      "wanted_sources": 141,
+      "matched_sources": 141,
+      "decks": 141
     },
     {
       "set_id": "hbg",
@@ -1042,5 +1056,6 @@
       "matched_sources": 1281,
       "decks": 1281
     }
-  ]
+  ],
+  "source_inventory_scope": "Current parent corpus, Live components, and the approved FRA Traditional supplement."
 }

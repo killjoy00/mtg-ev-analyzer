@@ -32,7 +32,7 @@ test('every match and non-match keeps three distinct role-appropriate cards',()=
 
 test('curated public decks retain exact quantities, aliases and complete display metadata',()=>{
   assert.equal(createHash('sha256').update(bytes).digest('hex'),sha256);
-  assert.equal(catalog.decks.length,1029);assert.equal(Object.keys(catalog.sources).length,3087);
+  assert.equal(catalog.decks.length,1170);assert.equal(Object.keys(catalog.sources).length,3510);
   for(const deck of catalog.decks) {
     assert.equal(deck.deck.reduce((sum,[,count])=>sum+count,0),deck.size);assert.ok(deck.size>=40);
     for(const [index,count] of [...deck.deck,...deck.sideboard]) {
@@ -67,7 +67,7 @@ test('all published set catalogs have verified hashes, exact lists and complete 
       }
     }
   }
-  assert.equal(total,110232);assert.equal(total,coverage.decks);
+  assert.equal(total,110373);assert.equal(total,coverage.decks);
   assert.equal(coverage.source_drafts-coverage.matched_sources,181);
 });
 
@@ -83,6 +83,17 @@ test('deck and availability caches cannot mix sets or sources with the same loca
     assert.equal(state[0].deckAvailable,true);
   }
   await assert.rejects(()=>trophyDeckForRound(async()=>({rows:[{set_id:'hob',source_draft_hash:source}]}),session,'0'),error=>error.status===404);
+});
+
+test('FRA Traditional sources return their own exact deck without affecting publication',async()=>{
+  const index=catalog.decks.findIndex(deck=>deck.event_type==='TradDraft');assert.ok(index>=0);
+  const source=Object.keys(catalog.sources).find(source=>catalog.sources[source]===index);
+  const query=async()=>({rows:[{puzzle_id:'locked',set_id:'fra',source_draft_hash:source}]});
+  const state=await withTrophyDeckAvailability(query,[answer]);assert.equal(state[0].deckAvailable,true);
+  const value=await trophyDeckForRound(query,{answers:[answer],puzzle_ids:['locked']},'0');
+  assert.equal(value.event_type,'TradDraft');
+  assert.deepEqual(value.deck,catalog.decks[index].deck.map(([card,count])=>({...catalog.cards[card],count})));
+  assert.deepEqual(value.sideboard,catalog.decks[index].sideboard.map(([card,count])=>({...catalog.cards[card],count})));
 });
 
 test('availability reads only revealed metadata and never includes a deck in a run snapshot',async()=>{
