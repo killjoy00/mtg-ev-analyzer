@@ -33,6 +33,8 @@ Regular chronology comes from set release metadata and Live eligibility. Powered
 7. **Practice announcement:** once the new set is Live and available for single-set Custom practice, update the gold callout in `practice/index.html` from “Now includes Reality Fracture.” to the new set's name. Keep it visible for guests, free accounts and Elite members, and check phone and desktop layouts. Do not advertise a Candidate or a set that has not passed Custom practice coverage.
 8. **Later archives:** each changed upstream archive creates a new development Candidate snapshot. To serve one, repeat step 4 and switch the Live environment to it in the Corpus area; the switch supersedes the previous Approved snapshot. A snapshot switch requires a Live environment, so publish the first snapshot before switching. Candidates that are never activated stay stored.
 
+Before activating a new draft set, review which accompanying bonus sheets actually appear in its draft boosters and register verified source set codes in `scripts/fetch_card_metadata.py` (`DRAFT_BONUS_PRINTINGS`), with collector-number limits for shared codes such as SPG. Add deterministic printing-selection tests. Do not assume every related Commander, promo, or similarly dated printing was draftable. The next full guarded card-image release applies a changed source-selection policy to existing Live images; merely updating the registry does not rewrite served puzzles.
+
 Card-image maintenance covers only environments listed in `corpus/draft-run/catalog.json`, so a newly discovered set cannot use image refresh until that pipeline supports database-registered environments. Import already requires an HTTPS image for every card.
 
 ## Publication gates (`corpus-gates-v2`)
