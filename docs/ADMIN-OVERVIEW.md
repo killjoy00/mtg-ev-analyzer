@@ -23,7 +23,13 @@ entry pages but reuse the existing publishing implementation and safety gates.
 ## Summary semantics
 
 - Activity and sharing use today's Pacific date and existing measurement definitions.
-  Observed players are not site-wide unique visitors.
+  **Observed players** means distinct player identities with a browser-observed,
+  current-corpus first encounter with a draft decision on that date. It can include
+  players who have not completed a run; it is not a site-wide visitor count.
+- **Users → Signed out vs signed in** counts distinct current-corpus players with
+  *completed runs*, excluding QA and admin players. Linked accounts are merged,
+  guests remain per browser, Daily runs use their assigned Daily date, and practice
+  uses run creation time. The two metrics cannot be subtracted to estimate abandonment.
 - Account totals and 30-day counts retain the Users report's definitions.
 - Return rates aggregate mature cohort denominators, not averages of percentages.
 - Corpus readiness is healthy only when both current and verified. Live-set metadata
