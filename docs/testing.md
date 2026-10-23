@@ -54,7 +54,7 @@ the repository's migrations. No production SQL is replaced by fake query results
 
 The backend workflow's manual trigger, or a push to `ci/test-fixture-*`, runs
 only the disposable PostgreSQL job. Provider branch tests still run on the
-normal PR path. This allows fixture failures to be fixed without repeatedly
+normal PR path and, for all six domains, on the nightly schedule. This allows fixture failures to be fixed without repeatedly
 provisioning Neon branches.
 
 Browser invocations preload the production API guard and use the pinned

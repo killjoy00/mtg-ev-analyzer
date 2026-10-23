@@ -192,3 +192,18 @@ test('backend full path fans out by domain and aggregates fail closed', () => {
   assert.match(backend, /At least one required isolated backend domain was skipped, cancelled, or failed/);
   assert.match(backend, /if: always\(\) && steps\.neon\.outputs\.branch_id != ''/);
 });
+
+test('backend Neon branches are capped, sampled, gated on the local contract and covered nightly', () => {
+  const backend = readFileSync('.github/workflows/backend-gate.yml', 'utf8');
+  const domain = backend.split('\n  backend-domain:\n')[1].split('\n  backend-gate:\n')[0];
+  assert.match(backend, /schedule:\n    - cron: '[^']+'/);
+  assert.match(domain, /needs: \[precheck, postgres-contract\]/);
+  assert.match(domain, /if: \$\{\{ !cancelled\(\) && needs\.postgres-contract\.result == 'success' && \(\(github\.event_name == 'schedule' && github\.repository == 'killjoy00\/mtg-ev-analyzer'\) \|\| /);
+  assert.match(domain, /    env:\n(?:      #.*\n)*      CI_BRANCH_MAX_CU: 2\n/);
+  assert.match(domain, /CI_BRANCH_PREFIX: ci-pr-\$\{\{ github\.event\.pull_request\.number \|\| 0 \}\}/);
+  assert.doesNotMatch(domain, /HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
+  const summary = domain.indexOf('name: Summarize Neon compute allocation');
+  assert.ok(domain.indexOf('name: Start Neon compute sampler') > domain.indexOf('name: Prepare isolated connection'));
+  assert.ok(summary > 0 && summary < domain.indexOf('name: Delete isolated Neon branch'));
+  assert.match(domain.slice(summary), /^name: Summarize Neon compute allocation\n        if: always\(\) && env\.NEON_SAMPLER_PID != ''\n        continue-on-error: true\n/);
+});

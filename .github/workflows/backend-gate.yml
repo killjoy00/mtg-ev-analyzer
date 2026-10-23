@@ -2,6 +2,11 @@ name: backend schema gate
 
 on:
   workflow_dispatch:
+  # Pull requests run only the domains their changes reach. The nightly run
+  # covers all six against main for anything that reaches across domains
+  # without a static import, such as HTTP routes.
+  schedule:
+    - cron: '17 7 * * *'
   push:
     branches: ['ci/test-fixture-*']
   pull_request:
@@ -31,6 +36,7 @@ on:
       - 'scripts/reroll-index-schema.mjs'
       - '.github/scripts/apply-identity-migration.sh'
       - 'scripts/create-ci-neon-branch.mjs'
+      - 'scripts/ci-neon-compute-sample.mjs'
       - 'scripts/control-read.mjs'
       - 'scripts/load_verified_draft_run.mjs'
       - 'scripts/*corpus*manifest.mjs'
@@ -46,7 +52,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: backend-gate-pr-${{ github.event.pull_request.number }}
+  group: backend-gate-pr-${{ github.event.pull_request.number || github.event_name }}
   cancel-in-progress: true
 
 jobs:
@@ -143,10 +149,11 @@ jobs:
 
   backend-domain:
     name: backend ${{ matrix.domain }}
-    needs: precheck
+    # No Neon branch is created until the local PostgreSQL contract passes.
+    needs: [precheck, postgres-contract]
     # Fork PRs do not receive repository secrets. Keep them skipped rather than
     # failing or ever pointing the fixture suites at the production branch.
-    if: ${{ !cancelled() && github.event.pull_request.head.repo.full_name == github.repository && (needs.precheck.result != 'success' || needs.precheck.outputs.needs_neon != 'false') }}
+    if: ${{ !cancelled() && needs.postgres-contract.result == 'success' && ((github.event_name == 'schedule' && github.repository == 'killjoy00/mtg-ev-analyzer') || github.event.pull_request.head.repo.full_name == github.repository) && (needs.precheck.result != 'success' || needs.precheck.outputs.needs_neon != 'false') }}
     strategy:
       fail-fast: false
       max-parallel: 3
@@ -154,6 +161,10 @@ jobs:
         domain: ${{ fromJSON(needs.precheck.outputs.domains_json || '["account","subscriptions","draft_run","daily","corpus","seasons"]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
+    env:
+      # Routine suites stay below the project's 8 CU ceiling. The sampler
+      # summary shows whether each domain needs this much.
+      CI_BRANCH_MAX_CU: 2
     steps:
       - uses: actions/checkout@v4
         with:
@@ -183,7 +194,7 @@ jobs:
         id: neon
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          CI_BRANCH_PREFIX: ci-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.domain }}
+          CI_BRANCH_PREFIX: ci-pr-${{ github.event.pull_request.number || 0 }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.domain }}
           CI_BRANCH_PARENT: br-orange-feather-ayps8kep
           CI_BRANCH_EXPIRES: ${{ steps.expiry.outputs.expires_at }}
           CI_BRANCH_SUSPEND: 0
@@ -201,12 +212,18 @@ jobs:
           chmod 600 "$connection_file"
           echo "PACK1_CI_CONNECTION=$connection_file" >> "$GITHUB_ENV"
 
+      - name: Start Neon compute sampler
+        shell: bash
+        run: |
+          nohup node scripts/ci-neon-compute-sample.mjs sample "$PACK1_CI_CONNECTION" "$RUNNER_TEMP/neon-cpu.jsonl" >/dev/null 2>&1 &
+          echo "NEON_SAMPLER_PID=$!" >> "$GITHUB_ENV"
+
       - name: Apply pending migrations
         shell: bash
         env:
           DATABASE_URL: ${{ steps.neon.outputs.db_url }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           if ! command -v psql >/dev/null 2>&1; then
@@ -272,7 +289,7 @@ jobs:
         shell: bash
         env:
           PACK1_CI_BRANCH_ID: ${{ steps.neon.outputs.branch_id }}
-          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           BACKEND_DOMAIN: ${{ matrix.domain }}
           V5_FIXTURE_RUN_ID: ${{ steps.v5_fixture.outputs.run_id }}
         run: |
@@ -345,6 +362,15 @@ jobs:
           if-no-files-found: ignore
           retention-days: 30
 
+      - name: Summarize Neon compute allocation
+        if: always() && env.NEON_SAMPLER_PID != ''
+        continue-on-error: true
+        env:
+          BACKEND_DOMAIN: ${{ matrix.domain }}
+        run: |
+          kill "$NEON_SAMPLER_PID" 2>/dev/null || true
+          node scripts/ci-neon-compute-sample.mjs summary "$RUNNER_TEMP/neon-cpu.jsonl" "$BACKEND_DOMAIN" "$CI_BRANCH_MAX_CU"
+
       - name: Delete isolated Neon branch
         if: always() && steps.neon.outputs.branch_id != ''
         uses: neondatabase/delete-branch-action@v3
@@ -356,7 +382,7 @@ jobs:
   backend-gate:
     name: backend-gate
     needs: [precheck, backend-domain, postgres-contract]
-    if: ${{ !cancelled() && github.event.pull_request.head.repo.full_name == github.repository && (needs.precheck.result != 'success' || needs.precheck.outputs.needs_neon != 'false') }}
+    if: ${{ !cancelled() && ((github.event_name == 'schedule' && github.repository == 'killjoy00/mtg-ev-analyzer') || github.event.pull_request.head.repo.full_name == github.repository) && (needs.precheck.result != 'success' || needs.precheck.outputs.needs_neon != 'false') }}
     runs-on: ubuntu-latest
     steps:
       - name: Aggregate isolated backend domains

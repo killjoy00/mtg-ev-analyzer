@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { appendFileSync, existsSync, readFileSync } from 'node:fs';
+import { appendFileSync, existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, extname, join, normalize, relative, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -117,22 +117,102 @@ function directDomainsFor(path, map) {
   return domains;
 }
 
+function filesMatching(repoRoot, glob) {
+  // Walk only the glob's literal directory prefix.
+  const prefix = glob.slice(0, glob.indexOf('*') < 0 ? glob.length : glob.indexOf('*'));
+  const start = prefix.includes('/') ? prefix.slice(0, prefix.lastIndexOf('/')) : '.';
+  const found = [];
+  const walk = (dir) => {
+    let entries;
+    try {
+      entries = readdirSync(join(repoRoot, dir), { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const entry of entries) {
+      if (entry.name === 'node_modules' || entry.name === '.git') continue;
+      const path = dir === '.' ? entry.name : `${dir}/${entry.name}`;
+      if (entry.isDirectory()) {
+        if (glob.includes('**') || glob.startsWith(`${path}/`)) walk(path);
+      } else if (matchesGlob(path, glob)) found.push(path);
+    }
+  };
+  walk(start);
+  return found;
+}
+
+const reachableCache = new Map();
+
+// Every module a domain's suites or owned modules import, without following
+// imports through full-path files. Those entry points (the function routers,
+// core and schema helpers) import nearly every module, so following them made
+// almost any backend change look shared by all six domains. A change to a
+// full-path file itself still runs the full suite.
+function domainReach(repoRoot, map, domain) {
+  const key = `${repoRoot}\0${domain}`;
+  if (reachableCache.has(key)) return reachableCache.get(key);
+  const config = map.domains[domain];
+  const roots = [...config.suites, ...config.paths.flatMap((glob) => filesMatching(repoRoot, glob))];
+  const seen = new Set();
+  const stack = [...roots];
+  while (stack.length) {
+    const current = stack.pop();
+    if (seen.has(current)) continue;
+    seen.add(current);
+    if (isFullPath(current, map)) continue;
+    for (const imported of importsFor(repoRoot, current)) stack.push(imported);
+  }
+  reachableCache.set(key, seen);
+  return seen;
+}
+
+const WORKFLOW = '.github/workflows/backend-gate.yml';
+const usageCache = new Map();
+
+// Everything the backend gate can execute or read: the workflow's trigger
+// paths and named files, every suite and full path, and the full import graph
+// from them, including imports through the function routers. A changed file
+// none of those reach or name cannot change what the gate runs.
+function gateUsage(repoRoot, map) {
+  if (usageCache.has(repoRoot)) return usageCache.get(repoRoot);
+  const workflow = readFileSync(join(repoRoot, WORKFLOW), 'utf8');
+  const globs = [
+    WORKFLOW,
+    ...[...workflow.matchAll(/^      - '([^']+)'$/gm)].map((match) => match[1]),
+    ...[...workflow.matchAll(/(?:^|[\s"'(./])((?:scripts|tests|worker|corpus|research|data)\/[A-Za-z0-9_.*/-]+)/gm)].map((match) => match[1]),
+    ...allSuites(map),
+    ...map.full_paths,
+  ];
+  const seen = new Set();
+  const stack = [...new Set(globs)].flatMap((glob) => (glob.includes('*') ? filesMatching(repoRoot, glob) : [glob]));
+  while (stack.length) {
+    const current = stack.pop();
+    if (seen.has(current)) continue;
+    seen.add(current);
+    for (const imported of importsFor(repoRoot, current)) stack.push(imported);
+  }
+  // Names also catch files that are spawned or read rather than imported. The
+  // classifier, its map and its test name paths without running them.
+  const routing = new Set(['scripts/backend-gate-scope.mjs', 'scripts/backend-gate-map.json', 'tests/backend-gate-scope.test.mjs']);
+  const text = [...seen]
+    .filter((path) => !routing.has(path) && /\.(?:mjs|js|cjs|json|sh|py|sql|yml)$/.test(path) && existsSync(join(repoRoot, path)))
+    .map((path) => readFileSync(join(repoRoot, path), 'utf8'))
+    .filter((source) => source.length < 2_000_000)
+    .join('\n');
+  const usage = { seen, text };
+  usageCache.set(repoRoot, usage);
+  return usage;
+}
+
+function gateUses(repoRoot, map, path) {
+  const { seen, text } = gateUsage(repoRoot, map);
+  return seen.has(path) || text.includes(path.slice(path.lastIndexOf('/') + 1));
+}
+
 function derivedDomainsFor(path, repoRoot, map) {
   const owners = new Set(directDomainsFor(path, map));
-  for (const [domain, config] of Object.entries(map.domains)) {
-    const roots = [...config.suites];
-    // A changed source file that matches this domain's explicit path globs is itself a root.
-    if (config.paths.some((glob) => matchesGlob(path, glob))) roots.push(path);
-
-    const seen = new Set();
-    const stack = [...roots];
-    while (stack.length) {
-      const current = stack.pop();
-      if (seen.has(current)) continue;
-      seen.add(current);
-      if (current === path) owners.add(domain);
-      for (const imported of importsFor(repoRoot, current)) stack.push(imported);
-    }
+  for (const domain of Object.keys(map.domains)) {
+    if (domainReach(repoRoot, map, domain).has(path)) owners.add(domain);
   }
   return [...owners].sort();
 }
@@ -190,16 +270,23 @@ export function classifyBackendChanges(paths, { repoRoot = process.cwd(), map = 
     }
 
     const owners = derivedDomainsFor(path, repoRoot, map);
-    if (owners.length === 0) {
+    if (owners.length === 0 && !gateUses(repoRoot, map, path)) {
+      reasons.push(`not used by the backend gate: ${path}`);
+    } else if (owners.length === 0) {
       fullSuite = true;
       reasons.push(`unmapped: ${path}`);
     } else if (owners.length > 1) {
-      fullSuite = true;
+      for (const owner of owners) domains.add(owner);
       reasons.push(`shared across domains ${owners.join(',')}: ${path}`);
     } else {
       domains.add(owners[0]);
       reasons.push(`${owners[0]}: ${path}`);
     }
+  }
+
+  if (!fullSuite && domains.size === 0) {
+    fullSuite = true;
+    reasons.push('no backend domain selected');
   }
 
   const selectedDomains = fullSuite ? Object.keys(map.domains) : [...domains].sort();
