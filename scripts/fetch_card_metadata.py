@@ -135,6 +135,8 @@ def draft_printing_priority(card: dict, draft_set: Optional[str]) -> int:
     """
     if not draft_set:
         return 0  # Powered Cube/global lookup retains the original-art policy.
+    if card.get("set_type") in BAD_SET_TYPES:
+        return 2  # Token, art-series and playtest names are not draft cards.
     source = str(card.get("set") or "").lower()
     intended = draft_set.lower()
     if source == intended:
