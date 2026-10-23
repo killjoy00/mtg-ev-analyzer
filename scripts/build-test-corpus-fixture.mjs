@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import {gunzipSync,gzipSync} from 'node:zlib';
 import {createHash} from 'node:crypto';
+import {corpusGameplayFingerprint} from './corpus-gameplay-fingerprint.mjs';
 import {interestingDraftRunPuzzle,gradeDraftRunPick,eligiblePickForRound,selectDraftRunReroll} from '../draft-run.mjs';
 const sha=bytes=>createHash('sha256').update(bytes).digest('hex');
 const catalogBytes=fs.readFileSync('corpus/draft-run/catalog.json'),catalog=JSON.parse(catalogBytes);
@@ -10,7 +11,8 @@ const sets=[];
 for(const set of catalog.sets) {
   const original=fs.readFileSync(`corpus/draft-run/${set.id}.json.gz`);
   if(sha(original)!==set.sha256)throw Error('Corpus checksum mismatch: '+set.id);
-  const rows=JSON.parse(gunzipSync(original)).filter(interestingDraftRunPuzzle);
+  const allRows=JSON.parse(gunzipSync(original));
+  const rows=allRows.filter(interestingDraftRunPuzzle);
   const chosen=new Set();
   for(let pick=1;pick<=11;pick++)for(const source of [...new Set(rows.filter(p=>p.pick_number===pick).map(p=>p.source_draft_hash))].sort().slice(0,16))chosen.add(source);
   // Cube rerolls retain difficulty anchors; preserve the full small Cube pool
@@ -27,7 +29,7 @@ for(const set of catalog.sets) {
   const selected=rows.filter(p=>sources.includes(p.source_draft_hash));
   const bytes=gzipSync(JSON.stringify(selected),{level:9,mtime:0});
   fs.writeFileSync(`${root}/${set.id}.json.gz`,bytes);
-  sets.push({...set,puzzles:selected.length,trophy_drafts:sources.length,sha256:sha(bytes),source_sha256:set.sha256});
+  sets.push({...set,puzzles:selected.length,trophy_drafts:sources.length,sha256:sha(bytes),source_sha256:set.sha256,source_gameplay_sha256:corpusGameplayFingerprint(allRows)});
 }
 fs.writeFileSync(`${root}/catalog.json`,JSON.stringify({...catalog,fixture_version:1,source_catalog_sha256:sha(catalogBytes),sets},null,2)+'\n');
 if(process.argv.includes('--refresh-golden')) {

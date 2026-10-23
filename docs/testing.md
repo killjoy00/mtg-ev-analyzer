@@ -28,7 +28,12 @@ is application code; registered backend tests remain selectable by their own pat
 ## Immutable corpus fixtures
 
 `tests/fixtures/draft-run/catalog.json` records each sample's checksum and the
-original corpus checksum. Fixtures retain difficulty coverage, source
+original corpus checksum, plus a frozen fingerprint of every source puzzle's
+gameplay fields. The fingerprint excludes only card-level `image_url`,
+`mana_cost`, `rarity`, `type_line`, and `display_faces`, so image maintenance can
+change display metadata without regenerating fixtures or accepted scores.
+Tests still verify the current corpus checksum against its catalog, the frozen
+gameplay fingerprint, and original archive/evidence provenance. Fixtures retain difficulty coverage, source
 trajectories and real reroll alternatives. The fast and exhaustive modes share
 the same behavior assertions; exhaustive mode increases corpus and seed coverage.
 

@@ -93,8 +93,12 @@ test('every generated overlay contains a complete validated pair and records exa
 test('image maintenance carries faces, rejects malformed pairs and remains idempotent',async()=>{
   const rows=JSON.parse(gunzipSync(fs.readFileSync('corpus/draft-run/neo.json.gz')));
   let stored=structuredClone(rows.find(p=>p.candidates.some(c=>c.name===fable.name)));
-  const frozen=structuredClone(stored),target=stored.candidates.find(c=>c.name===fable.name);
+  const target=stored.candidates.find(c=>c.name===fable.name);
   const mapping=[{name:target.name,image_url:target.image_url,display_faces:effectiveCardMetadata(target).display_faces}];
+  // Explicitly model legacy storage, even when the checked-in corpus has
+  // already received the face-aware image refresh being tested.
+  for(const card of [...stored.candidates,...stored.prior_picks])if(card.name===fable.name)delete card.display_faces;
+  const frozen=structuredClone(stored);
   let writes=0;
   const query=async(sql,params)=>{
     if(sql.includes('SELECT p.puzzle_id,p.payload')) {
@@ -107,6 +111,7 @@ test('image maintenance carries faces, rejects malformed pairs and remains idemp
     throw Error('Unexpected query');
   };
   assert.equal((await refreshTrophyImagePage(query,'neo',mapping)).updated_puzzles,1);
+  assert.deepEqual(stored.candidates.find(c=>c.name===fable.name).display_faces,mapping[0].display_faces);
   assert.equal((await refreshTrophyImagePage(query,'neo',mapping)).updated_puzzles,0);
   assert.equal(writes,1);
   const strip=p=>({...p,candidates:p.candidates.map(({display_faces,...c})=>c),prior_picks:p.prior_picks.map(({display_faces,...c})=>c)});
