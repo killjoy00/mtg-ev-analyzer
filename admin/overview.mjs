@@ -116,7 +116,7 @@ export async function renderOverview(root,request,{role='admin',isCurrent=()=>tr
     }),
     section('overview-accounts','/v1/admin/users?summary_only=1',data=>{
       const s=data.summary;if(!s)throw Error('Missing account summary');
-      return `<dl class="overview-facts"><dt>Accounts</dt><dd>${count(s.total)}</dd><dt>New in 30 days</dt><dd>${count(s.new_30d)}</dd><dt>Active in 30 days</dt><dd>${count(s.active_30d)}</dd><dt>Paid access</dt><dd>${count(s.paid)}</dd><dt>Username attention</dt><dd>${count(s.username_attention)}</dd></dl>`;
+      return `<dl class="overview-facts"><dt>Accounts</dt><dd>${count(s.total)}</dd><dt>New in 30 days</dt><dd>${count(s.new_30d)}</dd><dt>Active in 30 days</dt><dd>${count(s.active_30d)}</dd><dt>Premium access</dt><dd>${count(s.paid)}</dd><dt>Username attention</dt><dd>${count(s.username_attention)}</dd></dl>`;
     }),
     section('overview-retention','/v1/admin/measurements/habits?'+recent,data=>{
       const rows=data.habit_metrics?.cohorts;if(!Array.isArray(rows))throw Error('Missing cohort summary');
