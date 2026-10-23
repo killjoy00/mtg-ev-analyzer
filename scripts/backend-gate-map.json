@@ -73,7 +73,9 @@
         "draft-run-policy.mjs",
         "draft-run-difficulty.mjs",
         "worker/report-pick-removal.mjs",
-        "worker/admin-player-reports.mjs"
+        "worker/admin-player-reports.mjs",
+        "worker/trophy-decks.mjs",
+        "corpus/trophy-decks/**"
       ],
       "suites": [
         "tests/draft-run-backend-smoke.mjs",
@@ -84,7 +86,8 @@
         "tests/creator-event-migration-rollout.mjs",
         "tests/creator-event-write-safety.mjs",
         "tests/creator-challenge-backend-smoke.mjs",
-        "tests/report-pick-removal-backend-smoke.mjs"
+        "tests/report-pick-removal-backend-smoke.mjs",
+        "tests/trophy-deck-backend-smoke.mjs"
       ]
     },
     "daily": {

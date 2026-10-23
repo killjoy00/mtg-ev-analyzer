@@ -18,14 +18,14 @@ test('account and profile entry modules use release-versioned imports', async ()
     readFile('practice-page.mjs', 'utf8'),
   ]);
 
-  assert.match(index, /bootstrap\.mjs\?v=37/);
-  assert.match(bootstrap, /growth\.mjs\?v=28/);
+  assert.match(index, /bootstrap\.mjs\?v=38/);
+  assert.match(bootstrap, /growth\.mjs\?v=29/);
   assert.match(bootstrap, /daily-home\.mjs\?v=25/);
   assert.match(bootstrap, /profile-product\.mjs\?v=24/);
-  assert.match(bootstrap, /draft-run-product\.mjs\?v=28/);
+  assert.match(bootstrap, /draft-run-product\.mjs\?v=29/);
   assert.match(daily, /growth\.mjs\?v=28/);
   assert.match(growth, /profile-product\.mjs\?v=24/);
-  assert.match(growth, /draft-run-product\.mjs\?v=25/);
+  assert.match(growth, /draft-run-product\.mjs\?v=29/);
   assert.match(growth, /patreon-activation\.mjs\?v=2/);
   assert.match(profile, /progression\.mjs\?v=10/);
   assert.match(profile, /growth\.mjs\?v=28/);
@@ -35,17 +35,17 @@ test('account and profile entry modules use release-versioned imports', async ()
   assert.match(await readFile('daily-reminder-settings.mjs','utf8'), /growth-api\.mjs\?v=2/);
   assert.match(myPackOne, /my-pack-insights\.mjs\?v=5/);
   assert.match(progression, /growth\.mjs\?v=10/);
-  assert.match(draft, /growth\.mjs\?v=19/);
+  assert.match(draft, /growth\.mjs\?v=29/);
   assert.match(draft, /share-cards\.mjs\?v=8/);
   assert.match(draft, /today-status\.mjs\?v=2/);
   assert.match(draft, /set-guides\.mjs\?v=2/);
-  assert.match(draft, /draft-run-feedback\.mjs\?v=5/);
+  assert.match(draft, /draft-run-feedback\.mjs\?v=6/);
   assert.match(patreonHtml, /patreon-page\.mjs\?v=5/);
   assert.match(patreonPage, /patreon-activation\.mjs\?v=2/);
-  assert.match(practiceHtml, /bootstrap\.mjs\?v=37/);
+  assert.match(practiceHtml, /bootstrap\.mjs\?v=38/);
   assert.match(practiceHtml, /growth\.mjs\?v=28/);
-  assert.match(practiceHtml, /draft-run-product\.mjs\?v=28/);
-  assert.match(practiceHtml, /draft-run\.css\?v=19/);
+  assert.match(practiceHtml, /draft-run-product\.mjs\?v=29/);
+  assert.match(practiceHtml, /draft-run\.css\?v=20/);
   assert.match(practiceJs, /growth\.mjs\?v=28/);
   assert.match(patreonPage, /growth\.mjs\?v=10/);
 });

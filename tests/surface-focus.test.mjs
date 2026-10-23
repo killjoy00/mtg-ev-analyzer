@@ -40,46 +40,23 @@ test('guest Daily results offer score validation instead of a career action', as
   assert.match(css, /\.run-ranking-state\.is-quiet\{[^}]*font-size:12px;[^}]*border-left:0;[^}]*padding:0/);
 });
 
-test('Draft Run reveal puts continuation before disclosures and restores result focus', async () => {
-  const source = await readFile('draft-run-product.mjs', 'utf8');
-  const render = source.slice(source.indexOf('function render()'), source.indexOf('function zoom(card)'));
-  const next=render.indexOf('id="run-next"');
-  const analysis=render.indexOf('revealAnalysis(p,answer)');
-  const pack=render.indexOf('class="run-pack-review"');
-  assert.ok(next>=0&&analysis>next&&pack>analysis,'Next pick precedes both reveal disclosures in DOM order');
-  assert.match(render,/id="run-feedback-result" tabindex="-1"/);
-  assert.match(render,/focus\(\{preventScroll:true\}\)/);
-  assert.doesNotMatch(render,/aria-live=/);
-  assert.match(source,/function compactRevealCards/);
-  assert.match(source,/✓ Trophy Match/);
-  assert.doesNotMatch(source,/compactTrophyThumbnail|run-trophy-thumb/);
-  const css = await readFile('draft-run.css', 'utf8');
-  assert.match(css, /\.run-reveal-pick\{flex:0 0 108px;width:108px/);
-  assert.match(css, /@media\(max-width:600px\)[\s\S]*\.run-reveal-pick\{flex-basis:92px;width:92px\}/);
-  assert.match(css, /@media\(min-width:601px\)[\s\S]*\.run-feedback\{flex-wrap:nowrap\}/);
-  assert.match(css, /\.run-next-dock #run-next\{white-space:nowrap\}/);
+test('Draft Run review retains result focus, the pack and a separate continuation',async()=>{
+ const source=await readFile('draft-run-product.mjs','utf8');
+ const render=source.slice(source.indexOf('function render()'),source.indexOf('function zoom(card)'));
+ assert.match(render,/id="run-feedback-result" tabindex="-1"/);assert.match(render,/focus\(\{preventScroll:true\}\)/);
+ assert.match(render,/class="run-pack-review"/);assert.match(render,/Review the pack/);
+ assert.ok(render.indexOf('revealAnalysis(p,answer)')<render.indexOf('class="run-pack-review"'));
+ assert.ok(render.indexOf('class="run-pack-review"')<render.indexOf('id="run-next"'));
+ assert.match(source,/revealCardChoices/);
 });
 
-
-test('decision reporting stays inside Why this score and away from continuation', async () => {
-  const source = await readFile('draft-run-product.mjs', 'utf8');
-  const analysis = source.slice(source.indexOf('function revealAnalysis'), source.indexOf('function compactResultLabel'));
-  assert.match(analysis, /Report this decision/);
-  assert.match(analysis, /run-analysis-body[\s\S]*run-decision-report/);
-  assert.match(source, /What seems wrong\?/);
-  assert.match(source, /Draft context looks wrong/);
-  assert.match(source, /Card or image issue/);
-  assert.match(source, /Score \/ recommendation seems wrong/);
-  assert.match(source, /Something is broken/);
-  assert.match(source, /Anything else\?/);
-  assert.match(source, /Thanks \\u2014 report sent\./);
-  const render = source.slice(source.indexOf('function render()'), source.indexOf('function zoom(card)'));
-  assert.ok(render.indexOf('id="run-next"') < render.indexOf('revealAnalysis(p,answer)'));
-  const css = await readFile('draft-run.css', 'utf8');
-  assert.match(css, /\.run-decision-report \.text-button\{[^}]*color:var\(--muted\)/);
-  assert.match(css, /\.run-report-dialog/);
+test('decision reporting is visible outside score and pack disclosures',async()=>{
+ const source=await readFile('draft-run-product.mjs','utf8');
+ assert.match(source,/Does something look wrong\?/);assert.match(source,/Let us know\./);
+ assert.match(source,/Thanks for letting us know\./);assert.match(source,/function reportDecisionMarkup/);
+ assert.match(source,/Anything else\?/);assert.match(source,/data-report-decision/);
+ const css=await readFile('draft-run.css','utf8');assert.match(css,/\.run-report-prompt/);
 });
-
 
 test('Draft Run previous-card context stays visible and visually distinct', async () => {
   const source = await readFile('draft-run-product.mjs', 'utf8');

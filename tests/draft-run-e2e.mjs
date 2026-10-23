@@ -5,6 +5,7 @@ import {chromium} from 'playwright';
 import {selectDraftRun,selectDraftRunReroll,interestingDraftRunPuzzle,publicDraftRunPuzzle,gradeDraftRunPick,calibratedSupports,supportSharpening,withSourceDraftRecord} from '../draft-run.mjs';
 import {rateDraftRunPuzzle} from '../draft-run-difficulty.mjs';
 import {trophyDrafterFacts,trophyDrafterSentences,trophyRevealSentence} from '../draft-run-feedback.mjs';
+import {revealCardChoices} from '../draft-run-reveal.mjs';
 import policy from '../data/selection-policy.json' with {type:'json'};
 import {regularRunSet} from '../draft-run-policy.mjs';
 import {latestSetPlan} from '../daily-selection.mjs';
@@ -196,43 +197,21 @@ try{
     assert.equal(await page.locator('#run-feedback-result').innerText(),trophyRevealSentence(expectedGrade),'visible trophy reveal is a complete sentence for matched and unmatched picks');
     assert.ok((await page.locator('#run-feedback-result').getAttribute('aria-label'))?.includes(trophyRevealSentence(expectedGrade)),'accessible copy matches the pick-only reveal');
     assert.equal(await page.evaluate(()=>document.activeElement?.id),'run-feedback-result','locked result receives deterministic focus');
-    assert.equal(await page.locator('.run-analysis').getAttribute('open'),null,'analysis stays collapsed by default');
     assert.equal(await page.locator('.run-pack-review').getAttribute('open'),null,'pack review stays collapsed by default');
-    assert.equal(await page.locator('.run-card-shop:visible').count(),0,'affiliate links stay out of the compact default result');
-    const domOrder=await page.evaluate(()=>{
-      const next=document.querySelector('#run-next'),analysis=document.querySelector('.run-analysis'),pack=document.querySelector('.run-pack-review');
-      return Boolean(next&&analysis&&pack&&(next.compareDocumentPosition(analysis)&Node.DOCUMENT_POSITION_FOLLOWING)&&(analysis.compareDocumentPosition(pack)&Node.DOCUMENT_POSITION_FOLLOWING));
-    });
-    assert.equal(domOrder,true,'continuation precedes analysis and pack review in DOM order');
-    if(expectedGrade.historicalMatch){
-      assert.equal(await page.locator('.run-reveal-pick').count(),2,'trophy match pairs the shared card with the highest-ranked other card');
-      assert.match(await page.locator('.run-reveal-pick.is-shared').innerText(),/✓ Trophy Match/i,'the shared card is clearly labeled as a trophy match');
-      assert.equal(await page.locator('.run-reveal-pick.is-shared [data-zoom]').getAttribute('data-zoom'),selected,'shared reveal card is the player and trophy pick');
-      const ranked=[...answers[round].ranking].sort((a,b)=>b.support-a.support),leader=answers[round].consensusId||ranked[0].id;
-      const other=leader!==selected?leader:ranked.find(c=>c.id!==selected).id;
-      assert.equal(await page.locator('.run-reveal-pick.is-ranked [data-zoom]').getAttribute('data-zoom'),other,'second card is the model’s highest-ranked other card');
-      assert.match(await page.locator('.run-reveal-pick.is-ranked').innerText(),/Next Highest/i,'the second card is always labeled Next Highest');
-      assert.equal(await page.locator('.run-feedback-copy p').count(),0,'trophy match needs no filler sentence');
-    }else{
-      assert.equal(await page.locator('.run-reveal-pick').count(),2,'non-match pairs the player and trophy cards');
-      const revealText=await page.locator('.run-reveal-picks').innerText();
-      assert.match(revealText,/Your Pick/i);
-      assert.match(revealText,/Trophy Pick/i);
-      assert.equal(await page.locator('.run-reveal-pick.is-mine [data-zoom]').getAttribute('data-zoom'),selected,'player reveal card matches the locked pick');
-      assert.equal(await page.locator('.run-reveal-pick.is-trophy [data-zoom]').getAttribute('data-zoom'),p.historical_pick_id,'trophy reveal card matches the historical pick');
-      assert.equal(await page.locator('.run-feedback-copy p').count(),1,'compact non-match has at most one explanatory sentence');
-      const chosenName=p.candidates.find(c=>c.id===selected)?.name;
-      const compactCopy=await page.locator('.run-feedback-copy p').innerText();
-      assert.ok(chosenName&&compactCopy.includes(`You chose ${chosenName}`),'compact reveal names the player’s chosen card');
-      assert.ok((await page.locator('#run-feedback-result').getAttribute('aria-label'))?.includes(`You chose ${chosenName}`),'accessible result label names the player’s chosen card');
-      assert.doesNotMatch(await page.locator('.run-feedback').innerText(),/Model’s strongest|leading model support|partial credit/i);
-      if(round===0)assert.match(compactCopy,/less support/);
-      if(round===strongRound)assert.match(await page.locator('.run-feedback-copy p').innerText(),/strongly supported alternative/);
-      const wordCount=(await page.locator('.run-feedback').innerText()).trim().split(/\s+/).length;
-      assert.ok(wordCount<45,`compact reveal remains short (${wordCount} words)`);
-    }
-    const revealCardBox=await page.locator('.run-reveal-pick').first().boundingBox();
-    assert.ok(revealCardBox&&revealCardBox.width>=90,`compact reveal card is visibly larger (${revealCardBox?.width}px)`);
+    const expectedChoices=revealCardChoices(answers[round]);
+    const shown=page.locator('.run-choice-card');
+    assert.equal(await shown.count(),3);
+    assert.deepEqual(await shown.evaluateAll(nodes=>nodes.map(node=>node.dataset.choiceId)),expectedChoices.map(c=>c.id));
+    assert.deepEqual(await shown.locator('.run-choice-label').allInnerTexts(),expectedChoices.map(c=>c.label));
+    assert.equal(new Set(await shown.evaluateAll(nodes=>nodes.map(node=>node.dataset.choiceId))).size,3,'no duplicate role cards');
+    if(!expectedGrade.historicalMatch) {
+      assert.deepEqual(expectedChoices.slice(0,2).map(c=>c.id),[p.historical_pick_id,selected]);
+      assert.match(await page.locator('.run-feedback-copy p').innerText(),new RegExp('You picked '));
+      assert.ok((await page.locator('.run-feedback-copy p').innerText()).includes(p.candidates.find(c=>c.id===selected).name));
+    } else assert.equal(await page.locator('.run-feedback-copy p').count(),0);
+    assert.ok(await page.getByRole('button',{name:'Does something look wrong? Let us know.'}).isVisible());
+    const revealCardBox=await shown.first().boundingBox();
+    assert.ok(revealCardBox&&revealCardBox.width>=80,`reveal card remains visible (${revealCardBox?.width}px)`);
     if(round===0){
       const feedbackBox=await page.locator('.run-feedback').boundingBox();assert.ok(feedbackBox&&feedbackBox.height<280,`compact mobile result stays under 280px (${feedbackBox?.height})`);
       const prefix=`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}`;
@@ -241,25 +220,20 @@ try{
       await page.screenshot({path:`${prefix}-reveal-desktop.png`});
       await page.setViewportSize({width:390,height:844});await noOverflow();
     }
-    await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>document.activeElement?.id),'run-next','Next pick is the next Tab stop after the focused result');
-    await page.locator('.run-analysis>summary').click();
     const drafterRecord=page.locator('.run-analysis .run-trophy-record p');
-    const drafterLines=trophyDrafterSentences(trophyDrafterFacts(expectedGrade));
-    assert.deepEqual(await drafterRecord.allInnerTexts(),drafterLines,'drafter record and win rate are separate lines below Why this score');
-    const headline=await page.locator('#run-feedback-result').innerText();
-    assert.doesNotMatch(headline,/win rate|7–[0-2]|Mythic|Diamond/,'drafter context stays out of the headline');
-    await page.getByRole('heading',{name:'Model’s strongest choice: '+expectedGrade.consensusName,exact:true}).waitFor();
-    assert.equal(await page.locator('.run-consensus-leaders li').count(),3);
-    assert.equal(await page.locator('.run-consensus-leaders li').first().locator('[data-zoom]').getAttribute('data-zoom'),p.historical_pick_id);
-    assert.doesNotMatch(await page.locator('.run-consensus-leaders li').first().innerText(),/%/);
-    assert.equal(await page.locator('.run-consensus tbody tr').first().locator('td').first().textContent(),'N/A');
-    assert.equal(await page.locator('.run-consensus details').count(),0,'analysis does not retain a nested comparison disclosure');
+    assert.deepEqual(await drafterRecord.allInnerTexts(),trophyDrafterSentences(trophyDrafterFacts(expectedGrade)));
+    assert.doesNotMatch(await page.locator('#run-feedback-result').innerText(),/win rate|7–[0-2]|Mythic|Diamond/);
+    await page.getByRole('heading',{name:'Why this score?',exact:true}).waitFor();
+    assert.equal(await page.locator('.run-consensus-all').getAttribute('open'),null);
+    await page.locator('.run-consensus-all>summary').click();
+    assert.equal(await page.locator('.run-consensus tbody tr').count(),p.candidates.length);
+    assert.match(await page.locator('.run-consensus tbody tr').first().locator('td').first().textContent(),/%/);
     if(daily&&round>0){
       // Peer shares arrive with the "% of players picked this" line and share its threshold.
       // Round one keeps the existing compact-height budget, measured without peer stats.
       await page.locator('#run-peer-stats:not([hidden])').waitFor();
       await page.locator('.run-consensus thead th[data-peer-col]:not([hidden])').waitFor();
-      assert.deepEqual(await page.locator('.run-consensus thead th').allInnerTexts(),['Card','Support','Points','Chosen'],'Chosen is the third data column');
+      assert.deepEqual(await page.locator('.run-consensus thead th').allInnerTexts(),['Card','Model support','Score','Players’ picks'],'player pick rates remain the third data column');
       const share=async id=>(await page.locator(`.run-consensus [data-peer-card="${id}"]`).innerText()).trim();
       assert.equal(await share(selected),'50%');
       if(!expectedGrade.historicalMatch)assert.equal(await share(p.historical_pick_id),'25%');
@@ -280,6 +254,14 @@ try{
       assert.equal(commerce.props.surface,'draft_run_reveal');
       await page.locator('.run-consensus').scrollIntoViewIfNeeded();
       await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-consensus-mobile.png`});
+    }
+    if(round===0) {
+      await page.locator('.run-pack-review>summary').click();
+      assert.equal(await page.locator('.run-pack-review .run-card').count(),p.candidates.length);
+      assert.equal(await page.locator('.run-pack-review [data-zoom-prior]').count(),p.prior_picks.length);
+      await page.locator('.run-pack-review [data-zoom]').first().click();
+      await page.locator('.card-face-dialog').waitFor();await page.keyboard.press('Escape');
+      await page.locator('.run-pack-review>summary').click();
     }
     assert.equal(answers.length,round+1);
     assert.equal(await page.locator('.run-card-score').count(),0);
