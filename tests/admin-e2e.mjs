@@ -283,7 +283,7 @@ try {
   for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:`artifacts/ui-users-activity-${width}.png`,fullPage:true});}
   const todayRequest=page.waitForRequest(request=>{
     const url=new URL(request.url()),from=url.searchParams.get('activity_from');
-    return url.pathname==='/v1/admin/users'&&/^\\d{4}-\\d{2}-\\d{2}$/.test(from||'')&&from===url.searchParams.get('activity_to');
+    return url.pathname==='/v1/admin/users'&&/^\d{4}-\d{2}-\d{2}$/.test(from||'')&&from===url.searchParams.get('activity_to');
   });
   await page.getByRole('button',{name:'Today',exact:true}).click();
   await todayRequest;
@@ -298,7 +298,8 @@ try {
   // The click resolves before the search request is sent, so wait for it instead of checking the log.
   const search=page.waitForRequest(request=>request.url().includes('/v1/admin/users?search=member%40example.com'));
   await page.getByRole('button',{name:'Refresh',exact:true}).click();
-  await search;
+  const searchRequest=await search;
+  assert.equal(new URL(searchRequest.url()).searchParams.get('activity'),'0','account searches reuse activity results');
   await page.getByRole('button',{name:/Test Member/}).click();
   await page.locator('#user-detail').getByRole('heading',{name:'Test Member'}).waitFor();
   assert.ok((await page.locator('#user-detail').innerText()).includes('Custom sets'));
