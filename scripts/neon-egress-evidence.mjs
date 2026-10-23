@@ -97,10 +97,11 @@ async function main() {
   if(!['--previous','--since','--output'].includes(args[i])||!args[i+1]||args[i+1].startsWith('--'))throw Error('Usage: node scripts/neon-egress-evidence.mjs [--previous JSON] [--since ISO] [--output JSON]');
   if(options[args[i]])throw Error('Duplicate option');options[args[i]]=args[++i];
  }
+ const out=options['--output'];
+ if(!out||!out.startsWith('/')||resolve(out).includes('/artifacts/'))throw Error('Private absolute output required');
  const previous=options['--previous']?JSON.parse(fs.readFileSync(options['--previous'],'utf8')):null;
  const report=await collectEvidence({key:process.env.NEON_API_KEY,previous,since:options['--since']||null});
- const out=options['--output']||'artifacts/neon-egress-evidence/report.json';
- fs.mkdirSync(dirname(resolve(out)),{recursive:true});fs.writeFileSync(out,JSON.stringify(report,null,2)+'\n');
- console.log(JSON.stringify(report,null,2));
+ fs.mkdirSync(dirname(resolve(out)),{recursive:true});fs.writeFileSync(out,JSON.stringify(report,null,2)+'\n',{mode:0o600,flag:'wx'});
+ console.log('Private egress evidence saved. No usage details were published.');
 }
-if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))await main();
+if(process.argv[1]&&resolve(process.argv[1])===fileURLToPath(import.meta.url))await main().catch(()=>{console.error('Private egress evidence failed.');process.exitCode=1;});

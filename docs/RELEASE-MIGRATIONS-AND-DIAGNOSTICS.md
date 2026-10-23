@@ -96,6 +96,15 @@ names alone do not establish CI ownership. Exact reviewed ownership receipts may
 be supplied through the private `compute-history/ownership.json` object. No
 project-minus-branch difference is assigned to CI. A successful collection and
 readback do not prove complete attribution or settled billing.
+
+The existing egress-evidence schedule also writes privately through
+`scripts/private-egress-report.mjs`. A verified immutable run copy precedes the
+private latest-observation pointer used for counter comparisons. The first
+private observation starts a new comparison baseline; missing history is never
+zero usage. Its schedule and alert routing are unchanged, and PRs run only the
+offline regressions without live credentials. Detailed reports are no longer
+printed or uploaded as public workflow artifacts. This does not erase older
+published evidence or move the launch-monitoring coverage watermark.
 Hourly windows must fit the provider's 168-hour retention; daily windows fit
 60 days. Windows are UTC-aligned and never silently shortened. Pagination loops,
 conflicting frames, overlaps and invalid metrics fail. Missing metrics are not

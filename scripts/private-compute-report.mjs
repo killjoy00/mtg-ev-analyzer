@@ -9,6 +9,10 @@ export const ACCOUNT='2eff4354681d85e7daa3ee437d64498c',BUCKET='pack1-private-op
 const BASE=`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT}/r2/buckets/${BUCKET}`;
 const HOUR=3600000,DAY=24*HOUR,MAX_BYTES=20*1024*1024;
 const digest=value=>createHash('sha256').update(value).digest('hex');
+const storageFailure=(stage,status)=>Object.assign(Error('Private storage unavailable'),{privateCode:`storage_${stage}_http_${Number.isInteger(status)?status:0}`});
+export function publicFailureCode(error) {
+ return /^storage_(?:read|write|ownership)_http_[0-5][0-9]{0,2}$/.test(error?.privateCode||'')?error.privateCode:'collection_unavailable';
+}
 export function reportWindows(now=Date.now()) {
  const hour=Math.floor(now/HOUR)*HOUR,day=Math.floor(now/DAY)*DAY;
  const date=new Date(now),month=Date.UTC(date.getUTCFullYear(),date.getUTCMonth(),1);
@@ -20,7 +24,7 @@ export function privateStore({token,fetcher=fetch}={}) {
  if(!token)throw Error('Private storage credential unavailable');
  const read=async route=>{
    const response=await fetcher(BASE+route,{method:'GET',redirect:'error',headers:{authorization:`Bearer ${token}`},signal:AbortSignal.timeout(30000)});
-   if(!response.ok)throw Error('Private storage read unavailable');
+   if(!response.ok)throw storageFailure('read',response.status);
    return response;
  };
  const verify=async()=>{
@@ -29,14 +33,18 @@ export function privateStore({token,fetcher=fetch}={}) {
      throw Error('Private destination verification failed');
  };
  const keyPath=key=>{
-   if(!/^compute-history\/(?:[0-9]+-[0-9]+\/report|ownership)\.json$/.test(key))throw Error('Unreviewed private object key');
+   if(!/^(?:compute-history\/(?:[0-9]+-[0-9]+\/report|ownership)|egress-history\/(?:[0-9]+-[0-9]+\/report|latest))\.json$/.test(key))throw Error('Unreviewed private object key');
    return '/objects/'+key;
  };
- return {verify,async ownership(){
-   const response=await fetcher(BASE+keyPath('compute-history/ownership.json'),{method:'GET',redirect:'error',headers:{authorization:`Bearer ${token}`},signal:AbortSignal.timeout(30000)});
-   if(response.status===404)return [];
-   if(!response.ok)throw Error('Private ownership read unavailable');
-   const result=await response.json();if(!Array.isArray(result))throw Error('Invalid private ownership evidence');return result;
+ const optional=async key=>{
+   const response=await fetcher(BASE+keyPath(key),{method:'GET',redirect:'error',headers:{authorization:`Bearer ${token}`},signal:AbortSignal.timeout(30000)});
+   if(response.status===404)return null;
+   if(!response.ok)throw storageFailure('ownership',response.status);
+   return response.json();
+ };
+ return {verify,optional,async ownership(){
+   const result=await optional('compute-history/ownership.json')??[];
+   if(!Array.isArray(result))throw Error('Invalid private ownership evidence');return result;
  },async save(key,value){
    await verify(); // Recheck immediately before writing, not just at startup.
    const body=JSON.stringify(value)+'\n';if(Buffer.byteLength(body)>MAX_BYTES)throw Error('Private report exceeds bound');
@@ -107,5 +115,5 @@ if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url) {
      runId:process.env.GITHUB_RUN_ID,attempt:process.env.GITHUB_RUN_ATTEMPT,sha:process.env.GITHUB_SHA});
    console.log(result.available?'Private compute history saved and readback verified. Coverage and attribution require private review.':'Private capability/validation report saved. Complete compute history is not established.');
    if(!result.available)process.exitCode=1;
- } catch {console.error('Private compute collection failed. No usage details or credentials were published.');process.exitCode=1;}
+ } catch(error) {console.error('Private compute collection failed ('+publicFailureCode(error)+'). No usage details or credentials were published.');process.exitCode=1;}
 }
