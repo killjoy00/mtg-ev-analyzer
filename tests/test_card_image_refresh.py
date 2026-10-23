@@ -52,6 +52,27 @@ class CardImageRefreshTests(unittest.TestCase):
         self.assertEqual(details["abc"], {})
         self.assertEqual(details["powered-cube"], {})
 
+    def test_otj_bonus_art_is_display_only_and_accepted_as_intentional_frame(self):
+        old = self.card("old-ride-down", "ktk", "2014-09-26",
+                        "https://img/ride-down-ktk.jpg", name="Ride Down")
+        otp = self.card("otp-ride-down", "otp", "2024-04-19",
+                        "https://img/ride-down-otp.jpg", name="Ride Down",
+                        collector_number="52", border_color="borderless",
+                        frame_effects=["inverted"])
+        with mock.patch.object(refresh, "all_printings", return_value=iter([old, otp])):
+            by_set, global_records, details = refresh.resolve_inventory({
+                "otj": {"Ride Down"},
+                "powered-cube": {"Ride Down"},
+            })
+        self.assertEqual(by_set["otj"]["Ride Down"]["image_url"], "https://img/ride-down-otp.jpg")
+        self.assertEqual(by_set["powered-cube"]["Ride Down"]["image_url"], "https://img/ride-down-ktk.jpg")
+        self.assertEqual(global_records["Ride Down"]["image_url"], "https://img/ride-down-ktk.jpg")
+        self.assertEqual(details["otj"]["Ride Down"]["selected_set"], "otp")
+        self.assertTrue(details["otj"]["Ride Down"]["draft_source_bonus"])
+        self.assertTrue(details["otj"]["Ride Down"]["draft_source_special"])
+        self.assertFalse(details["otj"]["Ride Down"]["special_unavoidable"])
+        self.assertEqual(details["powered-cube"], {})
+
     def test_bulk_missing_name_uses_shared_named_resolver(self):
         fallback = self.card(
             "fallback",
