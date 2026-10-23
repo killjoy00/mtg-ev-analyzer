@@ -6,6 +6,10 @@ import {encoded,sha256} from '../corpus/trophy-decks/fra.mjs';
 import {withTrophyDeckAvailability,trophyDeckForRound} from '../worker/trophy-decks.mjs';
 import {revealCardChoices} from '../draft-run-reveal.mjs';
 import {gateway,routeFamily} from '../edge/gateway.mjs';
+import {catalogLoaders} from '../corpus/trophy-decks/index.mjs';
+import coverage from '../corpus/trophy-decks/coverage.json' with {type:'json'};
+import {normalizedDisplayFaces} from '../card-faces.mjs';
+import {safeCardImageUrl} from '../card-image-policy.mjs';
 
 const bytes=gunzipSync(Buffer.from(encoded,'base64')),catalog=JSON.parse(bytes);
 const source=Object.keys(catalog.sources)[0];
@@ -37,6 +41,48 @@ test('curated public decks retain exact quantities, aliases and complete display
       assert.ok(catalog.cards[index].type_line);assert.ok(Number.isFinite(catalog.cards[index].mana_value));
     }
   }
+});
+
+test('all published set catalogs have verified hashes, exact lists and complete card details',async()=>{
+  assert.equal(Object.keys(catalogLoaders).length,31);
+  assert.deepEqual(Object.keys(catalogLoaders).sort(),coverage.sets.map(set=>set.set_id).sort());
+  let total=0;
+  for(const [set,load] of Object.entries(catalogLoaders)) {
+    const {encoded,sha256}=await load(),bytes=gunzipSync(Buffer.from(encoded,'base64'));
+    assert.equal(createHash('sha256').update(bytes).digest('hex'),sha256,set);
+    const current=JSON.parse(bytes),expected=coverage.sets.find(row=>row.set_id===set);
+    assert.equal(current.set_id,set);assert.equal(current.decks.length,expected.decks);total+=current.decks.length;
+    for(const [source,index] of Object.entries(current.sources)) {
+      assert.match(source,/^[a-f0-9]{32}$/);assert.ok(current.decks[index]);
+    }
+    for(const card of current.cards) {
+      assert.ok(card.name&&card.type_line,set);assert.ok(safeCardImageUrl(card.image_url),card.name);
+      assert.ok(Number.isFinite(card.mana_value)&&card.mana_value>=0,card.name);
+      if(card.display_faces)assert.equal(normalizedDisplayFaces(card.display_faces).length,2,card.name);
+    }
+    for(const deck of current.decks) {
+      assert.equal(deck.deck.reduce((sum,[,count])=>sum+count,0),deck.size,set);assert.ok(deck.size>=40);
+      for(const [index,count] of [...deck.deck,...deck.sideboard]) {
+        assert.ok(current.cards[index]);assert.ok(Number.isInteger(count)&&count>0);
+      }
+    }
+  }
+  assert.equal(total,110232);assert.equal(total,coverage.decks);
+  assert.equal(coverage.source_drafts-coverage.matched_sources,181);
+});
+
+test('deck and availability caches cannot mix sets or sources with the same local index',async()=>{
+  const session={answers:[answer],puzzle_ids:['locked']};
+  for(const set of ['fra','hob','powered-cube','fra']) {
+    const {encoded}=await catalogLoaders[set](),current=JSON.parse(gunzipSync(Buffer.from(encoded,'base64')));
+    const source=Object.keys(current.sources).find(source=>current.sources[source]===0);
+    const query=async()=>({rows:[{puzzle_id:'locked',set_id:set,source_draft_hash:source}]});
+    const value=await trophyDeckForRound(query,session,'0');
+    assert.deepEqual(value.deck,current.decks[0].deck.map(([index,count])=>({...current.cards[index],count})));
+    const state=await withTrophyDeckAvailability(query,[{puzzle:{puzzle_id:'locked',set_id:set}}]);
+    assert.equal(state[0].deckAvailable,true);
+  }
+  await assert.rejects(()=>trophyDeckForRound(async()=>({rows:[{set_id:'hob',source_draft_hash:source}]}),session,'0'),error=>error.status===404);
 });
 
 test('availability reads only revealed metadata and never includes a deck in a run snapshot',async()=>{
