@@ -1,6 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';
 import {handlePlayerReports} from '../worker/admin-player-reports.mjs';
 import {adminPath} from '../edge/gateway.mjs';
+import fs from 'node:fs';
+import manifest from '../migrations/manifest.json' with {type:'json'};
 const id='11111111-1111-4111-8111-111111111111',actor='22222222-2222-4222-8222-222222222222';
 const path='/v1/admin/player-reports/decisions/'+id+'/pick';
 const req=method=>new Request('https://api.packone.pro'+path,{method});
@@ -34,4 +36,13 @@ test('lost readiness verification does not hide an already committed moderation'
 test('missing archived payload disables removal while retaining report access',async()=>{
  const result=await handlePlayerReports(req('GET'),async()=>({rows:[{puzzle_id:'archived-missing',payload:null}]}),async()=>({}),actor);
  assert.equal(result.available,false);
+});
+test('the serving cache and its carry-forward comparison both skip removed picks',()=>{
+ const removal=/NOT EXISTS\(SELECT 1 FROM draft_run_pick_removal_members m JOIN draft_run_pick_removals q USING\(decision_key\)\s+WHERE m\.puzzle_id=p\.puzzle_id AND q\.removed\)/;
+ for(const name of ['pack1_build_serving_snapshot','pack1_serving_snapshot_matches_current']) {
+  const latest=manifest.ordered.map(file=>fs.readFileSync(new URL('../migrations/'+file,import.meta.url),'utf8'))
+   .map(sql=>sql.match(new RegExp(`CREATE OR REPLACE FUNCTION ${name}\\([\\s\\S]*?\\$\\$;`))?.[0]).filter(Boolean).at(-1);
+  assert.ok(latest,name);
+  assert.match(latest,removal,`${name} must exclude report-removed picks`);
+ }
 });

@@ -69,7 +69,8 @@
     "0062_daily_email_reminder_admission.sql",
     "0063_private_creator_consent.sql",
     "0064_report_linked_pick_removal.sql",
-    "0065_traditional_p1p6_component.sql"
+    "0065_traditional_p1p6_component.sql",
+    "0066_removal_aware_serving_carry.sql"
   ],
   "same_prefix_order": {
     "0037": [
@@ -188,7 +189,8 @@
         "0062_daily_email_reminder_admission.sql",
         "0063_private_creator_consent.sql",
         "0064_report_linked_pick_removal.sql",
-        "0065_traditional_p1p6_component.sql"
+        "0065_traditional_p1p6_component.sql",
+        "0066_removal_aware_serving_carry.sql"
       ]
     },
     "daily-calendar": {
@@ -248,7 +250,8 @@
         "0062_daily_email_reminder_admission.sql",
         "0063_private_creator_consent.sql",
         "0064_report_linked_pick_removal.sql",
-        "0065_traditional_p1p6_component.sql"
+        "0065_traditional_p1p6_component.sql",
+        "0066_removal_aware_serving_carry.sql"
       ]
     },
     "launch-load": {
@@ -283,7 +286,8 @@
         "0062_daily_email_reminder_admission.sql",
         "0063_private_creator_consent.sql",
         "0064_report_linked_pick_removal.sql",
-        "0065_traditional_p1p6_component.sql"
+        "0065_traditional_p1p6_component.sql",
+        "0066_removal_aware_serving_carry.sql"
       ]
     },
     "launch-distributed": {
@@ -320,7 +324,8 @@
         "0062_daily_email_reminder_admission.sql",
         "0063_private_creator_consent.sql",
         "0064_report_linked_pick_removal.sql",
-        "0065_traditional_p1p6_component.sql"
+        "0065_traditional_p1p6_component.sql",
+        "0066_removal_aware_serving_carry.sql"
       ]
     },
     "practice-performance": {
@@ -328,7 +333,8 @@
       "migrations": [
         "0045_batched_practice_selector.sql",
         "0050_practice_recency_bias.sql",
-        "0064_report_linked_pick_removal.sql"
+        "0064_report_linked_pick_removal.sql",
+        "0066_removal_aware_serving_carry.sql"
       ]
     }
   }
