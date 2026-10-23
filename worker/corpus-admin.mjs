@@ -198,12 +198,14 @@ async function handleCorpusLifecycle(request,query,readJson,accountId,automation
      WHERE c.parent_version=$1 AND c.set_id=$3 ORDER BY c.set_id,c.component_version`,[DRAFT_RUN_CORPUS_VERSION,TRADITIONAL_GATE_VERSION,setId]),
    timedAdminQuery(query,'corpus_detail','blocked_sources',"SELECT s.set_id,s.event_type,s.archive_url,s.import_status,s.last_error FROM corpus_sources s WHERE s.event_type='TradDraft' AND s.import_status='failed' AND NOT EXISTS(SELECT 1 FROM corpus_components c WHERE c.set_id=s.set_id AND c.parent_version=$1) AND s.set_id=$2",[DRAFT_RUN_CORPUS_VERSION,setId]),
    timedAdminQuery(query,'corpus_detail','retained_inventory',`SELECT p.set_id,p.corpus_version,p.source_snapshot_id,p.pick_number,count(*)::int retained,
-    count(*) FILTER(WHERE x.source_draft_hash IS NOT NULL)::int excluded,
-    count(*) FILTER(WHERE x.source_draft_hash IS NULL AND r.puzzle_id IS NOT NULL AND ${SERVING_QUALITY_SQL})::int eligible,
-    count(*) FILTER(WHERE x.source_draft_hash IS NULL AND (r.puzzle_id IS NULL OR NOT coalesce((${SERVING_QUALITY_SQL}),false)))::int under_floor
+    count(*) FILTER(WHERE x.source_draft_hash IS NOT NULL OR removed.decision_key IS NOT NULL)::int excluded,
+    count(*) FILTER(WHERE x.source_draft_hash IS NULL AND removed.decision_key IS NULL AND r.puzzle_id IS NOT NULL AND ${SERVING_QUALITY_SQL})::int eligible,
+    count(*) FILTER(WHERE x.source_draft_hash IS NULL AND removed.decision_key IS NULL AND (r.puzzle_id IS NULL OR NOT coalesce((${SERVING_QUALITY_SQL}),false)))::int under_floor
     FROM draft_run_verified_puzzles p
     LEFT JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'
     LEFT JOIN corpus_source_exclusions x ON x.set_id=p.set_id AND x.corpus_version=p.corpus_version AND x.source_draft_hash=p.source_draft_hash
+    LEFT JOIN draft_run_pick_removal_members removal_member ON removal_member.puzzle_id=p.puzzle_id
+    LEFT JOIN draft_run_pick_removals removed ON removed.decision_key=removal_member.decision_key AND removed.removed
     WHERE (${corpusMembership()}) AND p.set_id=$2 AND p.interesting AND p.pack_number=1
     AND p.pick_number BETWEEN CASE WHEN p.set_id='powered-cube' THEN 2 ELSE 1 END AND CASE WHEN p.set_id='powered-cube' THEN 9 ELSE 8 END
     GROUP BY p.set_id,p.corpus_version,p.source_snapshot_id,p.pick_number`,[DRAFT_RUN_CORPUS_VERSION,setId]),
@@ -216,6 +218,7 @@ async function handleCorpusLifecycle(request,query,readJson,accountId,automation
     CROSS JOIN draft_run_serving_revision rv
     WHERE (${corpusMembership({serving:true})}) AND p.set_id=$2 AND p.interesting AND p.pack_number=1
     AND p.pick_number BETWEEN CASE WHEN p.set_id='powered-cube' THEN 2 ELSE 1 END AND CASE WHEN p.set_id='powered-cube' THEN 9 ELSE 8 END
+    AND NOT EXISTS(SELECT 1 FROM draft_run_pick_removal_members m JOIN draft_run_pick_removals q USING(decision_key) WHERE m.puzzle_id=p.puzzle_id AND q.removed)
     AND NOT EXISTS(SELECT 1 FROM corpus_source_exclusions x WHERE x.set_id=p.set_id AND x.corpus_version=p.corpus_version AND x.source_draft_hash=p.source_draft_hash)
     GROUP BY p.set_id,p.corpus_version,p.source_snapshot_id,p.pick_number,rv.revision`,[DRAFT_RUN_CORPUS_VERSION,setId]),
    timedAdminQuery(query,'corpus_detail','snapshots',`SELECT s.source_snapshot_id,s.set_id,s.event_type,s.corpus_version,s.schema_version,s.lifecycle_status,s.created_at,s.status_changed_at,s.superseded_by,

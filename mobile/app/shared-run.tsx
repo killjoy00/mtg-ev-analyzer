@@ -257,9 +257,7 @@ function SharedRunGate({ shareId }: { shareId: string }) {
             <Text style={styles.body}>{entry.name}</Text><Text style={styles.heading}>{entry.score}/100</Text>
           </View>)}
         </View> : null}
-        <Text style={styles.body}>{state.info.environment === 'powered-cube'
-          ? 'Powered Cube practice access is required. Your account access is checked by Pack One.'
-          : 'A free Pack One account includes regular Draft Run practice.'}</Text>
+        <Text style={styles.body}>A free Pack One account includes this shared run. Elite membership is not required.</Text>
         <Pressable accessibilityRole="button" disabled={busy} onPress={() => void accept()} style={[styles.button, busy && styles.disabled]}>
           <Text style={styles.buttonText}>{busy ? 'Recovering your run...' : state.session.accountToken ? 'Play or resume this run' : 'Sign in to play this run'}</Text>
         </Pressable>

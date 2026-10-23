@@ -10,7 +10,7 @@ The owner then approved serving FRA Traditional P1P1-P1P6 only, following the Po
 
 `prepare_new_set_p1p6_admission.py` refuses anything but the pinned artifact bytes. It re-evaluates P1P1-P1P6 with the same gate function, for all decisions and for the servable subset, and both must pass. Low support is -2.1pp, with an upper bound of -0.1pp. The script narrows the artifact to **846 decisions, 805 servable** and re-identifies them as `traditional-premier-v5-p1p6-v1`. It records the rejected P1P7-P1P8 evidence in its report.
 
-Migration 0064 admits that component only on the v5 parent and model, and only at picks 1–6 outside Powered Cube. Component imports register their set through the Candidate component row, so a Live database-discovered set can receive a supplement. Premier FRA puzzles are untouched at every pick. Traditional rows do not train or calibrate any model.
+Migration 0065 admits that component only on the v5 parent and model, and only at picks 1–6 outside Powered Cube. Component imports register their set through the Candidate component row, so a Live database-discovered set can receive a supplement. Premier FRA puzzles are untouched at every pick. Traditional rows do not train or calibrate any model.
 
 Publication uses the reviewed `publish-puzzle-components.yml` lifecycle with source `v5-fra-p1p6`: development stage -> development publish -> production stage -> production publish.
 

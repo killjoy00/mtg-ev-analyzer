@@ -12,7 +12,7 @@ const columns = `p.puzzle_id,p.set_id,p.corpus_version,p.source_draft_hash,p.pac
 const from = `FROM draft_run_verified_puzzles p JOIN draft_run_puzzle_ratings r
   ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'`;
 const base = `(${corpusMembership()}) AND p.interesting AND p.pack_number=1`;
-const servingCandidatesBase = `(${corpusMembership({serving:true})}) AND p.interesting AND p.pack_number=1 AND NOT EXISTS(SELECT 1 FROM corpus_source_exclusions x
+const servingCandidatesBase = `(${corpusMembership({serving:true})}) AND p.interesting AND p.pack_number=1 AND NOT EXISTS(SELECT 1 FROM draft_run_pick_removal_members m JOIN draft_run_pick_removals q USING(decision_key) WHERE m.puzzle_id=p.puzzle_id AND q.removed) AND NOT EXISTS(SELECT 1 FROM corpus_source_exclusions x
   WHERE x.set_id=p.set_id AND x.corpus_version=p.corpus_version AND x.source_draft_hash=p.source_draft_hash)`;
 const servingBase = `${SERVING_QUALITY_SQL} AND ${servingCandidatesBase}`;
 export function decodePuzzleMetadata(p) {

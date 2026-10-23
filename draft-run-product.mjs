@@ -233,6 +233,7 @@ function openDecisionReport(answer) {
     <label><input type="radio" name="reason" value="draft_context" required> Draft context looks wrong</label>
     <label><input type="radio" name="reason" value="card_or_image"> Card or image issue</label>
     <label><input type="radio" name="reason" value="score_recommendation"> Score / recommendation seems wrong</label>
+    <label><input type="radio" name="reason" value="uninteresting"> Uninteresting / forced decision</label>
     <label><input type="radio" name="reason" value="broken"> Something is broken</label>
     <label><input type="radio" name="reason" value="other"> Other</label>
   </fieldset><label class="run-report-comment">Anything else?<textarea name="comment" maxlength="500" rows="3"></textarea></label>
@@ -540,7 +541,7 @@ export async function installDraftRunPage() {
     } else if((params.has('shared')||params.has('challenge'))&&!params.has('run')) {
       const info=await api('/v1/shared-runs/'+encodeURIComponent(params.get('shared')||params.get('challenge')),undefined,false);
       environment=info.environment||'mixed';
-      app().innerHTML=`<section class="run-invite"><p class="eyebrow">A friend’s ${title()}</p><h1>Play this run and compare.</h1><p>${esc(info.name)} sent you ${draftRunLength(info)} real decisions from trophy drafts. You’ll see the same packs and the same earlier picks.</p><button class="button primary" id="accept-run-challenge">Play this run</button><p>${cube()?'Powered Cube practice access is required.':'A free account includes regular practice.'}</p>${info.scores?.length?`<ul class="run-shared-scores">${info.scores.map(s=>`<li>${esc(s.name)} <strong>${Number(s.score)}/100</strong></li>`).join('')}</ul>`:''}<p id="run-error" role="alert"></p></section>`;
+      app().innerHTML=`<section class="run-invite"><p class="eyebrow">A friend’s ${title()}</p><h1>Play this run and compare.</h1><p>${esc(info.name)} sent you ${draftRunLength(info)} real decisions from trophy drafts. You’ll see the same packs and the same earlier picks.</p><button class="button primary" id="accept-run-challenge">Play this run</button><p>This shared run is free to play. No account or Elite membership required.</p>${info.scores?.length?`<ul class="run-shared-scores">${info.scores.map(s=>`<li>${esc(s.name)} <strong>${Number(s.score)}/100</strong></li>`).join('')}</ul>`:''}<p id="run-error" role="alert"></p></section>`;
       trackEvent('challenge_open',{mode:'draft_run',kind:'stored'});
       document.querySelector('#accept-run-challenge').onclick=async()=>{try{trackEvent('challenge_start',{mode:'draft_run'});await launch({challenge:info.id});}catch(e){console.warn('Draft Run challenge failed to start',e?.message);renderLoadFailure(e,false);}};
     } else await launch({id:params.get('run'),daily:params.has('daily')});

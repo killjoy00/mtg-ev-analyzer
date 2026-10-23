@@ -184,6 +184,7 @@ const DECISION_REPORT_OPTIONS: readonly { value: DecisionReportReason; label: st
   { value: 'draft_context', label: 'Draft context looks wrong' },
   { value: 'card_or_image', label: 'Card or image issue' },
   { value: 'score_recommendation', label: 'Score / recommendation seems wrong' },
+  { value: 'uninteresting', label: 'Uninteresting / forced decision' },
   { value: 'broken', label: 'Something is broken' },
   { value: 'other', label: 'Other' },
 ];

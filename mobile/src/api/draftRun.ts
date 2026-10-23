@@ -142,6 +142,7 @@ export type DecisionReportReason =
   | 'draft_context'
   | 'card_or_image'
   | 'score_recommendation'
+  | 'uninteresting'
   | 'broken'
   | 'other';
 

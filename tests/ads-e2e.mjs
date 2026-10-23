@@ -187,7 +187,7 @@ try{
     const page=await context.newPage(),state=await installRoutes(page,{signed:true,status:{ad_free:false,ads_allowed:true}});
     await page.goto(base);
     await page.locator('[data-daily-home]').waitFor();
-    await page.locator('#practice-nav').waitFor();
+    await page.locator('#account-nav[data-account-state="signed-in"]').waitFor();
     assert.equal(await page.locator('#daily-nav').isVisible(),false,'signed mobile nav hides redundant Daily Run');
     assert.equal(await page.locator('#practice-nav').isVisible(),true);
     assert.equal(await page.locator('#leaderboard-nav').isVisible(),true);

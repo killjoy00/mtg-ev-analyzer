@@ -33,7 +33,7 @@ import {
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 const IDEMPOTENCY_KEY = /^[A-Za-z0-9_-]{16,128}$/;
-const DECISION_REPORT_REASONS=new Set(['draft_context','card_or_image','score_recommendation','broken','other']);
+const DECISION_REPORT_REASONS=new Set(['draft_context','card_or_image','score_recommendation','uninteresting','broken','other']);
 const environmentOf = s => s.environment || 'mixed';
 const runLength = s => s.puzzle_ids.length;
 const parse = value => typeof value === 'string' ? JSON.parse(value) : value;
