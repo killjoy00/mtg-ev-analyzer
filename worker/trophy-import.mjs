@@ -287,16 +287,20 @@ export async function normalizeResolvedImageMarkers(query,rawSetIds) {
 
 export async function insertTrophyBatch(query,puzzles,{componentVersion=null,sourceSnapshotId=null}={}) {
   if(!Array.isArray(puzzles)||!puzzles.length||puzzles.length>250||new Set(puzzles.map(p=>p.puzzle_id)).size!==puzzles.length)throw error('Invalid batch');
+  // A Candidate component row under the current parent also proves its set is
+  // registered, including database-discovered sets that are already Live.
+  const componentSets=new Set();
   if(componentVersion) {
     if(!supportedComponent(componentVersion))throw error('Unsupported source component');
     for(const sid of new Set(puzzles.map(p=>p.set_id))) {
       if(!(await query("SELECT 1 FROM corpus_components WHERE set_id=$1 AND component_version=$2 AND parent_version=$3 AND status='Candidate'",[sid,componentVersion,VERSION])).rows.length)throw error('Only an unpublished Candidate component accepts imports');
+      componentSets.add(sid);
     }
   }
   if(sourceSnapshotId&&!/^[a-f0-9]{64}$/.test(sourceSnapshotId))throw error('Invalid source snapshot');
   if(sourceSnapshotId&&!(await query("SELECT 1 FROM corpus_source_snapshots WHERE source_snapshot_id=$1 AND lifecycle_status='Blocked'",[sourceSnapshotId])).rows.length)throw error('Source snapshot is not open for import',409);
-  const dynamic=[...new Set(puzzles.map(p=>p.set_id).filter(s=>!allowed.has(s)))];
-  const registered=new Set();
+  const dynamic=[...new Set(puzzles.map(p=>p.set_id).filter(s=>!allowed.has(s)&&!componentSets.has(s)))];
+  const registered=new Set(componentSets);
   for(const sid of dynamic){const r=await query("SELECT v.set_id FROM corpus_set_versions v LEFT JOIN corpus_sources s ON s.set_id=v.set_id AND s.event_type='PremierDraft' LEFT JOIN draft_run_environment_policy p ON p.set_id=v.set_id WHERE v.set_id=$1 AND v.corpus_version=$2 AND ((p.status='Candidate' AND p.source_event_type='PremierDraft') OR (p.set_id IS NULL AND v.manifest->>'discovered'='true' AND s.archive_available AND s.import_status IN ('building','validating')))",[sid,VERSION]);if(r.rows.length)registered.add(sid);}
   const batch=puzzles.map(p=>{
     if((!allowed.has(p.set_id)&&!registered.has(p.set_id))||!validateDraftRunPuzzle(p,componentVersion||VERSION)||!['puzzle_id','source_draft_hash','source_fingerprint'].every(k=>new RegExp(k==='source_fingerprint'?'^[a-f0-9]{64}$':'^[a-f0-9]{32}$').test(p[k]))||[...p.candidates,...p.prior_picks].some(c=>!c.image_url?.startsWith('https://')))throw error('Invalid verified puzzle');

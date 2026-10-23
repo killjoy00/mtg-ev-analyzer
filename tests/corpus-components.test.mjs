@@ -149,6 +149,13 @@ test('the restricted new-set component serves only P1P1-P1P6 on the v5 parent',(
    model_source_event:'PremierDraft',source_event_type:'TradDraft',event_match_wins:3,event_match_losses:0};
   assert.equal(validateDraftRunPuzzle(p,p1p6Component),pick<=6,`pick ${pick}`);
   if(pick<=6) {
+   // Same v5 model as the regular v5 component, so displayed supports must match.
+   const alternative=p.candidates.find(c=>c.id!==p.historical_pick_id).id;
+   const reference=gradeDraftRunPick({...p,corpus_version:v5Component},alternative);
+   const graded=gradeDraftRunPick(p,alternative);
+   assert.equal(graded.selectedSupport,reference.selectedSupport);
+   assert.equal(graded.score,reference.score);
+   assert.equal(supportSharpening(p1p6Component),supportSharpening(v5Component));
    assert.equal(validateDraftRunPuzzle({...p,parent_corpus_version:modelVersions.v4.corpus_version},p1p6Component),false);
    assert.equal(validateDraftRunPuzzle({...p,model_version:v4Model},p1p6Component),false);
    assert.equal(validateDraftRunPuzzle({...p,set_id:'powered-cube'},p1p6Component),false);

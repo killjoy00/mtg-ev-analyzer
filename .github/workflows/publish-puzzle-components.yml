@@ -15,7 +15,7 @@ on:
         required: true
       source:
         type: choice
-        options: [v4-powered-cube, v4-regular-phase2, powered-cube, regular-study, regular-phase2]
+        options: [v4-powered-cube, v4-regular-phase2, powered-cube, regular-study, regular-phase2, v5-fra-p1p6]
         default: v4-regular-phase2
         required: true
 permissions:
@@ -52,6 +52,13 @@ jobs:
           name: traditional-v4-revalidation-powered-cube
           path: generated/v4-cube-research
       - uses: actions/download-artifact@v4
+        if: inputs.source == 'v5-fra-p1p6'
+        with:
+          github-token: ${{ github.token }}
+          run-id: 39451056661
+          name: traditional-new-set-39451056661
+          path: generated/fra-p1p6-research
+      - uses: actions/download-artifact@v4
         if: inputs.source == 'v4-regular-phase2'
         with:
           github-token: ${{ github.token }}
@@ -87,6 +94,9 @@ jobs:
               python scripts/prepare_v4_cube_admission.py generated/v4-cube-research/powered-cube generated/admission
               root=generated/admission ;;
             v4-regular-phase2) root=generated/v4-regular-phase2 ;;
+            v5-fra-p1p6)
+              python scripts/prepare_new_set_p1p6_admission.py generated/fra-p1p6-research generated/admission
+              root=generated/admission ;;
             powered-cube)
               python scripts/prepare-cube-admission.py generated/cube-research/powered-cube generated/admission
               root=generated/admission ;;
