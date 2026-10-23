@@ -1,20 +1,21 @@
 # Card image maintenance
 
-Pack One card-image maintenance is an explicit, display-only corpus operation. It normalizes every currently served card to deterministic Scryfall main art without changing puzzle identity, candidate identity, scoring evidence, model support, provenance, source trajectories, schedules, sessions, or historical scores.
+Pack One card-image maintenance is an explicit, display-only corpus operation. It chooses canonical Scryfall card images from the actual draft-booster source set when that source can be identified, otherwise a deterministic ordinary printing. It does not change puzzle identity, candidate identity, scoring evidence, model support, provenance, source trajectories, schedules, sessions, or historical scores.
 
 ## Selection policy
 
 The shared resolver in `scripts/fetch_card_metadata.py` owns card identity, aliases, face selection, and printing rank.
 
-- Regular draft environments prefer an ordinary/base printing from the intended draft set.
-- If the intended set has no ordinary printing for that exact identity, resolution may fall back to the earliest ordinary printing for the identity.
-- Powered Cube uses the global earliest ordinary/base printing policy directly.
-- Cosmetic/special treatments are penalized and rejected when a cleaner ordinary printing exists. Current special signals include variation, textless, full-art, promo, oversized, borderless, showcase/extended-art/inverted frame effects, and non-card set types such as art-series or tokens.
-- A special-framed printing is allowed when it is the original/only official printing and no ordinary alternative exists. The refresh report records these separately as unavoidable special printings; they are not publication blockers.
+- Regular draft environments prefer a printing belonging to the draft booster: first the main set, then any explicitly reviewed bonus sheet that was draftable in that environment. Within a selected source, choose its readable/base card rather than collector-only variants.
+- The reviewed draft-source registry covers BRO/BRR, MOM/MUL, SIR/SIS, WOE/WOT, and OTJ/OTP/BIG. OTJ Special Guests (SPG) are constrained to collector numbers 29–38 because SPG's set code is reused across multiple releases. Other SPG printings and Commander products are **not** automatically considered part of OTJ.
+- If none of the documented source printings contains the exact card identity, use the earliest ordinary/base printing from elsewhere. Powered Cube continues to use the global earliest ordinary/base policy directly.
+- Cosmetic/special treatments are penalized **within the same source**. Current signals include variation, textless, full-art, promo, oversized, borderless, showcase/extended-art/inverted frame effects, and non-card set types such as art-series or tokens.
+- A special frame is allowed when it belongs to an actual draft-booster source (e.g., OTP's newspaper frame), even if an older plain printing exists. Unavoidable special frames without any ordinary alternative are allowed as before. Other avoidable special selections still block publication.
+- 17Lands' draft archives identify a card's name, **not its exact image or foil/alternate-art printing**. This policy reproduces the expected set or bonus-sheet artwork, not the exact physical variant when multiple styles could occur in draft.
 - Digital/rebalanced identities omitted from Scryfall's `default_cards` bulk export are resolved through the same exact-name resolver and their `prints_search_uri`. The HBG `A-Monster Manual` draft name is canonicalized to Scryfall's full rebalanced Adventure identity before lookup.
 - Double-faced aliases, flavor/printed names, and the Prepare-card collision rule remain part of the shared identity contract.
 
-The resolver must be deterministic with respect to API ordering. Ranking is based on language, special-treatment penalty, preferred set, paper/digital tie-breaking after the set anchor, release date, collector number, and card ID.
+The resolver must be deterministic with respect to API ordering. Ranking is based on language, explicit main-set/bonus-sheet source priority, special-treatment penalty within that source, paper/digital tie-breaking, release date, collector number, and card ID.
 
 Future trophy/component imports must seed card metadata from the environment being built, not from an arbitrary other environment that happens to contain the same card name. Retained per-build image caches may fill missing metadata but may not override current environment-scoped shard metadata. Any true miss is resolved through the shared exact-name selector with that environment as the preferred set (or with no preferred set for Powered Cube).
 
@@ -39,13 +40,13 @@ The all-Pack-One refresh refuses publication when any of the following remain:
 - test-suite or production-data audit failures;
 - backend releases that do not match the reviewed code revision.
 
-Unavoidable original/only special-frame printings are reported but do not fail the release.
+Unavoidable original/only special-frame printings and intentionally drafted main-set/bonus-sheet frames are reported separately and do not fail the release. The report distinguishes verified draft bonus-sheet selections from genuine cross-set fallbacks.
 
 The refresh always uploads `generated/card-image-refresh-report.json` and per-environment mappings as retained Actions diagnostics, including on failure. Inspect these first for unresolved names, avoidable special selections, unavoidable special selections, cross-set fallbacks, and card-ID/name collisions.
 
 ## Targeted repair vs full refresh
 
-Use targeted repair for a known, isolated display regression on an exact served card name and explicit environment list when the shared selector/policy itself has not changed. Use the full refresh for resolver or printing-policy changes, bulk drift, audits, uncertain scope, or any case where more than a bounded named repair is intended.
+Use targeted repair for a known, isolated display regression on an exact served card name and explicit environment list when the shared selector/policy itself has not changed. Use the full refresh for resolver or printing-policy changes (including adding bonus-sheet sources), bulk drift, audits, uncertain scope, or any case where more than a bounded named repair is intended.
 
 Run the targeted repair dry-run before dispatching live mutation. Hydrate all replay shards read-only so the repair can apply the same global card-id/name collision check as the full refresh, then resolve and inspect the retained report without changing shards or checked-in source:
 
