@@ -57,6 +57,10 @@ class CardMetadataTests(unittest.TestCase):
         commander = {**base, "id": "commander", "set": "otc", "released_at": "2024-04-19"}
         self.assertEqual(draft_printing_priority(commander, "otj"), 2)
         self.assertEqual(choose_main_printing([base, commander], "Alpha", "otj")["id"], "old")
+        token = {**base, "id": "token", "set": "otj", "set_type": "token",
+                 "released_at": "2024-04-19"}
+        self.assertEqual(draft_printing_priority(token, "otj"), 2)
+        self.assertEqual(choose_main_printing([base, token], "Alpha", "otj")["id"], "old")
 
     def test_otj_special_guests_are_limited_to_the_2024_collector_range(self):
         old = {"id": "old", "name": "Stoneforge Mystic", "set": "wwk", "lang": "en",
