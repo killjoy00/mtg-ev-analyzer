@@ -32,6 +32,8 @@ test('scheduled output moves private while its schedule and alert routing remain
  assert.match(workflow,/cron: '43 15 \* \* \*'/);
  assert.match(workflow,/github.ref == 'refs\/heads\/main' && github.event_name != 'pull_request'/);
  assert.match(workflow,/environment: pack-one-mobile-release/);
+ assert.match(workflow,/secrets\.CLOUDFLARE_PRIVATE_REPORT_TOKEN/);
+ assert.doesNotMatch(workflow,/CLOUDFLARE_EDGE_TOKEN|CLOUDFLARE_AUDIT_TOKEN|R2_ACCESS_KEY_ID|R2_SECRET_ACCESS_KEY/);
  assert.match(workflow,/node scripts\/private-egress-report.mjs/);
  assert.doesNotMatch(workflow,/uses: actions\/(?:upload|download)-artifact|GITHUB_STEP_SUMMARY/);
  const legacy=fs.readFileSync(new URL('../scripts/neon-egress-evidence.mjs',import.meta.url),'utf8');

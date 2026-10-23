@@ -73,4 +73,6 @@ test('live collection has no PR secrets, schedule changes or public artifact upl
  const workflow=fs.readFileSync(new URL('../.github/workflows/private-compute-history.yml',import.meta.url),'utf8');
  assert.doesNotMatch(workflow,/^\s+(?:pull_request|schedule):/m);assert.match(workflow,/github.ref == 'refs\/heads\/main'/);
  assert.match(workflow,/environment: pack-one-mobile-release/);assert.doesNotMatch(workflow,/uses: actions\/upload-artifact|GITHUB_STEP_SUMMARY/);
+ assert.match(workflow,/secrets\.CLOUDFLARE_PRIVATE_REPORT_TOKEN/);
+ assert.doesNotMatch(workflow,/CLOUDFLARE_EDGE_TOKEN|CLOUDFLARE_AUDIT_TOKEN|R2_ACCESS_KEY_ID|R2_SECRET_ACCESS_KEY/);
 });

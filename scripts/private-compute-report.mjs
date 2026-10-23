@@ -111,7 +111,7 @@ export async function runPrivateReport({neonKey,cloudflareToken,runId,attempt,sh
 if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url) {
  try {
    if(process.env.GITHUB_REF!=='refs/heads/main'||process.env.GITHUB_REPOSITORY!=='killjoy00/mtg-ev-analyzer')throw Error('Reviewed main required');
-   const result=await runPrivateReport({neonKey:process.env.NEON_API_KEY,cloudflareToken:process.env.CLOUDFLARE_EDGE_TOKEN,
+   const result=await runPrivateReport({neonKey:process.env.NEON_API_KEY,cloudflareToken:process.env.CLOUDFLARE_PRIVATE_REPORT_TOKEN,
      runId:process.env.GITHUB_RUN_ID,attempt:process.env.GITHUB_RUN_ATTEMPT,sha:process.env.GITHUB_SHA});
    console.log(result.available?'Private compute history saved and readback verified. Coverage and attribution require private review.':'Private capability/validation report saved. Complete compute history is not established.');
    if(!result.available)process.exitCode=1;

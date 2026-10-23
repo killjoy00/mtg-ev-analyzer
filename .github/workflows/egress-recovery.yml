@@ -81,5 +81,5 @@ jobs:
       - name: Capture bounded provider evidence into verified private storage
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+          CLOUDFLARE_PRIVATE_REPORT_TOKEN: ${{ secrets.CLOUDFLARE_PRIVATE_REPORT_TOKEN }}
         run: node scripts/private-egress-report.mjs
