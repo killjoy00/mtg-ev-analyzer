@@ -6,11 +6,10 @@ checked-in verified corpus payloads, and the supplemental card-image map while
 asserting that puzzle identity, scoring, probabilities, provenance, and draft
 trajectories remain unchanged.
 
-Scryfall's default_cards bulk export is downloaded once. For regular draft sets,
-ordinary base printings from that set are preferred. If the set has no ordinary
-printing for an alias, the resolver falls back to the earliest ordinary printing
-for that exact card identity. Powered Cube uses the same global earliest-base
-policy directly.
+Scryfall's default_cards bulk export is downloaded once. Regular draft sets
+prefer their main-set base printings, then verified bonus-sheet base printings,
+then the earliest ordinary printing for that exact card identity. Powered Cube
+uses the global earliest-base policy directly.
 """
 from __future__ import annotations
 

@@ -7,7 +7,7 @@ Pack One card-image maintenance is an explicit, display-only corpus operation. I
 The shared resolver in `scripts/fetch_card_metadata.py` owns card identity, aliases, face selection, and printing rank.
 
 - **Use the simplest base/non-variant printing for each card in its draft set.** First prefer the main set, then a verified bonus sheet that was actually draftable in that environment. Within the eligible source, prefer an ordinary, readable version over promos, showcases, extended-art, textless or other cosmetic alternatives.
-- Bonus sheets with alternate-art collector numbers explicitly restrict their **source eligibility to the standard/base printings**: BRO/BRR #1–63 (not later schematic art), MOM/MUL #1–65 (not etched/halo treatments), WOE/WOT #1–63 (not later anime art), OTJ/OTP #1–65 (not later anime art), and OTJ/BIG #1–30 (not vault or extended art). SIR/SIS is also recognized. OTJ Special Guests (SPG) qualify only at #29–38, because that set code is reused across releases. Commander products and collector-only printings do not get draft-source priority.
+- Bonus sheets explicitly restrict **source eligibility to their standard/base printings**. The registry below covers the bonus-sheet sources in the checked-in draft catalog, including newer source-material sheets and release-specific Special Guests. Commander products, unrelated releases sharing a set code, and collector-only variants do not get draft-source priority.
 - **The basic style of a bonus sheet may itself be special.** For example, OTP's standard newspaper-style printing is tagged `borderless`/`showcase` in Scryfall. That is the correct *base* OTP printing, not an invitation to pick its alternate anime version or a KTK reprint.
 - In every set, the existing printing rank favors normal/non-variant art within the same source, and treats variation, promo, textless or oversized versions as ineligible for draft-source priority. If no suitable source printing exists, prefer the earliest ordinary/base printing from elsewhere; Powered Cube retains its separate globally earliest ordinary-printing policy.
 - 17Lands' draft archives identify the **card by name, not its exact artwork**. This policy consistently shows the default version of the source set, regardless of which cosmetic variant the original player may have opened.
@@ -15,6 +15,34 @@ The shared resolver in `scripts/fetch_card_metadata.py` owns card identity, alia
 - Double-faced aliases, flavor/printed names, and the Prepare-card collision rule remain part of the shared identity contract.
 
 The resolver must be deterministic with respect to API ordering. Ranking is based on language, verified main-set/standard-bonus-printing priority (including known collector bounds), cosmetic-treatment penalty within that source, paper/digital tie-breaking, release date, collector number, and card ID. A standard source-set frame can be inherently borderless/showcase, but an avoidable variant should never displace the simplest eligible base printing.
+
+### Verified bonus sources
+
+| Draft environment | Base bonus printings | Excluded variants/products |
+| --- | --- | --- |
+| BRO | BRR #1–63 | Schematic art and serialized variants |
+| MOM | MUL #1–65 | Etched, halo and serialized variants |
+| SIR | SIS | Digital Shadows of the Past |
+| WOE | WOT #1–63 | Anime/confetti variants |
+| MKM | SPG #19–28 | Other SPG releases |
+| OTJ | OTP #1–65, BIG #1–30, SPG #29–38 | Anime, vault and extended art |
+| MH3 | SPG #39–48 | Textured Elementals #49–53 |
+| BLB | SPG #54–63 | Other SPG releases |
+| DSK | SPG #64–73 | Other SPG releases |
+| FDN | SPG #74–83 | Other SPG releases |
+| DFT | SPG #84–93 | First-place foil box toppers #94–103 |
+| TDM | SPG #104–113 | Dragonscale fetch lands #114–118 |
+| FIN | FCA #1–64 | Suffixed/other printings |
+| EOE | EOS #1–45, SPG #119–128 | Poster and galaxy-foil EOS printings |
+| TLA | TLE #1–61 | Scene, Jumpstart and other Eternal-product cards |
+| ECL | SPG #129–148 | Other SPG releases |
+| TMT | PZA #1–20 | Non-source-material products |
+| SOS | SOA #1–65, SPG #149–158 | Japanese/silver-scroll SOA variants |
+| MSH | MAR #41–100 | Spider-Man's MAR #1–40 |
+
+Collector bounds were checked against Scryfall's printing records. Booster-source and variant distinctions are documented in Wizards' collecting guides for [MH3](https://magic.wizards.com/en/news/feature/collecting-modern-horizons-3), [DFT](https://magic.wizards.com/en/news/feature/collecting-aetherdrift), [TDM](https://magic.wizards.com/en/news/feature/collecting-tarkir-dragonstorm), [FIN](https://magic.wizards.com/en/news/feature/collecting-final-fantasy), [EOE](https://magic.wizards.com/en/news/feature/collecting-edge-of-eternities), [TLA](https://magic.wizards.com/en/news/feature/collecting-avatar-the-last-airbender), [ECL](https://magic.wizards.com/en/news/feature/collecting-lorwyn-eclipsed), [TMT](https://magic.wizards.com/en/news/feature/collecting-teenage-mutant-ninja-turtles), [SOS](https://magic.wizards.com/en/news/feature/collecting-secrets-of-strixhaven), and [MSH](https://magic.wizards.com/en/news/feature/collecting-marvel-super-heroes).
+
+LCI's Special Guests were not in Draft Boosters, so LCI does not receive SPG priority. The List's reused `plst` code is not broadly eligible: unregistered inserts retain the ordinary-printing fallback and appear in the cross-set report. PIO's rotating sheets use PIO itself and already receive main-set priority.
 
 Future trophy/component imports must seed card metadata from the environment being built, not from an arbitrary other environment that happens to contain the same card name. Retained per-build image caches may fill missing metadata but may not override current environment-scoped shard metadata. Any true miss is resolved through the shared exact-name selector with that environment as the preferred set (or with no preferred set for Powered Cube).
 
@@ -26,6 +54,7 @@ Image maintenance may change only:
 - `mana_cost`
 - `rarity`
 - `type_line`
+- `display_faces`
 
 `scripts/refresh_card_images.py` scrubs those fields before comparison and fails if any other card or puzzle metadata changes. This is not a model, scoring, selection, or corpus-admission release.
 

@@ -74,6 +74,11 @@ class CardMetadataTests(unittest.TestCase):
             ("woe", "wot", 63),
             ("otj", "otp", 65),
             ("otj", "big", 30),
+            ("fin", "fca", 64),
+            ("eoe", "eos", 45),
+            ("tla", "tle", 61),
+            ("tmt", "pza", 20),
+            ("sos", "soa", 65),
         )
         for draft_set, source_set, max_base in cases:
             with self.subTest(draft_set=draft_set, source_set=source_set):
@@ -97,6 +102,42 @@ class CardMetadataTests(unittest.TestCase):
                     choose_main_printing([old, alternate], "Alpha", draft_set)["id"],
                     "old",
                 )
+
+    def test_shared_bonus_set_codes_are_scoped_to_the_correct_release(self):
+        old = {"id": "old", "name": "Alpha", "set": "old", "lang": "en",
+               "released_at": "2000-01-01", "collector_number": "1",
+               "image_uris": {"normal": "https://img/old.jpg"}}
+        cases = (
+            ("mkm", "spg", 19, 28), ("otj", "spg", 29, 38),
+            ("mh3", "spg", 39, 48), ("blb", "spg", 54, 63),
+            ("dsk", "spg", 64, 73), ("fdn", "spg", 74, 83),
+            ("dft", "spg", 84, 93), ("tdm", "spg", 104, 113),
+            ("eoe", "spg", 119, 128), ("ecl", "spg", 129, 148),
+            ("sos", "spg", 149, 158), ("msh", "mar", 41, 100),
+        )
+        for draft_set, source, first, last in cases:
+            with self.subTest(draft_set=draft_set):
+                base = {**old, "id": "base", "set": source,
+                        "collector_number": str(first), "released_at": "2026-01-01",
+                        "border_color": "borderless", "frame_effects": ["inverted"]}
+                for number in (first, last):
+                    self.assertEqual(draft_printing_priority(
+                        {**base, "collector_number": str(number)}, draft_set), 1)
+                for number in (first - 1, last + 1, f"{first}z", "", "invalid"):
+                    outside = {**old, "id": "outside", "set": source,
+                               "collector_number": str(number), "released_at": "2026-01-01"}
+                    self.assertEqual(draft_printing_priority(outside, draft_set), 2)
+                    for options in ([outside, old, base], [base, old, outside]):
+                        self.assertEqual(choose_main_printing(options, "Alpha", draft_set)["id"], "base")
+                        self.assertEqual(choose_main_printing(options, "Alpha")["id"], "old")
+                primary = {**base, "id": "primary", "set": draft_set}
+                self.assertEqual(choose_main_printing([old, base, primary], "Alpha", draft_set)["id"], "primary")
+
+    def test_non_draft_products_do_not_gain_bonus_source_priority(self):
+        card = {"set": "spg", "collector_number": "1"}
+        self.assertEqual(draft_printing_priority(card, "lci"), 2)  # Set Boosters only.
+        self.assertEqual(draft_printing_priority({"set": "tle", "collector_number": "155"}, "tla"), 2)
+        self.assertEqual(draft_printing_priority({"set": "mar", "collector_number": "9"}, "msh"), 2)
 
     def test_same_set_normal_printing_wins_over_cosmetic_alternates(self):
         base = {"id": "base", "name": "Alpha", "set": "otj",

@@ -119,13 +119,29 @@ def special_flags(card: dict) -> list[str]:
 # alternate anime art. BRR's later schematic printings and WOT/MUL's later
 # collector versions likewise do not become Pack One's default art. The
 # underlying set's normal printings are still chosen by printing_rank.
-# SPG spans unrelated releases, so only OTJ's verified SPG #29-38 qualify.
+# SPG/MAR span unrelated releases; TLE also includes non-booster products.
+# Keep their eligibility bounded to each environment's actual base sheet.
+# Source references and excluded treatments: docs/CARD-IMAGE-MAINTENANCE.md.
 DRAFT_BONUS_PRINTINGS = {
     "bro": (("brr", (1, 63)),),     # Retro Artifacts; schematic starts at 64.
     "mom": (("mul", (1, 65)),),     # Multiverse Legends; etched starts at 66.
     "sir": (("sis", None),),       # Digital Shadows of the Past.
     "woe": (("wot", (1, 63)),),     # Enchanting Tales; anime starts at 64.
+    "mkm": (("spg", (19, 28)),),
     "otj": (("otp", (1, 65)), ("big", (1, 30)), ("spg", (29, 38))),
+    "mh3": (("spg", (39, 48)),),   # Textured foil Elementals start at 49.
+    "blb": (("spg", (54, 63)),),
+    "dsk": (("spg", (64, 73)),),
+    "fdn": (("spg", (74, 83)),),
+    "dft": (("spg", (84, 93)),),   # First-place foil box toppers start at 94.
+    "tdm": (("spg", (104, 113)),), # Dragonscale foil fetch lands start at 114.
+    "fin": (("fca", (1, 64)),),
+    "eoe": (("eos", (1, 45)), ("spg", (119, 128))),
+    "tla": (("tle", (1, 61)),),   # Source material only, not scene/Jumpstart cards.
+    "ecl": (("spg", (129, 148)),),
+    "tmt": (("pza", (1, 20)),),
+    "sos": (("soa", (1, 65)), ("spg", (149, 158))),
+    "msh": (("mar", (41, 100)),), # MAR 1-40 belong to Marvel's Spider-Man.
 }
 
 
