@@ -4,10 +4,13 @@
 // builder, so after a removal no verified cache could carry to a new revision.
 import assert from 'node:assert/strict';
 import {fixturePool} from './support/postgres-fixture.mjs';
+import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
+import {DRAFT_RUN_DIFFICULTY_VERSION} from '../draft-run-difficulty.mjs';
+import {SERVING_POLICY_VERSION} from '../serving-quality.mjs';
 
 const pool=fixturePool(),client=await pool.connect();
 const query=(text,values=[])=>client.query(text,values);
-const KEY=['elite-trophy-colour-stage-v9','support-ratio-v1','trophy-implied-score-20-v1'];
+const KEY=[DRAFT_RUN_CORPUS_VERSION,DRAFT_RUN_DIFFICULTY_VERSION,SERVING_POLICY_VERSION];
 const build=async()=>(await query('SELECT pack1_build_serving_snapshot($1,$2,$3)->>\'id\' id',KEY)).rows[0].id;
 const matches=async snapshot=>(await query('SELECT pack1_serving_snapshot_matches_current($1,$2,$3,$4::bigint) ok',[...KEY,snapshot])).rows[0].ok;
 let tests=0;
