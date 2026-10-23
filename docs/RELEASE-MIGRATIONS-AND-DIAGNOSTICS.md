@@ -79,8 +79,23 @@ node scripts/neon-compute-history.mjs FROM_UTC TO_UTC daily /private/history.jso
 ```
 
 Output is created exclusively with mode 0600; stdout contains no usage details.
-No public Actions collector or artifact upload is enabled. An approved private
-execution/output destination is required before enabling collection in CI.
+The reviewed `private compute history` workflow runs only from main in the
+existing protected environment, on manual dispatch or a merged request change.
+It uses the existing approved credentials and `scripts/private-compute-report.mjs`
+to write into the private operations bucket. It verifies that r2.dev access is
+disabled and no custom domains exist, rechecks before the write, then verifies
+the saved bytes by SHA-256 readback. There is no public artifact or usage output,
+and no new schedule. Each run/attempt has its own object. Credentials are never
+copied into reports. A missing capability or validation failure remains explicit;
+raw usage pages needed to diagnose schema/coverage failures stay private.
+
+Default collection covers completed UTC days this month and the latest 167
+complete UTC hours, leaving room inside the hourly retention boundary. Live and
+recoverable deleted branch metadata are retained privately as inventory evidence;
+names alone do not establish CI ownership. Exact reviewed ownership receipts may
+be supplied through the private `compute-history/ownership.json` object. No
+project-minus-branch difference is assigned to CI. A successful collection and
+readback do not prove complete attribution or settled billing.
 Hourly windows must fit the provider's 168-hour retention; daily windows fit
 60 days. Windows are UTC-aligned and never silently shortened. Pagination loops,
 conflicting frames, overlaps and invalid metrics fail. Missing metrics are not

@@ -1,0 +1,28 @@
+name: private compute history
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/private-compute-history-request.json']
+permissions:
+  contents: read
+concurrency:
+  group: private-compute-history
+  cancel-in-progress: false
+jobs:
+  collect:
+    if: github.ref == 'refs/heads/main'
+    environment: pack-one-mobile-release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Collect read-only history into verified private storage
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+        run: node scripts/private-compute-report.mjs
+      # No upload-artifact, job-summary data or provider payload logging.

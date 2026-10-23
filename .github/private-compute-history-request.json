@@ -1,0 +1,4 @@
+{
+  "operation": "collect-private-compute-history",
+  "reason": "Owner approved private storage and completion of compute attribution. Collect retained month-to-date daily history and recent complete hourly history using existing trusted credentials. Do not mutate databases, change schedules or publish usage details."
+}
