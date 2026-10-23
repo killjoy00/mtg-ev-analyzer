@@ -89,6 +89,14 @@ Reality Fracture has a separately versioned, owner-approved restricted component
 
 The complete September 21 release evidence, including the safe blocked production publish that exposed the required development-publication prerequisite, is in [Traditional v4 production release closeout](reports/TRADITIONAL-V4-RELEASE-2026-09-21.md).
 
+## Trophy decklist check (required for every puzzle import)
+
+Every path that adds puzzles must check trophy decklist coverage for those puzzles, every time. That includes parent supplements, the checked-in baseline and Traditional components. Decklists are optional context: a puzzle with no decklist can still be imported and served. The check itself is not optional.
+
+`scripts/trophy-deck-coverage.mjs` reads the same catalogs that serve decks (`worker/trophy-decks.mjs`). It reports, per set, how many added puzzles and source drafts have a decklist. The report goes to the log and to the workflow run summary, with counts only and never source identifiers. A set with no catalog is reported as 0 with a note. An unreadable catalog fails the import.
+
+`load-traditional-components.mjs`, `load_all_trophies.mjs` and `load_verified_draft_run.mjs` all run it before writing. The Traditional loader also runs it during `--validate-only` and publication, and includes it in the uploaded component-health JSON. `tests/trophy-deck-check-required.test.mjs` fails CI if any script or worker module calls `insertTrophyBatch` without the check, or inserts puzzles directly. The CI fixture loader is the only exemption. Low or zero coverage is a reason to refresh the trophy-deck catalogs (see `corpus/trophy-decks/README.md`), not a publication blocker.
+
 ## Serving score floor
 
 The owner’s September 19 update excludes new puzzles whose trophy choice has an implied model score below 20. The formula is the same rounded integer partial-credit calculation: `round(95 × trophy raw support / maximum raw support)`. A rounded score of 20 qualifies. Missing evidence fails closed. This is a selection filter, not a change to the model, probability calibration, corpus payloads, difficulty ratings or trophy-100 scoring. The version `trophy-implied-score-20-v1` is pinned on new sessions/schedules; shared recipients inherit the original run’s version. Earlier schedules and runs retain `legacy-interesting-v1` and their exact decisions. Rerolls select only currently eligible replacements.

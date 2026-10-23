@@ -32,6 +32,18 @@ async function sourceAvailable(set,source) {
   return remember(availability,key,has(await catalogFor(set),source),1024);
 }
 
+// Release-time coverage for puzzles being added, read through the same catalog
+// path that serves decks. Missing decks are counted, never invented.
+export async function trophyDeckCoverage(set,sourcePuzzleCounts) {
+  const catalog=await catalogFor(set);
+  let sources=0,withDeck=0,puzzles=0,puzzlesWithDeck=0;
+  for(const [source,count] of sourcePuzzleCounts) {
+    sources++;puzzles+=count;
+    if(has(catalog,source)){withDeck++;puzzlesWithDeck+=count;}
+  }
+  return {set,catalog:Boolean(catalog),sources,sources_with_deck:withDeck,puzzles,puzzles_with_deck:puzzlesWithDeck};
+}
+
 // One bounded metadata read for already-revealed answers. Catalogs load only
 // for the relevant sets; full card lists are never sent before a deck click.
 export async function withTrophyDeckAvailability(query,answers) {

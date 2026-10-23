@@ -11,6 +11,7 @@ import {refreshServingStatistics} from '../worker/serving-statistics.mjs';
 import {corpusDatabase} from './neon-corpus-db.mjs';
 import {sameSourceSnapshotManifest} from './source-snapshot-manifest.mjs';
 import {verifyStagedSnapshot} from './verify-staged-snapshot.mjs';
+import {checkTrophyDecks} from './trophy-deck-coverage.mjs';
 if(process.argv[2]?.startsWith('https://'))throw Error('Remote trophy import is disabled; pass a reviewed direct connection file.');
 const directory=process.argv[3]||'generated/trophy-import';
 const catalog=JSON.parse(fs.readFileSync(path.join(directory,'catalog.json')));
@@ -46,6 +47,7 @@ for(const s of catalog.sets) {
   }
   if(count!==s.additional_puzzles||[...byHash].some(([h,d])=>(counts.get(h)||0)!==d.additional_puzzles))throw Error('Puzzle accounting mismatch');
   console.log(s.id,count,'additional decisions validated');
+  await checkTrophyDecks(s.id,counts,DRAFT_RUN_CORPUS_VERSION);
 }
 if(process.argv.includes('--validate-only'))process.exit(0);
 const query=corpusDatabase(process.argv[2]);

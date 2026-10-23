@@ -16,6 +16,17 @@ Publication uses the reviewed `publish-puzzle-components.yml` lifecycle with sou
 
 Production staging requires the identical artifact to be verified in development first. The development copy may be staged, or already published under a Live parent. Production publication still requires development publication eligibility.
 
+Released October 23, 2026, and Live in production for P1P1-P1P6 only:
+- secure-auth release: 39881241236 (migration 0065 and the worker)
+- development stage: 39882733722
+- development publish: 39883495249
+- production stage: 39886235358
+- production publish: 39896218920
+
+Run 39884213428 stopped at the production-stage guard before any production change. That guard then required a still-Candidate development copy; #1310 now also accepts one already published under a Live parent.
+
+Trophy decklists: 141 of 141 source drafts have a last-game Traditional decklist in the FRA catalog, so 846 of 846 puzzles can show one.
+
 ## September 21 v4 release
 
 Issue #164's held-fold stage-reference dependency was corrected in the separately versioned v8/v4 build. Traditional admission was then revalidated against the leakage-corrected Premier-trained `strong-player-colour-stage-v4` grader without using Traditional rows for model training or calibration.
