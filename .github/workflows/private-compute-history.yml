@@ -22,6 +22,7 @@ jobs:
           node-version: 24
       - name: Verify existing credentials against the approved private bucket
         env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
           CLOUDFLARE_AUDIT_TOKEN: ${{ secrets.CLOUDFLARE_AUDIT_TOKEN }}
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
