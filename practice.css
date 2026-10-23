@@ -102,6 +102,26 @@
   line-height: 1.55;
 }
 
+.practice-card .practice-new-set {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 16px;
+  padding: 8px 10px;
+  border: 1px solid #d5bb91;
+  background: #fbf5e8;
+  color: #76531d;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.practice-new-set > [aria-hidden] {
+  flex: none;
+}
+
 .practice-card-action {
   margin-top: auto;
   padding-top: 24px;
