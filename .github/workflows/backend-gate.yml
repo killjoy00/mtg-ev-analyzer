@@ -262,6 +262,7 @@ jobs:
           import fs from 'node:fs';
           import {DRAFT_RUN_CORPUS_VERSION,V5_CORPUS_VERSION} from './draft-run.mjs';
           import {corpusDatabase} from './scripts/neon-corpus-db.mjs';
+          import {clonedCorpusMatchesCatalog} from './scripts/ci-corpus-baseline.mjs';
           if(DRAFT_RUN_CORPUS_VERSION===V5_CORPUS_VERSION) {
             const query=corpusDatabase(process.env.PACK1_CI_CONNECTION);
             const active=(await query(`SELECT count(*)::int n FROM draft_run_environment_policy p
@@ -311,18 +312,23 @@ jobs:
           # checked-in corpus can be loaded before production serves it.
           # During a staged rollout main can already be v9 while production is
           # still v8. An unchanged Git diff does not make that clone current.
+          # A verified full import can supersede legacy catalog hashes: accept
+          # it only while its schema, version, and active snapshot all match.
           current_baseline=$(node --input-type=module - <<'NODE'
           import fs from 'node:fs';
           import {corpusDatabase} from './scripts/neon-corpus-db.mjs';
           const catalog=JSON.parse(fs.readFileSync('corpus/draft-run/catalog.json','utf8'));
           const query=corpusDatabase(process.env.PACK1_CI_CONNECTION);
-          const rows=(await query(`SELECT v.set_id,v.manifest->>'sha256' checksum,s.corpus_version active_version
+          const rows=(await query(`SELECT v.set_id,v.manifest->>'sha256' checksum,s.corpus_version active_version,
+              v.manifest#>>'{full_import,corpus_version}' import_version,
+              v.manifest#>>'{full_import,schema_verified}' import_verified,
+              v.manifest#>>'{full_import,source_snapshot_id}' import_snapshot,
+              p.active_snapshot_id active_snapshot
             FROM corpus_set_versions v
             LEFT JOIN draft_run_environment_policy p ON p.set_id=v.set_id
             LEFT JOIN corpus_source_snapshots s ON s.source_snapshot_id=p.active_snapshot_id
             WHERE v.corpus_version=$1`,[catalog.corpus_version])).rows;
-          console.log(catalog.sets.every(set=>rows.some(row=>row.set_id===set.id
-            &&row.checksum===set.sha256&&row.active_version===catalog.corpus_version)));
+          console.log(clonedCorpusMatchesCatalog(catalog,rows));
           NODE
           )
           if [[ "$current_baseline" == true ]] && git diff --quiet "$STACK_BASE_SHA" "$HEAD_SHA" -- 'corpus/draft-run/**' scripts/load_verified_draft_run.mjs worker/trophy-import.mjs; then
