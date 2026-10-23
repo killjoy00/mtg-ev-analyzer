@@ -14,6 +14,8 @@ Migration 0065 admits that component only on the v5 parent and model, and only a
 
 Publication uses the reviewed `publish-puzzle-components.yml` lifecycle with source `v5-fra-p1p6`: development stage -> development publish -> production stage -> production publish.
 
+Production staging requires the identical artifact to be verified in development first. The development copy may be staged, or already published under a Live parent. Production publication still requires development publication eligibility.
+
 ## September 21 v4 release
 
 Issue #164's held-fold stage-reference dependency was corrected in the separately versioned v8/v4 build. Traditional admission was then revalidated against the leakage-corrected Premier-trained `strong-player-colour-stage-v4` grader without using Traditional rows for model training or calibration.
