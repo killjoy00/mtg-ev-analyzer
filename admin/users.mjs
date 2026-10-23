@@ -1,3 +1,5 @@
+import {gameDateKey} from '../game-date.mjs';
+
 const esc=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;");
 const fmt=value=>value==null?'N/A':Number(value).toLocaleString(undefined,{maximumFractionDigits:1});
 const pct=value=>value==null?'N/A':`${fmt(value)}%`;
@@ -20,31 +22,66 @@ const deletionStateLabel=value=>({
 
 export async function renderUsers(root,request,growthRequest=request,viewerRole='admin') {
   const prefill=new URLSearchParams(location.search).get('search')||'';
-  let data=null,filters={search:prefill.length<=100?prefill:'',status:'all'},activityWindow={from:'',to:''},detailLoadSerial=0;
+  let data=null,filters={search:prefill.length<=100?prefill:'',status:'all'},
+    activityWindow={from:'',to:''},page=1,detailLoadSerial=0,loadSerial=0;
 
   async function load() {
-    root.innerHTML='<p>Loading users…</p>';
+    const serial=++loadSerial;
+    if(!data)root.innerHTML='<p role="status">Loading users…</p>';
+    else {
+      const indicator=root.querySelector('#users-loading');
+      if(indicator)indicator.textContent='Updating users…';
+    }
     const query=new URLSearchParams();
     if(filters.search)query.set('search',filters.search);
     if(filters.status!=='all')query.set('status',filters.status);
+    if(page>1)query.set('page',String(page));
     if(activityWindow.from)query.set('activity_from',activityWindow.from);
     if(activityWindow.to)query.set('activity_to',activityWindow.to);
-    data=await request('/v1/admin/users?'+query);
-    render();
+    try {
+      const next=await request('/v1/admin/users?'+query);
+      if(serial!==loadSerial)return;
+      // Search results may have shrunk between page requests.
+      if(page>1&&!next.users.length) {
+        page=Math.max(1,Math.ceil(Number(next.total_matching)/(Number(next.page_size)||100))||1);
+        return load();
+      }
+      data=next;
+      render();
+    } catch(error) {
+      if(serial!==loadSerial)return;
+      if(!data)throw error;
+      const indicator=root.querySelector('#users-loading');
+      if(indicator){indicator.classList.add('error');indicator.textContent=error.message||'Unable to refresh users. Try again.';}
+    }
+  }
+
+  function activityPreset(days) {
+    const to=gameDateKey(new Date()),start=new Date(to+'T12:00:00Z');
+    start.setUTCDate(start.getUTCDate()-(days-1));
+    return {from:start.toISOString().slice(0,10),to};
   }
 
   function playActivity() {
     const activity=data.play_activity;
-    const heading='<h2 id="play-activity-heading">Signed out vs signed in</h2>';
-    if(!activity)return `${heading}<p class="muted">Available after the next Pack One backend release.</p>`;
-    const form=`<form id="play-activity-filters" class="filters"><label>From<input type="date" name="from" value="${esc(activity.start)}" required></label><label>Through<input type="date" name="to" value="${esc(activity.end)}" required></label><button>Update dates</button></form>`;
-    if(activity.unavailable)return `${heading}${form}<p class="error" role="alert">Signed-out activity is temporarily unavailable.</p>`;
+    const heading='<div class="users-section-heading"><div><p class="users-kicker">PLAYER ACTIVITY</p><h2 id="play-activity-heading">Signed out vs signed in</h2><p class="muted">People who completed at least one run in this period. Unlike Overview’s observed players, these counts exclude people who only viewed decisions.</p></div></div>';
+    if(!activity)return `${heading}<p class="muted">Activity is not available from this backend version.</p>`;
+    const form=`<form id="play-activity-filters" class="filters activity-filters"><label>From<input type="date" name="from" value="${esc(activity.start)}" required></label><label>Through<input type="date" name="to" value="${esc(activity.end)}" required></label><button>Update dates</button><div class="activity-presets" role="group" aria-label="Quick date ranges"><button type="button" class="secondary" data-activity-days="1">Today</button><button type="button" class="secondary" data-activity-days="7">7 days</button><button type="button" class="secondary" data-activity-days="14">14 days</button></div></form><p id="activity-error" class="error" role="alert" hidden></p>`;
+    if(activity.unavailable)return `${heading}${form}<p class="error" role="alert">Completed-run activity is temporarily unavailable. Account search remains available.</p>`;
+    const rows=activity.groups||[],signedOut=rows.find(row=>row.group==='signed_out'),
+      signedIn=rows.find(row=>row.group==='signed_in');
+    const out=Number(signedOut?.players)||0,inside=Number(signedIn?.players)||0,total=out+inside;
+    const runs=rows.reduce((sum,row)=>sum+(Number(row.completed_runs)||0),0);
+    const cards=[['Completed-run players',total],['Signed out',out],['Signed in',inside],['Completed runs',runs]];
     const labels={signed_out:'Signed out',signed_in:'Signed in'};
     return `${heading}${form}
+      <div class="cards user-activity-cards">
+        ${cards.map(([label,value])=>`<div class="card"><span>${esc(label)}</span><strong>${fmt(value)}</strong></div>`).join('')}
+      </div>
       <div class="scroll"><table class="play-activity-table"><thead><tr><th>Status</th><th>Players</th><th>Completed runs</th><th>First Daily in range</th><th>Next-day return</th></tr></thead><tbody>
-        ${(activity.groups||[]).map(row=>`<tr><th>${esc(labels[row.group]||row.group)}</th><td>${fmt(row.players)}</td><td>${fmt(row.completed_runs)}</td><td>${fmt(row.first_daily_people)}</td><td>${pct(row.next_day_rate)}<br><small>${fmt(row.next_day_returned)} / ${fmt(row.next_day_mature)} returned · ${fmt(row.next_day_immature)} too new</small></td></tr>`).join('')||'<tr><td colspan="5">No completed runs in this range.</td></tr>'}
+        ${rows.map(row=>`<tr><th>${esc(labels[row.group]||row.group)}</th><td>${fmt(row.players)}</td><td>${fmt(row.completed_runs)}</td><td>${fmt(row.first_daily_people)}</td><td>${pct(row.next_day_rate)}<br><small>${fmt(row.next_day_returned)} / ${fmt(row.next_day_mature)} returned · ${fmt(row.next_day_immature)} too new</small></td></tr>`).join('')||'<tr><td colspan="5">No completed runs in this range.</td></tr>'}
       </tbody></table></div>
-      <p class="note">Pacific dates. Completed Daily and practice runs on the current corpus; QA and admin players excluded. Signed-out players count once per browser, so one person on two devices counts twice. A signed-out player who later creates an account moves to Signed in, including earlier runs. Next-day return: of people whose first-ever Daily falls in the range, how many completed a Daily the next day. “Too new” means the next day hasn’t finished yet.</p>`;
+      <p class="users-activity-note">Pacific dates; current-corpus completed Daily and practice runs only, with QA and admin players excluded. Dailies use their assigned Daily date; practice uses the run creation date. Guests count per browser; linked players count by account, including earlier runs. These totals are not directly subtractable from Overview’s first-encounter observations. Next-day return counts first-ever Daily players who completed another Daily the next day; “too new” means that next day is not fully over.</p>`;
   }
 
   function access(user) {
@@ -57,47 +94,74 @@ export async function renderUsers(root,request,growthRequest=request,viewerRole=
     return items.join(' ');
   }
 
-  function render() {
-    const s=data.summary||{};
+function render() {
+    const summary=data.summary||{},size=Number(data.page_size)||100,total=Number(data.total_matching)||0,
+      lastPage=Math.max(1,Math.ceil(total/size)),currentPage=Number(data.page)||page,
+      first=total?((currentPage-1)*size+1):0,last=total?Math.min(total,(currentPage-1)*size+data.users.length):0;
     root.innerHTML=`<section class="users-page">
-      <div class="users-heading"><div><h1>Users</h1><p class="muted">Authenticated Pack One accounts only. Anonymous and guest gameplay identities are intentionally not listed here.</p></div></div>
-      <div class="cards user-cards">
-        ${[['Accounts',s.total],['New · 30d',s.new_30d],['Active · 30d',s.active_30d],['Username attention',s.username_attention],['Patreon linked',s.patreon],['Paid',s.paid],['Admins',s.admins]].map(([label,value])=>`<div class="card"><span>${esc(label)}</span><strong>${fmt(value)}</strong></div>`).join('')}
-      </div>
-      <form id="user-filters" class="filters user-filters">
-        <label>Find a user<input type="search" name="search" value="${esc(filters.search)}" placeholder="Account name, email, or public username"></label>
-        <label>Status<select name="status"><option value="all" ${filters.status==='all'?'selected':''}>All accounts</option><option value="paid" ${filters.status==='paid'?'selected':''}>Paid</option><option value="patreon" ${filters.status==='patreon'?'selected':''}>Patreon connected</option><option value="admin" ${filters.status==='admin'?'selected':''}>Admins</option></select></label>
-        <button>Refresh</button>
-      </form>
-      <p class="muted users-count">Showing ${fmt(data.users.length)} of ${fmt(data.total_matching)} matching accounts${data.truncated?' · refine the search to see more':''}.</p>
-      <div class="scroll"><table class="user-table"><thead><tr><th>Account</th><th>Public username</th><th>Created</th><th>Last active</th><th>Runs</th><th>Avg.</th><th>Access</th><th>Connections</th><th>Admin</th></tr></thead><tbody id="user-rows">
-        ${data.users.map(user=>`<tr>
-          <th><button type="button" class="user-open" data-user="${esc(user.id)}">${esc(user.name||'Unnamed account')}<small>${esc(user.email||'No email')}</small></button></th>
-          <td>${user.linked?esc(user.profile_name||'Pack Player'):'N/A'}${user.linked&&!user.username_owned?' · unowned':''}</td>
-          <td>${esc(dateOnly(user.created_at))}</td><td>${esc(dateTime(user.last_active))}</td><td class="corpus-number">${fmt(user.runs)}</td><td class="corpus-number">${fmt(user.average_score)}</td>
-          <td class="user-access">${access(user)}</td><td class="user-connections">${user.patreon_connected?badge('Patreon linked'):'N/A'}</td><td>${user.is_admin?badge('Admin','candidate'):'N/A'}</td>
-        </tr>`).join('')||'<tr><td colspan="9">No authenticated accounts match these filters.</td></tr>'}
-      </tbody></table></div>
+      <header class="users-heading"><div><p class="users-kicker">PACK ONE ADMINISTRATION</p><h1>Users</h1><p class="muted">Authenticated Pack One accounts only. Anonymous and guest gameplay identities are intentionally not listed here.</p></div></header>
       <section class="play-activity" aria-labelledby="play-activity-heading">${playActivity()}</section>
+      <section class="user-directory" aria-labelledby="user-directory-heading">
+        <div class="users-section-heading"><div><p class="users-kicker">ACCOUNT MANAGEMENT</p><h2 id="user-directory-heading">Account directory</h2><p class="muted">Search and account status filters apply only to this directory, not to the activity report above. Totals below describe all authenticated accounts.</p></div></div>
+        <div class="cards user-cards">
+          ${[['Accounts',summary.total],['New · 30d',summary.new_30d],['Active · 30d',summary.active_30d],['Username attention',summary.username_attention],['Patreon linked',summary.patreon],['Paid',summary.paid],['Admins',summary.admins]].map(([label,value])=>`<div class="card"><span>${esc(label)}</span><strong>${fmt(value)}</strong></div>`).join('')}
+        </div>
+        <form id="user-filters" class="filters user-filters">
+          <label>Find a user<input type="search" name="search" value="${esc(filters.search)}" maxlength="100" placeholder="Account name, email, or public username"></label>
+          <label>Status<select name="status"><option value="all" ${filters.status==='all'?'selected':''}>All accounts</option><option value="paid" ${filters.status==='paid'?'selected':''}>Paid</option><option value="patreon" ${filters.status==='patreon'?'selected':''}>Patreon connected</option><option value="admin" ${filters.status==='admin'?'selected':''}>Admins</option></select></label>
+          <button>Refresh</button>
+        </form>
+        <div class="users-list-meta">
+          <p class="muted users-count">Showing ${fmt(first)}–${fmt(last)} of ${fmt(total)} matching accounts · most recently active first.</p>
+          <div class="users-pagination" role="group" aria-label="Account pages">
+            <button type="button" class="secondary" data-user-page="previous" ${currentPage<=1?'disabled':''}>Previous</button>
+            <span>Page ${fmt(currentPage)} of ${fmt(lastPage)}</span>
+            <button type="button" class="secondary" data-user-page="next" ${currentPage>=lastPage?'disabled':''}>Next</button>
+          </div>
+        </div>
+        <div class="scroll"><table class="user-table"><thead><tr><th>Account</th><th>Public username</th><th>Created</th><th>Last active</th><th>Runs</th><th>Avg. score</th><th>Access</th><th>Connections</th><th>Admin</th></tr></thead><tbody id="user-rows">
+          ${data.users.map(user=>`<tr>
+            <th><button type="button" class="user-open" data-user="${esc(user.id)}">${esc(user.name||'Unnamed account')}<small>${esc(user.email||'No email')}</small></button></th>
+            <td>${user.linked?esc(user.profile_name||'Pack Player'):'N/A'}${user.linked&&!user.username_owned?' · unowned':''}</td>
+            <td>${esc(dateOnly(user.created_at))}</td><td>${esc(dateTime(user.last_active))}</td><td class="corpus-number">${fmt(user.runs)}</td><td class="corpus-number">${fmt(user.average_score)}</td>
+            <td class="user-access">${access(user)}</td><td class="user-connections">${user.patreon_connected?badge('Patreon linked'):'N/A'}</td><td>${user.is_admin?badge('Admin','candidate'):'N/A'}</td>
+          </tr>`).join('')||'<tr><td colspan="9">No authenticated accounts match these filters.</td></tr>'}
+        </tbody></table></div>
+        <p id="users-loading" role="status" aria-live="polite"></p>
+      </section>
       <dialog id="user-detail" aria-label="User details"><div id="user-detail-body"></div></dialog>
       <p id="status" role="status"></p>
     </section>`;
-    document.querySelector('#user-filters').onsubmit=async event=>{
+    root.querySelector('#user-filters').onsubmit=async event=>{
       event.preventDefault();
       const form=new FormData(event.currentTarget);
       filters={search:String(form.get('search')||'').trim(),status:String(form.get('status')||'all')};
+      page=1;
       await load();
     };
-    const activityForm=document.querySelector('#play-activity-filters');
+    const activityForm=root.querySelector('#play-activity-filters');
     if(activityForm)activityForm.onsubmit=async event=>{
       event.preventDefault();
       const form=new FormData(event.currentTarget);
       const next={from:String(form.get('from')||''),to:String(form.get('to')||'')};
-      if(next.from&&next.to&&(next.to<next.from||(Date.parse(next.to)-Date.parse(next.from))/86400000>365)){document.querySelector('#status').textContent='Choose a range of up to one year, with Through on or after From.';return;}
+      const error=root.querySelector('#activity-error');
+      if(!next.from||!next.to||next.to<next.from||(Date.parse(next.to)-Date.parse(next.from))/86400000>365){
+        if(error){error.hidden=false;error.textContent='Choose a range of up to one year, with Through on or after From.';}
+        return;
+      }
       activityWindow=next;
       await load();
     };
-    document.querySelectorAll('[data-user]').forEach(button=>button.onclick=()=>openDetail(button.dataset.user));
+    root.querySelectorAll('[data-activity-days]').forEach(button=>button.onclick=async()=>{
+      activityWindow=activityPreset(Number(button.dataset.activityDays));
+      await load();
+    });
+    root.querySelectorAll('[data-user-page]').forEach(button=>button.onclick=async()=>{
+      page+=button.dataset.userPage==='next'?1:-1;
+      page=Math.max(1,Math.min(page,lastPage));
+      await load();
+    });
+    root.querySelectorAll('[data-user]').forEach(button=>button.onclick=()=>openDetail(button.dataset.user));
   }
 
   async function deletionStatus(id) {
