@@ -35,7 +35,7 @@ test('unknown Neon create outcome reconciles its unique branch without a second 
   const result=await createCiBranch({...config,output:(...o)=>outputs.push(o),fetcher:async(url,options)=>{
     if(options.method==='POST') {
       posts++;assert.equal(JSON.parse(options.body).branch.parent_id,parent);
-      assert.equal(JSON.parse(options.body).endpoints[0].suspend_timeout_seconds,300);
+      assert.deepEqual(JSON.parse(options.body).endpoints[0],{type:'read_write',suspend_timeout_seconds:300});
       throw Error('request committed but response timed out');
     }
     if(url.includes('/branches?'))return Response.json({branches:++reads===1?[]:[branch]});
@@ -66,6 +66,20 @@ test('Neon provisioning refuses preexisting, ambiguous and incorrectly parented 
   }
   await assert.rejects(createCiBranch({...config,fetcher:async(_url,o)=>o.method==='POST'
     ?Response.json({branch:{...branch,parent_id:'br-other'}}):Response.json({branches:[]})}),/isolation and expiry/);
+});
+test('Neon CI branches take an explicit autoscaling ceiling and reject sizes Neon does not offer',async()=>{
+  let body;
+  await createCiBranch({...config,maxCu:2,fetcher:async(url,o)=>{
+    if(o.method==='POST'){body=JSON.parse(o.body);return Response.json({branch});}
+    if(url.includes('/branches?'))return Response.json({branches:[]});
+    return Response.json({uri});
+  }});
+  assert.deepEqual(body.endpoints[0],{type:'read_write',suspend_timeout_seconds:300,autoscaling_limit_min_cu:0.25,autoscaling_limit_max_cu:2});
+  for(const maxCu of [0,1.5,9,'2',null]) {
+    let calls=0;
+    await assert.rejects(createCiBranch({...config,maxCu,fetcher:async()=>{calls++;return Response.json({branches:[]});}}),/bounded expiry/);
+    assert.equal(calls,0,String(maxCu));
+  }
 });
 test('Neon unknown create without its branch fails closed, never creates twice',async()=>{
   let posts=0;

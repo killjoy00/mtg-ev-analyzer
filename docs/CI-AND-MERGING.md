@@ -42,6 +42,21 @@ Both required workflows have a daily scheduled run that forces broad validation 
 
 Release-secret provisioning checks belong in the release/control workflows that consume those secrets, such as the secure-auth/account-deletion release paths. The generic required `test` job no longer blocks unrelated PRs on those release credentials. Diagnostic-only browser greps that always exited successfully were removed because they did not validate behavior.
 
+## Backend gate and Neon compute
+
+`backend schema gate` runs each selected backend domain on its own short-lived Neon branch copied from production, and Neon bills that compute. To keep it proportional, the gate:
+
+- **Selects domains by ownership.** `scripts/backend-gate-scope.mjs` assigns a changed file to the domains whose suites, or whose mapped modules in `scripts/backend-gate-map.json`, import it. It does not follow imports through full-path files such as the function routers, core and schema helpers. Those import nearly every module, so following them made almost every change select all six domains.
+  - A change to a full-path file or a migration still runs all six.
+  - So does a file the gate uses that no domain owns.
+  - A file the gate never imports, executes or names is ignored, for example browser-only modules, `admin/` and HTML.
+  - A test fails if a new worker module has no domain.
+- **Runs all six nightly** (07:17 UTC) against `main`. This catches coupling with no static import, such as one domain's suite calling another domain's HTTP route.
+- **Waits for `postgres-contract`** before creating any branch.
+- **Caps branch compute at 2 CU.** The project default allows 8. Each domain job samples `num_cpus()` every 5 seconds and writes the allocation to its job summary, so the cap can be lowered per domain. `num_cpus()` rounds up to whole CPUs. Neon's own branch counters lag 15–60 minutes, longer than most CI branches live.
+
+On the 100 gate runs from October 14 to 23, the new selection creates 523 branches instead of 595, 12% fewer. In 75 of those runs the change touched a full-path file, mostly `worker/growth-function.js` or migrations, and still needs all six domains.
+
 ## Stacked pull requests
 
 Required workflows listen for `opened`, `synchronize`, and `reopened`. When a stacked pull request is retargeted to `main`, synchronize or reopen it as needed so the required checks run against the complete `main` merge-base diff.

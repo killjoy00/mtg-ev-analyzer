@@ -27,7 +27,8 @@
     ".github/scripts/apply-identity-migration.sh",
     "scripts/create-ci-neon-branch.mjs",
     "scripts/control-read.mjs",
-    "scripts/reroll-index-schema.mjs"
+    "scripts/reroll-index-schema.mjs",
+    "worker/backend-diagnostics.mjs"
   ],
   "domains": {
     "account": {
@@ -36,7 +37,12 @@
         "worker/username.mjs",
         "worker/public-identity-safety.mjs",
         "worker/user-admin.mjs",
-        "worker/apple-auth.mjs"
+        "worker/apple-auth.mjs",
+        "worker/admin-account-deletion.mjs",
+        "worker/admin-username-change.mjs",
+        "worker/admin-user-notifications.mjs",
+        "worker/mobile-version.mjs",
+        "worker/daily-reminder*.mjs"
       ],
       "suites": [
         "tests/account-session-backend-smoke.mjs",
@@ -75,7 +81,10 @@
         "worker/report-pick-removal.mjs",
         "worker/admin-player-reports.mjs",
         "worker/trophy-decks.mjs",
-        "corpus/trophy-decks/**"
+        "corpus/trophy-decks/**",
+        "worker/draft-run-insights*.mjs",
+        "worker/campaign-link-publish.mjs",
+        "worker/trophy-source-record.mjs"
       ],
       "suites": [
         "tests/draft-run-backend-smoke.mjs",
@@ -95,7 +104,10 @@
         "worker/daily-generation-*.mjs",
         "worker/draft-run-daily.mjs",
         "daily-selection.mjs",
-        "data/selection-policy.json"
+        "data/selection-policy.json",
+        "worker/daily-peer-stats.mjs",
+        "worker/daily-social-dispatch.mjs",
+        "worker/launch-watcher-*.mjs"
       ],
       "suites": [
         "tests/selection-backend-smoke.mjs",
@@ -112,7 +124,8 @@
         "worker/draft-run-health.mjs",
         "worker/trophy-import*.mjs",
         "scripts/*corpus*manifest.mjs",
-        "scripts/load*tro*.mjs"
+        "scripts/load*tro*.mjs",
+        "worker/revision-summary.mjs"
       ],
       "suites": [
         "tests/staged-manifest-backend-smoke.mjs",
