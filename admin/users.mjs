@@ -20,10 +20,24 @@ const deletionStateLabel=value=>({
   complete:'Complete',
 })[value]||value||'Unknown';
 
+const USER_SORT_COLUMNS=[
+  ['account','Account'],['username','Public username'],['created','Created'],
+  ['last_active','Last active'],['runs','Runs'],['average_score','Avg. score'],
+  ['access','Access'],['connections','Connections'],['admin','Admin'],
+];
+const userSortHeader=(key,label,sort)=>{
+  const active=sort.column===key,ascending=sort.direction==='asc',
+    nextDirection=active?(ascending?'desc':'asc'):(['account','username','access'].includes(key)?'asc':'desc');
+  const arrow=active?(ascending?'&#8593;':'&#8595;'):'&#8645;';
+  return `<th scope="col"${active?` aria-sort="${ascending?'ascending':'descending'}"`:''}><button type="button"
+    class="user-sort" data-user-sort="${key}" aria-label="Sort ${esc(label)} ${nextDirection==='asc'?'ascending':'descending'}">${esc(label)}
+    <span class="user-sort-icon${active?' active':''}" aria-hidden="true">${arrow}</span></button></th>`;
+};
+
 export async function renderUsers(root,request,growthRequest=request,viewerRole='admin') {
   const prefill=new URLSearchParams(location.search).get('search')||'';
   let data=null,filters={search:prefill.length<=100?prefill:'',status:'all'},
-    activityWindow={from:'',to:''},page=1,detailLoadSerial=0,loadSerial=0;
+    activityWindow={from:'',to:''},page=1,sorting={column:'last_active',direction:'desc'},detailLoadSerial=0,loadSerial=0;
 
   async function load({accountsOnly=false}={}) {
     const serial=++loadSerial;
@@ -36,6 +50,8 @@ export async function renderUsers(root,request,growthRequest=request,viewerRole=
     if(filters.search)query.set('search',filters.search);
     if(filters.status!=='all')query.set('status',filters.status);
     if(page>1)query.set('page',String(page));
+    query.set('sort',sorting.column);
+    query.set('direction',sorting.direction);
     if(accountsOnly&&data)query.set('activity','0');
     if(activityWindow.from)query.set('activity_from',activityWindow.from);
     if(activityWindow.to)query.set('activity_to',activityWindow.to);
@@ -48,10 +64,12 @@ export async function renderUsers(root,request,growthRequest=request,viewerRole=
         if(page>lastAvailablePage){page=lastAvailablePage;return load({accountsOnly});}
       }
       data=accountsOnly&&data?{...next,play_activity:data.play_activity}:next;
+      sorting=next.sort||sorting;
       render();
     } catch(error) {
       if(serial!==loadSerial)return;
       if(!data)throw error;
+      if(data.sort)sorting=data.sort;
       const indicator=root.querySelector('#users-loading');
       if(indicator){indicator.classList.add('error');indicator.textContent=error.message||'Unable to refresh users. Try again.';}
     }
@@ -120,7 +138,7 @@ function render() {
             <button type="button" class="secondary" data-user-page="next" ${currentPage>=lastPage?'disabled':''}>Next</button>
           </div>
         </div>
-        <div class="scroll"><table class="user-table"><thead><tr><th>Account</th><th>Public username</th><th>Created</th><th>Last active</th><th>Runs</th><th>Avg. score</th><th>Access</th><th>Connections</th><th>Admin</th></tr></thead><tbody id="user-rows">
+        <div class="scroll"><table class="user-table"><thead><tr>${USER_SORT_COLUMNS.map(([key,label])=>userSortHeader(key,label,sorting)).join('')}</tr></thead><tbody id="user-rows">
           ${data.users.map(user=>`<tr>
             <th><button type="button" class="user-open" data-user="${esc(user.id)}">${esc(user.name||'Unnamed account')}<small>${esc(user.email||'No email')}</small></button></th>
             <td>${user.linked?esc(user.profile_name||'Pack Player'):'N/A'}${user.linked&&!user.username_owned?' · unowned':''}</td>
@@ -161,6 +179,15 @@ function render() {
       page+=button.dataset.userPage==='next'?1:-1;
       page=Math.max(1,Math.min(page,lastPage));
       await load({accountsOnly:true});
+    });
+    root.querySelectorAll('[data-user-sort]').forEach(button=>button.onclick=async()=>{
+      const column=button.dataset.userSort;
+      const nextDirection=sorting.column===column?(sorting.direction==='asc'?'desc':'asc'):
+        (['account','username','access'].includes(column)?'asc':'desc');
+      sorting={column,direction:nextDirection};
+      page=1;
+      await load({accountsOnly:true});
+      root.querySelector('[data-user-sort="'+column+'"]')?.focus();
     });
     root.querySelectorAll('[data-user]').forEach(button=>button.onclick=()=>openDetail(button.dataset.user));
   }
