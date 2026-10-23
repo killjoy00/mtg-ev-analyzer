@@ -24,6 +24,31 @@ export function userAdminFilters(url) {
   return {search,status};
 }
 
+const USER_ADMIN_SORT_COLUMNS=Object.freeze({
+  account:"lower(coalesce(nullif(u.name,''),'Unnamed account'))",
+  username:'username_sort',
+  created:'u."createdAt"',
+  last_active:'last_active',
+  runs:'rs.runs',
+  average_score:'rs.average_score',
+  access:'access_sort',
+  connections:'patreon_connected',
+  admin:'is_admin',
+});
+export function userAdminSort(url) {
+  const column=url.searchParams.get('sort')||'last_active';
+  const direction=url.searchParams.get('direction')||(['account','username','access'].includes(column)?'asc':'desc');
+  if(!Object.hasOwn(USER_ADMIN_SORT_COLUMNS,column)||!['asc','desc'].includes(direction))
+    fail('Choose a valid account sorting column and direction.');
+  return {column,direction};
+}
+
+export function userAdminPage(url) {
+  const raw=url.searchParams.get('page')||'1';
+  if(!/^[1-9][0-9]{0,3}$/.test(raw))fail('Choose a valid account page.');
+  return Number(raw);
+}
+
 const DATE_KEY=/^\d{4}-\d{2}-\d{2}$/;
 const validDateKey=value=>DATE_KEY.test(value)&&Number.isFinite(Date.parse(value))&&new Date(value).toISOString().slice(0,10)===value;
 
@@ -300,7 +325,11 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
   }
 
   if(url.pathname!=='/v1/admin/users')fail('Not found.',404);
-  const filters=userAdminFilters(url),activityWindow=playActivityWindow(url),params=[filters.search,filters.status];
+  const filters=userAdminFilters(url),page=userAdminPage(url),sort=userAdminSort(url),activityWindow=playActivityWindow(url),
+    params=[filters.search,filters.status];
+  // Only validated server-owned SQL expressions ever enter ORDER BY.
+  const sortOrder=`${USER_ADMIN_SORT_COLUMNS[sort.column]} ${sort.direction.toUpperCase()} NULLS LAST`+
+    (sort.column==='last_active'&&sort.direction==='desc'?',u."createdAt" DESC,u.id':',u.id');
   const where=`WHERE ($1='' OR coalesce(u.name,'') ILIKE '%'||$1||'%' OR coalesce(u.email,'') ILIKE '%'||$1||'%'
       OR EXISTS(
         SELECT 1 FROM account_links search_link JOIN players search_player ON search_player.id=search_link.player_id
@@ -310,8 +339,8 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
       OR ($2='paid' AND EXISTS(SELECT 1 FROM entitlement_grants eg WHERE eg.auth_user_id=u.id AND eg.revoked_at IS NULL AND (eg.expires_at IS NULL OR eg.expires_at>now())))
       OR ($2='patreon' AND EXISTS(SELECT 1 FROM provider_accounts pc WHERE pc.auth_user_id=u.id AND pc.provider='patreon'))
       OR ($2='admin' AND EXISTS(SELECT 1 FROM pack1_admins pa WHERE pa.auth_user_id=u.id)))`;
-  const [summary,count,rows,activity]=await Promise.all([
-    query(`WITH activity AS (
+  // Overview only needs global account totals; avoid scanning directory rows or lifetime play cohorts.
+  const summaryRequest=query(`WITH activity AS (
         SELECT u.id,GREATEST(
           (SELECT max(s.updated_at) FROM account_links a JOIN draft_run_sessions s ON s.player_id=a.player_id WHERE a.auth_user_id=u.id),
           (SELECT max(e.created_at) FROM account_links a JOIN analytics_events e ON e.player_id=a.player_id WHERE a.auth_user_id=u.id),
@@ -329,9 +358,24 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
           SELECT 1 FROM account_links a JOIN players p ON p.id=a.player_id
           WHERE a.auth_user_id=u.id AND NOT p.username_owned
         ))::int username_attention
-      FROM neon_auth."user" u JOIN activity ON activity.id=u.id`),
+      FROM neon_auth."user" u JOIN activity ON activity.id=u.id`);
+  if(url.searchParams.get('summary_only')==='1') {
+    const summary=await summaryRequest;
+    return {generated_at:new Date().toISOString(),
+      summary:Object.fromEntries(Object.entries(summary.rows[0]||{}).map(([key,value])=>[key,num(value)]))};
+  }
+  const includeActivity=url.searchParams.get('activity')!=='0';
+  const [summary,count,rows,activity]=await Promise.all([
+    summaryRequest,
     query(`SELECT count(*)::int total FROM neon_auth."user" u ${where}`,params),
     query(`SELECT u.id,u.name,u.email,u."emailVerified" email_verified,u."createdAt" created_at,u.banned,
+        CASE WHEN a.claimed_at IS NOT NULL THEN lower(coalesce(p.display_name,'Pack Player')) END username_sort,
+        CASE WHEN u.banned THEN 'Banned'
+          WHEN a.claimed_at IS NOT NULL AND NOT coalesce(p.username_owned,false) THEN 'Username attention'
+          WHEN p.public_identity_hidden_at IS NOT NULL THEN 'Identity hidden'
+          WHEN EXISTS(SELECT 1 FROM entitlement_grants eg WHERE eg.auth_user_id=u.id
+            AND eg.revoked_at IS NULL AND (eg.expires_at IS NULL OR eg.expires_at>now()))
+            THEN 'Premium access' ELSE 'Free account' END access_sort,
         a.claimed_at,p.display_name profile_name,p.username_owned,p.public_identity_hidden_at,
         (SELECT count(*)::int FROM public_identity_reports pir WHERE pir.target_player_id=p.id AND pir.status='open') open_identity_reports,
         EXISTS(SELECT 1 FROM pack1_admins pa WHERE pa.auth_user_id=u.id) is_admin,
@@ -352,16 +396,17 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
       LEFT JOIN LATERAL (SELECT max(created_at) last_event FROM analytics_events e WHERE e.player_id=a.player_id) ev ON true
       LEFT JOIN LATERAL (SELECT max("updatedAt") last_auth FROM neon_auth.session ns WHERE ns."userId"=u.id) au ON true
       ${where}
-      ORDER BY last_active DESC NULLS LAST,u."createdAt" DESC
-      LIMIT 100`,params),
-    playActivity(query,activityWindow),
+      ORDER BY ${sortOrder}
+      LIMIT 100 OFFSET $3`,[...params,(page-1)*100]),
+    includeActivity?playActivity(query,activityWindow):Promise.resolve(null),
   ]);
   return {
     generated_at:new Date().toISOString(),
     filters,
     summary:Object.fromEntries(Object.entries(summary.rows[0]||{}).map(([key,value])=>[key,num(value)])),
     total_matching:num(count.rows[0]?.total),
-    truncated:num(count.rows[0]?.total)>100,
+    page,page_size:100,sort,
+    truncated:num(count.rows[0]?.total)>page*100,
     users:rows.rows.map(normalizeUser),
     play_activity:activity,
   };

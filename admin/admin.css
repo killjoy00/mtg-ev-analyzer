@@ -16,3 +16,55 @@ body{font-family:"Source Sans 3","Segoe UI",sans-serif;background:#f7f8fa;color:
 #admin-area-nav[hidden]{display:none}#admin-area-nav{align-items:center}#admin-area-nav #admin-signout{margin-left:auto}.admin-primary-link{display:inline-block;padding:10px 16px;color:#fff;background:#1e4d7a;text-decoration:none;font-weight:700;border-radius:3px}@media(max-width:680px){#admin-area-nav #admin-signout{margin-left:0}}
 
 #admin-team-link[hidden]{display:none}.admin-team h2{margin:26px 0 12px}.admin-team th{text-align:left}.admin-team td{text-align:left}.admin-team .filters input{min-width:min(340px,76vw)}.admin-team #admin-invite-result input{width:100%;min-width:0}.admin-team #admin-invite-result .note{max-width:680px;margin:20px 0}.admin-team .scroll{margin:12px 0}
+
+/* Admin Users: completed-run activity and account management. */
+
+.users-page{display:grid;gap:20px;min-width:0}
+.users-heading{margin:0 0 3px}
+.users-heading p.muted{max-width:760px;margin:4px 0}
+.users-kicker{font-size:11px;letter-spacing:.12em;font-weight:800;color:#426482;margin:0 0 5px}
+.users-section-heading h2{font-size:25px;margin:0 0 4px}
+.users-section-heading .muted{margin:0;max-width:830px;line-height:1.45}
+.play-activity,.user-directory{min-width:0;background:#fff;border:1px solid #d7dfe8;border-radius:7px;padding:clamp(14px,2.4vw,24px)}
+.activity-filters{margin:18px 0 14px;gap:10px}
+.activity-filters label{min-width:140px}
+.activity-filters input{width:100%}
+.activity-presets{display:flex;align-items:center;flex-wrap:wrap;gap:6px}
+.activity-presets button{font-size:12px;padding:8px 10px;white-space:nowrap}
+.user-activity-cards{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:14px 0}
+.user-activity-cards .card{padding:13px 15px;background:#f6f8fb}
+.user-activity-cards .card span{font-size:12px;color:#4a6275}
+.user-activity-cards .card strong{font-size:28px;color:#173f66;line-height:1.25}
+.play-activity-table thead th{font-size:12px}
+.play-activity-table tbody th{background:#fff}
+.users-activity-note{font-size:12px;color:#586675;line-height:1.55;margin:12px 0 0}
+.user-directory .user-cards{grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:10px;margin:16px 0 20px}
+.user-directory .user-cards .card{padding:13px 15px;background:#f6f8fb}
+.user-directory .user-cards .card strong{font-size:26px;line-height:1.25}
+.user-filters{margin:15px 0}
+.user-filters input[type=search]{width:100%}
+.users-list-meta{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin:14px 0}
+.users-list-meta .users-count{margin:0}
+.users-pagination{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:12px;white-space:nowrap}
+.users-pagination button{font-size:12px;padding:6px 10px}
+.users-pagination button:disabled{cursor:default}
+.user-table tbody tr:hover th,.user-table tbody tr:hover td{background:#f4f7fb}
+.user-open:focus-visible{outline:2px solid #1e4d7a;outline-offset:3px}
+#users-loading{font-size:13px;margin:12px 0 0}
+#users-loading:empty,#activity-error[hidden]{display:none}
+@media(max-width:680px){
+  .users-page{gap:14px}
+  .users-section-heading h2{font-size:22px}
+  .user-activity-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .user-activity-cards .card strong{font-size:24px}
+  .activity-presets{width:100%}
+  .user-directory .user-cards{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .users-list-meta{align-items:flex-start}
+}
+
+.user-table .user-sort{display:inline-flex;align-items:center;gap:7px;padding:3px 1px;border:0;border-radius:2px;background:transparent;color:inherit;font:inherit;font-weight:700;line-height:1.25;text-align:left;cursor:pointer}
+.user-table .user-sort:hover{background:transparent;color:#1e4d7a;text-decoration:underline;text-underline-offset:2px}
+.user-table .user-sort:focus-visible{outline:2px solid #1e4d7a;outline-offset:3px}
+.user-table .user-sort-icon{color:#748494;font-size:13px;min-width:12px;text-align:center}
+.user-table .user-sort-icon.active{color:#1e4d7a}
+.user-table th[aria-sort] .user-sort{color:#123e65}

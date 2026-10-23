@@ -94,7 +94,7 @@ export async function renderOverview(root,request,{role='admin',isCurrent=()=>tr
     section('overview-activity','/v1/admin/measurements?'+today,data=>{
       if(!data.summary)throw Error('Missing activity summary');
       const s=data.summary,f=data.share_funnel||{},href='?area=insights&'+today;
-      return `<div class="overview-metrics">${metric('Observed players',count(s.players),href,'First-encounter measurements')}${metric('Completed / observed runs',`${count(s.completed_runs)} / ${count(s.runs)}`,href)}${metric('Share-link arrivals',count(f.arrivals),href,'Best-effort client analytics')}${metric('Share arrival to Daily start',percent(f.start_pct),href,`${count(f.starts)} attributed starts`)}</div><p class="overview-footnote">Today\'s current-corpus, first-encounter observations, with QA excluded. These are not site-wide unique visitors. Open Insights for definitions and detailed filters.</p>`;
+      return `<div class="overview-metrics">${metric('Observed players',count(s.players),href,'Viewed at least one draft decision')}${metric('Completed / observed runs',`${count(s.completed_runs)} / ${count(s.runs)}`,href)}${metric('Share-link arrivals',count(f.arrivals),href,'Best-effort client analytics')}${metric('Share arrival to Daily start',percent(f.start_pct),href,`${count(f.starts)} attributed starts`)}</div><p class="overview-footnote">Today\'s current-corpus first-encounter decision viewers, with QA excluded, including unfinished runs. These are neither site visitors nor the Users page\'s completed-run players: identity grouping and Daily date attribution also differ. Do not subtract the counts to estimate abandonment. Open Insights for detailed filters or Users for completed-run activity.</p>`;
     }),
     section('overview-reports','/v1/admin/player-reports/summary',data=>{
       const d=data.summary?.decisions,p=data.summary?.profiles;
@@ -114,9 +114,9 @@ export async function renderOverview(root,request,{role='admin',isCurrent=()=>tr
       const pending=challenges.filter(c=>['draft','publishing'].includes(c.status)).length;
       return `<p class="overview-status ${failed?'warning':'ready'}">${failed?`${count(failed)} publication ${failed===1?'operation needs':'operations need'} attention`:'No failed publication operations'}</p><p>${count(challenges.filter(c=>c.status==='published').length)} published &middot; ${count(pending)} draft or publishing</p><p class="muted">Most recent 100 challenges.</p>`;
     }),
-    section('overview-accounts','/v1/admin/users',data=>{
+    section('overview-accounts','/v1/admin/users?summary_only=1',data=>{
       const s=data.summary;if(!s)throw Error('Missing account summary');
-      return `<dl class="overview-facts"><dt>Accounts</dt><dd>${count(s.total)}</dd><dt>New in 30 days</dt><dd>${count(s.new_30d)}</dd><dt>Active in 30 days</dt><dd>${count(s.active_30d)}</dd><dt>Paid access</dt><dd>${count(s.paid)}</dd><dt>Username attention</dt><dd>${count(s.username_attention)}</dd></dl>`;
+      return `<dl class="overview-facts"><dt>Accounts</dt><dd>${count(s.total)}</dd><dt>New in 30 days</dt><dd>${count(s.new_30d)}</dd><dt>Active in 30 days</dt><dd>${count(s.active_30d)}</dd><dt>Premium access</dt><dd>${count(s.paid)}</dd><dt>Username attention</dt><dd>${count(s.username_attention)}</dd></dl>`;
     }),
     section('overview-retention','/v1/admin/measurements/habits?'+recent,data=>{
       const rows=data.habit_metrics?.cohorts;if(!Array.isArray(rows))throw Error('Missing cohort summary');
