@@ -166,7 +166,7 @@ Do not expect the new acquisition logic to rewrite the existing result-share fun
 
 **Admin → Users** opens with **Signed out vs signed in**, showing players who completed runs for the From/Through Pacific dates (last 14 days by default). Use Today, 7 days, or 14 days for a quick range. The separate **Account directory** lists authenticated accounts only, supports 100 results per page, and has its own search and status filters:
 
-- **Players** and **Completed runs**: completed Daily and practice runs on those dates.
+- **Players** and **Completed runs**: completed Draft Runs (including shared challenges) on those dates.
 - **First Daily in range**: people whose first-ever Daily falls in the range.
 - **Next-day return**: the same definition as the Daily habit cohorts, shown as `returned / mature` plus the count that is still too new.
 
