@@ -45,7 +45,12 @@ try{
    const titles=await page.locator('.daily-home-game h2').allTextContents();
    assert.deepEqual(titles,['Daily Draft Run','Daily Powered Cube','Daily Latest Set'],'Daily card positions stay stable while completion hydrates');
    const completedEnvironment=sets[0];
-   assert.ok(String(await page.locator(`.daily-home-game[data-environment="${completedEnvironment}"]`).getAttribute('class')).includes('is-complete'));
+   // One atomic DOM read, reported in full on failure: this assertion failed
+   // once in CI without a reproducible cause.
+   const home=await page.evaluate(()=>({completed:document.querySelector('[data-daily-home]')?.dataset.completed,
+    cards:[...document.querySelectorAll('.daily-home-game')].map(card=>[card.dataset.environment,card.className])}));
+   assert.ok(home.cards.some(([environment,className])=>environment===completedEnvironment&&className.split(/\s+/).includes('is-complete')),
+    'Completed Daily card lost its state: '+JSON.stringify(home));
   }
   for(const width of [320,390,768,1440]){
    await page.setViewportSize({width,height:900});

@@ -121,10 +121,22 @@ jobs:
           BROWSER_GROUPS: ${{ steps.scope.outputs.browser_groups }}
         run: |
           npm ci --no-audit --no-fund
+          # A slow Ubuntu mirror has stalled --with-deps past the 30-minute job
+          # limit. Bound each attempt and retry once against the primary archive.
+          playwright_install() {
+            timeout --kill-after=30 480 "$@" && return 0
+            echo '::warning::Playwright system packages did not install within 8 minutes; retrying against archive.ubuntu.com.'
+            # timeout stops npx, but the apt-get it started through sudo can outlive it and keep the dpkg lock.
+            sudo pkill -KILL -x apt-get || true
+            for _ in $(seq 60); do pgrep -x 'apt-get|dpkg' >/dev/null || break; sleep 1; done
+            sudo dpkg --configure -a || true
+            { sudo grep -rlZ 'azure\.archive\.ubuntu\.com' /etc/apt || true; } | xargs -0r sudo sed -i 's#azure\.archive\.ubuntu\.com#archive.ubuntu.com#g'
+            timeout --kill-after=30 600 "$@"
+          }
           if [[ "$BROWSER_PLAN" == full || ",$BROWSER_GROUPS," == *,account,* || ",$BROWSER_GROUPS," == *,admin,* ]]; then
-            npx playwright install --with-deps chromium webkit
+            playwright_install npx playwright install --with-deps chromium webkit
           else
-            npx playwright install --with-deps chromium
+            playwright_install npx playwright install --with-deps chromium
           fi
       - name: Start static site
         if: steps.scope.outputs.browser_plan != 'none'
