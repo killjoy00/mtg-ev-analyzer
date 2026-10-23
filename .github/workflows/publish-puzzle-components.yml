@@ -125,7 +125,7 @@ jobs:
       - name: Require matching verified development inventory first
         if: inputs.target == 'production'
         run: |
-          status=Candidate
+          status=staged
           if [[ "$ACTION" == publish ]]; then status=eligible; fi
           node scripts/verify-puzzle-components.mjs "$RUNNER_TEMP/development.connection" "$ARTIFACT_ROOT" "$status"
       - name: Snapshot retained Premier Cube and existing universal Dailies

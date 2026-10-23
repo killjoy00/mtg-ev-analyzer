@@ -15,6 +15,9 @@ export async function verifyComponents(query,prepared,status=null) {
     WHERE c.set_id=$1 AND c.component_version=$2 AND c.parent_version=$3`,[s.sid,v,parent])).rows[0];
   assert.ok(row,s.sid+': component missing');
   if(status==='eligible')assert.equal(row.status,row.parent_status==='Live'?'Live':'Candidate',s.sid+': component lifecycle does not match parent publication eligibility');
+  // Production staging needs the identical artifact verified in development
+  // first; development may already have published it under a Live parent.
+  else if(status==='staged')assert.ok(row.status==='Candidate'||(row.status==='Live'&&row.parent_status==='Live'),s.sid+': development component is neither staged nor published');
   else if(status)assert.equal(row.status,status);
   assert.equal(hash(parse(row.manifest)),hash(s.manifest),s.sid+': immutable artifact differs');
   const n=(await query("SELECT count(*)::int n,count(*) FILTER(WHERE interesting)::int usable,count(*) FILTER(WHERE NOT EXISTS(SELECT 1 FROM draft_run_puzzle_ratings r WHERE r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'))::int unrated FROM draft_run_verified_puzzles p WHERE set_id=$1 AND corpus_version=$2",[s.sid,v])).rows[0];
