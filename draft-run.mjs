@@ -124,6 +124,8 @@ const REPLAY_COLOUR_STAGE_COMPONENTS=new Set([
   'traditional-cube-p2p7-v4-v1',
   'traditional-premier-v5-phase2-v1',
   'traditional-cube-p2p7-v5-v1',
+  // Same v5 colour-stage model as the regular v5 component, restricted to P1P1-P1P6.
+  'traditional-premier-v5-p1p6-v1',
 ]);
 function replaySupportSharpening(corpusVersion) {
   // Freeze the component inventory that uses colour-stage display calibration.

@@ -9,7 +9,7 @@ import {DRAFT_RUN_CORPUS_VERSION as parent,validateDraftRunPuzzle,interestingDra
 import {
  TRADITIONAL_COMPONENT_VERSION,TRADITIONAL_PHASE2_COMPONENT_VERSION,CUBE_TRADITIONAL_COMPONENT_VERSION,
  TRADITIONAL_V4_PHASE2_COMPONENT_VERSION,CUBE_TRADITIONAL_V4_COMPONENT_VERSION,
- TRADITIONAL_V5_PHASE2_COMPONENT_VERSION,CUBE_TRADITIONAL_V5_COMPONENT_VERSION,V5_CONTEXT_MODEL_VERSION,V5_PARENT_CORPUS_VERSION,
+ TRADITIONAL_V5_PHASE2_COMPONENT_VERSION,CUBE_TRADITIONAL_V5_COMPONENT_VERSION,TRADITIONAL_V5_P1P6_COMPONENT_VERSION,V5_CONTEXT_MODEL_VERSION,V5_PARENT_CORPUS_VERSION,
  FROZEN_CONTEXT_MODEL_VERSION,V4_CONTEXT_MODEL_VERSION,modelVersionForComponent,TRADITIONAL_GATE_VERSION as gate
 } from '../corpus-components.mjs';
 import {insertTrophyBatch} from '../worker/trophy-import.mjs';
@@ -22,6 +22,10 @@ const files=root=>fs.readdirSync(root,{withFileTypes:true}).flatMap(e=>e.isDirec
 async function* records(file){const reader=readline.createInterface({input:fs.createReadStream(file).pipe(zlib.createGunzip()),crlfDelay:Infinity});for await(const line of reader)if(line.trim())yield JSON.parse(line);}
 const PHASE2_SCOPE=['hob','msh','sos','eoe','fin','tdm','dft','fdn','dsk','blb','mh3','otj','mkm','ktk','lci','woe','ltr','mom','one','bro','dmu','snc','neo','hbg','sir','pio','powered-cube'];
 const sameSet=(a,b)=>[...a].sort().join(',')===[...b].sort().join(',');
+// Owner-approved restricted new-set admissions (P1P1-P1P6 only). Each set is
+// named explicitly; a restricted report for any other set is refused.
+const P1P6_POLICY='new-set-p1p6-v5-admission-v1',P1P6_SETS=['fra'];
+const isP1P6=report=>report.schema===P1P6_POLICY;
 const isV4Phase2=report=>report.schema===1&&report.corrected?.component_version===TRADITIONAL_V4_PHASE2_COMPONENT_VERSION&&report.corrected?.parent_corpus===modelVersions.v4.corpus_version&&report.corrected?.model===V4_CONTEXT_MODEL_VERSION;
 const isV4Cube=report=>report.schema==='cube-p2p7-v4-admission-v1';
 const expansionSupported=report=>report.expansion_supported===true||report.automatic_expansion_supported===true||
@@ -29,9 +33,9 @@ const expansionSupported=report=>report.expansion_supported===true||report.autom
 
 export function sourceQuality(report,sid,{puzzles,usable,metadataComplete,storedMetadataComplete=metadataComplete,imagesComplete},evidence=null) {
  const s=evidence||report.sets[sid];if(!s)throw Error('Missing per-set evidence');
- const checks=sid==='powered-cube'?['all_picks','serving_picks','quality','snapshot']:['all_picks','late_picks','serving_picks','serving_late_picks','quality'];
+ const checks=isP1P6(report)?['early_picks','serving_early_picks','quality']:sid==='powered-cube'?['all_picks','serving_picks','quality','snapshot']:['all_picks','late_picks','serving_picks','serving_late_picks','quality'];
  const gates=Object.fromEntries(checks.map(k=>[k,s[k]?.pass===true]));
- const v5=report.schema==='v5-traditional-rescore-v1';
+ const v5=report.schema==='v5-traditional-rescore-v1'||isP1P6(report);
  const parity=Number(v5?s.v5_parity_picks:s.parity_picks??s.v8_parity_picks??0);
  Object.assign(gates,{independent_expansion:expansionSupported(report)&&!report.residuals?.persistent_category_patterns?.length&&!report.persistent_category_patterns?.length,
   [v5?'v5_model_reconstruction':'frozen_model_parity']:parity>=200,source_accounting:puzzles===s.quality?.usable_traditional_puzzles,
@@ -46,17 +50,20 @@ export async function validateComponents(root) {
  if(reports.length!==1)throw Error('One complete research report required');
  const report=JSON.parse(fs.readFileSync(reports[0]));
  const v5=report.schema==='v5-traditional-rescore-v1';
- const pinnedV5=v5?JSON.parse(fs.readFileSync(new URL('../research/v5-production-component-pins.json',import.meta.url))).sets:[];
+ const pinnedV5=v5||isP1P6(report)?JSON.parse(fs.readFileSync(new URL('../research/v5-production-component-pins.json',import.meta.url))).sets:[];
  if(v5&&(report.model_version!==V5_CONTEXT_MODEL_VERSION||parent!==V5_PARENT_CORPUS_VERSION||report.parent_corpus_version!==parent||report.production_changed!==false||report.publication_authorized!==false||report.traditional_used_for_training!==false||report.source_membership_preserved!==true||report.failing_sets?.length))throw Error('Invalid or blocked complete v5 Traditional evidence');
+ const p1p6=isP1P6(report);
+ if(p1p6&&(report.model_version!==V5_CONTEXT_MODEL_VERSION||parent!==V5_PARENT_CORPUS_VERSION||report.parent_corpus_version!==parent||report.production_changed!==false||report.model_training_changed!==false||report.publication_authorized!==false||report.traditional_used_for_training!==false))throw Error('Invalid restricted v5 Traditional evidence');
  const cubeV3=report.schema==='cube-p2p7-admission-v1',cubeV4=isV4Cube(report),cubeReport=cubeV3||cubeV4;
  const cube=cubeReport;
  const phase2V3=!cube&&report.schema===2&&Array.isArray(report.passing_sets)&&Array.isArray(report.failed_sets);
  const phase2V4=!cube&&isV4Phase2(report)&&Array.isArray(report.passing_sets)&&Array.isArray(report.failing_sets);
  const phase2=phase2V3||phase2V4;
- const defaultComponent=cubeV4?CUBE_TRADITIONAL_V4_COMPONENT_VERSION:cubeV3?CUBE_TRADITIONAL_COMPONENT_VERSION:
+ const defaultComponent=p1p6?TRADITIONAL_V5_P1P6_COMPONENT_VERSION:cubeV4?CUBE_TRADITIONAL_V4_COMPONENT_VERSION:cubeV3?CUBE_TRADITIONAL_COMPONENT_VERSION:
   phase2V4?TRADITIONAL_V4_PHASE2_COMPONENT_VERSION:phase2V3?TRADITIONAL_PHASE2_COMPONENT_VERSION:TRADITIONAL_COMPONENT_VERSION;
  const defaultModel=modelVersionForComponent(defaultComponent);
- const expectedSets=v5?pinnedV5.map(p=>p.set_id):cube?['powered-cube']:phase2?PHASE2_SCOPE:['blb','dft','fin','hob'];
+ const expectedSets=v5?pinnedV5.map(p=>p.set_id):cube?['powered-cube']:phase2?PHASE2_SCOPE:p1p6?P1P6_SETS.filter(sid=>report.sets?.[sid]):['blb','dft','fin','hob'];
+ if(p1p6&&(expectedSets.length!==1||expectedSets.some(sid=>pinnedV5.some(p=>p.set_id===sid))))throw Error('Restricted admission must name exactly one approved new set');
  const preparedSets=phase2?PHASE2_SCOPE.filter(s=>s!=='powered-cube'):expectedSets;
  if(!defaultModel)throw Error('Unsupported component identity');
  if(phase2V4) {
@@ -85,6 +92,9 @@ export async function validateComponents(root) {
    if(manifest.parent_corpus_version!==parent||manifest.source_status!==pin.status)throw Error('Invalid v5 parent/status');
   }
   if(!s)throw Error('Missing per-set evidence');
+  if(p1p6&&(manifest.parent_corpus_version!==parent||manifest.admission_policy!==P1P6_POLICY||manifest.serving_window?.first_pick!==1||manifest.serving_window?.last_pick!==6||
+   s.model_version!==expectedModel||s.parent_corpus_version!==parent||s.traditional_used_for_training!==false||s.training_mode!=='all-qualified'||s.training_cap!==null||
+   !Number.isInteger(s.training_drafts)||s.training_drafts!==s.qualified_training_drafts||!Array.isArray(s.fold_training_ids_sha256)||s.fold_training_ids_sha256.length!==5||s.fold_training_ids_sha256.some(h=>!/^[a-f0-9]{64}$/.test(h))))throw Error('Unapproved restricted P1P1-P1P6 component');
   if(phase2V4) {
    if(!reportSet||summary.set!==sid||summary.model_version!==V4_CONTEXT_MODEL_VERSION||summary.parent_corpus_version!==modelVersions.v4.corpus_version||summary.traditional_used_for_training!==false)throw Error('Invalid v4 per-set evidence');
    if(summary.production_input_signature!==reportSet.production_input_signature||Number(summary.v8_parity_picks)!==Number(reportSet.v8_parity_picks)||Boolean(summary.pass)!==(reportSet.new_v4_result==='PASS'))throw Error('v4 summary differs from consolidated report');
@@ -98,7 +108,7 @@ export async function validateComponents(root) {
   for(const name of ['puzzles','trophies'])if(hash(path.join(dir,name+'.jsonl.gz'))!==manifest[name==='puzzles'?'puzzle_file_sha256':'ledger_file_sha256'])throw Error('Component checksum mismatch');
   const expectedPolicy=v5?'cube-p2p7-v5-admission-v1':cubeV4?'cube-p2p7-v4-admission-v1':'cube-p2p7-admission-v1';
   if(cube&&(manifest.admission_policy!==expectedPolicy||manifest.serving_window?.first_pick!==2||manifest.serving_window?.last_pick!==7||!manifest.cube_snapshot?.pass))throw Error('Unapproved Cube window');
-  const width=cube?6:8;
+  const width=cube||p1p6?6:8;
   const ledger=new Map();let qualified=0,included=0;
   for await(const d of records(path.join(dir,'trophies.jsonl.gz'))) {
    if(!/^[a-f0-9]{32}$/.test(d.source_draft_hash)||ledger.has(d.source_draft_hash)||d.event_type!=='TradDraft'||d.wins!==3||d.losses!==0||!['included','excluded'].includes(d.status))throw Error('Invalid Traditional source ledger');
@@ -115,7 +125,7 @@ export async function validateComponents(root) {
    puzzles++;usable+=Number(interestingDraftRunPuzzle(p));
    const cards=[...p.candidates,...p.prior_picks];storedMetadataComplete+=Number(cards.every(c=>c.name&&c.rarity&&c.type_line));metadataComplete+=Number(cards.map(effectiveCardMetadata).every(c=>c.name&&c.rarity&&c.type_line));imagesComplete+=Number(cards.every(c=>c.image_url?.startsWith('https://')));
   }
-  if(puzzles!==manifest.puzzles||groups.size!==included||[...groups.values()].some(p=>p.length!==(cube?7:8)))throw Error('Incomplete first-eight source accounting');
+  if(puzzles!==manifest.puzzles||groups.size!==included||[...groups.values()].some(p=>p.length!==(cube?7:p1p6?6:8)))throw Error('Incomplete first-eight source accounting');
   const health=sourceQuality(report,sid,{puzzles,usable,metadataComplete,storedMetadataComplete,imagesComplete},s);
   if(phase2&&health.ready!==passing.includes(sid))throw Error('Phase 2 pass status differs from reconstructed component health');
   prepared.push({sid,dir,ledger,health,manifest:{...manifest,model_source_corpus:expectedModel===V4_CONTEXT_MODEL_VERSION?modelVersions.v4.corpus_version:parent,research_report_sha256:hash(reports[0]),qualified_trophies:qualified,included_trophies:included,excluded_trophies:ledger.size-included,source_trophies:ledger.size}});

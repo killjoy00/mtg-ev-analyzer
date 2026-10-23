@@ -8,7 +8,7 @@ import {verifyImportToken,IMPORT_WORKFLOW,IMAGE_REFRESH_WORKFLOW} from '../worke
 import {insertTrophyBatch,handleTrophyImport,refreshTrophyImagePage,refreshTrophyImages,normalizeResolvedImageMarkers} from '../worker/trophy-import.mjs';
 import {SERVING_ANALYZE_SQL,SOURCE_ANALYZE_SQL,SERVING_STATISTICS_COLUMNS,SERVING_STATISTICS_READY_SQL} from '../worker/serving-statistics.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
-import {TRADITIONAL_V4_PHASE2_COMPONENT_VERSION,V4_CONTEXT_MODEL_VERSION} from '../corpus-components.mjs';
+import {TRADITIONAL_V4_PHASE2_COMPONENT_VERSION,V4_CONTEXT_MODEL_VERSION,TRADITIONAL_V5_P1P6_COMPONENT_VERSION,V5_CONTEXT_MODEL_VERSION,V5_PARENT_CORPUS_VERSION} from '../corpus-components.mjs';
 
 const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
 const jwk={...publicKey.export({format:'jwk'}),kid:'test',use:'sig'};
@@ -69,6 +69,37 @@ test('unsigned callers and invalid batches cannot touch SQL',async()=>{
   await assert.rejects(handleTrophyImport(new Request('https://example/v1/trophy-import',{method:'POST',body:'{}'}),query),/denied/);
   await assert.rejects(insertTrophyBatch(query,[]),/Invalid batch/);
   await assert.rejects(insertTrophyBatch(query,[{set_id:'hob',puzzle_id:'x'}]),/Invalid verified puzzle/);
+});
+
+test('a Candidate component row registers a database-discovered Live set for its component import only',async()=>{
+  const blb=JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL('../corpus/draft-run/blb.json.gz',import.meta.url))));
+  const component=TRADITIONAL_V5_P1P6_COMPONENT_VERSION;
+  const p={...structuredClone(blb.find(row=>row.pick_number===3)),set_id:'fra',corpus_version:component,parent_corpus_version:V5_PARENT_CORPUS_VERSION,
+    model_version:V5_CONTEXT_MODEL_VERSION,model_source_event:'PremierDraft',source_event_type:'TradDraft',event_match_wins:3,event_match_losses:0};
+  const database=candidate=>{
+    const calls=[];
+    const query=async(sql,params=[])=>{
+      calls.push(sql);
+      if(sql.includes('FROM corpus_components')){assert.deepEqual(params,['fra',component,DRAFT_RUN_CORPUS_VERSION]);return {rows:candidate?[{}]:[]};}
+      // A Live discovered set no longer has a Candidate environment policy.
+      if(sql.includes('FROM corpus_set_versions'))return {rows:[]};
+      if(sql.includes('INSERT INTO draft_run_verified_puzzles'))return {rows:[{conflicts:0,added:JSON.parse(params[0]).length}]};
+      throw new Error('Unexpected SQL in component import test: '+sql);
+    };
+    return {query,calls};
+  };
+  const accepted=database(true);
+  assert.equal(await insertTrophyBatch(accepted.query,[p],{componentVersion:component}),1);
+  assert.equal(accepted.calls.some(sql=>sql.includes('FROM corpus_set_versions')),false);
+  const published=database(false);
+  await assert.rejects(insertTrophyBatch(published.query,[p],{componentVersion:component}),/Only an unpublished Candidate component accepts imports/);
+  assert.equal(published.calls.some(sql=>sql.includes('INSERT INTO draft_run_verified_puzzles')),false);
+  // Without a component, the same discovered Live set is still refused.
+  const parent={...p,corpus_version:DRAFT_RUN_CORPUS_VERSION};
+  delete parent.source_event_type;
+  const plain=database(true);
+  await assert.rejects(insertTrophyBatch(plain.query,[parent]),/Invalid verified puzzle/);
+  assert.equal(plain.calls.some(sql=>sql.includes('FROM corpus_components')),false);
 });
 
 test('only the signed main trophy import can request fixed serving statistics maintenance',async t=>{

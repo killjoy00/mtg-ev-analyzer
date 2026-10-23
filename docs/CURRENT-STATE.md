@@ -225,7 +225,7 @@ Live browser run 35458218471 passed both complete unranked Dailies, loaded card 
 
 ## Traditional admission boundary
 
-Approved regular v4 scope: MSH, SOS, EOE, FIN, TDM, DFT, FDN, DSK, BLB, MH3, OTJ, MKM, LCI, WOE, LTR, MOM, ONE, BRO, DMU, SNC, NEO, and SIR. The same admission boundary survived v4 revalidation with no regular v3-to-v4 admission flips. Only the 21 whose parent is Live serve; SIR is Candidate only. HBG, HOB, KTK and PIO remain blocked. Powered Cube v4 is separately approved only for P1P2-P1P7; P1P8/P1P9 remain Premier-only. Existing Premier sources are separate and unchanged.
+Approved regular v4 scope: MSH, SOS, EOE, FIN, TDM, DFT, FDN, DSK, BLB, MH3, OTJ, MKM, LCI, WOE, LTR, MOM, ONE, BRO, DMU, SNC, NEO, and SIR. The same admission boundary survived v4 revalidation with no regular v3-to-v4 admission flips. Only the 21 whose parent is Live serve; SIR is Candidate only. HBG, HOB, KTK and PIO remain blocked. Powered Cube v4 is separately approved only for P1P2-P1P7; P1P8/P1P9 remain Premier-only. Reality Fracture is separately owner-approved for v5 Traditional P1P1-P1P6 only (`traditional-premier-v5-p1p6-v1`); its P1P7-P1P8 failed the unchanged low-support gate and remain Premier-only. Existing Premier sources are separate and unchanged.
 
 Expansion affects newly generated games. It does not regenerate today's Daily or alter stored scores, shares, historical puzzles, or model evidence.
 

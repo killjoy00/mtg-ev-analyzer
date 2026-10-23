@@ -85,6 +85,8 @@ Component publication is parent-aware. A ready component under a Live parent can
 
 Live Traditional components extend the same environment-level serving universe as retained Premier inventory. They do not replace the Premier parent or create a separate player-facing Traditional mode. Current new games use Live components only; existing schedules and sessions keep their pinned IDs and remain readable regardless of later component status.
 
+Reality Fracture has a separately versioned, owner-approved restricted component, `traditional-premier-v5-p1p6-v1`, on the v9 parent and `strong-player-colour-stage-v5`. It serves only P1P1-P1P6. P1P7-P1P8 failed the unchanged low-support gate and remain Premier-only. See [the FRA admission record](TRADITIONAL-PUZZLE-ADMISSION.md#october-22-reality-fracture-p1p1-p1p6-admission).
+
 The complete September 21 release evidence, including the safe blocked production publish that exposed the required development-publication prerequisite, is in [Traditional v4 production release closeout](reports/TRADITIONAL-V4-RELEASE-2026-09-21.md).
 
 ## Serving score floor

@@ -14,6 +14,7 @@ import {
  V4_CONTEXT_MODEL_VERSION as v4Model,
  TRADITIONAL_V5_PHASE2_COMPONENT_VERSION as v5Component,
  CUBE_TRADITIONAL_V5_COMPONENT_VERSION as v5CubeComponent,
+ TRADITIONAL_V5_P1P6_COMPONENT_VERSION as p1p6Component,
  V5_CONTEXT_MODEL_VERSION as v5Model,
  V5_PARENT_CORPUS_VERSION as v5Parent,
  modelVersionForComponent,
@@ -134,6 +135,30 @@ test('Cube source admission ends at P7 while Premier retains P2-P9',()=>{
    const trad={...p,corpus_version:version,parent_corpus_version:DRAFT_RUN_CORPUS_VERSION,source_event_type:'TradDraft',model_source_event:'PremierDraft',model_version:versionModel,event_match_wins:3,event_match_losses:0};
    assert.equal(validateDraftRunPuzzle(trad,version),p.pick_number<=7);
    assert.equal(supportSharpening(version),supportSharpening(DRAFT_RUN_CORPUS_VERSION));
+  }
+ }
+});
+
+test('the restricted new-set component serves only P1P1-P1P6 on the v5 parent',()=>{
+ assert.equal(modelVersionForComponent(p1p6Component),v5Model);
+ assert.equal(supportedComponent(p1p6Component),true);
+ const regular=JSON.parse(gunzipSync(fs.readFileSync(new URL('../corpus/draft-run/blb.json.gz',import.meta.url))));
+ for(const pick of [1,2,3,4,5,6,7,8]) {
+  const source=regular.find(row=>row.pick_number===pick);
+  const p={...structuredClone(source),corpus_version:p1p6Component,parent_corpus_version:v5Parent,model_version:v5Model,
+   model_source_event:'PremierDraft',source_event_type:'TradDraft',event_match_wins:3,event_match_losses:0};
+  assert.equal(validateDraftRunPuzzle(p,p1p6Component),pick<=6,`pick ${pick}`);
+  if(pick<=6) {
+   // Same v5 model as the regular v5 component, so displayed supports must match.
+   const alternative=p.candidates.find(c=>c.id!==p.historical_pick_id).id;
+   const reference=gradeDraftRunPick({...p,corpus_version:v5Component},alternative);
+   const graded=gradeDraftRunPick(p,alternative);
+   assert.equal(graded.selectedSupport,reference.selectedSupport);
+   assert.equal(graded.score,reference.score);
+   assert.equal(supportSharpening(p1p6Component),supportSharpening(v5Component));
+   assert.equal(validateDraftRunPuzzle({...p,parent_corpus_version:modelVersions.v4.corpus_version},p1p6Component),false);
+   assert.equal(validateDraftRunPuzzle({...p,model_version:v4Model},p1p6Component),false);
+   assert.equal(validateDraftRunPuzzle({...p,set_id:'powered-cube'},p1p6Component),false);
   }
  }
 });

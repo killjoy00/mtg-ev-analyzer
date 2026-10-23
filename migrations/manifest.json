@@ -68,7 +68,8 @@
     "0061_daily_reminders.sql",
     "0062_daily_email_reminder_admission.sql",
     "0063_private_creator_consent.sql",
-    "0064_report_linked_pick_removal.sql"
+    "0064_report_linked_pick_removal.sql",
+    "0065_traditional_p1p6_component.sql"
   ],
   "same_prefix_order": {
     "0037": [
@@ -144,7 +145,8 @@
         "0026_provider_accounts.sql",
         "0032_traditional_v4_components.sql",
         "0048_uncapped_v5_components.sql",
-        "0049_cross_version_corpus_cutover.sql"
+        "0049_cross_version_corpus_cutover.sql",
+        "0065_traditional_p1p6_component.sql"
       ]
     },
     "secure-auth-release": {
@@ -185,7 +187,8 @@
         "0061_daily_reminders.sql",
         "0062_daily_email_reminder_admission.sql",
         "0063_private_creator_consent.sql",
-        "0064_report_linked_pick_removal.sql"
+        "0064_report_linked_pick_removal.sql",
+        "0065_traditional_p1p6_component.sql"
       ]
     },
     "daily-calendar": {
@@ -244,7 +247,8 @@
         "0061_daily_reminders.sql",
         "0062_daily_email_reminder_admission.sql",
         "0063_private_creator_consent.sql",
-        "0064_report_linked_pick_removal.sql"
+        "0064_report_linked_pick_removal.sql",
+        "0065_traditional_p1p6_component.sql"
       ]
     },
     "launch-load": {
@@ -278,7 +282,8 @@
         "0061_daily_reminders.sql",
         "0062_daily_email_reminder_admission.sql",
         "0063_private_creator_consent.sql",
-        "0064_report_linked_pick_removal.sql"
+        "0064_report_linked_pick_removal.sql",
+        "0065_traditional_p1p6_component.sql"
       ]
     },
     "launch-distributed": {
@@ -314,7 +319,8 @@
         "0061_daily_reminders.sql",
         "0062_daily_email_reminder_admission.sql",
         "0063_private_creator_consent.sql",
-        "0064_report_linked_pick_removal.sql"
+        "0064_report_linked_pick_removal.sql",
+        "0065_traditional_p1p6_component.sql"
       ]
     },
     "practice-performance": {
