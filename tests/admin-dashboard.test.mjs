@@ -15,7 +15,7 @@ async function queryFixture(sql,params){
 }
 const request=path=>new Request('https://packone.pro'+path,{headers:{'x-pack1-auth-session':'synthetic-admin-token'}});
 test('dashboard routes remain admin protected',async()=>{
-  await assert.rejects(handleAdmin(request('/v1/admin/overview/trends'),async()=>({rows:[]}),async()=>({})),x=>x.status===403);
+  await assert.rejects(handleAdmin(request('/v1/admin/overview/trends'),async()=>({rows:[]}),async()=>({})),x=>x.status===401);
 });
 test('dashboard routes return bounded read-only reports',async()=>{
   for(const [path,key] of [['/v1/admin/overview/trends','weekly'],['/v1/admin/overview/health','dailies'],['/v1/admin/insights/quality-watch','rows'],['/v1/admin/campaign-performance','rows']]){
