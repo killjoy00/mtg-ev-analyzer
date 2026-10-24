@@ -32,7 +32,7 @@ export async function runAdminStartupChecks(browser) {
     events.push('account-session');
     return route.fulfill({json:session});
   });
-  await page.route(/\\/health\\?quick=1$/,route=>route.fulfill({
+  await page.route(url=>String(url).endsWith('/health?quick=1'),route=>route.fulfill({
     headers:{'x-pack1-admin-api-version':String(ADMIN_API_VERSION)},
     json:{ok:true,admin_api_version:ADMIN_API_VERSION},
   }));
