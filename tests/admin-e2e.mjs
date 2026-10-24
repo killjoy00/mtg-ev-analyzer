@@ -1,6 +1,7 @@
 // Browser contract runs in CI against the local static site and synthetic data.
 import {chromium} from 'playwright';
 import {runOverviewChecks} from './admin-overview-e2e.mjs';
+import {runAdminStartupChecks} from './admin-startup-e2e.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {ADMIN_API_VERSION} from '../admin-api-contract.mjs';
@@ -620,5 +621,6 @@ try {
   await page.screenshot({path:'artifacts/ui-campaign-links-mobile.png',fullPage:true});
   assert.deepEqual(errors,[]);
   await runOverviewChecks(browser);
-  console.log('Admin mobile layout, locked state, filters, review details and CSV export passed.');
+  await runAdminStartupChecks(browser);
+  console.log('Admin mobile layout, locked state, filters, review details, CSV export, and bounded first-party startup passed.');
 } finally {await browser.close();}

@@ -83,3 +83,13 @@ test('Owner Settings summarizes genuine access records and preserves invitation 
   for(const selector of ['admin-invite-form','admin-invite-result','team-status','data-revoke-invite','data-revoke-member'])
     assert.ok(js.includes(selector),selector);
 });
+
+test('admin startup does not wait on guest migrations and exposes its loading stage',()=>{
+  const js=read('admin/admin.mjs');
+  assert.match(js,/async function adminAccountSession\(\)/);
+  assert.match(js,/growthBase\+'\/v1\/account\/session'/);
+  assert.match(js,/AbortSignal\.timeout\(12000\)/);
+  assert.match(js,/session=await adminAccountSession\(\)/);
+  assert.match(js,/showLoading\(area==='insights'\?'Loading Insights…'/);
+  assert.match(js,/code:'admin_session_timeout'/);
+});

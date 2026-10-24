@@ -65,6 +65,29 @@ async function verifyAdminContract() {
   );
   adminContractVerified=true;
 }
+// The admin shell only needs the account cookie. Do not block it on the
+// unrelated guest-player session and legacy migration calls in getAuthSession().
+async function adminAccountSession() {
+  if(!firstPartyAuthEnabled())return getAuthSession();
+  try {
+    const response=await fetch(growthBase+'/v1/account/session',{
+      credentials:'include',cache:'no-store',signal:AbortSignal.timeout(12000),
+    });
+    const data=await response.json().catch(()=>({}));
+    if(response.status===401||response.status===403)return null;
+    if(!response.ok)throw Object.assign(Error(data.error||'Could not verify your Pack One account.'),{
+      status:response.status,code:data.code||null,
+    });
+    return data?.user?data:null;
+  } catch(error) {
+    if(error?.name==='TimeoutError'||error?.name==='AbortError')
+      throw Object.assign(Error('The account check took too long. Please retry.'),{status:0,code:'admin_session_timeout'});
+    throw error;
+  }
+}
+function showLoading(title,detail='') {
+  root.innerHTML=`<section class="admin-loading" role="status"><h1>${esc(title)}</h1>${detail?`<p class="muted">${esc(detail)}</p>`:''}</section>`;
+}
 const reportQuery=f=>new URLSearchParams({from:f.start,to:f.end,environment:f.environment,type:f.type,set:f.set,version:f.version,difficulty:f.band,pick:f.pick}).toString();
 function signInHref(){
   const destination=sanitizeAdminDestination(location.pathname+location.search,location.origin)||'/admin/';
@@ -230,12 +253,13 @@ async function refreshReport() {
 async function load() {
   const loadId=++deferredLoad;
   setAuthorized(false);
-  root.innerHTML='<p>Checking administrator access…</p>';
+  showLoading('Checking administrator access…','Confirming your Pack One session.');
   let session=null,authorized=false;
   try {
-    session=await getAuthSession();
+    session=await adminAccountSession();
     if(loadId!==deferredLoad)return;
     if(!session?.user){login(pendingInvitation()?'Sign in to review your administrator invitation.':'Your session may have expired. Sign in to continue.');return;}
+    showLoading('Checking administrator access…','Confirming the site and admin API are compatible.');
     await verifyAdminContract();
     if(loadId!==deferredLoad)return;
     const invitation=pendingInvitation();
@@ -243,6 +267,7 @@ async function load() {
       showInvitationPrompt(session.user,invitation,loadId);
       return;
     }
+    showLoading('Checking administrator access…','Verifying administrator permissions.');
     const access=await request('/v1/admin/access');
     if(loadId!==deferredLoad)return;
     authorized=true;
@@ -250,6 +275,8 @@ async function load() {
     const authorizedRequest=async (...args)=>{const data=await request(...args);if(loadId!==deferredLoad)throw Error('Administrator account changed.');return data;};
     const authorizedGrowthRequest=async (...args)=>{const data=await growthRequest(...args);if(loadId!==deferredLoad)throw Error('Administrator account changed.');return data;};
     const area=adminArea(location.search);
+    showLoading(area==='insights'?'Loading Insights…':`Loading ${ADMIN_AREAS[area]||'administration'}…`,
+      area==='insights'?'Administrator access confirmed. Loading decision metrics; additional breakdowns load after the summary.':'Administrator access confirmed. Fetching section data.');
     if(area==='overview'){await renderOverview(root,authorizedRequest,{role:access.role,isCurrent:()=>loadId===deferredLoad,onRefresh:()=>void load()});return;}
     if(area==='reports'){await renderPlayerReports(root,authorizedRequest);return;}
     if(area==='corpus'){await renderCorpus(root,authorizedRequest);return;}
