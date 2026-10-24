@@ -18,6 +18,9 @@ export async function runOverviewChecks(browser) {
     const request=route.request(),url=new URL(request.url()),path=url.pathname;
     requests.push({path,method:request.method(),query:url.search});
     if(path==='/v1/admin/access')return route.fulfill({json:{ok:true,role}});
+    if(path==='/v1/admin/overview/trends')return route.fulfill({json:{daily:[{label:'2026-10-23',completed_runs:8}],weekly:[{label:'current',observed_players:20,completed_runs:28,daily_players:14,daily_completions:20,new_accounts:7,answers:50,trophy_matches:25},{label:'previous',observed_players:10,completed_runs:14,daily_players:7,daily_completions:10,new_accounts:3,answers:40,trophy_matches:16}]}});
+    if(path==='/v1/admin/overview/health')return route.fulfill({json:{day:'2026-10-24',dailies:['mixed','powered-cube','latest'].map(environment=>({environment,scheduled:true,picks:8})),serving:{cache_current:true,revision:'12'},attention:{failed_publications:1,urgent_reports:1}}}});
+
     if(path==='/v1/admin/player-reports/summary')return route.fulfill({status:failReports||200,json:failReports?{error:'Synthetic report outage'}:{summary:{decisions:{open:3,broken_open:1},profiles:{open:2}}}});
     if(path==='/v1/admin/measurements') {
       if(holdActivity)await new Promise(resolve=>{held=resolve;});
@@ -34,6 +37,9 @@ export async function runOverviewChecks(browser) {
     await page.goto('http://127.0.0.1:4173/admin/');
     await page.getByRole('heading',{name:'Overview',exact:true}).waitFor();
     await page.getByText('5 open reports',{exact:true}).waitFor();
+    await page.getByRole('heading',{name:'What changed?'}).waitFor();
+    await page.getByText('+100.0%',{exact:false}).first().waitFor();
+    await page.getByRole('heading',{name:'Site health'}).waitFor();
     await page.getByText('Serving verified',{exact:true}).waitFor();
     await page.getByText('1 publication operation needs attention',{exact:true}).waitFor();
     await page.locator('#overview-retention').getByText('37.5%',{exact:false}).waitFor();
