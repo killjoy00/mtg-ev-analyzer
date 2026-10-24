@@ -177,6 +177,19 @@ function showInvitationPrompt(user,token,loadId){
   switchButton.onclick=()=>{if(loadId===deferredLoad)void switchAccount();};
 }
 function options(values,current){return values.map(([v,label])=>`<option value="${esc(v)}" ${v===current?'selected':''}>${esc(label)}</option>`).join('');}
+// Show the same four support ranges even when a narrow filter has no answers
+// in a range. Historical below-floor/unrated observations remain visible too.
+const TROPHY_SUPPORT_BRACKETS=['20–39','40–59','60–79','80–100'];
+function supportBracketRows(rows){
+  if(!rows.length)return [];
+  const byLabel=new Map(rows.map(row=>[row.label,row]));
+  const missing=label=>({label,answers:0,exposures:0,rerolls:0,likely_abandoned:0,mature_exposures:0,timed_answers:0});
+  return [
+    ...rows.filter(row=>row.label==='Below 20'),
+    ...TROPHY_SUPPORT_BRACKETS.map(label=>byLabel.get(label)||missing(label)),
+    ...rows.filter(row=>row.label!=='Below 20'&&!TROPHY_SUPPORT_BRACKETS.includes(row.label)).sort((a,b)=>a.label.localeCompare(b.label)),
+  ];
+}
 function table(rows,label) {
   return `<div class="scroll"><table><thead><tr><th>${label}</th><th>Answers</th><th>Trophy match</th><th>Avg. partial</th><th>Median time</th><th>Rerolls / views</th><th>Likely left / mature views</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${esc(r.label)}${Number(r.answers)<30?' · early':''}</td><td>${fmt(r.answers)}</td><td>${pct(r.trophy_match_pct)}<div class="bar"><i style="width:${Math.max(0,Math.min(100,Number(r.trophy_match_pct)||0))}%"></i></div></td><td>${fmt(r.average_partial_credit)}</td><td>${r.median_seconds==null?'N/A':fmt(r.median_seconds)+'s'} <small>n=${fmt(r.timed_answers)}</small></td><td>${fmt(r.rerolls)} / ${fmt(r.exposures)}</td><td>${fmt(r.likely_abandoned)} / ${fmt(r.mature_exposures)}</td></tr>`).join('')||'<tr><td colspan="7">No player observations in this range yet.</td></tr>'}</tbody></table></div>`;
 }
@@ -234,7 +247,7 @@ function render() {
     <p class="note">${Number(s.answers)<30?'Early data: wait for more player answers before drawing conclusions. ':''}Difficulty is a model estimate, not a measured human success probability. “Likely abandonment” means an unfinished choice with 24 hours of inactivity; returning players leave that count.</p>
     <p class="insights-report-meta">Excluded: ${fmt(c.qa_excluded)} QA observations, ${fmt(c.repeats_excluded)} repeat encounters, ${fmt(c.unobserved_excluded)} outcomes without a recorded view. Pending choices: ${fmt(s.pending)}. Timing available for ${fmt(s.timed_answers)} answers; reloads and multiple tabs omit timing. P90: ${s.p90_seconds==null?'N/A':fmt(s.p90_seconds)+'s'}.</p>
     </section><section class="subpage-section" aria-labelledby="insights-breakdowns-heading"><h2 id="insights-breakdowns-heading">Decision breakdowns</h2><p class="subpage-help">Open a breakdown to compare outcomes for that dimension. Sections with few answers should be treated as exploratory.</p><div class="insights-breakdowns">
-    ${[['difficulty','By difficulty'],['pick','By real draft pick'],['round','By game position'],['set','By set'],['source_event','By source event'],['model_disagreement','When the model questions the trophy pick'],['version','By scoring and selection version']].map(([dimension,title])=>`<details class="insights-breakdown" ${['difficulty','pick'].includes(dimension)?'open':''}><summary>${title}</summary>${table(report.groups.filter(r=>r.dimension===dimension).sort((a,b)=>dimension==='difficulty'?['easy','medium','hard','unrated'].indexOf(a.label)-['easy','medium','hard','unrated'].indexOf(b.label):a.label.localeCompare(b.label,undefined,{numeric:true})),dimension==='model_disagreement'?'Disagreement':'Group')}</details>`).join('')}</div></section>
+    ${[['difficulty','By difficulty'],['pick','By real draft pick'],['round','By game position'],['set','By set'],['source_event','By source event'],['trophy_support','How strongly the model supports the trophy pick'],['version','By scoring and selection version']].map(([dimension,title])=>`<details class="insights-breakdown" ${['difficulty','pick'].includes(dimension)?'open':''}><summary>${title}</summary>${dimension==='trophy_support'?'<p class="subpage-help">Brackets show the trophy card’s model-implied credit (rounded 95 × trophy support / top-card support), not the points earned by players. Current puzzles must have at least 20 implied points to be served; the maximum implied value is 95. Below-floor or unrated historical decisions appear separately if present.</p>':''}${table(dimension==='trophy_support'?supportBracketRows(report.groups.filter(r=>r.dimension===dimension)):report.groups.filter(r=>r.dimension===dimension).sort((a,b)=>dimension==='difficulty'?['easy','medium','hard','unrated'].indexOf(a.label)-['easy','medium','hard','unrated'].indexOf(b.label):a.label.localeCompare(b.label,undefined,{numeric:true})),dimension==='trophy_support'?'Implied points':'Group')}</details>`).join('')}</div></section>
     <section class="subpage-section" aria-labelledby="insights-reviews-heading"><h2 id="insights-reviews-heading">Decisions to review</h2>
     <details class="insights-note-details"><summary>Alternative-credit distribution</summary><p>${[['0–24',s.partial_0_24],['25–49',s.partial_25_49],['50–74',s.partial_50_74],['75–95',s.partial_75_95]].map(([label,n])=>`${label} points: <strong>${fmt(n)}</strong>`).join(' · ')}</p>
     </details><p class="subpage-help insights-review-intro">At least five first-encounter answers. Model disagreements appear first, then the largest samples. Small samples are exploratory.</p><div id="reviews"><p class="muted">Loading decisions to review…</p></div><p id="status" role="status"></p></section></section>`;
