@@ -438,6 +438,7 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
   const creatorPreview=root.querySelector('#creator-publish-preview'),creatorPublish=root.querySelector('#publish-creator');
   const creatorPublishStatus=root.querySelector('#creator-publish-status'),creatorKit=root.querySelector('#creator-kit');
   const creatorExisting=root.querySelector('#creator-existing'),creatorExistingStatus=root.querySelector('#creator-existing-status');
+  const creatorSummary=root.querySelector('#creator-summary');
   const creatorShowDeleted=root.querySelector('#creator-show-deleted');
   let creatorSource=null,creatorBusy=false,creatorDraft=null,creatorSlugs=new Set(),creatorShowDeletedRows=false;
 
@@ -575,6 +576,21 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
       creatorExistingStatus.textContent=display.visible.length
         ? `${display.visible.length} creator challenge(s).${!creatorShowDeletedRows&&display.deleted?` ${display.deleted} deleted hidden.`:''}`
         : display.deleted?'No active creator challenges. '+display.deleted+' deleted hidden.':'No creator challenges yet.';
+      const published=data.challenges.filter(challenge=>challenge.status==='published');
+      const pending=data.challenges.filter(challenge=>['draft','publishing'].includes(challenge.status));
+      const attention=data.challenges.filter(challenge=>challenge.status==='failed'
+        ||(challenge.status==='retired'&&challenge.publication_detail?.live_verified!==true));
+      const completedAttempts=published.reduce((total,challenge)=>total+Number(challenge.completions??challenge.attempts??0),0);
+      creatorSummary.replaceChildren(...[
+        ['Published',published.length],['Draft / publishing',pending.length],
+        ['Needs publication attention',attention.length],['Completed attempts · published',completedAttempts]
+      ].map(([label,value],index)=>{
+        const tile=document.createElement('div');
+        if(index===2&&value)tile.className='attention';
+        const number=document.createElement('strong');number.textContent=Number(value).toLocaleString();
+        const caption=document.createElement('span');caption.textContent=label;
+        tile.append(number,caption);return tile;
+      }));
       creatorExisting.replaceChildren(...display.visible.map(challenge=>{
         const item=document.createElement('article');item.className='note';
         const publicUrl=`https://packone.pro/creator/${challenge.slug}/`,trackedUrl=creatorTrackedUrl(challenge);
@@ -638,7 +654,7 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
         });
         return item;
       }));
-    }catch(error){creatorExistingStatus.textContent=error.message||'Creator challenges could not be loaded.';}
+    }catch(error){creatorSummary.textContent='Challenge summary is temporarily unavailable.';creatorExistingStatus.textContent=error.message||'Creator challenges could not be loaded.';}
   }
 
   creatorShowDeleted.addEventListener('click',()=>{
