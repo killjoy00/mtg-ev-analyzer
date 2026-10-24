@@ -592,10 +592,29 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
         tile.append(number,caption);return tile;
       }));
       creatorExisting.replaceChildren(...display.visible.map(challenge=>{
-        const item=document.createElement('article');item.className='note';
+        const item=document.createElement('article');item.className='creator-challenge-row';
         const publicUrl=`https://packone.pro/creator/${challenge.slug}/`,trackedUrl=creatorTrackedUrl(challenge);
         const retiredVerified=challenge.status==='retired'&&challenge.publication_detail?.live_verified===true;
-        item.innerHTML=`<strong>${esc(challenge.creator_public_name)}</strong> · ${esc(challenge.slug)}<br>${esc(challenge.source_type==='daily'?`Daily · ${dateLabel(challenge.source_day)}`:'Practice')} · ${esc(environmentLabel(challenge.source_environment))} · ${Number(challenge.source_score)}/100<br>Status: <strong>${esc(challenge.status)}</strong>${challenge.status==='retired'&&!retiredVerified?' · retired page not yet verified':''} · Opens: ${Number(challenge.opens||0)} · Starts: ${Number(challenge.starts||0)} · Completions: ${Number(challenge.completions||challenge.attempts||0)}<br>Attempts: ${Number(challenge.attempts||0)} · Beat rate: ${challenge.beat_percentage==null?'—':Number(challenge.beat_percentage)+'%'} · Avg challenger: ${challenge.average_score==null?'—':Number(challenge.average_score)+'/100'} · W/T/L: ${Number(challenge.wins||0)}/${Number(challenge.ties||0)}/${Number(challenge.losses||0)}<br><small>${esc(publicUrl)} · created ${esc(dateLabel(String(challenge.created_at||'').slice(0,10)))}${challenge.published_at?` · published ${esc(dateLabel(String(challenge.published_at).slice(0,10))) }`:''}</small><div class="actions">${['draft','failed','publishing'].includes(challenge.status)?'<button type="button" class="secondary" data-resume-publish>Publish / resume</button>':''}${challenge.status==='retired'&&!retiredVerified?'<button type="button" class="secondary" data-resume-retire>Finish delete</button>':''}<button type="button" class="secondary" data-copy-public>Copy public URL</button><button type="button" class="secondary" data-copy-tracked>Copy tracked URL</button>${challenge.status==='published'?'<button type="button" class="secondary" data-show-kit>Creator kit</button><a class="button secondary" target="_blank" rel="noopener" href="'+esc(publicUrl)+'">Open challenge</a>':''}${challenge.status!=='retired'?'<button type="button" class="secondary" data-retire>Delete</button>':''}${creatorCanaryMayBePurged(challenge)?'<button type="button" class="secondary" data-purge-test>Permanently remove test</button>':''}</div><section class="note" data-existing-creator-kit hidden></section>`;
+        const sourceKind=challenge.source_type==='daily'
+          ?'Daily · '+dateLabel(challenge.source_day):'Practice';
+        const completed=Number(challenge.completions??challenge.attempts??0);
+        const beatRate=challenge.beat_percentage==null?'—':Number(challenge.beat_percentage).toLocaleString(undefined,{maximumFractionDigits:1})+'%';
+        item.innerHTML=`<header class="creator-challenge-heading">
+          <div><h3>${esc(challenge.creator_public_name)}</h3><p>${esc(challenge.slug)} · ${esc(sourceKind)} · ${esc(environmentLabel(challenge.source_environment))}</p></div>
+          <span class="creator-challenge-status ${esc(challenge.status)}">Status: <strong>${esc(challenge.status)}</strong>${challenge.status==='retired'&&!retiredVerified?' · delete not yet verified':''}</span>
+        </header>
+        <p class="creator-challenge-detail">Creator score: <strong>${Number(challenge.source_score)}/100</strong>. Challenge results below reflect recorded activity, not the original source run.</p>
+        <div class="creator-challenge-metrics">
+          <div><strong>${Number(challenge.opens??0).toLocaleString()}</strong><span>Page opens</span></div>
+          <div><strong>${Number(challenge.starts??0).toLocaleString()}</strong><span>Challenge starts</span></div>
+          <div><strong>${completed.toLocaleString()}</strong><span>Completed attempts</span></div>
+          <div><strong>${beatRate}</strong><span>Beat creator rate</span></div>
+        </div>
+        <details class="creator-challenge-detail"><summary>Detailed results and publication dates</summary>
+          <p>Wins / ties / losses: ${Number(challenge.wins??0)} / ${Number(challenge.ties??0)} / ${Number(challenge.losses??0)} · Total attempts: ${Number(challenge.attempts??0)} · Average challenger score: ${challenge.average_score==null?'—':Number(challenge.average_score)+'/100'}</p>
+          <p>Created ${esc(dateLabel(String(challenge.created_at||'').slice(0,10)))}${challenge.published_at?' · Published '+esc(dateLabel(String(challenge.published_at).slice(0,10))):''}</p>
+          <p>Public URL: <code>${esc(publicUrl)}</code></p>
+        </details><div class="actions">${['draft','failed','publishing'].includes(challenge.status)?'<button type="button" class="secondary" data-resume-publish>Publish / resume</button>':''}${challenge.status==='retired'&&!retiredVerified?'<button type="button" class="secondary" data-resume-retire>Finish delete</button>':''}<button type="button" class="secondary" data-copy-public>Copy public URL</button><button type="button" class="secondary" data-copy-tracked>Copy tracked URL</button>${challenge.status==='published'?'<button type="button" class="secondary" data-show-kit>Creator kit</button><a class="button secondary" target="_blank" rel="noopener" href="'+esc(publicUrl)+'">Open challenge</a>':''}${challenge.status!=='retired'?'<button type="button" class="secondary" data-retire>Delete</button>':''}${creatorCanaryMayBePurged(challenge)?'<button type="button" class="secondary" data-purge-test>Permanently remove test</button>':''}</div><section class="note" data-existing-creator-kit hidden></section>`;
         item.querySelector('[data-copy-public]').onclick=()=>copy(publicUrl,creatorExistingStatus);
         item.querySelector('[data-copy-tracked]').onclick=()=>copy(trackedUrl,creatorExistingStatus);
         item.querySelector('[data-show-kit]')?.addEventListener('click',()=>{
