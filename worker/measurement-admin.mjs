@@ -222,9 +222,9 @@ export async function handleAdmin(request,query,readJson) {
         grouped AS (SELECT dimension,label,${METRICS} FROM primary_data
           LEFT JOIN draft_run_puzzle_ratings support
             ON support.puzzle_id=primary_data.puzzle_id AND support.difficulty_version='support-ratio-v1'
-          CROSS JOIN LATERAL (VALUES ('difficulty',coalesce(band,'unrated')),('set',set_id),('pick',pick_number::text),
+          CROSS JOIN LATERAL (VALUES ('difficulty',coalesce(primary_data.band,'unrated')),('set',set_id),('pick',pick_number::text),
           ('round',round::text),('source_event',source_event_type),('trophy_support',${TROPHY_SUPPORT_BRACKET_SQL}),
-          ('version',selection_version||' / '||scoring_version||' / '||difficulty_version)) dimensions(dimension,label)
+          ('version',selection_version||' / '||scoring_version||' / '||primary_data.difficulty_version)) dimensions(dimension,label)
           GROUP BY dimension,label)
         SELECT row_to_json(coverage) coverage,row_to_json(summary) summary,
           coalesce((SELECT json_agg(to_jsonb(g) ORDER BY g.dimension,g.label) FROM grouped g),'[]'::json) groups
