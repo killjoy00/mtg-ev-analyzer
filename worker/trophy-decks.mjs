@@ -1,5 +1,34 @@
 import {brotliDecompressSync} from 'node:zlib';
+import {createHash} from 'node:crypto';
 import {catalogLoaders} from '../corpus/trophy-decks/index.mjs';
+
+// Public draft IDs already determine the compatibility source hashes. Store
+// only a small mask identifying which hashes the original inventory retained.
+// Reconstruct exactly those aliases once per lazy catalog load.
+export function decodeTrophyDeckCatalog(encoded) {
+  const catalog=JSON.parse(brotliDecompressSync(Buffer.from(encoded,'base64')));
+  if(!Object.hasOwn(catalog,'source_alias_masks'))return catalog;
+  const {source_alias_masks:masks,...value}=catalog;
+  if(Object.hasOwn(value,'sources')||!Array.isArray(masks)||masks.length!==value.decks?.length
+    ||!/^[-a-z0-9]+$/.test(value.set_id||''))throw Error('Invalid trophy source encoding');
+  const sources={};
+  const expansion=value.set_id==='powered-cube'?'Cube_-_Powered':value.set_id.toUpperCase();
+  for(const [index,deck] of value.decks.entries()) {
+    const id=deck.draft_url?.match(/^https:\/\/www\.17lands\.com\/draft\/([a-f0-9]{32})$/)?.[1];
+    if(!id||!['PremierDraft','TradDraft'].includes(deck.event_type))throw Error('Invalid trophy draft identity');
+    const aliases=[...new Set([`${value.set_id}|${id}`,`${value.set_id}|${deck.event_type}|${id}`,
+      `pack-one|${expansion}|${id}`,`pack-one|${expansion.toUpperCase()}|${id}`]
+      .map(text=>createHash('sha256').update(text).digest('hex').slice(0,32)))].sort();
+    const mask=masks[index];
+    if(!Number.isInteger(mask)||mask<1||mask>=(1<<aliases.length))throw Error('Invalid trophy source mask');
+    aliases.forEach((source,bit)=>{
+      if(!(mask&(1<<bit)))return;
+      if(Object.hasOwn(sources,source))throw Error('Duplicate trophy source');
+      sources[source]=index;
+    });
+  }
+  return {...value,sources};
+}
 
 const catalogs=new Map();
 const availability=new Map();
@@ -18,7 +47,7 @@ async function catalogFor(set) {
   if(!registered(set))return null;
   const existing=cached(catalogs,set);if(existing)return existing;
   const promise=catalogLoaders[set]().then(({encoded})=>{
-    const catalog=JSON.parse(brotliDecompressSync(Buffer.from(encoded,'base64')));
+    const catalog=decodeTrophyDeckCatalog(encoded);
     if(catalog.set_id!==set)throw Error('Trophy deck catalog identity mismatch');
     return catalog;
   }).catch(error=>{if(catalogs.get(set)===promise)catalogs.delete(set);throw error;});

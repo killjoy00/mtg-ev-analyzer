@@ -23,6 +23,25 @@ def source_aliases(set_id, event_type, draft_id, expansion=None):
     return sorted({hashlib.sha256(value.encode()).hexdigest()[:32] for value in values})
 
 
+def compact_catalog(catalog):
+    selected = [set() for _ in catalog['decks']]
+    for source, index in catalog['sources'].items():
+        if not isinstance(index, int) or not 0 <= index < len(selected):
+            raise ValueError('Invalid trophy source index')
+        selected[index].add(source)
+    masks = []
+    for index, deck in enumerate(catalog['decks']):
+        match = re.fullmatch(r'https://www\.17lands\.com/draft/([a-f0-9]{32})', deck.get('draft_url', ''))
+        if not match or deck['event_type'] not in ('PremierDraft', 'TradDraft'):
+            raise ValueError('Invalid public trophy draft identity')
+        aliases = source_aliases(catalog['set_id'], deck['event_type'], match[1])
+        if not selected[index] or not selected[index].issubset(aliases):
+            raise ValueError('Trophy source aliases cannot be reconstructed exactly')
+        masks.append(sum(1 << bit for bit, alias in enumerate(aliases) if alias in selected[index]))
+    return {**{key: value for key, value in catalog.items() if key not in ('sources', 'source_alias_masks')},
+            'source_alias_masks': masks}
+
+
 def wanted_sources(rows, set_id, event_type):
     wanted = set()
     for row in rows:
