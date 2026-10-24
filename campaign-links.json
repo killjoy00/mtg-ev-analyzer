@@ -12,6 +12,12 @@
     "medium": "social"
   },
   {
+    "slug": "reddit",
+    "destination": "/?game=draft-run&set=latest&daily=1",
+    "source": "reddit",
+    "campaign": "mtgarena"
+  },
+  {
     "slug": "reddit-launch",
     "destination": "/",
     "source": "reddit",
