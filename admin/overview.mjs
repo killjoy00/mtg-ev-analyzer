@@ -66,13 +66,20 @@ export function trendsMarkup(data){
     [['Observed players','observed_players'],['Completed runs','completed_runs'],['Daily players','daily_players'],['Daily completions','daily_completions'],['New accounts','new_accounts']].map(([name,key])=>trendRow(name,key,current,previous)).join('')+
     trendRow('Trophy match','',current,previous,{ratio:true})+'</tbody></table></div>';
 }
-export function healthMarkup(data){
+export function healthMarkup(data,serviceRelease=null){
  const day=data?.day||'unknown',daily=data?.dailies||[],cache=data?.serving||{},attention=data?.attention||{};
  const check=(name,ok,detail,href)=>'<li><span class="overview-status '+(ok===true?'ready':ok===false?'warning':'unknown')+'">'+escape(ok===true?'Pass':ok===false?'Needs attention':'Unknown')+'</span> <strong>'+escape(name)+'</strong> · '+escape(detail)+(href?' · <a href="'+href+'">Inspect</a>':'')+'</li>';
  const links=daily.map(x=>check('Daily: '+(x.environment==='mixed'?'Regular':x.environment==='latest'?'Latest Set':'Powered Cube'),x.scheduled===true||x.scheduled==='t',x.scheduled?'Eight-pick schedule present':'Schedule missing','/?game=draft-run&daily=1'+(x.environment==='mixed'?'':'&set='+encodeURIComponent(x.environment==='latest'?'latest':'powered-cube'))));
  const bad=Number(attention.urgent_reports||0),failed=Number(attention.failed_publications||0);
+ const versions=serviceRelease?
+   check('Admin release',serviceRelease.frontendVersion===serviceRelease.backendVersion&&
+     (serviceRelease.gatewayVersion===serviceRelease.frontendVersion||serviceRelease.gatewayVersion==null),
+     'UI/API contract v'+String(serviceRelease.frontendVersion)+' / v'+String(serviceRelease.backendVersion)+
+     ' · backend revision '+String(serviceRelease.releaseCommit||'unavailable').slice(0,12),''):
+   '';
+
  return '<p class="muted">Read-only checks for '+escape(day)+' (Pacific). API reachability is indicated by successful responses; this is not an external uptime monitor.</p><ul class="overview-health-checks">'+
- check('Admin API',true,'Authorized endpoint responded','')+
+ check('Admin API',true,'Authorized endpoint responded','')+versions+
  check('Serving cache',cache.cache_current===true||cache.cache_current==='t','Revision '+(cache.revision??'unavailable'),'?area=corpus')+
  links.join('')+
  [check('Creator publications',failed===0,failed+' failed or unverified retirements','?area=creator-challenges'),check('Critical player reports',bad===0,bad+' open broken-puzzle reports','?area=reports')].join('')+'</ul>';
@@ -109,7 +116,7 @@ export function overviewMarkup({role='admin',now=new Date()}={}) {
 
 // Read-only composition of existing endpoints. Never fetch Team membership or
 // publish, activate, retry, or moderate anything from the dashboard.
-export async function renderOverview(root,request,{role='admin',isCurrent=()=>true,onRefresh,now=new Date()}={}) {
+export async function renderOverview(root,request,{role='admin',isCurrent=()=>true,onRefresh,now=new Date(),serviceRelease=null}={}) {
   root.innerHTML=overviewMarkup({role,now});
   const overview=root.querySelector('#admin-overview');
   const active=()=>isCurrent()&&root.querySelector('#admin-overview')===overview;
@@ -131,7 +138,7 @@ export async function renderOverview(root,request,{role='admin',isCurrent=()=>tr
   };
   await Promise.all([
     section('overview-trends','/v1/admin/overview/trends',trendsMarkup,{optional:true}),
-    section('overview-health','/v1/admin/overview/health',healthMarkup,{optional:true}),
+    section('overview-health','/v1/admin/overview/health',data=>healthMarkup(data,serviceRelease),{optional:true}),
     section('overview-activity','/v1/admin/measurements?'+today,data=>{
       if(!data.summary)throw Error('Missing activity summary');
       const s=data.summary,f=data.share_funnel||{},href='?area=insights&'+today;
