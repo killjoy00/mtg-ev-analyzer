@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {handleAdmin} from '../worker/measurement-admin.mjs';
 import {trendChange,trendsMarkup,healthMarkup} from '../admin/overview.mjs';
-const authSql=sql=>sql.includes('FROM neon_auth.session s')?[{user_id:'11111111-1111-4111-8111-111111111111'}]:sql.includes('SELECT role FROM pack1_admins')?[{role:'owner'}]:null;
+const authSql=sql=>sql.includes('neon_auth.session')?[{id:'11111111-1111-4111-8111-111111111111'}]:sql.includes('SELECT role FROM pack1_admins')?[{role:'owner'}]:null;
 async function queryFixture(sql,params){
   const auth=authSql(sql);if(auth)return {rows:auth};
   if(sql.includes('FROM dimensions d LEFT JOIN observation_metrics'))return {rows:[{kind:'week',label:'current',completed_runs:10},{kind:'week',label:'previous',completed_runs:5},{kind:'day',label:'2026-10-24',completed_runs:2}]};
