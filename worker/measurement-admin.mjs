@@ -8,6 +8,7 @@ import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {gameDateKey} from '../game-date.mjs';
 const fail=(message,status=400)=>{throw Object.assign(Error(message),{status});};
 const jsonArray=value=>Array.isArray(value)?value:(typeof value==='string'?JSON.parse(value):[]);
+const jsonObject=value=>value&&typeof value==='object'&&!Array.isArray(value)?value:(typeof value==='string'?JSON.parse(value):{});
 async function timedAdminQuery(query,report,label,sql,params) {
   const started=Date.now();
   try { return await query(sql,params); }
@@ -193,18 +194,28 @@ export async function handleAdmin(request,query,readJson) {
     return {generated_at:new Date().toISOString(),corpus_version:DRAFT_RUN_CORPUS_VERSION,filters:{...filters,params:undefined},reviews:reviews.rows};
   }
   if(url.pathname==='/v1/admin/measurements') {
-    const scope=`WITH scoped AS (SELECT * ${SCOPE}), primary_data AS (SELECT * FROM scoped WHERE observed AND NOT is_qa AND first_encounter)`;
-    const [coverage,summary,groups,options,shareFunnel]=await Promise.all([
-      timedAdminQuery(query,'measurements','coverage',`${scope} SELECT count(*)::int recorded,count(*) FILTER(WHERE is_qa)::int qa_excluded,
-        count(*) FILTER(WHERE NOT observed AND NOT is_qa)::int unobserved_excluded,
-        count(*) FILTER(WHERE observed AND NOT is_qa AND NOT first_encounter)::int repeats_excluded,
-        min(first_seen_at) collection_started FROM scoped`,filters.params),
-      timedAdminQuery(query,'measurements','summary',`${scope} SELECT ${METRICS},count(DISTINCT session_id)::int runs,
-        count(DISTINCT session_id) FILTER(WHERE run_complete)::int completed_runs FROM primary_data`,filters.params),
-      timedAdminQuery(query,'measurements','groups',`${scope} SELECT dimension,label,${METRICS} FROM primary_data
-        CROSS JOIN LATERAL (VALUES ('difficulty',coalesce(band,'unrated')),('set',set_id),('pick',pick_number::text),
-        ('round',round::text),('source_event',source_event_type),('model_disagreement',model_disagreement::text),('version',selection_version||' / '||scoring_version||' / '||difficulty_version)) dimensions(dimension,label)
-        GROUP BY dimension,label ORDER BY dimension,label`,filters.params),
+    // Materialize the expensive first-encounter decision scan once. Previously
+    // coverage, summary, and seven grouped aggregations each expanded the
+    // correlated measurement view in a separate concurrent SQL request.
+    // Both the coverage repeat count and eligible decisions reuse one scoped
+    // snapshot; summary and grouped metrics reuse the eligible subset.
+    const [aggregates,options,shareFunnel]=await Promise.all([
+      timedAdminQuery(query,'measurements','core_aggregates',`WITH scoped AS MATERIALIZED (SELECT * ${SCOPE}),
+        primary_data AS MATERIALIZED (SELECT * FROM scoped WHERE observed AND NOT is_qa AND first_encounter),
+        coverage AS (SELECT count(*)::int recorded,count(*) FILTER(WHERE is_qa)::int qa_excluded,
+          count(*) FILTER(WHERE NOT observed AND NOT is_qa)::int unobserved_excluded,
+          count(*) FILTER(WHERE observed AND NOT is_qa AND NOT first_encounter)::int repeats_excluded,
+          min(first_seen_at) collection_started FROM scoped),
+        summary AS (SELECT ${METRICS},count(DISTINCT session_id)::int runs,
+          count(DISTINCT session_id) FILTER(WHERE run_complete)::int completed_runs FROM primary_data),
+        grouped AS (SELECT dimension,label,${METRICS} FROM primary_data
+          CROSS JOIN LATERAL (VALUES ('difficulty',coalesce(band,'unrated')),('set',set_id),('pick',pick_number::text),
+          ('round',round::text),('source_event',source_event_type),('model_disagreement',model_disagreement::text),
+          ('version',selection_version||' / '||scoring_version||' / '||difficulty_version)) dimensions(dimension,label)
+          GROUP BY dimension,label)
+        SELECT row_to_json(coverage) coverage,row_to_json(summary) summary,
+          coalesce((SELECT json_agg(to_jsonb(g) ORDER BY g.dimension,g.label) FROM grouped g),'[]'::json) groups
+        FROM coverage CROSS JOIN summary`,filters.params),
       timedAdminQuery(query,'measurements','set_options','SELECT set_id FROM draft_run_environment_policy ORDER BY set_id'),
       timedAdminQuery(query,'measurements','share_funnel',`WITH corpus_epoch AS (
           SELECT min(created_at) started_at FROM draft_run_sessions WHERE corpus_version=$4
@@ -239,8 +250,8 @@ export async function handleAdmin(request,query,readJson) {
           round(100.0*(SELECT count(*) FROM starts s WHERE EXISTS(SELECT 1 FROM completed c WHERE c.run_id=s.run_id))/nullif((SELECT count(*) FROM starts),0),1) completion_pct`,
         [filters.start,filters.end,filters.environment,DRAFT_RUN_CORPUS_VERSION])
     ]);
-    return {generated_at:new Date().toISOString(),corpus_version:DRAFT_RUN_CORPUS_VERSION,filters:{...filters,params:undefined},coverage:coverage.rows[0],summary:summary.rows[0],share_funnel:shareFunnel.rows[0],
-      groups:groups.rows,sets:options.rows.map(r=>r.set_id),reviews_deferred:true,habit_metrics_deferred:true,
+    return {generated_at:new Date().toISOString(),corpus_version:DRAFT_RUN_CORPUS_VERSION,filters:{...filters,params:undefined},coverage:jsonObject(aggregates.rows[0]?.coverage),summary:jsonObject(aggregates.rows[0]?.summary),share_funnel:shareFunnel.rows[0],
+      groups:jsonArray(aggregates.rows[0]?.groups),sets:options.rows.map(r=>r.set_id),reviews_deferred:true,habit_metrics_deferred:true,
       definitions:{scope:'All decision, review, result-share and Daily habit metrics are scoped to sessions on the current parent corpus. Historical measurements remain stored but are excluded from this dashboard baseline.',primary:'First recorded encounter per player and puzzle inside the current corpus; observed in the browser; QA excluded.',abandonment:'Unfinished run with an open viewed decision and no activity for 24 hours. A return removes this classification.',timing:'Client-reported foreground time; missing for reloads, multiple tabs, old clients, or invalid timing. This is not a trusted gameplay score.',sample:'Fewer than 30 answers is an early signal, not a calibrated difficulty estimate.',review:'Decisions with at least five first-encounter answers; model disagreement first, then sample size.',habit_person:'Habit metrics count linked accounts as one person after identity merges; guests remain one browser/player identity.',habit_completion:'A Daily day is one or more completed Mixed, Powered Cube, or Latest Set sessions on the stored Pacific Daily date. Multiple Dailies on one date count once.',habit_exclusions:'All habit metrics exclude measurement-QA sessions, QA-pattern display names, and players linked to Pack One admin accounts.',habit_maturity:'Next-day, 7-day, and 3-in-7 rates include only cohorts whose full measurement window has closed; immature cohort counts are shown separately.',habit_attribution:'First touch is the earliest acquisition event for the merged player. Earlier product activity is pre_tracking; missing post-launch attribution is direct. Campaign is (none) when absent.',habit_ever:'Ever 3-in-7 is a lifetime observed status as of report generation, not a fixed-horizon cohort rate. Daily health counts people with 3+ distinct Daily days in each trailing seven-day window.'}};
   }
   const match=url.pathname.match(/^\/v1\/admin\/decisions\/([a-f0-9]{32})$/);

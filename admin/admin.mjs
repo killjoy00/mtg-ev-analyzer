@@ -15,6 +15,20 @@ const draftBase=window.PACK1_API.draftRunUrl;
 const growthBase=window.PACK1_API.growthUrl;
 let report,params=new URLSearchParams(location.search),deferredLoad=0,adminContractVerified=false,switching=false;
 params.delete('area');
+// Keep the first Insights load bounded to recent activity. Longer date ranges
+// remain available through the visible date filters and deep links.
+function defaultInsightsRange() {
+  if(adminArea(location.search)!=='insights'||params.has('from')||params.has('to'))return;
+  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{
+    timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit',
+  }).formatToParts(new Date()).filter(part=>['year','month','day'].includes(part.type)).map(part=>[part.type,part.value]));
+  const to=`${parts.year}-${parts.month}-${parts.day}`;
+  const date=new Date(to+'T12:00:00Z');
+  date.setUTCDate(date.getUTCDate()-6);
+  params.set('from',date.toISOString().slice(0,10));
+  params.set('to',to);
+}
+defaultInsightsRange();
 const INVITE_STORAGE='pack1-pending-admin-invite-v2';
 const INVITE_TTL_MS=15*60*1000;
 function pendingInvitation(){
@@ -204,7 +218,7 @@ async function loadDeferredSections(loadId,queryString){
 function render() {
   const s=report.summary,c=report.coverage,f=report.filters,sf=report.share_funnel||{};
   root.innerHTML=`<section class="admin-insights"><header class="subpage-heading"><p class="subpage-kicker">Decision insights</p><h1>How the decisions play</h1><p class="muted">Explore draft choices, player engagement, sharing and retention. Start with the summary, then expand the breakdowns you need.</p><p class="subpage-meta">Current corpus ${esc(report.corpus_version||'unknown')} · First encounters · QA excluded · Historical corpus measurements retained but excluded · Updated ${esc(new Date(report.generated_at).toLocaleString())}</p></header>
-    <section class="subpage-section" aria-labelledby="insights-filter-heading"><h2 id="insights-filter-heading">Explore the decisions</h2><p class="subpage-help">The filters below change decision answers and breakdowns. <strong>Only dates and environment</strong> also affect the share funnel; return-behavior cohorts have their own scope.</p>
+    <section class="subpage-section" aria-labelledby="insights-filter-heading"><h2 id="insights-filter-heading">Explore the decisions</h2><p class="subpage-help">Starts with the last seven Pacific days for faster loading. Set From and Through for a longer history. These filters change decision answers and breakdowns. <strong>Only dates and environment</strong> also affect the share funnel; return-behavior cohorts have their own scope.</p>
     <form id="filters" class="filters"><label>From<input type="date" name="from" value="${f.start}" required></label><label>Through<input type="date" name="to" value="${f.end}" required></label><label>Environment<select name="environment" aria-label="Environment">${options([['all','All'],['mixed','Regular'],['powered-cube','Powered Cube']],f.environment)}</select></label><label>Run type<select name="type" aria-label="Run type">${options([['all','All'],['daily','Daily'],['practice','Practice'],['challenge','Challenge']],f.type)}</select></label><label>Set<select name="set" aria-label="Set">${options([['all','All'],...report.sets.map(x=>[x,x==='powered-cube'?'Powered Cube':x.toUpperCase()])],f.set)}</select></label><label>Difficulty<select name="difficulty" aria-label="Difficulty">${options([['all','All'],['easy','Easy'],['medium','Medium'],['hard','Hard']],f.band)}</select></label><label>Draft pick<select name="pick" aria-label="Draft pick">${options([['all','All'],...Array.from({length:12},(_,i)=>[String(i+1),'P1P'+(i+1)])],f.pick)}</select></label><label>Selection version<select name="version" aria-label="Selection version">${options([['all','All'],...Array.from(new Set(report.groups.filter(r=>r.dimension==='version').map(r=>r.label.split(' / ')[0]))).map(x=>[x,x]),...(f.version!=='all'&&!report.groups.some(r=>r.dimension==='version'&&r.label.startsWith(f.version+' / '))?[[f.version,f.version]]:[])],f.version)}</select></label><button>Refresh</button><button type="button" class="secondary" id="csv">Export CSV</button></form></section>
     <section class="subpage-section" aria-labelledby="insights-summary-heading"><h2 id="insights-summary-heading">Decision overview</h2><p class="subpage-help">First encounters with the current corpus, excluding QA observations. Trophy match is an agreement rate, not an accuracy score.</p>
     <div class="cards">${[['First-encounter answers',fmt(s.answers)],['Trophy match rate',pct(s.trophy_match_pct)],['Average alternative credit',fmt(s.average_partial_credit)],['Median foreground time',s.median_seconds==null?'N/A':fmt(s.median_seconds)+'s'],['Players',fmt(s.players)],['Completed / observed runs',`${fmt(s.completed_runs)} / ${fmt(s.runs)}`],['Rerolls / viewed choices',`${fmt(s.rerolls)} / ${fmt(s.exposures)}`],['Likely abandonment',fmt(s.likely_abandoned)]].map(([label,value])=>`<div class="card"><span>${label}</span><strong>${value}</strong></div>`).join('')}</div><p class="subpage-help">Likely abandonment means an unfinished choice with at least 24 hours of inactivity; players who return leave that count. Timings omit reloads and conflicting tabs.</p></section>
