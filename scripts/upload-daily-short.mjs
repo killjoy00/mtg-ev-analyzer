@@ -78,12 +78,12 @@ export function checkedUploadLocation(value) {
     throw Error('YouTube API returned an untrusted upload URL.');
   return url.toString();
 }
-export async function uploadVideo({accessToken,day,bytes,fetchImpl=fetch}) {
+export async function uploadVideo({accessToken,day,bytes,fetchImpl=fetch,metadata=null}) {
   if(!(bytes instanceof Uint8Array)||bytes.length<100_000)throw Error('Invalid or empty Daily MP4.');
   const initial=await fetchImpl('https://www.googleapis.com/upload/youtube/v3/videos?uploadType=resumable&part=snippet,status',{
     method:'POST',headers:{authorization:`Bearer ${accessToken}`,'content-type':'application/json; charset=UTF-8',
       'x-upload-content-type':'video/mp4','x-upload-content-length':String(bytes.length)},
-    body:JSON.stringify(shortMetadata(day)),signal:AbortSignal.timeout(FETCH_TIMEOUT),
+    body:JSON.stringify(metadata||shortMetadata(day)),signal:AbortSignal.timeout(FETCH_TIMEOUT),
   });
   // An HTTP refusal means YouTube created nothing, so the day can be retried.
   if(!initial.ok)throw Object.assign(Error(`YouTube upload initiation returned HTTP ${initial.status}.`),{refused:true});
