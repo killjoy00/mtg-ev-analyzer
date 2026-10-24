@@ -82,6 +82,7 @@ export async function trophyDeckForRound(query,session,value) {
       event_type:deck.event_type,colors:deck.colors,splash_colors:deck.splash_colors,
       last_game_time:deck.last_game_time,
       source:{name:'17Lands',url:'https://www.17lands.com/public_datasets',license:'CC BY 4.0',
+        ...(/^https:\/\/www\.17lands\.com\/draft\/[a-f0-9]{32}$/.test(deck.draft_url||'')?{draft_url:deck.draft_url}:{}),
         note:'This is the deck used in the last game recorded by 17Lands. It may include sideboard changes. Later builds might not be recorded.'},
   },128);
 }

@@ -56,6 +56,11 @@ test('all published set catalogs have verified hashes, exact lists and complete 
     assert.equal(new Set(Object.values(current.sources)).size,current.decks.length,set+' retains every deck');
     for(const [source,index] of Object.entries(current.sources)) {
       assert.match(source,/^[a-f0-9]{32}$/);assert.ok(current.decks[index]);
+      const deck=current.decks[index];
+      assert.match(deck.draft_url,/^https:\/\/www\.17lands\.com\/draft\/[a-f0-9]{32}$/);
+      const id=deck.draft_url.split('/').at(-1),expansion=set==='powered-cube'?'Cube_-_Powered':set.toUpperCase();
+      const aliases=[`${set}|${id}`,`${set}|${deck.event_type}|${id}`,`pack-one|${expansion}|${id}`,`pack-one|${expansion.toUpperCase()}|${id}`];
+      assert.ok(aliases.some(value=>createHash('sha256').update(value).digest('hex').slice(0,32)===source),set+' draft URL matches the exact source');
     }
     for(const card of current.cards) {
       assert.ok(card.name&&card.type_line,set);assert.ok(safeCardImageUrl(card.image_url),card.name);
@@ -118,6 +123,7 @@ test('a revealed source returns its exact deck; missing sources never get a subs
   const deck=await trophyDeckForRound(async()=>({rows:[{set_id:'fra',source_draft_hash:source}]}),session,'0');
   assert.equal(deck.deck.reduce((sum,c)=>sum+c.count,0),deck.size);
   assert.equal(deck.source.license,'CC BY 4.0');assert.match(deck.source.note,/last game recorded/);
+  assert.equal(deck.source.draft_url,catalog.decks[catalog.sources[source]].draft_url);
   assert.equal(deck.source_draft_hash,undefined);assert.equal(deck.draft_id,undefined);
   await assert.rejects(()=>trophyDeckForRound(async()=>({rows:[{set_id:'fra',source_draft_hash:'missing'}]}),session,'0'),e=>e.status===404);
 });

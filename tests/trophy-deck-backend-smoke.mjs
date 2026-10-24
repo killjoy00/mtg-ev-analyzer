@@ -35,6 +35,7 @@ const deck=await call(api,`/v1/runs/${run.id}/deck?round=0`,undefined,owner.toke
 assert.equal(deck.deck.reduce((sum,card)=>sum+card.count,0),deck.size);
 assert.ok(deck.size>=40);
 const expected=catalog.decks[catalog.sources[rows[0].source_draft_hash]];
+assert.equal(deck.source.draft_url,expected.draft_url);
 assert.deepEqual(deck.deck,expected.deck.map(([card,count])=>({...catalog.cards[card],count})));
 assert.deepEqual(deck.sideboard,expected.sideboard.map(([card,count])=>({...catalog.cards[card],count})));
 await call(api,`/v1/runs/${run.id}/deck?round=1`,undefined,owner.token,403);
