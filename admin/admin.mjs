@@ -204,8 +204,21 @@ function reviewMarkup(rows){return rows.map(r=>`<details class="review" data-puz
 function bindReviewDetails(container,queryString){
   container.querySelectorAll('[data-puzzle]').forEach(el=>el.ontoggle=async()=>{if(!el.open||el.dataset.loaded)return;const target=el.querySelector('.detail');target.textContent='Loading decision…';try{const suffix=queryString?'?'+queryString:'';const data=await request(`/v1/admin/decisions/${el.dataset.puzzle}${suffix}`),p=data.puzzle;target.innerHTML=`<p>Earlier picks: ${esc(p.prior_picks.map(c=>c.name).join(', ')||'None')}</p><div class="decision-cards">${p.candidates.map(card=>{const count=data.choices.find(c=>c.selected_id===card.id);return `<article>${/^https:\/\//.test(card.image_url||'')?`<img src="${esc(card.image_url)}" alt="${esc(card.name)}" loading="lazy">`:''}<p><strong>${esc(card.name)}</strong>${card.id===p.historical_pick_id?' · Trophy pick':''}<br>${fmt(count?.answers||0)} choices · Model support ${pct(100*card.model_probability)}<br>Average awarded: ${fmt(count?.average_score)}</p></article>`;}).join('')}</div>`;el.dataset.loaded='1';}catch(err){target.textContent=err.message;}});
 }
+
+function qualityWatchMarkup(items){
+  if(!items.length)return '<p class="muted">No decisions currently meet the review thresholds.</p>';
+  return '<p class="subpage-help">Advisory signals, not automatic removals. At least 12 answers for surprising choices, or 12 mature views for high abandonment; repeated independent reports may qualify sooner. Recent 30-day, current-corpus observations.</p>'+
+  items.map(r=>'<details class="review" data-puzzle="'+esc(r.puzzle_id)+'"><summary>'+esc(String(r.set_id||'').toUpperCase())+' · P1P'+fmt(r.pick_number)+' · '+fmt(r.answers)+' answers · '+pct(r.trophy_match_pct)+' trophy match · '+[r.unexpected_choices?'Unexpected choices':'',r.high_abandonment?'High abandonment':'',r.repeated_reports?'Repeated reports':''].filter(Boolean).join(' / ')+'</summary><p>Model-implied trophy credit: '+fmt(r.implied_points)+' · Viewed: '+fmt(r.views)+' · Likely left: '+fmt(r.likely_left)+' / '+fmt(r.mature_views)+' mature · Independent reporters: '+fmt(r.reporters)+' · Open broken reports: '+fmt(r.broken_reports)+'</p><div class="detail"></div></details>').join('');
+}
+async function loadQualityWatch(loadId,queryString){
+  const target=document.querySelector('#quality-watch');if(!target)return;
+  try{const data=await request('/v1/admin/insights/quality-watch');if(loadId!==deferredLoad)return;
+    target.innerHTML=qualityWatchMarkup(data.rows||[]);bindReviewDetails(target,queryString);
+  }catch(error){if(loadId===deferredLoad)target.innerHTML='<p class="error" role="alert">'+esc(error.message||'Quality watchlist unavailable.')+'</p>';}
+}
 async function loadDeferredSections(loadId,queryString){
   const suffix=queryString?'?'+queryString:'';
+  const quality=loadQualityWatch(loadId,queryString);
   const habits=request('/v1/admin/measurements/habits'+suffix).then(data=>{
     if(loadId!==deferredLoad)return;
     const hm=data.habit_metrics||{cohorts:[],daily_health:[]},cohortTarget=document.querySelector('#habit-cohorts'),healthTarget=document.querySelector('#habit-health');
@@ -226,7 +239,7 @@ async function loadDeferredSections(loadId,queryString){
     const reviewTarget=document.querySelector('#reviews');
     if(reviewTarget)reviewTarget.innerHTML=`<p class="error" role="alert">${esc(error?.message||'Review candidates are temporarily unavailable.')}</p>`;
   });
-  await Promise.allSettled([habits,reviews]);
+  await Promise.allSettled([habits,reviews,quality]);
 }
 function render() {
   const s=report.summary,c=report.coverage,f=report.filters,sf=report.share_funnel||{};
@@ -248,6 +261,7 @@ function render() {
     <p class="insights-report-meta">Excluded: ${fmt(c.qa_excluded)} QA observations, ${fmt(c.repeats_excluded)} repeat encounters, ${fmt(c.unobserved_excluded)} outcomes without a recorded view. Pending choices: ${fmt(s.pending)}. Timing available for ${fmt(s.timed_answers)} answers; reloads and multiple tabs omit timing. P90: ${s.p90_seconds==null?'N/A':fmt(s.p90_seconds)+'s'}.</p>
     </section><section class="subpage-section" aria-labelledby="insights-breakdowns-heading"><h2 id="insights-breakdowns-heading">Decision breakdowns</h2><p class="subpage-help">Open a breakdown to compare outcomes for that dimension. Sections with few answers should be treated as exploratory.</p><div class="insights-breakdowns">
     ${[['difficulty','By difficulty'],['pick','By real draft pick'],['round','By game position'],['set','By set'],['source_event','By source event'],['trophy_support','How strongly the model supports the trophy pick'],['version','By scoring and selection version']].map(([dimension,title])=>`<details class="insights-breakdown" ${['difficulty','pick'].includes(dimension)?'open':''}><summary>${title}</summary>${dimension==='trophy_support'?'<p class="subpage-help">Brackets show the trophy card’s model-implied credit (rounded 95 × trophy support / top-card support), not the points earned by players. Current puzzles must have at least 20 implied points to be served; the maximum implied value is 95. Below-floor or unrated historical decisions appear separately if present.</p>':''}${table(dimension==='trophy_support'?supportBracketRows(report.groups.filter(r=>r.dimension===dimension)):report.groups.filter(r=>r.dimension===dimension).sort((a,b)=>dimension==='difficulty'?['easy','medium','hard','unrated'].indexOf(a.label)-['easy','medium','hard','unrated'].indexOf(b.label):a.label.localeCompare(b.label,undefined,{numeric:true})),dimension==='trophy_support'?'Implied points':'Group')}</details>`).join('')}</div></section>
+    <section class="subpage-section" aria-labelledby="insights-quality-heading"><h2 id="insights-quality-heading">Puzzle quality watchlist</h2><div id="quality-watch"><p class="muted">Checking puzzle quality signals…</p></div></section>
     <section class="subpage-section" aria-labelledby="insights-reviews-heading"><h2 id="insights-reviews-heading">Decisions to review</h2>
     <details class="insights-note-details"><summary>Alternative-credit distribution</summary><p>${[['0–24',s.partial_0_24],['25–49',s.partial_25_49],['50–74',s.partial_50_74],['75–95',s.partial_75_95]].map(([label,n])=>`${label} points: <strong>${fmt(n)}</strong>`).join(' · ')}</p>
     </details><p class="subpage-help insights-review-intro">At least five first-encounter answers. Model disagreements appear first, then the largest samples. Small samples are exploratory.</p><div id="reviews"><p class="muted">Loading decisions to review…</p></div><p id="status" role="status"></p></section></section>`;
