@@ -1,0 +1,147 @@
+/* Subpage presentation shared with the refreshed Users directory.
+   Deliberately scoped: the read-only /admin/ overview is unchanged. */
+.admin-insights,.admin-corpus,.admin-team,.campaign-link-builder,.player-reports{min-width:0}
+.subpage-heading{margin:0 0 24px;max-width:900px}
+.subpage-heading h1{margin:0 0 6px}
+.subpage-heading p{margin:4px 0;line-height:1.5}
+.subpage-kicker{font-size:11px;font-weight:800;letter-spacing:.12em;color:#426482;text-transform:uppercase}
+.subpage-meta{font-size:12px;color:#5f6770}
+.subpage-section{min-width:0;background:#fff;border:1px solid #d7dfe8;border-radius:7px;padding:clamp(14px,2.4vw,24px);margin:0 0 18px}
+.subpage-section h2{font-size:25px;margin:0 0 4px}
+.subpage-section h3{margin:12px 0 5px}
+.subpage-section>.muted,.subpage-section>.subpage-help{margin:4px 0 14px}
+.subpage-section .cards{grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:14px 0}
+.subpage-section .card{background:#f6f8fb;padding:13px 15px}
+.subpage-section .card strong{font-size:clamp(22px,2.5vw,30px);line-height:1.2;overflow-wrap:anywhere}
+.subpage-section .card span{color:#4a6275}
+.subpage-help{font-size:13px;line-height:1.5;color:#526372}
+.subpage-help strong{color:#263d4e}
+.subpage-section .filters{margin:16px 0 4px}
+.subpage-section .note{background:#f1f5f9;border-left:3px solid #9ab1c8;line-height:1.5}
+.subpage-section .scroll{max-width:100%}
+.subpage-section details>summary{color:#1e4d7a}
+.subpage-section details>summary:focus-visible{outline:2px solid #1e4d7a;outline-offset:3px}
+.insights-breakdowns{display:grid;gap:10px}
+.insights-breakdown{border:1px solid #d7dfe8;border-radius:5px;background:#fff;min-width:0}
+.insights-breakdown summary{padding:13px 15px;font-weight:750;cursor:pointer}
+.insights-breakdown[open]>summary{background:#f6f8fb;border-bottom:1px solid #d7dfe8}
+.insights-breakdown .scroll{border:0;border-radius:0}
+.insights-breakdown .scroll th{position:sticky;top:0}
+.insights-review-intro{margin:0 0 10px}
+.insights-note-details{margin:12px 0}
+.insights-note-details p{margin:10px 0}
+.insights-report-meta{font-size:12px;color:#526372;line-height:1.5;margin:10px 0 0}
+.admin-insights #reviews{min-width:0}
+.admin-insights .review{margin:10px 0}
+.admin-insights .decision-cards article{flex-shrink:0}
+.admin-insights .filters input,.admin-insights .filters select{max-width:100%}
+
+/* Corpus operations: preserve the existing sortable set table and detail dialog. */
+.corpus-page-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:10px;margin:18px 0 8px}
+.corpus-page-summary>div{background:#f6f8fb;border:1px solid #d7dfe8;border-radius:5px;padding:12px 14px;min-width:0}
+.corpus-page-summary strong{display:block;font:700 29px/1.2 'Barlow Condensed','Arial Narrow',sans-serif}
+.corpus-page-summary span{display:block;font-size:12px;color:#4a6275;margin-top:5px}
+.corpus-page-summary .attention strong{color:#9e4d1b}
+.corpus-page-summary .unavailable strong{font-size:21px}
+.corpus-legend{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:12px 0;font-size:12px;color:#526372}
+.corpus-legend .corpus-badge{margin-right:3px}
+.corpus-table-wrap{max-width:100%}
+.corpus-detail-summary{background:#f6f8fb;padding:12px;border-radius:5px}
+.corpus-table-note{line-height:1.5}
+.corpus-detail-heading .muted{margin:0}
+.corpus-helper{font-size:13px;color:#526372;line-height:1.5;margin:8px 0 14px}
+
+/* Creator challenge publishing and performance. */
+.campaign-link-builder{max-width:1050px}
+.campaign-link-builder>.subpage-heading{max-width:860px}
+.campaign-link-builder .campaign-form{max-width:900px}
+.campaign-step{background:#fff;border:1px solid #d7dfe8;border-radius:7px;padding:clamp(14px,2.4vw,24px);margin:16px 0}
+.campaign-step h2{font-size:25px;margin:0 0 4px}
+.campaign-step>.muted{margin:4px 0 14px}
+.campaign-step .campaign-form{margin:16px 0}
+.campaign-step .campaign-normalized{margin:14px 0}
+.campaign-step .campaign-output{margin:14px 0}
+.campaign-step .note{background:#f1f5f9;border-left:3px solid #9ab1c8}
+.campaign-existing{display:grid;gap:8px;padding:0;list-style:none}
+.campaign-existing li{padding:12px 14px;border:1px solid #d7dfe8;background:#fff;border-radius:5px;min-width:0}
+.campaign-existing strong{display:block;color:#173f66}
+.campaign-existing small{display:block;margin-top:4px;overflow-wrap:anywhere}
+.campaign-existing a{overflow-wrap:anywhere}
+.creator-existing-list{display:grid;gap:12px}
+.creator-challenge-row{padding:16px;border:1px solid #d7dfe8;border-radius:7px;background:#fff}
+.creator-challenge-heading{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:start}
+.creator-challenge-heading h3{font-size:24px;margin:0 0 3px}
+.creator-challenge-heading p{margin:0;color:#526372;font-size:13px}
+.creator-challenge-status{font-size:12px;font-weight:750;padding:5px 9px;background:#edf1f5;border-radius:4px;color:#40505f}
+.creator-challenge-status.published{color:#255e3c;background:#edf6ef}
+.creator-challenge-status.failed,.creator-challenge-status.retired{color:#8c4719;background:#fff4df}
+.creator-challenge-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0}
+.creator-challenge-metrics>div{background:#f6f8fb;border:1px solid #e2e8ee;padding:10px 12px;border-radius:4px;min-width:0}
+.creator-challenge-metrics strong{display:block;font:700 24px/1.2 'Barlow Condensed','Arial Narrow',sans-serif;color:#173f66}
+.creator-challenge-metrics span{font-size:12px;color:#526372}
+.creator-challenge-detail{color:#526372;font-size:12px;line-height:1.55;margin:10px 0;overflow-wrap:anywhere}
+.creator-challenge-row .actions{gap:8px;margin-top:14px}
+.creator-challenge-row .actions button,.creator-challenge-row .actions a{font-size:12px}
+.creator-challenge-row [data-existing-creator-kit]{margin-top:14px}
+.creator-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:15px 0}
+.creator-summary>div{padding:12px 14px;background:#f6f8fb;border:1px solid #d7dfe8;border-radius:5px}
+.creator-summary strong{display:block;font:700 27px/1.2 'Barlow Condensed','Arial Narrow',sans-serif}
+.creator-summary span{font-size:12px;color:#526372}
+.creator-summary .attention strong{color:#9e4d1b}
+.creator-publish-help{margin:8px 0 14px;color:#526372;font-size:13px}
+
+/* Report inbox: actionable content first, diagnostic metadata optional. */
+.player-reports{max-width:1100px;margin:0;padding:0 0 32px}
+.player-reports .subpage-heading{margin-bottom:12px}
+.player-report-count{border-radius:5px;background:#f6f8fb;border-color:#d7dfe8}
+.player-report-card{border-radius:7px;background:#fff;border-color:#d7dfe8}
+.player-report-card-header h3{font:700 23px/1.2 'Barlow Condensed','Arial Narrow',sans-serif}
+.player-report-comment{border-left-color:#9ab1c8;background:#f6f8fb}
+.player-report-primary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px;margin:12px 0}
+.player-report-primary>div{padding:9px 12px;background:#f6f8fb}
+.player-report-primary dt{font-size:12px;color:#526372}
+.player-report-primary dd{margin:2px 0 0;font-weight:650;overflow-wrap:anywhere}
+.player-report-technical{margin:14px 0;border:1px solid #d7dfe8;border-radius:5px}
+.player-report-technical summary{padding:10px 12px;color:#1e4d7a;cursor:pointer}
+.player-report-technical .player-report-details{margin:8px 12px 14px}
+.player-report-technical .player-report-field dd{font-size:13px}
+.player-report-reason{margin:12px 0 6px}
+.player-report-intro{line-height:1.5}
+.player-report-actions button{font-size:13px}
+.player-report-pages{justify-content:flex-start}
+.player-report-action-status:empty{display:none}
+
+/* Owner-only Settings: make permissions and actions legible. */
+.admin-team .subpage-heading{margin-bottom:20px}
+.admin-team .subpage-section{margin-bottom:16px}
+.admin-team .filters{margin:12px 0 8px}
+.admin-team .scroll{margin:12px 0 0}
+.admin-team table{white-space:normal}
+.admin-team th,.admin-team td{vertical-align:top;overflow-wrap:anywhere}
+.admin-team tbody th{background:#fff}
+.admin-team .team-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.admin-team .team-summary>div{padding:12px;background:#f6f8fb;border:1px solid #d7dfe8}
+.admin-team .team-summary strong{display:block;font:700 28px/1.2 'Barlow Condensed','Arial Narrow',sans-serif}
+.admin-team .team-summary span{font-size:12px;color:#526372}
+.admin-team .team-state{display:inline-block;padding:3px 8px;border-radius:4px;background:#edf1f5;font-size:12px;font-weight:700}
+.admin-team .team-state.pending{background:#fff4df;color:#805409}
+.admin-team .team-state.accepted{background:#edf6ef;color:#255e3c}
+.admin-team .team-table-note{font-size:12px;color:#526372;margin:8px 0}
+.admin-team .team-empty{text-align:left;padding:16px}
+.admin-team #admin-invite-result .note{max-width:760px}
+.admin-team .team-audit-event{font-weight:700}
+@media(max-width:900px){
+  .subpage-section .cards,.creator-challenge-metrics,.creator-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:640px){
+  .subpage-section{padding:14px}
+  .subpage-section h2,.campaign-step h2{font-size:22px}
+  .campaign-step{padding:14px}
+  .creator-challenge-metrics,.creator-summary,.player-report-primary,.admin-team .team-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .creator-challenge-heading h3{font-size:22px}
+  .creator-challenge-metrics strong{font-size:21px}
+  .subpage-section .card{padding:10px 12px}
+  .subpage-section .card strong{font-size:23px}
+  .admin-team .scroll{overflow:auto}
+  .admin-team .scroll table{min-width:540px}
+}

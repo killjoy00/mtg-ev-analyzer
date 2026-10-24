@@ -110,22 +110,29 @@ export async function renderPlayerReports(root,request) {
     top.append(heading,badge);card.append(top);
     card.append(n('p','player-report-reason',DECISION_REASONS[report.reason]||value(report.reason)));
     if(report.comment)card.append(n('p','player-report-comment',report.comment));
-    const details=n('dl','player-report-details');
-    details.append(
+    const primary=n('dl','player-report-primary');
+    primary.append(
       field('Player picked',report.selected_card_name),
       field('Model recommended',report.recommended_card_name),
-      field('Model score',report.recommended_card_score),
-      field('Same decision reports',format(report.reports_on_decision)+' ('+format(report.independent_reporters)+' players)'),
+      field('Reports on this decision',format(report.reports_on_decision)+' ('+format(report.independent_reporters)+' distinct players)')
+    );
+    card.append(primary);
+    const advanced=n('details','player-report-technical');
+    advanced.append(n('summary',null,'Technical details and scoring evidence'));
+    const details=n('dl','player-report-details');
+    details.append(
+      field('Model recommendation score',report.recommended_card_score),
       field('Draft pick ID',report.puzzle_id),
-      field('Round',report.round_number),
+      field('Game round',report.round_number),
       field('Platform',report.client_platform),
       field('App version',report.client_version),
       field('App build',report.client_build),
       field('Corpus / model',value(report.corpus_version)+' / '+value(report.model_version)),
       field('Scoring version',report.scoring_version),
-      field('Backend release',report.backend_release)
+      field('Backend release',report.backend_release),
+      field('Report ID',report.id)
     );
-    card.append(details);
+    advanced.append(details);card.append(advanced);
     if(report.status!=='open'&&report.reviewed_at)
       card.append(n('p','muted','Last reviewed '+time(report.reviewed_at)));
     if(report.review_note)card.append(n('p','player-report-note','Review note: '+report.review_note));
@@ -181,7 +188,10 @@ export async function renderPlayerReports(root,request) {
 
   function render(data) {
     const page=n('section','player-reports');
-    page.append(n('h1',null,'Player reports'),n('p','muted','Private admin inbox for player-submitted decision and profile reports. Reports remain saved when reviewed.'));
+    const header=n('header','subpage-heading');
+    header.append(n('p','subpage-kicker','Feedback and moderation'),n('h1',null,'Player reports'),
+      n('p','muted','Triage submitted draft-decision issues and reported public profiles. Reports remain saved after review for future reference.'));
+    page.append(header);
     const counts=n('div','player-report-counts');
     const reportSummary=data.summary||{};
     const d=reportSummary.decisions||{},p=reportSummary.profiles||{};
@@ -194,7 +204,8 @@ export async function renderPlayerReports(root,request) {
       tile.append(n('span',null,name),n('strong',null,format(count)));
       counts.append(tile);
     }
-    page.append(counts);
+    page.append(counts,n('h2',null,'Review queue'),n('p','subpage-help player-report-intro',
+      'Select a report category and filter to open items. Check the player comment and other reports first; expand technical details only when investigating a specific decision.'));
     const tabs=n('div','player-report-tabs');
     for(const [kind,title] of [['decisions','Draft decisions'],['profiles','Player profiles']]) {
       const tab=button(title,'tab',state.kind===kind?'player-report-tab active':'player-report-tab');
@@ -221,7 +232,7 @@ export async function renderPlayerReports(root,request) {
     const end=Math.min(total,state.page*data.page_size);
     page.append(n('p','muted','Showing '+format(start)+'–'+format(end)+' of '+format(total)+' matching reports.'));
     const list=n('div','player-report-list');
-    if(!(data.rows||[]).length)list.append(n('p','muted','No reports match these filters.'));
+    if(!(data.rows||[]).length)list.append(n('p','muted','No '+(state.status==='open'?'open ':'')+(state.kind==='decisions'?'decision':'profile')+' reports match these filters.'));
     for(const report of data.rows||[])list.append(state.kind==='decisions'?decisionCard(report):profileCard(report));
     page.append(list);
     const pages=n('div','player-report-pages');
