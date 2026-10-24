@@ -221,15 +221,14 @@ function renderCreatorKit(target,challenge,status) {
 
 export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode=null}={}) {
   root.innerHTML=`<section class="campaign-link-builder">
-    <h1>${mode==='creator'?'Creator Challenges':mode==='campaign'?'Campaign Links':'Campaign Links / Creator Challenges'}</h1>
+    <header class="subpage-heading"><p class="subpage-kicker">Publishing tools</p><h1>${mode==='creator'?'Creator Challenges':mode==='campaign'?'Campaign Links':'Campaign Links / Creator Challenges'}</h1><p class="muted">${mode==='creator'?'Turn a real completed run into a shareable creator challenge, then track how challengers perform.':'Create tracked links and optionally publish short, branded vanity URLs. Existing links stay available below.'}</p></header>
     <div class="campaign-mode-tabs" role="tablist" aria-label="Creation mode" ${mode?'hidden':''}>
       <button type="button" class="secondary" data-mode="campaign" role="tab" aria-selected="true">Campaign Link</button>
       <button type="button" class="secondary" data-mode="creator" role="tab" aria-selected="false">Beat the Creator</button>
     </div>
 
     <section data-panel="campaign" ${mode==='creator'?'hidden':''}>
-      <p class="muted">Build a tracked campaign URL immediately, or add a slug when you also want a static vanity route.</p>
-      <p class="note"><strong>One-click publish.</strong> The tracked URL works immediately. For a vanity URL, Publish opens a protected site PR, runs the required checks, merges it, and waits for the Pages route to go live.</p>
+      <section class="campaign-step" aria-labelledby="campaign-create-heading"><h2 id="campaign-create-heading">1. Set destination and tracking</h2><p class="muted">Source identifies where visitors come from; campaign identifies the promotion. A slug is needed only for a short vanity URL.</p>
       <form id="campaign-link-form" class="campaign-form" novalidate>
         <label>Slug (needed for vanity URL)<input name="slug" autocomplete="off" spellcheck="false" placeholder="reddit-launch"><small data-error="slug" class="error" hidden></small></label>
         <label>Source<input name="source" autocomplete="off" spellcheck="false" placeholder="reddit"><small data-error="source" class="error" hidden></small></label>
@@ -243,7 +242,8 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
         <div><span>Canonical campaign</span><output id="canonical-campaign">—</output></div>
         <div><span>Canonical medium</span><output id="canonical-medium">—</output></div>
       </div>
-      <p id="slug-warning" class="campaign-warning" role="status" hidden></p>
+      <p id="slug-warning" class="campaign-warning" role="status" hidden></p></section>
+      <section class="campaign-step" aria-labelledby="campaign-share-heading"><h2 id="campaign-share-heading">2. Copy or publish</h2><p class="subpage-help"><strong>Tracked URL:</strong> usable immediately with no publishing. <strong>Vanity URL:</strong> only ready to distribute after the Publish step confirms the route is live.</p>
       <div class="campaign-output">
         <label>Tracked UTM URL<input id="tracked-url" readonly aria-label="Tracked UTM URL"></label>
         <button type="button" class="secondary" data-copy="tracked-url">Copy tracked URL</button>
@@ -256,14 +256,14 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
         <button type="button" id="publish-campaign">Publish vanity link</button>
         <p id="publish-status" role="status"></p>
       </div>
-      <p id="copy-status" role="status"></p>
-      <h2>Existing campaign links</h2>
+      <p id="copy-status" role="status"></p><p class="subpage-help">Publishing a vanity URL opens a protected site PR, runs the required checks, merges, and verifies that the Pages route is live. Copying a preview does not publish it.</p></section>
+      <section class="campaign-step" aria-labelledby="campaign-existing-heading"><h2 id="campaign-existing-heading">Published vanity links</h2><p class="muted">These links come from the deployed campaign registry. Use an existing link rather than creating another slug for the same promotion.</p>
       <p id="existing-status" class="muted">Loading the checked-in campaign registry…</p>
-      <ul id="existing-campaign-links" class="campaign-existing"></ul>
+      <ul id="existing-campaign-links" class="campaign-existing"></ul></section>
     </section>
 
     <section data-panel="creator" ${mode==='creator'?'':'hidden'}>
-      <p class="muted">Promote one authentic completed Pack One run. The source session remains the gameplay authority; creator score, answers, and serving versions are never entered here.</p>
+      <section class="campaign-step" aria-labelledby="creator-source-heading"><h2 id="creator-source-heading">1. Choose an authentic completed run</h2><p class="muted">Resolve a shared practice run or select a completed Daily. The original session supplies the creator score and picks.</p>
       <form id="creator-source-form" class="campaign-form">
         <fieldset class="creator-source-kind"><legend>Source run</legend>
           <label><input type="radio" name="source_type" value="practice" checked> Shared Practice Run</label>
@@ -281,8 +281,8 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
         </div>
       </form>
       <p id="creator-source-status" role="status"></p>
-      <section id="creator-source-preview" class="note" hidden></section>
-
+      <section id="creator-source-preview" class="note" hidden></section></section>
+      <section class="campaign-step" aria-labelledby="creator-publish-heading"><h2 id="creator-publish-heading">2. Review and publish challenge</h2><p class="muted">Choose what players see publicly, confirm consent when required, then publish. Scores, answers and serving versions cannot be edited here.</p>
       <form id="creator-meta-form" class="campaign-form" hidden novalidate>
         <label>Creator name<input name="creator_public_name" maxlength="80" required></label>
         <label>Creator handle (optional)<input name="creator_handle" maxlength="80" placeholder="@creator"></label>
@@ -299,14 +299,13 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
         <button type="button" id="publish-creator" disabled>Publish creator challenge</button>
         <p id="creator-publish-status" role="status"></p>
       </div>
-      <section id="creator-kit" class="note" hidden></section>
-
-      <h2>Existing creator challenges</h2>
+      <section id="creator-kit" class="note" hidden></section></section>
+      <section class="campaign-step" aria-labelledby="creator-existing-heading"><h2 id="creator-existing-heading">Existing creator challenges</h2><p class="subpage-help">Opens, starts, and completed attempts help distinguish reach from engagement. Results cover the most recent 100 challenges returned by the backend, not all-time performance.</p><div id="creator-summary" class="creator-summary" aria-label="Creator challenge status summary"></div>
       <div class="campaign-publish-actions">
         <p id="creator-existing-status" class="muted">Loading creator challenges…</p>
         <button type="button" id="creator-show-deleted" class="secondary" hidden>Show deleted</button>
       </div>
-      <div id="creator-existing"></div>
+      <div id="creator-existing" class="creator-existing-list"></div></section>
     </section>
   </section>`;
 
@@ -369,8 +368,14 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
     existingStatus.textContent=entries.length?`${entries.length} published campaign link(s).`:'No published campaign links yet.';
     existingList.replaceChildren(...entries.map(entry=>{
       const item=document.createElement('li');
-      const attribution=entry.untracked?'no forced attribution':`source=${entry.source} · campaign=${entry.campaign}${entry.medium?` · medium=${entry.medium}`:''}`;
-      item.textContent=`${entry.slug} → ${CAMPAIGN_DESTINATION_LABELS[entry.destination]||entry.destination} · ${attribution}`;
+      const label=document.createElement('strong');label.textContent=entry.slug;
+      const detail=document.createElement('small');
+      detail.textContent=(CAMPAIGN_DESTINATION_LABELS[entry.destination]||entry.destination)+' · '+
+        (entry.untracked?'No forced tracking':`Source ${entry.source} · Campaign ${entry.campaign}${entry.medium?` · Medium ${entry.medium}`:''}`);
+      const link=document.createElement('a');
+      link.href='https://packone.pro/go/'+encodeURIComponent(entry.slug)+'/';
+      link.target='_blank';link.rel='noopener noreferrer';link.textContent='Open live vanity URL ↗';
+      item.append(label,detail,link);
       return item;
     }));
   }
