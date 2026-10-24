@@ -15,6 +15,7 @@ on:
       - 'scripts/daily-social-ledger.mjs'
       - 'tests/daily-social-post.test.mjs'
       - 'tests/daily-social-ledger.test.mjs'
+      - 'scripts/preview-featured-pick.mjs'
       - 'scripts/featured-pick.mjs'
       - 'scripts/generate-featured-pick.mjs'
       - 'scripts/render-featured-pick.mjs'
@@ -130,3 +131,36 @@ jobs:
       - name: Publish featured pick to configured channels, once
         if: steps.select.outputs.selected == 'true'
         run: node scripts/publish-featured-pick.mjs
+
+  featured-preview:
+    if: github.repository == 'killjoy00/mtg-ev-analyzer' && github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install project and offline test deterministic selection
+        run: |
+          npm ci --no-audit --no-fund
+          node --test tests/featured-pick.test.mjs
+      - name: Generate deidentified production pick preview (no secrets)
+        run: node scripts/preview-featured-pick.mjs
+      - name: Install browser and ffmpeg
+        run: |
+          npx playwright install --with-deps chromium
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends ffmpeg
+          fi
+      - name: Render real-card graphic and 20-second Short, no publication
+        run: node scripts/render-featured-pick.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packone-featured-preview
+          path: artifacts/featured-pick/
+          if-no-files-found: error
+          retention-days: 5

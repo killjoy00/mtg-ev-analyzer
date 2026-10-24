@@ -43,7 +43,7 @@ test('two-way fallback favors Latest Set even with a closer Cube split',()=>{
  assert.equal(picked.tier,2);
 });
 test('does not manufacture controversy from few peers or one clear favorite',()=>{
- const tiny=row('latest',[['a',12],['b',10],['c',8]],'a');
+ const tiny=row('latest',[['a',11],['b',10],['c',8]],'a');
  const obvious=row('latest',[['a',95],['b',3],['c',2]],'a');
  assert.equal(selectFeaturedPick([tiny,obvious],{day:'2026-10-23'}),null);
 });
