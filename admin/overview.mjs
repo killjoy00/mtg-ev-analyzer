@@ -74,7 +74,7 @@ export function healthMarkup(data){
  return '<p class="muted">Read-only checks for '+escape(day)+' (Pacific). API reachability is indicated by successful responses; this is not an external uptime monitor.</p><ul class="overview-health-checks">'+
  check('Admin API',true,'Authorized endpoint responded','')+
  check('Serving cache',cache.cache_current===true||cache.cache_current==='t','Revision '+(cache.revision??'unavailable'),'?area=corpus')+
- ...links+
+ links.join('')+
  [check('Creator publications',failed===0,failed+' failed or unverified retirements','?area=creator-challenges'),check('Critical player reports',bad===0,bad+' open broken-puzzle reports','?area=reports')].join('')+'</ul>';
 }
 export function overviewMarkup({role='admin',now=new Date()}={}) {
