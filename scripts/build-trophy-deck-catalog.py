@@ -68,6 +68,7 @@ for index, name in enumerate(names):
 card_index = {name: index for index, name in enumerate(names)}
 catalog = {'version': version, 'set_id': args.set_id, 'sources': {}, 'cards': cards, 'decks': []}
 for deck in sorted(decks, key=lambda d: (d['event_type'], d['draft_id'])):
+    assert re.fullmatch('[a-f0-9]{32}', deck['draft_id']), 'Invalid public draft identity'
     def quantities(values):
         assert len({c['name'] for c in values}) == len(values)
         assert all(isinstance(c['count'], int) and 0 < c['count'] <= 250 for c in values)
@@ -77,7 +78,8 @@ for deck in sorted(decks, key=lambda d: (d['event_type'], d['draft_id'])):
     entry = {'deck': main, 'sideboard': quantities(deck['sideboard']),
              'size': deck['deck_size'], 'event_type': deck['event_type'],
              'last_game_time': deck['last_game_time'], 'colors': deck['main_colors'],
-             'splash_colors': deck['splash_colors']}
+             'splash_colors': deck['splash_colors'],
+             'draft_url': 'https://www.17lands.com/draft/' + deck['draft_id']}
     index = len(catalog['decks'])
     catalog['decks'].append(entry)
     sources = [source for source in deck['source_hashes'] if source in allowed_sources]

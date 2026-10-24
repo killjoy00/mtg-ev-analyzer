@@ -1,8 +1,8 @@
 """Extract one exact last-game deck per matched Pack One draft source.
 
 Inputs are the licensed 17Lands game CSV and a metadata-only source inventory.
-The normalized output is a private build input, not a browser asset. Raw draft
-identifiers must be stripped by the serving catalog/import step.
+The normalized output is a private build input, not a browser asset. The serving
+catalog retains only the canonical public draft URL alongside the deck context.
 """
 import argparse
 import csv

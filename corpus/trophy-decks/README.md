@@ -42,8 +42,9 @@ differences are matched without changing the name in the game archive.
 
    The runner validates and extracts archives resumably. Coverage reports
    distinguish absent records from incomplete or ambiguous final records.
-   Normalized output retains raw draft IDs only as private build inputs;
-   never commit these inputs or send them to the browser.
+   Normalized output remains a private build input. The catalog retains each
+   matched public draft's canonical `https://www.17lands.com/draft/<id>` URL;
+   it does not include account identities or the normalized input records.
 3. Collect the named cards' Scryfall metadata and required name variants.
    Generate each catalog:
 
@@ -59,7 +60,7 @@ differences are matched without changing the name in the game archive.
    minimum sizes, source aliases, card metadata and set identity. The source
    inventory must include all stored corpus versions, so older runs keep their
    deck links. Unused hash forms are omitted to keep the function deployable.
-   It strips raw draft identifiers from the serving output.
+   It keeps the canonical public draft URL for the post-pick deck dialog.
 4. Update the lazy registry and aggregate coverage. Run the catalog integrity,
    source isolation, owned-run and locked-pick checks before the normal
    development-then-production release.
@@ -76,3 +77,22 @@ at most six decoded catalogs, 1,024 availability results and 128 expanded decks.
 Answers contain only an availability flag. Full decklists are returned only
 after the owning player locks the corresponding pick. Refreshes do not change
 scoring, source eligibility, fixed Dailies or stored answers.
+
+## Full draft links
+
+The deck dialog links to the same source draft on 17Lands. `source.draft_url` is
+returned with the deck only after the existing ownership and locked-pick checks.
+The browser accepts only canonical HTTPS 17Lands draft URLs and opens them in a
+new tab. Public log availability is controlled by 17Lands.
+
+To add URLs to older catalogs without rebuilding their card/deck data:
+
+```sh
+python scripts/backfill-trophy-draft-links.py --cache PRIVATE_ARCHIVE_CACHE
+```
+
+This resolves the existing source hashes against official game archives and
+requires every catalog alias to resolve to the same draft for that deck before
+writing any catalog. `draft-links.json` records the archive hashes and coverage.
+Decks, source membership and event types are preserved. No card-based matching
+or substitute draft is used.

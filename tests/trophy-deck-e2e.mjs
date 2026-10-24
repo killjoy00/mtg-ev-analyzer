@@ -10,7 +10,7 @@ const browser=await chromium.launch({headless:true});
 try {
  const page=await browser.newPage({viewport:{width:390,height:844}}),errors=[];
  page.on('pageerror',e=>errors.push(e.message));
- await page.route(base+'/__deck-test',route=>route.fulfill({contentType:'text/html; charset=utf-8',body:`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/visual-c.css"><link rel="stylesheet" href="/draft-run.css"></head><body><button id="open">Click here to see the drafter’s deck.</button><script type="module">import{openTrophyDeck}from'/trophy-deck-dialog.mjs';window.loads=0;document.querySelector('#open').onclick=()=>openTrophyDeck(async()=>{window.loads++;if(window.fail)throw Error('retry');return ${JSON.stringify(deck)}},{trophyName:${JSON.stringify(deck.deck[0].name)},priorNames:[${JSON.stringify(deck.deck[1].name)}],record:'7–1'});</script></body></html>`}));
+ await page.route(base+'/__deck-test',route=>route.fulfill({contentType:'text/html; charset=utf-8',body:`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/visual-c.css"><link rel="stylesheet" href="/draft-run.css"></head><body><button id="open">Click here to see the drafter’s deck.</button><script type="module">import{openTrophyDeck}from'/trophy-deck-dialog.mjs';window.loads=0;document.querySelector('#open').onclick=()=>openTrophyDeck(async()=>{window.loads++;if(window.fail)throw Error('retry');return window.deckOverride||${JSON.stringify(deck)}},{trophyName:${JSON.stringify(deck.deck[0].name)},priorNames:[${JSON.stringify(deck.deck[1].name)}],record:'7–1'});</script></body></html>`}));
  await page.goto(base+'/__deck-test');
  assert.equal(await page.locator('.run-deck-dialog').count(),0);
  await page.waitForFunction(()=>typeof window.loads==='number');assert.equal(await page.evaluate(()=>window.loads),0);
@@ -21,6 +21,11 @@ try {
  assert.equal(await page.locator('.run-deck-row.is-trophy').count(),1);
  assert.equal(await page.locator('.run-deck-row i').count(),1);
  assert.match(await page.locator('.run-deck-meta').innerText(),/7-1/);
+ const draftLink=page.getByRole('link',{name:'View full draft on 17Lands',exact:true});
+ assert.equal(await draftLink.getAttribute('href'),deck.source.draft_url);
+ assert.equal(await draftLink.getAttribute('target'),'_blank');
+ assert.match(await draftLink.getAttribute('rel'),/noopener/);
+ assert.match(await draftLink.getAttribute('rel'),/noreferrer/);
  assert.equal(await page.locator('.run-deck-group .run-deck-row>span:first-child').evaluateAll(nodes=>nodes.reduce((sum,n)=>sum+Number(n.textContent),0)),deck.size);
  for(const width of [390,320,1440]) {
   await page.setViewportSize({width,height:844});
@@ -36,6 +41,12 @@ try {
  await page.locator('.card-face-dialog').waitFor();await page.keyboard.press('Escape');
  assert.equal(await page.locator('.run-deck-dialog').count(),1,'card zoom returns to the deck');
  await page.getByRole('button',{name:'Close decklist'}).click();
+ for(const invalid of [null,'javascript:alert(1)','https://www.17lands.com.evil.example/draft/'+'0'.repeat(32)]) {
+  await page.evaluate(({deck,invalid})=>{window.deckOverride={...deck,source:{...deck.source,draft_url:invalid}};},{deck,invalid});
+  await page.locator('#open').click();await page.locator('.run-deck-group').first().waitFor();
+  assert.equal(await page.getByRole('link',{name:'View full draft on 17Lands',exact:true}).count(),0);
+  await page.getByRole('button',{name:'Close decklist'}).click();
+ }
  assert.deepEqual(errors,[]);
  console.log('Trophy deck UI verified: lazy loading, exact list, mobile widths, retry, card zoom and focus restoration.');
 } finally {await browser.close();}
