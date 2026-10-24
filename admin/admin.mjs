@@ -13,7 +13,7 @@ const fmt=x=>x==null?'N/A':Number(x).toLocaleString(undefined,{maximumFractionDi
 const pct=x=>x==null?'N/A':`${fmt(x)}%`;
 const draftBase=window.PACK1_API.draftRunUrl;
 const growthBase=window.PACK1_API.growthUrl;
-let report,params=new URLSearchParams(location.search),deferredLoad=0,adminContractVerified=false,switching=false;
+let report,params=new URLSearchParams(location.search),deferredLoad=0,adminContractVerified=false,adminRelease=null,switching=false;
 params.delete('area');
 // Keep the first Insights load bounded to recent activity. Longer date ranges
 // remain available through the visible date filters and deep links.
@@ -78,6 +78,7 @@ async function verifyAdminContract() {
     {status:503,code:'admin_release_mismatch',data:{required:ADMIN_API_VERSION,backend:backendVersion||null,gateway:gatewayVersion||null}}
   );
   adminContractVerified=true;
+  adminRelease={frontendVersion:ADMIN_API_VERSION,backendVersion,gatewayVersion,releaseCommit:data?.release_commit||null};
 }
 // The admin shell only needs the account cookie. Do not block it on the
 // unrelated guest-player session and legacy migration calls in getAuthSession().
@@ -318,7 +319,7 @@ async function load() {
     const area=adminArea(location.search);
     showLoading(area==='insights'?'Loading Insights…':`Loading ${ADMIN_AREAS[area]||'administration'}…`,
       area==='insights'?'Administrator access confirmed. Loading decision metrics; additional breakdowns load after the summary.':'Administrator access confirmed. Fetching section data.');
-    if(area==='overview'){await renderOverview(root,authorizedRequest,{role:access.role,isCurrent:()=>loadId===deferredLoad,onRefresh:()=>void load()});return;}
+    if(area==='overview'){await renderOverview(root,authorizedRequest,{role:access.role,isCurrent:()=>loadId===deferredLoad,onRefresh:()=>void load(),serviceRelease:adminRelease});return;}
     if(area==='reports'){await renderPlayerReports(root,authorizedRequest);return;}
     if(area==='corpus'){await renderCorpus(root,authorizedRequest);return;}
     if(area==='users'){await renderUsers(root,authorizedRequest,authorizedGrowthRequest,access.role);return;}
