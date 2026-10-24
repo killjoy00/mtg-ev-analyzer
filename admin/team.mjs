@@ -7,7 +7,7 @@ export async function renderAdminTeam(root,request){
   const pending=invitations.filter(inv=>state(inv)==='Pending').length;
   const eventName=value=>String(value||'Unknown event').replace(/[_-]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
   root.innerHTML=`<section class="admin-team">
-    <header class="subpage-heading"><p class="subpage-kicker">Owner settings</p><h1>Administrator access</h1><p class="muted">Invite administrators, review who currently has access, and inspect access changes. Only the Owner can manage these permissions.</p></header>
+    <header class="subpage-heading"><p class="subpage-kicker">Owner-only: Settings</p><h1>Administrator access</h1><p class="muted">Invite administrators, review who currently has access, and inspect access changes. Only the Owner can manage these permissions.</p></header>
     <div class="team-summary"><div><strong>${members.length}</strong><span>Administrators (including Owner)</span></div><div><strong>${pending}</strong><span>Pending invitations</span></div><div><strong>${audit.length}</strong><span>Recent access events (up to 50)</span></div></div>
     <section class="subpage-section"><h2>Invite an administrator</h2><p class="subpage-help">Invitations grant Admin access only, never Owner. The recipient must sign in with the exact verified email address below.</p>
     <form id="admin-invite-form" class="filters"><label>Verified account email
