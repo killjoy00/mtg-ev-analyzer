@@ -4,26 +4,28 @@ export async function renderAdminTeam(root,request){
   const data=await request('/v1/admin/team');
   const invitations=data.invitations||[],members=data.members||[],audit=data.audit||[];
   const state=item=>item.accepted_at?'Accepted':item.revoked_at?'Revoked':new Date(item.expires_at).getTime()<=Date.now()?'Expired':'Pending';
+  const pending=invitations.filter(inv=>state(inv)==='Pending').length;
+  const eventName=value=>String(value||'Unknown event').replace(/[_-]+/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
   root.innerHTML=`<section class="admin-team">
-    <h1>Administrator access</h1>
-    <p class="muted">Owner-only: invitations grant Admin access, never Owner access. Invitees must sign in with the exact verified recipient email.</p>
-    <h2>Invite an administrator</h2>
+    <header class="subpage-heading"><p class="subpage-kicker">Owner-only: Settings</p><h1>Administrator access</h1><p class="muted">Invite administrators, review who currently has access, and inspect access changes. Only the Owner can manage these permissions.</p></header>
+    <div class="team-summary"><div><strong>${members.length}</strong><span>Administrators (including Owner)</span></div><div><strong>${pending}</strong><span>Pending invitations</span></div><div><strong>${audit.length}</strong><span>Recent access events (up to 50)</span></div></div>
+    <section class="subpage-section"><h2>Invite an administrator</h2><p class="subpage-help">Invitations grant Admin access only, never Owner. The recipient must sign in with the exact verified email address below.</p>
     <form id="admin-invite-form" class="filters"><label>Verified account email
       <input name="email" type="email" autocomplete="off" required maxlength="254" placeholder="person@example.com"></label>
       <button type="submit">Create invitation</button></form>
-    <p class="muted">No invitation email is sent. The link is displayed once; copy it using a private channel.</p>
-    <div id="admin-invite-result" aria-live="polite"></div>
-    <h2>Administrators</h2>
-    <div class="scroll"><table><thead><tr><th>Account</th><th>Role</th><th>Action</th></tr></thead>
+    <p class="subpage-help"><strong>No email is sent.</strong> The invitation link appears only once after creation and expires in three days. Copy it and deliver it privately to the intended recipient.</p>
+    <div id="admin-invite-result" aria-live="polite"></div></section>
+    <section class="subpage-section"><h2>Administrators</h2><p class="subpage-help">Revoking Admin access removes administrative permissions; it does not delete the underlying Pack One account. The Owner is protected.</p>
+    <div class="scroll"><table><thead><tr><th>Account</th><th>Role</th><th>Email verified</th><th>Action</th></tr></thead>
       <tbody>${members.map(member=>`<tr><th>${esc(member.email)}<small>${esc(member.name||'')}</small></th>
-        <td>${esc(member.role==='owner'?'Owner':'Admin')}</td>
-        <td>${member.role==='owner'?'Protected':`<button type="button" class="secondary" data-revoke-member="${esc(member.id)}" data-email="${esc(member.email)}">Revoke access</button>`}</td></tr>`).join('')}</tbody></table></div>
-    <h2>Invitations</h2>
-    <div class="scroll"><table><thead><tr><th>Recipient</th><th>Status</th><th>Expires</th><th>Action</th></tr></thead>
-      <tbody>${invitations.map(inv=>`<tr><th>${esc(inv.recipient_email)}</th><td>${esc(state(inv))}</td><td>${esc(when(inv.expires_at))}</td>
-        <td>${state(inv)==='Pending'?`<button type="button" class="secondary" data-revoke-invite="${esc(inv.id)}">Revoke</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="4">No invitations yet.</td></tr>'}</tbody></table></div>
-    <h2>Access audit</h2><div class="scroll"><table><thead><tr><th>When</th><th>Event</th><th>Recipient</th><th>Actor</th></tr></thead>
-      <tbody>${audit.map(a=>`<tr><td>${esc(when(a.created_at))}</td><td>${esc(a.event_type)}</td><td>${esc(a.recipient_email||a.target_auth_user_id||'—')}</td><td>${esc(a.actor_auth_user_id)}</td></tr>`).join('')||'<tr><td colspan="4">No access events yet.</td></tr>'}</tbody></table></div>
+        <td>${esc(member.role==='owner'?'Owner':'Admin')}</td><td>${member.email_verified?'Yes':'No'}</td>
+        <td>${member.role==='owner'?'Protected':`<button type="button" class="secondary" data-revoke-member="${esc(member.id)}" data-email="${esc(member.email)}">Revoke access</button>`}</td></tr>`).join('')}</tbody></table></div></section>
+    <section class="subpage-section"><h2>Invitations</h2><p class="subpage-help">Recent invitations are listed newest first; revoke a pending invitation if it should no longer be usable.</p>
+    <div class="scroll"><table><thead><tr><th>Recipient</th><th>Status</th><th>Issued</th><th>Expires</th><th>Action</th></tr></thead>
+      <tbody>${invitations.map(inv=>`<tr><th>${esc(inv.recipient_email)}</th><td><span class="team-state ${esc(state(inv).toLowerCase())}">${esc(state(inv))}</span></td><td>${esc(when(inv.issued_at))}</td><td>${esc(when(inv.expires_at))}</td>
+        <td>${state(inv)==='Pending'?`<button type="button" class="secondary" data-revoke-invite="${esc(inv.id)}">Revoke</button>`:'—'}</td></tr>`).join('')||'<tr><td colspan="5">No invitations yet.</td></tr>'}</tbody></table></div><p class="team-table-note">Showing at most the 100 most recent invitations.</p></section>
+    <section class="subpage-section"><h2>Access history</h2><p class="subpage-help">The 50 most recent access events. IDs are retained when the backend does not provide account names.</p><div class="scroll"><table><thead><tr><th>When</th><th>Event</th><th>Recipient / account ID</th><th>Actor ID</th></tr></thead>
+      <tbody>${audit.map(a=>`<tr><td>${esc(when(a.created_at))}</td><td><span class="team-audit-event">${esc(eventName(a.event_type))}</span><small>${esc(a.event_type)}</small></td><td>${esc(a.recipient_email||a.target_auth_user_id||'—')}</td><td>${esc(a.actor_auth_user_id)}</td></tr>`).join('')||'<tr><td colspan="4">No access events yet.</td></tr>'}</tbody></table></div></section>
     <p id="team-status" role="status"></p>
   </section>`;
   const status=root.querySelector('#team-status'),form=root.querySelector('#admin-invite-form'),result=root.querySelector('#admin-invite-result');

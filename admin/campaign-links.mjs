@@ -221,15 +221,14 @@ function renderCreatorKit(target,challenge,status) {
 
 export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode=null}={}) {
   root.innerHTML=`<section class="campaign-link-builder">
-    <h1>${mode==='creator'?'Creator Challenges':mode==='campaign'?'Campaign Links':'Campaign Links / Creator Challenges'}</h1>
+    <header class="subpage-heading"><p class="subpage-kicker">Publishing tools</p><h1>${mode==='creator'?'Creator Challenges':mode==='campaign'?'Campaign Links':'Campaign Links / Creator Challenges'}</h1><p class="muted">${mode==='creator'?'Turn a real completed run into a shareable creator challenge, then track how challengers perform.':'Create tracked links and optionally publish short, branded vanity URLs. Existing links stay available below.'}</p></header>
     <div class="campaign-mode-tabs" role="tablist" aria-label="Creation mode" ${mode?'hidden':''}>
       <button type="button" class="secondary" data-mode="campaign" role="tab" aria-selected="true">Campaign Link</button>
       <button type="button" class="secondary" data-mode="creator" role="tab" aria-selected="false">Beat the Creator</button>
     </div>
 
     <section data-panel="campaign" ${mode==='creator'?'hidden':''}>
-      <p class="muted">Build a tracked campaign URL immediately, or add a slug when you also want a static vanity route.</p>
-      <p class="note"><strong>One-click publish.</strong> The tracked URL works immediately. For a vanity URL, Publish opens a protected site PR, runs the required checks, merges it, and waits for the Pages route to go live.</p>
+      <section class="campaign-step" aria-labelledby="campaign-create-heading"><h2 id="campaign-create-heading">1. Configure a link</h2><p class="muted">Destination controls where the link leads; source identifies where visitors come from; campaign names the promotion. A slug is needed only for a short vanity URL.</p>
       <form id="campaign-link-form" class="campaign-form" novalidate>
         <label>Slug (needed for vanity URL)<input name="slug" autocomplete="off" spellcheck="false" placeholder="reddit-launch"><small data-error="slug" class="error" hidden></small></label>
         <label>Source<input name="source" autocomplete="off" spellcheck="false" placeholder="reddit"><small data-error="source" class="error" hidden></small></label>
@@ -243,7 +242,8 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
         <div><span>Canonical campaign</span><output id="canonical-campaign">—</output></div>
         <div><span>Canonical medium</span><output id="canonical-medium">—</output></div>
       </div>
-      <p id="slug-warning" class="campaign-warning" role="status" hidden></p>
+      <p id="slug-warning" class="campaign-warning" role="status" hidden></p></section>
+      <section class="campaign-step" aria-labelledby="campaign-share-heading"><h2 id="campaign-share-heading">2. Copy or publish</h2><p class="subpage-help"><strong>Tracked URL:</strong> usable immediately with no publishing. <strong>Vanity URL:</strong> only ready to distribute after the Publish step confirms the route is live.</p>
       <div class="campaign-output">
         <label>Tracked UTM URL<input id="tracked-url" readonly aria-label="Tracked UTM URL"></label>
         <button type="button" class="secondary" data-copy="tracked-url">Copy tracked URL</button>
@@ -256,14 +256,14 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
         <button type="button" id="publish-campaign">Publish vanity link</button>
         <p id="publish-status" role="status"></p>
       </div>
-      <p id="copy-status" role="status"></p>
-      <h2>Existing campaign links</h2>
+      <p id="copy-status" role="status"></p><p class="subpage-help">Publishing a vanity URL opens a protected site PR, runs the required checks, merges, and verifies that the Pages route is live. Copying a preview does not publish it.</p></section>
+      <section class="campaign-step" aria-labelledby="campaign-existing-heading"><h2 id="campaign-existing-heading">Published vanity links</h2><p class="muted">These links come from the deployed campaign registry. Use an existing link rather than creating another slug for the same promotion.</p>
       <p id="existing-status" class="muted">Loading the checked-in campaign registry…</p>
-      <ul id="existing-campaign-links" class="campaign-existing"></ul>
+      <ul id="existing-campaign-links" class="campaign-existing"></ul></section>
     </section>
 
     <section data-panel="creator" ${mode==='creator'?'':'hidden'}>
-      <p class="muted">Promote one authentic completed Pack One run. The source session remains the gameplay authority; creator score, answers, and serving versions are never entered here.</p>
+      <section class="campaign-step" aria-labelledby="creator-source-heading"><h2 id="creator-source-heading">1. Choose an authentic completed run</h2><p class="muted">Resolve a shared practice run or select a completed Daily. The original session supplies the creator score and picks.</p>
       <form id="creator-source-form" class="campaign-form">
         <fieldset class="creator-source-kind"><legend>Source run</legend>
           <label><input type="radio" name="source_type" value="practice" checked> Shared Practice Run</label>
@@ -281,8 +281,8 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
         </div>
       </form>
       <p id="creator-source-status" role="status"></p>
-      <section id="creator-source-preview" class="note" hidden></section>
-
+      <section id="creator-source-preview" class="note" hidden></section></section>
+      <section class="campaign-step" aria-labelledby="creator-publish-heading"><h2 id="creator-publish-heading">2. Review and publish challenge</h2><p class="muted">Choose what players see publicly, confirm consent when required, then publish. Scores, answers and serving versions cannot be edited here.</p>
       <form id="creator-meta-form" class="campaign-form" hidden novalidate>
         <label>Creator name<input name="creator_public_name" maxlength="80" required></label>
         <label>Creator handle (optional)<input name="creator_handle" maxlength="80" placeholder="@creator"></label>
@@ -299,14 +299,13 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
         <button type="button" id="publish-creator" disabled>Publish creator challenge</button>
         <p id="creator-publish-status" role="status"></p>
       </div>
-      <section id="creator-kit" class="note" hidden></section>
-
-      <h2>Existing creator challenges</h2>
+      <section id="creator-kit" class="note" hidden></section></section>
+      <section class="campaign-step" aria-labelledby="creator-existing-heading"><h2 id="creator-existing-heading">Existing creator challenges</h2><p class="subpage-help">Opens, starts, and completed attempts help distinguish reach from engagement. Results cover the most recent 100 challenges returned by the backend, not all-time performance.</p><div id="creator-summary" class="creator-summary" aria-label="Creator challenge status summary"></div>
       <div class="campaign-publish-actions">
         <p id="creator-existing-status" class="muted">Loading creator challenges…</p>
         <button type="button" id="creator-show-deleted" class="secondary" hidden>Show deleted</button>
       </div>
-      <div id="creator-existing"></div>
+      <div id="creator-existing" class="creator-existing-list"></div></section>
     </section>
   </section>`;
 
@@ -369,8 +368,14 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
     existingStatus.textContent=entries.length?`${entries.length} published campaign link(s).`:'No published campaign links yet.';
     existingList.replaceChildren(...entries.map(entry=>{
       const item=document.createElement('li');
-      const attribution=entry.untracked?'no forced attribution':`source=${entry.source} · campaign=${entry.campaign}${entry.medium?` · medium=${entry.medium}`:''}`;
-      item.textContent=`${entry.slug} → ${CAMPAIGN_DESTINATION_LABELS[entry.destination]||entry.destination} · ${attribution}`;
+      const label=document.createElement('strong');label.textContent=entry.slug;
+      const detail=document.createElement('small');
+      detail.textContent=(CAMPAIGN_DESTINATION_LABELS[entry.destination]||entry.destination)+' · '+
+        (entry.untracked?'No forced tracking':`Source ${entry.source} · Campaign ${entry.campaign}${entry.medium?` · Medium ${entry.medium}`:''}`);
+      const link=document.createElement('a');
+      link.href='https://packone.pro/go/'+encodeURIComponent(entry.slug)+'/';
+      link.target='_blank';link.rel='noopener noreferrer';link.textContent='Open live vanity URL ↗';
+      item.append(label,detail,link);
       return item;
     }));
   }
@@ -433,6 +438,7 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
   const creatorPreview=root.querySelector('#creator-publish-preview'),creatorPublish=root.querySelector('#publish-creator');
   const creatorPublishStatus=root.querySelector('#creator-publish-status'),creatorKit=root.querySelector('#creator-kit');
   const creatorExisting=root.querySelector('#creator-existing'),creatorExistingStatus=root.querySelector('#creator-existing-status');
+  const creatorSummary=root.querySelector('#creator-summary');
   const creatorShowDeleted=root.querySelector('#creator-show-deleted');
   let creatorSource=null,creatorBusy=false,creatorDraft=null,creatorSlugs=new Set(),creatorShowDeletedRows=false;
 
@@ -570,11 +576,45 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
       creatorExistingStatus.textContent=display.visible.length
         ? `${display.visible.length} creator challenge(s).${!creatorShowDeletedRows&&display.deleted?` ${display.deleted} deleted hidden.`:''}`
         : display.deleted?'No active creator challenges. '+display.deleted+' deleted hidden.':'No creator challenges yet.';
+      const published=data.challenges.filter(challenge=>challenge.status==='published');
+      const pending=data.challenges.filter(challenge=>['draft','publishing'].includes(challenge.status));
+      const attention=data.challenges.filter(challenge=>challenge.status==='failed'
+        ||(challenge.status==='retired'&&challenge.publication_detail?.live_verified!==true));
+      const completedAttempts=published.reduce((total,challenge)=>total+Number(challenge.completions??challenge.attempts??0),0);
+      creatorSummary.replaceChildren(...[
+        ['Published',published.length],['Draft / publishing',pending.length],
+        ['Needs publication attention',attention.length],['Completed attempts · published',completedAttempts]
+      ].map(([label,value],index)=>{
+        const tile=document.createElement('div');
+        if(index===2&&value)tile.className='attention';
+        const number=document.createElement('strong');number.textContent=Number(value).toLocaleString();
+        const caption=document.createElement('span');caption.textContent=label;
+        tile.append(number,caption);return tile;
+      }));
       creatorExisting.replaceChildren(...display.visible.map(challenge=>{
-        const item=document.createElement('article');item.className='note';
+        const item=document.createElement('article');item.className='creator-challenge-row';
         const publicUrl=`https://packone.pro/creator/${challenge.slug}/`,trackedUrl=creatorTrackedUrl(challenge);
         const retiredVerified=challenge.status==='retired'&&challenge.publication_detail?.live_verified===true;
-        item.innerHTML=`<strong>${esc(challenge.creator_public_name)}</strong> · ${esc(challenge.slug)}<br>${esc(challenge.source_type==='daily'?`Daily · ${dateLabel(challenge.source_day)}`:'Practice')} · ${esc(environmentLabel(challenge.source_environment))} · ${Number(challenge.source_score)}/100<br>Status: <strong>${esc(challenge.status)}</strong>${challenge.status==='retired'&&!retiredVerified?' · retired page not yet verified':''} · Opens: ${Number(challenge.opens||0)} · Starts: ${Number(challenge.starts||0)} · Completions: ${Number(challenge.completions||challenge.attempts||0)}<br>Attempts: ${Number(challenge.attempts||0)} · Beat rate: ${challenge.beat_percentage==null?'—':Number(challenge.beat_percentage)+'%'} · Avg challenger: ${challenge.average_score==null?'—':Number(challenge.average_score)+'/100'} · W/T/L: ${Number(challenge.wins||0)}/${Number(challenge.ties||0)}/${Number(challenge.losses||0)}<br><small>${esc(publicUrl)} · created ${esc(dateLabel(String(challenge.created_at||'').slice(0,10)))}${challenge.published_at?` · published ${esc(dateLabel(String(challenge.published_at).slice(0,10))) }`:''}</small><div class="actions">${['draft','failed','publishing'].includes(challenge.status)?'<button type="button" class="secondary" data-resume-publish>Publish / resume</button>':''}${challenge.status==='retired'&&!retiredVerified?'<button type="button" class="secondary" data-resume-retire>Finish delete</button>':''}<button type="button" class="secondary" data-copy-public>Copy public URL</button><button type="button" class="secondary" data-copy-tracked>Copy tracked URL</button>${challenge.status==='published'?'<button type="button" class="secondary" data-show-kit>Creator kit</button><a class="button secondary" target="_blank" rel="noopener" href="'+esc(publicUrl)+'">Open challenge</a>':''}${challenge.status!=='retired'?'<button type="button" class="secondary" data-retire>Delete</button>':''}${creatorCanaryMayBePurged(challenge)?'<button type="button" class="secondary" data-purge-test>Permanently remove test</button>':''}</div><section class="note" data-existing-creator-kit hidden></section>`;
+        const sourceKind=challenge.source_type==='daily'
+          ?'Daily · '+dateLabel(challenge.source_day):'Practice';
+        const completed=Number(challenge.completions??challenge.attempts??0);
+        const beatRate=challenge.beat_percentage==null?'—':Number(challenge.beat_percentage).toLocaleString(undefined,{maximumFractionDigits:1})+'%';
+        item.innerHTML=`<header class="creator-challenge-heading">
+          <div><h3>${esc(challenge.creator_public_name)}</h3><p>${esc(challenge.slug)} · ${esc(sourceKind)} · ${esc(environmentLabel(challenge.source_environment))}</p></div>
+          <span class="creator-challenge-status ${esc(challenge.status)}">Status: <strong>${esc(challenge.status)}</strong>${challenge.status==='retired'&&!retiredVerified?' · delete not yet verified':''}</span>
+        </header>
+        <p class="creator-challenge-detail">Creator score: <strong>${Number(challenge.source_score)}/100</strong>. Challenge results below reflect recorded activity, not the original source run.</p>
+        <div class="creator-challenge-metrics">
+          <div><strong>${Number(challenge.opens??0).toLocaleString()}</strong><span>Page opens</span></div>
+          <div><strong>${Number(challenge.starts??0).toLocaleString()}</strong><span>Challenge starts</span></div>
+          <div><strong>${completed.toLocaleString()}</strong><span>Completed attempts</span></div>
+          <div><strong>${beatRate}</strong><span>Beat creator rate</span></div>
+        </div>
+        <details class="creator-challenge-detail"><summary>Detailed results and publication dates</summary>
+          <p>Wins / ties / losses: ${Number(challenge.wins??0)} / ${Number(challenge.ties??0)} / ${Number(challenge.losses??0)} · Total attempts: ${Number(challenge.attempts??0)} · Average challenger score: ${challenge.average_score==null?'—':Number(challenge.average_score)+'/100'}</p>
+          <p>Created ${esc(dateLabel(String(challenge.created_at||'').slice(0,10)))}${challenge.published_at?' · Published '+esc(dateLabel(String(challenge.published_at).slice(0,10))):''}</p>
+          <p>Public URL: <code>${esc(publicUrl)}</code></p>
+        </details><div class="actions">${['draft','failed','publishing'].includes(challenge.status)?'<button type="button" class="secondary" data-resume-publish>Publish / resume</button>':''}${challenge.status==='retired'&&!retiredVerified?'<button type="button" class="secondary" data-resume-retire>Finish delete</button>':''}<button type="button" class="secondary" data-copy-public>Copy public URL</button><button type="button" class="secondary" data-copy-tracked>Copy tracked URL</button>${challenge.status==='published'?'<button type="button" class="secondary" data-show-kit>Creator kit</button><a class="button secondary" target="_blank" rel="noopener" href="'+esc(publicUrl)+'">Open challenge</a>':''}${challenge.status!=='retired'?'<button type="button" class="secondary" data-retire>Delete</button>':''}${creatorCanaryMayBePurged(challenge)?'<button type="button" class="secondary" data-purge-test>Permanently remove test</button>':''}</div><section class="note" data-existing-creator-kit hidden></section>`;
         item.querySelector('[data-copy-public]').onclick=()=>copy(publicUrl,creatorExistingStatus);
         item.querySelector('[data-copy-tracked]').onclick=()=>copy(trackedUrl,creatorExistingStatus);
         item.querySelector('[data-show-kit]')?.addEventListener('click',()=>{
@@ -633,7 +673,7 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
         });
         return item;
       }));
-    }catch(error){creatorExistingStatus.textContent=error.message||'Creator challenges could not be loaded.';}
+    }catch(error){creatorSummary.textContent='Challenge summary is temporarily unavailable.';creatorExistingStatus.textContent=error.message||'Creator challenges could not be loaded.';}
   }
 
   creatorShowDeleted.addEventListener('click',()=>{
