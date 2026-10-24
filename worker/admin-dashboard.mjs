@@ -28,13 +28,13 @@ async function timed(query,label,sql,params) {
 // a sum of the daily counts (which double-counts returning people).
 export const ADMIN_TRENDS_SQL=`WITH
 days AS (
-  SELECT generate_series($1::date-13,$1::date,interval '1 day')::date day
+  SELECT generate_series($1::date-13,$1::date,interval '1 day')::date report_day
 ), dimensions AS (
-  SELECT 'day'::text kind,day::text label FROM days
+  SELECT 'day'::text kind,report_day::text label FROM days
   UNION ALL SELECT 'week','previous'
   UNION ALL SELECT 'week','current'
 ), observations AS MATERIALIZED (
-  SELECT (o.first_seen_at AT TIME ZONE 'America/Los_Angeles')::date day,
+  SELECT (o.first_seen_at AT TIME ZONE 'America/Los_Angeles')::date report_day,
     s.player_id,o.outcome,o.trophy_match
   FROM draft_run_decision_observations o
   JOIN draft_run_sessions s ON s.id=o.session_id
@@ -49,12 +49,12 @@ days AS (
     count(*) FILTER(WHERE outcome='pick')::int answers,
     count(*) FILTER(WHERE outcome='pick' AND trophy_match)::int trophy_matches
   FROM observations o CROSS JOIN LATERAL (VALUES
-    ('day',o.day::text),
-    ('week',CASE WHEN o.day>$1::date-7 THEN 'current' ELSE 'previous' END)
+    ('day',o.report_day::text),
+    ('week',CASE WHEN o.report_day>$1::date-7 THEN 'current' ELSE 'previous' END)
   ) d(kind,label)
   GROUP BY d.kind,d.label
 ), sessions AS MATERIALIZED (
-  SELECT coalesce(s.day,(s.created_at AT TIME ZONE 'America/Los_Angeles')::date) day,
+  SELECT coalesce(s.day,(s.created_at AT TIME ZONE 'America/Los_Angeles')::date) report_day,
     s.player_id,(s.day IS NOT NULL) daily,
     (jsonb_array_length(s.answers)=jsonb_array_length(s.puzzle_ids)) complete
   FROM draft_run_sessions s JOIN players p ON p.id=s.player_id
@@ -69,21 +69,21 @@ days AS (
     count(DISTINCT s.player_id) FILTER(WHERE s.complete AND s.daily)::int daily_players,
     count(*) FILTER(WHERE s.complete AND s.daily)::int daily_completions
   FROM sessions s CROSS JOIN LATERAL (VALUES
-    ('day',s.day::text),
-    ('week',CASE WHEN s.day>$1::date-7 THEN 'current' ELSE 'previous' END)
+    ('day',s.report_day::text),
+    ('week',CASE WHEN s.report_day>$1::date-7 THEN 'current' ELSE 'previous' END)
   ) d(kind,label)
-  WHERE s.day BETWEEN $1::date-13 AND $1::date
+  WHERE s.report_day BETWEEN $1::date-13 AND $1::date
   GROUP BY d.kind,d.label
 ), accounts AS MATERIALIZED (
-  SELECT ("createdAt" AT TIME ZONE 'America/Los_Angeles')::date day
+  SELECT ("createdAt" AT TIME ZONE 'America/Los_Angeles')::date report_day
   FROM neon_auth."user"
   WHERE "createdAt">= (($1::date-13)::timestamp AT TIME ZONE 'America/Los_Angeles')
     AND "createdAt"< (($1::date+1)::timestamp AT TIME ZONE 'America/Los_Angeles')
 ), account_metrics AS (
   SELECT d.kind,d.label,count(*)::int new_accounts
   FROM accounts a CROSS JOIN LATERAL (VALUES
-    ('day',a.day::text),
-    ('week',CASE WHEN a.day>$1::date-7 THEN 'current' ELSE 'previous' END)
+    ('day',a.report_day::text),
+    ('week',CASE WHEN a.report_day>$1::date-7 THEN 'current' ELSE 'previous' END)
   ) d(kind,label)
   GROUP BY d.kind,d.label
 )
