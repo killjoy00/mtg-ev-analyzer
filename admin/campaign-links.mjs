@@ -228,7 +228,7 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
     </div>
 
     <section data-panel="campaign" ${mode==='creator'?'hidden':''}>
-      <section class="campaign-step" aria-labelledby="campaign-create-heading"><h2 id="campaign-create-heading">1. Set destination and tracking</h2><p class="muted">Source identifies where visitors come from; campaign identifies the promotion. A slug is needed only for a short vanity URL.</p>
+      <section class="campaign-step" aria-labelledby="campaign-create-heading"><h2 id="campaign-create-heading">1. Configure a link</h2><p class="muted">Destination controls where the link leads; source identifies where visitors come from; campaign names the promotion. A slug is needed only for a short vanity URL.</p>
       <form id="campaign-link-form" class="campaign-form" novalidate>
         <label>Slug (needed for vanity URL)<input name="slug" autocomplete="off" spellcheck="false" placeholder="reddit-launch"><small data-error="slug" class="error" hidden></small></label>
         <label>Source<input name="source" autocomplete="off" spellcheck="false" placeholder="reddit"><small data-error="source" class="error" hidden></small></label>
