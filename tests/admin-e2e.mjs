@@ -14,7 +14,7 @@ try {
   await page.getByRole('heading',{name:'Pack One administration'}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Export CSV'}).count(),0);
   const sample={exposures:40,players:35,answers:32,trophy_match_pct:37.5,average_partial_credit:65,median_seconds:12,p90_seconds:28,timed_answers:29,rerolls:5,likely_abandoned:2,mature_exposures:30,pending:1,partial_0_24:1,partial_25_49:4,partial_50_74:8,partial_75_95:7,runs:9,completed_runs:6};
-  const fixture={generated_at:'2026-09-12T12:00:00Z',corpus_version:DRAFT_RUN_CORPUS_VERSION,filters:{start:'2026-09-01',end:'2026-09-12',environment:'all',type:'all',set:'all',version:'all',band:'all',pick:'all'},coverage:{qa_excluded:8,repeats_excluded:3,unobserved_excluded:2},summary:sample,share_funnel:{arrivals:20,visitors:17,starts:12,completions:9,start_pct:60,completion_pct:75},habit_metrics:{cohorts:[{source:'reddit',campaign:'creator_one',cohort_people:10,next_day_mature:8,next_day_returned:3,next_day_immature:2,next_day_rate:37.5,seven_day_mature:5,seven_day_returned:2,seven_day_immature:5,seven_day_rate:40,three_in_seven_mature:6,three_in_seven_reached:2,three_in_seven_immature:4,three_in_seven_rate:33.3,ever_three_in_seven_people:4,ever_three_in_seven_rate:40}],daily_health:[{day:'2026-09-12',people:4}]},groups:['difficulty','pick','round','set','model_disagreement','version'].map((dimension,i)=>({...sample,dimension,label:['hard','9','8','blb','true','first-pack-v2 / trophy-consensus-v2 / support-ratio-v1'][i]})),sets:['blb','powered-cube'],reviews:[{...sample,puzzle_id:'a'.repeat(32),set_id:'blb',pick_number:9,model_disagreement:true}]};
+  const fixture={generated_at:'2026-09-12T12:00:00Z',corpus_version:DRAFT_RUN_CORPUS_VERSION,filters:{start:'2026-09-01',end:'2026-09-12',environment:'all',type:'all',set:'all',version:'all',band:'all',pick:'all'},coverage:{qa_excluded:8,repeats_excluded:3,unobserved_excluded:2},summary:sample,share_funnel:{arrivals:20,visitors:17,starts:12,completions:9,start_pct:60,completion_pct:75},habit_metrics:{cohorts:[{source:'reddit',campaign:'creator_one',cohort_people:10,next_day_mature:8,next_day_returned:3,next_day_immature:2,next_day_rate:37.5,seven_day_mature:5,seven_day_returned:2,seven_day_immature:5,seven_day_rate:40,three_in_seven_mature:6,three_in_seven_reached:2,three_in_seven_immature:4,three_in_seven_rate:33.3,ever_three_in_seven_people:4,ever_three_in_seven_rate:40}],daily_health:[{day:'2026-09-12',people:4}]},groups:[...['difficulty','pick','round','set','version'].map((dimension,i)=>({...sample,dimension,label:['hard','9','8','blb','first-pack-v2 / trophy-consensus-v2 / support-ratio-v1'][i]})),...['20–39','40–59','60–79','80–100'].map((label,i)=>({...sample,dimension:'trophy_support',label,answers:[4,7,9,12][i],trophy_match_pct:[25,42.9,55.6,66.7][i]}))],sets:['blb','powered-cube'],reviews:[{...sample,puzzle_id:'a'.repeat(32),set_id:'blb',pick_number:9,model_disagreement:true}]};
   await page.addInitScript(()=>{localStorage.setItem('pack1-auth-session-v1','synthetic-admin-session');Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async value=>{window.__copiedText=value;}}});});
   const requests=[],publishBodies=[],usernameBodies=[],deleteBodies=[],adminControlRequests=[];
   const userId='11111111-1111-4111-8111-111111111111';
@@ -198,6 +198,11 @@ try {
   holdHabitReport=true;
   await page.getByRole('link',{name:'Insights',exact:true}).click();
   await page.getByRole('heading',{name:'How the decisions play'}).waitFor();
+  const supportSection=page.locator('details.insights-breakdown').filter({hasText:'How strongly the model supports the trophy pick'});
+  await supportSection.locator('summary').click();
+  assert.equal(await supportSection.locator('tbody tr').count(),4,'all four support brackets appear');
+  assert.deepEqual((await supportSection.locator('tbody tr td:first-child').allTextContents()).map(s=>s.split(' · ')[0]),['20–39','40–59','60–79','80–100']);
+  assert.match(await supportSection.innerText(),/model-implied credit/);
   const insightsUrl=requests.filter(url=>new URL(url).pathname==='/v1/admin/measurements'&&new URL(url).searchParams.has('from')).at(-1);
   assert.ok(insightsUrl,'Insights explicitly limits its first query to recent activity');
   const insightsQuery=new URL(insightsUrl).searchParams;
@@ -253,6 +258,9 @@ try {
   assert.ok(download.suggestedFilename().endsWith('.csv'));
   const csv=fs.readFileSync(await download.path(),'utf8');
   assert.match(csv,/fresh-hard/);
+  assert.match(csv,/trophy_support/);
+  assert.match(csv,/20–39/);
+  assert.match(csv,/80–100/);
   assert.doesNotMatch(csv,/stale-medium/);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),'Mobile page must not overflow horizontally');
   fs.mkdirSync('artifacts',{recursive:true});
