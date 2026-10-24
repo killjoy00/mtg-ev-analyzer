@@ -118,20 +118,20 @@ export async function renderOverview(root,request,{role='admin',isCurrent=()=>tr
   const {day,from}=overviewWindow(now);
   const today=new URLSearchParams({from:day,to:day});
   const recent=new URLSearchParams({from,to:day});
-  const section=async(id,path,render)=>{
+  const section=async(id,path,render,{optional=false}={})=>{
     const target=root.querySelector('#'+id);
     try {
       const data=await request(path);
       if(active())target.innerHTML=render(data);
     } catch(error) {
       if(!active())return;
-      if(error?.status===401||error?.status===403)throw error;
+      if(!optional&&(error?.status===401||error?.status===403))throw error;
       target.innerHTML='<p class="overview-status unknown" role="status">Temporarily unavailable. Refresh or open the full section.</p>';
     }
   };
   await Promise.all([
-    section('overview-trends','/v1/admin/overview/trends',trendsMarkup),
-    section('overview-health','/v1/admin/overview/health',healthMarkup),
+    section('overview-trends','/v1/admin/overview/trends',trendsMarkup,{optional:true}),
+    section('overview-health','/v1/admin/overview/health',healthMarkup,{optional:true}),
     section('overview-activity','/v1/admin/measurements?'+today,data=>{
       if(!data.summary)throw Error('Missing activity summary');
       const s=data.summary,f=data.share_funnel||{},href='?area=insights&'+today;
