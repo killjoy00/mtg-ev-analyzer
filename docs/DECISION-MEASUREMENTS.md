@@ -63,11 +63,20 @@ while starts and completions are server-written. The funnel follows the selected
 date range and environment only; the decision-specific run type, set, difficulty,
 pick and selection-version filters do not apply.
 
-Filters cover UTC date range (up to one year), environment, run type, set,
-difficulty band, real pick number and selection version. Groups show difficulty,
-pick depth, game position, set, model disagreement and the combined scoring /
-difficulty / selection versions. Version groups avoid hiding scoring changes
-inside one apparent trend. CSV exports contain the aggregate group rows.
+Filters cover Pacific calendar days (up to one year), environment, run
+type, set, difficulty band, real pick number and selection version. Groups show
+difficulty, pick depth, game position, set, trophy support brackets and the
+combined scoring / difficulty / selection versions. The trophy support groups
+are the trophy card's model-implied credit, calculated as
+`round(95 × trophy_card_support / top_card_support)`, independent of the
+player's actual pick and awarded score. The dashboard displays **20–39**,
+**40–59**, **60–79**, and **80–100** points (the formula's maximum is 95),
+with **Below 20** or **Unrated** shown if out-of-policy historical observations
+are present. Missing bins show zero answers, not fabricated rates. The existing
+serving policy excludes fresh puzzles below 20 implied points; this is why the
+former true/false model-disagreement breakdown had no true rows. Version groups
+avoid hiding scoring changes inside one apparent trend. CSV exports contain
+the aggregate group rows (only nonempty brackets in the export).
 
 QA runs set `qa:true` at creation. Existing test-name conventions are recognized
 server-side and persisted on new sessions; the reporting view also recognizes

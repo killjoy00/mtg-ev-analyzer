@@ -102,3 +102,12 @@ test('Insights bounds the initial history window without overriding explicit dat
   assert.match(source,/date\.setUTCDate\(date\.getUTCDate\(\)-6\)/);
   assert.match(source,/Set From and Through for a longer history/);
 });
+
+test('Insights replaces impossible disagreement boolean with a full trophy-support distribution',()=>{
+  const js=read('admin/admin.mjs');
+  assert.match(js,/How strongly the model supports the trophy pick/);
+  assert.match(js,/TROPHY_SUPPORT_BRACKETS=\['20–39','40–59','60–79','80–100'\]/);
+  assert.match(js,/supportBracketRows\(report\.groups\.filter/);
+  assert.match(js,/trophy card’s model-implied credit/);
+  assert.doesNotMatch(js,/When the model questions the trophy pick/);
+});

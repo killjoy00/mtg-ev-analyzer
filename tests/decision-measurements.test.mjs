@@ -107,3 +107,20 @@ test('Insights core reuses a single scoped scan and returns all report fields',a
   assert.match(scans[0],/primary_data AS MATERIALIZED/);
   assert.match(scans[0],/first_encounter/);
 });
+
+test('Insights groups by model-implied trophy credit without re-scoring or changing serving rules',()=>{
+  const source=fs.readFileSync('worker/measurement-admin.mjs','utf8');
+  const core=source.slice(source.indexOf("if(url.pathname==='/v1/admin/measurements') {"),source.indexOf('const match=url.pathname.match'));
+  assert.match(core,/LEFT JOIN draft_run_puzzle_ratings support/);
+  assert.match(core,/support\.puzzle_id=primary_data\.puzzle_id AND support\.difficulty_version='support-ratio-v1'/);
+  assert.match(core,/\('trophy_support',\$\{TROPHY_SUPPORT_BRACKET_SQL\}\)/);
+  assert.doesNotMatch(core,/\('model_disagreement',model_disagreement::text\)/);
+  const bracket=source.match(/const TROPHY_SUPPORT_BRACKET_SQL=\`([\s\S]*?)\`;/)?.[1];
+  assert.ok(bracket,'the SQL must define the trophy support bracket');
+  assert.match(bracket,/support\.target_support_ratio IS NULL THEN 'Unrated'/);
+  for(const [cut,label] of [[20,'Below 20'],[40,'20–39'],[60,'40–59'],[80,'60–79']])
+    assert.ok(bracket.includes(`floor(95*support.target_support_ratio+0.5) < ${cut} THEN '${label}'`));
+  assert.match(bracket,/ELSE '80–100'/);
+  assert.match(core,/WITH scoped AS MATERIALIZED/);
+  assert.match(core,/primary_data AS MATERIALIZED/);
+});
