@@ -257,6 +257,7 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
         <p id="publish-status" role="status"></p>
       </div>
       <p id="copy-status" role="status"></p><p class="subpage-help">Publishing a vanity URL opens a protected site PR, runs the required checks, merges, and verifies that the Pages route is live. Copying a preview does not publish it.</p></section>
+      <section class="campaign-step" aria-labelledby="campaign-performance-heading"><h2 id="campaign-performance-heading">Campaign performance</h2><p class="muted">Tracked acquisition touches are not all clicks; first-touch daily starts/completions are attributed activity, not a directly measured click-to-play conversion. Retention uses mature first-Daily cohorts and may use a different identity baseline.</p><form id="campaign-performance-filters" class="filters"><label>From<input type="date" name="from" required></label><label>Through<input type="date" name="to" required></label><button type="submit">Update performance</button></form><div id="campaign-performance" role="status"><p class="muted">Loading campaign performance…</p></div></section>
       <section class="campaign-step" aria-labelledby="campaign-existing-heading"><h2 id="campaign-existing-heading">Published vanity links</h2><p class="muted">These links come from the deployed campaign registry. Use an existing link rather than creating another slug for the same promotion.</p>
       <p id="existing-status" class="muted">Loading the checked-in campaign registry…</p>
       <ul id="existing-campaign-links" class="campaign-existing"></ul></section>
@@ -316,6 +317,34 @@ export async function renderCampaignLinks(root,publishRequest,draftRequest,{mode
     root.querySelectorAll('[data-mode]').forEach(item=>item.setAttribute('aria-selected',String(item===button)));
   }));
 
+  const performanceTarget=root.querySelector('#campaign-performance'),performanceForm=root.querySelector('#campaign-performance-filters');
+  if(performanceForm&&typeof draftRequest==='function'){
+    const now=new Intl.DateTimeFormat('en-CA',{timeZone:'America/Los_Angeles',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+    const to=/^\d{4}-\d{2}-\d{2}$/.test(now)?now:new Date().toISOString().slice(0,10);
+    const start=new Date(to+'T12:00:00Z');start.setUTCDate(start.getUTCDate()-29);
+    performanceForm.elements.namedItem('from').value=start.toISOString().slice(0,10);
+    performanceForm.elements.namedItem('to').value=to;
+    const load=async()=>{
+      const params=new URLSearchParams(new FormData(performanceForm));
+      performanceTarget.textContent='Loading campaign performance…';
+      try{
+        const [data,habits]=await Promise.all([
+          draftRequest('/v1/admin/campaign-performance?'+params),
+          draftRequest('/v1/admin/measurements/habits?'+params).catch(()=>null),
+        ]);
+        const cohorts=new Map((habits?.habit_metrics?.cohorts||[]).map(row=>[row.source+'\u0000'+row.campaign,row]));
+        const list=data.rows||[];
+        performanceTarget.innerHTML='<div class="scroll"><table><thead><tr><th>Source / campaign</th><th>Tracked arrivals</th><th>Arriving players</th><th>Daily starts</th><th>Daily completions</th><th>First tracked players</th><th>7-day return</th></tr></thead><tbody>'+
+        list.map(row=>{
+          const cohort=cohorts.get(row.source+'\u0000'+row.campaign),mature=Number(cohort?.seven_day_mature)||0;
+          const rate=mature?(100*Number(cohort.seven_day_returned||0)/mature).toFixed(1)+'%':'N/A';
+          return '<tr><th>'+esc(row.source)+' / '+esc(row.campaign)+'</th><td>'+esc(row.tracked_arrivals)+'</td><td>'+esc(row.arriving_players)+'</td><td>'+esc(row.daily_starts)+'</td><td>'+esc(row.daily_completions)+'</td><td>'+esc(row.new_tracked_players)+'</td><td>'+rate+' <small>n='+mature+'</small></td></tr>';
+        }).join('')+(list.length?'':'<tr><td colspan="7">No tracked campaigns or attributed runs in this range.</td></tr>')+'</tbody></table></div>';
+      }catch(error){performanceTarget.innerHTML='<p class="error" role="alert">'+esc(error.message||'Campaign performance unavailable.')+'</p>';}
+    };
+    performanceForm.onsubmit=e=>{e.preventDefault();void load();};
+    void load();
+  }
   // Existing Campaign Link mode remains intentionally unchanged below.
   const form=root.querySelector('#campaign-link-form');
   const existingStatus=root.querySelector('#existing-status');

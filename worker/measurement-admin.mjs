@@ -4,6 +4,7 @@ import {handlePlayerReports} from './admin-player-reports.mjs';
 import {handleCorpusAdmin} from './corpus-admin.mjs';
 import {handleUserAdmin} from './user-admin.mjs';
 import {handleCreatorChallengeAdmin} from './creator-challenges.mjs';
+import {handleDashboardAdmin} from './admin-dashboard.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {gameDateKey} from '../game-date.mjs';
 const fail=(message,status=400)=>{throw Object.assign(Error(message),{status});};
@@ -188,6 +189,8 @@ export async function handleAdmin(request,query,readJson) {
   if(url.pathname.startsWith('/v1/admin/creator-challenges'))return handleCreatorChallengeAdmin(request,query,readJson,id);
   if(url.pathname.startsWith('/v1/admin/player-reports'))return handlePlayerReports(request,query,readJson,id);
   if(request.method!=='GET')fail('Method not allowed.',405);
+  if(url.pathname.startsWith('/v1/admin/overview/')||url.pathname==='/v1/admin/insights/quality-watch'||url.pathname==='/v1/admin/campaign-performance')
+    return handleDashboardAdmin(request,query);
   const filters=reportFilters(url);
   if(url.pathname==='/v1/admin/measurements/habits') {
     const habitMetrics=await timedAdminQuery(query,'measurements_habits','habit_metrics',HABIT_METRICS_SQL,[filters.start,filters.end,DRAFT_RUN_CORPUS_VERSION]);

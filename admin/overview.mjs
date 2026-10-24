@@ -40,11 +40,57 @@ const metric=(label,value,href,note='')=>`<a class="overview-metric" href="${hre
 const tool=(area,description)=>`<a class="overview-tool" href="?area=${area}" aria-label="${escape(ADMIN_AREAS[area])}"${area==='team'?' id="admin-team-link"':''}><h3>${escape(ADMIN_AREAS[area])}<span aria-hidden="true">&#8594;</span></h3><p>${escape(description)}</p></a>`;
 const loading=label=>`<p class="muted" role="status">Loading ${label}...</p>`;
 
+
+export function trendChange(current,previous){
+  if(current==null||previous==null)return 'Unavailable';
+  const now=Number(current),before=Number(previous);
+  if(!Number.isFinite(now)||!Number.isFinite(before))return 'Unavailable';
+  if(before===0)return now===0?'No change':'New activity';
+  const delta=100*(now-before)/before;
+  return (delta>0?'+':'')+delta.toFixed(1)+'%';
+}
+const trendRow=(name,key,current,previous,{ratio=false}={})=>{
+  const curr=ratio?(Number(current.answers)>0?100*Number(current.trophy_matches)/Number(current.answers):null):Number(current[key]??0);
+  const prev=ratio?(Number(previous.answers)>0?100*Number(previous.trophy_matches)/Number(previous.answers):null):Number(previous[key]??0);
+  const change=ratio&&curr!=null&&prev!=null?((curr-prev)>=0?'+':'')+(curr-prev).toFixed(1)+' pp':trendChange(curr,prev);
+  return '<tr><th>'+escape(name)+'</th><td>'+escape(ratio?percent(curr):count(curr))+'</td><td>'+escape(ratio?percent(prev):count(prev))+'</td><td>'+escape(change)+'</td></tr>';
+};
+export function trendsMarkup(data){
+  const weekly=data?.weekly||[],current=weekly.find(x=>x.label==='current'),previous=weekly.find(x=>x.label==='previous');
+  if(!current||!previous)return '<p class="muted">Weekly trends unavailable.</p>';
+  const days=(data.daily||[]).slice().sort((a,b)=>a.label.localeCompare(b.label));
+  const max=Math.max(1,...days.map(x=>Number(x.completed_runs)||0));
+  const bars='<div class="overview-trend-bars" role="img" aria-label="Daily completed runs, oldest to newest">'+days.map(x=>'<span title="'+escape(x.label)+': '+escape(count(x.completed_runs))+' completed" style="height:'+Math.max(3,Math.round(100*(Number(x.completed_runs)||0)/max))+'%"></span>').join('')+'</div>';
+  return '<p class="muted">Last seven Pacific days versus previous seven. Distinct players are deduplicated within each week; trophy matches are an agreement rate.</p>'+bars+
+    '<div class="scroll"><table><thead><tr><th>Metric</th><th>Latest 7 days</th><th>Previous 7</th><th>Change</th></tr></thead><tbody>'+
+    [['Observed players','observed_players'],['Completed runs','completed_runs'],['Daily players','daily_players'],['Daily completions','daily_completions'],['New accounts','new_accounts']].map(([name,key])=>trendRow(name,key,current,previous)).join('')+
+    trendRow('Trophy match','',current,previous,{ratio:true})+'</tbody></table></div>';
+}
+export function healthMarkup(data,serviceRelease=null){
+ const day=data?.day||'unknown',daily=data?.dailies||[],cache=data?.serving||{},attention=data?.attention||{};
+ const check=(name,ok,detail,href)=>'<li><span class="overview-status '+(ok===true?'ready':ok===false?'warning':'unknown')+'">'+escape(ok===true?'Pass':ok===false?'Needs attention':'Unknown')+'</span> <strong>'+escape(name)+'</strong> · '+escape(detail)+(href?' · <a href="'+href+'">Inspect</a>':'')+'</li>';
+ const links=daily.map(x=>check('Daily: '+(x.environment==='mixed'?'Regular':x.environment==='latest'?'Latest Set':'Powered Cube'),x.scheduled===true||x.scheduled==='t',x.scheduled?'Eight-pick schedule present':'Schedule missing','/?game=draft-run&daily=1'+(x.environment==='mixed'?'':'&set='+encodeURIComponent(x.environment==='latest'?'latest':'powered-cube'))));
+ const bad=Number(attention.urgent_reports||0),failed=Number(attention.failed_publications||0);
+ const versions=serviceRelease?
+   check('Admin release',serviceRelease.frontendVersion===serviceRelease.backendVersion&&
+     (serviceRelease.gatewayVersion===serviceRelease.frontendVersion||serviceRelease.gatewayVersion==null),
+     'UI/API contract v'+String(serviceRelease.frontendVersion)+' / v'+String(serviceRelease.backendVersion)+
+     ' · backend revision '+String(serviceRelease.releaseCommit||'unavailable').slice(0,12),''):
+   '';
+
+ return '<p class="muted">Read-only checks for '+escape(day)+' (Pacific). API reachability is indicated by successful responses; this is not an external uptime monitor.</p><ul class="overview-health-checks">'+
+ check('Admin API',true,'Authorized endpoint responded','')+versions+
+ check('Serving cache',cache.cache_current===true||cache.cache_current==='t','Revision '+(cache.revision??'unavailable'),'?area=corpus')+
+ links.join('')+
+ [check('Creator publications',failed===0,failed+' failed or unverified retirements','?area=creator-challenges'),check('Critical player reports',bad===0,bad+' open broken-puzzle reports','?area=reports')].join('')+'</ul>';
+}
 export function overviewMarkup({role='admin',now=new Date()}={}) {
   const {day,from}=overviewWindow(now);
   return `<section class="admin-overview" id="admin-overview">
     <header class="overview-heading"><div><p class="overview-eyebrow">PACK ONE ADMINISTRATION</p><h1>Overview</h1><p>Your daily check-in. Open a section to dig deeper.</p></div><button type="button" class="secondary" id="overview-refresh">Refresh overview</button></header>
     <section aria-labelledby="overview-today-heading"><div class="overview-section-heading"><h2 id="overview-today-heading">Today at a glance</h2><time datetime="${day}">${day} &middot; Pacific</time></div><div id="overview-activity">${loading('today\'s activity')}</div></section>
+    <section aria-labelledby="overview-trends-heading" class="overview-panel"><h2 id="overview-trends-heading">What changed?</h2><div id="overview-trends">${loading("weekly trends")}</div><a href="?area=insights">Explore Insights →</a></section>
+    <section aria-labelledby="overview-health-heading" class="overview-panel"><h2 id="overview-health-heading">Site health</h2><div id="overview-health">${loading("site health")}</div></section>
     <section aria-labelledby="overview-attention-heading"><h2 id="overview-attention-heading">Needs attention</h2><div class="overview-attention-grid">
       <article class="overview-panel"><h3>Player reports</h3><div id="overview-reports">${loading('reports')}</div><a href="?area=reports" id="admin-reports-link">Review player reports &#8594;</a></article>
       <article class="overview-panel"><h3>Operations</h3><div id="overview-operations">${loading('serving status')}</div><a href="?area=corpus">Open corpus operations &#8594;</a></article>
@@ -70,7 +116,7 @@ export function overviewMarkup({role='admin',now=new Date()}={}) {
 
 // Read-only composition of existing endpoints. Never fetch Team membership or
 // publish, activate, retry, or moderate anything from the dashboard.
-export async function renderOverview(root,request,{role='admin',isCurrent=()=>true,onRefresh,now=new Date()}={}) {
+export async function renderOverview(root,request,{role='admin',isCurrent=()=>true,onRefresh,now=new Date(),serviceRelease=null}={}) {
   root.innerHTML=overviewMarkup({role,now});
   const overview=root.querySelector('#admin-overview');
   const active=()=>isCurrent()&&root.querySelector('#admin-overview')===overview;
@@ -79,18 +125,20 @@ export async function renderOverview(root,request,{role='admin',isCurrent=()=>tr
   const {day,from}=overviewWindow(now);
   const today=new URLSearchParams({from:day,to:day});
   const recent=new URLSearchParams({from,to:day});
-  const section=async(id,path,render)=>{
+  const section=async(id,path,render,{optional=false}={})=>{
     const target=root.querySelector('#'+id);
     try {
       const data=await request(path);
       if(active())target.innerHTML=render(data);
     } catch(error) {
       if(!active())return;
-      if(error?.status===401||error?.status===403)throw error;
+      if(!optional&&(error?.status===401||error?.status===403))throw error;
       target.innerHTML='<p class="overview-status unknown" role="status">Temporarily unavailable. Refresh or open the full section.</p>';
     }
   };
   await Promise.all([
+    section('overview-trends','/v1/admin/overview/trends',trendsMarkup,{optional:true}),
+    section('overview-health','/v1/admin/overview/health',data=>healthMarkup(data,serviceRelease),{optional:true}),
     section('overview-activity','/v1/admin/measurements?'+today,data=>{
       if(!data.summary)throw Error('Missing activity summary');
       const s=data.summary,f=data.share_funnel||{},href='?area=insights&'+today;
