@@ -74,3 +74,36 @@ test('admin measurement baseline is pinned to the current parent corpus without 
   assert.match(source,/puzzle_id=\$10/,'decision detail must keep its puzzle parameter after the corpus scope parameter');
   assert.match(source,/Historical measurements remain stored but are excluded from this dashboard baseline/);
 });
+
+// The core must compute the expensive first-encounter view once, not in
+// multiple concurrent SQL calls. The shape still matches the existing UI.
+test('Insights core reuses a single scoped scan and returns all report fields',async()=>{
+  const statements=[];
+  const query=async(sql,params=[])=>{
+    statements.push(sql);
+    if(sql.includes('FROM neon_auth.session s'))return {rows:[{user_id:'11111111-1111-4111-8111-111111111111'}]};
+    if(sql.includes('SELECT role FROM pack1_admins'))return {rows:[{role:'owner'}]};
+    if(sql.includes('WITH scoped AS MATERIALIZED'))return {rows:[{
+      coverage:JSON.stringify({recorded:12,qa_excluded:1,repeats_excluded:2,unobserved_excluded:3}),
+      summary:JSON.stringify({exposures:8,answers:6,players:4,runs:2,completed_runs:1}),
+      groups:JSON.stringify([{dimension:'difficulty',label:'hard',answers:3}]),
+    }]};
+    if(sql.includes('SELECT set_id FROM draft_run_environment_policy'))return {rows:[{set_id:'blb'}]};
+    if(sql.includes('WITH corpus_epoch AS'))return {rows:[{arrivals:3,starts:2,completions:1}]};
+    throw Error('Unexpected SQL in admin Insights mock: '+sql.slice(0,75));
+  };
+  const request=new Request('https://packone.pro/v1/admin/measurements?from=2026-10-01&to=2026-10-24',{
+    headers:{'x-pack1-auth-session':'synthetic-admin-token'},
+  });
+  const data=await handleAdmin(request,query,async()=>({}));
+  assert.equal(data.summary.answers,6);
+  assert.equal(data.coverage.repeats_excluded,2);
+  assert.deepEqual(data.groups,[{dimension:'difficulty',label:'hard',answers:3}]);
+  assert.deepEqual(data.sets,['blb']);
+  assert.equal(data.share_funnel.starts,2);
+  const scans=statements.filter(sql=>sql.includes('draft_run_source_measurements'));
+  assert.equal(scans.length,1,'shared report scans the decision measurement view exactly once');
+  assert.match(scans[0],/WITH scoped AS MATERIALIZED/);
+  assert.match(scans[0],/primary_data AS MATERIALIZED/);
+  assert.match(scans[0],/first_encounter/);
+});
