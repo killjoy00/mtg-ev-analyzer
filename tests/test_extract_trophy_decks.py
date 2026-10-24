@@ -18,7 +18,7 @@ spec.loader.exec_module(extractor)
 class FinalDeckExtractionTests(unittest.TestCase):
     def test_serving_catalog_retains_current_and_historical_sources_without_unused_aliases(self):
         builder = Path(__file__).parents[1] / 'scripts/build-trophy-deck-catalog.py'
-        current, historical, unused = 'a' * 32, 'b' * 32, 'c' * 32
+        current, historical, unused = extractor.source_aliases('fra', 'PremierDraft', '0' * 32)
         deck = {'set_id': 'fra', 'draft_id': '0' * 32, 'event_type': 'PremierDraft',
                 'deck': [{'name': 'Forest', 'count': 40}], 'sideboard': [{'name': 'Forest', 'count': 1}],
                 'deck_size': 40, 'last_game_time': None, 'main_colors': ['G'], 'splash_colors': [],
@@ -38,8 +38,8 @@ class FinalDeckExtractionTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             text = output.read_text()
             encoded = json.loads(re.search(r'export const encoded=(.*);', text).group(1))
-            decoded = subprocess.run(['node', '-e', "process.stdout.write(require('node:zlib').brotliDecompressSync(require('node:fs').readFileSync(0)))"],
-                                     input=base64.b64decode(encoded), capture_output=True, check=True)
+            decoded = subprocess.run(['node', '--input-type=module', '-e', "import{decodeTrophyDeckCatalog}from'./worker/trophy-decks.mjs';import fs from'node:fs';process.stdout.write(JSON.stringify(decodeTrophyDeckCatalog(fs.readFileSync(0,'utf8'))))"],
+                                     input=encoded.encode(), capture_output=True, check=True)
             catalog = json.loads(decoded.stdout)
             self.assertEqual(catalog['sources'], {current: 0, historical: 0})
             self.assertEqual(catalog['decks'][0]['deck'], [[0, 40]])

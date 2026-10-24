@@ -10,6 +10,11 @@ import json
 from pathlib import Path
 import re
 import subprocess
+from importlib.util import module_from_spec, spec_from_file_location
+
+spec = spec_from_file_location('extract_trophy_decks', Path(__file__).with_name('extract-trophy-decks.py'))
+extractor = module_from_spec(spec)
+spec.loader.exec_module(extractor)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--decks', required=True)
@@ -87,7 +92,7 @@ for deck in sorted(decks, key=lambda d: (d['event_type'], d['draft_id'])):
     for source in sources:
         assert source not in catalog['sources'], 'Ambiguous draft source'
         catalog['sources'][source] = index
-raw = json.dumps(catalog, separators=(',', ':'), sort_keys=True).encode()
+raw = json.dumps(extractor.compact_catalog(catalog), separators=(',', ':'), sort_keys=True).encode()
 compressor = "import{brotliCompressSync,constants}from'node:zlib';const chunks=[];for await(const chunk of process.stdin)chunks.push(chunk);process.stdout.write(brotliCompressSync(Buffer.concat(chunks),{params:{[constants.BROTLI_PARAM_QUALITY]:11}}));"
 packed = subprocess.run(['node', '--input-type=module', '-e', compressor], input=raw,
                         stdout=subprocess.PIPE, check=True).stdout

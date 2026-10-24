@@ -116,6 +116,7 @@ jobs:
       - name: Build exact Neon function revision
         env:
           ESBUILD_BIN: ${{ runner.temp }}/edge-tools/node_modules/.bin/esbuild
+          NEON_FUNCTION_PACKAGER: ${{ runner.temp }}/edge-tools/node_modules/@neon/config-runtime/dist/index.js
         run: |
           set -euo pipefail
           [[ "$GITHUB_SHA" =~ ^[a-f0-9]{40}$ ]]

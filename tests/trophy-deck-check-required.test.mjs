@@ -3,8 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {brotliDecompressSync} from 'node:zlib';
-import {trophyDeckCoverage} from '../worker/trophy-decks.mjs';
+import {decodeTrophyDeckCatalog,trophyDeckCoverage} from '../worker/trophy-decks.mjs';
 import {checkTrophyDecks,sourcePuzzleCounts} from '../scripts/trophy-deck-coverage.mjs';
 
 const root=new URL('..',import.meta.url).pathname;
@@ -37,7 +36,7 @@ test('puzzles are only inserted through the checked import function',()=>{
 
 test('coverage counts decks through the serving catalog and never requires them',async()=>{
   const {encoded}=await import('../corpus/trophy-decks/fra.mjs');
-  const known=Object.keys(JSON.parse(brotliDecompressSync(Buffer.from(encoded,'base64'))).sources)[0];
+  const known=Object.keys(decodeTrophyDeckCatalog(encoded).sources)[0];
   const coverage=await trophyDeckCoverage('fra',new Map([[known,6],['0'.repeat(32),2]]));
   assert.deepEqual(coverage,{set:'fra',catalog:true,sources:2,sources_with_deck:1,puzzles:8,puzzles_with_deck:6});
   assert.deepEqual(await trophyDeckCoverage('not-a-catalog',new Map([['0'.repeat(32),3]])),

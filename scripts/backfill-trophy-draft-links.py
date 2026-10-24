@@ -67,12 +67,13 @@ def add_links(catalog, links):
 
 
 def read_catalog(path):
-    script = "import{pathToFileURL}from'node:url';import{brotliDecompressSync}from'node:zlib';const{encoded}=await import(pathToFileURL(process.argv[1]));process.stdout.write(brotliDecompressSync(Buffer.from(encoded,'base64')));"
-    return json.loads(subprocess.check_output(['node', '--input-type=module', '-e', script, str(path)]))
+    script = "import{pathToFileURL}from'node:url';const{encoded}=await import(pathToFileURL(process.argv[1]));const{decodeTrophyDeckCatalog}=await import(pathToFileURL(process.argv[2]));process.stdout.write(JSON.stringify(decodeTrophyDeckCatalog(encoded)));"
+    return json.loads(subprocess.check_output(['node', '--input-type=module', '-e', script, str(path),
+                                              str(ROOT / 'worker/trophy-decks.mjs')]))
 
 
 def write_catalog(path, catalog):
-    raw = json.dumps(catalog, separators=(',', ':'), sort_keys=True).encode()
+    raw = json.dumps(extractor.compact_catalog(catalog), separators=(',', ':'), sort_keys=True).encode()
     script = "import{brotliCompressSync,constants}from'node:zlib';const chunks=[];for await(const chunk of process.stdin)chunks.push(chunk);process.stdout.write(brotliCompressSync(Buffer.concat(chunks),{params:{[constants.BROTLI_PARAM_QUALITY]:11}}).toString('base64'));"
     packed = subprocess.run(['node', '--input-type=module', '-e', script], input=raw,
                             stdout=subprocess.PIPE, check=True).stdout.decode()

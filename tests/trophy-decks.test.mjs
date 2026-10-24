@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {brotliDecompressSync} from 'node:zlib';
+import {brotliCompressSync,brotliDecompressSync} from 'node:zlib';
 import {createHash} from 'node:crypto';
 import {encoded,sha256} from '../corpus/trophy-decks/fra.mjs';
-import {withTrophyDeckAvailability,trophyDeckForRound} from '../worker/trophy-decks.mjs';
+import {decodeTrophyDeckCatalog,withTrophyDeckAvailability,trophyDeckForRound} from '../worker/trophy-decks.mjs';
 import {revealCardChoices} from '../draft-run-reveal.mjs';
 import {gateway,routeFamily} from '../edge/gateway.mjs';
 import {catalogLoaders} from '../corpus/trophy-decks/index.mjs';
@@ -11,9 +11,28 @@ import coverage from '../corpus/trophy-decks/coverage.json' with {type:'json'};
 import {normalizedDisplayFaces} from '../card-faces.mjs';
 import {safeCardImageUrl} from '../card-image-policy.mjs';
 
-const bytes=brotliDecompressSync(Buffer.from(encoded,'base64')),catalog=JSON.parse(bytes);
+const bytes=brotliDecompressSync(Buffer.from(encoded,'base64')),catalog=decodeTrophyDeckCatalog(encoded);
 const source=Object.keys(catalog.sources)[0];
 const answer={puzzle:{puzzle_id:'locked',set_id:'fra'}};
+
+test('compact sources retain only the selected aliases and reject corrupt masks',()=>{
+  const id='0'.repeat(32),deck={draft_url:'https://www.17lands.com/draft/'+id,event_type:'PremierDraft'};
+  const hashes=[`fra|${id}`,`fra|PremierDraft|${id}`,`pack-one|FRA|${id}`]
+    .map(value=>createHash('sha256').update(value).digest('hex').slice(0,32)).sort();
+  const raw={set_id:'fra',decks:[deck],source_alias_masks:[5]};
+  const encode=value=>brotliCompressSync(Buffer.from(JSON.stringify(value))).toString('base64');
+  const expanded=decodeTrophyDeckCatalog(encode(raw));
+  assert.deepEqual(expanded.sources,{[hashes[0]]:0,[hashes[2]]:0});
+  assert.equal(expanded.sources[hashes[1]],undefined,'unused compatibility aliases stay absent');
+  assert.equal(expanded.source_alias_masks,undefined);
+  for(const source_alias_masks of [[],[0],[8],[1.5],[null]])
+    assert.throws(()=>decodeTrophyDeckCatalog(encode({...raw,source_alias_masks})),/Invalid trophy source/);
+  assert.throws(()=>decodeTrophyDeckCatalog(encode({...raw,sources:{}})),/Invalid trophy source/);
+  assert.throws(()=>decodeTrophyDeckCatalog(encode({...raw,decks:[{...deck,draft_url:'https://example.invalid/'}]})),/Invalid trophy draft/);
+  assert.throws(()=>decodeTrophyDeckCatalog(encode({...raw,decks:[deck,deck],source_alias_masks:[1,1]})),/Duplicate trophy source/);
+  const legacy={set_id:'fra',sources:{[hashes[0]]:0},decks:[deck]};
+  assert.deepEqual(decodeTrophyDeckCatalog(encode(legacy)),legacy);
+});
 
 test('every match and non-match keeps three distinct role-appropriate cards',()=>{
   const ranking=[{id:'leader',support:.6},{id:'runner',support:.3},{id:'trophy',support:.09},{id:'weak',support:.01}];
@@ -50,7 +69,7 @@ test('all published set catalogs have verified hashes, exact lists and complete 
   for(const [set,load] of Object.entries(catalogLoaders)) {
     const {encoded,sha256}=await load(),bytes=brotliDecompressSync(Buffer.from(encoded,'base64'));
     assert.equal(createHash('sha256').update(bytes).digest('hex'),sha256,set);
-    const current=JSON.parse(bytes),expected=coverage.sets.find(row=>row.set_id===set);
+    const current=decodeTrophyDeckCatalog(encoded),expected=coverage.sets.find(row=>row.set_id===set);
     assert.equal(current.set_id,set);assert.equal(current.decks.length,expected.decks);total+=current.decks.length;
     assert.equal(Object.keys(current.sources).length,expected.serving_sources,set);
     assert.equal(new Set(Object.values(current.sources)).size,current.decks.length,set+' retains every deck');
@@ -81,7 +100,7 @@ test('all published set catalogs have verified hashes, exact lists and complete 
 test('deck and availability caches cannot mix sets or sources with the same local index',async()=>{
   const session={answers:[answer],puzzle_ids:['locked']};
   for(const set of ['fra','hob','powered-cube','fra']) {
-    const {encoded}=await catalogLoaders[set](),current=JSON.parse(brotliDecompressSync(Buffer.from(encoded,'base64')));
+    const {encoded}=await catalogLoaders[set](),current=decodeTrophyDeckCatalog(encoded);
     const source=Object.keys(current.sources).find(source=>current.sources[source]===0);
     const query=async()=>({rows:[{puzzle_id:'locked',set_id:set,source_draft_hash:source}]});
     const value=await trophyDeckForRound(query,session,'0');

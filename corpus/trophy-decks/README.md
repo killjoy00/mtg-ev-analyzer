@@ -78,6 +78,14 @@ Answers contain only an availability flag. Full decklists are returned only
 after the owning player locks the corresponding pick. Refreshes do not change
 scoring, source eligibility, fixed Dailies or stored answers.
 
+Source hashes are reconstructed from each public draft ID during the lazy
+catalog load. A small per-deck mask preserves exactly the aliases retained by
+the source inventory, including historical aliases; unused forms stay absent.
+This avoids storing both a public draft ID and its derived hash in the archive.
+The decoded catalogs and API behavior retain the same source membership.
+Protected releases validate archive size with the pinned Neon CLI's actual
+packager before deploying. Offline bundle builds retain a local ZIP estimate.
+
 ## Full draft links
 
 The deck dialog links to the same source draft on 17Lands. `source.draft_url` is
