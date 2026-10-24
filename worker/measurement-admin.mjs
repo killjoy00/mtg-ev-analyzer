@@ -197,10 +197,10 @@ export async function handleAdmin(request,query,readJson) {
     // Materialize the expensive first-encounter decision scan once. Previously
     // coverage, summary, and seven grouped aggregations each expanded the
     // correlated measurement view in a separate concurrent SQL request.
-    // The coverage projection does not need first_encounter; NOT MATERIALIZED
-    // lets Postgres prune that work while both summary and groups reuse it.
+    // Both the coverage repeat count and eligible decisions reuse one scoped
+    // snapshot; summary and grouped metrics reuse the eligible subset.
     const [aggregates,options,shareFunnel]=await Promise.all([
-      timedAdminQuery(query,'measurements','core_aggregates',`WITH scoped AS NOT MATERIALIZED (SELECT * ${SCOPE}),
+      timedAdminQuery(query,'measurements','core_aggregates',`WITH scoped AS MATERIALIZED (SELECT * ${SCOPE}),
         primary_data AS MATERIALIZED (SELECT * FROM scoped WHERE observed AND NOT is_qa AND first_encounter),
         coverage AS (SELECT count(*)::int recorded,count(*) FILTER(WHERE is_qa)::int qa_excluded,
           count(*) FILTER(WHERE NOT observed AND NOT is_qa)::int unobserved_excluded,
