@@ -76,6 +76,19 @@ cache key, lease token, captured intent and Pacific verification date. A writer
 cannot commit between that check and marking ready. Any newer serving revision
 supersedes previous readiness immediately; obsolete workers cannot make it ready.
 
+`tests/corpus-readiness-backend-smoke.mjs` runs in two scopes:
+
+- `postgres-contract` runs it with `--local-fixture` on the small fixture
+  corpus, about 5 seconds. It covers every check except component lifecycle,
+  using the fixture's Cube as the activation target. This scope alone holds
+  the state-machine checks: killed-worker lease recovery, timeout retry, cache
+  corruption, the post-smoke revision race and reactivation.
+- The corpus domain's Neon branch runs only the checks that need the
+  production-sized corpus: baseline, cross-version carry, staging and
+  activation, component lifecycle, and the schedule and session fingerprints.
+  On that copy every readiness cycle rebuilds and re-verifies about a million
+  cache rows. The full suite took 12–14 minutes there.
+
 Transient failures have at most four attempts per retry cycle with backoff.
 Expired leases and due retries are recovered by the existing authenticated
 `pack1-account-deletion-maintenance` invocation (every ten minutes), after its

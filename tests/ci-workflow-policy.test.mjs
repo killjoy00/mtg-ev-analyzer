@@ -193,6 +193,19 @@ test('backend full path fans out by domain and aggregates fail closed', () => {
   assert.match(backend, /if: always\(\) && steps\.neon\.outputs\.branch_id != ''/);
 });
 
+test('serving readiness state-machine checks run on the local PostgreSQL contract', () => {
+  const backend = readFileSync('.github/workflows/backend-gate.yml', 'utf8');
+  const contract = backend.split('\n  postgres-contract:\n')[1].split('\n  precheck:\n')[0];
+  assert.match(contract, /run: node tests\/corpus-readiness-backend-smoke\.mjs --local-fixture\n/);
+  const suite = readFileSync('tests/corpus-readiness-backend-smoke.mjs', 'utf8');
+  // Neon domain jobs install no dependencies, so pg must load only for the local scope.
+  assert.doesNotMatch(suite, /^import .*postgres-fixture/m);
+  for (const name of ['killed worker lease is reclaimed', 'timeout is actionable', 'real cache corruption fails', 'post-smoke concurrent revision', 'reactivation of the same source']) {
+    const at = suite.indexOf(name);
+    assert.ok(at > suite.indexOf('if(local) {\n // A real killed Node process') && at < suite.indexOf('// The local fixture has no supplemental component'), name);
+  }
+});
+
 test('serving maintenance runs only the reviewed SQL on a named Neon branch, and only when needed', () => {
   const flow = readFileSync('.github/workflows/serving-maintenance.yml', 'utf8');
   assert.match(flow, /schedule:\n    - cron: '[^']+'/);

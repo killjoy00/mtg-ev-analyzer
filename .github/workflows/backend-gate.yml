@@ -98,6 +98,9 @@ jobs:
           printf '%s' "$PACK1_TEST_DATABASE_URL" > "$RUNNER_TEMP/pack1-postgres.connection"
           node tests/creator-event-migration-rollout.mjs "$RUNNER_TEMP/pack1-postgres.connection" --dev-fixtures
           node tests/creator-event-write-safety.mjs "$RUNNER_TEMP/pack1-postgres.connection" --dev-fixtures
+      # Neon's corpus domain keeps only the production-scale readiness checks.
+      - name: Verify serving readiness leases, retries, corruption and revision races
+        run: node tests/corpus-readiness-backend-smoke.mjs --local-fixture
 
   precheck:
     if: github.event_name == 'pull_request'

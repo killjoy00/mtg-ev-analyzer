@@ -11,13 +11,27 @@ import {gameDateKey} from '../game-date.mjs';
 import {loadServingSnapshot,customSetsFromSnapshot} from '../worker/draft-run-selection.mjs';
 import {handleCorpusAdmin} from '../worker/corpus-admin.mjs';
 import {registerServingReadiness,readServingReadiness,advanceServingReadiness,retryServingReadiness,verifyServingReadiness} from '../worker/corpus-readiness.mjs';
-const connectionFile=process.argv[2],branch=process.env.PACK1_CI_BRANCH_ID;
-if(!connectionFile||!process.argv.includes('--dev-fixtures')||!branch?.startsWith('br-')||
+// Two scopes share this sequence. --local-fixture runs on postgres-contract's
+// small corpus and covers the lease, retry, corruption and revision-race state
+// machine. A disposable Neon branch runs only the checks that need the
+// production-sized corpus; each skipped one rebuilt and re-verified its whole
+// serving cache there.
+const local=process.argv.includes('--local-fixture');
+let connectionFile=process.argv[2],branch=process.env.PACK1_CI_BRANCH_ID,pool;
+if(local) {
+ // Neon domain jobs do not install dependencies, so load pg only here.
+ const {SQL_CONNECTION,fixturePool,postgresTransport}=await import('./support/postgres-fixture.mjs');
+ pool=fixturePool();
+ globalThis.fetch=postgresTransport(pool);
+ connectionFile=fs.mkdtempSync('/tmp/pack1-readiness-')+'/connection';
+ fs.writeFileSync(connectionFile,SQL_CONNECTION);
+ branch='local-fixture';
+} else if(!connectionFile||!process.argv.includes('--dev-fixtures')||!branch?.startsWith('br-')||
  ['br-orange-feather-ayps8kep','br-twilight-hill-ayffyd2b'].includes(branch))throw Error('Disposable CI branch identity is required.');
 const query=corpusDatabase(connectionFile),parse=x=>typeof x==='string'?JSON.parse(x):x,yes=x=>x===true||x==='t';
 const tag=randomBytes(5).toString('hex'),candidate=randomBytes(32).toString('hex'),reason='qa-readiness-'+tag;
 const identity={actor:'isolated-readiness-fixture',run_id:process.env.GITHUB_RUN_ID||'local'};
-const report={suite:'corpus-readiness',branch,sha:process.env.GITHUB_SHA,checks:[]};
+const report={suite:'corpus-readiness',scope:local?'local-fixture':'neon-production-scale',branch,sha:process.env.GITHUB_SHA,checks:[]};
 const check=(name,details={})=>{report.checks.push({name,...details});console.log(JSON.stringify({check:name,...details}));};
 const revision=async()=>String((await query('SELECT revision::text revision FROM draft_run_serving_revision WHERE singleton')).rows[0].revision);
 async function fingerprints() {
@@ -39,6 +53,9 @@ try {
  await query('DELETE FROM draft_run_readiness_keys');
  const initial=await loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION);
  setId=customSetsFromSnapshot(initial,gameDateKey())[0]?.set_id;
+ // No set in the small local fixture has single-set practice coverage (16
+ // sources per pick); its Cube passes the same activated-snapshot verification.
+ if(!setId&&local)setId='powered-cube';
  assert.ok(setId,'A complete Live single-set practice environment is required');
  original=(await query(`SELECT p.active_snapshot_id,p.status,s.lifecycle_status,s.superseded_by
   FROM draft_run_environment_policy p JOIN corpus_source_snapshots s ON s.source_snapshot_id=p.active_snapshot_id WHERE p.set_id=$1`,[setId])).rows[0];
@@ -65,10 +82,10 @@ try {
   FROM draft_run_verified_puzzles p
   WHERE p.set_id=$3 AND p.corpus_version=$4
   ORDER BY p.puzzle_id LIMIT 1`,[futurePuzzle,futureVersion,setId,DRAFT_RUN_CORPUS_VERSION]);
- assert.equal((await query(
+ assert.equal(Number((await query(
   'SELECT count(*)::int n FROM draft_run_puzzle_ratings WHERE puzzle_id=$1 AND difficulty_version=$2',
   [futurePuzzle,DRAFT_RUN_DIFFICULTY_VERSION]
- )).rows[0].n,1,'Puzzle insertion must derive its rating automatically');
+ )).rows[0].n),1,'Puzzle insertion must derive its rating automatically');
  assert.equal(await revision(),beforeFutureStage,'Inactive future-parent baseline and ratings must not churn the serving revision');
  await query('DELETE FROM draft_run_verified_puzzles WHERE puzzle_id=$1',[futurePuzzle]);
  futurePuzzle=null;
@@ -201,10 +218,11 @@ try {
  assert.ok(activated.readiness.evidence.samples.some(s=>s.set_id===setId&&s.active_snapshot_id===candidate));
  check('admin activation proactively builds and selects the intended source; concurrent claims coalesce',{revision:event.revision,operation:activated.readiness.operation_id});
 
+ if(local) {
  // A real killed Node process leaves a committed lease, not an in-memory job.
  const source=(await query('SELECT source_draft_hash FROM draft_run_verified_puzzles WHERE source_snapshot_id=$1 LIMIT 1',[candidate])).rows[0].source_draft_hash;
  await query("INSERT INTO corpus_source_exclusions(set_id,corpus_version,source_draft_hash,reason,evidence) VALUES($1,$2,$3,$4,'{}')",[setId,DRAFT_RUN_CORPUS_VERSION,source,reason]);
- child=spawn(process.execPath,['--input-type=module','-e',`setInterval(()=>{},1000);const {corpusDatabase}=await import('./scripts/neon-corpus-db.mjs');const {advanceServingReadiness}=await import('./worker/corpus-readiness.mjs');await advanceServingReadiness(corpusDatabase(process.argv[1]),{build:async()=>new Promise(()=>{})});`,connectionFile],{stdio:['ignore','ignore','pipe']});
+ child=spawn(process.execPath,['--import','./tests/support/postgres-fixture-fetch.mjs','--input-type=module','-e',`setInterval(()=>{},1000);const {corpusDatabase}=await import('./scripts/neon-corpus-db.mjs');const {advanceServingReadiness}=await import('./worker/corpus-readiness.mjs');await advanceServingReadiness(corpusDatabase(process.argv[1]),{build:async()=>new Promise(()=>{})});`,connectionFile],{stdio:['ignore','ignore','pipe']});
  let interrupted;
  for(let i=0;i<40;i++) {interrupted=await readServingReadiness(query);if(interrupted.state==='warming')break;await new Promise(r=>setTimeout(r,150));}
  assert.equal(interrupted.state,'warming');
@@ -253,7 +271,10 @@ try {
  const reactivated=await post('/'+setId+'/status',{oldStatus:'Paused',status:'Live',corpusVersion:DRAFT_RUN_CORPUS_VERSION,reason});
  assert.equal(reactivated.ok,true,JSON.stringify(reactivated));
  check('reactivation of the same source creates and completes new readiness');
+ }
 
+ // The local fixture has no supplemental component; production always does.
+ if(!local) {
  component=(await query(`SELECT c.set_id,c.component_version,c.status,v.manifest FROM corpus_components c
   JOIN corpus_set_versions v ON v.set_id=c.set_id AND v.corpus_version=c.component_version
   JOIN draft_run_environment_policy p ON p.set_id=c.set_id AND p.status='Live'
@@ -268,6 +289,7 @@ try {
   {oldStatus:'Paused',status:'Live',corpusVersion:DRAFT_RUN_CORPUS_VERSION,reason});
  assert.equal(componentReady.ok,true,JSON.stringify(componentReady));
  check('component lifecycle invalidates and warms through the same guarded operation');
+ }
  assert.deepEqual(await fingerprints(),immutable,'Readiness must not rewrite fixed Dailies or historical sessions');
  check('existing fixed schedules and historical sessions are byte-for-byte unchanged');
  report.pass=true;
@@ -291,6 +313,7 @@ try {
  await query('DELETE FROM corpus_health_checks WHERE source_snapshot_id=$1',[candidate]);
  await query('DELETE FROM corpus_source_snapshots WHERE source_snapshot_id=$1',[candidate]);
  fs.mkdirSync('artifacts/corpus-readiness',{recursive:true});
- fs.writeFileSync('artifacts/corpus-readiness/isolated.json',JSON.stringify(report,null,2)+'\n');
+ fs.writeFileSync(`artifacts/corpus-readiness/${local?'local-fixture':'isolated'}.json`,JSON.stringify(report,null,2)+'\n');
+ if(pool)await pool.end();
 }
 console.log(JSON.stringify(report));
