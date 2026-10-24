@@ -93,3 +93,12 @@ test('admin startup does not wait on guest migrations and exposes its loading st
   assert.match(js,/showLoading\(area==='insights'\?'Loading Insights…'/);
   assert.match(js,/code:'admin_session_timeout'/);
 });
+
+test('Insights bounds the initial history window without overriding explicit dates',()=>{
+  const source=read('admin/admin.mjs');
+  assert.match(source,/function defaultInsightsRange\(\)/);
+  assert.match(source,/params\.has\('from'\)\|\|params\.has\('to'\)/);
+  assert.match(source,/timeZone:'America\/Los_Angeles'/);
+  assert.match(source,/date\.setUTCDate\(date\.getUTCDate\(\)-6\)/);
+  assert.match(source,/Set From and Through for a longer history/);
+});
