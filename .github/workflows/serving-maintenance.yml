@@ -1,0 +1,104 @@
+name: serving index maintenance
+run-name: serving index maintenance / ${{ inputs.target || 'production' }}
+
+# Restores the serving tables' visibility map and statistics after bulk writes
+# that skip the release workflows' maintenance step, such as card-image
+# refreshes and targeted repairs. Runs only the reviewed maintenance SQL; it
+# never deploys code or changes rows. CI branches copy production, so a stale
+# visibility map also makes every backend-gate branch repeat this VACUUM.
+on:
+  schedule:
+    - cron: '43 3,15 * * *'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Neon branch to maintain'
+        type: choice
+        options: [production, development]
+        default: production
+        required: true
+      force:
+        description: 'Run maintenance even when the tables look current'
+        type: boolean
+        default: false
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: serving-maintenance-${{ inputs.target || 'production' }}
+  cancel-in-progress: false
+
+jobs:
+  maintain:
+    if: github.repository == 'killjoy00/mtg-ev-analyzer'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      PROJECT_ID: patient-shadow-91417882
+      TARGET: ${{ inputs.target || 'production' }}
+      FORCE: ${{ inputs.force || false }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Resolve target branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$NEON_API_KEY" || { echo '::error::NEON_API_KEY is missing.'; exit 1; }
+          case "$TARGET" in
+            development) branch=br-twilight-hill-ayffyd2b ;;
+            production) branch=br-orange-feather-ayps8kep ;;
+            *) echo "::error::Unknown target $TARGET"; exit 1 ;;
+          esac
+          echo "TARGET_BRANCH=$branch" >> "$GITHUB_ENV"
+
+      - name: Install pinned Neon CLI and psql
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install -g neon@4.17.4
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+
+      - name: Check serving table visibility
+        id: check
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          connection=$(neon connection-string "$TARGET_BRANCH" --project-id "$PROJECT_ID" --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          printf '%s' "$connection" > "$RUNNER_TEMP/target.connection"
+          # pg_class.relallvisible only moves at VACUUM or ANALYZE, so dead and
+          # newly inserted rows since the last vacuum are the live signal.
+          stale=$(psql "$connection" -XAt -v ON_ERROR_STOP=1 -c "
+            SELECT count(*) FROM pg_class c JOIN pg_stat_user_tables s ON s.relid=c.oid
+            WHERE c.oid IN ('public.draft_run_verified_puzzles'::regclass,'public.draft_run_puzzle_ratings'::regclass)
+              AND (c.relallvisible<0.99*c.relpages
+                OR s.n_dead_tup>0.01*greatest(s.n_live_tup,1)
+                OR s.n_ins_since_vacuum>0.01*greatest(s.n_live_tup,1))")
+          psql "$connection" -XA -F ' | ' -v ON_ERROR_STOP=1 -c "
+            SELECT c.relname,c.relpages,c.relallvisible,s.n_live_tup,s.n_dead_tup,s.n_ins_since_vacuum
+            FROM pg_class c JOIN pg_stat_user_tables s ON s.relid=c.oid
+            WHERE c.oid IN ('public.draft_run_verified_puzzles'::regclass,'public.draft_run_puzzle_ratings'::regclass)
+            ORDER BY 1" | tee -a "$GITHUB_STEP_SUMMARY"
+          if [[ "$stale" != 0 || "$FORCE" == true ]]; then needed=true; else needed=false; fi
+          echo "needed=$needed" >> "$GITHUB_OUTPUT"
+          echo "Maintenance needed on $TARGET: $needed" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Restore serving index visibility
+        if: steps.check.outputs.needed == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          connection=$(cat "$RUNNER_TEMP/target.connection")
+          psql "$connection" -X -v ON_ERROR_STOP=1 -f .github/scripts/maintain-serving-indexes.sql | tee -a "$GITHUB_STEP_SUMMARY"

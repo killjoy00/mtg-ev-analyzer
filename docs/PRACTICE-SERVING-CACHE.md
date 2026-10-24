@@ -127,6 +127,17 @@ It rejects the wrong database or a role that does not own both tables, waits at
 most five seconds for a conflicting maintenance lock, and bounds each table at
 eight minutes. TRUNCATE FALSE avoids end-of-vacuum heap truncation locks.
 
+Writes that bypass those workflows leave the visibility map stale until the next
+release, for example card-image refreshes and targeted repairs. On October 23 a
+card-image refresh ran from 21:38 to 23:08 UTC, three minutes after a release
+had vacuumed production. It left 319,000 dead puzzle rows and 82% of pages
+all-visible. Every backend-gate branch copies production, so each one then spent
+70–90 seconds repeating this VACUUM. `serving-maintenance.yml` checks production
+twice a day. It runs the same SQL when either serving table has more than 1% dead
+rows or rows inserted since the last vacuum, or fewer than 99% of its pages
+all-visible. It can also be dispatched for either branch, with `force`. It never
+deploys code or changes rows.
+
 A covering index can still fetch thousands of heap rows when its visibility map
 has not caught up with an import. ANALYZE and index creation do not restore those
 bits. On an isolated production-sized clone, the recorded SNC reroll took

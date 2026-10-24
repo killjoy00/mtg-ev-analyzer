@@ -193,6 +193,18 @@ test('backend full path fans out by domain and aggregates fail closed', () => {
   assert.match(backend, /if: always\(\) && steps\.neon\.outputs\.branch_id != ''/);
 });
 
+test('serving maintenance runs only the reviewed SQL on a named Neon branch, and only when needed', () => {
+  const flow = readFileSync('.github/workflows/serving-maintenance.yml', 'utf8');
+  assert.match(flow, /schedule:\n    - cron: '[^']+'/);
+  assert.match(flow, /\npermissions:\n  contents: read\n/);
+  assert.match(flow, /if: github\.repository == 'killjoy00\/mtg-ev-analyzer'/);
+  assert.match(flow, /npm install -g neon@4\.17\.4/);
+  assert.match(flow, /echo "::add-mask::\$connection"/);
+  assert.match(flow, /development\) branch=br-twilight-hill-ayffyd2b ;;\n\s+production\) branch=br-orange-feather-ayps8kep ;;/);
+  assert.match(flow, /if: steps\.check\.outputs\.needed == 'true'[\s\S]*-f \.github\/scripts\/maintain-serving-indexes\.sql/);
+  assert.doesNotMatch(flow, /functions deploy|build-neon-functions|\b(UPDATE|INSERT|DELETE|DROP|ALTER|TRUNCATE)\b/);
+});
+
 test('backend Neon branches are capped, sampled, gated on the local contract and covered nightly', () => {
   const backend = readFileSync('.github/workflows/backend-gate.yml', 'utf8');
   const domain = backend.split('\n  backend-domain:\n')[1].split('\n  backend-gate:\n')[0];
