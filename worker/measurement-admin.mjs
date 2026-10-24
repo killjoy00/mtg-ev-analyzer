@@ -28,6 +28,17 @@ export function reportFilters(url,now=new Date()) {
   if(!['all','easy','medium','hard'].includes(band)||!['all',...Array.from({length:12},(_,i)=>String(i+1))].includes(pick))fail('Invalid difficulty or pick filter.');
   return {start,end,environment,type,set,version,band,pick,corpus_version:DRAFT_RUN_CORPUS_VERSION,params:[start,end,environment,type,set,version,band,pick,DRAFT_RUN_CORPUS_VERSION]};
 }
+// The serving floor is 20 model-implied points (see serving-quality.mjs).
+// Use the *trophy card's* support relative to the top-supported card, not
+// the player's actual awarded score or the top-two difficulty ratio.
+const TROPHY_SUPPORT_BRACKET_SQL=`CASE
+  WHEN support.target_support_ratio IS NULL THEN 'Unrated'
+  WHEN floor(95*support.target_support_ratio+0.5) < 20 THEN 'Below 20'
+  WHEN floor(95*support.target_support_ratio+0.5) < 40 THEN '20–39'
+  WHEN floor(95*support.target_support_ratio+0.5) < 60 THEN '40–59'
+  WHEN floor(95*support.target_support_ratio+0.5) < 80 THEN '60–79'
+  ELSE '80–100'
+END`;
 const PACIFIC_RANGE_START="($1::date::timestamp AT TIME ZONE 'America/Los_Angeles')";
 const PACIFIC_RANGE_END="(($2::date + 1)::timestamp AT TIME ZONE 'America/Los_Angeles')";
 const SCOPE=`FROM draft_run_source_measurements WHERE first_seen_at >= ${PACIFIC_RANGE_START} AND first_seen_at < ${PACIFIC_RANGE_END}
@@ -209,8 +220,10 @@ export async function handleAdmin(request,query,readJson) {
         summary AS (SELECT ${METRICS},count(DISTINCT session_id)::int runs,
           count(DISTINCT session_id) FILTER(WHERE run_complete)::int completed_runs FROM primary_data),
         grouped AS (SELECT dimension,label,${METRICS} FROM primary_data
+          LEFT JOIN draft_run_puzzle_ratings support
+            ON support.puzzle_id=primary_data.puzzle_id AND support.difficulty_version='support-ratio-v1'
           CROSS JOIN LATERAL (VALUES ('difficulty',coalesce(band,'unrated')),('set',set_id),('pick',pick_number::text),
-          ('round',round::text),('source_event',source_event_type),('model_disagreement',model_disagreement::text),
+          ('round',round::text),('source_event',source_event_type),('trophy_support',${TROPHY_SUPPORT_BRACKET_SQL}),
           ('version',selection_version||' / '||scoring_version||' / '||difficulty_version)) dimensions(dimension,label)
           GROUP BY dimension,label)
         SELECT row_to_json(coverage) coverage,row_to_json(summary) summary,
