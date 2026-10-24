@@ -198,6 +198,11 @@ try {
   holdHabitReport=true;
   await page.getByRole('link',{name:'Insights',exact:true}).click();
   await page.getByRole('heading',{name:'How the decisions play'}).waitFor();
+  const insightsUrl=requests.filter(url=>new URL(url).pathname==='/v1/admin/measurements'&&new URL(url).searchParams.has('from')).at(-1);
+  assert.ok(insightsUrl,'Insights explicitly limits its first query to recent activity');
+  const insightsQuery=new URL(insightsUrl).searchParams;
+  assert.equal((Date.parse(insightsQuery.get('to'))-Date.parse(insightsQuery.get('from')))/86400000,6,
+    'Insights initial view requests seven Pacific calendar days');
   await page.getByRole('heading',{name:'Daily result-share funnel'}).waitFor();
   assert.match(await page.locator('.share-funnel').innerText(),/20[\s\S]*17[\s\S]*12[\s\S]*9/);
   await page.getByText('Loading Daily habit cohorts…',{exact:true}).waitFor();
