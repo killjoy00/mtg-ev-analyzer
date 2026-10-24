@@ -6,6 +6,8 @@ const mana=cost=>[...String(cost||'').matchAll(/\{([^}]+)\}/g)].map(([,symbol])=
 const group=card=>/\bLand\b/.test(card.type_line)?'Lands':/\bCreature\b/.test(card.type_line)?'Creatures':'Other spells';
 
 function deckMarkup(deck,context) {
+  const draftUrl=deck.source?.draft_url;
+  const draftLink=/^https:\/\/www\.17lands\.com\/draft\/[a-f0-9]{32}$/.test(draftUrl||'')?`<p class="run-deck-draft-link"><a href="${esc(draftUrl)}" target="_blank" rel="noopener noreferrer">View full draft on 17Lands</a></p>`:'';
   const earlier=new Set(context.priorNames||[]);
   const colors={W:'white',U:'blue',B:'black',R:'red',G:'green'};
   const names=value=>[...String(value||'')].map(c=>colors[c]).filter(Boolean).join(' and ');
@@ -20,7 +22,7 @@ function deckMarkup(deck,context) {
     return `<section class="run-deck-group"><h3>${label}<span>${cards.reduce((sum,c)=>sum+c.count,0)}</span></h3>${cards.map(card=>`<div class="run-deck-row ${card.name===context.trophyName?'is-trophy':''}"><span>${card.count}</span><button class="text-button" type="button" data-deck-card="${esc(card.id)}">${esc(card.name)}${card.name===context.trophyName?'<em>Trophy pick</em>':earlier.has(card.name)?'<i>Earlier pick</i>':''}</button><span class="run-deck-cost" aria-label="${esc(card.mana_cost)}">${mana(card.mana_cost)}</span></div>`).join('')}</section>`;
   }).join('');
   const side=deck.sideboard.length?`<details class="run-deck-sideboard"><summary>Sideboard (${deck.sideboard.reduce((n,c)=>n+c.count,0)})</summary>${deck.sideboard.map(card=>`<div class="run-deck-row"><span>${card.count}</span><button type="button" class="text-button" data-deck-card="${esc(card.id)}">${esc(card.name)}</button></div>`).join('')}</details>`:'';
-  return `<p class="run-deck-meta">${context.record?`<strong>${esc(context.record.replace('–','-'))}</strong> · `:''}${esc(events[deck.event_type]||deck.event_type)} · ${deck.size} cards</p>${colorText?`<p class="run-deck-colors">${esc(colorText[0].toUpperCase()+colorText.slice(1))}</p>`:''}${chart}${sections}${side}<p class="run-deck-source">Source: <a href="https://www.17lands.com/public_datasets" target="_blank" rel="noopener">17Lands public datasets</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></p><details class="run-deck-about"><summary>About this deck</summary><p>${esc(deck.source.note)}</p></details>`;
+  return `<p class="run-deck-meta">${context.record?`<strong>${esc(context.record.replace('–','-'))}</strong> · `:''}${esc(events[deck.event_type]||deck.event_type)} · ${deck.size} cards</p>${colorText?`<p class="run-deck-colors">${esc(colorText[0].toUpperCase()+colorText.slice(1))}</p>`:''}${draftLink}${chart}${sections}${side}<p class="run-deck-source">Source: <a href="https://www.17lands.com/public_datasets" target="_blank" rel="noopener">17Lands public datasets</a> · <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC BY 4.0</a></p><details class="run-deck-about"><summary>About this deck</summary><p>${esc(deck.source.note)}</p></details>`;
 }
 
 export function openTrophyDeck(load,context={}) {

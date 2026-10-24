@@ -1,0 +1,384 @@
+{
+  "schema_version": 1,
+  "sources": 110373,
+  "archives": [
+    {
+      "set_id": "blb",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.BLB.PremierDraft.csv.gz",
+      "archive_sha256": "61fed2a4db5854ca9f247eba9ea4176cf70a25ee253024928963335d32dbf281",
+      "sources": 3173
+    },
+    {
+      "set_id": "blb",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.BLB.TradDraft.csv.gz",
+      "archive_sha256": "e1c5f93501a265e4031b53c062775216230f1d261373f05c62e49d154ef6b959",
+      "sources": 852
+    },
+    {
+      "set_id": "bro",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.BRO.PremierDraft.csv.gz",
+      "archive_sha256": "5cfd6046d106727523345cf2779251187f1e6f4677cbc73ee6ca00ad414a1a52",
+      "sources": 1700
+    },
+    {
+      "set_id": "bro",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.BRO.TradDraft.csv.gz",
+      "archive_sha256": "036e860ed45b68a6e65a1bdb348d6b3b5cfd345ef4fa4876499f53f14ab61491",
+      "sources": 489
+    },
+    {
+      "set_id": "dft",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.DFT.PremierDraft.csv.gz",
+      "archive_sha256": "734325afbe5c023245e7769fab66c88dcf241407666becb06b956d7fee13a28b",
+      "sources": 3581
+    },
+    {
+      "set_id": "dft",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.DFT.TradDraft.csv.gz",
+      "archive_sha256": "2292eec50ae549b13e87364a3b56f57ec2e3cbed8cf884ba8db48eb3917f34ee",
+      "sources": 780
+    },
+    {
+      "set_id": "dmu",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.DMU.PremierDraft.csv.gz",
+      "archive_sha256": "073f868bf18f680e47d530e288e3408816cea9bd135cf79b9f4186db86d34ee6",
+      "sources": 4791
+    },
+    {
+      "set_id": "dmu",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.DMU.TradDraft.csv.gz",
+      "archive_sha256": "16fc90e3dd5e309f05871d1599cf6211c66a9e16b5ef709465a6e20547871924",
+      "sources": 1774
+    },
+    {
+      "set_id": "dsk",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.DSK.PremierDraft.csv.gz",
+      "archive_sha256": "9aca1d2f8b3f010fa48b2293c27b4fe0eb6ff5e040f020b9ad703bedd9996a0d",
+      "sources": 3839
+    },
+    {
+      "set_id": "dsk",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.DSK.TradDraft.csv.gz",
+      "archive_sha256": "68a11bf83a2d4e603d86498bc52f69e305c7dd71a338c3d2f6c1b8fe6b98e29f",
+      "sources": 936
+    },
+    {
+      "set_id": "ecl",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.ECL.PremierDraft.csv.gz",
+      "archive_sha256": "54b94edb0702dbcf20aa943d0e7da5a7987cf20232864083953e61b95b38ff48",
+      "sources": 2395
+    },
+    {
+      "set_id": "eoe",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.EOE.PremierDraft.csv.gz",
+      "archive_sha256": "130e7e7580a1cb4b4f635411d187a078bc7bdd9dd3436ef5ff7535e14cadaf1b",
+      "sources": 2743
+    },
+    {
+      "set_id": "eoe",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.EOE.TradDraft.csv.gz",
+      "archive_sha256": "b06f8adae37d7de9e835195584f14c54bd5f49ab89e0ea70a72df656bfe16208",
+      "sources": 660
+    },
+    {
+      "set_id": "fdn",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.FDN.PremierDraft.csv.gz",
+      "archive_sha256": "fcabe5abc61cd46cd355611dd0e1ccff10b428537c630104d7c5e8f1e090fe64",
+      "sources": 2822
+    },
+    {
+      "set_id": "fdn",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.FDN.TradDraft.csv.gz",
+      "archive_sha256": "67a8d91f029d9686bc5f949325545346b811d5ea54c6c7de4bf12430dfab7a67",
+      "sources": 685
+    },
+    {
+      "set_id": "fin",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.FIN.PremierDraft.csv.gz",
+      "archive_sha256": "f6452e622976f66dd5420c55741da5b246c7e8d25d63c080e728635e1741a6a6",
+      "sources": 4339
+    },
+    {
+      "set_id": "fin",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.FIN.TradDraft.csv.gz",
+      "archive_sha256": "bdd82001319a2db1dd941b867028fe9b8b0aa331836b3b2353353de61c1dd1f4",
+      "sources": 1273
+    },
+    {
+      "set_id": "fra",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.FRA.PremierDraft.csv.gz",
+      "archive_sha256": "a350666bfd293bd14601105af0187f13353b16fa86e81307432a7b3a9a0bbfdc",
+      "sources": 1029
+    },
+    {
+      "set_id": "fra",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.FRA.TradDraft.csv.gz",
+      "archive_sha256": "e06bef9b8300a5ec2a1cb79ac740c2122d265a0c72906a99424d4800bf7f37cf",
+      "sources": 141
+    },
+    {
+      "set_id": "hbg",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.HBG.PremierDraft.csv.gz",
+      "archive_sha256": "465db4c4e3a364d2cfbca5c520746544f568d786d47d85552f02a9ecf2257608",
+      "sources": 762
+    },
+    {
+      "set_id": "hob",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.HOB.PremierDraft.csv.gz",
+      "archive_sha256": "1ca977bb415ac8fce04b889b9b2d93a6540cf21a033dfa9fb0907af443000676",
+      "sources": 1119
+    },
+    {
+      "set_id": "ktk",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.KTK.PremierDraft.csv.gz",
+      "archive_sha256": "69bc6aa4c4501452dc6247940bf1bc23edf49ad2e44f12318cb9da44363cb5a2",
+      "sources": 489
+    },
+    {
+      "set_id": "lci",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.LCI.PremierDraft.csv.gz",
+      "archive_sha256": "8c3a02c441b3741ab1f335d978fe842b8b9d030ae06e63a291b8f8b259b9c947",
+      "sources": 3937
+    },
+    {
+      "set_id": "lci",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.LCI.TradDraft.csv.gz",
+      "archive_sha256": "a487f4ac5ed5749969839030f920268f2b30de77a07be439f0cff4ba8644038e",
+      "sources": 1450
+    },
+    {
+      "set_id": "ltr",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.LTR.PremierDraft.csv.gz",
+      "archive_sha256": "34b5381cad4639c02ae77f274d7196334aee6f3e130197a07d89df963238fa9d",
+      "sources": 5130
+    },
+    {
+      "set_id": "ltr",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.LTR.TradDraft.csv.gz",
+      "archive_sha256": "41b32b83a31ccb0b5899de3a5109245f6982648301462889d96b7e9e03ab5c9c",
+      "sources": 1176
+    },
+    {
+      "set_id": "mh3",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.MH3.PremierDraft.csv.gz",
+      "archive_sha256": "0188d66a067f961c81b538c0980dfdaa14904b8ac3355b4ce3b89efbb86aeb7c",
+      "sources": 3626
+    },
+    {
+      "set_id": "mh3",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.MH3.TradDraft.csv.gz",
+      "archive_sha256": "e5a2906710b633698a61c677342b814a028b523e02e7d360d75e0531f554f747",
+      "sources": 859
+    },
+    {
+      "set_id": "mkm",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.MKM.PremierDraft.csv.gz",
+      "archive_sha256": "22ff0b49d51381e0488b015dad2b062d90866c9e6646e66202f6c7c6c7efc79a",
+      "sources": 4024
+    },
+    {
+      "set_id": "mkm",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.MKM.TradDraft.csv.gz",
+      "archive_sha256": "ee869e6a155cfb72e5663911f055c811cf3d6884e8a3944c80674fd608a7ef3d",
+      "sources": 1505
+    },
+    {
+      "set_id": "mom",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.MOM.PremierDraft.csv.gz",
+      "archive_sha256": "a19eadcf9f3435f6c6db379c8119c28477f7037e770fe14b25424832c148de06",
+      "sources": 5561
+    },
+    {
+      "set_id": "mom",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.MOM.TradDraft.csv.gz",
+      "archive_sha256": "9e57fd4978f9efe5a3fb7cb0369721fe2d5f38b07221d21e6f2d41c9bee2ddf9",
+      "sources": 952
+    },
+    {
+      "set_id": "msh",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.MSH.PremierDraft.csv.gz",
+      "archive_sha256": "8a6bd93a5d50554a3d87703e93624d09e638dc6dd03eda12be9c3f2925484edf",
+      "sources": 2088
+    },
+    {
+      "set_id": "msh",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.MSH.TradDraft.csv.gz",
+      "archive_sha256": "52112abb802a83c52f8a9e14cc600c509073f43dc2d9c9b61c163cb130650261",
+      "sources": 337
+    },
+    {
+      "set_id": "neo",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.NEO.PremierDraft.csv.gz",
+      "archive_sha256": "2346aff37d6ece8e8248f2277fa9369ce5c740d8dec3f4e140f09f9be4c85db9",
+      "sources": 3741
+    },
+    {
+      "set_id": "neo",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.NEO.TradDraft.csv.gz",
+      "archive_sha256": "25010f706cca13f9e5b9d6f907b93ecd59bf102f4414b7e163ef18f3ae7f6ee9",
+      "sources": 1151
+    },
+    {
+      "set_id": "one",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.ONE.PremierDraft.csv.gz",
+      "archive_sha256": "157e82550f8790dd5df9373a5ed6f04002d3f25165aa628f520d4e6137f86804",
+      "sources": 2308
+    },
+    {
+      "set_id": "one",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.ONE.TradDraft.csv.gz",
+      "archive_sha256": "9006bc0c823289d3970bf1b3823ebbdfa2a59fa841155e1d6e76da1de4731db1",
+      "sources": 581
+    },
+    {
+      "set_id": "otj",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.OTJ.PremierDraft.csv.gz",
+      "archive_sha256": "e8c4bfe8482710a59411c7e1f5b5e35e3583f4c7ff7b46f1702b2d95356acee6",
+      "sources": 4199
+    },
+    {
+      "set_id": "otj",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.OTJ.TradDraft.csv.gz",
+      "archive_sha256": "8f316b4db736f20783f667698778394d1b4576a3c4bf343801c7119afb10f16c",
+      "sources": 1365
+    },
+    {
+      "set_id": "pio",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.PIO.PremierDraft.csv.gz",
+      "archive_sha256": "2a22a51b63c6caff6d8f20ccfec900ce9e5aa1fb963a57cad537495bcdb3f3ab",
+      "sources": 1380
+    },
+    {
+      "set_id": "powered-cube",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.Cube_-_Powered.PremierDraft.csv.gz",
+      "archive_sha256": "367bd4a831e891593f404a4ad141742b8e77e777dd80d7e93c9f319f10f0663d",
+      "sources": 1243
+    },
+    {
+      "set_id": "powered-cube",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.Cube_-_Powered.TradDraft.csv.gz",
+      "archive_sha256": "76d28a070411d28c4a2b5e0f5915124fe08560486c6319a90d38506bcbc21e5c",
+      "sources": 220
+    },
+    {
+      "set_id": "sir",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.SIR.PremierDraft.csv.gz",
+      "archive_sha256": "64ab0119e665182586107a887efb02251f45d542d65f7ce1b9462960b30ce442",
+      "sources": 1001
+    },
+    {
+      "set_id": "snc",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.SNC.PremierDraft.csv.gz",
+      "archive_sha256": "c0e5f3c087889ef2ea38c5a8ac4cc68ba43b83db5b7c0c204d4dee0200379fdd",
+      "sources": 4901
+    },
+    {
+      "set_id": "snc",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.SNC.TradDraft.csv.gz",
+      "archive_sha256": "93a78aaf21914a5079b9d2595d519a8a0c9d0b369dfb792f3d99c68cab1b70b4",
+      "sources": 606
+    },
+    {
+      "set_id": "sos",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.SOS.PremierDraft.csv.gz",
+      "archive_sha256": "1be513933918ca243c137af0314aae099c721c408786c9cb56f08027d9b113fb",
+      "sources": 3206
+    },
+    {
+      "set_id": "sos",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.SOS.TradDraft.csv.gz",
+      "archive_sha256": "9658a8435b0771c8be240507cd6e74290ed39480f97d0bd9ffffc5f52dae07c4",
+      "sources": 573
+    },
+    {
+      "set_id": "tdm",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.TDM.PremierDraft.csv.gz",
+      "archive_sha256": "e2e679168818d67d812972343ba541d626d0f57140bc22955e09dd07bc2086e4",
+      "sources": 2409
+    },
+    {
+      "set_id": "tdm",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.TDM.TradDraft.csv.gz",
+      "archive_sha256": "3cfe7433b421d9b08fa57ed5bdd11ab4c3d49dc6ce8b4b5632451bd6e2d65a85",
+      "sources": 588
+    },
+    {
+      "set_id": "tla",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.TLA.PremierDraft.csv.gz",
+      "archive_sha256": "6bb12e5cf17e57a2624ca8ac83f15fd4415ea347aa58eac0ed82feb1b17d536b",
+      "sources": 3408
+    },
+    {
+      "set_id": "tmt",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.TMT.PremierDraft.csv.gz",
+      "archive_sha256": "399f35cf89b4ad09ba811df0bc60936a5b443432f2fbad84d6264b597b49e4a9",
+      "sources": 701
+    },
+    {
+      "set_id": "woe",
+      "event_type": "PremierDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.WOE.PremierDraft.csv.gz",
+      "archive_sha256": "3d9a55acb2846905ea7fc930c6ec0b5954d1e6ff78187936b4db8da3baa8b8a6",
+      "sources": 4494
+    },
+    {
+      "set_id": "woe",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.WOE.TradDraft.csv.gz",
+      "archive_sha256": "553248144180d9c6f963a79ece614c4b0804e25787cf72092be463a2f730cfd9",
+      "sources": 1281
+    }
+  ]
+}

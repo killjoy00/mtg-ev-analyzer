@@ -19,7 +19,7 @@ class FinalDeckExtractionTests(unittest.TestCase):
     def test_serving_catalog_retains_current_and_historical_sources_without_unused_aliases(self):
         builder = Path(__file__).parents[1] / 'scripts/build-trophy-deck-catalog.py'
         current, historical, unused = 'a' * 32, 'b' * 32, 'c' * 32
-        deck = {'set_id': 'fra', 'draft_id': 'private-build-input', 'event_type': 'PremierDraft',
+        deck = {'set_id': 'fra', 'draft_id': '0' * 32, 'event_type': 'PremierDraft',
                 'deck': [{'name': 'Forest', 'count': 40}], 'sideboard': [{'name': 'Forest', 'count': 1}],
                 'deck_size': 40, 'last_game_time': None, 'main_colors': ['G'], 'splash_colors': [],
                 'source_hashes': [current, historical, unused]}
@@ -44,6 +44,7 @@ class FinalDeckExtractionTests(unittest.TestCase):
             self.assertEqual(catalog['sources'], {current: 0, historical: 0})
             self.assertEqual(catalog['decks'][0]['deck'], [[0, 40]])
             self.assertEqual(catalog['decks'][0]['sideboard'], [[0, 1]])
+            self.assertEqual(catalog['decks'][0]['draft_url'], 'https://www.17lands.com/draft/' + deck['draft_id'])
             self.assertNotIn(deck['draft_id'], text)
             output.unlink()
             (root / 'sources.json').write_text(json.dumps([{'source_draft_hash': 'd' * 32}]))
