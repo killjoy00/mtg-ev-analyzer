@@ -1,0 +1,56 @@
+name: One-time scored featured Short for October 25
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/reissue-featured-music-oct25.yml'
+
+permissions:
+  contents: read
+  actions: read
+  issues: write
+
+concurrency:
+  group: packone-featured-music-oct25-one-time
+  cancel-in-progress: false
+
+jobs:
+  reissue:
+    if: github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      PACKONE_YOUTUBE_CLIENT_ID: ${{ secrets.PACKONE_YOUTUBE_CLIENT_ID }}
+      PACKONE_YOUTUBE_CLIENT_SECRET: ${{ secrets.PACKONE_YOUTUBE_CLIENT_SECRET }}
+      PACKONE_YOUTUBE_REFRESH_TOKEN: ${{ secrets.PACKONE_YOUTUBE_REFRESH_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned project tools and verify one-time sound upload
+        run: |
+          npm ci --no-audit --no-fund
+          node --test tests/featured-pick.test.mjs tests/featured-soundtrack.test.mjs tests/reissue-featured-music.test.mjs
+      - name: Select and verify the corrected October 24 puzzle
+        run: node scripts/reissue-featured-music-once.mjs prepare
+      - name: Install browser and FFmpeg
+        run: |
+          npx playwright install --with-deps chromium
+          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends ffmpeg
+          fi
+      - name: Render new real-card Short with original music
+        run: node scripts/render-featured-pick.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: packone-oct25-corrected-music-short
+          path: artifacts/featured-pick/
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload only the new music-backed Short to YouTube
+        run: node scripts/reissue-featured-music-once.mjs publish
