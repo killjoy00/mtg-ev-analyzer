@@ -100,23 +100,26 @@ export async function findPublishedPatreonPost({title,token,
  return matches[0]||null;
 }
 
+async function tryControl(page,specs,timeoutMs=1800) {
+ const until=Date.now()+timeoutMs;
+ do {
+  for(const spec of specs) {
+   const loc=spec(page);
+   if(await loc.count()===1&&await loc.isVisible())return loc;
+  }
+  if(Date.now()>=until)break;
+  await page.waitForTimeout(250);
+ } while(true);
+ return null;
+}
 async function findControl(page,specs,label) {
- for(const spec of specs) {
-  const loc=spec(page);
-  if(await loc.count()===1&&await loc.isVisible())return loc;
- }
+ const found=await tryControl(page,specs,12000);
+ if(found)return found;
  throw Error('patreon-editor-'+label+'-unavailable');
 }
 const role=(type,name)=>page=>page.getByRole(type,{name});
 const textExact=s=>page=>page.getByText(s,{exact:true});
 const css=s=>page=>page.locator(s);
-async function tryControl(page,specs) {
- for(const spec of specs) {
-  const loc=spec(page);
-  if(await loc.count()===1&&await loc.isVisible())return loc;
- }
- return null;
-}
 async function safeStage(name,fn) {
  try {return await fn();}
  catch {throw Error('patreon-editor-'+name+'-failed');}
