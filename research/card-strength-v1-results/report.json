@@ -1,0 +1,853 @@
+{
+  "primary_macro_log_loss": {
+    "baseline": 0.6683086575569841,
+    "A_gih": 0.667457140447338,
+    "B_iwd": 0.6682792556029762,
+    "C_adjusted": 0.6667689039078005
+  },
+  "winner": {
+    "empirical_leader": "C_adjusted",
+    "operational_recommendation": "C_adjusted",
+    "demonstrated_winner": null,
+    "leader_vs_baseline_ci95": [
+      -0.0021708708001185323,
+      -0.0006568822897839835
+    ],
+    "pairwise": {
+      "A_gih_minus_B_iwd": {
+        "delta": -0.0008221151556382367,
+        "ci98333": [
+          -0.001796355981077677,
+          -0.00019226322816806948
+        ]
+      },
+      "A_gih_minus_C_adjusted": {
+        "delta": 0.0006882365395374235,
+        "ci98333": [
+          -0.00037970943769289055,
+          0.0014366115094382728
+        ]
+      },
+      "B_iwd_minus_C_adjusted": {
+        "delta": 0.0015103516951756601,
+        "ci98333": [
+          0.00025433811921512595,
+          0.002597415907310537
+        ]
+      }
+    },
+    "recommendation_has_baseline_evidence": true
+  },
+  "by_set_and_budget": {
+    "FRA": {
+      "500": {
+        "baseline": {
+          "log_loss": 0.6634036509160003,
+          "brier": 0.23594597637167358,
+          "mean_prediction": 0.4832265835414585,
+          "actual_win_rate": 0.49463581057685985
+        },
+        "A_gih": {
+          "log_loss": 0.6636115447255428,
+          "brier": 0.236043848322806,
+          "mean_prediction": 0.48170742485854773,
+          "actual_win_rate": 0.49463581057685985
+        },
+        "A_gih_opening": {
+          "log_loss": 0.6634145936818401,
+          "brier": 0.23594433555676525,
+          "mean_prediction": 0.481619605329471,
+          "actual_win_rate": 0.49463581057685985
+        },
+        "B_iwd": {
+          "log_loss": 0.6632460415554724,
+          "brier": 0.23586460710717014,
+          "mean_prediction": 0.4828171506069182,
+          "actual_win_rate": 0.49463581057685985
+        },
+        "B_iwd_opening": {
+          "log_loss": 0.6632699377514614,
+          "brier": 0.2358752380836453,
+          "mean_prediction": 0.4828042108216909,
+          "actual_win_rate": 0.49463581057685985
+        },
+        "C_adjusted": {
+          "log_loss": 0.6631883269931461,
+          "brier": 0.23584379382429563,
+          "mean_prediction": 0.482775910754583,
+          "actual_win_rate": 0.49463581057685985
+        },
+        "C_adjusted_opening": {
+          "log_loss": 0.6630956512446996,
+          "brier": 0.23579561997486975,
+          "mean_prediction": 0.48268883658710904,
+          "actual_win_rate": 0.49463581057685985
+        }
+      },
+      "2000": {
+        "baseline": {
+          "log_loss": 0.6634172182029564,
+          "brier": 0.2359526381886536,
+          "mean_prediction": 0.4827625134080243,
+          "actual_win_rate": 0.49463581057685985
+        },
+        "A_gih": {
+          "log_loss": 0.6623303361373793,
+          "brier": 0.2354301819471791,
+          "mean_prediction": 0.4865520370863264,
+          "actual_win_rate": 0.49463581057685985
+        },
+        "A_gih_opening": {
+          "log_loss": 0.6616174045051022,
+          "brier": 0.23507992603721736,
+          "mean_prediction": 0.4865669036862885,
+          "actual_win_rate": 0.49463581057685985
+        },
+        "B_iwd": {
+          "log_loss": 0.662772998670892,
+          "brier": 0.23563772139437875,
+          "mean_prediction": 0.48327184162922404,
+          "actual_win_rate": 0.49463581057685985
+        },
+        "B_iwd_opening": {
+          "log_loss": 0.6625827935483586,
+          "brier": 0.23554275191364415,
+          "mean_prediction": 0.48326531365004544,
+          "actual_win_rate": 0.49463581057685985
+        },
+        "C_adjusted": {
+          "log_loss": 0.6620714270905973,
+          "brier": 0.2353067968022668,
+          "mean_prediction": 0.4921545796182827,
+          "actual_win_rate": 0.49463581057685985
+        },
+        "C_adjusted_opening": {
+          "log_loss": 0.6616112228882809,
+          "brier": 0.23508464941549276,
+          "mean_prediction": 0.49227908004398807,
+          "actual_win_rate": 0.49463581057685985
+        }
+      },
+      "all": {
+        "baseline": {
+          "log_loss": 0.6634022780334421,
+          "brier": 0.2359453656641413,
+          "mean_prediction": 0.4830155912872173,
+          "actual_win_rate": 0.49463581057685985
+        },
+        "A_gih": {
+          "log_loss": 0.6615056584678424,
+          "brier": 0.23503112766342638,
+          "mean_prediction": 0.4867643147672052,
+          "actual_win_rate": 0.49463581057685985
+        },
+        "A_gih_opening": {
+          "log_loss": 0.660349711538384,
+          "brier": 0.23447712805673884,
+          "mean_prediction": 0.48658277286688384,
+          "actual_win_rate": 0.49463581057685985
+        },
+        "B_iwd": {
+          "log_loss": 0.6614089977709956,
+          "brier": 0.23498742035588246,
+          "mean_prediction": 0.4851363568111515,
+          "actual_win_rate": 0.49463581057685985
+        },
+        "B_iwd_opening": {
+          "log_loss": 0.660650885221074,
+          "brier": 0.2346216613151843,
+          "mean_prediction": 0.4849150291515981,
+          "actual_win_rate": 0.49463581057685985
+        },
+        "C_adjusted": {
+          "log_loss": 0.6590826496228146,
+          "brier": 0.2338730811501701,
+          "mean_prediction": 0.47999285365646666,
+          "actual_win_rate": 0.49463581057685985
+        },
+        "C_adjusted_opening": {
+          "log_loss": 0.6583264179877433,
+          "brier": 0.23351011990260712,
+          "mean_prediction": 0.47983621603291643,
+          "actual_win_rate": 0.49463581057685985
+        }
+      }
+    },
+    "HOB": {
+      "500": {
+        "baseline": {
+          "log_loss": 0.6667252030975234,
+          "brier": 0.23735757823411516,
+          "mean_prediction": 0.5005471755016492,
+          "actual_win_rate": 0.5062076483473958
+        },
+        "A_gih": {
+          "log_loss": 0.666285969834343,
+          "brier": 0.2371345210174278,
+          "mean_prediction": 0.5056165064425353,
+          "actual_win_rate": 0.5062076483473958
+        },
+        "A_gih_opening": {
+          "log_loss": 0.665676613355173,
+          "brier": 0.23683804851934132,
+          "mean_prediction": 0.5056864205128139,
+          "actual_win_rate": 0.5062076483473958
+        },
+        "B_iwd": {
+          "log_loss": 0.6667288408935852,
+          "brier": 0.2373615932746747,
+          "mean_prediction": 0.5027351382966964,
+          "actual_win_rate": 0.5062076483473958
+        },
+        "B_iwd_opening": {
+          "log_loss": 0.6666435999393192,
+          "brier": 0.23732075338878023,
+          "mean_prediction": 0.5027563135018784,
+          "actual_win_rate": 0.5062076483473958
+        },
+        "C_adjusted": {
+          "log_loss": 0.6666108834987616,
+          "brier": 0.23730933248469965,
+          "mean_prediction": 0.5100485882312045,
+          "actual_win_rate": 0.5062076483473958
+        },
+        "C_adjusted_opening": {
+          "log_loss": 0.6662119451041314,
+          "brier": 0.2371114795583139,
+          "mean_prediction": 0.510149176088031,
+          "actual_win_rate": 0.5062076483473958
+        }
+      },
+      "2000": {
+        "baseline": {
+          "log_loss": 0.6667489193346271,
+          "brier": 0.2373690173709384,
+          "mean_prediction": 0.499578565388879,
+          "actual_win_rate": 0.5062076483473958
+        },
+        "A_gih": {
+          "log_loss": 0.6655657916577152,
+          "brier": 0.23678665759408446,
+          "mean_prediction": 0.5062911701761568,
+          "actual_win_rate": 0.5062076483473958
+        },
+        "A_gih_opening": {
+          "log_loss": 0.6642570957868569,
+          "brier": 0.23615344271406868,
+          "mean_prediction": 0.5063942438942834,
+          "actual_win_rate": 0.5062076483473958
+        },
+        "B_iwd": {
+          "log_loss": 0.6672014160225967,
+          "brier": 0.23760025385746142,
+          "mean_prediction": 0.506231953512243,
+          "actual_win_rate": 0.5062076483473958
+        },
+        "B_iwd_opening": {
+          "log_loss": 0.6667175532207706,
+          "brier": 0.23736873449452306,
+          "mean_prediction": 0.5062835038473604,
+          "actual_win_rate": 0.5062076483473958
+        },
+        "C_adjusted": {
+          "log_loss": 0.6658350604488346,
+          "brier": 0.23692064178880387,
+          "mean_prediction": 0.5099154041378343,
+          "actual_win_rate": 0.5062076483473958
+        },
+        "C_adjusted_opening": {
+          "log_loss": 0.6650202761699329,
+          "brier": 0.23652772338908704,
+          "mean_prediction": 0.5100367481040186,
+          "actual_win_rate": 0.5062076483473958
+        }
+      },
+      "all": {
+        "baseline": {
+          "log_loss": 0.6667794456343393,
+          "brier": 0.23738355330859692,
+          "mean_prediction": 0.4989124917604514,
+          "actual_win_rate": 0.5062076483473958
+        },
+        "A_gih": {
+          "log_loss": 0.6648285727219285,
+          "brier": 0.23641518272105044,
+          "mean_prediction": 0.5112348893100569,
+          "actual_win_rate": 0.5062076483473958
+        },
+        "A_gih_opening": {
+          "log_loss": 0.6621909014237826,
+          "brier": 0.23514378453571275,
+          "mean_prediction": 0.511517387558718,
+          "actual_win_rate": 0.5062076483473958
+        },
+        "B_iwd": {
+          "log_loss": 0.6701220211453367,
+          "brier": 0.23900360467992712,
+          "mean_prediction": 0.5086320923419209,
+          "actual_win_rate": 0.5062076483473958
+        },
+        "B_iwd_opening": {
+          "log_loss": 0.6681032106850747,
+          "brier": 0.23802919258807756,
+          "mean_prediction": 0.5090684865897722,
+          "actual_win_rate": 0.5062076483473958
+        },
+        "C_adjusted": {
+          "log_loss": 0.6625127531269291,
+          "brier": 0.23533055070595146,
+          "mean_prediction": 0.5182861661192377,
+          "actual_win_rate": 0.5062076483473958
+        },
+        "C_adjusted_opening": {
+          "log_loss": 0.6605191333004992,
+          "brier": 0.23437833568488592,
+          "mean_prediction": 0.5185715842899035,
+          "actual_win_rate": 0.5062076483473958
+        }
+      }
+    },
+    "MSH": {
+      "500": {
+        "baseline": {
+          "log_loss": 0.6698407018234963,
+          "brier": 0.23884995832383837,
+          "mean_prediction": 0.4848538628992929,
+          "actual_win_rate": 0.49620502430928615
+        },
+        "A_gih": {
+          "log_loss": 0.668600721653503,
+          "brier": 0.2382534895649984,
+          "mean_prediction": 0.48934489479785026,
+          "actual_win_rate": 0.49620502430928615
+        },
+        "A_gih_opening": {
+          "log_loss": 0.66849385632641,
+          "brier": 0.23819925487384788,
+          "mean_prediction": 0.4892946594101299,
+          "actual_win_rate": 0.49620502430928615
+        },
+        "B_iwd": {
+          "log_loss": 0.6692377371589489,
+          "brier": 0.23856011317020157,
+          "mean_prediction": 0.48871595353925606,
+          "actual_win_rate": 0.49620502430928615
+        },
+        "B_iwd_opening": {
+          "log_loss": 0.6692854698527506,
+          "brier": 0.2385823292904799,
+          "mean_prediction": 0.48866167368784125,
+          "actual_win_rate": 0.49620502430928615
+        },
+        "C_adjusted": {
+          "log_loss": 0.6694578752757948,
+          "brier": 0.23866301561041725,
+          "mean_prediction": 0.483512333851103,
+          "actual_win_rate": 0.49620502430928615
+        },
+        "C_adjusted_opening": {
+          "log_loss": 0.6693277289676935,
+          "brier": 0.23859725433545584,
+          "mean_prediction": 0.48356345779923965,
+          "actual_win_rate": 0.49620502430928615
+        }
+      },
+      "2000": {
+        "baseline": {
+          "log_loss": 0.669624767105457,
+          "brier": 0.23874338353366353,
+          "mean_prediction": 0.491383047748289,
+          "actual_win_rate": 0.49620502430928615
+        },
+        "A_gih": {
+          "log_loss": 0.6683868241900142,
+          "brier": 0.23815215436291057,
+          "mean_prediction": 0.48499551820416864,
+          "actual_win_rate": 0.49620502430928615
+        },
+        "A_gih_opening": {
+          "log_loss": 0.668050742186794,
+          "brier": 0.23798539189954912,
+          "mean_prediction": 0.4847983572423814,
+          "actual_win_rate": 0.49620502430928615
+        },
+        "B_iwd": {
+          "log_loss": 0.6693656787464319,
+          "brier": 0.23861974136800412,
+          "mean_prediction": 0.48832780882473253,
+          "actual_win_rate": 0.49620502430928615
+        },
+        "B_iwd_opening": {
+          "log_loss": 0.6696669823807919,
+          "brier": 0.23876467586178227,
+          "mean_prediction": 0.48811697621716915,
+          "actual_win_rate": 0.49620502430928615
+        },
+        "C_adjusted": {
+          "log_loss": 0.6690976397163768,
+          "brier": 0.23847632731258123,
+          "mean_prediction": 0.48345683318038885,
+          "actual_win_rate": 0.49620502430928615
+        },
+        "C_adjusted_opening": {
+          "log_loss": 0.6687518354820682,
+          "brier": 0.2383049005321277,
+          "mean_prediction": 0.48352329584066234,
+          "actual_win_rate": 0.49620502430928615
+        }
+      },
+      "all": {
+        "baseline": {
+          "log_loss": 0.6695842257236333,
+          "brier": 0.23872406845684022,
+          "mean_prediction": 0.489553257567589,
+          "actual_win_rate": 0.49620502430928615
+        },
+        "A_gih": {
+          "log_loss": 0.6698779706495323,
+          "brier": 0.2388439627975798,
+          "mean_prediction": 0.46599696378084415,
+          "actual_win_rate": 0.49620502430928615
+        },
+        "A_gih_opening": {
+          "log_loss": 0.6689478678592976,
+          "brier": 0.23837206330569066,
+          "mean_prediction": 0.46580298655903835,
+          "actual_win_rate": 0.49620502430928615
+        },
+        "B_iwd": {
+          "log_loss": 0.6702954782536423,
+          "brier": 0.23906761014701267,
+          "mean_prediction": 0.47223121001354174,
+          "actual_win_rate": 0.49620502430928615
+        },
+        "B_iwd_opening": {
+          "log_loss": 0.6692222744562487,
+          "brier": 0.23853998941292326,
+          "mean_prediction": 0.4719584097110731,
+          "actual_win_rate": 0.49620502430928615
+        },
+        "C_adjusted": {
+          "log_loss": 0.6720767490349613,
+          "brier": 0.23989440409598206,
+          "mean_prediction": 0.4403780824627532,
+          "actual_win_rate": 0.49620502430928615
+        },
+        "C_adjusted_opening": {
+          "log_loss": 0.6708783762127807,
+          "brier": 0.23930988756207905,
+          "mean_prediction": 0.44037115732332993,
+          "actual_win_rate": 0.49620502430928615
+        }
+      }
+    },
+    "SOS": {
+      "500": {
+        "baseline": {
+          "log_loss": 0.6704222843636223,
+          "brier": 0.23907274743313967,
+          "mean_prediction": 0.4670286232806593,
+          "actual_win_rate": 0.47945465253239106
+        },
+        "A_gih": {
+          "log_loss": 0.671007157930743,
+          "brier": 0.2393295007794764,
+          "mean_prediction": 0.458030267122063,
+          "actual_win_rate": 0.47945465253239106
+        },
+        "A_gih_opening": {
+          "log_loss": 0.6708711625129705,
+          "brier": 0.23926334552759673,
+          "mean_prediction": 0.45806512238214137,
+          "actual_win_rate": 0.47945465253239106
+        },
+        "B_iwd": {
+          "log_loss": 0.670927221304993,
+          "brier": 0.23930750849891014,
+          "mean_prediction": 0.45958276820365257,
+          "actual_win_rate": 0.47945465253239106
+        },
+        "B_iwd_opening": {
+          "log_loss": 0.6708892795615558,
+          "brier": 0.23928907634603153,
+          "mean_prediction": 0.4595936282204449,
+          "actual_win_rate": 0.47945465253239106
+        },
+        "C_adjusted": {
+          "log_loss": 0.6705765872769645,
+          "brier": 0.23913307006954274,
+          "mean_prediction": 0.458632307183232,
+          "actual_win_rate": 0.47945465253239106
+        },
+        "C_adjusted_opening": {
+          "log_loss": 0.6708154970715459,
+          "brier": 0.2392410795084215,
+          "mean_prediction": 0.4584827855644904,
+          "actual_win_rate": 0.47945465253239106
+        }
+      },
+      "2000": {
+        "baseline": {
+          "log_loss": 0.6704325104194225,
+          "brier": 0.23907853745006272,
+          "mean_prediction": 0.4676354731634813,
+          "actual_win_rate": 0.47945465253239106
+        },
+        "A_gih": {
+          "log_loss": 0.6714538199591018,
+          "brier": 0.2395487156742565,
+          "mean_prediction": 0.4697470691049045,
+          "actual_win_rate": 0.47945465253239106
+        },
+        "A_gih_opening": {
+          "log_loss": 0.6709556055666835,
+          "brier": 0.23931357717871032,
+          "mean_prediction": 0.46984863388336595,
+          "actual_win_rate": 0.47945465253239106
+        },
+        "B_iwd": {
+          "log_loss": 0.6706772519288404,
+          "brier": 0.2391953512908079,
+          "mean_prediction": 0.4649801600256602,
+          "actual_win_rate": 0.47945465253239106
+        },
+        "B_iwd_opening": {
+          "log_loss": 0.6704399460850269,
+          "brier": 0.23908313406081086,
+          "mean_prediction": 0.46503582333137916,
+          "actual_win_rate": 0.47945465253239106
+        },
+        "C_adjusted": {
+          "log_loss": 0.6695205028716769,
+          "brier": 0.2386333035773649,
+          "mean_prediction": 0.46286794615669996,
+          "actual_win_rate": 0.47945465253239106
+        },
+        "C_adjusted_opening": {
+          "log_loss": 0.6694525964190462,
+          "brier": 0.23859499784879334,
+          "mean_prediction": 0.46269108253468105,
+          "actual_win_rate": 0.47945465253239106
+        }
+      },
+      "all": {
+        "baseline": {
+          "log_loss": 0.6704218343485568,
+          "brier": 0.23907341174383862,
+          "mean_prediction": 0.4679315541716176,
+          "actual_win_rate": 0.47945465253239106
+        },
+        "A_gih": {
+          "log_loss": 0.6692771510062115,
+          "brier": 0.2385100942392392,
+          "mean_prediction": 0.4802400826652778,
+          "actual_win_rate": 0.47945465253239106
+        },
+        "A_gih_opening": {
+          "log_loss": 0.6679188771286828,
+          "brier": 0.237858064944311,
+          "mean_prediction": 0.4803487297690836,
+          "actual_win_rate": 0.47945465253239106
+        },
+        "B_iwd": {
+          "log_loss": 0.6717302811508263,
+          "brier": 0.23970123912151284,
+          "mean_prediction": 0.4733256080096258,
+          "actual_win_rate": 0.47945465253239106
+        },
+        "B_iwd_opening": {
+          "log_loss": 0.6706932716292027,
+          "brier": 0.2392076035652548,
+          "mean_prediction": 0.47332468827245716,
+          "actual_win_rate": 0.47945465253239106
+        },
+        "C_adjusted": {
+          "log_loss": 0.6663714564943523,
+          "brier": 0.23713110268094606,
+          "mean_prediction": 0.4963217041727531,
+          "actual_win_rate": 0.47945465253239106
+        },
+        "C_adjusted_opening": {
+          "log_loss": 0.6656428364184104,
+          "brier": 0.23678062233913771,
+          "mean_prediction": 0.49634929300364344,
+          "actual_win_rate": 0.47945465253239106
+        }
+      }
+    },
+    "BLB": {
+      "500": {
+        "baseline": {
+          "log_loss": 0.6672500398371239,
+          "brier": 0.23760173813926339,
+          "mean_prediction": 0.4773827554240774,
+          "actual_win_rate": 0.4806577415022623
+        },
+        "A_gih": {
+          "log_loss": 0.6669494850681409,
+          "brier": 0.23745797335733462,
+          "mean_prediction": 0.47953819843236395,
+          "actual_win_rate": 0.4806577415022623
+        },
+        "A_gih_opening": {
+          "log_loss": 0.6667049680097377,
+          "brier": 0.23733981929013456,
+          "mean_prediction": 0.47959876197622914,
+          "actual_win_rate": 0.4806577415022623
+        },
+        "B_iwd": {
+          "log_loss": 0.6671096288981504,
+          "brier": 0.23753630908273454,
+          "mean_prediction": 0.4791901364211687,
+          "actual_win_rate": 0.4806577415022623
+        },
+        "B_iwd_opening": {
+          "log_loss": 0.6671192111269995,
+          "brier": 0.23754040136375437,
+          "mean_prediction": 0.4791795180222361,
+          "actual_win_rate": 0.4806577415022623
+        },
+        "C_adjusted": {
+          "log_loss": 0.6667125977516113,
+          "brier": 0.23734280624556237,
+          "mean_prediction": 0.47663175599739055,
+          "actual_win_rate": 0.4806577415022623
+        },
+        "C_adjusted_opening": {
+          "log_loss": 0.6663670221758332,
+          "brier": 0.23717385050546533,
+          "mean_prediction": 0.4766809783486909,
+          "actual_win_rate": 0.4806577415022623
+        }
+      },
+      "2000": {
+        "baseline": {
+          "log_loss": 0.6672489165276472,
+          "brier": 0.23760247540661986,
+          "mean_prediction": 0.4812967723749524,
+          "actual_win_rate": 0.4806577415022623
+        },
+        "A_gih": {
+          "log_loss": 0.6663661652586181,
+          "brier": 0.23718121096359868,
+          "mean_prediction": 0.484257861388992,
+          "actual_win_rate": 0.4806577415022623
+        },
+        "A_gih_opening": {
+          "log_loss": 0.6655188872825346,
+          "brier": 0.23677328306917186,
+          "mean_prediction": 0.4842017553343204,
+          "actual_win_rate": 0.4806577415022623
+        },
+        "B_iwd": {
+          "log_loss": 0.6667556557196243,
+          "brier": 0.2373703428349903,
+          "mean_prediction": 0.4851999556060668,
+          "actual_win_rate": 0.4806577415022623
+        },
+        "B_iwd_opening": {
+          "log_loss": 0.6664849311749623,
+          "brier": 0.23723983281221253,
+          "mean_prediction": 0.4851208707138274,
+          "actual_win_rate": 0.4806577415022623
+        },
+        "C_adjusted": {
+          "log_loss": 0.6658463535812418,
+          "brier": 0.2369317917017623,
+          "mean_prediction": 0.4844832982802937,
+          "actual_win_rate": 0.4806577415022623
+        },
+        "C_adjusted_opening": {
+          "log_loss": 0.6650683268446042,
+          "brier": 0.23655413879431988,
+          "mean_prediction": 0.48440731902345613,
+          "actual_win_rate": 0.4806577415022623
+        }
+      },
+      "all": {
+        "baseline": {
+          "log_loss": 0.6672537376554171,
+          "brier": 0.23760504636300503,
+          "mean_prediction": 0.48219079976216517,
+          "actual_win_rate": 0.4806577415022623
+        },
+        "A_gih": {
+          "log_loss": 0.6652164114843718,
+          "brier": 0.23662912805772773,
+          "mean_prediction": 0.4774678667108508,
+          "actual_win_rate": 0.4806577415022623
+        },
+        "A_gih_opening": {
+          "log_loss": 0.6628400165222642,
+          "brier": 0.23549228835286254,
+          "mean_prediction": 0.47765957640792983,
+          "actual_win_rate": 0.4806577415022623
+        },
+        "B_iwd": {
+          "log_loss": 0.6655201384213858,
+          "brier": 0.2367792234534727,
+          "mean_prediction": 0.48175880384935127,
+          "actual_win_rate": 0.4806577415022623
+        },
+        "B_iwd_opening": {
+          "log_loss": 0.6634022105428825,
+          "brier": 0.23576304256380903,
+          "mean_prediction": 0.48174505494646164,
+          "actual_win_rate": 0.4806577415022623
+        },
+        "C_adjusted": {
+          "log_loss": 0.6633989641017616,
+          "brier": 0.2357587445755346,
+          "mean_prediction": 0.462538577432016,
+          "actual_win_rate": 0.4806577415022623
+        },
+        "C_adjusted_opening": {
+          "log_loss": 0.6610152886052971,
+          "brier": 0.2346256927672886,
+          "mean_prediction": 0.4626485372781947,
+          "actual_win_rate": 0.4806577415022623
+        }
+      }
+    },
+    "ECL": {
+      "500": {
+        "baseline": {
+          "log_loss": 0.6726025286263405,
+          "brier": 0.24005689771929672,
+          "mean_prediction": 0.4666347037436759,
+          "actual_win_rate": 0.4866791311578307
+        },
+        "A_gih": {
+          "log_loss": 0.6720581556217782,
+          "brier": 0.2397910861847846,
+          "mean_prediction": 0.46227042207392527,
+          "actual_win_rate": 0.4866791311578307
+        },
+        "A_gih_opening": {
+          "log_loss": 0.671634391374672,
+          "brier": 0.2395856081710676,
+          "mean_prediction": 0.4622759617891481,
+          "actual_win_rate": 0.4866791311578307
+        },
+        "B_iwd": {
+          "log_loss": 0.6728202521958282,
+          "brier": 0.2401542261503822,
+          "mean_prediction": 0.46266202189922817,
+          "actual_win_rate": 0.4866791311578307
+        },
+        "B_iwd_opening": {
+          "log_loss": 0.6727815505295042,
+          "brier": 0.24013554016471678,
+          "mean_prediction": 0.4626724649897126,
+          "actual_win_rate": 0.4866791311578307
+        },
+        "C_adjusted": {
+          "log_loss": 0.6724132604590083,
+          "brier": 0.239959948915288,
+          "mean_prediction": 0.46327974557708035,
+          "actual_win_rate": 0.4866791311578307
+        },
+        "C_adjusted_opening": {
+          "log_loss": 0.6721174230438093,
+          "brier": 0.2398183265048487,
+          "mean_prediction": 0.4631074209218105,
+          "actual_win_rate": 0.4866791311578307
+        }
+      },
+      "2000": {
+        "baseline": {
+          "log_loss": 0.6722091077029673,
+          "brier": 0.23987290760166313,
+          "mean_prediction": 0.4724266538917052,
+          "actual_win_rate": 0.4866791311578307
+        },
+        "A_gih": {
+          "log_loss": 0.6716029300223745,
+          "brier": 0.2395716886405281,
+          "mean_prediction": 0.4630111767300796,
+          "actual_win_rate": 0.4866791311578307
+        },
+        "A_gih_opening": {
+          "log_loss": 0.6706548030145071,
+          "brier": 0.23911579708447003,
+          "mean_prediction": 0.4628864578163093,
+          "actual_win_rate": 0.4866791311578307
+        },
+        "B_iwd": {
+          "log_loss": 0.6721190449045465,
+          "brier": 0.23982063921057564,
+          "mean_prediction": 0.4661751316432877,
+          "actual_win_rate": 0.4866791311578307
+        },
+        "B_iwd_opening": {
+          "log_loss": 0.6716718658633586,
+          "brier": 0.23960792232529787,
+          "mean_prediction": 0.46615249382288027,
+          "actual_win_rate": 0.4866791311578307
+        },
+        "C_adjusted": {
+          "log_loss": 0.6712463012037901,
+          "brier": 0.2393912328725563,
+          "mean_prediction": 0.4575358204805623,
+          "actual_win_rate": 0.4866791311578307
+        },
+        "C_adjusted_opening": {
+          "log_loss": 0.6704582172028858,
+          "brier": 0.23901246022963182,
+          "mean_prediction": 0.4573986331664127,
+          "actual_win_rate": 0.4866791311578307
+        }
+      },
+      "all": {
+        "baseline": {
+          "log_loss": 0.6721884666731365,
+          "brier": 0.23986321197803034,
+          "mean_prediction": 0.47281434520393906,
+          "actual_win_rate": 0.4866791311578307
+        },
+        "A_gih": {
+          "log_loss": 0.6693038616629314,
+          "brier": 0.2384654472693118,
+          "mean_prediction": 0.46662594962571774,
+          "actual_win_rate": 0.4866791311578307
+        },
+        "A_gih_opening": {
+          "log_loss": 0.666709786283671,
+          "brier": 0.23721904780135855,
+          "mean_prediction": 0.46615401929592293,
+          "actual_win_rate": 0.4866791311578307
+        },
+        "B_iwd": {
+          "log_loss": 0.670987916111511,
+          "brier": 0.23927098890142784,
+          "mean_prediction": 0.4665806712975714,
+          "actual_win_rate": 0.4866791311578307
+        },
+        "B_iwd_opening": {
+          "log_loss": 0.6683555968819408,
+          "brier": 0.23800732971394092,
+          "mean_prediction": 0.4662794584339922,
+          "actual_win_rate": 0.4866791311578307
+        },
+        "C_adjusted": {
+          "log_loss": 0.6658208817917673,
+          "brier": 0.2367997642755678,
+          "mean_prediction": 0.47212549379047036,
+          "actual_win_rate": 0.4866791311578307
+        },
+        "C_adjusted_opening": {
+          "log_loss": 0.6637750487607732,
+          "brier": 0.23582700055137665,
+          "mean_prediction": 0.4717665417059853,
+          "actual_win_rate": 0.4866791311578307
+        }
+      }
+    }
+  },
+  "primary_definition": "equal sets, equal budgets, equal source drafts; pregame deck-strength log loss",
+  "causal_claim": false,
+  "pack_one_data_used": false,
+  "protocol_version": "card-strength-v1",
+  "protocol_sha256": "0f9966f4812bc0cf4cf94275785f5f9d67538c9f42a561407d22f8fdb372809a",
+  "code_sha256": "2d9bb1219bee4a35b5ef46544637ff59279d1a4d3eaa3050383ca2d84ebc408a"
+}

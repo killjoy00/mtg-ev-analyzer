@@ -1,0 +1,286 @@
+{
+  "protocol_sha256": "0f9966f4812bc0cf4cf94275785f5f9d67538c9f42a561407d22f8fdb372809a",
+  "code_sha256": "2d9bb1219bee4a35b5ef46544637ff59279d1a4d3eaa3050383ca2d84ebc408a",
+  "sources": {
+    "FRA": {
+      "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.FRA.PremierDraft.csv.gz",
+      "last_modified": "Mon, 19 Oct 2026 16:20:14 GMT",
+      "etag": "\"454df37989dfa31c3c1f9f139ba0800d-3\"",
+      "sha256": "a350666bfd293bd14601105af0187f13353b16fa86e81307432a7b3a9a0bbfdc",
+      "bytes": 24570968
+    },
+    "HOB": {
+      "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.HOB.PremierDraft.csv.gz",
+      "last_modified": "Thu, 01 Oct 2026 13:17:00 GMT",
+      "etag": "\"11103b69a197a8f351afd61debd8d4ba-3\"",
+      "sha256": "1ca977bb415ac8fce04b889b9b2d93a6540cf21a033dfa9fb0907af443000676",
+      "bytes": 22072331
+    },
+    "MSH": {
+      "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.MSH.PremierDraft.csv.gz",
+      "last_modified": "Mon, 27 Jul 2026 18:11:30 GMT",
+      "etag": "\"04762b8ce70225858c90a877a4579de8-4\"",
+      "sha256": "8a6bd93a5d50554a3d87703e93624d09e638dc6dd03eda12be9c3f2925484edf",
+      "bytes": 31463893
+    },
+    "SOS": {
+      "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.SOS.PremierDraft.csv.gz",
+      "last_modified": "Fri, 05 Jun 2026 22:15:21 GMT",
+      "etag": "\"eff255089693f3a81a17419588a9581e-6\"",
+      "sha256": "1be513933918ca243c137af0314aae099c721c408786c9cb56f08027d9b113fb",
+      "bytes": 49412352
+    },
+    "BLB": {
+      "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.BLB.PremierDraft.csv.gz",
+      "last_modified": "Sat, 07 Sep 2024 02:41:07 GMT",
+      "etag": "\"384cef5fde564a20965e2883322f9e96-9\"",
+      "sha256": "61fed2a4db5854ca9f247eba9ea4176cf70a25ee253024928963335d32dbf281",
+      "bytes": 69271450
+    },
+    "ECL": {
+      "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.ECL.PremierDraft.csv.gz",
+      "last_modified": "Mon, 18 May 2026 20:28:10 GMT",
+      "etag": "\"94b23621b015925bf9a2c3eaafe6f592-6\"",
+      "sha256": "54b94edb0702dbcf20aa943d0e7da5a7987cf20232864083953e61b95b38ff48",
+      "bytes": 42752573
+    }
+  },
+  "prediction_sha256": {
+    "BLB-2000.npz": "2fb125fe843aa33bb7175103fc23cee4a0b3bfe2f92f64b3861e2db9e99356c7",
+    "BLB-500.npz": "85468f0419edbd2e1c7d8d968ef78483f49999aed7bbc0edf028e0cf321cc3b1",
+    "BLB-all.npz": "ceea78c21f5ae25a03d936de9b979e83eb25abc42caf199aba1dfe0507793dca",
+    "ECL-2000.npz": "6e3d8c9aed4073ece5a7e0cb2c2afef23a5ab3483b521cb1d66cf61753a85bdc",
+    "ECL-500.npz": "e2aeca75a1ad5635cfca811223c58a48c67b92b8ea6332521187aa0cfaf6abcb",
+    "ECL-all.npz": "0cc7cb340980404da878e498456a42e97df6710fd26056c5156663c5222c700b",
+    "FRA-2000.npz": "1385620877fd39d533f141bb3a4127a8cff718d0f0fdba9090c651f3c8415469",
+    "FRA-500.npz": "7aa8db1c3ada4904b4205483e4ac6842ae1150d4ca750bcb9282cd5578efab43",
+    "FRA-all.npz": "0817d49dcb99de8b592cd7165ea3f318843269b7a6a8f32fdc6d4ee56ae99543",
+    "HOB-2000.npz": "c14023088e0b13eaa3a3557ffa06f080975de67425f797112d24cfaa2e2be010",
+    "HOB-500.npz": "cf5d0bc761624f20267e37881fc72085bc9b93dd84c767bb18fd06dc82211a4e",
+    "HOB-all.npz": "e8dbd10be91f4d8e78b2bae5573957bac5f6cd0075b6feffb13642ee50cfaada",
+    "MSH-2000.npz": "4694fa17e41020465fdea10401cc1714bcb928c913545f75944f7a2d908f7084",
+    "MSH-500.npz": "372d10e782d5dac2b65b42f5bc162f7246b1d8e92562953b37726e8d3cc6a7e1",
+    "MSH-all.npz": "35a63951589c734d26188317d656719a32949b5c8d5c35bbc6b8134b43940424",
+    "SOS-2000.npz": "5c5ea54f6e16c546513ab988b1e5de50a50cc1a9341cd1918a0514b5366e1a21",
+    "SOS-500.npz": "12923ce1dcde1bea5a2b50954d126a1334957a90143662c8b466f28a15e37b92",
+    "SOS-all.npz": "624bbc6e10f8be0a55a300486f720f0bd1a0327d42cce59be90ec2699fa790f7"
+  },
+  "data_audit": {
+    "FRA": {
+      "set": "FRA",
+      "cache_schema": 1,
+      "source_sha256": "a350666bfd293bd14601105af0187f13353b16fa86e81307432a7b3a9a0bbfdc",
+      "raw_games": 297964,
+      "invalid_games": 0,
+      "duplicate_games_excluded": 0,
+      "games": 297964,
+      "drafts": 55469,
+      "code_sha256": "b8dab35313c425d73b5128a1606c857fa3322dbb375ea02143c60797d951e9ef",
+      "train_drafts": 32213,
+      "validation_drafts": 10225,
+      "test_drafts": 11094,
+      "purged_drafts": 1937,
+      "500": {
+        "training_drafts": 500,
+        "training_games": 2744,
+        "test_unknown_copy_fraction": 0.00015523273855298607,
+        "observed_cards": 282
+      },
+      "2000": {
+        "training_drafts": 2000,
+        "training_games": 11062,
+        "test_unknown_copy_fraction": 1.9028573957350673e-05,
+        "observed_cards": 285
+      },
+      "all": {
+        "training_drafts": 32213,
+        "training_games": 174929,
+        "test_unknown_copy_fraction": 0.0,
+        "observed_cards": 290
+      }
+    },
+    "HOB": {
+      "set": "HOB",
+      "cache_schema": 1,
+      "source_sha256": "1ca977bb415ac8fce04b889b9b2d93a6540cf21a033dfa9fb0907af443000676",
+      "raw_games": 323114,
+      "invalid_games": 0,
+      "duplicate_games_excluded": 0,
+      "games": 323114,
+      "drafts": 57421,
+      "code_sha256": "2d9bb1219bee4a35b5ef46544637ff59279d1a4d3eaa3050383ca2d84ebc408a",
+      "array_sha256": {
+        "deck": "e04649c207e8295582abbbfa4e2410eb7bd584bb22fa58216700d355d0d2321e",
+        "hand": "49299205688988fefef6052866c57d51278a7f7ebfef850786326fb1b1a7ba7e",
+        "opening": "d6994787a7cb043c8cfd96da0a37e1995a430a8800ff35e9553d6118f1da87fe",
+        "rows": "d27cf7a7cd86aed2033c254479d69988caa81ca647e5d6fb7afc9c25ca15cbdf"
+      },
+      "train_drafts": 33745,
+      "validation_drafts": 11160,
+      "test_drafts": 11485,
+      "purged_drafts": 1031,
+      "500": {
+        "training_drafts": 500,
+        "training_games": 2846,
+        "test_unknown_copy_fraction": 9.591526562599324e-05,
+        "observed_cards": 186
+      },
+      "2000": {
+        "training_drafts": 2000,
+        "training_games": 11340,
+        "test_unknown_copy_fraction": 5.70868501458243e-06,
+        "observed_cards": 187
+      },
+      "all": {
+        "training_drafts": 33745,
+        "training_games": 189748,
+        "test_unknown_copy_fraction": 0.0,
+        "observed_cards": 188
+      }
+    },
+    "MSH": {
+      "set": "MSH",
+      "cache_schema": 1,
+      "source_sha256": "8a6bd93a5d50554a3d87703e93624d09e638dc6dd03eda12be9c3f2925484edf",
+      "raw_games": 377514,
+      "invalid_games": 0,
+      "duplicate_games_excluded": 0,
+      "games": 377514,
+      "drafts": 67808,
+      "code_sha256": "b8dab35313c425d73b5128a1606c857fa3322dbb375ea02143c60797d951e9ef",
+      "train_drafts": 39889,
+      "validation_drafts": 12955,
+      "test_drafts": 13562,
+      "purged_drafts": 1402,
+      "500": {
+        "training_drafts": 500,
+        "training_games": 2822,
+        "test_unknown_copy_fraction": 0.0012467957838046362,
+        "observed_cards": 293
+      },
+      "2000": {
+        "training_drafts": 2000,
+        "training_games": 11351,
+        "test_unknown_copy_fraction": 0.00031144656984226306,
+        "observed_cards": 318
+      },
+      "all": {
+        "training_drafts": 39889,
+        "training_games": 223103,
+        "test_unknown_copy_fraction": 0.0,
+        "observed_cards": 334
+      }
+    },
+    "SOS": {
+      "set": "SOS",
+      "cache_schema": 1,
+      "source_sha256": "1be513933918ca243c137af0314aae099c721c408786c9cb56f08027d9b113fb",
+      "raw_games": 582914,
+      "invalid_games": 0,
+      "duplicate_games_excluded": 0,
+      "games": 582914,
+      "drafts": 106121,
+      "code_sha256": "b8dab35313c425d73b5128a1606c857fa3322dbb375ea02143c60797d951e9ef",
+      "train_drafts": 62804,
+      "validation_drafts": 20540,
+      "test_drafts": 21225,
+      "purged_drafts": 1552,
+      "500": {
+        "training_drafts": 500,
+        "training_games": 2878,
+        "test_unknown_copy_fraction": 0.000988275516152485,
+        "observed_cards": 326
+      },
+      "2000": {
+        "training_drafts": 2000,
+        "training_games": 11396,
+        "test_unknown_copy_fraction": 8.904152747526918e-05,
+        "observed_cards": 338
+      },
+      "all": {
+        "training_drafts": 62804,
+        "training_games": 347515,
+        "test_unknown_copy_fraction": 0.0,
+        "observed_cards": 341
+      }
+    },
+    "BLB": {
+      "set": "BLB",
+      "cache_schema": 1,
+      "source_sha256": "61fed2a4db5854ca9f247eba9ea4176cf70a25ee253024928963335d32dbf281",
+      "raw_games": 931230,
+      "invalid_games": 0,
+      "duplicate_games_excluded": 0,
+      "games": 931230,
+      "drafts": 160150,
+      "code_sha256": "2d9bb1219bee4a35b5ef46544637ff59279d1a4d3eaa3050383ca2d84ebc408a",
+      "array_sha256": {
+        "deck": "826087ac91ef8b15cdd54f61daa5416628339f2df99a1c77c4c7b324190e4a01",
+        "hand": "a5929360625d8f8eb7ef7d053bb54238bc873bd298e563c2af13f240de89978f",
+        "opening": "23bf3e346b4101235ee9ce687696d5d24cd88e2d6edce570e02fc06521019431",
+        "rows": "61f9be754cdc09aab69bec8b19eeefb7178d1f83080b0ec4e7f1f4ef0482de36"
+      },
+      "train_drafts": 94404,
+      "validation_drafts": 30851,
+      "test_drafts": 32030,
+      "purged_drafts": 2865,
+      "500": {
+        "training_drafts": 500,
+        "training_games": 3004,
+        "test_unknown_copy_fraction": 0.0005169998542161971,
+        "observed_cards": 263
+      },
+      "2000": {
+        "training_drafts": 2000,
+        "training_games": 11821,
+        "test_unknown_copy_fraction": 2.528554273808407e-06,
+        "observed_cards": 269
+      },
+      "all": {
+        "training_drafts": 94404,
+        "training_games": 553688,
+        "test_unknown_copy_fraction": 0.0,
+        "observed_cards": 271
+      }
+    },
+    "ECL": {
+      "set": "ECL",
+      "cache_schema": 1,
+      "source_sha256": "54b94edb0702dbcf20aa943d0e7da5a7987cf20232864083953e61b95b38ff48",
+      "raw_games": 536566,
+      "invalid_games": 1,
+      "duplicate_games_excluded": 0,
+      "games": 536565,
+      "drafts": 98116,
+      "code_sha256": "2d9bb1219bee4a35b5ef46544637ff59279d1a4d3eaa3050383ca2d84ebc408a",
+      "array_sha256": {
+        "deck": "7762966e12562949ac2dd61d93aff85db37aa847f83aac5e4decb75354847cfc",
+        "hand": "0a65f318b6bf61f4223673af345ef1fd3e5b4a6d8b26afa5728ae3c5e46c9e14",
+        "opening": "681b29bd6ff69832e9340742090695f253bb5b8b1f4212afe12be299b11590a1",
+        "rows": "c39c8ab28bc7e7a1ad148b4de2bd9bad1d22d32570c1eb0869f3915315ed13b8"
+      },
+      "train_drafts": 57894,
+      "validation_drafts": 18980,
+      "test_drafts": 19624,
+      "purged_drafts": 1618,
+      "500": {
+        "training_drafts": 500,
+        "training_games": 2747,
+        "test_unknown_copy_fraction": 0.0005124078231176034,
+        "observed_cards": 276
+      },
+      "2000": {
+        "training_drafts": 2000,
+        "training_games": 11033,
+        "test_unknown_copy_fraction": 1.674627584847102e-05,
+        "observed_cards": 283
+      },
+      "all": {
+        "training_drafts": 57894,
+        "training_games": 316590,
+        "test_unknown_copy_fraction": 0.0,
+        "observed_cards": 288
+      }
+    }
+  }
+}
