@@ -64,6 +64,19 @@ async function awaitAdminVersionAlignment(){
   },'Admin Pages/gateway/Draft API versions must converge before release acceptance');
 }
 await awaitAdminVersionAlignment();
+// A version-aligned release can still omit new Admin endpoints from the
+// Cloudflare gateway allowlist. A no-session GET must reach the Neon Admin
+// guard (401), not die at the gateway as an unrecognized route (404).
+for(const path of [
+  '/v1/admin/overview/trends',
+  '/v1/admin/overview/health',
+  '/v1/admin/insights/quality-watch',
+  '/v1/admin/campaign-performance',
+]) {
+  const {response}=await call('/draft'+path,{headers:{origin},expected:401});
+  assert.equal(response.headers.get('access-control-allow-origin'),origin);
+}
+console.log('All four read-only Admin dashboard routes reach the protected production backend.');
 
 const mobileLeaderboardToken='p1_00000000-0000-4000-8000-000000000000.'+'A'.repeat(43);
 await call('/draft/v1/leaderboard?period=daily&environment=mixed',{

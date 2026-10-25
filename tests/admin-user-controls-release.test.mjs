@@ -46,6 +46,20 @@ test('gateway allows only the narrow admin username and deletion routes and meth
   assert.equal(adminPath('/v1/admin/measurements/habits','GET'),true);
   assert.equal(adminPath('/v1/admin/measurements/reviews','GET'),true);
   assert.equal(adminPath('/v1/admin/measurements/habits','POST'),false);
+  // All dashboard APIs added in #1353 must be reachable through the real
+  // production gateway; an omitted allowlist entry otherwise returns 404.
+  for(const path of [
+    '/v1/admin/overview/trends',
+    '/v1/admin/overview/health',
+    '/v1/admin/insights/quality-watch',
+    '/v1/admin/campaign-performance',
+  ]) {
+    assert.equal(adminPath(path,'GET'),true,`${path} is an allowed Admin read`);
+    for(const method of ['POST','PATCH','DELETE'])
+      assert.equal(adminPath(path,method),false,`${path} rejects ${method}`);
+  }
+  for(const path of ['/v1/admin/overview/all','/v1/admin/insights/quality-watch/extra','/v1/admin/campaign-performance/export'])
+    assert.equal(adminPath(path,'GET'),false,`${path} is not an allowed route`);
   assert.equal(adminPath('/v1/admin/corpus/blb/detail','GET'),true);
   assert.equal(adminPath('/v1/admin/corpus/blb/detail','POST'),false);
 });
