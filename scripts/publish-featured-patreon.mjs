@@ -108,7 +108,7 @@ async function tryControl(page,specs,timeoutMs=1800) {
    if(await loc.count()===1&&await loc.isVisible())return loc;
   }
   if(Date.now()>=until)break;
-  await page.waitForTimeout(250);
+  await pause(250);
  } while(true);
  return null;
 }
