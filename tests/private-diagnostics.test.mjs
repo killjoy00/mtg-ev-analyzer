@@ -8,11 +8,12 @@ const trace='a'.repeat(32),tag='b'.repeat(32);
 async function logs(fn){const old=console.log,rows=[];console.log=s=>rows.push(JSON.parse(s));try{return {result:await fn(),rows};}finally{console.log=old;}}
 test('quota handler correlates bounded operation timings without input identities',async()=>{
  let buckets,alarm=null;const tx={get:async k=>Array.isArray(k)?new Map():buckets,put:async(k,v)=>{buckets=v;},getAlarm:async()=>alarm,setAlarm:async v=>{alarm=v;}};
- const quota=new NetworkQuota({storage:{transaction:fn=>fn(tx)}});
+ const quota=new NetworkQuota({storage:{transaction:fn=>fn(tx),sync:async()=>{}}});
  const {result,rows}=await logs(()=>quota.fetch(new Request('https://quota/session',{method:'POST',headers:{[TRACE_HEADER]:trace,'x-pack1-quota-tag':tag}})));
  assert.equal(result.status,204);assert.equal(buckets.request.count,1);assert.equal(buckets.session.count,1);
- assert.equal(rows.length,2);const metric=rows[1];assert.equal(metric.trace,trace);assert.equal(metric.object_tag,tag);assert.equal(metric.concurrency,1);
- for(const key of ['handler_ms','transaction_ms','get_ms','put_ms','alarm_get_ms','alarm_set_ms'])assert.ok(Number.isFinite(metric[key]));
+ assert.equal(rows.length,3);const metric=rows[2];assert.equal(metric.trace,trace);assert.equal(metric.object_tag,tag);assert.equal(metric.concurrency,1);
+ assert.equal(rows[1].event,'quota_commit_wait');assert.equal(metric.durability_confirmed,true);
+ for(const key of ['handler_ms','transaction_ms','get_ms','put_ms','alarm_get_ms','alarm_set_ms','durability_ms'])assert.ok(Number.isFinite(metric[key]));
  assert.equal(metric.transaction_callbacks,1);assert.doesNotMatch(JSON.stringify(rows),/buckets|until|count|secret|session_id|192\.0\.2/);
 });
 test('a committed debit whose acknowledgement hangs times out once and never reaches application code',async()=>{

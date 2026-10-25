@@ -7,7 +7,7 @@ function fixture() {
   const get=async k=>Array.isArray(k)?new Map(k.filter(x=>values.has(x)).map(x=>[x,values.get(x)])):values.get(k);
   const setAlarm=async at=>{writes.alarms++;alarm=at;};
   const tx={get,put:async(k,v)=>{writes.rows++;values.set(k,v);},getAlarm:async()=>alarm,setAlarm};
-  const quota=new NetworkQuota({storage:{transaction:fn=>fn(tx),get,setAlarm,deleteAll:async()=>values.clear()}});
+  const quota=new NetworkQuota({storage:{transaction:fn=>fn(tx),sync:async()=>{},get,setAlarm,deleteAll:async()=>values.clear()}});
   return {values,writes,quota,alarm:()=>alarm,fire:async()=>{alarm=null;await quota.alarm();},call:kind=>quota.fetch(new Request('https://quota/'+kind,{method:'POST'}))};
 }
 test('100 simultaneous legitimate arrivals and full paced gameplay fit both request buckets',async()=>{

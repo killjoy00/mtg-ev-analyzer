@@ -1,4 +1,4 @@
-import {TRACE_HEADER,REASON_HEADER,traceId,backendReason,failureIndicators,milliseconds,boundedSignalCall} from './private-diagnostics.mjs';
+import {TRACE_HEADER,REASON_HEADER,traceId,backendReason,providerRay,failureIndicators,milliseconds,boundedSignalCall} from './private-diagnostics.mjs';
 import {isIP} from 'node:net';
 import {readJson} from '../worker/request-json.mjs';
 import {PROD_ORIGINS} from '../worker/account-config.mjs';
@@ -242,7 +242,8 @@ export class NetworkQuota {
     const metric={event:'quota_handler',trace,object_tag:traceId(request.headers.get('x-pack1-quota-tag')),
       attempt:Number(request.headers.get('x-pack1-quota-attempt'))===2?2:1,
       concurrency:++this.inflight,location_source:'provider_metadata',get_ms:0,put_ms:0,
-      alarm_get_ms:0,alarm_set_ms:0,transaction_ms:0,transaction_callbacks:0};
+      alarm_get_ms:0,alarm_set_ms:0,transaction_ms:0,transaction_callbacks:0,
+      timing_version:2,durability_ms:0,durability_confirmed:false,phase:'transaction'};
     const timed=async(name,call)=>{const at=performance.now();try{return await call();}finally{metric[name]+=performance.now()-at;}};
     if(trace)console.log(JSON.stringify({event:'quota_handler_start',trace,object_tag:metric.object_tag,attempt:metric.attempt,concurrency:metric.concurrency}));
     try {
@@ -270,7 +271,13 @@ export class NetworkQuota {
       if(await timed('alarm_get_ms',()=>tx.getAlarm())===null)await timed('alarm_set_ms',()=>tx.setAlarm(now+QUOTA_CLEANUP_MS));
       return {retry:0,scopes};
     }));
-    metric.status=retry?429:204;
+    // A transaction/put can resolve into the runtime's write buffer before the
+    // output gate confirms durability. Do not log success before that boundary.
+    // Keep the normal output gate enabled; sync observes its existing obligation.
+    metric.phase='durability';
+    if(trace)console.log(JSON.stringify({event:'quota_commit_wait',trace,object_tag:metric.object_tag,attempt:metric.attempt,decision_status:retry?429:204}));
+    await timed('durability_ms',()=>this.storage.sync());
+    metric.durability_confirmed=true;metric.phase='complete';metric.status=retry?429:204;
     const result=retry?Response.json({error:'Too many requests.',code:'network_rate_limited',scopes},
       {status:429,headers:{'cache-control':'no-store','retry-after':String(retry)}}):new Response(null,{status:204});
     result.headers.set('x-pack1-quota-handler-ms',String(milliseconds(performance.now()-began)));
@@ -278,7 +285,7 @@ export class NetworkQuota {
     } catch(error){Object.assign(metric,failureIndicators(error));metric.status=503;throw error;}
     finally {
       this.inflight--;metric.handler_ms=milliseconds(performance.now()-began);
-      for(const k of ['get_ms','put_ms','alarm_get_ms','alarm_set_ms','transaction_ms'])metric[k]=milliseconds(metric[k]);
+      for(const k of ['get_ms','put_ms','alarm_get_ms','alarm_set_ms','transaction_ms','durability_ms'])metric[k]=milliseconds(metric[k]);
       if(trace)console.log(JSON.stringify(metric));
     }
   }
@@ -343,11 +350,18 @@ export function routeFamily(path) {
 export async function gateway(request,env,fetcher=fetch) {
   const url=new URL(request.url),origin=request.headers.get('origin'),mode=env.MODE;
   const trace=crypto.randomUUID().replaceAll('-','');
-  const started=performance.now(),metric={event:'gateway_request',trace,quota_handler_ms:null,quota_transport_wait_ms:null,quota_tag:null,quota_timeout:false,quota_aborted:false,quota_provider_reset:false,backend_reason:null,ingress_colo:/^[A-Z]{3}$/.test(request.cf?.colo||'')?request.cf.colo:null,route:routeFamily(url.pathname),method:['GET','POST','PATCH','DELETE','OPTIONS'].includes(request.method)?request.method:'other',
+  const started=performance.now(),metric={event:'gateway_request',trace,quota_handler_ms:null,quota_transport_wait_ms:null,quota_tag:null,quota_timeout:false,quota_aborted:false,quota_provider_reset:false,quota_failure_code:null,backend_reason:null,upstream_ray:null,upstream_backend_ack:false,upstream_failure_code:null,ingress_colo:/^[A-Z]{3}$/.test(request.cf?.colo||'')?request.cf.colo:null,route:routeFamily(url.pathname),method:['GET','POST','PATCH','DELETE','OPTIONS'].includes(request.method)?request.method:'other',
     release:/^[a-f0-9]{40}$/.test(env.RELEASE_COMMIT||'')?env.RELEASE_COMMIT:'unknown',quota_ms:0,quota_attempts:0,quota_retryable:false,quota_overloaded:false,quota_remote:false,upstream_ms:0,upstream_calls:0,upstream_status:null,quota_scope:null,rate_limit_class:null,error:null};
   const upstreamFetch=async(...args)=>{
     const began=performance.now();metric.upstream_calls++;
-    try {const result=await fetcher(...args);metric.upstream_status=result.status;metric.backend_reason=backendReason(result.headers.get(REASON_HEADER));return result;}
+    metric.upstream_status=null;metric.backend_reason=null;metric.upstream_ray=null;metric.upstream_backend_ack=false;metric.upstream_failure_code=null;
+    try {
+      const result=await fetcher(...args);metric.upstream_status=result.status;
+      metric.backend_reason=backendReason(result.headers.get(REASON_HEADER));
+      metric.upstream_ray=providerRay(result.headers.get('cf-ray'));
+      metric.upstream_backend_ack=traceId(result.headers.get(TRACE_HEADER))===trace;
+      return result;
+    } catch(error){const f=failureIndicators(error);metric.upstream_failure_code=f.timeout?'timeout':f.aborted?'abort':f.failure_code||'transport_failure';throw error;}
     finally {metric.upstream_ms+=performance.now()-began;}
   };
   const quotaFetch=async(quotaId,kind)=>{
@@ -356,6 +370,7 @@ export async function gateway(request,env,fetcher=fetch) {
       const result=await chargeNetworkQuota(env.NETWORK_QUOTA,quotaId,kind,{trace,objectTag:metric.quota_tag,
         onAttempt:()=>metric.quota_attempts++,onFailure:failure=>{
           metric.quota_retryable ||= failure.retryable;metric.quota_overloaded ||= failure.overloaded;metric.quota_remote ||= failure.remote;metric.quota_timeout ||= failure.timeout;metric.quota_aborted ||= failure.aborted;metric.quota_provider_reset ||= failure.provider_reset;
+          metric.quota_failure_code=failure.failure_code||metric.quota_failure_code;
         },
       });
       const handler=result.headers.get('x-pack1-quota-handler-ms');
