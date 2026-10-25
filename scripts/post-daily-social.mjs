@@ -158,18 +158,18 @@ export async function linkCardImage(path=LINK_CARD_IMAGE) {
   } catch {return null;}
 }
 
-export async function blueskyPublish(fetchImpl,{handle,password,day,text,url,linkText=url,image,cardImage=null,rkey=null,imageAlt='Pack One Daily draft challenge'}) {
+export async function blueskyPublish(fetchImpl,{handle,password,day,text,url,linkText=url,image,cardImage=null}) {
   const session=await responseJson(fetchImpl,'https://bsky.social/xrpc/com.atproto.server.createSession',{
     method:'POST',headers:{'content-type':'application/json'},
     body:JSON.stringify({identifier:handle,password}),
   },'Bluesky login');
   if(!session?.accessJwt||!session.did)throw Error('Bluesky login returned no session.');
   const auth={'authorization':'Bearer '+session.accessJwt};
-  const recordKey=rkey||blueskyDailyRkey(day);
+  const rkey=blueskyDailyRkey(day);
   const getUrl=new URL('https://bsky.social/xrpc/com.atproto.repo.getRecord');
   getUrl.searchParams.set('repo',session.did);
   getUrl.searchParams.set('collection','app.bsky.feed.post');
-  getUrl.searchParams.set('rkey',recordKey);
+  getUrl.searchParams.set('rkey',rkey);
   async function alreadyPosted() {
     const existing=await fetchImpl(getUrl.toString(),{headers:auth,signal:AbortSignal.timeout(15_000)});
     if(existing.status===404)return false;
@@ -201,7 +201,7 @@ export async function blueskyPublish(fetchImpl,{handle,password,day,text,url,lin
   if(image) {
     const blob=await uploadBlob(image,'Bluesky image upload');
     if(!blob?.blob)throw Error('Bluesky upload returned no blob.');
-    embed={$type:'app.bsky.embed.images',images:[{alt:imageAlt,image:blob.blob}]};
+    embed={$type:'app.bsky.embed.images',images:[{alt:'Pack One Daily draft challenge',image:blob.blob}]};
   }
   const record={
     $type:'app.bsky.feed.post',
@@ -213,7 +213,7 @@ export async function blueskyPublish(fetchImpl,{handle,password,day,text,url,lin
   const response=await fetchImpl('https://bsky.social/xrpc/com.atproto.repo.createRecord',{
     method:'POST',
     headers:{...auth,'content-type':'application/json'},
-    body:JSON.stringify({repo:session.did,collection:'app.bsky.feed.post',rkey:recordKey,record}),
+    body:JSON.stringify({repo:session.did,collection:'app.bsky.feed.post',rkey,record}),
     signal:AbortSignal.timeout(15_000),
   });
   // ATProto PDS returns HTTP 400 for an existing rkey, not necessarily 409.
