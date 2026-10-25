@@ -26,8 +26,11 @@ on:
       - 'scripts/render-featured-pick.mjs'
       - 'scripts/featured-soundtrack.mjs'
       - 'scripts/publish-featured-pick.mjs'
+      - 'scripts/publish-featured-patreon.mjs'
+      - 'scripts/capture-patreon-session.mjs'
       - 'scripts/upload-daily-short.mjs'
       - 'tests/featured-pick.test.mjs'
+      - 'tests/featured-patreon.test.mjs'
       - 'tests/featured-soundtrack.test.mjs'
       - 'docs/FEATURED-PICK-MORNINGS.md'
   workflow_dispatch:
@@ -79,6 +82,8 @@ jobs:
           DAILY_IMAGE_URL_TEMPLATE: ${{ vars.PACKONE_DAILY_IMAGE_URL_TEMPLATE }}
 
   featured:
+    outputs:
+      artifact_ready: ${{ steps.featured_artifact.outputs.artifact-id != '' }}
     # The same independent Neon clock (07:10, 07:20, 07:40 Pacific) and GitHub
     # fallback drive both Daily announcements and yesterday's separate feature.
     if: >-
@@ -154,6 +159,49 @@ jobs:
       - name: Publish featured pick to configured channels, once
         if: steps.select.outputs.selected == 'true'
         run: node scripts/publish-featured-pick.mjs
+
+  featured-patreon:
+    # Runs separately so a Patreon session/UI failure cannot stop other social destinations.
+    # Run even if another featured destination failed AFTER the artifact upload.
+    needs: [featured]
+    if: >-
+      always() &&
+      github.repository == 'killjoy00/mtg-ev-analyzer' &&
+      github.ref == 'refs/heads/main' &&
+      needs.featured.outputs.artifact_ready == 'true' &&
+      (github.event_name == 'schedule' || github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' && inputs.live == true))
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    env:
+      GITHUB_TOKEN: ${{ github.token }}
+      SOURCE_PACIFIC_DAY: ${{ inputs.source_day }}
+      PACKONE_PATREON_AUTOPUBLISH_ENABLED: ${{ vars.PACKONE_PATREON_AUTOPUBLISH_ENABLED }}
+      PACKONE_PATREON_STORAGE_STATE_B64: ${{ secrets.PACKONE_PATREON_STORAGE_STATE_B64 }}
+      PATREON_CREATOR_ACCESS_TOKEN: ${{ secrets.PATREON_CREATOR_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install pinned dependencies and test Patreon publishing guards
+        run: |
+          npm ci --no-audit --no-fund
+          node --test tests/featured-patreon.test.mjs
+      - name: Download rendered featured image, data and Patreon copy
+        uses: actions/download-artifact@v4
+        with:
+          name: packone-featured-pick
+          path: artifacts/featured-pick
+      - name: Install Chromium only if Patreon publisher is activated
+        if: env.PACKONE_PATREON_AUTOPUBLISH_ENABLED == 'true'
+        run: npx playwright install --with-deps chromium
+      - name: Publish and verify public Patreon image post
+        run: node scripts/publish-featured-patreon.mjs
 
   featured-preview:
     if: github.repository == 'killjoy00/mtg-ev-analyzer' && github.event_name == 'pull_request'
