@@ -80,6 +80,10 @@ class QualityInferenceTests(unittest.TestCase):
         puzzle['pick_number'] = 1;table['set'] = 'wrong'
         with self.assertRaises(ValueError): q.prepare_context(puzzle, table)
 
+    def test_unsupported_event_cannot_use_premier_strength(self):
+        puzzle, table, _ = fixture();puzzle['source_event_type'] = 'TradDraft'
+        with self.assertRaises(ValueError): q.prepare_context(puzzle, table)
+
     def test_portfolio_never_repeats_source_or_backfills_failures(self):
         rows = [{'puzzle_id': str(i), 'set_id': 'x', 'pick_number': i + 1,
                  'source_draft_hash': 'one-source', 'eligible': True, 'quality_score': 1.} for i in range(3)]
@@ -90,6 +94,14 @@ class QualityInferenceTests(unittest.TestCase):
 
 @unittest.skipUnless(SCIENTIFIC, 'optional research dependencies not installed')
 class QualityExperimentTests(unittest.TestCase):
+    def test_unsupported_response_context_is_excluded_before_version_join(self):
+        puzzle, _, protocol = fixture()
+        puzzle.update(corpus_version='traditional-corpus', model_version=protocol['model_version'])
+        response = {'puzzle_id': puzzle['puzzle_id'], 'source_event_type': 'TradDraft'}
+        rows, excluded = experiment.join_labels([puzzle], [response], protocol)
+        self.assertEqual(rows, [])
+        self.assertEqual(excluded['unsupported_response_format'], 1)
+
     def test_source_exclusion_precedes_training_budget(self):
         chosen = experiment.independent_training_ids(np.arange(4), np.array(['a', 'b', 'c', 'd']), {'a', 'c'})
         np.testing.assert_array_equal(chosen[:2], [1, 3])

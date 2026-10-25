@@ -98,18 +98,21 @@ def fit_strength_tables(protocol, inputs, out):
 
 
 def join_labels(contexts, responses, protocol):
-    lookup = {}
+    lookup, excluded = {}, Counter()
     for row in responses:
+        if row.get('source_event_type') != protocol['event_type']:
+            excluded['unsupported_response_format'] += 1
+            continue
         if row['puzzle_id'] in lookup: raise ValueError('Duplicate response aggregate')
         if row.get('is_admin') or row['corpus_version'] != protocol['corpus_version'] or row['scoring_version'] != protocol['scoring_version']:
             raise ValueError('Invalid response cohort/version')
         lookup[row['puzzle_id']] = row
-    result, excluded = [], Counter()
+    result = []
     for context in contexts:
-        if context['corpus_version'] != protocol['corpus_version'] or context['model_version'] != protocol['model_version']:
-            raise ValueError('Context version differs from frozen cohort')
         row = lookup.get(context['puzzle_id'])
         if row is None: excluded['no_response'] += 1; continue
+        if context['corpus_version'] != protocol['corpus_version'] or context['model_version'] != protocol['model_version']:
+            raise ValueError('Context version differs from frozen cohort')
         if row['source_draft_hash'] != context['source_draft_hash'] or row['set_id'] != context['set_id']:
             raise ValueError('Response/context identity mismatch')
         ids = [c['id'] for c in context['candidates']]

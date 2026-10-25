@@ -3,6 +3,10 @@
 Protocol fixed before fitting this comparison. The aggregate response snapshot
 was previously examined for difficulty research; it is not a pristine external
 test. This is an offline development experiment, not a production release.
+Only recorded PremierDraft responses qualify. Traditional responses are
+explicitly excluded because their strength evidence and match environment
+were not validated by the first benchmark. This restriction was made explicit
+after inspecting format metadata, before fitting the choice models.
 
 ## Separation of roles
 

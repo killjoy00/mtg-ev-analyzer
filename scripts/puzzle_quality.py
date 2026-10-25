@@ -67,6 +67,8 @@ def prepare_context(puzzle, table, method='C_adjusted'):
         raise ValueError('Unsupported strength method')
     if str(puzzle.get('set_id', '')).lower() != str(table.get('set', '')).lower():
         raise ValueError('Strength table is from another set')
+    if puzzle.get('source_event_type', 'PremierDraft') != table.get('event_type', 'PremierDraft'):
+        raise ValueError('Strength table is from another event type')
     cards = puzzle.get('candidates')
     prior = puzzle.get('prior_picks') or []
     pick = puzzle.get('pick_number')

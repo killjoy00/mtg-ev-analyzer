@@ -2,6 +2,7 @@
   "version": "puzzle-quality-v1",
   "sets": ["fra", "hob", "msh", "sos", "blb", "ecl"],
   "assessment_set": "fra",
+  "event_type": "PremierDraft",
   "corpus_version": "elite-trophy-colour-stage-v9",
   "scoring_version": "trophy-consensus-v3",
   "model_version": "strong-player-colour-stage-v5",
