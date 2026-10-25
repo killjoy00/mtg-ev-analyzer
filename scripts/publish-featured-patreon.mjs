@@ -157,13 +157,21 @@ export async function publishInPatreonEditor({post,state,onSubmit=()=>{}}) {
   await safeStage('image-upload',async()=>{
    const before=await page.evaluate(()=>Array.from(document.images)
     .filter(img=>img.complete&&img.naturalWidth>=320&&img.naturalHeight>=160).length);
-   let input=await tryControl(page,[css('input[type="file"][accept*="image"]')]);
+   // File inputs are normally hidden. Playwright can set their files without
+   // opening an OS dialog; do not apply isVisible() to a file input.
+   const chooseFile=async()=>{
+    for(const selector of ['input[type="file"][accept*="image"]','input[type="file"]']) {
+     const loc=page.locator(selector);
+     if(await loc.count()===1)return loc;
+    }
+    return null;
+   };
+   let input=await chooseFile();
    if(!input) {
     const browse=await tryControl(page,[role('button',/^Browse$/i),
      role('button',/^Upload images?$/i),textExact('Browse')]);
     if(browse)await browse.click();
-    input=await tryControl(page,[css('input[type="file"][accept*="image"]'),
-     css('input[type="file"]')]);
+    input=await chooseFile();
    }
    if(!input)throw Error('image-picker-ambiguous');
    await input.setInputFiles({name:'featured-cover.jpg',mimeType:'image/jpeg',
