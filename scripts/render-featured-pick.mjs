@@ -1,4 +1,4 @@
-// Render a real-card, data-derived cover and silent vertical Short from yesterday's pick.
+// Render a real-card cover and original-scored vertical Short from yesterday's pick.
 // All source card art URLs come from the verified immutable puzzle payload.
 import {readFile,writeFile} from 'node:fs/promises';
 import {execFile} from 'node:child_process';
@@ -6,6 +6,7 @@ import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
 import {chromium} from 'playwright';
 import {imageUrl,formatPercent} from './featured-pick.mjs';
+import {buildFeaturedSoundtrack,FEATURED_AUDIO_VERSION,FEATURED_AUDIO_SECONDS} from './featured-soundtrack.mjs';
 
 const DIR='artifacts/featured-pick',run=promisify(execFile);
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>
@@ -94,6 +95,7 @@ export async function renderFeatured() {
  const data=JSON.parse(await readFile(DIR+'/pick.json','utf8'));
  const f=data.feature;
  if(!f||!Array.isArray(f.choices)||![2,3].includes(f.tier)||
+    !f.choices.some(c=>c.id===f.trophy?.id)||
     !f.choices.every(c=>imageUrl(c.image_url))||!imageUrl(f.trophy?.image_url))
   throw Error('Featured rendering requires source-verified card images.');
  const font=(await readFile('assets/fonts/barlow-condensed-700.woff2')).toString('base64');
@@ -116,21 +118,34 @@ export async function renderFeatured() {
   await render(cover,'featured-cover.jpg',true);
   const shots=scenes(f);
   for(let i=0;i<shots.length;i++)await render(shots[i].body,'scene-'+i+'.png');
+  const soundtrack=buildFeaturedSoundtrack();
+  await writeFile(DIR+'/featured-original-music.wav',soundtrack.wav);
   const inputs=shots.flatMap((scene,i)=>['-loop','1','-framerate','30','-t',String(scene.seconds),
    '-i',DIR+'/scene-'+i+'.png']);
   const graph=shots.map((_,i)=>'['+i+':v]fps=30,scale=1080:1920,setsar=1[v'+i+']').join(';')+';'+
    shots.map((_,i)=>'[v'+i+']').join('')+
    'concat=n='+shots.length+':v=1:a=0,format=yuv420p[out]';
   await run('ffmpeg',['-hide_banner','-loglevel','error','-y',...inputs,
-   '-filter_complex',graph,'-map','[out]','-an','-c:v','libx264',
-   '-preset','veryfast','-crf','25','-movflags','+faststart',DIR+'/featured-short.mp4'],
-   {timeout:180000});
-  const {stdout}=await run('ffprobe',['-v','error','-show_entries','format=duration',
-   '-of','default=noprint_wrappers=1:nokey=1',DIR+'/featured-short.mp4']);
-  const duration=Number(stdout.trim());
-  if(Math.abs(duration-20)>0.1)throw Error('Featured Short duration failed validation: '+duration);
+   '-i',DIR+'/featured-original-music.wav',
+   '-filter_complex',graph,'-map','[out]','-map',shots.length+':a:0',
+   '-c:v','libx264','-preset','veryfast','-crf','25',
+   '-c:a','aac','-b:a','128k','-ac','2','-ar','44100',
+   '-t',String(FEATURED_AUDIO_SECONDS),'-movflags','+faststart',
+   DIR+'/featured-short.mp4'],{timeout:180000});
+  const {stdout}=await run('ffprobe',['-hide_banner','-v','error',
+   '-show_entries','stream=codec_type,codec_name:format=duration','-of','json',
+   DIR+'/featured-short.mp4']);
+  const probe=JSON.parse(stdout);
+  const duration=Number(probe.format?.duration);
+  const video=probe.streams?.find(s=>s.codec_type==='video');
+  const audio=probe.streams?.find(s=>s.codec_type==='audio');
+  if(Math.abs(duration-FEATURED_AUDIO_SECONDS)>0.1||video?.codec_name!=='h264'||
+     audio?.codec_name!=='aac')
+   throw Error('Featured Short audio/video verification failed: no reliable AAC soundtrack.');
   await writeFile(DIR+'/render.json',JSON.stringify({day:f.day,puzzle_id:f.puzzle_id,
-   duration_seconds:duration,width:1080,height:1920,real_card_art:true,poster_ready:true},null,2)+'\n');
+   duration_seconds:duration,width:1080,height:1920,real_card_art:true,poster_ready:true,
+   audio_track:true,audio_source:FEATURED_AUDIO_VERSION,audio_stats:soundtrack.stats,
+  },null,2)+'\n');
   return {rendered:true,day:f.day,video_seconds:duration};
  } finally {await browser.close();}
 }
