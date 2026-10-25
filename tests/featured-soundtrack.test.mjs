@@ -42,7 +42,7 @@ test('YouTube renderer encodes AAC with the scene-timed score and verifies the M
  assert.match(src,/buildFeaturedSoundtrack\(\)/);
  assert.match(src,/featured-original-music\.wav/);
  assert.match(src,/'-c:a','aac'/);
- assert.match(src,/audio\.codec_name!=='aac'/);
+ assert.match(src,/audio\?\.codec_name!=='aac'/);
  assert.match(src,/audio_track:true,audio_source:FEATURED_AUDIO_VERSION/);
  assert.doesNotMatch(src,/'-an'/);
 });
