@@ -15,14 +15,6 @@ on:
       - 'scripts/daily-social-ledger.mjs'
       - 'tests/daily-social-post.test.mjs'
       - 'tests/daily-social-ledger.test.mjs'
-      - 'scripts/preview-featured-pick.mjs'
-      - 'scripts/featured-pick.mjs'
-      - 'scripts/generate-featured-pick.mjs'
-      - 'scripts/render-featured-pick.mjs'
-      - 'scripts/publish-featured-pick.mjs'
-      - 'scripts/upload-daily-short.mjs'
-      - 'tests/featured-pick.test.mjs'
-      - 'docs/FEATURED-PICK-MORNINGS.md'
   workflow_dispatch:
     inputs:
       live:
@@ -57,7 +49,7 @@ jobs:
         with:
           node-version: '24'
       - name: Verify offline publishing contracts
-        run: node --test tests/daily-social-post.test.mjs tests/daily-social-ledger.test.mjs tests/daily-social-dispatch.test.mjs tests/featured-pick.test.mjs
+        run: node --test tests/daily-social-post.test.mjs tests/daily-social-ledger.test.mjs tests/daily-social-dispatch.test.mjs
       - name: Publish or preview Daily
         if: github.event_name != 'pull_request'
         run: node scripts/post-daily-social.mjs
@@ -70,97 +62,3 @@ jobs:
           BLUESKY_APP_PASSWORD: ${{ secrets.PACKONE_BLUESKY_APP_PASSWORD }}
           DISCORD_WEBHOOK_URLS: ${{ secrets.PACKONE_DISCORD_WEBHOOK_URLS }}
           DAILY_IMAGE_URL_TEMPLATE: ${{ vars.PACKONE_DAILY_IMAGE_URL_TEMPLATE }}
-
-  featured:
-    # The same independent Neon clock (07:10, 07:20, 07:40 Pacific) and GitHub
-    # fallback drive both Daily announcements and yesterday's separate feature.
-    if: >-
-      github.repository == 'killjoy00/mtg-ev-analyzer' &&
-      github.ref == 'refs/heads/main' &&
-      (github.event_name == 'schedule' ||
-       (github.event_name == 'workflow_dispatch' && inputs.live == true))
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: read
-      actions: read
-      issues: write
-    env:
-      GITHUB_TOKEN: ${{ github.token }}
-      MANUAL_LIVE: ${{ inputs.live }}
-      SOURCE_PACIFIC_DAY: ${{ inputs.source_day }}
-      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-      BLUESKY_HANDLE: ${{ secrets.PACKONE_BLUESKY_HANDLE }}
-      BLUESKY_APP_PASSWORD: ${{ secrets.PACKONE_BLUESKY_APP_PASSWORD }}
-      DISCORD_WEBHOOK_URLS: ${{ secrets.PACKONE_DISCORD_WEBHOOK_URLS }}
-      PACKONE_YOUTUBE_CLIENT_ID: ${{ secrets.PACKONE_YOUTUBE_CLIENT_ID }}
-      PACKONE_YOUTUBE_CLIENT_SECRET: ${{ secrets.PACKONE_YOUTUBE_CLIENT_SECRET }}
-      PACKONE_YOUTUBE_REFRESH_TOKEN: ${{ secrets.PACKONE_YOUTUBE_REFRESH_TOKEN }}
-      YOUTUBE_PAUSED: ${{ vars.PACKONE_YOUTUBE_UPLOAD_PAUSED }}
-      FEATURED_YOUTUBE_PAUSED: ${{ vars.PACKONE_FEATURED_YOUTUBE_PAUSED }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-      - name: Install pinned project dependencies
-        run: npm ci --no-audit --no-fund
-      - name: Verify deterministic featured-pick selection and copy
-        run: node --test tests/featured-pick.test.mjs
-      - name: Select the previous Pacific day's most debated pick
-        id: select
-        run: node scripts/generate-featured-pick.mjs
-      - name: Install browser and video codec for real card images
-        if: steps.select.outputs.selected == 'true'
-        run: |
-          npx playwright install --with-deps chromium
-          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends ffmpeg
-          fi
-      - name: Render real-card social image, Patreon draft and vertical Short
-        if: steps.select.outputs.selected == 'true'
-        run: node scripts/render-featured-pick.mjs
-      - uses: actions/upload-artifact@v4
-        if: steps.select.outputs.selected == 'true'
-        with:
-          name: packone-featured-pick
-          path: artifacts/featured-pick/
-          if-no-files-found: error
-          retention-days: 7
-      - name: Publish featured pick to configured channels, once
-        if: steps.select.outputs.selected == 'true'
-        run: node scripts/publish-featured-pick.mjs
-
-  featured-preview:
-    if: github.repository == 'killjoy00/mtg-ev-analyzer' && github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-      - name: Install project and offline test deterministic selection
-        run: |
-          npm ci --no-audit --no-fund
-          node --test tests/featured-pick.test.mjs
-      - name: Generate deidentified production pick preview (no secrets)
-        run: node scripts/preview-featured-pick.mjs
-      - name: Install browser and ffmpeg
-        run: |
-          npx playwright install --with-deps chromium
-          if ! command -v ffmpeg >/dev/null || ! command -v ffprobe >/dev/null; then
-            sudo apt-get update
-            sudo apt-get install -y --no-install-recommends ffmpeg
-          fi
-      - name: Render real-card graphic and 20-second Short, no publication
-        run: node scripts/render-featured-pick.mjs
-      - uses: actions/upload-artifact@v4
-        with:
-          name: packone-featured-preview
-          path: artifacts/featured-pick/
-          if-no-files-found: error
-          retention-days: 5
