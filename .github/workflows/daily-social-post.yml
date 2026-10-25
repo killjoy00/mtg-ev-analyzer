@@ -24,9 +24,11 @@ on:
       - 'scripts/featured-pick-correction.mjs'
       - 'scripts/generate-featured-pick.mjs'
       - 'scripts/render-featured-pick.mjs'
+      - 'scripts/featured-soundtrack.mjs'
       - 'scripts/publish-featured-pick.mjs'
       - 'scripts/upload-daily-short.mjs'
       - 'tests/featured-pick.test.mjs'
+      - 'tests/featured-soundtrack.test.mjs'
       - 'docs/FEATURED-PICK-MORNINGS.md'
   workflow_dispatch:
     inputs:
@@ -111,8 +113,8 @@ jobs:
           node-version: '24'
       - name: Install pinned project dependencies
         run: npm ci --no-audit --no-fund
-      - name: Verify deterministic featured-pick selection and copy
-        run: node --test tests/featured-pick.test.mjs
+      - name: Verify selection and original soundtrack
+        run: node --test tests/featured-pick.test.mjs tests/featured-soundtrack.test.mjs
       - name: Select the previous Pacific day's most debated pick
         id: select
         run: node scripts/generate-featured-pick.mjs
@@ -124,16 +126,31 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y --no-install-recommends ffmpeg
           fi
-      - name: Render real-card social image, Patreon draft and vertical Short
+      - name: Render real-card social image, Patreon copy and scored vertical Short
         if: steps.select.outputs.selected == 'true'
         run: node scripts/render-featured-pick.mjs
       - uses: actions/upload-artifact@v4
+        id: featured_artifact
         if: steps.select.outputs.selected == 'true'
         with:
           name: packone-featured-pick
           path: artifacts/featured-pick/
           if-no-files-found: error
           retention-days: 7
+      - name: Show owner where to get the Patreon draft
+        if: steps.select.outputs.selected == 'true'
+        env:
+          FEATURE_ARTIFACT_URL: ${{ steps.featured_artifact.outputs.artifact-url }}
+        run: |
+          {
+            echo "### Featured pick for Patreon"
+            echo "The copy is **not in Patreon's Drafts section**. We cannot create Patreon drafts through its public API."
+            echo "Download the generated media and open **patreon.md**:"
+            echo
+            echo "[Download today's featured-pick artifact]($FEATURE_ARTIFACT_URL)"
+            echo
+            echo "The featured YouTube Short now includes a synthesized original soundtrack."
+          } >> "$GITHUB_STEP_SUMMARY"
       - name: Publish featured pick to configured channels, once
         if: steps.select.outputs.selected == 'true'
         run: node scripts/publish-featured-pick.mjs
@@ -152,7 +169,7 @@ jobs:
       - name: Install project and offline test deterministic selection
         run: |
           npm ci --no-audit --no-fund
-          node --test tests/featured-pick.test.mjs
+          node --test tests/featured-pick.test.mjs tests/featured-soundtrack.test.mjs
       - name: Generate deidentified production pick preview (no secrets)
         run: node scripts/preview-featured-pick.mjs
       - name: Install browser and ffmpeg
@@ -162,7 +179,7 @@ jobs:
             sudo apt-get update
             sudo apt-get install -y --no-install-recommends ffmpeg
           fi
-      - name: Render real-card graphic and 20-second Short, no publication
+      - name: Render real-card graphic and original-scored 20-second Short, no publication
         run: node scripts/render-featured-pick.mjs
       - uses: actions/upload-artifact@v4
         with:

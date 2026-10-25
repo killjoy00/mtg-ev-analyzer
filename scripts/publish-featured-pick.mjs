@@ -8,6 +8,7 @@ import {blueskyPublish,discordPublish,discordWebhookEntries,
  assertCurrentLivePublisher} from './post-daily-social.mjs';
 import {createGithubReceiptLedger,discordReceiptKey} from './daily-social-ledger.mjs';
 import {youtubeAccessToken,uploadVideo} from './upload-daily-short.mjs';
+import {FEATURED_AUDIO_VERSION,FEATURED_AUDIO_SECONDS} from './featured-soundtrack.mjs';
 import {isCorrection,CORRECTION_DAY,retractIncorrectBluesky,attemptIncorrectYoutubeDeletion} from './featured-pick-correction.mjs';
 
 const DIR='artifacts/featured-pick';
@@ -39,7 +40,9 @@ export async function publishFeatured({env=process.env,fetcher=fetch}={}) {
  const render=JSON.parse(await readFile(DIR+'/render.json','utf8'));
  if(!f||f.day!==previousPacificDay()||![2,3].includes(f.tier)||
   render.day!==f.day||render.puzzle_id!==f.puzzle_id||
-  render.real_card_art!==true||render.duration_seconds!==20||
+  render.real_card_art!==true||render.duration_seconds!==FEATURED_AUDIO_SECONDS||
+  render.audio_track!==true||render.audio_source!==FEATURED_AUDIO_VERSION||
+  render.audio_stats?.original_composition!==true||
   !f.choices.every(c=>imageUrl(c.image_url))||
   !f.choices.some(c=>c.id===f.trophy?.id)||
   JSON.stringify(copy)!==JSON.stringify(featureCopies(f)))
