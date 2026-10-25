@@ -169,16 +169,19 @@ export async function publishInPatreonEditor({post,state,onSubmit=()=>{}}) {
     }
     return null;
    };
-   let input=await chooseFile();
-   if(!input) {
-    const browse=await tryControl(page,[role('button',/^Browse$/i),
-     role('button',/^Upload images?$/i),textExact('Browse')]);
-    if(browse)await browse.click();
-    input=await chooseFile();
+   const imageFile={name:'featured-cover.jpg',mimeType:'image/jpeg',
+    buffer:post.cover};
+   const input=await chooseFile();
+   if(input)await input.setInputFiles(imageFile);
+   else {
+    const browse=await findControl(page,[role('button',/^Browse$/i),
+     role('button',/^Upload images?$/i),textExact('Browse')],'image-picker');
+    // Use Playwright's documented chooser event instead of an unattended OS dialog.
+    const [chooser]=await Promise.all([
+     page.waitForEvent('filechooser',{timeout:12000}),browse.click(),
+    ]);
+    await chooser.setFiles(imageFile);
    }
-   if(!input)throw Error('image-picker-ambiguous');
-   await input.setInputFiles({name:'featured-cover.jpg',mimeType:'image/jpeg',
-    buffer:post.cover});
    await page.waitForFunction(n=>Array.from(document.images).some(img=>
     img.complete&&img.naturalWidth>=320&&img.naturalHeight>=160)&&
     Array.from(document.images).filter(img=>
