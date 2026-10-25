@@ -79,6 +79,12 @@ class StrengthBenchmarkTests(unittest.TestCase):
             self.assertEqual(info['duplicate_games_excluded'], 2)
             self.assertEqual(info['games'], 2)
             self.assertEqual(info['cards'], ['Alpha'])
+            self.assertTrue(b.cache_valid(root / 'cache/test', info['array_sha256']))
+            (root / 'cache/test-hand.npz').write_bytes(b'incomplete archive')
+            self.assertFalse(b.cache_valid(root / 'cache/test', info['array_sha256']))
+            rebuilt = b.prepare_one('test', path, root / 'cache', {'sha256': b.sha256(path)})
+            self.assertEqual(rebuilt['games'], 2)
+            self.assertTrue(b.cache_valid(root / 'cache/test', rebuilt['array_sha256']))
 
     def test_target_validation_and_assessment_labels_cannot_affect_predictions(self):
         rng = np.random.default_rng(4)
@@ -115,6 +121,12 @@ class StrengthBenchmarkTests(unittest.TestCase):
         self.assertEqual(result['empirical_leader'], 'C_adjusted')
         self.assertEqual(result['operational_recommendation'], 'A_gih')
         self.assertIsNone(result['demonstrated_winner'])
+
+    def test_repeated_set_draw_uses_independent_draft_resamples(self):
+        values = np.array([0., 2.]).reshape(2, 1, 1)
+        boot = b.bootstrap([values, values], 8000, 9)
+        # Four independent draws from {0, 2} have mean variance 1 / 4.
+        self.assertAlmostEqual(float(boot.var()), .25, delta=.03)
 
 
 if __name__ == '__main__':

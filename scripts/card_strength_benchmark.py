@@ -9,17 +9,17 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
 import json
-import os
 from pathlib import Path
-import sys
 import urllib.request
 import warnings
+import zipfile
 
 import numpy as np
 import pandas as pd
 from scipy import sparse
-from scipy.special import expit, logit
+from scipy.special import logit
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
@@ -48,6 +48,37 @@ def write_json(path, value):
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(value, indent=2, allow_nan=False) + '\n')
+
+
+def write_npz(path, writer):
+    """Serialize in memory, then atomically replace a complete, checked archive.
+
+    Some mounted workspaces do not reliably preserve repeated seek/write calls
+    to a long-lived file. A single write also prevents reuse of partial caches.
+    """
+    buffer = io.BytesIO()
+    writer(buffer)
+    with zipfile.ZipFile(buffer) as archive:
+        if archive.testzip() is not None:
+            raise ValueError('Invalid serialized array archive')
+    path = Path(path)
+    temporary = path.with_suffix('.tmp')
+    temporary.write_bytes(buffer.getvalue())
+    temporary.replace(path)
+
+
+def cache_valid(prefix, expected=None):
+    for label in ('deck', 'hand', 'opening', 'rows'):
+        path = Path(str(prefix) + f'-{label}.npz')
+        try:
+            if expected and sha256(path) != expected[label]:
+                return False
+            with zipfile.ZipFile(path) as archive:
+                if archive.testzip() is not None:
+                    return False
+        except (OSError, zipfile.BadZipFile, KeyError):
+            return False
+    return True
 
 
 def download(protocol, raw):
@@ -114,7 +145,9 @@ def prepare_one(sid, path, cache, source):
         info = json.loads(manifest_path.read_text())
         if info['source_sha256'] != source['sha256'] or info.get('cache_schema') != 1:
             raise ValueError('Prepared cache does not match source')
-        return info
+        if cache_valid(prefix, info.get('array_sha256')):
+            return info
+        print(f'{sid}: incomplete/corrupt prepared cache; rebuilding from frozen source', flush=True)
     header = pd.read_csv(path, nrows=0).columns.tolist()
     required = {'draft_id', 'game_time', 'won', 'on_play', 'num_mulligans'}
     if not required.issubset(header):
@@ -172,12 +205,15 @@ def prepare_one(sid, path, cache, source):
               'draft': draft, 'time': np.concatenate(times)[unique]}
     cache.mkdir(parents=True, exist_ok=True)
     for label, chunks in [('deck', decks), ('hand', hands), ('opening', opening)]:
-        sparse.save_npz(str(prefix) + f'-{label}.npz', sparse.vstack(chunks, format='csr')[unique])
-    np.savez_compressed(str(prefix) + '-rows.npz', **arrays)
+        matrix = sparse.vstack(chunks, format='csr')[unique]
+        write_npz(str(prefix) + f'-{label}.npz', lambda buffer: sparse.save_npz(buffer, matrix))
+    write_npz(str(prefix) + '-rows.npz', lambda buffer: np.savez_compressed(buffer, **arrays))
     info = {'set': sid, 'cache_schema': 1, 'source_sha256': source['sha256'], 'raw_games': raw_rows,
             'invalid_games': invalid_rows, 'duplicate_games_excluded': int((~unique).sum()),
             'games': len(ids), 'drafts': len(draft_names), 'cards': names,
-            'code_sha256': sha256(__file__)}
+            'code_sha256': sha256(__file__),
+            'array_sha256': {label: sha256(str(prefix) + f'-{label}.npz')
+                             for label in ('deck', 'hand', 'opening', 'rows')}}
     write_json(manifest_path, info)
     print(f'{sid}: prepared {info["games"]:,} games / {info["drafts"]:,} drafts', flush=True)
     return info
@@ -346,19 +382,20 @@ def by_draft(values, ids):
 def bootstrap(scores, draws, seed):
     """Paired sets/drafts; scores[set] has drafts x budgets x model columns."""
     rng = np.random.default_rng(seed)
-    per_set = []
-    for values in scores:
+    # One independent within-set resample for each position in the resampled
+    # set list. A set selected twice must not reuse the same draft resample.
+    selected_sets = rng.integers(len(scores), size=(draws, len(scores)))
+    totals = np.zeros((draws, scores[0].shape[2]))
+    for sid, values in enumerate(scores):
         # Preserve all regimes/models when sampling a draft.
         average = values.mean(axis=1)
-        result = []
-        for start in range(0, draws, 40):
-            size = min(40, draws - start)
+        replicates, _ = np.where(selected_sets == sid)
+        for start in range(0, len(replicates), 40):
+            take = replicates[start:start + 40]
+            size = len(take)
             pick = rng.integers(len(average), size=(size, len(average)))
-            result.append(average[pick].mean(axis=1))
-        per_set.append(np.concatenate(result))
-    estimates = np.stack(per_set, axis=1)
-    selected_sets = rng.integers(len(scores), size=(draws, len(scores)))
-    return estimates[np.arange(draws)[:, None], selected_sets].mean(axis=1)
+            np.add.at(totals, take, average[pick].mean(axis=1))
+    return totals / len(scores)
 
 
 def choose_winner(means, boot):
@@ -439,7 +476,8 @@ def main(argv=None):
     prediction_dir.mkdir(parents=True, exist_ok=True)
     for sid, budgets in predictions.items():
         for label, values in budgets.items():
-            np.savez_compressed(prediction_dir / f'{sid}-{label}.npz', **values)
+            write_npz(prediction_dir / f'{sid}-{label}.npz',
+                      lambda buffer: np.savez_compressed(buffer, **values))
     hashes = {p.name: sha256(p) for p in sorted(prediction_dir.glob('*.npz'))}
     provenance = {'protocol_sha256': sha256(args.protocol), 'code_sha256': sha256(__file__),
                   'sources': json.loads((args.raw / 'sources.json').read_text()),
