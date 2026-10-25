@@ -17,10 +17,19 @@ async function main() {
   try {
    await rl.question('Sign in to your Patreon creator account in the browser, then press Enter here. ');
   } finally {rl.close();}
-  const state=await context.storageState();
-  if(!state.cookies.some(c=>typeof c.domain==='string'&&
-     /(^|\.)patreon\.com$/.test(c.domain)&&c.value))
-   throw Error('No Patreon cookies found; login was not captured.');
+  const raw=await context.storageState();
+  // Drop unrelated cookies and localStorage before creating the secret.
+  const state={
+   cookies:raw.cookies.filter(c=>typeof c.domain==='string'&&
+     /(^|\.)patreon\.com$/.test(c.domain)),
+   origins:raw.origins.filter(o=>{
+    try {return /(^|\.)patreon\.com$/.test(new URL(o.origin).hostname);}
+    catch {return false;}
+   }),
+  };
+  if(!state.cookies.some(c=>c.value))throw Error('No Patreon cookies found; login was not captured.');
+  if(Buffer.byteLength(Buffer.from(JSON.stringify(state)).toString('base64'))>=48000)
+   throw Error('Patreon session exceeds GitHub secret size limit.');
   await mkdir('artifacts',{recursive:true});
   await writeFile(DEST,JSON.stringify(state),{mode:0o600});
   await chmod(DEST,0o600);
