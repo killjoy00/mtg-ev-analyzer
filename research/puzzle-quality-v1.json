@@ -1,0 +1,21 @@
+{
+  "version": "puzzle-quality-v1",
+  "sets": ["fra", "hob", "msh", "sos", "blb", "ecl"],
+  "assessment_set": "fra",
+  "corpus_version": "elite-trophy-colour-stage-v9",
+  "scoring_version": "trophy-consensus-v3",
+  "model_version": "strong-player-colour-stage-v5",
+  "response_cutoff": "2026-10-25T14:49:24.679Z",
+  "ridge": 0.02,
+  "bootstrap_draws": 2000,
+  "seed": 20261025,
+  "minimum_debate_answers": 20,
+  "strength_budgets": [500, 2000, null],
+  "minimum_card_games": 100,
+  "minimum_viable_support_ratio": 0.5,
+  "minimum_trophy_support_ratio": 0.20526315789473684,
+  "minimum_strength_z": 0.0,
+  "minimum_fit": -0.5,
+  "minimum_predictions": [0.15, 0.15],
+  "selection_fraction": 0.2
+}
