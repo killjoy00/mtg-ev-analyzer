@@ -16,13 +16,18 @@ export async function observedRoute(request,service,route) {
  const began=performance.now(),base={trace,service,route:family};
  console.log(JSON.stringify({event:'backend_request_start',...base}));
  try {
-   const response=await route(request);
-   if(response.status>=500)response.headers.set(REASON_HEADER,family==='health'?'corpus_unavailable':'backend_failure');
+   const original=await route(request);
+   // Fetch/redirect responses may have immutable headers. Keep their body
+   // streaming while adding only the private acknowledgement to a fresh wrapper.
+   const response=new Response(original.body,original);
+   response.headers.set(TRACE_HEADER,trace);
+   if(response.status>=500&&!backendReason(response.headers.get(REASON_HEADER)))response.headers.set(REASON_HEADER,family==='health'?'corpus_unavailable':'backend_failure');
    console.log(JSON.stringify({event:'backend_request',...base,status:response.status,duration_ms:milliseconds(performance.now()-began),reason:backendReason(response.headers.get(REASON_HEADER))}));
    return response;
  } catch(error) {
    const status=Number(error?.status)||500;
-   const code=['40001','57014','57P01','ECONNRESET','ETIMEDOUT'].includes(error?.code)?error.code:null;
+   const candidate=error?.pgCode||error?.code;
+   const code=['40001','57014','57P01','ECONNRESET','ETIMEDOUT'].includes(candidate)?candidate:null;
    console.log(JSON.stringify({event:'backend_request',...base,status,duration_ms:milliseconds(performance.now()-began),reason:reasonFor(error,status),failure_code:code}));
    throw error;
  }

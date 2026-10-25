@@ -58,6 +58,38 @@ gate acknowledgement, so it cannot alone identify network latency. Handler
 transaction/get/put/alarm timings and concurrency distinguish other stages.
 Start records can survive a reset that prevents a completion record.
 
+Quota timing version 2 explicitly awaits `storage.sync()` after the transaction.
+The `quota_commit_wait` record precedes this wait; `quota_handler` reports its
+`durability_ms`, `durability_confirmed` and last `phase`. Buffered `put()` or
+transaction completion alone does not establish durable acknowledgement. Normal
+output gates remain enabled, and this wait adds no database reads or writes.
+Worker clocks advance only across I/O, so a zero timing is not proof of zero work.
+The storage API documents the distinction between buffered writes and
+[durable acknowledgement](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/#sync).
+
+Provider exceptions are reduced to fixed classifications, including SQLite
+allocation failure, storage reset, provider internal error and transport reset.
+The classification does not grant retry permission. Runtime termination can
+prevent catch/finally from running; correlate the start or commit-wait record
+with private provider exception records using the invocation ID in metadata.
+
+Upstream response diagnostics retain only a validated `cf-ray` reference and a
+boolean indicating that the backend echoed this request's random trace. The
+reference and acknowledgement header are removed from public gateway responses.
+The fields reset for each upstream attempt, including a proven-missing-session
+refresh followed by its one permitted creation attempt. A missing acknowledgement
+does not prove the backend never ran: an older deployment, thrown error or lost
+response can also omit it. Preserve intentional allowlisted backend reason codes
+and extract only allowlisted Postgres codes from the HTTP database adapter.
+None of these fields establishes the cause of an older uncorrelated 520, and
+response bodies are never used as diagnostic evidence.
+
+The local runtime check uses the repository's pinned deployment-tool installation:
+`node tests/network-quota-runtime-smoke.mjs /absolute/path/to/pinned-tools`.
+It runs SQLite Durable Objects in local workerd with disposable fixture state,
+checking acknowledgement, restart persistence and legacy quota denial. It makes
+no provider calls or production mutations.
+
 The shared five-second quota deadline, denial handling and fresh-stub retry rules
 remain enforced. Timeout, abort and overload never trigger a retry. A retryable
 stub failure may conservatively overcount a committed debit. Backend session
