@@ -54,7 +54,7 @@ test('rejects stale, off-choice, fake art or mismatched content without opening 
  assert.throws(()=>makePatreonPost({...fixture,copy:{...copy,title:'fake'}}),
   /invalid-featured-artifact/);
  assert.throws(()=>makePatreonPost({...fixture,feature:{...feature,
-  trophy:{...feature.trophy,id:'fourth'}}}),/trophy choice must be displayed/);
+  trophy:{...feature.trophy,id:'fourth'}}}),/invalid-featured-artifact/);
 });
 
 test('accepts encrypted-secret-compatible storageState JSON, not an invalid session',()=>{
