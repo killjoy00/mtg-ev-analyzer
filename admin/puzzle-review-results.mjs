@@ -1,6 +1,7 @@
 // Scoring for the blinded owner puzzle review. Criteria are fixed before any
 // rating: the proposed rule passes only if it has at most half as many dull or
 // broken puzzles as today's selector and loses at most a quarter of the pairs.
+// Unpaired probes, when a review has them, are scored on their own.
 export const RATINGS=Object.freeze([
   {id:'interesting',label:'Interesting',help:'A real decision that relates to winning. I would be glad to see it in a Daily.'},
   {id:'fine',label:'Fine',help:'A reasonable decision, but forgettable.'},
@@ -26,6 +27,15 @@ export function summarizeReview(key,ratings) {
     const diff=RANK[proposed]-RANK[current];
     pairs.push({...pair,current_rating:current,proposed_rating:proposed,winner:diff>0?'proposed':diff<0?'current':'tie'});
   }
+  // A separate check on one rule: probes pass if at least three quarters
+  // are rated Interesting or Fine.
+  let landProbe=null;
+  if(Array.isArray(key.probes)&&key.probes.length) {
+    const rows=key.probes.map(p=>({...p,rating:ratings?.[p.item]?.rating}));
+    if(rows.some(r=>!isRating(r.rating)))return {complete:false};
+    const good=rows.filter(r=>r.rating==='interesting'||r.rating==='fine').length,needed=Math.ceil(0.75*rows.length);
+    landProbe={rows,good,needed,pass:good>=needed};
+  }
   const bad=arm=>arms[arm].dull+arms[arm].broken;
   const losses=pairs.filter(p=>p.winner==='current').length;
   const allowedLosses=Math.floor(pairs.length/4);
@@ -37,5 +47,6 @@ export function summarizeReview(key,ratings) {
     // With no dull or broken baseline puzzles the first check passes
     // trivially; the test then cannot show an improvement on that axis.
     baseline_clean:bad('current')===0,
+    land_probe:landProbe,
     pass:fewerBad.pass&&lossCheck.pass};
 }

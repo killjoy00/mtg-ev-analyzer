@@ -11,7 +11,7 @@ export async function runPuzzleReviewChecks(browser) {
   const page=await browser.newPage({viewport:{width:1280,height:900}});
   const errors=[],keyRequests=[];
   page.on('pageerror',error=>errors.push(error.message));
-  page.on('request',request=>{if(request.url().includes('puzzle-review-v1-key.json'))keyRequests.push(request.url());});
+  page.on('request',request=>{if(request.url().includes('puzzle-review-v2-key.json'))keyRequests.push(request.url());});
   await page.addInitScript(()=>localStorage.setItem('pack1-auth-session-v1','synthetic-review-session'));
   await page.route('https://cards.scryfall.io/**',route=>route.fulfill({contentType:'image/png',body:PIXEL}));
   await page.route('**/v1/account/session',route=>route.fulfill({json:{user:{id:'22222222-2222-4222-8222-222222222222',email:'review@example.invalid'}}}));
@@ -58,14 +58,18 @@ export async function runPuzzleReviewChecks(browser) {
     await page.getByRole('button',{name:'See results'}).click();
     await page.getByRole('heading',{name:/^The proposed rule (passes|does not pass)$/}).waitFor();
     assert.equal(keyRequests.length,1);
-    assert.equal(await page.locator('.review-pairs tbody tr').count(),12);
+    assert.equal(await page.locator('.review-pairs').first().locator('tbody tr').count(),10);
+    await page.getByRole('heading',{name:'Land test',exact:true}).waitFor();
+    assert.equal(await page.locator('.review-pairs').nth(1).locator('tbody tr').count(),4);
     await page.getByText('Note: Synthetic note').waitFor();
     const download=page.waitForEvent('download');
     await page.getByRole('button',{name:'Download results'}).click();
     const saved=JSON.parse(fs.readFileSync(await (await download).path(),'utf8'));
-    assert.equal(saved.version,'puzzle-review-v1');
+    assert.equal(saved.version,'puzzle-review-v2');
     assert.equal(Object.keys(saved.ratings).length,24);
-    assert.equal(saved.pairs.length,12);
+    assert.equal(saved.pairs.length,10);
+    assert.equal(saved.land_probe.length,4);
+    assert.ok(saved.pairs.every(p=>['interesting','fine','dull','broken'].includes(p.current.rating)&&Number.isInteger(p.current.difficulty_rating)));
     for(const width of [320,1280]) {
       await page.setViewportSize({width,height:900});
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),`Review results fit ${width}px`);
@@ -77,6 +81,6 @@ export async function runPuzzleReviewChecks(browser) {
     await page.getByRole('button',{name:'Start a new review'}).click();
     await page.getByRole('heading',{name:'0 of 24 rated'}).waitFor();
     assert.deepEqual(errors,[]);
-    console.log('PASS: Puzzle review blinding, reveal-before-rating, saved progress, results, export, reset, and responsive widths.');
+    console.log('PASS: Puzzle review blinding, reveal-before-rating, saved progress, pair and land-test results, export, reset, and responsive widths.');
   } finally {await page.close();}
 }
