@@ -12,27 +12,27 @@
 
 GitHub standard runners for this public repository have no additional Actions compute charge under the currently applicable GitHub public-repository policy. There is no Browserbase, Zapier, n8n Cloud, or Patreon publishing service fee. Existing infrastructure and GitHub quotas still apply.
 
-## One-time authorization and activation (owner only)
+## One-time authorization from an iPhone (no local code)
 
-Use a local computer with Node and a browser. **Never paste Patreon cookies, tokens, or session JSON into chat, a public GitHub issue/PR, CI output, or a workflow artifact.** The capture file is under `artifacts/`, which is gitignored.
+**You do not need a Mac, PC, terminal, Playwright install, or local Git checkout.** A special one-time GitHub Codespace runs a normal desktop browser with a private, password-protected noVNC view. GitHub Codespaces private forwarded ports require the Codespace owner's GitHub authentication. The browser helper never asks you to paste a password into Pack One or ChatGPT.
 
-1. Check out the reviewed/merged repository and run `npm ci` then `npx playwright install chromium` on your own machine.
-2. Run `node scripts/capture-patreon-session.mjs`. Sign in normally to the intended Patreon **creator account**, switch to creator mode, and press Enter in the terminal. This only captures the Patreon-origin browser state locally (mode 0600). It does not publish anything.
-3. With GitHub CLI authenticated to the repository, install the saved state as an encrypted **Actions secret**:
+[Open the Patreon connection Codespace](https://github.com/codespaces/new?repo=1201587098&ref=feature%2Fautomatic-patreon-featured-publishing&devcontainer_path=.devcontainer%2Fpatreon-auth%2Fdevcontainer.json)
 
-   ```sh
-   base64 < artifacts/patreon-auth-state.json | tr -d '\n' | gh secret set PACKONE_PATREON_STORAGE_STATE_B64 -R killjoy00/mtg-ev-analyzer
-   ```
+1. On your phone, open the link, keep **2 cores** selected, confirm configuration **Pack One Patreon — mobile sign-in**, and tap **Create codespace**. The special configuration installs and starts the browser automatically. If GitHub says free quota is exhausted, **do not approve paid use**; this flow requires unused personal-account Codespaces free allocation.
+2. The **Connect Pack One to Patreon** page should open automatically. Otherwise, in GitHub Codespaces open the **Ports** tab and choose the private forwarded **6081** port. **Never switch port 6080 or 6081 to Public.**
+3. Tap **Open Patreon browser**. Enter the temporary remote-browser password displayed on your connection page, log in normally to the Pack One **creator** identity, and complete any Patreon security verification. Use the noVNC keyboard controls as needed on the phone. Return to the original connection tab.
+4. Tap **Save Patreon connection**. The helper uses GitHub's encryption-aware CLI to attempt to store the browser state as the repository Actions secret **`PACKONE_PATREON_STORAGE_STATE_B64`**, without writing credentials to any committed file or CI artifact.
+5. If GitHub denies the Codespace's secret-writing permission, the page offers **Copy session securely** and **Open GitHub Actions secret form**. Use your phone's Copy/Paste to create the secret named **`PACKONE_PATREON_STORAGE_STATE_B64`** in that form. **Never paste it into ChatGPT or an issue/PR. Clear your clipboard afterward.** This is a one-time browser interaction, not coding.
+6. Once GitHub has saved the secret, **delete the temporary Codespace** at [Your GitHub Codespaces](https://github.com/codespaces). Deleting it destroys the temporary cloud browser session; the encrypted Actions secret remains in GitHub.
+7. The existing **`PATREON_CREATOR_ACCESS_TOKEN`** Actions secret is reused only to **read** published posts through Patreon's official API. It must support campaign post reading; it cannot write new posts. After merging the PR and validating a canary, set the repository Actions variable **`PACKONE_PATREON_AUTOPUBLISH_ENABLED`** to **`true`** from GitHub's web Settings UI. Until then the publisher remains disabled.
+8. To test live, run **post Pack One Daily to Bluesky and Discord** from GitHub Actions with **live=true** for the current Pacific day. Verify the independent **featured-patreon** job and the public post. All subsequent eligible mornings are automated, with retries and duplicate checks.
 
-4. Remove the local copy after verifying that GitHub accepted the secret: `rm artifacts/patreon-auth-state.json`. The contents cannot safely be printed to diagnose failures.
-5. The existing `PATREON_CREATOR_ACCESS_TOKEN` GitHub secret is reused **only** for the official read-only post listing. Check that it works with scope `campaigns.posts`; the existing Patreon OAuth connection does not grant a post-writing capability.
-6. After PR checks pass and the release is reviewed, set repository Actions variable `PACKONE_PATREON_AUTOPUBLISH_ENABLED` to `true`. This is the explicit go-live gate; absent/false is inert. Leave it off until the owner has authorized the first public post.
-7. Run the existing `post Pack One Daily to Bluesky and Discord` workflow with `live=true` on reviewed `main`, for the current Pacific Daily. This uses yesterday's real qualifying pick and is deduplicated by the existing receipts. Confirm the new `featured-patreon` job logs a **public** Patreon post URL and confirm the actual published post looks correct. Do not claim success based solely on a workflow dispatch or draft.
+The GitHub personal account's included Codespaces allowance is free within its monthly compute/storage quotas. Codespaces is *not* continuously required for publishing: only the one-time sign-in uses it. Check your Codespaces balance and spending settings before starting. The saved session can expire, in which case repeat the one-time cloud login.
 
 ## Safety and operator behavior
 
 - No credentials, browser state, raw player rows, or authenticated page screenshots are uploaded to artifacts or echoed to logs. The browser session secret is passed directly as an environment variable and parsed in memory. Never enable Playwright trace/video/screenshot upload on the live publishing job.
-- A stored browser session may expire or encounter a CAPTCHA, 2FA prompt, geographic validation, or other challenge. The job **does not bypass** these protections. An expired session must be reauthorized using the local capture command. No free solution can promise permanent zero-intervention authentication.
+- A stored browser session may expire or encounter a CAPTCHA, 2FA prompt, geographic validation, or other challenge. The job **does not bypass** these protections. An expired session must be reauthorized through the phone-only Codespaces connection page. No free solution can promise permanent zero-intervention authentication.
 - Patreon can change its editor controls. Playwright uses narrow, accessible selectors and fails closed when a title, image, Free access audience, or Publish button cannot be verified. Do not enable selectors that guess by nearby element position or skip public-access verification.
 - To prevent duplicate public posts: (1) read-only exact-title lookup before any UI interaction, (2) date-scoped receipt claim, (3) read-only exact-title verification after submitting. If the browser may have clicked Publish but API verification fails, keep the receipt **claimed** and investigate rather than resetting it to failed. A later normal run checks the API again and will skip an existing matching post.
 - Publishing is limited to reviewed `main` and a first-attempt job, today's Pacific scheduler date, and a qualifying featured pick from **yesterday**. A corrected source date or rerun must never overwrite a different day's post.
