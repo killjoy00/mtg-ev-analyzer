@@ -1,0 +1,930 @@
+{
+ "version": "puzzle-review-v1",
+ "seed": "pack-one-puzzle-review-2026-10-26",
+ "rule": {
+  "credible_support_ratio": 0.35,
+  "max_credible_options": 3,
+  "deck_gate_from_pick": 4,
+  "top_share": 0.25,
+  "min_top_pool": 3
+ },
+ "pair_picks": [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  2,
+  4,
+  6,
+  8
+ ],
+ "inputs": {
+  "hob": {
+   "corpus": "39f11f4997137d9037f5bf47bd3a9f18dbe00b8780b9846f8cc1cdab45437aaf",
+   "strength": "429bbb1de5fa2eceb11b239efa0b43d82568dcafa16aee73f4d8e027c0fb156a",
+   "trophy_decks": "637365c3af3ebbd74f892933f6a985373310df2d6587bff641cc9b103d2d34b5"
+  },
+  "msh": {
+   "corpus": "2538f8342abb513d52e2936ee503ecfbfe9e31e2517a77ccefbacbb520076012",
+   "strength": "755fc0ae9881d522cd55525e725388d7eb9691175788c8124773da00b29e4805",
+   "trophy_decks": "5edab7bcc3a803d0af8c5d931b1f29fcc0257dfc316337363b407c3d9f652de7"
+  },
+  "sos": {
+   "corpus": "dd6f9e6b3360864fc6092bd2bdddb022a89d2328378013c34c4eb21b866b16e7",
+   "strength": "23d0068327e67f6213a29ccf34d973205862a124b9ef9da7654d5babd9386c95",
+   "trophy_decks": "78b4926b89f4b9023b1108731eecf92c751bf22dd853142c414b10f87c7752c9"
+  }
+ },
+ "pairs": [
+  {
+   "pair_id": "pair-01",
+   "set_id": "hob",
+   "pick_number": 1,
+   "current": "529a0cfda4c6",
+   "proposed": "784a3764db71"
+  },
+  {
+   "pair_id": "pair-02",
+   "set_id": "msh",
+   "pick_number": 2,
+   "current": "23f5e384afa6",
+   "proposed": "3538ff56b4f2"
+  },
+  {
+   "pair_id": "pair-03",
+   "set_id": "sos",
+   "pick_number": 3,
+   "current": "615cdd6b22c5",
+   "proposed": "02ee8f832575"
+  },
+  {
+   "pair_id": "pair-04",
+   "set_id": "hob",
+   "pick_number": 4,
+   "current": "8c4a64086460",
+   "proposed": "bac480552b4c"
+  },
+  {
+   "pair_id": "pair-05",
+   "set_id": "msh",
+   "pick_number": 5,
+   "current": "c1cc47592053",
+   "proposed": "db192d31d381"
+  },
+  {
+   "pair_id": "pair-06",
+   "set_id": "sos",
+   "pick_number": 6,
+   "current": "cf8da728409a",
+   "proposed": "f7d66993dc6f"
+  },
+  {
+   "pair_id": "pair-07",
+   "set_id": "hob",
+   "pick_number": 7,
+   "current": "f35f4101fda7",
+   "proposed": "6830ca1f968b"
+  },
+  {
+   "pair_id": "pair-08",
+   "set_id": "msh",
+   "pick_number": 8,
+   "current": "f583f8deb2ce",
+   "proposed": "58ae6ca76233"
+  },
+  {
+   "pair_id": "pair-09",
+   "set_id": "sos",
+   "pick_number": 2,
+   "current": "5728d727ff89",
+   "proposed": "d8840fb40fd1"
+  },
+  {
+   "pair_id": "pair-10",
+   "set_id": "hob",
+   "pick_number": 4,
+   "current": "49fd56453a7a",
+   "proposed": "2ac8109fbd43"
+  },
+  {
+   "pair_id": "pair-11",
+   "set_id": "msh",
+   "pick_number": 6,
+   "current": "9fa11253f3b2",
+   "proposed": "ff014a5b91e1"
+  },
+  {
+   "pair_id": "pair-12",
+   "set_id": "sos",
+   "pick_number": 8,
+   "current": "157e97b65a41",
+   "proposed": "58a43d6ad191"
+  }
+ ],
+ "items": {
+  "529a0cfda4c6": {
+   "arm": "current",
+   "pair_id": "pair-01",
+   "puzzle_id": "0a473e04c7a66e404e84ff9ececbe11b",
+   "pick": 1,
+   "band": "hard",
+   "rating": 97,
+   "trophy_in_main_deck": false,
+   "trophy_gih_points": 2.46321444,
+   "kind": "opening",
+   "credible": [
+    {
+     "name": "Master's Councillors",
+     "support_ratio": 1,
+     "gih_points": 1.2
+    },
+    {
+     "name": "Smaug, Wicked Worm",
+     "support_ratio": 0.969,
+     "gih_points": 0
+    },
+    {
+     "name": "Misty Mountains Raider",
+     "support_ratio": 0.879,
+     "gih_points": 2.5
+    }
+   ],
+   "stakes_gih_points": 2.5,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 36,
+    "proposed_valid": 36,
+    "proposed_top": 9
+   }
+  },
+  "784a3764db71": {
+   "arm": "proposed",
+   "pair_id": "pair-01",
+   "puzzle_id": "4db6f75963fad31dbf846b93fb460a17",
+   "pick": 1,
+   "band": "hard",
+   "rating": 93,
+   "trophy_in_main_deck": true,
+   "trophy_gih_points": 5.606404144,
+   "kind": "opening",
+   "credible": [
+    {
+     "name": "Desolation Prowler",
+     "support_ratio": 1,
+     "gih_points": 5.6
+    },
+    {
+     "name": "Celebrate the Mountain-king",
+     "support_ratio": 0.928,
+     "gih_points": 5.6
+    }
+   ],
+   "stakes_gih_points": 5.6,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 36,
+    "proposed_valid": 36,
+    "proposed_top": 9
+   }
+  },
+  "23f5e384afa6": {
+   "arm": "current",
+   "pair_id": "pair-02",
+   "puzzle_id": "ff0e5f9a282c2d5ad75e219e8a647463",
+   "pick": 2,
+   "band": "medium",
+   "rating": 72,
+   "trophy_in_main_deck": true,
+   "trophy_gih_points": 0.8860873729,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "Hour of Defeat",
+     "support_ratio": 1,
+     "gih_points": 0.9
+    },
+    {
+     "name": "We Say Thee Nay!",
+     "support_ratio": 0.719,
+     "gih_points": 3.4
+    },
+    {
+     "name": "Heroic Feast",
+     "support_ratio": 0.484,
+     "gih_points": -2.4
+    }
+   ],
+   "stakes_gih_points": 3.4,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 44,
+    "proposed_valid": 44,
+    "proposed_top": 11
+   }
+  },
+  "3538ff56b4f2": {
+   "arm": "proposed",
+   "pair_id": "pair-02",
+   "puzzle_id": "452306b0cd27d1f8726183eb1365a4d7",
+   "pick": 2,
+   "band": "medium",
+   "rating": 71,
+   "trophy_in_main_deck": true,
+   "trophy_gih_points": 4.998847284,
+   "kind": "same-lane",
+   "credible": [
+    {
+     "name": "Hero in Training",
+     "support_ratio": 1,
+     "gih_points": 5
+    },
+    {
+     "name": "Agent Maria Hill",
+     "support_ratio": 0.709,
+     "gih_points": 4.3
+    }
+   ],
+   "stakes_gih_points": 5,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 44,
+    "proposed_valid": 44,
+    "proposed_top": 11
+   }
+  },
+  "615cdd6b22c5": {
+   "arm": "current",
+   "pair_id": "pair-03",
+   "puzzle_id": "fa096d08fd2076b3ed88f040211d0071",
+   "pick": 3,
+   "band": "hard",
+   "rating": 95,
+   "trophy_in_main_deck": true,
+   "trophy_gih_points": 2.770736171,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "Proctor's Gaze",
+     "support_ratio": 1,
+     "gih_points": 2.3
+    },
+    {
+     "name": "Startled Relic Sloth",
+     "support_ratio": 0.951,
+     "gih_points": 2.7
+    },
+    {
+     "name": "Mana Sculpt",
+     "support_ratio": 0.834,
+     "gih_points": 2.8
+    }
+   ],
+   "stakes_gih_points": 2.8,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 33,
+    "proposed_valid": 33,
+    "proposed_top": 9
+   }
+  },
+  "02ee8f832575": {
+   "arm": "proposed",
+   "pair_id": "pair-03",
+   "puzzle_id": "c7135020ca0f4118fa846d28df1a2ed5",
+   "pick": 3,
+   "band": "hard",
+   "rating": 90,
+   "trophy_in_main_deck": true,
+   "trophy_gih_points": 10.308166320000002,
+   "kind": "same-lane",
+   "credible": [
+    {
+     "name": "Together as One",
+     "support_ratio": 1,
+     "gih_points": 10.3
+    },
+    {
+     "name": "Burst Lightning",
+     "support_ratio": 0.895,
+     "gih_points": 4
+    }
+   ],
+   "stakes_gih_points": 10.3,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 33,
+    "proposed_valid": 33,
+    "proposed_top": 9
+   }
+  },
+  "8c4a64086460": {
+   "arm": "current",
+   "pair_id": "pair-04",
+   "puzzle_id": "5c2eb9747032bb40ffccb93b4931ba73",
+   "pick": 4,
+   "band": "medium",
+   "rating": 53,
+   "trophy_in_main_deck": true,
+   "trophy_gih_points": -0.1438849297,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "Gathering of Darkness",
+     "support_ratio": 1,
+     "gih_points": -1
+    },
+    {
+     "name": "Duskwatch Hunter",
+     "support_ratio": 0.531,
+     "gih_points": -0.1
+    }
+   ],
+   "stakes_gih_points": -0.1,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 47,
+    "proposed_valid": 44,
+    "proposed_top": 11
+   }
+  },
+  "bac480552b4c": {
+   "arm": "proposed",
+   "pair_id": "pair-04",
+   "puzzle_id": "9ee9af537e038e94cd92bba8a0da954a",
+   "pick": 4,
+   "band": "hard",
+   "rating": 89,
+   "trophy_in_main_deck": true,
+   "trophy_gih_points": 3.722959447,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "Misty Mountains Raider",
+     "support_ratio": 1,
+     "gih_points": 2.5
+    },
+    {
+     "name": "Nighthowl Pursuer",
+     "support_ratio": 0.888,
+     "gih_points": 3.7
+    },
+    {
+     "name": "Thranduil, Sindarin Liege",
+     "support_ratio": 0.64,
+     "gih_points": 1.9
+    }
+   ],
+   "stakes_gih_points": 3.7,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 47,
+    "proposed_valid": 44,
+    "proposed_top": 11
+   }
+  },
+  "c1cc47592053": {
+   "arm": "current",
+   "pair_id": "pair-05",
+   "puzzle_id": "fd1d3fae62ceb7385a5492ae07065ac3",
+   "pick": 5,
+   "band": "medium",
+   "rating": 78,
+   "trophy_in_main_deck": true,
+   "trophy_gih_points": 2.753595855,
+   "kind": "same-lane",
+   "credible": [
+    {
+     "name": "Borough Backup",
+     "support_ratio": 1,
+     "gih_points": 2.8
+    },
+    {
+     "name": "S.H.I.E.L.D. Spy Kit",
+     "support_ratio": 0.783,
+     "gih_points": 3
+    }
+   ],
+   "stakes_gih_points": 3,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 30,
+    "proposed_valid": 24,
+    "proposed_top": 6
+   }
+  },
+  "db192d31d381": {
+   "arm": "proposed",
+   "pair_id": "pair-05",
+   "puzzle_id": "b826a2eb3088567e518dee2d3657b9b4",
+   "pick": 5,
+   "band": "medium",
+   "rating": 54,
+   "trophy_in_main_deck": true,
+   "trophy_gih_points": -0.5882355074000001,
+   "kind": "same-lane",
+   "credible": [
+    {
+     "name": "Murdock's Crusade",
+     "support_ratio": 1,
+     "gih_points": 5
+    },
+    {
+     "name": "Helicarrier Strike",
+     "support_ratio": 0.535,
+     "gih_points": 2.3
+    },
+    {
+     "name": "Iron Lad, Diverging Destiny",
+     "support_ratio": 0.512,
+     "gih_points": -0.6
+    }
+   ],
+   "stakes_gih_points": 5,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 30,
+    "proposed_valid": 24,
+    "proposed_top": 6
+   }
+  },
+  "cf8da728409a": {
+   "arm": "current",
+   "pair_id": "pair-06",
+   "puzzle_id": "cc9d427a4c52192008813eb997842c81",
+   "pick": 6,
+   "band": "medium",
+   "rating": 73,
+   "trophy_in_main_deck": true,
+   "trophy_gih_points": 0.8330459582,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "Sundering Archaic",
+     "support_ratio": 1,
+     "gih_points": 3.4
+    },
+    {
+     "name": "Wander Off",
+     "support_ratio": 0.732,
+     "gih_points": 0.8
+    },
+    {
+     "name": "Studious First-Year",
+     "support_ratio": 0.424,
+     "gih_points": 1.3
+    }
+   ],
+   "stakes_gih_points": 3.4,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 43,
+    "proposed_valid": 35,
+    "proposed_top": 9
+   }
+  },
+  "f7d66993dc6f": {
+   "arm": "proposed",
+   "pair_id": "pair-06",
+   "puzzle_id": "3260fe4921b2de669d288ecddaf4db09",
+   "pick": 6,
+   "band": "medium",
+   "rating": 73,
+   "trophy_in_main_deck": true,
+   "trophy_gih_points": 4.082348926,
+   "kind": "off-lane",
+   "credible": [
+    {
+     "name": "Colossus of the Blood Age",
+     "support_ratio": 1,
+     "gih_points": 4.1
+    },
+    {
+     "name": "Pursue the Past",
+     "support_ratio": 0.731,
+     "gih_points": 4.5
+    },
+    {
+     "name": "Inkshape Demonstrator",
+     "support_ratio": 0.561,
+     "gih_points": 1.7
+    }
+   ],
+   "stakes_gih_points": 4.5,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 43,
+    "proposed_valid": 35,
+    "proposed_top": 9
+   }
+  },
+  "f35f4101fda7": {
+   "arm": "current",
+   "pair_id": "pair-07",
+   "puzzle_id": "f1d08e6e7bd03ffb10caa8a05840a2ea",
+   "pick": 7,
+   "band": "medium",
+   "rating": 61,
+   "trophy_in_main_deck": false,
+   "trophy_gih_points": -0.8140265456000001,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "Bolg of the North",
+     "support_ratio": 1,
+     "gih_points": -0.8
+    },
+    {
+     "name": "Hobbit Hole",
+     "support_ratio": 0.612,
+     "gih_points": -0.1
+    },
+    {
+     "name": "Nasty Little Rabbit",
+     "support_ratio": 0.382,
+     "gih_points": 2.9
+    }
+   ],
+   "stakes_gih_points": 2.9,
+   "meets_proposed_rule": false,
+   "pool": {
+    "current_eligible": 51,
+    "proposed_valid": 39,
+    "proposed_top": 10
+   }
+  },
+  "6830ca1f968b": {
+   "arm": "proposed",
+   "pair_id": "pair-07",
+   "puzzle_id": "143175c3127b6a763443f5a61d540120",
+   "pick": 7,
+   "band": "medium",
+   "rating": 53,
+   "trophy_in_main_deck": true,
+   "trophy_gih_points": -0.12208514579999999,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "Hobbit Hole",
+     "support_ratio": 1,
+     "gih_points": -0.1
+    },
+    {
+     "name": "Gollum, Silent Slinker",
+     "support_ratio": 0.525,
+     "gih_points": 3.5
+    },
+    {
+     "name": "Rage into the Valley",
+     "support_ratio": 0.467,
+     "gih_points": 0.4
+    }
+   ],
+   "stakes_gih_points": 3.5,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 51,
+    "proposed_valid": 39,
+    "proposed_top": 10
+   }
+  },
+  "f583f8deb2ce": {
+   "arm": "current",
+   "pair_id": "pair-08",
+   "puzzle_id": "cd459e6922790eced81b15cd30c47c0d",
+   "pick": 8,
+   "band": "medium",
+   "rating": 50,
+   "trophy_in_main_deck": true,
+   "trophy_gih_points": 2.2512114409999997,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "Helicarrier Strike",
+     "support_ratio": 1,
+     "gih_points": 2.3
+    },
+    {
+     "name": "Pet Avengers",
+     "support_ratio": 0.502,
+     "gih_points": 1.5
+    }
+   ],
+   "stakes_gih_points": 2.3,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 40,
+    "proposed_valid": 29,
+    "proposed_top": 8
+   }
+  },
+  "58ae6ca76233": {
+   "arm": "proposed",
+   "pair_id": "pair-08",
+   "puzzle_id": "27629ceb25e548510b7e81cbc4dbb519",
+   "pick": 8,
+   "band": "medium",
+   "rating": 74,
+   "trophy_in_main_deck": true,
+   "trophy_gih_points": 0.308267199,
+   "kind": "same-lane",
+   "credible": [
+    {
+     "name": "Bold Biochemist",
+     "support_ratio": 1,
+     "gih_points": 2.2
+    },
+    {
+     "name": "Avengers Tower",
+     "support_ratio": 0.744,
+     "gih_points": 4.6
+    },
+    {
+     "name": "Stark Industries",
+     "support_ratio": 0.37,
+     "gih_points": 0.3
+    }
+   ],
+   "stakes_gih_points": 4.6,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 40,
+    "proposed_valid": 29,
+    "proposed_top": 8
+   }
+  },
+  "5728d727ff89": {
+   "arm": "current",
+   "pair_id": "pair-09",
+   "puzzle_id": "f42a0147c692d8c093308abe2e7287f9",
+   "pick": 2,
+   "band": "medium",
+   "rating": 62,
+   "trophy_in_main_deck": true,
+   "trophy_gih_points": 2.966741437,
+   "kind": "off-lane",
+   "credible": [
+    {
+     "name": "Stirring Honormancer",
+     "support_ratio": 1,
+     "gih_points": 3.3
+    },
+    {
+     "name": "Proctor's Gaze",
+     "support_ratio": 0.618,
+     "gih_points": 2.3
+    },
+    {
+     "name": "Tome Blast",
+     "support_ratio": 0.48,
+     "gih_points": 3
+    }
+   ],
+   "stakes_gih_points": 3.3,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 31,
+    "proposed_valid": 31,
+    "proposed_top": 8
+   }
+  },
+  "d8840fb40fd1": {
+   "arm": "proposed",
+   "pair_id": "pair-09",
+   "puzzle_id": "8254f0d78b815c02589d5b5ffad6b42c",
+   "pick": 2,
+   "band": "hard",
+   "rating": 91,
+   "trophy_in_main_deck": true,
+   "trophy_gih_points": 6.591359604999999,
+   "kind": "off-lane",
+   "credible": [
+    {
+     "name": "Snarl Song",
+     "support_ratio": 1,
+     "gih_points": 6.6
+    },
+    {
+     "name": "Environmental Scientist",
+     "support_ratio": 0.907,
+     "gih_points": 5.5
+    },
+    {
+     "name": "Molten Note",
+     "support_ratio": 0.508,
+     "gih_points": 4.8
+    }
+   ],
+   "stakes_gih_points": 6.6,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 31,
+    "proposed_valid": 31,
+    "proposed_top": 8
+   }
+  },
+  "49fd56453a7a": {
+   "arm": "current",
+   "pair_id": "pair-10",
+   "puzzle_id": "3c01bb5b5af6a39039a4207fac6931d2",
+   "pick": 4,
+   "band": "medium",
+   "rating": 50,
+   "trophy_in_main_deck": true,
+   "trophy_gih_points": 1.949715669,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "Thranduil, Sindarin Liege",
+     "support_ratio": 1,
+     "gih_points": 1.9
+    },
+    {
+     "name": "Orcrist, Goblin-cleaver",
+     "support_ratio": 0.499,
+     "gih_points": -3.3
+    }
+   ],
+   "stakes_gih_points": 1.9,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 44,
+    "proposed_valid": 41,
+    "proposed_top": 11
+   }
+  },
+  "2ac8109fbd43": {
+   "arm": "proposed",
+   "pair_id": "pair-10",
+   "puzzle_id": "5af4280fd04f9de0f1dc96f55bd0e9c1",
+   "pick": 4,
+   "band": "hard",
+   "rating": 86,
+   "trophy_in_main_deck": true,
+   "trophy_gih_points": 3.504353442,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "Gollum, Silent Slinker",
+     "support_ratio": 1,
+     "gih_points": 3.5
+    },
+    {
+     "name": "Ravening Warg",
+     "support_ratio": 0.856,
+     "gih_points": 1.8
+    },
+    {
+     "name": "Patient Instructor",
+     "support_ratio": 0.524,
+     "gih_points": 1.7
+    }
+   ],
+   "stakes_gih_points": 3.5,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 44,
+    "proposed_valid": 41,
+    "proposed_top": 11
+   }
+  },
+  "9fa11253f3b2": {
+   "arm": "current",
+   "pair_id": "pair-11",
+   "puzzle_id": "ad52c4c6f94e84b706267161119d9dd9",
+   "pick": 6,
+   "band": "hard",
+   "rating": 86,
+   "trophy_in_main_deck": true,
+   "trophy_gih_points": 4.669087607,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "Super Villain Lockup",
+     "support_ratio": 1,
+     "gih_points": 0.7
+    },
+    {
+     "name": "Falcon, Winged Wonder",
+     "support_ratio": 0.856,
+     "gih_points": 4.7
+    },
+    {
+     "name": "S.H.I.E.L.D. Spy Kit",
+     "support_ratio": 0.728,
+     "gih_points": 3
+    }
+   ],
+   "stakes_gih_points": 4.7,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 42,
+    "proposed_valid": 40,
+    "proposed_top": 10
+   }
+  },
+  "ff014a5b91e1": {
+   "arm": "proposed",
+   "pair_id": "pair-11",
+   "puzzle_id": "e00645270b9775fcabbeaea09d6b8d08",
+   "pick": 6,
+   "band": "medium",
+   "rating": 73,
+   "trophy_in_main_deck": true,
+   "trophy_gih_points": 2.217827296,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "Raft Security Officer",
+     "support_ratio": 1,
+     "gih_points": 2.3
+    },
+    {
+     "name": "She-Hulk, Jade Defender",
+     "support_ratio": 0.732,
+     "gih_points": 4.6
+    },
+    {
+     "name": "Futurist Forge",
+     "support_ratio": 0.709,
+     "gih_points": 2.4
+    }
+   ],
+   "stakes_gih_points": 4.6,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 42,
+    "proposed_valid": 40,
+    "proposed_top": 10
+   }
+  },
+  "157e97b65a41": {
+   "arm": "current",
+   "pair_id": "pair-12",
+   "puzzle_id": "607a3d6cc725962891a14ecdc6dacd86",
+   "pick": 8,
+   "band": "medium",
+   "rating": 55,
+   "trophy_in_main_deck": true,
+   "trophy_gih_points": 1.195983592,
+   "kind": "same-lane",
+   "credible": [
+    {
+     "name": "Spectacle Summit",
+     "support_ratio": 1,
+     "gih_points": 1.2
+    },
+    {
+     "name": "Owlin Historian",
+     "support_ratio": 0.546,
+     "gih_points": 0.7
+    }
+   ],
+   "stakes_gih_points": 1.2,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 37,
+    "proposed_valid": 32,
+    "proposed_top": 8
+   }
+  },
+  "58a43d6ad191": {
+   "arm": "proposed",
+   "pair_id": "pair-12",
+   "puzzle_id": "b9791fc12630451af3f61b46df21bf1e",
+   "pick": 8,
+   "band": "hard",
+   "rating": 97,
+   "trophy_in_main_deck": true,
+   "trophy_gih_points": 0.09893196286,
+   "kind": "same-lane",
+   "credible": [
+    {
+     "name": "Spectacle Summit",
+     "support_ratio": 1,
+     "gih_points": 1.2
+    },
+    {
+     "name": "Brush Off",
+     "support_ratio": 0.966,
+     "gih_points": 2.7
+    },
+    {
+     "name": "Banishing Betrayal",
+     "support_ratio": 0.379,
+     "gih_points": 0.1
+    }
+   ],
+   "stakes_gih_points": 2.7,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 37,
+    "proposed_valid": 32,
+    "proposed_top": 8
+   }
+  }
+ }
+}
