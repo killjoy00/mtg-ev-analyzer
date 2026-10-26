@@ -354,6 +354,9 @@ try {
   const activityRange=page.waitForRequest(request=>request.url().includes('activity_from=2026-10-01&activity_to=2026-10-02'));
   await page.getByRole('button',{name:'Update dates'}).click();
   await activityRange;
+  // The previous table already shows "Signed in", so wait for the reload to
+  // re-render; otherwise it can replace the search box typed into below.
+  await page.waitForFunction(()=>!document.querySelector('#users-loading')?.textContent);
   await page.locator('.play-activity-table').getByText('Signed in').waitFor();
   assert.equal(await page.getByLabel('From').inputValue(),'2026-10-01');
   await page.getByLabel('Find a user').fill('member@example.com');
