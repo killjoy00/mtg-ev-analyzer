@@ -4,6 +4,9 @@ import {readFileSync} from 'node:fs';
 import {selectFeaturedPick,featureCopies} from '../scripts/featured-pick.mjs';
 import {makePatreonPost,parsePatreonStorageState,findPublishedPatreonPost,
  publishFeaturedPatreon} from '../scripts/publish-featured-patreon.mjs';
+import {filteredPatreonState,codespaceHosts,installSessionSecret,
+ startMobilePatreonSetup} from '../scripts/patreon-mobile-auth-server.mjs';
+import {EventEmitter} from 'node:events';
 
 const d='2026-10-24';
 const cards=['one','two','three'].map(id=>({id,name:id.toUpperCase(),
@@ -160,6 +163,60 @@ test('production workflow isolates Patreon from other channels and keeps secrets
  assert.match(source,/needs: \[featured\]/);
  assert.match(source,/scripts\/publish-featured-patreon\.mjs/);
  assert.match(source,/tests\/featured-patreon\.test\.mjs/);
- const capture=readFileSync(new URL('../scripts/capture-patreon-session.mjs',import.meta.url),'utf8');
- assert.match(capture,/artifacts\/patreon-auth-state\.json/);
+ const config=JSON.parse(readFileSync(new URL('../.devcontainer/patreon-auth/devcontainer.json',import.meta.url),'utf8'));
+ assert.deepEqual(config.forwardPorts,[6081,6080]);
+ assert.match(config.postStartCommand,/patreon-mobile-auth-server\.mjs/);
+ assert.ok(!JSON.stringify(config).includes('public'));
+ const cloud=readFileSync(new URL('../scripts/patreon-mobile-auth-server.mjs',import.meta.url),'utf8');
+ assert.match(cloud,/GH_TOKEN/);
+ assert.match(cloud,/filteredPatreonState/);
+ assert.match(cloud,/\-rfbauth/);
+ assert.doesNotMatch(cloud,/-nopw/);
+});
+
+test('mobile Codespaces helper limits captured state to Patreon-origin credentials',()=>{
+ const valid={cookies:[
+  {domain:'.patreon.com',name:'login',value:'private-session',path:'/'},
+  {domain:'unrelated.test',name:'other',value:'not-allowed',path:'/'},
+ ],origins:[
+  {origin:'https://www.patreon.com',localStorage:[{name:'p',value:'1'}]},
+  {origin:'https://other.test',localStorage:[{name:'bad',value:'2'}]},
+ ]};
+ const encoded=filteredPatreonState(valid);
+ const decoded=JSON.parse(Buffer.from(encoded,'base64').toString('utf8'));
+ assert.equal(decoded.cookies.length,1);
+ assert.equal(decoded.origins.length,1);
+ assert.equal(decoded.cookies[0].domain,'.patreon.com');
+ assert.throws(()=>filteredPatreonState({cookies:[],origins:[]}),/sign-in-not-confirmed/);
+ assert.throws(()=>filteredPatreonState({cookies:[valid.cookies[1]],origins:[]}),/sign-in-not-confirmed/);
+});
+test('private Codespace URLs are validated before building a login link',()=>{
+ const links=codespaceHosts('friendly-codespace-123');
+ assert.match(links.login,/^https:\/\/friendly-codespace-123-6080\.app\.github\.dev\/vnc\.html/);
+ assert.equal(links.setup,'friendly-codespace-123-6081.app.github.dev');
+ assert.throws(()=>codespaceHosts('evil.com/path'),/codespace-name-unavailable/);
+});
+test('session secret goes to GitHub CLI stdin, never command arguments or stdout',async()=>{
+ let injected='';
+ const spawned=[];
+ const spawnImpl=(cmd,args,options)=>{
+  spawned.push({cmd,args,options});
+  const child=new EventEmitter();
+  child.stdin=new EventEmitter();
+  child.stdin.end=value=>{
+   injected=value;
+   queueMicrotask(()=>child.emit('exit',0));
+  };
+  return child;
+ };
+ const ok=await installSessionSecret('fixture-secret',{token:'codespace-token',spawnImpl});
+ assert.equal(ok,true);
+ assert.match(injected,/fixture-secret/);
+ assert.ok(!JSON.stringify(spawned[0].args).includes('fixture-secret'));
+ assert.equal(spawned[0].options.env.GH_TOKEN,'codespace-token');
+ assert.deepEqual(spawned[0].options.stdio,['pipe','ignore','ignore']);
+});
+test('mobile login helper cannot run outside an authenticated Codespace',async()=>{
+ await assert.rejects(startMobilePatreonSetup({
+  name:'friendly-codespace-123',codespaces:'false'}),/cloud-browser-only/);
 });
