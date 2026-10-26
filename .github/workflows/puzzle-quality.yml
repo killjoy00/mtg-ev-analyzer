@@ -6,6 +6,7 @@ on:
       - 'scripts/card_strength_benchmark.py'
       - 'tests/test_puzzle_quality*.py'
       - 'research/puzzle-quality-v*.json'
+      - 'research/puzzle-quality-model-selection-v*.json'
       - 'research/card-strength-requirements.txt'
       - '.github/workflows/puzzle-quality.yml'
   workflow_dispatch:

@@ -1,5 +1,9 @@
 # Select for strong, defensible competing options
 
+Historical v2 comparison. The subsequent five-candidate, additional-set
+[v3 model selection](PUZZLE-QUALITY-V3-RESULTS.md) selects a GIH-led adaptive
+blend in place of adjusted strength alone. This report remains the v2 record.
+
 V2 is an offline candidate that ranks the weaker strength of the historical
 pick and its best credible alternative. Both must pass the existing contextual
 support and colour-fit checks. Predicted disagreement is no longer the quality
