@@ -1,4 +1,4 @@
-import {observedRoute,tagBackendResponse} from './backend-diagnostics.mjs';
+import {observedRoute,tagBackendResponse,observedDatabaseCall} from './backend-diagnostics.mjs';
 import {createHmac} from 'node:crypto';
 import {reminderRoute,revokeReminderSessionDevices,reminderReadiness} from './daily-reminders.mjs';
 import {retryRolledBackQuery} from './database-retry.mjs';
@@ -87,7 +87,7 @@ function dbUrl() {
 }
 
 async function query(sql, params = []) {
-  return retryRolledBackQuery(async()=>{
+  return retryRolledBackQuery(()=>observedDatabaseCall(async onResponseHeaders=>{
     const response = await fetch(dbUrl(), {
       method: 'POST',
       headers: {
@@ -98,6 +98,7 @@ async function query(sql, params = []) {
       },
       body: JSON.stringify({ query: sql, params: params.map((value) => (value == null ? null : String(value))) }),
     });
+    onResponseHeaders(response.status);
     if (!response.ok) throw dbError(response.status, await response.text());
     const data = await response.json();
     const names = (data.fields || []).map((field) => field.name);
@@ -105,7 +106,7 @@ async function query(sql, params = []) {
       rows: (data.rows || []).map((row) => Object.fromEntries(row.map((value, index) => [names[index], value]))),
       rowCount: Number(data.rowCount || 0),
     };
-  });
+  }));
 }
 
 // Constraint violations are part of the contract, not just a failure: callers
