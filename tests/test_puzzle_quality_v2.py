@@ -6,8 +6,10 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 import puzzle_quality_v2 as q
-import puzzle_quality_compare as comparison
-from test_puzzle_quality import fixture
+from test_puzzle_quality import SCIENTIFIC, fixture
+
+if SCIENTIFIC:
+    import puzzle_quality_compare as comparison
 
 
 def example():
@@ -176,6 +178,7 @@ class StrengthSelectionTests(unittest.TestCase):
             self.assertEqual(len(selected), len({r['source_draft_hash'] for r in selected}))
 
 
+@unittest.skipUnless(SCIENTIFIC, 'optional research dependencies not installed')
 class ComparisonTests(unittest.TestCase):
     def test_later_evidence_requires_both_cards_and_distinct_drafts(self):
         puzzle, table, protocol = example()
