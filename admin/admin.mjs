@@ -1,3 +1,4 @@
+import {renderPatreonPublishing} from './patreon-publishing.mjs';
 import {renderOverview,adminArea,ADMIN_AREAS} from './overview.mjs?v=20261024-dashboard';
 import {renderCorpus} from './corpus.mjs?v=20261024-subpages';
 import {renderUsers} from './users.mjs?v=20261023-activity';
@@ -320,6 +321,7 @@ async function load() {
     showLoading(area==='insights'?'Loading Insights…':`Loading ${ADMIN_AREAS[area]||'administration'}…`,
       area==='insights'?'Administrator access confirmed. Loading decision metrics; additional breakdowns load after the summary.':'Administrator access confirmed. Fetching section data.');
     if(area==='overview'){await renderOverview(root,authorizedRequest,{role:access.role,isCurrent:()=>loadId===deferredLoad,onRefresh:()=>void load(),serviceRelease:adminRelease});return;}
+    if(area==='patreon'){if(access.role!=='owner'){denied(session?.user);return;}renderPatreonPublishing(root);return;}
     if(area==='reports'){await renderPlayerReports(root,authorizedRequest);return;}
     if(area==='corpus'){await renderCorpus(root,authorizedRequest);return;}
     if(area==='users'){await renderUsers(root,authorizedRequest,authorizedGrowthRequest,access.role);return;}
