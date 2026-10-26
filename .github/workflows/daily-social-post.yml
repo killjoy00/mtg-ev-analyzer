@@ -69,7 +69,12 @@ jobs:
         with:
           node-version: '24'
       - name: Verify offline publishing contracts
-        run: node --test tests/daily-social-post.test.mjs tests/daily-social-ledger.test.mjs tests/daily-social-dispatch.test.mjs tests/featured-pick.test.mjs tests/featured-patreon.test.mjs
+        run: node --test tests/daily-social-post.test.mjs tests/daily-social-ledger.test.mjs tests/daily-social-dispatch.test.mjs tests/featured-pick.test.mjs tests/featured-patreon.test.mjs tests/admin-patreon-publishing.test.mjs
+      - 'tests/admin-patreon-publishing.test.mjs'
+      - 'admin/patreon-publishing.mjs'
+      - 'admin/admin.mjs'
+      - 'admin/overview.mjs'
+      - 'admin/index.html'
       - name: Publish or preview Daily
         if: github.event_name != 'pull_request'
         run: node scripts/post-daily-social.mjs
