@@ -53,7 +53,8 @@ The proposed rule passes only if both hold. These were fixed before any
 rating:
 
 - it has at most half as many Dull or Broken puzzles as today's selector;
-- today's puzzle rates higher in at most 3 of the 12 pairs.
+- today's puzzle rates higher in at most a quarter of the pairs (3 of 12 in
+  v1, 2 of 10 in v2).
 
 If today's selector has no Dull or Broken puzzles, the first check passes
 trivially and the page says so.
@@ -98,5 +99,5 @@ fix show the difficulty number in each pair's `rating` field; their top-level
 - Strength tables exist only for six sets; v1 uses three and v2 five (FRA has
   no checked-in corpus sample).
 - Four land probes are a taste check, not a measurement.
-- One rater, 12 pairs: a directional check, not a measurement of player
-  enjoyment.
+- One rater and 10–12 pairs per round: a directional check, not a
+  measurement of player enjoyment.
