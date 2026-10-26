@@ -51,7 +51,7 @@ try {
   const owner=await pageFor();
   await owner.page.goto('http://127.0.0.1:4173/admin/?area=team');
   await owner.page.getByRole('heading',{name:'Administrator access'}).waitFor();
-  assert.equal(await owner.page.locator('#admin-overview-link').isVisible(),true);
+  await owner.page.locator('#admin-overview-link').waitFor({state:'visible'});
   assert.equal(await owner.page.getByText('Owner-only:',{exact:false}).count(),1);
   await owner.page.getByRole('textbox',{name:'Verified account email'}).fill('invited@example.invalid');
   await owner.page.getByRole('button',{name:'Create invitation'}).click();
