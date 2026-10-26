@@ -101,7 +101,10 @@ export async function ensurePackSession() {
   if(identityRetired)throw Object.assign(new Error('This browser identity was retired by account deletion.'),{status:410,code:'ACCOUNT_DELETED'});
   if(firstPartyAuthEnabled()) {
     if(sessionPromise)return sessionPromise;
-    sessionPromise=ensureBrowserPlayerSession().catch(error=>{sessionPromise=null;throw error;});
+    // An error can hide a committed creation whose response/cookie was lost.
+    // Background consumers must share that failure for this page. The explicit
+    // Try again action reloads; proven events-401 recovery clears this below.
+    sessionPromise=ensureBrowserPlayerSession();
     return sessionPromise;
   }
   const existing=loadPackToken();
