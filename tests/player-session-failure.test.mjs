@@ -53,3 +53,33 @@ test('concurrent first-party session callers still share one creation',async()=>
     assert.equal(creations,1);
   } finally {globalThis.fetch=original;}
 });
+
+test('a confirmed gateway quota denial does not prevent later session recovery',async()=>{
+  browser();let creations=0;
+  const original=globalThis.fetch;
+  globalThis.fetch=async()=>{
+    creations++;
+    return creations===1
+      ?Response.json({error:'Too many requests.',code:'network_rate_limited'},{status:429,headers:{'retry-after':'1'}})
+      :Response.json({ok:true,playerId:'fixture'},{status:201});
+  };
+  try {
+    const api=await import('../growth-api.mjs?session-quota-denial');
+    await assert.rejects(api.ensurePackSession(),{status:429,code:'network_rate_limited'});
+    assert.equal(creations,1,'a denial is not retried within the same call');
+    assert.equal((await api.ensurePackSession()).ok,true);
+    assert.equal(creations,2,'a later call can recover after a proven non-creation');
+  } finally {globalThis.fetch=original;}
+});
+
+test('an unclassified 429 does not prove that session creation was prevented',async()=>{
+  browser();let creations=0;
+  const original=globalThis.fetch;
+  globalThis.fetch=async()=>{creations++;return Response.json({error:'Synthetic limit'},{status:429});};
+  try {
+    const api=await import('../growth-api.mjs?session-unknown-denial');
+    await assert.rejects(api.ensurePackSession(),{status:429});
+    await assert.rejects(api.ensurePackSession(),{status:429});
+    assert.equal(creations,1);
+  } finally {globalThis.fetch=original;}
+});

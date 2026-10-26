@@ -102,9 +102,13 @@ export async function ensurePackSession() {
   if(firstPartyAuthEnabled()) {
     if(sessionPromise)return sessionPromise;
     // An error can hide a committed creation whose response/cookie was lost.
-    // Background consumers must share that failure for this page. The explicit
-    // Try again action reloads; proven events-401 recovery clears this below.
-    sessionPromise=ensureBrowserPlayerSession();
+    // Background consumers share that failure for this page. A gateway quota
+    // denial proves no backend creation ran and can be attempted later. The
+    // explicit Try again reload and proven events-401 recovery remain available.
+    sessionPromise=ensureBrowserPlayerSession().catch(error=>{
+      if(error?.status===429&&error?.code==='network_rate_limited')sessionPromise=null;
+      throw error;
+    });
     return sessionPromise;
   }
   const existing=loadPackToken();
