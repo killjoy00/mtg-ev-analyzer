@@ -98,6 +98,9 @@ database detail. A completed attempt can have failed; neither this counter nor a
 missing response proves whether a mutation committed. Logs never contain SQL,
 parameters, connection strings, rows, raw error text or request identifiers other
 than the gateway's random correlation trace.
+The HTTP database adapter also keeps provider response text out of exception
+messages. Its SQLSTATE and constraint metadata remain readable by retry and
+conflict handlers, but are not enumerable in ordinary exception logs.
 
 Automatic platform tracing needs a separate privacy review before activation.
 Its documented fetch and handler attributes include full URLs and paths. Query

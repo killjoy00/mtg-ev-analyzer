@@ -1,7 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {inspect} from 'node:util';
 import {observedRoute,observedDatabaseCall} from '../worker/backend-diagnostics.mjs';
 import {query} from '../worker/growth-function.js';
+import {isUsernameConflict} from '../worker/username.mjs';
 import {gateway} from '../edge/gateway.mjs';
 import {TRACE_HEADER} from '../edge/private-diagnostics.mjs';
 
@@ -71,6 +73,26 @@ test('SQL HTTP failure stays separate from an upstream 520 and preserves rollbac
  assert.equal(calls,2);
  assert.deepEqual(rows.filter(r=>r.event==='backend_database').map(r=>[r.sequence,r.ok,r.failure_code??null]),[[1,false,'40001'],[2,true,null]]);
  assert.equal(rows.at(-1).database_calls,2);
+}));
+
+test('database errors do not copy response bodies or internal metadata into exception logs',async()=>fixture(async()=>{
+ let calls=0;
+ for(const metadata of [{constraint:'players_username_uq'},{constraint_name:'players_username_uq'},{message:'duplicate key value violates unique constraint "players_username_uq"'}]) {
+   globalThis.fetch=async()=>{calls++;return Response.json({code:'23505',...metadata,detail:'private SQL parameters and response body'},{status:400});};
+   await assert.rejects(query('INSERT INTO fixture VALUES ($1)',['private-value']),error=>{
+     assert.equal(error.message,'Database query failed (400).');
+     assert.equal(error.pgCode,'23505');assert.equal(error.pgConstraint,'players_username_uq');
+     assert.equal(isUsernameConflict(error),true,'constraint extraction must preserve the existing friendly conflict');
+     assert.doesNotMatch(inspect(error),/private SQL|response body|23505|players_username_uq/);
+     assert.equal(JSON.stringify(error),'{}');
+     return true;
+   });
+ }
+ assert.equal(calls,3);
+ globalThis.fetch=async()=>Response.json({code:'private arbitrary code',constraint:'private arbitrary constraint'},{status:520});
+ await assert.rejects(query('SELECT fixture'),error=>{
+   assert.equal(error.pgCode,null);assert.doesNotMatch(inspect(error),/private arbitrary/);return true;
+ });
 }));
 
 test('a reset or abort while reading a successful SQL response body never replays its mutation',async()=>fixture(async rows=>{

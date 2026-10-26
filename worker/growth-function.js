@@ -115,9 +115,14 @@ async function query(sql, params = []) {
 function dbError(status, text) {
   let detail = {};
   try { detail = JSON.parse(text) || {}; } catch {}
-  return Object.assign(new Error(`Database query failed (${status}): ${text}`), {
-    pgCode: detail.code ? String(detail.code) : null,
-    pgConstraint: detail.constraint ? String(detail.constraint) : null,
+  const constraint=detail.constraint||detail.constraint_name||
+    String(detail.message||'').match(/\bunique constraint "([A-Za-z_][A-Za-z0-9_$]{0,62})"/)?.[1]||null;
+  // Keep the adapter contract without copying a provider response (which can
+  // include SQL parameters) into exception logs. Internal metadata is readable
+  // by retry/conflict handlers but omitted from ordinary error inspection.
+  return Object.defineProperties(new Error(`Database query failed (${status}).`), {
+    pgCode: {value:/^[0-9A-Z]{5}$/.test(String(detail.code||''))?String(detail.code):null,writable:true,configurable:true},
+    pgConstraint: {value:constraint?String(constraint):null,writable:true,configurable:true},
   });
 }
 
