@@ -26,6 +26,14 @@ const options=convertV4MiniflareOptions({name:'quota-local-fixture',compatibilit
        await this.storage.put('session',{count:120,until:Date.now()+300000});
        await this.storage.sync();return new Response(null,{status:204});
      }
+     if(path==='/fixture-expired') {
+       await this.storage.put('buckets',{request:{count:1,until:0}});
+       await this.storage.sync();return new Response(null,{status:204});
+     }
+     if(path==='/fixture-cleanup') {
+       await super.alarm({isRetry:false,retryCount:0});
+       return new Response(null,{status:204});
+     }
      return super.fetch(request);
    }
  }
@@ -45,10 +53,17 @@ try {
  assert.equal((await object.fetch('https://quota/session',{method:'POST'})).status,204);
  const second=await (await object.fetch('https://quota/fixture-state')).json();
  assert.equal(second.request.count,2);assert.equal(second.session.count,2);
+ assert.equal((await object.fetch('https://quota/fixture-cleanup',{method:'POST'})).status,204);
+ assert.deepEqual(await (await object.fetch('https://quota/fixture-state')).json(),second,'cleanup preserves active quota windows');
+ await object.fetch('https://quota/fixture-expired',{method:'POST'});
+ assert.equal((await object.fetch('https://quota/fixture-cleanup',{method:'POST'})).status,204,'sync remains valid after SQLite deleteAll');
+ assert.equal(await (await object.fetch('https://quota/fixture-state')).json(),null,'cleanup durably clears expired counters');
+ assert.equal((await object.fetch('https://quota/session',{method:'POST'})).status,204);
+ assert.equal((await (await object.fetch('https://quota/fixture-state')).json()).session.count,1,'returning network restarts after expired cleanup');
  const legacy=restored.get(restored.idFromName('legacy-fixture'));
  await legacy.fetch('https://quota/fixture-legacy',{method:'POST'});
  const denied=await legacy.fetch('https://quota/session',{method:'POST'});
  assert.equal(denied.status,429);assert.deepEqual((await denied.json()).scopes,['session']);
  assert.equal(await (await legacy.fetch('https://quota/fixture-state')).json(),null,'denial makes no partial request debit');
- console.log('Local SQLite workerd quota checks passed: acknowledgement, restart persistence and legacy denial.');
+ console.log('Local SQLite workerd quota checks passed: acknowledgement, restart persistence, cleanup durability and legacy denial.');
 } finally {await runtime?.dispose();rmSync(persist,{recursive:true,force:true});}
