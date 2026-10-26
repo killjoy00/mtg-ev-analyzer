@@ -1,0 +1,41 @@
+/* Admin Puzzle Review: blinded owner ratings of Daily puzzle selection. */
+.puzzle-review{display:grid;gap:0;min-width:0}
+.review-about summary{font-weight:700}
+.review-about p{margin:8px 0 0;max-width:860px}
+.review-jump{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0}
+.review-jump button{min-width:40px;padding:6px 8px;font-size:13px;font-variant-numeric:tabular-nums}
+.review-jump button.secondary.rated{background:#e3f0e6;color:#245833;border-color:#9cc3a6}
+.review-puzzle h3{margin:20px 0 8px;font-size:18px}
+.review-prior,.review-pack{display:grid;gap:10px}
+.review-prior{grid-template-columns:repeat(auto-fill,minmax(92px,1fr))}
+.review-pack{grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}
+.review-prior figure,.review-pack figure{margin:0;min-width:0}
+.review-prior img,.review-pack img{display:block;width:100%;height:auto;aspect-ratio:488/680;object-fit:cover;border-radius:6px;background:#eef1f4}
+.review-prior figcaption{font-size:11px;line-height:1.25;margin-top:3px;overflow-wrap:anywhere}
+.review-pack figcaption{font-size:13px;line-height:1.3;margin-top:5px;overflow-wrap:anywhere}
+.review-pack figure.trophy img{outline:4px solid #c2891b;outline-offset:2px}
+.review-score{display:block;font-weight:700;color:#1e4d7a;margin-top:2px}
+.review-pack figure.trophy .review-score{color:#7a5410}
+.review-rating{border:1px solid #d7dfe8;border-radius:7px;margin:22px 0 0;padding:14px 16px}
+.review-rating[disabled]{opacity:.55}
+.review-rating legend{font-weight:700;padding:0 6px}
+.review-rating-options{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:6px 0 12px}
+.review-rating-options button{display:grid;gap:4px;text-align:left;align-content:start;padding:10px 12px}
+.review-rating-options button small{font-size:12px;line-height:1.35;color:inherit;opacity:.85}
+.review-rating[disabled] button{cursor:not-allowed}
+.review-rating textarea{font:inherit;width:100%;padding:8px 10px;border:1px solid #a6b09f;border-radius:6px;resize:vertical}
+.review-reveal{margin:18px 0 0}
+.review-nav{margin-top:16px}
+.review-criteria{padding-left:22px}
+.review-criteria li{margin:6px 0;font-weight:600}
+.review-criteria li.pass{color:#245833}
+.review-criteria li.fail{color:#9c2424}
+.review-pairs{white-space:normal;min-width:760px}
+.review-pairs th,.review-pairs td{text-align:left;vertical-align:top}
+.review-pairs td small{display:block;margin-top:4px;font-size:12px}
+.review-results .actions{margin-top:18px}
+@media(max-width:680px){
+  .review-rating-options{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .review-pack{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .review-prior{grid-template-columns:repeat(4,minmax(0,1fr))}
+}

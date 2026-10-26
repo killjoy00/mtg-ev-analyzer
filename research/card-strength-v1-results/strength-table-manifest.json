@@ -1,0 +1,44 @@
+{
+  "FRA": {
+    "file": "strengths-FRA.csv",
+    "sha256": "9af758a733759affc3b1696bc87411c604909f102c62081434ae22e2db07ab2f",
+    "training_drafts": 32213,
+    "training_games": 174929,
+    "baseline_win_rate": 0.5544821041679767
+  },
+  "HOB": {
+    "file": "strengths-HOB.csv",
+    "sha256": "429bbb1de5fa2eceb11b239efa0b43d82568dcafa16aee73f4d8e027c0fb156a",
+    "training_drafts": 33745,
+    "training_games": 189748,
+    "baseline_win_rate": 0.5583405358686258
+  },
+  "MSH": {
+    "file": "strengths-MSH.csv",
+    "sha256": "755fc0ae9881d522cd55525e725388d7eb9691175788c8124773da00b29e4805",
+    "training_drafts": 39889,
+    "training_games": 223103,
+    "baseline_win_rate": 0.5643716131114328
+  },
+  "SOS": {
+    "file": "strengths-SOS.csv",
+    "sha256": "23d0068327e67f6213a29ccf34d973205862a124b9ef9da7654d5babd9386c95",
+    "training_drafts": 62804,
+    "training_games": 347515,
+    "baseline_win_rate": 0.5568450282721609
+  },
+  "BLB": {
+    "file": "strengths-BLB.csv",
+    "sha256": "8f1153bc4f5aadcdb8fe291445ec410abe7cabbfeaf16176bc8e9a69a6172c75",
+    "training_drafts": 94404,
+    "training_games": 553688,
+    "baseline_win_rate": 0.5465713542644955
+  },
+  "ECL": {
+    "file": "strengths-ECL.csv",
+    "sha256": "85c6edc0e24180e43a8a04486a5d83dc74d7a247f5ab549f8450163bd7b3c054",
+    "training_drafts": 57894,
+    "training_games": 316590,
+    "baseline_win_rate": 0.5481916674563315
+  }
+}

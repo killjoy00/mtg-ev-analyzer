@@ -101,7 +101,14 @@ export async function ensurePackSession() {
   if(identityRetired)throw Object.assign(new Error('This browser identity was retired by account deletion.'),{status:410,code:'ACCOUNT_DELETED'});
   if(firstPartyAuthEnabled()) {
     if(sessionPromise)return sessionPromise;
-    sessionPromise=ensureBrowserPlayerSession().catch(error=>{sessionPromise=null;throw error;});
+    // An error can hide a committed creation whose response/cookie was lost.
+    // Background consumers share that failure for this page. A gateway quota
+    // denial proves no backend creation ran and can be attempted later. The
+    // explicit Try again reload and proven events-401 recovery remain available.
+    sessionPromise=ensureBrowserPlayerSession().catch(error=>{
+      if(error?.status===429&&error?.code==='network_rate_limited')sessionPromise=null;
+      throw error;
+    });
     return sessionPromise;
   }
   const existing=loadPackToken();

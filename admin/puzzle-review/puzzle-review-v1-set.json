@@ -1,0 +1,3203 @@
+{
+ "version": "puzzle-review-v1",
+ "items": [
+  {
+   "item_id": "6830ca1f968b",
+   "set_id": "hob",
+   "set_name": "The Hobbit",
+   "pick_number": 7,
+   "prior_picks": [
+    {
+     "id": "roads-go-ever-ever-on",
+     "name": "Roads Go Ever, Ever On",
+     "mana_cost": "{1}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/b/3/b3c1ebd6-967f-4b8c-8f1f-442ce8c1da24.jpg?1784673434",
+     "type_line": "Enchantment — Saga",
+     "rarity": "rare"
+    },
+    {
+     "id": "bilbo-luckwearer",
+     "name": "Bilbo, Luckwearer",
+     "mana_cost": "{1}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/8/b/8bff0aa6-16d9-4c83-b598-ef00a3b33d2c.jpg?1783902786",
+     "type_line": "Legendary Creature — Halfling Rogue",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "the-mountain-king-s-return",
+     "name": "The Mountain-king's Return",
+     "mana_cost": "{2}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/8/68f4893d-e9a5-4f89-ade3-9ab78a834ad5.jpg?1787201116",
+     "type_line": "Enchantment — Saga",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "esgaroth-garrison",
+     "name": "Esgaroth Garrison",
+     "mana_cost": "{4}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/5/7/573f67b0-6ce8-4857-a703-4a5728640736.jpg?1785496934",
+     "type_line": "Creature — Human Soldier",
+     "rarity": "common"
+    },
+    {
+     "id": "plunder-the-trollshaws",
+     "name": "Plunder the Trollshaws",
+     "mana_cost": "{1}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/a/f/afb73190-b9bd-4744-a011-a37cd9c0148d.jpg?1785496438",
+     "type_line": "Instant",
+     "rarity": "common"
+    },
+    {
+     "id": "enchanted-river-s-grasp",
+     "name": "Enchanted River's Grasp",
+     "mana_cost": "{2}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/a/d/ad40a4b9-9fab-49c1-8e9f-6e0776966833.jpg?1785497045",
+     "type_line": "Enchantment — Aura",
+     "rarity": "common"
+    }
+   ],
+   "candidates": [
+    {
+     "id": "confusticate-and-bebother",
+     "name": "Confusticate and Bebother",
+     "mana_cost": "{2}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/9/d/9de48690-e5ae-495a-addf-305f1db7ec21.jpg?1785496428",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.120234
+    },
+    {
+     "id": "fearsome-goblin-pair",
+     "name": "Fearsome Goblin Pair",
+     "mana_cost": "{2}{B/R}",
+     "image_url": "https://cards.scryfall.io/normal/front/2/e/2efe2dc7-3eaa-47f6-b1ae-f974c4a8ae79.jpg?1785324572",
+     "type_line": "Creature — Goblin Soldier",
+     "rarity": "uncommon",
+     "model_probability": 0.089717
+    },
+    {
+     "id": "gollum-silent-slinker",
+     "name": "Gollum, Silent Slinker",
+     "mana_cost": "{3}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/c/6cfaa182-3fec-4907-8814-b4d29c33cec3.jpg?1785323234",
+     "type_line": "Legendary Creature — Halfling Horror",
+     "rarity": "common",
+     "model_probability": 0.158872
+    },
+    {
+     "id": "hobbit-hole",
+     "name": "Hobbit Hole",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/0/3/0365c439-30bf-4d32-a791-166751bdb996.jpg?1785323332",
+     "type_line": "Land",
+     "rarity": "common",
+     "model_probability": 0.302501
+    },
+    {
+     "id": "plains",
+     "name": "Plains",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/7/b/7b7c408b-8660-4db5-9a16-5003c11b4ac1.jpg?1785323349",
+     "type_line": "Basic Land — Plains",
+     "rarity": "common",
+     "model_probability": 0.005562
+    },
+    {
+     "id": "rage-into-the-valley",
+     "name": "Rage into the Valley",
+     "mana_cost": "{2}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/8/6/8651958c-3b94-47a9-a751-faf8f6236a42.jpg?1785496290",
+     "type_line": "Sorcery",
+     "rarity": "common",
+     "model_probability": 0.141377
+    },
+    {
+     "id": "roll-roll-roll-roll",
+     "name": "Roll-Roll-Roll-Roll",
+     "mana_cost": "{2}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/a/2/a2e4099e-86bd-461f-87fa-7f7850ae7eec.jpg?1785152396",
+     "type_line": "Enchantment — Saga",
+     "rarity": "rare",
+     "model_probability": 0.11896
+    },
+    {
+     "id": "tidings-of-war",
+     "name": "Tidings of War",
+     "mana_cost": "{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/3/8/38c16a0a-375e-48cb-9720-dbbc08c603ae.jpg?1785497148",
+     "type_line": "Sorcery",
+     "rarity": "common",
+     "model_probability": 0.062776
+    }
+   ],
+   "historical_pick_id": "hobbit-hole"
+  },
+  {
+   "item_id": "ff014a5b91e1",
+   "set_id": "msh",
+   "set_name": "Marvel Super Heroes",
+   "pick_number": 6,
+   "prior_picks": [
+    {
+     "id": "the-vision",
+     "name": "The Vision",
+     "mana_cost": "{4}",
+     "image_url": "https://cards.scryfall.io/normal/front/2/9/2961cf20-33c8-4e66-9d0f-6daca8ea7880.jpg?1783902887",
+     "type_line": "Legendary Artifact Creature — Robot Hero",
+     "rarity": "rare"
+    },
+    {
+     "id": "absorbing-man",
+     "name": "Absorbing Man",
+     "mana_cost": "{1}{G}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/7/1/7114ef87-53ff-43e9-864c-9faa455d86ef.jpg?1783902907",
+     "type_line": "Legendary Creature — Human Villain",
+     "rarity": "rare"
+    },
+    {
+     "id": "i-am-iron-man",
+     "name": "I Am Iron Man",
+     "mana_cost": "{2}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/9/c/9c401abb-5978-41c0-962b-0432f9433929.jpg?1783902957",
+     "type_line": "Instant",
+     "rarity": "common"
+    },
+    {
+     "id": "red-guardian-super-soldier",
+     "name": "Red Guardian, Super-Soldier",
+     "mana_cost": "{2}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/c/0/c08f8163-319a-4a31-b15a-93974cacd5b7.jpg?1783902967",
+     "type_line": "Legendary Creature — Human Soldier Villain",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "borough-backup",
+     "name": "Borough Backup",
+     "mana_cost": "{4}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/b/b/bb753ac8-67e1-44b0-b404-37f04c2b7438.jpg?1783902978",
+     "type_line": "Sorcery",
+     "rarity": "common"
+    }
+   ],
+   "candidates": [
+    {
+     "id": "bold-biochemist",
+     "name": "Bold Biochemist",
+     "mana_cost": "{1}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/1/0/10644127-3da0-484e-9afc-de26d9c34390.jpg?1783902964",
+     "type_line": "Creature — Human Scientist",
+     "rarity": "common",
+     "model_probability": 0.154429
+    },
+    {
+     "id": "echo-perceptive-prodigy",
+     "name": "Echo, Perceptive Prodigy",
+     "mana_cost": "{2}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/c/d/cd9b9be6-0143-467c-8a2a-937ecafe0473.jpg?1783902961",
+     "type_line": "Legendary Creature — Human Hero",
+     "rarity": "uncommon",
+     "model_probability": 0.101622
+    },
+    {
+     "id": "futurist-forge",
+     "name": "Futurist Forge",
+     "mana_cost": "{1}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/a/5/a50feebf-c660-43f1-9fae-75294703b346.jpg?1783902959",
+     "type_line": "Artifact",
+     "rarity": "common",
+     "model_probability": 0.158156
+    },
+    {
+     "id": "hire-a-crew",
+     "name": "Hire a Crew",
+     "mana_cost": "{2}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/5/0/50a6aa80-79a3-46f3-9cc1-5bf663b64976.jpg?1783902933",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.000482
+    },
+    {
+     "id": "pym-technologies",
+     "name": "Pym Technologies",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/1/d/1de583ce-e805-45f1-907f-198bc82fd3b5.jpg?1783902882",
+     "type_line": "Land",
+     "rarity": "common",
+     "model_probability": 0.058841
+    },
+    {
+     "id": "raft-security-officer",
+     "name": "Raft Security Officer",
+     "mana_cost": "{1}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/9/f9b9f9d6-b50c-4b29-80be-284ba773c70b.jpg?1783902967",
+     "type_line": "Creature — Human Soldier",
+     "rarity": "common",
+     "model_probability": 0.22305
+    },
+    {
+     "id": "serpent-specialist",
+     "name": "Serpent Specialist",
+     "mana_cost": "{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/7/2/72727c2a-08a9-47bc-a5eb-cda52e21684b.jpg?1783902912",
+     "type_line": "Creature — Human Snake Villain",
+     "rarity": "common",
+     "model_probability": 0.021768
+    },
+    {
+     "id": "she-hulk-jade-defender",
+     "name": "She-Hulk, Jade Defender",
+     "mana_cost": "{3}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/d/2/d22a8d02-023c-4f71-a771-16b5aa2a05d7.jpg?1783902911",
+     "type_line": "Legendary Creature — Gamma Hero",
+     "rarity": "uncommon",
+     "model_probability": 0.163268
+    },
+    {
+     "id": "wakandan-drone-flock",
+     "name": "Wakandan Drone Flock",
+     "mana_cost": "{3}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/b/4b12dc1f-2218-4c71-aafa-ea6a26eeb0aa.jpg?1783902964",
+     "type_line": "Artifact Creature — Robot",
+     "rarity": "common",
+     "model_probability": 0.118384
+    }
+   ],
+   "historical_pick_id": "bold-biochemist"
+  },
+  {
+   "item_id": "5728d727ff89",
+   "set_id": "sos",
+   "set_name": "Secrets of Strixhaven",
+   "pick_number": 2,
+   "prior_picks": [
+    {
+     "id": "graduation-day",
+     "name": "Graduation Day",
+     "mana_cost": "{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/d/b/db1cea01-123e-4b23-8b98-f94cabce3912.jpg?1783903705",
+     "type_line": "Enchantment",
+     "rarity": "uncommon"
+    }
+   ],
+   "candidates": [
+    {
+     "id": "archaic-s-agony",
+     "name": "Archaic's Agony",
+     "mana_cost": "{4}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/8/d/8d99f8b2-5c1c-4059-bf68-c6b2e9e5b275.jpg?1783903672",
+     "type_line": "Sorcery",
+     "rarity": "uncommon",
+     "model_probability": 0.090429
+    },
+    {
+     "id": "forum-of-amity",
+     "name": "Forum of Amity",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/1/d/1de6c6cc-0c55-4997-8623-d7f796bd9ab8.jpg?1783903623",
+     "type_line": "Land",
+     "rarity": "common",
+     "model_probability": 0.014877
+    },
+    {
+     "id": "hungry-graffalon",
+     "name": "Hungry Graffalon",
+     "mana_cost": "{3}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/0/3/030b1272-5990-4bc9-8fc1-82cc05602060.jpg?1783903657",
+     "type_line": "Creature — Giraffe",
+     "rarity": "common",
+     "model_probability": 0.001108
+    },
+    {
+     "id": "hydro-channeler",
+     "name": "Hydro-Channeler",
+     "mana_cost": "{1}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/0/9/099f8400-d70a-48ef-8ff6-645eae97e072.jpg?1783903690",
+     "type_line": "Creature — Merfolk Wizard",
+     "rarity": "common",
+     "model_probability": 0.006131
+    },
+    {
+     "id": "interjection",
+     "name": "Interjection",
+     "mana_cost": "{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/0/5/0534cff6-299c-4155-b318-eb7581989e8a.jpg?1783903704",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.002123
+    },
+    {
+     "id": "monstrous-rage",
+     "name": "Monstrous Rage",
+     "mana_cost": "{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/b/4b2e000b-a147-443b-9138-9ff2d16c0422.jpg?1783903919",
+     "type_line": "Instant",
+     "rarity": "uncommon",
+     "model_probability": 0.03863
+    },
+    {
+     "id": "noxious-newt",
+     "name": "Noxious Newt",
+     "mana_cost": "{1}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/3/a/3a028306-c5d7-4f8f-b6f4-0d103fd47000.jpg?1783903656",
+     "type_line": "Creature — Salamander",
+     "rarity": "common",
+     "model_probability": 0.031366
+    },
+    {
+     "id": "planar-engineering",
+     "name": "Planar Engineering",
+     "mana_cost": "{3}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/c/8/c83b96a3-ddfd-4d11-8a85-5bf62087cbb9.jpg?1783903656",
+     "type_line": "Sorcery",
+     "rarity": "rare",
+     "model_probability": 0.034326
+    },
+    {
+     "id": "proctor-s-gaze",
+     "name": "Proctor's Gaze",
+     "mana_cost": "{2}{G}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/b/1/b127d543-0a90-4af6-9410-94d5cd30389e.jpg?1783903636",
+     "type_line": "Instant",
+     "rarity": "uncommon",
+     "model_probability": 0.206369
+    },
+    {
+     "id": "stirring-honormancer",
+     "name": "Stirring Honormancer",
+     "mana_cost": "{2}{W}{W/B}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/e/e/ee84b04d-78fc-416f-9166-72e5417c3e17.jpg?1783903628",
+     "type_line": "Creature — Rhino Bard",
+     "rarity": "uncommon",
+     "model_probability": 0.334099
+    },
+    {
+     "id": "tome-blast",
+     "name": "Tome Blast",
+     "mana_cost": "{1}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/7/2/72a3b17d-1e00-48e9-8402-c81bacd595a7.jpg?1783903663",
+     "type_line": "Sorcery",
+     "rarity": "common",
+     "model_probability": 0.160469
+    },
+    {
+     "id": "ulna-alley-shopkeep",
+     "name": "Ulna Alley Shopkeep",
+     "mana_cost": "{2}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/c/2/c25e1ae5-f17c-4eee-98f1-5681981af31c.jpg?1783903673",
+     "type_line": "Creature — Goblin Warlock",
+     "rarity": "common",
+     "model_probability": 0.00188
+    },
+    {
+     "id": "wilt-in-the-heat",
+     "name": "Wilt in the Heat",
+     "mana_cost": "{2}{R}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/6/f63f7209-fc0f-400c-8076-125f3131cb32.jpg?1783903625",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.078193
+    }
+   ],
+   "historical_pick_id": "tome-blast"
+  },
+  {
+   "item_id": "58ae6ca76233",
+   "set_id": "msh",
+   "set_name": "Marvel Super Heroes",
+   "pick_number": 8,
+   "prior_picks": [
+    {
+     "id": "vision-quest",
+     "name": "Vision Quest",
+     "mana_cost": "{X}{U}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/c/0/c01afea6-645d-4d4f-bdaa-90794a628bcd.jpg?1783902895",
+     "type_line": "Sorcery",
+     "rarity": "rare"
+    },
+    {
+     "id": "attuma-atlantean-warlord",
+     "name": "Attuma, Atlantean Warlord",
+     "mana_cost": "{2}{U}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/c/3/c3d5add1-0d0e-414b-a964-8da326472d35.jpg?1783902962",
+     "type_line": "Legendary Creature — Merfolk Warrior Villain",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "white-tiger-ava-ayala",
+     "name": "White Tiger, Ava Ayala",
+     "mana_cost": "{1}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/c/1/c1589e2e-32a8-48b8-93eb-a9af344e7084.jpg?1783902908",
+     "type_line": "Legendary Creature — Human Hero",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "jessica-jones-private-eye",
+     "name": "Jessica Jones, Private Eye",
+     "mana_cost": "{2}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/b/4/b48278fd-1d95-4ad6-9a51-f1c5a2ab9f4b.jpg?1783902929",
+     "type_line": "Legendary Creature — Human Detective Hero",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "atlantean-cavalry",
+     "name": "Atlantean Cavalry",
+     "mana_cost": "{2}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/1/3/1319bf54-8705-4cc4-8d08-40f05fd09837.jpg?1783902961",
+     "type_line": "Creature — Merfolk Soldier",
+     "rarity": "common"
+    },
+    {
+     "id": "absorbing-man",
+     "name": "Absorbing Man",
+     "mana_cost": "{1}{G}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/7/1/7114ef87-53ff-43e9-864c-9faa455d86ef.jpg?1783902907",
+     "type_line": "Legendary Creature — Human Villain",
+     "rarity": "rare"
+    },
+    {
+     "id": "futurist-forge",
+     "name": "Futurist Forge",
+     "mana_cost": "{1}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/a/5/a50feebf-c660-43f1-9fae-75294703b346.jpg?1783902959",
+     "type_line": "Artifact",
+     "rarity": "common"
+    }
+   ],
+   "candidates": [
+    {
+     "id": "avengers-tower",
+     "name": "Avengers Tower",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/8/8/88f0d9c9-8a1f-4b5a-b6f9-821ddd658d27.jpg?1783902887",
+     "type_line": "Land",
+     "rarity": "uncommon",
+     "model_probability": 0.302836
+    },
+    {
+     "id": "bold-biochemist",
+     "name": "Bold Biochemist",
+     "mana_cost": "{1}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/1/0/10644127-3da0-484e-9afc-de26d9c34390.jpg?1783902964",
+     "type_line": "Creature — Human Scientist",
+     "rarity": "common",
+     "model_probability": 0.407217
+    },
+    {
+     "id": "crimson-operative",
+     "name": "Crimson Operative",
+     "mana_cost": "{3}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/c/4/c4bc077c-f220-47a5-aaf4-5324ca23d0c5.jpg?1783902933",
+     "type_line": "Artifact Creature — Human Villain",
+     "rarity": "common",
+     "model_probability": 0.059957
+    },
+    {
+     "id": "kree-commandos",
+     "name": "Kree Commandos",
+     "mana_cost": "{2}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/0/401f9ccf-f30c-4777-9a5b-4c340e724fff.jpg?1783902972",
+     "type_line": "Creature — Kree Soldier Villain",
+     "rarity": "common",
+     "model_probability": 0.016074
+    },
+    {
+     "id": "roxxon-brutes",
+     "name": "Roxxon Brutes",
+     "mana_cost": "{4}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/6/66550490-74e1-4bf1-8741-1266dfab3a03.jpg?1783902938",
+     "type_line": "Creature — Human Berserker Villain",
+     "rarity": "common",
+     "model_probability": 0.051255
+    },
+    {
+     "id": "stark-industries",
+     "name": "Stark Industries",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/f/e/fe3609d8-71a2-49d9-a3fa-25e0906a1a0e.jpg?1783902882",
+     "type_line": "Land",
+     "rarity": "common",
+     "model_probability": 0.150597
+    },
+    {
+     "id": "unliving-legionnaire",
+     "name": "Unliving Legionnaire",
+     "mana_cost": "{3}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/c/e/ce08f4bb-7da3-4199-8b90-fcdb29e84e98.jpg?1783902935",
+     "type_line": "Creature — Vampire Villain",
+     "rarity": "common",
+     "model_probability": 0.012065
+    }
+   ],
+   "historical_pick_id": "stark-industries"
+  },
+  {
+   "item_id": "cf8da728409a",
+   "set_id": "sos",
+   "set_name": "Secrets of Strixhaven",
+   "pick_number": 6,
+   "prior_picks": [
+    {
+     "id": "last-gasp",
+     "name": "Last Gasp",
+     "mana_cost": "{1}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/d/a/da5f3729-6ec7-4482-90cb-83b973edeae4.jpg?1783903679",
+     "type_line": "Instant",
+     "rarity": "common"
+    },
+    {
+     "id": "scolding-administrator",
+     "name": "Scolding Administrator",
+     "mana_cost": "{W}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/9/69757177-aefa-44a6-81db-5ae9b5d2f117.jpg?1783903631",
+     "type_line": "Creature — Dwarf Cleric",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "wander-off",
+     "name": "Wander Off",
+     "mana_cost": "{3}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/3/d/3d409512-50b9-4a38-91b0-19ba25227992.jpg?1783903675",
+     "type_line": "Instant",
+     "rarity": "common"
+    },
+    {
+     "id": "terramorphic-expanse",
+     "name": "Terramorphic Expanse",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/9/a/9a4c5629-fadd-42b9-850f-9f8586a2ca50.jpg?1783903615",
+     "type_line": "Land",
+     "rarity": "common"
+    },
+    {
+     "id": "pull-from-the-grave",
+     "name": "Pull from the Grave",
+     "mana_cost": "{2}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/d/7/d73612fe-8992-4650-a7e3-c7b662da6a03.jpg?1783903677",
+     "type_line": "Sorcery",
+     "rarity": "common"
+    }
+   ],
+   "candidates": [
+    {
+     "id": "charging-strifeknight",
+     "name": "Charging Strifeknight",
+     "mana_cost": "{2}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/9/9/9940d992-1ba1-40ec-9b93-17d773452c4b.jpg?1783903672",
+     "type_line": "Creature — Spirit Knight",
+     "rarity": "uncommon",
+     "model_probability": 0.129603
+    },
+    {
+     "id": "forest",
+     "name": "Forest",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/f/1/f169dfb2-e4c8-46e9-8591-e51bb82da082.jpg?1783903611",
+     "type_line": "Basic Land — Forest",
+     "rarity": "common",
+     "model_probability": 0.001194
+    },
+    {
+     "id": "glorious-decay",
+     "name": "Glorious Decay",
+     "mana_cost": "{1}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/a/3/a335f396-1004-4fee-842a-a35ff6ba17f2.jpg?1783903658",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.000979
+    },
+    {
+     "id": "masterful-flourish",
+     "name": "Masterful Flourish",
+     "mana_cost": "{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/8/d/8d93d14d-7760-4af2-a237-2df326dd28d3.jpg?1783903678",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.030368
+    },
+    {
+     "id": "quick-study",
+     "name": "Quick Study",
+     "mana_cost": "{2}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/2/d/2d4f0bc7-da7c-4749-a24c-b01f3eb5860c.jpg?1783903688",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.038161
+    },
+    {
+     "id": "studious-first-year",
+     "name": "Studious First-Year",
+     "mana_cost": "{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/2/4/24f888dd-785c-4089-a89c-03f9080130ed.jpg?1783903652",
+     "type_line": "Creature — Bear Wizard",
+     "rarity": "common",
+     "model_probability": 0.151806
+    },
+    {
+     "id": "sundering-archaic",
+     "name": "Sundering Archaic",
+     "mana_cost": "{6}",
+     "image_url": "https://cards.scryfall.io/normal/front/c/3/c35b57e4-2358-46c0-8f09-cd27c10eaf2d.jpg?1783903710",
+     "type_line": "Creature — Avatar",
+     "rarity": "uncommon",
+     "model_probability": 0.357808
+    },
+    {
+     "id": "wander-off",
+     "name": "Wander Off",
+     "mana_cost": "{3}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/3/d/3d409512-50b9-4a38-91b0-19ba25227992.jpg?1783903675",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.261913
+    },
+    {
+     "id": "zealous-lorecaster",
+     "name": "Zealous Lorecaster",
+     "mana_cost": "{5}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/3/6/36ab2130-9f21-4d30-873a-aa72d3d15fa8.jpg?1783903662",
+     "type_line": "Creature — Giant Sorcerer",
+     "rarity": "common",
+     "model_probability": 0.028168
+    }
+   ],
+   "historical_pick_id": "wander-off"
+  },
+  {
+   "item_id": "529a0cfda4c6",
+   "set_id": "hob",
+   "set_name": "The Hobbit",
+   "pick_number": 1,
+   "prior_picks": [],
+   "candidates": [
+    {
+     "id": "elvenking-s-halls",
+     "name": "Elvenking's Halls",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/c/d/cd477096-41b1-4907-9cb3-852cb22c9ba2.jpg?1785323590",
+     "type_line": "Land",
+     "rarity": "common",
+     "model_probability": 0.003299
+    },
+    {
+     "id": "gnashing-of-teeth",
+     "name": "Gnashing of Teeth",
+     "mana_cost": "{1}{B}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/5/d/5d485d70-c7b9-40a4-9089-5e7f1c2b9213.jpg?1784734464",
+     "type_line": "Sorcery",
+     "rarity": "uncommon",
+     "model_probability": 0.118453
+    },
+    {
+     "id": "gollum-silent-slinker",
+     "name": "Gollum, Silent Slinker",
+     "mana_cost": "{3}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/c/6cfaa182-3fec-4907-8814-b4d29c33cec3.jpg?1785323234",
+     "type_line": "Legendary Creature — Halfling Horror",
+     "rarity": "common",
+     "model_probability": 0.072092
+    },
+    {
+     "id": "magnificent-end",
+     "name": "Magnificent End",
+     "mana_cost": "{4}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/3/430c8916-1167-400b-9cad-d301f59d5e5d.jpg?1785497008",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.012718
+    },
+    {
+     "id": "master-s-councillors",
+     "name": "Master's Councillors",
+     "mana_cost": "{1}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/a/d/addcefdd-e012-4adf-9052-e60376a8d2d3.jpg?1784798124",
+     "type_line": "Creature — Human Advisor",
+     "rarity": "uncommon",
+     "model_probability": 0.204187
+    },
+    {
+     "id": "mirkwood-meditator",
+     "name": "Mirkwood Meditator",
+     "mana_cost": "{2}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/a/d/ad7ed4e6-3fe2-40f1-909b-a03b2a3c941a.jpg?1785497064",
+     "type_line": "Creature — Elf Druid",
+     "rarity": "common",
+     "model_probability": 0.002776
+    },
+    {
+     "id": "misty-mountains-raider",
+     "name": "Misty Mountains Raider",
+     "mana_cost": "{4}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/d/6dff14cd-b60b-48f4-9d9f-c9019b55df4c.jpg?1785152178",
+     "type_line": "Creature — Goblin Soldier",
+     "rarity": "uncommon",
+     "model_probability": 0.179563
+    },
+    {
+     "id": "pinecone-strike",
+     "name": "Pinecone Strike",
+     "mana_cost": "{1}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/e/a/ea174cea-40e5-424e-9734-e39aae6c6b17.jpg?1785496194",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.168179
+    },
+    {
+     "id": "smaug-wicked-worm",
+     "name": "Smaug, Wicked Worm",
+     "mana_cost": "{3}{B}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/1/9/19cc91f0-e724-41ac-b6d8-9a293bd63b42.jpg?1785323313",
+     "type_line": "Legendary Creature — Dragon",
+     "rarity": "rare",
+     "model_probability": 0.197899
+    },
+    {
+     "id": "smaug-the-great-calamity",
+     "name": "Smaug, the Great Calamity",
+     "mana_cost": "{5}{R}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/1/419ca9e5-8413-4378-a4ef-eda5a1024218.jpg?1785497136",
+     "type_line": "Legendary Creature — Dragon",
+     "rarity": "common",
+     "model_probability": 0.00869
+    },
+    {
+     "id": "stir-up-trouble",
+     "name": "Stir Up Trouble",
+     "mana_cost": "{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/d/fd145e3a-c889-4390-accb-863dbcc845ce.jpg?1785497107",
+     "type_line": "Sorcery",
+     "rarity": "common",
+     "model_probability": 0.020059
+    },
+    {
+     "id": "uneasy-partings",
+     "name": "Uneasy Partings",
+     "mana_cost": "{3}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/e/4/e49866d4-966a-40f9-b08d-18e5af6d726b.jpg?1785497074",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.006464
+    },
+    {
+     "id": "vow-to-erebor",
+     "name": "Vow to Erebor",
+     "mana_cost": "{1}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/8/d/8d4f3eb5-fedf-45d6-8bd8-aacbe0ce33b2.jpg?1785497034",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.00289
+    },
+    {
+     "id": "warg-tactics",
+     "name": "Warg Tactics",
+     "mana_cost": "{1}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/b/0/b06d9cee-bb0f-4fe7-ab2a-b55d36461aec.jpg?1785497168",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.00273
+    }
+   ],
+   "historical_pick_id": "misty-mountains-raider"
+  },
+  {
+   "item_id": "c1cc47592053",
+   "set_id": "msh",
+   "set_name": "Marvel Super Heroes",
+   "pick_number": 5,
+   "prior_picks": [
+    {
+     "id": "web-up",
+     "name": "Web Up",
+     "mana_cost": "{2}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/9/a/9a1b057b-229c-4f65-ba4e-12dd342238de.jpg?1783902964",
+     "type_line": "Enchantment",
+     "rarity": "common"
+    },
+    {
+     "id": "hero-in-training",
+     "name": "Hero in Training",
+     "mana_cost": "{2}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/1/0/105a937b-289c-47b5-96a4-654c697bbb7d.jpg?1783902973",
+     "type_line": "Creature — Human Hero",
+     "rarity": "common"
+    },
+    {
+     "id": "thor-odinson",
+     "name": "Thor Odinson",
+     "mana_cost": "{3}{R}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/0/e/0e06f730-ae30-4ef2-88b1-073e02afdb25.jpg?1783902895",
+     "type_line": "Legendary Creature — God Warrior Hero",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "murdock-s-crusade",
+     "name": "Murdock's Crusade",
+     "mana_cost": "{1}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/9/8/98df64ca-39c3-47e6-8143-4106c8e9cf59.jpg?1783902970",
+     "type_line": "Sorcery",
+     "rarity": "common"
+    }
+   ],
+   "candidates": [
+    {
+     "id": "borough-backup",
+     "name": "Borough Backup",
+     "mana_cost": "{4}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/b/b/bb753ac8-67e1-44b0-b404-37f04c2b7438.jpg?1783902978",
+     "type_line": "Sorcery",
+     "rarity": "common",
+     "model_probability": 0.391014
+    },
+    {
+     "id": "call-damage-control",
+     "name": "Call Damage Control",
+     "mana_cost": "{1}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/d/e/de1ed886-c33b-4cfd-8442-944cec654a8b.jpg?1783902921",
+     "type_line": "Sorcery",
+     "rarity": "common",
+     "model_probability": 0.002771
+    },
+    {
+     "id": "depower",
+     "name": "Depower",
+     "mana_cost": "{2}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/3/6/36e9a6e9-1f9d-4860-97ee-f01e66f8eb4d.jpg?1783902960",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.017592
+    },
+    {
+     "id": "hercules-prince-of-power",
+     "name": "Hercules, Prince of Power",
+     "mana_cost": "{2}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/d/6/d610d9fe-f8ae-473f-9325-e2f28f7e8a69.jpg?1783902916",
+     "type_line": "Legendary Creature — Demigod Warrior Hero",
+     "rarity": "uncommon",
+     "model_probability": 0.044288
+    },
+    {
+     "id": "plains",
+     "name": "Plains",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/5/f/5f029c91-f20b-4aa5-a7d9-dd6ddef1c877.jpg?1783902876",
+     "type_line": "Basic Land — Plains",
+     "rarity": "common",
+     "model_probability": 0.002037
+    },
+    {
+     "id": "s-h-i-e-l-d-spy-kit",
+     "name": "S.H.I.E.L.D. Spy Kit",
+     "mana_cost": "{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/9/4938e23f-b5da-493b-9904-af61a3733ba0.jpg?1783902967",
+     "type_line": "Artifact — Equipment",
+     "rarity": "common",
+     "model_probability": 0.305983
+    },
+    {
+     "id": "savage-land-dinosaur",
+     "name": "Savage Land Dinosaur",
+     "mana_cost": "{4}{G}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/5/6/562bd376-3fba-4de0-b9fc-183004b03732.jpg?1783902912",
+     "type_line": "Creature — Dinosaur",
+     "rarity": "common",
+     "model_probability": 0.032528
+    },
+    {
+     "id": "surveillance-room",
+     "name": "Surveillance Room",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/8/f/8fb51fbb-ab7f-4484-a3c9-dc50cb6f2756.jpg?1783902881",
+     "type_line": "Land",
+     "rarity": "common",
+     "model_probability": 0.057768
+    },
+    {
+     "id": "thor-odinson",
+     "name": "Thor Odinson",
+     "mana_cost": "{3}{R}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/0/e/0e06f730-ae30-4ef2-88b1-073e02afdb25.jpg?1783902895",
+     "type_line": "Legendary Creature — God Warrior Hero",
+     "rarity": "uncommon",
+     "model_probability": 0.132719
+    },
+    {
+     "id": "visions-of-villainy",
+     "name": "Visions of Villainy",
+     "mana_cost": "{2}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/8/f8f1e4f9-7415-437f-b694-ecbdd76db114.jpg?1783902935",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.013301
+    }
+   ],
+   "historical_pick_id": "borough-backup"
+  },
+  {
+   "item_id": "49fd56453a7a",
+   "set_id": "hob",
+   "set_name": "The Hobbit",
+   "pick_number": 4,
+   "prior_picks": [
+    {
+     "id": "large-bear",
+     "name": "Large Bear",
+     "mana_cost": "{3}{B/G}{B/G}",
+     "image_url": "https://cards.scryfall.io/normal/front/5/0/50202288-f433-4b56-8f60-349bda7b4f6b.jpg?1785323294",
+     "type_line": "Creature — Bear",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "the-mountain-king-s-return",
+     "name": "The Mountain-king's Return",
+     "mana_cost": "{2}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/8/68f4893d-e9a5-4f89-ade3-9ab78a834ad5.jpg?1787201116",
+     "type_line": "Enchantment — Saga",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "crude-bent-blade",
+     "name": "Crude Bent Blade",
+     "mana_cost": "{2}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/a/fa8fd3c4-bd00-485d-80b1-2b67f5786fce.jpg?1785496297",
+     "type_line": "Artifact — Equipment",
+     "rarity": "common"
+    }
+   ],
+   "candidates": [
+    {
+     "id": "attercop",
+     "name": "Attercop",
+     "mana_cost": "{1}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/8/1/81263d5d-e402-4813-9458-161112da27ab.jpg?1785497157",
+     "type_line": "Creature — Spider",
+     "rarity": "common",
+     "model_probability": 0.038308
+    },
+    {
+     "id": "elvenking-s-halls",
+     "name": "Elvenking's Halls",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/c/d/cd477096-41b1-4907-9cb3-852cb22c9ba2.jpg?1785323590",
+     "type_line": "Land",
+     "rarity": "common",
+     "model_probability": 0.019454
+    },
+    {
+     "id": "elvenking-s-harper",
+     "name": "Elvenking's Harper",
+     "mana_cost": "{1}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/9/c/9c50656d-c74a-4e90-9ef7-afa237682516.jpg?1785497043",
+     "type_line": "Creature — Elf Bard",
+     "rarity": "common",
+     "model_probability": 0.003522
+    },
+    {
+     "id": "guardian-of-the-halls",
+     "name": "Guardian of the Halls",
+     "mana_cost": "{1}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/2/4265caec-8c28-44cd-8e6b-90b5af926d3c.jpg?1785497166",
+     "type_line": "Creature — Elf Soldier",
+     "rarity": "common",
+     "model_probability": 0.004897
+    },
+    {
+     "id": "lake-town-toymaker",
+     "name": "Lake-town Toymaker",
+     "mana_cost": "{3}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/7/67304269-c595-4cf0-8dbf-fcb2e9e01fe2.jpg?1785496951",
+     "type_line": "Creature — Human Artificer",
+     "rarity": "uncommon",
+     "model_probability": 0.086542
+    },
+    {
+     "id": "long-lake-nuisance",
+     "name": "Long Lake Nuisance",
+     "mana_cost": "{3}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/c/d/cd5af94d-6321-4834-8e5f-e5d0261b3ef3.jpg?1785497055",
+     "type_line": "Creature — Bird",
+     "rarity": "common",
+     "model_probability": 0.101476
+    },
+    {
+     "id": "moment-of-glory",
+     "name": "Moment of Glory",
+     "mana_cost": "{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/0/a/0a6a6ff0-b1cd-4b06-bd31-612690094e0e.jpg?1785497012",
+     "type_line": "Sorcery",
+     "rarity": "common",
+     "model_probability": 0.004953
+    },
+    {
+     "id": "nori-teller-of-tales",
+     "name": "Nori, Teller of Tales",
+     "mana_cost": "{1}{R/W}",
+     "image_url": "https://cards.scryfall.io/normal/front/b/0/b05adb48-980c-49a0-9ce6-7c7f3f20715d.jpg?1785323303",
+     "type_line": "Legendary Creature — Dwarf Bard",
+     "rarity": "common",
+     "model_probability": 0.066167
+    },
+    {
+     "id": "orcrist-goblin-cleaver",
+     "name": "Orcrist, Goblin-cleaver",
+     "mana_cost": "{3}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/5/f54f1c1d-6a22-43e9-a842-0a1ae25b323c.jpg?1784798240",
+     "type_line": "Legendary Artifact — Equipment",
+     "rarity": "mythic",
+     "model_probability": 0.223968
+    },
+    {
+     "id": "smaug-s-fury",
+     "name": "Smaug's Fury",
+     "mana_cost": "{1}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/a/1/a16f203a-785e-4c78-9410-fb9f8a0ffa01.jpg?1785497138",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.00218
+    },
+    {
+     "id": "thranduil-sindarin-liege",
+     "name": "Thranduil, Sindarin Liege",
+     "mana_cost": "{2}{G/U}{G/U}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/8/481870ee-d1f7-421b-86e1-570ea933bbbc.jpg?1785412747",
+     "type_line": "Legendary Creature — Elf Noble",
+     "rarity": "uncommon",
+     "model_probability": 0.448533
+    }
+   ],
+   "historical_pick_id": "thranduil-sindarin-liege"
+  },
+  {
+   "item_id": "d8840fb40fd1",
+   "set_id": "sos",
+   "set_name": "Secrets of Strixhaven",
+   "pick_number": 2,
+   "prior_picks": [
+    {
+     "id": "scolding-administrator",
+     "name": "Scolding Administrator",
+     "mana_cost": "{W}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/9/69757177-aefa-44a6-81db-5ae9b5d2f117.jpg?1783903631",
+     "type_line": "Creature — Dwarf Cleric",
+     "rarity": "uncommon"
+    }
+   ],
+   "candidates": [
+    {
+     "id": "ennis-debate-moderator",
+     "name": "Ennis, Debate Moderator",
+     "mana_cost": "{1}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/d/2/d2ef31b4-24fa-4443-9f05-c8e99c3522e5.jpg?1783903705",
+     "type_line": "Legendary Creature — Human Cleric",
+     "rarity": "uncommon",
+     "model_probability": 0.022003
+    },
+    {
+     "id": "environmental-scientist",
+     "name": "Environmental Scientist",
+     "mana_cost": "{1}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/2/f2bf6b36-43e4-49d9-98b2-cbb4304c248b.jpg?1783903658",
+     "type_line": "Creature — Human Druid",
+     "rarity": "uncommon",
+     "model_probability": 0.276489
+    },
+    {
+     "id": "glorious-decay",
+     "name": "Glorious Decay",
+     "mana_cost": "{1}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/a/3/a335f396-1004-4fee-842a-a35ff6ba17f2.jpg?1783903658",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.000874
+    },
+    {
+     "id": "last-gasp",
+     "name": "Last Gasp",
+     "mana_cost": "{1}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/d/a/da5f3729-6ec7-4482-90cb-83b973edeae4.jpg?1783903679",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.111696
+    },
+    {
+     "id": "molten-note",
+     "name": "Molten Note",
+     "mana_cost": "{X}{R}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/5/0/506f69aa-7dc4-4dd7-990a-7371fc1762c0.jpg?1783903638",
+     "type_line": "Sorcery",
+     "rarity": "uncommon",
+     "model_probability": 0.15488
+    },
+    {
+     "id": "monstrous-rage",
+     "name": "Monstrous Rage",
+     "mana_cost": "{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/b/4b2e000b-a147-443b-9138-9ff2d16c0422.jpg?1783903919",
+     "type_line": "Instant",
+     "rarity": "uncommon",
+     "model_probability": 0.018298
+    },
+    {
+     "id": "procrastinate",
+     "name": "Procrastinate",
+     "mana_cost": "{X}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/1/e/1edb449d-620f-4e21-9d76-2c840635eb9d.jpg?1783903688",
+     "type_line": "Sorcery",
+     "rarity": "common",
+     "model_probability": 0.0015
+    },
+    {
+     "id": "quick-study",
+     "name": "Quick Study",
+     "mana_cost": "{2}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/2/d/2d4f0bc7-da7c-4749-a24c-b01f3eb5860c.jpg?1783903688",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.0018
+    },
+    {
+     "id": "rehearsed-debater",
+     "name": "Rehearsed Debater",
+     "mana_cost": "{2}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/c/fc6a1425-6733-42a2-94d9-605966398092.jpg?1783903700",
+     "type_line": "Creature — Djinn Bard",
+     "rarity": "common",
+     "model_probability": 0.004016
+    },
+    {
+     "id": "rubble-rouser",
+     "name": "Rubble Rouser",
+     "mana_cost": "{2}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/a/f/afe61957-a9bb-42b0-98e8-b5fa418cbaff.jpg?1783903665",
+     "type_line": "Creature — Dwarf Sorcerer",
+     "rarity": "common",
+     "model_probability": 0.049949
+    },
+    {
+     "id": "snarl-song",
+     "name": "Snarl Song",
+     "mana_cost": "{5}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/c/fc4c7fa2-aebb-4636-9afd-f1010c923316.jpg?1783903655",
+     "type_line": "Sorcery",
+     "rarity": "uncommon",
+     "model_probability": 0.304946
+    },
+    {
+     "id": "swamp",
+     "name": "Swamp",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/5/1/51fe930f-2b5a-4b1e-9007-6ee74fb44715.jpg?1783903613",
+     "type_line": "Basic Land — Swamp",
+     "rarity": "common",
+     "model_probability": 0.000836
+    },
+    {
+     "id": "terramorphic-expanse",
+     "name": "Terramorphic Expanse",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/9/a/9a4c5629-fadd-42b9-850f-9f8586a2ca50.jpg?1783903615",
+     "type_line": "Land",
+     "rarity": "common",
+     "model_probability": 0.052713
+    }
+   ],
+   "historical_pick_id": "snarl-song"
+  },
+  {
+   "item_id": "db192d31d381",
+   "set_id": "msh",
+   "set_name": "Marvel Super Heroes",
+   "pick_number": 5,
+   "prior_picks": [
+    {
+     "id": "s-h-i-e-l-d-deployment-drone",
+     "name": "S.H.I.E.L.D. Deployment Drone",
+     "mana_cost": "{2}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/c/3/c3d0f02f-dfaf-47b6-8053-514417f4dfe2.jpg?1783902953",
+     "type_line": "Artifact Creature — Robot",
+     "rarity": "common"
+    },
+    {
+     "id": "wiccan-rising-magician",
+     "name": "Wiccan, Rising Magician",
+     "mana_cost": "{4}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/5/d/5d27ddec-716d-47e5-ac48-365e91b88ff1.jpg?1783902949",
+     "type_line": "Legendary Creature — Mutant Warlock Hero",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "night-nurse-healer-of-heroes",
+     "name": "Night Nurse, Healer of Heroes",
+     "mana_cost": "{1}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/3/1/3199907b-9f24-4554-942a-8ab5a7701717.jpg?1783902972",
+     "type_line": "Legendary Creature — Human Doctor Hero",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "atlantis-attacks",
+     "name": "Atlantis Attacks",
+     "mana_cost": "{5}{U}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/0/40bc4380-055d-4913-93cb-280c9c1d1a87.jpg?1783902962",
+     "type_line": "Sorcery",
+     "rarity": "common"
+    }
+   ],
+   "candidates": [
+    {
+     "id": "asgardian-citadel",
+     "name": "Asgardian Citadel",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/d/5/d5f88c3d-b17b-46aa-a573-449350f95d46.jpg?1783902886",
+     "type_line": "Land",
+     "rarity": "common",
+     "model_probability": 0.043424
+    },
+    {
+     "id": "giant-growth",
+     "name": "Giant Growth",
+     "mana_cost": "{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/d/fd1f95bf-48ea-455a-8a6c-0249b11c8900.jpg?1783902918",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.001251
+    },
+    {
+     "id": "helicarrier-strike",
+     "name": "Helicarrier Strike",
+     "mana_cost": "{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/e/6e518842-ce44-4af2-8f38-89869828294a.jpg?1783902975",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.204599
+    },
+    {
+     "id": "hydraulic-helper",
+     "name": "Hydraulic Helper",
+     "mana_cost": "{1}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/0/6/06d8a2a0-775b-4813-973f-8b15612b38d1.jpg?1783902958",
+     "type_line": "Artifact Creature — Robot",
+     "rarity": "common",
+     "model_probability": 0.040135
+    },
+    {
+     "id": "i-am-iron-man",
+     "name": "I Am Iron Man",
+     "mana_cost": "{2}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/9/c/9c401abb-5978-41c0-962b-0432f9433929.jpg?1783902957",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.028135
+    },
+    {
+     "id": "iron-lad-diverging-destiny",
+     "name": "Iron Lad, Diverging Destiny",
+     "mana_cost": "{2}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/3/5/355e7197-2f20-43b6-9305-73c4e1fd4a3c.jpg?1783902957",
+     "type_line": "Legendary Artifact Creature — Human Hero",
+     "rarity": "uncommon",
+     "model_probability": 0.195774
+    },
+    {
+     "id": "k-un-lun-warrior",
+     "name": "K'un-Lun Warrior",
+     "mana_cost": "{1}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/e/6/e6e8359d-12be-49be-8cbe-6a3b8506a9e6.jpg?1783902928",
+     "type_line": "Creature — Human Warrior Hero",
+     "rarity": "common",
+     "model_probability": 0.005509
+    },
+    {
+     "id": "murdock-s-crusade",
+     "name": "Murdock's Crusade",
+     "mana_cost": "{1}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/9/8/98df64ca-39c3-47e6-8143-4106c8e9cf59.jpg?1783902970",
+     "type_line": "Sorcery",
+     "rarity": "common",
+     "model_probability": 0.382152
+    },
+    {
+     "id": "titania-rugged-rumbler",
+     "name": "Titania, Rugged Rumbler",
+     "mana_cost": "{2}{B/G}",
+     "image_url": "https://cards.scryfall.io/normal/front/c/2/c281e0ee-155b-4022-b921-ebc391535aad.jpg?1783902896",
+     "type_line": "Legendary Creature — Human Villain",
+     "rarity": "uncommon",
+     "model_probability": 0.098203
+    },
+    {
+     "id": "volcanic-villain",
+     "name": "Volcanic Villain",
+     "mana_cost": "{2}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/f/4f48ba40-9934-40fd-a251-e15a68e772d2.jpg?1783902922",
+     "type_line": "Creature — Elemental Villain",
+     "rarity": "common",
+     "model_probability": 0.000818
+    }
+   ],
+   "historical_pick_id": "iron-lad-diverging-destiny"
+  },
+  {
+   "item_id": "615cdd6b22c5",
+   "set_id": "sos",
+   "set_name": "Secrets of Strixhaven",
+   "pick_number": 3,
+   "prior_picks": [
+    {
+     "id": "flow-state",
+     "name": "Flow State",
+     "mana_cost": "{1}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/7/47d6093b-b1b6-4956-8bfd-02cce899f832.jpg?1783903694",
+     "type_line": "Sorcery",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "impractical-joke",
+     "name": "Impractical Joke",
+     "mana_cost": "{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/3/9/39a816b4-39b8-421c-b828-68db901d34b7.jpg?1783903668",
+     "type_line": "Sorcery",
+     "rarity": "uncommon"
+    }
+   ],
+   "candidates": [
+    {
+     "id": "chase-inspiration",
+     "name": "Chase Inspiration",
+     "mana_cost": "{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/0/6/06f9f257-c7ef-44b7-8b2b-f038fba900af.jpg?1783903695",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.003122
+    },
+    {
+     "id": "mana-sculpt",
+     "name": "Mana Sculpt",
+     "mana_cost": "{1}{U}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/2/0/200c8e3d-c53b-40c7-a29a-fccc1281bfc6.jpg?1783903688",
+     "type_line": "Instant",
+     "rarity": "rare",
+     "model_probability": 0.230926
+    },
+    {
+     "id": "melancholic-poet",
+     "name": "Melancholic Poet",
+     "mana_cost": "{1}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/d/8/d8309815-7035-47a5-acf2-2b2ac1e65037.jpg?1783903678",
+     "type_line": "Creature — Elf Bard",
+     "rarity": "common",
+     "model_probability": 0.023508
+    },
+    {
+     "id": "mindful-biomancer",
+     "name": "Mindful Biomancer",
+     "mana_cost": "{1}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/2/c/2c3a6eb8-ce0c-4dc8-9ed6-d2a9223eef53.jpg?1783903656",
+     "type_line": "Creature — Dryad Druid",
+     "rarity": "common",
+     "model_probability": 0.004299
+    },
+    {
+     "id": "proctor-s-gaze",
+     "name": "Proctor's Gaze",
+     "mana_cost": "{2}{G}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/b/1/b127d543-0a90-4af6-9410-94d5cd30389e.jpg?1783903636",
+     "type_line": "Instant",
+     "rarity": "uncommon",
+     "model_probability": 0.277049
+    },
+    {
+     "id": "render-speechless",
+     "name": "Render Speechless",
+     "mana_cost": "{2}{W}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/2/5/25bbb1c7-14e8-444f-ab98-e95f50927460.jpg?1783903633",
+     "type_line": "Sorcery",
+     "rarity": "common",
+     "model_probability": 0.032866
+    },
+    {
+     "id": "return-the-favor",
+     "name": "Return the Favor",
+     "mana_cost": "{R}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/e/9/e968efff-635b-4780-9bbe-099e75a1841b.jpg?1783903919",
+     "type_line": "Instant",
+     "rarity": "uncommon",
+     "model_probability": 0.0098
+    },
+    {
+     "id": "spiritcall-enthusiast",
+     "name": "Spiritcall Enthusiast",
+     "mana_cost": "{2}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/c/0/c0b85569-2cb3-4b64-b0fe-418195c4dab0.jpg?1783903699",
+     "type_line": "Creature — Cat Cleric",
+     "rarity": "uncommon",
+     "model_probability": 0.019861
+    },
+    {
+     "id": "startled-relic-sloth",
+     "name": "Startled Relic Sloth",
+     "mana_cost": "{2}{R}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/1/f143fd41-58c3-45a0-bef8-e9e4b4a502a5.jpg?1783903631",
+     "type_line": "Creature — Sloth Beast",
+     "rarity": "uncommon",
+     "model_probability": 0.263486
+    },
+    {
+     "id": "swamp",
+     "name": "Swamp",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/5/1/51fe930f-2b5a-4b1e-9007-6ee74fb44715.jpg?1783903613",
+     "type_line": "Basic Land — Swamp",
+     "rarity": "common",
+     "model_probability": 0.001078
+    },
+    {
+     "id": "wilt-in-the-heat",
+     "name": "Wilt in the Heat",
+     "mana_cost": "{2}{R}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/6/f63f7209-fc0f-400c-8076-125f3131cb32.jpg?1783903625",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.124362
+    },
+    {
+     "id": "zealous-lorecaster",
+     "name": "Zealous Lorecaster",
+     "mana_cost": "{5}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/3/6/36ab2130-9f21-4d30-873a-aa72d3d15fa8.jpg?1783903662",
+     "type_line": "Creature — Giant Sorcerer",
+     "rarity": "common",
+     "model_probability": 0.009643
+    }
+   ],
+   "historical_pick_id": "mana-sculpt"
+  },
+  {
+   "item_id": "f7d66993dc6f",
+   "set_id": "sos",
+   "set_name": "Secrets of Strixhaven",
+   "pick_number": 6,
+   "prior_picks": [
+    {
+     "id": "aziza-mage-tower-captain",
+     "name": "Aziza, Mage Tower Captain",
+     "mana_cost": "{R}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/2/6261e89a-dbf1-481a-823e-6bb00be57195.jpg?1783903650",
+     "type_line": "Legendary Creature — Djinn Sorcerer",
+     "rarity": "rare"
+    },
+    {
+     "id": "scheming-silvertongue",
+     "name": "Scheming Silvertongue",
+     "mana_cost": "{1}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/e/fe85a124-0d8b-4a29-8df1-65888a39147f.jpg?1783903675",
+     "type_line": "Creature — Vampire Warlock",
+     "rarity": "rare"
+    },
+    {
+     "id": "slumbering-trudge",
+     "name": "Slumbering Trudge",
+     "mana_cost": "{X}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/3/a/3a925370-58ac-4181-9acc-db7b0e0abf17.jpg?1783903653",
+     "type_line": "Creature — Plant Beast",
+     "rarity": "rare"
+    },
+    {
+     "id": "lluwen-exchange-student",
+     "name": "Lluwen, Exchange Student",
+     "mana_cost": "{2}{B}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/a/0/a0bcb638-c3c8-4973-9537-5c471f43f34f.jpg?1783903641",
+     "type_line": "Legendary Creature — Elf Druid",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "teacher-s-pest",
+     "name": "Teacher's Pest",
+     "mana_cost": "{B}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/e/a/eaa358ac-761d-4507-aa15-3d4684027207.jpg?1783903626",
+     "type_line": "Creature — Skeleton Pest",
+     "rarity": "uncommon"
+    }
+   ],
+   "candidates": [
+    {
+     "id": "colossus-of-the-blood-age",
+     "name": "Colossus of the Blood Age",
+     "mana_cost": "{4}{R}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/b/f/bfa7f0a4-6b65-4e53-ba00-848df260d8e3.jpg?1783903647",
+     "type_line": "Artifact Creature — Construct",
+     "rarity": "uncommon",
+     "model_probability": 0.330871
+    },
+    {
+     "id": "hungry-graffalon",
+     "name": "Hungry Graffalon",
+     "mana_cost": "{3}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/0/3/030b1272-5990-4bc9-8fc1-82cc05602060.jpg?1783903657",
+     "type_line": "Creature — Giraffe",
+     "rarity": "common",
+     "model_probability": 0.010673
+    },
+    {
+     "id": "hydro-channeler",
+     "name": "Hydro-Channeler",
+     "mana_cost": "{1}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/0/9/099f8400-d70a-48ef-8ff6-645eae97e072.jpg?1783903690",
+     "type_line": "Creature — Merfolk Wizard",
+     "rarity": "common",
+     "model_probability": 0.03286
+    },
+    {
+     "id": "inkshape-demonstrator",
+     "name": "Inkshape Demonstrator",
+     "mana_cost": "{3}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/b/c/bcfac992-9984-4529-b9ff-a42d58832b34.jpg?1783903702",
+     "type_line": "Creature — Elephant Cleric",
+     "rarity": "uncommon",
+     "model_probability": 0.185696
+    },
+    {
+     "id": "pursue-the-past",
+     "name": "Pursue the Past",
+     "mana_cost": "{R}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/5/4584d5f7-b1f1-4c8e-80c5-ad35e44a968e.jpg?1783903635",
+     "type_line": "Sorcery",
+     "rarity": "common",
+     "model_probability": 0.241793
+    },
+    {
+     "id": "rapier-wit",
+     "name": "Rapier Wit",
+     "mana_cost": "{1}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/9/7/97b50521-5a0f-4dbd-8e15-f0f0d059c258.jpg?1783903700",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.02824
+    },
+    {
+     "id": "seize-the-spoils",
+     "name": "Seize the Spoils",
+     "mana_cost": "{2}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/d/4ddf4e34-a1f9-4636-942d-0a08e9f94320.jpg?1783903666",
+     "type_line": "Sorcery",
+     "rarity": "common",
+     "model_probability": 0.062666
+    },
+    {
+     "id": "spirit-mascot",
+     "name": "Spirit Mascot",
+     "mana_cost": "{R}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/1/2/123f1fde-d8de-4640-baa1-bb3781713168.jpg?1783903631",
+     "type_line": "Creature — Spirit Ox",
+     "rarity": "common",
+     "model_probability": 0.105975
+    },
+    {
+     "id": "swamp",
+     "name": "Swamp",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/5/1/51fe930f-2b5a-4b1e-9007-6ee74fb44715.jpg?1783903613",
+     "type_line": "Basic Land — Swamp",
+     "rarity": "common",
+     "model_probability": 0.001227
+    }
+   ],
+   "historical_pick_id": "colossus-of-the-blood-age"
+  },
+  {
+   "item_id": "157e97b65a41",
+   "set_id": "sos",
+   "set_name": "Secrets of Strixhaven",
+   "pick_number": 8,
+   "prior_picks": [
+    {
+     "id": "stress-dream",
+     "name": "Stress Dream",
+     "mana_cost": "{3}{U}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/1/e/1ec40a1b-51e7-4a35-966c-ab2a10f21a80.jpg?1783903627",
+     "type_line": "Instant",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "fields-of-strife",
+     "name": "Fields of Strife",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/3/d/3dc7a4c3-c356-4fba-bea0-e8788da3eb57.jpg?1783903620",
+     "type_line": "Land",
+     "rarity": "common"
+    },
+    {
+     "id": "elite-interceptor",
+     "name": "Elite Interceptor",
+     "mana_cost": "{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/2/9/2970683e-e69c-42cb-a067-34abd56fb42b.jpg?1783903706",
+     "type_line": "Creature — Human Wizard",
+     "rarity": "common"
+    },
+    {
+     "id": "pursue-the-past",
+     "name": "Pursue the Past",
+     "mana_cost": "{R}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/5/4584d5f7-b1f1-4c8e-80c5-ad35e44a968e.jpg?1783903635",
+     "type_line": "Sorcery",
+     "rarity": "common"
+    },
+    {
+     "id": "tome-blast",
+     "name": "Tome Blast",
+     "mana_cost": "{1}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/7/2/72a3b17d-1e00-48e9-8402-c81bacd595a7.jpg?1783903663",
+     "type_line": "Sorcery",
+     "rarity": "common"
+    },
+    {
+     "id": "stone-docent",
+     "name": "Stone Docent",
+     "mana_cost": "{1}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/c/2/c2abfffb-bf36-44af-9a27-6e109e4d77dd.jpg?1783903696",
+     "type_line": "Creature — Spirit Chimera",
+     "rarity": "common"
+    },
+    {
+     "id": "rubble-rouser",
+     "name": "Rubble Rouser",
+     "mana_cost": "{2}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/a/f/afe61957-a9bb-42b0-98e8-b5fa418cbaff.jpg?1783903665",
+     "type_line": "Creature — Dwarf Sorcerer",
+     "rarity": "common"
+    }
+   ],
+   "candidates": [
+    {
+     "id": "banishing-betrayal",
+     "name": "Banishing Betrayal",
+     "mana_cost": "{1}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/1/a/1ae9d2f3-7a9f-433a-aa1f-14337ae6f9d4.jpg?1783903699",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.145533
+    },
+    {
+     "id": "biblioplex-tomekeeper",
+     "name": "Biblioplex Tomekeeper",
+     "mana_cost": "{4}",
+     "image_url": "https://cards.scryfall.io/normal/front/b/f/bf2efdd9-d2b4-4bea-a5b9-dbb2eee4dfba.jpg?1783903623",
+     "type_line": "Artifact Creature — Construct",
+     "rarity": "common",
+     "model_probability": 0.007087
+    },
+    {
+     "id": "melancholic-poet",
+     "name": "Melancholic Poet",
+     "mana_cost": "{1}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/d/8/d8309815-7035-47a5-acf2-2b2ac1e65037.jpg?1783903678",
+     "type_line": "Creature — Elf Bard",
+     "rarity": "common",
+     "model_probability": 0.104979
+    },
+    {
+     "id": "owlin-historian",
+     "name": "Owlin Historian",
+     "mana_cost": "{2}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/5/f/5fe99be0-e1ec-485e-82f8-02eba7b82441.jpg?1783903704",
+     "type_line": "Creature — Bird Cleric",
+     "rarity": "common",
+     "model_probability": 0.229877
+    },
+    {
+     "id": "page-loose-leaf",
+     "name": "Page, Loose Leaf",
+     "mana_cost": "{2}",
+     "image_url": "https://cards.scryfall.io/normal/front/8/c/8c6fecfd-8241-4cf0-b1eb-19472b99e0ed.jpg?1783903623",
+     "type_line": "Legendary Artifact Creature — Construct",
+     "rarity": "common",
+     "model_probability": 0.066423
+    },
+    {
+     "id": "shopkeeper-s-bane",
+     "name": "Shopkeeper's Bane",
+     "mana_cost": "{2}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/9/7/97f7fbb9-228c-4a74-975b-38d3b6cecb32.jpg?1783903656",
+     "type_line": "Creature — Badger Pest",
+     "rarity": "common",
+     "model_probability": 0.024918
+    },
+    {
+     "id": "spectacle-summit",
+     "name": "Spectacle Summit",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/a/0/a0a66f7b-eab4-45da-8895-c2c2c7eb05f8.jpg?1783903617",
+     "type_line": "Land",
+     "rarity": "common",
+     "model_probability": 0.421183
+    }
+   ],
+   "historical_pick_id": "spectacle-summit"
+  },
+  {
+   "item_id": "784a3764db71",
+   "set_id": "hob",
+   "set_name": "The Hobbit",
+   "pick_number": 1,
+   "prior_picks": [],
+   "candidates": [
+    {
+     "id": "bilbo-s-deadly-slice",
+     "name": "Bilbo's Deadly Slice",
+     "mana_cost": "{1}{B}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/1/7/17892c93-b9b2-4720-933b-998ed0200492.jpg?1785497075",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.0936
+    },
+    {
+     "id": "boughside-wanderers",
+     "name": "Boughside Wanderers",
+     "mana_cost": "{4}{G}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/7/1/71bec005-2925-4944-be16-2cc5eb30f5d6.jpg?1785497158",
+     "type_line": "Creature — Elf Scout",
+     "rarity": "common",
+     "model_probability": 0.002408
+    },
+    {
+     "id": "celebrate-the-mountain-king",
+     "name": "Celebrate the Mountain-king",
+     "mana_cost": "{3}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/2/42fbd61d-e1a6-465d-b1a3-f5ee0869d3af.jpg?1785496910",
+     "type_line": "Enchantment",
+     "rarity": "uncommon",
+     "model_probability": 0.383137
+    },
+    {
+     "id": "desolation-prowler",
+     "name": "Desolation Prowler",
+     "mana_cost": "{1}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/3/63c87009-ff1b-44b9-88b1-e26219094c67.jpg?1785237955",
+     "type_line": "Creature — Wolf",
+     "rarity": "uncommon",
+     "model_probability": 0.413083
+    },
+    {
+     "id": "galion-elvenking-s-butler",
+     "name": "Galion, Elvenking's Butler",
+     "mana_cost": "{2}{G}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/9/8/985bd676-58c4-42c7-a570-1b413e9aa94c.jpg?1785152142",
+     "type_line": "Legendary Creature — Elf Advisor",
+     "rarity": "uncommon",
+     "model_probability": 0.009609
+    },
+    {
+     "id": "gandalf-wandering-wizard",
+     "name": "Gandalf, Wandering Wizard",
+     "mana_cost": "{4}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/1/f/1f8403a2-849c-4a59-b0ed-c8803995028d.jpg?1785496472",
+     "type_line": "Legendary Creature — Avatar Wizard",
+     "rarity": "common",
+     "model_probability": 0.002279
+    },
+    {
+     "id": "goblin-plate-mail",
+     "name": "Goblin Plate Mail",
+     "mana_cost": "{1}{B/R}",
+     "image_url": "https://cards.scryfall.io/normal/front/c/b/cb982607-da37-4894-91a5-cf6307d4d703.jpg?1785323293",
+     "type_line": "Artifact — Equipment",
+     "rarity": "common",
+     "model_probability": 0.056842
+    },
+    {
+     "id": "lake-town",
+     "name": "Lake-town",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/2/f/2fbd0584-81a7-4c47-8af1-1c8635899a97.jpg?1785323601",
+     "type_line": "Land",
+     "rarity": "common",
+     "model_probability": 0.003233
+    },
+    {
+     "id": "lake-town-mariners",
+     "name": "Lake-town Mariners",
+     "mana_cost": "{4}{U}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/2/4202a678-a5f4-47f9-9c18-e88ab9ad20a4.jpg?1785237929",
+     "type_line": "Creature — Human Citizen",
+     "rarity": "uncommon",
+     "model_probability": 0.004962
+    },
+    {
+     "id": "mirkwood-meditator",
+     "name": "Mirkwood Meditator",
+     "mana_cost": "{2}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/a/d/ad7ed4e6-3fe2-40f1-909b-a03b2a3c941a.jpg?1785497064",
+     "type_line": "Creature — Elf Druid",
+     "rarity": "common",
+     "model_probability": 0.002298
+    },
+    {
+     "id": "nori-teller-of-tales",
+     "name": "Nori, Teller of Tales",
+     "mana_cost": "{1}{R/W}",
+     "image_url": "https://cards.scryfall.io/normal/front/b/0/b05adb48-980c-49a0-9ce6-7c7f3f20715d.jpg?1785323303",
+     "type_line": "Legendary Creature — Dwarf Bard",
+     "rarity": "common",
+     "model_probability": 0.003903
+    },
+    {
+     "id": "thorin-s-last-stand",
+     "name": "Thorin's Last Stand",
+     "mana_cost": "{2}{W}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/1/2/127367b6-9cfe-4516-9bfd-5b951468a25c.jpg?1785497020",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.002284
+    },
+    {
+     "id": "thranduil-the-elvenking",
+     "name": "Thranduil, the Elvenking",
+     "mana_cost": "{2}{B}{G}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/e/fe2fe8fa-3b99-44c1-bab9-922e5c864952.jpg?1784377043",
+     "type_line": "Legendary Creature — Elf Noble",
+     "rarity": "rare",
+     "model_probability": 0.020111
+    },
+    {
+     "id": "well-worn-spatula",
+     "name": "Well-Worn Spatula",
+     "mana_cost": "{1}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/5/659b687f-4068-496f-81b2-7b606bf07ec1.jpg?1785496409",
+     "type_line": "Artifact — Equipment",
+     "rarity": "common",
+     "model_probability": 0.002251
+    }
+   ],
+   "historical_pick_id": "desolation-prowler"
+  },
+  {
+   "item_id": "2ac8109fbd43",
+   "set_id": "hob",
+   "set_name": "The Hobbit",
+   "pick_number": 4,
+   "prior_picks": [
+    {
+     "id": "mirkwood-pathmaker",
+     "name": "Mirkwood Pathmaker",
+     "mana_cost": "{2}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/5/0/50fbedc0-bc66-4ffb-87f6-a2df69995091.jpg?1785152431",
+     "type_line": "Creature — Elf Ranger",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "stir-up-trouble",
+     "name": "Stir Up Trouble",
+     "mana_cost": "{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/d/fd145e3a-c889-4390-accb-863dbcc845ce.jpg?1785497107",
+     "type_line": "Sorcery",
+     "rarity": "common"
+    },
+    {
+     "id": "burn-burn-tree-and-fern",
+     "name": "Burn, Burn, Tree and Fern",
+     "mana_cost": "{3}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/c/fceb1a2d-121e-49ad-acf2-1bb5aebec116.jpg?1787200962",
+     "type_line": "Enchantment — Saga",
+     "rarity": "uncommon"
+    }
+   ],
+   "candidates": [
+    {
+     "id": "fearsome-goblin-pair",
+     "name": "Fearsome Goblin Pair",
+     "mana_cost": "{2}{B/R}",
+     "image_url": "https://cards.scryfall.io/normal/front/2/e/2efe2dc7-3eaa-47f6-b1ae-f974c4a8ae79.jpg?1785324572",
+     "type_line": "Creature — Goblin Soldier",
+     "rarity": "uncommon",
+     "model_probability": 0.11799
+    },
+    {
+     "id": "galion-elvenking-s-butler",
+     "name": "Galion, Elvenking's Butler",
+     "mana_cost": "{2}{G}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/9/8/985bd676-58c4-42c7-a570-1b413e9aa94c.jpg?1785152142",
+     "type_line": "Legendary Creature — Elf Advisor",
+     "rarity": "uncommon",
+     "model_probability": 0.046677
+    },
+    {
+     "id": "gollum-silent-slinker",
+     "name": "Gollum, Silent Slinker",
+     "mana_cost": "{3}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/c/6cfaa182-3fec-4907-8814-b4d29c33cec3.jpg?1785323234",
+     "type_line": "Legendary Creature — Halfling Horror",
+     "rarity": "common",
+     "model_probability": 0.292648
+    },
+    {
+     "id": "gundabad-opportunist",
+     "name": "Gundabad Opportunist",
+     "mana_cost": "{3}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/b/c/bc4a60b8-a5bb-4dbf-8d48-95caf757eac3.jpg?1785497118",
+     "type_line": "Creature — Goblin Rogue",
+     "rarity": "common",
+     "model_probability": 0.071313
+    },
+    {
+     "id": "island",
+     "name": "Island",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/c/6/c6aa89a8-3584-4906-b9a9-41ef2f021f8e.jpg?1785323353",
+     "type_line": "Basic Land — Island",
+     "rarity": "common",
+     "model_probability": 0.001637
+    },
+    {
+     "id": "mirkwood-meditator",
+     "name": "Mirkwood Meditator",
+     "mana_cost": "{2}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/a/d/ad7ed4e6-3fe2-40f1-909b-a03b2a3c941a.jpg?1785497064",
+     "type_line": "Creature — Elf Druid",
+     "rarity": "common",
+     "model_probability": 0.002252
+    },
+    {
+     "id": "moment-of-glory",
+     "name": "Moment of Glory",
+     "mana_cost": "{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/0/a/0a6a6ff0-b1cd-4b06-bd31-612690094e0e.jpg?1785497012",
+     "type_line": "Sorcery",
+     "rarity": "common",
+     "model_probability": 0.001065
+    },
+    {
+     "id": "ordinary-bear",
+     "name": "Ordinary Bear",
+     "mana_cost": "{3}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/0/f/0feb9817-56e1-465a-851c-b2fe202aa8ae.jpg?1785323277",
+     "type_line": "Creature — Bear",
+     "rarity": "common",
+     "model_probability": 0.013457
+    },
+    {
+     "id": "patient-instructor",
+     "name": "Patient Instructor",
+     "mana_cost": "{2}{W/U}",
+     "image_url": "https://cards.scryfall.io/normal/front/e/4/e4800508-8bb9-41bb-8712-b55fba7a80a5.jpg?1785323310",
+     "type_line": "Creature — Human Citizen",
+     "rarity": "common",
+     "model_probability": 0.153449
+    },
+    {
+     "id": "ravening-warg",
+     "name": "Ravening Warg",
+     "mana_cost": "{1}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/e/a/ea7b5052-b343-466d-879e-2a211657ef0a.jpg?1785497096",
+     "type_line": "Creature — Wolf",
+     "rarity": "common",
+     "model_probability": 0.25059
+    },
+    {
+     "id": "tidings-of-war",
+     "name": "Tidings of War",
+     "mana_cost": "{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/3/8/38c16a0a-375e-48cb-9720-dbbc08c603ae.jpg?1785497148",
+     "type_line": "Sorcery",
+     "rarity": "common",
+     "model_probability": 0.048922
+    }
+   ],
+   "historical_pick_id": "gollum-silent-slinker"
+  },
+  {
+   "item_id": "3538ff56b4f2",
+   "set_id": "msh",
+   "set_name": "Marvel Super Heroes",
+   "pick_number": 2,
+   "prior_picks": [
+    {
+     "id": "jennifer-walters",
+     "name": "Jennifer Walters",
+     "mana_cost": "{1}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/1/61237530-ad49-469c-a952-67c92315708e.jpg?1783902978",
+     "type_line": "Legendary Creature — Human Advisor Hero",
+     "rarity": "mythic"
+    }
+   ],
+   "candidates": [
+    {
+     "id": "agent-maria-hill",
+     "name": "Agent Maria Hill",
+     "mana_cost": "{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/9/e/9e327c67-1cf1-4d82-903c-b41c8e7cf747.jpg?1783902980",
+     "type_line": "Legendary Creature — Human Spy Hero",
+     "rarity": "uncommon",
+     "model_probability": 0.365609
+    },
+    {
+     "id": "atlantean-cavalry",
+     "name": "Atlantean Cavalry",
+     "mana_cost": "{2}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/1/3/1319bf54-8705-4cc4-8d08-40f05fd09837.jpg?1783902961",
+     "type_line": "Creature — Merfolk Soldier",
+     "rarity": "common",
+     "model_probability": 0.001155
+    },
+    {
+     "id": "blazing-crescendo",
+     "name": "Blazing Crescendo",
+     "mana_cost": "{1}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/8/4/8447c3d6-8c65-4d3c-81c4-609801602d06.jpg?1783902932",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.001188
+    },
+    {
+     "id": "hellcat-undying-vigilante",
+     "name": "Hellcat, Undying Vigilante",
+     "mana_cost": "{G}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/d/7/d7922c5f-d6ee-4b62-a537-3be5aa280e10.jpg?1783902917",
+     "type_line": "Legendary Creature — Human Hero",
+     "rarity": "uncommon",
+     "model_probability": 0.028366
+    },
+    {
+     "id": "hero-in-training",
+     "name": "Hero in Training",
+     "mana_cost": "{2}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/1/0/105a937b-289c-47b5-96a4-654c697bbb7d.jpg?1783902973",
+     "type_line": "Creature — Human Hero",
+     "rarity": "common",
+     "model_probability": 0.515414
+    },
+    {
+     "id": "ninja-of-the-hand",
+     "name": "Ninja of the Hand",
+     "mana_cost": "{2}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/b/6b8116d8-2cc6-449b-a8b4-8a5166553497.jpg?1783902939",
+     "type_line": "Creature — Human Ninja Villain",
+     "rarity": "common",
+     "model_probability": 0.002696
+    },
+    {
+     "id": "pet-avengers",
+     "name": "Pet Avengers",
+     "mana_cost": "{3}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/1/0/108a0b92-2134-4776-a2f7-da92050f1b21.jpg?1783902915",
+     "type_line": "Creature — Dragon Cat Dog Bird Frog Hero",
+     "rarity": "common",
+     "model_probability": 0.014789
+    },
+    {
+     "id": "project-deathlok-soldier",
+     "name": "Project Deathlok Soldier",
+     "mana_cost": "{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/5/c/5c21a120-4ec7-46ec-974a-2204edb92abb.jpg?1783902940",
+     "type_line": "Artifact Creature — Zombie Soldier",
+     "rarity": "common",
+     "model_probability": 0.001172
+    },
+    {
+     "id": "robot-domination",
+     "name": "Robot Domination",
+     "mana_cost": "{3}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/b/2/b26bb968-6612-43fe-9147-a3d4786cbc20.jpg?1783902938",
+     "type_line": "Enchantment — Plan",
+     "rarity": "uncommon",
+     "model_probability": 0.017189
+    },
+    {
+     "id": "ronin-shadow-stalker",
+     "name": "Ronin, Shadow Stalker",
+     "mana_cost": "{2}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/7/f74b9794-946e-4ddc-93b2-5a321fc51fd0.jpg?1783902939",
+     "type_line": "Legendary Creature — Human Rogue Hero",
+     "rarity": "uncommon",
+     "model_probability": 0.022527
+    },
+    {
+     "id": "serpent-specialist",
+     "name": "Serpent Specialist",
+     "mana_cost": "{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/7/2/72727c2a-08a9-47bc-a5eb-cda52e21684b.jpg?1783902912",
+     "type_line": "Creature — Human Snake Villain",
+     "rarity": "common",
+     "model_probability": 0.005121
+    },
+    {
+     "id": "stark-industries",
+     "name": "Stark Industries",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/f/e/fe3609d8-71a2-49d9-a3fa-25e0906a1a0e.jpg?1783902882",
+     "type_line": "Land",
+     "rarity": "common",
+     "model_probability": 0.011905
+    },
+    {
+     "id": "worlds-within-worlds",
+     "name": "Worlds Within Worlds",
+     "mana_cost": "{5}{G}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/7/4765e39c-cbf2-4605-9bf1-3baad7d92cfb.jpg?1783902892",
+     "type_line": "Sorcery",
+     "rarity": "rare",
+     "model_probability": 0.012869
+    }
+   ],
+   "historical_pick_id": "hero-in-training"
+  },
+  {
+   "item_id": "bac480552b4c",
+   "set_id": "hob",
+   "set_name": "The Hobbit",
+   "pick_number": 4,
+   "prior_picks": [
+    {
+     "id": "nighthowl-pursuer",
+     "name": "Nighthowl Pursuer",
+     "mana_cost": "{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/d/3/d3cbe830-7e95-4019-89c4-cfb36bcf00f8.jpg?1784894860",
+     "type_line": "Creature — Wolf",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "bombur-gentle-dreamer",
+     "name": "Bombur, Gentle Dreamer",
+     "mana_cost": "{2}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/3/63c317e7-432c-4817-8db4-3670a1d84be3.jpg?1785496185",
+     "type_line": "Legendary Creature — Dwarf Bard",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "nighthowl-pursuer",
+     "name": "Nighthowl Pursuer",
+     "mana_cost": "{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/d/3/d3cbe830-7e95-4019-89c4-cfb36bcf00f8.jpg?1784894860",
+     "type_line": "Creature — Wolf",
+     "rarity": "uncommon"
+    }
+   ],
+   "candidates": [
+    {
+     "id": "front-porch-sentries",
+     "name": "Front Porch Sentries",
+     "mana_cost": "{1}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/0/7/07bfc803-e11b-47ab-9f25-0ace7e174200.jpg?1785496282",
+     "type_line": "Creature — Goblin Soldier",
+     "rarity": "common",
+     "model_probability": 0.045864
+    },
+    {
+     "id": "gandalf-wandering-wizard",
+     "name": "Gandalf, Wandering Wizard",
+     "mana_cost": "{4}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/1/f/1f8403a2-849c-4a59-b0ed-c8803995028d.jpg?1785496472",
+     "type_line": "Legendary Creature — Avatar Wizard",
+     "rarity": "common",
+     "model_probability": 0.000649
+    },
+    {
+     "id": "giant-s-boulder",
+     "name": "Giant's Boulder",
+     "mana_cost": "{1}",
+     "image_url": "https://cards.scryfall.io/normal/front/c/e/ce254758-c928-4b43-a952-13fac1845668.jpg?1785497186",
+     "type_line": "Artifact",
+     "rarity": "common",
+     "model_probability": 0.003129
+    },
+    {
+     "id": "iron-hills",
+     "name": "Iron Hills",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/7/8/78045c43-5cbe-48ff-837d-e7c6baac2937.jpg?1785323594",
+     "type_line": "Land",
+     "rarity": "common",
+     "model_probability": 0.012041
+    },
+    {
+     "id": "misty-mountains-raider",
+     "name": "Misty Mountains Raider",
+     "mana_cost": "{4}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/d/6dff14cd-b60b-48f4-9d9f-c9019b55df4c.jpg?1785152178",
+     "type_line": "Creature — Goblin Soldier",
+     "rarity": "uncommon",
+     "model_probability": 0.258525
+    },
+    {
+     "id": "nighthowl-pursuer",
+     "name": "Nighthowl Pursuer",
+     "mana_cost": "{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/d/3/d3cbe830-7e95-4019-89c4-cfb36bcf00f8.jpg?1784894860",
+     "type_line": "Creature — Wolf",
+     "rarity": "uncommon",
+     "model_probability": 0.229601
+    },
+    {
+     "id": "nori-teller-of-tales",
+     "name": "Nori, Teller of Tales",
+     "mana_cost": "{1}{R/W}",
+     "image_url": "https://cards.scryfall.io/normal/front/b/0/b05adb48-980c-49a0-9ce6-7c7f3f20715d.jpg?1785323303",
+     "type_line": "Legendary Creature — Dwarf Bard",
+     "rarity": "common",
+     "model_probability": 0.020635
+    },
+    {
+     "id": "patient-instructor",
+     "name": "Patient Instructor",
+     "mana_cost": "{2}{W/U}",
+     "image_url": "https://cards.scryfall.io/normal/front/e/4/e4800508-8bb9-41bb-8712-b55fba7a80a5.jpg?1785323310",
+     "type_line": "Creature — Human Citizen",
+     "rarity": "common",
+     "model_probability": 0.093052
+    },
+    {
+     "id": "quarrel",
+     "name": "Quarrel",
+     "mana_cost": "{1}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/5/9/5900a0b4-aa89-4019-94c9-7e9ea3b4792e.jpg?1785496166",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.041675
+    },
+    {
+     "id": "stir-up-trouble",
+     "name": "Stir Up Trouble",
+     "mana_cost": "{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/d/fd145e3a-c889-4390-accb-863dbcc845ce.jpg?1785497107",
+     "type_line": "Sorcery",
+     "rarity": "common",
+     "model_probability": 0.129312
+    },
+    {
+     "id": "thranduil-sindarin-liege",
+     "name": "Thranduil, Sindarin Liege",
+     "mana_cost": "{2}{G/U}{G/U}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/8/481870ee-d1f7-421b-86e1-570ea933bbbc.jpg?1785412747",
+     "type_line": "Legendary Creature — Elf Noble",
+     "rarity": "uncommon",
+     "model_probability": 0.165516
+    }
+   ],
+   "historical_pick_id": "nighthowl-pursuer"
+  },
+  {
+   "item_id": "f35f4101fda7",
+   "set_id": "hob",
+   "set_name": "The Hobbit",
+   "pick_number": 7,
+   "prior_picks": [
+    {
+     "id": "celebrate-the-mountain-king",
+     "name": "Celebrate the Mountain-king",
+     "mana_cost": "{3}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/2/42fbd61d-e1a6-465d-b1a3-f5ee0869d3af.jpg?1785496910",
+     "type_line": "Enchantment",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "bothersome-noisemaker",
+     "name": "Bothersome Noisemaker",
+     "mana_cost": "{1}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/c/b/cb25b11a-6bf5-4a9a-b60f-d4dcac3816d6.jpg?1784894881",
+     "type_line": "Creature — Goblin Bard",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "crude-bent-blade",
+     "name": "Crude Bent Blade",
+     "mana_cost": "{2}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/a/fa8fd3c4-bd00-485d-80b1-2b67f5786fce.jpg?1785496297",
+     "type_line": "Artifact — Equipment",
+     "rarity": "common"
+    },
+    {
+     "id": "crude-bent-blade",
+     "name": "Crude Bent Blade",
+     "mana_cost": "{2}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/a/fa8fd3c4-bd00-485d-80b1-2b67f5786fce.jpg?1785496297",
+     "type_line": "Artifact — Equipment",
+     "rarity": "common"
+    },
+    {
+     "id": "ragged-short-spear",
+     "name": "Ragged Short Spear",
+     "mana_cost": "{1}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/7/b/7bf81a8b-52ad-49f5-a3d4-22613cad3a3d.jpg?1785497128",
+     "type_line": "Artifact — Equipment",
+     "rarity": "common"
+    },
+    {
+     "id": "stony-voiced-goblins",
+     "name": "Stony-Voiced Goblins",
+     "mana_cost": "{1}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/f/6fcc3699-b475-4612-884d-81bd4f21e9c1.jpg?1785497106",
+     "type_line": "Creature — Goblin Bard",
+     "rarity": "common"
+    }
+   ],
+   "candidates": [
+    {
+     "id": "bolg-of-the-north",
+     "name": "Bolg of the North",
+     "mana_cost": "{3}{B}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/7/b/7b2d2a7f-88e0-45a9-8579-a6736bcd66eb.jpg?1784377021",
+     "type_line": "Legendary Creature — Goblin Soldier",
+     "rarity": "uncommon",
+     "model_probability": 0.429901
+    },
+    {
+     "id": "forest",
+     "name": "Forest",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/c/3/c3e84b42-5423-4d4d-b8fc-cfbb2c53a4ca.jpg?1785323365",
+     "type_line": "Basic Land — Forest",
+     "rarity": "common",
+     "model_probability": 0.005046
+    },
+    {
+     "id": "hobbit-hole",
+     "name": "Hobbit Hole",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/0/3/0365c439-30bf-4d32-a791-166751bdb996.jpg?1785323332",
+     "type_line": "Land",
+     "rarity": "common",
+     "model_probability": 0.263018
+    },
+    {
+     "id": "iron-hills-stalwart",
+     "name": "Iron Hills Stalwart",
+     "mana_cost": "{4}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/6/46daa9ac-0ac7-4df9-b9d2-e03ab5b56c72.jpg?1785497126",
+     "type_line": "Creature — Dwarf Warrior",
+     "rarity": "common",
+     "model_probability": 0.022846
+    },
+    {
+     "id": "lake-town-mariners",
+     "name": "Lake-town Mariners",
+     "mana_cost": "{4}{U}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/2/4202a678-a5f4-47f9-9c18-e88ab9ad20a4.jpg?1785237929",
+     "type_line": "Creature — Human Citizen",
+     "rarity": "uncommon",
+     "model_probability": 0.018176
+    },
+    {
+     "id": "nasty-little-rabbit",
+     "name": "Nasty Little Rabbit",
+     "mana_cost": "{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/9/6/96bc7d25-2828-478a-8fe5-a1f4ede8c9c0.jpg?1785324620",
+     "type_line": "Creature — Rabbit",
+     "rarity": "uncommon",
+     "model_probability": 0.164096
+    },
+    {
+     "id": "well-worn-spatula",
+     "name": "Well-Worn Spatula",
+     "mana_cost": "{1}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/5/659b687f-4068-496f-81b2-7b606bf07ec1.jpg?1785496409",
+     "type_line": "Artifact — Equipment",
+     "rarity": "common",
+     "model_probability": 0.018881
+    },
+    {
+     "id": "wizard-s-staff",
+     "name": "Wizard's Staff",
+     "mana_cost": "{1}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/0/d/0de529a7-bdc5-4581-a169-1ad123bc099a.jpg?1785152406",
+     "type_line": "Artifact — Equipment",
+     "rarity": "rare",
+     "model_probability": 0.078035
+    }
+   ],
+   "historical_pick_id": "bolg-of-the-north"
+  },
+  {
+   "item_id": "23f5e384afa6",
+   "set_id": "msh",
+   "set_name": "Marvel Super Heroes",
+   "pick_number": 2,
+   "prior_picks": [
+    {
+     "id": "black-widow-super-spy",
+     "name": "Black Widow, Super Spy",
+     "mana_cost": "{1}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/3/63ce0909-7d7d-410d-ab6c-c87fa3e23877.jpg?1783902946",
+     "type_line": "Legendary Creature — Human Spy Hero",
+     "rarity": "mythic"
+    }
+   ],
+   "candidates": [
+    {
+     "id": "crowd-of-true-believers",
+     "name": "Crowd of True Believers",
+     "mana_cost": "{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/b/4b2fffb8-d538-4772-8fbc-9bec3b9c4d9c.jpg?1783902974",
+     "type_line": "Creature — Human Citizen",
+     "rarity": "common",
+     "model_probability": 0.015098
+    },
+    {
+     "id": "grim-reaper-lethal-legionnaire",
+     "name": "Grim Reaper, Lethal Legionnaire",
+     "mana_cost": "{3}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/b/4b1cedfe-4712-4602-a8a8-112bd54c9938.jpg?1783902943",
+     "type_line": "Legendary Creature — Human Villain",
+     "rarity": "uncommon",
+     "model_probability": 0.0394
+    },
+    {
+     "id": "guerrilla-gorilla",
+     "name": "Guerrilla Gorilla",
+     "mana_cost": "{1}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/a/f/af6bc9d2-5783-489a-8963-af65f54f4f17.jpg?1783902918",
+     "type_line": "Creature — Ape Soldier Hero",
+     "rarity": "common",
+     "model_probability": 0.012786
+    },
+    {
+     "id": "heroic-feast",
+     "name": "Heroic Feast",
+     "mana_cost": "{2}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/3/2/32d05c3d-cf03-492e-a956-2e77c36e36c4.jpg?1783902917",
+     "type_line": "Enchantment",
+     "rarity": "rare",
+     "model_probability": 0.176551
+    },
+    {
+     "id": "hire-a-crew",
+     "name": "Hire a Crew",
+     "mana_cost": "{2}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/5/0/50a6aa80-79a3-46f3-9cc1-5bf663b64976.jpg?1783902933",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.003191
+    },
+    {
+     "id": "hour-of-defeat",
+     "name": "Hour of Defeat",
+     "mana_cost": "{3}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/9/e/9e0034dd-396e-46af-b931-0daa25da4406.jpg?1783902942",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.365074
+    },
+    {
+     "id": "kree-sentinel",
+     "name": "Kree Sentinel",
+     "mana_cost": "{4}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/b/a/ba5e441d-d036-4080-9571-6cf76df7b452.jpg?1783902928",
+     "type_line": "Artifact Creature — Kree Robot Villain",
+     "rarity": "common",
+     "model_probability": 0.008744
+    },
+    {
+     "id": "mockingbird-ace-agent",
+     "name": "Mockingbird, Ace Agent",
+     "mana_cost": "{3}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/0/f/0f5701ac-ec30-4fb1-bd71-4bac4693c075.jpg?1783902972",
+     "type_line": "Legendary Creature — Human Spy Hero",
+     "rarity": "uncommon",
+     "model_probability": 0.035831
+    },
+    {
+     "id": "pym-technologies",
+     "name": "Pym Technologies",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/1/d/1de583ce-e805-45f1-907f-198bc82fd3b5.jpg?1783902882",
+     "type_line": "Land",
+     "rarity": "common",
+     "model_probability": 0.009801
+    },
+    {
+     "id": "quicksilver-brash-blur",
+     "name": "Quicksilver, Brash Blur",
+     "mana_cost": "{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/2/d/2d5819ca-165d-4f4c-9500-3ac206994880.jpg?1783902925",
+     "type_line": "Legendary Creature — Mutant Hero",
+     "rarity": "rare",
+     "model_probability": 0.031479
+    },
+    {
+     "id": "stolen-stark-tech",
+     "name": "Stolen Stark Tech",
+     "mana_cost": "{1}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/d/b/db4557ad-4141-4dae-870e-a587506f4914.jpg?1783902937",
+     "type_line": "Artifact — Equipment",
+     "rarity": "common",
+     "model_probability": 0.013499
+    },
+    {
+     "id": "the-thing-ben-grimm",
+     "name": "The Thing, Ben Grimm",
+     "mana_cost": "{5}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/3/f/3f1933a8-046f-471a-afcf-cfb08ca0d239.jpg?1783902911",
+     "type_line": "Legendary Creature — Human Hero",
+     "rarity": "uncommon",
+     "model_probability": 0.026062
+    },
+    {
+     "id": "we-say-thee-nay",
+     "name": "We Say Thee Nay!",
+     "mana_cost": "{1}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/1/3/13b70321-75bd-4d44-b9f6-5f062a5dda0f.jpg?1783902948",
+     "type_line": "Instant — Arcane",
+     "rarity": "common",
+     "model_probability": 0.262482
+    }
+   ],
+   "historical_pick_id": "hour-of-defeat"
+  },
+  {
+   "item_id": "f583f8deb2ce",
+   "set_id": "msh",
+   "set_name": "Marvel Super Heroes",
+   "pick_number": 8,
+   "prior_picks": [
+    {
+     "id": "loki-god-of-mischief",
+     "name": "Loki, God of Mischief",
+     "mana_cost": "{1}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/2/3/236c437f-ee9d-4145-a4db-b665908089cf.jpg?1783902955",
+     "type_line": "Legendary Creature — God Sorcerer Villain",
+     "rarity": "rare"
+    },
+    {
+     "id": "she-hulk-jade-defender",
+     "name": "She-Hulk, Jade Defender",
+     "mana_cost": "{3}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/d/2/d22a8d02-023c-4f71-a771-16b5aa2a05d7.jpg?1783902911",
+     "type_line": "Legendary Creature — Gamma Hero",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "agent-maria-hill",
+     "name": "Agent Maria Hill",
+     "mana_cost": "{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/9/e/9e327c67-1cf1-4d82-903c-b41c8e7cf747.jpg?1783902980",
+     "type_line": "Legendary Creature — Human Spy Hero",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "surveillance-room",
+     "name": "Surveillance Room",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/8/f/8fb51fbb-ab7f-4484-a3c9-dc50cb6f2756.jpg?1783902881",
+     "type_line": "Land",
+     "rarity": "common"
+    },
+    {
+     "id": "patriot-shield-wielder",
+     "name": "Patriot, Shield Wielder",
+     "mana_cost": "{1}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/1/4/1467d7c9-00d8-43f1-b4e7-a279d2b10503.jpg?1783902968",
+     "type_line": "Legendary Creature — Human Hero",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "s-h-i-e-l-d-spy-kit",
+     "name": "S.H.I.E.L.D. Spy Kit",
+     "mana_cost": "{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/9/4938e23f-b5da-493b-9904-af61a3733ba0.jpg?1783902967",
+     "type_line": "Artifact — Equipment",
+     "rarity": "common"
+    },
+    {
+     "id": "murdock-s-crusade",
+     "name": "Murdock's Crusade",
+     "mana_cost": "{1}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/9/8/98df64ca-39c3-47e6-8143-4106c8e9cf59.jpg?1783902970",
+     "type_line": "Sorcery",
+     "rarity": "common"
+    }
+   ],
+   "candidates": [
+    {
+     "id": "evil-s-thrall",
+     "name": "Evil's Thrall",
+     "mana_cost": "{2}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/3/1/310e30cd-b8c3-40ea-9d61-57c5c5fc2a0b.jpg?1783902932",
+     "type_line": "Sorcery",
+     "rarity": "uncommon",
+     "model_probability": 0.010874
+    },
+    {
+     "id": "helicarrier-strike",
+     "name": "Helicarrier Strike",
+     "mana_cost": "{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/e/6e518842-ce44-4af2-8f38-89869828294a.jpg?1783902975",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.594991
+    },
+    {
+     "id": "hire-a-crew",
+     "name": "Hire a Crew",
+     "mana_cost": "{2}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/5/0/50a6aa80-79a3-46f3-9cc1-5bf663b64976.jpg?1783902933",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.010597
+    },
+    {
+     "id": "mountain",
+     "name": "Mountain",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/4/b/4bdbae27-9a55-485f-a1fc-3fa988184e9d.jpg?1783902876",
+     "type_line": "Basic Land — Mountain",
+     "rarity": "common",
+     "model_probability": 0.001939
+    },
+    {
+     "id": "pet-avengers",
+     "name": "Pet Avengers",
+     "mana_cost": "{3}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/1/0/108a0b92-2134-4776-a2f7-da92050f1b21.jpg?1783902915",
+     "type_line": "Creature — Dragon Cat Dog Bird Frog Hero",
+     "rarity": "common",
+     "model_probability": 0.298524
+    },
+    {
+     "id": "roxxon-brutes",
+     "name": "Roxxon Brutes",
+     "mana_cost": "{4}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/6/66550490-74e1-4bf1-8741-1266dfab3a03.jpg?1783902938",
+     "type_line": "Creature — Human Berserker Villain",
+     "rarity": "common",
+     "model_probability": 0.064181
+    },
+    {
+     "id": "vibranium-energy-daggers",
+     "name": "Vibranium Energy Daggers",
+     "mana_cost": "{1}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/f/4fe5952d-f50f-443a-b960-657fc4bc1965.jpg?1783902888",
+     "type_line": "Artifact — Equipment",
+     "rarity": "common",
+     "model_probability": 0.018893
+    }
+   ],
+   "historical_pick_id": "helicarrier-strike"
+  },
+  {
+   "item_id": "8c4a64086460",
+   "set_id": "hob",
+   "set_name": "The Hobbit",
+   "pick_number": 4,
+   "prior_picks": [
+    {
+     "id": "the-arkenstone",
+     "name": "The Arkenstone",
+     "mana_cost": "{5}",
+     "image_url": "https://cards.scryfall.io/normal/front/a/5/a56a88ba-fcfa-4b56-bdae-a080b297b871.jpg?1783902783",
+     "type_line": "Legendary Artifact",
+     "rarity": "mythic"
+    },
+    {
+     "id": "desolation-prowler",
+     "name": "Desolation Prowler",
+     "mana_cost": "{1}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/3/63c87009-ff1b-44b9-88b1-e26219094c67.jpg?1785237955",
+     "type_line": "Creature — Wolf",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "desolation-prowler",
+     "name": "Desolation Prowler",
+     "mana_cost": "{1}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/3/63c87009-ff1b-44b9-88b1-e26219094c67.jpg?1785237955",
+     "type_line": "Creature — Wolf",
+     "rarity": "uncommon"
+    }
+   ],
+   "candidates": [
+    {
+     "id": "confusticate-and-bebother",
+     "name": "Confusticate and Bebother",
+     "mana_cost": "{2}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/9/d/9de48690-e5ae-495a-addf-305f1db7ec21.jpg?1785496428",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.031144
+    },
+    {
+     "id": "duskwatch-hunter",
+     "name": "Duskwatch Hunter",
+     "mana_cost": "{2}{B/G}",
+     "image_url": "https://cards.scryfall.io/normal/front/3/6/3685c783-d837-4466-a960-ab3098db64c3.jpg?1785323286",
+     "type_line": "Creature — Wolf",
+     "rarity": "common",
+     "model_probability": 0.210104
+    },
+    {
+     "id": "d-in-lord-of-the-iron-hills",
+     "name": "Dáin, Lord of the Iron Hills",
+     "mana_cost": "{1}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/9/9/99d27749-d16c-45e9-accc-6a01351c17f9.jpg?1785496921",
+     "type_line": "Legendary Creature — Dwarf Noble",
+     "rarity": "uncommon",
+     "model_probability": 0.132284
+    },
+    {
+     "id": "elvenking-s-harper",
+     "name": "Elvenking's Harper",
+     "mana_cost": "{1}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/9/c/9c50656d-c74a-4e90-9ef7-afa237682516.jpg?1785497043",
+     "type_line": "Creature — Elf Bard",
+     "rarity": "common",
+     "model_probability": 0.005253
+    },
+    {
+     "id": "esgaroth-garrison",
+     "name": "Esgaroth Garrison",
+     "mana_cost": "{4}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/5/7/573f67b0-6ce8-4857-a703-4a5728640736.jpg?1785496934",
+     "type_line": "Creature — Human Soldier",
+     "rarity": "common",
+     "model_probability": 0.012866
+    },
+    {
+     "id": "gathering-of-darkness",
+     "name": "Gathering of Darkness",
+     "mana_cost": "{3}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/2/c/2ce066be-e5ad-4b93-8245-1b5018990d03.jpg?1784733910",
+     "type_line": "Sorcery",
+     "rarity": "uncommon",
+     "model_probability": 0.395643
+    },
+    {
+     "id": "nori-teller-of-tales",
+     "name": "Nori, Teller of Tales",
+     "mana_cost": "{1}{R/W}",
+     "image_url": "https://cards.scryfall.io/normal/front/b/0/b05adb48-980c-49a0-9ce6-7c7f3f20715d.jpg?1785323303",
+     "type_line": "Legendary Creature — Dwarf Bard",
+     "rarity": "common",
+     "model_probability": 0.090529
+    },
+    {
+     "id": "ordinary-bear",
+     "name": "Ordinary Bear",
+     "mana_cost": "{3}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/0/f/0feb9817-56e1-465a-851c-b2fe202aa8ae.jpg?1785323277",
+     "type_line": "Creature — Bear",
+     "rarity": "common",
+     "model_probability": 0.013247
+    },
+    {
+     "id": "plains",
+     "name": "Plains",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/7/b/7b7c408b-8660-4db5-9a16-5003c11b4ac1.jpg?1785323349",
+     "type_line": "Basic Land — Plains",
+     "rarity": "common",
+     "model_probability": 0.011793
+    },
+    {
+     "id": "roll-roll-roll-roll",
+     "name": "Roll-Roll-Roll-Roll",
+     "mana_cost": "{2}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/a/2/a2e4099e-86bd-461f-87fa-7f7850ae7eec.jpg?1785152396",
+     "type_line": "Enchantment — Saga",
+     "rarity": "rare",
+     "model_probability": 0.093732
+    },
+    {
+     "id": "smaug-s-fury",
+     "name": "Smaug's Fury",
+     "mana_cost": "{1}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/a/1/a16f203a-785e-4c78-9410-fb9f8a0ffa01.jpg?1785497138",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.003405
+    }
+   ],
+   "historical_pick_id": "duskwatch-hunter"
+  },
+  {
+   "item_id": "58a43d6ad191",
+   "set_id": "sos",
+   "set_name": "Secrets of Strixhaven",
+   "pick_number": 8,
+   "prior_picks": [
+    {
+     "id": "snarl-song",
+     "name": "Snarl Song",
+     "mana_cost": "{5}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/c/fc4c7fa2-aebb-4636-9afd-f1010c923316.jpg?1783903655",
+     "type_line": "Sorcery",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "snarl-song",
+     "name": "Snarl Song",
+     "mana_cost": "{5}{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/c/fc4c7fa2-aebb-4636-9afd-f1010c923316.jpg?1783903655",
+     "type_line": "Sorcery",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "together-as-one",
+     "name": "Together as One",
+     "mana_cost": "{6}",
+     "image_url": "https://cards.scryfall.io/normal/front/a/c/ac2a8a66-e38c-42ab-83e1-d2d99ee48861.jpg?1783903712",
+     "type_line": "Sorcery",
+     "rarity": "rare"
+    },
+    {
+     "id": "forum-of-amity",
+     "name": "Forum of Amity",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/1/d/1de6c6cc-0c55-4997-8623-d7f796bd9ab8.jpg?1783903623",
+     "type_line": "Land",
+     "rarity": "common"
+    },
+    {
+     "id": "studious-first-year",
+     "name": "Studious First-Year",
+     "mana_cost": "{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/2/4/24f888dd-785c-4089-a89c-03f9080130ed.jpg?1783903652",
+     "type_line": "Creature — Bear Wizard",
+     "rarity": "common"
+    },
+    {
+     "id": "essence-scatter",
+     "name": "Essence Scatter",
+     "mana_cost": "{1}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/3/2/32840097-0531-4c43-b6a8-e76c17420b04.jpg?1783903696",
+     "type_line": "Instant",
+     "rarity": "common"
+    },
+    {
+     "id": "titan-s-grave",
+     "name": "Titan's Grave",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/a/9/a9ab41c8-3ee2-4676-9b8b-20c34d9f5f21.jpg?1783903615",
+     "type_line": "Land",
+     "rarity": "common"
+    }
+   ],
+   "candidates": [
+    {
+     "id": "banishing-betrayal",
+     "name": "Banishing Betrayal",
+     "mana_cost": "{1}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/1/a/1ae9d2f3-7a9f-433a-aa1f-14337ae6f9d4.jpg?1783903699",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.129396
+    },
+    {
+     "id": "brush-off",
+     "name": "Brush Off",
+     "mana_cost": "{2}{U}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/1/5/151eab82-d20f-433b-b3bb-1d44e2871d5c.jpg?1783903697",
+     "type_line": "Instant",
+     "rarity": "uncommon",
+     "model_probability": 0.329629
+    },
+    {
+     "id": "cheerful-osteomancer",
+     "name": "Cheerful Osteomancer",
+     "mana_cost": "{3}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/3/c/3c34660c-25e3-4ff5-9b2b-5554ded2bcc3.jpg?1783903683",
+     "type_line": "Creature — Orc Warlock",
+     "rarity": "common",
+     "model_probability": 0.026885
+    },
+    {
+     "id": "sneering-shadewriter",
+     "name": "Sneering Shadewriter",
+     "mana_cost": "{4}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/b/4b4c120e-abe9-4f11-a7e4-bc3f723da4b2.jpg?1783903674",
+     "type_line": "Creature — Vampire Warlock",
+     "rarity": "common",
+     "model_probability": 0.020465
+    },
+    {
+     "id": "spectacle-summit",
+     "name": "Spectacle Summit",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/a/0/a0a66f7b-eab4-45da-8895-c2c2c7eb05f8.jpg?1783903617",
+     "type_line": "Land",
+     "rarity": "common",
+     "model_probability": 0.341218
+    },
+    {
+     "id": "stadium-tidalmage",
+     "name": "Stadium Tidalmage",
+     "mana_cost": "{2}{U}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/a/6/a689289e-7141-4950-8a87-82e9bd6846fe.jpg?1783903632",
+     "type_line": "Creature — Djinn Sorcerer",
+     "rarity": "common",
+     "model_probability": 0.082979
+    },
+    {
+     "id": "stone-docent",
+     "name": "Stone Docent",
+     "mana_cost": "{1}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/c/2/c2abfffb-bf36-44af-9a27-6e109e4d77dd.jpg?1783903696",
+     "type_line": "Creature — Spirit Chimera",
+     "rarity": "common",
+     "model_probability": 0.069429
+    }
+   ],
+   "historical_pick_id": "banishing-betrayal"
+  },
+  {
+   "item_id": "02ee8f832575",
+   "set_id": "sos",
+   "set_name": "Secrets of Strixhaven",
+   "pick_number": 3,
+   "prior_picks": [
+    {
+     "id": "improvisation-capstone",
+     "name": "Improvisation Capstone",
+     "mana_cost": "{5}{R}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/d/0/d01fe6e9-49ee-4708-833e-75cd5a9f167c.jpg?1783903667",
+     "type_line": "Sorcery — Lesson",
+     "rarity": "mythic"
+    },
+    {
+     "id": "charging-strifeknight",
+     "name": "Charging Strifeknight",
+     "mana_cost": "{2}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/9/9/9940d992-1ba1-40ec-9b93-17d773452c4b.jpg?1783903672",
+     "type_line": "Creature — Spirit Knight",
+     "rarity": "uncommon"
+    }
+   ],
+   "candidates": [
+    {
+     "id": "arnyn-deathbloom-botanist",
+     "name": "Arnyn, Deathbloom Botanist",
+     "mana_cost": "{2}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/6/1/6168b472-0930-4db5-9920-407340b99050.jpg?1783903683",
+     "type_line": "Legendary Creature — Vampire Druid",
+     "rarity": "uncommon",
+     "model_probability": 0.010476
+    },
+    {
+     "id": "blazing-firesinger",
+     "name": "Blazing Firesinger",
+     "mana_cost": "{2}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/3/b/3ba971e7-0b7a-4750-896f-7cf063e66b2a.jpg?1783903672",
+     "type_line": "Creature — Dwarf Bard",
+     "rarity": "uncommon",
+     "model_probability": 0.018259
+    },
+    {
+     "id": "burst-lightning",
+     "name": "Burst Lightning",
+     "mana_cost": "{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/9/f98b402a-ecdb-432f-a050-65945c8c415d.jpg?1783903920",
+     "type_line": "Instant",
+     "rarity": "uncommon",
+     "model_probability": 0.408252
+    },
+    {
+     "id": "elemental-mascot",
+     "name": "Elemental Mascot",
+     "mana_cost": "{1}{U}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/c/5/c507eb1c-48e9-4d28-bb2d-71f2a9df9ab0.jpg?1783903646",
+     "type_line": "Creature — Elemental Bird",
+     "rarity": "common",
+     "model_probability": 0.020526
+    },
+    {
+     "id": "expressive-firedancer",
+     "name": "Expressive Firedancer",
+     "mana_cost": "{1}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/2/5/259b8c45-6241-4206-a34e-34c7f401f47b.jpg?1783903669",
+     "type_line": "Creature — Human Sorcerer",
+     "rarity": "common",
+     "model_probability": 0.026576
+    },
+    {
+     "id": "masterful-flourish",
+     "name": "Masterful Flourish",
+     "mana_cost": "{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/8/d/8d93d14d-7760-4af2-a237-2df326dd28d3.jpg?1783903678",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.002852
+    },
+    {
+     "id": "pterafractyl",
+     "name": "Pterafractyl",
+     "mana_cost": "{X}{G}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/e/c/ecd33152-e290-4505-addd-a8d08cefdddd.jpg?1783903635",
+     "type_line": "Creature — Dinosaur Fractal",
+     "rarity": "common",
+     "model_probability": 0.005883
+    },
+    {
+     "id": "quandrix-charm",
+     "name": "Quandrix Charm",
+     "mana_cost": "{G}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/3/1/318486e0-f255-40f5-8150-dc272eec9d7d.jpg?1783903634",
+     "type_line": "Instant",
+     "rarity": "uncommon",
+     "model_probability": 0.049059
+    },
+    {
+     "id": "spellbook-seeker",
+     "name": "Spellbook Seeker",
+     "mana_cost": "{3}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/c/c/cc44eaa4-59a4-419e-b1d1-d92f354ff588.jpg?1783903686",
+     "type_line": "Creature — Bird Wizard",
+     "rarity": "common",
+     "model_probability": 0.00061
+    },
+    {
+     "id": "swamp",
+     "name": "Swamp",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/5/1/51fe930f-2b5a-4b1e-9007-6ee74fb44715.jpg?1783903613",
+     "type_line": "Basic Land — Swamp",
+     "rarity": "common",
+     "model_probability": 0.000915
+    },
+    {
+     "id": "together-as-one",
+     "name": "Together as One",
+     "mana_cost": "{6}",
+     "image_url": "https://cards.scryfall.io/normal/front/a/c/ac2a8a66-e38c-42ab-83e1-d2d99ee48861.jpg?1783903712",
+     "type_line": "Sorcery",
+     "rarity": "rare",
+     "model_probability": 0.456036
+    },
+    {
+     "id": "ulna-alley-shopkeep",
+     "name": "Ulna Alley Shopkeep",
+     "mana_cost": "{2}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/c/2/c25e1ae5-f17c-4eee-98f1-5681981af31c.jpg?1783903673",
+     "type_line": "Creature — Goblin Warlock",
+     "rarity": "common",
+     "model_probability": 0.000554
+    }
+   ],
+   "historical_pick_id": "together-as-one"
+  },
+  {
+   "item_id": "9fa11253f3b2",
+   "set_id": "msh",
+   "set_name": "Marvel Super Heroes",
+   "pick_number": 6,
+   "prior_picks": [
+    {
+     "id": "web-up",
+     "name": "Web Up",
+     "mana_cost": "{2}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/9/a/9a1b057b-229c-4f65-ba4e-12dd342238de.jpg?1783902964",
+     "type_line": "Enchantment",
+     "rarity": "common"
+    },
+    {
+     "id": "hour-of-defeat",
+     "name": "Hour of Defeat",
+     "mana_cost": "{3}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/9/e/9e0034dd-396e-46af-b931-0daa25da4406.jpg?1783902942",
+     "type_line": "Instant",
+     "rarity": "common"
+    },
+    {
+     "id": "brave-brawler",
+     "name": "Brave Brawler",
+     "mana_cost": "{1}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/2/2/2242b5c3-42ef-4be0-a61f-65c93e56fcab.jpg?1783902978",
+     "type_line": "Creature — Human Warrior Hero",
+     "rarity": "common"
+    },
+    {
+     "id": "patriot-shield-wielder",
+     "name": "Patriot, Shield Wielder",
+     "mana_cost": "{1}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/1/4/1467d7c9-00d8-43f1-b4e7-a279d2b10503.jpg?1783902968",
+     "type_line": "Legendary Creature — Human Hero",
+     "rarity": "uncommon"
+    },
+    {
+     "id": "white-widow-free-agent",
+     "name": "White Widow, Free Agent",
+     "mana_cost": "{3}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/5/7/57da765f-7d87-42ac-9eb0-a49c296fbbf8.jpg?1783902963",
+     "type_line": "Legendary Creature — Human Hero Villain",
+     "rarity": "uncommon"
+    }
+   ],
+   "candidates": [
+    {
+     "id": "atlantis-attacks",
+     "name": "Atlantis Attacks",
+     "mana_cost": "{5}{U}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/0/40bc4380-055d-4913-93cb-280c9c1d1a87.jpg?1783902962",
+     "type_line": "Sorcery",
+     "rarity": "common",
+     "model_probability": 0.070044
+    },
+    {
+     "id": "death-to-our-enemies",
+     "name": "Death to Our Enemies",
+     "mana_cost": "{2}{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/2/f2a8f518-c0b5-4e15-aab2-49b5ef29fb41.jpg?1783902933",
+     "type_line": "Enchantment — Plan",
+     "rarity": "uncommon",
+     "model_probability": 0.015305
+    },
+    {
+     "id": "falcon-winged-wonder",
+     "name": "Falcon, Winged Wonder",
+     "mana_cost": "{4}{U}",
+     "image_url": "https://cards.scryfall.io/normal/front/8/d/8dc209ed-0d4c-4d0c-90e8-04cadc3d4c3d.jpg?1783902960",
+     "type_line": "Legendary Creature — Human Hero",
+     "rarity": "uncommon",
+     "model_probability": 0.273133
+    },
+    {
+     "id": "giant-growth",
+     "name": "Giant Growth",
+     "mana_cost": "{G}",
+     "image_url": "https://cards.scryfall.io/normal/front/f/d/fd1f95bf-48ea-455a-8a6c-0249b11c8900.jpg?1783902918",
+     "type_line": "Instant",
+     "rarity": "common",
+     "model_probability": 0.003168
+    },
+    {
+     "id": "s-h-i-e-l-d-spy-kit",
+     "name": "S.H.I.E.L.D. Spy Kit",
+     "mana_cost": "{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/4/9/4938e23f-b5da-493b-9904-af61a3733ba0.jpg?1783902967",
+     "type_line": "Artifact — Equipment",
+     "rarity": "common",
+     "model_probability": 0.23231
+    },
+    {
+     "id": "stark-industries-executive",
+     "name": "Stark Industries Executive",
+     "mana_cost": "{R}",
+     "image_url": "https://cards.scryfall.io/normal/front/7/0/709ffd07-706c-471f-b74d-4637afa11686.jpg?1783902924",
+     "type_line": "Creature — Human Advisor",
+     "rarity": "common",
+     "model_probability": 0.009106
+    },
+    {
+     "id": "subterranean-cavern",
+     "name": "Subterranean Cavern",
+     "mana_cost": "",
+     "image_url": "https://cards.scryfall.io/normal/front/0/3/038bf500-e23a-4d38-9312-db1909e20353.jpg?1783902881",
+     "type_line": "Land",
+     "rarity": "common",
+     "model_probability": 0.071995
+    },
+    {
+     "id": "super-villain-lockup",
+     "name": "Super Villain Lockup",
+     "mana_cost": "{1}{W}",
+     "image_url": "https://cards.scryfall.io/normal/front/1/a/1af5a1ca-3d11-45e3-ba12-c455c5a7fea1.jpg?1783902965",
+     "type_line": "Enchantment",
+     "rarity": "uncommon",
+     "model_probability": 0.319076
+    },
+    {
+     "id": "unliving-legionnaire",
+     "name": "Unliving Legionnaire",
+     "mana_cost": "{3}{B}",
+     "image_url": "https://cards.scryfall.io/normal/front/c/e/ce08f4bb-7da3-4199-8b90-fcdb29e84e98.jpg?1783902935",
+     "type_line": "Creature — Vampire Villain",
+     "rarity": "common",
+     "model_probability": 0.005862
+    }
+   ],
+   "historical_pick_id": "falcon-winged-wonder"
+  }
+ ]
+}
