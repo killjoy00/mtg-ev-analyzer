@@ -1,9 +1,9 @@
-import {RATINGS,ARMS,isRating,ratedCount,summarizeReview} from './puzzle-review-results.mjs?v=20261026-puzzle-review';
+import {RATINGS,ARMS,isRating,ratedCount,summarizeReview} from './puzzle-review-results.mjs?v=20261026-puzzle-review-v2';
 
 // Blinded owner review of puzzle selection. The review set is static and
 // public card data; the arm key is fetched only after every puzzle is rated.
 // Progress lives in this browser only, so results can be downloaded.
-export const REVIEW_VERSION='puzzle-review-v1';
+export const REVIEW_VERSION='puzzle-review-v2';
 const SET_URL=new URL(`./puzzle-review/${REVIEW_VERSION}-set.json`,import.meta.url);
 const KEY_URL=new URL(`./puzzle-review/${REVIEW_VERSION}-key.json`,import.meta.url);
 const esc=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
@@ -66,18 +66,31 @@ function progressMarkup(items,state) {
   </section>`;
 }
 
-const introMarkup=(total,pairs)=>`<header class="subpage-heading"><p class="subpage-kicker">Selection research</p><h1>Puzzle review</h1>
-  <p class="muted">Rate ${total} Pack One puzzles. In each of ${pairs} matched pairs, one puzzle was drawn the way today’s Daily draws it and one by the proposed rule, from the same set and pick. They are shuffled, and you only see which is which after rating all of them.</p></header>
+const introMarkup=(total,pairs,probes)=>`<header class="subpage-heading"><p class="subpage-kicker">Selection research</p><h1>Puzzle review</h1>
+  <p class="muted">Rate ${total} Pack One puzzles. ${pairs*2} of them are ${pairs} matched pairs: one puzzle drawn the way today’s Daily draws it and one by the proposed rule, from the same set and pick.${probes?` The other ${probes} test a separate land rule.`:''} They are shuffled, and you only see which is which after rating all of them.</p></header>
   <details class="subpage-section review-about"><summary>How this test works</summary>
   <p class="subpage-help"><strong>Today’s selector:</strong> any medium or hard puzzle at that pick, chosen at random.</p>
-  <p class="subpage-help"><strong>Proposed rule:</strong> at least two credible options (35% or more of the leader’s model support); from pick 4 on, the trophy pick must have made the trophy deck’s main deck; then the top quarter by the strongest credible card’s win rate, chosen at random.</p>
-  <p class="subpage-help"><strong>Pass:</strong> the proposed rule has at most half as many Dull or Broken puzzles, and loses at most ${Math.floor(pairs/4)} of the ${pairs} pairs. These criteria were fixed before any rating.</p>
-  <p class="subpage-help">Puzzles come from the checked-in corpus sample for The Hobbit, Marvel Super Heroes and Secrets of Strixhaven, with a fixed random seed. Progress is saved in this browser only.</p></details>`;
+  <p class="subpage-help"><strong>Proposed rule:</strong> at least two credible options (35% or more of the leader’s model support); from pick 4 on, the trophy pick must have made the trophy deck’s main deck; from pick 5 on, the trophy pick is not a land; then the top quarter by the strongest credible card’s win rate, chosen at random.</p>
+  ${probes?`<p class="subpage-help"><strong>Land test:</strong> ${probes} late picks (5–8) where the trophy pick is a land taken over a card in the top 20% of its set by win rate that strong players also rated. They show whether a land over a strong card makes a good late puzzle.</p>`:''}
+  <p class="subpage-help"><strong>Pass:</strong> the proposed rule has at most half as many Dull or Broken puzzles, and loses at most ${Math.floor(pairs/4)} of the ${pairs} pairs.${probes?` Allowing late lands taken over a strong card is worth adding only if at least ${Math.ceil(0.75*probes)} of the ${probes} land puzzles are rated Interesting or Fine.`:''} These criteria were fixed before any rating.</p>
+  <p class="subpage-help">Puzzles come from the checked-in corpus sample for The Hobbit, Marvel Super Heroes, Secrets of Strixhaven, Bloomburrow and Lorwyn Eclipsed, with a fixed random seed. None reuse a draft from the first review. Progress is saved in this browser only.</p></details>`;
 
-function resultsMarkup(summary,key,state) {
+function landProbeMarkup(probe,key,state,itemsById) {
+  if(!probe)return '';
+  const label=id=>RATINGS.find(r=>r.id===id)?.label||id;
+  const land=row=>{const item=itemsById.get(row.item);return item?.candidates.find(c=>c.id===item.historical_pick_id)?.name||'Unknown';};
+  return `<h3>Land test</h3>
+    <ul class="review-criteria"><li class="${probe.pass?'pass':'fail'}">Late land answers taken over a strong card, rated Interesting or Fine: ${probe.good} of ${probe.rows.length}. Needs ${probe.needed} or more.</li></ul>
+    <p class="subpage-help">${probe.pass?'Late land answers could be allowed when the land was taken over a strong card.':'Keep the simpler rule: no land answers from pick 5 on.'}</p>
+    <div class="scroll"><table class="review-pairs"><thead><tr><th>Puzzle</th><th>Rating</th><th>Land taken over</th></tr></thead><tbody>${probe.rows.map(row=>`<tr><th>${esc(row.set_id.toUpperCase())} P1P${esc(row.pick_number)}</th>
+      <td><strong>${esc(label(row.rating))}</strong>${state.ratings[row.item]?.note?`<small>Note: ${esc(state.ratings[row.item].note)}</small>`:''}</td>
+      <td>${esc(land(row))}<small>over ${key.items[row.item].passed_over.map(c=>`${esc(c.name)} (+${esc(c.gih_points)})`).join(', ')}</small></td></tr>`).join('')}</tbody></table></div>`;
+}
+
+function resultsMarkup(summary,key,state,itemsById) {
   const arms=['current','proposed'];
   const label=id=>RATINGS.find(r=>r.id===id)?.label||id;
-  const option=(item)=>`<small>${esc(item.band)} · strongest credible card ${item.stakes_gih_points==null?'unknown':`${item.stakes_gih_points>0?'+':''}${esc(item.stakes_gih_points)} pts`} · trophy pick ${item.trophy_in_main_deck?'made':'missed'} the main deck · ${esc(item.kind)}</small><small>${item.credible.map(c=>`${esc(c.name)} (${c.gih_points==null?'?':(c.gih_points>0?'+':'')+esc(c.gih_points)})`).join(', ')}</small>`;
+  const option=(item)=>`<small>${esc(item.band)} · strongest credible card ${item.stakes_gih_points==null?'unknown':`${item.stakes_gih_points>0?'+':''}${esc(item.stakes_gih_points)} pts`} · trophy pick ${item.trophy_in_main_deck?'made':'missed'} the main deck${item.trophy_is_land?' · land answer':''} · ${esc(item.kind)}</small><small>${item.credible.map(c=>`${esc(c.name)} (${c.gih_points==null?'?':(c.gih_points>0?'+':'')+esc(c.gih_points)})`).join(', ')}</small>`;
   const winner={proposed:'Proposed better',current:'Today better',tie:'Tie'};
   const {fewer_bad:bad,losses}=summary.criteria;
   return `<section class="subpage-section review-results" aria-labelledby="review-results-heading">
@@ -94,16 +107,22 @@ function resultsMarkup(summary,key,state) {
       <td><strong>${esc(label(p.current_rating))}</strong>${option(key.items[p.current])}${state.ratings[p.current]?.note?`<small>Note: ${esc(state.ratings[p.current].note)}</small>`:''}</td>
       <td><strong>${esc(label(p.proposed_rating))}</strong>${option(key.items[p.proposed])}${state.ratings[p.proposed]?.note?`<small>Note: ${esc(state.ratings[p.proposed].note)}</small>`:''}</td>
       <td>${winner[p.winner]}</td></tr>`).join('')}</tbody></table></div>
+    ${landProbeMarkup(summary.land_probe,key,state,itemsById)}
     <div class="actions"><button type="button" id="review-download">Download results</button><button type="button" class="secondary" id="review-reset">Start a new review</button></div>
   </section>`;
 }
 
+// The key's own `rating` is the support-ratio difficulty; keep it under its
+// own name so it never replaces the rater's rating.
+const exportItem=(key,id,rating)=>{const {rating:difficulty,...rest}=key.items[id];return {rating,difficulty_rating:difficulty,...rest};};
 export function resultsExport(state,summary,key) {
   return {version:REVIEW_VERSION,exported_at:new Date().toISOString(),seed:key.seed,rule:key.rule,
     ratings:Object.fromEntries(Object.entries(state.ratings).map(([id,r])=>[id,{rating:r.rating,note:r.note||''}])),
-    summary:{pass:summary.pass,criteria:summary.criteria,arms:summary.arms,wins:summary.wins,baseline_clean:summary.baseline_clean},
-    pairs:summary.pairs.map(p=>({pair_id:p.pair_id,set_id:p.set_id,pick_number:p.pick_number,current:{rating:p.current_rating,...key.items[p.current]},
-      proposed:{rating:p.proposed_rating,...key.items[p.proposed]},winner:p.winner}))};
+    summary:{pass:summary.pass,criteria:summary.criteria,arms:summary.arms,wins:summary.wins,baseline_clean:summary.baseline_clean,
+      ...(summary.land_probe?{land_probe:{good:summary.land_probe.good,needed:summary.land_probe.needed,pass:summary.land_probe.pass}}:{})},
+    pairs:summary.pairs.map(p=>({pair_id:p.pair_id,set_id:p.set_id,pick_number:p.pick_number,current:exportItem(key,p.current,p.current_rating),
+      proposed:exportItem(key,p.proposed,p.proposed_rating),winner:p.winner})),
+    ...(summary.land_probe?{land_probe:summary.land_probe.rows.map(r=>({probe_id:r.probe_id,set_id:r.set_id,pick_number:r.pick_number,...exportItem(key,r.item,r.rating)}))}:{})};
 }
 
 export async function renderPuzzleReview(root,{accountId=null,storage=globalThis.localStorage,fetcher=globalThis.fetch}={}) {
@@ -112,11 +131,11 @@ export async function renderPuzzleReview(root,{accountId=null,storage=globalThis
   if(!response.ok)throw Error('The puzzle review set could not be loaded.');
   const reviewSet=await response.json();
   if(reviewSet.version!==REVIEW_VERSION||!Array.isArray(reviewSet.items)||!reviewSet.items.length)throw Error('The puzzle review set is not the expected version.');
-  const items=reviewSet.items,state=loadState(storage,keyName);
+  const items=reviewSet.items,state=loadState(storage,keyName),itemsById=new Map(items.map(item=>[item.item_id,item]));
   state.index=Math.min(Math.max(0,Number(state.index)||0),items.length-1);
   let saving=saveState(storage,keyName,state),key=null;
   const persist=()=>{saving=saveState(storage,keyName,state);};
-  const pairCount=items.length/2;
+  const probeCount=Number(reviewSet.probes)||0,pairCount=Number(reviewSet.pairs)||(items.length-probeCount)/2;
   async function loadKey() {
     if(key)return key;
     const r=await fetcher(KEY_URL,{cache:'no-store'});
@@ -128,12 +147,12 @@ export async function renderPuzzleReview(root,{accountId=null,storage=globalThis
   async function draw() {
     const storageNote=saving?'':'<p class="note" role="alert">This browser is not saving progress. Finish in one sitting, then download the results.</p>';
     if(state.results_viewed_at) {
-      root.innerHTML=`<section class="puzzle-review">${introMarkup(items.length,pairCount)}${storageNote}<p role="status">Loading results…</p></section>`;
+      root.innerHTML=`<section class="puzzle-review">${introMarkup(items.length,pairCount,probeCount)}${storageNote}<p role="status">Loading results…</p></section>`;
       let summary;
       try {key=await loadKey();summary=summarizeReview(key,state.ratings);}
       catch(error) {root.querySelector('[role="status"]').textContent=error.message;return;}
       if(!summary.complete){state.results_viewed_at=null;persist();return draw();}
-      root.innerHTML=`<section class="puzzle-review">${introMarkup(items.length,pairCount)}${storageNote}${resultsMarkup(summary,key,state)}</section>`;
+      root.innerHTML=`<section class="puzzle-review">${introMarkup(items.length,pairCount,probeCount)}${storageNote}${resultsMarkup(summary,key,state,itemsById)}</section>`;
       root.querySelector('#review-download').onclick=()=>{
         const blob=new Blob([JSON.stringify(resultsExport(state,summary,key),null,1)],{type:'application/json'});
         const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`pack-one-${REVIEW_VERSION}-results.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
@@ -145,7 +164,7 @@ export async function renderPuzzleReview(root,{accountId=null,storage=globalThis
       return;
     }
     const item=items[state.index];
-    root.innerHTML=`<section class="puzzle-review">${introMarkup(items.length,pairCount)}${storageNote}${progressMarkup(items,state)}${puzzleMarkup(item,state,state.index+1,items.length)}<p id="review-status" role="status" aria-live="polite"></p></section>`;
+    root.innerHTML=`<section class="puzzle-review">${introMarkup(items.length,pairCount,probeCount)}${storageNote}${progressMarkup(items,state)}${puzzleMarkup(item,state,state.index+1,items.length)}<p id="review-status" role="status" aria-live="polite"></p></section>`;
     const go=index=>{state.index=index;persist();void draw();root.querySelector('#review-puzzle-heading')?.scrollIntoView?.({block:'start'});};
     root.querySelectorAll('[data-jump]').forEach(button=>button.onclick=()=>go(Number(button.dataset.jump)));
     root.querySelector('#review-prev').onclick=()=>go(state.index-1);
