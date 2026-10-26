@@ -234,18 +234,18 @@ function safeRedirect(value,{mobileOAuth=false}={}) {
 // active network instead of on every request.
 const QUOTA_STATE='buckets',LEGACY_QUOTA_KEYS=['request','request_burst','session'],QUOTA_CLEANUP_MS=660000;
 export class NetworkQuota {
-  constructor(state) {this.storage=state.storage;this.inflight=0;}
+  constructor(state) {this.storage=state.storage;this.inflight=0;this.cleanupInflight=0;}
   async fetch(request) {
     const kind=new URL(request.url).pathname;
     if(request.method!=='POST'||!['/request','/session','/session-only'].includes(kind))return response(400,'Invalid quota request.');
     const began=performance.now(),trace=traceId(request.headers.get(TRACE_HEADER));
     const metric={event:'quota_handler',trace,object_tag:traceId(request.headers.get('x-pack1-quota-tag')),
       attempt:Number(request.headers.get('x-pack1-quota-attempt'))===2?2:1,
-      concurrency:++this.inflight,location_source:'provider_metadata',get_ms:0,put_ms:0,
+      concurrency:++this.inflight,cleanup_inflight:this.cleanupInflight>0,location_source:'provider_metadata',get_ms:0,put_ms:0,
       alarm_get_ms:0,alarm_set_ms:0,transaction_ms:0,transaction_callbacks:0,
-      timing_version:2,durability_ms:0,durability_confirmed:false,phase:'transaction'};
+      timing_version:2,durability_ms:0,durability_confirmed:false,phase:'transaction',state_layout:'unread'};
     const timed=async(name,call)=>{const at=performance.now();try{return await call();}finally{metric[name]+=performance.now()-at;}};
-    if(trace)console.log(JSON.stringify({event:'quota_handler_start',trace,object_tag:metric.object_tag,attempt:metric.attempt,concurrency:metric.concurrency}));
+    if(trace)console.log(JSON.stringify({event:'quota_handler_start',trace,object_tag:metric.object_tag,attempt:metric.attempt,concurrency:metric.concurrency,cleanup_inflight:metric.cleanup_inflight}));
     try {
     const now=Date.now();
     // /session-only follows a charged /request and an origin refresh that
@@ -258,7 +258,12 @@ export class NetworkQuota {
       metric.transaction_callbacks++;
       // Counters persisted under the earlier one-row-per-bucket layout stay
       // authoritative until this network's first write in the single row.
-      const stored=await timed('get_ms',()=>tx.get(QUOTA_STATE))||Object.fromEntries(await timed('get_ms',()=>tx.get(LEGACY_QUOTA_KEYS)));
+      let stored=await timed('get_ms',()=>tx.get(QUOTA_STATE));
+      if(stored)metric.state_layout='current';
+      else {
+        stored=Object.fromEntries(await timed('get_ms',()=>tx.get(LEGACY_QUOTA_KEYS)));
+        metric.state_layout=Object.keys(stored).length?'legacy':'empty';
+      }
       const next={...stored},scopes=[];let retry=0;
       for(const [key,limit,period] of limits) {
         let row=stored[key];
@@ -291,16 +296,29 @@ export class NetworkQuota {
   }
   // The alarm is armed at a network's first request, not its last, so a window
   // may still be open when it fires. Deleting an open window would reset it.
-  async alarm() {
-    const began=performance.now(),metric={event:'quota_alarm',get_ms:0,set_alarm_ms:0,delete_all_ms:0};
+  async alarm(alarmInfo) {
+    const began=performance.now(),retry={
+      is_retry:typeof alarmInfo?.isRetry==='boolean'?alarmInfo.isRetry:null,
+      retry_count:Number.isSafeInteger(alarmInfo?.retryCount)&&alarmInfo.retryCount>=0&&alarmInfo.retryCount<=6?alarmInfo.retryCount:null,
+    },metric={event:'quota_alarm',...retry,timing_version:2,phase:'get',action:null,
+      request_concurrency:this.inflight,get_ms:0,set_alarm_ms:0,delete_all_ms:0,durability_ms:0,durability_confirmed:false,ok:false};
     const timed=async(name,call)=>{const at=performance.now();try{return await call();}finally{metric[name]=milliseconds(performance.now()-at);}};
+    const emit=value=>{try {console.log(JSON.stringify(value));}catch{/* Diagnostics cannot change cleanup or retry behavior. */}};
+    this.cleanupInflight++;
+    emit({event:'quota_alarm_start',...retry,timing_version:2,request_concurrency:metric.request_concurrency});
     try {
       const now=Date.now(),state=await timed('get_ms',()=>this.storage.get(QUOTA_STATE))||{};
-      if(Object.values(state).some(row=>row.until>now))await timed('set_alarm_ms',()=>this.storage.setAlarm(now+QUOTA_CLEANUP_MS));
+      metric.phase='write';metric.action=Object.values(state).some(row=>row.until>now)?'rearm':'clear';
+      if(metric.action==='rearm')await timed('set_alarm_ms',()=>this.storage.setAlarm(now+QUOTA_CLEANUP_MS));
       else await timed('delete_all_ms',()=>this.storage.deleteAll());
-      metric.ok=true;
+      // Cleanup writes can resolve into the same buffer as request debits.
+      // Observe their existing output-gate obligation before logging success.
+      metric.phase='durability';
+      emit({event:'quota_alarm_commit_wait',...retry,timing_version:2,action:metric.action});
+      await timed('durability_ms',()=>this.storage.sync());
+      metric.durability_confirmed=true;metric.phase='complete';metric.ok=true;
     } catch(error){Object.assign(metric,failureIndicators(error));metric.ok=false;throw error;}
-    finally {metric.duration_ms=milliseconds(performance.now()-began);console.log(JSON.stringify(metric));}
+    finally {this.cleanupInflight--;metric.duration_ms=milliseconds(performance.now()-began);emit(metric);}
   }
 }
 

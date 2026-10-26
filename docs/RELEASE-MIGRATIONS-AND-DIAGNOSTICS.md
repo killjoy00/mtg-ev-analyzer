@@ -67,6 +67,24 @@ Worker clocks advance only across I/O, so a zero timing is not proof of zero wor
 The storage API documents the distinction between buffered writes and
 [durable acknowledgement](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/#sync).
 
+Cleanup alarms also use timing version 2. Join `quota_alarm_start`,
+`quota_alarm_commit_wait` and `quota_alarm` using the provider's object and
+invocation metadata. Their fixed `action` is `clear` or `rearm`; their phase,
+durability confirmation and bounded runtime retry metadata distinguish cleanup
+work from durable acknowledgement. Logging success waits for `storage.sync()`;
+logging failures cannot change cleanup or the runtime's retry behavior. The
+alarm's `request_concurrency` snapshots active request handlers at entry; a
+request's `cleanup_inflight` marks an alarm still executing when it entered.
+These are local overlap indicators, not provider queue-depth measurements. The
+cleanup delay, active-window protection, deletion operation and output gates
+remain unchanged. A missing completion is not proof that cleanup did not run.
+
+Request records also classify the quota state observed by existing reads as
+`current`, `legacy`, `empty` or `unread`. This adds no reads or writes and exposes
+no bucket values. `empty` does not distinguish a new object from a previously
+cleared object by itself. Cleanup followed by a slow first write is a hypothesis
+to investigate, not proof that cleanup caused a provider allocation delay.
+
 Provider exceptions are reduced to fixed classifications, including SQLite
 allocation failure, storage reset, provider internal error and transport reset.
 The classification does not grant retry permission. Runtime termination can
