@@ -115,6 +115,11 @@ const errors={
   DEVICE_STILL_ATTACHED:['This device is still attached to another account. Sign out of that account first.',409],
   DEVICE_LIMIT:['You can register up to five devices. Disable an old device first.',409],
 };
+// The SQL adapter may retain this fixed domain code without retaining a
+// provider error body. Keep its allowlist tied to the existing UI contract.
+export function reminderDatabaseReason(message) {
+  return typeof message==='string'&&Object.hasOwn(errors,message)?message:null;
+}
 function domainError(code) {
   const [message,status]=errors[code]||['Reminder settings are temporarily unavailable.',503];
   return Object.assign(apiError(message,status),{code});

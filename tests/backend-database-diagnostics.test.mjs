@@ -4,6 +4,7 @@ import {inspect} from 'node:util';
 import {observedRoute,observedDatabaseCall} from '../worker/backend-diagnostics.mjs';
 import {query} from '../worker/growth-function.js';
 import {isUsernameConflict} from '../worker/username.mjs';
+import {reminderDatabaseReason} from '../worker/daily-reminders.mjs';
 import {gateway} from '../edge/gateway.mjs';
 import {TRACE_HEADER} from '../edge/private-diagnostics.mjs';
 
@@ -93,6 +94,24 @@ test('database errors do not copy response bodies or internal metadata into exce
  await assert.rejects(query('SELECT fixture'),error=>{
    assert.equal(error.pgCode,null);assert.doesNotMatch(inspect(error),/private arbitrary/);return true;
  });
+}));
+
+test('fixed SQL guard reasons and reminder domain codes survive without dynamic database text',async()=>fixture(async()=>{
+ const cases=[
+   ['Pick removal history is append-only',/append-only/],
+   ['Latest Set Daily on 2026-09-03 references unvalidated regular set private-fixture-set.',/unvalidated regular set/],
+   ...['REMINDER_INVALID_SCHEDULE','REMINDER_EMAIL_UNVERIFIED','REMINDER_EMAIL_SUPPRESSED','REMINDER_DEVICE_REQUIRED',
+     'ACCOUNT_DELETING','SESSION_EXPIRED','DEVICE_PROOF_REQUIRED','DEVICE_VERSION_CHANGED','DEVICE_STILL_ATTACHED','DEVICE_LIMIT'].map(code=>[code,new RegExp(code)]),
+ ];
+ for(const [message,expected] of cases) {
+   globalThis.fetch=async()=>Response.json({code:'P0001',message,detail:'private database detail'},{status:400});
+   await assert.rejects(query('SELECT fixture'),error=>{
+     assert.equal(error.pgCode,'P0001');assert.match(error.message,expected);
+     assert.doesNotMatch(inspect(error),/private database detail|private-fixture-set|2026-09-03/);
+     return true;
+   });
+ }
+ assert.equal(reminderDatabaseReason('REMINDER_EMAIL_UNVERIFIED: private details'),null);
 }));
 
 test('a reset or abort while reading a successful SQL response body never replays its mutation',async()=>fixture(async rows=>{

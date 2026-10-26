@@ -1,6 +1,6 @@
 import {observedRoute,tagBackendResponse,observedDatabaseCall} from './backend-diagnostics.mjs';
 import {createHmac} from 'node:crypto';
-import {reminderRoute,revokeReminderSessionDevices,reminderReadiness} from './daily-reminders.mjs';
+import {reminderRoute,revokeReminderSessionDevices,reminderReadiness,reminderDatabaseReason} from './daily-reminders.mjs';
 import {retryRolledBackQuery} from './database-retry.mjs';
 import {releaseMetadata} from './release.mjs';
 import {guardIngress} from './ingress-auth.mjs';
@@ -117,10 +117,14 @@ function dbError(status, text) {
   try { detail = JSON.parse(text) || {}; } catch {}
   const constraint=detail.constraint||detail.constraint_name||
     String(detail.message||'').match(/\bunique constraint "([A-Za-z_][A-Za-z0-9_$]{0,62})"/)?.[1]||null;
+  const reason=reminderDatabaseReason(detail.message)||
+    (detail.message==='Pick removal history is append-only'?'Pick removal history is append-only':
+      typeof detail.message==='string'&&detail.message.startsWith('Latest Set Daily on ')&&detail.message.includes(' references unvalidated regular set ')
+        ?'Latest Set Daily references unvalidated regular set.':null);
   // Keep the adapter contract without copying a provider response (which can
   // include SQL parameters) into exception logs. Internal metadata is readable
   // by retry/conflict handlers but omitted from ordinary error inspection.
-  return Object.defineProperties(new Error(`Database query failed (${status}).`), {
+  return Object.defineProperties(new Error(`Database query failed (${status}).${reason?' '+reason:''}`), {
     pgCode: {value:/^[0-9A-Z]{5}$/.test(String(detail.code||''))?String(detail.code):null,writable:true,configurable:true},
     pgConstraint: {value:constraint?String(constraint):null,writable:true,configurable:true},
   });
