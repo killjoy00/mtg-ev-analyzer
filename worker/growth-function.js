@@ -1,6 +1,6 @@
-import {observedRoute,tagBackendResponse} from './backend-diagnostics.mjs';
+import {observedRoute,tagBackendResponse,observedDatabaseCall} from './backend-diagnostics.mjs';
 import {createHmac} from 'node:crypto';
-import {reminderRoute,revokeReminderSessionDevices,reminderReadiness} from './daily-reminders.mjs';
+import {reminderRoute,revokeReminderSessionDevices,reminderReadiness,reminderDatabaseReason} from './daily-reminders.mjs';
 import {retryRolledBackQuery} from './database-retry.mjs';
 import {releaseMetadata} from './release.mjs';
 import {guardIngress} from './ingress-auth.mjs';
@@ -87,7 +87,7 @@ function dbUrl() {
 }
 
 async function query(sql, params = []) {
-  return retryRolledBackQuery(async()=>{
+  return retryRolledBackQuery(()=>observedDatabaseCall(async onResponseHeaders=>{
     const response = await fetch(dbUrl(), {
       method: 'POST',
       headers: {
@@ -98,6 +98,7 @@ async function query(sql, params = []) {
       },
       body: JSON.stringify({ query: sql, params: params.map((value) => (value == null ? null : String(value))) }),
     });
+    onResponseHeaders(response.status);
     if (!response.ok) throw dbError(response.status, await response.text());
     const data = await response.json();
     const names = (data.fields || []).map((field) => field.name);
@@ -105,7 +106,7 @@ async function query(sql, params = []) {
       rows: (data.rows || []).map((row) => Object.fromEntries(row.map((value, index) => [names[index], value]))),
       rowCount: Number(data.rowCount || 0),
     };
-  });
+  }));
 }
 
 // Constraint violations are part of the contract, not just a failure: callers
@@ -114,9 +115,18 @@ async function query(sql, params = []) {
 function dbError(status, text) {
   let detail = {};
   try { detail = JSON.parse(text) || {}; } catch {}
-  return Object.assign(new Error(`Database query failed (${status}): ${text}`), {
-    pgCode: detail.code ? String(detail.code) : null,
-    pgConstraint: detail.constraint ? String(detail.constraint) : null,
+  const constraint=detail.constraint||detail.constraint_name||
+    String(detail.message||'').match(/\bunique constraint "([A-Za-z_][A-Za-z0-9_$]{0,62})"/)?.[1]||null;
+  const reason=reminderDatabaseReason(detail.message)||
+    (detail.message==='Pick removal history is append-only'?'Pick removal history is append-only':
+      typeof detail.message==='string'&&detail.message.startsWith('Latest Set Daily on ')&&detail.message.includes(' references unvalidated regular set ')
+        ?'Latest Set Daily references unvalidated regular set.':null);
+  // Keep the adapter contract without copying a provider response (which can
+  // include SQL parameters) into exception logs. Internal metadata is readable
+  // by retry/conflict handlers but omitted from ordinary error inspection.
+  return Object.defineProperties(new Error(`Database query failed (${status}).${reason?' '+reason:''}`), {
+    pgCode: {value:/^[0-9A-Z]{5}$/.test(String(detail.code||''))?String(detail.code):null,writable:true,configurable:true},
+    pgConstraint: {value:constraint?String(constraint):null,writable:true,configurable:true},
   });
 }
 

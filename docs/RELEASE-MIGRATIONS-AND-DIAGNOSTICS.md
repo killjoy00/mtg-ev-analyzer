@@ -84,6 +84,33 @@ and extract only allowlisted Postgres codes from the HTTP database adapter.
 None of these fields establishes the cause of an older uncorrelated 520, and
 response bodies are never used as diagnostic evidence.
 
+For traced session creation and run starts, backend database records distinguish
+waiting for HTTP response headers from waiting for the response body and decoding.
+They wrap each attempt inside the existing rollback-only retry policy. They do
+not issue extra queries, change timeouts or authorize retries. Request-local
+context keeps concurrent traces separate. Only the first 12 database attempts
+per request emit start/headers/completion detail; the backend completion record
+reports total attempts, completed attempts, omitted detail and aggregate timings.
+Aggregate durations sum attempts; parallel waits can overlap and are not CPU time
+or a measure of compute charges.
+Untraced requests, other route families and work after route completion emit no
+database detail. A completed attempt can have failed; neither this counter nor a
+missing response proves whether a mutation committed. Logs never contain SQL,
+parameters, connection strings, rows, raw error text or request identifiers other
+than the gateway's random correlation trace.
+The HTTP database adapter also keeps provider response text out of exception
+messages. Its SQLSTATE and constraint metadata remain readable by retry and
+conflict handlers, but are not enumerable in ordinary exception logs.
+A small allowlist preserves fixed SQL guard reasons and the existing reminder
+domain codes. Dynamic dates, set identifiers, SQL details and unrecognized
+provider messages are excluded.
+
+Automatic platform tracing needs a separate privacy review before activation.
+Its documented fetch and handler attributes include full URLs and paths. Query
+string redaction alone does not remove identifiers embedded in a path. Keep
+allowlisted application diagnostics when platform metadata cannot meet these
+privacy constraints; do not enable raw request tracing as a debugging shortcut.
+
 The local runtime check uses the repository's pinned deployment-tool installation:
 `node tests/network-quota-runtime-smoke.mjs /absolute/path/to/pinned-tools`.
 It runs SQLite Durable Objects in local workerd with disposable fixture state,
