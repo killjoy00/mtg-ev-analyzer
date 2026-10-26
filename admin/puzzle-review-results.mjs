@@ -38,15 +38,22 @@ export function summarizeReview(key,ratings) {
   }
   const bad=arm=>arms[arm].dull+arms[arm].broken;
   const losses=pairs.filter(p=>p.winner==='current').length;
-  const allowedLosses=Math.floor(pairs.length/4);
-  const fewerBad={proposed:bad('proposed'),current:bad('current'),pass:bad('proposed')<=bad('current')/2};
+  // From v3 a review states its own criteria: a minimum count of new-rule
+  // puzzles rated Interesting or Fine, and a loss limit.
+  const stated=key.criteria;
+  const allowedLosses=stated?.max_losses??Math.floor(pairs.length/4);
   const lossCheck={losses,allowed:allowedLosses,pass:losses<=allowedLosses};
+  const fewerBad={proposed:bad('proposed'),current:bad('current'),pass:bad('proposed')<=bad('current')/2};
+  const goodNew=arms.proposed.interesting+arms.proposed.fine;
+  const first=stated?.min_good_new_rule!=null
+    ?{proposed_good:{good:goodNew,needed:stated.min_good_new_rule,pass:goodNew>=stated.min_good_new_rule}}
+    :{fewer_bad:fewerBad};
   return {complete:true,arms,pairs,
     wins:{proposed:pairs.filter(p=>p.winner==='proposed').length,current:losses,ties:pairs.filter(p=>p.winner==='tie').length},
-    criteria:{fewer_bad:fewerBad,losses:lossCheck},
+    criteria:{...first,losses:lossCheck},
     // With no dull or broken baseline puzzles the first check passes
     // trivially; the test then cannot show an improvement on that axis.
     baseline_clean:bad('current')===0,
     land_probe:landProbe,
-    pass:fewerBad.pass&&lossCheck.pass};
+    pass:Object.values(first)[0].pass&&lossCheck.pass};
 }
