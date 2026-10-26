@@ -1,0 +1,827 @@
+{
+ "version": "puzzle-review-v3",
+ "seed": "pack-one-puzzle-review-v3-2026-10-26",
+ "rule": {
+  "credible_support_ratio": 0.35,
+  "max_credible_options": 3,
+  "deck_gate_from_pick": 4,
+  "top_share": 0.25,
+  "min_top_pool": 3,
+  "no_land_answer_from_pick": 5,
+  "require_band": "hard"
+ },
+ "pair_picks": [
+  1,
+  2,
+  3,
+  4,
+  5,
+  6,
+  7,
+  8,
+  3,
+  6
+ ],
+ "excluded_reviews": [
+  "puzzle-review-v1",
+  "puzzle-review-v2"
+ ],
+ "current_rule": {
+  "no_land_answer_from_pick": 5
+ },
+ "criteria": {
+  "min_good_new_rule": 8,
+  "max_losses": 2
+ },
+ "inputs": {
+  "sos": {
+   "corpus": "dd6f9e6b3360864fc6092bd2bdddb022a89d2328378013c34c4eb21b866b16e7",
+   "strength": "23d0068327e67f6213a29ccf34d973205862a124b9ef9da7654d5babd9386c95",
+   "trophy_decks": "78b4926b89f4b9023b1108731eecf92c751bf22dd853142c414b10f87c7752c9"
+  },
+  "blb": {
+   "corpus": "682743e1c1097769e9b7f18c205ee2bf2bd3cb72b2e4dcc4ca3ee5d19f886c18",
+   "strength": "8f1153bc4f5aadcdb8fe291445ec410abe7cabbfeaf16176bc8e9a69a6172c75",
+   "trophy_decks": "e8a484c03c332dab9ced5f6a860d3636d173c0bd1861ce187bd9a426df12f4d7"
+  },
+  "ecl": {
+   "corpus": "fdc7605592036296c8651ac72bdeecaf60d583614c27da3f1518dc92fca3604c",
+   "strength": "85c6edc0e24180e43a8a04486a5d83dc74d7a247f5ab549f8450163bd7b3c054",
+   "trophy_decks": "9f8cf4e3fc7548edf5fda083f33a35f5b8e7aacb22e96ddb0d31ca33e22e284a"
+  },
+  "hob": {
+   "corpus": "39f11f4997137d9037f5bf47bd3a9f18dbe00b8780b9846f8cc1cdab45437aaf",
+   "strength": "429bbb1de5fa2eceb11b239efa0b43d82568dcafa16aee73f4d8e027c0fb156a",
+   "trophy_decks": "637365c3af3ebbd74f892933f6a985373310df2d6587bff641cc9b103d2d34b5"
+  },
+  "msh": {
+   "corpus": "2538f8342abb513d52e2936ee503ecfbfe9e31e2517a77ccefbacbb520076012",
+   "strength": "755fc0ae9881d522cd55525e725388d7eb9691175788c8124773da00b29e4805",
+   "trophy_decks": "5edab7bcc3a803d0af8c5d931b1f29fcc0257dfc316337363b407c3d9f652de7"
+  }
+ },
+ "pairs": [
+  {
+   "pair_id": "pair-01",
+   "set_id": "sos",
+   "pick_number": 1,
+   "current": "6d0064ff1693",
+   "proposed": "19cbe280eda2"
+  },
+  {
+   "pair_id": "pair-02",
+   "set_id": "blb",
+   "pick_number": 2,
+   "current": "b0a53b239764",
+   "proposed": "8c8121df316c"
+  },
+  {
+   "pair_id": "pair-03",
+   "set_id": "ecl",
+   "pick_number": 3,
+   "current": "5cbc48409c11",
+   "proposed": "8bab3c341f00"
+  },
+  {
+   "pair_id": "pair-04",
+   "set_id": "hob",
+   "pick_number": 4,
+   "current": "7776a4378beb",
+   "proposed": "629f74427731"
+  },
+  {
+   "pair_id": "pair-05",
+   "set_id": "msh",
+   "pick_number": 5,
+   "current": "a75155f2ce44",
+   "proposed": "b0d0cc46ca9e"
+  },
+  {
+   "pair_id": "pair-06",
+   "set_id": "sos",
+   "pick_number": 6,
+   "current": "4b8c39326d19",
+   "proposed": "14d0eec52098"
+  },
+  {
+   "pair_id": "pair-07",
+   "set_id": "blb",
+   "pick_number": 7,
+   "current": "a387ba54a7f5",
+   "proposed": "1c8532f898ea"
+  },
+  {
+   "pair_id": "pair-08",
+   "set_id": "ecl",
+   "pick_number": 8,
+   "current": "bf055c6a9686",
+   "proposed": "9c59b08b4506"
+  },
+  {
+   "pair_id": "pair-09",
+   "set_id": "hob",
+   "pick_number": 3,
+   "current": "1adbb3b175ec",
+   "proposed": "335e1a7ac1ba"
+  },
+  {
+   "pair_id": "pair-10",
+   "set_id": "msh",
+   "pick_number": 6,
+   "current": "8fc308307d39",
+   "proposed": "494f3003e5ad"
+  }
+ ],
+ "items": {
+  "6d0064ff1693": {
+   "arm": "current",
+   "pair_id": "pair-01",
+   "puzzle_id": "153ccae885951f5675fd4e928c393bca",
+   "pick": 1,
+   "band": "medium",
+   "rating": 71,
+   "trophy_in_main_deck": true,
+   "trophy_is_land": false,
+   "trophy_gih_points": 1.574891484,
+   "kind": "opening",
+   "credible": [
+    {
+     "name": "Tablet of Discovery",
+     "support_ratio": 1,
+     "gih_points": 1.6
+    },
+    {
+     "name": "Brush Off",
+     "support_ratio": 0.711,
+     "gih_points": 2.7
+    }
+   ],
+   "stakes_gih_points": 2.7,
+   "meets_proposed_rule": false,
+   "pool": {
+    "current_eligible": 15,
+    "proposed_valid": 9,
+    "proposed_top": 3
+   }
+  },
+  "19cbe280eda2": {
+   "arm": "proposed",
+   "pair_id": "pair-01",
+   "puzzle_id": "e0f41e200dc9f0986aa950a145b85ce0",
+   "pick": 1,
+   "band": "hard",
+   "rating": 92,
+   "trophy_in_main_deck": true,
+   "trophy_is_land": false,
+   "trophy_gih_points": 6.591359604999999,
+   "kind": "opening",
+   "credible": [
+    {
+     "name": "Snarl Song",
+     "support_ratio": 1,
+     "gih_points": 6.6
+    },
+    {
+     "name": "The Dawning Archaic",
+     "support_ratio": 0.918,
+     "gih_points": -0.5
+    }
+   ],
+   "stakes_gih_points": 6.6,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 15,
+    "proposed_valid": 9,
+    "proposed_top": 3
+   }
+  },
+  "b0a53b239764": {
+   "arm": "current",
+   "pair_id": "pair-02",
+   "puzzle_id": "ee878aa847572881845788c2a9c47f83",
+   "pick": 2,
+   "band": "hard",
+   "rating": 98,
+   "trophy_in_main_deck": true,
+   "trophy_is_land": false,
+   "trophy_gih_points": 0.2050680244,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "Pond Prophet",
+     "support_ratio": 1,
+     "gih_points": 2
+    },
+    {
+     "name": "Eddymurk Crab",
+     "support_ratio": 0.979,
+     "gih_points": 0.2
+    },
+    {
+     "name": "Brambleguard Veteran",
+     "support_ratio": 0.79,
+     "gih_points": 1.4
+    }
+   ],
+   "stakes_gih_points": 2,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 30,
+    "proposed_valid": 13,
+    "proposed_top": 4
+   }
+  },
+  "8c8121df316c": {
+   "arm": "proposed",
+   "pair_id": "pair-02",
+   "puzzle_id": "304dbffa769bd3a42deed0684be909a6",
+   "pick": 2,
+   "band": "hard",
+   "rating": 97,
+   "trophy_in_main_deck": true,
+   "trophy_is_land": false,
+   "trophy_gih_points": 3.6370527690000003,
+   "kind": "off-lane",
+   "credible": [
+    {
+     "name": "Muerra, Trash Tactician",
+     "support_ratio": 1,
+     "gih_points": 3.6
+    },
+    {
+     "name": "Wick's Patrol",
+     "support_ratio": 0.968,
+     "gih_points": 5.8
+    }
+   ],
+   "stakes_gih_points": 5.8,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 30,
+    "proposed_valid": 13,
+    "proposed_top": 4
+   }
+  },
+  "5cbc48409c11": {
+   "arm": "current",
+   "pair_id": "pair-03",
+   "puzzle_id": "7063ce1be8e2691622146511a177c21f",
+   "pick": 3,
+   "band": "medium",
+   "rating": 64,
+   "trophy_in_main_deck": true,
+   "trophy_is_land": false,
+   "trophy_gih_points": 4.514479951,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "Wanderbrine Trapper",
+     "support_ratio": 1,
+     "gih_points": 4.5
+    },
+    {
+     "name": "Virulent Emissary",
+     "support_ratio": 0.642,
+     "gih_points": 4.1
+    },
+    {
+     "name": "Assert Perfection",
+     "support_ratio": 0.436,
+     "gih_points": 3.7
+    }
+   ],
+   "stakes_gih_points": 4.5,
+   "meets_proposed_rule": false,
+   "pool": {
+    "current_eligible": 44,
+    "proposed_valid": 17,
+    "proposed_top": 5
+   }
+  },
+  "8bab3c341f00": {
+   "arm": "proposed",
+   "pair_id": "pair-03",
+   "puzzle_id": "1e4a8fab0408938addf79860289219c8",
+   "pick": 3,
+   "band": "hard",
+   "rating": 98,
+   "trophy_in_main_deck": true,
+   "trophy_is_land": false,
+   "trophy_gih_points": 3.000654893,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "Gathering Stone",
+     "support_ratio": 1,
+     "gih_points": 4.3
+    },
+    {
+     "name": "Twinflame Travelers",
+     "support_ratio": 0.98,
+     "gih_points": 3
+    },
+    {
+     "name": "Assert Perfection",
+     "support_ratio": 0.465,
+     "gih_points": 3.7
+    }
+   ],
+   "stakes_gih_points": 4.3,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 44,
+    "proposed_valid": 17,
+    "proposed_top": 5
+   }
+  },
+  "7776a4378beb": {
+   "arm": "current",
+   "pair_id": "pair-04",
+   "puzzle_id": "a105ff60f44a519412f4f6df20fbb02d",
+   "pick": 4,
+   "band": "medium",
+   "rating": 57,
+   "trophy_in_main_deck": true,
+   "trophy_is_land": false,
+   "trophy_gih_points": -1.5744273789999998,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "Gollum, Silent Slinker",
+     "support_ratio": 1,
+     "gih_points": 3.5
+    },
+    {
+     "name": "Bombur, Gentle Dreamer",
+     "support_ratio": 0.57,
+     "gih_points": -1
+    },
+    {
+     "name": "The Notary Hobbits",
+     "support_ratio": 0.53,
+     "gih_points": -1.2
+    }
+   ],
+   "stakes_gih_points": 3.5,
+   "meets_proposed_rule": false,
+   "pool": {
+    "current_eligible": 39,
+    "proposed_valid": 15,
+    "proposed_top": 4
+   }
+  },
+  "629f74427731": {
+   "arm": "proposed",
+   "pair_id": "pair-04",
+   "puzzle_id": "da640f40d01f6f5cd57d66a2857f93ce",
+   "pick": 4,
+   "band": "hard",
+   "rating": 94,
+   "trophy_in_main_deck": true,
+   "trophy_is_land": false,
+   "trophy_gih_points": 0.6510060636,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "Crude Bent Blade",
+     "support_ratio": 1,
+     "gih_points": 4.8
+    },
+    {
+     "name": "Burn, Burn, Tree and Fern",
+     "support_ratio": 0.941,
+     "gih_points": 4.1
+    },
+    {
+     "name": "Lakeshore Apothecary",
+     "support_ratio": 0.684,
+     "gih_points": 0.7
+    }
+   ],
+   "stakes_gih_points": 4.8,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 39,
+    "proposed_valid": 15,
+    "proposed_top": 4
+   }
+  },
+  "a75155f2ce44": {
+   "arm": "current",
+   "pair_id": "pair-05",
+   "puzzle_id": "dbfa693999c8052e7dc78608b8f6c4c1",
+   "pick": 5,
+   "band": "medium",
+   "rating": 62,
+   "trophy_in_main_deck": true,
+   "trophy_is_land": false,
+   "trophy_gih_points": 3.249105757,
+   "kind": "same-lane",
+   "credible": [
+    {
+     "name": "Agent 13, Sharon Carter",
+     "support_ratio": 1,
+     "gih_points": 3.2
+    },
+    {
+     "name": "Raft Security Officer",
+     "support_ratio": 0.619,
+     "gih_points": 2.3
+    }
+   ],
+   "stakes_gih_points": 3.2,
+   "meets_proposed_rule": false,
+   "pool": {
+    "current_eligible": 24,
+    "proposed_valid": 8,
+    "proposed_top": 3
+   }
+  },
+  "b0d0cc46ca9e": {
+   "arm": "proposed",
+   "pair_id": "pair-05",
+   "puzzle_id": "63d360187f892022f82ae7777096f3fc",
+   "pick": 5,
+   "band": "hard",
+   "rating": 80,
+   "trophy_in_main_deck": true,
+   "trophy_is_land": false,
+   "trophy_gih_points": 3.9209270370000002,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "S.H.I.E.L.D. Deployment Drone",
+     "support_ratio": 1,
+     "gih_points": 3.9
+    },
+    {
+     "name": "Stature, Size Shifter",
+     "support_ratio": 0.797,
+     "gih_points": 3.7
+    },
+    {
+     "name": "Abomination, Terrifying Titan",
+     "support_ratio": 0.587,
+     "gih_points": 0.7
+    }
+   ],
+   "stakes_gih_points": 3.9,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 24,
+    "proposed_valid": 8,
+    "proposed_top": 3
+   }
+  },
+  "4b8c39326d19": {
+   "arm": "current",
+   "pair_id": "pair-06",
+   "puzzle_id": "dd1d36ec23407cfb776223e6ce1c4889",
+   "pick": 6,
+   "band": "hard",
+   "rating": 90,
+   "trophy_in_main_deck": false,
+   "trophy_is_land": false,
+   "trophy_gih_points": -0.07630088422999999,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "Quick Study",
+     "support_ratio": 1,
+     "gih_points": 0.3
+    },
+    {
+     "name": "Elemental Mascot",
+     "support_ratio": 0.897,
+     "gih_points": -0.1
+    },
+    {
+     "name": "Imperious Inkmage",
+     "support_ratio": 0.847,
+     "gih_points": 2.1
+    }
+   ],
+   "stakes_gih_points": 2.1,
+   "meets_proposed_rule": false,
+   "pool": {
+    "current_eligible": 29,
+    "proposed_valid": 7,
+    "proposed_top": 3
+   }
+  },
+  "14d0eec52098": {
+   "arm": "proposed",
+   "pair_id": "pair-06",
+   "puzzle_id": "672c870f3fe67a7b9986f05f10b4857c",
+   "pick": 6,
+   "band": "hard",
+   "rating": 99,
+   "trophy_in_main_deck": true,
+   "trophy_is_land": false,
+   "trophy_gih_points": 2.6997402260000003,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "Artistic Process",
+     "support_ratio": 1,
+     "gih_points": 2.7
+    },
+    {
+     "name": "Snarl Song",
+     "support_ratio": 0.993,
+     "gih_points": 6.6
+    },
+    {
+     "name": "Wilt in the Heat",
+     "support_ratio": 0.737,
+     "gih_points": 2.8
+    }
+   ],
+   "stakes_gih_points": 6.6,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 29,
+    "proposed_valid": 7,
+    "proposed_top": 3
+   }
+  },
+  "a387ba54a7f5": {
+   "arm": "current",
+   "pair_id": "pair-07",
+   "puzzle_id": "b37699d12665054e803aa5b5af4818fb",
+   "pick": 7,
+   "band": "medium",
+   "rating": 59,
+   "trophy_in_main_deck": true,
+   "trophy_is_land": false,
+   "trophy_gih_points": 1.6182268770000001,
+   "kind": "same-lane",
+   "credible": [
+    {
+     "name": "Warren Elder",
+     "support_ratio": 1,
+     "gih_points": 1.6
+    },
+    {
+     "name": "Mabel's Mettle",
+     "support_ratio": 0.593,
+     "gih_points": -1.1
+    }
+   ],
+   "stakes_gih_points": 1.6,
+   "meets_proposed_rule": false,
+   "pool": {
+    "current_eligible": 24,
+    "proposed_valid": 6,
+    "proposed_top": 3
+   }
+  },
+  "1c8532f898ea": {
+   "arm": "proposed",
+   "pair_id": "pair-07",
+   "puzzle_id": "22d50eed1284a13b1dfec1dcbf1da2ed",
+   "pick": 7,
+   "band": "hard",
+   "rating": 92,
+   "trophy_in_main_deck": true,
+   "trophy_is_land": false,
+   "trophy_gih_points": 3.25956792,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "Cache Grab",
+     "support_ratio": 1,
+     "gih_points": 3.3
+    },
+    {
+     "name": "Treeguard Duo",
+     "support_ratio": 0.923,
+     "gih_points": 2.6
+    },
+    {
+     "name": "Lilysplash Mentor",
+     "support_ratio": 0.897,
+     "gih_points": 3.4
+    }
+   ],
+   "stakes_gih_points": 3.4,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 24,
+    "proposed_valid": 6,
+    "proposed_top": 3
+   }
+  },
+  "bf055c6a9686": {
+   "arm": "current",
+   "pair_id": "pair-08",
+   "puzzle_id": "45df818183edb4a4941e72f154e8973c",
+   "pick": 8,
+   "band": "hard",
+   "rating": 91,
+   "trophy_in_main_deck": false,
+   "trophy_is_land": false,
+   "trophy_gih_points": -0.22948413069999998,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "Eclipsed Boggart",
+     "support_ratio": 1,
+     "gih_points": 3.6
+    },
+    {
+     "name": "Assert Perfection",
+     "support_ratio": 0.913,
+     "gih_points": 3.7
+    },
+    {
+     "name": "Flame-Chain Mauler",
+     "support_ratio": 0.7,
+     "gih_points": -0.6
+    }
+   ],
+   "stakes_gih_points": 3.7,
+   "meets_proposed_rule": false,
+   "pool": {
+    "current_eligible": 47,
+    "proposed_valid": 12,
+    "proposed_top": 3
+   }
+  },
+  "9c59b08b4506": {
+   "arm": "proposed",
+   "pair_id": "pair-08",
+   "puzzle_id": "f5699bc050724666a043064c9e39ea68",
+   "pick": 8,
+   "band": "hard",
+   "rating": 87,
+   "trophy_in_main_deck": true,
+   "trophy_is_land": false,
+   "trophy_gih_points": -0.539742875,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "Evolving Wilds",
+     "support_ratio": 1,
+     "gih_points": 0.1
+    },
+    {
+     "name": "Blossombind",
+     "support_ratio": 0.872,
+     "gih_points": 0.3
+    },
+    {
+     "name": "Dawnhand Eulogist",
+     "support_ratio": 0.589,
+     "gih_points": 4.1
+    }
+   ],
+   "stakes_gih_points": 4.1,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 47,
+    "proposed_valid": 12,
+    "proposed_top": 3
+   }
+  },
+  "1adbb3b175ec": {
+   "arm": "current",
+   "pair_id": "pair-09",
+   "puzzle_id": "9840b53dc09091ff33f000562273f068",
+   "pick": 3,
+   "band": "medium",
+   "rating": 69,
+   "trophy_in_main_deck": true,
+   "trophy_is_land": false,
+   "trophy_gih_points": 1.183440716,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "Stir Up Trouble",
+     "support_ratio": 1,
+     "gih_points": 1.2
+    },
+    {
+     "name": "The Chief Warg",
+     "support_ratio": 0.692,
+     "gih_points": -2.6
+    },
+    {
+     "name": "Lakeshore Apothecary",
+     "support_ratio": 0.535,
+     "gih_points": 0.7
+    }
+   ],
+   "stakes_gih_points": 1.2,
+   "meets_proposed_rule": false,
+   "pool": {
+    "current_eligible": 39,
+    "proposed_valid": 12,
+    "proposed_top": 3
+   }
+  },
+  "335e1a7ac1ba": {
+   "arm": "proposed",
+   "pair_id": "pair-09",
+   "puzzle_id": "35fe9ef6b7e608509b58b9ff3a5d3c1e",
+   "pick": 3,
+   "band": "hard",
+   "rating": 99,
+   "trophy_in_main_deck": true,
+   "trophy_is_land": true,
+   "trophy_gih_points": 1.454595935,
+   "kind": "power-vs-fit",
+   "credible": [
+    {
+     "name": "The Lonely Mountain",
+     "support_ratio": 1,
+     "gih_points": 1.5
+    },
+    {
+     "name": "Desolation Prowler",
+     "support_ratio": 0.993,
+     "gih_points": 5.6
+    },
+    {
+     "name": "Thorin Oakenshield",
+     "support_ratio": 0.44,
+     "gih_points": 0.4
+    }
+   ],
+   "stakes_gih_points": 5.6,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 39,
+    "proposed_valid": 12,
+    "proposed_top": 3
+   }
+  },
+  "8fc308307d39": {
+   "arm": "current",
+   "pair_id": "pair-10",
+   "puzzle_id": "44efce204a9a1dd99a5b287086cbeb7a",
+   "pick": 6,
+   "band": "medium",
+   "rating": 69,
+   "trophy_in_main_deck": true,
+   "trophy_is_land": false,
+   "trophy_gih_points": 4.669087607,
+   "kind": "same-lane",
+   "credible": [
+    {
+     "name": "Falcon, Winged Wonder",
+     "support_ratio": 1,
+     "gih_points": 4.7
+    },
+    {
+     "name": "H.E.R.B.I.E. Scout Unit",
+     "support_ratio": 0.687,
+     "gih_points": 1.9
+    },
+    {
+     "name": "Falcon's Wing Harness",
+     "support_ratio": 0.523,
+     "gih_points": 1.6
+    }
+   ],
+   "stakes_gih_points": 4.7,
+   "meets_proposed_rule": false,
+   "pool": {
+    "current_eligible": 33,
+    "proposed_valid": 18,
+    "proposed_top": 5
+   }
+  },
+  "494f3003e5ad": {
+   "arm": "proposed",
+   "pair_id": "pair-10",
+   "puzzle_id": "26a6db485d1507881bc3f263980cb99a",
+   "pick": 6,
+   "band": "hard",
+   "rating": 85,
+   "trophy_in_main_deck": true,
+   "trophy_is_land": false,
+   "trophy_gih_points": 4.963875102,
+   "kind": "same-lane",
+   "credible": [
+    {
+     "name": "Murdock's Crusade",
+     "support_ratio": 1,
+     "gih_points": 5
+    },
+    {
+     "name": "Brave Brawler",
+     "support_ratio": 0.848,
+     "gih_points": 2.9
+    }
+   ],
+   "stakes_gih_points": 5,
+   "meets_proposed_rule": true,
+   "pool": {
+    "current_eligible": 33,
+    "proposed_valid": 18,
+    "proposed_top": 5
+   }
+  }
+ }
+}

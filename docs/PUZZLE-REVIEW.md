@@ -12,9 +12,10 @@ regenerate unchanged, and any change to the rule or sample needs a new version.
 | Version | Puzzles | Sets | Proposed rule adds |
 | --- | --- | --- | --- |
 | `puzzle-review-v1` | 12 pairs; picks 1–8, then 2, 4, 6, 8 | HOB, MSH, SOS | — |
-| `puzzle-review-v2` (served) | 10 pairs; picks 1–8, then 5, 7; plus 4 land probes | HOB, MSH, SOS, BLB, ECL | No land trophy pick from pick 5 on |
+| `puzzle-review-v2` | 10 pairs; picks 1–8, then 5, 7; plus 4 land probes | HOB, MSH, SOS, BLB, ECL | No land trophy pick from pick 5 on |
+| `puzzle-review-v3` (served) | 10 pairs; picks 1–8, then 3, 6 | SOS, BLB, ECL, HOB, MSH | Close decisions only (support-ratio "hard" band); both arms drop late land answers |
 
-v2 uses no source draft that v1 used.
+Each version uses no source draft that an earlier version used.
 
 ## What is compared
 
@@ -43,6 +44,10 @@ taken over a strong card" is worth adding to the rule. Only four such puzzles
 exist in the five-set sample once v1's drafts are excluded, so the probes are
 drawn before the pairs.
 
+v3 tests closeness plus stakes on its own: both arms drop land trophy picks
+from pick 5 on, and the proposed arm also requires the "hard" band (runner-up
+support at least 80% of the leader's) before ranking by stakes.
+
 ## Rating and pass criteria
 
 Each puzzle is rated after its trophy pick is revealed: Interesting, Fine,
@@ -59,6 +64,10 @@ rating:
 If today's selector has no Dull or Broken puzzles, the first check passes
 trivially and the page says so.
 
+v3 states its own criteria, also fixed before rating: at least 8 of the 10
+proposed-rule puzzles rated Interesting or Fine, and today's puzzle rates
+higher in at most 2 of the 10 pairs.
+
 Land probes (v2) are scored separately: allowing late land answers taken over
 a strong card is worth adding only if at least 3 of the 4 are rated
 Interesting or Fine. Otherwise the simpler rule stands: no land answers from
@@ -73,8 +82,9 @@ catalogs, and the card-strength benchmark tables in
 The key is public in the repository; the rater should not open it before
 finishing.
 
-Ratings and notes are stored in the rater's browser (`localStorage`) and can
-be downloaded as JSON from the results view. Nothing is sent to the backend.
+Ratings and notes are stored in the rater's browser (`localStorage`). The
+results view can copy them as JSON text (for tablets that cannot attach a
+downloaded file) or download them. Nothing is sent to the backend.
 
 ## Regenerate
 
@@ -96,8 +106,10 @@ fix show the difficulty number in each pair's `rating` field; their top-level
 
 - The local corpus sample has roughly 50–75 source drafts per set, so each
   proposed top quarter holds only 5–11 puzzles. Production pools are larger.
-- Strength tables exist only for six sets; v1 uses three and v2 five (FRA has
-  no checked-in corpus sample).
+- Strength tables exist only for six sets; v1 uses three, v2 and v3 five (FRA
+  has no checked-in corpus sample).
+- v3's close-only proposed pool holds 3–5 puzzles per set and pick in this
+  sample.
 - Four land probes are a taste check, not a measurement.
 - One rater and 10–12 pairs per round: a directional check, not a
   measurement of player enjoyment.

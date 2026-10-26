@@ -1,9 +1,9 @@
-import {RATINGS,ARMS,isRating,ratedCount,summarizeReview} from './puzzle-review-results.mjs?v=20261026-puzzle-review-v2';
+import {RATINGS,ARMS,isRating,ratedCount,summarizeReview} from './puzzle-review-results.mjs?v=20261026-puzzle-review-v3';
 
 // Blinded owner review of puzzle selection. The review set is static and
 // public card data; the arm key is fetched only after every puzzle is rated.
 // Progress lives in this browser only, so results can be downloaded.
-export const REVIEW_VERSION='puzzle-review-v2';
+export const REVIEW_VERSION='puzzle-review-v3';
 const SET_URL=new URL(`./puzzle-review/${REVIEW_VERSION}-set.json`,import.meta.url);
 const KEY_URL=new URL(`./puzzle-review/${REVIEW_VERSION}-key.json`,import.meta.url);
 const esc=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
@@ -66,14 +66,14 @@ function progressMarkup(items,state) {
   </section>`;
 }
 
-const introMarkup=(total,pairs,probes)=>`<header class="subpage-heading"><p class="subpage-kicker">Selection research</p><h1>Puzzle review</h1>
+const introMarkup=(total,pairs,probes,criteria)=>`<header class="subpage-heading"><p class="subpage-kicker">Selection research</p><h1>Puzzle review</h1>
   <p class="muted">Rate ${total} Pack One puzzles. ${pairs*2} of them are ${pairs} matched pairs: one puzzle drawn the way today’s Daily draws it and one by the proposed rule, from the same set and pick.${probes?` The other ${probes} test a separate land rule.`:''} They are shuffled, and you only see which is which after rating all of them.</p></header>
   <details class="subpage-section review-about"><summary>How this test works</summary>
-  <p class="subpage-help"><strong>Today’s selector:</strong> any medium or hard puzzle at that pick, chosen at random.</p>
-  <p class="subpage-help"><strong>Proposed rule:</strong> at least two credible options (35% or more of the leader’s model support); from pick 4 on, the trophy pick must have made the trophy deck’s main deck; from pick 5 on, the trophy pick is not a land; then the top quarter by the strongest credible card’s win rate, chosen at random.</p>
-  ${probes?`<p class="subpage-help"><strong>Land test:</strong> ${probes} late picks (5–8) where the trophy pick is a land taken over a card in the top 20% of its set by win rate that strong players also rated. They show whether a land over a strong card makes a good late puzzle.</p>`:''}
-  <p class="subpage-help"><strong>Pass:</strong> the proposed rule has at most half as many Dull or Broken puzzles, and loses at most ${Math.floor(pairs/4)} of the ${pairs} pairs.${probes?` Allowing late lands taken over a strong card is worth adding only if at least ${Math.ceil(0.75*probes)} of the ${probes} land puzzles are rated Interesting or Fine.`:''} These criteria were fixed before any rating.</p>
-  <p class="subpage-help">Puzzles come from the checked-in corpus sample for The Hobbit, Marvel Super Heroes, Secrets of Strixhaven, Bloomburrow and Lorwyn Eclipsed, with a fixed random seed. None reuse a draft from the first review. Progress is saved in this browser only.</p></details>`;
+  <p class="subpage-help"><strong>Both sides:</strong> no trophy pick that is a land from pick 5 on. Earlier rounds showed those are rarely interesting.</p>
+  <p class="subpage-help"><strong>Today’s selector:</strong> otherwise any medium or hard puzzle at that pick, chosen at random.</p>
+  <p class="subpage-help"><strong>Proposed rule:</strong> close decisions only (the runner-up has at least 80% of the leader’s strong-player support), with at least two credible options; from pick 4 on, the trophy pick made the trophy deck’s main deck; then the top quarter by the strongest credible card’s win rate, chosen at random.</p>
+  <p class="subpage-help"><strong>Pass:</strong> ${criteria?`at least ${criteria.min_good_new_rule} of the ${pairs} proposed-rule puzzles are rated Interesting or Fine, and today’s puzzle rates higher in at most ${criteria.max_losses} of the ${pairs} pairs`:`the proposed rule has at most half as many Dull or Broken puzzles, and loses at most ${Math.floor(pairs/4)} of the ${pairs} pairs`}. These criteria were fixed before any rating.</p>
+  <p class="subpage-help">Puzzles come from the checked-in corpus sample for The Hobbit, Marvel Super Heroes, Secrets of Strixhaven, Bloomburrow and Lorwyn Eclipsed, with a fixed random seed. None reuse a draft from earlier reviews. Progress is saved in this browser only.</p></details>`;
 
 function landProbeMarkup(probe,key,state,itemsById) {
   if(!probe)return '';
@@ -92,11 +92,12 @@ function resultsMarkup(summary,key,state,itemsById) {
   const label=id=>RATINGS.find(r=>r.id===id)?.label||id;
   const option=(item)=>`<small>${esc(item.band)} · strongest credible card ${item.stakes_gih_points==null?'unknown':`${item.stakes_gih_points>0?'+':''}${esc(item.stakes_gih_points)} pts`} · trophy pick ${item.trophy_in_main_deck?'made':'missed'} the main deck${item.trophy_is_land?' · land answer':''} · ${esc(item.kind)}</small><small>${item.credible.map(c=>`${esc(c.name)} (${c.gih_points==null?'?':(c.gih_points>0?'+':'')+esc(c.gih_points)})`).join(', ')}</small>`;
   const winner={proposed:'Proposed better',current:'Today better',tie:'Tie'};
-  const {fewer_bad:bad,losses}=summary.criteria;
+  const {fewer_bad:bad,proposed_good:good,losses}=summary.criteria;
   return `<section class="subpage-section review-results" aria-labelledby="review-results-heading">
     <h2 id="review-results-heading">${summary.pass?'The proposed rule passes':'The proposed rule does not pass'}</h2>
     <ul class="review-criteria">
-      <li class="${bad.pass?'pass':'fail'}">Dull or Broken: proposed ${bad.proposed}, today ${bad.current}. Needs ${Math.floor(bad.current/2)} or fewer.</li>
+      ${bad?`<li class="${bad.pass?'pass':'fail'}">Dull or Broken: proposed ${bad.proposed}, today ${bad.current}. Needs ${Math.floor(bad.current/2)} or fewer.</li>`:''}
+      ${good?`<li class="${good.pass?'pass':'fail'}">Proposed-rule puzzles rated Interesting or Fine: ${good.good} of ${summary.pairs.length}. Needs ${good.needed} or more.</li>`:''}
       <li class="${losses.pass?'pass':'fail'}">Pairs where today’s puzzle rated higher: ${losses.losses} of ${summary.pairs.length}. Needs ${losses.allowed} or fewer.</li>
     </ul>
     ${summary.baseline_clean?'<p class="note">Today’s selector produced no Dull or Broken puzzles in this sample, so the first check cannot show an improvement.</p>':''}
@@ -108,7 +109,9 @@ function resultsMarkup(summary,key,state,itemsById) {
       <td><strong>${esc(label(p.proposed_rating))}</strong>${option(key.items[p.proposed])}${state.ratings[p.proposed]?.note?`<small>Note: ${esc(state.ratings[p.proposed].note)}</small>`:''}</td>
       <td>${winner[p.winner]}</td></tr>`).join('')}</tbody></table></div>
     ${landProbeMarkup(summary.land_probe,key,state,itemsById)}
-    <div class="actions"><button type="button" id="review-download">Download results</button><button type="button" class="secondary" id="review-reset">Start a new review</button></div>
+    <div class="actions"><button type="button" id="review-copy">Copy results</button><button type="button" class="secondary" id="review-download">Download results</button><button type="button" class="secondary" id="review-reset">Start a new review</button></div>
+    <p id="review-copy-status" class="subpage-help" role="status" aria-live="polite"></p>
+    <label id="review-copy-fallback" hidden>Results to copy<textarea readonly rows="6"></textarea></label>
   </section>`;
 }
 
@@ -147,12 +150,23 @@ export async function renderPuzzleReview(root,{accountId=null,storage=globalThis
   async function draw() {
     const storageNote=saving?'':'<p class="note" role="alert">This browser is not saving progress. Finish in one sitting, then download the results.</p>';
     if(state.results_viewed_at) {
-      root.innerHTML=`<section class="puzzle-review">${introMarkup(items.length,pairCount,probeCount)}${storageNote}<p role="status">Loading results…</p></section>`;
+      root.innerHTML=`<section class="puzzle-review">${introMarkup(items.length,pairCount,probeCount,reviewSet.criteria)}${storageNote}<p role="status">Loading results…</p></section>`;
       let summary;
       try {key=await loadKey();summary=summarizeReview(key,state.ratings);}
       catch(error) {root.querySelector('[role="status"]').textContent=error.message;return;}
       if(!summary.complete){state.results_viewed_at=null;persist();return draw();}
-      root.innerHTML=`<section class="puzzle-review">${introMarkup(items.length,pairCount,probeCount)}${storageNote}${resultsMarkup(summary,key,state,itemsById)}</section>`;
+      root.innerHTML=`<section class="puzzle-review">${introMarkup(items.length,pairCount,probeCount,reviewSet.criteria)}${storageNote}${resultsMarkup(summary,key,state,itemsById)}</section>`;
+      // Some tablets cannot attach a downloaded file, so the results can also
+      // be copied as text. If the clipboard is unavailable, show the text.
+      root.querySelector('#review-copy').onclick=async()=>{
+        const text=JSON.stringify(resultsExport(state,summary,key)),status=root.querySelector('#review-copy-status');
+        try {await navigator.clipboard.writeText(text);status.textContent='Copied. Paste it into your message.';}
+        catch {
+          const fallback=root.querySelector('#review-copy-fallback'),area=fallback.querySelector('textarea');
+          area.value=text;fallback.hidden=false;area.focus();area.select();
+          status.textContent='Copying is blocked here. Select the text below and copy it.';
+        }
+      };
       root.querySelector('#review-download').onclick=()=>{
         const blob=new Blob([JSON.stringify(resultsExport(state,summary,key),null,1)],{type:'application/json'});
         const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`pack-one-${REVIEW_VERSION}-results.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
@@ -164,7 +178,7 @@ export async function renderPuzzleReview(root,{accountId=null,storage=globalThis
       return;
     }
     const item=items[state.index];
-    root.innerHTML=`<section class="puzzle-review">${introMarkup(items.length,pairCount,probeCount)}${storageNote}${progressMarkup(items,state)}${puzzleMarkup(item,state,state.index+1,items.length)}<p id="review-status" role="status" aria-live="polite"></p></section>`;
+    root.innerHTML=`<section class="puzzle-review">${introMarkup(items.length,pairCount,probeCount,reviewSet.criteria)}${storageNote}${progressMarkup(items,state)}${puzzleMarkup(item,state,state.index+1,items.length)}<p id="review-status" role="status" aria-live="polite"></p></section>`;
     const go=index=>{state.index=index;persist();void draw();root.querySelector('#review-puzzle-heading')?.scrollIntoView?.({block:'start'});};
     root.querySelectorAll('[data-jump]').forEach(button=>button.onclick=()=>go(Number(button.dataset.jump)));
     root.querySelector('#review-prev').onclick=()=>go(state.index-1);

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {gunzipSync} from 'node:zlib';
-import {buildReviewSet,serialize,assessPuzzle,proposedTop,parseCsv,strengthPercentile,REVIEWS,OUTPUT_DIR,RULE} from '../scripts/build-puzzle-review-set.mjs';
+import {buildReviewSet,serialize,assessPuzzle,proposedTop,parseCsv,strengthPercentile,REVIEWS,LATEST_REVIEW,OUTPUT_DIR,RULE} from '../scripts/build-puzzle-review-set.mjs';
 import {summarizeReview,ratedCount} from '../admin/puzzle-review-results.mjs';
 import {cardScores,loadState,emptyState,storageKey,resultsExport,REVIEW_VERSION} from '../admin/puzzle-review.mjs';
 import {adminArea,overviewMarkup,ADMIN_AREAS} from '../admin/overview.mjs';
@@ -24,13 +24,13 @@ test('every checked-in review set and key regenerates exactly from checked-in in
     assert.equal(read(`${version}-set.json`),serialize(set),version);
     assert.equal(read(`${version}-key.json`),serialize(key),version);
   }
-  assert.equal(REVIEW_VERSION,'puzzle-review-v2','the admin page serves the latest review');
+  assert.equal(REVIEW_VERSION,LATEST_REVIEW,'the admin page serves the latest review');
 });
 
 test('every pair matches set and pick, uses distinct source drafts, and arms meet their rules',()=>{
   for(const version of versions) {
     const {set,key}=files(version),rule=REVIEWS[version].rule;
-    assert.equal(set.items.length,24,version);
+    assert.equal(set.items.length,2*key.pairs.length+(key.probes?.length||0),version);
     assert.equal(key.pairs.length,REVIEWS[version].pairPicks.length,version);
     const byId=new Map(set.items.map(item=>[item.item_id,item]));
     for(const pair of key.pairs) {
@@ -46,6 +46,9 @@ test('every pair matches set and pick, uses distinct source drafts, and arms mee
       assert.ok(proposed.credible.length>=2);
       if(pair.pick_number>=rule.deck_gate_from_pick)assert.equal(proposed.trophy_in_main_deck,true);
       if(rule.no_land_answer_from_pick&&pair.pick_number>=rule.no_land_answer_from_pick)assert.equal(proposed.trophy_is_land,false,version+' '+pair.pair_id);
+      if(rule.require_band)assert.equal(proposed.band,rule.require_band,version+' '+pair.pair_id);
+      const currentRule=REVIEWS[version].currentRule;
+      if(currentRule&&pair.pick_number>=currentRule.no_land_answer_from_pick)assert.equal(key.items[pair.current].trophy_is_land,false,version+' '+pair.pair_id);
     }
     const sources=sourcesOf(key);
     assert.ok(sources.every(Boolean));
@@ -73,11 +76,27 @@ test('v2 reuses no v1 source draft and its land probes are late land answers ove
   }
 });
 
+test('each later review reuses no source draft from the reviews it excludes',()=>{
+  for(const version of versions)for(const earlier of REVIEWS[version].excludeReviews||[]) {
+    const before=new Set(sourcesOf(files(earlier).key));
+    assert.ok(sourcesOf(files(version).key).every(source=>!before.has(source)),version+' reuses '+earlier);
+  }
+  assert.deepEqual(files('puzzle-review-v3').set.criteria,{min_good_new_rule:8,max_losses:2});
+});
+
 test('the blinded sets carry no arm, pair, probe, or selection evidence',()=>{
   for(const version of versions) {
     const text=read(`${version}-set.json`),set=JSON.parse(text);
     for(const item of set.items)assert.deepEqual(Object.keys(item).sort(),['candidates','historical_pick_id','item_id','pick_number','prior_picks','set_id','set_name']);
-    for(const word of ['"arm"','pair_id','proposed','current','stakes','gih','puzzle_id','main_deck','band','land-probe','passed_over'])assert.ok(!text.includes(word),version+' '+word);
+    // Check field names and labels, not card text: a card can be named
+    // "Prismatic Undercurrents".
+    assert.deepEqual(Object.keys(set).filter(k=>!['version','pairs','probes','criteria','items'].includes(k)),[],version);
+    const keys=new Set(),strings=new Set();
+    const walk=value=>{if(Array.isArray(value))value.forEach(walk);else if(value&&typeof value==='object')for(const [k,v] of Object.entries(value)){keys.add(k);walk(v);}else if(typeof value==='string')strings.add(value);};
+    walk(set);
+    for(const key of ['arm','pair_id','puzzle_id','stakes','stakes_gih_points','trophy_in_main_deck','band','passed_over','current','proposed'])assert.ok(!keys.has(key),version+' key '+key);
+    for(const label of ['current','proposed','land-probe'])assert.ok(!strings.has(label),version+' label '+label);
+    assert.ok(!/gih|main_deck|land-probe|"arm"/.test(text),version);
   }
 });
 
@@ -146,6 +165,13 @@ test('review summary applies the fixed pass criteria',()=>{
   assert.deepEqual((({good,needed,pass})=>({good,needed,pass}))(summarizeReview(probed,probeRatings(['interesting','fine','fine','dull'])).land_probe),{good:3,needed:3,pass:true});
   assert.equal(summarizeReview(probed,probeRatings(['interesting','fine','dull','broken'])).land_probe.pass,false);
   assert.equal(summarizeReview(key,all).land_probe,null);
+  const stated={...key,criteria:{min_good_new_rule:3,max_losses:1}};
+  const ok=summarizeReview(stated,rate(['interesting','dull','fine','dull'],['fine','fine','interesting','dull']));
+  assert.deepEqual(ok.criteria.proposed_good,{good:3,needed:3,pass:true});
+  assert.equal(ok.criteria.fewer_bad,undefined);
+  assert.deepEqual(ok.criteria.losses,{losses:1,allowed:1,pass:true});
+  assert.equal(ok.pass,true);
+  assert.equal(summarizeReview(stated,rate(['fine','fine','fine','fine'],['fine','fine','dull','dull'])).pass,false,'2 good is below 3');
   assert.equal(ratedCount([{item_id:'c1'},{item_id:'c2'}],{c1:{rating:'fine'},c2:{note:'x'}}),1);
 });
 
@@ -160,6 +186,7 @@ test('player-facing scores and saved progress',()=>{
 
 test('exported results keep the rater\'s rating separate from the support difficulty rating',()=>{
   const {key}=files('puzzle-review-v2');
+  // resultsExport labels output with the served version; the shape is shared.
   const ratings=Object.fromEntries(Object.keys(key.items).map(id=>[id,{rating:'fine'}]));
   const out=resultsExport({ratings},summarizeReview(key,ratings),key);
   for(const pair of out.pairs)for(const arm of ['current','proposed']) {

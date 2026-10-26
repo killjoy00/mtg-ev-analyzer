@@ -35,8 +35,19 @@ export const REVIEWS=Object.freeze({
     landProbe:Object.freeze({count:4,from_pick:5,to_pick:8,power_percentile:0.8}),
     excludeReviews:['puzzle-review-v1'],
   }),
+  'puzzle-review-v3':Object.freeze({
+    version:'puzzle-review-v3',seed:'pack-one-puzzle-review-v3-2026-10-26',sets:['sos','blb','ecl','hob','msh'],
+    // Picks 1-8, then 3 and 6; set order rotated so no set/pick repeats v2's.
+    pairPicks:[1,2,3,4,5,6,7,8,3,6],
+    // Close decisions only (the support-ratio "hard" band), ranked by stakes.
+    rule:Object.freeze({...RULE,no_land_answer_from_pick:5,require_band:'hard'}),
+    // Both arms drop late land answers, so the pairs test closeness and stakes.
+    currentRule:Object.freeze({no_land_answer_from_pick:5}),
+    criteria:Object.freeze({min_good_new_rule:8,max_losses:2}),
+    excludeReviews:['puzzle-review-v1','puzzle-review-v2'],
+  }),
 });
-export const LATEST_REVIEW='puzzle-review-v2';
+export const LATEST_REVIEW='puzzle-review-v3';
 const ROOT=new URL('../',import.meta.url);
 const path=relative=>fileURLToPath(new URL(relative,ROOT));
 const sha256=bytes=>createHash('sha256').update(bytes).digest('hex');
@@ -107,7 +118,8 @@ export function assessPuzzle(puzzle,{strength,mainDeck,rule=RULE}) {
   const landRule=rule.no_land_answer_from_pick!=null,lateLand=landRule&&puzzle.pick_number>=rule.no_land_answer_from_pick&&isLand(target);
   const contested=band!=='easy';
   const currentEligible=interesting&&serving&&contested;
-  const proposedValid=currentEligible&&credible.length>=2&&stakes!==null&&(puzzle.pick_number<rule.deck_gate_from_pick||trophyInMain)&&!lateLand;
+  const proposedValid=currentEligible&&credible.length>=2&&stakes!==null&&(puzzle.pick_number<rule.deck_gate_from_pick||trophyInMain)&&!lateLand
+    &&(!rule.require_band||band===rule.require_band);
   return {puzzle_id:puzzle.puzzle_id,source:puzzle.source_draft_hash,pick:puzzle.pick_number,band,rating,
     current_eligible:currentEligible,proposed_valid:proposedValid,stakes,trophy_in_main_deck:trophyInMain,
     ...(landRule?{trophy_is_land:isLand(target)}:{}),
@@ -212,7 +224,8 @@ export function buildReviewSet(version=LATEST_REVIEW,{load=loadSet,setNames={}}=
     const set=bySet.get(config.sets[index%config.sets.length]);
     const assessed=set.puzzles.filter(p=>p.pick_number===pick).map(p=>({p,a:assess(set,p)}));
     const open=assessed.filter(x=>!blocked(x.p.source_draft_hash));
-    const currentPool=open.filter(x=>x.a.current_eligible).map(x=>({...x,band:x.a.band}));
+    const lateLand=x=>config.currentRule?.no_land_answer_from_pick!=null&&x.a.trophy_is_land&&pick>=config.currentRule.no_land_answer_from_pick;
+    const currentPool=open.filter(x=>x.a.current_eligible&&!lateLand(x)).map(x=>({...x,band:x.a.band}));
     const valid=open.filter(x=>x.a.proposed_valid);
     const top=proposedTop(valid.map(x=>x.a),rule).map(a=>valid.find(x=>x.a.puzzle_id===a.puzzle_id));
     const proposed=top[Math.floor(random()*top.length)];
@@ -235,13 +248,13 @@ export function buildReviewSet(version=LATEST_REVIEW,{load=loadSet,setNames={}}=
   });
   for(let i=items.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[items[i],items[j]]=[items[j],items[i]];}
   const inputs=Object.fromEntries(sets.map(s=>[s.setId,s.hashes]));
-  if(!config.landProbe)return {
-    set:{version,items},
-    key:{version,seed,rule,pair_picks:config.pairPicks,inputs,pairs,items:key},
-  };
+  // v1 predates pair counts in the set file; later versions carry them, and
+  // the criteria, which are not secret, so the page can state them up front.
+  const optional=(name,value)=>value===undefined?{}:{[name]:value};
   return {
-    set:{version,pairs:pairs.length,probes:probes.length,items},
-    key:{version,seed,rule,pair_picks:config.pairPicks,land_probe:config.landProbe,excluded_reviews:config.excludeReviews,inputs,pairs,probes,items:key},
+    set:config.excludeReviews?{version,pairs:pairs.length,...optional('probes',config.landProbe&&probes.length),...optional('criteria',config.criteria),items}:{version,items},
+    key:{version,seed,rule,pair_picks:config.pairPicks,...optional('land_probe',config.landProbe),...optional('excluded_reviews',config.excludeReviews),
+      ...optional('current_rule',config.currentRule),...optional('criteria',config.criteria),inputs,pairs,...optional('probes',config.landProbe&&probes),items:key},
   };
 }
 

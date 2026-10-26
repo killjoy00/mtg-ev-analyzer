@@ -4,7 +4,7 @@ import {renderUsers} from './users.mjs?v=20261023-activity';
 import {renderAdminTeam} from './team.mjs?v=20261024-subpages';
 import {renderCampaignLinks} from './campaign-links.mjs?v=20261024-dashboard';
 import {renderPlayerReports} from './player-reports.mjs?v=20261024-subpages';
-import {renderPuzzleReview} from './puzzle-review.mjs?v=20261026-puzzle-review-v2';
+import {renderPuzzleReview} from './puzzle-review.mjs?v=20261026-puzzle-review-v3';
 import {ADMIN_API_VERSION} from '../admin-api-contract.mjs';
 import {accountCsrfToken,firstPartyAuthEnabled,getAuthSession,storedAccountToken,signOutAccount} from '../growth-api.mjs';
 import {sanitizeAdminDestination} from './admin-return.mjs';
