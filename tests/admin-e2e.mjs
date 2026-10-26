@@ -2,6 +2,7 @@
 import {chromium} from 'playwright';
 import {runOverviewChecks} from './admin-overview-e2e.mjs';
 import {runAdminStartupChecks} from './admin-startup-e2e.mjs';
+import {runPuzzleReviewChecks} from './admin-puzzle-review-e2e.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {ADMIN_API_VERSION} from '../admin-api-contract.mjs';
@@ -635,5 +636,6 @@ try {
   assert.deepEqual(errors,[]);
   await runOverviewChecks(browser);
   await runAdminStartupChecks(browser);
+  await runPuzzleReviewChecks(browser);
   console.log('Admin mobile layout, locked state, filters, review details, CSV export, and bounded first-party startup passed.');
 } finally {await browser.close();}

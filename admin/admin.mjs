@@ -1,9 +1,10 @@
-import {renderOverview,adminArea,ADMIN_AREAS} from './overview.mjs?v=20261024-dashboard';
+import {renderOverview,adminArea,ADMIN_AREAS} from './overview.mjs?v=20261026-puzzle-review';
 import {renderCorpus} from './corpus.mjs?v=20261024-subpages';
 import {renderUsers} from './users.mjs?v=20261023-activity';
 import {renderAdminTeam} from './team.mjs?v=20261024-subpages';
 import {renderCampaignLinks} from './campaign-links.mjs?v=20261024-dashboard';
 import {renderPlayerReports} from './player-reports.mjs?v=20261024-subpages';
+import {renderPuzzleReview} from './puzzle-review.mjs?v=20261026-puzzle-review';
 import {ADMIN_API_VERSION} from '../admin-api-contract.mjs';
 import {accountCsrfToken,firstPartyAuthEnabled,getAuthSession,storedAccountToken,signOutAccount} from '../growth-api.mjs';
 import {sanitizeAdminDestination} from './admin-return.mjs';
@@ -322,6 +323,7 @@ async function load() {
     if(area==='overview'){await renderOverview(root,authorizedRequest,{role:access.role,isCurrent:()=>loadId===deferredLoad,onRefresh:()=>void load(),serviceRelease:adminRelease});return;}
     if(area==='reports'){await renderPlayerReports(root,authorizedRequest);return;}
     if(area==='corpus'){await renderCorpus(root,authorizedRequest);return;}
+    if(area==='puzzle-review'){await renderPuzzleReview(root,{accountId:session?.user?.id});return;}
     if(area==='users'){await renderUsers(root,authorizedRequest,authorizedGrowthRequest,access.role);return;}
     if(area==='team'){if(access.role!=='owner'){denied(session?.user);return;}await renderAdminTeam(root,authorizedRequest);return;}
     if(area==='campaign-links'||area==='creator-challenges'){await renderCampaignLinks(root,authorizedGrowthRequest,authorizedRequest,{mode:area==='creator-challenges'?'creator':'campaign'});return;}

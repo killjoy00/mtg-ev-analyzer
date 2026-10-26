@@ -8,7 +8,7 @@ const yes=value=>value===true||value==='t';
 
 export const ADMIN_AREAS=Object.freeze({
   insights:'Insights',reports:'Feedback & Moderation',corpus:'Operations',users:'Users',
-  'campaign-links':'Campaign Links','creator-challenges':'Creator Challenges',team:'Settings',
+  'campaign-links':'Campaign Links','creator-challenges':'Creator Challenges','puzzle-review':'Puzzle Review',team:'Settings',
 });
 export function adminArea(search='') {
   const area=new URLSearchParams(search).get('area');
@@ -103,6 +103,7 @@ export function overviewMarkup({role='admin',now=new Date()}={}) {
       ${tool('users','Find accounts, manage public identities, and inspect membership access.')}
       ${tool('campaign-links','Build tracked links and publish campaign URLs.')}
       ${tool('corpus','Manage sets, quality checks, source data, and serving readiness.')}
+      ${tool('puzzle-review','Blind-rate puzzles from today’s Daily selector against the proposed selection rule.')}
       ${role==='owner'?tool('team','Owner-only administrator invitations, access, and audit history.'):''}
     </div></section>
     <div class="overview-bottom-grid">

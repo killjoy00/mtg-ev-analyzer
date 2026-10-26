@@ -14,6 +14,7 @@ preserve native browser history and direct bookmarks.
 | Users | `/admin/?area=users` |
 | Campaign Links | `/admin/?area=campaign-links` |
 | Operations / corpus | `/admin/?area=corpus` |
+| Puzzle Review (blinded selection test, [details](PUZZLE-REVIEW.md)) | `/admin/?area=puzzle-review` |
 | Settings / administrator access | `/admin/?area=team` (Owner only) |
 
 Existing named URLs retain their tools; the former root decision-quality report
