@@ -1,5 +1,11 @@
 # Puzzle quality v1: implementation and decision
 
+Historical experiment: the choice-prediction result below is not a puzzle-quality
+objective or a deployment justification. The owner's revised selection objective
+is implemented in [v2](PUZZLE-QUALITY-V2.md), with a separate
+[comparison and decision](PUZZLE-QUALITY-V2-RESULTS.md). V1 code and frozen inputs
+remain available for reproduction.
+
 The offline selector now separates strength, colour commitment, predicted
 debate, and historical-target defensibility. Its inference module has no
 response-store or database dependency. The training/evaluation harness is a

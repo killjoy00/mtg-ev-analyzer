@@ -4,8 +4,8 @@ on:
     paths:
       - 'scripts/puzzle_quality*.py'
       - 'scripts/card_strength_benchmark.py'
-      - 'tests/test_puzzle_quality.py'
-      - 'research/puzzle-quality-v1.json'
+      - 'tests/test_puzzle_quality*.py'
+      - 'research/puzzle-quality-v*.json'
       - 'research/card-strength-requirements.txt'
       - '.github/workflows/puzzle-quality.yml'
   workflow_dispatch:
@@ -26,5 +26,5 @@ jobs:
           cache: pip
           cache-dependency-path: research/card-strength-requirements.txt
       - run: python -m pip install -r research/card-strength-requirements.txt
-      - run: python -m unittest discover -s tests -p test_puzzle_quality.py -v
+      - run: python -m unittest discover -s tests -p 'test_puzzle_quality*.py' -v
       - run: python -m unittest discover -s tests -p test_card_strength_benchmark.py -v
