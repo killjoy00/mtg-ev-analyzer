@@ -91,6 +91,8 @@ not issue extra queries, change timeouts or authorize retries. Request-local
 context keeps concurrent traces separate. Only the first 12 database attempts
 per request emit start/headers/completion detail; the backend completion record
 reports total attempts, completed attempts, omitted detail and aggregate timings.
+Aggregate durations sum attempts; parallel waits can overlap and are not CPU time
+or a measure of compute charges.
 Untraced requests, other route families and work after route completion emit no
 database detail. A completed attempt can have failed; neither this counter nor a
 missing response proves whether a mutation committed. Logs never contain SQL,

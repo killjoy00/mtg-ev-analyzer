@@ -73,6 +73,19 @@ test('SQL HTTP failure stays separate from an upstream 520 and preserves rollbac
  assert.equal(rows.at(-1).database_calls,2);
 }));
 
+test('a reset or abort while reading a successful SQL response body never replays its mutation',async()=>fixture(async rows=>{
+ for(const error of [Object.assign(Error('private body reset'),{code:'ECONNRESET'}),new DOMException('private body abort','AbortError')]) {
+   rows.length=0;let commits=0;
+   globalThis.fetch=async()=>{commits++;return {status:200,ok:true,json:async()=>{throw error;}};};
+   await assert.rejects(observedRoute(request(),'growth',()=>query('INSERT INTO fixture VALUES ($1)',['synthetic'])),actual=>actual===error);
+   assert.equal(commits,1);
+   const metric=rows.find(r=>r.event==='backend_database');
+   assert.equal(metric.phase,'body');assert.equal(metric.http_status,200);assert.equal(metric.ok,false);
+   assert.equal(metric.failure_code,error.code==='ECONNRESET'?'ECONNRESET':'abort');
+   assert.doesNotMatch(JSON.stringify(rows),/private body|INSERT/);
+ }
+}));
+
 test('a lost backend response can coexist with a completed database operation and no gateway acknowledgement',async()=>fixture(async rows=>{
  let commits=0,upstream=0;
  globalThis.fetch=async()=>{commits++;return sqlResult();};
