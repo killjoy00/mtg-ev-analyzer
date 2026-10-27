@@ -17,6 +17,11 @@ const originalFetch=globalThis.fetch;
 globalThis.fetch=postgresTransport(pool);
 process.argv=[process.argv[0],path.resolve(suite),connectionFile,'--dev-fixtures'];
 try {
+  await pool.query(`CREATE TABLE IF NOT EXISTS neon_auth.account (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    "userId" uuid NOT NULL REFERENCES neon_auth."user"(id) ON DELETE CASCADE,
+    "providerId" text NOT NULL,"accountId" text NOT NULL,password text,
+    "createdAt" timestamptz NOT NULL DEFAULT now(),"updatedAt" timestamptz NOT NULL DEFAULT now())`);
   // The production-clone suite intentionally does not create managed Auth
   // rows. Supply only its documented prerequisites in this disposable fixture.
   if(suite==='tests/account-deletion-backend-smoke.mjs') {
