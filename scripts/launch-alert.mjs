@@ -44,12 +44,12 @@ export function parseGatewayEvent(row) {
 // residual includes transport, queueing and the output gate, not pure network
 // latency. A handler/residual split alone cannot establish a root cause.
 export function quotaStageSummary(events) {
-  const result={slow_events:0,timing_available:0,handler_dominant:0,residual_dominant:0,missing_timing:0,retried:0,quota_failures:0};
+  const result={slow_events:0,timing_available:0,handler_dominant:0,residual_dominant:0,missing_timing:0,retried:0,gateway_5xx_with_slow_quota:0};
   for(const e of events) {
     if(!(e.quota_ms>thresholds.quota_ms))continue;
     result.slow_events++;
     if(e.quota_attempts>1)result.retried++;
-    if(e.status>=500)result.quota_failures++;
+    if(e.status>=500)result.gateway_5xx_with_slow_quota++;
     if(!Number.isFinite(e.quota_handler_ms)||!Number.isFinite(e.quota_transport_wait_ms)) {
       result.missing_timing++;
       continue;
