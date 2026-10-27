@@ -216,3 +216,20 @@ test('shared preview workflows queue both acceptance jobs while preserving exclu
     assert.match(concurrency,/queue: max/);
   }
 });
+
+
+test('backend CI retains PR coverage and only dispatches full suites on reviewed main weekly or manually',()=>{
+  const workflow=fs.readFileSync('.github/workflows/backend-gate.yml','utf8');
+  assert.match(workflow,/cron: '17 7 \* \* 1'/);
+  assert.match(workflow,/CI_BRANCH_SUSPEND: 300/);
+  assert.doesNotMatch(workflow,/CI_BRANCH_SUSPEND: 0/);
+  assert.match(workflow,/github\.event_name == 'workflow_dispatch'/);
+  assert.match(workflow,/github\.ref == 'refs\/heads\/main'/);
+  assert.match(workflow,/github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
+  assert.match(workflow,/if: github\.event_name == 'pull_request'/);
+  assert.match(workflow,/needs\.precheck\.outputs\.domains_json/);
+  assert.match(workflow,/delete-branch-action@v3/);
+  const sampler=workflow.split('- name: Start Neon compute sampler')[1].split('- name: Apply pending migrations')[0];
+  assert.match(workflow,/sample_compute:[\s\S]*?type: boolean\n        default: false/);
+  assert.match(sampler,/if: github\.event_name == 'workflow_dispatch' && inputs\.sample_compute == true/);
+});

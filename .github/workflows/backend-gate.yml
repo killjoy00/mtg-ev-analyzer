@@ -2,11 +2,16 @@ name: backend schema gate
 
 on:
   workflow_dispatch:
-  # Pull requests run only the domains their changes reach. The nightly run
-  # covers all six against main for anything that reaches across domains
-  # without a static import, such as HTTP routes.
+    inputs:
+      sample_compute:
+        description: Diagnostic SQL polling (keeps CI compute awake; leave off for suspension tests)
+        type: boolean
+        default: false
+  # PRs run affected domains. A weekly full sweep covers unexpected cross-domain
+  # coupling without provisioning six production-sized copies every night.
+  # Operators can dispatch the same full sweep manually from reviewed main.
   schedule:
-    - cron: '17 7 * * *'
+    - cron: '17 7 * * 1'
   push:
     branches: ['ci/test-fixture-*']
   pull_request:
@@ -167,7 +172,7 @@ jobs:
     needs: [precheck, postgres-contract]
     # Fork PRs do not receive repository secrets. Keep them skipped rather than
     # failing or ever pointing the fixture suites at the production branch.
-    if: ${{ !cancelled() && needs.postgres-contract.result == 'success' && ((github.event_name == 'schedule' && github.repository == 'killjoy00/mtg-ev-analyzer') || github.event.pull_request.head.repo.full_name == github.repository) && (needs.precheck.result != 'success' || needs.precheck.outputs.needs_neon != 'false') }}
+    if: ${{ !cancelled() && needs.postgres-contract.result == 'success' && (((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/main') || github.event.pull_request.head.repo.full_name == github.repository) && (needs.precheck.result != 'success' || needs.precheck.outputs.needs_neon != 'false') }}
     strategy:
       fail-fast: false
       max-parallel: 3
@@ -212,7 +217,7 @@ jobs:
           CI_BRANCH_PREFIX: ci-pr-${{ github.event.pull_request.number || 0 }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.domain }}
           CI_BRANCH_PARENT: br-orange-feather-ayps8kep
           CI_BRANCH_EXPIRES: ${{ steps.expiry.outputs.expires_at }}
-          CI_BRANCH_SUSPEND: 0
+          CI_BRANCH_SUSPEND: 300
         run: node scripts/create-ci-neon-branch.mjs
 
       - name: Prepare isolated connection
@@ -228,6 +233,9 @@ jobs:
           echo "PACK1_CI_CONNECTION=$connection_file" >> "$GITHUB_ENV"
 
       - name: Start Neon compute sampler
+        # SQL polling every five seconds prevents idle suspension. Reserve it
+        # for an explicitly requested diagnostic sweep, never routine CI.
+        if: github.event_name == 'workflow_dispatch' && inputs.sample_compute == true
         shell: bash
         run: |
           nohup node scripts/ci-neon-compute-sample.mjs sample "$PACK1_CI_CONNECTION" "$RUNNER_TEMP/neon-cpu.jsonl" >/dev/null 2>&1 &
@@ -403,7 +411,7 @@ jobs:
   backend-gate:
     name: backend-gate
     needs: [precheck, backend-domain, postgres-contract]
-    if: ${{ !cancelled() && ((github.event_name == 'schedule' && github.repository == 'killjoy00/mtg-ev-analyzer') || github.event.pull_request.head.repo.full_name == github.repository) && (needs.precheck.result != 'success' || needs.precheck.outputs.needs_neon != 'false') }}
+    if: ${{ !cancelled() && (((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/main') || github.event.pull_request.head.repo.full_name == github.repository) && (needs.precheck.result != 'success' || needs.precheck.outputs.needs_neon != 'false') }}
     runs-on: ubuntu-latest
     steps:
       - name: Aggregate isolated backend domains
