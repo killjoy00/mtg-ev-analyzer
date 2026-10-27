@@ -23,7 +23,7 @@ At a fixed clock, 600 sequential admitted request-only calls require 75 counter 
 ### Bounded synthetic probe
 
 The **isolated synthetic quota comparison** workflow creates its own expiring,
-authenticated Worker and three SQLite namespaces (baseline, identical baseline control, and candidate). It has no Neon database or
+authenticated Worker and four SQLite namespaces (baseline, identical baseline control, candidate, and the same-actor crossover). It has no Neon database or
 application/production bindings and verifies cleanup by readback. On reviewed
 main its `extended` option runs a fixed correctness profile, capped at 10,000 measured HTTP calls:
 
@@ -96,11 +96,35 @@ repeats must finish: exactly 8,256 measured calls under a 10,000-call ceiling.
 No latency failure is retried. Completed repeat summaries are emitted as the
 run progresses, so an interrupted run cannot hide earlier evidence.
 
-A/A uses a separate namespace/class with exactly the baseline implementation,
-not the reservation code under another label. The runner verifies distinct
-instance IDs, declared implementation, stable instances, one confirmed counter
-write per baseline/control admission and write reduction for A/B. Control and
-candidate evidence cannot be silently interchanged.
+The initial v1 control used separate baseline/control namespaces. Its
+[fixed hosted run](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/40566853455)
+completed all 8,256 calls and verified cleanup. Identical A/A code produced
+aggregate client p99 values of 290.67 versus 759.23 ms and 135.88 versus
+870.48 ms. Both A/B repeats improved aggregate tails, but only three and five
+cohorts met the original heuristic. The experiment did not pass, and no result
+was discarded or retried to manufacture a pass.
+
+The current v2 experiment removes between-object placement as a confound:
+both sides use one actual Durable Object and its unchanged shared `buckets`
+row. [Cloudflare's location hints](https://developers.cloudflare.com/durable-objects/reference/data-location/)
+are best effort and do not guarantee identical placement for separate objects.
+This is a possible contributor to v1 variation, not an established cause of
+every observed regression.
+
+Baseline/control/candidate are ordinary JavaScript instances receiving the
+same untouched native state/storage. No native API is proxied. A common
+actor-instance marker must match across modes and stay stable. Separate
+measurement-instance markers and counters identify the selected implementation.
+Mode changes are rejected while another mode has in-flight calls; same-mode
+concurrency is preserved. Each paired cohort admits 258 calls total, below the
+unchanged 600-call burst cap even with at most seven unused candidate credits.
+There are no counter resets, separate policy key spaces, or doubled quota
+allowances. The ordinary extended correctness profile retains separate objects.
+
+The fixed sequence, sample counts, call ceiling, deadline and six-of-eight
+criterion remain identical. This is a revised experimental design, not a retry
+of the v1 plan. V1 evidence remains linked above. Any remaining time-dependent
+variation is measured by the same-actor A/A control.
 
 The report retains every cohort and computes paired client/handler p95/p99
 deltas. For each metric it compares candidate regressions with the observed
