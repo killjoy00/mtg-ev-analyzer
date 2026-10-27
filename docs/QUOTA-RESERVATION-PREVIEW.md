@@ -8,15 +8,15 @@ Cloudflare's output gates hold outgoing responses until pending writes are durab
 
 The persisted `buckets` row records an upper bound on consumed quota: admitted calls plus unused reserved credit. An instance reserves at most eight request credits, eight burst credits and two session credits, bounded by each window's remaining headroom. It consumes only those credits. Request, burst and session caps and fixed-window periods are unchanged. `/session-only` still avoids charging a previously charged request twice.
 
-All candidate fetches and cleanup alarms share one queue, held through transaction completion and `sync()`. Storage callback retries publish no instance state. A failed operation discards all instance credits before the next queued operation. Rejected mixed requests neither write partial reservations nor consume their other available credits. Expired credits cannot be reused. Legacy rows remain authoritative. Malformed persisted counters fail closed.
+Candidate debit batches and cleanup alarms share one queue, held through transaction completion and `sync()`. Calls that can use already-confirmed credits finish before a new write begins. When a refill is needed, up to 256 already-queued calls are planned together in arrival order and use one counter write and acknowledgement. Each call is admitted or denied against all its scopes together. Only actual queued calls are coalesced; speculative unused credit remains bounded at seven per request bucket and one session credit. Storage callback retries publish no instance state. A failed operation discards all instance credits and rejects the entire unconfirmed batch before the next queued operation. No successful decision or new credit is published before acknowledgement. Rejected mixed requests neither write partial reservations nor consume their other available credits. Expired credits cannot be reused. Legacy rows remain authoritative. Malformed persisted counters fail closed.
 
-After an acknowledged admission, eviction can forfeit up to seven unused credits from each request bucket and one session credit. Failed or lost acknowledgements may forfeit an entire new reservation. Repeated restarts can therefore cause earlier 429s; this is an explicit fairness cost, not an exact admission-equivalence claim. Rollback is safe because the old per-request implementation treats the reserved counts as spent. No counter reset or schema migration is needed.
+After an acknowledged admission, eviction can forfeit up to seven unused credits from each request bucket and one session credit. Failed or lost acknowledgements may additionally forfeit the charges for an unconfirmed batch of at most 256 queued calls, plus its bounded speculative credit; clients cannot distinguish committed requests from lost acknowledgements. No rejected mixed call partially charges another scope. Repeated restarts can therefore cause earlier 429s; this is an explicit fairness cost, not an exact admission-equivalence claim. Rollback is safe because the old per-request implementation treats the reserved counts as spent. No counter reset or schema migration is needed.
 
 ## Automated checks
 
 The gateway runtime workflow exercises both modes in real workerd with SQLite: simultaneous request/session caps, mixed refresh/creation calls, restart persistence, legacy denial, active-window cleanup and deletion. Unit tests additionally cover delayed/failed acknowledgement, queued concurrency, callback retries, exact window boundaries, rollback, corrupt state, 100 shared-network players completing paced gameplay, and generated mixed traffic with evictions against an independent model of the original limits.
 
-At a fixed clock, 600 admitted request-only calls require 75 counter writes in the candidate versus 600 in the baseline; the initial cleanup alarm is one additional write in either mode. This is a controlled algorithm test, not a provider latency or billing measurement. Window expiration and mixed traffic cause additional replenishments.
+At a fixed clock, 600 sequential admitted request-only calls require 75 counter writes in the candidate versus 600 in the baseline; the initial cleanup alarm is one additional write in either mode. This is a controlled algorithm test, not a provider latency or billing measurement. Window expiration and mixed traffic cause additional replenishments. In a controlled single-turn workload, 650 queued calls use three counter commits while admitting exactly 600 and denying 50; this is not a provider latency measurement.
 
 ## Isolated provider rehearsal
 
@@ -32,6 +32,10 @@ main it runs a fixed extended profile, capped at 10,000 HTTP calls:
   Candidate warm samples also separate refill/credit calls with queue and
   durability timing from the limiter's own metric object. Native storage APIs
   remain untouched; these timings do not claim to include provider dispatch.
+  Shared-network candidate records also report queue/durability percentiles and
+  the number of calls served in coalesced batches. `reservation_write` identifies
+  one owner per committed write; `batch_write` marks every call awaiting that
+  shared write, and `batch_size` counts calls planned together.
 - Exact fresh burst/session ceilings, plus 100 simultaneous session creations
   and 20 paced request rounds for each mode (2,100 admissions per shared quota).
 - Resume a quiet quota after more than a minute, then independently verify the
@@ -66,6 +70,20 @@ passed exact caps and reduced counter-write decisions from 195 to 27. Its
 The handler p99 regression prevents treating the faster p95 as rollout
 acceptance. This is synthetic evidence, not production telemetry or billing
 savings. Write decisions exclude provider-internal transaction retries.
+
+The [first extended hosted rehearsal](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/40555131767)
+completed all 9,157 scenario calls on retry and verified cleanup. Exact caps,
+2,100 shared-network admissions per mode, expiry and the documented three-credit
+restart forfeiture passed. However, the original serialized candidate failed
+latency acceptance: shared-network client p99 was 1,822.58 ms versus 489.78 ms
+for baseline, and only two of eight paired cohorts improved both tails. Faster
+aggregate warm p99 did not override this failed gate.
+
+To address the refill queue, the current preview coalesces already-waiting
+calls into a single confirmed commit, without increasing speculative credit.
+It must pass the same provider gates; the failed rehearsal is not rollout evidence.
+The auth preflight still fails closed and now requires a Worker-owned 403
+signature, reporting only a bounded HTTP status if provider preflight fails.
 
 ### Full gameplay rehearsal
 

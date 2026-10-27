@@ -36,22 +36,36 @@ test('only explicit isolated preview can activate reservations',async()=>{
   }
 });
 
-test('confirmed credits reduce request writes eightfold and preserve exact burst cap under concurrency',async()=>clock(async()=>{
+test('queued calls share batch commits and preserve the exact burst cap under concurrency',async()=>clock(async()=>{
   const f=fixture(),responses=await Promise.all(Array.from({length:650},()=>f.call('request')));
   assert.equal(responses.filter(r=>r.status===204).length,600);
   assert.equal(responses.filter(r=>r.status===429).length,50);
-  assert.equal(f.writes.rows,75);assert.equal(f.writes.alarms,1);
+  assert.equal(f.writes.rows,3);assert.equal(f.writes.alarms,1);
   assert.equal(f.values.get('buckets').request.count,600);
 }));
 
 test('no concurrent request spends credits before their acknowledgement; failures forfeit tentative credits',async()=>clock(async()=>{
   const wait=deferred(),commit=deferred();let first=true,finished=0;
   const f=fixture({sync:async()=>{if(first){first=false;wait.resolve();await commit.promise;}}});
-  const a=f.call('request').then(()=>{finished++;},e=>e),b=f.call('request').then(r=>{finished++;return r;});
+  const a=f.call('request').then(()=>{finished++;},e=>e),b=f.call('request').then(()=>{finished++;},e=>e);
   await wait.promise;await new Promise(r=>setImmediate(r));assert.equal(finished,0);assert.equal(f.writes.rows,1);
   commit.reject(Error('storage failed'));assert.match((await a).message,/storage failed/);
-  assert.equal((await b).status,204);assert.equal(f.writes.rows,2);
+  assert.match((await b).message,/storage failed/);assert.equal(finished,0);
+  assert.equal((await f.call('request')).status,204);assert.equal(f.writes.rows,2);
   assert.equal(f.values.get('buckets').request.count,16,'failed reservation cannot be reused');
+}));
+
+test('calls arriving during acknowledgement share the next commit with bounded unused credit',async()=>clock(async()=>{
+  const wait=deferred(),commit=deferred();let first=true,finished=0;
+  const f=fixture({sync:async()=>{if(first){first=false;wait.resolve();await commit.promise;}}});
+  const initial=f.call('request').then(r=>{finished++;return r;});await wait.promise;
+  const queued=Array.from({length:100},()=>f.call('request').then(r=>{finished++;return r;}));
+  await new Promise(r=>setImmediate(r));assert.equal(finished,0);assert.equal(f.writes.rows,1);
+  commit.resolve();assert.equal((await initial).status,204);
+  assert.ok((await Promise.all(queued)).every(r=>r.status===204));
+  assert.equal(f.writes.rows,2,'one confirmed write serves the queued refill group');
+  assert.equal(f.values.get('buckets').request.count,104);
+  assert.equal(f.quota().reservations.credits.request.remaining,3);
 }));
 
 test('restart discards unused credits, including strict-mode rollback, without reopening windows',async()=>clock(async()=>{
@@ -112,6 +126,33 @@ test('transaction callback retries cannot duplicate in-memory credits',async()=>
   assert.equal(f.values.get('buckets').request.count,16);assert.equal(f.quota().reservations.credits.request.remaining,7);
 }));
 
+test('transaction callback retries cannot duplicate a batch of creation decisions',async()=>clock(async()=>{
+  const f=fixture({retry:true});const rows=await Promise.all(Array.from({length:256},()=>f.call('session-only')));
+  assert.equal(rows.filter(r=>r.status===204).length,120);assert.equal(rows.filter(r=>r.status===429).length,136);
+  assert.equal(f.values.get('buckets').session.count,120);assert.equal(f.quota().reservations.credits.session.remaining,0);
+  assert.equal((await f.call('request')).status,204);assert.equal(f.values.get('buckets').session.count,120);
+}));
+
+test('a batch completion record cannot precede acknowledgement or hide its failure',async()=>clock(async()=>{
+  const wait=deferred(),commit=deferred(),rows=[],log=console.log;
+  console.log=line=>rows.push(JSON.parse(line));
+  try {
+    const f=fixture({sync:()=>{wait.resolve();return commit.promise;}});
+    const calls=Promise.allSettled([1,2].map(i=>f.quota().fetch(new Request('https://quota/request',{method:'POST',
+      headers:{'x-pack1-trace':String(i).repeat(32)}}))));
+    await wait.promise;assert.equal(rows.filter(r=>r.event==='quota_handler').length,0);
+    assert.equal(rows.filter(r=>r.event==='quota_commit_wait').length,2);
+    commit.reject(Error('private provider detail'));
+    assert.ok((await calls).every(r=>r.status==='rejected'));
+    const completed=rows.filter(r=>r.event==='quota_handler');assert.equal(completed.length,2);
+    for(const row of completed) {
+      assert.equal(row.phase,'durability');assert.equal(row.durability_confirmed,false);
+      assert.equal(row.status,503);assert.equal(row.batch_size,2);
+    }
+    assert.doesNotMatch(JSON.stringify(rows),/private provider detail/);
+  } finally {console.log=log;}
+}));
+
 test('100 shared-network players and paced full gameplay fit the unchanged limits',async()=>clock(async(set,now)=>{
   const f=fixture();assert.equal((await Promise.all(Array.from({length:100},()=>f.call('session')))).every(r=>r.status===204),true);
   for(let wave=0;wave<22;wave++) {
@@ -146,5 +187,26 @@ test('generated mixed traffic with evictions never admits a request outside the 
       if(!oracle[key]||now()>=oracle[key].until)oracle[key]={count:0,until:now()+period};
       assert.ok(oracle[key].count<cap,`original ${key} cap at event ${i}`);oracle[key].count++;
     }
+  }
+}));
+
+test('concurrent mixed batches, expiry and restarts obey an independent original-limit oracle',async()=>clock(async(set,now)=>{
+  const f=fixture(),oracle={};let seed=31;
+  const random=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed;};
+  for(let wave=0;wave<60;wave++) {
+    if(wave%3===0)f.restart();
+    if(wave%5===0)set(now()+10001);
+    const kinds=Array.from({length:50},()=>['request','session','session-only'][random()%3]);
+    const results=await Promise.all(kinds.map(kind=>f.call(kind)));
+    for(let i=0;i<results.length;i++) {
+      if(results[i].status!==204){assert.equal(results[i].status,429);continue;}
+      const kind=kinds[i],limits=[...(kind!=='session-only'?[['request',3600,60000],['request_burst',600,10000]]:[]),...(kind!=='request'?[['session',120,600000]]:[])];
+      for(const [key,cap,period] of limits) {
+        if(!oracle[key]||now()>=oracle[key].until)oracle[key]={count:0,until:now()+period};
+        assert.ok(oracle[key].count<cap,`original ${key} cap at wave ${wave}`);oracle[key].count++;
+      }
+    }
+    for(const [key,credit] of Object.entries(f.quota().reservations.credits))
+      assert.ok(credit.remaining<=(key==='session'?1:7),'only the documented speculative credit remains');
   }
 }));
