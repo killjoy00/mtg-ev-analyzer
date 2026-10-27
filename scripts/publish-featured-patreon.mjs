@@ -127,9 +127,17 @@ async function safeStage(name,fn) {
 
 // Accessible controls are deliberately restrictive. Unknown redesigns fail closed,
 // instead of clicking a nearby paid-access option or publishing empty content.
-export async function publishInPatreonEditor({post,state,onSubmit=()=>{}}) {
+export function browserlessEndpoint(token) {
+ if(typeof token!=='string'||!/^[-_a-zA-Z0-9]{12,256}$/.test(token))
+  throw Error('patreon-browserless-token-invalid');
+ return 'wss://production-sfo.browserless.io?token='+encodeURIComponent(token);
+}
+
+export async function publishInPatreonEditor({post,state,onSubmit=()=>{},browserlessToken=process.env.PACKONE_BROWSERLESS_TOKEN}) {
  const {chromium}=await import('playwright');
- const browser=await chromium.launch({headless:true});
+ const browser=browserlessToken
+  ? await chromium.connectOverCDP(browserlessEndpoint(browserlessToken))
+  : await chromium.launch({headless:true});
  try {
   const context=await browser.newContext({storageState:state,acceptDownloads:false});
   const page=await context.newPage();
@@ -268,7 +276,8 @@ export async function publishFeaturedPatreon({env=process.env,fetchImpl=fetch,
   throw Error('patreon-receipt-posted-but-post-not-found');
  let possible=false;
  try {
-  await editor({post,state,onSubmit:()=>{possible=true;}});
+  await editor({post,state,onSubmit:()=>{possible=true;},
+   browserlessToken:env.PACKONE_BROWSERLESS_TOKEN});
   for(let i=0;i<7;i++) {
    existing=await find();
    if(existing)break;
