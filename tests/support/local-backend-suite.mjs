@@ -4,11 +4,11 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {fixturePool,postgresTransport,SQL_CONNECTION} from './postgres-fixture.mjs';
 
 const map=JSON.parse(fs.readFileSync('scripts/backend-gate-map.json','utf8'));
 const suite=process.argv[2];
 if(!map.domains.account.suites.includes(suite))throw Error('Only reviewed account suites may use local PostgreSQL');
+const {fixturePool,postgresTransport,SQL_CONNECTION}=await import('./postgres-fixture.mjs');
 const pool=fixturePool(); // validates local host, database and dedicated test role
 const directory=fs.mkdtempSync(path.join(os.tmpdir(),'pack1-local-account-'));
 const connectionFile=path.join(directory,'connection');
