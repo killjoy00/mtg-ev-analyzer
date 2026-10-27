@@ -229,4 +229,7 @@ test('backend CI retains PR coverage and only dispatches full suites on reviewed
   assert.match(workflow,/if: github\.event_name == 'pull_request'/);
   assert.match(workflow,/needs\.precheck\.outputs\.domains_json/);
   assert.match(workflow,/delete-branch-action@v3/);
+  const sampler=workflow.split('- name: Start Neon compute sampler')[1].split('- name: Apply pending migrations')[0];
+  assert.match(workflow,/sample_compute:[\s\S]*?type: boolean\n        default: false/);
+  assert.match(sampler,/if: github\.event_name == 'workflow_dispatch' && inputs\.sample_compute == true/);
 });

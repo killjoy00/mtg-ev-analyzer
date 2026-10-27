@@ -2,6 +2,11 @@ name: backend schema gate
 
 on:
   workflow_dispatch:
+    inputs:
+      sample_compute:
+        description: Diagnostic SQL polling (keeps CI compute awake; leave off for suspension tests)
+        type: boolean
+        default: false
   # PRs run affected domains. A weekly full sweep covers unexpected cross-domain
   # coupling without provisioning six production-sized copies every night.
   # Operators can dispatch the same full sweep manually from reviewed main.
@@ -228,6 +233,9 @@ jobs:
           echo "PACK1_CI_CONNECTION=$connection_file" >> "$GITHUB_ENV"
 
       - name: Start Neon compute sampler
+        # SQL polling every five seconds prevents idle suspension. Reserve it
+        # for an explicitly requested diagnostic sweep, never routine CI.
+        if: github.event_name == 'workflow_dispatch' && inputs.sample_compute == true
         shell: bash
         run: |
           nohup node scripts/ci-neon-compute-sample.mjs sample "$PACK1_CI_CONNECTION" "$RUNNER_TEMP/neon-cpu.jsonl" >/dev/null 2>&1 &
