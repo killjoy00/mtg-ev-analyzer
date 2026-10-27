@@ -15,7 +15,13 @@ const pool=fixturePool();
 const query=async(text,values=[])=>pool.query({text,values,types:textTypes});
 const array=values=>`{${values.join(',')}}`;
 const seed=day=>`daily:latest:${day}:${DRAFT_RUN_CORPUS_VERSION}:${DRAFT_RUN_SELECTION_VERSION}`;
-const latest=async day=>selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed(day),'latest',{daily:true,day});
+// Returns the run and the rule that chose it.
+const select=async(environment,day,seedText)=>{
+  const report={};
+  const run=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seedText,environment,{daily:true,day,report});
+  return {run,rule:report.selectionRule};
+};
+const latest=day=>select('latest',day,seed(day));
 const DAYS=['2026-11-02','2026-11-03','2026-11-04','2026-11-05','2026-11-06'];
 // The fixture's serving filters, as the selector applies them.
 const SERVING=`p.interesting AND r.target_support_ratio>=0.2 AND NOT EXISTS(SELECT 1 FROM draft_run_pick_removal_members m
@@ -31,8 +37,8 @@ try {
 
   let contested=0,ruleRounds=0;
   for(const day of DAYS) {
-    const run=await latest(day);
-    check(run.selectionRule===LATEST_DAILY_RULE&&run.length===8,`${day}: the scored latest set uses the stakes rule`);
+    const {run,rule}=await latest(day);
+    check(rule===LATEST_DAILY_RULE&&run.length===8,`${day}: the scored latest set uses the stakes rule`);
     const rows=new Map((await query(`SELECT p.puzzle_id,p.source_draft_hash,p.pick_number,r.band,f.stakes_points,f.credible_count,f.trophy_in_main_deck,f.trophy_is_land
       FROM draft_run_verified_puzzles p JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'
       JOIN draft_run_puzzle_selection_features f ON f.puzzle_id=p.puzzle_id AND f.feature_version=$2 WHERE p.puzzle_id=ANY($1::text[])`,
@@ -62,24 +68,25 @@ try {
     }
     check(new Set(run.map(p=>p.source_draft_hash)).size===8,`${day}: eight distinct source drafts`);
   }
+  const plain=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed(DAYS[0]),'latest',{daily:true,day:DAYS[0]});
+  assert.deepStrictEqual(plain,(await latest(DAYS[0])).run,'The report option does not change the returned run');tests++;
   check(contested>=DAYS.length*5&&ruleRounds===contested,`Every contested round came from its top stakes pool (${ruleRounds}/${contested})`);
 
-  const mixed=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,`daily:mixed:${DAYS[0]}`,'mixed',{daily:true,day:DAYS[0]});
-  check(mixed.selectionRule===null,'The mixed Daily keeps the band draw');
+  check((await select('mixed',DAYS[0],`daily:mixed:${DAYS[0]}`)).rule===null,'The mixed Daily keeps the band draw');
 
   // One unscored serving puzzle of the latest set turns the rule off.
-  const setId=(await latest(DAYS[0]))[0].set_id;
+  const setId=(await latest(DAYS[0])).run[0].set_id;
   const victim=(await query(`SELECT p.puzzle_id FROM draft_run_verified_puzzles p
     JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'
     WHERE ${SERVING} AND p.set_id=$1 AND p.pick_number=8 ORDER BY p.puzzle_id LIMIT 1`,[setId])).rows[0].puzzle_id;
-  const ruled=(await latest(DAYS[0])).map(p=>p.puzzle_id);
+  const ruled=(await latest(DAYS[0])).run.map(p=>p.puzzle_id);
   await query('DELETE FROM draft_run_puzzle_selection_features WHERE puzzle_id=$1',[victim]);
   const fallback=await latest(DAYS[0]);
-  check(fallback.selectionRule===null&&fallback.length===8,'A partly scored latest set keeps the band draw');
-  check(fallback.map(p=>p.puzzle_id).join()!==ruled.join(),'The band draw chooses differently from the rule');
+  check(fallback.rule===null&&fallback.run.length===8,'A partly scored latest set keeps the band draw');
+  check(fallback.run.map(p=>p.puzzle_id).join()!==ruled.join(),'The band draw chooses differently from the rule');
   const restored=await scorePuzzleSelection(query,{setIds:[setId],log:()=>{}});
   check(restored[0].written===1,'The backfill scores the missing puzzle');
-  check((await latest(DAYS[0])).map(p=>p.puzzle_id).join()===ruled.join(),'Scored again, the rule returns the same Daily');
+  check((await latest(DAYS[0])).run.map(p=>p.puzzle_id).join()===ruled.join(),'Scored again, the rule returns the same Daily');
 
   // A changed strength table marks rows stale; the backfill rewrites them.
   await query("UPDATE draft_run_puzzle_selection_features SET strength_sha256=repeat('0',64) WHERE puzzle_id=$1",[victim]);
@@ -92,7 +99,7 @@ try {
     check(created,'The latest-set Daily schedule is created');
     const stored=(await query("SELECT selection_rule FROM draft_run_schedules WHERE day=$1::date AND environment='latest'",[day])).rows[0];
     check(stored.selection_rule===LATEST_DAILY_RULE,'The schedule records the stakes rule');
-    check(JSON.parse(schedule.puzzle_ids).join()===(await latest(day)).map(p=>p.puzzle_id).join(),'The schedule holds the rule selection');
+    check(JSON.parse(schedule.puzzle_ids).join()===(await latest(day)).run.map(p=>p.puzzle_id).join(),'The schedule holds the rule selection');
     await ensureDailySchedule(query,day,'mixed');
     check((await query("SELECT selection_rule FROM draft_run_schedules WHERE day=$1::date AND environment='mixed'",[day])).rows[0].selection_rule===null,
       'A mixed schedule records no rule');

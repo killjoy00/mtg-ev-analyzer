@@ -61,15 +61,17 @@ async function buildDailySchedule(query,day,environment) {
     :[];
   const seed=`daily:${environment}:${day}:${DRAFT_RUN_CORPUS_VERSION}:${DRAFT_RUN_SELECTION_VERSION}`;
   const recent=(await query(RECENT_DAILY_DECISIONS,[day,DAILY_REPEAT_WINDOW_DAYS.decision-1,DAILY_REPEAT_WINDOW_DAYS.source-1])).rows;
+  // The tier that succeeds runs last, so its rule is the one recorded.
+  const report={selectionRule:null};
   const selected=await selectDailyWithoutRepeats(
-    exclude=>selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,environment,{daily:true,day,exclude}),
+    exclude=>selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,environment,{daily:true,day,exclude,report}),
     dailyRepeatExclusion(recent),{environment,day});
   if(!selected.length)throw unavailable('Daily schedule unavailable.');
   const plan=selected.map(p=>p.puzzle_id);
   if(environment==='latest')featuredSets=[selected[0].set_id];
   const inserted=await query(
     'INSERT INTO draft_run_schedules(day,environment,corpus_version,puzzle_ids,difficulty_version,selection_version,daily_featured_sets,scoring_version,serving_policy_version,selection_rule) VALUES($1::date,$2,$3,$4::jsonb,$5,$6,$7::jsonb,$8,$9,$10) ON CONFLICT(day,environment) DO NOTHING RETURNING day',
-    [day,environment,DRAFT_RUN_CORPUS_VERSION,JSON.stringify(plan),DRAFT_RUN_DIFFICULTY_VERSION,DRAFT_RUN_SELECTION_VERSION,JSON.stringify(featuredSets),DRAFT_RUN_SCORING_VERSION,SERVING_POLICY_VERSION,selected.selectionRule||null],
+    [day,environment,DRAFT_RUN_CORPUS_VERSION,JSON.stringify(plan),DRAFT_RUN_DIFFICULTY_VERSION,DRAFT_RUN_SELECTION_VERSION,JSON.stringify(featuredSets),DRAFT_RUN_SCORING_VERSION,SERVING_POLICY_VERSION,report.selectionRule],
   );
   schedule=(await query(DAILY_SCHEDULE_SELECT,[day,environment])).rows[0];
   if(!schedule)throw unavailable('Daily schedule unavailable.');

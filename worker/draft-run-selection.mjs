@@ -140,7 +140,9 @@ async function stakesRound(query,where,params,{setId,band,draw}) {
     [...rule,offset]);
 }
 
-export async function selectDatabaseRun(query,version,seed,environment='mixed',{daily=false,day=gameDateKey(),selectionVersion=DRAFT_RUN_SELECTION_VERSION,setIds=[],snapshot=null,exclude=null}={}) {
+// report, when given, receives selectionRule: the rule that chose this run, or
+// null for the band draw.
+export async function selectDatabaseRun(query,version,seed,environment='mixed',{daily=false,day=gameDateKey(),selectionVersion=DRAFT_RUN_SELECTION_VERSION,setIds=[],snapshot=null,exclude=null,report=null}={}) {
   const random=seededRandom(seed),bands=runDifficultyBands(random,selectionVersion),selected=[],sources=[],sets=new Set();
   let windows=runPickWindows(environment,selectionVersion);
   const released=new Set(releasedRunSets(day));
@@ -170,7 +172,7 @@ export async function selectDatabaseRun(query,version,seed,environment='mixed',{
   }
   const forced=requiredSetRounds(groups,bands,windows,random,required);
   const stakes=daily&&environment==='latest'&&!snapshot&&selectionVersion===DAILY_SELECTION_VERSION&&await latestStakesReady(query,version,required[0]);
-  selected.selectionRule=stakes?LATEST_DAILY_RULE:null;
+  if(report)report.selectionRule=stakes?LATEST_DAILY_RULE:null;
   const key=p=>`${p.set_id}:${p.pick_number}:${p.band}`;
   const remaining=new Map(groups.map(g=>[key(g),g]));
   for(let round=0;round<windows.length;round++) {
