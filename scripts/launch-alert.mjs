@@ -12,7 +12,7 @@ const CONTINUATION_WORKFLOW='launch-alert.yml';
 export const MAX_CONTINUATION_DEPTH=12;
 export const GATEWAY_PAGE_SIZE=2000,GATEWAY_MAX_PAGES=32;
 const RECOVERABLE_ALERTS=new Set(['coverage_pending','coverage_continuation_failed','telemetry_unavailable']);
-export const thresholds={window_minutes:15,minimum_errors:5,estimated_error_fraction:.01,minimum_429:10,minimum_slow_samples:3,slow_ms:SLOW_REQUEST_MS,quota_ms:SLOW_QUOTA_MS,requests_per_day:100000,free_requests_warning:80000,free_requests_alert:95000,compute_cu_hours_per_billing_period:200,egress_bytes_per_billing_period:50*1024**3};
+export const thresholds={window_minutes:15,minimum_errors:5,estimated_error_fraction:.01,minimum_429:10,minimum_slow_samples:3,slow_ms:SLOW_REQUEST_MS,quota_ms:SLOW_QUOTA_MS,requests_per_day:100000,free_requests_warning:80000,free_requests_alert:95000,compute_cu_hours_per_billing_period:200,egress_bytes_per_billing_period:200_000_000_000};
 
 async function json(fetcher,url,token,body,method=body?'POST':'GET') {
   const r=await fetcher(url,{method,headers:{authorization:'Bearer '+token,'content-type':'application/json',accept:'application/json'},body:body?JSON.stringify(body):undefined,redirect:'error',signal:AbortSignal.timeout(20000)});
