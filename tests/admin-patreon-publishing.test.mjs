@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {summarizePatreonRuns,summarizePatreonConnection,renderPatreonPublishing} from '../admin/patreon-publishing.mjs';
+import {adminArea,ADMIN_AREAS} from '../admin/overview.mjs';
+import {sanitizeAdminDestination} from '../admin/admin-return.mjs';
+
+test('the owner Patreon link resolves to a registered admin destination',()=>{
+ assert.equal(adminArea('?area=patreon'),'patreon');
+ assert.equal(ADMIN_AREAS.patreon,'Patreon Publishing');
+ assert.equal(sanitizeAdminDestination('/admin/?area=patreon'),'/admin/?area=patreon');
+});
 
 test('admin workflow summary excludes pull requests and unrelated branches',()=>{
  const rows=summarizePatreonRuns([

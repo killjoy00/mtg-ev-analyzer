@@ -9,6 +9,7 @@ const yes=value=>value===true||value==='t';
 export const ADMIN_AREAS=Object.freeze({
   insights:'Insights',reports:'Feedback & Moderation',corpus:'Operations',users:'Users',
   'campaign-links':'Campaign Links','creator-challenges':'Creator Challenges','puzzle-review':'Puzzle Review',team:'Settings',
+  patreon:'Patreon Publishing',
 });
 export function adminArea(search='') {
   const area=new URLSearchParams(search).get('area');
