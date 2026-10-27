@@ -27,14 +27,38 @@ export function parseGatewayEvent(row) {
   if(!p||typeof p!=='object')try{p=JSON.parse(row?.$metadata?.message);}catch{return null;}
   if(!p||typeof p!=='object'||p.event!=='gateway_request'||![.1,1].includes(p.sample_rate)||!Number.isInteger(p.status)||p.status<100||p.status>599||!Number.isFinite(p.duration_ms)||p.duration_ms<0)return null;
   const duration=value=>Number.isFinite(value)&&value>=0?value:0;
+  const boundedTiming=value=>Number.isFinite(value)&&value>=0&&value<=600000?Math.round(value):null;
   const integer=value=>Number.isInteger(value)&&value>=0&&value<=100?value:null;
   const event={id:row?.$metadata?.id,route:/^[a-z_]{1,40}$/.test(p.route)?p.route:'other',status:p.status,sample_rate:p.sample_rate,duration_ms:p.duration_ms,quota_ms:duration(p.quota_ms),upstream_ms:duration(p.upstream_ms),quota_scope:['request','session','request,session'].includes(p.quota_scope)?p.quota_scope:null,release:/^[a-f0-9]{40}$/.test(p.release)?p.release:'unknown',
     tail_sampling_version:p.tail_sampling_version===1?1:0,rate_limit_class:p.rate_limit_class==='player_auth'&&p.status===429&&p.route==='account'&&p.upstream_status===429&&p.upstream_calls===1&&!p.quota_scope?'player_auth':null,
     upstream_calls:integer(p.upstream_calls),upstream_status:Number.isInteger(p.upstream_status)&&p.upstream_status>=100&&p.upstream_status<=599?p.upstream_status:null,
+    quota_handler_ms:boundedTiming(p.quota_handler_ms),quota_transport_wait_ms:boundedTiming(p.quota_transport_wait_ms),
     quota_attempts:integer(p.quota_attempts),quota_retryable:p.quota_retryable===true,quota_overloaded:p.quota_overloaded===true,quota_remote:p.quota_remote===true,
     error:['timeout','invalid_body','gateway_failure'].includes(p.error)?p.error:null};
   if(event.tail_sampling_version===1&&(event.duration_ms>thresholds.slow_ms||event.quota_ms>thresholds.quota_ms)&&event.sample_rate!==1)return null;
   return event;
+}
+
+// Only aggregate bounded stage counts; never copy gateway traces, object tags,
+// IPs or provider diagnostic records into the public watcher report. The
+// residual includes transport, queueing and the output gate, not pure network
+// latency. A handler/residual split alone cannot establish a root cause.
+export function quotaStageSummary(events) {
+  const result={slow_events:0,timing_available:0,handler_dominant:0,residual_dominant:0,missing_timing:0,retried:0,quota_failures:0};
+  for(const e of events) {
+    if(!(e.quota_ms>thresholds.quota_ms))continue;
+    result.slow_events++;
+    if(e.quota_attempts>1)result.retried++;
+    if(e.status>=500)result.quota_failures++;
+    if(!Number.isFinite(e.quota_handler_ms)||!Number.isFinite(e.quota_transport_wait_ms)) {
+      result.missing_timing++;
+      continue;
+    }
+    result.timing_available++;
+    if(e.quota_handler_ms>=e.quota_transport_wait_ms)result.handler_dominant++;
+    else result.residual_dominant++;
+  }
+  return result;
 }
 
 export function evaluate(events,usage) {
@@ -68,7 +92,7 @@ export function evaluate(events,usage) {
   const persistent_candidates=[];
   if(events.filter(e=>gameplay(e)&&e.duration_ms>thresholds.slow_ms).length>=thresholds.minimum_slow_samples)persistent_candidates.push('slow_requests_gameplay');
   if(events.filter(e=>gameplay(e)&&e.quota_ms>thresholds.quota_ms).length>=thresholds.minimum_slow_samples)persistent_candidates.push('slow_quota_gameplay');
-  return {alerts,persistent_candidates,severities:Object.fromEntries(alerts.map(c=>[c,alertSeverity(c)])),diagnostic_categories:[...diagnostic_categories].sort(),latency_sampling:events.length&&events.every(e=>e.tail_sampling_version===1)?'complete_tail':'legacy_or_mixed',sampled_events:events.length,estimated_requests:estimated,errors,limited,slow_samples:slow,slow_quota_samples:quotaSlow,releases:[...new Set(events.map(e=>e.release))],usage};
+  return {alerts,persistent_candidates,severities:Object.fromEntries(alerts.map(c=>[c,alertSeverity(c)])),diagnostic_categories:[...diagnostic_categories].sort(),latency_sampling:events.length&&events.every(e=>e.tail_sampling_version===1)?'complete_tail':'legacy_or_mixed',sampled_events:events.length,estimated_requests:estimated,errors,limited,slow_samples:slow,slow_quota_samples:quotaSlow,quota_stage_summary:quotaStageSummary(events),releases:[...new Set(events.map(e=>e.release))],usage};
 }
 
 export function parseBillingPeriodUsage(project,now=Date.now()) {
@@ -129,6 +153,7 @@ function gatewaySummary(summary) {
     limited:summary.limited,
     slow_samples:summary.slow_samples,
     slow_quota_samples:summary.slow_quota_samples,
+    quota_stage_summary:summary.quota_stage_summary,
     releases:summary.releases,
   };
 }
