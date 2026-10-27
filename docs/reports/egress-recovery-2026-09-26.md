@@ -101,3 +101,8 @@ is changed by this patch. Source merge and successful repository operational
 workflow runs are distinct from an application release. No application release
 is needed solely for these repository-run scripts. No production corpus payload
 was read to conduct this investigation or its SQL fixture tests.
+
+
+## October 27, 2026 policy update
+
+At the owner's request, the **launch watcher warning** for cumulative whole-project billing-period transfer is now **200 GB (200,000,000,000 bytes)**, superseding the historical 50-GiB threshold described above. The September observations remain unchanged as historical evidence. This operator alert-policy change does not affect the separate 5-GiB daily evidence threshold, Neon plan allowances, actual usage, compute warnings or the need to investigate genuine egress growth.
