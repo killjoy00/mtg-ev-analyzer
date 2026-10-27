@@ -1,46 +1,51 @@
-# Automated Patreon featured-pick publisher
+# Automated Patreon featured posts
 
-**Status:** Code is staged for review. This is not live until the change is merged, the creator session is authorized, and the opt-in repository variable is enabled. An actual Patreon editor and API publication must be verified before calling it operational.
+The publisher uses Patreon's normal creator editor because the supported API has no create-post operation. It posts the existing featured JPEG and text, selects Free access, reads the exact public title through API v2, and independently checks the title, full body and loaded cover-shaped image from a signed-out browser. A connection check is not a successful live publication.
 
-## What it does (no paid tools)
+## Connect once on a phone
 
-- Reuses the existing previous-day featured-pick selection, exact source-date checks, trophy-in-offered-choices integrity rule, JPEG cover, and generated `patreon.md`.
-- Adds a separate `featured-patreon` job after the `featured` media artifact upload. Patreon failure cannot cancel Bluesky, Discord, or YouTube; those destinations keep their own receipts.
-- Opens Patreon's documented creator **Image** post editor with Playwright Chromium on a standard GitHub Actions runner, fills title and body, uploads the real graphic, selects **Free access**, and invokes Publish. This is a normal public image/text post, not audio or a paid-tier post.
-- Reads published posts using Patreon's **documented read-only OAuth v2 API** for the Pack One campaign, checks an exact day-unique title and `is_public=true`, and records a nonsecret, date-scoped receipt in existing issue #1135.
-- Keeps possible partial submissions claimed rather than blindly publishing another copy. Safe failures before reaching Publish can retry through the independent 07:10/07:20/07:40 Pacific Neon dispatch. The current GitHub schedule remains a fallback.
+1. Open [Browserless Profiles](https://www.browserless.io/account/profiles) and sign into the existing Browserless account. Use the same API-token context as the key already saved in GitHub; profiles are scoped to that token.
+2. Choose **New Profile**, name it **packone-patreon**, select **Sign in via remote browser**, and set the starting URL to **https://www.patreon.com/**.
+3. Tap **Continue**, then **Open auth flow in new tab**. Sign into Patreon normally, complete any security verification and switch to the **Pack One creator** profile. Save with **Save profile** in the remote-browser toolbar (or **Done** in the original setup dialog).
+4. The existing morning workflow can now connect and publish automatically. For an immediate optional test, open [Connect and verify Patreon publishing](https://github.com/killjoy00/mtg-ev-analyzer/actions/workflows/patreon-publishing.yml), choose **Run workflow**, keep **main**, check **publish_once**, and run it. This publishes the latest eligible generated feature once. It requires yesterday's media from a trusted morning workflow; stale media is rejected.
 
-GitHub standard runners for this public repository have no additional Actions compute charge under the currently applicable GitHub public-repository policy. There is no Browserbase, Zapier, n8n Cloud, or Patreon publishing service fee. Existing infrastructure and GitHub quotas still apply.
+The same links and instructions are in Admin → Patreon publishing. No Codespace, terminal, downloaded cookie file, clipboard session or new login server is needed. Admin links to Browserless's authenticated profile setup; it does not embed or receive the Patreon login. Never paste credentials into chat or public repository content.
 
-## One-time authorization from an iPhone (no local code)
+## How automatic posting is gated
 
-**You do not need a Mac, PC, terminal, Playwright install, or local Git checkout.** A special one-time GitHub Codespace runs a normal desktop browser with a private, password-protected noVNC view. GitHub Codespaces private forwarded ports require the Codespace owner's GitHub authentication. The browser helper never asks you to paste a password into Pack One or ChatGPT.
+The morning job explicitly opts into profile-based automatic setup with `PACKONE_PATREON_AUTO_ACTIVATE=true`. Before reading the media or claiming a publication it verifies:
 
-[Open the Patreon connection Codespace](https://github.com/codespaces/new?repo=1201587098&ref=feature%2Fautomatic-patreon-featured-publishing&devcontainer_path=.devcontainer%2Fpatreon-auth%2Fdevcontainer.json)
+- The existing Browserless key can access the named saved profile and it contains cookies.
+- The existing Patreon creator token can read the configured campaign and its posts. A membership-only token is insufficient.
+- The signed-in creator's **My page** navigation points to Pack One. Missing or changed navigation fails closed.
 
-1. On your phone, open the link, keep **2 cores** selected, confirm configuration **Pack One Patreon — mobile sign-in**, and tap **Create codespace**. The special configuration installs and starts the browser automatically. If GitHub says free quota is exhausted, **do not approve paid use**; this flow requires unused personal-account Codespaces free allocation.
-2. The **Connect Pack One to Patreon** page should open automatically. Otherwise, in GitHub Codespaces open the **Ports** tab and choose the private forwarded **6081** port. **Never switch port 6080 or 6081 to Public.**
-3. Tap **Open Patreon browser**. Enter the temporary remote-browser password displayed on your connection page, log in normally to the Pack One **creator** identity, and complete any Patreon security verification. Use the noVNC keyboard controls as needed on the phone. Return to the original connection tab.
-4. Tap **Save Patreon connection**. The helper uses GitHub's encryption-aware CLI to attempt to store the browser state as the repository Actions secret **`PACKONE_PATREON_STORAGE_STATE_B64`**, without writing credentials to any committed file or CI artifact.
-5. If GitHub denies the Codespace's secret-writing permission, the page offers **Copy session securely** and **Open GitHub Actions secret form**. Use your phone's Copy/Paste to create the secret named **`PACKONE_PATREON_STORAGE_STATE_B64`** in that form. **Never paste it into ChatGPT or an issue/PR. Clear your clipboard afterward.** This is a one-time browser interaction, not coding.
-6. Once GitHub has saved the secret, **delete the temporary Codespace** at [Your GitHub Codespaces](https://github.com/codespaces). Deleting it destroys the temporary cloud browser session; the encrypted Actions secret remains in GitHub.
-7. The existing **`PATREON_CREATOR_ACCESS_TOKEN`** Actions secret is reused only to **read** published posts through Patreon's official API. It must support campaign post reading; it cannot write new posts. After merging the PR and validating a canary, set the repository Actions variable **`PACKONE_PATREON_AUTOPUBLISH_ENABLED`** to **`true`** from GitHub's web Settings UI. Until then the publisher remains disabled.
-8. To test live, run **post Pack One Daily to Bluesky and Discord** from GitHub Actions with **live=true** for the current Pacific day. Verify the independent **featured-patreon** job and the public post. All subsequent eligible mornings are automated, with retries and duplicate checks.
+A missing profile is a normal waiting state, with no attempted post. Other connection errors fail visibly. A connection check only opens the existing login; it never creates a post. The optional first-post workflow uses the same main/first-attempt and date restrictions, publication code, receipts and concurrency group as the mornings.
 
-The GitHub personal account's included Codespaces allowance is free within its monthly compute/storage quotas. Codespaces is *not* continuously required for publishing: only the one-time sign-in uses it. Check your Codespaces balance and spending settings before starting. The saved session can expire, in which case repeat the one-time cloud login.
+The legacy `PACKONE_PATREON_STORAGE_STATE_B64` path remains supported for existing installations. Profile mode reuses Browserless's **default browser context**; creating a new Playwright context would discard the saved login. Normal cookie rotation is saved back to the same Browserless profile after submission, without exporting the session into GitHub.
 
-## Safety and operator behavior
+Set the repository Actions variable `PACKONE_PATREON_AUTOPUBLISH_ENABLED=false` to pause morning posts. An unset variable allows the reviewed profile setup path; `true` retains the legacy explicit-enable behavior. The optional manual `publish_once` test is a separate explicit publication request.
 
-- No credentials, browser state, raw player rows, or authenticated page screenshots are uploaded to artifacts or echoed to logs. The browser session secret is passed directly as an environment variable and parsed in memory. Never enable Playwright trace/video/screenshot upload on the live publishing job.
-- A stored browser session may expire or encounter a CAPTCHA, 2FA prompt, geographic validation, or other challenge. The job **does not bypass** these protections. An expired session must be reauthorized through the phone-only Codespaces connection page. No free solution can promise permanent zero-intervention authentication.
-- Patreon can change its editor controls. Playwright uses narrow, accessible selectors and fails closed when a title, image, Free access audience, or Publish button cannot be verified. Do not enable selectors that guess by nearby element position or skip public-access verification.
-- To prevent duplicate public posts: (1) read-only exact-title lookup before any UI interaction, (2) date-scoped receipt claim, (3) read-only exact-title verification after submitting. If the browser may have clicked Publish but API verification fails, keep the receipt **claimed** and investigate rather than resetting it to failed. A later normal run checks the API again and will skip an existing matching post.
-- Publishing is limited to reviewed `main` and a first-attempt job, today's Pacific scheduler date, and a qualifying featured pick from **yesterday**. A corrected source date or rerun must never overwrite a different day's post.
-- A failure produces a red `featured-patreon` GitHub Actions job; turn on GitHub workflow-failure notifications or monitor this job. Existing Bluesky/Discord/YouTube publication continues independently.
-- Disable new publication by setting `PACKONE_PATREON_AUTOPUBLISH_ENABLED` to `false` (or deleting it). This does not affect Patreon's existing member OAuth, reconciliation, tiers, or other Pack One channels.
+## Publication and duplicate protection
 
-## Validation
+- Preserve selection, source date, real card imagery and trophy-in-offered-choices requirements.
+- Look up the complete exact-title post set through the supported read-only API before opening an editor.
+- Claim the date/channel receipt in issue #1135 under the existing workflow identity; public commenters cannot forge trusted receipts.
+- Before submission, verify the creator, retained title/body, image upload and Free access controls.
+- After submission, verify API public state and a signed-out browser view before marking the receipt posted.
+- Once Publish may have been clicked, a failure keeps the claim ambiguous. Do not automatically reset it or submit another post. A subsequent run can reconcile an existing exact-title public post without creating a duplicate, but must verify its public body and image too.
+- The dedicated first-post workflow and morning workflow share `packone-social-live` serialization. Other destinations retain their existing independent jobs.
+- No authenticated screenshots, page HTML, cookies, provider responses or token-bearing URLs are logged or uploaded. Only fixed status categories and already-public post URLs are returned.
 
-Run `node --test tests/featured-patreon.test.mjs`. Offline tests verify content provenance, public/private verification, pagination, duplicate handling, session-gate failures, claim behavior, current Pacific day guards, and workflow wiring. They intentionally do **not** contact a Patreon account or publish real content.
+Admin distinguishes the latest connection job from the latest first-post test. Its overall morning history is not proof of Patreon publication. Expired sessions or editor changes produce a failed Patreon job while other destinations can continue. Reconnect a revoked/expired login using the same profile name; indefinite authentication cannot be guaranteed by this integration.
 
-The live creator UI is **not proven compatible until the first owner-authorized canary succeeds**. If the first canary fails before Publish, review Patreon editor selectors without recording private browser state. If Patreon blocks GitHub-hosted browsers, stop: do not try to circumvent bot protection or silently substitute a paid service.
+## Limits and evidence
+
+Browserless currently documents a Free plan with 1,000 units/month, two concurrent browsers and a **two-minute absolute session limit**. A profile creation is bounded by the plan limit even though paid plans can allow longer. Have credentials/MFA ready before starting. No paid upgrade is automatically authorized. A daily readiness check, one short publisher session and one anonymous verification session are designed to fit that allowance, but actual login success, editor timing and usage require live verification.
+
+Sources checked October 27, 2026:
+
+- [Browserless authenticated profiles](https://docs.browserless.io/baas/features/authenticated-profiles)
+- [Browserless pricing and session limits](https://www.browserless.io/pricing)
+- [Patreon API v2](https://docs.patreon.com/)
+
+Offline regressions: `node --test tests/featured-patreon.test.mjs tests/patreon-publishing-connection.test.mjs tests/admin-patreon-publishing.test.mjs`. They cover profile context reuse, cleanup, wrong creator/campaign, missing post-read scope, public verification ordering, waiting/paused behavior, stale media and duplicate ambiguity. The merged workflow checks real configuration without exposing values. Only a completed real first post proves the live editor is compatible; document that outcome separately after authorization.
