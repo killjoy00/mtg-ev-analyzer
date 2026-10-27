@@ -27,6 +27,8 @@ on:
       - 'scripts/featured-soundtrack.mjs'
       - 'scripts/publish-featured-pick.mjs'
       - 'scripts/publish-featured-patreon.mjs'
+      - 'scripts/check-patreon-publishing.mjs'
+      - 'tests/patreon-publishing-connection.test.mjs'
       - 'scripts/patreon-mobile-auth-server.mjs'
       - '.devcontainer/patreon-auth/devcontainer.json'
       - 'docs/FEATURED-PATREON-AUTOPUBLISH.md'
@@ -189,6 +191,7 @@ jobs:
       MANUAL_LIVE: ${{ github.event_name == 'push' && 'true' || inputs.live }}
       SOURCE_PACIFIC_DAY: ${{ inputs.source_day }}
       PACKONE_PATREON_AUTOPUBLISH_ENABLED: ${{ vars.PACKONE_PATREON_AUTOPUBLISH_ENABLED }}
+      PACKONE_PATREON_AUTO_ACTIVATE: 'true'
       PACKONE_PATREON_STORAGE_STATE_B64: ${{ secrets.PACKONE_PATREON_STORAGE_STATE_B64 }}
       PACKONE_BROWSERLESS_TOKEN: ${{ secrets.PACKONE_BROWSERLESS_TOKEN }}
       PATREON_CREATOR_ACCESS_TOKEN: ${{ secrets.PATREON_CREATOR_ACCESS_TOKEN }}

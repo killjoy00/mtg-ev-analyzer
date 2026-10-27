@@ -1,0 +1,91 @@
+name: Connect and verify Patreon publishing
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/patreon-publishing.yml'
+      - 'scripts/check-patreon-publishing.mjs'
+      - 'scripts/publish-featured-patreon.mjs'
+  workflow_dispatch:
+    inputs:
+      publish_once:
+        description: 'Publish and independently verify the latest generated featured image and text once'
+        type: boolean
+        default: false
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+# Same lock as morning publication, so a canary and a scheduled post cannot race.
+concurrency:
+  group: packone-social-live
+  cancel-in-progress: false
+
+jobs:
+  connection:
+    if: github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci --no-audit --no-fund
+      - name: Check saved profile, creator identity and official post-reading access
+        run: node scripts/check-patreon-publishing.mjs
+        env:
+          PACKONE_BROWSERLESS_TOKEN: ${{ secrets.PACKONE_BROWSERLESS_TOKEN }}
+          PATREON_CREATOR_ACCESS_TOKEN: ${{ secrets.PATREON_CREATOR_ACCESS_TOKEN }}
+
+  canary-publish:
+    needs: [connection]
+    if: github.event_name == 'workflow_dispatch' && inputs.publish_once == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: npm ci --no-audit --no-fund
+      - name: Find media from a trusted recent morning run
+        id: media
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const {data:{workflow_runs:runs}} = await github.rest.actions.listWorkflowRuns({
+              ...context.repo, workflow_id:'daily-social-post.yml', branch:'main', per_page:20
+            });
+            for (const run of runs) {
+              if (run.head_branch !== 'main' || run.path !== '.github/workflows/daily-social-post.yml' ||
+                  !['schedule','workflow_dispatch','push'].includes(run.event) || run.run_attempt !== 1) continue;
+              const {data:{artifacts}} = await github.rest.actions.listWorkflowRunArtifacts({
+                ...context.repo, run_id:run.id
+              });
+              if (artifacts.some(a => a.name === 'packone-featured-pick' && !a.expired)) {
+                core.setOutput('run_id',run.id); return;
+              }
+            }
+            core.setFailed('No trusted recent featured media is available. Wait for the next morning run.');
+      - uses: actions/download-artifact@v4
+        with:
+          name: packone-featured-pick
+          path: artifacts/featured-pick
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.media.outputs.run_id }}
+      - name: Publish and independently verify Patreon
+        run: node scripts/publish-featured-patreon.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MANUAL_LIVE: 'true'
+          PACKONE_PATREON_AUTOPUBLISH_ENABLED: 'true'
+          PACKONE_BROWSERLESS_TOKEN: ${{ secrets.PACKONE_BROWSERLESS_TOKEN }}
+          PATREON_CREATOR_ACCESS_TOKEN: ${{ secrets.PATREON_CREATOR_ACCESS_TOKEN }}

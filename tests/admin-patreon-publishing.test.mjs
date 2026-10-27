@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {summarizePatreonRuns,renderPatreonPublishing} from '../admin/patreon-publishing.mjs';
+import {summarizePatreonRuns,summarizePatreonConnection,renderPatreonPublishing} from '../admin/patreon-publishing.mjs';
 
 test('admin workflow summary excludes pull requests and unrelated branches',()=>{
  const rows=summarizePatreonRuns([
@@ -12,6 +12,13 @@ test('admin workflow summary excludes pull requests and unrelated branches',()=>
  assert.deepEqual(rows.map(r=>r.id),[1,4]);
  assert.equal(rows[0].status,'success');
  assert.equal(rows[1].status,'in_progress');
+});
+test('connection success is distinct from a verified public post',()=>{
+ assert.deepEqual(summarizePatreonConnection([{name:'connection',conclusion:'success'},
+  {name:'canary-publish',conclusion:'skipped'}]),{
+  connection:'success',publication:'skipped',verified:false});
+ assert.equal(summarizePatreonConnection([{name:'canary-publish',conclusion:'success',
+  steps:[{name:'Publish and independently verify Patreon',conclusion:'success'}]}]).verified,true);
 });
 test('Patreon admin view does not claim to authorize or publish',()=>{
  assert.equal(typeof renderPatreonPublishing,'function');

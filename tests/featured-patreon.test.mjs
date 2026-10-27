@@ -80,6 +80,7 @@ test('supported read-only Patreon API verifies the exact public title across pag
   assert.equal(options.redirect,'error');
   assert.ok(url.startsWith('https://www.patreon.com/api/oauth2/v2/campaigns/'));
   assert.ok(options.headers.authorization.startsWith('Bearer '));
+  assert.equal(options.headers['user-agent'],'Pack One featured publisher');
   if(calls===1)return response({data:[item('Different title')],
    meta:{pagination:{cursors:{next:'cursor-2'}}}});
   assert.match(url,/page%5Bcursor%5D=cursor-2/);
@@ -119,7 +120,10 @@ test('publishes once, confirms API result and records a durable receipt',async()
   editor:async({post,state,onSubmit})=>{
    opened++;assert.equal(post.title,expected.title);
    assert.ok(state.cookies.length>0);onSubmit();
-  },sleep:async()=>{}});
+  },sleep:async()=>{},verifyPublic:async({url,post})=>{
+   assert.equal(url,'https://www.patreon.com/posts/890');
+   assert.equal(post.title,expected.title);
+  }});
  assert.equal(out.published,true);
  assert.equal(opened,1);
  assert.deepEqual(records.map(r=>r[0]),['claim','posted']);
@@ -129,9 +133,21 @@ test('existing public post is skipped before claiming or launching browser',asyn
  const r=await publishFeaturedPatreon({env,read:artifacts,
   now:new Date('2026-10-25T17:00:00Z'),assertLive:preflight,
   findPost:async()=>({id:'890',url:'https://www.patreon.com/posts/890'}),
+  verifyPublic:async()=>true,
   ledgerFactory:()=>{assert.fail('no claim when already live');},
   editor:async()=>{assert.fail('no browser when already live');}});
  assert.equal(r.alreadyPosted,true);
+});
+
+test('an unverified public body/image cannot produce a posted receipt or hide an ambiguous submission',async()=>{
+ const records=[];let reads=0;
+ await assert.rejects(publishFeaturedPatreon({env,read:artifacts,
+  now:new Date('2026-10-25T17:00:00Z'),assertLive:preflight,
+  ledgerFactory:fakeLedger(records),
+  findPost:async()=>++reads===1?null:{id:'890',url:'https://www.patreon.com/posts/890'},
+  editor:async({onSubmit})=>onSubmit(),
+  verifyPublic:async()=>{throw Error('patreon-public-verification-failed');}}),/publication-ambiguous/);
+ assert.deepEqual(records.map(r=>r[0]),['claim']);
 });
 
 test('safe UI error marks retryable; a possible Publish leaves claimed receipt',async()=>{

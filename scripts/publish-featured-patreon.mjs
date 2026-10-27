@@ -13,6 +13,7 @@ const POST_API='https://www.patreon.com/api/oauth2/v2/';
 const LEDGER_CHANNEL=discordReceiptKey('featured-patreon-public-v1');
 const POST_TITLE_SUFFIX=' | Pack One Daily ';
 const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+export const PATREON_BROWSERLESS_PROFILE='packone-patreon';
 
 export function makePatreonPost({feature:f,copy,render,cover}) {
  if(!f||!/^20\d\d-\d\d-\d\d$/.test(f.day||'')||
@@ -75,7 +76,8 @@ export async function findPublishedPatreonPost({title,token,
    throw Error('patreon-post-search-incomplete');
   visited.add(url.toString());
   const response=await fetchImpl(url.toString(),{
-   headers:{authorization:'Bearer '+token,accept:'application/json'},
+   headers:{authorization:'Bearer '+token,accept:'application/json',
+    'user-agent':'Pack One featured publisher'},
    redirect:'error',signal:AbortSignal.timeout(25000),
   });
   if(!response.ok)throw Error('patreon-post-read-failed-'+response.status);
@@ -127,27 +129,52 @@ async function safeStage(name,fn) {
 
 // Accessible controls are deliberately restrictive. Unknown redesigns fail closed,
 // instead of clicking a nearby paid-access option or publishing empty content.
-export function browserlessEndpoint(token) {
+export function browserlessEndpoint(token,profile) {
  if(typeof token!=='string'||!/^[-_a-zA-Z0-9]{12,256}$/.test(token))
   throw Error('patreon-browserless-token-invalid');
- return 'wss://production-sfo.browserless.io?token='+encodeURIComponent(token);
+ if(profile!==undefined&&(!/^[A-Za-z0-9_-]{1,64}$/.test(profile)))
+  throw Error('patreon-browserless-profile-invalid');
+ return 'wss://production-sfo.browserless.io?token='+encodeURIComponent(token)+
+  (profile?'&profile='+encodeURIComponent(profile)+'&timeout=120000':'');
 }
 
-export async function publishInPatreonEditor({post,state,onSubmit=()=>{},browserlessToken=process.env.PACKONE_BROWSERLESS_TOKEN}) {
- const {chromium}=await import('playwright');
+export async function openPatreonBrowser({state,browserlessToken,profile,chromiumImpl}) {
+ if(profile&&(!browserlessToken||state))throw Error('patreon-profile-configuration-invalid');
+ const chromium=chromiumImpl||(await import('playwright')).chromium;
  const browser=browserlessToken
-  ? await chromium.connectOverCDP(browserlessEndpoint(browserlessToken))
+  ? await chromium.connectOverCDP(browserlessEndpoint(browserlessToken,profile))
   : await chromium.launch({headless:true});
  try {
-  const context=await browser.newContext({storageState:state,acceptDownloads:false});
+  // A saved Browserless profile is loaded only in the existing default context.
+  // newContext() would silently discard its authenticated cookies and storage.
+  const context=profile?browser.contexts()[0]:
+   await browser.newContext({storageState:state,acceptDownloads:false});
+  if(!context)throw Error('patreon-profile-context-unavailable');
   const page=await context.newPage();
   page.setDefaultTimeout(12000);
-  await safeStage('open',async()=>{
+  return {browser,context,page};
+ } catch(error) {await browser.close().catch(()=>{});throw error;}
+}
+
+export async function assertPatreonCreator(page) {
    await page.goto('https://www.patreon.com/',{waitUntil:'domcontentloaded',timeout:30000});
-   if(!new URL(page.url()).hostname.endsWith('patreon.com')||
+   if(!/(^|\.)patreon\.com$/.test(new URL(page.url()).hostname)||
       /login|auth|challenge|captcha/i.test(page.url()))
-    throw Error('login-required');
-  });
+    throw Error('patreon-login-required');
+   // This is the signed-in creator's own-page navigation, not an arbitrary
+   // Pack One link on a public page. Unknown navigation fails closed.
+   const own=await findControl(page,[role('link',/^My page$/i)],'creator-identity');
+   const url=new URL(await own.getAttribute('href'),page.url());
+   if(url.origin!=='https://www.patreon.com'||
+      !['/c/PackOne','/PackOne'].includes(url.pathname.replace(/\/$/,'')))
+    throw Error('patreon-creator-mismatch');
+}
+
+export async function publishInPatreonEditor({post,state,onSubmit=()=>{},profile,
+ browserlessToken=process.env.PACKONE_BROWSERLESS_TOKEN}) {
+ const {browser,context,page}=await openPatreonBrowser({state,browserlessToken,profile});
+ try {
+  await safeStage('open',()=>assertPatreonCreator(page));
   await safeStage('create',async()=>{
    const button=await findControl(page,[
     role('button',/^Create(?: post)?$/i),role('link',/^Create(?: post)?$/i),
@@ -241,6 +268,13 @@ export async function publishInPatreonEditor({post,state,onSubmit=()=>{},browser
     if(confirm)await confirm.click();
    }
   });
+  // Persist normal session-cookie rotation without exporting state to GitHub,
+  // the Admin page, logs or artifacts. This never supplies login credentials.
+  if(profile) {
+   const cdp=await context.newCDPSession(page);
+   const result=await cdp.send('Browserless.saveProfile',{name:profile});
+   if(result?.ok!==true)throw Error('patreon-profile-refresh-failed');
+  }
   return {submitted:true};
  } finally {await browser.close();}
 }
@@ -248,8 +282,12 @@ export async function publishInPatreonEditor({post,state,onSubmit=()=>{},browser
 export async function publishFeaturedPatreon({env=process.env,fetchImpl=fetch,
  read=readFile,now=new Date(),editor=publishInPatreonEditor,
  ledgerFactory=createGithubReceiptLedger,findPost=findPublishedPatreonPost,
- sleep=pause,assertLive=assertCurrentLivePublisher}={}) {
- if(env.PACKONE_PATREON_AUTOPUBLISH_ENABLED!=='true')
+ sleep=pause,assertLive=assertCurrentLivePublisher,
+ connectionCheck=async options=>(await import('./check-patreon-publishing.mjs')).checkPatreonPublishing(options),
+ verifyPublic=verifyPublicPatreonPost}={}) {
+ const automatic=env.PACKONE_PATREON_AUTO_ACTIVATE==='true'&&
+  env.PACKONE_PATREON_AUTOPUBLISH_ENABLED!=='false';
+ if(env.PACKONE_PATREON_AUTOPUBLISH_ENABLED!=='true'&&!automatic)
   return {skipped:true,reason:'patreon-autopublish-not-activated'};
  if(env.GITHUB_REPOSITORY!=='killjoy00/mtg-ev-analyzer'||
     env.GITHUB_REF!=='refs/heads/main'||
@@ -258,17 +296,32 @@ export async function publishFeaturedPatreon({env=process.env,fetchImpl=fetch,
  if(env.SOURCE_PACIFIC_DAY&&env.SOURCE_PACIFIC_DAY!==pacificDay(now))
   return {skipped:true,reason:'stale-pacific-dispatch'};
  await assertLive({env,fetchImpl});
+ if(automatic&&env.PACKONE_PATREON_AUTOPUBLISH_ENABLED!=='true') {
+  try {await connectionCheck({env,fetchImpl});}
+  catch(error) {
+   if(error.message==='patreon-browser-profile-missing')
+    return {skipped:true,reason:'patreon-waiting-for-one-time-sign-in'};
+   throw error;
+  }
+ }
+
  const data=JSON.parse(await read(DIR+'/pick.json','utf8'));
  const render=JSON.parse(await read(DIR+'/render.json','utf8'));
  const cover=await read(DIR+'/featured-cover.jpg');
  const post=makePatreonPost({...data,render,cover});
  if(post.day!==previousPacificDay(now))throw Error('patreon-featured-day-stale');
- const state=parsePatreonStorageState(env.PACKONE_PATREON_STORAGE_STATE_B64);
+ const state=env.PACKONE_PATREON_STORAGE_STATE_B64?
+  parsePatreonStorageState(env.PACKONE_PATREON_STORAGE_STATE_B64):undefined;
+ const profile=state?undefined:PATREON_BROWSERLESS_PROFILE;
+ if(profile&&!env.PACKONE_BROWSERLESS_TOKEN)throw Error('patreon-browserless-token-missing');
  const token=env.PATREON_CREATOR_ACCESS_TOKEN;
  const find=()=>findPost({title:post.title,token,
   campaignId:PATREON_POLICY.campaignId,fetchImpl});
  let existing=await find();
- if(existing)return {alreadyPosted:true,day:post.day,url:existing.url};
+ if(existing) {
+  await verifyPublic({post,url:existing.url,browserlessToken:env.PACKONE_BROWSERLESS_TOKEN});
+  return {alreadyPosted:true,day:post.day,url:existing.url};
+ }
  const ledger=ledgerFactory({token:env.GITHUB_TOKEN,
   repo:'killjoy00/mtg-ev-analyzer',issueNumber:1135,fetchImpl});
  const claim=await ledger.claim(post.day,LEDGER_CHANNEL);
@@ -277,13 +330,14 @@ export async function publishFeaturedPatreon({env=process.env,fetchImpl=fetch,
  let possible=false;
  try {
   await editor({post,state,onSubmit:()=>{possible=true;},
-   browserlessToken:env.PACKONE_BROWSERLESS_TOKEN});
+   browserlessToken:env.PACKONE_BROWSERLESS_TOKEN,profile});
   for(let i=0;i<7;i++) {
    existing=await find();
    if(existing)break;
    if(i<6)await sleep(5000);
   }
   if(!existing)throw Error('patreon-publish-not-confirmed');
+  await verifyPublic({post,url:existing.url,browserlessToken:env.PACKONE_BROWSERLESS_TOKEN});
   await ledger.markPosted(post.day,LEDGER_CHANNEL,claim);
   return {published:true,day:post.day,url:existing.url};
  } catch {
@@ -293,6 +347,29 @@ export async function publishFeaturedPatreon({env=process.env,fetchImpl=fetch,
   throw Error(possible?'patreon-publication-ambiguous-reconcile-before-retry':
    'patreon-editor-failed-before-publish');
  }
+}
+
+export async function verifyPublicPatreonPost({post,url,browserlessToken,chromiumImpl}) {
+ if(!safePostUrl(url))throw Error('patreon-public-url-invalid');
+ // Deliberately omit the profile. A creator's signed-in view cannot prove that
+ // anyone else can read the post. No screenshots/HTML are written to disk.
+ const {browser,page}=await openPatreonBrowser({browserlessToken,chromiumImpl});
+ try {
+  await page.goto(url,{waitUntil:'domcontentloaded',timeout:30000});
+  await page.getByRole('heading',{name:post.title,exact:true}).waitFor({state:'visible',timeout:20000});
+  const more=page.getByRole('button',{name:/^Read more$/i});
+  if(await more.count()===1&&await more.isVisible())await more.click();
+  await page.waitForFunction(({title,body})=>{
+   const normalize=s=>s.replace(/\s+/g,' ').trim();
+   return normalize(document.body.innerText).includes(normalize(body))&&
+    document.body.innerText.includes(title)&&Array.from(document.images).some(img=>
+     img.complete&&img.naturalWidth>=1000&&img.naturalHeight>=500&&
+     Math.abs(img.naturalWidth/img.naturalHeight-1200/630)<.03);
+  },{title:post.title,body:post.body},{timeout:20000});
+  if(!safePostUrl(page.url()))throw Error('patreon-public-verification-failed');
+  return true;
+ } catch {throw Error('patreon-public-verification-failed');}
+ finally {await browser.close();}
 }
 
 if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]) {
