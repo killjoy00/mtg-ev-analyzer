@@ -175,7 +175,7 @@ test('production workflow isolates Patreon from other channels and keeps secrets
  const source=readFileSync(new URL('../.github/workflows/daily-social-post.yml',import.meta.url),'utf8');
  assert.match(source,/featured-patreon:/);
  assert.match(source,/PACKONE_PATREON_STORAGE_STATE_B64: \$\{\{ secrets\.PACKONE_PATREON_STORAGE_STATE_B64 \}\}/);
- assert.match(source,/PACKONE_PATREON_AUTOPUBLISH_ENABLED: \$\{\{ vars\.PACKONE_PATREON_AUTOPUBLISH_ENABLED \}\}/);
+ assert.match(source,/PACKONE_PATREON_AUTOPUBLISH_ENABLED: 'false'/);
  assert.match(source,/needs: \[featured\]/);
  assert.match(source,/scripts\/publish-featured-patreon\.mjs/);
  assert.match(source,/tests\/featured-patreon\.test\.mjs/);
