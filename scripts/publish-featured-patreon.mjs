@@ -53,8 +53,9 @@ export function parsePatreonStorageState(base64) {
 
 function safePostUrl(input) {
  try {
-  const url=new URL(input);
-  return url.protocol==='https:'&&url.hostname==='www.patreon.com'&&
+  if(typeof input!=='string')return null;
+  const url=new URL(input,'https://www.patreon.com');
+  return url.origin==='https://www.patreon.com'&&
     /^\/posts\//.test(url.pathname)&&!url.username&&!url.password?url.toString():null;
  } catch {return null;}
 }
@@ -86,8 +87,12 @@ export async function findPublishedPatreonPost({title,token,
   for(const item of page.data) {
    if(item?.attributes?.title!==title)continue;
    const a=item.attributes;
-   if(!a.published_at||a.is_public!==true||!safePostUrl(a.url))
-    throw Error('patreon-existing-post-not-verified-public');
+   if(!a.published_at||a.is_public!==true||!safePostUrl(a.url)) {
+    const error=Error('patreon-existing-post-not-verified-public');
+    error.verificationReason=!a.published_at?'unpublished':
+     a.is_public!==true?'not-public':'url-invalid';
+    throw error;
+   }
    matches.push({id:item.id,url:safePostUrl(a.url)});
   }
   if(matches.length>1)throw Error('patreon-duplicate-posts-detected');

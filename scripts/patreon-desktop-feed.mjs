@@ -74,6 +74,25 @@ export async function main(env=process.env) {
  await writeDesktopFeed({feed,cover,token:env.GITHUB_TOKEN});
  console.log(feed.verified_public_url?'desktop-feed:public-post-confirmed':'desktop-feed:ready');
 }
-if(process.argv[1]===fileURLToPath(import.meta.url))main().catch(()=>{
- console.error('desktop-feed:failed-closed');process.exitCode=1;
+// Public diagnostics are fixed codes only. Never print raw exceptions, provider
+// payloads, URLs or credentials when this job runs in the public repository.
+export function safeDesktopFeedFailure(error) {
+ const message=typeof error?.message==='string'?error.message:'';
+ const revision=new Map([
+  ['Live Daily posting requires main.','revision-main-required'],
+  ['Live Daily job re-runs are forbidden; dispatch a fresh run on current main.','revision-rerun-blocked'],
+  ['Live Daily revision attestation is incomplete.','revision-attestation-incomplete'],
+  ['Cannot verify live Daily publisher revision.','revision-check-unavailable'],
+  ['Stale Daily publisher revision; dispatch a fresh run on current main.','revision-stale'],
+ ]);
+ let code=revision.get(message);
+ if(!code&&/^(?:desktop-feed-(?:stale-artifact|image-mismatch|github-request-failed-\d{3})|patreon-(?:post-read-(?:not-configured|malformed|failed-\d{3})|post-search-incomplete|existing-post-not-verified-public|duplicate-posts-detected)|invalid-featured-artifact|invalid-patreon-copy|missing-patreon-provenance)$/.test(message))code=message;
+ if(!code)code='unknown';
+ if(code==='patreon-existing-post-not-verified-public'&&
+  ['unpublished','not-public','url-invalid'].includes(error?.verificationReason))
+  code+=':'+error.verificationReason;
+ return code;
+}
+if(process.argv[1]===fileURLToPath(import.meta.url))main().catch(error=>{
+ console.error('desktop-feed:failed-closed:'+safeDesktopFeedFailure(error));process.exitCode=1;
 });
