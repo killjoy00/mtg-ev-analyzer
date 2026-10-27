@@ -99,6 +99,7 @@ export function overviewMarkup({role='admin',now=new Date()}={}) {
     <section aria-labelledby="overview-tools-heading"><h2 id="overview-tools-heading">Manage Pack One</h2><div class="overview-tools">
       ${tool('insights','Decision quality, sharing conversion, and returning players.')}
       ${tool('creator-challenges','Publish authentic creator runs and check challenge performance.')}
+      ${role==='owner'?tool('patreon','Review automated Patreon publishing and connection readiness.'):''}
       ${tool('reports','Review player feedback and moderate reported profiles.')}
       ${tool('users','Find accounts, manage public identities, and inspect membership access.')}
       ${tool('campaign-links','Build tracked links and publish campaign URLs.')}

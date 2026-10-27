@@ -1,0 +1,20 @@
+{
+  "name": "Pack One Patreon — mobile sign-in",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:24-bookworm",
+  "postCreateCommand": "sudo apt-get update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends xvfb x11vnc fluxbox novnc websockify && npm ci --no-audit --no-fund && npx playwright install --with-deps chromium",
+  "postStartCommand": "nohup node scripts/patreon-mobile-auth-server.mjs >/tmp/packone-patreon-auth.log 2>&1 </dev/null &",
+  "forwardPorts": [
+    6081,
+    6080
+  ],
+  "portsAttributes": {
+    "6080": {
+      "label": "Patreon sign-in browser (keep private)",
+      "onAutoForward": "silent"
+    },
+    "6081": {
+      "label": "Connect Pack One to Patreon",
+      "onAutoForward": "openBrowser"
+    }
+  }
+}

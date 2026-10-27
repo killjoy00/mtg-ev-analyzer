@@ -1,0 +1,33 @@
+name: Verify mobile Patreon Codespace
+on:
+  pull_request:
+    paths:
+      - '.devcontainer/patreon-auth/**'
+      - 'scripts/patreon-mobile-auth-server.mjs'
+      - 'scripts/publish-featured-patreon.mjs'
+      - 'tests/featured-patreon.test.mjs'
+      - '.github/workflows/patreon-mobile-codespace-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: patreon-codespace-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codespace-smoke:
+    if: github.repository == 'killjoy00/mtg-ev-analyzer'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the actual Codespace image, install dependencies and run offline tests
+        uses: devcontainers/ci@v0.3
+        with:
+          configFile: .devcontainer/patreon-auth/devcontainer.json
+          push: never
+          runCmd: |
+            node --check scripts/patreon-mobile-auth-server.mjs
+            node --test tests/featured-patreon.test.mjs
