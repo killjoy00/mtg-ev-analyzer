@@ -62,8 +62,17 @@ latest set is scored, and a partly scored set never runs a half-applied rule.
    with `target=production`, `sets=fra` and that run's ID as
    `validated_run_id`. The next FRA Daily generated afterwards uses the rule;
    a schedule already generated for a day is never changed.
-4. Optionally score every set (`sets` empty) so a future newest set is ready
-   when it becomes Live. New imports are scored automatically.
+
+Done on 2026-10-27: release run 105, FRA scored on development and production
+(12,175 puzzles each), and the 2026-10-27 latest-set Daily was the first
+generated with `latest-stakes-v1`.
+
+Only the latest set needs scoring. A set imported from now on is scored as it
+loads; older sets never become the latest again. Do not backfill every set on
+production: the backfill pages through a set with a sort per page, so large
+sets cost hours of database compute (a development run over all sets reached
+about 1.6 of 4.4 million puzzles before its 3-hour limit). The workflow
+therefore requires `sets` for production.
 
 To check it took effect: `SELECT day,selection_rule FROM draft_run_schedules
 WHERE environment='latest' ORDER BY day DESC LIMIT 3`.
