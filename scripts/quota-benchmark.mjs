@@ -25,7 +25,8 @@ export async function compareQuota({url,key,fetcher=fetch,clock=performance.now.
     if(![204,429].includes(r.status)) {
       const body=await r.json().catch(()=>null);
       const reason=body?.error==='synthetic_quota_exception'&&['storage_quota','storage_receiver','type_error','reference_error','unclassified'].includes(body.reason)?body.reason:'unclassified_response';
-      throw Error(`probe_${mode}_http_${r.status}_${reason}`);
+      const code=['sqlite_out_of_memory','storage_reset','provider_internal','transport_reset'].includes(body?.failure_code)?body.failure_code:reason;
+      throw Error(`probe_${mode}_http_${r.status}_${code}`);
     }
     const ms=clock()-began,rawTotal=r.headers.get('x-quota-counter-write-total'),rawHandler=r.headers.get('x-pack1-quota-handler-ms');
     const total=Number(rawTotal),handler=Number(rawHandler);
@@ -59,11 +60,11 @@ export async function compareQuota({url,key,fetcher=fetch,clock=performance.now.
     assert((await call(mode,cohort,kind)).status===429,'probe_limit_not_enforced');
   }
   const summary=Object.fromEntries(modes.map(mode=>[mode,{cold:summarizeSamples(samples[mode].cold),
-    warm:summarizeSamples(samples[mode].warm),handler:summarizeSamples(samples[mode].handler),counter_write_calls:samples[mode].writes}]));
-  assert(summary.baseline.counter_write_calls>=195&&summary.candidate.counter_write_calls<summary.baseline.counter_write_calls/2,'write_reduction_unverified');
+    warm:summarizeSamples(samples[mode].warm),handler:summarizeSamples(samples[mode].handler),counter_write_decisions:samples[mode].writes}]));
+  assert(summary.baseline.counter_write_decisions>=195&&summary.candidate.counter_write_decisions<summary.baseline.counter_write_decisions/2,'write_reduction_unverified');
   return {source:'synthetic-quota-only',...summary,exact_caps_passed:true,
     latency_improved:summary.candidate.handler.p95_ms<summary.baseline.handler.p95_ms,
-    limitation:'Short synthetic run from one client region. Does not establish production tail latency, eviction frequency, billing savings or gameplay acceptance.'};
+    limitation:'Short synthetic run from one client region. Write decisions exclude internal provider transaction retries. Does not establish production tail latency, eviction frequency, billing savings or gameplay acceptance.'};
 }
 function context(env) {
   assert(env.GITHUB_REPOSITORY==='killjoy00/mtg-ev-analyzer'&&env.GITHUB_REF==='refs/heads/main','reviewed_main_required');

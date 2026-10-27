@@ -19,6 +19,6 @@ try {
       durableObjects:{BASELINE_QUOTA:{className:'BaselineQuota',useSQLite:true},CANDIDATE_QUOTA:{className:'CandidateQuota',useSQLite:true}}}]}));
   const report=await compareQuota({url:'https://synthetic.invalid',key,fetcher:(url,options)=>runtime.dispatchFetch(url,options)});
   assert.equal(report.exact_caps_passed,true);
-  assert.equal(report.baseline.counter_write_calls,195);assert.equal(report.candidate.counter_write_calls,27);
+  assert.equal(report.baseline.counter_write_decisions,195);assert.equal(report.candidate.counter_write_decisions,27);
   console.log('Real Workers/SQLite synthetic probe: authenticated routing, instrumented writes and exact ceilings passed.');
 } finally {await runtime?.dispose();await rm(persist,{recursive:true,force:true});}
