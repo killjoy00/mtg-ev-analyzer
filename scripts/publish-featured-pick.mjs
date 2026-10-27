@@ -45,7 +45,7 @@ export async function publishFeatured({env=process.env,fetcher=fetch}={}) {
   render.audio_stats?.original_composition!==true||
   !f.choices.every(c=>imageUrl(c.image_url))||
   !f.choices.some(c=>c.id===f.trophy?.id)||
-  JSON.stringify(copy)!==JSON.stringify(featureCopies(f)))
+  JSON.stringify(copy)!==JSON.stringify(featureCopies(f,{legacyPatreon:!copy?.patreonTitle})))
   throw Error('Featured data or rendered asset failed provenance checks.');
  const correction=isCorrection(f);
  if(f.day===CORRECTION_DAY&&!correction)
