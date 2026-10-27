@@ -73,8 +73,9 @@ export async function puzzleSnapshots(query,ids) {
 
 // Premier decisions must come from the active snapshot. A Live Traditional
 // component of the same set has its own lifecycle and may share the draw, but at
-// least one Premier decision is required so the snapshot is actually exercised.
-export function assertFromActiveSnapshot(env,picks,snapshots,label) {
+// least one Premier decision is required so the snapshot is actually exercised
+// (requirePremier=false checks the picks and returns the count instead).
+export function assertFromActiveSnapshot(env,picks,snapshots,label,{requirePremier=true}={}) {
  assert.ok(picks.length>0,`${label}: nothing was selected`);
  let premier=0;
  for(const pick of picks) {
@@ -86,8 +87,22 @@ export function assertFromActiveSnapshot(env,picks,snapshots,label) {
   assert.equal(row.source_snapshot_id??null,env.puzzle_snapshot_id,
    `${label}: ${pick.puzzle_id} is from snapshot ${row.source_snapshot_id}, not the active ${env.active_snapshot_id}`);
  }
- assert.ok(premier>0,`${label}: no Premier decision was selected, so the active snapshot was not exercised`);
+ if(requirePremier)assert.ok(premier>0,`${label}: no Premier decision was selected, so the active snapshot was not exercised`);
  return premier;
+}
+
+// A Daily's seed fixes its draw for the day, and a Live Traditional component
+// of the newest set can fill every newest-set slot of that one draw. Draw
+// again with numbered seeds until a Premier decision exercises the snapshot;
+// any pick from the wrong set or snapshot still fails at once.
+export const DAILY_DRAW_ATTEMPTS=8;
+export async function drawExercisingSnapshot(query,env,label,draw,attempts=DAILY_DRAW_ATTEMPTS) {
+ for(let attempt=0;attempt<attempts;attempt++) {
+  const picks=await draw(attempt);
+  const snapshots=await puzzleSnapshots(query,picks.map(p=>p.puzzle_id));
+  if(assertFromActiveSnapshot(env,picks,snapshots,label,{requirePremier:false}))return {picks,attempt};
+ }
+ assert.fail(`${label}: no Premier decision was selected in ${attempts} draws, so the active snapshot was not exercised`);
 }
 
 // A version-only rebuild must preserve a historical mixed-only capability.
@@ -197,14 +212,17 @@ export async function runActivatedSnapshotSmoke(query,{setId,snapshotId=null,day
   result.checks.daily={applicable:false,reason:!env.regular_run?'not a regular-run environment'
    :!live.some(s=>s.set_id===setId)?`not released on ${day} (release ${env.release_date})`:`newest Live release is ${newest}`};
  } else {
-  const latest=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed+':latest','latest',{daily:true,day});
-  const mixed=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed+':daily','mixed',{daily:true,day});
-  const newestSlots=mixed.filter(p=>p.set_id===setId);
-  assert.ok(newestSlots.length>=2,`${setId}: mixed Daily used ${newestSlots.length} newest-set slots, expected at least 2`);
-  const snapshots=await puzzleSnapshots(query,[...latest,...newestSlots].map(p=>p.puzzle_id));
-  assertFromActiveSnapshot(env,latest,snapshots,'latest daily');
-  assertFromActiveSnapshot(env,newestSlots,snapshots,'mixed daily');
-  result.checks.daily={applicable:true,latest:latest.map(p=>p.puzzle_id),mixed_newest_slots:newestSlots.length};
+  const attemptSeed=(name,attempt)=>seed+':'+name+(attempt?':'+attempt:'');
+  const latest=await drawExercisingSnapshot(query,env,'latest daily',
+   attempt=>selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,attemptSeed('latest',attempt),'latest',{daily:true,day}));
+  const mixed=await drawExercisingSnapshot(query,env,'mixed daily',async attempt=>{
+   const run=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,attemptSeed('daily',attempt),'mixed',{daily:true,day});
+   const newestSlots=run.filter(p=>p.set_id===setId);
+   assert.ok(newestSlots.length>=2,`${setId}: mixed Daily used ${newestSlots.length} newest-set slots, expected at least 2`);
+   return newestSlots;
+  });
+  result.checks.daily={applicable:true,latest:latest.picks.map(p=>p.puzzle_id),latest_attempt:latest.attempt,
+   mixed_newest_slots:mixed.picks.length,mixed_attempt:mixed.attempt};
  }
  await loadActivatedEnvironment(query,setId,env.active_snapshot_id);
  assert.ok(await servingRevisionMatches(query,cache.revision),'Serving revision changed during the activation smoke');
