@@ -20,7 +20,7 @@ export function probeName(run,attempt,nonce) {
 export async function compareQuota({url,key,fetcher=fetch,clock=performance.now.bind(performance),extended=false,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}) {
   let requests=0;const rounds=extended?8:3,chunks=extended?16:8;
   const perRound=[];
-  const samples=Object.fromEntries(modes.map(m=>[m,{cold:[],warm:[],handler:[],writes:0}]));
+  const samples=Object.fromEntries(modes.map(m=>[m,{cold:[],warm:[],handler:[],rows:[],writes:0}]));
   const call=async(mode,cohort,kind='request')=>{
     assert(++requests<=(extended?10000:2000),'probe_request_budget_exceeded');
     const began=clock(),r=await fetcher(url+'/'+kind,{method:'POST',redirect:'error',
@@ -37,7 +37,13 @@ export async function compareQuota({url,key,fetcher=fetch,clock=performance.now.
     assert(rawTotal!==null&&rawHandler!==null&&Number.isSafeInteger(total)&&total>=0&&Number.isFinite(handler)&&handler>=0,'missing_probe_evidence');
     const instance=r.headers.get('x-quota-instance');
     if(extended)assert(/^[a-f0-9]{32}$/.test(instance||''),'missing_probe_instance');
-    await r.body?.cancel();return {status:r.status,total,handler,ms,instance};
+    const write=r.headers.get('x-quota-reservation-write'),queue=r.headers.get('x-quota-queue-ms'),durability=r.headers.get('x-quota-durability-ms');
+    if(extended) {
+      assert(['true','false'].includes(write),'missing_write_decision');
+      if(mode==='candidate')assert(queue!==null&&durability!==null&&[Number(queue),Number(durability)].every(n=>Number.isFinite(n)&&n>=0),'missing_candidate_phase_evidence');
+    }
+    await r.body?.cancel();return {status:r.status,total,handler,ms,instance,write:write==='true',
+      queue:queue===null?null:Number(queue),durability:durability===null?null:Number(durability)};
   };
   for(let round=0;round<rounds;round++) {
     const cohort=randomBytes(16).toString('hex'),last={baseline:0,candidate:0},instances={};
@@ -52,6 +58,7 @@ export async function compareQuota({url,key,fetcher=fetch,clock=performance.now.
       if(extended)assert(rows.every(r=>r.instance===instances[mode]),'probe_object_restarted');
       const total=Math.max(...rows.map(r=>r.total));assert(total>=last[mode],'probe_object_restarted');last[mode]=total;
       cohortSamples[mode].push(...rows);
+      samples[mode].rows.push(...rows);
       samples[mode].warm.push(...rows.map(r=>r.ms));samples[mode].handler.push(...rows.map(r=>r.handler));
     }
     for(const mode of modes)samples[mode].writes+=last[mode];
@@ -125,6 +132,11 @@ export async function compareQuota({url,key,fetcher=fetch,clock=performance.now.
   }
   const summary=Object.fromEntries(modes.map(mode=>[mode,{cold:summarizeSamples(samples[mode].cold),
     warm:summarizeSamples(samples[mode].warm),handler:summarizeSamples(samples[mode].handler),counter_write_decisions:samples[mode].writes}]));
+  if(extended)summary.candidate.by_write=Object.fromEntries([['refill',true],['credit',false]].map(([name,write])=>{
+    const rows=samples.candidate.rows.filter(r=>r.write===write);
+    return [name,{client:summarizeSamples(rows.map(r=>r.ms)),handler:summarizeSamples(rows.map(r=>r.handler)),
+      queue:summarizeSamples(rows.map(r=>r.queue)),durability:summarizeSamples(rows.map(r=>r.durability))}];
+  }));
   assert(summary.baseline.counter_write_decisions>=195&&summary.candidate.counter_write_decisions<summary.baseline.counter_write_decisions/2,'write_reduction_unverified');
   const tailImproves=row=>row.candidate.client.p95_ms<row.baseline.client.p95_ms&&
     row.candidate.client.p99_ms<=row.baseline.client.p99_ms&&row.candidate.handler.p95_ms<row.baseline.handler.p95_ms&&

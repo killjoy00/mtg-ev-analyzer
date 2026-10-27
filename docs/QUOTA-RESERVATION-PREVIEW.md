@@ -29,6 +29,9 @@ main it runs a fixed extended profile, capped at 10,000 HTTP calls:
 
 - Eight paired cohorts, alternating mode/order, with 128 warm samples per mode
   per cohort. Report client and handler p95/p99 per cohort and in aggregate.
+  Candidate warm samples also separate refill/credit calls with queue and
+  durability timing from the limiter's own metric object. Native storage APIs
+  remain untouched; these timings do not claim to include provider dispatch.
 - Exact fresh burst/session ceilings, plus 100 simultaneous session creations
   and 20 paced request rounds for each mode (2,100 admissions per shared quota).
 - Resume a quiet quota after more than a minute, then independently verify the

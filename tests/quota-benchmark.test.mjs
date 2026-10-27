@@ -101,6 +101,8 @@ test('extended comparison proves paced NAT traffic, expired credits and exact re
       })});
     assert.equal(report.requests,9157);assert.equal(report.baseline.counter_write_decisions,1032);
     assert.equal(report.candidate.counter_write_decisions,136);assert.equal(report.per_round.length,8);
+    assert.equal(report.candidate.by_write.refill.handler.samples,128);
+    assert.equal(report.candidate.by_write.credit.handler.samples,896);
     for(const mode of ['baseline','candidate']) {
       assert.equal(report.shared_network[mode].admitted,2100);assert.equal(report.shared_network[mode].denied,0);
       assert.equal(report.restarts[mode].confirmed_restarts,3);assert.equal(report.restarts[mode].strict_cap_passed,true);
