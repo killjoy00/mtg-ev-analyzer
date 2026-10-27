@@ -51,3 +51,17 @@ Sources checked October 27, 2026:
 - [Patreon API v2](https://docs.patreon.com/)
 
 Offline regressions: `node --test tests/featured-patreon.test.mjs tests/patreon-publishing-connection.test.mjs tests/admin-patreon-publishing.test.mjs`. They cover profile context reuse, cleanup, wrong creator/campaign, missing post-read scope, public verification ordering, waiting/paused behavior, stale media and duplicate ambiguity. The merged workflow checks real configuration without exposing values. Only a completed real first post proves the live editor is compatible; document that outcome separately after authorization.
+
+## Windows PostyBirb bridge
+
+The cloud browser remains paused after the verified fresh-session Cloudflare failure. The desktop alternative uses the owner's normal PostyBirb+ login. It is not considered operational until a real public image post succeeds.
+
+`Patreon Windows helper` builds `PackOnePatreon.exe` on Windows, runs the protocol tests and packaged-runtime self-test, and publishes a download only from reviewed `main`. It requires no Python installation. The helper checks PostyBirb's logged-in campaign and its `Everyone` folder, uploads the daily JPEG and text to the local app, validates the returned draft and queues that one Patreon destination. It does not read Patreon cookies or expose a listening service. Local authentication is sent only after the loopback TLS peer matches the certificate in PostyBirb's own Windows data directory.
+
+`Public Patreon desktop feed` copies only the validated public feature image and text from today's first-attempt main-branch morning artifact to the data-only `packone-patreon-feed` branch. Every 15 minutes it refreshes an exact-title/publication check using the supported read-only Patreon API. A failed or stale check cannot authorize a new desktop post. This API check confirms the public post and title; it does not claim anonymous visual verification of the image or body.
+
+First use: leave PostyBirb open, open the helper, and click **Publish today** once. After the public post is confirmed, enable **Post automatically and start this helper at Windows sign-in**. This saves a local copy and a current-user startup entry; unchecking it removes that entry. Also enable PostyBirb's tray-menu **Open on startup** once. The computer, helper and PostyBirb must be running with network access. Sleep, logout, expired login and renewed website challenges can interrupt posting.
+
+A local exclusive journal is written and flushed before any draft creation. Queue errors, crashes and uncertain responses never cause an automatic retry; matching local drafts/logs and public-post checks also prevent a new submission. Use one Windows worker. This is not a distributed cross-device lock and cannot protect against an independent manual publisher racing the desktop. Do not delete local journals to retry an uncertain publication. Inspect the public destination and PostyBirb first. The cloud publisher must remain paused while the desktop worker is used.
+
+The app uses PostyBirb+'s default local port 9247 and Windows data directory. Custom ports or profiles are not yet supported. No tokens, local account records or diagnostic exception contents are written to the public feed or release logs.

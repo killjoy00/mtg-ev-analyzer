@@ -190,7 +190,8 @@ jobs:
       GITHUB_TOKEN: ${{ github.token }}
       MANUAL_LIVE: ${{ github.event_name == 'push' && 'true' || inputs.live }}
       SOURCE_PACIFIC_DAY: ${{ inputs.source_day }}
-      PACKONE_PATREON_AUTOPUBLISH_ENABLED: ${{ vars.PACKONE_PATREON_AUTOPUBLISH_ENABLED }}
+      # The Windows worker owns publication; prevent a second scheduled writer.
+      PACKONE_PATREON_AUTOPUBLISH_ENABLED: 'false'
       # Fresh-session Patreon access is blocked; do not repeat unattended attempts.
       PACKONE_PATREON_AUTO_ACTIVATE: 'false'
       PACKONE_PATREON_STORAGE_STATE_B64: ${{ secrets.PACKONE_PATREON_STORAGE_STATE_B64 }}
