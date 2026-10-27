@@ -167,8 +167,8 @@ async function scoreStripe(query,{first,last,open},{chunk,setIds,rescore,strengt
 }
 
 // Puzzles in scope that still have no current row.
-export async function unscoredPuzzles(query,{setIds=null,strengthDir=STRENGTH_DIR}={}) {
-  const params=[SELECTION_FEATURE_VERSION,JSON.stringify(currentStrength(strengthDir))];
+export async function unscoredPuzzles(query,{setIds=null,strengthDir=STRENGTH_DIR,current=currentStrength(strengthDir)}={}) {
+  const params=[SELECTION_FEATURE_VERSION,JSON.stringify(current)];
   const sets=setFilter(setIds,params);
   return Number((await query(`SELECT count(*)::int n FROM draft_run_verified_puzzles p WHERE true ${sets} AND ${STALE}`,params)).rows[0].n);
 }
@@ -184,6 +184,15 @@ export async function scorePuzzleSelection(query,{setIds=null,rescore=false,stre
     return totals.get(setId);
   };
   for(const setId of setIds||[])tally(setId);
+  // A previously completed backfill should not read millions of puzzle
+  // payloads again. The database-only stale count returns one small scalar.
+  // --rescore deliberately bypasses this optimization and still visits all rows.
+  if(!rescore&&await unscoredPuzzles(query,{setIds,current})===0) {
+    const results=[...totals.values()].sort((a,b)=>a.set_id.localeCompare(b.set_id));
+    for(const result of results)log(JSON.stringify(result));
+    log(JSON.stringify({unscored_remaining:0}));
+    return {sets:results,remaining:0};
+  }
   const {blocks,chunk}=await tableBlocks(query);
   const count=Math.max(1,stripes);
   await Promise.all(Array.from({length:count},(_,i)=>scoreStripe(query,
@@ -191,7 +200,7 @@ export async function scorePuzzleSelection(query,{setIds=null,rescore=false,stre
     {chunk,setIds,rescore,strengthDir,current,tally,log,stripe:i})));
   const results=[...totals.values()].sort((a,b)=>a.set_id.localeCompare(b.set_id));
   for(const result of results)log(JSON.stringify(result));
-  const remaining=await unscoredPuzzles(query,{setIds,strengthDir});
+  const remaining=await unscoredPuzzles(query,{setIds,current});
   log(JSON.stringify({unscored_remaining:remaining}));
   return {sets:results,remaining};
 }
