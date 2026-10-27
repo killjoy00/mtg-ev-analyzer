@@ -12,7 +12,7 @@ on:
         options: [development, production]
         default: development
       sets:
-        description: 'Space-separated set ids (for example: fra). Required for production; empty scores every set on development only.'
+        description: 'Space-separated set ids (for example: fra). Empty scores every puzzle.'
         required: false
         type: string
       validated_run_id:
@@ -39,12 +39,9 @@ jobs:
       - name: Validate inputs
         env:
           SETS: ${{ inputs.sets }}
-          TARGET: ${{ inputs.target }}
         run: |
           set -euo pipefail
           [[ "$SETS" =~ ^[a-z0-9\ -]*$ ]] || { echo 'sets must be space-separated set ids' >&2; exit 1; }
-          # Scoring every set takes hours of database compute; production names its sets.
-          [[ "$TARGET" != production || -n "${SETS// /}" ]] || { echo 'production requires sets (for example: fra)' >&2; exit 1; }
       - name: Require a development run of this commit before production
         if: ${{ inputs.target == 'production' }}
         env:

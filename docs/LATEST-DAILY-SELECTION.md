@@ -67,12 +67,15 @@ Done on 2026-10-27: release run 105, FRA scored on development and production
 (12,175 puzzles each), and the 2026-10-27 latest-set Daily was the first
 generated with `latest-stakes-v1`.
 
-Only the latest set needs scoring. A set imported from now on is scored as it
-loads; older sets never become the latest again. Do not backfill every set on
-production: the backfill pages through a set with a sort per page, so large
-sets cost hours of database compute (a development run over all sets reached
-about 1.6 of 4.4 million puzzles before its 3-hour limit). The workflow
-therefore requires `sets` for production.
+Every puzzle is scored, so the rule can later cover the other Dailies and
+Practice. A set imported from now on is scored as it loads. **Score puzzle
+selection** with `sets` empty backfills everything: it reads the table once
+in physical order, about 1,000 puzzles per sequential block-range read, in
+four parallel stripes. It fails if any puzzle is still unscored at the end
+(for example a row that moved while it was read); running it again finishes
+the rest. The first version paged through each set with a sort per page; a
+development run over all sets reached about 1.6 of 4.4 million puzzles before
+its 3-hour limit.
 
 To check it took effect: `SELECT day,selection_rule FROM draft_run_schedules
 WHERE environment='latest' ORDER BY day DESC LIMIT 3`.
