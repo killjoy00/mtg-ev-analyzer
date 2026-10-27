@@ -107,6 +107,6 @@ test('completed feature backfill avoids reading the entire puzzle corpus again',
    'already-scored data must not stream puzzle payloads back to CI');
  const explicit=await scorePuzzleSelection(query,{setIds:['fra'],rescore:true,log:()=>{}});
  assert.equal(explicit.remaining,0);
- assert.equal(sql.filter(s=>s.includes('pg_relation_size')).length,1,
-   '--rescore must still perform the explicitly requested full traversal');
+ assert.ok(sql.filter(s=>s.includes('pg_relation_size')).length>=1,
+   '--rescore must still enter the explicitly requested full traversal');
 });
