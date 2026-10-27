@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {selectFeaturedPick,featureCopies} from '../scripts/featured-pick.mjs';
-import {makeDesktopFeed,verifyDesktopFeed,writeDesktopFeed,sha256} from '../scripts/patreon-desktop-feed.mjs';
+import {makeDesktopFeed,verifyDesktopFeed,writeDesktopFeed,sha256,safeDesktopFeedFailure} from '../scripts/patreon-desktop-feed.mjs';
 const now=new Date('2026-10-27T17:00:00Z'),day='2026-10-26';
 const cards=['one','two','three'].map(id=>({id,name:id.toUpperCase(),image_url:'https://cards.scryfall.io/normal/front/a/b/'+id+'.jpg',model_probability:.5}));
 const feature=selectFeaturedPick([{environment:'latest',puzzle_id:'desktop-fixture',set_id:'spm',round:2,pick_number:2,
@@ -51,4 +51,27 @@ test('workflow keeps cloud publishing paused and releases only main builds',()=>
  assert.match(build,/runtime-self-test\.ok/);
  const workflow=readFileSync(new URL('../.github/workflows/patreon-desktop-feed.yml',import.meta.url),'utf8');
  assert.match(workflow,/run\.run_attempt!==1/);assert.match(workflow,/run\.head_repository\?\.full_name/);
+});
+
+test('public diagnostics expose only fixed failure codes, never private exception details',()=>{
+ assert.equal(safeDesktopFeedFailure(Error('patreon-post-read-failed-401')),'patreon-post-read-failed-401');
+ const error=Error('patreon-existing-post-not-verified-public');error.verificationReason='url-invalid';
+ assert.equal(safeDesktopFeedFailure(error),'patreon-existing-post-not-verified-public:url-invalid');
+ error.verificationReason='secret-fixture-account';
+ assert.equal(safeDesktopFeedFailure(error),'patreon-existing-post-not-verified-public');
+ assert.equal(safeDesktopFeedFailure(Error('https://private.example/?token=secret-fixture')),'unknown');
+ assert.equal(safeDesktopFeedFailure(Error('Stale Daily publisher revision; dispatch a fresh run on current main.')),'revision-stale');
+});
+
+test('the existing morning dispatch delivers desktop media after artifact upload independently of other destinations',()=>{
+ const daily=readFileSync(new URL('../.github/workflows/daily-social-post.yml',import.meta.url),'utf8');
+ const job=daily.split('  featured-patreon-feed:')[1].split('  featured-patreon:')[0];
+ assert.match(job,/needs: \[featured\]/);
+ assert.match(job,/always\(\)/);
+ assert.match(job,/needs\.featured\.outputs\.artifact_ready == 'true'/);
+ assert.match(job,/contents: write/);
+ assert.match(job,/group: packone-patreon-feed/);
+ assert.match(job,/actions\/download-artifact@v4/);
+ assert.match(job,/node scripts\/patreon-desktop-feed\.mjs/);
+ assert.doesNotMatch(job,/BLUESKY|DISCORD|BROWSERLESS|STORAGE_STATE|NEON_API_KEY/);
 });

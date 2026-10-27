@@ -125,7 +125,8 @@ test('explicit pause wins over automatic activation; unset configuration stays i
 
 test('live workflow keeps credentials out of artifacts and uses the morning concurrency lock',()=>{
  const source=readFileSync(new URL('../.github/workflows/patreon-publishing.yml',import.meta.url),'utf8');
- assert.match(source,/group: packone-social-live/);
+ assert.match(source,/packone-patreon-read-review-\{0\}/);
+ assert.match(source,/\|\| 'packone-social-live'/);
  assert.match(source,/inputs\.publish_once == true/);
  assert.match(source,/Publish and independently verify Patreon/);
  assert.doesNotMatch(source,/upload-artifact|set-secret|liveURL|secrets: write/);

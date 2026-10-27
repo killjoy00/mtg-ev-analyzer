@@ -7,6 +7,11 @@ on:
       - '.github/workflows/patreon-publishing.yml'
       - 'scripts/check-patreon-publishing.mjs'
       - 'scripts/publish-featured-patreon.mjs'
+  pull_request:
+    paths:
+      - 'scripts/publish-featured-patreon.mjs'
+      - 'scripts/patreon-desktop-feed.mjs'
+      - '.github/workflows/patreon-publishing.yml'
   workflow_dispatch:
     inputs:
       publish_once:
@@ -21,12 +26,47 @@ permissions:
 
 # Same lock as morning publication, so a canary and a scheduled post cannot race.
 concurrency:
-  group: packone-social-live
+  group: ${{ github.event_name == 'pull_request' && format('packone-patreon-read-review-{0}', github.ref) || 'packone-social-live' }}
   cancel-in-progress: false
 
 jobs:
+  public-api-contract:
+    # Owner-authored same-repository reviews only. No browser, publishing or writes.
+    if: >-
+      github.event_name == 'pull_request' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.user.login == 'killjoy00'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify current public-post API contract, fixed diagnostics only
+        env:
+          PATREON_CREATOR_ACCESS_TOKEN: ${{ secrets.PATREON_CREATOR_ACCESS_TOKEN }}
+        run: |
+          node --input-type=module <<'JS'
+          import {findPublishedPatreonPost} from './scripts/publish-featured-patreon.mjs';
+          import {safeDesktopFeedFailure} from './scripts/patreon-desktop-feed.mjs';
+          try {
+            const response=await fetch('https://raw.githubusercontent.com/killjoy00/mtg-ev-analyzer/packone-patreon-feed/latest.json', {redirect:'error',signal:AbortSignal.timeout(15000)});
+            if(!response.ok)throw Error('desktop-feed-unavailable');
+            const feed=await response.json();
+            const found=await findPublishedPatreonPost({title:feed.title,token:process.env.PATREON_CREATOR_ACCESS_TOKEN});
+            console.log(found?'desktop-api:public-post-confirmed':'desktop-api:no-matching-post');
+          } catch(error) {
+            console.error('desktop-api:failed-closed:'+safeDesktopFeedFailure(error));
+            process.exitCode=1;
+          }
+          JS
+
   connection:
-    if: github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/main'
+    # The Windows worker owns publication. Cloud readiness is owner-invoked only.
+    if: github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
