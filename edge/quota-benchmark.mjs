@@ -1,6 +1,15 @@
 // Isolated synthetic probe only. No application origins or production bindings.
 import {NetworkQuota} from './gateway.mjs';
 import {readJson} from '../worker/request-json.mjs';
+import {failureIndicators} from './private-diagnostics.mjs';
+
+function probeFailure(error) {
+  const message=String(error?.message||'');
+  const reason=/rows written|storage.*quota|daily.*limit|quota.*exceeded/i.test(message)?'storage_quota':
+    /illegal invocation|incompatible receiver/i.test(message)?'storage_receiver':
+    error?.name==='TypeError'?'type_error':error?.name==='ReferenceError'?'reference_error':'unclassified';
+  return Response.json({error:'synthetic_quota_exception',reason,...failureIndicators(error)},{status:503});
+}
 
 class MeasuredQuota extends NetworkQuota {
   constructor(state,reserved) {
@@ -17,9 +26,11 @@ class MeasuredQuota extends NetworkQuota {
     this.writes=()=>writes;
   }
   async fetch(request) {
-    const result=await super.fetch(request);
-    result.headers.set('x-quota-counter-write-total',String(this.writes()));
-    return result;
+    try {
+      const result=await super.fetch(request);
+      result.headers.set('x-quota-counter-write-total',String(this.writes()));
+      return result;
+    } catch(error){return probeFailure(error);}
   }
 }
 export class BaselineQuota extends MeasuredQuota {constructor(state){super(state,false);}}
@@ -34,5 +45,6 @@ export default {async fetch(request,env) {
   if(!['baseline','candidate'].includes(body.mode)||!/^[a-f0-9]{32}$/.test(body.cohort||'')||
     Object.keys(body).some(key=>!['mode','cohort'].includes(key)))return new Response(null,{status:400});
   const namespace=body.mode==='baseline'?env.BASELINE_QUOTA:env.CANDIDATE_QUOTA;
-  return namespace.get(namespace.idFromName(body.cohort),{locationHint:'enam'}).fetch(new Request('https://quota'+path,{method:'POST'}));
+  try{return await namespace.get(namespace.idFromName(body.cohort),{locationHint:'enam'}).fetch(new Request('https://quota'+path,{method:'POST'}));}
+  catch(error){return probeFailure(error);}
 }};
