@@ -6,6 +6,7 @@ import {nativePatreonAction} from '../worker/patreon-mobile-policy.mjs';
 import {appleSubscriptionAction,nativeAppleSubscriptionAction} from '../worker/apple-subscription-policy.mjs';
 import {ADMIN_API_VERSION} from '../admin-api-contract.mjs';
 import {productionSampleRate,TAIL_SAMPLING_VERSION,RATE_LIMIT_CLASS_HEADER,confirmedAuthLimit} from '../launch-alert-policy.mjs';
+import {QuotaReservations} from './quota-reservations.mjs';
 
 const SERVICES={legacy:'pack1api',growth:'pack1growth',draft:'draftrunapi'};
 const PROD_BRANCH='br-orange-feather-ayps8kep';
@@ -234,16 +235,29 @@ function safeRedirect(value,{mobileOAuth=false}={}) {
 // active network instead of on every request.
 const QUOTA_STATE='buckets',LEGACY_QUOTA_KEYS=['request','request_burst','session'],QUOTA_CLEANUP_MS=660000;
 export class NetworkQuota {
-  constructor(state) {this.storage=state.storage;this.inflight=0;this.cleanupInflight=0;}
-  async fetch(request) {
+  constructor(state,env={}) {
+    this.storage=state.storage;this.inflight=0;this.cleanupInflight=0;
+    // No production opt-in exists: a separate rollout requires review after
+    // isolated preview latency and conservative-denial acceptance.
+    if(env.MODE==='preview'&&/^br-[a-z0-9-]+$/.test(env.NEON_BRANCH_ID||'')&&
+      ![PROD_BRANCH,DEV_BRANCH].includes(env.NEON_BRANCH_ID)&&env.QUOTA_RESERVATIONS==='preview-v1')
+      this.reservations=new QuotaReservations(this.storage);
+  }
+  fetch(request) {
+    const enqueued=performance.now();
+    return this.reservations?this.reservations.exclusive(()=>this.handle(request,enqueued)):this.handle(request,enqueued);
+  }
+  async handle(request,enqueued) {
     const kind=new URL(request.url).pathname;
     if(request.method!=='POST'||!['/request','/session','/session-only'].includes(kind))return response(400,'Invalid quota request.');
-    const began=performance.now(),trace=traceId(request.headers.get(TRACE_HEADER));
+    const began=enqueued,trace=traceId(request.headers.get(TRACE_HEADER));
     const metric={event:'quota_handler',trace,object_tag:traceId(request.headers.get('x-pack1-quota-tag')),
       attempt:Number(request.headers.get('x-pack1-quota-attempt'))===2?2:1,
       concurrency:++this.inflight,cleanup_inflight:this.cleanupInflight>0,location_source:'provider_metadata',get_ms:0,put_ms:0,
       alarm_get_ms:0,alarm_set_ms:0,transaction_ms:0,transaction_callbacks:0,
-      timing_version:2,durability_ms:0,durability_confirmed:false,phase:'transaction',state_layout:'unread'};
+      timing_version:2,durability_ms:0,durability_confirmed:false,phase:'transaction',state_layout:'unread',
+      quota_mode:this.reservations?'reserved-preview-v1':'per-request',reservation_write:false,
+      queue_ms:milliseconds(performance.now()-began)};
     const timed=async(name,call)=>{const at=performance.now();try{return await call();}finally{metric[name]+=performance.now()-at;}};
     if(trace)console.log(JSON.stringify({event:'quota_handler_start',trace,object_tag:metric.object_tag,attempt:metric.attempt,concurrency:metric.concurrency,cleanup_inflight:metric.cleanup_inflight}));
     try {
@@ -254,7 +268,7 @@ export class NetworkQuota {
     // complete run. The short bucket bounds bursts; the minute bucket bounds
     // sustained load. Session creation remains independently limited.
     const limits=[...(kind!=='/session-only'?[['request',3600,60000],['request_burst',600,10000]]:[]),...(kind!=='/request'?[['session',120,600000]]:[])];
-    const {retry,scopes}=await timed('transaction_ms',()=>this.storage.transaction(async tx=>{
+    const {retry,scopes}=this.reservations?await this.reservations.debit(limits,now,metric,timed):await timed('transaction_ms',()=>this.storage.transaction(async tx=>{
       metric.transaction_callbacks++;
       // Counters persisted under the earlier one-row-per-bucket layout stay
       // authoritative until this network's first write in the single row.
@@ -296,7 +310,10 @@ export class NetworkQuota {
   }
   // The alarm is armed at a network's first request, not its last, so a window
   // may still be open when it fires. Deleting an open window would reset it.
-  async alarm(alarmInfo) {
+  alarm(alarmInfo) {
+    return this.reservations?this.reservations.exclusive(()=>this.cleanup(alarmInfo)):this.cleanup(alarmInfo);
+  }
+  async cleanup(alarmInfo) {
     const began=performance.now(),retry={
       is_retry:typeof alarmInfo?.isRetry==='boolean'?alarmInfo.isRetry:null,
       retry_count:Number.isSafeInteger(alarmInfo?.retryCount)&&alarmInfo.retryCount>=0&&alarmInfo.retryCount<=6?alarmInfo.retryCount:null,
@@ -316,6 +333,7 @@ export class NetworkQuota {
       metric.phase='durability';
       emit({event:'quota_alarm_commit_wait',...retry,timing_version:2,action:metric.action});
       await timed('durability_ms',()=>this.storage.sync());
+      if(metric.action==='clear')this.reservations?.clear();
       metric.durability_confirmed=true;metric.phase='complete';metric.ok=true;
     } catch(error){Object.assign(metric,failureIndicators(error));metric.ok=false;throw error;}
     finally {this.cleanupInflight--;metric.duration_ms=milliseconds(performance.now()-began);emit(metric);}

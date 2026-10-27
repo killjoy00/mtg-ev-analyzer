@@ -2,6 +2,9 @@ name: exclusive distributed preview acceptance
 on:
   workflow_call:
     inputs:
+      quota_reservations:
+        type: boolean
+        default: false
       require_performance:
         type: string
         required: true
@@ -95,6 +98,7 @@ jobs:
       - name: Deploy isolated Functions and private gateway
         id: deploy
         env:
+          PREVIEW_QUOTA_RESERVATIONS: ${{ inputs.quota_reservations }}
           CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
