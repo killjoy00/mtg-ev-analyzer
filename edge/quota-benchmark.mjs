@@ -85,8 +85,10 @@ export class CrossoverQuota {
 }
 
 export default {async fetch(request,env) {
-  if(!/^[a-f0-9]{64}$/.test(env.BENCHMARK_KEY||'')||request.headers.get('authorization')!=='Bearer '+env.BENCHMARK_KEY||
-    !Number.isFinite(Number(env.EXPIRES_AT))||Date.now()>=Number(env.EXPIRES_AT))return new Response(null,{status:403,headers:{'x-quota-probe-auth':'required'}});
+  const denial=!/^[a-f0-9]{64}$/.test(env.BENCHMARK_KEY||'')?'key_unavailable':
+    request.headers.get('authorization')!=='Bearer '+env.BENCHMARK_KEY?'key_mismatch':
+    !Number.isFinite(Number(env.EXPIRES_AT))?'expiry_unavailable':Date.now()>=Number(env.EXPIRES_AT)?'expired':null;
+  if(denial)return new Response(null,{status:403,headers:{'x-quota-probe-auth':'required','x-quota-probe-denial':denial}});
   const path=new URL(request.url).pathname;
   if(request.method!=='POST'||!['/request','/session','/session-only','/restart'].includes(path))return new Response(null,{status:400});
   let body;try{body=await readJson(request,256);}catch{return new Response(null,{status:400});}

@@ -119,3 +119,22 @@ test('extended comparison proves paced NAT traffic, expired credits and exact re
     assert.equal(report.production_ready,false);
   } finally {Date.now=originalNow;}
 });
+
+test('code and key deploy together once and the private key file is removed on success or failure',async()=>{
+  const fs=await import('node:fs'),os=await import('node:os'),path=await import('node:path');
+  const {deployProbeWithKey}=await import('../scripts/quota-benchmark.mjs');
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'quota-atomic-deploy-'));
+  try {
+    for(const fail of [false,true]) {
+      let calls=0;const secretsPath=path.join(directory,'secrets.json');
+      const invoke=()=>deployProbeWithKey({configPath:'synthetic-config',secretsPath,key,cli:args=>{
+        calls++;assert.deepEqual(args,['deploy','--config','synthetic-config','--secrets-file',secretsPath]);
+        assert.deepEqual(JSON.parse(fs.readFileSync(secretsPath,'utf8')),{BENCHMARK_KEY:key});
+        assert.equal(fs.statSync(secretsPath).mode&0o777,0o600);
+        if(fail)throw Error('synthetic deployment failed');return 'synthetic deployment complete';
+      }});
+      if(fail)assert.throws(invoke,/synthetic deployment failed/);else assert.equal(invoke(),'synthetic deployment complete');
+      assert.equal(calls,1);assert.equal(fs.existsSync(secretsPath),false);
+    }
+  } finally {fs.rmSync(directory,{recursive:true,force:true});}
+});

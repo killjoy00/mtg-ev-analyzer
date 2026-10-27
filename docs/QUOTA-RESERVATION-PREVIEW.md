@@ -139,6 +139,24 @@ isolated gameplay rehearsal follows only if that confirmation passes.
 `production_ready` remains false. Any proposed change to the heuristic needs
 an explicit, evidence-backed review; the measurement job cannot change it.
 
+### Probe deployment reliability
+
+The first [v2 hosted attempt](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/40569484852)
+stopped on HTTP 403 for its first control request. No complete paired cohort or
+latency conclusion was produced; cleanup was verified. The earlier runner
+uploaded code, then used a separate secret deployment. That creates an avoidable
+version/propagation window, but the observed 403 lacked enough diagnostics to
+prove its cause.
+
+The runner now uploads code and its random key together using the pinned
+Wrangler `deploy --secrets-file` capability. The temporary secret file has mode
+0600 and is deleted after deployment succeeds or fails; no key or CLI output is
+published. Bounded denial markers distinguish unavailable/mismatched keys,
+expiry, and a 403 outside the probe guard. Access checks and measurement failure
+remain fail-closed. The experiment, deadline, traffic budget and latency criteria
+are unchanged. A new fixed run verifies this deployment fix; the failed attempt
+is retained and cannot be counted as a passing measurement.
+
 ### Full gameplay rehearsal
 
 Run **isolated distributed launch acceptance** on the reviewed candidate revision, first with `quota_reservations` false and then true, using the same capacity target and existing policy. Both defaults are false. The input reaches only the disposable preview deployment. Activation also requires `MODE=preview`, an isolated branch ID, and the exact `preview-v1` switch. Production and the shared development branch are explicitly excluded. The checked-in Wrangler configuration does not enable it.
