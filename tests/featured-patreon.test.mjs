@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {selectFeaturedPick,featureCopies} from '../scripts/featured-pick.mjs';
 import {makePatreonPost,parsePatreonStorageState,findPublishedPatreonPost,
- publishFeaturedPatreon} from '../scripts/publish-featured-patreon.mjs';
+ publishFeaturedPatreon,browserlessEndpoint} from '../scripts/publish-featured-patreon.mjs';
 import {filteredPatreonState,codespaceHosts,installSessionSecret,
  startMobilePatreonSetup} from '../scripts/patreon-mobile-auth-server.mjs';
 import {EventEmitter} from 'node:events';
@@ -219,4 +219,11 @@ test('session secret goes to GitHub CLI stdin, never command arguments or stdout
 test('mobile login helper cannot run outside an authenticated Codespace',async()=>{
  await assert.rejects(startMobilePatreonSetup({
   name:'friendly-codespace-123',codespaces:'false'}),/cloud-browser-only/);
+});
+
+test('Browserless endpoint accepts only token characters and never uses HTTP',()=>{
+ assert.equal(browserlessEndpoint('abcdefghijklmnop'),
+  'wss://production-sfo.browserless.io?token=abcdefghijklmnop');
+ assert.throws(()=>browserlessEndpoint('https://evil.example/?token=secret'));
+ assert.throws(()=>browserlessEndpoint(''));
 });
