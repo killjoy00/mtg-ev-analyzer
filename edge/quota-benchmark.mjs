@@ -39,6 +39,7 @@ class MeasuredQuota extends NetworkQuota {
       if(!this.reserved&&result.status===204)this.writeDecisions++;
       result.headers.set('x-quota-counter-write-total',String(this.writeDecisions));
       result.headers.set('x-quota-instance',this.instanceId);
+      result.headers.set('x-quota-implementation',this.reserved?'coalesced-preview':'per-request');
       const metric=this.metrics.get(tag);
       result.headers.set('x-quota-reservation-write',String(this.reserved?(metric?.batch_write??metric?.reservation_write)===true:result.status===204));
       if(this.reserved&&metric) {
@@ -52,6 +53,7 @@ class MeasuredQuota extends NetworkQuota {
   }
 }
 export class BaselineQuota extends MeasuredQuota {constructor(state){super(state,false);}}
+export class ControlQuota extends MeasuredQuota {constructor(state){super(state,false);}}
 export class CandidateQuota extends MeasuredQuota {constructor(state){super(state,true);}}
 
 export default {async fetch(request,env) {
@@ -60,9 +62,9 @@ export default {async fetch(request,env) {
   const path=new URL(request.url).pathname;
   if(request.method!=='POST'||!['/request','/session','/session-only','/restart'].includes(path))return new Response(null,{status:400});
   let body;try{body=await readJson(request,256);}catch{return new Response(null,{status:400});}
-  if(!['baseline','candidate'].includes(body.mode)||!/^[a-f0-9]{32}$/.test(body.cohort||'')||
+  if(!body||Array.isArray(body)||!['baseline','control','candidate'].includes(body.mode)||!/^[a-f0-9]{32}$/.test(body.cohort||'')||
     Object.keys(body).some(key=>!['mode','cohort'].includes(key)))return new Response(null,{status:400});
-  const namespace=body.mode==='baseline'?env.BASELINE_QUOTA:env.CANDIDATE_QUOTA;
+  const namespace={baseline:env.BASELINE_QUOTA,control:env.CONTROL_QUOTA,candidate:env.CANDIDATE_QUOTA}[body.mode];
   if(path==='/restart') {
     // A reset necessarily interrupts this control request. The runner must
     // independently confirm a new instance ID and surviving quota afterward.
