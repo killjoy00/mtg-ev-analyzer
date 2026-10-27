@@ -1,11 +1,17 @@
 name: isolated synthetic quota comparison
 on:
   pull_request:
-    paths: ['edge/quota-benchmark.mjs', 'scripts/quota-benchmark.mjs', 'tests/quota-benchmark.test.mjs', 'tests/quota-benchmark-runtime.mjs', '.github/workflows/quota-benchmark.yml']
+    paths: ['edge/quota-benchmark.mjs', 'scripts/quota-benchmark.mjs', 'scripts/quota-latency-confirmation.mjs', 'tests/quota-benchmark.test.mjs', 'tests/quota-latency-confirmation.test.mjs', 'tests/quota-benchmark-runtime.mjs', '.github/workflows/quota-benchmark.yml']
   push:
     branches: [main]
-    paths: ['edge/quota-benchmark.mjs', 'scripts/quota-benchmark.mjs', 'tests/quota-benchmark.test.mjs', 'tests/quota-benchmark-runtime.mjs', '.github/workflows/quota-benchmark.yml']
+    paths: ['edge/quota-benchmark.mjs', 'scripts/quota-benchmark.mjs', 'scripts/quota-latency-confirmation.mjs', 'tests/quota-benchmark.test.mjs', 'tests/quota-latency-confirmation.test.mjs', 'tests/quota-benchmark-runtime.mjs', '.github/workflows/quota-benchmark.yml']
   workflow_dispatch:
+    inputs:
+      profile:
+        description: Fixed latency confirmation or the extended correctness rehearsal
+        type: choice
+        options: ['confirmation', 'extended']
+        default: 'confirmation'
 permissions:
   contents: read
 concurrency:
@@ -20,7 +26,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - run: node --test tests/quota-benchmark.test.mjs
+      - run: node --test tests/quota-benchmark.test.mjs tests/quota-latency-confirmation.test.mjs
       - name: Install pinned Workers tools
         run: node .github/scripts/install-wrangler-tool.mjs "$RUNNER_TEMP/quota-validation" esbuild@0.28.2
       - name: Test benchmark instrumentation in real Workers and SQLite
@@ -34,6 +40,8 @@ jobs:
     if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 12
+    outputs:
+      latency_confirmation_passed: ${{ steps.probe.outputs.latency_confirmation_passed }}
     env:
       CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
     steps:
@@ -44,9 +52,16 @@ jobs:
       - name: Install pinned Workers tools
         run: node .github/scripts/install-wrangler-tool.mjs "$RUNNER_TEMP/quota-tools"
       - name: Compare only synthetic quotas on a new private-key-protected Worker
+        id: probe
         env:
           EDGE_TOOLS_DIR: ${{ runner.temp }}/quota-tools
-        run: node scripts/quota-benchmark.mjs run
+          PROBE_PROFILE: ${{ inputs.profile || 'confirmation' }}
+        run: |
+          case "$PROBE_PROFILE" in
+            confirmation) node scripts/quota-latency-confirmation.mjs ;;
+            extended) node scripts/quota-benchmark.mjs run ;;
+            *) echo 'Unrecognized synthetic profile'; exit 1 ;;
+          esac
       - name: Verify removal of this run's Worker and namespaces
         if: always()
         env:

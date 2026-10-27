@@ -21,6 +21,9 @@ export async function verifyProbeAuth(response) {
   await response.body?.cancel();
   assert(response.status===403&&response.headers.get('x-quota-probe-auth')==='required',`probe_auth_unverified_${response.status}`);
 }
+export const tailsImprove=(baseline,candidate)=>candidate.client.p95_ms<baseline.client.p95_ms&&
+  candidate.client.p99_ms<=baseline.client.p99_ms&&candidate.handler.p95_ms<baseline.handler.p95_ms&&
+  candidate.handler.p99_ms<=baseline.handler.p99_ms;
 export async function compareQuota({url,key,fetcher=fetch,clock=performance.now.bind(performance),extended=false,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}) {
   let requests=0;const rounds=extended?8:3,chunks=extended?16:8;
   const perRound=[];
@@ -148,9 +151,7 @@ export async function compareQuota({url,key,fetcher=fetch,clock=performance.now.
       queue:summarizeSamples(rows.map(r=>r.queue)),durability:summarizeSamples(rows.map(r=>r.durability))}];
   }));
   assert(summary.baseline.counter_write_decisions>=195&&summary.candidate.counter_write_decisions<summary.baseline.counter_write_decisions/2,'write_reduction_unverified');
-  const tailImproves=row=>row.candidate.client.p95_ms<row.baseline.client.p95_ms&&
-    row.candidate.client.p99_ms<=row.baseline.client.p99_ms&&row.candidate.handler.p95_ms<row.baseline.handler.p95_ms&&
-    row.candidate.handler.p99_ms<=row.baseline.handler.p99_ms;
+  const tailImproves=row=>tailsImprove(row.baseline,row.candidate);
   const winningRounds=perRound.filter(tailImproves).length;
   const tailAcceptance=extended&&tailImproves({baseline:{client:summary.baseline.warm,handler:summary.baseline.handler},
     candidate:{client:summary.candidate.warm,handler:summary.candidate.handler}})&&winningRounds>=6&&
@@ -175,13 +176,14 @@ export async function cleanupProbe({env=process.env,fetcher=fetch}={}) {
   const cf=(route,options={})=>controlRequest(base+route,{provider:'Cloudflare',token:env.CLOUDFLARE_EDGE_TOKEN,fetcher,...options});
   const settings=await cf('/settings',{allow404:true});if(settings===null)return;
   assert(settings.success===true&&settings.result?.bindings?.some(b=>b.name==='PROBE_OWNER'&&b.text===row.owner),'probe_ownership_unverified');
-  // The random Worker and both namespaces were created solely by this run.
+  // The random Worker and its namespaces were created solely by this run.
   // Verify identity before deleting, and verify absence after an ambiguous DELETE.
   try{await cf('?force=true',{method:'DELETE'});}catch{}
   assert(await cf('/settings',{allow404:true})===null,'probe_cleanup_unverified');
   console.log('Synthetic quota Worker cleanup verified.');
 }
-async function run(env=process.env) {
+export async function runProbe(env=process.env,collect=options=>compareQuota({...options,extended:true}),label='SYNTHETIC_QUOTA_COMPARISON') {
+  assert(['SYNTHETIC_QUOTA_COMPARISON','SYNTHETIC_QUOTA_CONFIRMATION'].includes(label),'invalid_report_profile');
   const receipt=context(env),nonce=randomBytes(5).toString('hex');
   const name=probeName(env.GITHUB_RUN_ID,env.GITHUB_RUN_ATTEMPT,nonce),owner=env.GITHUB_RUN_ID+'-'+env.GITHUB_RUN_ATTEMPT+'-'+nonce;
   const cf=(url,options={})=>controlRequest(API+url,{provider:'Cloudflare',token:env.CLOUDFLARE_EDGE_TOKEN,...options});
@@ -192,8 +194,8 @@ async function run(env=process.env) {
   const config={name,account_id:account,main:path.resolve('edge/quota-benchmark.mjs'),compatibility_date:'2026-09-01',
     compatibility_flags:['nodejs_compat'],workers_dev:true,preview_urls:false,observability:{enabled:false},
     vars:{PROBE_OWNER:owner,EXPIRES_AT:String(Date.now()+10*60000)},
-    durable_objects:{bindings:[{name:'BASELINE_QUOTA',class_name:'BaselineQuota'},{name:'CANDIDATE_QUOTA',class_name:'CandidateQuota'}]},
-    migrations:[{tag:'v1',new_sqlite_classes:['BaselineQuota','CandidateQuota']}]};
+    durable_objects:{bindings:[{name:'BASELINE_QUOTA',class_name:'BaselineQuota'},{name:'CONTROL_QUOTA',class_name:'ControlQuota'},{name:'CANDIDATE_QUOTA',class_name:'CandidateQuota'}]},
+    migrations:[{tag:'v1',new_sqlite_classes:['BaselineQuota','ControlQuota','CandidateQuota']}]};
   const configPath=path.join(env.RUNNER_TEMP,'quota-benchmark-wrangler.json');fs.writeFileSync(configPath,JSON.stringify(config),{mode:0o600});
   fs.writeFileSync(receipt,JSON.stringify({name,account,owner,nonce}),{mode:0o600});
   const cli=(args,input)=>{
@@ -217,11 +219,11 @@ async function run(env=process.env) {
   }
   assert(ready,'probe_not_ready');
   await verifyProbeAuth(await fetch(url+'/request',{method:'POST',redirect:'error',signal:AbortSignal.timeout(5000)}));
-  const report=await compareQuota({url,key,extended:true});
-  console.log('SYNTHETIC_QUOTA_COMPARISON '+JSON.stringify(report));
+  const report=await collect({url,key});
+  console.log(label+' '+JSON.stringify(report));
 }
 if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url) {
   const action=process.argv[2];
-  try {if(action==='run')await run();else if(action==='cleanup')await cleanupProbe();else throw Error('invalid_probe_action');}
+  try {if(action==='run')await runProbe();else if(action==='cleanup')await cleanupProbe();else throw Error('invalid_probe_action');}
   catch(error){console.error('Synthetic quota comparison failed: '+(/^[a-z0-9_]+$/.test(error.message)?error.message:'details_withheld'));process.exitCode=1;}
 }

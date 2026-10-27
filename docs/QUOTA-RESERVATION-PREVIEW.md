@@ -23,9 +23,9 @@ At a fixed clock, 600 sequential admitted request-only calls require 75 counter 
 ### Bounded synthetic probe
 
 The **isolated synthetic quota comparison** workflow creates its own expiring,
-authenticated Worker and two SQLite namespaces. It has no Neon database or
+authenticated Worker and three SQLite namespaces (baseline, identical baseline control, and candidate). It has no Neon database or
 application/production bindings and verifies cleanup by readback. On reviewed
-main it runs a fixed extended profile, capped at 10,000 HTTP calls:
+main its `extended` option runs a fixed correctness profile, capped at 10,000 measured HTTP calls:
 
 - Eight paired cohorts, alternating mode/order, with 128 warm samples per mode
   per cohort. Report client and handler p95/p99 per cohort and in aggregate.
@@ -84,6 +84,36 @@ calls into a single confirmed commit, without increasing speculative credit.
 It must pass the same provider gates; the failed rehearsal is not rollout evidence.
 The auth preflight still fails closed and now requires a Worker-owned 403
 signature, reporting only a bounded HTTP status if provider preflight fails.
+
+### Fixed A/A and A/B confirmation
+
+The workflow now defaults to `confirmation` on reviewed main; operators can
+still choose `extended` manually. The quota algorithm, production guard and
+six-of-eight heuristic are unchanged. The fixed sequence is **A/A, A/B, A/B,
+A/A**. Each repeat uses eight fresh paired cohorts with 128 warm samples per
+side, balanced request order and the same five-second deadline. All four
+repeats must finish: exactly 8,256 measured calls under a 10,000-call ceiling.
+No latency failure is retried. Completed repeat summaries are emitted as the
+run progresses, so an interrupted run cannot hide earlier evidence.
+
+A/A uses a separate namespace/class with exactly the baseline implementation,
+not the reservation code under another label. The runner verifies distinct
+instance IDs, declared implementation, stable instances, one confirmed counter
+write per baseline/control admission and write reduction for A/B. Control and
+candidate evidence cannot be silently interchanged.
+
+The report retains every cohort and computes paired client/handler p95/p99
+deltas. For each metric it compares candidate regressions with the observed
+absolute A/A spread. This is a descriptive noise check, not a confidence bound
+or proof of the cause of a particular regression. Identical A/A implementations
+are not expected to improve; their expected failure of an improvement test
+does not invalidate that test. Control variation never waives a failed A/B gate.
+
+`latency_confirmation_passed` requires each A/B repeat independently to meet
+both aggregate tail conditions and the original six-of-eight rule. A full
+isolated gameplay rehearsal follows only if that confirmation passes.
+`production_ready` remains false. Any proposed change to the heuristic needs
+an explicit, evidence-backed review; the measurement job cannot change it.
 
 ### Full gameplay rehearsal
 
