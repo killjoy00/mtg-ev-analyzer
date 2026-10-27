@@ -1,0 +1,51 @@
+name: isolated synthetic quota comparison
+on:
+  pull_request:
+    paths: ['edge/quota-benchmark.mjs', 'scripts/quota-benchmark.mjs', 'tests/quota-benchmark.test.mjs', 'tests/quota-benchmark-runtime.mjs', '.github/workflows/quota-benchmark.yml']
+  push:
+    branches: [main]
+    paths: ['edge/quota-benchmark.mjs', 'scripts/quota-benchmark.mjs', 'tests/quota-benchmark.test.mjs', 'tests/quota-benchmark-runtime.mjs', '.github/workflows/quota-benchmark.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pack1-synthetic-quota-comparison
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node --test tests/quota-benchmark.test.mjs
+      - name: Install pinned Workers tools
+        run: node .github/scripts/install-wrangler-tool.mjs "$RUNNER_TEMP/quota-validation" esbuild@0.28.2
+      - name: Test benchmark instrumentation in real Workers and SQLite
+        env:
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/quota-validation
+        run: |
+          "$EDGE_TOOLS_DIR/node_modules/.bin/esbuild" edge/quota-benchmark.mjs --bundle --format=esm --platform=browser --external:node:net --outfile="$RUNNER_TEMP/quota-benchmark.mjs"
+          node tests/quota-benchmark-runtime.mjs "$RUNNER_TEMP/quota-benchmark.mjs"
+  compare:
+    needs: validate
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+      EDGE_TOOLS_DIR: ${{ runner.temp }}/quota-tools
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install pinned Workers tools
+        run: node .github/scripts/install-wrangler-tool.mjs "$EDGE_TOOLS_DIR"
+      - name: Compare only synthetic quotas on a new private-key-protected Worker
+        run: node scripts/quota-benchmark.mjs run
+      - name: Verify removal of this run's Worker and namespaces
+        if: always()
+        run: node scripts/quota-benchmark.mjs cleanup
