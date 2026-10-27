@@ -17,9 +17,12 @@ export function probeName(run,attempt,nonce) {
   assert(/^[0-9]{1,20}$/.test(run||'')&&/^[0-9]{1,3}$/.test(attempt||'')&&/^[a-f0-9]{10}$/.test(nonce||''),'invalid_probe_identity');
   return PREFIX+run+'-'+attempt+'-'+nonce;
 }
-export async function compareQuota({url,key,fetcher=fetch,clock=performance.now.bind(performance)}={}) {
-  const samples=Object.fromEntries(modes.map(m=>[m,{cold:[],warm:[],handler:[],writes:0}]));
+export async function compareQuota({url,key,fetcher=fetch,clock=performance.now.bind(performance),extended=false,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}) {
+  let requests=0;const rounds=extended?8:3,chunks=extended?16:8;
+  const perRound=[];
+  const samples=Object.fromEntries(modes.map(m=>[m,{cold:[],warm:[],handler:[],rows:[],writes:0}]));
   const call=async(mode,cohort,kind='request')=>{
+    assert(++requests<=(extended?10000:2000),'probe_request_budget_exceeded');
     const began=clock(),r=await fetcher(url+'/'+kind,{method:'POST',redirect:'error',
       headers:{authorization:'Bearer '+key,'content-type':'application/json'},body:JSON.stringify({mode,cohort}),signal:AbortSignal.timeout(5000)});
     if(![204,429].includes(r.status)) {
@@ -28,24 +31,38 @@ export async function compareQuota({url,key,fetcher=fetch,clock=performance.now.
       const code=['sqlite_out_of_memory','storage_reset','provider_internal','transport_reset'].includes(body?.failure_code)?body.failure_code:reason;
       throw Error(`probe_${mode}_http_${r.status}_${code}`);
     }
+    if(kind==='restart'){assert(r.status===204,'probe_restart_control_failed');await r.body?.cancel();return;}
     const ms=clock()-began,rawTotal=r.headers.get('x-quota-counter-write-total'),rawHandler=r.headers.get('x-pack1-quota-handler-ms');
     const total=Number(rawTotal),handler=Number(rawHandler);
     assert(rawTotal!==null&&rawHandler!==null&&Number.isSafeInteger(total)&&total>=0&&Number.isFinite(handler)&&handler>=0,'missing_probe_evidence');
-    await r.body?.cancel();return {status:r.status,total,handler,ms};
+    const instance=r.headers.get('x-quota-instance');
+    if(extended)assert(/^[a-f0-9]{32}$/.test(instance||''),'missing_probe_instance');
+    const write=r.headers.get('x-quota-reservation-write'),queue=r.headers.get('x-quota-queue-ms'),durability=r.headers.get('x-quota-durability-ms');
+    if(extended) {
+      assert(['true','false'].includes(write),'missing_write_decision');
+      if(mode==='candidate')assert(queue!==null&&durability!==null&&[Number(queue),Number(durability)].every(n=>Number.isFinite(n)&&n>=0),'missing_candidate_phase_evidence');
+    }
+    await r.body?.cancel();return {status:r.status,total,handler,ms,instance,write:write==='true',
+      queue:queue===null?null:Number(queue),durability:durability===null?null:Number(durability)};
   };
-  for(let round=0;round<3;round++) {
-    const cohort=randomBytes(16).toString('hex'),last={baseline:0,candidate:0};
+  for(let round=0;round<rounds;round++) {
+    const cohort=randomBytes(16).toString('hex'),last={baseline:0,candidate:0},instances={};
+    const cohortSamples={baseline:[],candidate:[]};
     const order=round%2?[...modes].reverse():modes;
     for(const mode of order) {
-      const r=await call(mode,cohort);assert(r.status===204,'cold_quota_failed');samples[mode].cold.push(r.ms);last[mode]=r.total;
+      const r=await call(mode,cohort);assert(r.status===204,'cold_quota_failed');samples[mode].cold.push(r.ms);last[mode]=r.total;instances[mode]=r.instance;
     }
-    for(let chunk=0;chunk<8;chunk++)for(const mode of (chunk%2?[...order].reverse():order)) {
+    for(let chunk=0;chunk<chunks;chunk++)for(const mode of (chunk%2?[...order].reverse():order)) {
       const rows=await Promise.all(Array.from({length:8},()=>call(mode,cohort)));
       assert(rows.every(r=>r.status===204),'warm_quota_failed');
+      if(extended)assert(rows.every(r=>r.instance===instances[mode]),'probe_object_restarted');
       const total=Math.max(...rows.map(r=>r.total));assert(total>=last[mode],'probe_object_restarted');last[mode]=total;
+      cohortSamples[mode].push(...rows);
+      samples[mode].rows.push(...rows);
       samples[mode].warm.push(...rows.map(r=>r.ms));samples[mode].handler.push(...rows.map(r=>r.handler));
     }
     for(const mode of modes)samples[mode].writes+=last[mode];
+    perRound.push(Object.fromEntries(modes.map(mode=>[mode,{client:summarizeSamples(cohortSamples[mode].map(r=>r.ms)),handler:summarizeSamples(cohortSamples[mode].map(r=>r.handler))}])));
   }
   // Independently prove exact session and burst ceilings without resetting
   // counters. Separate cohort IDs prevent interaction with latency samples.
@@ -59,12 +76,80 @@ export async function compareQuota({url,key,fetcher=fetch,clock=performance.now.
     assert(kind!=='request'||clock()-began<9000,'burst_proof_window_elapsed');
     assert((await call(mode,cohort,kind)).status===429,'probe_limit_not_enforced');
   }
+  let sharedNetwork=null,restarts=null,quiet=null;
+  if(extended) {
+    const quietCohort=randomBytes(16).toString('hex'),quietBegan=clock();
+    for(const mode of modes)assert((await call(mode,quietCohort)).status===204,'quiet_initial_denial');
+    const cohort=randomBytes(16).toString('hex');
+    const nat=Object.fromEntries(modes.map(mode=>[mode,[]]));
+    for(const mode of modes) {
+      const rows=await Promise.all(Array.from({length:100},()=>call(mode,cohort,'session')));
+      assert(rows.every(r=>r.status===204),'shared_network_session_denial');nat[mode].push(...rows);
+    }
+    // 100 players each make 20 later requests. The pacing crosses burst and
+    // minute windows while staying within the existing shared-network limits.
+    for(let tick=0;tick<20;tick++) {
+      await wait(3000);
+      for(const mode of (tick%2?[...modes].reverse():modes)) {
+        const rows=await Promise.all(Array.from({length:100},()=>call(mode,cohort)));
+        assert(rows.every(r=>r.status===204),'shared_network_request_denial');nat[mode].push(...rows);
+      }
+    }
+    sharedNetwork=Object.fromEntries(modes.map(mode=>[mode,{admitted:nat[mode].length,denied:0,
+      client:summarizeSamples(nat[mode].map(r=>r.ms)),handler:summarizeSamples(nat[mode].map(r=>r.handler))}]));
+    const idle=clock()-quietBegan;assert(idle>=60000,'quiet_interval_too_short');
+    // Old candidate credits must not reopen an expired burst window. The
+    // following 600 admissions plus denial independently check the new window.
+    for(const mode of modes) {
+      const began=clock();
+      for(let sent=0;sent<600;sent+=20) {
+        const rows=await Promise.all(Array.from({length:20},()=>call(mode,quietCohort)));
+        assert(rows.every(r=>r.status===204),'quiet_resume_denial');
+      }
+      assert(clock()-began<9000,'quiet_burst_proof_window_elapsed');
+      assert((await call(mode,quietCohort)).status===429,'quiet_credits_reused');
+    }
+    quiet={idle_ms:Math.round(idle),resumed_admissions_per_mode:600,expired_credit_cap_passed:true};
+    restarts={};
+    for(const mode of modes) {
+      const id=randomBytes(16).toString('hex'),expected=mode==='candidate'?117:120;
+      let admitted=0,previous=null;
+      for(let restart=0;restart<3;restart++) {
+        const row=await call(mode,id,'session-only');assert(row.status===204,'restart_initial_denial');
+        if(previous)assert(row.instance!==previous,'probe_instance_not_restarted');
+        previous=row.instance;admitted++;
+        await call(mode,id,'restart');
+      }
+      const resumed=await call(mode,id,'session-only');
+      assert(resumed.status===204&&resumed.instance!==previous,'probe_instance_not_restarted');admitted++;
+      while(admitted<expected) {
+        const count=Math.min(20,expected-admitted),rows=await Promise.all(Array.from({length:count},()=>call(mode,id,'session-only')));
+        assert(rows.every(r=>r.status===204),'restart_forfeiture_exceeded');admitted+=count;
+      }
+      assert((await call(mode,id,'session-only')).status===429,'restart_reopened_quota');
+      restarts[mode]={confirmed_restarts:3,admitted,forfeited:120-admitted,strict_cap_passed:true};
+    }
+  }
   const summary=Object.fromEntries(modes.map(mode=>[mode,{cold:summarizeSamples(samples[mode].cold),
     warm:summarizeSamples(samples[mode].warm),handler:summarizeSamples(samples[mode].handler),counter_write_decisions:samples[mode].writes}]));
+  if(extended)summary.candidate.by_write=Object.fromEntries([['refill',true],['credit',false]].map(([name,write])=>{
+    const rows=samples.candidate.rows.filter(r=>r.write===write);
+    return [name,{client:summarizeSamples(rows.map(r=>r.ms)),handler:summarizeSamples(rows.map(r=>r.handler)),
+      queue:summarizeSamples(rows.map(r=>r.queue)),durability:summarizeSamples(rows.map(r=>r.durability))}];
+  }));
   assert(summary.baseline.counter_write_decisions>=195&&summary.candidate.counter_write_decisions<summary.baseline.counter_write_decisions/2,'write_reduction_unverified');
-  return {source:'synthetic-quota-only',...summary,exact_caps_passed:true,
-    latency_improved:summary.candidate.handler.p95_ms<summary.baseline.handler.p95_ms,
-    limitation:'Short synthetic run from one client region. Write decisions exclude internal provider transaction retries. Does not establish production tail latency, eviction frequency, billing savings or gameplay acceptance.'};
+  const tailImproves=row=>row.candidate.client.p95_ms<row.baseline.client.p95_ms&&
+    row.candidate.client.p99_ms<=row.baseline.client.p99_ms&&row.candidate.handler.p95_ms<row.baseline.handler.p95_ms&&
+    row.candidate.handler.p99_ms<=row.baseline.handler.p99_ms;
+  const winningRounds=perRound.filter(tailImproves).length;
+  const tailAcceptance=extended&&tailImproves({baseline:{client:summary.baseline.warm,handler:summary.baseline.handler},
+    candidate:{client:summary.candidate.warm,handler:summary.candidate.handler}})&&winningRounds>=6&&
+    sharedNetwork.candidate.client.p99_ms<=sharedNetwork.baseline.client.p99_ms&&
+    sharedNetwork.candidate.handler.p99_ms<=sharedNetwork.baseline.handler.p99_ms;
+  return {source:'synthetic-quota-only',profile:extended?'extended':'short',requests,...summary,exact_caps_passed:true,
+    per_round:perRound,rounds_improving_both_tails:winningRounds,shared_network:sharedNetwork,quiet,restarts,
+    preview_tail_acceptance:tailAcceptance,production_ready:false,
+    limitation:'Synthetic run from one client region. Write decisions exclude internal provider transaction retries. Successful execution verifies correctness scenarios; preview_tail_acceptance separately requires p95/p99 improvement. Does not establish production tail latency, eviction frequency, billing savings or gameplay acceptance.'};
 }
 function context(env) {
   assert(env.GITHUB_REPOSITORY==='killjoy00/mtg-ev-analyzer'&&env.GITHUB_REF==='refs/heads/main','reviewed_main_required');
@@ -122,7 +207,7 @@ async function run(env=process.env) {
   }
   assert(ready,'probe_not_ready');
   assert((await fetch(url+'/request',{method:'POST',redirect:'error',signal:AbortSignal.timeout(5000)})).status===403,'probe_auth_failed');
-  const report=await compareQuota({url,key});
+  const report=await compareQuota({url,key,extended:true});
   console.log('SYNTHETIC_QUOTA_COMPARISON '+JSON.stringify(report));
 }
 if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url) {

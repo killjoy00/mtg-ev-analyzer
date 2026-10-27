@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import probe from '../edge/quota-benchmark.mjs';
+import probe,{BaselineQuota,CandidateQuota} from '../edge/quota-benchmark.mjs';
 import {compareQuota,probeName,summarizeSamples} from '../scripts/quota-benchmark.mjs';
 
 const key='a'.repeat(64);
@@ -34,7 +34,8 @@ test('bounded benchmark verifies reduction and both exact caps without provider 
   };
   const report=await compareQuota({url:'https://synthetic.invalid',key,fetcher});
   assert.equal(report.exact_caps_passed,true);assert.equal(report.baseline.counter_write_decisions,195);
-  assert.equal(report.candidate.counter_write_decisions,27);assert.equal(report.latency_improved,true);
+  assert.equal(report.candidate.counter_write_decisions,27);assert.equal(report.preview_tail_acceptance,false);
+  assert.equal(report.production_ready,false);
   assert.ok(calls<2000);assert.doesNotMatch(JSON.stringify(report),/aaaaaaaa|bbbbbbbb|authorization|workers\.dev/);
   assert.deepEqual(summarizeSamples([1,2,1001]),{samples:3,p50_ms:2,p95_ms:1001,p99_ms:1001,gt_1000ms:1});
 });
@@ -76,4 +77,38 @@ test('Worker exception diagnostics expose only bounded failure categories',async
   const r=await probe.fetch(req(),{...env,CANDIDATE_QUOTA:namespace});
   assert.equal(r.status,503);const body=await r.json();assert.equal(body.reason,'storage_quota');
   assert.doesNotMatch(JSON.stringify(body),/private provider reference/);
+});
+
+test('extended comparison proves paced NAT traffic, expired credits and exact restart forfeiture',async()=>{
+  const originalNow=Date.now;let now=1000000;Date.now=()=>now;
+  const namespaces={};
+  try {
+    for(const [mode,Quota] of [['baseline',BaselineQuota],['candidate',CandidateQuota]]) {
+      const objects=new Map(),durable=new Map();
+      namespaces[mode]={idFromName:id=>id,get:id=>({fetch:async request=>{
+        if(!durable.has(id))durable.set(id,{values:new Map(),alarm:null,transaction:Promise.resolve()});
+        const row=durable.get(id),storage={
+          get:async keys=>Array.isArray(keys)?new Map(keys.filter(k=>row.values.has(k)).map(k=>[k,structuredClone(row.values.get(k))])):structuredClone(row.values.get(keys)),
+          put:async(k,v)=>row.values.set(k,structuredClone(v)),getAlarm:async()=>row.alarm,setAlarm:async at=>{row.alarm=at;},sync:async()=>{},
+        };storage.transaction=fn=>{const result=row.transaction.then(()=>fn(storage));row.transaction=result.catch(()=>{});return result;};
+        if(!objects.has(id))objects.set(id,new Quota({storage,abort(){objects.delete(id);throw Error('synthetic reset');}}));
+        return objects.get(id).fetch(request);
+      }})};
+    }
+    const report=await compareQuota({url:'https://synthetic.invalid',key,extended:true,clock:()=>now,
+      wait:async ms=>{now+=ms;},fetcher:(url,options)=>probe.fetch(new Request(url,options),{
+        ...env,BASELINE_QUOTA:namespaces.baseline,CANDIDATE_QUOTA:namespaces.candidate,
+      })});
+    assert.equal(report.requests,9157);assert.equal(report.baseline.counter_write_decisions,1032);
+    assert.equal(report.candidate.counter_write_decisions,136);assert.equal(report.per_round.length,8);
+    assert.equal(report.candidate.by_write.refill.handler.samples,128);
+    assert.equal(report.candidate.by_write.credit.handler.samples,896);
+    for(const mode of ['baseline','candidate']) {
+      assert.equal(report.shared_network[mode].admitted,2100);assert.equal(report.shared_network[mode].denied,0);
+      assert.equal(report.restarts[mode].confirmed_restarts,3);assert.equal(report.restarts[mode].strict_cap_passed,true);
+    }
+    assert.equal(report.restarts.baseline.admitted,120);assert.equal(report.restarts.candidate.admitted,117);
+    assert.equal(report.restarts.candidate.forfeited,3);assert.equal(report.quiet.expired_credit_cap_passed,true);
+    assert.equal(report.production_ready,false);
+  } finally {Date.now=originalNow;}
 });
