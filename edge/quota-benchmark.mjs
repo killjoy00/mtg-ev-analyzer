@@ -13,22 +13,24 @@ function probeFailure(error) {
 
 class MeasuredQuota extends NetworkQuota {
   constructor(state,reserved) {
-    let writes=0;
-    const wrap=tx=>new Proxy(tx,{get(target,key){
-      if(key==='put')return async(...args)=>{writes++;return target.put(...args);};
-      const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
-    }});
-    const storage=new Proxy(state.storage,{get(target,key){
-      if(key==='transaction')return call=>target.transaction(tx=>call(wrap(tx)));
-      const value=Reflect.get(target,key,target);return typeof value==='function'?value.bind(target):value;
-    }});
-    super({storage},{MODE:'preview',NEON_BRANCH_ID:'br-synthetic-quota-only',QUOTA_RESERVATIONS:reserved?'preview-v1':undefined});
-    this.writes=()=>writes;
+    // Keep the native DurableObjectState/storage objects untouched. Observe
+    // the limiter's own write decisions instead of proxying provider APIs.
+    super(state,{MODE:'preview',NEON_BRANCH_ID:'br-synthetic-quota-only',QUOTA_RESERVATIONS:reserved?'preview-v1':undefined});
+    this.writeDecisions=0;this.reserved=reserved;
+    if(this.reservations) {
+      const debit=this.reservations.debit.bind(this.reservations);
+      this.reservations.debit=async(...args)=>{
+        const result=await debit(...args);
+        if(args[2].reservation_write)this.writeDecisions++;
+        return result;
+      };
+    }
   }
   async fetch(request) {
     try {
       const result=await super.fetch(request);
-      result.headers.set('x-quota-counter-write-total',String(this.writes()));
+      if(!this.reserved&&result.status===204)this.writeDecisions++;
+      result.headers.set('x-quota-counter-write-total',String(this.writeDecisions));
       return result;
     } catch(error){return probeFailure(error);}
   }

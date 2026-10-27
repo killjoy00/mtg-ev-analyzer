@@ -33,8 +33,8 @@ test('bounded benchmark verifies reduction and both exact caps without provider 
     return new Response(null,{status,headers:{'x-quota-counter-write-total':String(row.writes),'x-pack1-quota-handler-ms':mode==='baseline'?'12':'2'}});
   };
   const report=await compareQuota({url:'https://synthetic.invalid',key,fetcher});
-  assert.equal(report.exact_caps_passed,true);assert.equal(report.baseline.counter_write_calls,195);
-  assert.equal(report.candidate.counter_write_calls,27);assert.equal(report.latency_improved,true);
+  assert.equal(report.exact_caps_passed,true);assert.equal(report.baseline.counter_write_decisions,195);
+  assert.equal(report.candidate.counter_write_decisions,27);assert.equal(report.latency_improved,true);
   assert.ok(calls<2000);assert.doesNotMatch(JSON.stringify(report),/aaaaaaaa|bbbbbbbb|authorization|workers\.dev/);
   assert.deepEqual(summarizeSamples([1,2,1001]),{samples:3,p50_ms:2,p95_ms:1001,p99_ms:1001,gt_1000ms:1});
 });
