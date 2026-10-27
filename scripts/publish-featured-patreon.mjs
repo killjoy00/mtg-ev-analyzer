@@ -51,12 +51,19 @@ export function parsePatreonStorageState(base64) {
  return state;
 }
 
-function safePostUrl(input) {
+function safePostUrl(input,expectedId) {
  try {
   if(typeof input!=='string')return null;
   const url=new URL(input,'https://www.patreon.com');
-  return url.origin==='https://www.patreon.com'&&
-    /^\/posts\//.test(url.pathname)&&!url.username&&!url.password?url.toString():null;
+  if(url.protocol!=='https:'||url.port||url.username||url.password||
+     !['patreon.com','www.patreon.com'].includes(url.hostname))return null;
+  // Patreon also returns creator-prefixed and legacy creation permalinks.
+  // Bind every accepted shape to the API resource ID, then use the canonical
+  // public post URL rather than exposing tracking parameters or redirects.
+  const match=url.pathname.match(/^\/(?:[^/]+\/)?posts\/(?:[^/]+-)?([0-9]+)\/?$/);
+  const id=match?.[1]||(url.pathname==='/creation'?url.searchParams.get('hid'):null);
+  if(!/^\d+$/.test(id||'')||(expectedId!==undefined&&String(expectedId)!==id))return null;
+  return 'https://www.patreon.com/posts/'+id;
  } catch {return null;}
 }
 
@@ -87,13 +94,13 @@ export async function findPublishedPatreonPost({title,token,
   for(const item of page.data) {
    if(item?.attributes?.title!==title)continue;
    const a=item.attributes;
-   if(!a.published_at||a.is_public!==true||!safePostUrl(a.url)) {
+   if(!a.published_at||a.is_public!==true||!safePostUrl(a.url,item.id)) {
     const error=Error('patreon-existing-post-not-verified-public');
     error.verificationReason=!a.published_at?'unpublished':
      a.is_public!==true?'not-public':'url-invalid';
     throw error;
    }
-   matches.push({id:item.id,url:safePostUrl(a.url)});
+   matches.push({id:item.id,url:safePostUrl(a.url,item.id)});
   }
   if(matches.length>1)throw Error('patreon-duplicate-posts-detected');
   next=page.links?.next||null;

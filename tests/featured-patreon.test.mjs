@@ -106,13 +106,19 @@ test('publishing verification fails closed on API error, private post, or unsafe
 
 test('normalizes provider-relative public post links and rejects external or unpublished matches',async()=>{
  const relative=item(expected.title);
- relative.attributes.url='/posts/890';
- assert.deepEqual(await findPublishedPatreonPost({title:expected.title,token:'safe',
-  fetchImpl:async()=>response({data:[relative]})}),{id:'890',url:'https://www.patreon.com/posts/890'});
+ for(const url of ['/posts/890','https://patreon.com/posts/890',
+  'https://www.patreon.com/PackOne/posts/feature-890','/PackOne/posts/890',
+  'https://www.patreon.com/creation?hid=890&tracking=ignored']) {
+  relative.attributes.url=url;
+  assert.deepEqual(await findPublishedPatreonPost({title:expected.title,token:'safe',
+   fetchImpl:async()=>response({data:[relative]})}),{id:'890',url:'https://www.patreon.com/posts/890'});
+ }
  for(const [change,reason] of [
   [{published_at:null},'unpublished'],[{is_public:false},'not-public'],
   [{url:'//evil.test/posts/890'},'url-invalid'],[{url:'https://www.patreon.com:444/posts/890'},'url-invalid'],
   [{url:'https://secret@www.patreon.com/posts/890'},'url-invalid'],
+  [{url:'https://www.patreon.com/posts/891'},'url-invalid'],
+  [{url:'https://patreon.com/creation?hid=891'},'url-invalid'],
  ]) {
   await assert.rejects(()=>findPublishedPatreonPost({title:expected.title,token:'safe',
    fetchImpl:async()=>response({data:[{...relative,attributes:{...relative.attributes,...change}}]})}),
