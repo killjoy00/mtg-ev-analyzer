@@ -7,7 +7,8 @@ import {fixturePool,textTypes} from './support/postgres-fixture.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {DRAFT_RUN_SELECTION_VERSION} from '../draft-run-policy.mjs';
 import {selectDatabaseRun} from '../worker/draft-run-selection.mjs';
-import {ensureDailySchedule} from '../worker/draft-run-daily.mjs';
+import {ensureDailySchedule,RECENT_DAILY_DECISIONS,DAILY_REPEAT_WINDOW_DAYS,dailyRepeatExclusion,selectDailyWithoutRepeats} from '../worker/draft-run-daily.mjs';
+import {decisionKey} from '../worker/draft-run-selection.mjs';
 import {LATEST_DAILY_RULE,SELECTION_FEATURE_VERSION,STAKES_RULE,stakesTopPoolSize} from '../puzzle-selection.mjs';
 import {scorePuzzleSelection} from '../scripts/score-puzzle-selection.mjs';
 
@@ -97,14 +98,23 @@ try {
   await query("UPDATE draft_run_puzzle_selection_features SET strength_sha256=repeat('0',64) WHERE puzzle_id=$1",[victim]);
   check((await scorePuzzleSelection(query,{setIds:[setId],log:()=>{}})).sets[0].written===1,'A stale strength table is rescored');
 
-  // The schedule records the rule that chose it.
+  // The schedule records the rule that chose it, and the rule draws after the
+  // Daily repeat window. Earlier suites may have generated today's Dailies, so
+  // the expected run uses the same exclusion, read before this schedule exists.
   const day='2026-11-20';
+  const recent=(await query(RECENT_DAILY_DECISIONS,[day,DAILY_REPEAT_WINDOW_DAYS.decision-1,DAILY_REPEAT_WINDOW_DAYS.source-1])).rows;
+  const exclusion=dailyRepeatExclusion(recent);
+  const report={};
+  const expected=await selectDailyWithoutRepeats(exclude=>selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed(day),'latest',{daily:true,day,exclude,report}),
+    exclusion,{environment:'latest',day,warn:()=>{}});
+  check(report.selectionRule===LATEST_DAILY_RULE,'The stakes rule still applies with the repeat window');
+  check(!expected.some(p=>exclusion.decisions.includes(decisionKey(p))),'The rule never repeats a decision from the repeat window');
   try {
     const {schedule,created}=await ensureDailySchedule(query,day,'latest');
     check(created,'The latest-set Daily schedule is created');
     const stored=(await query("SELECT selection_rule FROM draft_run_schedules WHERE day=$1::date AND environment='latest'",[day])).rows[0];
     check(stored.selection_rule===LATEST_DAILY_RULE,'The schedule records the stakes rule');
-    check(JSON.parse(schedule.puzzle_ids).join()===(await latest(day)).run.map(p=>p.puzzle_id).join(),'The schedule holds the rule selection');
+    check(JSON.parse(schedule.puzzle_ids).join()===expected.map(p=>p.puzzle_id).join(),'The schedule holds the rule selection');
     await ensureDailySchedule(query,day,'mixed');
     check((await query("SELECT selection_rule FROM draft_run_schedules WHERE day=$1::date AND environment='mixed'",[day])).rows[0].selection_rule===null,
       'A mixed schedule records no rule');

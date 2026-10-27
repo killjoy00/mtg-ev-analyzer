@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {DAILY_REPEAT_WINDOW_DAYS,dailyRepeatExclusion,dailyRepeatTiers,selectDailyWithoutRepeats} from '../worker/draft-run-daily.mjs';
 import {selectDatabaseRun} from '../worker/draft-run-selection.mjs';
 
-test('Daily repeat windows are two weeks for decisions and one week for source drafts',()=>{
-  assert.deepEqual({...DAILY_REPEAT_WINDOW_DAYS},{decision:14,source:7});
+test('Daily repeat windows are four weeks for decisions and one week for source drafts',()=>{
+  assert.deepEqual({...DAILY_REPEAT_WINDOW_DAYS},{decision:28,source:7});
 });
 
 test('recent schedule rows become decision keys and recent source drafts',()=>{

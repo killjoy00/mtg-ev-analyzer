@@ -9,9 +9,9 @@ export const DAILY_SCHEDULE_SELECT='SELECT puzzle_ids,corpus_version,scoring_ver
 const unavailable=message=>Object.assign(new Error(message),{status:503});
 
 // A Daily never repeats an exact decision scheduled by any Daily in the last
-// 14 days, nor reuses a source draft scheduled in the last 7 days. Days are
+// 28 days, nor reuses a source draft scheduled in the last 7 days. Days are
 // inclusive of today, so other environments already generated today count.
-export const DAILY_REPEAT_WINDOW_DAYS=Object.freeze({decision:14,source:7});
+export const DAILY_REPEAT_WINDOW_DAYS=Object.freeze({decision:28,source:7});
 export const RECENT_DAILY_DECISIONS=`SELECT DISTINCT p.source_draft_hash,p.pick_number,(s.day>=$1::date-$3::int) recent_source
   FROM draft_run_schedules s
   CROSS JOIN LATERAL jsonb_array_elements_text(s.puzzle_ids) scheduled(puzzle_id)

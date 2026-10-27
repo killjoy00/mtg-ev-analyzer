@@ -22,7 +22,7 @@ strongest credible option's strength) and draws uniformly from the top quarter
 (at least three). An easy round draws uniformly from easy puzzles.
 
 The existing serving filters, the `interesting` flag, source exclusion within
-a run and the 14-day decision / 7-day source repeat windows all still apply
+a run and the 28-day decision / 7-day source repeat windows all still apply
 first, so the top quarter is taken over what remains.
 
 If no puzzle qualifies in a round, that round makes today's band draw. The
@@ -96,9 +96,9 @@ omits snapshot membership and removed picks):
 
 ## Limits
 
-- The rule comes from one rater's blinded ratings over three rounds (32
-  pairs, `docs/PUZZLE-REVIEW.md`): a directional result, not a measurement of
-  player enjoyment.
-- Stakes are a static ranking. Within one set the same top-quarter puzzles
-  recur once the repeat windows pass; with pools this size that takes months.
+- The rule comes from blinded ratings by the owner and other raters over
+  three rounds (32 pairs, `docs/PUZZLE-REVIEW.md`): a directional result, not
+  a measurement of player enjoyment.
+- Stakes are a static ranking, so a top-quarter puzzle can return once the
+  28-day decision window passes.
 - Strength is observational: winning decks that played a card.
