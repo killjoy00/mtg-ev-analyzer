@@ -17,6 +17,7 @@ import {refreshServingStatistics} from '../worker/serving-statistics.mjs';
 import {effectiveCardMetadata} from '../card-metadata.mjs';
 import {corpusDatabase} from './neon-corpus-db.mjs';
 import {checkTrophyDecks} from './trophy-deck-coverage.mjs';
+import {scoreImportedPuzzles} from './score-puzzle-selection.mjs';
 const hash=file=>createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const parse=x=>typeof x==='string'?JSON.parse(x):x;
 const files=root=>fs.readdirSync(root,{withFileTypes:true}).flatMap(e=>e.isDirectory()?files(path.join(root,e.name)):[path.join(root,e.name)]);
@@ -154,7 +155,8 @@ export async function importComponents(query,prepared) {
   }
   await query('INSERT INTO corpus_set_versions(set_id,corpus_version,manifest,last_successful_import) VALUES($1,$2,$3::jsonb,now()) ON CONFLICT DO NOTHING',[s.sid,component,JSON.stringify(s.manifest)]);
   await query("INSERT INTO corpus_components(set_id,parent_version,component_version,event_type,model_version) VALUES($1,$2,$3,'TradDraft',$4) ON CONFLICT DO NOTHING",[s.sid,parent,component,expectedModel]);
-  let batch=[];for await(const p of records(path.join(s.dir,'puzzles.jsonl.gz'))){batch.push(p);if(batch.length===250){await insertTrophyBatch(query,batch,{componentVersion:component});batch=[];}}if(batch.length)await insertTrophyBatch(query,batch,{componentVersion:component});
+  const insert=async batch=>{await insertTrophyBatch(query,batch,{componentVersion:component});await scoreImportedPuzzles(query,batch);};
+  let batch=[];for await(const p of records(path.join(s.dir,'puzzles.jsonl.gz'))){batch.push(p);if(batch.length===250){await insert(batch);batch=[];}}if(batch.length)await insert(batch);
   const ledger=[...s.ledger.values()].map(d=>({source_draft_hash:d.source_draft_hash,event_type:'TradDraft',wins:3,losses:0,qualified:d.qualified,included:d.status==='included',puzzle_count:d.puzzles||0,exclusion_reason:d.reason||null}));
   for(let i=0;i<ledger.length;i+=1000)await query(`INSERT INTO corpus_trophy_trajectories(set_id,corpus_version,source_draft_hash,event_type,wins,losses,qualified,included,puzzle_count,exclusion_reason)
    SELECT $1,$2,x.* FROM jsonb_to_recordset($3::jsonb) x(source_draft_hash text,event_type text,wins smallint,losses smallint,qualified boolean,included boolean,puzzle_count integer,exclusion_reason text) ON CONFLICT DO NOTHING`,[s.sid,component,JSON.stringify(ledger.slice(i,i+1000))]);

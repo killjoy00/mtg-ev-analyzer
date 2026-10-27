@@ -34,6 +34,10 @@ on:
       - 'tests/postgres-client-contract.mjs'
       - 'tests/admin-invitations-postgres.mjs'
       - 'tests/serving-carry-postgres.mjs'
+      - 'tests/latest-daily-selection-postgres.mjs'
+      - 'puzzle-selection.mjs'
+      - 'scripts/score-puzzle-selection.mjs'
+      - 'corpus/card-strength/**'
       - 'scripts/verify-neon-schema.mjs'
       - 'scripts/creator-event-schema.mjs'
       - 'scripts/reroll-index-schema.mjs'
@@ -91,6 +95,8 @@ jobs:
         run: node tests/admin-invitations-postgres.mjs
       - name: Verify the serving cache carries forward after a removed decision
         run: node tests/serving-carry-postgres.mjs
+      - name: Verify the latest-set Daily stakes rule, its fallback and import scoring
+        run: node tests/latest-daily-selection-postgres.mjs
       - name: Verify reviewed release plan, ledger and serving invalidation
         run: node tests/release-migrations-postgres.mjs
       - name: Check migration rollout, concurrent writes and rollback safety

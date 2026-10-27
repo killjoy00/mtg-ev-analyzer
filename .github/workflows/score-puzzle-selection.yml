@@ -1,0 +1,82 @@
+name: Score puzzle selection
+# Backfills draft_run_puzzle_selection_features (migration 0068) for puzzles
+# imported before import-time scoring existed, or after a strength table or
+# decklist changes. Writes only that derived table; payloads, ratings, grading
+# and serving caches are untouched. See docs/LATEST-DAILY-SELECTION.md.
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Database to score'
+        type: choice
+        options: [development, production]
+        default: development
+      sets:
+        description: 'Space-separated set ids (for example: fra). Empty scores every set.'
+        required: false
+        type: string
+      validated_run_id:
+        description: 'Production only: a successful development run of this workflow on the same commit'
+        required: false
+        type: string
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: score-puzzle-selection
+  cancel-in-progress: false
+jobs:
+  score:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require reviewed code
+        run: test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validate inputs
+        env:
+          SETS: ${{ inputs.sets }}
+        run: |
+          set -euo pipefail
+          [[ "$SETS" =~ ^[a-z0-9\ -]*$ ]] || { echo 'sets must be space-separated set ids' >&2; exit 1; }
+      - name: Require a development run of this commit before production
+        if: ${{ inputs.target == 'production' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VALIDATED_RUN_ID: ${{ inputs.validated_run_id }}
+        run: |
+          set -euo pipefail
+          test -n "$VALIDATED_RUN_ID" || { echo 'production requires validated_run_id from a successful development run' >&2; exit 1; }
+          run_json=$(gh run view "$VALIDATED_RUN_ID" --json conclusion,workflowName,headBranch,headSha)
+          echo "$run_json" | jq -e --arg sha "$GITHUB_SHA" 'select(.conclusion=="success" and .workflowName=="Score puzzle selection" and .headBranch=="main" and .headSha==$sha)' >/dev/null
+      - run: npm install -g neon@4.17.4
+      - name: Prepare explicit connection and require the features schema
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+          umask 077
+          case "$TARGET" in
+            development) branch=br-twilight-hill-ayffyd2b ;;
+            production) branch=br-orange-feather-ayps8kep ;;
+            *) exit 1 ;;
+          esac
+          connection=$(neon connection-string "$branch" --project-id patient-shadow-91417882 --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          printf '%s' "$connection" > "$RUNNER_TEMP/corpus.connection"
+          DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+      - name: Score puzzles
+        env:
+          SETS: ${{ inputs.sets }}
+        run: |
+          set -euo pipefail
+          if [[ -n "$SETS" ]]; then
+            read -ra sets <<< "$SETS"
+            node scripts/score-puzzle-selection.mjs "$RUNNER_TEMP/corpus.connection" --sets "${sets[@]}"
+          else
+            node scripts/score-puzzle-selection.mjs "$RUNNER_TEMP/corpus.connection"
+          fi

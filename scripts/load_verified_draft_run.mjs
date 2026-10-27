@@ -9,6 +9,7 @@ import {corpusDatabase} from './neon-corpus-db.mjs';
 
 import {stageCorpusManifest} from './stage-corpus-manifest.mjs';
 import {checkTrophyDecks,sourcePuzzleCounts} from './trophy-deck-coverage.mjs';
+import {scoreImportedPuzzles} from './score-puzzle-selection.mjs';
 const query=corpusDatabase(process.argv[2]);
 if (process.argv.includes('--schema')) {
   for(const sql of fs.readFileSync('migrations/0004_draft_run_product.sql','utf8').split('-- statement')) await query(sql);
@@ -32,6 +33,7 @@ async function loadSet({set,rows}) {
     // The same immutable insert is used for baselines and supplements. A
     // conflicting payload is an error, not an apparently successful no-op.
     await insertTrophyBatch(query,rows.slice(i,i+250));
+    await scoreImportedPuzzles(query,rows.slice(i,i+250));
   }
   console.log(set.id,rows.length,'verified puzzles');
 }
