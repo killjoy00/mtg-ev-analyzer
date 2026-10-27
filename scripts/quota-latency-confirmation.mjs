@@ -55,7 +55,9 @@ export async function confirmQuotaLatency({url,key,fetcher=fetch,clock=performan
       headers:{authorization:'Bearer '+key,'content-type':'application/json'},body:JSON.stringify({mode,cohort,paired:true}),signal:AbortSignal.timeout(5000)});}
     catch(error){throw Error('confirmation_'+mode+'_'+(error?.name==='TimeoutError'?'deadline':error?.name==='AbortError'?'aborted':'transport'));}
     if(response.status!==204) {
-      await response.body?.cancel();throw Error('confirmation_'+mode+'_http_'+response.status);
+      const raw=response.headers.get('x-quota-probe-denial'),cause=response.headers.get('x-quota-probe-auth')==='required'?
+        (['key_unavailable','key_mismatch','expiry_unavailable','expired'].includes(raw)?raw:'probe_guard'):'edge';
+      await response.body?.cancel();throw Error('confirmation_'+mode+'_http_'+response.status+(response.status===403?'_'+cause:''));
     }
     const client=clock()-start,header=name=>response.headers.get(name),handler=Number(header('x-pack1-quota-handler-ms')),
       writes=Number(header('x-quota-counter-write-total')),instance=header('x-quota-instance'),implementation=header('x-quota-implementation'),actor=header('x-quota-actor-instance');

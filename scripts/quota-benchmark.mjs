@@ -21,6 +21,14 @@ export async function verifyProbeAuth(response) {
   await response.body?.cancel();
   assert(response.status===403&&response.headers.get('x-quota-probe-auth')==='required',`probe_auth_unverified_${response.status}`);
 }
+export function deployProbeWithKey({configPath,secretsPath,key,cli}) {
+  assert(/^[a-f0-9]{64}$/.test(key||''),'invalid_probe_key');
+  // Upload code and its key in ONE version. A second secret deployment can
+  // leave newly routed requests hitting a version without the key.
+  fs.writeFileSync(secretsPath,JSON.stringify({BENCHMARK_KEY:key}),{mode:0o600,flag:'wx'});
+  try {return cli(['deploy','--config',configPath,'--secrets-file',secretsPath]);}
+  finally {fs.rmSync(secretsPath,{force:true});}
+}
 export const tailsImprove=(baseline,candidate)=>candidate.client.p95_ms<baseline.client.p95_ms&&
   candidate.client.p99_ms<=baseline.client.p99_ms&&candidate.handler.p95_ms<baseline.handler.p95_ms&&
   candidate.handler.p99_ms<=baseline.handler.p99_ms;
@@ -203,12 +211,11 @@ export async function runProbe(env=process.env,collect=options=>compareQuota({..
       env:{...env,CLOUDFLARE_API_TOKEN:env.CLOUDFLARE_EDGE_TOKEN,WRANGLER_SEND_METRICS:'false'}});
     assert(!r.error&&r.status===0,'probe_cli_failed');return r.stdout;
   };
-  const output=cli(['deploy','--config',configPath]);
+  const key=randomBytes(32).toString('hex');
+  const output=deployProbeWithKey({configPath,secretsPath:path.join(env.RUNNER_TEMP,'quota-benchmark-secrets.json'),key,cli});
   const urls=[...output.matchAll(/https:\/\/[a-z0-9.-]+\.workers\.dev/g)].map(m=>m[0]);
   const url=urls.find(value=>new URL(value).hostname.startsWith(name+'.'));
   assert(url,'probe_url_unverified');
-  const key=randomBytes(32).toString('hex');
-  cli(['secret','bulk','--config',configPath],JSON.stringify({BENCHMARK_KEY:key}));
   // Wait only for deployment propagation, before any quota calls. Retries here
   // cannot repeat an admitted request or conceal a quota/latency failure.
   let ready=false;

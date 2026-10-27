@@ -100,3 +100,9 @@ test('a policy cannot switch while another policy has an unacknowledged call',as
   assert.equal(f.values.get('buckets').request.count,1);
   release();assert.equal((await baseline).status,204);assert.equal((await f.call('candidate')).status,204);
 });
+
+test('403 diagnostics distinguish the probe guard from an external edge denial without exposing bodies',async()=>{
+  for(const [headers,code] of [[{'x-quota-probe-auth':'required','x-quota-probe-denial':'key_unavailable'},'key_unavailable'],[{},'edge']])
+    await assert.rejects(confirmQuotaLatency({url:'https://synthetic.invalid',key:'key',fetcher:async()=>new Response('private provider data',{status:403,headers})}),
+      new RegExp('confirmation_baseline_http_403_'+code));
+});
