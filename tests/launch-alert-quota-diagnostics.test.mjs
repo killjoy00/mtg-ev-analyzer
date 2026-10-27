@@ -16,7 +16,7 @@ test('slow-quota diagnosis counts actual retained slow events by stage, never gu
   const d=event('d',200,120,80);
   assert.deepEqual(quotaStageSummary([a,b,c,d]),{
     slow_events:3,timing_available:2,handler_dominant:1,residual_dominant:1,
-    missing_timing:1,retried:1,quota_failures:0,
+    missing_timing:1,retried:1,gateway_5xx_with_slow_quota:0,
   });
   const result=evaluate([a,b,c,d],{});
   assert.ok(result.alerts.includes('slow_quota'));
@@ -30,7 +30,7 @@ test('untrusted stage values cannot be copied into the public summary or classif
   assert.equal(bad.quota_transport_wait_ms,null);
   assert.deepEqual(quotaStageSummary([bad]),{
     slow_events:1,timing_available:0,handler_dominant:0,residual_dominant:0,
-    missing_timing:1,retried:1,quota_failures:1,
+    missing_timing:1,retried:1,gateway_5xx_with_slow_quota:1,
   });
   assert.doesNotMatch(JSON.stringify(evaluate([bad],{})),/private-should-not-escape/);
 });
@@ -39,6 +39,6 @@ test('fast events and legacy events cannot be mistaken for slow, attributable qu
   const legacy=event('legacy',1800,null,null,{tail_sampling_version:0});
   assert.deepEqual(quotaStageSummary([fast,legacy]),{
     slow_events:1,timing_available:0,handler_dominant:0,residual_dominant:0,
-    missing_timing:1,retried:0,quota_failures:0,
+    missing_timing:1,retried:0,gateway_5xx_with_slow_quota:0,
   });
 });
