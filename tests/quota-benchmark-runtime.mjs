@@ -9,7 +9,7 @@ const require=createRequire(path.resolve(process.env.EDGE_TOOLS_DIR,'node_module
 const {Miniflare,Log,LogLevel,convertV4MiniflareOptions}=await import(pathToFileURL(require.resolve('miniflare')));
 const persist=await mkdtemp(path.join(tmpdir(),'pack1-quota-probe-')),script=path.join(persist,'probe.mjs');
 const now=Date.now(),key='a'.repeat(64);
-await writeFile(script,`Date.now=()=>${now};\n`+await readFile(process.argv[2],'utf8'));
+await writeFile(script,await readFile(process.argv[2],'utf8'));
 let runtime;
 try {
   runtime=new Miniflare(convertV4MiniflareOptions({log:new Log(LogLevel.ERROR),resourcePersistencePath:persist,
@@ -17,8 +17,11 @@ try {
       compatibilityDate:'2026-09-01',compatibilityFlags:['nodejs_compat'],
       bindings:{BENCHMARK_KEY:key,EXPIRES_AT:String(now+600000)},
       durableObjects:{BASELINE_QUOTA:{className:'BaselineQuota',useSQLite:true},CANDIDATE_QUOTA:{className:'CandidateQuota',useSQLite:true}}}]}));
-  const report=await compareQuota({url:'https://synthetic.invalid',key,fetcher:(url,options)=>runtime.dispatchFetch(url,options)});
+  const report=await compareQuota({url:'https://synthetic.invalid',key,extended:true,fetcher:(url,options)=>runtime.dispatchFetch(url,options)});
   assert.equal(report.exact_caps_passed,true);
-  assert.equal(report.baseline.counter_write_decisions,195);assert.equal(report.candidate.counter_write_decisions,27);
-  console.log('Real Workers/SQLite synthetic probe: authenticated routing, instrumented writes and exact ceilings passed.');
+  assert.equal(report.baseline.counter_write_decisions,1032);assert.equal(report.candidate.counter_write_decisions,136);
+  assert.equal(report.requests,9157);assert.equal(report.shared_network.candidate.admitted,2100);
+  assert.equal(report.restarts.baseline.admitted,120);assert.equal(report.restarts.candidate.admitted,117);
+  assert.equal(report.quiet.expired_credit_cap_passed,true);
+  console.log('Real Workers/SQLite probe: authenticated routing, paced shared networks, expiry, three real resets and exact ceilings passed.');
 } finally {await runtime?.dispose();await rm(persist,{recursive:true,force:true});}

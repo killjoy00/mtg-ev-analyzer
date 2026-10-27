@@ -20,6 +20,52 @@ At a fixed clock, 600 admitted request-only calls require 75 counter writes in t
 
 ## Isolated provider rehearsal
 
+### Bounded synthetic probe
+
+The **isolated synthetic quota comparison** workflow creates its own expiring,
+authenticated Worker and two SQLite namespaces. It has no Neon database or
+application/production bindings and verifies cleanup by readback. On reviewed
+main it runs a fixed extended profile, capped at 10,000 HTTP calls:
+
+- Eight paired cohorts, alternating mode/order, with 128 warm samples per mode
+  per cohort. Report client and handler p95/p99 per cohort and in aggregate.
+- Exact fresh burst/session ceilings, plus 100 simultaneous session creations
+  and 20 paced request rounds for each mode (2,100 admissions per shared quota).
+- Resume a quiet quota after more than a minute, then independently verify the
+  new burst window admits 600 calls and denies the next. Expired unused credits
+  cannot reopen that window.
+- Three forced instance resets per mode, each after one confirmed session
+  admission. Verify a new instance ID after each reset and surviving durable
+  counts. Baseline must admit exactly 120 total; candidate exactly 117, losing
+  one unused session credit per reset. No counters are deleted or reset.
+
+The reset route exists only in the disposable probe. It calls the documented
+`DurableObjectState.abort()` API; it cannot reach the application namespaces.
+Successful workflow execution means these correctness scenarios passed.
+`preview_tail_acceptance` is a separate result: client and handler p95 must
+improve, neither p99 may regress, at least six of eight cohorts must meet those
+conditions, and shared-network client/handler p99 may not regress.
+`production_ready` remains false even when those synthetic gates pass: real
+distributed gameplay rehearsal, naturally occurring eviction frequency and a
+separately reviewed rollout are still required.
+
+The [first short hosted run](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/40552520368)
+passed exact caps and reduced counter-write decisions from 195 to 27. Its
+192 warm samples per mode gave mixed tail evidence:
+
+| Measurement | Baseline | Candidate |
+| --- | ---: | ---: |
+| Client p95 | 165.14 ms | 107.52 ms |
+| Client p99 | 337.37 ms | 184.64 ms |
+| Handler p95 | 32 ms | 20 ms |
+| Handler p99 | 37 ms | 78 ms |
+
+The handler p99 regression prevents treating the faster p95 as rollout
+acceptance. This is synthetic evidence, not production telemetry or billing
+savings. Write decisions exclude provider-internal transaction retries.
+
+### Full gameplay rehearsal
+
 Run **isolated distributed launch acceptance** on the reviewed candidate revision, first with `quota_reservations` false and then true, using the same capacity target and existing policy. Both defaults are false. The input reaches only the disposable preview deployment. Activation also requires `MODE=preview`, an isolated branch ID, and the exact `preview-v1` switch. Production and the shared development branch are explicitly excluded. The checked-in Wrangler configuration does not enable it.
 
 Keep the existing source checks, resource ownership lock, usage budgets, expiry, cleanup, unsampled client records, retained telemetry checks and failure thresholds. Do not reset counters between stages or relax a failed gate. Include the shared-NAT scenario and restart/quiet-traffic scenarios before proposing rollout.
