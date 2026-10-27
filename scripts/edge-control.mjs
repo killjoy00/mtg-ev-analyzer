@@ -344,6 +344,7 @@ async function main(action) {
   config.main=path.resolve('edge/gateway.mjs');config.account_id=zone.account.id;
   config.vars={...config.vars,NEON_BRANCH_ID:branch,RELEASE_COMMIT:commit,
     CI_PREVIEW_RUN:process.env.GITHUB_RUN_ID,CI_PREVIEW_ATTEMPT:process.env.GITHUB_RUN_ATTEMPT,CI_PREVIEW_EXPIRES:process.env.CI_RESOURCE_EXPIRES};
+  if(process.env.PREVIEW_QUOTA_RESERVATIONS==='true')config.vars.QUOTA_RESERVATIONS='preview-v1';
   if(recovery)config.vars={...config.vars,PREVIEW_DNS_RECOVERY_ID:recovery.record_id,
     PREVIEW_DNS_RECOVERY_SOURCE_REVISION:recovery.source_revision};
   const configPath=path.join(process.env.RUNNER_TEMP,'edge-wrangler.json');

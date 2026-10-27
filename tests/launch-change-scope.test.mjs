@@ -41,6 +41,7 @@ test('shared, gameplay, quota and ambiguous gateway edits still require the full
 
 test('capacity-sensitive application and harness paths always require the load rehearsal',()=>{
   for(const file of [
+    'edge/quota-reservations.mjs',
     '.github/scripts/maintain-serving-indexes.sql',
     'worker/draft-run-function.mjs',
     'worker/draft-run-selection.mjs',

@@ -1,10 +1,10 @@
 name: gateway runtime tests
 on:
   pull_request:
-    paths: ['edge/**', 'launch-alert-policy.mjs', 'worker/ingress-auth.mjs', 'tests/ingress.test.mjs', 'tests/edge-runtime.mjs', 'scripts/edge-*.mjs', '.github/workflows/edge-*.yml']
+    paths: ['edge/**', 'launch-alert-policy.mjs', 'worker/ingress-auth.mjs', 'tests/ingress.test.mjs', 'tests/edge-runtime.mjs', 'tests/network-quota-*', 'tests/quota-reservations.test.mjs', 'scripts/edge-*.mjs', '.github/workflows/edge-*.yml']
   push:
     branches: [main]
-    paths: ['edge/**', 'launch-alert-policy.mjs', 'worker/ingress-auth.mjs', 'tests/ingress.test.mjs', 'tests/edge-runtime.mjs', 'scripts/edge-*.mjs', '.github/workflows/edge-*.yml']
+    paths: ['edge/**', 'launch-alert-policy.mjs', 'worker/ingress-auth.mjs', 'tests/ingress.test.mjs', 'tests/edge-runtime.mjs', 'tests/network-quota-*', 'tests/quota-reservations.test.mjs', 'scripts/edge-*.mjs', '.github/workflows/edge-*.yml']
 permissions:
   contents: read
 jobs:
@@ -32,12 +32,17 @@ jobs:
           JS
       - name: Test request and origin boundaries
         run: node --test tests/ingress.test.mjs
+      - name: Verify quota reservation failure and fairness contracts
+        run: node --test tests/quota-reservations.test.mjs tests/network-quota-policy.test.mjs tests/network-quota-recovery.test.mjs tests/quota-commit-diagnostics.test.mjs tests/quota-cleanup-diagnostics.test.mjs
       - name: Build and test the Workers runtime
         env:
           EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
         run: |
           "$EDGE_TOOLS_DIR/node_modules/.bin/esbuild" edge/gateway.mjs --bundle --format=esm --platform=browser --external:node:net --outfile="$RUNNER_TEMP/gateway.mjs"
           node tests/edge-runtime.mjs "$RUNNER_TEMP/gateway.mjs"
+          PACK1_TEST_QUOTA_RESERVATIONS=1 node tests/edge-runtime.mjs "$RUNNER_TEMP/gateway.mjs"
+          node tests/network-quota-runtime-smoke.mjs "$EDGE_TOOLS_DIR"
+          PACK1_TEST_QUOTA_RESERVATIONS=1 node tests/network-quota-runtime-smoke.mjs "$EDGE_TOOLS_DIR"
       - name: Validate Cloudflare deployment configuration
         run: "$RUNNER_TEMP/edge-tools/node_modules/.bin/wrangler deploy --config edge/wrangler.json --dry-run --outdir $RUNNER_TEMP/edge-dry-run"
       - name: Validate recovery webhook Worker deployment configuration

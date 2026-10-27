@@ -17,6 +17,7 @@ await writeFile(runtimeScript,`Date.now=()=>${Date.now()};\n`+await readFile(pro
 // Wrangler 4.132 ships Miniflare 5; use its supported v4 configuration adapter
 // rather than relying on the older constructor shape still shown in examples.
 const options=convertV4MiniflareOptions({resourcePersistencePath:persist,workers:[{name:'gateway',rootPath:path.dirname(runtimeScript),modulesRoot:path.dirname(runtimeScript),modules:true,scriptPath:runtimeScript,compatibilityDate:'2026-09-01',compatibilityFlags:['nodejs_compat'],
+  bindings:process.env.PACK1_TEST_QUOTA_RESERVATIONS==='1'?{MODE:'preview',NEON_BRANCH_ID:'br-isolated-runtime',QUOTA_RESERVATIONS:'preview-v1'}:{},
   durableObjects:{NETWORK_QUOTA:{className:'NetworkQuota',useSQLite:true}}}]});
 let mf;
 try {
