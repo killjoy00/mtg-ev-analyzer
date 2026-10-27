@@ -36,7 +36,10 @@ try {
  assert.ok(Object.values(histories).every(Boolean),'All preserved history fixtures must be populated');
  const before=await state();
  const first=await applyReleaseMigrations(client,{baseline});
- assert.equal(first.applied,1);
+ // Every release migration after the frozen baseline executes once.
+ const afterBaseline=manifest.release_paths['secure-auth-release'].migrations.filter(m=>!Object.hasOwn(baseline.migrations,m));
+ assert.deepEqual(afterBaseline,['0067_restore_serving_invalidation.sql','0068_puzzle_selection_features.sql']);
+ assert.equal(first.applied,afterBaseline.length);
  assert.deepEqual(await applyReleaseMigrations(client,{baseline}),{applied:0,skipped:manifest.release_paths['secure-auth-release'].migrations.length});
  assert.equal(await state(),before,'Actual release plan must preserve serving/readiness and historical results');
  // Two independent sessions are serialized by the ledger advisory lock.

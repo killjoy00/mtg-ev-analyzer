@@ -71,7 +71,8 @@
     "0064_report_linked_pick_removal.sql",
     "0065_traditional_p1p6_component.sql",
     "0066_removal_aware_serving_carry.sql",
-    "0067_restore_serving_invalidation.sql"
+    "0067_restore_serving_invalidation.sql",
+    "0068_puzzle_selection_features.sql"
   ],
   "same_prefix_order": {
     "0037": [
@@ -192,7 +193,8 @@
         "0064_report_linked_pick_removal.sql",
         "0065_traditional_p1p6_component.sql",
         "0066_removal_aware_serving_carry.sql",
-        "0067_restore_serving_invalidation.sql"
+        "0067_restore_serving_invalidation.sql",
+        "0068_puzzle_selection_features.sql"
       ]
     },
     "daily-calendar": {
@@ -254,7 +256,8 @@
         "0064_report_linked_pick_removal.sql",
         "0065_traditional_p1p6_component.sql",
         "0066_removal_aware_serving_carry.sql",
-        "0067_restore_serving_invalidation.sql"
+        "0067_restore_serving_invalidation.sql",
+        "0068_puzzle_selection_features.sql"
       ]
     },
     "launch-load": {
@@ -291,7 +294,8 @@
         "0064_report_linked_pick_removal.sql",
         "0065_traditional_p1p6_component.sql",
         "0066_removal_aware_serving_carry.sql",
-        "0067_restore_serving_invalidation.sql"
+        "0067_restore_serving_invalidation.sql",
+        "0068_puzzle_selection_features.sql"
       ]
     },
     "launch-distributed": {
@@ -330,7 +334,8 @@
         "0064_report_linked_pick_removal.sql",
         "0065_traditional_p1p6_component.sql",
         "0066_removal_aware_serving_carry.sql",
-        "0067_restore_serving_invalidation.sql"
+        "0067_restore_serving_invalidation.sql",
+        "0068_puzzle_selection_features.sql"
       ]
     },
     "practice-performance": {

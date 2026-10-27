@@ -12,6 +12,7 @@ import {corpusDatabase} from './neon-corpus-db.mjs';
 import {sameSourceSnapshotManifest} from './source-snapshot-manifest.mjs';
 import {verifyStagedSnapshot} from './verify-staged-snapshot.mjs';
 import {checkTrophyDecks} from './trophy-deck-coverage.mjs';
+import {scoreImportedPuzzles} from './score-puzzle-selection.mjs';
 if(process.argv[2]?.startsWith('https://'))throw Error('Remote trophy import is disabled; pass a reviewed direct connection file.');
 const directory=process.argv[3]||'generated/trophy-import';
 const catalog=JSON.parse(fs.readFileSync(path.join(directory,'catalog.json')));
@@ -54,7 +55,9 @@ const query=corpusDatabase(process.argv[2]);
 const stageOnly=process.argv.includes('--stage-only');
 async function batchInsert(puzzles,sourceSnapshotId) {
   const {insertTrophyBatch}=await import('../worker/trophy-import.mjs');
-  return insertTrophyBatch(query,puzzles,{sourceSnapshotId});
+  const added=await insertTrophyBatch(query,puzzles,{sourceSnapshotId});
+  await scoreImportedPuzzles(query,puzzles);
+  return added;
 }
 async function loadSet(s) {
   if(!s.total_puzzles)return;

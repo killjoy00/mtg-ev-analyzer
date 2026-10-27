@@ -106,8 +106,10 @@ fix show the difficulty number in each pair's `rating` field; their top-level
 
 - The local corpus sample has roughly 50–75 source drafts per set, so each
   proposed top quarter holds only 5–11 puzzles. Production pools are larger.
-- Strength tables exist only for six sets; v1 uses three, v2 and v3 five (FRA
-  has no checked-in corpus sample).
+- The review uses the benchmark's six strength tables (training split only);
+  v1 uses three sets, v2 and v3 five (FRA has no checked-in corpus sample).
+  Production uses `corpus/card-strength/`, built for every set from all games;
+  see `docs/LATEST-DAILY-SELECTION.md`.
 - v3's close-only proposed pool holds 3–5 puzzles per set and pick in this
   sample.
 - Four land probes are a taste check, not a measurement.

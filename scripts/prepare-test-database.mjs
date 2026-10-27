@@ -8,6 +8,7 @@ import {stageCorpusManifest} from './stage-corpus-manifest.mjs';
 import {insertTrophyBatch} from '../worker/trophy-import.mjs';
 import {registerServingReadiness,advanceServingReadiness} from '../worker/corpus-readiness.mjs';
 import {refreshServingStatistics} from '../worker/serving-statistics.mjs';
+import {scoreImportedPuzzles} from './score-puzzle-selection.mjs';
 const pool=fixturePool(),root='tests/fixtures/draft-run';
 const catalog=JSON.parse(fs.readFileSync(root+'/catalog.json'));
 const query=async(sql,params=[])=>pool.query({text:sql,values:params,types:textTypes});
@@ -35,7 +36,10 @@ try {
     if(createHash('sha256').update(bytes).digest('hex')!==set.sha256)throw Error('Fixture checksum changed: '+set.id);
     const rows=JSON.parse(gunzipSync(bytes));
     await stageCorpusManifest(query,set.id,catalog.corpus_version,{...set,model_version:catalog.model_version});
-    for(let i=0;i<rows.length;i+=250)await insertTrophyBatch(query,rows.slice(i,i+250));
+    for(let i=0;i<rows.length;i+=250) {
+      await insertTrophyBatch(query,rows.slice(i,i+250));
+      await scoreImportedPuzzles(query,rows.slice(i,i+250));
+    }
   }
   await refreshServingStatistics(query);
   await registerServingReadiness(query);

@@ -68,8 +68,8 @@ async function buildDailySchedule(query,day,environment) {
   const plan=selected.map(p=>p.puzzle_id);
   if(environment==='latest')featuredSets=[selected[0].set_id];
   const inserted=await query(
-    'INSERT INTO draft_run_schedules(day,environment,corpus_version,puzzle_ids,difficulty_version,selection_version,daily_featured_sets,scoring_version,serving_policy_version) VALUES($1::date,$2,$3,$4::jsonb,$5,$6,$7::jsonb,$8,$9) ON CONFLICT(day,environment) DO NOTHING RETURNING day',
-    [day,environment,DRAFT_RUN_CORPUS_VERSION,JSON.stringify(plan),DRAFT_RUN_DIFFICULTY_VERSION,DRAFT_RUN_SELECTION_VERSION,JSON.stringify(featuredSets),DRAFT_RUN_SCORING_VERSION,SERVING_POLICY_VERSION],
+    'INSERT INTO draft_run_schedules(day,environment,corpus_version,puzzle_ids,difficulty_version,selection_version,daily_featured_sets,scoring_version,serving_policy_version,selection_rule) VALUES($1::date,$2,$3,$4::jsonb,$5,$6,$7::jsonb,$8,$9,$10) ON CONFLICT(day,environment) DO NOTHING RETURNING day',
+    [day,environment,DRAFT_RUN_CORPUS_VERSION,JSON.stringify(plan),DRAFT_RUN_DIFFICULTY_VERSION,DRAFT_RUN_SELECTION_VERSION,JSON.stringify(featuredSets),DRAFT_RUN_SCORING_VERSION,SERVING_POLICY_VERSION,selected.selectionRule||null],
   );
   schedule=(await query(DAILY_SCHEDULE_SELECT,[day,environment])).rows[0];
   if(!schedule)throw unavailable('Daily schedule unavailable.');

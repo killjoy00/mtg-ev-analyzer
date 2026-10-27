@@ -6,6 +6,9 @@ on:
       - 'scripts/card_strength_benchmark.py'
       - 'scripts/card_outcomes.py'
       - 'tests/test_card_strength_benchmark.py'
+      - 'scripts/build_card_strength_tables.py'
+      - 'tests/test_card_strength_tables.py'
+      - 'corpus/card-strength/**'
       - 'research/card-strength-*.json'
       - 'research/card-strength-requirements.txt'
       - '.github/workflows/card-strength-benchmark.yml'
@@ -31,3 +34,4 @@ jobs:
       - run: python -m pip install -r research/card-strength-requirements.txt
       - run: python -m unittest discover -s tests -p test_card_strength_benchmark.py -v
       - run: python -m unittest discover -s tests -p test_card_outcomes.py -v
+      - run: python -m unittest discover -s tests -p test_card_strength_tables.py -v
