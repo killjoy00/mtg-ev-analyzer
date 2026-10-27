@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import probe,{BaselineQuota,CandidateQuota} from '../edge/quota-benchmark.mjs';
-import {compareQuota,probeName,summarizeSamples} from '../scripts/quota-benchmark.mjs';
+import {compareQuota,probeName,summarizeSamples,verifyProbeAuth} from '../scripts/quota-benchmark.mjs';
 
 const key='a'.repeat(64);
 const env={BENCHMARK_KEY:key,EXPIRES_AT:String(Date.now()+60000)};
@@ -79,6 +79,11 @@ test('Worker exception diagnostics expose only bounded failure categories',async
   assert.doesNotMatch(JSON.stringify(body),/private provider reference/);
 });
 
+test('auth preflight requires the probe guard rather than an unrelated provider error',async()=>{
+  await verifyProbeAuth(await probe.fetch(req('/request',{},'wrong'),env));
+  for(const status of [200,403,503])await assert.rejects(verifyProbeAuth(new Response('private provider body',{status})),new RegExp('probe_auth_unverified_'+status));
+});
+
 test('extended comparison proves paced NAT traffic, expired credits and exact restart forfeiture',async()=>{
   const originalNow=Date.now;let now=1000000;Date.now=()=>now;
   const namespaces={};
@@ -103,6 +108,8 @@ test('extended comparison proves paced NAT traffic, expired credits and exact re
     assert.equal(report.candidate.counter_write_decisions,136);assert.equal(report.per_round.length,8);
     assert.equal(report.candidate.by_write.refill.handler.samples,128);
     assert.equal(report.candidate.by_write.credit.handler.samples,896);
+    assert.ok(report.shared_network.candidate.batching.coalesced_calls>0);
+    assert.ok(report.shared_network.candidate.batching.max_batch_size<=256);
     for(const mode of ['baseline','candidate']) {
       assert.equal(report.shared_network[mode].admitted,2100);assert.equal(report.shared_network[mode].denied,0);
       assert.equal(report.restarts[mode].confirmed_restarts,3);assert.equal(report.restarts[mode].strict_cap_passed,true);

@@ -17,6 +17,10 @@ export function probeName(run,attempt,nonce) {
   assert(/^[0-9]{1,20}$/.test(run||'')&&/^[0-9]{1,3}$/.test(attempt||'')&&/^[a-f0-9]{10}$/.test(nonce||''),'invalid_probe_identity');
   return PREFIX+run+'-'+attempt+'-'+nonce;
 }
+export async function verifyProbeAuth(response) {
+  await response.body?.cancel();
+  assert(response.status===403&&response.headers.get('x-quota-probe-auth')==='required',`probe_auth_unverified_${response.status}`);
+}
 export async function compareQuota({url,key,fetcher=fetch,clock=performance.now.bind(performance),extended=false,wait=ms=>new Promise(resolve=>setTimeout(resolve,ms))}={}) {
   let requests=0;const rounds=extended?8:3,chunks=extended?16:8;
   const perRound=[];
@@ -38,12 +42,14 @@ export async function compareQuota({url,key,fetcher=fetch,clock=performance.now.
     const instance=r.headers.get('x-quota-instance');
     if(extended)assert(/^[a-f0-9]{32}$/.test(instance||''),'missing_probe_instance');
     const write=r.headers.get('x-quota-reservation-write'),queue=r.headers.get('x-quota-queue-ms'),durability=r.headers.get('x-quota-durability-ms');
+    const batch=r.headers.get('x-quota-batch-size');
     if(extended) {
       assert(['true','false'].includes(write),'missing_write_decision');
       if(mode==='candidate')assert(queue!==null&&durability!==null&&[Number(queue),Number(durability)].every(n=>Number.isFinite(n)&&n>=0),'missing_candidate_phase_evidence');
+      if(mode==='candidate')assert(batch!==null&&Number.isInteger(Number(batch))&&Number(batch)>=1&&Number(batch)<=256,'missing_candidate_batch_evidence');
     }
     await r.body?.cancel();return {status:r.status,total,handler,ms,instance,write:write==='true',
-      queue:queue===null?null:Number(queue),durability:durability===null?null:Number(durability)};
+      queue:queue===null?null:Number(queue),durability:durability===null?null:Number(durability),batch:batch===null?null:Number(batch)};
   };
   for(let round=0;round<rounds;round++) {
     const cohort=randomBytes(16).toString('hex'),last={baseline:0,candidate:0},instances={};
@@ -97,6 +103,10 @@ export async function compareQuota({url,key,fetcher=fetch,clock=performance.now.
     }
     sharedNetwork=Object.fromEntries(modes.map(mode=>[mode,{admitted:nat[mode].length,denied:0,
       client:summarizeSamples(nat[mode].map(r=>r.ms)),handler:summarizeSamples(nat[mode].map(r=>r.handler))}]));
+    sharedNetwork.candidate.queue=summarizeSamples(nat.candidate.map(r=>r.queue));
+    sharedNetwork.candidate.durability=summarizeSamples(nat.candidate.map(r=>r.durability));
+    sharedNetwork.candidate.batching={single_request_calls:nat.candidate.filter(r=>r.batch===1).length,
+      coalesced_calls:nat.candidate.filter(r=>r.batch>1).length,max_batch_size:Math.max(...nat.candidate.map(r=>r.batch))};
     const idle=clock()-quietBegan;assert(idle>=60000,'quiet_interval_too_short');
     // Old candidate credits must not reopen an expired burst window. The
     // following 600 admissions plus denial independently check the new window.
@@ -146,7 +156,7 @@ export async function compareQuota({url,key,fetcher=fetch,clock=performance.now.
     candidate:{client:summary.candidate.warm,handler:summary.candidate.handler}})&&winningRounds>=6&&
     sharedNetwork.candidate.client.p99_ms<=sharedNetwork.baseline.client.p99_ms&&
     sharedNetwork.candidate.handler.p99_ms<=sharedNetwork.baseline.handler.p99_ms;
-  return {source:'synthetic-quota-only',profile:extended?'extended':'short',requests,...summary,exact_caps_passed:true,
+  return {source:'synthetic-quota-only',candidate_variant:'coalesced-preview',profile:extended?'extended':'short',requests,...summary,exact_caps_passed:true,
     per_round:perRound,rounds_improving_both_tails:winningRounds,shared_network:sharedNetwork,quiet,restarts,
     preview_tail_acceptance:tailAcceptance,production_ready:false,
     limitation:'Synthetic run from one client region. Write decisions exclude internal provider transaction retries. Successful execution verifies correctness scenarios; preview_tail_acceptance separately requires p95/p99 improvement. Does not establish production tail latency, eviction frequency, billing savings or gameplay acceptance.'};
@@ -206,7 +216,7 @@ async function run(env=process.env) {
     await new Promise(resolve=>setTimeout(resolve,1000));
   }
   assert(ready,'probe_not_ready');
-  assert((await fetch(url+'/request',{method:'POST',redirect:'error',signal:AbortSignal.timeout(5000)})).status===403,'probe_auth_failed');
+  await verifyProbeAuth(await fetch(url+'/request',{method:'POST',redirect:'error',signal:AbortSignal.timeout(5000)}));
   const report=await compareQuota({url,key,extended:true});
   console.log('SYNTHETIC_QUOTA_COMPARISON '+JSON.stringify(report));
 }

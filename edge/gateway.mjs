@@ -245,7 +245,7 @@ export class NetworkQuota {
   }
   fetch(request) {
     const enqueued=performance.now();
-    return this.reservations?this.reservations.exclusive(()=>this.handle(request,enqueued)):this.handle(request,enqueued);
+    return this.handle(request,enqueued);
   }
   async handle(request,enqueued) {
     const kind=new URL(request.url).pathname;
@@ -293,9 +293,11 @@ export class NetworkQuota {
     // A transaction/put can resolve into the runtime's write buffer before the
     // output gate confirms durability. Do not log success before that boundary.
     // Keep the normal output gate enabled; sync observes its existing obligation.
-    metric.phase='durability';
-    if(trace)console.log(JSON.stringify({event:'quota_commit_wait',trace,object_tag:metric.object_tag,attempt:metric.attempt,decision_status:retry?429:204}));
-    await timed('durability_ms',()=>this.storage.sync());
+    if(!this.reservations) {
+      metric.phase='durability';
+      if(trace)console.log(JSON.stringify({event:'quota_commit_wait',trace,object_tag:metric.object_tag,attempt:metric.attempt,decision_status:retry?429:204}));
+      await timed('durability_ms',()=>this.storage.sync());
+    } else if(!metric.durability_confirmed)throw Error('Unconfirmed quota decision.');
     metric.durability_confirmed=true;metric.phase='complete';metric.status=retry?429:204;
     const result=retry?Response.json({error:'Too many requests.',code:'network_rate_limited',scopes},
       {status:429,headers:{'cache-control':'no-store','retry-after':String(retry)}}):new Response(null,{status:204});

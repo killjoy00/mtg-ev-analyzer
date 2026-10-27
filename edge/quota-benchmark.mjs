@@ -40,10 +40,11 @@ class MeasuredQuota extends NetworkQuota {
       result.headers.set('x-quota-counter-write-total',String(this.writeDecisions));
       result.headers.set('x-quota-instance',this.instanceId);
       const metric=this.metrics.get(tag);
-      result.headers.set('x-quota-reservation-write',String(this.reserved?metric?.reservation_write===true:result.status===204));
+      result.headers.set('x-quota-reservation-write',String(this.reserved?(metric?.batch_write??metric?.reservation_write)===true:result.status===204));
       if(this.reserved&&metric) {
         result.headers.set('x-quota-queue-ms',String(metric.queue_ms));
         result.headers.set('x-quota-durability-ms',String(metric.durability_ms));
+        result.headers.set('x-quota-batch-size',String(metric.batch_size||1));
       }
       return result;
     } catch(error){return probeFailure(error);}
@@ -55,7 +56,7 @@ export class CandidateQuota extends MeasuredQuota {constructor(state){super(stat
 
 export default {async fetch(request,env) {
   if(!/^[a-f0-9]{64}$/.test(env.BENCHMARK_KEY||'')||request.headers.get('authorization')!=='Bearer '+env.BENCHMARK_KEY||
-    !Number.isFinite(Number(env.EXPIRES_AT))||Date.now()>=Number(env.EXPIRES_AT))return new Response(null,{status:403});
+    !Number.isFinite(Number(env.EXPIRES_AT))||Date.now()>=Number(env.EXPIRES_AT))return new Response(null,{status:403,headers:{'x-quota-probe-auth':'required'}});
   const path=new URL(request.url).pathname;
   if(request.method!=='POST'||!['/request','/session','/session-only','/restart'].includes(path))return new Response(null,{status:400});
   let body;try{body=await readJson(request,256);}catch{return new Response(null,{status:400});}
