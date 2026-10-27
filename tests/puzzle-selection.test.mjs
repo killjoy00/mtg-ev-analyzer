@@ -4,7 +4,7 @@ import {readFileSync,readdirSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
 import {puzzleSelectionFeatures,stakesTopPoolSize,isLandCard,STAKES_RULE,SELECTION_FEATURE_VERSION} from '../puzzle-selection.mjs';
 import {assessPuzzle,strengthTable,isLand,RULE} from '../scripts/build-puzzle-review-set.mjs';
-import {loadStrengthTable,loadMainDecks,scoreImportedPuzzles} from '../scripts/score-puzzle-selection.mjs';
+import {loadStrengthTable,loadMainDecks,scoreImportedPuzzles,scorePuzzleSelection} from '../scripts/score-puzzle-selection.mjs';
 
 const card=(id,name,model_probability,type_line='Creature')=>({id,name,model_probability,type_line});
 const strength=points=>({version:'gih-shrunk-400-v1',sha256:'a'.repeat(64),cards:new Map(Object.entries(points))});
@@ -87,4 +87,26 @@ test('import scoring skips a database without the features table',async()=>{
   assert.equal(await scoreImportedPuzzles(query,[{puzzle_id:'q'}],{log:m=>messages.push(m)}),0);
   assert.equal(sql.length,1,'the table check runs once per database adapter');
   assert.match(messages.join('\n'),/migration 0068 is not applied/);
+});
+
+test('completed feature backfill avoids reading the entire puzzle corpus again',async()=>{
+ const sql=[];
+ const query=async text=>{
+   sql.push(text);
+   if(text.includes('to_regclass('))return {rows:[{present:true}]};
+   if(text.includes('SELECT count(*)::int n FROM draft_run_verified_puzzles'))return {rows:[{n:0}]};
+   if(text.includes('pg_relation_size'))return {rows:[{blocks:0,tuples:0,pages:0}]};
+   throw Error('Unexpected SQL on no-op backfill');
+ };
+ const normal=await scorePuzzleSelection(query,{setIds:['fra'],log:()=>{}});
+ assert.deepEqual(normal.sets.map(x=>[x.set_id,x.scored,x.written]),[['fra',0,0]]);
+ assert.equal(normal.remaining,0);
+ assert.equal(sql.filter(s=>s.includes('pg_relation_size')).length,0,
+   'already-scored data must not trigger a physical block scan');
+ assert.equal(sql.filter(s=>s.includes('p.ctid>=')).length,0,
+   'already-scored data must not stream puzzle payloads back to CI');
+ const explicit=await scorePuzzleSelection(query,{setIds:['fra'],rescore:true,log:()=>{}});
+ assert.equal(explicit.remaining,0);
+ assert.equal(sql.filter(s=>s.includes('pg_relation_size')).length,1,
+   '--rescore must still perform the explicitly requested full traversal');
 });
