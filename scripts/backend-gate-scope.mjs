@@ -304,18 +304,28 @@ export function classifyBackendChanges(paths, { repoRoot = process.cwd(), map = 
   }
 
   return {
-    needsNeon: true,
+    needsNeon: fullSuite || selectedDomains.some(domain=>domain!=='account'),
     fullSuite,
     domains: selectedDomains,
     suites,
     seasonDestructive: fullSuite || selected.has('seasons'),
-    alwaysSteps: [...ALWAYS_STEPS],
+    alwaysSteps: fullSuite || selectedDomains.some(domain=>domain!=='account')?[...ALWAYS_STEPS]:['prepare-local-postgres','run-account-integration-suites'],
     reasons,
   };
 }
 
+export function backendExecutionPlan(result,map=loadBackendMap()) {
+  const all=Object.keys(map.domains);
+  const valid=result?.fullSuite===false&&Array.isArray(result.domains)&&result.domains.length>0&&
+    result.domains.every(domain=>all.includes(domain))&&new Set(result.domains).size===result.domains.length;
+  const selected=valid?result.domains:all;
+  return {localDomains:['account'],neonDomains:valid?selected.filter(domain=>domain!=='account'):all};
+}
+
 function writeOutputs(result) {
-  appendFileSync(process.env.GITHUB_OUTPUT, `needs_neon=${result.needsNeon}\n`);
+  const plan=backendExecutionPlan(result);
+  appendFileSync(process.env.GITHUB_OUTPUT, `needs_neon=${plan.neonDomains.length>0}\n`);
+  appendFileSync(process.env.GITHUB_OUTPUT, `neon_domains_json=${JSON.stringify(plan.neonDomains)}\n`);
   appendFileSync(process.env.GITHUB_OUTPUT, `full_suite=${result.fullSuite}\n`);
   appendFileSync(process.env.GITHUB_OUTPUT, `domains=${result.domains.join(',')}\n`);
   appendFileSync(process.env.GITHUB_OUTPUT, `domains_json=${JSON.stringify(result.domains)}\n`);

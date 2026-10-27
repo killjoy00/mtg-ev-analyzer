@@ -52,13 +52,14 @@ Release-secret provisioning checks belong in the release/control workflows that 
   - A file the gate never imports, executes or names is ignored, for example browser-only modules, `admin/` and HTML.
   - A test fails if a new worker module has no domain.
 - **Runs all six weekly** (Mondays 07:17 UTC) against `main`, with a manual full sweep available on reviewed `main`. This catches coupling with no static import without creating six additional Neon branches every night. Pull-request domain coverage is unchanged; run a manual full sweep before a high-risk launch.
+- **Runs the complete account domain on local PostgreSQL for every backend gate.** All six existing integration suites run unchanged against real PostgreSQL and the immutable small corpus. A PR scoped to account alone creates no Neon branch; a mixed narrow PR creates branches only for its other selected domains. Migrations, shared/full paths, classifier failures, weekly and manual full sweeps retain all six Neon domains. The aggregate gate rejects missing local results or mismatched provider routing.
 - **Waits for `postgres-contract`** before creating any branch.
 - **Suspends disposable CI computes after five idle minutes.** Only isolated expiring CI branches change; production stays always on. A resumed compute must pass its existing tests, not bypass them.
 - **No background SQL polling in routine CI.** The allocation sampler keeps idle compute awake, so it runs only on a manual full sweep with `sample_compute` enabled. That diagnostic mode cannot validate idle suspension.
 - **Caps branch compute per domain.** The project default allows 8 CU.
   - draft_run and corpus are capped at 2 CU. On their first capped run (#1323) they sat at the cap 74% and 92% of the time and took about 11 and 28 minutes against a 40-minute limit.
   - account, seasons, daily and subscriptions are capped at 1 CU. At 2 CU they used more than 1 CU for between 0% and 21% of the time.
-  - Each domain job samples `num_cpus()` every 5 seconds and writes the allocation to its job summary. `num_cpus()` rounds up to whole CPUs.
+  - An explicitly requested diagnostic sweep samples `num_cpus()` every 5 seconds and writes the allocation to its job summary. `num_cpus()` rounds up to whole CPUs.
   - Neon's own branch counters lag 15–60 minutes, longer than most CI branches live, so they can't be used for this.
 
 On the 100 gate runs from October 14 to 23, the new selection creates 523 branches instead of 595, 12% fewer. In 75 of those runs the change touched a full-path file, mostly `worker/growth-function.js` or migrations, and still needs all six domains.

@@ -53,6 +53,9 @@ on:
       - 'scripts/load_verified_draft_run.mjs'
       - 'scripts/*corpus*manifest.mjs'
       - 'scripts/load*tro*.mjs'
+      - 'scripts/run-local-backend-domain.mjs'
+      - 'scripts/verify-backend-execution.mjs'
+      - 'tests/local-backend-runner.test.mjs'
       - 'scripts/backend-gate-scope.mjs'
       - 'scripts/backend-gate-map.json'
       - 'tests/backend-gate-scope.test.mjs'
@@ -112,6 +115,8 @@ jobs:
       # Neon's corpus domain keeps only the production-scale readiness checks.
       - name: Verify serving readiness leases, retries, corruption and revision races
         run: node tests/corpus-readiness-backend-smoke.mjs --local-fixture
+      - name: Verify all account integration contracts on local PostgreSQL
+        run: node scripts/run-local-backend-domain.mjs account
 
   precheck:
     if: github.event_name == 'pull_request'
@@ -122,6 +127,7 @@ jobs:
       full_suite: ${{ steps.scope.outputs.full_suite }}
       domains: ${{ steps.scope.outputs.domains }}
       domains_json: ${{ steps.scope.outputs.domains_json }}
+      neon_domains_json: ${{ steps.scope.outputs.neon_domains_json }}
       suites_json: ${{ steps.scope.outputs.suites_json }}
       season_destructive: ${{ steps.scope.outputs.season_destructive }}
     steps:
@@ -177,7 +183,7 @@ jobs:
       fail-fast: false
       max-parallel: 3
       matrix:
-        domain: ${{ fromJSON(needs.precheck.outputs.domains_json || '["account","subscriptions","draft_run","daily","corpus","seasons"]') }}
+        domain: ${{ fromJSON(needs.precheck.result == 'success' && needs.precheck.outputs.neon_domains_json || '["account","subscriptions","draft_run","daily","corpus","seasons"]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
@@ -411,9 +417,13 @@ jobs:
   backend-gate:
     name: backend-gate
     needs: [precheck, backend-domain, postgres-contract]
-    if: ${{ !cancelled() && (((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/main') || github.event.pull_request.head.repo.full_name == github.repository) && (needs.precheck.result != 'success' || needs.precheck.outputs.needs_neon != 'false') }}
+    if: ${{ !cancelled() && (((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/main') || github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
       - name: Aggregate isolated backend domains
         shell: bash
         env:
@@ -422,22 +432,5 @@ jobs:
           POSTGRES_RESULT: ${{ needs.postgres-contract.result }}
           BACKEND_FULL: ${{ needs.precheck.result != 'success' || needs.precheck.outputs.full_suite != 'false' }}
           DOMAINS_JSON: ${{ needs.precheck.outputs.domains_json }}
-        run: |
-          set -euo pipefail
-          test "$POSTGRES_RESULT" = success || { echo '::error::Real PostgreSQL fixture gate failed.'; exit 1; }
-          if [[ "$DOMAIN_RESULT" != 'success' ]]; then
-            echo "::error::At least one required isolated backend domain was skipped, cancelled, or failed (aggregate result: $DOMAIN_RESULT)."
-            exit 1
-          fi
-
-          if [[ "$BACKEND_FULL" == 'true' && "$PRECHECK_RESULT" == 'success' ]]; then
-            DOMAINS_JSON="$DOMAINS_JSON" node -e '
-              const expected = ["account","subscriptions","draft_run","daily","corpus","seasons"].sort();
-              const actual = JSON.parse(process.env.DOMAINS_JSON || "[]").sort();
-              if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-                throw new Error("Full backend routing omitted a domain: " + JSON.stringify(actual));
-              }
-            '
-          fi
-
-          echo 'All required isolated backend domain jobs succeeded.'
+          NEON_DOMAINS_JSON: ${{ needs.precheck.outputs.neon_domains_json }}
+        run: node scripts/verify-backend-execution.mjs

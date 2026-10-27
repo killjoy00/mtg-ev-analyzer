@@ -50,11 +50,12 @@ test('mixed narrow domains retain every required domain without broadening to fu
   assert.ok(result.suites.includes('tests/apple-subscription-backend-smoke.mjs'));
 });
 
-test('account backend-smoke change selects account suites plus the always-run foundation', () => {
+test('account backend-smoke change selects the complete account suites on local PostgreSQL', () => {
   const result = classifyBackendChanges(['tests/account-deletion-backend-smoke.mjs'], { map });
   assert.equal(result.fullSuite, false);
   assert.deepEqual(result.domains, ['account']);
-  assert.deepEqual(result.alwaysSteps, [...ALWAYS_STEPS]);
+  assert.equal(result.needsNeon,false);
+  assert.deepEqual(result.alwaysSteps,['prepare-local-postgres','run-account-integration-suites']);
   assert.ok(result.suites.includes('tests/account-deletion-backend-smoke.mjs'));
   assert.ok(!result.suites.includes('tests/draft-run-backend-smoke.mjs'));
 });

@@ -28,7 +28,11 @@
     "scripts/create-ci-neon-branch.mjs",
     "scripts/control-read.mjs",
     "scripts/reroll-index-schema.mjs",
-    "worker/backend-diagnostics.mjs"
+    "worker/backend-diagnostics.mjs",
+    "scripts/run-local-backend-domain.mjs",
+    "scripts/verify-backend-execution.mjs",
+    "tests/support/local-backend-suite.mjs",
+    "tests/local-backend-runner.test.mjs"
   ],
   "domains": {
     "account": {

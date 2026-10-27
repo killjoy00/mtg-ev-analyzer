@@ -189,7 +189,12 @@ test('backend full path fans out by domain and aggregates fail closed', () => {
   assert.match(backend, /CI_BRANCH_PREFIX: ci-pr-.*matrix\.domain/);
   assert.match(backend, /name: backend-gate\n    needs: \[precheck, backend-domain, postgres-contract\]/);
   assert.match(backend, /DOMAIN_RESULT: \$\{\{ needs\.backend-domain\.result \}\}/);
-  assert.match(backend, /At least one required isolated backend domain was skipped, cancelled, or failed/);
+  assert.match(backend, /run: node scripts\/verify-backend-execution\.mjs/);
+  const aggregate=backend.split('\n  backend-gate:\n')[1];
+  const checkout=aggregate.indexOf('actions/checkout@v4');
+  assert.ok(checkout>=0&&checkout<aggregate.indexOf('name: Aggregate isolated backend domains'));
+  assert.match(aggregate,/actions\/setup-node@v4\n        with:\n          node-version: 24/);
+  assert.match(backend, /NEON_DOMAINS_JSON: \$\{\{ needs\.precheck\.outputs\.neon_domains_json \}\}/);
   assert.match(backend, /if: always\(\) && steps\.neon\.outputs\.branch_id != ''/);
 });
 
