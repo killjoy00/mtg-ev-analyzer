@@ -26,7 +26,8 @@ concurrency:
 
 jobs:
   connection:
-    if: github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/main'
+    # The Windows worker owns publication. Cloud readiness is owner-invoked only.
+    if: github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
