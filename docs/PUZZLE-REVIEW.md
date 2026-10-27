@@ -113,5 +113,5 @@ fix show the difficulty number in each pair's `rating` field; their top-level
 - v3's close-only proposed pool holds 3–5 puzzles per set and pick in this
   sample.
 - Four land probes are a taste check, not a measurement.
-- One rater and 10–12 pairs per round: a directional check, not a
-  measurement of player enjoyment.
+- Rated by the owner and other raters, 10–12 pairs per round: a
+  directional check, not a measurement of player enjoyment.
