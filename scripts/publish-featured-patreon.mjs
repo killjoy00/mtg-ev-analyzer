@@ -156,18 +156,40 @@ export async function openPatreonBrowser({state,browserlessToken,profile,chromiu
  } catch(error) {await browser.close().catch(()=>{});throw error;}
 }
 
-export async function assertPatreonCreator(page) {
+export async function assertPatreonCreator(page,{navigationTimeout=1500}={}) {
    await page.goto('https://www.patreon.com/',{waitUntil:'domcontentloaded',timeout:30000});
    if(!/(^|\.)patreon\.com$/.test(new URL(page.url()).hostname)||
       /login|auth|challenge|captcha/i.test(page.url()))
     throw Error('patreon-login-required');
-   // This is the signed-in creator's own-page navigation, not an arbitrary
-   // Pack One link on a public page. Unknown navigation fails closed.
-   const own=await findControl(page,[role('link',/^My page$/i)],'creator-identity');
-   const url=new URL(await own.getAttribute('href'),page.url());
-   if(url.origin!=='https://www.patreon.com'||
-      !['/c/PackOne','/PackOne'].includes(url.pathname.replace(/\/$/,'')))
-    throw Error('patreon-creator-mismatch');
+   if(await page.getByText('Performing security verification',{exact:true}).isVisible())
+    throw Error('patreon-browser-security-verification');
+   const expected=input=>{
+    const url=new URL(input,page.url());
+    return url.origin==='https://www.patreon.com'&&
+     ['/c/PackOne','/PackOne'].includes(url.pathname.replace(/\/$/,''));
+   };
+   const ownPage=()=>tryControl(page,[role('link',/^My page$/i),
+    role('link',/^View page$/i)],navigationTimeout);
+   const verify=async own=>{
+    if(!expected(await own.getAttribute('href')))throw Error('patreon-creator-mismatch');
+   };
+   let own=await ownPage();
+   if(own){await verify(own);return;}
+   // Patreon replaced My page with Creator studio in the current navigation.
+   // Enter that signed-in creator dashboard, then verify its own page target.
+   const studio=await findControl(page,[role('link',/^Creator studio$/i),
+    role('button',/^Creator studio$/i)],'creator-studio');
+   const target=await studio.getAttribute('href');
+   await studio.click();
+   if(target&&expected(target))return;
+   own=await ownPage();
+   if(own){await verify(own);return;}
+   const edit=await tryControl(page,[role('button',/^Edit page$/i),
+    role('link',/^Edit page$/i)],navigationTimeout);
+   if(edit&&expected(page.url()))return;
+   const more=await tryControl(page,[role('button',/^More(?: options)?$/i)],navigationTimeout);
+   if(more){await more.click();own=await ownPage();if(own){await verify(own);return;}}
+   throw Error('patreon-editor-creator-identity-unavailable');
 }
 
 export async function publishInPatreonEditor({post,state,onSubmit=()=>{},profile,

@@ -7,6 +7,7 @@ on:
       - '.github/workflows/patreon-publishing.yml'
       - 'scripts/check-patreon-publishing.mjs'
       - 'scripts/publish-featured-patreon.mjs'
+      - '.github/patreon-publish-request.json'
   workflow_dispatch:
     inputs:
       publish_once:
@@ -14,6 +15,12 @@ on:
         type: boolean
         default: false
         required: true
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/workflows/patreon-publishing.yml'
+      - 'scripts/check-patreon-publishing.mjs'
+      - 'scripts/publish-featured-patreon.mjs'
 
 permissions:
   contents: read
@@ -21,29 +28,51 @@ permissions:
 
 # Same lock as morning publication, so a canary and a scheduled post cannot race.
 concurrency:
-  group: packone-social-live
+  group: ${{ github.event_name == 'pull_request' && format('packone-patreon-connection-{0}', github.event.pull_request.number) || 'packone-social-live' }}
   cancel-in-progress: false
 
 jobs:
   connection:
-    if: github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/main'
+    if: >-
+      github.repository == 'killjoy00/mtg-ev-analyzer' &&
+      (github.ref == 'refs/heads/main' ||
+       (github.event_name == 'pull_request' &&
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.event.pull_request.user.login == 'killjoy00'))
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    outputs:
+      publish_requested: ${{ steps.request.outputs.publish }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
       - run: npm ci --no-audit --no-fund
+      - name: Validate an explicit current-day publication request
+        id: request
+        if: github.event_name == 'push'
+        run: |
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs';
+          import {isPatreonPublishRequest} from './scripts/check-patreon-publishing.mjs';
+          const event=JSON.parse(fs.readFileSync(process.env.GITHUB_EVENT_PATH,'utf8'));
+          const path='.github/patreon-publish-request.json';
+          const request=fs.existsSync(path)?JSON.parse(fs.readFileSync(path,'utf8')):null;
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,'publish='+isPatreonPublishRequest(event,request)+'\n');
+          JS
       - name: Check saved profile, creator identity and official post-reading access
         run: node scripts/check-patreon-publishing.mjs
         env:
           PACKONE_BROWSERLESS_TOKEN: ${{ secrets.PACKONE_BROWSERLESS_TOKEN }}
           PATREON_CREATOR_ACCESS_TOKEN: ${{ secrets.PATREON_CREATOR_ACCESS_TOKEN }}
+          PACKONE_PATREON_UI_DIAGNOSTICS: 'true'
 
   canary-publish:
     needs: [connection]
-    if: github.event_name == 'workflow_dispatch' && inputs.publish_once == true
+    if: >-
+      (github.event_name == 'workflow_dispatch' && inputs.publish_once == true) ||
+      (github.event_name == 'push' && needs.connection.outputs.publish_requested == 'true')
     runs-on: ubuntu-latest
     timeout-minutes: 8
     permissions:

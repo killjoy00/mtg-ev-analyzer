@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {checkPatreonPublishing} from '../scripts/check-patreon-publishing.mjs';
+import {checkPatreonPublishing,isPatreonPublishRequest} from '../scripts/check-patreon-publishing.mjs';
 import {openPatreonBrowser,browserlessEndpoint,assertPatreonCreator,
  publishFeaturedPatreon} from '../scripts/publish-featured-patreon.mjs';
 import {PATREON_POLICY} from '../patreon-policy.mjs';
@@ -9,6 +9,20 @@ import {PATREON_POLICY} from '../patreon-policy.mjs';
 const env={PACKONE_BROWSERLESS_TOKEN:'fixture-browserless-token',
  PATREON_CREATOR_ACCESS_TOKEN:'fixture-read-token',GITHUB_TOKEN:'fixture-github-token'};
 const response=(data,status=200)=>({ok:status===200,status,json:async()=>data});
+
+test('only an explicit changed request for the current product day can trigger a push canary',()=>{
+ const now=new Date('2026-10-27T17:00:00Z');
+ const event={ref:'refs/heads/main',repository:{full_name:'killjoy00/mtg-ev-analyzer'},
+  commits:[{added:['.github/patreon-publish-request.json']}]};
+ const request={version:1,day:'2026-10-27',feature_day:'2026-10-26'};
+ assert.equal(isPatreonPublishRequest(event,request,now),true);
+ for(const bad of [{...event,ref:'refs/heads/other'},{...event,commits:[]},
+  {...event,repository:{full_name:'other/repo'}}])
+  assert.equal(isPatreonPublishRequest(bad,request,now),false);
+ assert.equal(isPatreonPublishRequest(event,{...request,day:'2026-10-26'},now),false);
+ assert.equal(isPatreonPublishRequest(event,{...request,feature_day:'2026-10-25'},now),false);
+ assert.equal(isPatreonPublishRequest(event,null,now),false);
+});
 
 test('saved login is reused in the default context; a fresh context would lose it',async()=>{
  let connected,closed=false;
@@ -55,6 +69,7 @@ test('creator navigation must identify Pack One before any editor action',async(
  for(const [href,ok] of [['/c/PackOne',true],['/PackOne/',true],
   ['/c/OtherCreator',false],['https://evil.test/c/PackOne',false]]) {
   const page={goto:async()=>{},url:()=> 'https://www.patreon.com/home',
+   getByText:()=>({isVisible:async()=>false}),
    getByRole:(role,opts)=>{
     assert.equal(role,'link');assert.match('My page',opts.name);
     return {count:async()=>1,isVisible:async()=>true,getAttribute:async()=>href};
@@ -64,6 +79,19 @@ test('creator navigation must identify Pack One before any editor action',async(
  }
  await assert.rejects(assertPatreonCreator({goto:async()=>{},
   url:()=> 'https://notpatreon.com/'}),/login-required/);
+});
+
+test('current Creator studio navigation verifies its own Pack One page',async()=>{
+ let entered=false;
+ const absent={count:async()=>0,isVisible:async()=>false};
+ const page={goto:async()=>{},url:()=>entered?'https://www.patreon.com/c/PackOne':'https://www.patreon.com/home',
+  getByText:()=>({isVisible:async()=>false}),getByRole:(role,{name})=>{
+   if(role==='link'&&name.test('Creator studio'))return {count:async()=>1,
+    isVisible:async()=>true,getAttribute:async()=>'/c/PackOne',click:async()=>{entered=true;}};
+   return absent;
+  }};
+ await assertPatreonCreator(page,{navigationTimeout:0});
+ assert.equal(entered,true);
 });
 
 test('readiness verifies the existing secret, saved profile, API scopes and browser identity',async()=>{
@@ -125,7 +153,7 @@ test('explicit pause wins over automatic activation; unset configuration stays i
 
 test('live workflow keeps credentials out of artifacts and uses the morning concurrency lock',()=>{
  const source=readFileSync(new URL('../.github/workflows/patreon-publishing.yml',import.meta.url),'utf8');
- assert.match(source,/group: packone-social-live/);
+ assert.match(source,/'packone-social-live'/);
  assert.match(source,/inputs\.publish_once == true/);
  assert.match(source,/Publish and independently verify Patreon/);
  assert.doesNotMatch(source,/upload-artifact|set-secret|liveURL|secrets: write/);

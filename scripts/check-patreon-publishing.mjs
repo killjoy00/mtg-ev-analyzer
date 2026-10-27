@@ -3,6 +3,16 @@ import {pathToFileURL} from 'node:url';
 import {PATREON_POLICY} from '../patreon-policy.mjs';
 import {PATREON_BROWSERLESS_PROFILE,browserlessEndpoint,openPatreonBrowser,
  assertPatreonCreator,findPublishedPatreonPost} from './publish-featured-patreon.mjs';
+import {pacificDay,previousPacificDay} from './featured-pick.mjs';
+
+export function isPatreonPublishRequest(event,request,now=new Date()) {
+ const path='.github/patreon-publish-request.json';
+ return event?.ref==='refs/heads/main'&&
+  event.repository?.full_name==='killjoy00/mtg-ev-analyzer'&&
+  event.commits?.some(c=>[...(c.added||[]),...(c.modified||[])].includes(path))===true&&
+  request?.version===1&&request.day===pacificDay(now)&&
+  request.feature_day===previousPacificDay(now);
+}
 
 export async function checkPatreonPublishing({env=process.env,fetchImpl=fetch,
  openBrowser=openPatreonBrowser,assertCreator=assertPatreonCreator}={}) {
@@ -33,6 +43,22 @@ export async function checkPatreonPublishing({env=process.env,fetchImpl=fetch,
  const {browser,page}=await openBrowser({browserlessToken:token,
   profile:PATREON_BROWSERLESS_PROFILE});
  try {await assertCreator(page);}
+ catch(error) {
+  // Only fixed UI labels/booleans, never page text, user names, hrefs or state.
+  // This keeps live layout failures diagnosable in a public repository.
+  if(env.PACKONE_PATREON_UI_DIAGNOSTICS==='true') {
+   const flags={};
+   for(const name of ['My page','Creator studio','View page','Edit page','Create','Post']) {
+    flags[name]=false;
+    for(const role of ['button','link','menuitem']) {
+     const matches=page.getByRole(role,{name,exact:true});
+     if(await matches.count()===1&&await matches.isVisible())flags[name]=true;
+    }
+   }
+   console.log('patreon-known-navigation-controls '+JSON.stringify(flags));
+  }
+  throw error;
+ }
  finally {await browser.close();}
  return {ready:true};
 }
