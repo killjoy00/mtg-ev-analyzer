@@ -21,16 +21,19 @@ export async function renderPatreonPublishing(root,{fetchImpl=fetch}={}) {
  <h1 id="patreon-title">Patreon publishing</h1>
  <p class="subpage-help">Daily featured picks. The real trophy pick must be one of the displayed choices.</p>
  <h2>Patreon connection</h2>
+ <p role="status"><strong>Automatic publishing is blocked by Patreon browser security verification.</strong> A saved login has not passed a fresh-session check. Repeating sign-in is not a verified fix, and no live post has been confirmed.</p>
+ <details><summary>Connection setup reference</summary>
  <p>Connect once using Browserless's secure saved-login screen. Your Patreon login stays there; this page never receives your password or cookies.</p>
  <ol>
  <li><a href="https://www.browserless.io/account/profiles" target="_blank" rel="noopener noreferrer">Connect Patreon in Browserless</a>. Sign in to your existing Browserless account, open <strong>Profiles</strong>, then <strong>New Profile</strong>.</li>
  <li>Name it <strong>packone-patreon</strong>, choose <strong>Sign in via remote browser</strong>, and enter <strong>https://www.patreon.com/</strong>. Tap <strong>Continue</strong>, then <strong>Open auth flow in new tab</strong>.</li>
  <li>Sign in to Patreon, switch to the <strong>Pack One creator</strong> profile, finish any verification, and tap <strong>Save profile</strong>. On Browserless Free the browser closes after two minutes; have your sign-in details ready.</li>
- <li>Once saved, the morning job can publish automatically. For an optional immediate test, <a href="https://github.com/${REPO}/actions/workflows/patreon-publishing.yml" target="_blank" rel="noopener noreferrer">verify Patreon publishing</a>: tap <strong>Run workflow</strong>, keep <strong>main</strong>, check <strong>publish_once</strong>, then tap the green <strong>Run workflow</strong>.</li>
+ <li>After the browser verification problem is resolved, the morning job can use the saved login. For an optional immediate test, <a href="https://github.com/${REPO}/actions/workflows/patreon-publishing.yml" target="_blank" rel="noopener noreferrer">verify Patreon publishing</a>: tap <strong>Run workflow</strong>, keep <strong>main</strong>, check <strong>publish_once</strong>, then tap the green <strong>Run workflow</strong>.</li>
  </ol>
+ </details>
  <div id="patreon-connection-status" role="status" aria-live="polite">Checking the latest connection test…</div>
  <h2>Publishing</h2>
- <p>The morning job waits for the saved login, verifies the Pack One creator and post-reading access, then publishes the image and text. Each post must pass a public check from a signed-out browser. A connection check alone is not proof that a post was published. Opening this page does not publish anything.</p>
+ <p>Automatic Patreon attempts are paused pending a verified reuse of the saved login and a real public post. Other morning destinations run independently. A connection check alone is not proof of publication.</p>
  <p>If Patreon expires the saved login, reconnect using the same profile name. An explicit repository pause still stops morning posts.</p>
  <div class="actions"><button type="button" class="secondary" id="patreon-refresh">Refresh workflow history</button>
  <a href="https://github.com/${REPO}/pull/1367" target="_blank" rel="noopener noreferrer">Review publisher implementation</a></div>
