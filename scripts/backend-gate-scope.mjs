@@ -304,12 +304,12 @@ export function classifyBackendChanges(paths, { repoRoot = process.cwd(), map = 
   }
 
   return {
-    needsNeon: true,
+    needsNeon: fullSuite || selectedDomains.some(domain=>domain!=='account'),
     fullSuite,
     domains: selectedDomains,
     suites,
     seasonDestructive: fullSuite || selected.has('seasons'),
-    alwaysSteps: [...ALWAYS_STEPS],
+    alwaysSteps: fullSuite || selectedDomains.some(domain=>domain!=='account')?[...ALWAYS_STEPS]:['prepare-local-postgres','run-account-integration-suites'],
     reasons,
   };
 }

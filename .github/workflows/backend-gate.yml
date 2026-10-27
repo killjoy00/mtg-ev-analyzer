@@ -56,7 +56,6 @@ on:
       - 'scripts/run-local-backend-domain.mjs'
       - 'scripts/verify-backend-execution.mjs'
       - 'tests/local-backend-runner.test.mjs'
-      - '.github/workflows/backend-local-qualification.yml'
       - 'scripts/backend-gate-scope.mjs'
       - 'scripts/backend-gate-map.json'
       - 'tests/backend-gate-scope.test.mjs'
