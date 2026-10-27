@@ -1,5 +1,5 @@
 import {renderPatreonPublishing} from './patreon-publishing.mjs?v=20261027-profiles';
-import {renderOverview,adminArea,ADMIN_AREAS} from './overview.mjs?v=20261026-puzzle-review';
+import {renderOverview,adminArea,ADMIN_AREAS} from './overview.mjs?v=20261027-patreon';
 import {renderCorpus} from './corpus.mjs?v=20261024-subpages';
 import {renderUsers} from './users.mjs?v=20261023-activity';
 import {renderAdminTeam} from './team.mjs?v=20261024-subpages';
