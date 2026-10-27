@@ -420,6 +420,10 @@ jobs:
     if: ${{ !cancelled() && (((github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/main') || github.event.pull_request.head.repo.full_name == github.repository) }}
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
       - name: Aggregate isolated backend domains
         shell: bash
         env:
