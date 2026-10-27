@@ -48,6 +48,81 @@ class FakeClient:
             raise TimeoutError('ambiguous')
 
 
+class DraftApp:
+    """Source-derived PostyBirb contract: creation adds an unrated default part."""
+    def __init__(self, root, feed, cover):
+        self.image = root / 'stored.jpg'
+        self.image.write_bytes(cover)
+        self.cover = cover
+        self.feed = feed
+        self.calls = []
+        self.logs = []
+        self.multiple = False
+        self.fail_patch = False
+        self.fail_queue = False
+        self.created_parts = []
+        self.package = {'parts': {
+            'default': {'accountId': 'default', 'website': 'default', 'isDefault': True,
+                        'data': {'title': 'featured-cover', 'description': {'value': '', 'overwriteDefault': False}},
+                        'postStatus': 'UNPOSTED'},
+            'account': {'accountId': 'account', 'website': 'Patreon', 'isDefault': False,
+                        'data': bridge.patreon_options(feed, 'everyone'), 'postStatus': 'UNPOSTED'}},
+            'submission': {'_id': 'draft123', 'type': 'FILE', 'isPosting': False, 'isQueued': False,
+                           'schedule': {}, 'additional': [],
+                           'primary': {'mimetype': 'image/jpeg', 'size': len(cover), 'location': str(self.image)}},
+            'problems': {}, 'hasProblems': False}
+        self.validate()
+
+    def validate(self):
+        errors = [] if self.package['parts']['default']['data'].get('rating') else ['Please provide a rating.']
+        self.package['problems'] = {'default': {'problems': errors}}
+        self.package['hasProblems'] = bool(errors)
+
+    def client(self):
+        client = object.__new__(bridge.PostyBirb)
+        client.request = self.request
+        client.account = lambda: ('account', 'everyone')
+        return client
+
+    def request(self, method, path, body=None, content_type=None):
+        if path == '/submission-log/FILE':
+            return self.logs
+        if path == '/submission?type=FILE&packaged=true':
+            return [copy.deepcopy(self.package)] * (2 if self.multiple else 1)
+        if path == '/submission/draft123?packaged=true':
+            return copy.deepcopy(self.package)
+        if path == '/submission/create':
+            self.calls.append('create')
+            boundary = content_type.split('boundary=')[1].encode()
+            piece = next(p for p in body.split(b'--' + boundary) if b'name="parts"' in p)
+            parts = json.loads(piece.split(b'\r\n\r\n', 1)[1].strip())
+            self.created_parts = [p['accountId'] for p in parts]
+            for part in parts:
+                self.package['parts'][part['accountId']] = {**part, 'postStatus': 'UNPOSTED'}
+            self.validate()
+            assert self.cover in body
+            return {'_id': 'draft123'}
+        if method == 'PATCH' and path == '/submission/update':
+            self.calls.append('patch')
+            assert body['id'] == 'draft123' and body['removedParts'] == []
+            assert len(body['parts']) == 1 and body['parts'][0]['accountId'] == 'default'
+            original = self.package['parts']['default']
+            expected = {**original, 'data': {**original['data'], 'rating': 'general'}}
+            assert body['parts'][0] == expected
+            self.package['parts']['default'] = body['parts'][0]
+            self.validate()
+            if self.fail_patch:
+                raise TimeoutError('rating update response lost')
+            return copy.deepcopy(self.package)
+        if path == '/post/queue/draft123':
+            self.calls.append('queue')
+            assert not self.package['hasProblems']
+            if self.fail_queue:
+                raise TimeoutError('queue response lost')
+            return None
+        raise AssertionError('Unexpected local request')
+
+
 class DesktopTests(unittest.TestCase):
     def test_feed_rejects_stale_paid_wrong_campaign_and_wrong_image(self):
         feed, _ = fixture()
@@ -116,33 +191,96 @@ class DesktopTests(unittest.TestCase):
         with self.assertRaises(bridge.BridgeError):
             client.account()
 
-    def test_create_protocol_round_trips_only_public_patreon_part(self):
+    def test_create_sets_both_required_ratings_and_validates_stored_image(self):
         feed, cover = fixture()
-        client = object.__new__(bridge.PostyBirb)
-        captured = {}
-        def request(method, path, body=None, content_type=None):
-            if path == '/submission/create':
-                boundary = content_type.split('boundary=')[1].encode()
-                part = next(piece for piece in body.split(b'--' + boundary) if b'name="parts"' in piece)
-                parts = json.loads(part.split(b'\r\n\r\n', 1)[1].strip())
-                self.assertEqual(len(parts), 1)
-                captured['part'] = parts[0]
-                self.assertIn(cover, body)
-                return {'_id': 'draft123'}
-            return {'parts': {'account': captured['part']}, 'hasProblems': False, 'problems': {},
-                    'submission': {'schedule': {'isScheduled': False}, 'additional': [],
-                                   'primary': {'mimetype': 'image/jpeg', 'size': len(cover)}}}
-        client.request = request
-        self.assertEqual(client.create(feed, cover, 'account', 'everyone'), 'draft123')
-        options = captured['part']['data']
-        self.assertEqual(options['tiers'], ['everyone'])
-        self.assertFalse(options['charge'])
-        package = request('GET', '/submission/draft123')
-        for key, value in [('charge', True), ('tiers', ['paid']), ('schedule', 'tomorrow')]:
-            changed = copy.deepcopy(package)
-            changed['parts']['account']['data'][key] = value
+        with tempfile.TemporaryDirectory() as root:
+            app = DraftApp(Path(root), feed, cover)
+            client = app.client()
+            self.assertEqual(client.create(feed, cover, 'account', 'everyone'), 'draft123')
+            self.assertEqual(app.created_parts, ['default', 'account'])
+            self.assertEqual(app.package['parts']['default']['data']['rating'], 'general')
+            self.assertEqual(app.package['parts']['account']['data']['rating'], 'general')
+            self.assertFalse(app.package['hasProblems'])
+            options = bridge.patreon_options(feed, 'everyone')
+            for key, value in [('charge', True), ('tiers', ['paid']), ('schedule', 'tomorrow')]:
+                changed = copy.deepcopy(app.package)
+                changed['parts']['account']['data'][key] = value
+                with self.assertRaises(bridge.BridgeError):
+                    bridge.verify_package(changed, 'account', options, len(cover))
+
+    def test_validator_reproduces_reported_missing_default_rating(self):
+        feed, cover = fixture()
+        with tempfile.TemporaryDirectory() as root:
+            app = DraftApp(Path(root), feed, cover)
+            self.assertTrue(app.package['hasProblems'])
+            self.assertEqual(app.package['problems']['default']['problems'], ['Please provide a rating.'])
             with self.assertRaises(bridge.BridgeError):
-                bridge.verify_package(changed, 'account', options, len(cover))
+                bridge.verify_package(app.package, 'account', bridge.patreon_options(feed, 'everyone'), len(cover))
+
+    def test_recovers_the_original_never_queued_draft_without_duplicate_creation(self):
+        feed, cover = fixture()
+        with tempfile.TemporaryDirectory() as root:
+            app = DraftApp(Path(root), feed, cover)
+            journal = bridge.Journal(Path(root) / 'journal')
+            journal.claim(feed)  # Original helper stopped during validation.
+            fetch = lambda path: json.dumps(feed).encode() if path == 'latest.json' else cover
+            bridge.run_once(True, fetch, app.client, journal)
+            self.assertEqual(app.calls, ['patch', 'queue'])
+            self.assertEqual(app.package['submission']['_id'], 'draft123')
+            self.assertEqual(app.package['parts']['default']['data']['rating'], 'general')
+            with self.assertRaises(bridge.BridgeError):
+                bridge.run_once(True, fetch, app.client, bridge.Journal(Path(root) / 'journal'))
+            self.assertEqual(app.calls, ['patch', 'queue'])
+
+    def test_recovery_refuses_changed_attempted_or_ambiguous_drafts_before_mutation(self):
+        feed, cover = fixture()
+        scenarios = ['queued', 'posting', 'failed', 'paid', 'other-error', 'changed-image', 'prior-log', 'multiple', 'mature']
+        for scenario in scenarios:
+            with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as root:
+                app = DraftApp(Path(root), feed, cover)
+                if scenario == 'queued':
+                    app.package['submission']['isQueued'] = True
+                elif scenario == 'posting':
+                    app.package['submission']['isPosting'] = True
+                elif scenario == 'failed':
+                    app.package['parts']['account']['postStatus'] = 'FAILED'
+                elif scenario == 'paid':
+                    app.package['parts']['account']['data']['charge'] = True
+                elif scenario == 'other-error':
+                    app.package['problems']['account'] = {'problems': ['Other validation problem.']}
+                elif scenario == 'changed-image':
+                    app.image.write_bytes(b'changed')
+                elif scenario == 'prior-log':
+                    app.logs.append({'parts': [{'part': copy.deepcopy(app.package['parts']['account'])}]})
+                elif scenario == 'multiple':
+                    app.multiple = True
+                elif scenario == 'mature':
+                    app.package['parts']['default']['data']['rating'] = 'mature'
+                journal = bridge.Journal(Path(root) / 'journal')
+                journal.claim(feed)
+                fetch = lambda path: json.dumps(feed).encode() if path == 'latest.json' else cover
+                with self.assertRaises(bridge.BridgeError):
+                    bridge.run_once(True, fetch, app.client, journal)
+                self.assertEqual(app.calls, [])
+
+    def test_rating_patch_timeout_can_resume_but_queue_timeout_cannot(self):
+        feed, cover = fixture()
+        with tempfile.TemporaryDirectory() as root:
+            app = DraftApp(Path(root), feed, cover)
+            app.fail_patch = True
+            journal = bridge.Journal(Path(root) / 'journal')
+            journal.claim(feed)
+            fetch = lambda path: json.dumps(feed).encode() if path == 'latest.json' else cover
+            with self.assertRaises(TimeoutError):
+                bridge.run_once(True, fetch, app.client, journal)
+            self.assertEqual(app.calls, ['patch'])
+            app.fail_patch = False
+            app.fail_queue = True
+            with self.assertRaises(TimeoutError):
+                bridge.run_once(True, fetch, app.client, journal)
+            with self.assertRaises(bridge.BridgeError):
+                bridge.run_once(True, fetch, app.client, journal)
+            self.assertEqual(app.calls, ['patch', 'queue'])
 
     def test_tls_pin_is_checked_before_auth_header(self):
         client = object.__new__(bridge.PostyBirb)
