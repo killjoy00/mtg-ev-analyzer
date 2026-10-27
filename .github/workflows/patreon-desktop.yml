@@ -62,4 +62,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "patreon-desktop-${{ github.sha }}" dist/PackOnePatreon.exe dist/SHA256.txt --repo '${{ github.repository }}' --target '${{ github.sha }}' --title 'Pack One Patreon for Windows' --notes 'Runs locally with PostyBirb+. First public post must be verified before automatic posting is enabled. Keep this helper and PostyBirb running.'
+          gh release create "patreon-desktop-${{ github.sha }}" dist/PackOnePatreon.exe dist/SHA256.txt --repo '${{ github.repository }}' --latest=false --target '${{ github.sha }}' --title 'Pack One Patreon for Windows' --notes 'Runs locally with PostyBirb+. First public post must be verified before automatic posting is enabled. Keep this helper and PostyBirb running.'
