@@ -180,27 +180,49 @@ class PostyBirb:
                 'Could not confirm the Everyone audience. No post was queued.')
         return account['_id'], everyone[0]
 
-    def existing(self, title):
+    def history(self, title):
         logs = self.request('GET', '/submission-log/FILE')
         submissions = self.request('GET', '/submission?type=FILE&packaged=true')
         require(isinstance(logs, list) and isinstance(submissions, list), 'Cannot check local post history.')
-        for record in logs:
-            for part in record.get('parts', []):
-                p = part.get('part', {})
-                if p.get('website') == 'Patreon' and p.get('data', {}).get('title') == title:
-                    return True
-        for record in submissions:
-            for p in record.get('parts', {}).values():
-                if p.get('website') == 'Patreon' and p.get('data', {}).get('title') == title:
-                    return True
-        return False
+        logged = any(p.get('part', {}).get('website') == 'Patreon'
+                     and p.get('part', {}).get('data', {}).get('title') == title
+                     for record in logs for p in record.get('parts', []))
+        drafts = [record for record in submissions if any(
+            p.get('website') == 'Patreon' and p.get('data', {}).get('title') == title
+            for p in record.get('parts', {}).values())]
+        return logged, drafts
+
+    def existing(self, title):
+        logged, drafts = self.history(title)
+        return logged or bool(drafts)
+
+    def recover_rating_draft(self, feed, cover, account_id, everyone):
+        logged, drafts = self.history(feed['title'])
+        require(not logged and len(drafts) == 1,
+                'Cannot safely identify one unposted draft. No duplicate was queued.')
+        sid = drafts[0].get('submission', {}).get('_id', '')
+        require(isinstance(sid, str) and re.fullmatch(r'[A-Za-z0-9_-]+', sid), 'Invalid local draft.')
+        package = self.request('GET', '/submission/' + sid + '?packaged=true')
+        options = patreon_options(feed, everyone)
+        verify_package(package, account_id, options, len(cover), allow_missing_rating=True)
+        verify_draft_image(package, feed['image_sha256'])
+        default = package['parts']['default']
+        if default['data'].get('rating') != 'general':
+            patched = {**default, 'data': {**default['data'], 'rating': 'general'}}
+            self.request('PATCH', '/submission/update',
+                         {'id': sid, 'parts': [patched], 'removedParts': [], 'altTexts': {}})
+        # Re-read after the update; no queue request is made until every guard passes.
+        package = self.request('GET', '/submission/' + sid + '?packaged=true')
+        verify_package(package, account_id, options, len(cover))
+        verify_draft_image(package, feed['image_sha256'])
+        return sid
 
     def create(self, feed, cover, account_id, everyone):
-        options = {'title': feed['title'], 'description': {'value': post_html(feed['body']), 'overwriteDefault': True},
-                   'tags': {'value': [], 'extendDefault': False}, 'rating': 'general', 'sources': [],
-                   'tiers': [everyone], 'charge': False, 'collections': [], 'allAsAttachment': False,
-                   'useThumbnail': False, 'autoScale': False}
-        parts = [{'accountId': account_id, 'website': 'Patreon', 'isDefault': False, 'data': options}]
+        options = patreon_options(feed, everyone)
+        # PostyBirb validates the default part independently of website ratings.
+        common = {k: options[k] for k in ('title', 'description', 'tags', 'rating', 'sources')}
+        parts = [{'accountId': 'default', 'website': 'default', 'isDefault': True, 'data': common},
+                 {'accountId': account_id, 'website': 'Patreon', 'isDefault': False, 'data': options}]
         boundary = 'PackOne' + uuid.uuid4().hex
         chunks = []
         for name, value in [('type', 'FILE'), ('title', feed['title']), ('parts', json.dumps(parts))]:
@@ -212,22 +234,56 @@ class PostyBirb:
         require(isinstance(sid, str) and re.fullmatch(r'[A-Za-z0-9_-]+', sid), 'Cannot confirm the created local draft.')
         package = self.request('GET', '/submission/' + sid + '?packaged=true')
         verify_package(package, account_id, options, len(cover))
+        verify_draft_image(package, feed['image_sha256'])
         return sid
 
 
-def verify_package(package, account_id, options, image_size):
+def patreon_options(feed, everyone):
+    return {'title': feed['title'], 'description': {'value': post_html(feed['body']), 'overwriteDefault': True},
+            'tags': {'value': [], 'extendDefault': False}, 'rating': 'general', 'sources': [],
+            'tiers': [everyone], 'charge': False, 'collections': [], 'allAsAttachment': False,
+            'useThumbnail': False, 'autoScale': False}
+
+
+def verify_draft_image(package, expected_hash):
+    path = Path(package.get('submission', {}).get('primary', {}).get('location', ''))
+    require(path.is_absolute() and path.suffix.lower() in ('.jpg', '.jpeg'), 'Cannot verify the stored draft image.')
+    with path.open('rb') as handle:
+        cover = handle.read(MAX_BYTES + 1)
+    require(len(cover) <= MAX_BYTES and hashlib.sha256(cover).hexdigest() == expected_hash,
+            'The stored draft image changed; no post was queued.')
+
+
+def verify_package(package, account_id, options, image_size, allow_missing_rating=False):
     parts = [p for p in package.get('parts', {}).values() if not p.get('isDefault')]
     require(len(parts) == 1 and parts[0].get('website') == 'Patreon'
             and parts[0].get('accountId') == account_id, 'Unexpected posting destination; stopped.')
-    require(not package.get('hasProblems', True), 'PostyBirb reported a validation problem. Check its window.')
-    for problem in package.get('problems', {}).values():
-        require(not problem.get('problems'), 'PostyBirb reported a validation problem.')
+    defaults = [p for p in package.get('parts', {}).values() if p.get('isDefault')]
+    require(len(defaults) == 1 and package.get('parts', {}).get('default') == defaults[0]
+            and defaults[0].get('accountId') == 'default' and defaults[0].get('website') == 'default',
+            'Cannot confirm the default draft settings.')
+    default_rating = defaults[0].get('data', {}).get('rating')
+    require(default_rating == 'general' or (allow_missing_rating and not default_rating),
+            'The default draft rating must be General.')
+    allowed = ['Please provide a rating.'] if allow_missing_rating and not default_rating else []
+    actual = []
+    for account, problem in package.get('problems', {}).items():
+        errors = problem.get('problems', [])
+        require(not errors or (account == 'default' and errors == allowed),
+                'PostyBirb reported another validation problem. Check its window.')
+        actual.extend(errors)
+    require(actual == allowed and package.get('hasProblems') is bool(actual),
+            'PostyBirb reported a validation problem. Check its window.')
+    require(parts[0].get('postStatus') == 'UNPOSTED' and not parts[0].get('postedTo'),
+            'This draft has already been attempted. No duplicate was queued.')
     for key, value in options.items():
         require(parts[0].get('data', {}).get(key) == value, 'PostyBirb changed a post option; stopped.')
     data = parts[0]['data']
     require(not any(data.get(k) for k in ('schedule', 'earlyAccess', 'teaser')), 'Unexpected scheduling option.')
     submission = package.get('submission', {})
-    require(not submission.get('schedule', {}).get('isScheduled') and not submission.get('additional')
+    require(not submission.get('isPosting') and not submission.get('isQueued')
+            and not submission.get('schedule', {}).get('isScheduled')
+            and not submission.get('schedule', {}).get('postAt') and not submission.get('additional')
             and submission.get('primary', {}).get('mimetype') == 'image/jpeg'
             and submission['primary'].get('size') == image_size, 'Unexpected image or schedule; stopped.')
 
@@ -248,6 +304,19 @@ class Journal:
             raise BridgeError('Already attempted today. Waiting for verification; no duplicate will be queued.') from None
         return path
 
+    def recovery_claim(self, feed):
+        path = self.root / (feed['publication_day'] + '.json')
+        if not path.exists():
+            return None
+        try:
+            record = json.loads(path.read_text())
+        except (OSError, ValueError):
+            raise BridgeError('Cannot read the prior attempt. No duplicate was queued.') from None
+        require(record.get('state') == 'claimed' and record.get('title') == feed['title']
+                and record.get('image_sha256') == feed['image_sha256'],
+                'Already attempted today. Waiting for verification; no duplicate will be queued.')
+        return path
+
     def record(self, path, state, **data):
         tmp = path.with_suffix('.tmp')
         with tmp.open('w', encoding='utf-8') as handle:
@@ -265,18 +334,25 @@ def run_once(publish=False, fetch=download, client_factory=PostyBirb, journal=No
     account, everyone = client.account()
     if not publish:
         return 'Connected to Pack One. Today’s post is ready. Click Publish today once.', False
-    require(not client.existing(feed['title']), 'A matching post or draft exists in PostyBirb. No duplicate was queued.')
     cover = fetch(feed['image_path'])
     require(5000 <= len(cover) <= MAX_BYTES and cover.startswith(b'\xff\xd8\xff')
             and hashlib.sha256(cover).hexdigest() == feed['image_sha256'], 'Image validation failed; stopped.')
     validate_feed(feed)  # Downloads must not carry an old day over midnight.
     journal = journal or Journal()
-    claim = journal.claim(feed)  # Before any local mutation; even a timed-out draft is not blindly retried.
-    sid = client.create(feed, cover, account, everyone)
+    claim = journal.recovery_claim(feed)
+    if claim:
+        # Only a never-queued, exact-content draft with the known missing-rating
+        # problem can resume. An ambiguous queue is never retried.
+        sid = client.recover_rating_draft(feed, cover, account, everyone)
+    else:
+        require(not client.existing(feed['title']), 'A matching post or draft exists in PostyBirb. No duplicate was queued.')
+        claim = journal.claim(feed)
+        sid = client.create(feed, cover, account, everyone)
+    validate_feed(feed)
     journal.record(claim, 'queue-uncertain', submission_id=sid, title=feed['title'])
     client.request('POST', '/post/queue/' + sid)
     journal.record(claim, 'queued', submission_id=sid, title=feed['title'])
-    return 'Sent to PostyBirb. Waiting for the public-post check (up to 20 minutes).', False
+    return 'Sent to PostyBirb. Waiting for the public-post check (usually within 20 minutes).', False
 
 
 def lock_instance():
