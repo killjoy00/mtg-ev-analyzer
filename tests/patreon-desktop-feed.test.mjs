@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {selectFeaturedPick,featureCopies} from '../scripts/featured-pick.mjs';
-import {makeDesktopFeed,verifyDesktopFeed,writeDesktopFeed,sha256,safeDesktopFeedFailure} from '../scripts/patreon-desktop-feed.mjs';
+import {makeDesktopFeed,verifyDesktopFeed,writeDesktopFeed,sha256,safeDesktopFeedFailure,retainPublishedDesktopFeed} from '../scripts/patreon-desktop-feed.mjs';
 const now=new Date('2026-10-27T17:00:00Z'),day='2026-10-26';
 const cards=['one','two','three'].map(id=>({id,name:id.toUpperCase(),image_url:'https://cards.scryfall.io/normal/front/a/b/'+id+'.jpg',model_probability:.5}));
 const feature=selectFeaturedPick([{environment:'latest',puzzle_id:'desktop-fixture',set_id:'spm',round:2,pick_number:2,
@@ -74,4 +74,15 @@ test('the existing morning dispatch delivers desktop media after artifact upload
  assert.match(job,/actions\/download-artifact@v4/);
  assert.match(job,/node scripts\/patreon-desktop-feed\.mjs/);
  assert.doesNotMatch(job,/BLUESKY|DISCORD|BROWSERLESS|STORAGE_STATE|NEON_API_KEY/);
+});
+
+test('a published day retains its existing post and media when future copy changes',async()=>{
+ const existing={...feed,title:'Previously published title | Pack One Daily '+day,
+  body:'Previously published body',verified_public_url:'https://www.patreon.com/posts/123',
+  image_sha256:'a'.repeat(64)};
+ assert.equal(retainPublishedDesktopFeed(feed,existing),existing);
+ assert.equal(retainPublishedDesktopFeed(feed,{...existing,publication_day:'2026-10-26'}),feed);
+ assert.equal(retainPublishedDesktopFeed(feed,{...existing,verified_public_url:null}),feed);
+ assert.throws(()=>retainPublishedDesktopFeed(feed,{...existing,campaign_id:'other'}),/receipt-invalid/);
+ await assert.rejects(()=>verifyDesktopFeed(existing,{now,find:async()=>null}),/published-post-missing/);
 });

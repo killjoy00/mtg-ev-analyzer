@@ -41,12 +41,24 @@ const fakeLedger=records=>()=>({
 const preflight=async()=>({checked:true});
 
 test('formats a real public image post, with a date-unique title and readable text',()=>{
- assert.match(expected.title,/Pack One Daily 2026-10-24$/);
+ assert.equal(expected.title,"Pack One's Contested Daily Pick 2026-10-24");
+ assert.doesNotMatch(expected.body,/distinct|That was the choice of/);
  assert.match(expected.body,/ONE/);
  assert.match(expected.body,/2026-10-24/);
  assert.ok(expected.body.includes('TWO'));
  assert.ok(!expected.body.includes('**'));
  assert.equal(expected.public,true);
+});
+
+test('previously generated artifacts retain their original title and exact copy',()=>{
+ const legacyCopy=featureCopies(feature,{legacyPatreon:true});
+ const legacy=makePatreonPost({...fixture,copy:legacyCopy});
+ assert.equal(legacy.title,legacyCopy.title+' | Pack One Daily '+d);
+ assert.match(legacy.body,/distinct Pack One players/);
+ const current=featureCopies(feature);
+ assert.equal(current.title,legacyCopy.title);
+ assert.equal(current.bluesky,legacyCopy.bluesky);
+ assert.equal(current.discord,legacyCopy.discord);
 });
 
 test('rejects stale, off-choice, fake art or mismatched content without opening Patreon',()=>{

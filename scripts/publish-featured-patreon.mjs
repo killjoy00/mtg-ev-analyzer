@@ -19,17 +19,18 @@ export function makePatreonPost({feature:f,copy,render,cover}) {
  if(!f||!/^20\d\d-\d\d-\d\d$/.test(f.day||'')||
     ![2,3].includes(f.tier)||!Array.isArray(f.choices)||
     f.choices.length!==f.tier||!f.choices.some(c=>c.id===f.trophy?.id)||
-    JSON.stringify(featureCopies(f))!==JSON.stringify(copy)||
+    JSON.stringify(featureCopies(f,{legacyPatreon:!copy?.patreonTitle}))!==JSON.stringify(copy)||
     render?.day!==f.day||render?.puzzle_id!==f.puzzle_id||
     render?.real_card_art!==true||render?.poster_ready!==true||
     !Buffer.isBuffer(cover)||cover.length<5000||
     cover[0]!==0xff||cover[1]!==0xd8||cover[2]!==0xff)
   throw Error('invalid-featured-artifact');
- const title=copy.title+POST_TITLE_SUFFIX+f.day;
- if(title.length>150||!copy.patreon.startsWith('# '+copy.title+'\n\n'))
+ const title=copy.patreonTitle||copy.title+POST_TITLE_SUFFIX+f.day;
+ const heading=copy.patreonTitle||copy.title;
+ if(title.length>150||!copy.patreon.startsWith('# '+heading+'\n\n'))
   throw Error('invalid-patreon-copy');
  // Patreon uses a rich-text editor, not a Markdown parser. Paste readable text.
- const body=copy.patreon.slice(('# '+copy.title+'\n\n').length)
+ const body=copy.patreon.slice(('# '+heading+'\n\n').length)
   .replace(/\*\*/g,'').replace(/^- /gm,'• ').trim();
  if(!body.includes(f.day)||!body.includes(f.trophy.name)||
     !body.includes('https://packone.pro/'))

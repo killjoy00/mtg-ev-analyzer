@@ -61,7 +61,7 @@ def validate_feed(feed, now=None):
     require(feed.get('feature_day') == day and feed.get('campaign_id') == CAMPAIGN
             and feed.get('public') is True, 'Unexpected post destination or date; stopped.')
     require(isinstance(feed.get('title'), str) and 0 < len(feed['title']) <= 150
-            and feed['title'].endswith(' | Pack One Daily ' + day), 'Invalid post title.')
+            and re.findall(r'20\d\d-\d\d-\d\d', feed['title']) == [day], 'Invalid post title.')
     require(isinstance(feed.get('body'), str) and day in feed['body']
             and 'https://packone.pro/' in feed['body'] and len(feed['body']) < 30000
             and not any(c in feed['body'] for c in '{}'), 'Invalid post text.')
@@ -407,13 +407,21 @@ def gui():
     except OSError:
         messagebox.showinfo('Pack One Patreon', 'The helper is already running.')
         return
+    startup_enabled = automatic_settings()
+    if startup_enabled:
+        try:
+            save_automatic(True)
+        except OSError:
+            messagebox.showerror('Pack One Patreon', 'Could not update automatic startup. Close the old helper and open this update again.')
+            instance_lock.close()
+            return
     root = tk.Tk()
     root.title('Pack One → Patreon')
     root.geometry('610x330')
     root.resizable(False, False)
     messages = queue.Queue()
     busy = False
-    verified = automatic_settings()
+    verified = startup_enabled
     auto = tk.BooleanVar(value=verified)
     status = tk.StringVar(value='Keep PostyBirb open. Checking the connection…')
     tk.Label(root, text='Pack One → Patreon', font=('Segoe UI', 19, 'bold')).pack(pady=(20, 8))
