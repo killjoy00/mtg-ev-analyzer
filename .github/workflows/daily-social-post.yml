@@ -169,6 +169,41 @@ jobs:
         if: steps.select.outputs.selected == 'true'
         run: node scripts/publish-featured-pick.mjs
 
+  featured-patreon-feed:
+    # The independent morning dispatch delivers content directly to the desktop
+    # feed, even when another featured destination fails after artifact upload.
+    needs: [featured]
+    if: >-
+      always() &&
+      github.repository == 'killjoy00/mtg-ev-analyzer' &&
+      github.ref == 'refs/heads/main' &&
+      needs.featured.outputs.artifact_ready == 'true' &&
+      (github.event_name == 'schedule' || github.event_name == 'push' ||
+       (github.event_name == 'workflow_dispatch' && inputs.live == true))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    concurrency:
+      group: packone-patreon-feed
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/download-artifact@v4
+        with:
+          name: packone-featured-pick
+          path: artifacts/featured-pick
+      - name: Deliver validated daily media and supported API publication check
+        run: node scripts/patreon-desktop-feed.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MANUAL_LIVE: 'true'
+          PATREON_CREATOR_ACCESS_TOKEN: ${{ secrets.PATREON_CREATOR_ACCESS_TOKEN }}
+
   featured-patreon:
     # Runs separately so a Patreon session/UI failure cannot stop other social destinations.
     # Run even if another featured destination failed AFTER the artifact upload.

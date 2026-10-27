@@ -62,3 +62,16 @@ test('public diagnostics expose only fixed failure codes, never private exceptio
  assert.equal(safeDesktopFeedFailure(Error('https://private.example/?token=secret-fixture')),'unknown');
  assert.equal(safeDesktopFeedFailure(Error('Stale Daily publisher revision; dispatch a fresh run on current main.')),'revision-stale');
 });
+
+test('the existing morning dispatch delivers desktop media after artifact upload independently of other destinations',()=>{
+ const daily=readFileSync(new URL('../.github/workflows/daily-social-post.yml',import.meta.url),'utf8');
+ const job=daily.split('  featured-patreon-feed:')[1].split('  featured-patreon:')[0];
+ assert.match(job,/needs: \[featured\]/);
+ assert.match(job,/always\(\)/);
+ assert.match(job,/needs\.featured\.outputs\.artifact_ready == 'true'/);
+ assert.match(job,/contents: write/);
+ assert.match(job,/group: packone-patreon-feed/);
+ assert.match(job,/actions\/download-artifact@v4/);
+ assert.match(job,/node scripts\/patreon-desktop-feed\.mjs/);
+ assert.doesNotMatch(job,/BLUESKY|DISCORD|BROWSERLESS|STORAGE_STATE|NEON_API_KEY/);
+});
