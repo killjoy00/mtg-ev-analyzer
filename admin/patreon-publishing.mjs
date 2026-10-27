@@ -12,13 +12,13 @@ export async function renderPatreonPublishing(root,{fetchImpl=fetch}={}) {
  <h1 id="patreon-title">Patreon publishing</h1>
  <p class="subpage-help">Daily featured picks. The real trophy pick must be one of the displayed choices.</p>
  <h2>Patreon connection</h2>
- <p role="status"><strong>Not configured through Pack One</strong></p>
- <p>A secure, owner-authorized connection service is not deployed. Patreon does not offer a supported API for publishing these posts, so browser-based publication still needs an authenticated session. This admin page never requests your password or cookies.</p>
+ <p role="status"><strong>Connection not yet available</strong></p>
+ <p>A secure, owner-authorized connection service is not deployed. Browserless remote publishing support is being added, but Browserless alone does not authorize Patreon. Do not enter Patreon passwords, cookies, or API tokens into Pack One Admin.</p>
  <h2>Publishing</h2>
- <p role="status"><strong>Not activated</strong> — this admin page cannot turn on publication. The proposed publisher remains in an unmerged pull request.</p>
- <p>When verified, the existing morning job will post the image and text, verify public visibility, and prevent duplicates. No posts are initiated by opening this page.</p>
+ <p role="status"><strong>Not activated</strong> — this admin page cannot turn on publication. The publisher code is merged but cannot be enabled without an authorized browser session and verified public post.</p>
+ <p>After secure authorization and a successful live canary, the existing morning job can post the image and text, verify public visibility, and prevent duplicates. No posts are initiated by opening this page.</p>
  <div class="actions"><button type="button" class="secondary" id="patreon-refresh">Refresh workflow history</button>
- <a href="https://github.com/${REPO}/pull/1367" target="_blank" rel="noopener noreferrer">Review implementation</a></div>
+ <a href="https://github.com/${REPO}/pull/1367" target="_blank" rel="noopener noreferrer">Review publisher implementation</a></div>
  <h2>Recent morning workflows</h2><div id="patreon-runs" role="status" aria-live="polite">Checking GitHub workflow history…</div>
  <p class="subpage-help">These are overall morning workflow runs, <strong>not</strong> proof of Patreon publication. Patreon publication requires a separately verified job and public post.</p>
  </section>`;
