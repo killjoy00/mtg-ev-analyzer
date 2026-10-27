@@ -191,7 +191,8 @@ jobs:
       MANUAL_LIVE: ${{ github.event_name == 'push' && 'true' || inputs.live }}
       SOURCE_PACIFIC_DAY: ${{ inputs.source_day }}
       PACKONE_PATREON_AUTOPUBLISH_ENABLED: ${{ vars.PACKONE_PATREON_AUTOPUBLISH_ENABLED }}
-      PACKONE_PATREON_AUTO_ACTIVATE: 'true'
+      # Fresh-session Patreon access is blocked; do not repeat unattended attempts.
+      PACKONE_PATREON_AUTO_ACTIVATE: 'false'
       PACKONE_PATREON_STORAGE_STATE_B64: ${{ secrets.PACKONE_PATREON_STORAGE_STATE_B64 }}
       PACKONE_BROWSERLESS_TOKEN: ${{ secrets.PACKONE_BROWSERLESS_TOKEN }}
       PATREON_CREATOR_ACCESS_TOKEN: ${{ secrets.PATREON_CREATOR_ACCESS_TOKEN }}
