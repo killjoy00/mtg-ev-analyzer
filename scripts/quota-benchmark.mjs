@@ -22,8 +22,14 @@ export async function compareQuota({url,key,fetcher=fetch,clock=performance.now.
   const call=async(mode,cohort,kind='request')=>{
     const began=clock(),r=await fetcher(url+'/'+kind,{method:'POST',redirect:'error',
       headers:{authorization:'Bearer '+key,'content-type':'application/json'},body:JSON.stringify({mode,cohort}),signal:AbortSignal.timeout(5000)});
-    const ms=clock()-began,total=Number(r.headers.get('x-quota-counter-write-total')),handler=Number(r.headers.get('x-pack1-quota-handler-ms'));
-    assert(Number.isSafeInteger(total)&&total>=0&&Number.isFinite(handler)&&handler>=0,'missing_probe_evidence');
+    if(![204,429].includes(r.status)) {
+      const body=await r.json().catch(()=>null);
+      const reason=body?.error==='synthetic_quota_exception'&&['storage_quota','storage_receiver','type_error','reference_error','unclassified'].includes(body.reason)?body.reason:'unclassified_response';
+      throw Error(`probe_${mode}_http_${r.status}_${reason}`);
+    }
+    const ms=clock()-began,rawTotal=r.headers.get('x-quota-counter-write-total'),rawHandler=r.headers.get('x-pack1-quota-handler-ms');
+    const total=Number(rawTotal),handler=Number(rawHandler);
+    assert(rawTotal!==null&&rawHandler!==null&&Number.isSafeInteger(total)&&total>=0&&Number.isFinite(handler)&&handler>=0,'missing_probe_evidence');
     await r.body?.cancel();return {status:r.status,total,handler,ms};
   };
   for(let round=0;round<3;round++) {

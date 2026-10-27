@@ -62,3 +62,18 @@ test('cleanup refuses mismatched ownership before deletion and reconciles an amb
     }});assert.equal(deletes,1);
   } finally {rmSync(directory,{recursive:true,force:true});}
 });
+
+test('missing timing headers and provider failures cannot masquerade as fast successful quota calls',async()=>{
+  await assert.rejects(compareQuota({url:'https://synthetic.invalid',key,fetcher:async()=>new Response(null,{status:204})}),/missing_probe_evidence/);
+  await assert.rejects(compareQuota({url:'https://synthetic.invalid',key,fetcher:async()=>Response.json({
+    error:'synthetic_quota_exception',reason:'storage_quota',message:'private provider details',
+  },{status:503})}),/probe_baseline_http_503_storage_quota/);
+  await assert.rejects(compareQuota({url:'https://synthetic.invalid',key,fetcher:async()=>new Response('private provider details',{status:500})}),/probe_baseline_http_500_unclassified_response/);
+});
+
+test('Worker exception diagnostics expose only bounded failure categories',async()=>{
+  const namespace={idFromName:x=>x,get:()=>({fetch:async()=>{throw Error('Daily storage quota exceeded; private provider reference');}})};
+  const r=await probe.fetch(req(),{...env,CANDIDATE_QUOTA:namespace});
+  assert.equal(r.status,503);const body=await r.json();assert.equal(body.reason,'storage_quota');
+  assert.doesNotMatch(JSON.stringify(body),/private provider reference/);
+});
