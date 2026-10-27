@@ -20,7 +20,7 @@ def fixture():
     cover = b'\xff\xd8\xff' + b'x' * 6000
     feed = {'version': 1, 'publication_day': str(today), 'feature_day': day,
             'campaign_id': bridge.CAMPAIGN, 'public': True,
-            'title': 'Real feature | Pack One Daily ' + day,
+            'title': "Pack One's Contested Daily Pick " + day,
             'body': day + '\nhttps://packone.pro/', 'image_path': str(today) + '/featured-cover.jpg',
             'image_sha256': hashlib.sha256(cover).hexdigest(), 'checked_at': now.isoformat(),
             'read_check': 'ok', 'verified_public_url': None}
@@ -133,6 +133,18 @@ class DesktopTests(unittest.TestCase):
                            ('verified_public_url', 'https://evil.test/posts/12')]:
             with self.subTest(key=key), self.assertRaises(bridge.BridgeError):
                 bridge.validate_feed({**feed, key: value})
+
+    def test_title_wording_can_change_without_losing_date_provenance(self):
+        feed, _ = fixture()
+        day = feed['feature_day']
+        for title in ["Pack One's Contested Daily Pick " + day,
+                      'Legacy headline | Pack One Daily ' + day,
+                      'Pack One draft discussion ' + day]:
+            bridge.validate_feed({**feed, 'title': title})
+        for title in ['Missing date', "Pack One's Contested Daily Pick 2000-01-01",
+                      day + ' and 2026-01-01']:
+            with self.assertRaises(bridge.BridgeError):
+                bridge.validate_feed({**feed, 'title': title})
 
     def test_exact_image_and_single_durable_claim(self):
         feed, cover = fixture()

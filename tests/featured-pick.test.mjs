@@ -74,7 +74,9 @@ test('Bluesky has independent TID, link facets, bounded copy; Patreon has real t
  assert.match(copy.bluesky,/FATES/);
  assert.ok([...copy.bluesky].length<=300);
  assert.match(copy.discord,/\|\|FATES\|\|/);
- assert.match(copy.patreon,/135 distinct Pack One players/);
+ assert.match(copy.patreon,/135 Pack One players/);
+ assert.doesNotMatch(copy.patreon,/distinct|That was the choice of/);
+ assert.equal(copy.patreonTitle,"Pack One's Contested Daily Pick 2026-10-23");
  assert.match(featureLink('bluesky'),/utm_campaign=featured_pick/);
  assert.notEqual(featuredBlueskyRkey('2026-10-23'),blueskyDailyRkey('2026-10-23'));
  assert.equal(featuredBlueskyRkey('2026-10-23').length,13);

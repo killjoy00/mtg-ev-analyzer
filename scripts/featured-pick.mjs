@@ -119,7 +119,7 @@ export function featureLink(platform) {
  return 'https://packone.pro/?game=draft-run&daily=1&utm_source='+source+
   '&utm_medium=social&utm_campaign=featured_pick';
 }
-export function featureCopies(f) {
+export function featureCopies(f,{legacyPatreon=false}={}) {
  if(!f||![2,3].includes(f.tier)||f.choices.length!==f.tier||
   !f.choices.some(c=>c.id===f.trophy?.id))
   throw Error('Invalid featured pick: trophy choice must be displayed.');
@@ -146,16 +146,17 @@ export function featureCopies(f) {
   '**What would you take—and why?**\n'+featureLink('discord');
  const title='The Pick That Split '+f.players+' Drafters '+f.tier+
   ' Ways | Pack One '+label;
- const patreon='# '+title+'\n\n'+label+' · P1P'+f.pick_number+
+ const patreonTitle="Pack One's Contested Daily Pick "+f.day;
+ const patreon='# '+(legacyPatreon?title:patreonTitle)+'\n\n'+label+' · P1P'+f.pick_number+
   ' · '+f.day+'\n\n'+
   (f.prior_picks.length?'**Prior picks:** '+f.prior_picks.map(c=>c.name).join(', ')+'.\n\n':'')+
-  'Of '+f.players+' distinct Pack One players:\n\n'+
+  'Of '+f.players+(legacyPatreon?' distinct Pack One players:\n\n':' Pack One players:\n\n')+
   f.choices.map(c=>'- **'+formatPercent(c.pct)+'%** chose '+c.name+' ('+c.votes+' players)').join('\n')+
   (f.other_votes?'\n- **'+f.other_votes+'** chose other cards.':'')+
   '\n\nThe original trophy drafter took **'+f.trophy.name+
-  '**. That was the choice of '+formatPercent(f.trophy.pct)+'% of players.'+
+  '**.'+(legacyPatreon?' That was the choice of '+formatPercent(f.trophy.pct)+'% of players.':'')+
   '\n\n**What would you take, and why?**\n\nPlay today\'s Daily: https://packone.pro/';
- return {label,bluesky:blue,discord,patreon,title};
+ return {label,bluesky:blue,discord,patreon,title,...(legacyPatreon?{}:{patreonTitle})};
 }
 // Deterministic ATProto TID, distinct from the existing Daily announcement.
 export function featuredBlueskyRkey(day) {

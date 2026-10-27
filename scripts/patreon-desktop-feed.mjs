@@ -18,10 +18,22 @@ export function makeDesktopFeed({feature,copy,render,cover,now=new Date()}) {
   campaign_id:PATREON_POLICY.campaignId,title:post.title,body:post.body,public:true,
   image_path:day+'/featured-cover.jpg',image_sha256:sha256(cover)};
 }
+// A public post's title/content stays pinned for that publication day. Style
+// updates apply to the next post rather than renaming or duplicating today's.
+export function retainPublishedDesktopFeed(candidate,existing) {
+ if(!existing?.verified_public_url||existing.publication_day!==candidate.publication_day)return candidate;
+ if(existing.version!==1||existing.feature_day!==candidate.feature_day||
+    existing.campaign_id!==candidate.campaign_id||existing.public!==true||
+    existing.image_path!==candidate.image_path||!/^[a-f0-9]{64}$/.test(existing.image_sha256||'')||
+    typeof existing.title!=='string'||!existing.title||typeof existing.body!=='string')
+  throw Error('desktop-feed-published-receipt-invalid');
+ return existing;
+}
 export async function verifyDesktopFeed(feed,{token,fetchImpl=fetch,now=new Date(),find=findPublishedPatreonPost}={}) {
  if(feed.publication_day!==pacificDay(now)||feed.feature_day!==previousPacificDay(now))
   throw Error('desktop-feed-stale-artifact');
  const found=await find({title:feed.title,token,fetchImpl});
+ if(feed.verified_public_url&&!found)throw Error('desktop-feed-published-post-missing');
  // This is a supported API title/publication check. Image/body validation remains
  // the local bridge's job; do not claim an anonymous visual check here.
  return {...feed,checked_at:now.toISOString(),read_check:'ok',verified_public_url:found?.url||null};
@@ -69,6 +81,11 @@ export async function main(env=process.env) {
   const render=JSON.parse(await readFile('artifacts/featured-pick/render.json','utf8'));
   cover=await readFile('artifacts/featured-pick/featured-cover.jpg');
   feed=makeDesktopFeed({feature,copy,render,cover});
+  const record=await githubJson('contents/latest.json?ref='+BRANCH,{token:env.GITHUB_TOKEN});
+  const existing=record?JSON.parse(Buffer.from(record.content,'base64').toString()):null;
+  const retained=retainPublishedDesktopFeed(feed,existing);
+  if(retained!==feed)cover=undefined;
+  feed=retained;
  }
  feed=await verifyDesktopFeed(feed,{token:env.PATREON_CREATOR_ACCESS_TOKEN});
  await writeDesktopFeed({feed,cover,token:env.GITHUB_TOKEN});
@@ -86,7 +103,7 @@ export function safeDesktopFeedFailure(error) {
   ['Stale Daily publisher revision; dispatch a fresh run on current main.','revision-stale'],
  ]);
  let code=revision.get(message);
- if(!code&&/^(?:desktop-feed-(?:stale-artifact|image-mismatch|github-request-failed-\d{3})|patreon-(?:post-read-(?:not-configured|malformed|failed-\d{3})|post-search-incomplete|existing-post-not-verified-public|duplicate-posts-detected)|invalid-featured-artifact|invalid-patreon-copy|missing-patreon-provenance)$/.test(message))code=message;
+ if(!code&&/^(?:desktop-feed-(?:stale-artifact|image-mismatch|published-post-missing|published-receipt-invalid|github-request-failed-\d{3})|patreon-(?:post-read-(?:not-configured|malformed|failed-\d{3})|post-search-incomplete|existing-post-not-verified-public|duplicate-posts-detected)|invalid-featured-artifact|invalid-patreon-copy|missing-patreon-provenance)$/.test(message))code=message;
  if(!code)code='unknown';
  if(code==='patreon-existing-post-not-verified-public'&&
   ['unpublished','not-public','url-invalid'].includes(error?.verificationReason))
