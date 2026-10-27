@@ -26,7 +26,7 @@ permissions:
 
 # Same lock as morning publication, so a canary and a scheduled post cannot race.
 concurrency:
-  group: packone-social-live
+  group: ${{ github.event_name == 'pull_request' && format('packone-patreon-read-review-{0}', github.ref) || 'packone-social-live' }}
   cancel-in-progress: false
 
 jobs:
