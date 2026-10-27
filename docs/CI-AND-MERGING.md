@@ -51,8 +51,9 @@ Release-secret provisioning checks belong in the release/control workflows that 
   - So does a file the gate uses that no domain owns.
   - A file the gate never imports, executes or names is ignored, for example browser-only modules, `admin/` and HTML.
   - A test fails if a new worker module has no domain.
-- **Runs all six nightly** (07:17 UTC) against `main`. This catches coupling with no static import, such as one domain's suite calling another domain's HTTP route.
+- **Runs all six weekly** (Mondays 07:17 UTC) against `main`, with a manual full sweep available on reviewed `main`. This catches coupling with no static import without creating six additional Neon branches every night. Pull-request domain coverage is unchanged; run a manual full sweep before a high-risk launch.
 - **Waits for `postgres-contract`** before creating any branch.
+- **Suspends disposable CI computes after five idle minutes.** Only isolated expiring CI branches change; production stays always on. A resumed compute must pass its existing tests, not bypass them.
 - **Caps branch compute per domain.** The project default allows 8 CU.
   - draft_run and corpus are capped at 2 CU. On their first capped run (#1323) they sat at the cap 74% and 92% of the time and took about 11 and 28 minutes against a 40-minute limit.
   - account, seasons, daily and subscriptions are capped at 1 CU. At 2 CU they used more than 1 CU for between 0% and 21% of the time.
