@@ -23,7 +23,7 @@ test('control variation is descriptive and cannot waive a failed candidate gate'
   const wrong=structuredClone(rows);wrong[0].comparison='ab';assert.throws(()=>analyzeConfirmation(wrong),/invalid_confirmation_sequence/);
   const missing=structuredClone(rows);missing[1].right.client.samples=1000;assert.throws(()=>analyzeConfirmation(missing),/incomplete_confirmation_coverage/);
 });
-function transport({alias=false,wrongImplementation=false,failAfter=Infinity}={}) {
+function transport({alias=false,wrongImplementation=false,actorMismatch=false,failAfter=Infinity}={}) {
   const states=new Map();let calls=0;
   return {calls:()=>calls,fetcher:async(url,options)=>{
     if(++calls>failAfter)throw Error('private transport detail');
@@ -31,6 +31,7 @@ function transport({alias=false,wrongImplementation=false,failAfter=Infinity}={}
     const count=(states.get(id)||0)+1;states.set(id,count);
     return new Response(null,{status:204,headers:{'x-quota-counter-write-total':String(mode==='candidate'?Math.ceil(count/8):count),
       'x-pack1-quota-handler-ms':mode==='candidate'?'2':'20','x-quota-instance':(alias?'a':{baseline:'a',control:'b',candidate:'c'}[mode]).repeat(32),
+      'x-quota-actor-instance':(actorMismatch&&mode!=='baseline'?'e':'d').repeat(32),
       'x-quota-implementation':mode==='candidate'||(wrongImplementation&&mode==='control')?'coalesced-preview':'per-request'}});
   }};
 }
@@ -47,7 +48,7 @@ test('the entire fixed balanced experiment runs once within budget and retains a
   assert.equal(report.production_ready,false);assert.doesNotMatch(JSON.stringify(report),/synthetic-key|authorization|synthetic\.invalid|aaaaaaaa/);
 });
 test('the control must be a separate per-request implementation with real evidence',async()=>{
-  for(const [options,reason] of [[{alias:true},/confirmation_namespaces_not_isolated/],[{wrongImplementation:true},/wrong_confirmation_implementation/]])
+  for(const [options,reason] of [[{alias:true},/confirmation_wrappers_not_distinct/],[{wrongImplementation:true},/wrong_confirmation_implementation/],[{actorMismatch:true},/confirmation_actor_not_shared/]])
     await assert.rejects(confirmQuotaLatency({url:'https://synthetic.invalid',key:'key',fetcher:transport(options).fetcher}),reason);
   await assert.rejects(confirmQuotaLatency({url:'https://synthetic.invalid',key:'key',fetcher:async()=>new Response(null,{status:204})}),/missing_confirmation_evidence/);
 });
@@ -55,4 +56,47 @@ test('a failed later repeat preserves earlier evidence and never retries to obta
   const f=transport({failAfter:4128}),progress=[];
   await assert.rejects(confirmQuotaLatency({url:'https://synthetic.invalid',key:'key',fetcher:f.fetcher,onRepeat:r=>progress.push(r)}),/confirmation_baseline_transport/);
   assert.equal(progress.length,2);assert.equal(f.calls(),4129);
+});
+
+// Exercise the actual crossover object, not only the client protocol fixture.
+const {CrossoverQuota}=await import('../edge/quota-benchmark.mjs');
+function crossoverFixture(sync=async()=>{}) {
+  const values=new Map();let alarm=null,tail=Promise.resolve(),deletions=0;
+  const storage={get:async keys=>Array.isArray(keys)?new Map(keys.filter(k=>values.has(k)).map(k=>[k,structuredClone(values.get(k))])):structuredClone(values.get(keys)),
+    put:async(k,v)=>values.set(k,structuredClone(v)),getAlarm:async()=>alarm,setAlarm:async at=>{alarm=at;},sync,
+    deleteAll:async()=>{deletions++;values.clear();}};
+  storage.transaction=fn=>{const pending=tail.then(()=>fn(storage));tail=pending.catch(()=>{});return pending;};
+  const quota=new CrossoverQuota({storage}),call=mode=>quota.fetch(new Request('https://quota/request',{method:'POST',headers:{'x-quota-probe-mode':mode}}));
+  return {values,call,quota,deletions:()=>deletions};
+}
+test('crossover uses one native counter without resets or separate per-policy storage keys',async()=>{
+  const original=Date.now;Date.now=()=>1000000;
+  try {
+    for(const right of ['control','candidate']) {
+      const f=crossoverFixture();let actor;
+      for(let i=0;i<129;i++)for(const mode of ['baseline',right]) {
+        const response=await f.call(mode);assert.equal(response.status,204);
+        actor??=response.headers.get('x-quota-actor-instance');assert.equal(response.headers.get('x-quota-actor-instance'),actor);
+      }
+      assert.deepEqual([...f.values.keys()],['buckets']);assert.equal(f.deletions(),0);
+      assert.equal(f.values.get('buckets').request.count,right==='control'?258:265);
+    }
+  } finally {Date.now=original;}
+});
+test('the combined crossover modes cannot each obtain an independent burst allowance',async()=>{
+  const original=Date.now;Date.now=()=>1000000;
+  try {
+    const f=crossoverFixture(),responses=[];
+    for(let sent=0;sent<650;sent+=10)responses.push(...await Promise.all(Array.from({length:Math.min(10,650-sent)},()=>f.call(sent%20?'control':'baseline'))));
+    assert.equal(responses.filter(r=>r.status===204).length,600);assert.equal(responses.filter(r=>r.status===429).length,50);
+    assert.equal(f.values.get('buckets').request_burst.count,600);
+  } finally {Date.now=original;}
+});
+test('a policy cannot switch while another policy has an unacknowledged call',async()=>{
+  let release,waiting;const gate=new Promise(resolve=>{release=resolve;}),ready=new Promise(resolve=>{waiting=resolve;});let first=true;
+  const f=crossoverFixture(async()=>{if(first){first=false;waiting();await gate;}});
+  const baseline=f.call('baseline');await ready;
+  assert.equal((await f.call('candidate')).status,409);
+  assert.equal(f.values.get('buckets').request.count,1);
+  release();assert.equal((await baseline).status,204);assert.equal((await f.call('candidate')).status,204);
 });

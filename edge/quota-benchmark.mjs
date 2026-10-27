@@ -56,6 +56,34 @@ export class BaselineQuota extends MeasuredQuota {constructor(state){super(state
 export class ControlQuota extends MeasuredQuota {constructor(state){super(state,false);}}
 export class CandidateQuota extends MeasuredQuota {constructor(state){super(state,true);}}
 
+// Latency-only crossover: every mode uses the SAME native actor/storage and
+// counter row. The full correctness profile keeps its independent namespaces.
+export class CrossoverQuota {
+  constructor(state) {
+    this.instanceId=crypto.randomUUID().replaceAll('-','');this.active=null;this.inflight=0;this.cleaning=false;
+    this.modes={baseline:new BaselineQuota(state),control:new ControlQuota(state),candidate:new CandidateQuota(state)};
+  }
+  async fetch(request) {
+    const mode=request.headers.get('x-quota-probe-mode');
+    if(request.method!=='POST'||new URL(request.url).pathname!=='/request'||!['baseline','control','candidate'].includes(mode))return new Response(null,{status:400});
+    // The sampler awaits each complete same-mode group before switching. Do
+    // not allow overlapping policies to confound the measurement or cleanup.
+    if(this.cleaning)return new Response(null,{status:503});
+    if(this.inflight&&this.active!==mode)return new Response(null,{status:409});
+    this.active=mode;this.inflight++;
+    try {
+      const result=await this.modes[mode].fetch(request);
+      result.headers.set('x-quota-actor-instance',this.instanceId);return result;
+    } finally {if(--this.inflight===0)this.active=null;}
+  }
+  async alarm(info) {
+    if(this.inflight)throw Error('Synthetic crossover busy; retry cleanup.');
+    this.cleaning=true;
+    try {await this.modes.baseline.alarm(info);this.modes.candidate.reservations.clear();}
+    finally {this.cleaning=false;}
+  }
+}
+
 export default {async fetch(request,env) {
   if(!/^[a-f0-9]{64}$/.test(env.BENCHMARK_KEY||'')||request.headers.get('authorization')!=='Bearer '+env.BENCHMARK_KEY||
     !Number.isFinite(Number(env.EXPIRES_AT))||Date.now()>=Number(env.EXPIRES_AT))return new Response(null,{status:403,headers:{'x-quota-probe-auth':'required'}});
@@ -63,7 +91,13 @@ export default {async fetch(request,env) {
   if(request.method!=='POST'||!['/request','/session','/session-only','/restart'].includes(path))return new Response(null,{status:400});
   let body;try{body=await readJson(request,256);}catch{return new Response(null,{status:400});}
   if(!body||Array.isArray(body)||!['baseline','control','candidate'].includes(body.mode)||!/^[a-f0-9]{32}$/.test(body.cohort||'')||
-    Object.keys(body).some(key=>!['mode','cohort'].includes(key)))return new Response(null,{status:400});
+    Object.keys(body).some(key=>!['mode','cohort','paired'].includes(key))||
+    (body.paired!==undefined&&body.paired!==true)||(body.paired&&path!=='/request'))return new Response(null,{status:400});
+  if(body.paired) {
+    try {return await env.PAIRED_QUOTA.get(env.PAIRED_QUOTA.idFromName(body.cohort),{locationHint:'enam'}).fetch(
+      new Request('https://quota/request',{method:'POST',headers:{'x-quota-probe-mode':body.mode}}));}
+    catch(error){return probeFailure(error);}
+  }
   const namespace={baseline:env.BASELINE_QUOTA,control:env.CONTROL_QUOTA,candidate:env.CANDIDATE_QUOTA}[body.mode];
   if(path==='/restart') {
     // A reset necessarily interrupts this control request. The runner must

@@ -52,34 +52,35 @@ export async function confirmQuotaLatency({url,key,fetcher=fetch,clock=performan
     assert(++requests<=MAX_CALLS,'confirmation_request_budget_exceeded');
     const start=clock();let response;
     try {response=await fetcher(url+'/request',{method:'POST',redirect:'error',
-      headers:{authorization:'Bearer '+key,'content-type':'application/json'},body:JSON.stringify({mode,cohort}),signal:AbortSignal.timeout(5000)});}
+      headers:{authorization:'Bearer '+key,'content-type':'application/json'},body:JSON.stringify({mode,cohort,paired:true}),signal:AbortSignal.timeout(5000)});}
     catch(error){throw Error('confirmation_'+mode+'_'+(error?.name==='TimeoutError'?'deadline':error?.name==='AbortError'?'aborted':'transport'));}
     if(response.status!==204) {
       await response.body?.cancel();throw Error('confirmation_'+mode+'_http_'+response.status);
     }
     const client=clock()-start,header=name=>response.headers.get(name),handler=Number(header('x-pack1-quota-handler-ms')),
-      writes=Number(header('x-quota-counter-write-total')),instance=header('x-quota-instance'),implementation=header('x-quota-implementation');
+      writes=Number(header('x-quota-counter-write-total')),instance=header('x-quota-instance'),implementation=header('x-quota-implementation'),actor=header('x-quota-actor-instance');
     assert(header('x-pack1-quota-handler-ms')!==null&&Number.isFinite(handler)&&handler>=0&&Number.isFinite(client)&&client>=0&&
-      header('x-quota-counter-write-total')!==null&&Number.isSafeInteger(writes)&&writes>=0&&/^[a-f0-9]{32}$/.test(instance||''),'missing_confirmation_evidence');
+      header('x-quota-counter-write-total')!==null&&Number.isSafeInteger(writes)&&writes>=0&&/^[a-f0-9]{32}$/.test(instance||'')&&/^[a-f0-9]{32}$/.test(actor||''),'missing_confirmation_evidence');
     assert(implementation===(mode==='candidate'?'coalesced-preview':'per-request'),'wrong_confirmation_implementation');
-    await response.body?.cancel();return {client,handler,writes,instance};
+    await response.body?.cancel();return {client,handler,writes,instance,actor};
   };
   for(let repeat=0;repeat<CONFIRMATION_PLAN.length;repeat++) {
     const comparison=CONFIRMATION_PLAN[repeat],right=comparison==='aa'?'control':'candidate',modes=['baseline',right],
       rows={baseline:[],right:[]},cold={baseline:[],right:[]},cohorts=[];
     let baselineWrites=0,rightWrites=0;
     for(let cohortIndex=0;cohortIndex<COHORTS;cohortIndex++) {
-      const cohort=randomBytes(16).toString('hex'),local={baseline:[],right:[]},instances={},last={};
+      const cohort=randomBytes(16).toString('hex'),local={baseline:[],right:[]},instances={},actors={},last={};
       const order=(cohortIndex+repeat)%2?[...modes].reverse():modes;
       for(const mode of order) {
         const row=await call(mode,cohort),slot=mode==='baseline'?'baseline':'right';
         assert(row.writes===1,'confirmation_cold_counter_mismatch');cold[slot].push(row.client);
-        instances[mode]=row.instance;last[mode]=1;
+        instances[mode]=row.instance;actors[mode]=row.actor;last[mode]=1;
       }
-      assert(instances.baseline!==instances[right],'confirmation_namespaces_not_isolated');
+      assert(instances.baseline!==instances[right],'confirmation_wrappers_not_distinct');
+      assert(actors.baseline===actors[right],'confirmation_actor_not_shared');
       for(let chunk=0;chunk<CHUNKS;chunk++)for(const mode of (chunk%2?[...order].reverse():order)) {
         const batch=await Promise.all(Array.from({length:WIDTH},()=>call(mode,cohort))),slot=mode==='baseline'?'baseline':'right';
-        assert(batch.every(r=>r.instance===instances[mode]),'confirmation_instance_restarted');
+        assert(batch.every(r=>r.instance===instances[mode]&&r.actor===actors.baseline),'confirmation_instance_restarted');
         const total=Math.max(...batch.map(r=>r.writes)),admissions=1+(chunk+1)*WIDTH;
         assert(total>=last[mode]&&total<=admissions,'confirmation_write_evidence_invalid');
         if(mode!=='candidate')assert(total===admissions,'confirmation_baseline_policy_mismatch');
@@ -96,9 +97,9 @@ export async function confirmQuotaLatency({url,key,fetcher=fetch,clock=performan
     repeats.push(row);onRepeat(structuredClone(row));
   }
   assert(requests===EXPECTED_CALLS,'confirmation_request_count_mismatch');
-  return {source:'synthetic-quota-only',profile:'fixed-aa-ab-confirmation-v1',plan:[...CONFIRMATION_PLAN],requests,
+  return {source:'synthetic-quota-only',profile:'fixed-aa-ab-crossover-v2',placement:'same-actor-shared-counter',plan:[...CONFIRMATION_PLAN],requests,
     repetitions:repeats,analysis:analyzeConfirmation(repeats),production_ready:false,
-    limitation:'Fixed plan from one client region. P99 per cohort has 128 warm samples and is noisy. Control spread is descriptive and cannot establish the cause of an individual A/B regression. No thresholds or production settings are changed.'};
+    limitation:'Fixed same-actor crossover from one client region. Both modes share the unchanged quota counter; no resets or separated key spaces are used. P99 per cohort has 128 warm samples and is noisy. Control spread is descriptive and cannot establish the cause of an individual A/B regression. No thresholds or production settings are changed.'};
 }
 if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url) {
   try {

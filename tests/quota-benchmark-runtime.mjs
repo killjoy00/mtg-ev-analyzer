@@ -17,7 +17,7 @@ try {
     workers:[{name:'quota-probe',scriptPath:script,rootPath:persist,modulesRoot:persist,modules:true,
       compatibilityDate:'2026-09-01',compatibilityFlags:['nodejs_compat'],
       bindings:{BENCHMARK_KEY:key,EXPIRES_AT:String(now+600000)},
-      durableObjects:{BASELINE_QUOTA:{className:'BaselineQuota',useSQLite:true},CONTROL_QUOTA:{className:'ControlQuota',useSQLite:true},CANDIDATE_QUOTA:{className:'CandidateQuota',useSQLite:true}}}]}));
+      durableObjects:{BASELINE_QUOTA:{className:'BaselineQuota',useSQLite:true},CONTROL_QUOTA:{className:'ControlQuota',useSQLite:true},CANDIDATE_QUOTA:{className:'CandidateQuota',useSQLite:true},PAIRED_QUOTA:{className:'CrossoverQuota',useSQLite:true}}}]}));
   await verifyProbeAuth(await runtime.dispatchFetch('https://synthetic.invalid/request',{method:'POST'}));
   const report=await compareQuota({url:'https://synthetic.invalid',key,extended:true,fetcher:(url,options)=>runtime.dispatchFetch(url,options)});
   assert.equal(report.exact_caps_passed,true);
@@ -27,6 +27,7 @@ try {
   assert.equal(report.quiet.expired_credit_cap_passed,true);
   const confirmation=await confirmQuotaLatency({url:'https://synthetic.invalid',key,fetcher:(url,options)=>runtime.dispatchFetch(url,options)});
   assert.equal(confirmation.requests,8256);assert.equal(confirmation.repetitions.length,4);
+  assert.equal(confirmation.placement,'same-actor-shared-counter');
   for(const repeat of confirmation.repetitions) {
     assert.equal(repeat.counter_write_decisions.baseline,1032);
     assert.equal(repeat.counter_write_decisions.right,repeat.comparison==='aa'?1032:136);

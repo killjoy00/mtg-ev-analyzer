@@ -194,8 +194,8 @@ export async function runProbe(env=process.env,collect=options=>compareQuota({..
   const config={name,account_id:account,main:path.resolve('edge/quota-benchmark.mjs'),compatibility_date:'2026-09-01',
     compatibility_flags:['nodejs_compat'],workers_dev:true,preview_urls:false,observability:{enabled:false},
     vars:{PROBE_OWNER:owner,EXPIRES_AT:String(Date.now()+10*60000)},
-    durable_objects:{bindings:[{name:'BASELINE_QUOTA',class_name:'BaselineQuota'},{name:'CONTROL_QUOTA',class_name:'ControlQuota'},{name:'CANDIDATE_QUOTA',class_name:'CandidateQuota'}]},
-    migrations:[{tag:'v1',new_sqlite_classes:['BaselineQuota','ControlQuota','CandidateQuota']}]};
+    durable_objects:{bindings:[{name:'BASELINE_QUOTA',class_name:'BaselineQuota'},{name:'CONTROL_QUOTA',class_name:'ControlQuota'},{name:'CANDIDATE_QUOTA',class_name:'CandidateQuota'},{name:'PAIRED_QUOTA',class_name:'CrossoverQuota'}]},
+    migrations:[{tag:'v1',new_sqlite_classes:['BaselineQuota','ControlQuota','CandidateQuota','CrossoverQuota']}]};
   const configPath=path.join(env.RUNNER_TEMP,'quota-benchmark-wrangler.json');fs.writeFileSync(configPath,JSON.stringify(config),{mode:0o600});
   fs.writeFileSync(receipt,JSON.stringify({name,account,owner,nonce}),{mode:0o600});
   const cli=(args,input)=>{
