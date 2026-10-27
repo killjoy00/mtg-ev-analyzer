@@ -33,7 +33,12 @@ try {
   check((await query("SELECT count(*)::int n FROM draft_run_verified_puzzles p LEFT JOIN draft_run_puzzle_selection_features f ON f.puzzle_id=p.puzzle_id AND f.feature_version=$1 WHERE f.puzzle_id IS NULL",[SELECTION_FEATURE_VERSION])).rows[0].n==='0',
     'Every fixture puzzle was scored when it was imported');
   const rescored=await scorePuzzleSelection(query,{log:()=>{}});
-  check(rescored.every(r=>r.scored===0&&r.written===0),'A backfill after import finds nothing to score');
+  check(rescored.sets.every(r=>r.scored===0&&r.written===0)&&rescored.remaining===0,'A backfill after import finds nothing to score');
+  // A full rescore reads every heap chunk once and agrees with import scoring.
+  const total=Number((await query('SELECT count(*)::int n FROM draft_run_verified_puzzles')).rows[0].n);
+  const full=await scorePuzzleSelection(query,{rescore:true,log:()=>{}});
+  check(full.sets.reduce((n,r)=>n+r.scored,0)===total,'A full rescore visits every puzzle exactly once');
+  check(full.sets.every(r=>r.written===0),'Backfill scoring equals import scoring, so a rescore writes nothing');
 
   let contested=0,ruleRounds=0;
   for(const day of DAYS) {
@@ -85,12 +90,12 @@ try {
   check(fallback.rule===null&&fallback.run.length===8,'A partly scored latest set keeps the band draw');
   check(fallback.run.map(p=>p.puzzle_id).join()!==ruled.join(),'The band draw chooses differently from the rule');
   const restored=await scorePuzzleSelection(query,{setIds:[setId],log:()=>{}});
-  check(restored[0].written===1,'The backfill scores the missing puzzle');
+  check(restored.sets[0].written===1&&restored.remaining===0,'The backfill scores the missing puzzle');
   check((await latest(DAYS[0])).run.map(p=>p.puzzle_id).join()===ruled.join(),'Scored again, the rule returns the same Daily');
 
   // A changed strength table marks rows stale; the backfill rewrites them.
   await query("UPDATE draft_run_puzzle_selection_features SET strength_sha256=repeat('0',64) WHERE puzzle_id=$1",[victim]);
-  check((await scorePuzzleSelection(query,{setIds:[setId],log:()=>{}}))[0].written===1,'A stale strength table is rescored');
+  check((await scorePuzzleSelection(query,{setIds:[setId],log:()=>{}})).sets[0].written===1,'A stale strength table is rescored');
 
   // The schedule records the rule that chose it.
   const day='2026-11-20';
