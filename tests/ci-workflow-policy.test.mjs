@@ -218,12 +218,16 @@ test('serving maintenance runs only the reviewed SQL on a named Neon branch, and
   assert.doesNotMatch(flow, /functions deploy|build-neon-functions|\b(UPDATE|INSERT|DELETE|DROP|ALTER|TRUNCATE)\b/);
 });
 
-test('backend Neon branches are capped, sampled, gated on the local contract and covered nightly', () => {
+test('backend Neon branches are capped, sampled, gated on local contracts and swept weekly', () => {
   const backend = readFileSync('.github/workflows/backend-gate.yml', 'utf8');
   const domain = backend.split('\n  backend-domain:\n')[1].split('\n  backend-gate:\n')[0];
-  assert.match(backend, /schedule:\n    - cron: '[^']+'/);
+  assert.match(backend, /schedule:\n    - cron: '17 7 \* \* 1'/);
   assert.match(domain, /needs: \[precheck, postgres-contract\]/);
-  assert.match(domain, /if: \$\{\{ !cancelled\(\) && needs\.postgres-contract\.result == 'success' && \(\(github\.event_name == 'schedule' && github\.repository == 'killjoy00\/mtg-ev-analyzer'\) \|\| /);
+  assert.match(domain, /needs\.postgres-contract\.result == 'success'/);
+  assert.match(domain, /github\.event_name == 'schedule'/);
+  assert.match(domain, /github\.event_name == 'workflow_dispatch'/);
+  assert.match(domain, /github\.ref == 'refs\/heads\/main'/);
+  assert.match(domain, /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
   assert.match(domain, /    env:\n(?:      #.*\n)*      CI_BRANCH_MAX_CU: \$\{\{ \(matrix\.domain == 'draft_run' \|\| matrix\.domain == 'corpus'\) && 2 \|\| 1 \}\}\n/);
   assert.match(domain, /CI_BRANCH_PREFIX: ci-pr-\$\{\{ github\.event\.pull_request\.number \|\| 0 \}\}/);
   assert.doesNotMatch(domain, /HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
