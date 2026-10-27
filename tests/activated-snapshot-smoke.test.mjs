@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import modelVersions from '../model-versions.json' with {type:'json'};
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
-import {loadActivatedEnvironment,assertFromActiveSnapshot,runActivatedSnapshotSmoke,loadRecentActivations,runRecentActivationSmokes,verifyMixedOnlySnapshot} from '../scripts/activated-snapshot-smoke.mjs';
+import {loadActivatedEnvironment,assertFromActiveSnapshot,drawExercisingSnapshot,DAILY_DRAW_ATTEMPTS,runActivatedSnapshotSmoke,loadRecentActivations,runRecentActivationSmokes,verifyMixedOnlySnapshot} from '../scripts/activated-snapshot-smoke.mjs';
 
 const ACTIVE='a'.repeat(64);
 const environment=row=>async()=>({rows:row?[row]:[]});
@@ -80,8 +80,38 @@ test('selected decisions must come from the active snapshot of the same set',asy
  assert.throws(()=>assertFromActiveSnapshot(env,[{puzzle_id:'3'}],rows([component]),'practice'),/active snapshot was not exercised/);
 });
 
+test('a Daily draw that only reaches the Traditional component is drawn again',async()=>{
+ const env=await loadActivatedEnvironment(environment(live),'fra');
+ const stored={
+  premier:{puzzle_id:'premier',set_id:'fra',corpus_version:DRAFT_RUN_CORPUS_VERSION,source_snapshot_id:ACTIVE},
+  component:{puzzle_id:'component',set_id:'fra',corpus_version:'traditional-premier-v5-p1p6-v1',source_snapshot_id:null},
+  stale:{puzzle_id:'stale',set_id:'fra',corpus_version:DRAFT_RUN_CORPUS_VERSION,source_snapshot_id:'b'.repeat(64)},
+ };
+ const query=async(sql,[ids])=>{
+  assert.match(sql,/FROM draft_run_verified_puzzles/);
+  return {rows:ids.slice(1,-1).split(',').map(id=>stored[id.replaceAll('"','')]).filter(Boolean)};
+ };
+ const drawn=[];
+ const draws=sequence=>async attempt=>{drawn.push(attempt);return sequence(attempt).map(id=>({puzzle_id:id}));};
+ // The first draw keeps the day's seed; a component-only draw moves to the next.
+ assert.deepEqual(await drawExercisingSnapshot(query,env,'mixed daily',draws(()=>['premier','component'])),{picks:[{puzzle_id:'premier'},{puzzle_id:'component'}],attempt:0});
+ drawn.length=0;
+ const later=await drawExercisingSnapshot(query,env,'mixed daily',draws(a=>a<2?['component','component']:['component','premier']));
+ assert.equal(later.attempt,2);assert.deepEqual(drawn,[0,1,2]);
+ // Never reaching the snapshot still fails, after a bounded number of draws.
+ drawn.length=0;
+ await assert.rejects(drawExercisingSnapshot(query,env,'mixed daily',draws(()=>['component','component'])),
+  /no Premier decision was selected in 8 draws, so the active snapshot was not exercised/);
+ assert.equal(drawn.length,DAILY_DRAW_ATTEMPTS);
+ // A Premier pick from another snapshot is a real failure and is not redrawn.
+ drawn.length=0;
+ await assert.rejects(drawExercisingSnapshot(query,env,'latest daily',draws(()=>['component','stale'])),/not the active/);
+ assert.deepEqual(drawn,[0]);
+});
+
 test('the smoke drives the production selectors and never writes sessions or schedules',()=>{
  const script=fs.readFileSync(new URL('../worker/activated-snapshot-smoke.mjs',import.meta.url),'utf8');
+ assert.equal((script.match(/drawExercisingSnapshot\(query,env,'(?:latest|mixed) daily'/g)||[]).length,2,'both Daily checks redraw until the snapshot is exercised');
  for(const selector of ['loadServingSnapshot','customSetsFromSnapshot','selectCachedDatabaseRun','selectDatabaseReroll','selectDatabaseRun','loadLiveSetMetadata'])
   assert.match(script,new RegExp(selector+'\\('),selector);
  assert.match(script,/'latest',\{daily:true,day\}/);
