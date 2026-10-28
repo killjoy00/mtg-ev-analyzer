@@ -74,7 +74,7 @@ test('signed-in progression uses My Pack One stats and Account settings tabs', (
   assert.match(worker, /Beat the target score in five challenges/);
   assert.match(worker, /Beat the target score in twenty-five challenges/);
   assert.match(myPack, /Welcome to My Pack One/);
-  assert.match(myPack, /Play your first Daily to start your record/);
+  assert.match(myPack, /Play a Daily to get started/);
   assert.doesNotMatch(myPack, /Empty data is not treated as a zero score/);
   // Elite from any source is shown even when Patreon itself is unavailable.
   assert.match(myPack, /membershipLabel=elite\?'Elite':patreon\?\.configured!==true\?'Status unavailable'/);
