@@ -2,6 +2,10 @@
 
 Updated October 23, 2026 for the Reality Fracture Traditional supplement, the trophy decklist import check and the serving-cache carry-forward fix (first section below). The October 12 update covered the exact trophy-record release and the iOS 1.1/100765 and Android 100772 candidates, after the My Pack One Insights release and the Daily peer-stats, trophy-evidence and account-recovery releases; the October 10 mobile and October 8 Admin/Owner sections below are historical snapshots. Implementation, backend deployment, gateway deployment, Pages deployment, database publication and provider activation remain separate. Older reviews are historical evidence.
 
+## October 28, 2026: one production gateway release path
+
+The production gateway is published only by the guarded **release secure account auth** workflow (`.github/secure-auth-release-request.json`). The separate gateway-only workflow and its `.github/gateway-release-request.json` request were retired: it was added on October 4 so the gateway could ship without the full release replaying schema, which the immutable migration ledger (#1324) now prevents, and its preflight still expected a fixed active-set count that production no longer matches, so its first run since October 8 (40639914241) stopped before any upload. The Admin YouTube Shorts route went live through secure-auth run 40640630881 at `b8c91542698aafb98f46d11ef18015c05218f560`. The gateway-only sections below are historical.
+
 ## October 23, 2026 — Reality Fracture Traditional supplement, decklist check and serving-cache fix
 
 | Change | Production state | Evidence |
