@@ -17,6 +17,8 @@ const FRAME={width:540,height:960}; // Native 9:16 phone viewport, three real ca
 const ARTIFACT_DIR='artifacts/daily-short';
 export const QA_PLAYER_NAME='QA Daily Short';
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+// The opening pack is round 1: the current step in the run header.
+const currentRound=page=>page.locator('.run-heading .run-steps [aria-current="step"]').getAttribute('aria-label');
 
 async function imagesReady(page,count) {
   await page.locator('.run-cards .run-card-select img').first().waitFor({state:'visible',timeout:45_000});
@@ -53,7 +55,7 @@ async function startGuestDaily(page,day) {
   const state=await reply.json();
   const manifest=validateOpeningRun(state,day);
   await imagesReady(page,manifest.cards);
-  assert.match(await page.locator('.run-heading').innerText(),/Round 1/);
+  assert.equal(await currentRound(page),'Round 1');
   return manifest;
 }
 async function recordHome(context,day,output) {
@@ -72,7 +74,7 @@ async function recordPack(context,day,count,output) {
     await page.goto(DAILY_URL,{waitUntil:'domcontentloaded',timeout:45_000});
     await imagesReady(page,count);
     const heading=await page.locator('.run-heading').innerText();
-    assert.ok(heading.includes(day)&&/Round 1/.test(heading),'Recorded view is not the opening Daily pack.');
+    assert.ok(heading.includes(day)&&await currentRound(page)==='Round 1','Recorded view is not the opening Daily pack.');
     await page.evaluate(()=>window.scrollTo({top:0,behavior:'instant'}));
     await page.screenshot({path:path.join(output,'first-pack.png')});
     const started=Date.now();
