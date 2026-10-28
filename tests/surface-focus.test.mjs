@@ -42,7 +42,7 @@ test('guest Daily results offer score validation instead of a career action', as
 
 test('Draft Run review retains result focus, the pack and a separate continuation',async()=>{
  const source=await readFile('draft-run-product.mjs','utf8');
- const render=source.slice(source.indexOf('function render()'),source.indexOf('function zoom(card)'));
+ const render=source.slice(source.indexOf('function render('),source.indexOf('function zoom(card)'));
  assert.match(render,/id="run-feedback-result" tabindex="-1"/);assert.match(render,/focus\(\{preventScroll:true\}\)/);
  assert.match(render,/class="run-pack-review"/);assert.match(render,/Review the pack/);
  assert.ok(render.indexOf('revealAnalysis(p,answer)')<render.indexOf('class="run-pack-review"'));
@@ -90,6 +90,24 @@ test('mobile reveal keeps Next pick in a bottom safe-area dock', async () => {
   assert.match(css, /\.run-next-dock #run-next\{width:100%\}/);
 });
 
+
+test('Draft Run keeps the decision on screen: compact header, fitted strip and floating actions', async () => {
+  const source = await readFile('draft-run-product.mjs', 'utf8');
+  const css = await readFile('draft-run.css', 'utf8');
+  // One header block carries the set, the pick and the round progress.
+  assert.match(source, /<span class="run-pick">Pack 1 · Pick \$\{p\.pick_number\}<\/span>/);
+  assert.match(source, /function runHeading\(p\)[\s\S]*rankingStateMarkup\(run\)[\s\S]*setRefresherButton\(p\.set_id\)\}\$\{steps\(\)\}<\/header>/);
+  assert.match(source, /<h2>Choose one<\/h2>/);
+  // Previous picks keep 85% of a pack card until they would overflow, then shrink to 62px.
+  assert.match(source, /class="run-pool-cards" style="--pool-count:\$\{previous\.length\}"/);
+  assert.match(css, /\.run-pool-cards button\{--pool-share:[^}]*\* \.85\);[^}]*width:max\(62px,min\(var\(--pool-share\),var\(--pool-fit\)\)\)/);
+  // Without rerolls the lock bar waits for a choice; Next pick floats where it was.
+  assert.match(source, /run-lock\$\{run\.day\|\|run\.comparison\?\.exact\?' is-awaiting':''\}/);
+  assert.match(css, /\.run-lock\.is-awaiting\{display:none\}/);
+  assert.match(css, /@media\(min-width:601px\)\{\s*body \.run-next-dock\{position:sticky;bottom:0/);
+  assert.match(source, /next\.disabled=true;setTimeout\(\(\)=>\{next\.disabled=false;\},350\)/);
+  assert.match(source, /render\(\{land:true\}\)/);
+});
 
 test('Draft Run repeats preserve the practice context', async () => {
   const source = await readFile('draft-run-product.mjs', 'utf8');

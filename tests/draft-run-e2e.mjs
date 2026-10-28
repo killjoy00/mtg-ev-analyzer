@@ -169,6 +169,7 @@ try{
   await page.evaluate(()=>Promise.all([...document.querySelectorAll('.run-cards img')].map(img=>img.decode())));
   assert.equal(await page.locator('.run-cards').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length),3);
   await page.locator('.run-card').last().scrollIntoViewIfNeeded();
+  if(daily){assert.equal(await page.locator('.run-lock').isVisible(),false,'without rerolls the lock bar waits for a choice');await page.locator('.run-card-select').last().click();await page.locator('.run-lock').waitFor();}
   const dock=await page.locator('.run-lock').boundingBox();assert.ok(dock.y+dock.height<=845,'Rerolls and lock remain within the viewport');
   await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-mobile-last-row.png`});
   await page.evaluate(()=>window.scrollTo(0,0));
@@ -183,6 +184,7 @@ try{
   const strongChoice=strongRound>0?puzzles[strongRound].candidates.filter(c=>c.id!==puzzles[strongRound].historical_pick_id&&gradeDraftRunPick(puzzles[strongRound],c.id).score>=85).sort((a,b)=>gradeDraftRunPick(puzzles[strongRound],b.id).score-gradeDraftRunPick(puzzles[strongRound],a.id).score)[0]:null;
   for(let round=0;round<puzzles.length;round++){
     const p=puzzles[round];if(cube)assert.equal(p.set_id,'powered-cube');assert.equal(await page.locator('.run-pool-cards>button').count(),p.pick_number-1);assert.equal(await page.locator('.run-pool-empty').count(),p.pick_number===1?1:0,'only first-pick states show the empty previous-card box');if(p.pick_number>1){assert.equal(await page.locator('.run-pool-note').innerText(),'Already selected by this drafter.');assert.notEqual(await page.locator('.run-pool-cards').evaluate(el=>getComputedStyle(el).backgroundColor),'rgba(0, 0, 0, 0)','previous cards share one off-color strip background');assert.equal(await page.locator('.run-pool-cards>button').first().evaluate(el=>getComputedStyle(el).backgroundColor),'rgba(0, 0, 0, 0)','individual previous cards stay transparent inside the shared strip');}
+    assert.equal(await page.locator('.run-heading .run-pick').innerText(),`Pack 1 · Pick ${p.pick_number}`,'the header names the pick');
     const selected=round===0?weakChoice.id:round===strongRound?strongChoice.id:p.historical_pick_id;
     const expectedGrade=gradeDraftRunPick(withSourceDraftRecord(p,round%3),selected);
     await page.locator(`[data-pick="${selected}"]`).click();await page.locator('#run-lock').click();await page.locator('#run-next').waitFor();
@@ -218,7 +220,9 @@ try{
       const feedbackBox=await page.locator('.run-feedback').boundingBox();assert.ok(feedbackBox&&feedbackBox.height<280,`compact mobile result stays under 280px (${feedbackBox?.height})`);
       const prefix=`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}`;
       await page.screenshot({path:`${prefix}-reveal-mobile.png`});
+      const mobileNext=await page.locator('#run-next').boundingBox();assert.ok(mobileNext&&mobileNext.y+mobileNext.height<=844,'Next pick is in reach on a phone');
       await page.setViewportSize({width:1440,height:1000});await noOverflow();
+      const desktopNext=await page.locator('#run-next').boundingBox();assert.ok(desktopNext&&desktopNext.y>=0&&desktopNext.y+desktopNext.height<=1000,`Next pick floats in view on desktop (${desktopNext?.y})`);
       await page.screenshot({path:`${prefix}-reveal-desktop.png`});
       await page.setViewportSize({width:390,height:844});await noOverflow();
     }
