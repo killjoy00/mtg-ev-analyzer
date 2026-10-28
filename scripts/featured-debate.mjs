@@ -10,7 +10,7 @@ export const DEBATE_WEEKDAYS=Object.freeze([1,3,5]);
 // The largest MTG Bluesky feed picks up any tag beginning with #mtg.
 export const DEBATE_TAGS=Object.freeze(['MTG','MTGDraft']);
 export const REVEAL_DELAY_HOURS=4;
-export const DEBATE_TEMPLATE_VERSION='debate-short-v1';
+export const DEBATE_TEMPLATE_VERSION='debate-short-v2';
 export const BLUESKY_LIMIT=300;
 const SITE='https://packone.pro/';
 
@@ -67,12 +67,24 @@ export function debateObservation(f) {
  return {rank,sentence:'The trophy drafter took '+f.trophy.name+', '+where+'.'+close};
 }
 
-export function debateCopies(f) {
+// Keep the previous question wording recognizable for debates already posted
+// before this correction, so their afternoon reveal can still publish.
+// 'legacySplit' is used only to validate an existing public question.
+export function otherVotePercent(f) {
+ assertDebatable(f);
+ if(!Number.isInteger(f.other_votes)||f.other_votes<0||f.other_votes>f.players)
+  throw Error('Invalid number of votes for other cards.');
+ return Math.round(1000*f.other_votes/f.players)/10;
+}
+
+export function debateCopies(f,{legacySplit=false}={}) {
  assertDebatable(f);
  const set=setLabel(f),names=f.choices.map(c=>c.name);
  const prior=f.prior_picks.map(c=>c.name);
  const where='Pick '+f.pick_number+' of a real '+set+' trophy draft.';
- const split=f.players+' Pack One players split '+f.tier+' ways on it.';
+ const leading=f.tier===3?'Three':'Two';
+ const hook=f.players+' players. '+leading+' leading picks.';
+ const split=legacySplit?f.players+' Pack One players split '+f.tier+' ways on it.':hook;
  const tags=DEBATE_TAGS.map(t=>'#'+t).join(' ');
  const ask='Your pick, and why? Results later today.';
  const already=prior.length?'Already drafted: '+prior.join(', ')+'.':'First pick of the draft.';
@@ -89,26 +101,24 @@ export function debateCopies(f) {
   ' The choices: '+andList(names)+'. No results shown.';
  const obs=debateObservation(f);
  const lines=f.choices.map(c=>formatPercent(c.pct)+'% '+c.name);
- const otherPct=Math.round(1000*f.other_votes/f.players)/10;
+ const otherPct=otherVotePercent(f);
  if(otherPct>0)lines.push(formatPercent(otherPct)+'% other cards');
  const closing='Fresh Dailies every day: packone.pro';
  const revealVariants=[
   ['Results from '+f.players+' Pack One players:\n'+lines.join('\n'),obs.sentence,closing],
   ['Results from '+f.players+' players:\n'+lines.join('\n'),'The trophy drafter took '+f.trophy.name+'.',closing],
   ['Results from '+f.players+' players: '+f.choices.map((c,i)=>String.fromCharCode(65+i)+' '+
-   formatPercent(c.pct)+'%').join(', ')+'.','The trophy drafter took '+
+   formatPercent(c.pct)+'%').join(', ')+(otherPct>0?', '+formatPercent(otherPct)+'% other cards':'')+'.','The trophy drafter took '+
    String.fromCharCode(65+obs.rank)+'.',closing],
  ].map(parts=>parts.join('\n\n'));
  const reveal=revealVariants.find(text=>graphemes(text)<=BLUESKY_LIMIT);
  if(!reveal)throw Error('Debate reveal exceeds the Bluesky limit.');
- // A no-break space keeps "3 ways" together when the headline wraps.
- const hook=f.players+' players split '+f.tier+'\u00a0ways';
  const longTitle='Which Would You Draft? '+names.join(' vs ')+' #Shorts';
  const title=longTitle.length<=100?longTitle:
-  'Which Would You Draft? '+f.players+' Players Split '+f.tier+' Ways | MTG #Shorts';
+  'Which Would You Draft? '+f.players+' Players, '+leading+' Leading Picks | MTG #Shorts';
  const description=[
-  f.players+' Pack One players split '+f.tier+' ways on Pick '+f.pick_number+' of a real '+set+
-   ' trophy draft. Which would you take? Comment your pick.',
+  f.players+' Pack One players voted on Pick '+f.pick_number+' of a real '+set+
+   ' trophy draft. These were the '+leading.toLowerCase()+' leading picks. Which would you take? Comment your pick.',
   '',
   'Pack One: eight real trophy-draft decisions every day. Free. No account required. '+
    'Play at packone.pro (link in our channel profile).',

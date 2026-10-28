@@ -51,7 +51,7 @@ const app=()=>document.querySelector('#app');
 function styles() {
   installSetGuides();
   if(document.querySelector('[data-draft-run-style]')) return;
-  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=23';link.dataset.draftRunStyle='1';document.head.appendChild(link);
+  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=24';link.dataset.draftRunStyle='1';document.head.appendChild(link);
 }
 async function api(path,body,auth=true) {
   const method=body===undefined?'GET':'POST',headers={'content-type':'application/json'};
@@ -88,11 +88,13 @@ function image(card,extra='') {
 function steps() {
   return `<ol class="run-steps" aria-label="Run progress">${Array.from({length:runLength()},(_,i)=>`<li class="${run.answers[i]?'done':i===run.answers.length?'current':''}" aria-label="Round ${i+1}${run.answers[i]?`, ${run.answers[i].score} points`:''}" ${i===run.answers.length?'aria-current="step"':''}><span>${i+1}</span>${run.answers[i]?`<small>${run.answers[i].score} pts</small>`:''}</li>`).join('')}</ol>`;
 }
+// The strip keeps its own tinted band so earlier picks never read as part of
+// the pack. --pool-count lets the cards shrink to fit one line (draft-run.css).
 function pool(p) {
   const previous=p.prior_picks||[];
-  if(!previous.length) return '<section class="run-pool is-empty" aria-label="Original drafter’s earlier picks"><p class="run-pool-empty">No earlier picks yet.</p></section>';
-  const cardLabel=`${previous.length} card${previous.length===1?'':'s'} · in pick order`;
-  return `<section class="run-pool" aria-label="Original drafter’s earlier picks"><h2>Earlier picks <small>${cardLabel}</small></h2><div class="run-pool-cards">${previous.map((c,i)=>`<button type="button" data-zoom-prior="${i}" aria-label="View previous pick ${i+1}: ${esc(c.name)}">${image(c)}<span>${i+1}. ${esc(c.name)} ${faceIndicatorMarkup(c)}</span></button>`).join('')}</div></section>`;
+  const head=detail=>`<div class="run-pool-head"><h2>Earlier picks</h2>${detail}</div>`;
+  if(!previous.length) return `<section class="run-pool is-empty" aria-label="Original drafter’s earlier picks">${head('<p class="run-pool-empty">No earlier picks yet.</p>')}</section>`;
+  return `<section class="run-pool" aria-label="Original drafter’s earlier picks">${head(`<small>${previous.length} card${previous.length===1?'':'s'} · in pick order</small>`)}<div class="run-pool-cards" style="--pool-count:${previous.length}">${previous.map((c,i)=>`<button type="button" data-zoom-prior="${i}" aria-label="View previous pick ${i+1}: ${esc(c.name)}">${image(c)}<span>${i+1}. ${esc(c.name)} ${faceIndicatorMarkup(c)}</span></button>`).join('')}</div></section>`;
 }
 function revealComparison(p,answer) {
   const byId=new Map((p.candidates||[]).map(card=>[card.id,card]));
@@ -174,30 +176,72 @@ function rankingStateMarkup(value=run) {
     ? '<p class="run-ranking-state" role="status">Playing as guest. Sign in to add this score to the leaderboard.</p>'
     : '<p class="run-ranking-state is-quiet" role="status">Playing as guest.</p>';
 }
-function render() {
+// One compact block: set and pick on the first line, mode and ranking on the
+// second, round progress last. The step bar already shows the round.
+function runHeading(p) {
+  const mode=`${run.day?'Daily ':''}${title()} · ${run.day||'Practice'}`,short=run.day?`Daily · ${run.day}`:'Practice';
+  return `<header class="run-heading"><div class="run-title"><h1>${esc(setName(p.set_id))}</h1><span class="run-pick">Pack 1 · Pick ${p.pick_number}</span></div><a class="text-button run-leave" href="./">Leave run</a><div class="run-meta"><p class="eyebrow"><span class="run-mode-full">${esc(mode)}</span><span class="run-mode-short">${esc(short)}</span></p>${rankingStateMarkup(run)}</div>${setRefresherButton(p.set_id)}${steps()}</header>`;
+}
+function nextNote() {
+  if(run.complete)return 'Run complete';
+  const left=runLength()-run.answers.length;
+  return `${left} of ${runLength()} picks left`;
+}
+function render({land=false}={}) {
   dismissSetRefresher();
   const answer=review==null?null:run.answers[review];
   if(answer||run.complete){clock.clear();viewKey=null;}
-  if(run.complete&&!answer) {renderResult();return;}
+  if(run.complete&&!answer) {renderResult();if(land)window.scrollTo({top:0,behavior:'instant'});return;}
   const p=answer?.puzzle||run.current;
   if(answer&&!run.complete)prefetchPackImages(run.current);
   const compactSentence=answer?compactDraftRunFeedback(answer):'';
   document.body.classList.add('is-game');
-  app().innerHTML=`<section class="draft-run-page"><header class="run-heading"><div><p class="eyebrow">${run.day?'Daily ':''}${title()} · ${run.day||'Practice'}</p><div class="run-set-title"><h1>${esc(setName(p.set_id))} <span>Round ${answer?review+1:run.round}/${runLength()} · Pack 1 · Pick ${p.pick_number}${answer?' · revealed':''}</span></h1>${setRefresherButton(p.set_id)}</div></div><a class="text-button" href="./">Leave run</a></header>${steps()}
-    ${rankingStateMarkup(run)}
+  app().innerHTML=`<section class="draft-run-page">${runHeading(p)}
     ${sharedDayNotice(answer)}
     ${run.comparison?run.comparison.kind==='creator'?`<aside class="run-friend"><strong>BEAT THE CREATOR</strong> · ${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. You’re playing the same ${runLength()} decisions.</aside>`:`<aside class="run-friend">${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. ${run.comparison.exact?`You’re playing the same ${runLength()} packs.`:'Packs changed. This result counts as practice.'}</aside>`:''}
     ${answer?'':pool(p)}
     ${answer?`<section class="run-feedback ${answer.historicalMatch?'is-match':'is-miss'}"><strong class="run-feedback-score">${answer.score}<small>/100</small></strong><div class="run-feedback-copy"><h2 id="run-feedback-result" tabindex="-1" aria-label="${esc(compactResultLabel(answer,compactSentence))}">${esc(trophyRevealSentence(answer))}</h2>${compactSentence?`<p>${esc(compactSentence)}</p>`:''}<div id="run-peer-stats" class="run-peer-stats" role="status" hidden></div></div></section>${revealAnalysis(p,answer)}`:
     ''}
-    ${answer?`<details class="run-pack-review"><summary>Review the pack</summary>${pool(p)}${cardGrid(p,answer)}</details>`:cardGrid(p)}
-    ${answer?`${reportDecisionMarkup(answer)}<div class="run-next-dock"><button class="button primary" id="run-next">${run.complete?'See result':'Next pick'}</button></div>`:''}
-    ${answer?'':`<div class="run-lock"><div class="run-lock-choice"><span id="run-selection-label">Choose a card</span><button class="button primary" id="run-lock" disabled>Lock pick</button></div>${run.day||run.comparison?.exact?'':`<div class="run-tools"><div>${cube()||run.custom_set_ids?.length?'':`<button class="button secondary" data-reroll="set" ${!run.rerolls.set||run.set_reroll_allowed===false?'disabled':''}>Reroll set · ${run.rerolls.set}</button>`}<button class="button secondary" data-reroll="pack" ${!run.rerolls.pack?'disabled':''}>Reroll pack · ${run.rerolls.pack}</button></div></div>`}</div>`}
+    ${answer?`<details class="run-pack-review"><summary>Review the pack</summary>${pool(p)}${cardGrid(p,answer)}</details>`:`<div class="run-pack-head"><h2>Choose one</h2><p>${p.candidates.length} cards in this pack</p></div>${cardGrid(p)}`}
+    ${answer?`${reportDecisionMarkup(answer)}<div class="run-next-dock"><span class="run-next-note">${nextNote()}</span><button class="button primary" id="run-next">${run.complete?'See result':'Next pick'}</button></div>`:''}
+    ${answer?'':`<div class="run-lock${run.day||run.comparison?.exact?' is-awaiting':''}"><div class="run-lock-choice"><span id="run-selection-label">Choose a card</span><button class="button primary" id="run-lock" disabled>Lock pick</button></div>${run.day||run.comparison?.exact?'':`<div class="run-tools"><div>${cube()||run.custom_set_ids?.length?'':`<button class="button secondary" data-reroll="set" ${!run.rerolls.set||run.set_reroll_allowed===false?'disabled':''}>Reroll set · ${run.rerolls.set}</button>`}<button class="button secondary" data-reroll="pack" ${!run.rerolls.pack?'disabled':''}>Reroll pack · ${run.rerolls.pack}</button></div></div>`}</div>`}
     <p class="run-error" id="run-error" role="alert"></p></section>`;
   bind(p,answer);
+  placeRun(land);
   if(answer) {document.querySelector('#run-feedback-result')?.focus({preventScroll:true});void revealDailyPeers(review,answer);}
   else recordView();
 }
+// Every view after the first opens at the run header, with the site menu just
+// above it. Wider screens then size the pack so all of it fits above the lock
+// bar when it can, never below a readable card width.
+const PACK_MAX_CARD=200,LOCK_RESERVE=72;
+function runTop() {
+  const page=app().querySelector('.draft-run-page');
+  return page?Math.max(0,Math.round(page.getBoundingClientRect().top+scrollY-8)):0;
+}
+function fitPack(top) {
+  const page=app().querySelector('.draft-run-page'),grid=page?.querySelector(':scope>.run-cards');
+  if(!grid)return;
+  page.style.removeProperty('--pack-columns');
+  if(innerWidth<=600)return;
+  const width=grid.clientWidth,gap=Number.parseFloat(getComputedStyle(grid).columnGap)||12,floor=innerWidth>1100?150:120;
+  const limit=innerHeight+top-LOCK_RESERVE;
+  for(let cols=Math.max(3,Math.ceil((width+gap)/(PACK_MAX_CARD+gap)));cols<=10;cols++) {
+    if((width-(cols-1)*gap)/cols<floor)break;
+    page.style.setProperty('--pack-columns',cols);
+    if(grid.getBoundingClientRect().bottom+scrollY<=limit)return;
+  }
+}
+function placeRun(land) {
+  const top=land?runTop():0;
+  fitPack(top);
+  if(land)window.scrollTo({top,behavior:'instant'});
+}
+let fitFrame=0;
+window.addEventListener('resize',()=>{
+  cancelAnimationFrame(fitFrame);
+  fitFrame=requestAnimationFrame(()=>{if(run&&review==null&&!run.complete)fitPack(Math.min(scrollY,runTop()));});
+});
 // A result-share link always opens the recipient's current Daily. When the
 // friend's score came from an earlier Daily, say so before the first pick.
 function sharedDayNotice(answer) {
@@ -263,7 +307,11 @@ function bind(p,answer) {
   app().querySelectorAll('[data-zoom]').forEach(b=>b.onclick=()=>zoom(p.candidates.find(c=>c.id===b.dataset.zoom)));
   app().querySelectorAll('[data-zoom-prior]').forEach(b=>b.onclick=()=>zoom(p.prior_picks[Number(b.dataset.zoomPrior)]));
   if(answer) {
-    document.querySelector('#run-next').onclick=()=>{review=null;selection=null;render();window.scrollTo({top:0,behavior:'instant'});};
+    // Next pick sits where Lock pick was. A brief hold stops the second click
+    // of a double-click on Lock from skipping straight past the reveal.
+    const next=document.querySelector('#run-next');
+    next.disabled=true;setTimeout(()=>{next.disabled=false;},350);
+    next.onclick=()=>{review=null;selection=null;render({land:true});};
     const report=app().querySelector('[data-report-decision]');if(report)report.onclick=()=>openDecisionReport(answer);
     const deck=app().querySelector('[data-trophy-deck]');
     if(deck)deck.onclick=()=>{
@@ -279,6 +327,14 @@ function bind(p,answer) {
     if(busy)return;selection=b.dataset.pick;
     app().querySelectorAll('[data-pick]').forEach(c=>{c.setAttribute('aria-pressed',String(c.dataset.pick===selection));c.closest('.run-card').classList.toggle('selected',c.dataset.pick===selection);});
     document.querySelector('#run-selection-label').textContent=p.candidates.find(c=>c.id===selection).name;document.querySelector('#run-lock').disabled=false;
+    // Without rerolls the lock bar appears only once there is a choice. Keep
+    // the chosen card clear of it.
+    const lock=document.querySelector('.run-lock');
+    if(lock?.classList.contains('is-awaiting')) {
+      lock.classList.remove('is-awaiting');
+      const bar=lock.getBoundingClientRect(),card=b.getBoundingClientRect();
+      if(card.bottom>bar.top&&card.top<bar.top)window.scrollBy({top:card.bottom-bar.top+8,behavior:'smooth'});
+    }
   });
   app().querySelectorAll('[data-reroll]').forEach(b=>b.onclick=()=>mutate('reroll',{type:b.dataset.reroll}));
   document.querySelector('#run-lock').onclick=()=>mutate('pick',{cardId:selection});
@@ -292,10 +348,9 @@ async function mutate(action,body) {
     // Measurement delivery must not hold a player's pick behind a slow request.
     await Promise.race([viewPromise,new Promise(resolve=>setTimeout(resolve,1500))]);
     run=await api(`/v1/runs/${run.id}/${action}`,{...body,...measurement,revision:run.revision,round,puzzleId:run.current.puzzle_id});
-    review=action==='pick'?round:null;selection=null;render();
+    review=action==='pick'?round:null;selection=null;render({land:true});
     if(action==='reroll') trackEvent('draft_run_rerolled',{type:body.type,round:round+1,daily:Boolean(run.day)});
     if(run.complete) document.dispatchEvent(new CustomEvent('pack1:result-completed',{detail:{id:`draft-run:${run.id}`,score:run.score,mode:'draft_run',set_id:run.environment,daily:Boolean(run.day)}}));
-    window.scrollTo({top:0,behavior:'instant'});
   } catch(e) {
     // Recover authoritative state after a lost response or a second-tab write.
     const message=e.message;
@@ -377,7 +432,7 @@ function renderResult() {
     ${run.day?'<p data-all-dailies hidden><a class="text-button" href="./">All Dailies</a></p>':''}
     <h2>Your ${runLength()} picks</h2><ol class="run-review-list">${run.answers.map((a,i)=>`<li><button data-review="${i}"><span>${i+1}</span><div><strong>${esc(setName(a.puzzle.set_id))} · Pick ${a.pickNumber}</strong><small>${esc(a.selectedName)}${a.historicalMatch?' · Trophy match':''}</small></div><b>${a.score}</b></button></li>`).join('')}</ol>
     <p class="run-note">Your final score is the average of your ${runLength()} picks. Matching the trophy drafter earns 100; other picks can score up to 95 based on the model.</p>${run.day?'':'<div id="run-share-status" role="status"></div>'}<p id="run-error" role="alert"></p></section>`;
-  app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render();window.scrollTo({top:0,behavior:'instant'});});
+  app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render({land:true});});
   document.querySelector('#run-share').onclick=()=>shareResult();
   document.querySelector('#run-copy-result').onclick=()=>shareResult({copy:true});
   document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=32')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};

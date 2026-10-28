@@ -69,6 +69,10 @@ export async function publishDebateQuestion(fetchImpl,{handle,password,f,image})
  if(await getPost(fetchImpl,session,featuredBlueskyRkey(f.day)))
   return {status:'skipped',reason:'earlier featured format already posted for this day'};
  const copy=debateCopies(f);
+ // A question posted before this wording fix must remain valid on retries.
+ const existing=await getPost(fetchImpl,session,debateQuestionRkey(f.day));
+ if(existing?.value?.text===debateCopies(f,{legacySplit:true}).question)
+  return {status:'already-posted',uri:existing.uri,cid:existing.cid};
  return publishPost(fetchImpl,session,{rkey:debateQuestionRkey(f.day),
   record:{text:copy.question,facets:debateFacets(copy.question),langs:['en']},
   prepare:async()=>({embed:{$type:'app.bsky.embed.images',images:[{

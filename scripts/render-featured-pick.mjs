@@ -6,7 +6,7 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {fileURLToPath} from 'node:url';
 import {imageUrl,formatPercent} from './featured-pick.mjs';
-import {debateCopies,debateObservation,DEBATE_TEMPLATE_VERSION} from './featured-debate.mjs';
+import {debateCopies,debateObservation,otherVotePercent,DEBATE_TEMPLATE_VERSION} from './featured-debate.mjs';
 import {buildFeaturedSoundtrack,FEATURED_AUDIO_VERSION,FEATURED_AUDIO_SECONDS} from './featured-soundtrack.mjs';
 
 const DIR='artifacts/featured-pick',run=promisify(execFile);
@@ -59,6 +59,7 @@ const css=(display,body)=>[
  '.bar{height:22px;margin-top:14px;background:#34516b;border-radius:12px;overflow:hidden}',
  '.bar span{display:block;height:100%;background:linear-gradient(90deg,#65b3ed,#a9ddff)}',
  '.note{font-size:46px;line-height:1.3;color:#e3f1ff;text-align:center;margin:44px 20px 0;font-weight:700}',
+ '.other-votes{font-size:38px;color:#cfe0f0;text-align:center;margin:20px 0 0}',
  '.cta{font:700 112px/1.0 Barlow,Arial;text-transform:uppercase}',
  '.facts{font-size:52px;line-height:1.3;color:#e3f1ff;margin-top:40px;font-weight:700}',
  '.url{display:inline-block;margin-top:60px;background:#fff;color:#103352;font:700 96px Barlow,Arial;',
@@ -104,6 +105,7 @@ const stage=(logo,inner)=>brand(logo)+'<div class="stage">'+inner+'</div>';
 export function debateScenes(f,logo) {
  const copy=debateCopies(f),obs=debateObservation(f);
  const where=escape(copy.set)+' · Pick '+f.pick_number;
+ const other=otherVotePercent(f);
  const decide=n=>({seconds:1,body:'<div class="count">'+n+'</div>'+stage(logo,
   '<h2>Lock in your pick</h2><p class="sub">'+where+'</p>'+priorRow(f,true)+cardRow(f,{letters:true}))});
  return [
@@ -113,7 +115,8 @@ export function debateScenes(f,logo) {
    priorRow(f)+cardRow(f,{letters:true}))},
   decide(3),decide(2),decide(1),
   {seconds:4,body:stage(logo,'<h2>'+f.players+' players voted</h2><p class="sub">'+where+'</p>'+
-   '<div class="votes">'+voteRows(f)+'</div>')},
+   '<div class="votes">'+voteRows(f)+'</div>'+
+   (other>0?'<p class="other-votes">'+formatPercent(other)+'% chose other cards</p>':''))},
   {seconds:2,body:stage(logo,'<h2>The trophy drafter took</h2><p class="sub">'+
    escape(f.trophy.name)+'</p>'+cardRow(f,{trophy:true})+'<p class="note">'+
    escape(obs.sentence.replace(/^The trophy drafter took [^,]+, /,'').replace(/^./,s=>s.toUpperCase()))+'</p>')},
