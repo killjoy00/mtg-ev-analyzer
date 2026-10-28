@@ -104,7 +104,7 @@ test('fresh guests get a larger Start here label instead of the generic first-ro
  assert.doesNotMatch(guest,/The daily challenge/);
  const signed=dailyHomeMarkup({player:{claimed:true},capabilities:['account'],daily_history:[]},day);
  assert.doesNotMatch(signed,/daily-home-start">Start here<\/span>/);
- assert.match(signed,/The daily challenge/);
+ assert.match(signed,/A mix of Draft sets/);
  assert.match(guest,/Free · No account required/);
 });
 
@@ -114,7 +114,7 @@ test('checking state is neutral instead of pretending the player is a guest',()=
  assert.match(html,/data-completed="pending"/);
  assert.equal((html.match(/is-pending/g)||[]).length,3);
  assert.doesNotMatch(html,/is-unplayed|is-complete|Start here|Free · No account required|Create a free account|Dailies complete/);
- assert.match(html,/The daily challenge/);
+ assert.match(html,/A mix of Draft sets/);
 });
 
 test('failed Daily hydration stays unknown and offers a retry',()=>{
