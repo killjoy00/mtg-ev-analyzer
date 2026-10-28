@@ -34,7 +34,8 @@ export async function revealOne(fetchImpl,session,f,{now=new Date()}={}) {
  const question=await getPost(fetchImpl,session,debateQuestionRkey(f.day));
  if(!question)return {day:f.day,status:'skipped',reason:'no question was posted'};
  // Never answer a question with data from a different decision.
- if(question.value?.text!==copy.question)
+ if(question.value?.text!==copy.question &&
+    question.value?.text!==debateCopies(f,{legacySplit:true}).question)
   throw Error('Bluesky question for '+f.day+' does not match its cached decision.');
  const asked=Date.parse(question.value?.createdAt);
  if(!Number.isFinite(asked))throw Error('Bluesky question for '+f.day+' has no timestamp.');
