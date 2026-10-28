@@ -1,6 +1,6 @@
 {
   "operation": "deploy-gateway",
-  "source_sha": "2138aaefac0612d79dbace7be94e5b19500b9358",
-  "production_run_id": "37717941183",
-  "reason": "Promote the audited October 7 runtime candidate. Production Functions for exact source 2138aaefac0612d79dbace7be94e5b19500b9358 passed the guarded development run 37717086904 and production run 37717941183, including the same-revision development gate, release-marker/Daily acceptance, and live v5 account-linked Practice acceptance. This source includes the gateway fresh-stub transient retry/diagnostics behavior introduced at 632c762b575d687f157c7370d64272100d0ebc56; overload, HTTP denial, abort and timeout remain non-retryable, application mutations are not replayed, and quota identity must be preserved by the protected gateway release. Admin API contract remains unchanged."
+  "source_sha": "a3d73c47ac7615218ad08ae5866b1a670a96bbd4",
+  "production_run_id": "40629375992",
+  "reason": "Owner-authorized gateway release so Admin Insights can load the YouTube Shorts report. Adds GET /v1/admin/youtube to the gateway's read-only Admin allowlist (PR #1415); without it the browser's CORS preflight gets a 404 and the page shows Load failed. The backend route is protected by the same account and Admin membership checks as the other draft Admin dashboards. Production Functions for exact source a3d73c47ac7615218ad08ae5866b1a670a96bbd4 passed production run 40629375992. Since the last gateway publish (e4049cbd) this source also carries the isolated quota reservation preview from PRs #1396 to #1411; it stays inactive in production because it requires MODE preview, a non-production branch and QUOTA_RESERVATIONS preview-v1, so production quota decisions are unchanged apart from three added timing fields. Admin API contract and v9 runtime unchanged; quota identity, gateway ownership, monitoring and the #596 watermark retained."
 }
