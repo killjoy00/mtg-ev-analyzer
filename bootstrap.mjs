@@ -25,9 +25,14 @@ if(!utmSource&&!resultShare&&document.referrer) {
 }
 const hadAttributionParams=['utm_source','utm_campaign','utm_medium'].some(key=>params.has(key));
 for(const key of ['utm_source','utm_campaign','utm_medium'])params.delete(key);
+// New result-share links carry the sharer's Daily date so the game can say
+// when a friend's score came from an earlier Daily. Old links have none.
+const sharedDay=resultShare&&/^\d{4}-\d{2}-\d{2}$/.test(params.get('d')||'')?params.get('d'):null;
 if(resultShare) {
   window.PACK1_ENTRY_SOURCE='result_share';
+  if(sharedDay)window.PACK1_SHARED_DAY=sharedDay;
   params.delete('ref');
+  params.delete('d');
 }
 if(hadAttributionParams||resultShare)history.replaceState({},'',`${location.pathname}${params.size?'?'+params:''}${location.hash}`);
 const {trackEvent:trackArrivalEvent}=await import('./retention-events.mjs');
@@ -37,7 +42,7 @@ trackArrivalEvent('acquisition_touch',{
   ...(medium?{medium}:{}),
   ...(referrerHost?{referrer_host:referrerHost}:{})
 });
-if(resultShare)trackArrivalEvent('daily_share_arrival',{source:'result_share',daily:true});
+if(resultShare)trackArrivalEvent('daily_share_arrival',{source:'result_share',daily:true,kind:sharedDay?'dated':'undated'});
 // Only previously published stored links load the historical game reader.
 const historicalShare = params.has('challenge') && params.get('game') !== 'draft-run';
 if (!historicalShare && (params.has('legacy-board') || params.has('mode') || params.has('seed') || (params.get('set') === 'powered-cube' && params.get('game') !== 'draft-run'))) {
@@ -160,7 +165,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     await identityReady;
     (await import('./profile-product.mjs?v=24')).installProfileProductLayer();
   } else {
-    const game = await import('./draft-run-product.mjs?v=32');
+    const game = await import('./draft-run-product.mjs?v=33');
     await identityReady;
     await refreshPrimaryNav();
     await game.installDraftRunPage();

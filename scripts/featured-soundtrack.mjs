@@ -1,9 +1,12 @@
 // Original, reproducible soundtrack for the 20-second Pack One featured Short.
 // All sound is synthesized here: no external recordings, samples or music licensing.
-export const FEATURED_AUDIO_VERSION='packone-original-synth-v1';
+export const FEATURED_AUDIO_VERSION='packone-original-synth-v2';
 export const FEATURED_AUDIO_SECONDS=20;
 export const FEATURED_AUDIO_SAMPLE_RATE=32000;
-export const FEATURED_AUDIO_CUE_TIMES=Object.freeze([2,5,9,13,17]);
+// Scene changes of the debate Short: context, the 3-2-1 countdown, votes,
+// the trophy reveal and the closing call to action.
+export const FEATURED_AUDIO_CUE_TIMES=Object.freeze([3,6,7,8,9,13,15]);
+export const FEATURED_AUDIO_REVEAL_SECONDS=13;
 const TAU=2*Math.PI;
 
 function frequency(midi) {return 440*Math.pow(2,(midi-69)/12);}
@@ -77,13 +80,14 @@ export function buildFeaturedSoundtrack({
   }
  }
  // Small, recognizable UI cues exactly where the on-screen scenes change.
- for(const [k,t] of FEATURED_AUDIO_CUE_TIMES.entries()){
-  addSoftNoise(t,.16,k===3?.055:.033,13);
-  addTone(t,.24,k===3?880:590,.025,{attack:.003,release:.07,decay:.11});
+ for(const t of FEATURED_AUDIO_CUE_TIMES){
+  const reveal=t===FEATURED_AUDIO_REVEAL_SECONDS;
+  addSoftNoise(t,.16,reveal?.055:.033,13);
+  addTone(t,.24,reveal?880:590,.025,{attack:.003,release:.07,decay:.11});
  }
- // The trophy reveal at 13 s gets a cheerful three-note flourish.
+ // The trophy reveal gets a cheerful three-note flourish.
  for(const [i,note] of [72,76,79].entries())
-  addTone(13+i*.12,.60,frequency(note),.079,
+  addTone(FEATURED_AUDIO_REVEAL_SECONDS+i*.12,.60,frequency(note),.079,
    {attack:.006,release:.17,decay:.36,warmth:.18});
  // Gently settle the CTA and leave no sudden cut at 20 seconds.
  let peak=0;

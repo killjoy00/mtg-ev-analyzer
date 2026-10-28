@@ -4,6 +4,7 @@ import {mkdir,writeFile,appendFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {FEATURED_SQL,selectFeaturedPick,featureCopies,pacificDay,previousPacificDay} from './featured-pick.mjs';
 import {assertCurrentLivePublisher} from './post-daily-social.mjs';
+import {cachedFeature,FEATURE_CACHE} from './publish-debate-reveal.mjs';
 
 const PROJECT='patient-shadow-91417882';
 const BRANCH='br-orange-feather-ayps8kep';
@@ -72,22 +73,30 @@ export async function featureDbRows(day,{apiKey=process.env.NEON_API_KEY,fetcher
   throw Object.assign(Error('Featured read-only aggregate query failed'),{code:error.code});
  } finally {await client.end().catch(()=>{});}
 }
+// The first selection for a source day is frozen in the Actions cache. Morning
+// retries and the afternoon Bluesky reveal then use exactly the same decision
+// and numbers, even if a late finisher changes the live counts.
 export async function generateFeatured({env=process.env,now=new Date(),fetcher=fetch}={}) {
  const gate=await assertFeaturedMorning({env,now,fetcher});
- const output=async(selected,day='')=>{
-  if(env.GITHUB_OUTPUT)await appendFile(env.GITHUB_OUTPUT,'selected='+selected+'\nday='+day+'\n');
+ const output=async(selected,day='',cached=false)=>{
+  if(env.GITHUB_OUTPUT)await appendFile(env.GITHUB_OUTPUT,'selected='+selected+'\nday='+day+
+   '\ncache_hit='+cached+'\n');
  };
  if(!gate.eligible){await output(false);return {selected:false,reason:gate.reason};}
- const rows=await featureDbRows(gate.day,{apiKey:env.NEON_API_KEY,fetcher});
- const selected=selectFeaturedPick(rows,{day:gate.day});
+ const frozen=await cachedFeature(gate.day);
+ const selected=frozen||selectFeaturedPick(
+  await featureDbRows(gate.day,{apiKey:env.NEON_API_KEY,fetcher}),{day:gate.day});
  if(!selected) {await output(false,gate.day);return {selected:false,day:gate.day,reason:'no qualified split'};}
- await mkdir(DIR,{recursive:true});
  const copy=featureCopies(selected);
- await writeFile(DIR+'/pick.json',JSON.stringify({feature:selected,copy},null,2)+'\n');
+ const json=JSON.stringify({feature:selected,copy},null,2)+'\n';
+ await mkdir(DIR,{recursive:true});
+ await mkdir(FEATURE_CACHE+'/'+gate.day,{recursive:true});
+ await writeFile(DIR+'/pick.json',json);
+ await writeFile(FEATURE_CACHE+'/'+gate.day+'/pick.json',json);
  await writeFile(DIR+'/patreon.md',copy.patreon+'\n');
- await output(true,gate.day);
- return {selected:true,day:gate.day,environment:selected.environment,round:selected.round,
-  tier:selected.tier,players:selected.players,score:selected.score};
+ await output(true,gate.day,Boolean(frozen));
+ return {selected:true,day:gate.day,cached:Boolean(frozen),environment:selected.environment,
+  round:selected.round,tier:selected.tier,players:selected.players,score:selected.score};
 }
 if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]) {
  generateFeatured().then(result=>console.log(JSON.stringify(result)))

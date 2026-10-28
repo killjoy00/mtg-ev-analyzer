@@ -271,7 +271,7 @@ try{
     await page.locator('#run-next').click();
     if(round===0){const thumb=await page.locator('.run-pool-cards img').first().boundingBox(),pack=await page.locator('.run-card-select img').first().boundingBox();assert.ok(Math.abs(thumb.width/pack.width-.85)<.03,`Prior picks are about 85% of pack cards: ${thumb.width}/${pack.width}`);assert.equal(await page.locator('.run-pool-cards>button').count(),cube?2:1);await page.reload();await page.locator('.run-cards').waitFor();assert.equal(answers.length,1);}
   }
-  await page.locator('.run-result-page').waitFor();assert.equal(await page.locator('.run-image-share,#run-share-image').count(),0);assert.equal(await page.locator('.run-review-list li').count(),puzzles.length);assert.match(await page.locator('.run-final-score').innerText(),new RegExp(String(snapshot().score))); assert.equal(await page.locator('.run-result-actions .button').count(),5);assert.ok(await page.getByRole('button',{name:'Copy result',exact:true}).isVisible());assert.equal(await page.locator('#home-editorial').count(),0);assert.ok(await page.getByRole('button',{name:'View your career',exact:true}).isVisible());assert.equal(await page.locator('.run-result-page .run-note').evaluate(el=>getComputedStyle(el).marginTop),'24px','result footnote retains its spacing');await noOverflow();
+  await page.locator('.run-result-page').waitFor();assert.equal(await page.locator('.run-image-share,#run-share-image').count(),daily?1:0,'only a Daily offers the optional image card; the main Share stays text and link');assert.equal(await page.locator('.run-review-list li').count(),puzzles.length);assert.match(await page.locator('.run-final-score').innerText(),new RegExp(String(snapshot().score))); assert.equal(await page.locator('.run-result-actions .button').count(),daily?3:5);if(daily)assert.equal(await page.locator('.run-share-actions .button').count(),3);assert.ok(await page.getByRole('button',{name:'Copy result',exact:true}).isVisible());assert.equal(await page.locator('#home-editorial').count(),0);assert.ok(await page.getByRole('button',{name:'View your career',exact:true}).isVisible());assert.equal(await page.locator('.run-result-page .run-note').evaluate(el=>getComputedStyle(el).marginTop),'24px','result footnote retains its spacing');await noOverflow();
   if(daily){
     await page.locator('.post-game-daily-cue').waitFor();
     const cue=(await page.locator('.post-game-daily-cue').innerText()).trim();
@@ -308,8 +308,26 @@ try{
     await page.evaluate(()=>{window.__denyClipboard=false;});
   }
   if(daily){
-    assert.match(shared.text,/I scored \d+\/100 on today’s Pack One [^.]+\. Can you beat it\?/);assert.match(shared.text,/Daily 2026-10-07/);
-    const sharedUrl=new URL(shared.url);assert.equal(sharedUrl.pathname,'/share/daily/v2/');assert.equal(sharedUrl.searchParams.get('environment'),environment);assert.equal(sharedUrl.searchParams.get('ref'),'result_share');assert.doesNotMatch(shared.url,/challenge=/);assert.equal(shareCalls,0);
+    assert.match(shared.text,/I scored \d+\/100 on the Pack One (Draft Run|Powered Cube|Latest Set) Daily \(Oct 7\)\./);
+    assert.match(shared.text,/Play today’s Daily yourself\. Free, no account needed:$/);
+    const sharedUrl=new URL(shared.url);assert.equal(sharedUrl.pathname,'/share/daily/'+environment+'/');assert.equal(sharedUrl.searchParams.get('d'),fixtureDay);assert.equal(sharedUrl.searchParams.get('ref'),'result_share');assert.doesNotMatch(shared.url,/challenge=|shared=/);assert.equal(shareCalls,0);
+    // The share panel sits above the next-Daily handoff and previews exactly what is sent.
+    const order=await page.evaluate(()=>{const panel=document.querySelector('.run-share-panel'),next=document.querySelector('[data-next-daily-action]');return Boolean(panel.compareDocumentPosition(next)&Node.DOCUMENT_POSITION_FOLLOWING);});
+    assert.equal(order,true,'sharing comes first, the next Daily stays one tap below');
+    const nextDaily=await page.locator('[data-next-daily-action]').boundingBox();
+    assert.ok(nextDaily.y+nextDaily.height<=844,'the next Daily stays on a phone screen without scrolling: '+nextDaily.y);
+    await page.locator('[data-share-card]:not([hidden])').waitFor({state:'attached'});
+    await page.setViewportSize({width:1440,height:1000});await noOverflow();
+    assert.ok(await page.locator('[data-share-card]').isVisible(),'wide screens preview the image card beside the buttons');
+    await page.locator('.run-share-panel').screenshot({path:`artifacts/ui-${environment}-daily-share-panel-desktop.png`});
+    await page.setViewportSize({width:390,height:844});await noOverflow();
+    assert.equal(await page.locator('[data-share-card]').isVisible(),false,'phones keep the panel short');
+    assert.ok(await page.locator('[data-share-card]').evaluate(img=>img.naturalWidth===1200&&img.naturalHeight===630));
+    assert.doesNotMatch(await page.locator('.run-share-panel').innerText(),new RegExp(answers.map(a=>a.selectedName).filter(Boolean).map(n=>n.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|')||'^$'),'no card names in the share panel');
+    const download=page.waitForEvent('download');
+    await page.locator('#run-share-image').click();
+    assert.match((await download).suggestedFilename(),/^pack-one-daily-2026-10-07\.png$/,'without file sharing the card is saved');
+    await page.getByText('Image saved. Attach it to your message with the link.').waitFor();
     assert.equal(await page.locator('#run-challenge').count(),0);
     await page.goto(shared.url);
     await page.waitForFunction(()=>!new URL(location.href).searchParams.has('ref'));
@@ -317,7 +335,18 @@ try{
     assert.equal(runStarts.at(-1).source,'result_share');
     for(let i=0;i<30&&!events.some(event=>event.name==='daily_share_arrival');i++)await page.waitForTimeout(100);
     const arrivals=events.filter(event=>event.name==='daily_share_arrival');
-    assert.equal(arrivals.length,1);assert.equal(arrivals[0].props.source,'result_share');assert.equal(arrivals[0].props.daily,true);
+    assert.equal(arrivals.length,1);assert.equal(arrivals[0].props.source,'result_share');assert.equal(arrivals[0].props.daily,true);assert.equal(arrivals[0].props.kind,'dated');
+    assert.equal(new URL(page.url()).searchParams.has('d'),false,'the sharer date is not left in the address bar');
+    // A friend's link from an earlier Daily opens today's Daily and says the scores are not comparable.
+    const completed=answers;answers=[];
+    await page.goto(base+'/share/daily/'+environment+'/?ref=result_share&d=2026-10-06');
+    await page.locator('[data-shared-day-notice]').waitFor();
+    assert.match(await page.locator('[data-shared-day-notice]').innerText(),/Oct 6 Daily\. Today’s picks are different/);
+    assert.equal(runStarts.at(-1).daily,true);assert.equal(runStarts.at(-1).challenge,undefined,'no replay of the friend\'s decisions');
+    for(let i=0;i<30&&!events.some(event=>event.name==='daily_share_notice');i++)await page.waitForTimeout(100);
+    assert.equal(events.filter(event=>event.name==='daily_share_notice').at(-1)?.props.kind,'earlier_day');
+    await noOverflow();
+    answers=completed;
     const resultTouches=events.filter(event=>event.name==='acquisition_touch'&&event.props.source==='result_share');
     assert.ok(resultTouches.length>=1,'result_share still records the shared-link first-touch source independently of any sharer attribution');
   }else{

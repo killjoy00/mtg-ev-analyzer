@@ -83,8 +83,8 @@ try {
   assert.equal(order.actions,order.callout+1,'and directly above the action buttons');
   assert.deepEqual(
     (await page.locator('.run-result-actions .button').allTextContents()).map(text=>text.trim()),
-    ['Back to Dailies','Share result','Copy result','Leaderboard','Sign in to add score'],
-    'existing result actions are unchanged',
+    ['Back to Dailies','Leaderboard','Sign in to add score'],
+    'navigation actions are unchanged; sharing moved to its own panel above',
   );
 
   const desktop=await page.locator(callout).evaluate(node=>{

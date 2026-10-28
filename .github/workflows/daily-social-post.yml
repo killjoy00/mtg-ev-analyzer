@@ -12,6 +12,9 @@ on:
     - cron: '10 14 * * *'
     - cron: '10 15 * * *'
     - cron: '10 16 * * *'
+    # Afternoon answers to the morning Bluesky debate question (12:23-16:23
+    # Pacific). Deterministic reply keys make every later attempt a no-op.
+    - cron: '23 20-23 * * *'
   pull_request:
     paths:
       - '.github/workflows/daily-social-post.yml'
@@ -34,6 +37,10 @@ on:
       - 'docs/FEATURED-PATREON-AUTOPUBLISH.md'
       - 'scripts/upload-daily-short.mjs'
       - 'tests/featured-pick.test.mjs'
+      - 'scripts/featured-debate.mjs'
+      - 'scripts/bluesky-records.mjs'
+      - 'scripts/publish-debate-reveal.mjs'
+      - 'tests/featured-debate.test.mjs'
       - 'tests/featured-patreon.test.mjs'
       - 'tests/admin-patreon-publishing.test.mjs'
       - 'admin/patreon-publishing.mjs'
@@ -54,6 +61,11 @@ on:
         type: string
         default: ''
         required: false
+      reveal:
+        description: 'Only answer pending Bluesky debate questions (recovery; needs live)'
+        type: boolean
+        default: false
+        required: false
 
 permissions:
   contents: read
@@ -67,7 +79,11 @@ concurrency:
 
 jobs:
   publish:
-    if: github.repository == 'killjoy00/mtg-ev-analyzer' && (github.event_name == 'pull_request' || (github.ref == 'refs/heads/main' && github.event_name != 'push'))
+    if: >-
+      github.repository == 'killjoy00/mtg-ev-analyzer' &&
+      (github.event_name == 'pull_request' ||
+       (github.ref == 'refs/heads/main' && github.event_name != 'push' &&
+        github.event.schedule != '23 20-23 * * *' && inputs.reveal != true))
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
@@ -76,7 +92,7 @@ jobs:
         with:
           node-version: '24'
       - name: Verify offline publishing contracts
-        run: node --test tests/daily-social-post.test.mjs tests/daily-social-ledger.test.mjs tests/daily-social-dispatch.test.mjs tests/featured-pick.test.mjs tests/featured-patreon.test.mjs tests/admin-patreon-publishing.test.mjs
+        run: node --test tests/daily-social-post.test.mjs tests/daily-social-ledger.test.mjs tests/daily-social-dispatch.test.mjs tests/featured-pick.test.mjs tests/featured-debate.test.mjs tests/featured-patreon.test.mjs tests/admin-patreon-publishing.test.mjs
       - name: Publish or preview Daily
         if: github.event_name != 'pull_request'
         run: node scripts/post-daily-social.mjs
@@ -98,9 +114,9 @@ jobs:
     if: >-
       github.repository == 'killjoy00/mtg-ev-analyzer' &&
       github.ref == 'refs/heads/main' &&
-      (github.event_name == 'schedule' ||
+      ((github.event_name == 'schedule' && github.event.schedule != '23 20-23 * * *') ||
        github.event_name == 'push' ||
-       (github.event_name == 'workflow_dispatch' && inputs.live == true))
+       (github.event_name == 'workflow_dispatch' && inputs.live == true && inputs.reveal != true))
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -127,11 +143,27 @@ jobs:
           node-version: '24'
       - name: Install pinned project dependencies
         run: npm ci --no-audit --no-fund
-      - name: Verify selection and original soundtrack
-        run: node --test tests/featured-pick.test.mjs tests/featured-soundtrack.test.mjs
+      - name: Verify selection, debate copy and original soundtrack
+        run: node --test tests/featured-pick.test.mjs tests/featured-debate.test.mjs tests/featured-soundtrack.test.mjs
+      - name: Previous Pacific day
+        id: day
+        run: node --input-type=module -e "import {previousPacificDay} from './scripts/featured-pick.mjs';console.log('day='+previousPacificDay())" >> "$GITHUB_OUTPUT"
+      # The first selection of a source day is frozen so retries and the
+      # afternoon reveal use the same decision and numbers.
+      - name: Restore a frozen selection for this source day
+        uses: actions/cache/restore@v4
+        with:
+          path: artifacts/featured-cache/${{ steps.day.outputs.day }}
+          key: featured-pick-v2-${{ steps.day.outputs.day }}
       - name: Select the previous Pacific day's most debated pick
         id: select
         run: node scripts/generate-featured-pick.mjs
+      - name: Freeze this source day's selection
+        if: steps.select.outputs.selected == 'true' && steps.select.outputs.cache_hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: artifacts/featured-cache/${{ steps.select.outputs.day }}
+          key: featured-pick-v2-${{ steps.select.outputs.day }}
       - name: Install browser and video codec for real card images
         if: steps.select.outputs.selected == 'true'
         run: |
@@ -163,11 +195,55 @@ jobs:
             echo
             echo "[Download today's featured-pick artifact]($FEATURE_ARTIFACT_URL)"
             echo
-            echo "The featured YouTube Short now includes a synthesized original soundtrack."
+            echo "On Monday, Wednesday and Friday the debate Short goes to YouTube and the question (no answer) to Bluesky."
           } >> "$GITHUB_STEP_SUMMARY"
       - name: Publish featured pick to configured channels, once
         if: steps.select.outputs.selected == 'true'
         run: node scripts/publish-featured-pick.mjs
+
+  debate-reveal:
+    # Answers the morning Bluesky question once it is at least four hours old.
+    if: >-
+      github.repository == 'killjoy00/mtg-ev-analyzer' &&
+      github.ref == 'refs/heads/main' &&
+      ((github.event_name == 'schedule' && github.event.schedule == '23 20-23 * * *') ||
+       (github.event_name == 'workflow_dispatch' && inputs.live == true && inputs.reveal == true))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify debate copy and reply contracts
+        run: node --test tests/featured-debate.test.mjs
+      - name: Source days that may need an answer
+        id: days
+        run: node --input-type=module -e "import {revealSourceDays} from './scripts/publish-debate-reveal.mjs';const d=revealSourceDays();console.log('first='+(d[0]||'none')+'\nsecond='+(d[1]||'none'))" >> "$GITHUB_OUTPUT"
+      - name: Restore the frozen decision behind today's question
+        if: steps.days.outputs.first != 'none'
+        uses: actions/cache/restore@v4
+        with:
+          path: artifacts/featured-cache/${{ steps.days.outputs.first }}
+          key: featured-pick-v2-${{ steps.days.outputs.first }}
+      - name: Restore the frozen decision behind yesterday's question
+        if: steps.days.outputs.second != 'none'
+        uses: actions/cache/restore@v4
+        with:
+          path: artifacts/featured-cache/${{ steps.days.outputs.second }}
+          key: featured-pick-v2-${{ steps.days.outputs.second }}
+      - name: Post the answer as a reply, once
+        if: steps.days.outputs.first != 'none' || steps.days.outputs.second != 'none'
+        run: node scripts/publish-debate-reveal.mjs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          MANUAL_LIVE: ${{ inputs.live }}
+          BLUESKY_HANDLE: ${{ secrets.PACKONE_BLUESKY_HANDLE }}
+          BLUESKY_APP_PASSWORD: ${{ secrets.PACKONE_BLUESKY_APP_PASSWORD }}
 
   featured-patreon-feed:
     # The independent morning dispatch delivers content directly to the desktop
@@ -266,7 +342,7 @@ jobs:
       - name: Install project and offline test deterministic selection
         run: |
           npm ci --no-audit --no-fund
-          node --test tests/featured-pick.test.mjs tests/featured-soundtrack.test.mjs
+          node --test tests/featured-pick.test.mjs tests/featured-debate.test.mjs tests/featured-soundtrack.test.mjs
       - name: Generate deidentified production pick preview (no secrets)
         run: node scripts/preview-featured-pick.mjs
       - name: Install browser and ffmpeg
@@ -278,6 +354,8 @@ jobs:
           fi
       - name: Render real-card graphic and original-scored 20-second Short, no publication
         run: node scripts/render-featured-pick.mjs
+      - name: Show the Bluesky question, reveal and YouTube copy for review
+        run: cat artifacts/featured-pick/debate-preview.md >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
           name: packone-featured-preview

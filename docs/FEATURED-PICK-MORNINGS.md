@@ -1,44 +1,75 @@
 # Morning featured pick: yesterday's debate
 
-Status: implemented as a separate **featured** job in `.github/workflows/daily-social-post.yml`. The existing Daily announcement and the existing real-browser 10-second YouTube Short are preserved. Do not claim this job is in production until the PR is merged and a scheduled live run has been verified.
+Status: the **debate format** below replaces the earlier featured format once this change is merged. Do not claim it is in production until a scheduled live run has been verified. The existing Daily announcement and the generic 10-second YouTube Short keep running until the new formats have published successfully once (see "Replacing the older formats").
 
 ## Schedule and daily decision
 
-The existing independently scheduled Neon dispatch at **07:10, 07:20, and 07:40 America/Los_Angeles**, with GitHub cron fallback, invokes the same workflow. The new job reads the **previous completed Pacific day** from the production Neon database, independently of the current day's Daily. All three environments' eight scheduled puzzles (24 total) are eligible.
+The independently scheduled Neon dispatch at **07:10, 07:20, and 07:40 America/Los_Angeles**, with GitHub cron fallback, invokes `.github/workflows/daily-social-post.yml`. The featured job reads the **previous completed Pacific day** from the production Neon database (read-only aggregates). Today's Daily is never used. All three environments' eight scheduled puzzles (24 total) are eligible.
 
-Votes use each distinct player's **first committed pick** for that Daily environment/puzzle, with linked accounts deduplicated via `COALESCE(s.daily_account_id::text,s.player_id::text)` and `measurement_qa` excluded. The query uses the immutable scheduled puzzle IDs and the verified corpus payload. A puzzle must have at least **30 real distinct players**, a real trophy choice, and verified Scryfall image URLs for the selected cards.
+Votes use each distinct player's **first committed pick** for that Daily environment/puzzle, with linked accounts deduplicated via `COALESCE(s.daily_account_id::text,s.player_id::text)` and `measurement_qa` excluded. A puzzle qualifies only with:
+
+- at least **50 real distinct players** (public posts quote this number);
+- the original trophy pick present, with verified Scryfall images for every displayed card;
+- the **complete prior-pick context**: exactly `pick_number - 1` earlier picks, every one named and imaged (a missing pick would misrepresent the decision);
+- a trophy pick that is **not a basic land**.
 
 Selection is tiered:
 
 1. A **three-way split** qualifies if third choice >=15%, second >=20%, top choice <=60%, and top three collectively >=75%.
 2. Otherwise a **two-way split** qualifies if second choice >=18%, top choice <=75%, and top two collectively >=65%.
-3. **Hard display-integrity rule**: the original trophy-drafter card **must be inside the displayed top-three or top-two options**. Otherwise reject the whole puzzle. A fourth-card reveal is never permitted.
-4. Three-way takes precedence over two-way **across all environments**. Within each tier, Latest Set takes precedence over Mixed/Powered Cube. Remaining candidates rank on closeness, trophy surprise, sample size, and deterministic ties.
-5. If no pick qualifies, **skip the featured post** rather than invent debate or post a tiny sample.
+3. **Hard display-integrity rule**: the trophy-drafter card **must be one of the displayed choices**. Otherwise the whole puzzle is rejected. A fourth-card reveal is never permitted.
+4. Three-way beats two-way across all environments. Within a tier, Latest Set beats Mixed/Powered Cube. Remaining candidates rank on closeness, trophy surprise, sample size, and deterministic ties.
+5. If nothing qualifies, **skip**. Quality thresholds are never lowered to fill a day.
 
-Three-way examples: Latest Set 42/34/16 beats Powered Cube 42/33/23 because of the explicit Latest Set preference. If Latest Set has only a two-way split, a qualifying Powered Cube three-way wins. For two-way-only days, Latest Set wins.
+**Frozen per source day.** The first successful selection is saved in the GitHub Actions cache (`featured-pick-v2-<day>`, private to the repository's workflows). Morning retries and the afternoon Bluesky answer reuse exactly that decision and those numbers, even if a late finisher changes the live counts.
 
-The featured source day is retained in `artifacts/featured-pick/pick.json` for reproducibility. The Instagram-style cover is a 1200x630 JPG built from real Scryfall art, and the **original-scored** 1080x1920 MP4 is a 20-second storyboard showing the prior picks, options, player split, trophy reveal and Pack One CTA. A human-readable `patreon.md` is also generated. The Short includes a quiet original synthesized soundtrack (no third-party tracks or samples): warm chords, an arpeggio, gentle scene cues, and a small trophy-reveal flourish. FFmpeg must verify an AAC audio stream before upload; the upload path also rejects an audio-less render. All outputs appear in a private-by-default Actions artifact with seven-day retention; do not publish raw player measurements.
+## The debate format (Monday, Wednesday, Friday)
 
-## Destinations
+Debates publish on **Monday, Wednesday and Friday mornings (Pacific)**, about 13 a month at most, and only when a decision qualifies. On other days YouTube and Bluesky get nothing from this job. Copy and frames are generated by `scripts/featured-debate.mjs` and `scripts/render-featured-pick.mjs`.
 
-- **Bluesky**: Uses existing `PACKONE_BLUESKY_HANDLE` and `PACKONE_BLUESKY_APP_PASSWORD` secrets. Separate deterministic ATProto TID and copy, so it never replaces or collides with the standard morning Daily post. The attached graphic reflects the real recorded votes.
-- **Discord**: Uses the existing opt-in `PACKONE_DISCORD_WEBHOOK_URLS` secret. A server must explicitly provide its webhook privately; an empty list means Discord is skipped. A separate SHA-256-derived receipt per webhook/date prevents duplicates. Do not paste private webhook URLs into repo files or issues.
-- **YouTube**: Reuses existing `PACKONE_YOUTUBE_CLIENT_ID`, `PACKONE_YOUTUBE_CLIENT_SECRET`, `PACKONE_YOUTUBE_REFRESH_TOKEN`. A distinct featured-YouTube receipt per source day prevents duplicate uploads. `PACKONE_YOUTUBE_UPLOAD_PAUSED=true` pauses both normal and featured videos; `PACKONE_FEATURED_YOUTUBE_PAUSED=true` pauses only the featured upload. YouTube controls public/private visibility independently; verify returned visibility in the job log.
-- **Patreon**: A separate **opt-in, $0 Playwright image/text publisher** is available (see [owner setup and safety](FEATURED-PATREON-AUTOPUBLISH.md)). Patreon’s official API cannot write posts; the publisher operates the normal authenticated creator editor, then checks the supported read-only posts API for the exact, **public** post. It reuses the existing `patreon.md` and `featured-cover.jpg` artifact, does not create audio posts, and is inert until `PACKONE_PATREON_AUTOPUBLISH_ENABLED=true` and a local creator browser session is installed as a GitHub secret. No automatic Patreon publication is established until an owner-authorized real canary succeeds. The existing artifact download remains useful for inspection and recovery.
+**YouTube: one 20-second Short.** 0-3 s: the real competing cards and a factual hook ("135 players split 3 ways"). 3-9 s: the drafter's earlier picks, then a 3-2-1 "lock in your pick" countdown. 9-13 s: the actual player vote. 13-15 s: the trophy drafter's pick, highlighted among the shown choices, with one factual observation. 15-20 s: "Eight real trophy-draft decisions every day. Free. No account required. PACKONE.PRO. Link in profile." The title and description never contain the answer. The description carries the Wizards Fan Content notice. Shorts descriptions are not clickable, so the call to action points to the **channel profile link**, which must be `https://packone.pro/go/shorts/` (owner step below).
 
-The previous day's individual pick does not currently have a dedicated public permalink; the CTA points to today's Daily with `utm_campaign=featured_pick`. Don't pretend clicking the CTA opens yesterday's decision.
+**Bluesky: a question, then the answer.** The morning post asks the question only: the pick, the set, how many players split, the earlier picks and the choices, with a 1200x1500 image of the real cards (lettered A/B/C, no percentages) and descriptive alt text. It is tagged `#MTG #MTGDraft` with real tag facets; the largest MTG Bluesky feed includes any tag beginning with `#mtg`. No link, so nobody has to visit Pack One to understand it. At least **four hours later** a reply gives the player percentages, the trophy drafter's pick, one factual observation (never "correct") and `packone.pro` (homepage, `utm_campaign=draft_debate`). Replies run from GitHub crons at 12:23-16:23 Pacific; GitHub sometimes runs these hours late, which only delays the answer. A missed answer is retried the next afternoon.
+
+**Discord and Patreon are unchanged**: yesterday's result every qualifying day, as before.
+
+## Duplicate prevention
+
+- Bluesky question and answer use deterministic record keys per source day, distinct from the Daily announcement and from the earlier featured post. A retry finds its own record and stops; different content under the key is an error. If the earlier featured format already posted for a source day, the question is skipped.
+- The answer is a reply to that day's question only if the question's text matches the frozen decision.
+- YouTube keeps the earlier featured receipt key, so a source day can never get a second featured upload across formats. Receipts live in issue #1135 as before.
+
+## Replacing the older formats
+
+The replacements switch the old formats off themselves, without owner action, once verified:
+
+- The first **public** debate Short writes the marker `youtube-debate-v1` to #1135. From then on the generic 10-second Daily Short (`daily-youtube-short.yml`) skips its upload.
+- The first answered Bluesky debate writes `bluesky-debate-v1`. From then on the morning Daily announcement skips Bluesky (Discord announcements continue).
+- Only markers written by `github-actions[bot]` count. If the marker lookup fails, the older format keeps publishing.
+
+## Measurement
+
+- **Channel results:** Admin **Campaign Links** (arrivals, Daily starts and completions per source / campaign) and **Insights > Daily habit cohorts**, grouped by source and campaign: `youtube / organic_shorts` (channel profile link), `bluesky / draft_debate` (answer replies). The earlier YouTube test used `youtube / rfalaunch` and stays separate.
+- **Bluesky engagement:** each answer run writes a table of public likes, reposts, replies and quotes for the last three weeks' debates to its GitHub Actions run summary. Bluesky publishes no reach or impressions.
+- **YouTube views and retention** need the YouTube Analytics read scope, which the current upload-only credential does not have. Until the owner grants it, read these numbers in YouTube Studio. Do not estimate them.
+- **Evaluation:** after ten improved Bluesky discussions, compare engagement and `draft_debate` arrivals and first Dailies. Without meaningful evidence, recommend pausing active Bluesky marketing.
+
+## Owner steps
+
+1. Before merging: download the PR's `packone-featured-preview` artifact and watch `featured-short.mp4`; read `debate-preview.md` and look at `debate-question.jpg`. Merging approves the format.
+2. YouTube Studio > **Customization > Profile** (or Basic info) > **Links**: set the first link to `https://packone.pro/go/shorts/` with a title such as "Play free". The YouTube API cannot change channel links.
 
 ## Operations and failure behavior
 
-- The current Daily announcement remains unchanged. The new featured job is isolated, with its own rendering, posting, and receipts.
-- Manual `workflow_dispatch live=false` never publishes. `live=true` on reviewed main explicitly runs the featured pipeline alongside the standard Daily; retries are deduplicated.
-- The publisher verifies current main's SHA and rejects old job re-runs. It validates Neon source day, checks the source is yesterday, requires real image decode, and never posts a fabricated/low-sample split.
-- Published destinations use issue #1135 for nonsecret `posted/claimed/failed` receipts. A timeout leaves the channel **claimed** to avoid duplicate writes. Operators must reconcile by checking the destination and ledger before retrying; never blindly rerun a previous job attempt.
-- Credentials are consumed only in GitHub Actions; the Neon database connection is obtained via the existing Actions `NEON_API_KEY` secret for read-only aggregate querying and is never printed or written to artifacts.
-- Failure of a destination causes a nonzero job exit. Other successfully published destinations retain their receipts, so the next morning retry cannot double-post.
-- If media rendering fails, the featured job fails closed before publication (no fake card art). The existing standard Daily social job is independent and continues to run.
-- Tests: `node --test tests/featured-pick.test.mjs`. Preview a new feature after merging with Actions artifacts; verify actual Bluesky, YouTube, configured Discord, and (if activated) Patreon publication and receipts rather than assuming a dispatched job equals successful delivery.
+- Manual `workflow_dispatch live=false` never publishes. `live=true` runs the morning jobs; `live=true` with `reveal=true` only answers pending Bluesky questions.
+- The publisher verifies current main's SHA, rejects re-runs, checks the source is yesterday, requires the debate render template and a spoiler-free question image, and never posts a fabricated or low-sample split.
+- A timeout leaves a YouTube or Discord receipt **claimed**, which blocks automatic retries until reconciled. Never blindly rerun a previous job attempt.
+- If rendering fails, the featured job fails before publishing. The Daily announcement job is independent.
+- Tests: `node --test tests/featured-pick.test.mjs tests/featured-debate.test.mjs tests/featured-soundtrack.test.mjs`.
+
+## Known limitation: decisions can return in a later Daily
+
+A Daily never repeats a decision scheduled in the last 28 days, but it can after that, and the window relaxes for a small new set. A featured decision's trophy pick is public, so a player who saw it could recognise it if it returns. Excluding featured decisions from future Daily selection would close this; it is a Daily-selection change and needs an owner decision.
 
 ## Corrective reissue on October 25, 2026
 
@@ -48,6 +79,4 @@ On the one-time guarded `push` event, the workflow regenerates media and publish
 
 ## Featured Short soundtrack
 
-`node scripts/render-featured-pick.mjs` synthesizes an original 20-second, 120-BPM instrumental bed in `scripts/featured-soundtrack.mjs`. It adds understated plucks/percussion and soft per-scene accent cues at 2, 5, 9, 13 and 17 seconds, plus a modest trophy reveal flourish. No samples, purchased tracks, voice cloning, or external music library is involved; original composition avoids Content ID disputes. The renderer encodes AAC and validates both H.264 video and AAC audio streams with `ffprobe` before writing the `render.json` manifest. The uploader requires the exact audio provenance marker. Source WAV and MP4 are included in the Actions artifact for owner listening/review. The standard 10-second Daily YouTube Short is unchanged.
-
-Test with `node --test tests/featured-pick.test.mjs tests/featured-soundtrack.test.mjs` and inspect the PR preview's scored MP4 prior to merging. To avoid duplicate uploads, do not rerun the completed production job or change its YouTube receipt.
+`node scripts/render-featured-pick.mjs` synthesizes an original 20-second, 120-BPM instrumental bed in `scripts/featured-soundtrack.mjs` (`packone-original-synth-v2`). Soft accent cues land on the scene changes at 3, 6, 7, 8, 9, 13 and 15 seconds, with a modest flourish on the trophy reveal at 13 seconds. No samples, purchased tracks, voice cloning, or external music library is involved; original composition avoids Content ID disputes. The renderer validates H.264 1080x1920 video and an AAC audio stream with `ffprobe` before writing `render.json`, and the uploader requires the exact template and audio provenance markers.

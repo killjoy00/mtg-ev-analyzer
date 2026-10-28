@@ -3,6 +3,8 @@
 import {mkdir,writeFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {selectFeaturedPick,featureCopies} from './featured-pick.mjs';
+import {debateCopies} from './featured-debate.mjs';
+import {featuredYoutubeMetadata} from './publish-featured-pick.mjs';
 const url=(s)=>'https://cards.scryfall.io/normal/front/'+s;
 const prior=[
  ['Sanctum Lurker','2/1/2185c08f-bb4d-49d5-8b6c-c629a48bb61c.jpg?1789556729'],
@@ -16,6 +18,14 @@ const candidates=[
  ['theoretical-necromancer','Theoretical Necromancer','e/3/e36a7908-1e22-494b-adb4-e72ac0974d62.jpg?1789556734'],
  ['way-of-the-paradox','Way of the Paradox','9/8/98dc5470-507a-4364-8480-42607255e56c.jpg?1789729606'],
 ].map(([id,name,image])=>({id,name,image_url:url(image),model_probability:0.2}));
+// Exactly what would be posted, for owner review before the format goes live.
+export function debatePreview(feature) {
+ const d=debateCopies(feature),yt=featuredYoutubeMetadata(feature).snippet;
+ const block=t=>'```text\n'+t+'\n```';
+ return ['### Bluesky question (morning, image: debate-question.jpg)',block(d.question),
+  '**Image alt text:** '+d.questionAlt,'','### Bluesky reveal (reply, at least 4 hours later)',block(d.reveal),
+  '### YouTube Short (featured-short.mp4)','**Title:** '+yt.title,block(yt.description),''].join('\n');
+}
 export async function previewFeatured() {
  const day='2026-10-23';
  const rows=[{environment:'latest',round:4,pick_number:4,set_id:'fra',
@@ -29,6 +39,7 @@ export async function previewFeatured() {
  await mkdir('artifacts/featured-pick',{recursive:true});
  await writeFile('artifacts/featured-pick/pick.json',JSON.stringify({feature,copy},null,2)+'\n');
  await writeFile('artifacts/featured-pick/patreon.md',copy.patreon+'\n');
+ await writeFile('artifacts/featured-pick/debate-preview.md',debatePreview(feature));
  return {preview:true,day,environment:feature.environment,tier:feature.tier,players:feature.players};
 }
 if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]) {

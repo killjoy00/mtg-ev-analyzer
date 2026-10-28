@@ -5,6 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {pacificDay,shortMetadata,videoFilename,youtubeReceiptMarker,checkedDay,
   INTRO_SECONDS,PACK_SECONDS,OUTRO_SECONDS,TEMPLATE_VERSION,TOTAL_FRAMES} from './daily-short.mjs';
+import {createFormatMarkers,FORMAT_MARKERS} from './daily-social-ledger.mjs';
 
 const ROOT='https://api.github.com/repos/killjoy00/mtg-ev-analyzer';
 const LEDGER=1135; // Already-owned Daily social publishing ledger; no secrets in comments.
@@ -100,11 +101,23 @@ export async function uploadVideo({accessToken,day,bytes,fetchImpl=fetch,metadat
   if(!/^[A-Za-z0-9_-]{11}$/.test(video?.id||''))throw Error('YouTube upload lacks a video ID.');
   return {id:video.id,visibility:video.status?.privacyStatus||null};
 }
+export async function genericShortRetired({token,fetchImpl=fetch}) {
+  try {
+    const markers=createFormatMarkers({token,repo:'killjoy00/mtg-ev-analyzer',fetchImpl});
+    return await markers.has(FORMAT_MARKERS.youtubeDebate);
+  } catch {return false;}
+}
 export async function main() {
   if(process.env.GITHUB_REF!=='refs/heads/main'||process.env.GITHUB_REPOSITORY!=='killjoy00/mtg-ev-analyzer')
     throw Error('YouTube publication is restricted to reviewed main.');
   const {PACKONE_YOUTUBE_CLIENT_ID:clientId,PACKONE_YOUTUBE_CLIENT_SECRET:clientSecret,
     PACKONE_YOUTUBE_REFRESH_TOKEN:refreshToken,GITHUB_TOKEN:githubToken}=process.env;
+  // One video per qualifying day: once a debate Short has published publicly,
+  // this generic 10-second format stops. Until then it keeps publishing.
+  if(await genericShortRetired({token:githubToken})) {
+    console.log(JSON.stringify({skipped:true,reason:'replaced by the verified debate Short'}));
+    return;
+  }
   const raw=JSON.parse(await readFile('artifacts/daily-short/capture.json','utf8'));
   const day=checkedDay(raw.day);
   if(raw.real_browser_capture!==true||raw.spoiler_free!==true||raw.environment!=='mixed'||
