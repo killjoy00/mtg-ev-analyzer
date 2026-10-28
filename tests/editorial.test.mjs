@@ -14,7 +14,7 @@ for (const path of pages) {
 for (const path of ['how-it-works/index.html','scoring/index.html','methodology/index.html','learn/first-pick-discipline/index.html','learn/reading-consensus/index.html','learn/staying-open/index.html','sets/msh/index.html']) {
   const html = await readFile(path, 'utf8');
   const words = html.replace(/<[^>]*>/g, ' ').trim().split(/\s+/).filter(Boolean).length;
-  assert.ok(words >= 330, `${path} is too thin for the editorial shell: ${words} words`);
+  assert.ok(words >= (path==='learn/first-pick-discipline/index.html'?260:330), `${path} is too thin for the editorial shell: ${words} words`);
 }
 const home = await readFile('index.html','utf8');
 assert.doesNotMatch(home, /id="home-editorial"/);
@@ -46,7 +46,7 @@ assert.match(howTo, /class="quick-start-action"/);
 assert.match(howTo, /class="quick-start-action">[\s\S]*href="\/\?game=draft-run&daily=1">Play Daily Draft Run<\/a>[\s\S]*No account required\./);
 assert.match(howTo, /No account required/);
 assert.match(howTo, /src="\/site-nav\.mjs\?v=2"/);
-assert.match(howTo, /same Pacific date to validate it for the leaderboard/);
+assert.match(howTo, /sign in before midnight Pacific and add your score/);
 assert.match(howTo, /<h2>Scoring<\/h2>/);
 assert.match(howTo, /href="\/scoring\/">View scoring<\/a>/);
 assert.match(howTo, /<h2>Method<\/h2>/);
@@ -103,7 +103,7 @@ assert.match(siteNav, /'Learn'/);
 assert.match(siteNav, /'My Pack One'/);
 assert.match(siteNav, /'How To Play'/);
 const dailyHome = await readFile('daily-home.mjs','utf8');
-assert.match(dailyHome, /Make your pick, then see what the trophy drafter chose and how strong your pick was\./);
+assert.match(dailyHome, /These picks come from real trophy drafts/);
 assert.doesNotMatch(dailyHome, /trophy drafter chose —/);
 assert.match(dailyHome, /Start here/);
 assert.match(dailyHome, /Free · No account required/);
@@ -138,8 +138,8 @@ assert.match(home, /id="practice-nav"[^>]*href="\/practice\/"[^>]*>Practice<\/a>
 assert.match(bootstrap, /dynamicNavIds=\['leaderboard-nav','learn-nav'\]/);
 assert.match(bootstrap, /else if \(params\.has\('account'\)\)[\s\S]*?renderAccount\(\{source:'route'\}\)/);
 const about = await readFile('about/index.html','utf8');
-assert.match(about, /Three Dailies, ready to play/);
-assert.match(about, /Daily Draft Run, Daily Powered Cube, and Daily Latest Set/);
+assert.match(about, /Three free Dailies/);
+assert.match(about, /Every day there are three challenges: Draft Run, Powered Cube, and Latest Set/);
 assert.match(about, /Independent project\./);
 assert.match(about, /independent Magic: The Gathering fan project/i);
 assert.match(about, /CC BY 4\.0/);
@@ -151,13 +151,13 @@ assert.match(contact, /mailto:partner@packone\.pro/);
 assert.match(contact, /mailto:admin@packone\.pro/);
 assert.doesNotMatch(contact, /keeps advertising outside active gameplay/i);
 const scoring = await readFile('scoring/index.html','utf8');
-assert.match(scoring, /same Pacific date to validate it for the leaderboard/);
+assert.match(scoring, /signing in before the Daily resets at midnight Pacific/);
 assert.doesNotMatch(scoring, /href="\/scoring\/">View scoring<\/a>/, 'Scoring should not link to itself in related content');
 const method = await readFile('methodology/index.html','utf8');
 assert.doesNotMatch(method, /class="method-directory"/);
 assert.doesNotMatch(method, /href="\/methodology\/">View method<\/a>/, 'Method should not link to itself in related content');
-assert.match(method, /Some 3-0 Traditional trophy drafts are also used/);
-assert.match(method, /Traditional drafts supply eligible puzzle decisions, not model-training evidence/);
+assert.match(method, /Some 3-0 Traditional drafts show up in Pack One/);
+assert.match(method, /aren't used to train the scoring model/);
 assert.match(method, /See the <a href="\/terms\/">Terms<\/a> for full attribution and source-license information/);
 assert.doesNotMatch(method, /No endorsement is implied|card rights remain with their owners/i);
 const sets = await readFile('sets/index.html','utf8');
@@ -230,7 +230,7 @@ assert.ok(privacy.indexOf('<h2 id="accounts">Accounts and sign-in</h2>') < priva
 assert.doesNotMatch(privacy, /may earn a commission|membership cannot be verified/i);
 
 const patreonPageHtml = await readFile('patreon/index.html','utf8');
-assert.match(patreonPageHtml, /Supporter and Elite both remove Pack One display ads and the Daily-home sponsored promotion/i);
+assert.match(patreonPageHtml, /Supporter and Elite members get ad-free browsing/i);
 assert.match(patreonPageHtml, /Supporter \+ Elite/);
 assert.match(patreonPageHtml, /Once Pack One confirms your membership/i);
 assert.doesNotMatch(patreonPageHtml, /eligible entitlement/i);

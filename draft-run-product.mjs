@@ -92,9 +92,9 @@ function steps() {
 // the pack. --pool-count lets the cards shrink to fit one line (draft-run.css).
 function pool(p) {
   const previous=p.prior_picks||[];
-  const head=detail=>`<div class="run-pool-head"><h2>Previous cards</h2>${detail}</div>`;
-  if(!previous.length) return `<section class="run-pool is-empty" aria-label="Original drafter’s earlier picks">${head('<p class="run-pool-empty">No Previous Cards Selected</p>')}</section>`;
-  return `<section class="run-pool" aria-label="Original drafter’s earlier picks">${head('<p class="run-pool-note">Already selected by this drafter.</p>')}<div class="run-pool-cards" style="--pool-count:${previous.length}">${previous.map((c,i)=>`<button type="button" data-zoom-prior="${i}" aria-label="View previous pick ${i+1}: ${esc(c.name)}">${image(c)}<span>${i+1}. ${esc(c.name)} ${faceIndicatorMarkup(c)}</span></button>`).join('')}</div></section>`;
+  const head=detail=>`<div class="run-pool-head"><h2>Earlier picks</h2>${detail}</div>`;
+  if(!previous.length) return `<section class="run-pool is-empty" aria-label="Original drafter’s earlier picks">${head('<p class="run-pool-empty">No earlier picks yet.</p>')}</section>`;
+  return `<section class="run-pool" aria-label="Original drafter’s earlier picks">${head(`<small>${previous.length} card${previous.length===1?'':'s'} · in pick order</small>`)}<div class="run-pool-cards" style="--pool-count:${previous.length}">${previous.map((c,i)=>`<button type="button" data-zoom-prior="${i}" aria-label="View previous pick ${i+1}: ${esc(c.name)}">${image(c)}<span>${i+1}. ${esc(c.name)} ${faceIndicatorMarkup(c)}</span></button>`).join('')}</div></section>`;
 }
 function revealComparison(p,answer) {
   const byId=new Map((p.candidates||[]).map(card=>[card.id,card]));
@@ -363,14 +363,14 @@ function dailySetCompleteMarkup() {
   if(!run.day||!run.complete||run.leaderboard_eligible||hasAccountSession())return '';
   return `<aside class="run-daily-set-complete" data-daily-set-complete aria-labelledby="run-daily-set-complete-title" hidden>
     <span class="run-daily-set-complete-icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8"/><path d="m6.5 10.2 2.3 2.3 4.7-4.9"/></svg></span>
-    <div><p class="eyebrow">Finished all 3 free dailies</p><h2 id="run-daily-set-complete-title">Sign in to keep playing with unlimited draft runs.</h2><p>Create a free account to save progress, track stats, and compete on the leaderboard.</p></div>
+    <div><p class="eyebrow">Finished all 3 free dailies</p><h2 id="run-daily-set-complete-title">Finished today's Dailies? Keep drafting.</h2><p>Sign in or create a free account to play unlimited regular Draft Runs, save your scores, and join the leaderboard.</p></div>
     <button class="button primary" type="button">Sign in for unlimited runs</button>
   </aside>`;
 }
 // Sharing sits right under the score, compact enough on a phone that the
 // next-Daily button stays on screen. No card names, so nothing is spoiled.
 function dailySharePanelMarkup() {
-  return `<section class="run-share-panel" aria-labelledby="run-share-title"><div class="run-share-copy"><h2 id="run-share-title">Share your result</h2><p>Score and colored squares only, no spoilers. Friends can play today’s Daily free, no account needed.</p></div>
+  return `<section class="run-share-panel" aria-labelledby="run-share-title"><div class="run-share-copy"><h2 id="run-share-title">Share your result</h2><p>Share your score and colored squares, not the cards. Friends can play the same Daily for free without signing up.</p></div>
     <div class="run-share-actions"><button class="button primary" id="run-share" type="button">Share result</button><button class="button secondary" id="run-copy-result" type="button">Copy result</button></div>
     <div id="run-share-status" role="status"></div></section>`;
 }
@@ -431,7 +431,7 @@ function renderResult() {
     <div class="run-result-actions"><a class="button primary" data-next-daily-action href="${repeat.href}">${repeat.label}</a>${run.day?'':'<button class="button secondary" id="run-share">Share this run and compare</button><button class="button secondary" id="run-copy-result" type="button">Copy result</button>'}<a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">${run.day&&!run.leaderboard_eligible?(['username_taken','username_required','name_not_allowed'].includes(run.ranking_identity?.reason)?'Choose display name to add score':hasAccountSession()?'Add score to leaderboard':'Sign in to add score'):'View your career'}</button></div>
     ${run.day?'<p data-all-dailies hidden><a class="text-button" href="./">All Dailies</a></p>':''}
     <h2>Your ${runLength()} picks</h2><ol class="run-review-list">${run.answers.map((a,i)=>`<li><button data-review="${i}"><span>${i+1}</span><div><strong>${esc(setName(a.puzzle.set_id))} · Pick ${a.pickNumber}</strong><small>${esc(a.selectedName)}${a.historicalMatch?' · Trophy match':''}</small></div><b>${a.score}</b></button></li>`).join('')}</ol>
-    <p class="run-note">Your final score is the rounded average of ${runLength()} decisions. Trophy picks earn 100; other picks can earn up to 95 based on broader drafting evidence.</p>${run.day?'':'<div id="run-share-status" role="status"></div>'}<p id="run-error" role="alert"></p></section>`;
+    <p class="run-note">Your final score is the average of your ${runLength()} picks. Matching the trophy drafter earns 100; other picks can score up to 95 based on the model.</p>${run.day?'':'<div id="run-share-status" role="status"></div>'}<p id="run-error" role="alert"></p></section>`;
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render({land:true});});
   document.querySelector('#run-share').onclick=()=>shareResult();
   document.querySelector('#run-copy-result').onclick=()=>shareResult({copy:true});

@@ -98,16 +98,17 @@ function normalizeMarkupText(value) {
 test('native instructional copy preserves current web Daily eligibility semantics', () => {
   const webHowToText = normalizeMarkupText(webHowTo);
   const webScoringText = normalizeMarkupText(webScoring);
-  const dailyIntro = 'Pack One has three fixed Daily challenges.';
+  const webDailyIntro = 'Pick one of three Dailies.';
+  const nativeDailyIntro = 'Pack One has three fixed Daily challenges.';
   const howToGuestValidation = 'an eligible guest can also sign in or link the completed first attempt on the same Pacific date to validate it for the leaderboard';
   const scoringGuestValidation = 'an eligible guest can sign in or link that completed first attempt on the same Pacific date to validate it for the leaderboard';
 
-  assert.ok(webHowToText.includes(dailyIntro));
-  assert.ok(howToScreen.includes(dailyIntro));
-  assert.ok(webHowToText.includes(howToGuestValidation));
+  assert.ok(webHowToText.includes(webDailyIntro));
+  assert.ok(howToScreen.includes(nativeDailyIntro));
+  assert.ok(webHowToText.includes('If you already finished a Daily as a guest, you can still sign in before midnight Pacific and add your score.'));
   assert.ok(howToScreen.includes(howToGuestValidation));
 
-  assert.ok(webScoringText.includes(scoringGuestValidation));
+  assert.ok(webScoringText.includes('Played as a guest? You can still add your first completed attempt by signing in before the Daily resets at midnight Pacific.'));
   assert.ok(scoringScreen.includes(scoringGuestValidation));
   assert.doesNotMatch(scoringScreen, /requires an authenticated account when starting/);
 

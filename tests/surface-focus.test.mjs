@@ -60,8 +60,8 @@ test('decision reporting is visible outside score and pack disclosures',async()=
 
 test('Draft Run previous-card context stays visible and visually distinct', async () => {
   const source = await readFile('draft-run-product.mjs', 'utf8');
-  assert.match(source, /No Previous Cards Selected/);
-  assert.match(source, /Already selected by this drafter\./);
+  assert.match(source, /No earlier picks yet\./);
+  assert.match(source, /<h2>Earlier picks<\/h2>/);
   const css = await readFile('draft-run.css', 'utf8');
   assert.match(css, /\.run-pool-empty\{[^}]*background:var\(--surface-soft\)/);
   assert.match(css, /\.run-pool-cards\{[^}]*background:var\(--surface-soft\)/);
@@ -125,7 +125,7 @@ test('secondary gameplay controls keep mobile-sized targets', async () => {
   assert.match(css, /\.run-zoom-glyph\{[^}]*width:24px;[^}]*height:24px/);
   assert.doesNotMatch(product, />Enlarge<\/button>/, 'card grid should not repeat visible Enlarge labels');
   assert.match(product, /class="run-card-caption"><span class="run-card-name">\$\{esc\(c\.name\)\} \$\{faceIndicatorMarkup\(c\)\}<\/span><button class="run-zoom"[^>]*aria-label="Enlarge \$\{esc\(c\.name\)\}"[^>]*><span class="run-zoom-glyph" aria-hidden="true"><\/span><\/button><\/div>/);
-  assert.match(product, /other picks can earn up to 95 based on broader drafting evidence\./);
+  assert.match(product, /other picks can score up to 95 based on the model\./);
   assert.doesNotMatch(product, /held-out strong-player support/);
   assert.match(css, /\.run-lock \.run-tools \.button\{min-height:44px/);
 });
