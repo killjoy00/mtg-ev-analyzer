@@ -89,7 +89,7 @@ function formatsMarkup(rows,current) {
 }
 
 function progressMarkup(result) {
-  if(!result.progress)return '<p class="my-pack-empty">Once there's enough history, we can compare the more recent picks with the earlier ones.</p>';
+  if(!result.progress)return '<p class="my-pack-empty">Once there’s enough history, we can compare the more recent picks with the earlier ones.</p>';
   const p=result.progress;
   return '<div class="my-insights-progress">'+
     '<div><span>Previous 40 picks</span><strong>'+score(p.previous.average_score)+'</strong><small>'+esc(p.previous.from)+' to '+esc(p.previous.to)+'</small></div>'+
