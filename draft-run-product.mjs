@@ -1,6 +1,6 @@
 import {draftRunLength} from './draft-run-format.mjs';
 import { accountCsrfToken, ensurePackSession, firstPartyAuthEnabled, hasAccountSession, loadDailyStatus, storedAccountToken } from './growth-api.mjs';
-import { dailyResultCardBlob, dailyShareUrl, draftRunShareText, shareDailyImage, shareDraftRunCard, shareDate } from './share-cards.mjs?v=9';
+import { dailyShareUrl, draftRunShareText, shareDraftRunCard, shareDate } from './share-cards.mjs?v=10';
 import {openCardViewer,faceIndicatorMarkup} from './card-viewer.mjs?v=1';
 import { trackEvent } from './retention-events.mjs';
 import {decisionClock} from './decision-clock.mjs';
@@ -51,7 +51,7 @@ const app=()=>document.querySelector('#app');
 function styles() {
   installSetGuides();
   if(document.querySelector('[data-draft-run-style]')) return;
-  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=22';link.dataset.draftRunStyle='1';document.head.appendChild(link);
+  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=23';link.dataset.draftRunStyle='1';document.head.appendChild(link);
 }
 async function api(path,body,auth=true) {
   const method=body===undefined?'GET':'POST',headers={'content-type':'application/json'};
@@ -315,18 +315,9 @@ function dailySetCompleteMarkup() {
 // Sharing sits right under the score, compact enough on a phone that the
 // next-Daily button stays on screen. No card names, so nothing is spoiled.
 function dailySharePanelMarkup() {
-  return `<section class="run-share-panel" aria-labelledby="run-share-title"><div class="run-share-main"><div class="run-share-copy"><h2 id="run-share-title">Share your result</h2><p>Score and colored squares only, no spoilers. Friends can play today’s Daily free, no account needed.</p></div>
-    <div class="run-share-actions"><button class="button primary" id="run-share" type="button">Share result</button><button class="button secondary" id="run-copy-result" type="button">Copy result</button><button class="button secondary" id="run-share-image" type="button">Share image</button></div>
-    <div id="run-share-status" role="status"></div></div>
-    <img class="run-share-card" data-share-card alt="" hidden width="1200" height="630"></section>`;
-}
-async function showDailyCardPreview(resultId) {
-  const blob=await dailyResultCardBlob(run).catch(()=>null);
-  const img=document.querySelector('[data-share-card]');
-  if(!blob||!img||run?.id!==resultId)return;
-  img.src=URL.createObjectURL(blob);
-  img.alt=`Shareable card: ${run.score}/100 on the ${title()} Daily, one colored square per pick.`;
-  img.hidden=false;
+  return `<section class="run-share-panel" aria-labelledby="run-share-title"><div class="run-share-copy"><h2 id="run-share-title">Share your result</h2><p>Score and colored squares only, no spoilers. Friends can play today’s Daily free, no account needed.</p></div>
+    <div class="run-share-actions"><button class="button primary" id="run-share" type="button">Share result</button><button class="button secondary" id="run-copy-result" type="button">Copy result</button></div>
+    <div id="run-share-status" role="status"></div></section>`;
 }
 function resultRepeatAction() {
   if(run.day||run.comparison?.kind==='creator')return {href:'./',label:'Back to Dailies'};
@@ -389,9 +380,6 @@ function renderResult() {
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render();window.scrollTo({top:0,behavior:'instant'});});
   document.querySelector('#run-share').onclick=()=>shareResult();
   document.querySelector('#run-copy-result').onclick=()=>shareResult({copy:true});
-  const imageButton=document.querySelector('#run-share-image');
-  if(imageButton)imageButton.onclick=()=>shareResult({image:true});
-  if(run.day)void showDailyCardPreview(run.id);
   document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=32')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
   const setCompleteSignIn=document.querySelector('[data-daily-set-complete] button');
   if(setCompleteSignIn)setCompleteSignIn.onclick=async()=>(await import('./growth.mjs?v=32')).renderAccount({validateDailyRunId:run.id,source:'daily_set_complete'});
@@ -412,8 +400,8 @@ export async function returnToValidatedDaily(runId,{standing=null,confirmed=true
   window.scrollTo({top:0,behavior:'instant'});
 }
 
-async function shareResult({copy=false,image=false}={}) {
-  const buttons=[...document.querySelectorAll('#run-share,#run-copy-result,#run-share-image')];
+async function shareResult({copy=false}={}) {
+  const buttons=[...document.querySelectorAll('#run-share,#run-copy-result')];
   buttons.forEach(button=>{button.disabled=true;});
   const status=document.querySelector('#run-share-status');
   status.replaceChildren();
@@ -433,16 +421,7 @@ async function shareResult({copy=false,image=false}={}) {
       : share?.creator&&share.url
         ? new URL(share.url,location.origin).toString()
         : new URL(sharedRunAppPath(share.id),location.origin).toString();
-    trackEvent('share_click',{surface:'draft_run_result',method:copy?'copy_button':image?'image':'native'});
-    if(image&&run.day) {
-      const result=await shareDailyImage(run,url);
-      if(result.failed){status.textContent='Copy this link: ';const a=document.createElement('a');a.href=url;a.textContent=url;status.append(a);}
-      else if(!result.cancelled) {
-        status.textContent=result.method==='download'?'Image saved. Attach it to your message with the link.':'';
-        trackEvent('daily_result_shared',{mode:'draft_run',method:result.method,surface:'image'});
-      }
-      return;
-    }
+    trackEvent('share_click',{surface:'draft_run_result',method:copy?'copy_button':'native'});
     if(copy) {
       const payload=`${draftRunShareText(run)}\n${url}`;
       try {
