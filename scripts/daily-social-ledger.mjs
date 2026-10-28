@@ -87,3 +87,52 @@ export function createGithubReceiptLedger({token,repo,issueNumber,fetchImpl=fetc
     },
   };
 }
+
+// Durable "replacement verified" markers in the same public ledger. When a new
+// format first publishes successfully it records a marker, and the format it
+// replaces stops from then on. Markers are never rewritten or removed.
+export const FORMAT_MARKERS_SINCE='2026-10-28';
+export const FORMAT_MARKERS=Object.freeze({
+ youtubeDebate:'youtube-debate-v1',
+ blueskyDebate:'bluesky-debate-v1',
+});
+export function createFormatMarkers({token,repo,issueNumber=1135,fetchImpl=fetch,since=FORMAT_MARKERS_SINCE}) {
+ if(!token||repo!=='killjoy00/mtg-ev-analyzer'||issueNumber!==1135)
+  throw Error('Protected GitHub Daily receipt ledger is not configured.');
+ const root='https://api.github.com/repos/'+repo;
+ const known=new Set(Object.values(FORMAT_MARKERS));
+ const marker=name=>{
+  if(!known.has(name))throw Error('Unknown format marker.');
+  return 'packone-format-verified:'+name+'\n';
+ };
+ async function github(path,{method='GET',body}={}) {
+  const response=await fetchImpl(root+path,{method,
+   headers:{authorization:'Bearer '+token,accept:'application/vnd.github+json',
+    ...(body?{'content-type':'application/json'}:{})},
+   ...(body?{body:JSON.stringify(body)}:{}),signal:AbortSignal.timeout(15_000)});
+  if(!response.ok)throw Error('Format marker ledger returned HTTP '+response.status+'.');
+  return response.json();
+ }
+ async function has(name) {
+  const prefix=marker(name);
+  for(let page=1;page<=20;page++) {
+   const batch=await github('/issues/'+issueNumber+'/comments?since='+
+    encodeURIComponent(since+'T00:00:00Z')+'&per_page=100&page='+page);
+   // Public issue: only this workflow's token identity can verify a format.
+   if(batch.some(c=>c?.user?.login==='github-actions[bot]'&&typeof c.body==='string'&&
+    c.body.startsWith(prefix)))return true;
+   if(batch.length<100)return false;
+  }
+  throw Error('Format marker ledger pagination exceeded its safety limit.');
+ }
+ return {
+  has,
+  async record(name,day) {
+   if(await has(name))return 'already-recorded';
+   await github('/issues/'+issueNumber+'/comments',{method:'POST',body:{body:marker(name)+
+    'first verified: '+String(day).slice(0,10)+
+    '\nThe format this replaces no longer publishes. Non-secret automated state.'}});
+   return 'recorded';
+  },
+ };
+}

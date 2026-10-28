@@ -11,7 +11,8 @@ function row(environment,sets,trophy,{puzzle_id='puzzle',round=4,pick_number=4}=
  const cards=sets.map(([id,n])=>({id,name:id.toUpperCase(),image_url:img(id),
   model_probability:0.5}));
  return {environment,puzzle_id,round,pick_number,set_id:environment==='latest'?'fra':'powered-cube',
-  payload:{historical_pick_id:trophy,candidates:cards,prior_picks:[cards[0]]},
+  payload:{historical_pick_id:trophy,candidates:cards,
+   prior_picks:Array.from({length:pick_number-1},(_,i)=>({name:'Prior '+i,image_url:img('prior-'+i)}))},
   votes:Object.fromEntries(sets.map(([id,n])=>[id,n]))};
 }
 const latest3=row('latest',[['mind',57],['inferno',46],['fates',21],['other',9],['extra',2]],'fates',
@@ -84,11 +85,11 @@ test('Bluesky has independent TID, link facets, bounded copy; Patreon has real t
  assert.equal(formatPercent(42.2),'42.2');
  const youtube=featuredYoutubeMetadata(f);
  assert.ok(youtube.snippet.title.length<=100);
- assert.match(youtube.snippet.description,/FATES/);
+ assert.match(youtube.snippet.title,/FATES/);
  assert.equal(youtube.status.privacyStatus,'public');
 });
-test('minimum peers is 30 and latest two-way still valid with a real sample',()=>{
- assert.equal(MIN_FEATURED_PEERS,30);
+test('minimum peers is 50 and latest two-way still valid with a real sample',()=>{
+ assert.equal(MIN_FEATURED_PEERS,50);
  const selected=selectFeaturedPick([latest2],{day:'2026-10-23'});
  assert.equal(selected.tier,2);
  assert.equal(selected.players,145);

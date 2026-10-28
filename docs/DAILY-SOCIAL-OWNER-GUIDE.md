@@ -1,5 +1,7 @@
 # Pack One morning Daily posts — owner setup
 
+**Bluesky change.** Once the first Bluesky draft debate has been answered (marker `bluesky-debate-v1` in #1135), this morning announcement stops posting to Bluesky; Discord announcements continue. See [featured pick mornings](FEATURED-PICK-MORNINGS.md).
+
 The [Daily social workflow](../.github/workflows/daily-social-post.yml) runs live on **main only**; its independent Neon clock targets **7:10 a.m. America/Los_Angeles**. Three UTC triggers handle daylight saving and retries; the original GitHub run time identifies the intended Pacific Daily so delayed jobs can still post for the correct day. It posts one Daily link; the Daily homepage also offers Powered Cube and Latest Set. Discord displays the short owned link `https://packone.pro/go/discord/`, which redirects to the regular Daily Draft Run with the existing Discord `daily_post` campaign attribution. The generic `https://packone.pro/go/daily/` link has no forced source or campaign tracking. The Bluesky linked label and destination are unchanged. This does **not** replace the independent Neon Daily puzzle generation.
 
 ## Independent morning clock (Neon)

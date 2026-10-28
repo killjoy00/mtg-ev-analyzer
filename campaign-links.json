@@ -29,5 +29,12 @@
     "destination": "/",
     "source": "youtube",
     "campaign": "rfalaunch"
+  },
+  {
+    "slug": "shorts",
+    "destination": "/",
+    "source": "youtube",
+    "campaign": "organic_shorts",
+    "medium": "social"
   }
 ]

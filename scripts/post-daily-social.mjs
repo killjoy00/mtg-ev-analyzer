@@ -2,7 +2,7 @@
 // Never print session tokens, app passwords, or Discord webhook URLs.
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
-import {createGithubReceiptLedger,discordReceiptKey} from './daily-social-ledger.mjs';
+import {createGithubReceiptLedger,discordReceiptKey,createFormatMarkers,FORMAT_MARKERS} from './daily-social-ledger.mjs';
 
 const SITE='https://packone.pro';
 const DAILY_URL=SITE+'/?game=draft-run&daily=1';
@@ -255,8 +255,18 @@ export async function discordPublish(fetchImpl,webhook,{text,image},{
   throw Error('Discord publish retry budget exhausted.');
 }
 
+// The generic Bluesky announcement continues only until a Bluesky debate has
+// been answered once. A failed lookup keeps the existing announcement going.
+export async function blueskyAnnouncementRetired({env,fetchImpl,markers=null}) {
+  try {
+    const store=markers||createFormatMarkers({token:env.GITHUB_TOKEN,repo:env.GITHUB_REPOSITORY,fetchImpl});
+    return await store.has(FORMAT_MARKERS.blueskyDebate);
+  } catch {return false;}
+}
+
 export async function postDaily({
   env=process.env,now=new Date(),scheduledAt=now,fetchImpl=fetch,ledger=null,cardImagePath=LINK_CARD_IMAGE,
+  markers=null,
 }={}) {
   const event=env.GITHUB_EVENT_NAME||'workflow_dispatch';
   const triggered=pacificClock(event==='schedule'?scheduledAt:now);
@@ -294,14 +304,15 @@ export async function postDaily({
     invalid_discord_entries:invalidWebhooks,image_requested:Boolean(imageUrl),text:blue.text};
   if(!handle&&!webhooks.length)throw Error('Configure a Bluesky account or Discord webhooks before enabling live posting.'+
     (invalidWebhooks.length?' Invalid Discord webhook entries: '+invalidWebhooks.join(', ')+'.':''));
+  const retired=handle?await blueskyAnnouncementRetired({env,fetchImpl,markers}):false;
   const receipts=ledger||(webhooks.length?createGithubReceiptLedger({
     token:env.GITHUB_TOKEN,repo:env.GITHUB_REPOSITORY,issueNumber:Number(env.SOCIAL_LEDGER_ISSUE),
     fetchImpl,
   }):null);
   const image=await maybeDailyImage(fetchImpl,imageUrl);
   const jobs=[];
-  const cardImage=handle&&!image?await linkCardImage(cardImagePath):null;
-  if(handle)jobs.push({label:'Bluesky',run:()=>blueskyPublish(fetchImpl,
+  const cardImage=handle&&!retired&&!image?await linkCardImage(cardImagePath):null;
+  if(handle&&!retired)jobs.push({label:'Bluesky',run:()=>blueskyPublish(fetchImpl,
     {handle,password,day,text:blue.text,url:blue.url,linkText:blue.linkText,image,cardImage})});
   for(const [index,webhook] of webhooks.entries())
     jobs.push({label:'Discord server '+(index+1),run:async()=>{
@@ -331,7 +342,8 @@ export async function postDaily({
   });
   for(const line of invalidWebhooks)failed.push('Discord webhook entry '+line+' is invalid');
   if(failed.length)throw Error('Daily publish incomplete: '+failed.join(' | '));
-  return {day,posted:results.filter(r=>r.status==='fulfilled'&&r.value==='posted').length,
+  return {day,bluesky_announcement_retired:retired,
+    posted:results.filter(r=>r.status==='fulfilled'&&r.value==='posted').length,
     already_posted:results.filter(r=>r.status==='fulfilled'&&r.value==='already-posted').length,
     channels:jobs.length,image_included:Boolean(image)};
 }

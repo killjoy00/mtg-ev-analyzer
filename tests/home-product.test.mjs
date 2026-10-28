@@ -22,13 +22,14 @@ test('homepage metadata uses a shallow branded preview with a compact Twitter ic
  assert.match(html,/rel="apple-touch-icon"[^>]*href="https:\/\/packone\.pro\/pack-one-icon-v1\.png"/);
  assert.match(html,/name="twitter:card" content="summary"/);
 });
-test('both Daily share bridges have the banner and preserve environment and attribution',()=>{
+test('both older Daily share bridges keep working with a date-neutral large preview',()=>{
  for(const route of ['/share/daily/','/share/daily/v2/']){
   const html=fs.readFileSync(route.slice(1)+'index.html','utf8');
   assert.match(html,/property="og:title" content="Daily MTG Draft Decisions"/);
-  assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/social-preview-v6\.png"/);
-  assert.match(html,/property="og:image:height" content="240"/);
-  assert.match(html,/name="twitter:card" content="summary"/);
+  assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/share-daily-v1\.png"/);
+  assert.match(html,/property="og:image:height" content="630"/);
+  assert.match(html,/name="twitter:card" content="summary_large_image"/);
+  assert.doesNotMatch(html,/beat today’s score/,'an old link may open a different Daily');
   assert.ok(html.includes('property="og:url" content="https://packone.pro'+route+'"'));
   const script=html.match(/<script>([\s\S]*?)<\/script>/)[1];
   for(const environment of ['mixed','powered-cube','latest','untrusted-set']){
@@ -42,8 +43,30 @@ test('both Daily share bridges have the banner and preserve environment and attr
   }
  }
 });
+test('per-mode Daily share pages open the recipient\'s own Daily and carry the sharer\'s date',()=>{
+ for(const [mode,label] of [['mixed','Draft Run'],['latest','Latest Set'],['powered-cube','Powered Cube']]){
+  const route='/share/daily/'+mode+'/';
+  const html=fs.readFileSync(route.slice(1)+'index.html','utf8');
+  assert.match(html,new RegExp('property="og:title" content="Pack One '+label+' Daily"'));
+  assert.match(html,/Play today’s Daily free, no account needed/);
+  assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/share-daily-v1\.png"/);
+  assert.ok(html.includes('property="og:url" content="https://packone.pro'+route+'"'));
+  const script=html.match(/<script>([\s\S]*?)<\/script>/)[1];
+  for(const [search,day] of [['?ref=result_share&d=2026-10-27','2026-10-27'],['?ref=result_share&d=<script>',null],['?ref=result_share',null]]){
+   let redirected;
+   vm.runInNewContext(script,{URL,URLSearchParams,location:{origin:'https://packone.pro',search,replace(value){redirected=new URL(value,'https://packone.pro');}}});
+   assert.equal(redirected.pathname,'/');
+   assert.equal(redirected.searchParams.get('daily'),'1');
+   assert.equal(redirected.searchParams.get('ref'),'result_share');
+   assert.equal(redirected.searchParams.get('set'),mode==='mixed'?null:mode);
+   assert.equal(redirected.searchParams.get('d'),day);
+   assert.equal(redirected.searchParams.has('challenge')||redirected.searchParams.has('shared'),false,
+    'a Daily share never becomes a replay of revealed decisions');
+  }
+ }
+});
 test('share assets are complete PNGs with genuinely shallow banner dimensions',()=>{
- for(const [file,width,height] of [['social-preview-v6.png',1200,240],['pack-one-icon-v1.png',1024,1024]]){
+ for(const [file,width,height] of [['social-preview-v6.png',1200,240],['pack-one-icon-v1.png',1024,1024],['share-daily-v1.png',1200,630]]){
   const png=fs.readFileSync(file);
   assert.equal(png.subarray(0,8).toString('hex'),'89504e470d0a1a0a');
   assert.equal(png.readUInt32BE(16),width);

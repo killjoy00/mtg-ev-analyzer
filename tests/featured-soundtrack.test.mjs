@@ -21,7 +21,7 @@ test('creates an original, valid 20-second PCM soundtrack with reasonable loudne
  assert.equal(wav.length,44+frames*2);
  assert.equal(stats.version,FEATURED_AUDIO_VERSION);
  assert.equal(stats.original_composition,true);
- assert.deepEqual(stats.cues_seconds,[2,5,9,13,17]);
+ assert.deepEqual(stats.cues_seconds,[3,6,7,8,9,13,15]);
  assert.ok(stats.rms_dbfs>-35&&stats.rms_dbfs< -11,JSON.stringify(stats));
  assert.ok(stats.peak_dbfs<= -2,JSON.stringify(stats));
  const ending=wav.readInt16LE(wav.length-2);

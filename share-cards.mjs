@@ -243,12 +243,97 @@ export async function shareResultCard(profile, result, environmentName = null) {
   });
 }
 
+// One grade per pick, shared by the emoji text and the image card.
+const GRADE_EMOJI={match:'🟩',strong:'🟦',good:'🟨',fair:'🟧',miss:'⬛'};
+const GRADE_COLOR={match:'#2f8a4f',strong:'#2d6fd0',good:'#e3b62e',fair:'#e07a2b',miss:'#24292e'};
+export function pickGrades(answers) {
+  return answers.map(a=>a.historicalMatch?'match':a.score>=85?'strong':a.score>=60?'good':a.score>=25?'fair':'miss');
+}
+const SHARE_PATHS={latest:'latest','powered-cube':'powered-cube',mixed:'mixed'};
+export function dailyModeLabel(environment) {
+  return environment==='latest'?'Latest Set':environment==='powered-cube'?'Powered Cube':'Draft Run';
+}
+export function shareDate(day) {
+  return new Intl.DateTimeFormat('en-US',{month:'short',day:'numeric',timeZone:'UTC'}).format(new Date(day+'T12:00:00Z'));
+}
+// Recipients land straight in their own current Daily. The date lets the
+// landing explain when a friend's score came from an earlier Daily.
+export function dailyShareUrl(run,origin=SHARE_ORIGIN) {
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(run?.day||'')))throw new Error('A Daily share needs its Daily date.');
+  const url=new URL(`/share/daily/${SHARE_PATHS[run.environment]||'mixed'}/`,origin);
+  url.searchParams.set('ref','result_share');
+  url.searchParams.set('d',run.day);
+  return url.toString();
+}
+
 export function draftRunShareText(run) {
   const matches=run.answers.filter(a=>a.historicalMatch).length;
-  const label=run.environment==='latest'?'Latest Set':run.environment==='powered-cube'?'Powered Cube':'Draft Run';
-  const squares=run.answers.map(a=>a.historicalMatch?'🟩':a.score>=85?'🟦':a.score>=60?'🟨':a.score>=25?'🟧':'⬛').join('');
-  if(run.day) return `I scored ${run.score}/100 on today’s Pack One ${label}. Can you beat it?\n${squares}\n${matches}/${draftRunLength(run)} trophy picks matched · Daily ${run.day}`;
+  const label=dailyModeLabel(run.environment);
+  const squares=pickGrades(run.answers).map(g=>GRADE_EMOJI[g]).join('');
+  // Dated, and never "beat my score": a link opened tomorrow plays different picks.
+  if(run.day) return `I scored ${run.score}/100 on the Pack One ${label} Daily (${shareDate(run.day)}).\n${squares}\n${matches}/${draftRunLength(run)} trophy picks matched.\nPlay today’s Daily yourself. Free, no account needed:`;
   return `Pack One · ${label} · Practice\n${run.score}/100  ${squares}\n${matches}/${draftRunLength(run)} trophy picks matched. Play this run and compare.`;
+}
+
+// Spoiler-safe Daily card: score, one colored tile per pick, mode, date and
+// branding. No card names, so it can be posted before friends have played.
+export function dailyResultCardBlob(run) {
+  const canvas=document.createElement('canvas');
+  canvas.width=1200;canvas.height=630;
+  const ctx=canvas.getContext('2d');
+  const font=(weight,size)=>`${weight} ${size}px system-ui, -apple-system, "Segoe UI", sans-serif`;
+  ctx.fillStyle='#f7f8fa';ctx.fillRect(0,0,1200,630);
+  ctx.fillStyle='#1e4d7a';ctx.fillRect(0,0,22,630);
+  roundRect(ctx,72,56,64,64,12);ctx.fill();
+  ctx.fillStyle='#ffffff';ctx.font=font(800,40);ctx.fillText('P',88,104);
+  ctx.font=font(800,22);ctx.fillText('1',113,84);
+  ctx.fillStyle='#101820';ctx.font=font(800,34);ctx.fillText('Pack One',154,100);
+  const label=`${dailyModeLabel(run.environment)} Daily · ${shareDate(run.day)}`.toUpperCase();
+  ctx.fillStyle='#1e4d7a';ctx.font=font(800,26);ctx.fillText(label,74,186);
+  ctx.fillStyle='#101820';ctx.font=font(850,150);
+  const score=String(run.score??0);ctx.fillText(score,66,330);
+  const scoreWidth=ctx.measureText(score).width;
+  ctx.fillStyle='#5b6670';ctx.font=font(700,50);ctx.fillText('/100',78+scoreWidth,330);
+  const matches=run.answers.filter(a=>a.historicalMatch).length;
+  ctx.font=font(650,30);ctx.fillText(`${matches} of ${draftRunLength(run)} picks matched the trophy drafter`,74,382);
+  const grades=pickGrades(run.answers),size=Math.min(96,Math.floor((1056-12*(grades.length-1))/grades.length));
+  grades.forEach((grade,i)=>{
+    roundRect(ctx,74+i*(size+12),420,size,size,14);
+    ctx.fillStyle=GRADE_COLOR[grade];ctx.fill();
+  });
+  const percentile=run.standing?.percentile;
+  if(percentile) {
+    const pill=`Top ${percentile}% ${run.standing.final?'finish':'so far'}`;
+    ctx.font=font(750,26);
+    const w=ctx.measureText(pill).width+36;
+    roundRect(ctx,1128-w,62,w,52,26);ctx.fillStyle='#e6eef6';ctx.fill();
+    ctx.fillStyle='#1e4d7a';ctx.fillText(pill,1146-w,97);
+  }
+  ctx.fillStyle='#5b6670';ctx.font=font(600,24);
+  ctx.fillText('Green: same pick as the trophy drafter. Blue to black: how close each pick scored.',74,562);
+  ctx.fillStyle='#1e4d7a';ctx.font=font(800,28);
+  ctx.fillText('Play today’s Daily free at packone.pro',74,604);
+  return new Promise(resolve=>canvas.toBlob(resolve,'image/png'));
+}
+
+// Shares the Daily card as an image file with the text and link. Where the
+// browser cannot share files the card is saved instead, and the user is told.
+export async function shareDailyImage(run,url) {
+  const blob=await dailyResultCardBlob(run);
+  if(!blob)return {failed:true,url};
+  const file=new File([blob],`pack-one-daily-${run.day}.png`,{type:'image/png'});
+  const text=`${draftRunShareText(run)}\n${url}`;
+  if(navigator.canShare?.({files:[file]})) {
+    try {await navigator.share({files:[file],text});}
+    catch(error) {if(error?.name==='AbortError')return {cancelled:true};return {failed:true,url};}
+    document.dispatchEvent(new CustomEvent('pack1:share-completed',{detail:{method:'native_file',context:'draft_run_result_image',challenge:false}}));
+    return {method:'native_file'};
+  }
+  const link=document.createElement('a');
+  link.href=URL.createObjectURL(blob);link.download=file.name;
+  document.body.append(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(link.href),10000);
+  return {method:'download'};
 }
 
 export async function shareDraftRunCard(run,url,{challenge=false,asImage=false}={}) {

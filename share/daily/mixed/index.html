@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Pack One Draft Run Daily">
+  <meta property="og:description" content="Eight real MTG draft picks every day. Play today’s Daily free, no account needed, then compare with the trophy drafter.">
+  <meta property="og:url" content="https://packone.pro/share/daily/mixed/">
+  <meta property="og:image" content="https://packone.pro/share-daily-v1.png" />
+  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Pack One: today’s MTG draft Daily. Eight real trophy-draft picks, free, no account needed." />
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Pack One Draft Run Daily">
+  <meta name="twitter:description" content="Eight real MTG draft picks every day. Play today’s Daily free, no account needed, then compare with the trophy drafter.">
+  <meta name="twitter:image" content="https://packone.pro/share-daily-v1.png" />
+  <meta name="twitter:image:alt" content="Pack One: today’s MTG draft Daily. Eight real trophy-draft picks, free, no account needed." />
+  <link rel="icon" type="image/png" sizes="1024x1024" href="https://packone.pro/pack-one-icon-v1.png" />
+  <link rel="apple-touch-icon" sizes="1024x1024" href="https://packone.pro/pack-one-icon-v1.png" />
+  <title>Pack One Draft Run Daily</title>
+</head>
+<body>
+  <p>Opening Pack One…</p>
+  <script>
+    // Opens the recipient's own current Daily. The sharer's date (d) lets the
+    // game explain when their score came from an earlier Daily.
+    const params=new URLSearchParams(location.search);
+    const target=new URL('/',location.origin);
+    target.searchParams.set('game','draft-run');
+    target.searchParams.set('daily','1');
+    if(params.get('ref')==='result_share')target.searchParams.set('ref','result_share');
+    if(/^\d{4}-\d{2}-\d{2}$/.test(params.get('d')||''))target.searchParams.set('d',params.get('d'));
+    location.replace(target.pathname+target.search);
+  </script>
+  <noscript><a href="/">Open Pack One</a></noscript>
+</body>
+</html>

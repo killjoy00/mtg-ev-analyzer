@@ -236,7 +236,7 @@ export async function handleAdmin(request,query,readJson) {
       timedAdminQuery(query,'measurements','share_funnel',`WITH corpus_epoch AS (
           SELECT min(created_at) started_at FROM draft_run_sessions WHERE corpus_version=$4
         ), arrivals AS (
-          SELECT e.player_id,e.created_at
+          SELECT e.player_id,e.created_at,e.event_props->>'kind' kind
           FROM analytics_events e JOIN players p ON p.id=e.player_id CROSS JOIN corpus_epoch epoch
           WHERE e.event_name='daily_share_arrival'
             AND e.created_at >= ${PACIFIC_RANGE_START} AND e.created_at < ${PACIFIC_RANGE_END}
@@ -257,13 +257,35 @@ export async function handleAdmin(request,query,readJson) {
           FROM analytics_events e
           JOIN draft_run_sessions s ON s.id::text=e.event_props->>'run_id'
           WHERE e.event_name='daily_completed' AND s.corpus_version=$4
+        ), finishers AS (
+          -- Sharing participation: browser players who finished a Daily in the
+          -- range, against those who completed a share (text, copy or image).
+          SELECT count(DISTINCT s.player_id)::int people
+          FROM draft_run_sessions s JOIN players p ON p.id=s.player_id
+          WHERE s.corpus_version=$4 AND s.day BETWEEN $1::date AND $2::date
+            AND jsonb_array_length(s.answers)=jsonb_array_length(s.puzzle_ids)
+            AND NOT s.measurement_qa AND ($3='all' OR s.environment=$3)
+            AND NOT coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
+        ), sharers AS (
+          SELECT count(DISTINCT e.player_id)::int people,
+            count(*) FILTER(WHERE e.event_props->>'surface'='image')::int image_shares
+          FROM analytics_events e JOIN players p ON p.id=e.player_id CROSS JOIN corpus_epoch epoch
+          WHERE e.event_name='daily_result_shared'
+            AND e.created_at >= ${PACIFIC_RANGE_START} AND e.created_at < ${PACIFIC_RANGE_END}
+            AND epoch.started_at IS NOT NULL AND e.created_at>=epoch.started_at
+            AND ($3='all' OR coalesce(e.event_props->>'set','mixed')=$3)
+            AND NOT coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
         )
         SELECT (SELECT count(*) FROM arrivals)::int arrivals,
           (SELECT count(DISTINCT player_id) FROM arrivals)::int visitors,
           (SELECT count(*) FROM starts)::int starts,
           (SELECT count(*) FROM starts s WHERE EXISTS(SELECT 1 FROM completed c WHERE c.run_id=s.run_id))::int completions,
           round(100.0*(SELECT count(*) FROM starts)/nullif((SELECT count(*) FROM arrivals),0),1) start_pct,
-          round(100.0*(SELECT count(*) FROM starts s WHERE EXISTS(SELECT 1 FROM completed c WHERE c.run_id=s.run_id))/nullif((SELECT count(*) FROM starts),0),1) completion_pct`,
+          round(100.0*(SELECT count(*) FROM starts s WHERE EXISTS(SELECT 1 FROM completed c WHERE c.run_id=s.run_id))/nullif((SELECT count(*) FROM starts),0),1) completion_pct,
+          (SELECT people FROM finishers) finishers,(SELECT people FROM sharers) sharers,
+          round(100.0*(SELECT people FROM sharers)/nullif((SELECT people FROM finishers),0),1) share_pct,
+          (SELECT image_shares FROM sharers) image_shares,
+          (SELECT count(*) FROM arrivals WHERE kind='dated')::int dated_arrivals`,
         [filters.start,filters.end,filters.environment,DRAFT_RUN_CORPUS_VERSION])
     ]);
     return {generated_at:new Date().toISOString(),corpus_version:DRAFT_RUN_CORPUS_VERSION,filters:{...filters,params:undefined},coverage:jsonObject(aggregates.rows[0]?.coverage),summary:jsonObject(aggregates.rows[0]?.summary),share_funnel:shareFunnel.rows[0],

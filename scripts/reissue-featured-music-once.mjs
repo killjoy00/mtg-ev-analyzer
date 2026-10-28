@@ -5,7 +5,7 @@ import {fileURLToPath} from 'node:url';
 import {featureDbRows} from './generate-featured-pick.mjs';
 import {featureCopies,selectFeaturedPick,pacificDay} from './featured-pick.mjs';
 import {assertCurrentLivePublisher} from './post-daily-social.mjs';
-import {featuredYoutubeMetadata} from './publish-featured-pick.mjs';
+import {legacyFeaturedYoutubeMetadata} from './publish-featured-pick.mjs';
 import {FEATURED_AUDIO_VERSION,FEATURED_AUDIO_SECONDS} from './featured-soundtrack.mjs';
 import {youtubeAccessToken,uploadVideo} from './upload-daily-short.mjs';
 import {createGithubReceiptLedger,discordReceiptKey} from './daily-social-ledger.mjs';
@@ -37,7 +37,7 @@ export function validateFeaturedMusicReissue(f,render) {
  return true;
 }
 export function scoredReissueMetadata(f) {
- const meta=featuredYoutubeMetadata(f);
+ const meta=legacyFeaturedYoutubeMetadata(f);
  meta.snippet.title='284 MTG Drafters Split 3 Ways! Now With Music | Pack One #Shorts';
  meta.snippet.description+='\\nOriginal Pack One soundtrack and sound cues.';
  return meta;

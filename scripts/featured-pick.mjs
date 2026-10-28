@@ -1,5 +1,10 @@
 // Yesterday's most debated pick. Pure ranking is independent of publication.
-export const MIN_FEATURED_PEERS=30;
+// Public posts quote this sample size, so a thin split is not evidence.
+export const MIN_FEATURED_PEERS=50;
+// A basic-land trophy pick reads as a data error to viewers, whatever the reason.
+const BASIC_LAND=/^(Snow-Covered )?(Plains|Island|Swamp|Mountain|Forest|Wastes)$/;
+export const isBasicLand=c=>/\bBasic\b.*\bLand\b/.test(String(c?.type_line||''))||
+ BASIC_LAND.test(String(c?.name||''));
 export const FEATURED_SQL=`
 WITH scheduled AS (
  SELECT s.environment,a.ordinality::int round,p.puzzle_id,p.set_id,p.pick_number,p.payload
@@ -88,9 +93,15 @@ export function selectFeaturedPick(rows,{day,minPeers=MIN_FEATURED_PEERS}={}) {
   // Skip the puzzle entirely rather than silently turning a three-way into a two-way.
   if(!counts.slice(0,tier).some(c=>c.id===row.payload.historical_pick_id))continue;
   const trophy=byId.get(row.payload.historical_pick_id);
+  const trophyCard=cards.find(c=>c.id===trophy.id);
+  if(isBasicLand(trophyCard))continue;
   const prior=Array.isArray(row.payload.prior_picks)?row.payload.prior_picks:[];
-  const priorPicks=prior.slice(0,15).filter(c=>name(c.name)&&imageUrl(c.image_url))
-   .map(c=>({name:c.name,image_url:imageUrl(c.image_url)}));
+  // Viewers judge the pick from the drafter's earlier picks. A missing or
+  // imageless prior pick would make the shown context misleading, so skip.
+  const pickNumber=Number(row.pick_number);
+  if(!Number.isInteger(pickNumber)||pickNumber<1||pickNumber>15||prior.length!==pickNumber-1||
+   prior.some(c=>!name(c?.name)||!imageUrl(c?.image_url)))continue;
+  const priorPicks=prior.map(c=>({name:c.name,image_url:imageUrl(c.image_url)}));
   const trophyVotes=counts.find(c=>c.id===trophy.id)?.votes||0;
   const spread=share(0)-share(tier-1);
   const surprise=1-trophyVotes/total;

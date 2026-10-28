@@ -1,6 +1,6 @@
 import {draftRunLength} from './draft-run-format.mjs';
 import { accountCsrfToken, ensurePackSession, firstPartyAuthEnabled, hasAccountSession, loadDailyStatus, storedAccountToken } from './growth-api.mjs';
-import { draftRunShareText, shareDraftRunCard } from './share-cards.mjs?v=8';
+import { dailyResultCardBlob, dailyShareUrl, draftRunShareText, shareDailyImage, shareDraftRunCard, shareDate } from './share-cards.mjs?v=9';
 import {openCardViewer,faceIndicatorMarkup} from './card-viewer.mjs?v=1';
 import { trackEvent } from './retention-events.mjs';
 import {decisionClock} from './decision-clock.mjs';
@@ -19,7 +19,7 @@ import {dismissSetRefresher,installSetGuides,setRefresherButton} from './set-gui
 const base = () => String(window.PACK1_API?.draftRunUrl||'').replace(/\/$/,'');
 const webClientBuild=()=>new URL(import.meta.url).searchParams.get('v')||null;
 const reportSentText='Thanks for letting us know.';
-let run=null,selection=null,review=null,busy=false,dailyValidationConfirmation=null;
+let run=null,selection=null,review=null,busy=false,dailyValidationConfirmation=null,sharedDay=null;
 const reportedDecisions=new Set();
 const dailyPeerCache=new Map();
 const trophyDeckCache=new Map();
@@ -51,7 +51,7 @@ const app=()=>document.querySelector('#app');
 function styles() {
   installSetGuides();
   if(document.querySelector('[data-draft-run-style]')) return;
-  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=21';link.dataset.draftRunStyle='1';document.head.appendChild(link);
+  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=22';link.dataset.draftRunStyle='1';document.head.appendChild(link);
 }
 async function api(path,body,auth=true) {
   const method=body===undefined?'GET':'POST',headers={'content-type':'application/json'};
@@ -185,6 +185,7 @@ function render() {
   document.body.classList.add('is-game');
   app().innerHTML=`<section class="draft-run-page"><header class="run-heading"><div><p class="eyebrow">${run.day?'Daily ':''}${title()} · ${run.day||'Practice'}</p><div class="run-set-title"><h1>${esc(setName(p.set_id))} <span>Round ${answer?review+1:run.round}/${runLength()} · Pack 1 · Pick ${p.pick_number}${answer?' · revealed':''}</span></h1>${setRefresherButton(p.set_id)}</div></div><a class="text-button" href="./">Leave run</a></header>${steps()}
     ${rankingStateMarkup(run)}
+    ${sharedDayNotice(answer)}
     ${run.comparison?run.comparison.kind==='creator'?`<aside class="run-friend"><strong>BEAT THE CREATOR</strong> · ${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. You’re playing the same ${runLength()} decisions.</aside>`:`<aside class="run-friend">${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. ${run.comparison.exact?`You’re playing the same ${runLength()} packs.`:'Packs changed. This result counts as practice.'}</aside>`:''}
     ${answer?'':pool(p)}
     ${answer?`<section class="run-feedback ${answer.historicalMatch?'is-match':'is-miss'}"><strong class="run-feedback-score">${answer.score}<small>/100</small></strong><div class="run-feedback-copy"><h2 id="run-feedback-result" tabindex="-1" aria-label="${esc(compactResultLabel(answer,compactSentence))}">${esc(trophyRevealSentence(answer))}</h2>${compactSentence?`<p>${esc(compactSentence)}</p>`:''}<div id="run-peer-stats" class="run-peer-stats" role="status" hidden></div></div></section>${revealAnalysis(p,answer)}`:
@@ -196,6 +197,12 @@ function render() {
   bind(p,answer);
   if(answer) {document.querySelector('#run-feedback-result')?.focus({preventScroll:true});void revealDailyPeers(review,answer);}
   else recordView();
+}
+// A result-share link always opens the recipient's current Daily. When the
+// friend's score came from an earlier Daily, say so before the first pick.
+function sharedDayNotice(answer) {
+  if(answer||!run.day||!sharedDay||sharedDay>=run.day||run.answers.length)return '';
+  return `<aside class="run-friend" data-shared-day-notice>Your friend’s score was from the ${esc(shareDate(sharedDay))} Daily. Today’s picks are different, so your scores won’t be directly comparable.</aside>`;
 }
 function openDecisionReport(answer) {
   const round=review;
@@ -305,6 +312,22 @@ function dailySetCompleteMarkup() {
     <button class="button primary" type="button">Sign in for unlimited runs</button>
   </aside>`;
 }
+// Sharing sits right under the score, compact enough on a phone that the
+// next-Daily button stays on screen. No card names, so nothing is spoiled.
+function dailySharePanelMarkup() {
+  return `<section class="run-share-panel" aria-labelledby="run-share-title"><div class="run-share-main"><div class="run-share-copy"><h2 id="run-share-title">Share your result</h2><p>Score and colored squares only, no spoilers. Friends can play today’s Daily free, no account needed.</p></div>
+    <div class="run-share-actions"><button class="button primary" id="run-share" type="button">Share result</button><button class="button secondary" id="run-copy-result" type="button">Copy result</button><button class="button secondary" id="run-share-image" type="button">Share image</button></div>
+    <div id="run-share-status" role="status"></div></div>
+    <img class="run-share-card" data-share-card alt="" hidden width="1200" height="630"></section>`;
+}
+async function showDailyCardPreview(resultId) {
+  const blob=await dailyResultCardBlob(run).catch(()=>null);
+  const img=document.querySelector('[data-share-card]');
+  if(!blob||!img||run?.id!==resultId)return;
+  img.src=URL.createObjectURL(blob);
+  img.alt=`Shareable card: ${run.score}/100 on the ${title()} Daily, one colored square per pick.`;
+  img.hidden=false;
+}
 function resultRepeatAction() {
   if(run.day||run.comparison?.kind==='creator')return {href:'./',label:'Back to Dailies'};
   if(run.custom_set_ids?.length)return {href:'?game=draft-run&custom=1',label:'Choose Sets for Another Run'};
@@ -354,17 +377,21 @@ function renderResult() {
     <aside id="post-game-progress" class="post-game-progress" data-result-id="draft-run:${run.id}"></aside>
     ${run.standing?`<p class="run-standing">#${run.standing.rank} of ${run.standing.total} today${run.standing.percentile?` · Top ${run.standing.percentile}%`:''}. ${run.standing.final?'Final result.':'The board closes at midnight Pacific.'}</p>`:''}
     ${dailyValidationConfirmation?`<div class="run-validation-success" role="status" data-daily-validation-confirmation><strong>Score added to today's leaderboard</strong>${dailyValidationConfirmation.standing?`<span>#${dailyValidationConfirmation.standing.rank} of ${dailyValidationConfirmation.standing.total}${dailyValidationConfirmation.standing.percentile?` · Top ${dailyValidationConfirmation.standing.percentile}%`:''}</span>`:''}<a class="text-button" href="${gameUrl('board=daily')}">View leaderboard</a></div>`:''}
+    ${run.day?dailySharePanelMarkup():''}
     ${rankingStateMarkup(run)}
     ${dailySetCompleteMarkup()}
     ${run.comparison&&run.comparison.kind!=='creator'?`<p class="run-friend">${run.comparison.exact?`You: ${run.score} · ${esc(run.comparison.name)}: ${run.comparison.score}`:'These scores came from different decisions.'}</p>`:''}
     ${creator?.creator_post_run_note?`<blockquote class="run-friend"><strong>${esc(creator.name)} after the run:</strong> “${esc(creator.creator_post_run_note)}”</blockquote>`:''}
-    <div class="run-result-actions"><a class="button primary" data-next-daily-action href="${repeat.href}">${repeat.label}</a><button class="button secondary" id="run-share">${run.day?'Share result':'Share this run and compare'}</button><button class="button secondary" id="run-copy-result" type="button">Copy result</button><a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">${run.day&&!run.leaderboard_eligible?(['username_taken','username_required','name_not_allowed'].includes(run.ranking_identity?.reason)?'Choose display name to add score':hasAccountSession()?'Add score to leaderboard':'Sign in to add score'):'View your career'}</button></div>
+    <div class="run-result-actions"><a class="button primary" data-next-daily-action href="${repeat.href}">${repeat.label}</a>${run.day?'':'<button class="button secondary" id="run-share">Share this run and compare</button><button class="button secondary" id="run-copy-result" type="button">Copy result</button>'}<a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">${run.day&&!run.leaderboard_eligible?(['username_taken','username_required','name_not_allowed'].includes(run.ranking_identity?.reason)?'Choose display name to add score':hasAccountSession()?'Add score to leaderboard':'Sign in to add score'):'View your career'}</button></div>
     ${run.day?'<p data-all-dailies hidden><a class="text-button" href="./">All Dailies</a></p>':''}
     <h2>Your ${runLength()} picks</h2><ol class="run-review-list">${run.answers.map((a,i)=>`<li><button data-review="${i}"><span>${i+1}</span><div><strong>${esc(setName(a.puzzle.set_id))} · Pick ${a.pickNumber}</strong><small>${esc(a.selectedName)}${a.historicalMatch?' · Trophy match':''}</small></div><b>${a.score}</b></button></li>`).join('')}</ol>
-    <p class="run-note">Your final score is the rounded average of ${runLength()} decisions. Trophy picks earn 100; other picks can earn up to 95 based on broader drafting evidence.</p><div id="run-share-status" role="status"></div><p id="run-error" role="alert"></p></section>`;
+    <p class="run-note">Your final score is the rounded average of ${runLength()} decisions. Trophy picks earn 100; other picks can earn up to 95 based on broader drafting evidence.</p>${run.day?'':'<div id="run-share-status" role="status"></div>'}<p id="run-error" role="alert"></p></section>`;
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render();window.scrollTo({top:0,behavior:'instant'});});
   document.querySelector('#run-share').onclick=()=>shareResult();
   document.querySelector('#run-copy-result').onclick=()=>shareResult({copy:true});
+  const imageButton=document.querySelector('#run-share-image');
+  if(imageButton)imageButton.onclick=()=>shareResult({image:true});
+  if(run.day)void showDailyCardPreview(run.id);
   document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=32')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
   const setCompleteSignIn=document.querySelector('[data-daily-set-complete] button');
   if(setCompleteSignIn)setCompleteSignIn.onclick=async()=>(await import('./growth.mjs?v=32')).renderAccount({validateDailyRunId:run.id,source:'daily_set_complete'});
@@ -385,8 +412,8 @@ export async function returnToValidatedDaily(runId,{standing=null,confirmed=true
   window.scrollTo({top:0,behavior:'instant'});
 }
 
-async function shareResult({copy=false}={}) {
-  const buttons=[...document.querySelectorAll('#run-share,#run-copy-result')];
+async function shareResult({copy=false,image=false}={}) {
+  const buttons=[...document.querySelectorAll('#run-share,#run-copy-result,#run-share-image')];
   buttons.forEach(button=>{button.disabled=true;});
   const status=document.querySelector('#run-share-status');
   status.replaceChildren();
@@ -402,11 +429,20 @@ async function shareResult({copy=false}={}) {
       }
     }
     const url=run.day
-      ? `${location.origin}/share/daily/v2/?environment=${encodeURIComponent(run.environment||environment)}&ref=result_share`
+      ? dailyShareUrl({...run,environment:run.environment||environment},location.origin)
       : share?.creator&&share.url
         ? new URL(share.url,location.origin).toString()
         : new URL(sharedRunAppPath(share.id),location.origin).toString();
-    trackEvent('share_click',{surface:'draft_run_result',method:copy?'copy_button':'native'});
+    trackEvent('share_click',{surface:'draft_run_result',method:copy?'copy_button':image?'image':'native'});
+    if(image&&run.day) {
+      const result=await shareDailyImage(run,url);
+      if(result.failed){status.textContent='Copy this link: ';const a=document.createElement('a');a.href=url;a.textContent=url;status.append(a);}
+      else if(!result.cancelled) {
+        status.textContent=result.method==='download'?'Image saved. Attach it to your message with the link.':'';
+        trackEvent('daily_result_shared',{mode:'draft_run',method:result.method,surface:'image'});
+      }
+      return;
+    }
     if(copy) {
       const payload=`${draftRunShareText(run)}\n${url}`;
       try {
@@ -467,6 +503,9 @@ async function launch(options={}) {
   const entrySource=!options.id&&options.daily===true&&window.PACK1_ENTRY_SOURCE==='result_share'?'result_share':null;
   run=options.id?await api(`/v1/runs/${options.id}`):await api('/v1/runs',{daily:options.daily===true,challenge:options.challenge,creatorChallenge:options.creatorChallenge,environment,setIds:options.setIds,...(entrySource?{source:entrySource}:{})});
   if(entrySource)delete window.PACK1_ENTRY_SOURCE;
+  sharedDay=entrySource&&/^\d{4}-\d{2}-\d{2}$/.test(String(window.PACK1_SHARED_DAY||''))?window.PACK1_SHARED_DAY:null;
+  delete window.PACK1_SHARED_DAY;
+  if(sharedDay&&run.day&&sharedDay<run.day)trackEvent('daily_share_notice',{kind:'earlier_day',set:run.environment});
   environment=run.environment||environment;
   const url=new URL(location.href);if(environment!=='mixed')url.searchParams.set('set',environment);else url.searchParams.delete('set');url.searchParams.delete('challenge');url.searchParams.delete('shared');url.searchParams.delete('creator');url.searchParams.delete('custom');url.searchParams.set('run',run.id);history.replaceState({},'',url);
   selection=null;review=null;render();
