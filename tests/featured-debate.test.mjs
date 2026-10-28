@@ -48,13 +48,29 @@ test('the question never reveals results; the reveal always does',()=>{
   for(const c of three.choices)assert.match(text,new RegExp(c.name));
  }
  assert.match(copy.question,/Prior 0, Prior 1, Prior 2/);
- assert.match(copy.question,/135 Pack One players split 3 ways/);
+ assert.match(copy.question,/135 players\. Three leading picks\./);
+ assert.doesNotMatch(copy.question,/split 3 ways/);
+ assert.equal(copy.hook,'135 players. Three leading picks.');
+ assert.match(copy.youtube.description,/three leading picks/);
+ assert.doesNotMatch(copy.youtube.description,/split 3 ways/);
  assert.ok(graphemes(copy.question)<=300&&graphemes(copy.reveal)<=300);
  for(const c of three.choices)assert.match(copy.reveal,new RegExp(c.pct+'% '+c.name));
  assert.match(copy.reveal,/8\.1% other cards/);
  assert.match(copy.reveal,/The trophy drafter took FATES, the least popular of the three\./);
  assert.match(copy.reveal,/packone\.pro$/);
  assert.doesNotMatch(copy.reveal+copy.question,/correct|right answer|best pick|mistake/i);
+});
+
+test('two-way debates show other votes; a complete split needs no other note',()=>{
+ const two=selectFeaturedPick([row([['a',73],['b',62],['c',3]],'b')],{day});
+ const copy=debateCopies(two);
+ assert.equal(copy.hook,'138 players. Two leading picks.');
+ assert.match(copy.question,/Two leading picks/);
+ assert.match(copy.reveal,/2\.2% other cards/);
+ assert.match(debateScenes(two,'logo')[5].body,/2\.2% chose other cards/);
+ const all=selectFeaturedPick([row([['a',45],['b',30],['c',25]],'b')],{day});
+ assert.equal(all.other_votes,0);
+ assert.doesNotMatch(debateScenes(all,'logo')[5].body,/other-votes/);
 });
 
 test('observations are factual and cover every trophy position',()=>{
@@ -134,12 +150,15 @@ test('the Short shows cards first, results only after 9 seconds, and the brief C
  assert.deepEqual(starts,[0,3,6,7,8,9,13,15]);
  assert.deepEqual(FEATURED_AUDIO_CUE_TIMES,starts.slice(1),'music cues land on scene changes');
  for(const c of three.choices)assert.match(scenes[0].body,new RegExp(c.name));
- assert.match(scenes[0].body,/135 players split 3 ways/);
+ assert.match(scenes[0].body,/135 players\. Three leading picks\./);
  scenes.forEach((s,i)=>{
   const spoils=/%|trophy drafter took|class="card win"/i.test(s.body);
   assert.equal(spoils,starts[i]>=9&&starts[i]<15,'scene at '+starts[i]+'s');
  });
  assert.match(scenes[5].body,/42\.2%/);
+ assert.match(scenes[5].body,/8\.1% chose other cards/);
+ assert.equal((scenes[5].body.match(/class="vote"/g)||[]).length,3,
+  'other votes are context, never a fourth choice');
  assert.match(scenes[6].body,/class="card win"><img src="[^"]+fates/);
  assert.match(scenes[1].body,/ALREADY DRAFTED/);
  for(const p of three.prior_picks)assert.match(scenes[1].body,new RegExp(p.image_url));
@@ -219,6 +238,13 @@ test('the question skips a day the earlier featured format already covered',asyn
  const result=await publishDebateQuestion(legacy.fetcher,{handle:'h',password:'p',f:three,image:new Uint8Array([1])});
  assert.equal(result.status,'skipped');
  assert.ok(!legacy.calls.includes('com.atproto.repo.createRecord'));
+ const legacyQuestion=debateCopies(three,{legacySplit:true}).question;
+ assert.match(legacyQuestion,/135 Pack One players split 3 ways/);
+ const previous=pds({records:{[debateQuestionRkey(day)]:{text:legacyQuestion}}});
+ const retried=await publishDebateQuestion(previous.fetcher,{handle:'h',password:'p',f:three,image:new Uint8Array([1])});
+ assert.equal(retried.status,'already-posted');
+ assert.ok(!previous.calls.includes('com.atproto.repo.createRecord'));
+ assert.ok(!previous.calls.includes('com.atproto.repo.uploadBlob'));
  const fresh=pds();
  const posted=await publishDebateQuestion(fresh.fetcher,{handle:'h',password:'p',f:three,image:new Uint8Array([1])});
  assert.equal(posted.status,'posted');
@@ -244,6 +270,10 @@ test('the reveal waits four hours, threads under its own question, and posts onc
   cid:'cid-'+debateQuestionRkey(day)});
  assert.equal(reply.facets.at(-1).features[0].uri,debateLink('bluesky'));
  assert.equal((await revealOne(store.fetcher,session,three,{now:later})).status,'already-posted');
+ const old=pds({records:{[debateQuestionRkey(day)]:{
+  text:debateCopies(three,{legacySplit:true}).question,createdAt:asked}}});
+ assert.equal((await revealOne(old.fetcher,session,three,{now:later})).status,'posted',
+  'the reveal must still answer a question published before the wording fix');
  const none=await revealOne(pds().fetcher,session,three,{now:later});
  assert.equal(none.status,'skipped');
  const mismatch=pds({records:{[debateQuestionRkey(day)]:{...question,text:'another decision'}}});
