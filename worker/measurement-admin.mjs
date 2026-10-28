@@ -1,3 +1,4 @@
+import {youtubeReport} from './youtube-report.mjs';
 import {accountSession} from './account-session.mjs';
 import {acceptAdminInvitation,handleAdminTeam} from './admin-invitations.mjs';
 import {handlePlayerReports} from './admin-player-reports.mjs';
@@ -191,6 +192,8 @@ export async function handleAdmin(request,query,readJson) {
   if(request.method!=='GET')fail('Method not allowed.',405);
   if(url.pathname.startsWith('/v1/admin/overview/')||url.pathname==='/v1/admin/insights/quality-watch'||url.pathname==='/v1/admin/campaign-performance')
     return handleDashboardAdmin(request,query);
+  if(url.pathname==='/v1/admin/youtube')
+    return youtubeReport().catch(error=>({configured:true,error:String(error?.message||'YouTube results are unavailable.')}));
   const filters=reportFilters(url);
   if(url.pathname==='/v1/admin/measurements/habits') {
     const habitMetrics=await timedAdminQuery(query,'measurements_habits','habit_metrics',HABIT_METRICS_SQL,[filters.start,filters.end,DRAFT_RUN_CORPUS_VERSION]);

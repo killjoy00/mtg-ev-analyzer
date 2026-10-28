@@ -51,7 +51,7 @@ The replacements switch the old formats off themselves, without owner action, on
 
 - **Channel results:** Admin **Campaign Links** (arrivals, Daily starts and completions per source / campaign) and **Insights > Daily habit cohorts**, grouped by source and campaign: `youtube / organic_shorts` (channel profile link), `bluesky / draft_debate` (answer replies). The earlier YouTube test used `youtube / rfalaunch` and stays separate.
 - **Bluesky engagement:** each answer run writes a table of public likes, reposts, replies and quotes for the last three weeks' debates to its GitHub Actions run summary. Bluesky publishes no reach or impressions.
-- **YouTube views and retention** need the YouTube Analytics read scope, which the current upload-only credential does not have. Until the owner grants it, read these numbers in YouTube Studio. Do not estimate them.
+- **YouTube views and retention:** Admin **Insights > YouTube Shorts** lists every upload of the last 60 days by format (debate, earlier featured, generic 10-second, other) with views, engaged views, average watch time, and, for debate Shorts, the share still watching at 3, 9 and 15 seconds. Engaged views ÷ views is the closest available measure of early swipe-away. It reads YouTube through a separate read-only credential (`PACKONE_YOUTUBE_ANALYTICS_CLIENT_ID`, `_CLIENT_SECRET`, `_REFRESH_TOKEN`), passed only to the production `draftrunapi` function by **deploy neon functions**, and is never written to public GitHub output.
 - **Evaluation:** after ten improved Bluesky discussions, compare engagement and `draft_debate` arrivals and first Dailies. Without meaningful evidence, recommend pausing active Bluesky marketing.
 
 ## Owner steps
