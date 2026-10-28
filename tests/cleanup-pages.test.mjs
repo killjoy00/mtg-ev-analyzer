@@ -13,10 +13,10 @@ test('Practice copy and Learn guide cleanup are present',async()=>{
   ]);
   assert.doesNotMatch(practice,/included with your free account/);
   assert.match(practiceHtml,/Unlimited eight-decision runs from real trophy drafts\./);
-  assert.match(practiceHtml,/Regular Draft Run practice is free/);
+  assert.match(practiceHtml,/A free account lets you play unlimited regular Draft Runs/);
   assert.match(learn,/Card strength vs\. deck fit: know what changed/);
   assert.match(learn,/\/learn\/card-strength-vs-fit\//);
-  assert.match(guide,/Demand a bigger reason for a bigger downgrade/);
+  assert.match(guide,/How much weaker is the card you're taking\?/);
   assert.match(guide,/grade the adjustment, not memorize the answer/);
 });
 
