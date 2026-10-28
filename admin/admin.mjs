@@ -242,7 +242,28 @@ async function loadDeferredSections(loadId,queryString){
     const reviewTarget=document.querySelector('#reviews');
     if(reviewTarget)reviewTarget.innerHTML=`<p class="error" role="alert">${esc(error?.message||'Review candidates are temporarily unavailable.')}</p>`;
   });
-  await Promise.allSettled([habits,reviews,quality]);
+  const youtube=request('/v1/admin/youtube').then(data=>{
+    if(loadId!==deferredLoad)return;
+    const target=document.querySelector('#youtube-shorts');
+    if(target)target.innerHTML=youtubeMarkup(data);
+  }).catch(error=>{
+    if(loadId!==deferredLoad)return;
+    const target=document.querySelector('#youtube-shorts');
+    if(target)target.innerHTML=`<p class="error" role="alert">${esc(error?.message||'YouTube results are temporarily unavailable.')}</p>`;
+  });
+  await Promise.allSettled([habits,reviews,quality,youtube]);
+}
+const YOUTUBE_FORMATS={debate:'Debate Short',featured_v1:'Earlier featured Short',daily_generic:'Generic 10-second Short',other:'Other'};
+// Channel analytics stay on this signed-in page, never in public GitHub output.
+function youtubeMarkup(data) {
+  if(!data?.configured)return '<p class="muted">YouTube Analytics is not connected to the backend yet.</p>';
+  if(data.error)return `<p class="error" role="alert">${esc(data.error)}</p>`;
+  const videos=data.videos||[];
+  if(!videos.length)return '<p class="muted">No uploads in the last 60 days.</p>';
+  const points=data.retention_points||[];
+  const rows=videos.map(v=>`<tr><th>${esc(String(v.published_at).slice(0,10))}<br><small>${esc(v.title)}</small></th><td>${esc(YOUTUBE_FORMATS[v.format]||v.format)}</td><td>${fmt(v.views)}</td><td>${fmt(v.engaged_views)}</td><td>${fmt(v.average_view_seconds)}${v.average_view_seconds==null?'':'s'}</td><td>${pct(v.average_view_pct)}</td>${points.map(p=>`<td>${v.retention?pct(v.retention[p]):'N/A'}</td>`).join('')}<td>${fmt(v.likes)}</td><td>${fmt(v.subscribers_gained)}</td></tr>`).join('');
+  return `<div class="scroll"><table><thead><tr><th>Published</th><th>Format</th><th>Views</th><th>Engaged views</th><th>Avg watched</th><th>Avg % watched</th>${points.map(p=>`<th>Still watching at ${esc(p)}</th>`).join('')}<th>Likes</th><th>Subscribers gained</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <p class="subpage-help">Last 60 days, from YouTube Analytics (updated ${esc(new Date(data.generated_at).toLocaleString())}). Engaged views count plays past the first seconds, so engaged views ÷ views is the closest available measure of early swipe-away${data.engaged_views_available?'':'; YouTube did not return engaged views for this report'}. Retention points apply to the 20-second debate Shorts. Pack One visits from the channel link are under <code>youtube / organic_shorts</code> in Campaign Links.</p>`;
 }
 function render() {
   const s=report.summary,c=report.coverage,f=report.filters,sf=report.share_funnel||{};
@@ -255,6 +276,7 @@ function render() {
     <div class="cards share-funnel">${[['Daily finishers',fmt(sf.finishers)],['Players who shared',fmt(sf.sharers)],['Sharing participation',pct(sf.share_pct)],['Share-link arrivals',fmt(sf.arrivals)],['Unique visitors',fmt(sf.visitors)],['New Daily starts',fmt(sf.starts)],['Completed Dailies',fmt(sf.completions)]].map(([label,value])=>`<div class="card"><span>${label}</span><strong>${value}</strong></div>`).join('')}</div>
     <p class="subpage-help">Sharing participation is players who completed a share (Share, Copy or Share image) divided by players who finished a Daily in the range, both per browser player with QA excluded. ${fmt(sf.image_shares)} shares used the image card; ${fmt(sf.dated_arrivals)} arrivals came from dated links. Mobile-app shares are not yet tracked. Repeat play by referred players is in Daily habit cohorts below, under the <code>result_share</code> source.</p>
     <p class="subpage-help">Start conversion: <strong>${pct(sf.start_pct)}</strong> · Completion of attributed starts: <strong>${pct(sf.completion_pct)}</strong>. Uses the selected date range and environment inside the current-corpus baseline. Share-link arrivals are best-effort client analytics bounded to the current corpus epoch; starts and completions are authoritative current-corpus sessions. Other decision filters do not apply to this funnel.</p></section>
+    <section class="subpage-section" aria-labelledby="insights-youtube-heading"><h2 id="insights-youtube-heading">YouTube Shorts</h2><p class="subpage-help">Organic results for each recent Short, by format.</p><div id="youtube-shorts"><p class="muted">Loading YouTube results…</p></div></section>
     <section class="subpage-section" aria-labelledby="insights-retention-heading"><h2 id="insights-retention-heading">Daily habit cohorts</h2><p class="subpage-help">Who returns after their first Daily? Rates below use only cohorts old enough to have completed the relevant observation window.</p>
     <details class="insights-note-details"><summary>How these cohorts are counted</summary><p class="subpage-help">Current-corpus Dailies only · distinct Pacific Daily dates · first current-corpus Daily in the selected date range. Linked accounts collapse across merged browser identities; guests are counted per browser. QA sessions, QA-pattern names, and admin-linked players are excluded. Environment and decision filters do not change these habit metrics.</p></details>
     <div id="habit-cohorts"><p class="muted">Loading Daily habit cohorts…</p></div>

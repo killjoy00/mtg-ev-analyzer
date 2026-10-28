@@ -39,6 +39,10 @@ jobs:
       PACK1_DELETION_ADMIN_EMAIL: ${{ secrets.PACK1_DELETION_ADMIN_EMAIL }}
       PACK1_DELETION_ADMIN_PASSWORD: ${{ secrets.PACK1_DELETION_ADMIN_PASSWORD }}
       PACK1_ACCOUNT_DELETE_RESEND_API_KEY: ${{ secrets.PACK1_ACCOUNT_DELETE_RESEND_API_KEY }}
+      # Read-only YouTube Analytics credential for Admin Insights (never the upload token).
+      PACKONE_YOUTUBE_ANALYTICS_CLIENT_ID: ${{ secrets.PACKONE_YOUTUBE_ANALYTICS_CLIENT_ID }}
+      PACKONE_YOUTUBE_ANALYTICS_CLIENT_SECRET: ${{ secrets.PACKONE_YOUTUBE_ANALYTICS_CLIENT_SECRET }}
+      PACKONE_YOUTUBE_ANALYTICS_REFRESH_TOKEN: ${{ secrets.PACKONE_YOUTUBE_ANALYTICS_REFRESH_TOKEN }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -126,6 +130,18 @@ jobs:
             test -n "$PATREON_CLIENT_ID" && test -n "$PATREON_CLIENT_SECRET" && test -n "$PATREON_WEBHOOK_SECRET" || { echo '::error::Activated Patreon requires all runtime secrets.'; exit 1; }
           fi
 
+      - name: Check the optional YouTube Analytics credential is complete
+        shell: bash
+        run: |
+          set -euo pipefail
+          present=0
+          for value in "$PACKONE_YOUTUBE_ANALYTICS_CLIENT_ID" "$PACKONE_YOUTUBE_ANALYTICS_CLIENT_SECRET" "$PACKONE_YOUTUBE_ANALYTICS_REFRESH_TOKEN"; do
+            if [[ -n "$value" ]]; then present=$((present+1)); fi
+          done
+          if [[ $present -ne 0 && $present -ne 3 ]]; then echo '::error::Set all three PACKONE_YOUTUBE_ANALYTICS_* secrets or none.'; exit 1; fi
+          echo "YOUTUBE_ANALYTICS_CONFIGURED=$([[ $present -eq 3 ]] && echo true || echo false)" >> "$GITHUB_ENV"
+          if [[ $present -eq 0 ]]; then echo '::notice::YouTube Analytics is not configured; Admin Insights will say so.'; fi
+
       - name: Build and verify all bundles before upload
         run: node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$RELEASE_COMMIT"
 
@@ -135,6 +151,11 @@ jobs:
           set -euo pipefail
           while IFS=: read -r slug entry; do
             extra=()
+            if [[ "$slug" == draftrunapi && "$RELEASE_TARGET" == production && "$YOUTUBE_ANALYTICS_CONFIGURED" == true ]]; then
+              extra+=(--env "PACKONE_YOUTUBE_ANALYTICS_CLIENT_ID=$PACKONE_YOUTUBE_ANALYTICS_CLIENT_ID"
+                --env "PACKONE_YOUTUBE_ANALYTICS_CLIENT_SECRET=$PACKONE_YOUTUBE_ANALYTICS_CLIENT_SECRET"
+                --env "PACKONE_YOUTUBE_ANALYTICS_REFRESH_TOKEN=$PACKONE_YOUTUBE_ANALYTICS_REFRESH_TOKEN")
+            fi
             if [[ "$slug" == pack1growth ]]; then
               extra+=(--env "PACK1_RATE_LIMIT_SECRET=$PACK1_RATE_LIMIT_SECRET"
                 --env "PACK1_DELETION_ADMIN_EMAIL=$PACK1_DELETION_ADMIN_EMAIL"
