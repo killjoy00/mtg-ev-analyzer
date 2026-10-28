@@ -54,6 +54,6 @@ States are Candidate, Live, Paused and Retired. Discovery and unfinished imports
 
 ## Presentation and provenance
 
-Mobile-first play, recognizable prior cards at approximately 85% of pack-card width, quick first-pack access, explicit trophy/model distinction and accessible feedback are core requirements. Attribution links to 17Lands and the source license and explains the adaptation without implying endorsement. [Policy review](17LANDS-DATA-REVIEW-2026-09-18.md).
+Mobile-first play, recognizable prior cards at approximately 85% of pack-card width (smaller only as needed to keep every prior pick on one line), quick first-pack access, explicit trophy/model distinction and accessible feedback are core requirements. Attribution links to 17Lands and the source license and explains the adaptation without implying endorsement. [Policy review](17LANDS-DATA-REVIEW-2026-09-18.md).
 
 Retired opening-pack products and the former task-board homepage have no current navigation, marketing or normal gameplay role. Compatibility code is isolated for historical links. This game does not simulate a draft table, alternate wheel contents or a constructed deck.

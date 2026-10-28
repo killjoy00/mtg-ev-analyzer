@@ -247,7 +247,7 @@ function setFormPending(form,pending,label) {
 
 async function returnToValidatedDaily(validationRunId,linked,source,{confirmed=true}={}) {
   if(confirmed)event('daily_score_validated',{source});
-  const draft=await import('./draft-run-product.mjs?v=34');
+  const draft=await import('./draft-run-product.mjs?v=35');
   await draft.returnToValidatedDaily(validationRunId,{standing:linked?.standing||null,confirmed});
 }
 

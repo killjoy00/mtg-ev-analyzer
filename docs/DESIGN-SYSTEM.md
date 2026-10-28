@@ -25,7 +25,13 @@ practice appears after all three are complete as a single handoff to the dedicat
 Practice hub. Practice and Elite options are not duplicated below unfinished Dailies.
 Mobile play controls remain at least 44 pixels high,
 keyboard focus is visible, and prior cards retain the established 85% size relationship
-to pack cards.
+to pack cards until more picks would overflow one line; they then shrink to fit, never
+below 62 pixels, and scroll sideways after that. On a pick, the header carries the set,
+a "Pack 1 · Pick N" label and the round steps; the pack is labelled "Choose one". Wider
+screens size the pack columns so the whole pack fits when it can (cards at least 150
+pixels on desktop). The primary action stays in a bottom bar: Lock pick appears once a
+card is chosen (immediately in Practice, where it holds rerolls), and Next pick floats in
+the same place on the reveal. Views after the first open at the run header.
 
 Guest primary navigation is Daily Run, Practice, How To Play, and Sign in.
 Practice remains visible while account status is being checked or unavailable.
