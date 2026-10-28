@@ -42,6 +42,7 @@ export function adminPath(path,method) {
   // These four read-only dashboard endpoints are protected by the same
   // backend account/Admin membership checks as the other draft Admin routes.
   if(method==='GET'&&/^\/v1\/admin\/(?:overview\/(?:trends|health)|insights\/quality-watch|campaign-performance)$/.test(path))return true;
+  if(method==='GET'&&path==='/v1/admin/youtube')return true;
   if(method==='GET'&&/^\/v1\/admin\/player-reports(?:\/summary)?$/.test(path))return true;
   if(method==='POST'&&path==='/v1/admin/player-reports/serving/warmup')return true;
   if(['GET','POST'].includes(method)&&/^\/v1\/admin\/player-reports\/decisions\/[a-f0-9-]{36}\/pick$/.test(path))return true;

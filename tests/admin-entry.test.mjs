@@ -13,6 +13,17 @@ test('setup-code claims are neither permitted by gateway nor handled by admin ba
   assert.equal(adminPath('/v1/admin/access','GET'),true);
   assert.doesNotMatch(fs.readFileSync('worker/measurement-admin.mjs','utf8'),/pack1_admin_invites|v1\/admin\/claim/);
 });
+// A read-only Admin request missing from the gateway allowlist fails its CORS
+// preflight in the browser ("Load failed") even though the backend serves it.
+test('every read-only Admin request the page makes is allowed by the gateway',()=>{
+  const missing=[];
+  for(const file of fs.readdirSync('admin').filter(f=>f.endsWith('.mjs')))
+    for(const [,path] of fs.readFileSync('admin/'+file,'utf8').matchAll(/\brequest\('(\/v1\/admin\/[a-z0-9\/-]*[a-z0-9])'(?:\)|\+)/g))
+      if(!adminPath(path,'GET'))missing.push(file+': '+path);
+  assert.deepEqual(missing,[]);
+  assert.equal(adminPath('/v1/admin/youtube','GET'),true);
+  assert.equal(adminPath('/v1/admin/youtube','POST'),false);
+});
 test('admin login delegates to standard account UI and hides privileged navigation until authorized',()=>{
   const html=fs.readFileSync('admin/index.html','utf8'),js=fs.readFileSync('admin/admin.mjs','utf8');
   assert.match(html,/id="admin-area-nav"[^>]*hidden/);

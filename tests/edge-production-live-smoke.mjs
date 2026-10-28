@@ -72,11 +72,12 @@ for(const path of [
   '/v1/admin/overview/health',
   '/v1/admin/insights/quality-watch',
   '/v1/admin/campaign-performance',
+  '/v1/admin/youtube',
 ]) {
   const {response}=await call('/draft'+path,{headers:{origin},expected:401});
   assert.equal(response.headers.get('access-control-allow-origin'),origin);
 }
-console.log('All four read-only Admin dashboard routes reach the protected production backend.');
+console.log('All five read-only Admin dashboard routes reach the protected production backend.');
 
 const mobileLeaderboardToken='p1_00000000-0000-4000-8000-000000000000.'+'A'.repeat(43);
 await call('/draft/v1/leaderboard?period=daily&environment=mixed',{
