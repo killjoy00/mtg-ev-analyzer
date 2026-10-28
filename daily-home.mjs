@@ -6,9 +6,9 @@ let generation = 0;
 let installed = false;
 let lastDay;
 const games = [
-  { key: 'draftRun', number: '01', label: 'The daily challenge', environment: 'mixed', title: 'Daily Draft Run', description: 'Eight decisions from real trophy drafts.', href: '?game=draft-run&daily=1' },
-  { key: 'cube', number: '02', label: 'The powered table', environment: 'powered-cube', title: 'Daily Powered Cube', description: 'Eight decisions from Powered Cube trophy drafts.', href: '?game=draft-run&set=powered-cube&daily=1' },
-  { key: 'latest', number: '03', label: 'The newest release', environment: 'latest', title: 'Daily Latest Set', description: 'Eight decisions from trophy drafts in the latest set.', href: '?game=draft-run&set=latest&daily=1' },
+  { key: 'draftRun', number: '01', label: 'A mix of Draft sets', environment: 'mixed', title: 'Daily Draft Run', description: 'Eight decisions from real trophy drafts.', href: '?game=draft-run&daily=1' },
+  { key: 'cube', number: '02', label: 'Powered Cube picks', environment: 'powered-cube', title: 'Daily Powered Cube', description: 'Eight decisions from Powered Cube trophy drafts.', href: '?game=draft-run&set=powered-cube&daily=1' },
+  { key: 'latest', number: '03', label: 'Only the newest set', environment: 'latest', title: 'Daily Latest Set', description: 'Eight decisions from trophy drafts in the latest set.', href: '?game=draft-run&set=latest&daily=1' },
 ];
 
 export function dailyHomeMarkup(profile, day = gameDateKey(), state = 'ready') {
