@@ -1,4 +1,17 @@
 // Query coverage, not a claim of complete provider log retention.
+export function telemetryEventIdentity(row){
+  const id=row?.$metadata?.id;
+  if(typeof id!=='string'||!id||id.length>512)return null;
+  let source=row.source;
+  if(typeof source==='string')try{source=JSON.parse(source);}catch{return id;}
+  if(!source||typeof source!=='object')try{source=JSON.parse(row?.$metadata?.message);}catch{return id;}
+  // Concurrent application records can share a provider ID and timestamp.
+  // The provider ID remains the pagination cursor, not the sole event key.
+  if(['gateway_request','quota_handler','quota_handler_start','quota_commit_wait'].includes(source?.event)&&
+    /^[a-f0-9]{32}$/.test(source?.trace||''))
+    return JSON.stringify([id,source.event,source.trace,Number.isInteger(source.attempt)?source.attempt:null]);
+  return id;
+}
 export async function collectVerifiedTelemetry({from,to,fetchPage,pageSize=2000,maxPages=12,maxRequests=48}){
   if(!Number.isSafeInteger(from)||!Number.isSafeInteger(to)||from<0||from>=to||to-from>35*60000||
     !Number.isInteger(pageSize)||pageSize<1||pageSize>2000||!Number.isInteger(maxPages)||maxPages<1||maxPages>32||
@@ -19,8 +32,8 @@ export async function collectVerifiedTelemetry({from,to,fetchPage,pageSize=2000,
         await partition(begin,middle);await partition(middle,end);return;
       }
       for(const row of page){
-        const id=row?.$metadata?.id;
-        if(typeof id!=='string'||!id||id.length>512)throw Error('Malformed telemetry event identifier');
+        const id=telemetryEventIdentity(row);
+        if(!id)throw Error('Malformed telemetry event identifier');
         if(local.has(id)&&JSON.stringify(local.get(id))!==JSON.stringify(row))throw Error('Conflicting telemetry event identity');
         local.set(id,row);
       }

@@ -6,6 +6,10 @@ import {collectVerifiedTelemetry} from './verified-observability.mjs';
 
 const MAX_PAGES=12,PAGE_SIZE=2000;
 const RETENTION_MS=3*86400000,SETTLEMENT_MS=2*60000,MAX_WINDOW_MS=35*60000;
+export function quotaForensicsFailureCode(error){
+  const code=error?.forensicCode;
+  return typeof code==='string'&&/^(?:trusted_context|private_storage_access|telemetry_collection|private_storage_save|(?:storage|telemetry)_http_[1-5][0-9]{2})$/.test(code)?code:'collection_unavailable';
+}
 const timing=v=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=600000?v:null;
 const key=v=>typeof v==='string'&&/^[a-f0-9]{32}$/.test(v)?v:null;
 const attempt=v=>Number.isInteger(v)&&v>0&&v<=2?v:null;
@@ -74,7 +78,7 @@ async function requestJson(fetcher,url,token,body){
   const r=await fetcher(url,{method:body?'POST':'GET',redirect:'error',signal:AbortSignal.timeout(20000),
     headers:{authorization:'Bearer '+token,accept:'application/json','content-type':'application/json'},
     ...(body?{body:JSON.stringify(body)}:{})});
-  if(!r.ok)throw Error('Read-only telemetry HTTP request failed');
+  if(!r.ok)throw Object.assign(Error('Read-only telemetry HTTP request failed'),{forensicCode:'telemetry_http_'+r.status});
   const d=await r.json().catch(()=>null);
   if(!d||d.success===false||d.errors?.length)throw Error('Read-only telemetry response invalid');
   return d;
@@ -149,14 +153,23 @@ export async function runQuotaForensics({fetcher=fetch,env=process.env,now=Date.
     limitation:'Verified query partitions do not establish complete log retention. Missing records are not proof of nonexecution, and gateway summaries are sampled.'};
 }
 export async function publishQuotaForensics({fetcher=fetch,env=process.env,now=Date.now()}={}){
-  if(env.GITHUB_REF!=='refs/heads/main'||env.GITHUB_REPOSITORY!=='killjoy00/mtg-ev-analyzer'||
-    !/^[1-9]\d{0,19}$/.test(env.GITHUB_RUN_ID||'')||!/^[1-9]\d{0,2}$/.test(env.GITHUB_RUN_ATTEMPT||'')||!/^[a-f0-9]{40}$/.test(env.GITHUB_SHA||''))throw Error('Reviewed main context required');
-  const store=privateQuotaStore({token:env.CLOUDFLARE_PRIVATE_REPORT_TOKEN,fetcher});
-  await store.verify();
-  const report=await runQuotaForensics({fetcher,env,now});
-  await store.save(report,{runId:env.GITHUB_RUN_ID,attempt:env.GITHUB_RUN_ATTEMPT,sha:env.GITHUB_SHA,now});
+  let stage='trusted_context';
+  try {
+    if(env.GITHUB_REF!=='refs/heads/main'||env.GITHUB_REPOSITORY!=='killjoy00/mtg-ev-analyzer'||
+      !/^[1-9]\d{0,19}$/.test(env.GITHUB_RUN_ID||'')||!/^[1-9]\d{0,2}$/.test(env.GITHUB_RUN_ATTEMPT||'')||!/^[a-f0-9]{40}$/.test(env.GITHUB_SHA||''))throw Error('Reviewed main context required');
+    stage='private_storage_access';
+    const store=privateQuotaStore({token:env.CLOUDFLARE_PRIVATE_REPORT_TOKEN,fetcher});
+    await store.verify();
+    stage='telemetry_collection';
+    const report=await runQuotaForensics({fetcher,env,now});
+    stage='private_storage_save';
+    await store.save(report,{runId:env.GITHUB_RUN_ID,attempt:env.GITHUB_RUN_ATTEMPT,sha:env.GITHUB_SHA,now});
+  } catch(error) {
+    if(quotaForensicsFailureCode(error)==='collection_unavailable')throw Object.assign(Error('Private quota investigation unavailable'),{forensicCode:stage});
+    throw error;
+  }
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
   publishQuotaForensics().then(()=>console.log('Private quota timing report saved and readback verified.'))
-    .catch(()=>{console.error('Quota stage investigation unavailable; provider details withheld.');process.exitCode=1;});
+    .catch(error=>{console.error('Quota stage investigation unavailable ('+quotaForensicsFailureCode(error)+'); provider details withheld.');process.exitCode=1;});
 }

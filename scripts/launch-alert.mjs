@@ -1,6 +1,7 @@
 import fs from 'node:fs';
 import {pathToFileURL} from 'node:url';
-import {collectVerifiedTelemetry} from './verified-observability.mjs';
+import {createHash} from 'node:crypto';
+import {collectVerifiedTelemetry,telemetryEventIdentity} from './verified-observability.mjs';
 import {SLOW_REQUEST_MS,SLOW_QUOTA_MS,alertSeverity} from '../launch-alert-policy.mjs';
 import {reconcileIncidents,persistentLatencyConditions} from './launch-incident-state.mjs';
 import {
@@ -30,7 +31,8 @@ export function parseGatewayEvent(row) {
   const duration=value=>Number.isFinite(value)&&value>=0?value:0;
   const boundedTiming=value=>Number.isFinite(value)&&value>=0&&value<=600000?Math.round(value):null;
   const integer=value=>Number.isInteger(value)&&value>=0&&value<=100?value:null;
-  const event={id:row?.$metadata?.id,route:/^[a-z_]{1,40}$/.test(p.route)?p.route:'other',status:p.status,sample_rate:p.sample_rate,duration_ms:p.duration_ms,quota_ms:duration(p.quota_ms),upstream_ms:duration(p.upstream_ms),quota_scope:['request','session','request,session'].includes(p.quota_scope)?p.quota_scope:null,release:/^[a-f0-9]{40}$/.test(p.release)?p.release:'unknown',
+  const identity=telemetryEventIdentity(row);
+  const event={id:identity&&identity!==row?.$metadata?.id?createHash('sha256').update(identity).digest('hex'):identity,route:/^[a-z_]{1,40}$/.test(p.route)?p.route:'other',status:p.status,sample_rate:p.sample_rate,duration_ms:p.duration_ms,quota_ms:duration(p.quota_ms),upstream_ms:duration(p.upstream_ms),quota_scope:['request','session','request,session'].includes(p.quota_scope)?p.quota_scope:null,release:/^[a-f0-9]{40}$/.test(p.release)?p.release:'unknown',
     tail_sampling_version:p.tail_sampling_version===1?1:0,rate_limit_class:p.rate_limit_class==='player_auth'&&p.status===429&&p.route==='account'&&p.upstream_status===429&&p.upstream_calls===1&&!p.quota_scope?'player_auth':null,
     upstream_calls:integer(p.upstream_calls),upstream_status:Number.isInteger(p.upstream_status)&&p.upstream_status>=100&&p.upstream_status<=599?p.upstream_status:null,
     quota_handler_ms:boundedTiming(p.quota_handler_ms),quota_transport_wait_ms:boundedTiming(p.quota_transport_wait_ms),

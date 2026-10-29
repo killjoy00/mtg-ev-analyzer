@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {collectQuotaEventRows,forensicWindows,publishQuotaForensics,runQuotaForensics} from '../scripts/quota-stage-forensics.mjs';
+import {collectQuotaEventRows,forensicWindows,publishQuotaForensics,runQuotaForensics,quotaForensicsFailureCode} from '../scripts/quota-stage-forensics.mjs';
 import {privateQuotaStore} from '../scripts/private-quota-forensics.mjs';
+import {collectVerifiedTelemetry} from '../scripts/verified-observability.mjs';
 
 const now=Date.parse('2026-10-29T19:00:00Z'),account='a'.repeat(32),token='private-token-'.repeat(3);
 const event=id=>({$metadata:{id},source:{event:'quota_handler'}});
@@ -43,6 +44,21 @@ test('pagination detects a non-adjacent cursor cycle before exhausting the reque
     const id=['a','b','a'][calls++];return page(Array.from({length:2000},()=>event(id)));
   }}),/pagination stalled/);
   assert.equal(calls,3);
+});
+test('concurrent records sharing provider ID and timestamp retain distinct traces and attempts',async()=>{
+  const record=(trace,attempt=1,concurrency=1)=>({$metadata:{id:'shared-provider-id'},timestamp:now,
+    source:{event:'quota_handler_start',trace,attempt,concurrency}});
+  const first=record('ab'.repeat(16)),second=record('cd'.repeat(16),1,2),retry=record('ab'.repeat(16),2);
+  const result=await collectQuotaEventRows({...options,event:'quota_handler_start',fetcher:async()=>page([first,first,second,retry])});
+  assert.equal(result.rows.length,3);assert.deepEqual(result.rows,[first,second,retry]);
+  const offsets=[];
+  const paginated=await collectVerifiedTelemetry({from:options.from,to:options.to,pageSize:2,fetchPage:async({offset})=>{
+    offsets.push(offset);
+    const next={...retry,$metadata:{id:'next-provider-id'}};
+    return {level:1,events:offset===null?[first,second]:offset==='shared-provider-id'?[second,next]:[]};
+  }});
+  assert.equal(paginated.rows.length,3);assert.deepEqual(offsets,[null,'shared-provider-id','next-provider-id']);
+  await assert.rejects(collectQuotaEventRows({...options,event:'quota_handler_start',fetcher:async()=>page([first,record('ab'.repeat(16),1,99)])}),/Conflicting telemetry event identity/);
 });
 test('expired default history is explicit and never prevents a current settled collection',async()=>{
   const windows=forensicWindows(now);
@@ -92,11 +108,32 @@ test('public destinations and mismatched readback are rejected without public fa
 });
 test('publication requires trusted main context and private credentials before querying telemetry',async()=>{
   let calls=0;const fetcher=async()=>{calls++;throw Error('must not call');};
-  await assert.rejects(publishQuotaForensics({fetcher,env:{},now}),/Reviewed main context/);
-  await assert.rejects(publishQuotaForensics({fetcher,env:{GITHUB_REF:'refs/heads/main',GITHUB_REPOSITORY:'killjoy00/mtg-ev-analyzer',GITHUB_RUN_ID:'12345',GITHUB_RUN_ATTEMPT:'1',GITHUB_SHA:'a'.repeat(40)},now}),/credential unavailable/);
+  await assert.rejects(publishQuotaForensics({fetcher,env:{},now}),error=>quotaForensicsFailureCode(error)==='trusted_context');
+  await assert.rejects(publishQuotaForensics({fetcher,env:{GITHUB_REF:'refs/heads/main',GITHUB_REPOSITORY:'killjoy00/mtg-ev-analyzer',GITHUB_RUN_ID:'12345',GITHUB_RUN_ATTEMPT:'1',GITHUB_SHA:'a'.repeat(40)},now}),error=>quotaForensicsFailureCode(error)==='private_storage_access');
   assert.equal(calls,0);
   const workflow=fs.readFileSync('.github/workflows/quota-stage-forensics.yml','utf8');
   assert.match(workflow,/CLOUDFLARE_PRIVATE_REPORT_TOKEN/);assert.doesNotMatch(workflow,/upload-artifact|schedule:/);
+  assert.match(workflow,/diagnosis:[\s\S]*environment: pack-one-mobile-release/);
   const source=fs.readFileSync('scripts/quota-stage-forensics.mjs','utf8');
   assert.doesNotMatch(source,/console\.log\([^\n]*JSON\.stringify/);
+});
+const trustedEnv={GITHUB_REF:'refs/heads/main',GITHUB_REPOSITORY:'killjoy00/mtg-ev-analyzer',GITHUB_RUN_ID:'12345',GITHUB_RUN_ATTEMPT:'1',GITHUB_SHA:'a'.repeat(40),CLOUDFLARE_EDGE_TOKEN:token,CLOUDFLARE_PRIVATE_REPORT_TOKEN:token};
+test('publisher completes collection, private write and readback in trusted context',async()=>{
+  const storage=storageFixture();let queries=0;
+  await publishQuotaForensics({now,env:trustedEnv,fetcher:async(url,options)=>{
+    if(url.includes('/zones?'))return Response.json({success:true,result:[{name:'packone.pro',status:'active',account:{id:account}}]});
+    if(url.includes('/observability/')){queries++;return page([]);}
+    return storage.fetcher(url,options);
+  }});
+  assert.equal(queries,3);assert.equal(storage.calls.filter(x=>x.method==='PUT').length,1);
+  assert.equal(storage.calls.filter(x=>x.url.endsWith('/domains/managed')).length,2);
+});
+test('public failure categories retain stages and HTTP status but never arbitrary messages or codes',async()=>{
+  for(const value of [undefined,{message:'private provider payload'},{forensicCode:'storage_http_403 private data'},{forensicCode:'telemetry_http_999'},{forensicCode:123}])
+    assert.equal(quotaForensicsFailureCode(value),'collection_unavailable');
+  assert.equal(quotaForensicsFailureCode({forensicCode:'storage_http_403'}),'storage_http_403');
+  for(const [stage,fetcher] of [
+    ['storage_http_403',async()=>new Response('private provider payload',{status:403})],
+    ['telemetry_http_400',async url=>url.endsWith('/domains/managed')?Response.json({success:true,result:{enabled:false}}):url.endsWith('/domains/custom')?Response.json({success:true,result:{domains:[]}}):new Response('private provider payload',{status:400})],
+  ])await assert.rejects(publishQuotaForensics({now,env:trustedEnv,fetcher}),error=>quotaForensicsFailureCode(error)===stage&&!error.message.includes('private provider payload'));
 });
