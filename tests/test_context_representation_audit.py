@@ -3,16 +3,22 @@
 Tests of old behavior are diagnostic contracts, not endorsements. A separately
 versioned replacement must pass improved expectations before promotion.
 """
+import csv
+import gzip
+import json
 import math
 from pathlib import Path
 import sys
+import tempfile
 import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from audit_context_representation import audit_fits, summarize_copy_observations
+from audit_context_representation import (audit_fits, audit_splash_sensitivity, scan_deck_colours,
+                                          summarize_copy_observations)
 from build_replays import CountStore, OutOfFoldModel, PickExample
 from deck_fit import commitment, observe_examples
 from eval_model import VARIANTS, VariantModel
+from build_rules_context_metadata import encode, select_records
 from rules_mana_context import card_mana_context
 
 
@@ -83,6 +89,59 @@ class ContextAuditTests(unittest.TestCase):
         self.assertEqual(fold['required_color_omitted'], 2)
         self.assertEqual(fold['zero_stage_cells'], 1)
         self.assertEqual(fold['zero_marginal_cells'], 0)
+
+
+    def test_fixing_land_with_one_inferred_color_is_counted(self):
+        land = lambda *colors: {'layout': 'normal', 'mana_cost': '', 'type_line': 'Land',
+                                'produced_mana': list(colors)}
+        metadata = {'Partial': land('W', 'U'), 'Flexible': land('W', 'U'), 'Full': land('W', 'U'),
+                    'Thin': land('W', 'U'), 'Island': land('U')}
+        fit = {'holdout_fold': 0, 'cards': {name: {'colours': color} for name, color in
+               [('Partial', 'U'), ('Flexible', 'C'), ('Full', 'UW'), ('Thin', '?'), ('Island', 'U')]},
+               'by_stage': {}, 'by_commitment': {}, 'play_rate': .5}
+        fold = audit_fits([fit], metadata)['folds'][0]
+        self.assertEqual(fold['fixing_lands'], 4)
+        self.assertEqual(fold['fixing_land_partial_affinity'], 1)
+        self.assertEqual(fold['fixing_land_flexible_affinity'], 1)
+        self.assertEqual(fold['fixing_land_unknown_affinity'], 1)
+        self.assertEqual(fold['lands_with_colored_affinity'], 3)
+        self.assertEqual(fold['known_simple_colored_spells'], 0)
+
+    def test_splash_colors_restore_a_dropped_printed_color(self):
+        # 26 UR decks and 4 U decks splashing R: R misses the 90% main-color bar.
+        rows = [(f'd{i}', 'UR', '') for i in range(26)] + [(f's{i}', 'U', 'R') for i in range(4)]
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'games.csv.gz'
+            with gzip.open(path, 'wt', newline='') as handle:
+                writer = csv.writer(handle)
+                writer.writerow(['draft_id', 'main_colors', 'splash_colors', 'deck_Gold', 'deck_Other'])
+                writer.writerows([*row, 1, 0] for row in rows)
+            ids = {row[0] for row in rows}
+            played, main, both, games = scan_deck_colours(path, ids)
+        self.assertEqual((main['s0'], both['s0']), ('U', 'UR'))
+        self.assertEqual(games, {'games': 30, 'games_with_splash': 4})
+        fit = {'holdout_fold': 0, 'cards': {'Gold': {'colours': 'U'}}}
+        metadata = {'Gold': simple_card('{1}{U}{R}')}
+        self.assertEqual(audit_fits([fit], metadata)['folds'][0]['required_color_omitted'], 1)
+        result = audit_splash_sensitivity([fit], [ids], played, main, both, metadata)
+        self.assertEqual(result['folds'][0]['required_color_omitted'], 0)
+        self.assertEqual(result['folds'][0]['known_simple_colored_spells'], 1)
+        # The recount refuses to run if it no longer matches the production fit.
+        with self.assertRaises(ValueError):
+            audit_splash_sensitivity([{**fit, 'cards': {'Gold': {'colours': 'UR'}}}],
+                                     [ids], played, main, both, metadata)
+
+    def test_rules_metadata_snapshot_is_deterministic_and_keyed_by_alias(self):
+        def printing(card_id, set_code, promo=False, **fields):
+            return {'id': card_id, 'name': 'Gold', 'set': set_code, 'lang': 'en', 'promo': promo,
+                    'layout': 'normal', 'mana_cost': '{1}{U}{R}', 'type_line': 'Instant',
+                    'image_uris': {'normal': f'https://example.test/{card_id}.jpg'},
+                    'prices': {'usd': '1.00'}, **fields}
+        records = select_records([printing('promo', 'fra', promo=True), printing('base', 'fra')], 'fra')
+        self.assertEqual(records, {'Gold': {'id': 'base', 'layout': 'normal', 'mana_cost': '{1}{U}{R}',
+                                            'name': 'Gold', 'type_line': 'Instant'}})
+        self.assertEqual(encode(records), encode(json.loads(json.dumps(records))))
+        self.assertEqual(json.loads(gzip.decompress(encode(records))), records)
 
 
 if __name__ == '__main__':
