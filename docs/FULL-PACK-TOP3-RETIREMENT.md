@@ -8,7 +8,7 @@ The legacy API returns `410 Gone` for `POST /v1/scores`, `GET /v1/leaderboard`, 
 
 The Growth service's obsolete `POST /v1/results` writer also returns 410. Forged Draft Run submissions still return 403; real results are saved by the game server. No legacy results or scores are rewritten or deleted.
 
-Old web share links show a retirement notice with links to the Daily and practice. The native historical-link screen also offers the Daily. Full Pack/Top 3 graders, their replay-path runtime, old SPA, social/leaderboard client and unused legacy presentation layers are removed. `scoring.mjs` retains the ranking helper used by Draft Run. Date, hash, selector and period helpers remain in `worker/core.mjs`. Replay archives and offline training/build tools are retained.
+Old web share links show a retirement notice with links to the Daily and practice. The native historical-link screen also offers the Daily. Full Pack/Top 3 graders, their replay-path runtime, old SPA, social/leaderboard client and unused legacy presentation/flow layers are removed. Legacy seeded-link creation and replay-prefetch helpers are removed; the shared random generator and rarity ordering used by Draft Run remain. `scoring.mjs` retains the ranking helper used by Draft Run. Date, hash, selector and period helpers remain in `worker/core.mjs`. Replay archives and offline training/build tools are retained.
 
 ## Identity and traffic verification
 

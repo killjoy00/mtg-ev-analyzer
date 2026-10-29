@@ -44,7 +44,7 @@ test('old share page shows a notice without network access or dynamic game impor
   try {await installHistoricalShare();assert.match(app.innerHTML,/has been retired/);assert.match(app.innerHTML,/Play the Daily/);}
   finally {globalThis.document=previous;}
   assert.doesNotMatch(readFileSync('historical-share.mjs','utf8'),/fetch\(|import\(/);
-  for(const path of ['app.js','leaderboard.mjs','social.mjs','path-model.mjs','worker/path-model.mjs'])
+  for(const path of ['app.js','leaderboard.mjs','social.mjs','path-model.mjs','worker/path-model.mjs','product.mjs','flow-fixes.mjs'])
     assert.equal(existsSync(path),false,path);
 });
 

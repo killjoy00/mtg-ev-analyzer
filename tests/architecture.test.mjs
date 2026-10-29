@@ -9,8 +9,6 @@ function source(path) {
 const lifecycleModules = [
   'render-lifecycle.mjs',
   'bootstrap.mjs',
-  'product.mjs',
-  'flow-fixes.mjs',
   'growth.mjs',
   'retention.mjs',
   'home-today.mjs',
