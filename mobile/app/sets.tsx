@@ -53,7 +53,7 @@ function SetCard({
     : latest ? 'latest' : entry.regular_run ? 'mixed' : null;
   const action = environment === 'powered-cube'
     ? 'Play Cube Daily →'
-    : environment === 'latest' ? 'Play Latest Set Daily →' : 'Play Draft Run Daily →';
+    : environment === 'latest' ? 'Play Latest Set Daily →' : 'Play mixed-set Daily →';
   const archive = publishedSetArchive(entry.set_id);
 
   return (
@@ -61,7 +61,7 @@ function SetCard({
       <Text style={styles.kicker}>DATA THROUGH {dateLabel(entry.data_date).toUpperCase()}</Text>
       <Text style={styles.cardTitle}>{entry.set_name || entry.set_id.toUpperCase()}</Text>
       <Text style={styles.body}>
-        {formatNumber(entry.verified_decisions)} verified first-pack decisions · {formatNumber(entry.qualified_trophy_drafts)} qualified Premier trophy drafts.
+        {formatNumber(entry.verified_decisions)} first-pack picks from {formatNumber(entry.qualified_trophy_drafts)} Premier Draft trophies.
       </Text>
       <Text style={styles.body}>
         {cohortLabel(entry)}{entry.training_drafts ? ` · ${formatNumber(entry.training_drafts)} training drafts` : ''}.
@@ -99,7 +99,7 @@ export default function SetsScreen() {
     } catch (error: unknown) {
       setState({
         status: 'error',
-        message: error instanceof Error ? error.message : 'Current serving coverage could not be loaded.',
+        message: error instanceof Error ? error.message : 'Couldn’t load the set list. Try again.',
       });
     }
   };
@@ -114,7 +114,7 @@ export default function SetsScreen() {
         if (!active) return;
         setState({
           status: 'error',
-          message: error instanceof Error ? error.message : 'Current serving coverage could not be loaded.',
+          message: error instanceof Error ? error.message : 'Couldn’t load the set list. Try again.',
         });
       });
     return () => {
@@ -127,7 +127,7 @@ export default function SetsScreen() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
           <ActivityIndicator color={colors.accent} />
-          <Text style={styles.body}>Loading current serving coverage…</Text>
+          <Text style={styles.body}>Loading sets…</Text>
         </View>
       </SafeAreaView>
     );
@@ -162,18 +162,18 @@ export default function SetsScreen() {
           <Text style={styles.kicker}>SET ARCHIVE</Text>
           <Text style={styles.title}>Every set in Pack One.</Text>
           <Text style={styles.deck}>
-            Live Draft Run coverage, qualified trophy sources, verified first-pack decisions, and training cohorts—read from the serving corpus.
+            Browse the sets in Pack One and see how many real draft picks are available from each.
           </Text>
         </View>
 
         <View style={styles.summary}>
           <View style={styles.summaryItem}>
             <Text style={styles.summaryValue}>{standard.length}</Text>
-            <Text style={styles.summaryLabel}>standard sets</Text>
+            <Text style={styles.summaryLabel}>Draft sets</Text>
           </View>
           <View style={styles.summaryItem}>
             <Text style={styles.summaryValue} numberOfLines={2}>{latest?.set_name || latest?.set_id.toUpperCase() || '—'}</Text>
-            <Text style={styles.summaryLabel}>latest environment</Text>
+            <Text style={styles.summaryLabel}>Newest set</Text>
           </View>
           <View style={styles.summaryItem}>
             <Text style={styles.summaryValue}>{dateLabel(latest?.data_date)}</Text>
@@ -189,7 +189,7 @@ export default function SetsScreen() {
           {standard.length ? standard.map((entry) => (
             <SetCard key={entry.set_id} entry={entry} latest={entry.set_id === latest?.set_id} />
           )) : (
-            <Text style={styles.body}>The serving catalog did not contain any playable regular sets.</Text>
+            <Text style={styles.body}>No Draft sets are available right now. Try again.</Text>
           )}
         </View>
 

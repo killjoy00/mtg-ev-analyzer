@@ -55,6 +55,9 @@ import type { SharedRunSurface } from '@/src/state/sharedRunSurface';
 import { tcgplayerUrl } from '@/src/tcgplayer';
 import { colors, spacing } from '@/src/theme';
 import { trophyDrafterFacts, trophyDrafterSentences } from '@/src/trophyDrafter';
+import setDisplayNames from '../../data/set-display-names.json';
+
+const resultSetName = (id: string) => (setDisplayNames.names as Record<string, string>)[String(id || '').toLowerCase()] || String(id || '').toUpperCase();
 
 type LoadState =
   | { status: 'loading' }
@@ -373,8 +376,8 @@ function PackReview({
     <View style={styles.packReview}>
       {answer.puzzle.prior_picks.length ? (
         <>
-          <Text style={styles.analysisSubhead}>Previous cards</Text>
-          <Text style={styles.sectionBody}>Already selected by this drafter.</Text>
+          <Text style={styles.analysisSubhead}>Earlier picks</Text>
+          
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.poolRow}>
             {answer.puzzle.prior_picks.map((card, index) => (
               <Pressable
@@ -1018,7 +1021,7 @@ export default function DraftRunScreen({
                 ? creator.outcome === 'win' ? `You beat ${creator.name}.` : creator.outcome === 'loss' ? `${creator.name} won this challenge.` : 'This creator challenge was a tie.'
                 : run.comparison.exact
                   ? Number(run.score) > run.comparison.score ? 'You won this shared run.' : Number(run.score) < run.comparison.score ? 'Your friend won this shared run.' : 'This shared run was a tie.'
-                  : 'These results are not an exact same-decision comparison.'}</Text>
+                  : 'You and your friend played different packs, so the scores aren’t directly comparable.'}</Text>
               {creator?.creator_post_run_note ? <Text style={styles.resultBody}>{creator.name} after the run: “{creator.creator_post_run_note}”</Text> : null}
             </View>
           ) : null}
@@ -1041,7 +1044,7 @@ export default function DraftRunScreen({
                 <Text style={styles.resultReviewIndex}>{index + 1}</Text>
                 <View style={styles.resultReviewCopy}>
                   <Text style={styles.resultReviewTitle}>
-                    {item.puzzle.set_id.toUpperCase()} · Pick {item.pickNumber ?? item.puzzle.pick_number}
+                    {resultSetName(item.puzzle.set_id)} · P1P{item.pickNumber ?? item.puzzle.pick_number}
                   </Text>
                   <Text style={styles.rankingMeta}>
                     {item.selectedName}{item.historicalMatch ? ' · Trophy match' : ''}
@@ -1069,14 +1072,14 @@ export default function DraftRunScreen({
             </Text>
             <Text style={styles.resultBody}>
               {creatorChallenge
-                ? 'This is an unranked creator replay. It does not consume or modify your Daily attempt, streak, or leaderboard result.'
+                ? 'Playing this won’t use up your Daily attempt, change your streak, or affect your leaderboard score.'
                 : shared
                   ? 'This is your saved shared run. Reopening the invitation recovers the same picks and result, not another attempt.'
                   : practice
                   ? 'Practice builds your career. Play the Dailies to join the leaderboard.'
                   : state.session.accountToken
                     ? 'Your result is saved to your Pack One account.'
-                    : 'Sign in or create your Pack One account to validate this Daily score and keep your career across devices.'}
+                    : 'Sign in or create a free account to add this score to today’s leaderboard and keep your scores across devices.'}
             </Text>
             {!shared && !practice && !state.session.accountToken ? (
               <Pressable
@@ -1087,7 +1090,7 @@ export default function DraftRunScreen({
                 })}
                 style={styles.secondaryButton}
               >
-                <Text style={styles.secondaryButtonText}>Sign in to save this score</Text>
+                <Text style={styles.secondaryButtonText}>Sign in to add this score to the leaderboard</Text>
               </Pressable>
             ) : null}
           </View>
