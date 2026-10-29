@@ -25,8 +25,8 @@ function dateLabel(value) {
 }
 
 function cohortLabel(entry) {
-  if (entry.win_rate_cutoff) return `${Math.round(Number(entry.win_rate_cutoff) * 100)}%+ source win rate`;
-  return 'Experienced Arena-rank source cohort';
+  if (entry.win_rate_cutoff) return `Drafters with at least a ${Math.round(Number(entry.win_rate_cutoff) * 100)}% win rate`;
+  return 'For older sets, we used Arena rank to decide which drafters qualified';
 }
 
 function formatNumber(value) {
@@ -41,9 +41,9 @@ function card(entry, { special = false } = {}) {
   return `<article class="content-card set-catalog-card" data-set-id="${esc(id)}">
     <p class="kicker">Data through ${esc(dateLabel(entry.data_date))}</p>
     <h2>${esc(entry.set_name || id.toUpperCase())}</h2>
-    <p>${formatNumber(entry.verified_decisions)} verified first-pack decisions · ${formatNumber(entry.qualified_trophy_drafts)} qualified Premier trophy drafts.</p>
+    <p>${formatNumber(entry.verified_decisions)} first-pack picks from ${formatNumber(entry.qualified_trophy_drafts)} Premier Draft trophies.</p>
     <p>${esc(cohortLabel(entry))}${entry.training_drafts ? ` · ${formatNumber(entry.training_drafts)} training drafts` : ''}.</p>
-    <div class="set-card-actions"><a href="${practiceUrl}">${special ? 'Elite Cube Practice' : 'Play Draft Run'}</a>${hasSetGuide(id)?`<a href="${setGuidePath(id)}">Set guide</a>`:''}${detailPages.has(id) ? `<a href="/sets/${encodeURIComponent(id)}/">Data notes</a>` : ''}</div>
+    <div class="set-card-actions"><a href="${practiceUrl}">${special ? 'Elite Cube Practice' : 'Play a mixed-set Draft Run'}</a>${hasSetGuide(id)?`<a href="${setGuidePath(id)}">Set guide</a>`:''}${detailPages.has(id) ? `<a href="/sets/${encodeURIComponent(id)}/">Data notes</a>` : ''}</div>
   </article>`;
 }
 
@@ -70,7 +70,7 @@ async function renderCatalog() {
       specialSection.hidden = false;
     }
   } catch (error) {
-    grid.innerHTML = '<p class="set-archive-error">Current serving coverage could not be loaded. Open <a href="/?game=draft-run">Draft Run</a> to keep playing.</p>';
+    grid.innerHTML = '<p class="set-archive-error">Couldn’t load the set list. You can still play a <a href="/?game=draft-run">Draft Run</a>.</p>';
   }
 }
 
