@@ -26,6 +26,7 @@ export default function AccountRemindersScreen() {
   const [loading,setLoading]=useState(true);
   const [saving,setSaving]=useState(false);
   const [deviceEnabled,setDeviceEnabled]=useState(false);
+  const [showDeliveryDetails,setShowDeliveryDetails]=useState(false);
   const [notice,setNotice]=useState<string|null>(null);
   const [permissionBlocked,setPermissionBlocked]=useState(false);
   const ownerId=session?.accountUser?.id||null;
@@ -122,10 +123,15 @@ export default function AccountRemindersScreen() {
       <Text style={styles.body}>Next reminder: {formatDate(snapshot.nextAt)}</Text>
       {snapshot.email.deliveryActive===false?<Text style={styles.alert}>Email delivery is not active yet.</Text>:null}
       {snapshot.push.deliveryActive===false?<Text style={styles.alert}>Push delivery is not active yet.</Text>:null}
-      <Text style={styles.help}>Latest email attempt: {snapshot.email.lastAttempt?.state||'none'}. Latest push attempt: {snapshot.push.lastAttempt?.state||'none'}.</Text>
-      {snapshot.push.lastAttempt?.platformReceipt?<Text style={styles.help}>Push platform receipt: {snapshot.push.lastAttempt.platformReceipt} (not proof of display).</Text>:null}
-      <Text style={styles.help}>Last confirmed email delivery: {formatDate(snapshot.email.deliveredAt)}</Text>
-      <Text style={styles.help}>Last push provider acceptance: {formatDate(snapshot.push.providerAcceptedAt)}. This is not proof of device display.</Text>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: showDeliveryDetails }} onPress={() => setShowDeliveryDetails(value => !value)} style={styles.secondary}>
+        <Text style={styles.buttonLabel}>{showDeliveryDetails ? 'Hide delivery details' : 'Delivery details'}</Text>
+      </Pressable>
+      {showDeliveryDetails ? <>
+        <Text style={styles.help}>Latest email attempt: {snapshot.email.lastAttempt?.state||'none'}. Latest push attempt: {snapshot.push.lastAttempt?.state||'none'}.</Text>
+        {snapshot.push.lastAttempt?.platformReceipt?<Text style={styles.help}>Push platform receipt: {snapshot.push.lastAttempt.platformReceipt} (not proof of display).</Text>:null}
+        <Text style={styles.help}>Last confirmed email delivery: {formatDate(snapshot.email.deliveredAt)}</Text>
+        <Text style={styles.help}>Last push provider acceptance: {formatDate(snapshot.push.providerAcceptedAt)}. This is not proof of device display.</Text>
+      </> : null}
     </View>:null}
     {schedule?<View style={styles.panel}>
       <Text style={styles.heading}>Schedule</Text>
@@ -146,7 +152,7 @@ export default function AccountRemindersScreen() {
       <Text style={styles.help}>Local time (HH:mm)</Text>
       <TextInput accessibilityLabel="Local reminder time" style={styles.input} value={schedule.localTime}
         maxLength={5} placeholder="09:00" autoCorrect={false} onChangeText={localTime=>setSchedule({...schedule,localTime})}/>
-      <Text style={styles.help}>IANA timezone, such as America/Chicago</Text>
+      <Text style={styles.help}>Time zone (for example, America/Chicago)</Text>
       <TextInput accessibilityLabel="Reminder timezone" style={styles.input} value={schedule.timeZone}
         maxLength={80} autoCapitalize="none" autoCorrect={false}
         onChangeText={timeZone=>setSchedule({...schedule,timeZone})}/>

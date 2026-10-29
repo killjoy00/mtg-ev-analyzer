@@ -214,7 +214,7 @@ export default function AccountProfileScreen() {
             <Text style={[styles.toggleValue, profilePublic && styles.toggleValueActive]}>{profilePublic ? 'ON' : 'OFF'}</Text>
           </Pressable>
 
-          <Text style={styles.fieldLabel}>Favorite environment</Text>
+          <Text style={styles.fieldLabel}>Favorite set or format</Text>
           <View style={styles.optionGrid}>
             <Pressable accessibilityRole="button" accessibilityState={{ selected: favoriteSetId === '' }}
               onPress={() => setFavoriteSetId('')} style={[styles.optionChip, favoriteSetId === '' && styles.optionChipSelected]}>

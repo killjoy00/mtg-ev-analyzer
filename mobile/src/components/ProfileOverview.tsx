@@ -192,10 +192,10 @@ export function ProfileOverview({ profile, publicView = false }: { profile: Care
         {activityLink('daily', 'Browse Daily finishes and sharing')}
       </Section>
 
-      <Section title="Archive Progress">
+      <Section title="Sets you\'ve played">
         <Text style={styles.archiveNumber}>{played} / {total || 0}</Text>
         <Text style={styles.body}>Currently available environments played.</Text>
-        {activityLink('archive', 'Explore archive progress')}
+        {activityLink('archive', 'See all sets')}
         {total > 0 ? (
           <View style={styles.archiveTrack}>
             <View style={[styles.archiveFill, { width: `${Math.min(100, Math.round((played / total) * 100))}%` as `${number}%` }]} />
