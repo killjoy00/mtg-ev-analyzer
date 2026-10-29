@@ -102,4 +102,3 @@ Display calibration, fitted on the validation calibration partition only (228,59
 - v6 predicts strong players' served picks better overall and in 26 of 30 environments. This is the quantity Pack One's partial credit is defined from; it is not a measurement of contextual fairness.
 - The three worse sets, SNC, TDM and KTK, are all formats built around three-colour factions. A plausible but unverified explanation is that counting splash colours there makes too many cards look multicoloured. The owner chose one uniform model regardless.
 - Points move: the model leader changes on 3.7–16.3% of served decisions by set, and mean model-only points move by 1.18–5.33. A v6 release needs a new corpus version; existing puzzles keep their stored scores.
-
