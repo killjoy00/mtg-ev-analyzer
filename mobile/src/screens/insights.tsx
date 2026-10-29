@@ -94,7 +94,7 @@ function Metrics({ rows }: { rows: (InsightGroup & { label: string })[] }) {
   return <View style={styles.metricList}>{rows.map((row, index) => <View key={row.label + index} style={styles.metric}>
     <View style={styles.metricHead}>
       <Text style={styles.metricName}>{row.label}</Text>
-      <Text style={styles.metricScore}>{row.average_score === null ? 'Need 5 picks' : score(row.average_score) + ' / 100'}</Text>
+      <Text style={styles.metricScore}>{row.average_score === null ? 'Average after 5 picks' : score(row.average_score) + ' / 100'}</Text>
     </View>
     <View accessibilityLabel={row.label + ', ' + row.count + ' picks, ' +
       (row.average_score === null ? 'not enough to average' : score(row.average_score) + ' average points')}
@@ -145,7 +145,7 @@ function DNASummary({dna,cardChoices,onReview}:{
     trait?.status==='qualified');
   const qualified=[...new Map(traits.map(trait=>[trait.id,trait])).values()];
   const ready=(cardChoices?.choices||[]).filter(choice=>choice.status==='ready');
-  return <Section title="Your pick patterns" caption="Across formats · All available history" compact>
+  return <Section title="Your pick patterns" caption="Recent picks across all formats" compact>
     {qualified.length?qualified.map(trait=><DNATrait key={trait.id} trait={trait}/>):
       <Text style={styles.caption}>No clear pick pattern to show yet.</Text>}
     {ready.length?<View style={styles.contextWrap}>
@@ -183,7 +183,7 @@ function DNASummary({dna,cardChoices,onReview}:{
       <Text style={styles.summary}>How this works</Text>
     </Pressable>
     {showRules?<View style={styles.evidence}>
-      <Text style={styles.caption}>{num(dna.eligible_decisions)} picks included independent of the Format and time filters. Only the first included answer per puzzle counts. History is bounded to recent qualifying runs, so older picks may not appear.</Text>
+      <Text style={styles.caption}>{num(dna.eligible_decisions)} picks included independent of the Format and time filters. We count each puzzle once, even if you play it again. History is bounded to recent qualifying runs, so older picks may not appear.</Text>
       <Text style={styles.caption}>Traits describe patterns in your picks, not measured skill. {dna.note}</Text>
       {cardChoices?<Text style={styles.caption}>{cardChoices.note}</Text>:null}
     </View>:null}
@@ -257,7 +257,7 @@ function HighlightsStory({highlights,finding,onReview,onLoadMore,morePhase}:{
   const [showScoring,setShowScoring]=useState(false);
   const rows=selected==='best'?highlights.best:highlights.misses;
   const show=expanded?rows:(rows||[]).slice(0,3);
-  return <Section title="Picks to review" caption="Only your first included answer to each puzzle counts."
+  return <Section title="Picks to review" caption="We count each puzzle once, even if you play it again."
     onLayout={config.screenshots.fixtures?()=>console.info('PACKONE_INSIGHTS_READY'):undefined}>
     {finding?<Text style={styles.reportLead}>{finding.text} Individual examples illustrate the comparison, not its cause.</Text>:
       <Text style={styles.caption}>Open a pick to see the full pack and the trophy drafter’s earlier picks.</Text>}
@@ -392,8 +392,8 @@ function InsightSections({data,onReview,onLoadMore,morePhase}:{
   // Keep them visible even before this format/time range unlocks its report.
   const dnaSection=data.drafting_dna?<DNASummary dna={data.drafting_dna}
     cardChoices={data.card_choices} onReview={onReview}/>:
-    <Section title="Your pick patterns" caption="Across formats · All available history">
-      <Text style={styles.caption}>Pattern details aren’t available from this version yet.</Text>
+    <Section title="Your pick patterns" caption="Recent picks across all formats">
+      <Text style={styles.caption}>We can’t show your pick patterns right now.</Text>
     </Section>;
   if (!data.unlocked) return <>
     <Section title="Picks to review">
@@ -435,10 +435,10 @@ function InsightSections({data,onReview,onLoadMore,morePhase}:{
           <Text style={styles.bigScore}>{score(row.average_score)}/100</Text>
           <Text style={styles.meta}>{num(row.count)} picks included{row.average_score===null?' · need 5':''}</Text>
         </View>)}</View>
-        {extra.length?<><Text style={styles.subheading}>Other within-format comparisons</Text>
+        {extra.length?<><Text style={styles.subheading}>More comparisons from this format</Text>
           {extra.map(row=><Text key={row.id} style={styles.body}>{row.text}</Text>)}</>:null}
         <Text style={styles.subheading}>How this works</Text>
-        <Text style={styles.caption}>{data.methodology||'Only the first included answer to each puzzle counts.'}</Text>
+        <Text style={styles.caption}>{data.methodology||'We count each puzzle once, even if you play it again.'}</Text>
       </View>:null}
     </View>
   </>;

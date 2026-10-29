@@ -149,15 +149,15 @@ try{
   if(cube){
     assert.equal(originalSet,'powered-cube');assert.equal(puzzles[0].pick_number,2);
     assert.equal(await page.locator('[data-reroll="set"]').count(),0);
-    await page.locator('[data-reroll="pack"]').click();await page.getByRole('button',{name:'Reroll pack · 1',exact:true}).waitFor();
+    await page.locator('[data-reroll="pack"]').click();await page.getByRole('button',{name:'New pack · 1',exact:true}).waitFor();
   }else{
-    await page.locator('[data-reroll="set"]').click();await page.getByRole('button',{name:'Reroll set · 0',exact:true}).waitFor();
+    await page.locator('[data-reroll="set"]').click();await page.getByRole('button',{name:'New set · 0',exact:true}).waitFor();
     assert.notEqual(puzzles[0].set_id,originalSet);
   }
   const replacementSet=puzzles[0].set_id;
   if(hasSetGuide(replacementSet))assert.equal(await guideTrigger.getAttribute('data-set-refresher'),replacementSet,'guide follows the rerolled set');
   else assert.equal(await guideTrigger.count(),0);
-  await page.locator('[data-reroll="pack"]').click();await page.getByRole('button',{name:'Reroll pack · 0',exact:true}).waitFor();
+  await page.locator('[data-reroll="pack"]').click();await page.getByRole('button',{name:'New pack · 0',exact:true}).waitFor();
   assert.equal(puzzles[0].set_id,replacementSet);
   }
   await noOverflow();
@@ -318,7 +318,7 @@ try{
   }
   if(daily){
     assert.match(shared.text,/I scored \d+\/100 on the Pack One (Draft Run|Powered Cube|Latest Set) Daily \(Oct 7\)\./);
-    assert.match(shared.text,/Play today’s Daily yourself\. Free, no account needed:$/);
+    assert.match(shared.text,/Try Pack One's Daily\. No account needed:$/);
     const sharedUrl=new URL(shared.url);assert.equal(sharedUrl.pathname,'/share/daily/'+environment+'/');assert.equal(sharedUrl.searchParams.get('d'),fixtureDay);assert.equal(sharedUrl.searchParams.get('ref'),'result_share');assert.doesNotMatch(shared.url,/challenge=|shared=/);assert.equal(shareCalls,0);
     // The share panel sits above the next-Daily handoff and names no cards.
     const order=await page.evaluate(()=>{const panel=document.querySelector('.run-share-panel'),next=document.querySelector('[data-next-daily-action]');return Boolean(panel.compareDocumentPosition(next)&Node.DOCUMENT_POSITION_FOLLOWING);});

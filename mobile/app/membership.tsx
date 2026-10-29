@@ -332,7 +332,7 @@ function AppleElitePanel({
             : 'Connecting to the App Store...'}</Text>
       )}
 
-      {!signedIn ? <Text style={styles.help}>Sign in to Pack One before purchasing or restoring so StoreKit can bind the subscription to the correct account.</Text> : null}
+      {!signedIn ? <Text style={styles.help}>Sign in to the Pack One account you want to use for Elite before purchasing. To restore a subscription, use the account it was originally connected to.</Text> : null}
 
       {!appleActive ? (
         <Pressable

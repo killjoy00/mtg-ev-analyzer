@@ -124,7 +124,7 @@ try {
 
   await reset({isSigned:true,status:disconnected});
   await page.goto(base+'/patreon/');
-  await page.getByRole('heading',{name:'Connect Patreon to activate Elite',exact:true}).waitFor();
+  await page.getByRole('heading',{name:'Connect Patreon to check your membership benefits',exact:true}).waitFor();
   assert.ok(accountSessionRequests>0,'fresh signed-in scenario must request account session');
   assert.equal(await page.getByRole('button',{name:'Connect Patreon',exact:true}).count(),1);
   assert.equal(await page.getByRole('link',{name:'View Patreon membership',exact:true}).count(),1);

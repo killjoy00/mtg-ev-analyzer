@@ -74,7 +74,7 @@ function barRows(rows,{labelKey='label',valueLabel='picks'}={}) {
     const pct=avg===null?0:Math.max(0,Math.min(100,Number(avg)));
     return '<div class="my-insights-bar" aria-label="'+esc(rowText(row,label))+'">'+
       '<div class="my-insights-bar-head"><strong>'+esc(label)+'</strong><span>'+
-      (avg===null?'<em>Need 5 picks</em>':score(avg)+' / 100')+'</span></div>'+
+      (avg===null?'<em>Average after 5 picks</em>':score(avg)+' / 100')+'</span></div>'+
       '<div class="my-insights-track" aria-hidden="true"><i style="width:'+pct+'%"></i></div>'+
       '<small>'+number(row.count)+' '+esc(valueLabel)+'</small></div>';
   }).join('')+'</div>';
@@ -109,7 +109,7 @@ function monthMarkup(rows) {
 function dnaMarkup(data) {
   const dna=data.drafting_dna;
   if(!dna)return '<section class="my-pack-card my-insights-wide my-insights-dna"><h2>Your pick patterns</h2>'+
-    '<p class="my-insights-note">Pattern details aren’t available from this version yet.</p></section>';
+    '<p class="my-insights-note">We can’t show your pick patterns right now.</p></section>';
   const traits=[dna.primary,...(dna.secondary||[])].filter(t=>t?.status==='qualified');
   const distinct=[...new Map(traits.map(t=>[t.id,t])).values()];
   const traitHtml=distinct.length?'<div class="my-insights-qualified-traits">'+distinct.map(trait=>
@@ -134,10 +134,10 @@ function dnaMarkup(data) {
           ' · '+esc(shortInsightDate(e.date))+'</button>').join('')+'</details></div>';
     }).join('')+'</details>':'';
   return '<section class="my-pack-card my-insights-wide my-insights-dna">'+
-    '<div class="my-card-heading"><h2>Your pick patterns</h2><span>Across formats · All available history</span></div>'+
+    '<div class="my-card-heading"><h2>Your pick patterns</h2><span>Recent picks across all formats</span></div>'+
     traitHtml+choiceHtml+
     '<details class="my-insights-dna-method"><summary>How this works</summary>'+
-    '<p class="my-insights-note">'+number(dna.eligible_decisions)+' picks included, regardless of the Format and time filters. Only the first included answer per puzzle counts. History is bounded to recent eligible runs, so older picks may not appear.</p>'+
+    '<p class="my-insights-note">'+number(dna.eligible_decisions)+' picks included, regardless of the Format and time filters. We count each puzzle once, even if you play it again. History is bounded to recent eligible runs, so older picks may not appear.</p>'+
     '<p class="my-insights-note">Traits describe patterns in your picks, not measured skill. '+esc(dna.note||'')+'</p>'+
     (data.card_choices?'<p class="my-insights-note">'+esc(data.card_choices.note||'')+'</p>':'')+
     '</details></section>';
@@ -174,7 +174,7 @@ function highlightCards(rows,kind,expanded=false,showFinding=false) {
 }
 function highlightsMarkup(data) {
   if(!data.highlights)return '<section class="my-pack-card my-insights-wide my-insights-highlights">'+
-    '<h2>Picks to review</h2><p class="my-insights-note">Pick examples aren’t available from this version yet.</p></section>';
+    '<h2>Picks to review</h2><p class="my-insights-note">We can’t show examples from your saved picks right now.</p></section>';
   const selected=data.highlights.misses?.length?'misses':'best';
   const more=kind=>data.highlights?.[kind]?.length>3||data.highlights.has_more?.[kind]
     ?'<button type="button" class="button secondary" data-insights-more="'+kind+'" data-insights-page2="'+String(Boolean(data.highlights.has_more?.[kind]))+'">See more picks</button>':'';
@@ -199,7 +199,7 @@ function highlightsMarkup(data) {
       highlightCards(data.highlights.best,'best',false,Boolean(finding))+more('best')+'</div>'+
     '<details class="my-insights-how"><summary>How scores work</summary>'+
     '<p>Matching the trophy pick earns 100 points. Other picks earn up to 95 based on the model. Scores reflect the original result, not a measure of drafting skill.</p>'+
-    '<p>Only the first included answer to each puzzle counts.</p></details></section>';
+    '<p>We count each puzzle once, even if you play it again.</p></details></section>';
 }
 function journeyMarkup(data) {
   const journey=data.journey;
@@ -391,10 +391,10 @@ function insightsContent(data) {
       (data.unknown_difficulty?'<p class="my-insights-note">'+number(data.unknown_difficulty)+' picks have no rating.</p>':'')+
       '</section>'+
     '<section><h3>Scores by format</h3>'+formatsMarkup(data.formats||[],data.environment)+'</section>'+
-    (extras.length?'<section><h3>Other within-format comparisons</h3><ul class="my-insights-observations">'+
+    (extras.length?'<section><h3>More comparisons from this format</h3><ul class="my-insights-observations">'+
       extras.map(x=>'<li>'+esc(x.text)+'</li>').join('')+'</ul></section>':'')+
     '<section><h3>How this works</h3><p class="my-insights-note">'+
-       esc(data.methodology||'Only your first included answer to each puzzle counts. Scores are not a skill rating.')+'</p></section>'+
+       esc(data.methodology||'We count each puzzle once, even if you play it again. Scores are not a skill rating.')+'</p></section>'+
     '</div></details></div>';
 }
 // The Mixed sets note only applies while that format is selected.

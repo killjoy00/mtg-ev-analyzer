@@ -434,7 +434,7 @@ try {
   const record=page.locator('.my-stack .my-challenge-card');
   assert.equal(await record.locator('h2').innerText(), 'Shared Challenges');
   assert.deepEqual(await record.locator('.my-challenge-record > div').evaluateAll(nodes=>nodes.map(node=>node.innerText.replace(/\s+/g,' ').trim())), ['8 Beaten','3 Below target','1 Tied'], 'record card lists beaten, below target and tied');
-  assert.equal(await page.locator('.my-stack > section').first().locator('h2').innerText(), 'Archive Progress', 'record sits under Archive Progress');
+  assert.equal(await page.locator('.my-stack > section').first().locator('h2').innerText(), 'Sets you\'ve played', 'record sits under Sets you\'ve played');
   assert.deepEqual(await page.locator('.my-career-metrics strong').evaluateAll(nodes=>[...new Set(nodes.map(node=>getComputedStyle(node).fontSize))]), ['25px'], 'every snapshot value uses the same size');
   {const vp=page.viewportSize();await page.setViewportSize({width:390,height:844});
    const tops=await page.locator('.my-career-metrics strong').evaluateAll(nodes=>nodes.map(node=>Math.round(node.getBoundingClientRect().top)));
@@ -461,7 +461,7 @@ try {
   const order=await page.locator('#my-insights-result .my-insights-grid > *').evaluateAll(nodes=>
     nodes.map(node=>node.querySelector('h2')?.textContent||node.querySelector('summary')?.textContent));
   assert.deepEqual(order,['Picks to review','Your pick patterns','Your scores over time','More stats']);
-  assert.match(await page.locator('.my-insights-dna').textContent(),/Across formats · All available history/);
+  assert.match(await page.locator('.my-insights-dna').textContent(),/Recent picks across all formats/);
   assert.match(await page.locator('.my-insights-dna').textContent(),/The Independent Thinker/);
   assert.equal(await page.locator('.my-insights-qualified-trait').count(),2,
     'only qualified traits appear, with no empty secondary positions');
@@ -624,8 +624,8 @@ try {
   await page.locator('#my-insights-result').getByText('P1P2').waitFor();
   await page.locator('#my-insights-period').selectOption('90d');
   await page.locator('.my-insights-sample').getByText(/Last 90 days/).waitFor();
-  assert.match(await page.locator('.my-insights-dna').textContent(),/Across formats · All available history/,
-    'all-history DNA scope does not change under review filters');
+  assert.match(await page.locator('.my-insights-dna').textContent(),/Recent picks across all formats/,
+    'pick-pattern scope does not change under review filters');
   await high.click();
   for(const width of [320,390,768,1440]){
     await page.setViewportSize({width,height:844});

@@ -64,7 +64,7 @@ async function renderCatalog() {
     if (!standard.length) throw new Error('The serving catalog did not contain any playable sets.');
 
     grid.innerHTML = standard.map((entry) => card(entry)).join('');
-    summary.innerHTML = `<div><strong>${standard.length}</strong><span>standard sets</span></div><div><strong>${esc(standard[0].set_name || standard[0].set_id.toUpperCase())}</strong><span>latest environment</span></div><div><strong>${esc(dateLabel(standard[0].data_date))}</strong><span>latest data date</span></div>`;
+    summary.innerHTML = `<div><strong>${standard.length}</strong><span>Draft sets</span></div><div><strong>${esc(standard[0].set_name || standard[0].set_id.toUpperCase())}</strong><span>Newest set</span></div><div><strong>${esc(dateLabel(standard[0].data_date))}</strong><span>latest data date</span></div>`;
     if (special.length) {
       specialGrid.innerHTML = special.map((entry) => card(entry, { special: true })).join('');
       specialSection.hidden = false;
