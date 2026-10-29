@@ -307,7 +307,7 @@ try{
   await page.locator('#run-copy-result').click();
   await page.waitForFunction(()=>Boolean(window.__runCopied));
   assert.equal(await page.evaluate(()=>window.__runCopied),`${shared.text}\n${shared.url}`,'copy includes exactly the summary, colored squares and playable URL');
-  assert.match(await page.locator('#run-share-status').innerText(),/Score, colored squares and link copied/);
+  assert.match(await page.locator('#run-share-status').innerText(),/Copied your score, squares, and link/);
   if(daily){
     await page.evaluate(()=>{window.__denyClipboard=true;});
     await page.locator('#run-copy-result').click();
