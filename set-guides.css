@@ -41,3 +41,5 @@
   .guide-results-table tbody th>.guide-colors { display:none }.guide-results-table th,.guide-results-table td { padding-left:8px;font-size:13px }.guide-results-table thead th { font-size:12px }.guide-archetype p { margin-left:0 }
   .guide-mechanics dl { grid-template-columns:1fr;gap:4px }.guide-mechanics dd { margin-bottom:9px }.set-guide-callout { align-items:start;flex-direction:column;padding:18px }.set-refresher-trigger { min-height:44px }
 }
+/* Standalone guide links get the same 44px target as the rest of the site. */
+.guide-breadcrumb a,.guide-sources a,.set-guide-callout > a { display:inline-flex;align-items:center;min-height:44px }

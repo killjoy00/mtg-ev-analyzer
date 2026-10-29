@@ -93,6 +93,15 @@ function syncPrimaryNavState(state) {
 }
 syncPrimaryNavState('checking');
 
+// Mark the section the reader is in; site-nav.mjs does the same on content pages.
+{
+  const current=params.has('account')||params.has('profile')||params.has('patreon')?'account-nav'
+    :params.has('board')?'leaderboard-nav'
+    :params.get('game')==='draft-run'&&params.get('daily')!=='1'?'practice-nav'
+    :'daily-nav';
+  document.querySelector('#'+current)?.setAttribute('aria-current','page');
+}
+
 const deletionState=params.get('account');
 if (deletionState==='deleted'||deletionState==='deleting') {
   syncPrimaryNavState('signed-out');

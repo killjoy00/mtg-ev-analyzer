@@ -21,9 +21,9 @@ for(const id of GUIDE_IDS) {
   <meta property="og:url" content="https://packone.pro/sets/${id}/guide/" />
   <meta property="og:image" content="https://packone.pro/mobile/assets/images/icon.png" />
   <link rel="canonical" href="https://packone.pro/sets/${id}/guide/" />
-  <link rel="stylesheet" href="/visual-c.css?v=10" />
-  <link rel="stylesheet" href="/editorial.css?v=6" />
-  <link rel="stylesheet" href="/set-guides.css?v=1" data-set-guide-styles />
+  <link rel="stylesheet" href="/visual-c.css?v=11" />
+  <link rel="stylesheet" href="/editorial.css?v=7" />
+  <link rel="stylesheet" href="/set-guides.css?v=2" data-set-guide-styles />
   <title>${esc(title)}</title>
 </head>
 <body data-page="editorial">
@@ -42,7 +42,7 @@ for(const id of GUIDE_IDS) {
 </main>
 <footer class="site-footer"><div><strong>Pack One</strong></div><nav aria-label="Footer"><a href="/about/">About</a><a href="/contact/">Contact</a><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a></nav></footer>
 <script src="/leaderboard-config.js"></script>
-<script type="module" src="/site-nav.mjs?v=2"></script>
+<script type="module" src="/site-nav.mjs?v=3"></script>
 <script type="module" src="/sets/guide-page.mjs?v=1"></script>
 </body>
 </html>
