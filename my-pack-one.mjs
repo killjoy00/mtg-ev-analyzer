@@ -111,7 +111,7 @@ function archiveMarkup(progress) {
   const pct=progress.total?Math.round((progress.played/progress.total)*100):0;
   return '<div class="my-archive-summary"><div><strong>'+progress.played+'/'+progress.total+'</strong><span>environments played</span></div><b>'+pct+'%</b></div>'+
     '<div class="my-archive-track" role="progressbar" aria-label="Archive progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+pct+'"><i style="width:'+pct+'%"></i></div>'+
-    '<details class="my-pack-details" data-profile-section="archive"><summary>View environments</summary><div class="my-archive-grid">'+progress.environments.map(entry=>
+    '<details class="my-pack-details" data-profile-section="archive"><summary>See all sets</summary><div class="my-archive-grid">'+progress.environments.map(entry=>
       '<a class="my-archive-item '+(entry.played?'is-played':'is-unplayed')+'" data-environment-id="'+esc(entry.id)+'" href="/sets/#'+encodeURIComponent(entry.id)+'"><strong>'+esc(entry.name)+'</strong><span>'+(entry.played?entry.games+' games · '+entry.averageScore.toFixed(1)+' avg':'Not played yet')+'</span></a>'
     ).join('')+'</div></details>';
 }
@@ -204,7 +204,7 @@ function statsMarkup(profile,liveCatalog,account,patreon) {
       (recent.length?'<details class="my-pack-details"><summary>View all game history</summary><ol class="profile-history-list" id="profile-history-list">'+recent.map(row=>historyRow(row,names)).join('')+'</ol><button type="button" class="button secondary" id="profile-load-more" '+(recent.length<20?'hidden':'')+'>Load more</button></details>':'')+'</section>'+
     '<div class="my-two-up"><section class="my-pack-card"><div class="my-card-heading"><h2>Daily History</h2></div>'+(dailyPreview?'<ol class="my-daily-preview">'+dailyPreview+'</ol>':'<p class="my-pack-empty">No ranked Daily history yet.</p>')+
       (daily.length?'<details class="my-pack-details"><summary>View Daily finishes</summary><ol class="profile-daily-list">'+daily.map((row,index)=>dailyDetailRow(row,names,index)).join('')+'</ol></details>':'')+'</section>'+
-    '<div class="my-stack"><section class="my-pack-card"><div class="my-card-heading"><h2>Archive Progress</h2></div>'+archiveMarkup(progress)+'</section>'+challengeRecordMarkup(summary)+'</div></div>'+
+    '<div class="my-stack"><section class="my-pack-card"><div class="my-card-heading"><h2>Sets you\'ve played</h2></div>'+archiveMarkup(progress)+'</section>'+challengeRecordMarkup(summary)+'</div></div>'+
   '</main><aside class="my-pack-one-aside">'+profileAside(profile,progress,account,patreon)+membershipAside(patreon)+shareAside(profile)+'</aside></div>';
 }
 
