@@ -5,13 +5,19 @@ on:
     paths:
       - '.github/workflows/quota-stage-forensics.yml'
       - 'scripts/quota-stage-forensics.mjs'
+      - 'scripts/private-quota-forensics.mjs'
+      - 'scripts/verified-observability.mjs'
       - 'tests/quota-stage-forensics.test.mjs'
+      - 'tests/quota-forensics-collection.test.mjs'
   pull_request:
     branches: [main]
     paths:
       - '.github/workflows/quota-stage-forensics.yml'
       - 'scripts/quota-stage-forensics.mjs'
+      - 'scripts/private-quota-forensics.mjs'
+      - 'scripts/verified-observability.mjs'
       - 'tests/quota-stage-forensics.test.mjs'
+      - 'tests/quota-forensics-collection.test.mjs'
   workflow_dispatch:
 permissions:
   contents: read
@@ -26,19 +32,20 @@ jobs:
         with:
           node-version: 24
       - name: Test read-only analyzer without provider credentials
-        run: node --test tests/quota-stage-forensics.test.mjs
+        run: node --test tests/quota-stage-forensics.test.mjs tests/quota-forensics-collection.test.mjs
   diagnosis:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 8
     env:
       CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+      CLOUDFLARE_PRIVATE_REPORT_TOKEN: ${{ secrets.CLOUDFLARE_PRIVATE_REPORT_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
       - name: Test read-only analyzer
-        run: node --test tests/quota-stage-forensics.test.mjs
-      - name: Emit aggregate historical and current stage counts
+        run: node --test tests/quota-stage-forensics.test.mjs tests/quota-forensics-collection.test.mjs
+      - name: Save private historical and current stage evidence with verified query coverage
         run: node scripts/quota-stage-forensics.mjs

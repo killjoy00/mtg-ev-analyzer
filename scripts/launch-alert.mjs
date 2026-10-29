@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import {pathToFileURL} from 'node:url';
+import {collectVerifiedTelemetry} from './verified-observability.mjs';
 import {SLOW_REQUEST_MS,SLOW_QUOTA_MS,alertSeverity} from '../launch-alert-policy.mjs';
 import {reconcileIncidents,persistentLatencyConditions} from './launch-incident-state.mjs';
 import {
@@ -114,20 +115,15 @@ export function parseNeonUsage(data) {
 }
 
 export async function queryEvents(fetcher,token,account,from,to) {
-  const url=`https://api.cloudflare.com/client/v4/accounts/${account}/workers/observability/telemetry/query`,seen=new Map();
-  let offset=null;
-  for(let page=0;page<GATEWAY_MAX_PAGES;page++) {
-    const body={queryId:'pack1-launch-watch',timeframe:{from,to},dry:true,limit:GATEWAY_PAGE_SIZE,view:'events',parameters:{datasets:['cloudflare-workers'],filterCombination:'and',filters:[{key:'$metadata.service',operation:'eq',type:'string',value:'pack1-gateway'},{key:'event',operation:'eq',type:'string',value:'gateway_request'}]}};
-    if(offset){body.offset=offset;body.offsetDirection='next';}
-    const d=await json(fetcher,url,token,body);
-    const rows=d.result?.events?.events;if(!Array.isArray(rows))throw Error('Unexpected gateway log schema');
-    for(const row of rows){const event=parseGatewayEvent(row);if(!event?.id)throw Error('Unexpected gateway event schema');seen.set(event.id,event);}
-    if(rows.length<GATEWAY_PAGE_SIZE)return [...seen.values()];
-    const next=rows.at(-1)?.$metadata?.id;
-    if(typeof next!=='string'||!next||next.length>512||next===offset)throw Error('Gateway telemetry cursor invalid');
-    offset=next;
-  }
-  throw Error('Gateway telemetry exceeds bounded query capacity');
+  const url=`https://api.cloudflare.com/client/v4/accounts/${account}/workers/observability/telemetry/query`;
+  const result=await collectVerifiedTelemetry({from,to,pageSize:GATEWAY_PAGE_SIZE,maxPages:GATEWAY_MAX_PAGES,maxRequests:64,
+    fetchPage:async({from:begin,to:end,limit,offset})=>{
+      const body={queryId:'pack1-launch-watch',timeframe:{from:begin,to:end},dry:true,limit,view:'events',parameters:{datasets:['cloudflare-workers'],filterCombination:'and',filters:[{key:'$metadata.service',operation:'eq',type:'string',value:'pack1-gateway'},{key:'event',operation:'eq',type:'string',value:'gateway_request'}]}};
+      if(offset){body.offset=offset;body.offsetDirection='next';}
+      const data=await json(fetcher,url,token,body);
+      return {events:data.result?.events?.events,level:data.result?.statistics?.abr_level??data.result?.run?.statistics?.abr_level};
+    }});
+  return result.rows.map(row=>{const event=parseGatewayEvent(row);if(!event?.id)throw Error('Unexpected gateway event schema');return event;});
 }
 
 function dedupeEvents(events) {
