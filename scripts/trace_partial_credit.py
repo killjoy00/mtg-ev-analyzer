@@ -16,7 +16,7 @@ from pathlib import Path
 from build_replays import (
     CONTEXT_STRENGTH, FIT_STRENGTH, PAIR_MIN_SEEN, PAIR_PRIOR_STRENGTH,
     CountStore, DraftSkill, OutOfFoldModel, build_colour_tables_by_fold,
-    logit, logistic, normalize_probabilities, select_strong_drafts, stable_fold,
+    logit, logistic, normalize_probabilities, open_text, select_strong_drafts, stable_fold,
 )
 from import_all_trophies import collect_isolated, digest, scan_metadata, trajectory
 from model_training import V5_MODEL, current_model_version
@@ -66,7 +66,7 @@ def trace_card(model, card, pack_number, pick_number, pool):
     }
 
 
-def trace_decision(model, example, expected=None):
+def trace_decision(model, example, expected=None, card_metadata=None):
     rows = [trace_card(model, name, example.raw_pack_number, example.raw_pick_number, example.pool)
             for name in example.candidates]
     normalized = normalize_probabilities({r['name']: r['final_tendency'] for r in rows})
@@ -74,6 +74,8 @@ def trace_decision(model, example, expected=None):
     supports = {name: round(value, 6) for name, value in normalized.items()}
     if expected is not None:
         verify_served_state(example, expected, supports)
+    metadata = card_metadata or {}
+    prior_metadata = [metadata.get(c['name'], c) for c in expected['prior_picks']] if expected else []
     leader = max(supports.values())
     for row in rows:
         row['raw_support'] = supports[row['name']]
@@ -81,8 +83,8 @@ def trace_decision(model, example, expected=None):
         row['trophy_match'] = row['name'] == example.historical_pick
         row['awarded_credit'] = 100 if row['trophy_match'] else row['model_only_credit']
         if expected is not None:
-            metadata = next(c for c in expected['candidates'] if c['name'] == row['name'])
-            context = candidate_pool_context(metadata, expected['prior_picks'])
+            display = next(c for c in expected['candidates'] if c['name'] == row['name'])
+            context = candidate_pool_context(metadata.get(row['name'], display), prior_metadata)
             row['explicit_mana_context'] = context
             cast = context['card'].get('cast')
             affinity = row['inferred_color_affinity']
@@ -99,7 +101,8 @@ def trace_decision(model, example, expected=None):
             name: (model.fit or {}).get('cards', {}).get(name, {}).get('colours', '?')
             for name in example.pool},
         'prior_pool_explicit_mana': {
-            c['name']: card_mana_context(c) for c in expected['prior_picks']
+            display['name']: card_mana_context(metadata.get(display['name'], display))
+            for display in expected['prior_picks']
         } if expected is not None else None,
         'candidates': sorted(rows, key=lambda r: (-r['raw_support'], r['name'])),
     }
@@ -139,12 +142,18 @@ def main():
     p.add_argument('--source-draft-hash', required=True)
     p.add_argument('--pick-number', required=True, type=int)
     p.add_argument('--expected-puzzle', required=True, type=Path)
+    p.add_argument('--card-metadata', type=Path, help='Canonical card metadata keyed by archive card name')
+    p.add_argument('--metadata-sha256', help='Required with --card-metadata')
     p.add_argument('--output', required=True, type=Path)
     args = p.parse_args()
+    if bool(args.card_metadata) != bool(args.metadata_sha256):
+        p.error('--card-metadata and --metadata-sha256 must be supplied together')
     if current_model_version() != V5_MODEL or not 1 <= args.pick_number <= 11:
         p.error('This reconstruction supports current v5 Premier Pack 1 picks 1–11 only')
     verify_archive(args.draft_data, args.draft_sha256)
     verify_archive(args.game_data, args.game_sha256)
+    if args.card_metadata:
+        verify_archive(args.card_metadata, args.metadata_sha256)
     drafts, header, _, conflicts = scan_metadata(args.draft_data)
     ids = [did for did in drafts if hashlib.sha256(f'{args.set}|{did}'.encode()).hexdigest()[:32] == args.source_draft_hash]
     if len(ids) != 1 or ids[0] in conflicts:
@@ -166,9 +175,14 @@ def main():
     example = next((x for x in valid if x.raw_pick_number == args.pick_number - 1), None)
     if example is None:
         raise ValueError('Requested pick has no verified contiguous source prefix')
-    report = trace_decision(model, example, json.loads(args.expected_puzzle.read_text()))
+    metadata = None
+    if args.card_metadata:
+        with open_text(args.card_metadata) as handle:
+            metadata = json.load(handle)
+    report = trace_decision(model, example, json.loads(args.expected_puzzle.read_text()), metadata)
     report['reconstruction'] = {
         'draft_sha256': args.draft_sha256, 'game_sha256': args.game_sha256,
+        'metadata_sha256': args.metadata_sha256,
         'qualified_training_drafts': len(training), 'cohort_cutoff': cutoff,
         'fold_training_drafts': len(fold.training_ids),
         'source_excluded_from_training': True,

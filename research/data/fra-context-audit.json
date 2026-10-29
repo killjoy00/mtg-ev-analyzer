@@ -1,0 +1,90 @@
+{
+  "set": "fra",
+  "source_sha256": {
+    "draft": "f9497000be929d3f8cef87be643dc0b010e406a966ece7d0fc05e5e8e0c4b43d",
+    "game": "a350666bfd293bd14601105af0187f13353b16fa86e81307432a7b3a9a0bbfdc",
+    "metadata": "5dee48cee16adf09b5c1003c4ef9af88a4951e4c24e7f7ba47283e444b80dfd7"
+  },
+  "qualified_training_drafts": 4677,
+  "cohort_cutoff": 0.6,
+  "training_pick_rows": 196432,
+  "affinity": {
+    "folds": [
+      {
+        "holdout_fold": 0,
+        "fit_cards": 295,
+        "known_simple_colored_spells": 221,
+        "unsupported_or_missing_metadata": 37,
+        "unknown_affinity": 28,
+        "required_color_omitted": 34,
+        "colored_spell_flexible_affinity": 18,
+        "colored_spell_partial_affinity": 16,
+        "zero_stage_cells": 0,
+        "zero_marginal_cells": 0,
+        "zero_reference_rate": false
+      },
+      {
+        "holdout_fold": 1,
+        "fit_cards": 295,
+        "known_simple_colored_spells": 221,
+        "unsupported_or_missing_metadata": 37,
+        "unknown_affinity": 27,
+        "required_color_omitted": 33,
+        "colored_spell_flexible_affinity": 18,
+        "colored_spell_partial_affinity": 15,
+        "zero_stage_cells": 0,
+        "zero_marginal_cells": 0,
+        "zero_reference_rate": false
+      },
+      {
+        "holdout_fold": 2,
+        "fit_cards": 295,
+        "known_simple_colored_spells": 221,
+        "unsupported_or_missing_metadata": 37,
+        "unknown_affinity": 26,
+        "required_color_omitted": 35,
+        "colored_spell_flexible_affinity": 19,
+        "colored_spell_partial_affinity": 16,
+        "zero_stage_cells": 0,
+        "zero_marginal_cells": 0,
+        "zero_reference_rate": false
+      },
+      {
+        "holdout_fold": 3,
+        "fit_cards": 295,
+        "known_simple_colored_spells": 221,
+        "unsupported_or_missing_metadata": 37,
+        "unknown_affinity": 26,
+        "required_color_omitted": 33,
+        "colored_spell_flexible_affinity": 18,
+        "colored_spell_partial_affinity": 15,
+        "zero_stage_cells": 0,
+        "zero_marginal_cells": 0,
+        "zero_reference_rate": false
+      },
+      {
+        "holdout_fold": 4,
+        "fit_cards": 295,
+        "known_simple_colored_spells": 221,
+        "unsupported_or_missing_metadata": 37,
+        "unknown_affinity": 28,
+        "required_color_omitted": 33,
+        "colored_spell_flexible_affinity": 18,
+        "colored_spell_partial_affinity": 15,
+        "zero_stage_cells": 0,
+        "zero_marginal_cells": 0,
+        "zero_reference_rate": false
+      }
+    ],
+    "distinct_cards_with_required_color_omitted": 36
+  },
+  "copy_labels": {
+    "drafts_with_game_observations": 4640,
+    "repeated_card_draft_groups": 26258,
+    "repeated_groups_ever_played": 21545,
+    "groups_with_fewer_observed_deck_copies": 3984,
+    "picks_in_those_groups": 9247,
+    "copies_above_maximum_observed_deck_count": 4338
+  },
+  "interpretation": "Feature and label coverage, not recommendation errors or causal pick value."
+}

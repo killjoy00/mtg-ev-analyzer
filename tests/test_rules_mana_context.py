@@ -7,7 +7,7 @@ from rules_mana_context import card_mana_context, candidate_pool_context
 
 
 def card(cost, type_line='Creature', **extra):
-    return {'mana_cost': cost, 'type_line': type_line, **extra}
+    return {'mana_cost': cost, 'type_line': type_line, 'layout': 'normal', **extra}
 
 
 class RulesManaContextTests(unittest.TestCase):
@@ -47,6 +47,12 @@ class RulesManaContextTests(unittest.TestCase):
         c = card_mana_context(card('{G}'))
         self.assertFalse(c['rules_text_available'])
         self.assertIsNone(c['produced_mana'])
+
+    def test_display_metadata_cannot_establish_a_complete_normal_card(self):
+        c = card('{G}')
+        del c['layout']
+        self.assertEqual(card_mana_context(c)['reason'], 'missing_layout')
+        self.assertEqual(card_mana_context(card('{G}', display_faces=[{'role': 'back'}]))['reason'], 'unsupported_layout')
 
 
 if __name__ == '__main__':

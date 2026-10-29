@@ -16,7 +16,9 @@ The 0–95 award is relative to the model leader. It is not confidence, win prob
 
 `scripts/rules_mana_context.py` provides independent research inputs from explicit card metadata: required colors and pips, each required color's representation in prior picks, newly required colors, which mana a land can produce, and a separate basic-landcycling mode with its activation cost. It does not assign points, fix a player's lane, or claim that a draft pool is a mana base. In particular, a generic landcycling mode does not make the creature itself freely castable.
 
-Unknown metadata stays unknown. Hybrid/Phyrexian costs, alternative costs, multi-face cards, Adventures and Rooms are not approximated as ordinary colorless spells. These need explicit mode support before a complete scorer can use this feature family. Missing rules text cannot establish that a card provides no fixing. Mana requirements are available from card metadata without Pack One player responses or target-set game outcomes.
+Unknown metadata stays unknown. A missing layout, including stripped display-only metadata, cannot establish that a card is an ordinary one-face spell. Hybrid/Phyrexian costs and multi-face cards, Adventures and Rooms are not approximated as ordinary colorless spells. Alternative casting costs are not evaluated; a known printed cost does not prove it is the card's only useful route. These need explicit mode support before a complete scorer can use this feature family. Missing rules text cannot establish that a card provides no fixing. Mana requirements are available from card metadata without Pack One player responses or target-set game outcomes.
+
+The broader [context audit](CONTEXT-MODEL-AUDIT.md) records additional calculation and representation findings with synthetic reproductions and aggregate public-data checks.
 
 ## Next scorer experiment
 
@@ -43,6 +45,7 @@ python scripts/trace_partial_credit.py \
   --draft-sha256 DRAFT_SHA256 --game-sha256 GAME_SHA256 \
   --source-draft-hash SOURCE_HASH --pick-number 5 \
   --expected-puzzle artifacts/context/expected.json \
+  --card-metadata raw-data/context/canonical-cards.json --metadata-sha256 METADATA_SHA256 \
   --output artifacts/context/trace.json
 python -m unittest discover -s tests -p test_trace_partial_credit.py -v
 python -m unittest discover -s tests -p test_rules_mana_context.py -v

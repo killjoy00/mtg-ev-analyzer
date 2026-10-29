@@ -38,7 +38,11 @@ def card_mana_context(card):
     if not isinstance(card, dict):
         return {'status': 'unknown', 'reason': 'missing_metadata'}
     # Back faces, Adventures, Rooms and other modal cards need explicit routes.
-    if card.get('card_faces') or card.get('layout', 'normal') != 'normal':
+    if card.get('card_faces') or card.get('display_faces'):
+        return {'status': 'unknown', 'reason': 'unsupported_layout'}
+    if 'layout' not in card:
+        return {'status': 'unknown', 'reason': 'missing_layout'}
+    if card['layout'] != 'normal':
         return {'status': 'unknown', 'reason': 'unsupported_layout'}
     type_line = card.get('type_line')
     types = type_line.split(' — ')[0].split() if isinstance(type_line, str) else []

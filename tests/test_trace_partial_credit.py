@@ -110,12 +110,27 @@ class CreditTraceTests(unittest.TestCase):
         payload = stored(before)
         for c in payload['candidates']:
             if c['name'] == 'Gold':
-                c.update(mana_cost='{2}{R}{W}', type_line='Artifact — Equipment')
+                c.update(mana_cost='{2}{R}{W}', type_line='Artifact — Equipment', layout='normal')
         report = trace_decision(model, example, payload)
         row = next(c for c in report['candidates'] if c['name'] == 'Gold')
         self.assertEqual(row['required_colors_missing_from_affinity'], ['W', 'R'])
         self.assertEqual([c['awarded_credit'] for c in report['candidates']],
                          [c['awarded_credit'] for c in before['candidates']])
+
+    def test_pinned_canonical_metadata_is_needed_for_a_mana_judgment(self):
+        model, example = fixture()
+        model.fit_colours['Gold'] = frozenset()
+        model.fit['cards']['Gold']['colours'] = 'C'
+        payload = stored(trace_decision(model, example))
+        display = next(c for c in payload['candidates'] if c['name'] == 'Gold')
+        display.update(mana_cost='{2}{R}{W}', type_line='Artifact — Equipment')
+        unknown = trace_decision(model, example, payload)
+        row = next(c for c in unknown['candidates'] if c['name'] == 'Gold')
+        self.assertIsNone(row['required_colors_missing_from_affinity'])
+        canonical = {'Gold': {**display, 'layout': 'normal'}}
+        known = trace_decision(model, example, payload, canonical)
+        row = next(c for c in known['candidates'] if c['name'] == 'Gold')
+        self.assertEqual(row['required_colors_missing_from_affinity'], ['W', 'R'])
 
     def test_pinned_source_mismatch_fails(self):
         with tempfile.TemporaryDirectory() as directory:
