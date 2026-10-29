@@ -232,7 +232,7 @@ assert.doesNotMatch(privacy, /may earn a commission|membership cannot be verifie
 const patreonPageHtml = await readFile('patreon/index.html','utf8');
 assert.match(patreonPageHtml, /Supporter and Elite members get ad-free browsing/i);
 assert.match(patreonPageHtml, /Supporter \+ Elite/);
-assert.match(patreonPageHtml, /Once Pack One confirms your membership/i);
+assert.match(patreonPageHtml, /Both Supporter and Elite include ad-free browsing/i);
 assert.doesNotMatch(patreonPageHtml, /eligible entitlement/i);
 
 const noEmDashCopyFiles = [
