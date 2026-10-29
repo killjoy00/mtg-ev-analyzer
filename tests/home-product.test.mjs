@@ -139,7 +139,7 @@ test('all three complete hands signed-in players to Practice or guests to accoun
  const p={daily_history:[row('mixed'),row('powered-cube'),row('latest')],player:{claimed:true},capabilities:['account']};
  const freeHtml=dailyHomeMarkup(p,day);
  assert.match(freeHtml,/Dailies complete/);
- assert.match(freeHtml,/Your practice options are all in one place/);
+ assert.match(freeHtml,/Keep playing regular Draft Runs, or any sets with Pack One Elite/);
  assert.match(freeHtml,/href="\/practice\/"[^>]*>Go to Practice<\/a>/);
  assert.doesNotMatch(freeHtml,/Start Another Draft Run|Powered Cube Practice|Choose your sets|Become Elite|Upgrade to Elite/);
  p.player.claimed=false;const guestHtml=dailyHomeMarkup(p,day);
