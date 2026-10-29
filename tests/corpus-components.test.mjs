@@ -17,6 +17,12 @@ import {
  TRADITIONAL_V5_P1P6_COMPONENT_VERSION as p1p6Component,
  V5_CONTEXT_MODEL_VERSION as v5Model,
  V5_PARENT_CORPUS_VERSION as v5Parent,
+ TRADITIONAL_V6_PHASE2_COMPONENT_VERSION as v6Component,
+ TRADITIONAL_V6_P1P6_COMPONENT_VERSION as v6P1P6Component,
+ CUBE_TRADITIONAL_V6_COMPONENT_VERSION as v6CubeComponent,
+ CUBE_TRADITIONAL_V6_P2P9_COMPONENT_VERSION as v6CubeP2P9Component,
+ V6_CONTEXT_MODEL_VERSION as v6Model,
+ V6_PARENT_CORPUS_VERSION as v6Parent,
  modelVersionForComponent,
  supportedComponent
 } from '../corpus-components.mjs';
@@ -161,4 +167,28 @@ test('the restricted new-set component serves only P1P1-P1P6 on the v5 parent',(
    assert.equal(validateDraftRunPuzzle({...p,set_id:'powered-cube'},p1p6Component),false);
   }
  }
+});
+
+test('v6 components require the v10 parent and serve only their admitted window',()=>{
+ const premier=JSON.parse(gunzipSync(fs.readFileSync(new URL('../corpus/draft-run/blb.json.gz',import.meta.url))));
+ const cube=JSON.parse(gunzipSync(fs.readFileSync(new URL('../corpus/draft-run/powered-cube.json.gz',import.meta.url))));
+ const trad=(source,version,parent=v6Parent)=>({...structuredClone(source),corpus_version:version,parent_corpus_version:parent,model_version:v6Model,
+  model_source_event:'PremierDraft',source_event_type:'TradDraft',event_match_wins:3,event_match_losses:0});
+ for(const version of [v6Component,v6P1P6Component,v6CubeComponent,v6CubeP2P9Component])assert.equal(modelVersionForComponent(version),v6Model);
+ for(const pick of [1,2,3,4,5,6,7,8]) {
+  const source=premier.find(row=>row.pick_number===pick);
+  assert.equal(validateDraftRunPuzzle(trad(source,v6Component),v6Component),true,`phase2 pick ${pick}`);
+  assert.equal(validateDraftRunPuzzle(trad(source,v6P1P6Component),v6P1P6Component),pick<=6,`p1p6 pick ${pick}`);
+  assert.equal(validateDraftRunPuzzle(trad(source,v6Component,v5Parent),v6Component),false,'v6 needs the v10 parent');
+  // Only Cube may reach P1P9, and only through its P2-P9 component.
+  assert.equal(validateDraftRunPuzzle(trad(source,v6CubeP2P9Component),v6CubeP2P9Component),false);
+ }
+ for(const pick of [2,3,4,5,6,7,8,9]) {
+  const source=cube.find(row=>row.pick_number===pick);
+  assert.equal(validateDraftRunPuzzle(trad(source,v6CubeComponent),v6CubeComponent),pick<=7,`cube p2p7 pick ${pick}`);
+  assert.equal(validateDraftRunPuzzle(trad(source,v6CubeP2P9Component),v6CubeP2P9Component),true,`cube p2p9 pick ${pick}`);
+  assert.equal(supportSharpening(v6CubeP2P9Component),1.75);
+ }
+ const ten=cube.find(row=>row.pick_number===10);
+ if(ten)assert.equal(validateDraftRunPuzzle(trad(ten,v6CubeP2P9Component),v6CubeP2P9Component),false);
 });
