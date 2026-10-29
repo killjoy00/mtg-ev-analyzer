@@ -145,7 +145,7 @@ function DNASummary({dna,cardChoices,onReview}:{
     trait?.status==='qualified');
   const qualified=[...new Map(traits.map(trait=>[trait.id,trait])).values()];
   const ready=(cardChoices?.choices||[]).filter(choice=>choice.status==='ready');
-  return <Section title="Your pick patterns" caption="Across formats · All available history" compact>
+  return <Section title="Your pick patterns" caption="Recent picks across all formats" compact>
     {qualified.length?qualified.map(trait=><DNATrait key={trait.id} trait={trait}/>):
       <Text style={styles.caption}>No clear pick pattern to show yet.</Text>}
     {ready.length?<View style={styles.contextWrap}>
@@ -392,8 +392,8 @@ function InsightSections({data,onReview,onLoadMore,morePhase}:{
   // Keep them visible even before this format/time range unlocks its report.
   const dnaSection=data.drafting_dna?<DNASummary dna={data.drafting_dna}
     cardChoices={data.card_choices} onReview={onReview}/>:
-    <Section title="Your pick patterns" caption="Across formats · All available history">
-      <Text style={styles.caption}>Pattern details aren’t available from this version yet.</Text>
+    <Section title="Your pick patterns" caption="Recent picks across all formats">
+      <Text style={styles.caption}>We can't show your pick patterns right now.</Text>
     </Section>;
   if (!data.unlocked) return <>
     <Section title="Picks to review">
