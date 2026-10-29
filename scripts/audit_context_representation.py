@@ -106,9 +106,10 @@ def scan_deck_colours(game_archive, keep):
             games['games_with_splash'] += any(c in splash for c in COLOURS)
             main[did][core] += 1
             both[did][''.join(c for c in COLOURS if c in core or c in splash)] += 1
+            cards = played[did]
             for i, name in deck_columns:
                 if count_of(values[i]):
-                    played[did].add(name)
+                    cards.add(name)
     modal = lambda by: {did: counter.most_common(1)[0][0] for did, counter in by.items()}
     return dict(played), modal(main), modal(both), dict(games)
 
