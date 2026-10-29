@@ -7,7 +7,9 @@ replace launch monitoring or the #596 coverage watermark.
 
 The workflow uses the existing `CLOUDFLARE_EDGE_TOKEN` for observability and
 `CLOUDFLARE_PRIVATE_REPORT_TOKEN` for storage. It requires reviewed main and a
-valid run identity. Managed public bucket access must be disabled, custom domains
+valid run identity, and reuses the existing protected private-report environment.
+Failures expose only an allowlisted stage or HTTP status, without provider bodies.
+Managed public bucket access must be disabled, custom domains
 must be empty, and every saved report must pass exact readback verification.
 There is no public artifact or log fallback when private storage is unavailable.
 

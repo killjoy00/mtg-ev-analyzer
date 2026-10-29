@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {collectQuotaEventRows,forensicWindows,publishQuotaForensics,runQuotaForensics} from '../scripts/quota-stage-forensics.mjs';
+import {collectQuotaEventRows,forensicWindows,publishQuotaForensics,runQuotaForensics,quotaForensicsFailureCode} from '../scripts/quota-stage-forensics.mjs';
 import {privateQuotaStore} from '../scripts/private-quota-forensics.mjs';
 
 const now=Date.parse('2026-10-29T19:00:00Z'),account='a'.repeat(32),token='private-token-'.repeat(3);
@@ -92,11 +92,32 @@ test('public destinations and mismatched readback are rejected without public fa
 });
 test('publication requires trusted main context and private credentials before querying telemetry',async()=>{
   let calls=0;const fetcher=async()=>{calls++;throw Error('must not call');};
-  await assert.rejects(publishQuotaForensics({fetcher,env:{},now}),/Reviewed main context/);
-  await assert.rejects(publishQuotaForensics({fetcher,env:{GITHUB_REF:'refs/heads/main',GITHUB_REPOSITORY:'killjoy00/mtg-ev-analyzer',GITHUB_RUN_ID:'12345',GITHUB_RUN_ATTEMPT:'1',GITHUB_SHA:'a'.repeat(40)},now}),/credential unavailable/);
+  await assert.rejects(publishQuotaForensics({fetcher,env:{},now}),error=>quotaForensicsFailureCode(error)==='trusted_context');
+  await assert.rejects(publishQuotaForensics({fetcher,env:{GITHUB_REF:'refs/heads/main',GITHUB_REPOSITORY:'killjoy00/mtg-ev-analyzer',GITHUB_RUN_ID:'12345',GITHUB_RUN_ATTEMPT:'1',GITHUB_SHA:'a'.repeat(40)},now}),error=>quotaForensicsFailureCode(error)==='private_storage_access');
   assert.equal(calls,0);
   const workflow=fs.readFileSync('.github/workflows/quota-stage-forensics.yml','utf8');
   assert.match(workflow,/CLOUDFLARE_PRIVATE_REPORT_TOKEN/);assert.doesNotMatch(workflow,/upload-artifact|schedule:/);
+  assert.match(workflow,/diagnosis:[\s\S]*environment: pack-one-mobile-release/);
   const source=fs.readFileSync('scripts/quota-stage-forensics.mjs','utf8');
   assert.doesNotMatch(source,/console\.log\([^\n]*JSON\.stringify/);
+});
+const trustedEnv={GITHUB_REF:'refs/heads/main',GITHUB_REPOSITORY:'killjoy00/mtg-ev-analyzer',GITHUB_RUN_ID:'12345',GITHUB_RUN_ATTEMPT:'1',GITHUB_SHA:'a'.repeat(40),CLOUDFLARE_EDGE_TOKEN:token,CLOUDFLARE_PRIVATE_REPORT_TOKEN:token};
+test('publisher completes collection, private write and readback in trusted context',async()=>{
+  const storage=storageFixture();let queries=0;
+  await publishQuotaForensics({now,env:trustedEnv,fetcher:async(url,options)=>{
+    if(url.includes('/zones?'))return Response.json({success:true,result:[{name:'packone.pro',status:'active',account:{id:account}}]});
+    if(url.includes('/observability/')){queries++;return page([]);}
+    return storage.fetcher(url,options);
+  }});
+  assert.equal(queries,3);assert.equal(storage.calls.filter(x=>x.method==='PUT').length,1);
+  assert.equal(storage.calls.filter(x=>x.url.endsWith('/domains/managed')).length,2);
+});
+test('public failure categories retain stages and HTTP status but never arbitrary messages or codes',async()=>{
+  for(const value of [undefined,{message:'private provider payload'},{forensicCode:'storage_http_403 private data'},{forensicCode:'telemetry_http_999'},{forensicCode:123}])
+    assert.equal(quotaForensicsFailureCode(value),'collection_unavailable');
+  assert.equal(quotaForensicsFailureCode({forensicCode:'storage_http_403'}),'storage_http_403');
+  for(const [stage,fetcher] of [
+    ['storage_http_403',async()=>new Response('private provider payload',{status:403})],
+    ['telemetry_http_400',async url=>url.endsWith('/domains/managed')?Response.json({success:true,result:{enabled:false}}):url.endsWith('/domains/custom')?Response.json({success:true,result:{domains:[]}}):new Response('private provider payload',{status:400})],
+  ])await assert.rejects(publishQuotaForensics({now,env:trustedEnv,fetcher}),error=>quotaForensicsFailureCode(error)===stage&&!error.message.includes('private provider payload'));
 });
