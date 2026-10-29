@@ -14,7 +14,7 @@ function installOwnerIsolation() {
 export function dailyReminderSettingsMarkup({signedIn=false}={}) {
   return '<section class="settings-row profile-settings-group profile-reminders" aria-labelledby="daily-reminder-heading" id="daily-reminder-settings">'+
     '<div class="settings-row-label"><h3 id="daily-reminder-heading">Daily reminders</h3>'+
-    '<p class="profile-settings-intro">One email a day while the Dailies are open. Skipped on days you’ve finished all three.</p></div>'+
+    '<p class="profile-settings-intro">Get one email reminder a day. If you’ve already finished all three Dailies, we won’t send one.</p></div>'+
     '<div class="settings-row-body">'+(signedIn?'<div id="daily-reminder-content" aria-live="polite"><p class="profile-settings-intro">Loading reminder settings…</p></div>':
       '<p class="profile-settings-intro">Sign in and verify your account email to get email reminders.</p>')+'</div>'+
     '</section>';
