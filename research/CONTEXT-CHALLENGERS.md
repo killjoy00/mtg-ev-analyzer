@@ -51,3 +51,47 @@ python scripts/compare_context_challengers.py --cache raw-data/SET/cache.json \
 ```
 
 Public data attribution: [17Lands datasets](https://www.17lands.com/public_datasets), CC BY 4.0; card metadata from the [Scryfall API](https://scryfall.com/docs/api).
+
+## Results (2026-10-29)
+
+Scored after the preregistration commit `a870585`, with no change to the challengers, sets, metrics or rule. All six runs passed the check that the deck scan reproduces the harness color table. Full aggregates, archive checksums and cache identities: [context-challengers-2026-10-29.json](data/context-challengers-2026-10-29.json).
+
+**Verdict: all three challengers improve the secondary check.** `explicit` and `explicit-fixing` lower served-slice log loss with intervals below zero on 5 of 5 confirmation sets. `splash` does so on 4 of 5; its TMT interval spans zero. No challenger's top-1 interval lies below zero on any set.
+
+Served-slice log loss change against `v5` (negative is better), with 95% cluster-bootstrap intervals:
+
+| Set | Decisions | `v5` log loss | `splash` | `explicit` | `explicit-fixing` |
+| --- | ---: | ---: | --- | --- | --- |
+| HOB | 6,952 | 1.1935 | -0.0126 [-0.0159, -0.0095] | -0.0099 [-0.0134, -0.0064] | -0.0152 [-0.0188, -0.0114] |
+| MSH | 16,280 | 1.2225 | -0.0292 [-0.0322, -0.0261] | -0.0201 [-0.0226, -0.0174] | -0.0187 [-0.0216, -0.0157] |
+| SOS | 24,651 | 1.2403 | -0.0239 [-0.0270, -0.0211] | -0.0071 [-0.0090, -0.0052] | -0.0172 [-0.0197, -0.0148] |
+| ECL | 17,120 | 1.2415 | -0.0120 [-0.0146, -0.0094] | -0.0061 [-0.0081, -0.0040] | -0.0064 [-0.0085, -0.0044] |
+| TMT | 4,570 | 1.2168 | -0.0035 [-0.0108, 0.0036] | -0.0069 [-0.0114, -0.0023] | -0.0168 [-0.0218, -0.0120] |
+| FRA (development) | 7,524 | 1.3190 | -0.0329 [-0.0370, -0.0288] | -0.0244 [-0.0280, -0.0208] | -0.0279 [-0.0321, -0.0237] |
+
+Top-1 change in percentage points, and how far model-only points move on the same packs:
+
+| Set | `splash` top-1 | `explicit` top-1 | `explicit-fixing` top-1 | Leader changes | Mean absolute point change |
+| --- | --- | --- | --- | --- | --- |
+| HOB | +0.4 [+0.0, +0.9] | +0.7 [+0.3, +1.2] | +0.4 [-0.1, +0.8] | 4.8–5.5% | 1.4–1.7 |
+| MSH | +1.2 [+0.8, +1.6] | +1.1 [+0.7, +1.4] | +0.6 [+0.2, +1.0] | 7.3–10.4% | 2.3–3.2 |
+| SOS | +1.4 [+1.0, +1.8] | +0.4 [+0.1, +0.7] | +1.0 [+0.7, +1.4] | 7.9–14.5% | 2.1–3.9 |
+| ECL | +0.9 [+0.5, +1.3] | +0.7 [+0.4, +1.0] | +0.6 [+0.3, +0.8] | 5.4–10.8% | 1.8–3.6 |
+| TMT | +0.0 [-0.9, +1.0] | -0.1 [-0.7, +0.5] | +0.4 [-0.2, +1.1] | 6.3–14.9% | 2.0–5.0 |
+| FRA (development) | +1.3 [+0.6, +1.9] | +1.4 [+0.8, +1.9] | +1.2 [+0.5, +1.8] | 8.8–11.2% | 2.9–3.5 |
+
+The last two columns give the range across the three challengers. Point change is the mean absolute change in the model-only award (0–95) across every candidate in every served pack.
+
+### Interpretation
+
+- Where separated from zero, the gains are 0.5–2.4% of `v5` log loss on the confirmation sets (0.006–0.029 nats). For scale, stage matching moved log loss by 0.005–0.071 nats and calibration by 10.7% in [model evaluation](../docs/MODEL-EVALUATION.md). These gains are smaller but consistent across sets.
+- Every challenger changes the model's leader on about 5–15% of served decisions and moves points by 1.4–5.0 on average. Adopting one is a scoring change that needs a new model version and scoring profile, not a silent fix.
+- `explicit` gives more cards a color judgment than `v5` (for example 191 against 169 in HOB), because printed colors do not need 30 observed decks. Part of its gain may come from that coverage rather than from correcting wrong colors; this run does not separate the two.
+- No contrast between challengers was preregistered, so this does not choose among them. As point estimates only: `splash` was largest on MSH, SOS, ECL and FRA but not separated from zero on TMT, and it colors lands; `explicit-fixing` was largest on HOB and TMT and exceeded `explicit` on every set except MSH, though only by 0.0004 on ECL.
+
+### What this does not show
+
+- Pick prediction measures agreement with strong players' picks, not whether a challenger grades alternatives better. That still needs the blind contextual benchmark in steps 4–6 of the [plan](PARTIAL-CREDIT-CONTEXT.md).
+- The harness trains on its 60% split; production fits each fold on the other 80% of the cohort. Production magnitudes may differ.
+- Commitment still counts any shared color, and pips, alternative costs and landcycling are not modeled. These are representation swaps, not the full contextual model.
+- The test split remains unread and available for a frozen promotion decision.
