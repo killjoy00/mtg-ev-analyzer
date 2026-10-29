@@ -52,8 +52,15 @@ Future work should preserve this structure and avoid introducing gradients,
 glass panels, decorative AI imagery, unrelated fantasy/card illustration, or an
 unrelated typeface system.
 
-Daily home, Practice, and the custom-set picker share a 900px content column and
-a 600-weight display heading (60px desktop, 48px on phones). Mode labels use
+Every page shares one frame: the menu, the page content and the footer start and
+end at the same edges (a 1188px frame with a 24px gutter, 16px at 700px and
+narrower). Daily home, Practice, gameplay and set pages use the full frame width.
+Reading pages, results, leaderboards and the custom-set picker keep their narrower
+columns, but those columns start at the same left edge as the logo instead of
+being centered. Running text stops at 68 characters.
+
+Daily home and Practice use a 600-weight display heading (60px desktop, 48px on
+phones). Mode labels use
 12px, 700-weight reading type. Entry actions are centered, fill their card, and
 are at least 48px high. The set picker uses selectable rows with the shared blue,
 surface, and border tokens. Gameplay retains its wider card layout.

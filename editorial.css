@@ -653,3 +653,14 @@ body[data-page="editorial"] > .topbar {
 
 /* Narrow-screen editorial refinements. */
 @media(max-width:600px){.site-header{padding:12px 16px}.site-nav a{font-size:14px}.site-brand strong{font-size:25px}}
+
+/* Content pages use the shared page frame from visual-c.css. Reading text stays at
+   68 characters; set pages give their stats, card grids and tables the full width. */
+.editorial-main, .home-editorial { padding-left: var(--gutter, 24px); padding-right: var(--gutter, 24px); }
+.site-footer { width: min(calc(var(--content) - 2 * var(--gutter, 24px)), calc(100% - 2 * var(--gutter, 24px))); padding-left: 0; padding-right: 0; }
+.article-shell { margin-left: 0; }
+.editorial-main p { max-width: 68ch; }
+.article-shell:has(> .set-guide-callout) { max-width: none; }
+.article-shell:has(> .set-guide-callout) > .prose { max-width: none; }
+.article-shell:has(> .set-guide-callout) > .prose > :is(ul, ol) { max-width: 68ch; }
+.set-guide-callout p { max-width: none; }
