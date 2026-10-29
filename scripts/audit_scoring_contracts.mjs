@@ -6,7 +6,6 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { gradeDraftRunPick, validateDraftRunPuzzle } from '../draft-run.mjs';
-import { gradePick } from '../scoring.mjs';
 
 const root = process.argv[2] || 'corpus/draft-run';
 const catalogBytes = readFileSync(join(root, 'catalog.json'));
@@ -25,11 +24,15 @@ for (const entry of catalog.sets) {
     const sum = puzzle.candidates.reduce((n, card) => n + Number(card.model_probability), 0);
     assert.ok(Math.abs(sum - 1) <= puzzle.candidates.length * .0000005 + 1e-12,
       `${entry.id}: support normalization`);
+    // Independent current-contract reference, without the retired grader.
+    const leadingSupport = Math.max(...puzzle.candidates.map(card => Number(card.model_probability)));
     for (const card of puzzle.candidates) {
       const server = gradeDraftRunPick(puzzle, card.id);
-      const client = gradePick(puzzle.candidates, card.id, puzzle.historical_pick_id);
-      assert.equal(server.score, client.score, `${entry.id}: award parity`);
-      assert.equal(server.historicalMatch, client.historicalMatch, `${entry.id}: historical parity`);
+      const historicalMatch = card.id === puzzle.historical_pick_id;
+      const expected = historicalMatch ? 100
+        : Math.round(95 * Math.max(0, Math.min(1, Number(card.model_probability) / leadingSupport)));
+      assert.equal(server.score, expected, `${entry.id}: linear award contract`);
+      assert.equal(server.historicalMatch, historicalMatch, `${entry.id}: historical contract`);
       assert.ok(Number.isInteger(server.score), `${entry.id}: integer award`);
       if (card.id === puzzle.historical_pick_id) {
         assert.equal(server.score, 100, `${entry.id}: trophy award`);

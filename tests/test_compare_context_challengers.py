@@ -5,7 +5,8 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from build_replays import CountStore, PickExample
-from compare_context_challengers import award_shift, explicit_colours, score, served, summary
+from compare_context_challengers import (award_shift, explicit_colours, score, served, summary,
+                                        matched_colours, pairwise_contrasts, contrast_verdict, compare)
 
 
 def card(cost, type_line='Creature', **fields):
@@ -13,6 +14,44 @@ def card(cost, type_line='Creature', **fields):
 
 
 class ChallengerTests(unittest.TestCase):
+    def test_matched_coverage_preserves_known_empty_and_unknown_metadata(self):
+        names = ['Known', 'Flexible', 'Thin', 'Absent', 'Hybrid']
+        inferred = {'Known': frozenset('U'), 'Flexible': frozenset(), 'Thin': None,
+                    'Hybrid': frozenset('W')}
+        metadata = {name: card('{R}') for name in names}
+        metadata['Hybrid'] = card('{W/U}')
+        result = matched_colours(names, inferred, metadata)
+        self.assertEqual(result['Known'], frozenset('R'))
+        self.assertEqual(result['Flexible'], frozenset('R'))
+        self.assertIsNone(result['Thin'])
+        self.assertIsNone(result['Absent'])
+        self.assertEqual(result['Hybrid'], frozenset('W'))
+        self.assertEqual({n for n, v in result.items() if v is not None},
+                         {n for n, v in inferred.items() if v is not None})
+
+    def test_six_pairs_have_candidate_minus_baseline_direction(self):
+        names = ['splash', 'explicit', 'explicit-fixing', 'explicit-matched']
+        scored = {name: ([('d', 4-i, .5, 1)], [[.6, .4]]) for i, name in enumerate(names)}
+        results = pairwise_contrasts(scored, 20)
+        self.assertEqual(len(results), 6)
+        self.assertEqual(results['explicit-minus-splash']['log_loss_delta'], -1)
+        self.assertEqual(results['explicit-matched-minus-splash']['log_loss_ci95'], [-3, -3])
+
+    def test_frozen_rule_requires_four_sets_and_top_one_guardrail(self):
+        win = {'log_loss_ci95': [-.2, -.1], 'top1_ci95': [-.01, .01]}
+        tie = {'log_loss_ci95': [-.1, 0], 'top1_ci95': [-.01, .01]}
+        self.assertEqual(contrast_verdict([win]*4+[tie]), 'candidate beats baseline')
+        self.assertEqual(contrast_verdict([win]*3+[tie]*2), 'inconclusive')
+        self.assertEqual(contrast_verdict([win]*4), 'incomplete')
+        self.assertEqual(contrast_verdict([win]*4+[{**tie,'top1_ci95':[-.02,-.01]}]), 'inconclusive')
+        reverse = {'log_loss_ci95': [.1, .2], 'top1_ci95': [-.01, .01]}
+        self.assertEqual(contrast_verdict([reverse]*5), 'baseline beats candidate')
+        self.assertEqual(contrast_verdict([reverse]*4+[{**reverse,'top1_ci95':[.01,.02]}]), 'inconclusive')
+
+    def test_pairwise_cannot_open_reserved_test_even_programmatically(self):
+        with self.assertRaisesRegex(ValueError, 'test is reserved'):
+            compare(None, None, None, 'test', 20, pairwise=True)
+
     def test_explicit_colors_replace_only_complete_metadata(self):
         metadata = {
             'Splashed': card('{4}{R}{R}'), 'Gold': card('{1}{U}{R}'), 'Artifact': card('{3}', 'Artifact'),
