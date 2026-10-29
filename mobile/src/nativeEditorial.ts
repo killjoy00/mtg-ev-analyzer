@@ -14,9 +14,9 @@ export const aboutSections: ArticleSection[] = [
     ],
   },
   {
-    title: 'The trophy pick is the target.',
+    title: 'How scoring works',
     body: [
-      '100 means you matched the trophy drafter. Other choices receive up to 95 based on model support. An excellent alternative can differ from the choice made in that successful draft.',
+      'Matching the trophy drafter gets you 100 points. Other picks can score up to 95 if the model supports them. That doesn’t mean every other card was wrong.',
     ],
   },
   {
