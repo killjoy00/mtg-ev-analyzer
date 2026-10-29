@@ -109,7 +109,7 @@ function monthMarkup(rows) {
 function dnaMarkup(data) {
   const dna=data.drafting_dna;
   if(!dna)return '<section class="my-pack-card my-insights-wide my-insights-dna"><h2>Your pick patterns</h2>'+
-    '<p class="my-insights-note">Pattern details aren’t available from this version yet.</p></section>';
+    '<p class="my-insights-note">We can\'t show your pick patterns right now.</p></section>';
   const traits=[dna.primary,...(dna.secondary||[])].filter(t=>t?.status==='qualified');
   const distinct=[...new Map(traits.map(t=>[t.id,t])).values()];
   const traitHtml=distinct.length?'<div class="my-insights-qualified-traits">'+distinct.map(trait=>
@@ -134,7 +134,7 @@ function dnaMarkup(data) {
           ' · '+esc(shortInsightDate(e.date))+'</button>').join('')+'</details></div>';
     }).join('')+'</details>':'';
   return '<section class="my-pack-card my-insights-wide my-insights-dna">'+
-    '<div class="my-card-heading"><h2>Your pick patterns</h2><span>Across formats · All available history</span></div>'+
+    '<div class="my-card-heading"><h2>Your pick patterns</h2><span>Recent picks across all formats</span></div>'+
     traitHtml+choiceHtml+
     '<details class="my-insights-dna-method"><summary>How this works</summary>'+
     '<p class="my-insights-note">'+number(dna.eligible_decisions)+' picks included, regardless of the Format and time filters. Only the first included answer per puzzle counts. History is bounded to recent eligible runs, so older picks may not appear.</p>'+
