@@ -61,7 +61,7 @@ from fetch_card_metadata import compact_card, aliases
 EVENTS = ("PremierDraft", "TradDraft")
 CUBE = "powered-cube"
 SETS = (
-    "hob", "msh", "sos", "eoe", "fin", "tdm", "dft", "fdn", "dsk", "blb",
+    "msh", "sos", "eoe", "fin", "tdm", "dft", "fdn", "dsk", "blb",
     "mh3", "otj", "mkm", "ktk", "lci", "woe", "ltr", "mom", "one", "bro",
     "dmu", "snc", "neo", "hbg", "sir", "pio", CUBE,
 )
@@ -72,6 +72,7 @@ EXCLUSIONS = {
     "mid": "No public TradDraft draft archive in the original Phase 1 source study.",
     "vow": "No public TradDraft draft archive in the original Phase 1 source study.",
     "stx": "Traditional archive lacked the current skill-bucket evidence required by the frozen study and the environment is retired.",
+    "hob": "17Lands replaced the pinned v8 HOB Premier archive on 2026-10-01 and the original bytes are not recoverable. HOB was never admitted to Traditional, and v6 rescoring uses current inputs.",
 }
 PARENT = VERSIONS['v4']['corpus_version']
 MODEL = 'strong-player-colour-stage-v4'
