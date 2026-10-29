@@ -130,7 +130,7 @@ function renderAccountError(app, error, retry=()=>renderAccount(), reauth=()=>re
   if(error?.status===403&&error?.message==='Account request could not be verified.') {
     // A valid account cookie with a failed CSRF proof cannot be repaired by
     // retrying the same protected write. Require a fresh provider sign-in instead.
-    app.innerHTML=`<section class="message-card"><p class="eyebrow">Account</p><h1>Confirm your sign-in.</h1><p>Pack One couldn't verify this browser's account security token. Sign in again to restore secure access. Your saved progress won't be cleared.</p><button class="button primary" id="account-reauth">Sign in again</button><a class="button secondary" href="./">Back to Dailies</a></section>`;
+    app.innerHTML=`<section class="message-card"><p class="eyebrow">Account</p><h1>Confirm your sign-in.</h1><p>We couldn't confirm your sign-in. Sign in again to restore access. Your saved progress won't be cleared.</p><button class="button primary" id="account-reauth">Sign in again</button><a class="button secondary" href="./">Back to Dailies</a></section>`;
     document.querySelector('#account-reauth')?.addEventListener('click',()=>void reauth());
     return;
   }
