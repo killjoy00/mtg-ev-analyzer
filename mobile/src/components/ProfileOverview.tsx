@@ -192,7 +192,7 @@ export function ProfileOverview({ profile, publicView = false }: { profile: Care
         {activityLink('daily', 'Browse Daily finishes and sharing')}
       </Section>
 
-      <Section title="Sets you\'ve played">
+      <Section title="Sets you've played">
         <Text style={styles.archiveNumber}>{played} / {total || 0}</Text>
         <Text style={styles.body}>Currently available environments played.</Text>
         {activityLink('archive', 'See all sets')}
