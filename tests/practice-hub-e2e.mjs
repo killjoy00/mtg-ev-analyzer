@@ -88,6 +88,7 @@ try {
   await guest.page.locator('[data-account-state="guest"][data-practice-hub]').waitFor();
   await cards(guest.page, 0);
   assert.equal(await guest.page.getByRole('link', { name: 'Sign in to practice', exact: true }).count(), 1);
+  assert.equal(await guest.page.locator('.practice-card-action .button.primary').count(), 1, 'guests get one primary action: sign in for free practice');
   assert.equal(await guest.page.getByRole('button', { name: 'Upgrade to Elite', exact: true }).count(), 2);
   assert.equal(await guest.page.locator('.practice-card-action a:not([href="/?account=1"])').count(), 0);
   assert.equal(await guest.page.locator('[data-nav="practice"]').getAttribute('aria-current'), 'page');

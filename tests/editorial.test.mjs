@@ -120,7 +120,7 @@ assert.match(learnHub, /<h2>Sets<\/h2>/);
 assert.ok(learnHub.indexOf('Play today’s Daily') < learnHub.indexOf('Drafting guides'), 'Daily CTA must appear before the guide directory');
 const practiceHub = await readFile('practice/index.html','utf8');
 assert.match(practiceHub, /<title>Practice · Pack One<\/title>/);
-assert.match(practiceHub, /src="\/practice-page\.mjs\?v=4"/,'Practice entrypoint must use the same versioned module across navigations');
+assert.match(practiceHub, /src="\/practice-page\.mjs\?v=5"/,'Practice entrypoint must use the same versioned module across navigations');
 assert.match(practiceHub, /href="\/practice\.css\?v=4"/);
 const practicePage = await readFile('practice-page.mjs','utf8');
 assert.match(practiceHub, /<h2>Regular Draft Run<\/h2>/);
