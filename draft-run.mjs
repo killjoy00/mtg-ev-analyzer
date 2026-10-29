@@ -132,7 +132,6 @@ const REPLAY_COLOUR_STAGE_COMPONENTS=new Set([
   'traditional-premier-v6-phase2-v1',
   'traditional-premier-v6-p1p6-v1',
   'traditional-cube-p2p7-v6-v1',
-  'traditional-cube-p2p9-v6-v1',
 ]);
 function replaySupportSharpening(corpusVersion) {
   // Freeze the component inventory that uses colour-stage display calibration.
@@ -376,8 +375,7 @@ export function validateDraftRunPuzzle(puzzle, expectedVersion = DRAFT_RUN_CORPU
       ? Number(puzzle.event_match_wins)===7 && (puzzle.event_match_losses==null||[0,1,2].includes(Number(puzzle.event_match_losses)))
       : puzzle.source_event_type==='TradDraft' && approvedTraditionalSource(puzzle) &&
         puzzle.model_version===modelVersionForComponent(puzzle.corpus_version) && puzzle.model_source_event==='PremierDraft' &&
-        Number(puzzle.event_match_wins)===3 && puzzle.event_match_losses===0 &&
-        pick<=(puzzle.set_id === POWERED_CUBE_ENVIRONMENT ? 9 : 8) && rateSkill) &&
+        Number(puzzle.event_match_wins)===3 && puzzle.event_match_losses===0 && pick<=8 && rateSkill) &&
     Number(puzzle.player_games_lower_bound) >= 100 &&
     (legacySkill || rateSkill) && puzzle.source_evidence === 'official_archive_trajectory' &&
     Number.isInteger(pick) && pick >= (puzzle.set_id === POWERED_CUBE_ENVIRONMENT ? 2 : 1) &&

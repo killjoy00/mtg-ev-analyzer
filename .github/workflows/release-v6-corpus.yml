@@ -126,7 +126,6 @@ jobs:
           # The admitted Cube window decides which component serves Traditional Cube.
           cube=$(jq -r '.admitted["powered-cube"] // ""' generated/v6-candidate/v6-traditional/report.json)
           case "$cube" in
-            cube-p2p9) echo 'CUBE_COMPONENT=traditional-cube-p2p9-v6-v1' >> "$GITHUB_ENV" ;;
             cube-p2p7) echo 'CUBE_COMPONENT=traditional-cube-p2p7-v6-v1' >> "$GITHUB_ENV" ;;
             '') echo 'CUBE_COMPONENT=' >> "$GITHUB_ENV" ;;
             *) echo '::error::unexpected Cube window'; exit 1 ;;

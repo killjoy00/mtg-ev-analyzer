@@ -1,10 +1,9 @@
-"""Rescore every measured Traditional source with v6 Premier graders and admit by window.
+"""Rescore every measured Traditional source with v6 Premier graders and admit it or not.
 
 No Traditional observation is used for fitting and no gate threshold changes.
-Each environment is scored on its widest window first (regular P1-P8, Powered
-Cube P2-P9). If that fails, the owner's restricted-window precedent applies
-uniformly: regular P1-P6 (FRA) and Cube P2-P7, re-evaluated with the same gates.
-A set that passes neither is not admitted. Membership is the measured source
+Each environment is scored once, on its approved window only: regular P1-P8,
+Powered Cube P2-P7, FRA P1-P6. There is no fallback to another window (owner,
+2026-10-29). A set that fails is not admitted. Membership is the measured source
 list: the v4 Phase 2 artifacts, FRA's new-set artifact, or for HOB, whose
 original Traditional archive was replaced upstream, a fresh v6 measurement of
 its current pinned archive. Rule recorded in research/V6-RELEASE.md.
@@ -29,14 +28,18 @@ ORIGINALS = ROOT/'generated/v6-original-traditional'
 WINDOWS = {
     'phase2': {'component': 'traditional-premier-v6-phase2-v1', 'first': 1, 'last': 8, 'late': 7},
     'p1p6': {'component': 'traditional-premier-v6-p1p6-v1', 'first': 1, 'last': 6, 'late': None},
-    'cube-p2p9': {'component': 'traditional-cube-p2p9-v6-v1', 'first': 2, 'last': 9, 'late': 8},
     'cube-p2p7': {'component': 'traditional-cube-p2p7-v6-v1', 'first': 2, 'last': 7, 'late': None},
 }
 FRESH_COMPONENT = 'traditional-premier-v6-fresh-measurement'
 
 
-def order(sid):
-    return ('cube-p2p9', 'cube-p2p7') if sid == CUBE else ('phase2', 'p1p6')
+# Owner-approved windows. FRA's P1-P6 and Cube's P2-P7 are their existing
+# approved restrictions; every other set uses the full regular window.
+APPROVED = {CUBE: 'cube-p2p7', 'fra': 'p1p6'}
+
+
+def approved_window(sid):
+    return APPROVED.get(sid, 'phase2')
 
 
 def evaluate(name, records, puzzles, complete_trajectories, snapshot=None):
@@ -68,13 +71,10 @@ def evaluate(name, records, puzzles, complete_trajectories, snapshot=None):
 
 
 def admit(sid, records, puzzles, complete_trajectories, snapshot=None):
-    """Widest window first; the first passing window is admitted, else none."""
-    windows = {}
-    for name in order(sid):
-        windows[name] = evaluate(name, records, puzzles, complete_trajectories, snapshot)
-        if windows[name]['pass']:
-            return windows, name
-    return windows, None
+    """Score the approved window only; admitted if it passes, else not."""
+    name = approved_window(sid)
+    windows = {name: evaluate(name, records, puzzles, complete_trajectories, snapshot)}
+    return windows, name if windows[name]['pass'] else None
 
 
 def measure_fresh(sid, premier_pin, component_pin):
@@ -258,7 +258,7 @@ def consolidate(build, output):
     write(output/'report.json', {'schema': SCHEMA, 'model_version': V6_MODEL, 'parent_corpus_version': V6_CORPUS,
         'production_changed': False, 'publication_authorized': False,
         'traditional_used_for_training': False, 'source_membership_preserved': True,
-        'expansion_supported': True, 'thresholds': THRESHOLDS, 'window_order': {'regular': list(order('fra')), 'cube': list(order(CUBE))},
+        'expansion_supported': True, 'thresholds': THRESHOLDS, 'approved_windows': {**APPROVED, 'default': 'phase2'},
         'sets': evidence, 'admitted': admitted,
         'not_admitted': sorted(s for s, e in evidence.items() if not e['pass']),
         'newly_admitted': sorted(s for s in admitted if not evidence[s]['production_component']),

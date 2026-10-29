@@ -10,7 +10,7 @@ import {
  TRADITIONAL_COMPONENT_VERSION,TRADITIONAL_PHASE2_COMPONENT_VERSION,CUBE_TRADITIONAL_COMPONENT_VERSION,
  TRADITIONAL_V4_PHASE2_COMPONENT_VERSION,CUBE_TRADITIONAL_V4_COMPONENT_VERSION,
  TRADITIONAL_V5_PHASE2_COMPONENT_VERSION,CUBE_TRADITIONAL_V5_COMPONENT_VERSION,TRADITIONAL_V5_P1P6_COMPONENT_VERSION,V5_CONTEXT_MODEL_VERSION,V5_PARENT_CORPUS_VERSION,
- TRADITIONAL_V6_PHASE2_COMPONENT_VERSION,TRADITIONAL_V6_P1P6_COMPONENT_VERSION,CUBE_TRADITIONAL_V6_COMPONENT_VERSION,CUBE_TRADITIONAL_V6_P2P9_COMPONENT_VERSION,V6_CONTEXT_MODEL_VERSION,V6_PARENT_CORPUS_VERSION,
+ TRADITIONAL_V6_PHASE2_COMPONENT_VERSION,TRADITIONAL_V6_P1P6_COMPONENT_VERSION,CUBE_TRADITIONAL_V6_COMPONENT_VERSION,V6_CONTEXT_MODEL_VERSION,V6_PARENT_CORPUS_VERSION,
  FROZEN_CONTEXT_MODEL_VERSION,V4_CONTEXT_MODEL_VERSION,modelVersionForComponent,TRADITIONAL_GATE_VERSION as gate
 } from '../corpus-components.mjs';
 import {insertTrophyBatch} from '../worker/trophy-import.mjs';
@@ -29,16 +29,16 @@ const sameSet=(a,b)=>[...a].sort().join(',')===[...b].sort().join(',');
 // named explicitly; a restricted report for any other set is refused.
 const P1P6_POLICY='new-set-p1p6-v5-admission-v1',P1P6_SETS=['fra'];
 const isP1P6=report=>report.schema===P1P6_POLICY;
-// v6 rescoring admits one window per set: the widest that passes, else the
-// restricted precedent. Each window has exactly one component and width.
+// v6 rescoring scores each set on its approved window only; there is no
+// fallback. Each window has exactly one component and width.
 const V6_SCHEMA='v6-traditional-rescore-v1';
 const V6_WINDOWS=Object.freeze({
  'phase2':{component:TRADITIONAL_V6_PHASE2_COMPONENT_VERSION,first:1,last:8},
  'p1p6':{component:TRADITIONAL_V6_P1P6_COMPONENT_VERSION,first:1,last:6},
- 'cube-p2p9':{component:CUBE_TRADITIONAL_V6_P2P9_COMPONENT_VERSION,first:2,last:9},
  'cube-p2p7':{component:CUBE_TRADITIONAL_V6_COMPONENT_VERSION,first:2,last:7},
 });
 const isV6=report=>report.schema===V6_SCHEMA;
+const v6Window=sid=>({'powered-cube':'cube-p2p7',fra:'p1p6'})[sid]||'phase2';
 const isV4Phase2=report=>report.schema===1&&report.corrected?.component_version===TRADITIONAL_V4_PHASE2_COMPONENT_VERSION&&report.corrected?.parent_corpus===modelVersions.v4.corpus_version&&report.corrected?.model===V4_CONTEXT_MODEL_VERSION;
 const isV4Cube=report=>report.schema==='cube-p2p7-v4-admission-v1';
 const expansionSupported=report=>report.expansion_supported===true||report.automatic_expansion_supported===true||
@@ -71,7 +71,7 @@ export async function validateComponents(root) {
  if(v6) {
   const admitted=Object.entries(report.admitted||{});
   if(report.model_version!==V6_CONTEXT_MODEL_VERSION||parent!==V6_PARENT_CORPUS_VERSION||report.parent_corpus_version!==parent||report.production_changed!==false||report.publication_authorized!==false||report.traditional_used_for_training!==false||report.source_membership_preserved!==true)throw Error('Invalid complete v6 Traditional evidence');
-  if(!sameSet(Object.keys(report.sets||{}),pinnedV6.map(p=>p.set_id))||admitted.some(([sid,window])=>!V6_WINDOWS[window]||report.sets[sid]?.admitted_window!==window||report.sets[sid]?.pass!==true||(sid==='powered-cube')!==window.startsWith('cube-'))||
+  if(!sameSet(Object.keys(report.sets||{}),pinnedV6.map(p=>p.set_id))||admitted.some(([sid,window])=>window!==v6Window(sid)||report.sets[sid]?.admitted_window!==window||report.sets[sid]?.pass!==true)||
      !sameSet(report.not_admitted||[],Object.keys(report.sets).filter(sid=>!report.admitted[sid]))||Object.values(report.sets).some(s=>s.pass!==Boolean(s.admitted_window)))throw Error('v6 admissions differ from their per-set evidence');
  }
  const p1p6=isP1P6(report);

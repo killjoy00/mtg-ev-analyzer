@@ -1,6 +1,6 @@
 -- Admit the v6 colour model on the v10 parent. Re-declares the 0065
--- constraints with the v6 Traditional identities added (Cube may serve
--- P1P2-P1P9 only through its v6 P2-P9 component), enforces the v10 Premier
+-- constraints with the three v6 Traditional identities added, keeping each
+-- approved window (regular P1-P8, P1-P6, Cube P2-P7), enforces the v10 Premier
 -- model pair, and lets the v9 runtime keep serving the exact v9 snapshot that
 -- each active v10 snapshot superseded while the release bridge is deployed.
 -- No data rewrite or deletion; retained rows are not rescanned.
@@ -27,7 +27,7 @@ ALTER TABLE corpus_components ADD CONSTRAINT corpus_components_version_model_che
   AND parent_version='elite-trophy-colour-stage-v9')
  OR
  (component_version IN ('traditional-premier-v6-phase2-v1','traditional-premier-v6-p1p6-v1',
-    'traditional-cube-p2p7-v6-v1','traditional-cube-p2p9-v6-v1')
+    'traditional-cube-p2p7-v6-v1')
   AND model_version='strong-player-colour-stage-v6'
   AND parent_version='elite-trophy-colour-stage-v10')
 ) NOT VALID;
@@ -53,7 +53,7 @@ ALTER TABLE draft_run_verified_puzzles ADD CONSTRAINT draft_run_source_evidence_
   payload->>'source_event_type'='TradDraft'
   AND (payload->>'event_match_wins')::int=3
   AND (payload->>'event_match_losses')::int=0
-  AND (pick_number BETWEEN 1 AND 8 OR (set_id='powered-cube' AND corpus_version='traditional-cube-p2p9-v6-v1' AND pick_number=9))
+  AND pick_number BETWEEN 1 AND 8
   AND (
    (
     (
@@ -83,8 +83,7 @@ ALTER TABLE draft_run_verified_puzzles ADD CONSTRAINT draft_run_source_evidence_
    )
    OR
    (
-    ((set_id='powered-cube' AND corpus_version='traditional-cube-p2p9-v6-v1' AND pick_number BETWEEN 2 AND 9)
-     OR (set_id='powered-cube' AND corpus_version='traditional-cube-p2p7-v6-v1' AND pick_number BETWEEN 2 AND 7)
+    ((set_id='powered-cube' AND corpus_version='traditional-cube-p2p7-v6-v1' AND pick_number BETWEEN 2 AND 7)
      OR (set_id<>'powered-cube' AND corpus_version='traditional-premier-v6-phase2-v1')
      OR (set_id<>'powered-cube' AND corpus_version='traditional-premier-v6-p1p6-v1' AND pick_number BETWEEN 1 AND 6))
     AND payload->>'model_version'='strong-player-colour-stage-v6'

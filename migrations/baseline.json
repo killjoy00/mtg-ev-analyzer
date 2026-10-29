@@ -756,7 +756,7 @@
     "constraint:corpus_components.corpus_components_status_check": "719c087230960f618c62c9eae5b9aef7",
     "constraint:corpus_components.corpus_components_version_model_check": [
       "efbfc0435004e1dc4e7814d6a9b26afc",
-      "b1154213896fb6c97bbaeb6c0247502d"
+      "bf96c6269c62b18ded93a14b1263ea8a"
     ],
     "constraint:corpus_health_checks.corpus_health_checks_pkey": "4c6419b3704337bbfe50f018842a9ad3",
     "constraint:corpus_health_checks.corpus_health_checks_set_id_corpus_version_fkey": "1cbdbb8b024a48344bf36337829b55c9",
@@ -930,7 +930,7 @@
     "constraint:draft_run_verified_puzzles.draft_run_pick_position": "9ca8190f5b165b2f1a1d230c2ab759f8",
     "constraint:draft_run_verified_puzzles.draft_run_source_evidence_required": [
       "03af83bbba9b9a1c2dcb6b285f4ad677",
-      "c9e949166497d4323efecbdce3e6b485"
+      "6c98ed741b13092a3da6dbb2301951fa"
     ],
     "constraint:draft_run_verified_puzzles.draft_run_v5_model_identity": "446ad6564996a8421c5fde04ac471012",
     "constraint:draft_run_verified_puzzles.draft_run_verified_puzzles_candidate_count_check": "de2149d067b0cf0864c15ad0136167b1",

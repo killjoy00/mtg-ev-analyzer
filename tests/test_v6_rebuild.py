@@ -61,33 +61,32 @@ class WindowTests(unittest.TestCase):
             return {'pass': ok, 'gates': {'calibration': ok}}
         return fake
 
-    def test_widest_window_is_admitted_when_it_passes(self):
+    def test_each_set_is_scored_once_on_its_approved_window(self):
+        self.assertEqual([traditional.approved_window(s) for s in ('blb', 'ktk', 'hob', 'fra', 'powered-cube')],
+                         ['phase2', 'phase2', 'phase2', 'p1p6', 'cube-p2p7'])
         with patch.object(traditional, 'compare', side_effect=self.gates(99)):
             windows, admitted = traditional.admit('blb', self.records(range(1, 9)), self.puzzles(range(1, 9)), 1)
-        self.assertEqual(admitted, 'phase2')
-        self.assertEqual(list(windows), ['phase2'])
+        self.assertEqual((list(windows), admitted), (['phase2'], 'phase2'))
 
-    def test_late_failure_falls_back_to_the_restricted_window_with_unchanged_gates(self):
+    def test_a_failing_window_has_no_fallback(self):
+        # Late picks fail: a regular set is not admitted, never narrowed to P1-P6.
         with patch.object(traditional, 'compare', side_effect=self.gates(7)):
             windows, admitted = traditional.admit('ktk', self.records(range(1, 9)), self.puzzles(range(1, 9)), 1)
-        self.assertEqual(admitted, 'p1p6')
+        self.assertIsNone(admitted)
+        self.assertEqual(list(windows), ['phase2'])
         self.assertEqual(windows['phase2']['failure_reasons'], ['all_picks.calibration', 'serving_picks.calibration',
                                                                 'late_picks.calibration', 'serving_late_picks.calibration'])
-        self.assertEqual(windows['p1p6']['quality']['usable_traditional_puzzles'], 6)
+        # FRA and Cube are scored only on their approved restricted windows.
+        with patch.object(traditional, 'compare', side_effect=self.gates(7)):
+            self.assertEqual(traditional.admit('fra', self.records(range(1, 9)), self.puzzles(range(1, 9)), 1)[1], 'p1p6')
         with patch.object(traditional, 'compare', side_effect=self.gates(8)):
-            _, cube = traditional.admit('powered-cube', self.records(range(2, 10)), self.puzzles(range(2, 10)), 1,
-                                        {'pass': True})
-        self.assertEqual(cube, 'cube-p2p7')
-
-    def test_a_set_failing_every_window_is_not_admitted(self):
-        with patch.object(traditional, 'compare', side_effect=self.gates(1)):
-            windows, admitted = traditional.admit('hbg', self.records(range(1, 9)), self.puzzles(range(1, 9)), 1)
-        self.assertIsNone(admitted)
-        self.assertEqual(list(windows), ['phase2', 'p1p6'])
+            self.assertEqual(traditional.admit('powered-cube', self.records(range(2, 10)), self.puzzles(range(2, 10)), 1,
+                                               {'pass': True})[1], 'cube-p2p7')
         with patch.object(traditional, 'compare', side_effect=self.gates(99)):
             _, cube = traditional.admit('powered-cube', self.records(range(2, 10)), self.puzzles(range(2, 10)), 1,
                                         {'pass': False})
         self.assertIsNone(cube)
+        self.assertNotIn('cube-p2p9', traditional.WINDOWS)
 
     def test_quality_counts_only_puzzles_inside_the_window(self):
         with patch.object(traditional, 'compare', side_effect=self.gates(99)):

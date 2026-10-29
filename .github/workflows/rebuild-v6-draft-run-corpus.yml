@@ -304,7 +304,7 @@ jobs:
           cat > "$RUNNER_TEMP/v6-pr-body.md" <<'EOF'
           Rebuilds all 31 active environments under strong-player-colour-stage-v6 from the exact inputs of their production v9 snapshots and creates the separate elite-trophy-colour-stage-v10 corpus. v6 changes only the colour policy (splash colours count as deck colours; a 0.0 rate cell is data). FRA rebuilds trophies and Traditional only, as in v9.
 
-          Every measured Traditional source, including sets blocked under v5, is rescored with Premier-trained v6 graders and admitted by the unchanged gates: widest window first, then the restricted-window precedent (regular P1-P6, Cube P2-P7). Admissions and QA are in results/v6-rebuild. Exact validated load artifacts are attached to the rebuild run; v9 data remains available for rollback.
+          Every measured Traditional source, including sets blocked under v5, is rescored with Premier-trained v6 graders and admitted only if its approved window (regular P1-P8, FRA P1-P6, Cube P2-P7) passes the unchanged gates; there is no fallback. Admissions and QA are in results/v6-rebuild. Exact validated load artifacts are attached to the rebuild run; v9 data remains available for rollback.
 
           Validation: full npm test, replay/path audits, complete trophy accounting, Traditional gates, R2 byte readback. This PR does not stage or switch Neon serving.
           EOF
