@@ -15,7 +15,7 @@
 .daily-home-identity-warning .button{flex:0 0 auto;white-space:nowrap}
 .daily-home-game{display:grid;grid-template-columns:64px minmax(0,1fr) 102px auto;align-items:center;gap:24px;padding:30px 28px;border-bottom:1px solid var(--line);border-left:3px solid var(--green)}
 .daily-home-game[data-environment="powered-cube"]{border-left-color:#976822}
-.daily-home-number{align-self:start;font-family:var(--display);font-size:50px;font-weight:600;line-height:1;color:#a4b2c0;font-variant-numeric:tabular-nums}
+.daily-home-number{align-self:start;font-family:var(--display);font-size:48px;font-weight:600;line-height:1;color:#a4b2c0;font-variant-numeric:tabular-nums}
 .daily-home-game[data-environment="powered-cube"] .daily-home-number{color:#b6a183}
 .daily-home-game .daily-home-label{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 7px}
 .daily-home-start{padding:5px 9px;border:1px solid #9fb6ca;background:#e5edf4;color:var(--green-dark);font-size:12px;font-weight:800;line-height:1;letter-spacing:.08em}
@@ -38,7 +38,7 @@
 .daily-home-game.is-complete .daily-home-mark{display:none}
 .daily-home-game.is-complete .daily-home-label{display:none}
 .daily-home-game.is-complete .daily-home-number{font-size:32px}
-.daily-home-game.is-complete h2{font-size:26px;margin-bottom:5px}
+.daily-home-game.is-complete h2{font-size:28px;margin-bottom:5px}
 .daily-home-game.is-complete .button{min-width:110px}
 .daily-home-unavailable{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-bottom:1px solid var(--line);color:var(--muted);font-size:14px}
 .daily-home-unavailable .text-button{flex:0 0 auto}
@@ -85,7 +85,6 @@
 /* Phones: each Daily is one compact row with Play on the right, so all three
    fit on the first screen. */
 @media(max-width:600px){
- .daily-home-heading h1{font-size:44px}
  .daily-home-heading>p:not(.eyebrow){margin-bottom:18px}
  .daily-home-heading time{padding:10px 10px 10px 0;font-size:13px}
  .daily-home>.daily-home-status{flex-direction:row;align-items:center;gap:6px 10px;padding:10px 0}
@@ -94,14 +93,14 @@
  .daily-home-number{font-size:24px}
  .daily-home-game .daily-home-label{font-size:11px;margin-bottom:3px}
  .daily-home-start{font-size:11px;padding:3px 7px}
- .daily-home-game h2{font-size:23px;margin-bottom:2px}
+ .daily-home-game h2{font-size:22px;margin-bottom:2px}
  .daily-home-game p{font-size:14px;line-height:1.35}
  .daily-home-action{display:contents}
  .daily-home-game .button{grid-column:3;grid-row:1;width:auto;min-width:92px;min-height:44px;padding-inline:14px}
  .daily-home-action .daily-home-free{grid-column:2 / -1;justify-self:start}
  .daily-home-game.is-complete{grid-template-columns:26px minmax(0,1fr) auto;padding:12px}
  .daily-home-game.is-complete .daily-home-number{font-size:22px}
- .daily-home-game.is-complete h2{font-size:21px}
+ .daily-home-game.is-complete h2{font-size:20px}
 }
 /* The Dailies use the full shared page width: rows start under the logo and end under the menu. */
 .daily-home{max-width:none;margin-left:0}

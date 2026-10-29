@@ -34,7 +34,7 @@
 .guide-results-table tbody th>.guide-colors { margin-right:10px }.guide-results-table tbody th>span:not(.guide-colors) { display:inline-block;vertical-align:middle }.guide-results-table small { display:block;font-weight:400;font-size:12px;color:var(--muted) }
 .guide-baseline { display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:12px 14px;background:var(--surface-soft);font-size:14px }.guide-baseline strong { grid-column:2;grid-row:1/3;font-size:23px;align-self:center }.guide-baseline>span { color:var(--muted);font-size:12px }
 .guide-sources { padding:16px 24px;display:flex;flex-wrap:wrap;gap:8px 16px;border-top:1px solid var(--line);font-size:12px;color:var(--muted) }.guide-sources>span { flex-basis:100% }.guide-page-link { padding:0 24px 20px;font-size:13px }
-.set-guide-callout { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 24px;margin:24px 0;border:1px solid var(--line);border-left:3px solid var(--green);background:var(--surface) }.set-guide-callout h2 { margin:0;font-size:26px }.set-guide-callout p { margin:6px 0 0;color:var(--muted);font-size:15px }.set-guide-callout a { flex-shrink:0;color:var(--green);font-weight:650;text-underline-offset:3px }
+.set-guide-callout { display:flex;align-items:center;justify-content:space-between;gap:16px;padding:20px 24px;margin:24px 0;border:1px solid var(--line);border-left:3px solid var(--green);background:var(--surface) }.set-guide-callout h2 { margin:0;font-size:28px }.set-guide-callout p { margin:6px 0 0;color:var(--muted);font-size:16px }.set-guide-callout a { flex-shrink:0;color:var(--green);font-weight:650;text-underline-offset:3px }
 .set-guide-page { max-width:850px;margin:0 auto }.set-guide-page>.article-header { margin-bottom:24px }.set-guide-page>.set-guide { background:var(--surface);border:1px solid var(--line) }.guide-breadcrumb { display:flex;flex-wrap:wrap;gap:8px 20px;margin:0 0 24px;font-size:14px;color:var(--green) }
 @media(max-width:600px) {
   .set-guide-dialog { width:calc(100vw - 16px);max-height:calc(100dvh - 16px) }.set-guide-dialog-header { padding:16px;gap:10px }.set-guide-dialog-header h2 { font-size:27px }.guide-tabs { padding:0 16px }.guide-panel { padding:18px 16px }.guide-sources { padding:14px 16px }.guide-page-link { padding:0 16px 18px }
@@ -51,3 +51,8 @@
  .set-guide-page .guide-archetype:last-child { border-bottom:0 }
  .set-guide-page .guide-table-wrap { max-width:720px }
 }
+/* Set guide pages use the site's text scale (16px reading text, 24px section titles).
+   The pick-screen refresher keeps its own compact sizes. */
+.set-guide-page .guide-tabs button,.set-guide-page .guide-format ul,.set-guide-page .guide-archetype strong,.set-guide-page .guide-results-lead { font-size:16px }
+.set-guide-page .guide-panel h3 { font-size:24px }
+.set-guide-page .guide-baseline strong { font-size:22px }
