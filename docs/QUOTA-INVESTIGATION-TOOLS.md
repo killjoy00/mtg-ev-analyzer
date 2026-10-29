@@ -22,6 +22,10 @@ at least two minutes old and at most 35 minutes apart.
 A short query page is not sufficient coverage evidence. The collector requires
 query level 1, splits coarser partitions, discards their partial rows, checks
 pagination cycles, deduplicates event identities and caps requests and rows.
+Event identity includes the application event, random trace and attempt when
+available: concurrent records may share a provider ID and timestamp. Gateway
+parsing hashes this composite identity and never copies its trace into summaries.
+Conflicting payloads with the same full identity still fail closed.
 Unresolved or unavailable sampling information fails closed. Even verified query
 partitions cannot prove that the provider retained every event. Missing handler
 records or backend acknowledgement do not prove nonexecution. Gateway residual

@@ -23,3 +23,16 @@ test('unverified query sampling cannot advance the existing coverage watermark',
 test('missing sampling metadata fails closed rather than reporting an empty successful window',async()=>{
   await assert.rejects(queryEvents(async()=>Response.json({result:{events:{events:[]}}}),'fixture','a'.repeat(32),0,1000),/sampling coverage unavailable/);
 });
+test('gateway events with colliding provider IDs stay distinct through parsing and coverage evaluation',async()=>{
+  const from=Date.parse('2026-10-29T19:00:00Z'),to=from+15*60000;
+  const first=row('shared-id'),second=row('shared-id');
+  first.source.trace='ab'.repeat(16);second.source.trace='cd'.repeat(16);
+  const events=await queryEvents(async()=>page([first,first,second],1),'fixture','a'.repeat(32),from,to);
+  assert.equal(events.length,2);assert.notEqual(events[0].id,events[1].id);
+  assert.ok(events.every(e=>/^[a-f0-9]{64}$/.test(e.id)));
+  assert.ok(!JSON.stringify(events).includes(first.source.trace));
+  const initial={version:1,coverage_floor:new Date(from-3600000).toISOString(),covered_through:new Date(from).toISOString(),alerted_windows:{},updated_at:null};
+  const inspected=await inspectGatewayCoverage({state:initial,now:to+5*60000,loadWindow:async()=>events});
+  assert.equal(inspected.failed,null);assert.ok(inspected.windows.length>0);
+  assert.ok(inspected.windows.every(w=>w.errors===2));
+});

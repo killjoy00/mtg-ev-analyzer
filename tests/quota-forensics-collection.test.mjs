@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {collectQuotaEventRows,forensicWindows,publishQuotaForensics,runQuotaForensics,quotaForensicsFailureCode} from '../scripts/quota-stage-forensics.mjs';
 import {privateQuotaStore} from '../scripts/private-quota-forensics.mjs';
+import {collectVerifiedTelemetry} from '../scripts/verified-observability.mjs';
 
 const now=Date.parse('2026-10-29T19:00:00Z'),account='a'.repeat(32),token='private-token-'.repeat(3);
 const event=id=>({$metadata:{id},source:{event:'quota_handler'}});
@@ -43,6 +44,21 @@ test('pagination detects a non-adjacent cursor cycle before exhausting the reque
     const id=['a','b','a'][calls++];return page(Array.from({length:2000},()=>event(id)));
   }}),/pagination stalled/);
   assert.equal(calls,3);
+});
+test('concurrent records sharing provider ID and timestamp retain distinct traces and attempts',async()=>{
+  const record=(trace,attempt=1,concurrency=1)=>({$metadata:{id:'shared-provider-id'},timestamp:now,
+    source:{event:'quota_handler_start',trace,attempt,concurrency}});
+  const first=record('ab'.repeat(16)),second=record('cd'.repeat(16),1,2),retry=record('ab'.repeat(16),2);
+  const result=await collectQuotaEventRows({...options,event:'quota_handler_start',fetcher:async()=>page([first,first,second,retry])});
+  assert.equal(result.rows.length,3);assert.deepEqual(result.rows,[first,second,retry]);
+  const offsets=[];
+  const paginated=await collectVerifiedTelemetry({from:options.from,to:options.to,pageSize:2,fetchPage:async({offset})=>{
+    offsets.push(offset);
+    const next={...retry,$metadata:{id:'next-provider-id'}};
+    return {level:1,events:offset===null?[first,second]:offset==='shared-provider-id'?[second,next]:[]};
+  }});
+  assert.equal(paginated.rows.length,3);assert.deepEqual(offsets,[null,'shared-provider-id','next-provider-id']);
+  await assert.rejects(collectQuotaEventRows({...options,event:'quota_handler_start',fetcher:async()=>page([first,record('ab'.repeat(16),1,99)])}),/Conflicting telemetry event identity/);
 });
 test('expired default history is explicit and never prevents a current settled collection',async()=>{
   const windows=forensicWindows(now);
