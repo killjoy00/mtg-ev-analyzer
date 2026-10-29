@@ -103,3 +103,6 @@
  .daily-home-game.is-complete .daily-home-number{font-size:22px}
  .daily-home-game.is-complete h2{font-size:21px}
 }
+/* The Dailies use the full shared page width: rows start under the logo and end under the menu. */
+.daily-home{max-width:none;margin-left:0}
+.daily-home-heading>p:not(.eyebrow){max-width:68ch}

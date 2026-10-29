@@ -43,3 +43,11 @@
 }
 /* Standalone guide links get the same 44px target as the rest of the site. */
 .guide-breadcrumb a,.guide-sources a,.set-guide-callout > a { display:inline-flex;align-items:center;min-height:44px }
+/* Set guide pages use the full page width; archetypes sit in two columns on wide screens. */
+.set-guide-page { max-width:none;margin-left:0 }
+.set-guide-page>.article-header { max-width:68ch }
+@media(min-width:900px){
+ .set-guide-page .guide-archetypes { display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:40px;align-items:start;border-bottom:1px solid var(--line) }
+ .set-guide-page .guide-archetype:last-child { border-bottom:0 }
+ .set-guide-page .guide-table-wrap { max-width:720px }
+}

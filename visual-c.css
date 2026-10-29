@@ -965,3 +965,13 @@ body .run-review-list li {
     text-align: left;
   }
 }
+
+/* One page frame: the menu, the page and the footer share the same left and right edges,
+   and narrower columns start at that left edge instead of floating in the middle. */
+:root { --gutter: 24px; }
+@media (max-width: 700px) { :root { --gutter: 16px; } }
+.topbar { padding-left: max(var(--gutter), calc((100% - var(--content)) / 2 + var(--gutter))); padding-right: max(var(--gutter), calc((100% - var(--content)) / 2 + var(--gutter))); }
+.app { padding-left: var(--gutter); padding-right: var(--gutter); }
+.app-footer, .app-shell > .ad-slot[data-ad-slot="home"] { width: min(calc(var(--content) - 2 * var(--gutter)), calc(100% - 2 * var(--gutter))); }
+.app-footer { padding-left: 0; padding-right: 0; }
+.growth-page, body .run-result-page, body .run-board, body .run-invite, body .practice-picker { margin-left: 0; }

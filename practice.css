@@ -182,3 +182,8 @@
     font-size: 30px;
   }
 }
+
+/* Practice uses the shared page frame from visual-c.css. */
+.practice-main { padding-left: var(--gutter); padding-right: var(--gutter); }
+.practice-shell { max-width: none; margin-left: 0; }
+.practice-main p { max-width: 68ch; }
