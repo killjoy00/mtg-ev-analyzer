@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 
 from decision_context import PickState, card_features, diagnostic_flags
+from model_training import V5_MODEL
 
 ROOT = Path(__file__).resolve().parents[1]
 SETS = ('blb', 'dsk', 'neo', 'eoe', 'woe')
@@ -37,7 +38,7 @@ def load_public(root=ROOT):
         rows = json.loads(gzip.open(path, 'rt').read())
         metadata[sid] = {}
         for p in rows:
-            if p['model_version'] != 'strong-player-colour-stage-v5':
+            if p['model_version'] != V5_MODEL:
                 raise ValueError('Audit requires v5 puzzles only')
             for c in p['candidates'] + p['prior_picks']:
                 # Current public metadata is display-only, and has no oracle text.
