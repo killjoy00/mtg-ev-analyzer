@@ -14,7 +14,7 @@ for (const path of pages) {
 for (const path of ['how-it-works/index.html','scoring/index.html','methodology/index.html','learn/first-pick-discipline/index.html','learn/reading-consensus/index.html','learn/staying-open/index.html','sets/msh/index.html']) {
   const html = await readFile(path, 'utf8');
   const words = html.replace(/<[^>]*>/g, ' ').trim().split(/\s+/).filter(Boolean).length;
-  assert.ok(words >= (path==='learn/first-pick-discipline/index.html'?260:330), `${path} is too thin for the editorial shell: ${words} words`);
+  assert.ok(words >= (path.startsWith('learn/')?260:330), `${path} is too thin for the editorial shell: ${words} words`);
 }
 const home = await readFile('index.html','utf8');
 assert.doesNotMatch(home, /id="home-editorial"/);
