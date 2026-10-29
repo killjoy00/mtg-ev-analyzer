@@ -1,0 +1,35 @@
+name: Decision context research contracts
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/decision_context*.py'
+      - 'tests/test_decision_context.py'
+      - 'research/DECISION-CONTEXT-V1.md'
+      - 'research/decision-context-v1/**'
+      - '.github/workflows/decision-context.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      OPENBLAS_NUM_THREADS: '1'
+      OMP_NUM_THREADS: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: research/card-strength-requirements.txt
+      - run: python -m pip install -r research/card-strength-requirements.txt
+      - run: python -m unittest discover -s tests -p test_decision_context.py -v
+      - name: Reproduce frozen review artifacts
+        run: |
+          python scripts/decision_context_audit.py
+          git diff --exit-code -- research/decision-context-v1/audit.json research/decision-context-v1/review-blind.json.gz research/decision-context-v1/review-key.json.gz
