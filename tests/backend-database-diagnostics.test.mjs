@@ -96,6 +96,44 @@ test('database errors do not copy response bodies or internal metadata into exce
  });
 }));
 
+test('non-retryable SQL failures retain safe classification on event routes without leaking detail',async()=>fixture(async rows=>{
+ const cases=[['23503','integrity_constraint'],['53300','insufficient_resources'],['42P01','syntax_or_access'],['22003','data_exception']];
+ for(const [code,classification] of cases){
+   rows.length=0;let calls=0;
+   globalThis.fetch=async()=>{calls++;return Response.json({code,message:'private provider message',constraint:'private_constraint',detail:'private SQL parameters'},{status:400});};
+   await assert.rejects(observedRoute(request(trace,'/v1/events'),'growth',()=>query('INSERT INTO private_table VALUES ($1)',['private-identity'])));
+   assert.equal(calls,1,'diagnostic classification must never enable a retry');
+   const end=rows.find(r=>r.event==='backend_request');
+   assert.equal(end.status,500);assert.equal(end.route,'other');assert.equal(end.failure_code,code);assert.equal(end.failure_class,classification);
+   assert.equal(rows.some(r=>r.event==='backend_database'),false,'existing detailed route scope stays bounded');
+   assert.doesNotMatch(JSON.stringify(rows),/private provider|private_constraint|private SQL|private_table|private-identity/);
+ }
+}));
+
+test('SQL classes distinguish redacted codes from missing SQLSTATE while exact unknown codes stay private',async()=>fixture(async rows=>{
+ for(const [code,classification] of [['23999','integrity_constraint'],['ZZ999','other_sqlstate'],['private arbitrary code',null]]){
+   rows.length=0;
+   globalThis.fetch=async()=>Response.json({code,message:'private database detail'},{status:400});
+   await assert.rejects(observedRoute(request(),'growth',()=>query('INSERT INTO fixture VALUES ($1)',['private-identity'])));
+   const metric=rows.find(r=>r.event==='backend_database'),end=rows.find(r=>r.event==='backend_request');
+   assert.equal(metric.failure_code,null);assert.equal(metric.failure_class,classification);
+   assert.equal(end.failure_code,null);assert.equal(end.failure_class,classification);
+   assert.ok(!JSON.stringify(rows).includes(code));assert.doesNotMatch(JSON.stringify(rows),/private database|private-identity/);
+ }
+}));
+
+test('unknown transaction completion codes never replay an already committed mutation',async()=>fixture(async rows=>{
+ for(const code of ['08007','40003']){
+   rows.length=0;let commits=0;
+   globalThis.fetch=async()=>{commits++;return Response.json({code,message:'private ambiguous completion'},{status:400});};
+   await assert.rejects(observedRoute(request(),'growth',()=>query('INSERT INTO fixture VALUES ($1)',['private-identity'])));
+   assert.equal(commits,1);
+   const metric=rows.find(r=>r.event==='backend_database');
+   assert.equal(metric.failure_code,code);assert.equal(metric.ok,false);
+   assert.doesNotMatch(JSON.stringify(rows),/private ambiguous|private-identity|INSERT/);
+ }
+}));
+
 test('fixed SQL guard reasons and reminder domain codes survive without dynamic database text',async()=>fixture(async()=>{
  const cases=[
    ['Pick removal history is append-only',/append-only/],

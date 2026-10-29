@@ -49,3 +49,17 @@ memory-credit admissions or transport outliers. They cannot establish the cause
 of individual tail regressions. Counter-write decisions are not total billed
 operations or verified production cost savings. The original latency acceptance
 and subsequent correctness/gameplay gates remain required.
+
+Private backend request failures retain a fixed allowlist of PostgreSQL SQLSTATE
+codes and a bounded `failure_class`. Unlisted but well-formed SQLSTATE values
+retain only a fixed class, so a redacted code can be distinguished from an absent
+code. SQL, parameters, constraint names, provider text and identities are never
+added. The class labels follow the
+[PostgreSQL error-code classes](https://www.postgresql.org/docs/current/errcodes-appendix.html).
+
+Classification is not a retry directive or proof of rollback. Connection and
+transaction classes include unknown completion outcomes. Only the existing
+explicit rollback codes permit mutation retries; adding a diagnostic code never
+expands that policy. Detailed database spans remain limited to the existing
+session-creation and run-start routes. These fields help future observations and
+cannot recover error codes that earlier logs did not retain.
