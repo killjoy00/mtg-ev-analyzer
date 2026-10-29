@@ -9,7 +9,7 @@ export function faceIndicatorMarkup(card) {
 export function openCardViewer(card) {
   if(!card)return;
   if(!document.querySelector('[data-card-viewer-style]')) {
-    const link=document.createElement('link');link.rel='stylesheet';link.href=new URL('./card-viewer.css?v=1',import.meta.url).href;
+    const link=document.createElement('link');link.rel='stylesheet';link.href=new URL('./card-viewer.css?v=2',import.meta.url).href;
     link.dataset.cardViewerStyle='1';document.head.append(link);
   }
   const returnFocus=document.activeElement,faces=cardDisplayFaces(card);
@@ -19,7 +19,7 @@ export function openCardViewer(card) {
   dialog.innerHTML=`<div class="card-face-header"><strong>${esc(card.name)}</strong><button type="button" class="button secondary" data-card-close autofocus>Close</button></div>
     ${faces.length===2?'<button type="button" class="button secondary card-face-toggle" data-face-toggle></button>':''}
     <div class="card-face-panels">${faces.map((face,index)=>`<figure class="card-face-panel" data-face="${index}">
-      <figcaption><span>${faces.length===2?esc(faceLabel(face))+' · ':''}${esc(face.name)}</span></figcaption>
+      ${faces.length===2?`<figcaption><span>${esc(faceLabel(face))} · ${esc(face.name)}</span></figcaption>`:''}
       <div class="card-face-art"><img alt="${esc(face.name)} — ${esc(faceLabel(face))}" src="${esc(face.large_image_url||face.image_url)}">
       <div class="card-face-error" hidden><p role="status">Image unavailable for ${esc(face.name)}.</p><button type="button" class="button secondary" data-face-retry="${index}">Retry image</button></div></div>
       ${face.partner_name?`<p class="card-face-note">Melds with ${esc(face.partner_name)}. Both cards are required.</p>`:''}</figure>`).join('')||'<p>Artwork unavailable.</p>'}</div>`;
@@ -50,7 +50,9 @@ export function openCardViewer(card) {
   });
   media.addEventListener('change',update);
   dialog.querySelector('[data-card-close]').onclick=()=>dialog.close();
-  dialog.addEventListener('click',event=>{if(event.target===dialog){const r=dialog.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)dialog.close();}});
+  // A tap anywhere closes the viewer, on the card or outside it; only the face
+  // toggle and image retry keep it open.
+  dialog.addEventListener('click',event=>{if(!event.target.closest('[data-face-toggle],[data-face-retry]'))dialog.close();});
   dialog.addEventListener('close',()=>{media.removeEventListener('change',update);dialog.remove();if(returnFocus?.isConnected)returnFocus.focus();},{once:true});
   document.body.append(dialog);update();dialog.showModal();
   return dialog;
