@@ -318,7 +318,7 @@ try{
   }
   if(daily){
     assert.match(shared.text,/I scored \d+\/100 on the Pack One (Draft Run|Powered Cube|Latest Set) Daily \(Oct 7\)\./);
-    assert.match(shared.text,/Play today’s Daily yourself\. Free, no account needed:$/);
+    assert.match(shared.text,/Try Pack One's Daily\. No account needed:$/);
     const sharedUrl=new URL(shared.url);assert.equal(sharedUrl.pathname,'/share/daily/'+environment+'/');assert.equal(sharedUrl.searchParams.get('d'),fixtureDay);assert.equal(sharedUrl.searchParams.get('ref'),'result_share');assert.doesNotMatch(shared.url,/challenge=|shared=/);assert.equal(shareCalls,0);
     // The share panel sits above the next-Daily handoff and names no cards.
     const order=await page.evaluate(()=>{const panel=document.querySelector('.run-share-panel'),next=document.querySelector('[data-next-daily-action]');return Boolean(panel.compareDocumentPosition(next)&Node.DOCUMENT_POSITION_FOLLOWING);});
