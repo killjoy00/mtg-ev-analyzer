@@ -16,6 +16,14 @@ export const CUBE_TRADITIONAL_V5_COMPONENT_VERSION='traditional-cube-p2p7-v5-v1'
 export const TRADITIONAL_V5_P1P6_COMPONENT_VERSION='traditional-premier-v5-p1p6-v1';
 export const V5_CONTEXT_MODEL_VERSION=modelVersions.v5.model_version;
 export const V5_PARENT_CORPUS_VERSION=modelVersions.v5.corpus_version;
+// v6 rescoring admits each environment's widest window first and otherwise the
+// restricted-window precedent (regular P1P1-P1P6, Cube P1P2-P1P7).
+export const TRADITIONAL_V6_PHASE2_COMPONENT_VERSION='traditional-premier-v6-phase2-v1';
+export const TRADITIONAL_V6_P1P6_COMPONENT_VERSION='traditional-premier-v6-p1p6-v1';
+export const CUBE_TRADITIONAL_V6_COMPONENT_VERSION='traditional-cube-p2p7-v6-v1';
+export const CUBE_TRADITIONAL_V6_P2P9_COMPONENT_VERSION='traditional-cube-p2p9-v6-v1';
+export const V6_CONTEXT_MODEL_VERSION=modelVersions.v6.model_version;
+export const V6_PARENT_CORPUS_VERSION=modelVersions.v6.corpus_version;
 
 const COMPONENT_MODELS=Object.freeze({
  [TRADITIONAL_COMPONENT_VERSION]:FROZEN_CONTEXT_MODEL_VERSION,
@@ -26,6 +34,10 @@ const COMPONENT_MODELS=Object.freeze({
  [TRADITIONAL_V5_PHASE2_COMPONENT_VERSION]:V5_CONTEXT_MODEL_VERSION,
  [CUBE_TRADITIONAL_V5_COMPONENT_VERSION]:V5_CONTEXT_MODEL_VERSION,
  [TRADITIONAL_V5_P1P6_COMPONENT_VERSION]:V5_CONTEXT_MODEL_VERSION,
+ [TRADITIONAL_V6_PHASE2_COMPONENT_VERSION]:V6_CONTEXT_MODEL_VERSION,
+ [TRADITIONAL_V6_P1P6_COMPONENT_VERSION]:V6_CONTEXT_MODEL_VERSION,
+ [CUBE_TRADITIONAL_V6_COMPONENT_VERSION]:V6_CONTEXT_MODEL_VERSION,
+ [CUBE_TRADITIONAL_V6_P2P9_COMPONENT_VERSION]:V6_CONTEXT_MODEL_VERSION,
 });
 export const modelVersionForComponent=v=>COMPONENT_MODELS[v]||null;
 export const supportedComponent=v=>Boolean(modelVersionForComponent(v));
@@ -33,7 +45,10 @@ export const supportedComponent=v=>Boolean(modelVersionForComponent(v));
 export function approvedTraditionalSource(p) {
  if(modelVersionForComponent(p?.corpus_version)===V5_CONTEXT_MODEL_VERSION &&
     p?.parent_corpus_version!==V5_PARENT_CORPUS_VERSION)return false;
- if(p?.set_id==='powered-cube')return [CUBE_TRADITIONAL_COMPONENT_VERSION,CUBE_TRADITIONAL_V4_COMPONENT_VERSION,CUBE_TRADITIONAL_V5_COMPONENT_VERSION].includes(p?.corpus_version)&&p.pick_number>=2&&p.pick_number<=7;
- if(p?.corpus_version===TRADITIONAL_V5_P1P6_COMPONENT_VERSION)return p.pick_number>=1&&p.pick_number<=6;
- return [TRADITIONAL_COMPONENT_VERSION,TRADITIONAL_PHASE2_COMPONENT_VERSION,TRADITIONAL_V4_PHASE2_COMPONENT_VERSION,TRADITIONAL_V5_PHASE2_COMPONENT_VERSION].includes(p?.corpus_version)&&p.pick_number>=1&&p.pick_number<=8;
+ if(modelVersionForComponent(p?.corpus_version)===V6_CONTEXT_MODEL_VERSION &&
+    p?.parent_corpus_version!==V6_PARENT_CORPUS_VERSION)return false;
+ if(p?.set_id==='powered-cube'&&p?.corpus_version===CUBE_TRADITIONAL_V6_P2P9_COMPONENT_VERSION)return p.pick_number>=2&&p.pick_number<=9;
+ if(p?.set_id==='powered-cube')return [CUBE_TRADITIONAL_COMPONENT_VERSION,CUBE_TRADITIONAL_V4_COMPONENT_VERSION,CUBE_TRADITIONAL_V5_COMPONENT_VERSION,CUBE_TRADITIONAL_V6_COMPONENT_VERSION].includes(p?.corpus_version)&&p.pick_number>=2&&p.pick_number<=7;
+ if([TRADITIONAL_V5_P1P6_COMPONENT_VERSION,TRADITIONAL_V6_P1P6_COMPONENT_VERSION].includes(p?.corpus_version))return p.pick_number>=1&&p.pick_number<=6;
+ return [TRADITIONAL_COMPONENT_VERSION,TRADITIONAL_PHASE2_COMPONENT_VERSION,TRADITIONAL_V4_PHASE2_COMPONENT_VERSION,TRADITIONAL_V5_PHASE2_COMPONENT_VERSION,TRADITIONAL_V6_PHASE2_COMPONENT_VERSION].includes(p?.corpus_version)&&p.pick_number>=1&&p.pick_number<=8;
 }

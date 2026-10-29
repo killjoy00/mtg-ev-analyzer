@@ -22,6 +22,8 @@ export const DRAFT_RUN_SCORING_VERSION = 'trophy-consensus-v3';
 export const DRAFT_RUN_CORPUS_VERSION = 'elite-trophy-colour-stage-v9';
 export const V5_CORPUS_VERSION = modelVersions.v5.corpus_version;
 export const V5_CONTEXT_MODEL_VERSION = 'strong-player-colour-stage-v5';
+export const V6_CORPUS_VERSION = modelVersions.v6.corpus_version;
+export const V6_CONTEXT_MODEL_VERSION = 'strong-player-colour-stage-v6';
 // Pooled validation fitted 2.0 for the old pair model and 1.75 for the
 // colour-stage model. Display calibration follows the puzzle's pinned model.
 export function supportSharpening(corpusVersion=DRAFT_RUN_CORPUS_VERSION) {
@@ -126,6 +128,11 @@ const REPLAY_COLOUR_STAGE_COMPONENTS=new Set([
   'traditional-cube-p2p7-v5-v1',
   // Same v5 colour-stage model as the regular v5 component, restricted to P1P1-P1P6.
   'traditional-premier-v5-p1p6-v1',
+  // v6 keeps the colour-stage display calibration; only its colour policy changed.
+  'traditional-premier-v6-phase2-v1',
+  'traditional-premier-v6-p1p6-v1',
+  'traditional-cube-p2p7-v6-v1',
+  'traditional-cube-p2p9-v6-v1',
 ]);
 function replaySupportSharpening(corpusVersion) {
   // Freeze the component inventory that uses colour-stage display calibration.
@@ -353,6 +360,7 @@ export function eligiblePickForRound(roundIndex, pickNumber, environment = 'mixe
 // their immutable evidence or make their still-present puzzles unreadable.
 export function validateDraftRunPuzzle(puzzle, expectedVersion = DRAFT_RUN_CORPUS_VERSION) {
   if(puzzle?.corpus_version===V5_CORPUS_VERSION && puzzle.model_version!==V5_CONTEXT_MODEL_VERSION)return false;
+  if(puzzle?.corpus_version===V6_CORPUS_VERSION && puzzle.model_version!==V6_CONTEXT_MODEL_VERSION)return false;
   const cards = puzzle?.candidates || [];
   const prior = puzzle?.prior_picks || [];
   const pick = Number(puzzle?.pick_number);
@@ -368,7 +376,8 @@ export function validateDraftRunPuzzle(puzzle, expectedVersion = DRAFT_RUN_CORPU
       ? Number(puzzle.event_match_wins)===7 && (puzzle.event_match_losses==null||[0,1,2].includes(Number(puzzle.event_match_losses)))
       : puzzle.source_event_type==='TradDraft' && approvedTraditionalSource(puzzle) &&
         puzzle.model_version===modelVersionForComponent(puzzle.corpus_version) && puzzle.model_source_event==='PremierDraft' &&
-        Number(puzzle.event_match_wins)===3 && puzzle.event_match_losses===0 && pick<=8 && rateSkill) &&
+        Number(puzzle.event_match_wins)===3 && puzzle.event_match_losses===0 &&
+        pick<=(puzzle.set_id === POWERED_CUBE_ENVIRONMENT ? 9 : 8) && rateSkill) &&
     Number(puzzle.player_games_lower_bound) >= 100 &&
     (legacySkill || rateSkill) && puzzle.source_evidence === 'official_archive_trajectory' &&
     Number.isInteger(pick) && pick >= (puzzle.set_id === POWERED_CUBE_ENVIRONMENT ? 2 : 1) &&

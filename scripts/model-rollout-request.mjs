@@ -21,6 +21,12 @@ export function rolloutDispatch(request) {
       if(!/^[1-9][0-9]{4,20}$/.test(String(reuse_run_id)))throw Error('Invalid source v5 rebuild run.');
       inputs={reuse_run_id:String(reuse_run_id)};extra=['reuse_run_id'];
     }
+  } else if(operation==='rebuild-v6') {
+    workflow='rebuild-v6-draft-run-corpus.yml';
+    if(reuse_run_id!==undefined) {
+      if(!/^[1-9][0-9]{4,20}$/.test(String(reuse_run_id)))throw Error('Invalid source v6 rebuild run.');
+      inputs={reuse_run_id:String(reuse_run_id)};extra=['reuse_run_id'];
+    }
   } else if(operation==='import') {
     if(!/^(all|[a-z0-9-]+(?:,[a-z0-9-]+)*)$/.test(sets||'')||!['build-only','development','production'].includes(target))throw Error('Invalid import request.');
     workflow='import-all-trophies.yml';inputs={sets,target};extra=['sets','target'];
@@ -43,6 +49,15 @@ export function rolloutDispatch(request) {
       inputs.repair_game_metadata='true';extra.push('repair_game_metadata');
     }
     workflow='release-v5-corpus.yml';
+  } else if(operation==='v6-corpus-release') {
+    if(!['development','production'].includes(target)||!['stage','activate','rollback','verify-active','resume-activation'].includes(action)||
+       !/^[1-9][0-9]{4,20}$/.test(String(candidate_run_id||''))||!/^[a-f0-9]{40}$/.test(release_commit||''))throw Error('Invalid v6 corpus release request.');
+    inputs={target,action,candidate_run_id:String(candidate_run_id),release_commit};extra=['target','action','candidate_run_id','release_commit'];
+    if(action!=='stage') {
+      if(!/^[1-9][0-9]{4,20}$/.test(String(stage_run_id||''))||!/^[a-f0-9]{40}$/.test(bridge_commit||''))throw Error('v6 activation/rollback requires exact stage and bridge identities.');
+      inputs.stage_run_id=String(stage_run_id);inputs.bridge_commit=bridge_commit;extra.push('stage_run_id','bridge_commit');
+    } else if(stage_run_id!==undefined||bridge_commit!==undefined)throw Error('v6 stage does not accept activation identities.');
+    workflow='release-v6-corpus.yml';
   } else if(operation==='corpus-health') {
     if(!['development','production'].includes(target))throw Error('Invalid health target.');
     workflow='corpus-health.yml';inputs={target};extra=['target'];
