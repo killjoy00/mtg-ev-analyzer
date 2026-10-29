@@ -198,7 +198,7 @@ function statsMarkup(profile,liveCatalog,account,patreon) {
   return '<div class="my-pack-one-grid"><main class="my-pack-one-main">'+
     '<section class="my-pack-card my-career-card"><div class="my-card-heading"><h2>Career Snapshot</h2></div><div class="my-career-metrics">'+metricHtml+'</div></section>'+currentSeasonMarkup(profile)+
     '<section class="my-pack-card"><div class="my-card-heading"><h2>Recent Performance</h2><span>Last '+Math.min(10,(profile.trend||[]).length)+' games</span></div>'+performanceBars(profile)+'</section>'+
-    '<div class="my-two-up"><section class="my-pack-card"><div class="my-card-heading"><h2>Best Environments</h2></div>'+bestEnvironmentRows(profile,names,progress)+'</section>'+
+    '<div class="my-two-up"><section class="my-pack-card"><div class="my-card-heading"><h2>Sets where you&#39;ve scored best</h2></div>'+bestEnvironmentRows(profile,names,progress)+'</section>'+
     '<section class="my-pack-card"><div class="my-card-heading"><h2>Achievements</h2><span>'+unlocked+' / '+totalAchievements+' unlocked</span></div>'+achievementPreview(profile)+achievementDetails(profile)+'</section></div>'+
     '<section class="my-pack-card"><div class="my-card-heading"><h2>Recent Games</h2></div>'+(recentPreview?'<ol class="my-game-preview">'+recentPreview+'</ol>':'<p class="my-pack-empty">No scored games yet.</p>')+
       (recent.length?'<details class="my-pack-details"><summary>View all game history</summary><ol class="profile-history-list" id="profile-history-list">'+recent.map(row=>historyRow(row,names)).join('')+'</ol><button type="button" class="button secondary" id="profile-load-more" '+(recent.length<20?'hidden':'')+'>Load more</button></details>':'')+'</section>'+
