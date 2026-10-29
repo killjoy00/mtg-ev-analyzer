@@ -54,7 +54,7 @@ from import_all_trophies import (
 )
 from traditional_puzzles import THRESHOLDS, compare, record
 from set_policy import corpus_version
-from model_training import VERSIONS
+from model_training import VERSIONS, colour_policy
 from run_import_all_trophies import resilient_request
 from fetch_card_metadata import compact_card, aliases
 
@@ -310,9 +310,14 @@ def build_v4_models(sid: str, draft: Path, game: Path, pin: dict):
     )
     if training_picks != int(pin["training_picks"]):
         raise ValueError(f"{sid}: production training pick count changed")
-    fits = build_colour_tables_by_fold(game, colour_examples, fold_training, sid)
+    # Graders follow the pinned Premier model's colour policy, so a v6 parent
+    # scores Traditional decisions exactly as it scores its own puzzles.
+    policy = colour_policy(pin.get("model_version", MODEL))
+    fits = build_colour_tables_by_fold(game, colour_examples, fold_training, sid,
+                                       policy["deck_colours"])
     models = [
-        OutOfFoldModel(fold.counts, CountStore.empty(), fits[fold.fold])
+        OutOfFoldModel(fold.counts, CountStore.empty(), fits[fold.fold],
+                       policy["zero_rates_are_data"])
         for fold in fold_training
     ]
     if len(models) != 5:

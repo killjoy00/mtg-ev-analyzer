@@ -1,0 +1,2809 @@
+{
+  "model_versions": [
+    "strong-player-colour-stage-v5",
+    "strong-player-colour-stage-v6"
+  ],
+  "split": "test",
+  "sets": [
+    "blb",
+    "bro",
+    "dft",
+    "dmu",
+    "dsk",
+    "ecl",
+    "eoe",
+    "fdn",
+    "fin",
+    "hbg",
+    "hob",
+    "ktk",
+    "lci",
+    "ltr",
+    "mh3",
+    "mkm",
+    "mom",
+    "msh",
+    "neo",
+    "one",
+    "otj",
+    "pio",
+    "powered-cube",
+    "sir",
+    "snc",
+    "sos",
+    "tdm",
+    "tla",
+    "tmt",
+    "woe"
+  ],
+  "pooled_v6_minus_v5": {
+    "drafts": 106921,
+    "decisions": 1164217,
+    "log_loss_delta": -0.016572,
+    "brier_delta": -0.005947,
+    "top1_delta": 0.006529,
+    "log_loss_ci95": [
+      -0.01689,
+      -0.01625
+    ],
+    "brier_ci95": [
+      -0.0061,
+      -0.00579
+    ],
+    "top1_ci95": [
+      0.00605,
+      0.007
+    ]
+  },
+  "verdict": "v6 passes",
+  "daily_weighted_log_loss_delta": -0.016495,
+  "sets_with_log_loss_ci_below_zero": 26,
+  "sets_with_log_loss_ci_above_zero": 3,
+  "sets_with_top1_ci_below_zero": 1,
+  "validation_display_exponent": {
+    "strong-player-colour-stage-v5": {
+      "exponent": 1.5,
+      "mean_log_loss": 1.160443,
+      "mean_log_loss_at_1_75": 1.162861,
+      "decisions": 228598
+    },
+    "strong-player-colour-stage-v6": {
+      "exponent": 1.5,
+      "mean_log_loss": 1.141815,
+      "mean_log_loss_at_1_75": 1.14289,
+      "decisions": 228598
+    }
+  },
+  "per_set": {
+    "blb": {
+      "set": "blb",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 9855,
+      "training_picks": 382362,
+      "held_out_drafts": 4200,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 46061,
+            "log_loss": 1.194964,
+            "brier": 0.588155,
+            "top1": 0.581707
+          },
+          "colour_coverage": {
+            "fit_cards": 271,
+            "cards_with_colour_judgment": 260
+          },
+          "validation_calibration": {
+            "decisions": 8434,
+            "summed_log_loss": {
+              "1": 10030.951017,
+              "1.25": 9637.284867,
+              "1.5": 9490.368103,
+              "1.75": 9519.139916,
+              "2": 9675.776056,
+              "2.25": 9927.526012,
+              "2.5": 10251.490261,
+              "2.75": 10631.317873,
+              "3": 11055.097051
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 46061,
+            "log_loss": 1.172918,
+            "brier": 0.579909,
+            "top1": 0.589827
+          },
+          "colour_coverage": {
+            "fit_cards": 271,
+            "cards_with_colour_judgment": 260
+          },
+          "validation_calibration": {
+            "decisions": 8434,
+            "summed_log_loss": {
+              "1": 9885.065787,
+              "1.25": 9480.220805,
+              "1.5": 9324.21933,
+              "1.75": 9344.566068,
+              "2": 9492.727039,
+              "2.25": 9735.629393,
+              "2.5": 10050.24982,
+              "2.75": 10420.211659,
+              "3": 10833.623305
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 4200,
+        "log_loss_delta": -0.02205,
+        "log_loss_ci95": [
+          -0.02344,
+          -0.02069
+        ],
+        "brier_delta": -0.00825,
+        "brier_ci95": [
+          -0.00893,
+          -0.00758
+        ],
+        "top1_delta": 0.00812,
+        "top1_ci95": [
+          0.00623,
+          0.01008
+        ],
+        "leader_change_rate": 0.066151,
+        "mean_abs_award_change": 2.1975
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "3b05a2d4a8a0f761aa8f527589287a63370a9062adc018dd6baeeca2907f104a",
+          "picks_sha256": "10f1cbd618c1563e0f3cfc7fac400133c90feb7b8660d0dd78a3bf977fe18ae9",
+          "train_ids_sha256": "ec990331431c4f6d3bf58b2456fe7a1a40305230c4ac09b2e67b412abf8f98cd"
+        },
+        "draft_sha256": "a02f9ebbadcd03cbcfd387eb95b2f5dd244d28bb0416de41113662e8f8eae0ea",
+        "games_sha256": "61fed2a4db5854ca9f247eba9ea4176cf70a25ee253024928963335d32dbf281"
+      }
+    },
+    "bro": {
+      "set": "bro",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 4689,
+      "training_picks": 209077,
+      "held_out_drafts": 1997,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 21846,
+            "log_loss": 1.321007,
+            "brier": 0.623963,
+            "top1": 0.547011
+          },
+          "colour_coverage": {
+            "fit_cards": 330,
+            "cards_with_colour_judgment": 262
+          },
+          "validation_calibration": {
+            "decisions": 4472,
+            "summed_log_loss": {
+              "1": 5896.07287,
+              "1.25": 5658.810429,
+              "1.5": 5581.849995,
+              "1.75": 5617.495474,
+              "2": 5733.812951,
+              "2.25": 5909.23795,
+              "2.5": 6128.922267,
+              "2.75": 6382.415121,
+              "3": 6662.201759
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 21846,
+            "log_loss": 1.305313,
+            "brier": 0.618516,
+            "top1": 0.552367
+          },
+          "colour_coverage": {
+            "fit_cards": 330,
+            "cards_with_colour_judgment": 262
+          },
+          "validation_calibration": {
+            "decisions": 4472,
+            "summed_log_loss": {
+              "1": 5825.282097,
+              "1.25": 5575.590383,
+              "1.5": 5487.030774,
+              "1.75": 5511.551098,
+              "2": 5616.981369,
+              "2.25": 5781.612198,
+              "2.5": 5990.512953,
+              "2.75": 6233.189667,
+              "3": 6502.107487
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 1997,
+        "log_loss_delta": -0.01569,
+        "log_loss_ci95": [
+          -0.01749,
+          -0.01387
+        ],
+        "brier_delta": -0.00545,
+        "brier_ci95": [
+          -0.00623,
+          -0.00467
+        ],
+        "top1_delta": 0.00536,
+        "top1_ci95": [
+          0.0026,
+          0.00797
+        ],
+        "leader_change_rate": 0.059141,
+        "mean_abs_award_change": 1.7318
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "7e2623bb6bd4e6dd5ca719595ddc4bb8194de56ddfa283bc060962ff63696d47",
+          "picks_sha256": "f5e162f8768f46f6c039b6145531d3a644cf8ae6c4774d9a91a45335ac578def",
+          "train_ids_sha256": "abd2f8855530283c889b4645a1028a8202a0e9ff04836b0f63eaa16fb00e591c"
+        },
+        "draft_sha256": "1a8a9530271334045262fbb34cf367ffe27e6f0a7c057c5cb5890efc421e5733",
+        "games_sha256": "5cfd6046d106727523345cf2779251187f1e6f4677cbc73ee6ca00ad414a1a52"
+      }
+    },
+    "dft": {
+      "set": "dft",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 11398,
+      "training_picks": 474683,
+      "held_out_drafts": 4761,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 52189,
+            "log_loss": 1.212417,
+            "brier": 0.593465,
+            "top1": 0.576348
+          },
+          "colour_coverage": {
+            "fit_cards": 286,
+            "cards_with_colour_judgment": 275
+          },
+          "validation_calibration": {
+            "decisions": 10021,
+            "summed_log_loss": {
+              "1": 12168.760939,
+              "1.25": 11707.203979,
+              "1.5": 11555.434571,
+              "1.75": 11619.05911,
+              "2": 11837.217513,
+              "2.25": 12169.374137,
+              "2.5": 12587.682851,
+              "2.75": 13072.481471,
+              "3": 13609.545476
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 52189,
+            "log_loss": 1.189775,
+            "brier": 0.585117,
+            "top1": 0.584606
+          },
+          "colour_coverage": {
+            "fit_cards": 286,
+            "cards_with_colour_judgment": 275
+          },
+          "validation_calibration": {
+            "decisions": 10021,
+            "summed_log_loss": {
+              "1": 11938.929895,
+              "1.25": 11442.565247,
+              "1.5": 11257.36335,
+              "1.75": 11288.600735,
+              "2": 11475.092563,
+              "2.25": 11776.024035,
+              "2.5": 12163.329213,
+              "2.75": 12617.182374,
+              "3": 13123.242874
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 4761,
+        "log_loss_delta": -0.02264,
+        "log_loss_ci95": [
+          -0.02413,
+          -0.02115
+        ],
+        "brier_delta": -0.00835,
+        "brier_ci95": [
+          -0.00908,
+          -0.00759
+        ],
+        "top1_delta": 0.00826,
+        "top1_ci95": [
+          0.00609,
+          0.01045
+        ],
+        "leader_change_rate": 0.094848,
+        "mean_abs_award_change": 2.7734
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "222472a245ba77a7870e49c4175614cbf342b01d6caee44ebd782007b468746d",
+          "picks_sha256": "131af8c795e9e22e89ee25d7300a3a2ee2429aeced6431573ebac116ab7804e7",
+          "train_ids_sha256": "64f7e6111dc31f31778edb3fd9086921ba0ee2e05d3db7ddf0a47860fa131feb"
+        },
+        "draft_sha256": "7812d16e0de78ff7a69faf9981f7ff03be4dfc618a86f14369424ec2204580cd",
+        "games_sha256": "734325afbe5c023245e7769fab66c88dcf241407666becb06b956d7fee13a28b"
+      }
+    },
+    "dmu": {
+      "set": "dmu",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 11410,
+      "training_picks": 476763,
+      "held_out_drafts": 4635,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 50836,
+            "log_loss": 1.287031,
+            "brier": 0.618786,
+            "top1": 0.546935
+          },
+          "colour_coverage": {
+            "fit_cards": 261,
+            "cards_with_colour_judgment": 253
+          },
+          "validation_calibration": {
+            "decisions": 9850,
+            "summed_log_loss": {
+              "1": 12679.443842,
+              "1.25": 12265.723365,
+              "1.5": 12155.112239,
+              "1.75": 12259.621077,
+              "2": 12520.681237,
+              "2.25": 12898.306599,
+              "2.5": 13364.510344,
+              "2.75": 13899.261162,
+              "3": 14487.932901
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 50836,
+            "log_loss": 1.272175,
+            "brier": 0.613469,
+            "top1": 0.554646
+          },
+          "colour_coverage": {
+            "fit_cards": 261,
+            "cards_with_colour_judgment": 253
+          },
+          "validation_calibration": {
+            "decisions": 9850,
+            "summed_log_loss": {
+              "1": 12567.470884,
+              "1.25": 12121.71104,
+              "1.5": 11978.147548,
+              "1.75": 12049.085325,
+              "2": 12276.202212,
+              "2.25": 12619.713125,
+              "2.5": 13051.785769,
+              "2.75": 13552.500303,
+              "3": 14107.305765
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 4635,
+        "log_loss_delta": -0.01486,
+        "log_loss_ci95": [
+          -0.01692,
+          -0.01281
+        ],
+        "brier_delta": -0.00532,
+        "brier_ci95": [
+          -0.00626,
+          -0.00437
+        ],
+        "top1_delta": 0.00771,
+        "top1_ci95": [
+          0.00505,
+          0.01038
+        ],
+        "leader_change_rate": 0.144701,
+        "mean_abs_award_change": 4.2138
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "56329328c091c0b04f5051f7377d44a166d0245773f016086b5ec894aa357caf",
+          "picks_sha256": "d6a9efd5122aa7f140163f2c6c448fccbc3cb2a702a29c65c5d8e8dd42093350",
+          "train_ids_sha256": "03515233042e1b68bf938643117f16f467ee2fe5ea68c72781c00ac187f0577a"
+        },
+        "draft_sha256": "b1164ed811aec9abc32ef2ebde70adb2364dc5861e612efbcdbab4e67a1df0ba",
+        "games_sha256": "073f868bf18f680e47d530e288e3408816cea9bd135cf79b9f4186db86d34ee6"
+      }
+    },
+    "dsk": {
+      "set": "dsk",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 11450,
+      "training_picks": 478362,
+      "held_out_drafts": 4790,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 52542,
+            "log_loss": 1.19691,
+            "brier": 0.585914,
+            "top1": 0.591165
+          },
+          "colour_coverage": {
+            "fit_cards": 286,
+            "cards_with_colour_judgment": 270
+          },
+          "validation_calibration": {
+            "decisions": 10583,
+            "summed_log_loss": {
+              "1": 12754.682507,
+              "1.25": 12188.249212,
+              "1.5": 11940.377035,
+              "1.75": 11917.478166,
+              "2": 12058.287037,
+              "2.25": 12321.270416,
+              "2.5": 12677.405565,
+              "2.75": 13105.891841,
+              "3": 13591.496992
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 52542,
+            "log_loss": 1.175189,
+            "brier": 0.578558,
+            "top1": 0.596685
+          },
+          "colour_coverage": {
+            "fit_cards": 286,
+            "cards_with_colour_judgment": 270
+          },
+          "validation_calibration": {
+            "decisions": 10583,
+            "summed_log_loss": {
+              "1": 12559.953448,
+              "1.25": 11994.551531,
+              "1.5": 11750.292174,
+              "1.75": 11731.521264,
+              "2": 11875.926899,
+              "2.25": 12141.523083,
+              "2.5": 12499.154931,
+              "2.75": 12928.04817,
+              "3": 13413.066096
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 4790,
+        "log_loss_delta": -0.02172,
+        "log_loss_ci95": [
+          -0.0231,
+          -0.0204
+        ],
+        "brier_delta": -0.00736,
+        "brier_ci95": [
+          -0.00804,
+          -0.0067
+        ],
+        "top1_delta": 0.00552,
+        "top1_ci95": [
+          0.00341,
+          0.00756
+        ],
+        "leader_change_rate": 0.081839,
+        "mean_abs_award_change": 2.4793
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "e3eb08c5d7e4b72e1dbe6d426ab6f2b1234d7ab1b591e09b8179ca712957fc3b",
+          "picks_sha256": "3358b52bb2ca49c76fdc4476aa63f5959f106bfa7aa38dc780dab1181d5976bd",
+          "train_ids_sha256": "cfbe3e76dc1dbbb452a0e14bb2882a371ec3991c04d93cec2db5f56032523b56"
+        },
+        "draft_sha256": "2a562c6c7998d218fd7951cacaf5a7767118edbbcde5b5d6de96139749d93014",
+        "games_sha256": "9aca1d2f8b3f010fa48b2293c27b4fe0eb6ff5e040f020b9ad703bedd9996a0d"
+      }
+    },
+    "ecl": {
+      "set": "ecl",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 6997,
+      "training_picks": 265886,
+      "held_out_drafts": 2844,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 28440,
+            "log_loss": 1.241269,
+            "brier": 0.610979,
+            "top1": 0.562342
+          },
+          "colour_coverage": {
+            "fit_cards": 288,
+            "cards_with_colour_judgment": 260
+          },
+          "validation_calibration": {
+            "decisions": 5560,
+            "summed_log_loss": {
+              "1": 6893.628296,
+              "1.25": 6639.402463,
+              "1.5": 6535.529124,
+              "1.75": 6542.502277,
+              "2": 6632.254391,
+              "2.25": 6784.800644,
+              "2.5": 6985.760684,
+              "2.75": 7224.638508,
+              "3": 7493.65316
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 28440,
+            "log_loss": 1.230452,
+            "brier": 0.606224,
+            "top1": 0.569515
+          },
+          "colour_coverage": {
+            "fit_cards": 288,
+            "cards_with_colour_judgment": 260
+          },
+          "validation_calibration": {
+            "decisions": 5560,
+            "summed_log_loss": {
+              "1": 6834.548012,
+              "1.25": 6568.321466,
+              "1.5": 6452.88307,
+              "1.75": 6448.64122,
+              "2": 6527.462407,
+              "2.25": 6669.296626,
+              "2.5": 6859.700276,
+              "2.75": 7088.120995,
+              "3": 7346.731498
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 2844,
+        "log_loss_delta": -0.01082,
+        "log_loss_ci95": [
+          -0.01299,
+          -0.00875
+        ],
+        "brier_delta": -0.00475,
+        "brier_ci95": [
+          -0.00584,
+          -0.00369
+        ],
+        "top1_delta": 0.00717,
+        "top1_ci95": [
+          0.00404,
+          0.0102
+        ],
+        "leader_change_rate": 0.104923,
+        "mean_abs_award_change": 3.5499
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "e60036b1ab3094ed0ef5e1e31233297adb498b5022f9b338c8054338035d00e4",
+          "picks_sha256": "e06e669b89fe4c488d381b43dada6da7ca07d0571ff1fc1914c0523682d9435b",
+          "train_ids_sha256": "f53f420933c8d8b1201e9b336283eacd4ff18b78108dcb3d3c56383b9d7160f5"
+        },
+        "draft_sha256": "77d14502147241bf5fff65abe7bdfdda5e18e90ece3f935316447386112bc876",
+        "games_sha256": "54b94edb0702dbcf20aa943d0e7da5a7987cf20232864083953e61b95b38ff48"
+      }
+    },
+    "eoe": {
+      "set": "eoe",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 7997,
+      "training_picks": 311883,
+      "held_out_drafts": 3253,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 35783,
+            "log_loss": 1.146348,
+            "brier": 0.569487,
+            "top1": 0.601766
+          },
+          "colour_coverage": {
+            "fit_cards": 316,
+            "cards_with_colour_judgment": 270
+          },
+          "validation_calibration": {
+            "decisions": 7260,
+            "summed_log_loss": {
+              "1": 8304.426138,
+              "1.25": 7940.171411,
+              "1.5": 7788.172622,
+              "1.75": 7786.103648,
+              "2": 7892.68077,
+              "2.25": 8079.864239,
+              "2.5": 8328.121233,
+              "2.75": 8623.527953,
+              "3": 8955.951703
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 35783,
+            "log_loss": 1.125807,
+            "brier": 0.560918,
+            "top1": 0.611939
+          },
+          "colour_coverage": {
+            "fit_cards": 316,
+            "cards_with_colour_judgment": 270
+          },
+          "validation_calibration": {
+            "decisions": 7260,
+            "summed_log_loss": {
+              "1": 8147.374702,
+              "1.25": 7759.287011,
+              "1.5": 7585.186781,
+              "1.75": 7561.718079,
+              "2": 7647.054846,
+              "2.25": 7812.90267,
+              "2.5": 8039.628414,
+              "2.75": 8313.284043,
+              "3": 8623.746349
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 3253,
+        "log_loss_delta": -0.02054,
+        "log_loss_ci95": [
+          -0.02211,
+          -0.01891
+        ],
+        "brier_delta": -0.00857,
+        "brier_ci95": [
+          -0.0094,
+          -0.00767
+        ],
+        "top1_delta": 0.01017,
+        "top1_ci95": [
+          0.00771,
+          0.01258
+        ],
+        "leader_change_rate": 0.076573,
+        "mean_abs_award_change": 2.3813
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "083b3aa14d38d9ae2d5721168cb9a95d31cdf1aadcce3c954727fe22b4007b16",
+          "picks_sha256": "f414577b279221805d05a867a66c5e65463db8174f2db03b3a03c44cd3ccd656",
+          "train_ids_sha256": "41e1c81e2994dc19e6ba692606be06667cbcf76e266e0f7b1bc179f5efb2b818"
+        },
+        "draft_sha256": "1dd9d1baf31fa56e06bbd2d9d9bb8c2c87cf342bc15872b5a30dbe9d4ecab648",
+        "games_sha256": "130e7e7580a1cb4b4f635411d187a078bc7bdd9dd3436ef5ff7535e14cadaf1b"
+      }
+    },
+    "fdn": {
+      "set": "fdn",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 8116,
+      "training_picks": 338794,
+      "held_out_drafts": 3362,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 36887,
+            "log_loss": 1.171324,
+            "brier": 0.572679,
+            "top1": 0.609375
+          },
+          "colour_coverage": {
+            "fit_cards": 286,
+            "cards_with_colour_judgment": 270
+          },
+          "validation_calibration": {
+            "decisions": 7167,
+            "summed_log_loss": {
+              "1": 8407.886435,
+              "1.25": 7996.773709,
+              "1.5": 7813.534449,
+              "1.75": 7788.86127,
+              "2": 7877.757305,
+              "2.25": 8050.21678,
+              "2.5": 8285.649242,
+              "2.75": 8569.543915,
+              "3": 8891.42701
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 36887,
+            "log_loss": 1.148567,
+            "brier": 0.564386,
+            "top1": 0.616098
+          },
+          "colour_coverage": {
+            "fit_cards": 286,
+            "cards_with_colour_judgment": 270
+          },
+          "validation_calibration": {
+            "decisions": 7167,
+            "summed_log_loss": {
+              "1": 8255.043159,
+              "1.25": 7845.095633,
+              "1.5": 7665.196563,
+              "1.75": 7644.419544,
+              "2": 7736.959627,
+              "2.25": 7912.444378,
+              "2.5": 8150.15074,
+              "2.75": 8435.553795,
+              "3": 8758.221384
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 3362,
+        "log_loss_delta": -0.02276,
+        "log_loss_ci95": [
+          -0.02445,
+          -0.02109
+        ],
+        "brier_delta": -0.00829,
+        "brier_ci95": [
+          -0.00911,
+          -0.00746
+        ],
+        "top1_delta": 0.00672,
+        "top1_ci95": [
+          0.00429,
+          0.00918
+        ],
+        "leader_change_rate": 0.076368,
+        "mean_abs_award_change": 2.2725
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "a5ad952650e825a1eccf5591197c70884a68ebb17ca0684d2e3c24750258107a",
+          "picks_sha256": "0e436cc4816e2603a7127280574363b792c8f4cee676ff79cbecdf05a552499e",
+          "train_ids_sha256": "a3e76c0ecfaffc81c39e43bfc7e6996b01215f6ecb638a25fdd21066826c9bcc"
+        },
+        "draft_sha256": "4c454ec9b6ecb0d711daf79262ffb3de2e682bf4a7988470ecb733da13d63a53",
+        "games_sha256": "fcabe5abc61cd46cd355611dd0e1ccff10b428537c630104d7c5e8f1e090fe64"
+      }
+    },
+    "fin": {
+      "set": "fin",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 12188,
+      "training_picks": 511896,
+      "held_out_drafts": 5091,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 56001,
+            "log_loss": 1.227542,
+            "brier": 0.595814,
+            "top1": 0.585329
+          },
+          "colour_coverage": {
+            "fit_cards": 362,
+            "cards_with_colour_judgment": 329
+          },
+          "validation_calibration": {
+            "decisions": 11462,
+            "summed_log_loss": {
+              "1": 14031.403983,
+              "1.25": 13387.542339,
+              "1.5": 13093.518848,
+              "1.75": 13047.820449,
+              "2": 13183.023319,
+              "2.25": 13453.130867,
+              "2.5": 13825.948007,
+              "2.75": 14278.41688,
+              "3": 14793.682754
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 56001,
+            "log_loss": 1.210161,
+            "brier": 0.58985,
+            "top1": 0.592579
+          },
+          "colour_coverage": {
+            "fit_cards": 362,
+            "cards_with_colour_judgment": 329
+          },
+          "validation_calibration": {
+            "decisions": 11462,
+            "summed_log_loss": {
+              "1": 13845.459889,
+              "1.25": 13188.163858,
+              "1.5": 12883.417875,
+              "1.75": 12828.089045,
+              "2": 12953.848336,
+              "2.25": 13214.236543,
+              "2.5": 13576.851258,
+              "2.75": 14018.564914,
+              "3": 14522.52226
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 5091,
+        "log_loss_delta": -0.01738,
+        "log_loss_ci95": [
+          -0.01884,
+          -0.01599
+        ],
+        "brier_delta": -0.00596,
+        "brier_ci95": [
+          -0.00662,
+          -0.00529
+        ],
+        "top1_delta": 0.00725,
+        "top1_ci95": [
+          0.00509,
+          0.00932
+        ],
+        "leader_change_rate": 0.089856,
+        "mean_abs_award_change": 2.7097
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "ee54660cd2f68a947dd3d91048fda30f454183f5a25d1110afc2edf6263edad3",
+          "picks_sha256": "d7f7aa557cde972d271698b3eb19db1aca2a21b9ebd49cb838819019eb66958f",
+          "train_ids_sha256": "b43e2bb78d26cf96199c6d54708273ec37b564762446191ce1bc19b0339a4d1c"
+        },
+        "draft_sha256": "9d5b2a3e908bb8daf0ea6e951097714b651546370a5c852893dc90a1f2f6ab8b",
+        "games_sha256": "f6452e622976f66dd5420c55741da5b246c7e8d25d63c080e728635e1741a6a6"
+      }
+    },
+    "hbg": {
+      "set": "hbg",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 1765,
+      "training_picks": 73579,
+      "held_out_drafts": 823,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 9033,
+            "log_loss": 1.245309,
+            "brier": 0.599104,
+            "top1": 0.581424
+          },
+          "colour_coverage": {
+            "fit_cards": 266,
+            "cards_with_colour_judgment": 197
+          },
+          "validation_calibration": {
+            "decisions": 1595,
+            "summed_log_loss": {
+              "1": 2048.400882,
+              "1.25": 1971.642976,
+              "1.5": 1950.058437,
+              "1.75": 1967.334234,
+              "2": 2012.345406,
+              "2.25": 2077.574286,
+              "2.5": 2157.88091,
+              "2.75": 2249.67895,
+              "3": 2350.408677
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 9033,
+            "log_loss": 1.230683,
+            "brier": 0.594202,
+            "top1": 0.588177
+          },
+          "colour_coverage": {
+            "fit_cards": 266,
+            "cards_with_colour_judgment": 197
+          },
+          "validation_calibration": {
+            "decisions": 1595,
+            "summed_log_loss": {
+              "1": 2022.966358,
+              "1.25": 1942.54925,
+              "1.5": 1917.491654,
+              "1.75": 1931.361962,
+              "2": 1972.983673,
+              "2.25": 2034.816704,
+              "2.5": 2111.711407,
+              "2.75": 2200.077322,
+              "3": 2297.35299
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 823,
+        "log_loss_delta": -0.01463,
+        "log_loss_ci95": [
+          -0.01704,
+          -0.0122
+        ],
+        "brier_delta": -0.0049,
+        "brier_ci95": [
+          -0.00584,
+          -0.00396
+        ],
+        "top1_delta": 0.00675,
+        "top1_ci95": [
+          0.00332,
+          0.01029
+        ],
+        "leader_change_rate": 0.0486,
+        "mean_abs_award_change": 1.514
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "9dcd2e8f5646374746cf78e573ca6b46aa4083d5afcdb30b4057cdbe05c20be3",
+          "picks_sha256": "38aa50f2fbdb870283555fa63d1c23af05e7726eea92f88d2f5cc0d77f7012bd",
+          "train_ids_sha256": "626218e960f0c9cc2b77601e004daf9fe7259caf54a3a5d7acbd0b52a2f3e2db"
+        },
+        "draft_sha256": "a6916d7bece8734b542c103ad4a6b613c78a5f3bbe9e3ff3b2b8ed68ff9ae350",
+        "games_sha256": "465db4c4e3a364d2cfbca5c520746544f568d786d47d85552f02a9ecf2257608"
+      }
+    },
+    "hob": {
+      "set": "hob",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 2575,
+      "training_picks": 108150,
+      "held_out_drafts": 984,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 10824,
+            "log_loss": 1.208269,
+            "brier": 0.586007,
+            "top1": 0.594974
+          },
+          "colour_coverage": {
+            "fit_cards": 193,
+            "cards_with_colour_judgment": 169
+          },
+          "validation_calibration": {
+            "decisions": 2332,
+            "summed_log_loss": {
+              "1": 2766.63239,
+              "1.25": 2622.443226,
+              "1.5": 2555.497382,
+              "1.75": 2542.598384,
+              "2": 2568.40341,
+              "2.25": 2622.62166,
+              "2.5": 2698.183157,
+              "2.75": 2790.106222,
+              "3": 2894.79764
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 10824,
+            "log_loss": 1.196948,
+            "brier": 0.582411,
+            "top1": 0.601441
+          },
+          "colour_coverage": {
+            "fit_cards": 193,
+            "cards_with_colour_judgment": 169
+          },
+          "validation_calibration": {
+            "decisions": 2332,
+            "summed_log_loss": {
+              "1": 2739.09461,
+              "1.25": 2590.360533,
+              "1.5": 2518.230695,
+              "1.75": 2499.67425,
+              "2": 2519.504059,
+              "2.25": 2567.546311,
+              "2.5": 2636.813125,
+              "2.75": 2722.378832,
+              "3": 2820.687601
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 984,
+        "log_loss_delta": -0.01132,
+        "log_loss_ci95": [
+          -0.0139,
+          -0.00869
+        ],
+        "brier_delta": -0.0036,
+        "brier_ci95": [
+          -0.00476,
+          -0.00243
+        ],
+        "top1_delta": 0.00647,
+        "top1_ci95": [
+          0.00259,
+          0.01025
+        ],
+        "leader_change_rate": 0.053769,
+        "mean_abs_award_change": 1.5445
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "69f206284c58080ddac8575c4aae92d946cfd7258d54b47cf6edde94107c39af",
+          "picks_sha256": "37276ff1d7101fb6e298065a1791717b3c249581450b5f881d56174d56f0e52a",
+          "train_ids_sha256": "f36aa82c5e1ceb08d04b1cc009761f7397842745d382579838ca148a0f4aa9cb"
+        },
+        "draft_sha256": "04b16ac6971ca9a3b77c666072fb066110632eaae7e09433501cdcefac5045c0",
+        "games_sha256": "1ca977bb415ac8fce04b889b9b2d93a6540cf21a033dfa9fb0907af443000676"
+      }
+    },
+    "ktk": {
+      "set": "ktk",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 1538,
+      "training_picks": 64259,
+      "held_out_drafts": 645,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 7093,
+            "log_loss": 1.261404,
+            "brier": 0.61399,
+            "top1": 0.563372
+          },
+          "colour_coverage": {
+            "fit_cards": 249,
+            "cards_with_colour_judgment": 197
+          },
+          "validation_calibration": {
+            "decisions": 1222,
+            "summed_log_loss": {
+              "1": 1504.112667,
+              "1.25": 1419.109411,
+              "1.5": 1375.470871,
+              "1.75": 1361.226246,
+              "2": 1368.10516,
+              "2.25": 1390.472143,
+              "2.5": 1424.448467,
+              "2.75": 1467.311236,
+              "3": 1517.105911
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 7093,
+            "log_loss": 1.282209,
+            "brier": 0.62332,
+            "top1": 0.556323
+          },
+          "colour_coverage": {
+            "fit_cards": 249,
+            "cards_with_colour_judgment": 197
+          },
+          "validation_calibration": {
+            "decisions": 1222,
+            "summed_log_loss": {
+              "1": 1544.474708,
+              "1.25": 1464.75787,
+              "1.5": 1425.139476,
+              "1.75": 1414.037706,
+              "2": 1423.490595,
+              "2.25": 1448.08949,
+              "2.5": 1484.114486,
+              "2.75": 1528.949951,
+              "3": 1580.711554
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 645,
+        "log_loss_delta": 0.02081,
+        "log_loss_ci95": [
+          0.01675,
+          0.02493
+        ],
+        "brier_delta": 0.00933,
+        "brier_ci95": [
+          0.0074,
+          0.01121
+        ],
+        "top1_delta": -0.00705,
+        "top1_ci95": [
+          -0.01339,
+          -0.00099
+        ],
+        "leader_change_rate": 0.109827,
+        "mean_abs_award_change": 3.172
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "4cc8a6283623b47956e63740df450861fe985190fa07f7f8feb40742378dfc0d",
+          "picks_sha256": "e05cd0e34dfe10a358bed756c45540f716781424bf589a887369a669bc43ec45",
+          "train_ids_sha256": "9c6e8cf6958ce22b20b46d6cebcfd82987c3f0c43f43a072da1a2f7e13d93329"
+        },
+        "draft_sha256": "0e33cd6916a24eb621c12b6c9524c956881f260afa1d1168189dba027542b649",
+        "games_sha256": "69bc6aa4c4501452dc6247940bf1bc23edf49ad2e44f12318cb9da44363cb5a2"
+      }
+    },
+    "lci": {
+      "set": "lci",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 11680,
+      "training_picks": 521928,
+      "held_out_drafts": 4873,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 53504,
+            "log_loss": 1.2422,
+            "brier": 0.595253,
+            "top1": 0.580835
+          },
+          "colour_coverage": {
+            "fit_cards": 291,
+            "cards_with_colour_judgment": 282
+          },
+          "validation_calibration": {
+            "decisions": 10699,
+            "summed_log_loss": {
+              "1": 13308.246016,
+              "1.25": 12693.679603,
+              "1.5": 12433.658102,
+              "1.75": 12419.811062,
+              "2": 12582.489521,
+              "2.25": 12875.340467,
+              "2.5": 13266.498034,
+              "2.75": 13733.436874,
+              "3": 14259.848908
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 53504,
+            "log_loss": 1.230073,
+            "brier": 0.591182,
+            "top1": 0.584947
+          },
+          "colour_coverage": {
+            "fit_cards": 291,
+            "cards_with_colour_judgment": 282
+          },
+          "validation_calibration": {
+            "decisions": 10699,
+            "summed_log_loss": {
+              "1": 13174.786795,
+              "1.25": 12556.376835,
+              "1.5": 12294.770746,
+              "1.75": 12280.100632,
+              "2": 12441.865355,
+              "2.25": 12733.280919,
+              "2.5": 13122.302948,
+              "2.75": 13586.367089,
+              "3": 14109.196823
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 4873,
+        "log_loss_delta": -0.01213,
+        "log_loss_ci95": [
+          -0.01327,
+          -0.01097
+        ],
+        "brier_delta": -0.00407,
+        "brier_ci95": [
+          -0.00457,
+          -0.00358
+        ],
+        "top1_delta": 0.00411,
+        "top1_ci95": [
+          0.00247,
+          0.00568
+        ],
+        "leader_change_rate": 0.054015,
+        "mean_abs_award_change": 1.6004
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "5828c179a8e56afd7f696ecb95ba7ff0651f80d8f3363f7fd00131112d8c4bb2",
+          "picks_sha256": "b657185a2371c4439f7ce8b03d5278bd7f7028bf731478d6355c8c1d0998420e",
+          "train_ids_sha256": "c32b4fc018e7b607d8fe3a0c679b7720cc5c01f49ef2f58bfd2396e7b9ea0c3b"
+        },
+        "draft_sha256": "507a9b687109eb2b62ed25966ff0b2f4ccc3297e7522d706a45bb576460715d5",
+        "games_sha256": "8c3a02c441b3741ab1f335d978fe842b8b9d030ae06e63a291b8f8b259b9c947"
+      }
+    },
+    "ltr": {
+      "set": "ltr",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 16914,
+      "training_picks": 705232,
+      "held_out_drafts": 6897,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 75671,
+            "log_loss": 1.151165,
+            "brier": 0.565952,
+            "top1": 0.614991
+          },
+          "colour_coverage": {
+            "fit_cards": 261,
+            "cards_with_colour_judgment": 251
+          },
+          "validation_calibration": {
+            "decisions": 16180,
+            "summed_log_loss": {
+              "1": 18553.127925,
+              "1.25": 17711.176571,
+              "1.5": 17383.256077,
+              "1.75": 17407.783237,
+              "2": 17681.879704,
+              "2.25": 18137.90973,
+              "2.5": 18729.990255,
+              "2.75": 19426.098253,
+              "3": 20203.312749
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 75671,
+            "log_loss": 1.138187,
+            "brier": 0.56103,
+            "top1": 0.618573
+          },
+          "colour_coverage": {
+            "fit_cards": 261,
+            "cards_with_colour_judgment": 251
+          },
+          "validation_calibration": {
+            "decisions": 16180,
+            "summed_log_loss": {
+              "1": 18330.690472,
+              "1.25": 17473.795388,
+              "1.5": 17131.196707,
+              "1.75": 17140.048658,
+              "2": 17397.183568,
+              "2.25": 17835.034745,
+              "2.5": 18407.893384,
+              "2.75": 19083.920184,
+              "3": 19840.355927
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 6897,
+        "log_loss_delta": -0.01298,
+        "log_loss_ci95": [
+          -0.01399,
+          -0.01201
+        ],
+        "brier_delta": -0.00492,
+        "brier_ci95": [
+          -0.00541,
+          -0.00446
+        ],
+        "top1_delta": 0.00358,
+        "top1_ci95": [
+          0.00226,
+          0.00499
+        ],
+        "leader_change_rate": 0.051473,
+        "mean_abs_award_change": 1.6188
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "2386933f0446c6c66ca212a7207d629dadf3237102c06c640c57b9577c1598f9",
+          "picks_sha256": "3908cc86ead36226fdc5e36f3afe59b76e09685b1197255e146dc39dfa49982b",
+          "train_ids_sha256": "3845aa7d91f131499e0a9e32e583f2e800be1dfceaeabdcdd63e087c1e26446b"
+        },
+        "draft_sha256": "23ffe0676c46624ebf5ec1cbc334a8e2ea360bfd78f162618565043e034d536a",
+        "games_sha256": "34b5381cad4639c02ae77f274d7196334aee6f3e130197a07d89df963238fa9d"
+      }
+    },
+    "mh3": {
+      "set": "mh3",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 10863,
+      "training_picks": 453661,
+      "held_out_drafts": 4594,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 50448,
+            "log_loss": 1.311744,
+            "brier": 0.629825,
+            "top1": 0.542539
+          },
+          "colour_coverage": {
+            "fit_cards": 326,
+            "cards_with_colour_judgment": 292
+          },
+          "validation_calibration": {
+            "decisions": 9712,
+            "summed_log_loss": {
+              "1": 12723.417507,
+              "1.25": 12243.910814,
+              "1.5": 12049.160827,
+              "1.75": 12061.124363,
+              "2": 12226.387573,
+              "2.25": 12507.605328,
+              "2.5": 12878.113502,
+              "2.75": 13318.503869,
+              "3": 13814.399083
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 50448,
+            "log_loss": 1.299424,
+            "brier": 0.625909,
+            "top1": 0.547871
+          },
+          "colour_coverage": {
+            "fit_cards": 326,
+            "cards_with_colour_judgment": 292
+          },
+          "validation_calibration": {
+            "decisions": 9712,
+            "summed_log_loss": {
+              "1": 12610.868264,
+              "1.25": 12118.56697,
+              "1.5": 11911.091033,
+              "1.75": 11910.424416,
+              "2": 12062.983585,
+              "2.25": 12331.264194,
+              "2.5": 12688.510787,
+              "2.75": 13115.285372,
+              "3": 13597.221305
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 4594,
+        "log_loss_delta": -0.01232,
+        "log_loss_ci95": [
+          -0.01376,
+          -0.01079
+        ],
+        "brier_delta": -0.00392,
+        "brier_ci95": [
+          -0.00459,
+          -0.00318
+        ],
+        "top1_delta": 0.00533,
+        "top1_ci95": [
+          0.00305,
+          0.00755
+        ],
+        "leader_change_rate": 0.089954,
+        "mean_abs_award_change": 2.6993
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "bfc6cdea801285f5c0712e87ff089ad01d51c3e938c2f40bc2d376b96a0d21cf",
+          "picks_sha256": "805cdd2aecf5ae544e612d25e73b71f527da478afae15948c36a2bcb674b5e2e",
+          "train_ids_sha256": "402ed3e091e2d057804d7cdfcc7b656f4585b264a5c984f3c33d1b93f3e1c0f6"
+        },
+        "draft_sha256": "c3a80b9ef8eeace2ab6e30441b93ab89ca2bb17a3cb4ed536d52960a804364b5",
+        "games_sha256": "0188d66a067f961c81b538c0980dfdaa14904b8ac3355b4ce3b89efbb86aeb7c"
+      }
+    },
+    "mkm": {
+      "set": "mkm",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 12764,
+      "training_picks": 495388,
+      "held_out_drafts": 5423,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 59552,
+            "log_loss": 1.191172,
+            "brier": 0.587714,
+            "top1": 0.579897
+          },
+          "colour_coverage": {
+            "fit_cards": 321,
+            "cards_with_colour_judgment": 280
+          },
+          "validation_calibration": {
+            "decisions": 11739,
+            "summed_log_loss": {
+              "1": 14025.023102,
+              "1.25": 13489.387986,
+              "1.5": 13290.891931,
+              "1.75": 13333.217107,
+              "2": 13551.414856,
+              "2.25": 13900.841189,
+              "2.5": 14350.146183,
+              "2.75": 14876.853859,
+              "3": 15464.534504
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 59552,
+            "log_loss": 1.170751,
+            "brier": 0.579267,
+            "top1": 0.588947
+          },
+          "colour_coverage": {
+            "fit_cards": 321,
+            "cards_with_colour_judgment": 280
+          },
+          "validation_calibration": {
+            "decisions": 11739,
+            "summed_log_loss": {
+              "1": 13787.483684,
+              "1.25": 13224.03102,
+              "1.5": 13001.275781,
+              "1.75": 13020.784386,
+              "2": 13216.457485,
+              "2.25": 13543.070528,
+              "2.5": 13969.009993,
+              "2.75": 14471.705772,
+              "3": 15034.721099
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 5423,
+        "log_loss_delta": -0.02042,
+        "log_loss_ci95": [
+          -0.0219,
+          -0.01892
+        ],
+        "brier_delta": -0.00845,
+        "brier_ci95": [
+          -0.0092,
+          -0.0077
+        ],
+        "top1_delta": 0.00905,
+        "top1_ci95": [
+          0.00705,
+          0.01103
+        ],
+        "leader_change_rate": 0.09103,
+        "mean_abs_award_change": 2.9226
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "807082a00b6c54eb88fda7b1b2029759dd2a1ccd9dbae469fb3490d1f9b84123",
+          "picks_sha256": "7a699aa4bfcf23a1c7ea57e3c41516a6ae8fa46a6298a49537055e7d3385fb1f",
+          "train_ids_sha256": "ca2c223ff272ed9d68853032783b336fbcbe0104a4ee010025c4135bdd6c89b5"
+        },
+        "draft_sha256": "7b81b76f23c81f9def1ac0ab88bc4d22a5f1adab93499096e13d2f5c1a3807df",
+        "games_sha256": "22ff0b49d51381e0488b015dad2b062d90866c9e6646e66202f6c7c6c7efc79a"
+      }
+    },
+    "mom": {
+      "set": "mom",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 17669,
+      "training_picks": 789603,
+      "held_out_drafts": 7318,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 80269,
+            "log_loss": 1.247163,
+            "brier": 0.59863,
+            "top1": 0.573372
+          },
+          "colour_coverage": {
+            "fit_cards": 346,
+            "cards_with_colour_judgment": 338
+          },
+          "validation_calibration": {
+            "decisions": 15415,
+            "summed_log_loss": {
+              "1": 19198.230648,
+              "1.25": 18433.966052,
+              "1.5": 18172.813415,
+              "1.75": 18260.05233,
+              "2": 18597.133793,
+              "2.25": 19118.598782,
+              "2.5": 19779.419723,
+              "2.75": 20547.726478,
+              "3": 21400.415243
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 80269,
+            "log_loss": 1.232322,
+            "brier": 0.593795,
+            "top1": 0.577359
+          },
+          "colour_coverage": {
+            "fit_cards": 346,
+            "cards_with_colour_judgment": 338
+          },
+          "validation_calibration": {
+            "decisions": 15415,
+            "summed_log_loss": {
+              "1": 18985.642191,
+              "1.25": 18217.818038,
+              "1.5": 17955.088669,
+              "1.75": 18041.098781,
+              "2": 18376.478983,
+              "2.25": 18895.417538,
+              "2.5": 19552.783886,
+              "2.75": 20316.726808,
+              "3": 21164.21412
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 7318,
+        "log_loss_delta": -0.01484,
+        "log_loss_ci95": [
+          -0.01592,
+          -0.01383
+        ],
+        "brier_delta": -0.00484,
+        "brier_ci95": [
+          -0.00533,
+          -0.00437
+        ],
+        "top1_delta": 0.00399,
+        "top1_ci95": [
+          0.00241,
+          0.00548
+        ],
+        "leader_change_rate": 0.069404,
+        "mean_abs_award_change": 1.9786
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "cdc3780d4c693349ab5dc5557faf40ac15606af86689590662af1de080efe7f2",
+          "picks_sha256": "105972864e1bac4fa7a43aaa197fa7efaf6859a6be93270465edccf34654082d",
+          "train_ids_sha256": "9508597255e9ad4f5a326e08f3470341787095b3c209b42147840d3505b2f0b5"
+        },
+        "draft_sha256": "628394aacee2dbd7e8edd6e5bdf296156a8f3cd0d29b65ca715bb88ce998a499",
+        "games_sha256": "a19eadcf9f3435f6c6db379c8119c28477f7037e770fe14b25424832c148de06"
+      }
+    },
+    "msh": {
+      "set": "msh",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 5795,
+      "training_picks": 243388,
+      "held_out_drafts": 2453,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 26983,
+            "log_loss": 1.225945,
+            "brier": 0.595652,
+            "top1": 0.573917
+          },
+          "colour_coverage": {
+            "fit_cards": 339,
+            "cards_with_colour_judgment": 274
+          },
+          "validation_calibration": {
+            "decisions": 5423,
+            "summed_log_loss": {
+              "1": 6597.235541,
+              "1.25": 6331.206209,
+              "1.5": 6241.343437,
+              "1.75": 6273.706708,
+              "2": 6393.213198,
+              "2.25": 6576.553868,
+              "2.5": 6807.813037,
+              "2.75": 7075.827313,
+              "3": 7372.572275
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 26983,
+            "log_loss": 1.194121,
+            "brier": 0.583847,
+            "top1": 0.588185
+          },
+          "colour_coverage": {
+            "fit_cards": 339,
+            "cards_with_colour_judgment": 274
+          },
+          "validation_calibration": {
+            "decisions": 5423,
+            "summed_log_loss": {
+              "1": 6442.855973,
+              "1.25": 6157.84906,
+              "1.5": 6048.669928,
+              "1.75": 6061.238068,
+              "2": 6160.46811,
+              "2.25": 6323.076103,
+              "2.5": 6533.179234,
+              "2.75": 6779.650888,
+              "3": 7054.504969
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 2453,
+        "log_loss_delta": -0.03182,
+        "log_loss_ci95": [
+          -0.03407,
+          -0.0295
+        ],
+        "brier_delta": -0.01181,
+        "brier_ci95": [
+          -0.01281,
+          -0.01073
+        ],
+        "top1_delta": 0.01427,
+        "top1_ci95": [
+          0.01075,
+          0.01731
+        ],
+        "leader_change_rate": 0.101138,
+        "mean_abs_award_change": 3.1208
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "02cf716970b586a707a9bdd6bf8cbb272c21ba21a7c31ea1b7edab6de94a28cd",
+          "picks_sha256": "6d198eb6e8648c5aeee62bee5ce20bddef52434756680f3866723de53d8207fe",
+          "train_ids_sha256": "1f4e3b481f636d6a8ceb716f89f3c12d39737056e1d371035b7917493e219ee1"
+        },
+        "draft_sha256": "64100d71db77e0f0ef8ba893b259a1024eb6d15816db337c7758e7d96bc29cf7",
+        "games_sha256": "8a6bd93a5d50554a3d87703e93624d09e638dc6dd03eda12be9c3f2925484edf"
+      }
+    },
+    "neo": {
+      "set": "neo",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 9373,
+      "training_picks": 418770,
+      "held_out_drafts": 3890,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 42622,
+            "log_loss": 1.22291,
+            "brier": 0.592033,
+            "top1": 0.57902
+          },
+          "colour_coverage": {
+            "fit_cards": 287,
+            "cards_with_colour_judgment": 276
+          },
+          "validation_calibration": {
+            "decisions": 8086,
+            "summed_log_loss": {
+              "1": 9823.095069,
+              "1.25": 9389.075239,
+              "1.5": 9219.938514,
+              "1.75": 9232.086697,
+              "2": 9373.218428,
+              "2.25": 9609.112735,
+              "2.5": 9916.463343,
+              "2.75": 10278.869449,
+              "3": 10684.478315
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 42622,
+            "log_loss": 1.21066,
+            "brier": 0.587447,
+            "top1": 0.585073
+          },
+          "colour_coverage": {
+            "fit_cards": 287,
+            "cards_with_colour_judgment": 276
+          },
+          "validation_calibration": {
+            "decisions": 8086,
+            "summed_log_loss": {
+              "1": 9737.219555,
+              "1.25": 9296.124276,
+              "1.5": 9120.063177,
+              "1.75": 9125.388538,
+              "2": 9259.651378,
+              "2.25": 9488.509796,
+              "2.5": 9788.59124,
+              "2.75": 10143.471891,
+              "3": 10541.301943
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 3890,
+        "log_loss_delta": -0.01225,
+        "log_loss_ci95": [
+          -0.01362,
+          -0.01079
+        ],
+        "brier_delta": -0.00459,
+        "brier_ci95": [
+          -0.00526,
+          -0.00389
+        ],
+        "top1_delta": 0.00605,
+        "top1_ci95": [
+          0.00385,
+          0.00833
+        ],
+        "leader_change_rate": 0.08078,
+        "mean_abs_award_change": 2.0365
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "d5300a3656f83f36ea66dbb57b19527d44c05d8cd0a1cca9d93b9d0fb62d0c44",
+          "picks_sha256": "7ab5d2577a64a29da75003ea732208116958310acda35200fd9e90aa4efb917c",
+          "train_ids_sha256": "564d1ce119ca1b5a57572018c91a6bdf56fe1d27631d71aeead742890a5fca11"
+        },
+        "draft_sha256": "f86c03291dbfd07283674422f36f2ca00238a585a1c43aa053314ec4216bb53e",
+        "games_sha256": "2346aff37d6ece8e8248f2277fa9369ce5c740d8dec3f4e140f09f9be4c85db9"
+      }
+    },
+    "one": {
+      "set": "one",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 5758,
+      "training_picks": 240174,
+      "held_out_drafts": 2453,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 26910,
+            "log_loss": 1.215047,
+            "brier": 0.587804,
+            "top1": 0.587328
+          },
+          "colour_coverage": {
+            "fit_cards": 265,
+            "cards_with_colour_judgment": 246
+          },
+          "validation_calibration": {
+            "decisions": 5257,
+            "summed_log_loss": {
+              "1": 6384.867852,
+              "1.25": 6110.432626,
+              "1.5": 6010.218691,
+              "1.75": 6031.229475,
+              "2": 6138.68972,
+              "2.25": 6309.394406,
+              "2.5": 6527.481676,
+              "2.75": 6781.834432,
+              "3": 7064.474283
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 26910,
+            "log_loss": 1.199903,
+            "brier": 0.582414,
+            "top1": 0.592048
+          },
+          "colour_coverage": {
+            "fit_cards": 265,
+            "cards_with_colour_judgment": 246
+          },
+          "validation_calibration": {
+            "decisions": 5257,
+            "summed_log_loss": {
+              "1": 6309.26246,
+              "1.25": 6033.3054,
+              "1.5": 5932.873123,
+              "1.75": 5953.942192,
+              "2": 6061.279215,
+              "2.25": 6231.505452,
+              "2.5": 6448.71719,
+              "2.75": 6701.811998,
+              "3": 6982.847221
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 2453,
+        "log_loss_delta": -0.01514,
+        "log_loss_ci95": [
+          -0.01653,
+          -0.01362
+        ],
+        "brier_delta": -0.00539,
+        "brier_ci95": [
+          -0.00599,
+          -0.00474
+        ],
+        "top1_delta": 0.00472,
+        "top1_ci95": [
+          0.00282,
+          0.00675
+        ],
+        "leader_change_rate": 0.036529,
+        "mean_abs_award_change": 1.1771
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "4076720016dcbcddce73f241c7f72d94111940c41e914145dda52e1b07427c56",
+          "picks_sha256": "3615b62dab94085ef7c51c487236c66dace68ad7c21035eb28369ba901d22b45",
+          "train_ids_sha256": "9b81c7ca655f9992da0684735520413a2567d69966b24a9bcb6a082ea3b68da7"
+        },
+        "draft_sha256": "2a758f8dba7697de3b88f60ebb5085ac27e65c0b035c53cc89c7e0637347059d",
+        "games_sha256": "157e82550f8790dd5df9373a5ed6f04002d3f25165aa628f520d4e6137f86804"
+      }
+    },
+    "otj": {
+      "set": "otj",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 13256,
+      "training_picks": 554195,
+      "held_out_drafts": 5391,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 59158,
+            "log_loss": 1.233556,
+            "brier": 0.601447,
+            "top1": 0.572264
+          },
+          "colour_coverage": {
+            "fit_cards": 381,
+            "cards_with_colour_judgment": 347
+          },
+          "validation_calibration": {
+            "decisions": 11437,
+            "summed_log_loss": {
+              "1": 14113.091817,
+              "1.25": 13581.250169,
+              "1.5": 13391.122601,
+              "1.75": 13441.098166,
+              "2": 13665.07079,
+              "2.25": 14018.553629,
+              "2.5": 14470.657019,
+              "2.75": 14999.344326,
+              "3": 15588.525328
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 59158,
+            "log_loss": 1.204414,
+            "brier": 0.590605,
+            "top1": 0.584503
+          },
+          "colour_coverage": {
+            "fit_cards": 381,
+            "cards_with_colour_judgment": 347
+          },
+          "validation_calibration": {
+            "decisions": 11437,
+            "summed_log_loss": {
+              "1": 13766.357908,
+              "1.25": 13194.718941,
+              "1.5": 12967.88062,
+              "1.75": 12982.625728,
+              "2": 13171.807095,
+              "2.25": 13490.327608,
+              "2.5": 13906.980201,
+              "2.75": 14399.591755,
+              "3": 14952.039347
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 5391,
+        "log_loss_delta": -0.02914,
+        "log_loss_ci95": [
+          -0.03076,
+          -0.02758
+        ],
+        "brier_delta": -0.01084,
+        "brier_ci95": [
+          -0.0116,
+          -0.01008
+        ],
+        "top1_delta": 0.01224,
+        "top1_ci95": [
+          0.00995,
+          0.01466
+        ],
+        "leader_change_rate": 0.112715,
+        "mean_abs_award_change": 3.2377
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "62ff27b29ecd817b36b6977752a7a94b37e7f2fa96c25b179b09c93e05ef1660",
+          "picks_sha256": "52e9b94cb9d4b3f4f2208c7c137a616cea533443e9624952a9662b3100a95898",
+          "train_ids_sha256": "d85bb583790986e8e2ef36a7e8479e2af0039c0b829a4ec7034491dec3b03307"
+        },
+        "draft_sha256": "87fd00a2e92bb38b1883240cf0e79aa711a24fb3d0348a70333517c777b63015",
+        "games_sha256": "e8c4bfe8482710a59411c7e1f5b5e35e3583f4c7ff7b46f1702b2d95356acee6"
+      }
+    },
+    "pio": {
+      "set": "pio",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 3050,
+      "training_picks": 136047,
+      "held_out_drafts": 1238,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 13557,
+            "log_loss": 1.465516,
+            "brier": 0.674421,
+            "top1": 0.502397
+          },
+          "colour_coverage": {
+            "fit_cards": 398,
+            "cards_with_colour_judgment": 270
+          },
+          "validation_calibration": {
+            "decisions": 2574,
+            "summed_log_loss": {
+              "1": 3750.369504,
+              "1.25": 3599.373082,
+              "1.5": 3530.883169,
+              "1.75": 3524.148469,
+              "2": 3563.926856,
+              "2.25": 3639.12697,
+              "2.5": 3741.654287,
+              "2.75": 3865.549522,
+              "3": 4006.375188
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 13557,
+            "log_loss": 1.434413,
+            "brier": 0.662575,
+            "top1": 0.511913
+          },
+          "colour_coverage": {
+            "fit_cards": 398,
+            "cards_with_colour_judgment": 270
+          },
+          "validation_calibration": {
+            "decisions": 2574,
+            "summed_log_loss": {
+              "1": 3671.20224,
+              "1.25": 3516.556497,
+              "1.5": 3446.869828,
+              "1.75": 3440.129637,
+              "2": 3480.302304,
+              "2.25": 3555.849017,
+              "2.5": 3658.452363,
+              "2.75": 3782.064462,
+              "3": 3922.233287
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 1238,
+        "log_loss_delta": -0.0311,
+        "log_loss_ci95": [
+          -0.03552,
+          -0.02678
+        ],
+        "brier_delta": -0.01185,
+        "brier_ci95": [
+          -0.01377,
+          -0.01
+        ],
+        "top1_delta": 0.00952,
+        "top1_ci95": [
+          0.00457,
+          0.01484
+        ],
+        "leader_change_rate": 0.133879,
+        "mean_abs_award_change": 4.2409
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "86f107a22a25bc66acc722d87142f1ff38ed075505b8c7a08bddaaebd7fb553c",
+          "picks_sha256": "0e3ed40e3ec72437d94be90272c6d6445786211d72909df8983566edb759b6b5",
+          "train_ids_sha256": "3266869087adde6046e31ec00489b87a8cb9f3ff4a24a082d75c4fc1357917c4"
+        },
+        "draft_sha256": "a7ffb8c49265ba02d30e428c19b184c937bc190e9120bc3af87681f34de878fa",
+        "games_sha256": "2a22a51b63c6caff6d8f20ccfec900ce9e5aa1fb963a57cad537495bcdb3f3ab"
+      }
+    },
+    "powered-cube": {
+      "set": "powered-cube",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 3291,
+      "training_picks": 144804,
+      "held_out_drafts": 1348,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 13480,
+            "log_loss": 1.567207,
+            "brier": 0.707533,
+            "top1": 0.471142
+          },
+          "colour_coverage": {
+            "fit_cards": 540,
+            "cards_with_colour_judgment": 530
+          },
+          "validation_calibration": {
+            "decisions": 2480,
+            "summed_log_loss": {
+              "1": 3837.534393,
+              "1.25": 3685.27573,
+              "1.5": 3604.080026,
+              "1.75": 3579.477192,
+              "2": 3599.446369,
+              "2.25": 3654.454734,
+              "2.5": 3737.122328,
+              "2.75": 3841.789692,
+              "3": 3964.118847
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 13480,
+            "log_loss": 1.544301,
+            "brier": 0.701632,
+            "top1": 0.476409
+          },
+          "colour_coverage": {
+            "fit_cards": 540,
+            "cards_with_colour_judgment": 530
+          },
+          "validation_calibration": {
+            "decisions": 2480,
+            "summed_log_loss": {
+              "1": 3767.101865,
+              "1.25": 3611.473874,
+              "1.5": 3528.856935,
+              "1.75": 3503.691319,
+              "2": 3523.329322,
+              "2.25": 3577.919806,
+              "2.5": 3659.944451,
+              "2.75": 3763.701013,
+              "3": 3884.855387
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 1348,
+        "log_loss_delta": -0.02291,
+        "log_loss_ci95": [
+          -0.02673,
+          -0.01906
+        ],
+        "brier_delta": -0.0059,
+        "brier_ci95": [
+          -0.00748,
+          -0.00438
+        ],
+        "top1_delta": 0.00527,
+        "top1_ci95": [
+          -0.00045,
+          0.01076
+        ],
+        "leader_change_rate": 0.163205,
+        "mean_abs_award_change": 5.326
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "78e6a6f0aa9810450a73645ce9d81cc5966c18948a9fd04dda4f6b9ee993e50d",
+          "picks_sha256": "4fd72727ecf4bbb51a8d67e6ecb052e800260e5a5c497d7b216b5c7eba702388",
+          "train_ids_sha256": "9317c3aa32fcd57fa6a604eb33b080743fc3afb2c19a30963ed078b3d012e45f"
+        },
+        "draft_sha256": "eac816bfc246d3b7dfb666bcdb84dc0e81b563508b8f8ed1dee948fc80ce8956",
+        "games_sha256": "367bd4a831e891593f404a4ad141742b8e77e777dd80d7e93c9f319f10f0663d"
+      }
+    },
+    "sir": {
+      "set": "sir",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 3026,
+      "training_picks": 135346,
+      "held_out_drafts": 1269,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 13910,
+            "log_loss": 1.3949,
+            "brier": 0.648911,
+            "top1": 0.530266
+          },
+          "colour_coverage": {
+            "fit_cards": 352,
+            "cards_with_colour_judgment": 296
+          },
+          "validation_calibration": {
+            "decisions": 2637,
+            "summed_log_loss": {
+              "1": 3676.657478,
+              "1.25": 3515.00413,
+              "1.5": 3441.770048,
+              "1.75": 3432.690088,
+              "2": 3470.753241,
+              "2.25": 3544.072584,
+              "2.5": 3644.244637,
+              "2.75": 3765.229391,
+              "3": 3902.60892
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 13910,
+            "log_loss": 1.388496,
+            "brier": 0.646893,
+            "top1": 0.532063
+          },
+          "colour_coverage": {
+            "fit_cards": 352,
+            "cards_with_colour_judgment": 296
+          },
+          "validation_calibration": {
+            "decisions": 2637,
+            "summed_log_loss": {
+              "1": 3669.293707,
+              "1.25": 3505.318061,
+              "1.5": 3429.487306,
+              "1.75": 3417.596729,
+              "2": 3452.70246,
+              "2.25": 3522.975939,
+              "2.5": 3620.058158,
+              "2.75": 3737.939976,
+              "3": 3872.223179
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 1269,
+        "log_loss_delta": -0.0064,
+        "log_loss_ci95": [
+          -0.0083,
+          -0.00465
+        ],
+        "brier_delta": -0.00202,
+        "brier_ci95": [
+          -0.00286,
+          -0.00121
+        ],
+        "top1_delta": 0.0018,
+        "top1_ci95": [
+          -0.00115,
+          0.00475
+        ],
+        "leader_change_rate": 0.050108,
+        "mean_abs_award_change": 1.3983
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "9178372b85cc3a5263b869cebd6feaeeae302c04733bb82bb989b2e56dc5eefa",
+          "picks_sha256": "42a9cddc85e8884f12329ba58d9af6befb2517c7d92b36c41041fa17b902bcb7",
+          "train_ids_sha256": "3a57fa0258cd704e5706a4dfcd0845358869d60b8d1593ea6dc06d05814a2f49"
+        },
+        "draft_sha256": "ddc447a95f12089f1c60203f8104f8d041781e049b5a9ff8bcf011eee06b9d09",
+        "games_sha256": "64ab0119e665182586107a887efb02251f45d542d65f7ce1b9462960b30ce442"
+      }
+    },
+    "snc": {
+      "set": "snc",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 10957,
+      "training_picks": 452268,
+      "held_out_drafts": 4655,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 50914,
+            "log_loss": 1.200222,
+            "brier": 0.586195,
+            "top1": 0.58917
+          },
+          "colour_coverage": {
+            "fit_cards": 261,
+            "cards_with_colour_judgment": 244
+          },
+          "validation_calibration": {
+            "decisions": 10063,
+            "summed_log_loss": {
+              "1": 12026.726743,
+              "1.25": 11505.537891,
+              "1.5": 11301.208028,
+              "1.75": 11317.222202,
+              "2": 11491.227462,
+              "2.25": 11781.645756,
+              "2.5": 12159.890481,
+              "2.75": 12605.769196,
+              "3": 13104.678615
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 50914,
+            "log_loss": 1.206682,
+            "brier": 0.589678,
+            "top1": 0.587579
+          },
+          "colour_coverage": {
+            "fit_cards": 261,
+            "cards_with_colour_judgment": 244
+          },
+          "validation_calibration": {
+            "decisions": 10063,
+            "summed_log_loss": {
+              "1": 12084.379804,
+              "1.25": 11567.460214,
+              "1.5": 11363.691001,
+              "1.75": 11377.9042,
+              "2": 11548.734139,
+              "2.25": 11835.249398,
+              "2.5": 12209.259961,
+              "2.75": 12650.804946,
+              "3": 13145.409532
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 4655,
+        "log_loss_delta": 0.00646,
+        "log_loss_ci95": [
+          0.00496,
+          0.008
+        ],
+        "brier_delta": 0.00348,
+        "brier_ci95": [
+          0.00276,
+          0.00427
+        ],
+        "top1_delta": -0.00159,
+        "top1_ci95": [
+          -0.00366,
+          0.00051
+        ],
+        "leader_change_rate": 0.08043,
+        "mean_abs_award_change": 2.4288
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "2d4c61f6de659bc2e2ee65c67a21b46fa5ce2ed5e63b30c01afca82552fa86d9",
+          "picks_sha256": "aad5e220f1ca83a8cc1c34bcc313baa8d0efdd220e2f1f0a21a8304dfa769ded",
+          "train_ids_sha256": "1a20168524e70c0c5b2f414485a89fdf1c70002ff742d41acc6130394c15965b"
+        },
+        "draft_sha256": "9b558f819c7dd46b9b443bcc01ae029c89e9c5b66f65e3875559fa09e5649fdd",
+        "games_sha256": "c0e5f3c087889ef2ea38c5a8ac4cc68ba43b83db5b7c0c204d4dee0200379fdd"
+      }
+    },
+    "sos": {
+      "set": "sos",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 9322,
+      "training_picks": 391521,
+      "held_out_drafts": 3914,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 43053,
+            "log_loss": 1.243527,
+            "brier": 0.603718,
+            "top1": 0.569159
+          },
+          "colour_coverage": {
+            "fit_cards": 346,
+            "cards_with_colour_judgment": 310
+          },
+          "validation_calibration": {
+            "decisions": 7953,
+            "summed_log_loss": {
+              "1": 9877.787142,
+              "1.25": 9473.184332,
+              "1.5": 9312.294582,
+              "1.75": 9322.85658,
+              "2": 9457.514752,
+              "2.25": 9684.36414,
+              "2.5": 9981.280821,
+              "2.75": 10332.518086,
+              "3": 10726.608432
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 43053,
+            "log_loss": 1.221006,
+            "brier": 0.594295,
+            "top1": 0.582096
+          },
+          "colour_coverage": {
+            "fit_cards": 346,
+            "cards_with_colour_judgment": 310
+          },
+          "validation_calibration": {
+            "decisions": 7953,
+            "summed_log_loss": {
+              "1": 9695.142895,
+              "1.25": 9256.702278,
+              "1.5": 9060.184669,
+              "1.75": 9034.31103,
+              "2": 9132.251074,
+              "2.25": 9322.33888,
+              "2.5": 9582.545781,
+              "2.75": 9897.155466,
+              "3": 10254.703952
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 3914,
+        "log_loss_delta": -0.02252,
+        "log_loss_ci95": [
+          -0.02481,
+          -0.0203
+        ],
+        "brier_delta": -0.00942,
+        "brier_ci95": [
+          -0.01059,
+          -0.00829
+        ],
+        "top1_delta": 0.01294,
+        "top1_ci95": [
+          0.00969,
+          0.01607
+        ],
+        "leader_change_rate": 0.142522,
+        "mean_abs_award_change": 3.972
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "9866c1732734ac62956b46b166c95a0a7eb4d2eecdf84812381a28c8fa909bad",
+          "picks_sha256": "df379b2b3051eba398693ac0807b5adc2348d71d6fef0e35e349b41c2d3c9faf",
+          "train_ids_sha256": "7591c0b3135d2698bee25d2bfba8fcfb343b918bf99450d4723e7a98b6053a87"
+        },
+        "draft_sha256": "df6220d8941e99b7264a54a7a7427096246ee6510057a83d4c9424b472761853",
+        "games_sha256": "1be513933918ca243c137af0314aae099c721c408786c9cb56f08027d9b113fb"
+      }
+    },
+    "tdm": {
+      "set": "tdm",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 7105,
+      "training_picks": 298410,
+      "held_out_drafts": 3024,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 33264,
+            "log_loss": 1.268831,
+            "brier": 0.61469,
+            "top1": 0.555285
+          },
+          "colour_coverage": {
+            "fit_cards": 286,
+            "cards_with_colour_judgment": 270
+          },
+          "validation_calibration": {
+            "decisions": 6666,
+            "summed_log_loss": {
+              "1": 8325.03082,
+              "1.25": 7995.864618,
+              "1.5": 7874.148899,
+              "1.75": 7898.288067,
+              "2": 8027.866234,
+              "2.25": 8235.685328,
+              "2.5": 8502.916708,
+              "2.75": 8816.176312,
+              "3": 9165.72379
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 33264,
+            "log_loss": 1.27799,
+            "brier": 0.61936,
+            "top1": 0.554263
+          },
+          "colour_coverage": {
+            "fit_cards": 286,
+            "cards_with_colour_judgment": 270
+          },
+          "validation_calibration": {
+            "decisions": 6666,
+            "summed_log_loss": {
+              "1": 8405.042581,
+              "1.25": 8074.063576,
+              "1.5": 7945.944338,
+              "1.75": 7961.137578,
+              "2": 8080.506502,
+              "2.25": 8277.596558,
+              "2.5": 8533.992626,
+              "2.75": 8836.531979,
+              "3": 9175.586617
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 3024,
+        "log_loss_delta": 0.00916,
+        "log_loss_ci95": [
+          0.00728,
+          0.01104
+        ],
+        "brier_delta": 0.00467,
+        "brier_ci95": [
+          0.00371,
+          0.00558
+        ],
+        "top1_delta": -0.00102,
+        "top1_ci95": [
+          -0.00394,
+          0.00201
+        ],
+        "leader_change_rate": 0.102694,
+        "mean_abs_award_change": 3.1224
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "c63b600e6736ee11d44a35b0580204ceecaf12fcd54436098483fd6083939444",
+          "picks_sha256": "58c3fddaa32f393e1ad6fd9be863fa5d2517289a358cd3428dd7aa6d4d86c9d0",
+          "train_ids_sha256": "796cad43334050eedb483ab952ddec26481e7086277b45bc09a6b96abedea805"
+        },
+        "draft_sha256": "831ba8bc4be5eabe140fac00a8e6eaded3f3f931685be8f91403ad9cfde5cbf5",
+        "games_sha256": "e2e679168818d67d812972343ba541d626d0f57140bc22955e09dd07bc2086e4"
+      }
+    },
+    "tla": {
+      "set": "tla",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 9994,
+      "training_picks": 409754,
+      "held_out_drafts": 4157,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 41570,
+            "log_loss": 1.240908,
+            "brier": 0.605059,
+            "top1": 0.570315
+          },
+          "colour_coverage": {
+            "fit_cards": 347,
+            "cards_with_colour_judgment": 277
+          },
+          "validation_calibration": {
+            "decisions": 8660,
+            "summed_log_loss": {
+              "1": 10856.750387,
+              "1.25": 10429.322821,
+              "1.5": 10254.217947,
+              "1.75": 10261.572357,
+              "2": 10403.685969,
+              "2.25": 10647.303188,
+              "2.5": 10968.760174,
+              "2.75": 11350.89789,
+              "3": 11781.056554
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 41570,
+            "log_loss": 1.214641,
+            "brier": 0.596062,
+            "top1": 0.57859
+          },
+          "colour_coverage": {
+            "fit_cards": 347,
+            "cards_with_colour_judgment": 277
+          },
+          "validation_calibration": {
+            "decisions": 8660,
+            "summed_log_loss": {
+              "1": 10611.916361,
+              "1.25": 10192.103469,
+              "1.5": 10029.319669,
+              "1.75": 10050.332668,
+              "2": 10205.688447,
+              "2.25": 10461.320579,
+              "2.5": 10793.274739,
+              "2.75": 11184.369101,
+              "3": 11622.046005
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 4157,
+        "log_loss_delta": -0.02627,
+        "log_loss_ci95": [
+          -0.02829,
+          -0.02424
+        ],
+        "brier_delta": -0.009,
+        "brier_ci95": [
+          -0.00997,
+          -0.00799
+        ],
+        "top1_delta": 0.00828,
+        "top1_ci95": [
+          0.00556,
+          0.01095
+        ],
+        "leader_change_rate": 0.115684,
+        "mean_abs_award_change": 3.7729
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "e30b7cd4bf9c5fcda3ed4bccfcf9eae2f419f90d260fb4d96b82d6fb45c37136",
+          "picks_sha256": "ad3ad78ccd547f0ac184b8deffc33e38823f31c953855444a4dfe72e034800c1",
+          "train_ids_sha256": "4e4c49dde917ede9da9a3ed20a5855dbe511ac7177932ed66bd708a672ba13db"
+        },
+        "draft_sha256": "e4a801b12cbe3d711dce7d92bd2d256db64e0be18d22da14b477d512567627bb",
+        "games_sha256": "6bb12e5cf17e57a2624ca8ac83f15fd4415ea347aa58eac0ed82feb1b17d536b"
+      }
+    },
+    "tmt": {
+      "set": "tmt",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 1890,
+      "training_picks": 77490,
+      "held_out_drafts": 779,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 7790,
+            "log_loss": 1.193877,
+            "brier": 0.587899,
+            "top1": 0.593582
+          },
+          "colour_coverage": {
+            "fit_cards": 215,
+            "cards_with_colour_judgment": 170
+          },
+          "validation_calibration": {
+            "decisions": 1490,
+            "summed_log_loss": {
+              "1": 1810.310248,
+              "1.25": 1721.526122,
+              "1.5": 1680.050841,
+              "1.75": 1672.275825,
+              "2": 1688.886873,
+              "2.25": 1723.508232,
+              "2.5": 1771.711035,
+              "2.75": 1830.35653,
+              "3": 1897.173484
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 7790,
+            "log_loss": 1.190763,
+            "brier": 0.588698,
+            "top1": 0.589345
+          },
+          "colour_coverage": {
+            "fit_cards": 215,
+            "cards_with_colour_judgment": 170
+          },
+          "validation_calibration": {
+            "decisions": 1490,
+            "summed_log_loss": {
+              "1": 1798.066416,
+              "1.25": 1711.160573,
+              "1.5": 1670.533566,
+              "1.75": 1662.577098,
+              "2": 1678.155823,
+              "2.25": 1711.099689,
+              "2.5": 1757.158771,
+              "2.75": 1813.334611,
+              "3": 1877.460563
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 779,
+        "log_loss_delta": -0.00311,
+        "log_loss_ci95": [
+          -0.0086,
+          0.00273
+        ],
+        "brier_delta": 0.0008,
+        "brier_ci95": [
+          -0.00201,
+          0.00369
+        ],
+        "top1_delta": -0.00424,
+        "top1_ci95": [
+          -0.01207,
+          0.00321
+        ],
+        "leader_change_rate": 0.157253,
+        "mean_abs_award_change": 5.0674
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "a13f51bc53a001d614f12984232c548a327253bbfe2b2094b1ff23013b66c663",
+          "picks_sha256": "fdb2a2c256d110c1774624a2dbef41020826049d758dd82b23747fb84db2fe7e",
+          "train_ids_sha256": "a674e97c3bb6e701cd40ffe9d84a3e089a0ffe8f567d575f9e84295a1b6a783e"
+        },
+        "draft_sha256": "7819ed6532a3b2329b1d2e0f24aed6e21306d6744b3dcc7a96329644a0bd090c",
+        "games_sha256": "399f35cf89b4ad09ba811df0bc60936a5b443432f2fbad84d6264b597b49e4a9"
+      }
+    },
+    "woe": {
+      "set": "woe",
+      "split": "test",
+      "served_definition": "pack 1, picks 1-11",
+      "train_drafts": 14052,
+      "training_picks": 580260,
+      "held_out_drafts": 5860,
+      "arms": {
+        "strong-player-colour-stage-v5": {
+          "served_slice": {
+            "decisions": 64027,
+            "log_loss": 1.205537,
+            "brier": 0.588493,
+            "top1": 0.579584
+          },
+          "colour_coverage": {
+            "fit_cards": 324,
+            "cards_with_colour_judgment": 281
+          },
+          "validation_calibration": {
+            "decisions": 12169,
+            "summed_log_loss": {
+              "1": 14887.514679,
+              "1.25": 14375.36122,
+              "1.5": 14248.925446,
+              "1.75": 14389.818077,
+              "2": 14721.684842,
+              "2.25": 15193.774536,
+              "2.5": 15771.338563,
+              "2.75": 16429.937121,
+              "3": 17151.963987
+            }
+          }
+        },
+        "strong-player-colour-stage-v6": {
+          "served_slice": {
+            "decisions": 64027,
+            "log_loss": 1.182885,
+            "brier": 0.579978,
+            "top1": 0.589002
+          },
+          "colour_coverage": {
+            "fit_cards": 324,
+            "cards_with_colour_judgment": 281
+          },
+          "validation_calibration": {
+            "decisions": 12169,
+            "summed_log_loss": {
+              "1": 14632.546514,
+              "1.25": 14089.876828,
+              "1.5": 13934.240181,
+              "1.75": 14045.779106,
+              "2": 14347.559656,
+              "2.25": 14788.660826,
+              "2.5": 15334.341376,
+              "2.75": 15960.238352,
+              "3": 16648.84334
+            }
+          }
+        }
+      },
+      "v6_minus_v5": {
+        "drafts": 5860,
+        "log_loss_delta": -0.02265,
+        "log_loss_ci95": [
+          -0.02401,
+          -0.02143
+        ],
+        "brier_delta": -0.00851,
+        "brier_ci95": [
+          -0.00919,
+          -0.00788
+        ],
+        "top1_delta": 0.00942,
+        "top1_ci95": [
+          0.00742,
+          0.01154
+        ],
+        "leader_change_rate": 0.094445,
+        "mean_abs_award_change": 2.7492
+      },
+      "sources": {
+        "cache": {
+          "cache_sha256": "68698b5ae1442ee6902a2da5270bd5f483fe7f877ff929d489922951acbbf1eb",
+          "picks_sha256": "01872e42642fe6d9d5194e3991d97c5515da145b745d550f4cee52f10aa0b74a",
+          "train_ids_sha256": "0c3ed041c39c8d421da955b8fe833cef612a26c330f2fbd69ccb04288d547b62"
+        },
+        "draft_sha256": "7c62add350ff9689e0da469bc2911860fb34df0ca2a468aa7e6e511c88675431",
+        "games_sha256": "3d9a55acb2846905ea7fc930c6ec0b5954d1e6ff78187936b4db8da3baa8b8a6"
+      }
+    }
+  }
+}

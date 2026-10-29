@@ -93,6 +93,7 @@ def main():
     reports = [json.loads(p.read_text()) for p in sorted(args.reports.glob('*.json'))]
     deltas = [json.load(gzip.open(p, 'rt', encoding='utf-8')) for p in sorted(args.deltas.glob('*.json.gz'))]
     result = summarize(reports, deltas)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2) + '\n')
     print(json.dumps({k: result[k] for k in ('verdict', 'pooled_v6_minus_v5', 'daily_weighted_log_loss_delta')}, indent=2))
 
