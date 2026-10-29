@@ -49,3 +49,5 @@ python scripts/report_v6_colour_model.py --reports artifacts/v6/reports --deltas
 The per-draft delta files contain 17Lands draft identifiers and stay under ignored `artifacts/`. Public data attribution: [17Lands datasets](https://www.17lands.com/public_datasets), CC BY 4.0.
 
 ## Results
+
+Amendment, 2026-10-29, before any pooled computation or any reading of a test-split result: the pooled bootstrap uses Python's `random.Random(20260915)` and the harness's percentile rule (`eval_model._interval`) instead of NumPy, because CI does not install NumPy. The resampling unit, draw count and decision rule are unchanged. At the time of this change one of the 30 per-set test runs (HOB) had finished; its output was not opened.

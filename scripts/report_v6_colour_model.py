@@ -11,31 +11,36 @@ import argparse
 import gzip
 import json
 from pathlib import Path
+import random
 
-import numpy as np
-
-from eval_model import daily_weights
+from eval_model import _interval, daily_weights
 from model_training import V5_MODEL, V6_MODEL
 
 SEED = 20260915
 
 
 def pooled_bootstrap(cells, draws=2000, seed=SEED):
-    """cells: per-draft [loss delta sum, brier delta sum, hit delta sum, decisions]."""
-    data = np.asarray(cells, dtype=float)
-    totals = data[:, :3]
-    counts = data[:, 3]
-    observed = totals.sum(axis=0) / counts.sum()
-    rng = np.random.default_rng(seed)
-    samples = np.empty((draws, 3))
-    for i in range(draws):
-        weight = np.bincount(rng.integers(0, len(data), len(data)), minlength=len(data))
-        samples[i] = weight @ totals / (weight @ counts)
-    low, high = np.percentile(samples, [2.5, 97.5], axis=0)
+    """Cluster bootstrap over drafts from every set at once.
+
+    cells: per-draft [loss delta sum, brier delta sum, hit delta sum, decisions].
+    Same resampling and interval rule as the harness's paired_bootstrap,
+    without its per-pick rows. Pure Python: CI has no NumPy.
+    """
+    columns = [list(column) for column in zip(*cells)]
+    counts = columns[3]
     names = ('log_loss', 'brier', 'top1')
-    return {'drafts': len(data), 'decisions': int(counts.sum()),
-            **{f'{n}_delta': round(float(observed[k]), 6) for k, n in enumerate(names)},
-            **{f'{n}_ci95': [round(float(low[k]), 6), round(float(high[k]), 6)] for k, n in enumerate(names)}}
+    rng = random.Random(seed)
+    population = range(len(cells))
+    samples = [[], [], []]
+    for _ in range(draws):
+        drawn = rng.choices(population, k=len(cells))
+        total = sum(map(counts.__getitem__, drawn))
+        for k in range(3):
+            samples[k].append(sum(map(columns[k].__getitem__, drawn)) / total)
+    decisions = sum(counts)
+    return {'drafts': len(cells), 'decisions': int(decisions),
+            **{f'{n}_delta': round(sum(columns[k]) / decisions, 6) for k, n in enumerate(names)},
+            **{f'{n}_ci95': _interval(samples[k]) for k, n in enumerate(names)}}
 
 
 def verdict(pooled):
