@@ -89,26 +89,27 @@ export function pruneCubeSessionRerollDeadEnds(rows) {
   return {rows:result,removed:removed.sort(),proof:verifyCubeSessionRerolls(result)};
 }
 
-export function admitV5Cube(root='.') {
+export function admitCube(root='.',version='v5') {
+  const versions=modelVersions[version];
   const file=path.join(root,'corpus/draft-run/powered-cube.json.gz'),catalogFile=path.join(root,'corpus/draft-run/catalog.json');
-  const reportFile=path.join(root,'generated/v5-cube-reroll-admission.json');
+  const reportFile=path.join(root,`generated/${version}-cube-reroll-admission.json`);
   const before=fs.readFileSync(file),catalog=JSON.parse(fs.readFileSync(catalogFile,'utf8'));
   const entry=catalog.sets.find(s=>s.id==='powered-cube');
-  if(catalog.corpus_version!==modelVersions.v5.corpus_version||catalog.model_version!==modelVersions.v5.model_version||entry?.sha256!==digest(before))throw Error('Cube admission requires the exact assembled v5/v9 corpus.');
+  if(catalog.corpus_version!==versions.corpus_version||catalog.model_version!==versions.model_version||entry?.sha256!==digest(before))throw Error(`Cube admission requires the exact assembled ${version} corpus.`);
   if(fs.existsSync(reportFile)) {
     const saved=JSON.parse(fs.readFileSync(reportFile,'utf8'));
     if(saved.schema===CUBE_SESSION_ADMISSION_VERSION&&saved.output_sha256===digest(before))return saved;
   }
   const original=JSON.parse(gunzipSync(before));
-  if(original.some(p=>p.corpus_version!==modelVersions.v5.corpus_version||p.model_version!==modelVersions.v5.model_version))throw Error('Mixed Cube model/corpus identity.');
+  if(original.some(p=>p.corpus_version!==versions.corpus_version||p.model_version!==versions.model_version))throw Error('Mixed Cube model/corpus identity.');
   const {rows,removed,proof}=pruneCubeSessionRerollDeadEnds(original);
   if(!proof.valid)throw Error('No Cube corpus satisfies the session reroll contract.');
   for(let round=0;round<DRAFT_RUN_LENGTH;round++)for(const band of ['medium','hard']) {
     if(!(proof.coverage[`${round}:${band}`]>=OTHER_SOURCES+3))throw Error(`Cube admission cannot preserve balanced runs: round ${round} ${band}.`);
   }
   const bytes=gzipSync(JSON.stringify(rows),{mtime:0});
-  const report={schema:CUBE_SESSION_ADMISSION_VERSION,corpus_version:modelVersions.v5.corpus_version,
-    model_version:modelVersions.v5.model_version,input_sha256:digest(before),output_sha256:digest(bytes),
+  const report={schema:CUBE_SESSION_ADMISSION_VERSION,corpus_version:versions.corpus_version,
+    model_version:versions.model_version,input_sha256:digest(before),output_sha256:digest(bytes),
     input_decisions:original.length,output_decisions:rows.length,removed_decisions:removed.length,
     removed_puzzle_ids:removed,proof,model_payloads_changed:false,environment_artifacts_changed:false};
   entry.puzzles=rows.length;entry.trophy_drafts=distinct(rows);entry.sha256=report.output_sha256;
@@ -117,6 +118,8 @@ export function admitV5Cube(root='.') {
   fs.mkdirSync(path.dirname(reportFile),{recursive:true});fs.writeFileSync(reportFile,JSON.stringify(report,null,2)+'\n');
   return report;
 }
+
+export const admitV5Cube=(root='.')=>admitCube(root,'v5');
 
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href) {
   const report=admitV5Cube();
