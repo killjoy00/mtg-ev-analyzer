@@ -120,6 +120,11 @@ test('SQL classes distinguish redacted codes from missing SQLSTATE while exact u
    assert.equal(end.failure_code,null);assert.equal(end.failure_class,classification);
    assert.ok(!JSON.stringify(rows).includes(code));assert.doesNotMatch(JSON.stringify(rows),/private database|private-identity/);
  }
+ rows.length=0;
+ await assert.rejects(observedRoute(request(),'growth',async()=>{throw Object.assign(Error('private application detail'),{code:'TOKEN'});}));
+ const applicationFailure=rows.find(r=>r.event==='backend_request');
+ assert.equal(applicationFailure.failure_code,null);assert.equal(applicationFailure.failure_class,null);
+ assert.doesNotMatch(JSON.stringify(rows),/TOKEN|private application/);
 }));
 
 test('unknown transaction completion codes never replay an already committed mutation',async()=>fixture(async rows=>{

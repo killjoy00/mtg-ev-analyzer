@@ -26,7 +26,9 @@ const databaseFailureCode=error=>{
  return error?.name==='AbortError'?'abort':error?.name==='TimeoutError'?'timeout':null;
 };
 const databaseFailureClass=error=>{
- const code=error?.pgCode||error?.code;
+ // Unlisted codes need the adapter's explicit pgCode provenance. A generic
+ // five-character application error code is not proof of a SQLSTATE.
+ const code=error?.pgCode||(DATABASE_FAILURE_CODES.has(error?.code)?error.code:null);
  return typeof code==='string'&&/^[0-9A-Z]{5}$/.test(code)?DATABASE_FAILURE_CLASSES[code.slice(0,2)]||'other_sqlstate':null;
 };
 function databaseLog(record){try{console.log(JSON.stringify(record));}catch{/* Diagnostics must not change a database outcome. */}}
