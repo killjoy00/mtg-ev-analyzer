@@ -53,6 +53,12 @@ def download():
         list(executor.map(fetch,[(sid,kind,pin) for sid,kinds in source_pins().items() for kind,pin in kinds.items()]))
     for sid in SETS:
         path=RAW/f'{sid}-metadata.json'
+        frozen=ROOT/f'research/decision-context-v1/metadata/{sid}.json.gz'
+        if frozen.exists():
+            raw=gzip.decompress(frozen.read_bytes())
+            if path.exists() and path.read_bytes()!=raw:raise ValueError('Metadata differs from frozen snapshot')
+            path.write_bytes(raw)
+            continue
         if path.exists():continue
         cards={};url=f'https://api.scryfall.com/cards/search?q=set%3A{sid}&unique=cards'
         while url:
@@ -276,7 +282,12 @@ def prepare(sid):
 def run():
     OUT.mkdir(parents=True,exist_ok=True)
     prepared={s:prepare(s) for s in SETS}
-    metadata={s:json.loads((RAW/f'{s}-metadata.json').read_text()) for s in SETS}
+    metadata={}
+    for sid in SETS:
+        frozen=ROOT/f'research/decision-context-v1/metadata/{sid}.json.gz'
+        raw=(RAW/f'{sid}-metadata.json').read_bytes()
+        if frozen.exists() and gzip.decompress(frozen.read_bytes())!=raw:raise ValueError('Metadata snapshot mismatch')
+        metadata[sid]=json.loads(raw)
     fit=[];fit_rows=[];held={k:[] for k in ('validation','later_development')};held_rows={k:[] for k in held}
     for sid,payload in prepared.items():
         groups=payload['groups'];games=payload['games'];rows=groups['fit']

@@ -102,9 +102,9 @@ but cannot replace that outcome evidence.
 `python scripts/decision_context_audit.py` builds the checked-corpus review.
 `python scripts/decision_context_experiment.py download` verifies pinned sources.
 `python scripts/decision_context_experiment.py run` executes the fixed screen.
-Raw data, metadata snapshots, fitted models and row-level predictions stay in
-ignored `raw-data/` and `artifacts/`. Only aggregate results and public-puzzle
-review artifacts may be committed. Hash protocol, code, metadata and inputs.
+Raw draft/game data, fitted models and row-level predictions stay in
+ignored `raw-data/` and `artifacts/`. Only aggregate results, public-puzzle
+review artifacts, and the public Scryfall metadata snapshots may be committed. Hash protocol, code, metadata and inputs.
 No production credentials, database, player telemetry, serving writes or deploy.
 
 Source attribution: 17Lands public data, CC BY 4.0, https://www.17lands.com/public_datasets.
