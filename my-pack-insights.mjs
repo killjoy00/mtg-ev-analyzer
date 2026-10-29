@@ -85,7 +85,7 @@ function formatsMarkup(rows,current) {
     (row.environment===current?' is-current':'')+'" aria-label="'+esc(rowText(row,row.label))+'">'+
     '<span>'+esc(row.label)+'</span><strong>'+(row.average_score===null?'—':score(row.average_score))+'</strong>'+
     '<small>'+number(row.count)+' picks'+(row.average_score===null?' · need 5 to average':' · average / 100')+'</small></article>').join('')+
-    '</div><p class="my-insights-note">Formats use different card pools; these are recorded averages, not comparable skill rankings.</p>';
+    '</div><p class="my-insights-note">The card pools are different across formats, so higher scores in one don’t necessarily mean you’re better at it.</p>';
 }
 
 function progressMarkup(result) {
@@ -231,7 +231,7 @@ function journeyMarkup(data) {
   return '<section class="my-pack-card my-insights-wide my-insights-journey">'+
     '<div class="my-card-heading"><h2>Your scores over time</h2><span>40-pick groups · Average points out of 100</span></div>'+
     warning+progress+chart+
-    '<p class="my-insights-note">These averages describe the picks you played; they do not prove a change in drafting skill.</p>'+
+    '<p class="my-insights-note">A higher average doesn’t necessarily mean you’re drafting better. You’re seeing different picks each time.</p>'+
     '<details class="my-insights-journey-details"><summary>More score details</summary>'+
     '<p class="my-insights-note">'+esc(journey.note||'')+
     ' Partial groups are shown with their actual pick counts.</p>'+
@@ -239,7 +239,7 @@ function journeyMarkup(data) {
       windows.length+' of '+journey.total_windows+' groups.</p>':'')+
     '<ol>'+windows.map(w=>'<li>'+esc(insightLocalRange(w))+' · '+w.count+' picks · '+
       (w.complete?'complete':'partial')+' · '+score(w.average_score)+'/100</li>').join('')+'</ol>'+
-    (!compatible?'<p>Different scoring or card-pool versions prevent a recent/previous comparison.</p>':
+    (!compatible?'<p>We can’t fairly compare these picks because the scoring system or card pools changed.</p>':
       '<h3>Last 40 versus previous 40</h3>'+progressMarkup(data))+
     (milestones?'<h3>Milestones</h3><ol class="my-insights-milestones">'+milestones+'</ol>':'')+
     '<h3>Pacific calendar months</h3>'+monthMarkup(data.months||[])+'</details></section>';
@@ -383,10 +383,10 @@ function insightsContent(data) {
   return '<div class="my-insights-grid">'+highlightsMarkup(data)+dnaMarkup(data)+journeyMarkup(data)+
     '<details class="my-pack-card my-insights-wide my-insights-explore"><summary>More stats</summary>'+
     '<div class="my-insights-explore-content">'+
-    '<section><h3>Scores by source pick position</h3><p class="my-insights-note">P1P positions are from the source draft, not the question number in this game. Averages require five picks.</p>'+
+    '<section><h3>Scores by original draft pick</h3><p class="my-insights-note">These are the pick numbers from the original drafts, not the order of questions in Pack One. We show averages once you’ve made at least five picks.</p>'+
       barRows(data.pick_depth||[])+'</section>'+
-    '<section><h3>Model-support closeness</h3>'+
-      '<p class="my-insights-note">“Hard” means the model gave two cards similar support. It does not measure how hard people found the pick.</p>'+
+    '<section><h3>How close were the model’s top picks?</h3>'+
+      '<p class="my-insights-note">Here, “hard” means the model gave two cards similar support. It doesn’t necessarily mean players found the pick hard.</p>'+
       barRows((data.difficulty||[]).map(row=>({...row,label:row.band==='unknown'?'Unknown':row.band[0].toUpperCase()+row.band.slice(1)})))+
       (data.unknown_difficulty?'<p class="my-insights-note">'+number(data.unknown_difficulty)+' picks have no rating.</p>':'')+
       '</section>'+

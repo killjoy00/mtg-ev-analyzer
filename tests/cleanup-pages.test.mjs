@@ -34,7 +34,7 @@ test('Elite acquisition routes through the Pack One Patreon landing page',async(
   assert.match(html,/Practice whenever you want/);
   assert.match(html,/Choose what to work on/);
   assert.match(html,/Having trouble with Patreon access/);
-  assert.match(html,/Do not buy another membership/);
+  assert.match(html,/Already subscribed\? Don.t pay again/);
   assert.match(html,/https:\/\/www\.patreon\.com\/c\/PackOne/);
   assert.match(page,/getAuthSession/);
   assert.match(page,/loadPatreonStatus/);

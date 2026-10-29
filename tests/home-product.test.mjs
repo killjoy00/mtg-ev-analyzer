@@ -13,7 +13,7 @@ test('homepage social metadata has no escaped-newline pollution',()=>{
 });
 test('homepage metadata uses a shallow branded preview with a compact Twitter icon',()=>{
  const html=fs.readFileSync('index.html','utf8');
- assert.match(html,/<title>Pack One: Daily MTG Draft Decisions<\/title>/);
+ assert.match(html,/<title>Pack One: Eight Picks from Real Trophy Drafts<\/title>/);
  assert.match(html,/Magic: The Gathering draft decisions every day/);
  assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/social-preview-v6\.png"/);
  assert.match(html,/property="og:image:width" content="1200"/);
@@ -25,7 +25,7 @@ test('homepage metadata uses a shallow branded preview with a compact Twitter ic
 test('both older Daily share bridges keep working with a date-neutral large preview',()=>{
  for(const route of ['/share/daily/','/share/daily/v2/']){
   const html=fs.readFileSync(route.slice(1)+'index.html','utf8');
-  assert.match(html,/property="og:title" content="Daily MTG Draft Decisions"/);
+  assert.match(html,/property="og:title" content="Pack One: Eight Picks from Real Trophy Drafts"/);
   assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/share-daily-v1\.png"/);
   assert.match(html,/property="og:image:height" content="630"/);
   assert.match(html,/name="twitter:card" content="summary_large_image"/);
@@ -104,7 +104,7 @@ test('fresh guests get a larger Start here label instead of the generic first-ro
  assert.doesNotMatch(guest,/The daily challenge/);
  const signed=dailyHomeMarkup({player:{claimed:true},capabilities:['account'],daily_history:[]},day);
  assert.doesNotMatch(signed,/daily-home-start">Start here<\/span>/);
- assert.match(signed,/A mix of Draft sets/);
+ assert.match(signed,/A mix of sets/);
  assert.match(guest,/Free · No account required/);
 });
 
@@ -114,7 +114,7 @@ test('checking state is neutral instead of pretending the player is a guest',()=
  assert.match(html,/data-completed="pending"/);
  assert.equal((html.match(/is-pending/g)||[]).length,3);
  assert.doesNotMatch(html,/is-unplayed|is-complete|Start here|Free · No account required|Create a free account|Dailies complete/);
- assert.match(html,/A mix of Draft sets/);
+ assert.match(html,/A mix of sets/);
 });
 
 test('failed Daily hydration stays unknown and offers a retry',()=>{
@@ -139,7 +139,7 @@ test('all three complete hands signed-in players to Practice or guests to accoun
  const p={daily_history:[row('mixed'),row('powered-cube'),row('latest')],player:{claimed:true},capabilities:['account']};
  const freeHtml=dailyHomeMarkup(p,day);
  assert.match(freeHtml,/Dailies complete/);
- assert.match(freeHtml,/Your practice options are all in one place/);
+ assert.match(freeHtml,/Keep playing regular Draft Runs, or any sets with Pack One Elite/);
  assert.match(freeHtml,/href="\/practice\/"[^>]*>Go to Practice<\/a>/);
  assert.doesNotMatch(freeHtml,/Start Another Draft Run|Powered Cube Practice|Choose your sets|Become Elite|Upgrade to Elite/);
  p.player.claimed=false;const guestHtml=dailyHomeMarkup(p,day);

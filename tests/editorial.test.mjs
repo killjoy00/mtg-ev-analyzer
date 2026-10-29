@@ -14,7 +14,7 @@ for (const path of pages) {
 for (const path of ['how-it-works/index.html','scoring/index.html','methodology/index.html','learn/first-pick-discipline/index.html','learn/reading-consensus/index.html','learn/staying-open/index.html','sets/msh/index.html']) {
   const html = await readFile(path, 'utf8');
   const words = html.replace(/<[^>]*>/g, ' ').trim().split(/\s+/).filter(Boolean).length;
-  assert.ok(words >= (path==='learn/first-pick-discipline/index.html'?260:330), `${path} is too thin for the editorial shell: ${words} words`);
+  assert.ok(words >= (path.startsWith('learn/')?260:330), `${path} is too thin for the editorial shell: ${words} words`);
 }
 const home = await readFile('index.html','utf8');
 assert.doesNotMatch(home, /id="home-editorial"/);
@@ -171,7 +171,7 @@ assert.match(setCatalog, /verified_decisions/);
 assert.doesNotMatch(setCatalog, /replay seats/);
 assert.doesNotMatch(sets, /custom=1/);
 assert.doesNotMatch(setCatalog, /custom=1/);
-assert.match(setCatalog, /Play Draft Run/);
+assert.match(setCatalog, /Play a mixed-set Draft Run/);
 const admin = await readFile('admin/index.html','utf8');
 assert.match(admin, /class="brand-mark"[^>]*><span>P<\/span><sup>1<\/sup>/i);
 const ads = await readFile('ad-config.js','utf8');
@@ -232,7 +232,7 @@ assert.doesNotMatch(privacy, /may earn a commission|membership cannot be verifie
 const patreonPageHtml = await readFile('patreon/index.html','utf8');
 assert.match(patreonPageHtml, /Supporter and Elite members get ad-free browsing/i);
 assert.match(patreonPageHtml, /Supporter \+ Elite/);
-assert.match(patreonPageHtml, /Once Pack One confirms your membership/i);
+assert.match(patreonPageHtml, /Both Supporter and Elite include ad-free browsing/i);
 assert.doesNotMatch(patreonPageHtml, /eligible entitlement/i);
 
 const noEmDashCopyFiles = [

@@ -193,7 +193,7 @@ function deletionControlMarkup(account,patreon) {
 }
 function settingsMarkup(profile, progress, account, patreon) {
   if (!profile.player.claimed) {
-    return `<aside class="profile-claim" id="profile-account"><div><span>Guest record</span><strong>Your progress is yours to keep.</strong><p>Save it across devices whenever you’re ready.</p></div><button type="button" class="text-button" id="profile-claim-account">Sign in</button></aside>`;
+    return `<aside class="profile-claim" id="profile-account"><div><span>Playing as a guest</span><strong>Sign in to save your picks and scores across devices.</strong></div><button type="button" class="text-button" id="profile-claim-account">Sign in</button></aside>`;
   }
   const unlocked = unlockedAchievements(profile);
   const identityHidden=profile.player.public_identity_hidden===true;

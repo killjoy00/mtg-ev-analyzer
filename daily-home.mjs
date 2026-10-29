@@ -6,7 +6,7 @@ let generation = 0;
 let installed = false;
 let lastDay;
 const games = [
-  { key: 'draftRun', number: '01', label: 'A mix of Draft sets', environment: 'mixed', title: 'Daily Draft Run', description: 'Eight decisions from real trophy drafts.', href: '?game=draft-run&daily=1' },
+  { key: 'draftRun', number: '01', label: 'A mix of sets', environment: 'mixed', title: 'Daily Draft Run', description: 'Eight decisions from real trophy drafts.', href: '?game=draft-run&daily=1' },
   { key: 'cube', number: '02', label: 'Powered Cube picks', environment: 'powered-cube', title: 'Daily Powered Cube', description: 'Eight decisions from Powered Cube trophy drafts.', href: '?game=draft-run&set=powered-cube&daily=1' },
   { key: 'latest', number: '03', label: 'Only the newest set', environment: 'latest', title: 'Daily Latest Set', description: 'Eight decisions from trophy drafts in the latest set.', href: '?game=draft-run&set=latest&daily=1' },
 ];
@@ -36,7 +36,7 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), state = 'ready') {
       </article>`;
     }).join('')}</div>
     ${ready&&status.completed === 3 ? `<section class="daily-home-practice${claimed?' is-practice-handoff':''}">${claimed
-      ? `<div><p class="eyebrow">Dailies complete</p><h2>Keep drafting.</h2><p>Your practice options are all in one place.</p></div><a class="button primary" href="/practice/">Go to Practice</a>`
+      ? `<div><p class="eyebrow">Dailies complete</p><h2>Keep drafting.</h2><p>Keep playing regular Draft Runs, or any sets with Pack One Elite.</p></div><a class="button primary" href="/practice/">Go to Practice</a>`
       : `<p class="eyebrow">Dailies complete</p><h2>Keep drafting.</h2><p>A free account adds unlimited regular Draft Runs.</p><button class="button primary" data-home-account>Create a free account</button>`}</section>` : ''}
     ${unavailable ? '<div class="daily-home-unavailable" role="status"><span>Daily progress is temporarily unavailable. Play now still resumes your saved attempt.</span><button class="text-button" type="button" data-home-retry>Retry</button></div>' : ''}
   </section>`;

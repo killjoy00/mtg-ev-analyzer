@@ -133,15 +133,15 @@ export function renderCampaignRedirectPage(entry) {
   const valid=validateCampaignEntries([entry])[0];
   const trackedUrl=buildCampaignTrackingUrl(valid);
   const trackedHref=htmlEscape(trackedUrl);
-  const title='Daily MTG Draft Decisions';
-  const description='Eight real MTG draft decisions every day. Make your pick, then compare with a trophy drafter.';
+  const title='Pack One: Eight Picks from Real Trophy Drafts';
+  const description='What would you take? Make eight picks from real trophy drafts, then see what the drafters chose.';
   return `${GENERATED_CAMPAIGN_MARKER}
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Eight real Magic: The Gathering draft decisions every day. Make your pick, then see what the trophy drafter chose and how strong your choice was. Free. No account required." />
+  <meta name="description" content="Eight real Magic: The Gathering draft decisions every day. Make your pick, then see what the trophy drafter took and what you scored. Free. No account required." />
   <meta name="robots" content="noindex,nofollow" />
   <meta property="og:type" content="website" />
   <meta property="og:title" content="${title}" />

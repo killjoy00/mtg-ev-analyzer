@@ -4,7 +4,7 @@ import { leaderboardPresentation } from '../leaderboard-product.mjs';
 
 test('default leaderboard means featured challenges, not all standard sets', () => {
   const view = leaderboardPresentation('all');
-  assert.equal(view.environmentLabel, 'Environment');
+  assert.equal(view.environmentLabel, 'Set or format');
   assert.equal(view.allLabel, 'Featured challenges');
   assert.equal(view.modeLabel, 'Full Pack');
   assert.equal(view.cube, false);

@@ -67,7 +67,7 @@ test('compact feedback names the player’s pick without grading adjectives or f
 test('deck links require availability and do not invent a missing event record',()=>{
  assert.doesNotMatch(trophyDrafterDetails({trophyDrafter:{record:'7–1'}}),/data-trophy-deck/);
  const text=trophyDrafterDetails({deckAvailable:true,trophyDrafter:{record:'7–1'}});
- assert.match(text,/finished 7-1\. <button/);assert.match(text,/Click here to see the drafter’s deck/);
+ assert.match(text,/finished 7-1\. <button/);assert.match(text,/See the trophy drafter’s deck/);
  assert.doesNotMatch(trophyDrafterDetails({deckAvailable:true}),/finished/);
 });
 

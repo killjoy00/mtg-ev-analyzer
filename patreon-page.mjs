@@ -93,7 +93,7 @@ async function renderMembershipState() {
   action.disabled=false;
   action.onclick=()=>void openPatreonConnection();
   setStatus(patreon?.connected
-    ? 'Patreon is connected. Refresh access after a membership change; a requested refresh is not confirmation until Pack One verifies the updated entitlement.'
+    ? 'Your Patreon account is connected. If you changed your membership, refresh here and Pack One will check your access.'
     : 'No Patreon account is connected to this Pack One account. Connect the Patreon account you use for Pack One membership.',patreon?.connected
       ? {state:'connected',heading:'Patreon connected',showPatreon:true,patreonLabel:'Manage Patreon membership'}
       : {state:'unconnected',heading:'Connect Patreon to activate Elite',showPatreon:true});

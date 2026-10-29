@@ -4,7 +4,7 @@ import { POWERED_CUBE_ID } from './cube-product.mjs';
 export function leaderboardPresentation(setId) {
   const cube = setId === POWERED_CUBE_ID;
   return {
-    environmentLabel: 'Environment',
+    environmentLabel: 'Set or format',
     allLabel: 'Featured challenges',
     modeLabel: cube ? 'Cube Pack Run' : 'Full Pack',
     cube,
