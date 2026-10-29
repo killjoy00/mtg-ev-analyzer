@@ -114,7 +114,7 @@ export function debateScenes(f,logo) {
   {seconds:3,body:stage(logo,'<h2>What would you take?</h2><p class="sub">'+where+'</p>'+
    priorRow(f)+cardRow(f,{letters:true}))},
   decide(3),decide(2),decide(1),
-  {seconds:4,body:stage(logo,'<h2>'+f.players+' players voted</h2><p class="sub">'+where+'</p>'+
+  {seconds:4,body:stage(logo,'<h2>'+f.players+' Pack One players picked</h2><p class="sub">'+where+'</p>'+
    '<div class="votes">'+voteRows(f)+'</div>'+
    (other>0?'<p class="other-votes">'+formatPercent(other)+'% chose other cards</p>':''))},
   {seconds:2,body:stage(logo,'<h2>The trophy drafter took</h2><p class="sub">'+
@@ -132,7 +132,7 @@ export function questionImage(f,logo) {
   '<div class="ask">Reply with your pick and why</div>');
 }
 export function coverImage(f,label,logo) {
- return brand(logo)+'<h1>'+f.tier+'-way split!</h1><p class="sub">'+f.players+' drafters · '+
+ return brand(logo)+'<h1>'+f.tier+'-way split!</h1><p class="sub">'+f.players+' Pack One players · '+
   escape(label)+' · P1P'+f.pick_number+'</p>'+'<div class="cards">'+f.choices.map(c=>card(c)).join('')+
   '</div><div class="coverRight">'+voteRows(f,{thumbs:false})+'</div>';
 }
