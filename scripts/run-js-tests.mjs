@@ -6,8 +6,6 @@ import {pathToFileURL} from 'node:url';
 
 export const SHARD_REQUIREMENTS = new Map([
   ['consensus-audit.test.mjs',['msh']],
-  ['path-model-distribution.test.mjs',['msh','sos','tmt','ecl']],
-  ['scoring-distribution.test.mjs',['msh','sos','tmt','ecl']],
 ]);
 export const DATA_TESTS = [...SHARD_REQUIREMENTS.keys(),'draft-run-corpus.test.mjs'];
 

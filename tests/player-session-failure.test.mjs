@@ -26,7 +26,7 @@ for(const failure of [503,520,'transport'])test(`background callers do not repea
     const api=await import(`../growth-api.mjs?session-failure=${failure}`);
     assert.equal(await api.sendEvents([{name:'page_view',props:{}}]),null);
     assert.equal(await api.loadRemoteStats(),null);
-    for(let n=0;n<3;n++)assert.equal(await api.saveGameResult({fixture:n}),null);
+    for(let n=0;n<3;n++)assert.equal(await api.loadRemoteStats(),null);
     await assert.rejects(api.ensurePackSession());
     assert.equal(creations,1,'a lost response may hide a committed creation');
     assert.equal(otherCalls,0,'dependent calls stop at the unresolved identity');

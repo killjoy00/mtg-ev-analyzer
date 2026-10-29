@@ -12,9 +12,7 @@ const lifecycleModules = [
   'product.mjs',
   'flow-fixes.mjs',
   'growth.mjs',
-  'historical-growth.mjs',
   'retention.mjs',
-  'social.mjs',
   'home-today.mjs',
   'profile-polish.mjs',
 ];
@@ -33,10 +31,9 @@ test('one centralized render lifecycle owns DOM mutation observation', () => {
 });
 
 test('replay loading never monkeypatches global fetch', () => {
-  const sources = ['bootstrap.mjs', 'replay-data.mjs', 'app.js', 'social.mjs'].map(source).join('\n');
+  const sources = ['bootstrap.mjs', 'replay-data.mjs', 'draft-run-product.mjs'].map(source).join('\n');
   assert.doesNotMatch(sources, /globalThis\.fetch\s*=/);
-  assert.match(source('app.js'), /loadReplayJson/);
-  assert.match(source('social.mjs'), /loadReplayJson/);
+  assert.doesNotMatch(source('historical-share.mjs'), /import\(|fetch\(/);
 });
 
 test('obsolete patch modules stay removed', () => {
@@ -56,7 +53,7 @@ test('the page has one stylesheet entrypoint and no inline style block', () => {
 
 test('current identity layer excludes retired game observers and result writers', () => {
   assert.doesNotMatch(source('growth.mjs'), /onAppRender|saveGameResult|Full Pack|Top 3|captureResult/);
-  assert.match(source('historical-share.mjs'), /historical-growth/);
+  assert.match(source('historical-share.mjs'), /retired/);
   assert.doesNotMatch(source('bootstrap.mjs'), /historical-growth/);
-  assert.match(source('historical-growth.mjs'), /saveGameResult/);
+  assert.doesNotMatch(source('historical-share.mjs'), /saveGameResult/);
 });
