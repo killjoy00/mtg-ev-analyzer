@@ -746,12 +746,18 @@
     "constraint:apple_subscription_notifications.apple_subscription_notifications_pkey": "db861e10cf56e389d47ad7b51e51b168",
     "constraint:corpus_components.corpus_components_check": "e6756df5df9ceb25f0291b9f0601cf4d",
     "constraint:corpus_components.corpus_components_event_type_check": "f96b26a07fa2cac58147a2125fcc13da",
-    "constraint:corpus_components.corpus_components_model_version_check": "672bedcceb10de6f3cc563ebb820ba4c",
+    "constraint:corpus_components.corpus_components_model_version_check": [
+      "672bedcceb10de6f3cc563ebb820ba4c",
+      "23195e19990de9d930b45dcc38cf6da6"
+    ],
     "constraint:corpus_components.corpus_components_pkey": "30f3f9cf4061d3188bb58b6fdea7df52",
     "constraint:corpus_components.corpus_components_set_id_component_version_fkey": "1108aa2d4bcbdaa7049fa270edb68d7f",
     "constraint:corpus_components.corpus_components_set_id_parent_version_fkey": "80dc482654f216d8ee4e0da31def342d",
     "constraint:corpus_components.corpus_components_status_check": "719c087230960f618c62c9eae5b9aef7",
-    "constraint:corpus_components.corpus_components_version_model_check": "efbfc0435004e1dc4e7814d6a9b26afc",
+    "constraint:corpus_components.corpus_components_version_model_check": [
+      "efbfc0435004e1dc4e7814d6a9b26afc",
+      "b1154213896fb6c97bbaeb6c0247502d"
+    ],
     "constraint:corpus_health_checks.corpus_health_checks_pkey": "4c6419b3704337bbfe50f018842a9ad3",
     "constraint:corpus_health_checks.corpus_health_checks_set_id_corpus_version_fkey": "1cbdbb8b024a48344bf36337829b55c9",
     "constraint:corpus_health_checks.corpus_health_checks_source_snapshot_id_fkey": "bb9600ad4175270b68a5a54b8e253f9a",
@@ -922,7 +928,10 @@
     "constraint:draft_run_shares.draft_run_shares_session_id_key": "4e54a273e27f80152c6bf3321fc10718",
     "constraint:draft_run_verified_puzzles.draft_run_first_pack_payload": "e3d04e99fb0ec0a7bb60851fec346f83",
     "constraint:draft_run_verified_puzzles.draft_run_pick_position": "9ca8190f5b165b2f1a1d230c2ab759f8",
-    "constraint:draft_run_verified_puzzles.draft_run_source_evidence_required": "03af83bbba9b9a1c2dcb6b285f4ad677",
+    "constraint:draft_run_verified_puzzles.draft_run_source_evidence_required": [
+      "03af83bbba9b9a1c2dcb6b285f4ad677",
+      "c9e949166497d4323efecbdce3e6b485"
+    ],
     "constraint:draft_run_verified_puzzles.draft_run_v5_model_identity": "446ad6564996a8421c5fde04ac471012",
     "constraint:draft_run_verified_puzzles.draft_run_verified_puzzles_candidate_count_check": "de2149d067b0cf0864c15ad0136167b1",
     "constraint:draft_run_verified_puzzles.draft_run_verified_puzzles_check": "3526fd266cbee5b7e5cf5cdd12ea5493",
@@ -1031,7 +1040,10 @@
     "function:pack1_apply_apple_subscription_state(uuid,uuid,text,text,text,text,timestamp with time zone,boolean,text,timestamp with time zone,uuid)": "a7e2097810f7bb31fd1a1345faa58079",
     "function:pack1_begin_account_deletion(uuid,uuid)": "2ea0a78fc963edafc97b3acc1a770853",
     "function:pack1_begin_admin_account_deletion(uuid,uuid,text,boolean)": "63d7febff8a1df587a9d40b42a662da9",
-    "function:pack1_build_serving_snapshot(text,text,text)": "2e740865d345162bbb4708556f67f5c5",
+    "function:pack1_build_serving_snapshot(text,text,text)": [
+      "2e740865d345162bbb4708556f67f5c5",
+      "66a5eb81b48907c5829b5e684cf7675c"
+    ],
     "function:pack1_bump_serving_revision()": "ba636dabf98d6b1115c4cbc25cc2749f",
     "function:pack1_capture_serving_source_groups()": "f5e7e90e718cc17458a01574ebce14bf",
     "function:pack1_claim_readiness(bigint,text,bigint)": "004a592c3ca6a6b9fc0934feffa6a570",
