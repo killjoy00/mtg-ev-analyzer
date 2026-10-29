@@ -16,7 +16,7 @@ export default function HistoricalChallengeScreen() {
   const open = async () => {
     if (!challenge) return;
     await WebBrowser.openBrowserAsync(
-      `https://packone.pro/?challenge=${encodeURIComponent(challenge)}`,
+      'https://packone.pro/?game=draft-run&daily=1',
     );
   };
 
@@ -24,14 +24,13 @@ export default function HistoricalChallengeScreen() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.page}>
         <Text style={styles.eyebrow}>HISTORICAL PACK ONE LINK</Text>
-        <Text style={styles.title}>This challenge uses the retired web format.</Text>
+        <Text style={styles.title}>This game mode has been retired.</Text>
         <Text style={styles.body}>
-          Older 12-character challenge links belong to Pack One&apos;s historical Full Pack / Top 3 reader.
-          They are preserved on packone.pro instead of being converted into a different eight-pick Draft Run.
+          Full Pack and Top 3 are no longer available. You can play today&apos;s Daily instead.
         </Text>
         {challenge ? (
           <Pressable accessibilityRole="button" onPress={() => void open()} style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>Open historical challenge on packone.pro</Text>
+            <Text style={styles.primaryButtonText}>Play the Daily on packone.pro</Text>
           </Pressable>
         ) : (
           <Text accessibilityRole="alert" style={styles.error}>This historical challenge link is invalid.</Text>

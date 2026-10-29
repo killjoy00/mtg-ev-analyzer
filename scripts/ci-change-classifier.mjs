@@ -47,7 +47,7 @@ const isPresentation=path=>{
     ||['CNAME','_config.yml','robots.txt','sitemap.xml','ads.txt','ads.txt.example'].includes(path);
 };
 const heavyRoot=new Set([
-  'scoring.mjs','path-model.mjs','replay-data.mjs','draft-run-difficulty.mjs','draft-run-policy.mjs','daily-selection.mjs',
+  'scoring.mjs','replay-data.mjs','draft-run-difficulty.mjs','draft-run-policy.mjs','daily-selection.mjs',
   'model-versions.json','corpus-components.mjs','corpus-quality.mjs','serving-quality.mjs',
 ]);
 const heavyToken=/(?:replay|scor|model|corpus|dataset|troph|traditional|holdout|pick_value|contextual_value|grading_curve|selection|v5[_-])/i;

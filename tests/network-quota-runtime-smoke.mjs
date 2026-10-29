@@ -40,7 +40,7 @@ const options=convertV4MiniflareOptions({name:'quota-local-fixture',compatibilit
    }
  }
  export default {fetch(){return new Response(null,{status:404});}};
- `},...['edge/gateway.mjs','edge/quota-reservations.mjs','edge/private-diagnostics.mjs','worker/request-json.mjs','worker/account-config.mjs','worker/patreon-mobile-policy.mjs','worker/apple-subscription-policy.mjs','admin-api-contract.mjs','launch-alert-policy.mjs'].map(name=>({type:'ESModule',path:path.join(root,name),contents:readFileSync(path.join(root,name),'utf8')}))]});
+ `},...['edge/gateway.mjs','edge/quota-reservations.mjs','edge/private-diagnostics.mjs','worker/request-json.mjs','worker/retired-modes.mjs','worker/account-config.mjs','worker/patreon-mobile-policy.mjs','worker/apple-subscription-policy.mjs','admin-api-contract.mjs','launch-alert-policy.mjs'].map(name=>({type:'ESModule',path:path.join(root,name),contents:readFileSync(path.join(root,name),'utf8')}))]});
 let runtime;
 try {
  runtime=new Miniflare(options);

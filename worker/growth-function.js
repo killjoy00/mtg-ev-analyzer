@@ -1,3 +1,4 @@
+import { RETIRED_MODES_MESSAGE } from './retired-modes.mjs';
 import {observedRoute,tagBackendResponse,observedDatabaseCall} from './backend-diagnostics.mjs';
 import {createHmac} from 'node:crypto';
 import {reminderRoute,revokeReminderSessionDevices,reminderReadiness,reminderDatabaseReason} from './daily-reminders.mjs';
@@ -333,20 +334,6 @@ function props(value) {
   }
   return output;
 }
-
-function mode(value) {
-  if (!['top3', 'full', 'draft_run'].includes(value)) {
-    throw Object.assign(new Error('Invalid mode.'), { status: 400 });
-  }
-  return value;
-}
-
-function setId(value) {
-  const cleaned = String(value || '').toLowerCase();
-  if (!/^[a-z0-9_-]{2,24}$/.test(cleaned)) throw Object.assign(new Error('Invalid set.'), { status: 400 });
-  return cleaned;
-}
-
 
 function previousDateKey(dateKey, days = 1) {
   const date = new Date(`${dateKey}T12:00:00Z`);
@@ -1397,37 +1384,9 @@ async function handleEvents(request) {
 }
 
 async function handleResult(request) {
-  const id = await player(request);
   const payload = await readJson(request);
   if(payload.mode==='draft_run') throw Object.assign(new Error('Draft Run results are saved by the game server.'),{status:403});
-  const score = Math.max(0, Math.min(100, Math.round(Number(payload.score))));
-  if (!Number.isFinite(score)) throw Object.assign(new Error('Invalid score.'), { status: 400 });
-  const resultId = String(payload.clientResultId || '').slice(0, 80);
-  if (!/^[a-zA-Z0-9:_-]{6,80}$/.test(resultId)) {
-    throw Object.assign(new Error('Invalid result id.'), { status: 400 });
-  }
-  await consumePlayerLimit(query,id,'results',{limit:60,seconds:600});
-  const outcome = ['win', 'tie', 'loss'].includes(payload.outcome) ? payload.outcome : null;
-  await query(
-    `INSERT INTO game_results(player_id,set_id,mode,score,grade,seed,is_daily,challenge_id,opponent_name,opponent_score,outcome,client_result_id)
-     VALUES($1::uuid,$2,$3,$4::int,$5,$6,$7::boolean,$8,$9,$10::int,$11,$12)
-     ON CONFLICT(player_id,client_result_id) DO NOTHING`,
-    [
-      id,
-      setId(payload.setId),
-      mode(payload.mode),
-      score,
-      String(payload.grade || '').slice(0, 12),
-      String(payload.seed || '').slice(0, 80) || null,
-      Boolean(payload.isDaily),
-      String(payload.challengeId || '').slice(0, 40) || null,
-      String(payload.opponentName || '').slice(0, 80) || null,
-      Number.isFinite(Number(payload.opponentScore)) ? Number(payload.opponentScore) : null,
-      outcome,
-      resultId,
-    ],
-  );
-  return json({ ok: true });
+  return json({error:RETIRED_MODES_MESSAGE,code:'mode_retired'},410);
 }
 
 async function handleStats(request) {

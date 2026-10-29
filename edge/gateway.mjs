@@ -8,6 +8,7 @@ import {ADMIN_API_VERSION} from '../admin-api-contract.mjs';
 import {productionSampleRate,TAIL_SAMPLING_VERSION,RATE_LIMIT_CLASS_HEADER,confirmedAuthLimit} from '../launch-alert-policy.mjs';
 import {QuotaReservations} from './quota-reservations.mjs';
 
+import { isRetiredLegacyRoute, RETIRED_MODES_MESSAGE } from '../worker/retired-modes.mjs';
 const SERVICES={legacy:'pack1api',growth:'pack1growth',draft:'draftrunapi'};
 const PROD_BRANCH='br-orange-feather-ayps8kep';
 const DEV_BRANCH='br-twilight-hill-ayffyd2b';
@@ -114,9 +115,8 @@ function permitted(service,path,method,search,mode) {
     if(method==='GET'&&/^\/v1\/creator-challenges\/[a-z0-9-]{1,64}$/.test(path))return true;
     return mode==='production'&&adminPath(path,method);
   }
-  return (method==='POST'&&['/v1/session','/v1/scores','/v1/challenges'].includes(path))||
-    (method==='PATCH'&&path==='/v1/player')||
-    (method==='GET'&&(['/v1/leaderboard','/v1/distribution'].includes(path)||/^\/v1\/challenges\/[a-f0-9]{12}$/.test(path)));
+  return (method==='POST'&&path==='/v1/session')||
+    (method==='PATCH'&&path==='/v1/player')||isRetiredLegacyRoute(path,method);
 }
 
 function selectedCookies(request) {
@@ -480,6 +480,8 @@ export async function gateway(request,env,fetcher=fetch) {
       }}));
     }
     if(preview&&request.headers.get('x-pack1-preview-key')!==env.PREVIEW_KEY)return finish(response(403,'Preview access required.'));
+    if(match[1]==='legacy'&&isRetiredLegacyRoute(match[2],method))
+      return finish(response(410,RETIRED_MODES_MESSAGE));
     const mobileSession=request.headers.get('x-pack1-mobile-session');
     if(mobileSession&&(!validMobileSession(mobileSession)||!mobileSessionRoute(match[1],match[2],method)))
       return finish(response(validMobileSession(mobileSession)?403:401,validMobileSession(mobileSession)?'Mobile session not allowed on this route.':'Invalid mobile session.'));
