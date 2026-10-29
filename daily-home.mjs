@@ -45,7 +45,7 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), state = 'ready') {
 export function renderDailyHome(profile = null, state = 'ready') {
   if (!document.querySelector('[data-daily-home-style]')) {
     const link = document.createElement('link'); link.rel = 'stylesheet';
-    link.href = './daily-home.css?v=12'; link.dataset.dailyHomeStyle = '1'; document.head.append(link);
+    link.href = './daily-home.css?v=13'; link.dataset.dailyHomeStyle = '1'; document.head.append(link);
   }
   lastDay = gameDateKey();
   document.querySelector('#app').innerHTML = dailyHomeMarkup(profile, lastDay, state);

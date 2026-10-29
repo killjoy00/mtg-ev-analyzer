@@ -59,6 +59,17 @@ Reading pages, results, leaderboards and the custom-set picker keep their narrow
 columns, but those columns start at the same left edge as the logo instead of
 being centered. Running text stops at 68 characters.
 
+At 700px and narrower the menu is one row: the logo, the section links, and the
+account link at the far end. At 600px and narrower the logo shows only the P¹ mark
+(the link keeps its "Return to Pack One home" label), so the bar is 48px tall.
+
+Text sizes come from one scale. Reading and interface text uses 11, 12, 13, 14,
+16, 17 (long-form prose), 18 and 20px. Display headings use 22, 24, 28, 32, 36,
+40, 48 and 60px. Page titles (`h1`) reach 60px on desktop and section titles
+(`h2`) default to 24px on phones and 32px on desktop; fluid headings pass through
+in-between sizes at middle widths. The "Pack One" wordmark, the final score, the
+gameplay screen and the in-game set refresher keep their own tuned sizes.
+
 Daily home and Practice use a 600-weight display heading (60px desktop, 48px on
 phones). Mode labels use
 12px, 700-weight reading type. Entry actions are centered, fill their card, and
