@@ -73,3 +73,33 @@
 }
 
 .daily-home-game[data-environment="latest"]{border-left-color:#8c4b36}.daily-home-game[data-environment="latest"] .daily-home-number{color:#b79b91}
+
+/* The date and the reset countdown share one ruled line. */
+.daily-home{display:grid;grid-template-columns:max-content minmax(0,1fr);column-gap:0}
+.daily-home>*,.daily-home-heading>*{grid-column:1 / -1}
+.daily-home-heading{display:contents}
+.daily-home-heading time{grid-column:1;align-self:stretch;display:flex;align-items:center;padding:12px 12px 12px 0;white-space:nowrap}
+.daily-home-heading time,.daily-home-status{border-top:2px solid var(--ink);border-bottom:1px solid var(--line)}
+.daily-home>.daily-home-status{grid-column:2;justify-content:flex-end;flex-wrap:wrap;row-gap:6px;padding:12px 0;text-align:right}
+
+/* Phones: each Daily is one compact row with Play on the right, so all three
+   fit on the first screen. */
+@media(max-width:600px){
+ .daily-home-heading h1{font-size:44px}
+ .daily-home-heading>p:not(.eyebrow){margin-bottom:18px}
+ .daily-home-heading time{padding:10px 10px 10px 0;font-size:13px}
+ .daily-home>.daily-home-status{flex-direction:row;align-items:center;gap:6px 10px;padding:10px 0}
+ .daily-home>.daily-home-status>strong{font-size:14px}
+ .daily-home-game{grid-template-columns:26px minmax(0,1fr) auto;align-items:center;gap:6px 12px;padding:14px 12px}
+ .daily-home-number{font-size:24px}
+ .daily-home-game .daily-home-label{font-size:11px;margin-bottom:3px}
+ .daily-home-start{font-size:11px;padding:3px 7px}
+ .daily-home-game h2{font-size:23px;margin-bottom:2px}
+ .daily-home-game p{font-size:14px;line-height:1.35}
+ .daily-home-action{display:contents}
+ .daily-home-game .button{grid-column:3;grid-row:1;width:auto;min-width:92px;min-height:44px;padding-inline:14px}
+ .daily-home-action .daily-home-free{grid-column:2 / -1;justify-self:start}
+ .daily-home-game.is-complete{grid-template-columns:26px minmax(0,1fr) auto;padding:12px}
+ .daily-home-game.is-complete .daily-home-number{font-size:22px}
+ .daily-home-game.is-complete h2{font-size:21px}
+}
