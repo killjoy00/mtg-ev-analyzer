@@ -171,7 +171,7 @@ assert.match(setCatalog, /verified_decisions/);
 assert.doesNotMatch(setCatalog, /replay seats/);
 assert.doesNotMatch(sets, /custom=1/);
 assert.doesNotMatch(setCatalog, /custom=1/);
-assert.match(setCatalog, /Play Draft Run/);
+assert.match(setCatalog, /Play a mixed-set Draft Run/);
 const admin = await readFile('admin/index.html','utf8');
 assert.match(admin, /class="brand-mark"[^>]*><span>P<\/span><sup>1<\/sup>/i);
 const ads = await readFile('ad-config.js','utf8');
