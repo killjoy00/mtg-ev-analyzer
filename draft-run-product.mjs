@@ -426,7 +426,7 @@ function renderResult() {
     ${run.day?dailySharePanelMarkup():''}
     ${rankingStateMarkup(run)}
     ${dailySetCompleteMarkup()}
-    ${run.comparison&&run.comparison.kind!=='creator'?`<p class="run-friend">${run.comparison.exact?`You: ${run.score} · ${esc(run.comparison.name)}: ${run.comparison.score}`:'These scores came from different decisions.'}</p>`:''}
+    ${run.comparison&&run.comparison.kind!=='creator'?`<p class="run-friend">${run.comparison.exact?`You: ${run.score} · ${esc(run.comparison.name)}: ${run.comparison.score}`:'You and your friend played different packs, so the scores aren’t directly comparable.'}</p>`:''}
     ${creator?.creator_post_run_note?`<blockquote class="run-friend"><strong>${esc(creator.name)} after the run:</strong> “${esc(creator.creator_post_run_note)}”</blockquote>`:''}
     <div class="run-result-actions"><a class="button primary" data-next-daily-action href="${repeat.href}">${repeat.label}</a>${run.day?'':'<button class="button secondary" id="run-share">Share this run and compare</button><button class="button secondary" id="run-copy-result" type="button">Copy result</button>'}<a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">${run.day&&!run.leaderboard_eligible?(['username_taken','username_required','name_not_allowed'].includes(run.ranking_identity?.reason)?'Choose display name to add score':hasAccountSession()?'Add score to leaderboard':'Sign in to add score'):'View your career'}</button></div>
     ${run.day?'<p data-all-dailies hidden><a class="text-button" href="./">All Dailies</a></p>':''}
@@ -482,7 +482,7 @@ async function shareResult({copy=false}={}) {
       try {
         if(!navigator.clipboard?.writeText)throw new Error('Clipboard unavailable');
         await navigator.clipboard.writeText(payload);
-        status.textContent='Score, colored squares and link copied. Paste into Messages.';
+        status.textContent='Copied your score, squares, and link. Paste it wherever you want to share.';
         document.dispatchEvent(new CustomEvent('pack1:share-completed',{detail:{method:'copy_button',context:'draft_run_result',challenge:false}}));
         trackEvent(run.day?'daily_result_shared':'shared_run_shared',{mode:'draft_run',method:'copy_button'});
       } catch {
@@ -528,7 +528,7 @@ async function showBoard(period='daily') {
   const seasonRating=period==='season'&&Boolean(data.scoring);
   const empty=period==='season'&&!data.season
     ? '<p class="run-empty">Season standings aren\'t available yet.</p>'
-    : `<p class="run-empty">A fresh board. Finish today’s ${title()} to set the score to beat.</p>`;
+    : `<p class="run-empty">No scores yet. Finish today's ${title()} to get on the leaderboard.</p>`;
   app().innerHTML=`<section class="run-board"><p class="eyebrow">Leaderboards</p><h1>${environment==='latest'?'Latest Set':cube()?'Cube':'Draft Run'}</h1><nav class="run-board-games" aria-label="Leaderboard game"><a class="${environment==='mixed'?'active':''}" href="${boardUrl('mixed',period)}">Draft Run</a><a class="${cube()?'active':''}" href="${boardUrl('powered-cube',period)}">Cube</a><a class="${environment==='latest'?'active':''}" href="${boardUrl('latest',period)}">Latest Set</a></nav><nav class="run-board-periods" aria-label="Leaderboard period">${[['daily','Today'],['week','This week'],['season','This season']].map(([id,name])=>`<a class="${period===id?'active':''}" href="${gameUrl('board='+id)}">${name}</a>`).join('')}</nav>${seasonContext}<p>${seasonRating?'Season rating uses every first-attempt Daily score, with a larger deduction when you have played fewer days. You rank after your first Daily; missed days do not count as zero.':period==='daily'?'First attempts on today’s shared starting packs.':`Average of your best ${data.best_of||(period==='week'?3:10)} first-attempt Daily scores ${period==='week'?'this week':'this season'}; days not played count as 0. Days played are shown alongside.`}</p>${data.rows.length?`<ol>${data.rows.map(r=>`<li><b>${r.rank}</b><span><span class="run-board-player">${r.profile_key?`<a href="?profile=${esc(r.profile_key)}">${esc(r.display_name)}</a>`:`<span>${esc(r.display_name)}</span>`}${achievementMark(r.showcase_achievement,{compact:true})}</span>${seasonRating?`<small class="run-board-average">Avg ${Number(r.average_score).toFixed(1)}</small>`:''}</span><small>${r.days} ${r.days===1?'day':'days'}</small><strong>${seasonRating?`<small>Rating</small>${Number(r.rating).toFixed(1)}`:r.score}</strong></li>`).join('')}</ol>`:empty}<div class="run-board-actions"><a class="button primary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a>${practiceAction}</div></section>`;
   trackEvent('leaderboard_view',{mode:'draft_run',set_id:environment,period,season_id:data.season?.id,season_set_id:data.season?.set_id});
 }
@@ -593,7 +593,7 @@ export async function installDraftRunPage() {
       const sourceContext=info.source_type==='daily'&&info.source_day
         ? `Originally played as the ${esc(new Date(info.source_day+'T12:00:00Z').toLocaleDateString(undefined,{month:'long',day:'numeric',year:'numeric'}))} ${esc(title())} Daily.`
         : '';
-      app().innerHTML=`<section class="run-invite"><p class="eyebrow">BEAT THE CREATOR</p><h1>${esc(info.headline||('Can you beat '+info.creator_name+'?'))}</h1><p>${esc(info.creator_name)} scored <strong>${Number(info.score)}/100</strong> on these ${Number(info.run_length)} real trophy-draft decisions.</p><p>You’ll see the same packs and prior draft context.</p>${sourceContext?`<p>${sourceContext}</p>`:''}<button class="button primary" id="accept-run-challenge">Play ${esc(info.creator_name)}’s Run</button><p>This is an unranked creator replay and does not use your Daily attempt.</p><p id="run-error" role="alert"></p></section>`;
+      app().innerHTML=`<section class="run-invite"><p class="eyebrow">BEAT THE CREATOR</p><h1>${esc(info.headline||('Can you beat '+info.creator_name+'?'))}</h1><p>${esc(info.creator_name)} scored <strong>${Number(info.score)}/100</strong> on these ${Number(info.run_length)} real trophy-draft decisions.</p><p>You’ll see the same packs and prior draft context.</p>${sourceContext?`<p>${sourceContext}</p>`:''}<button class="button primary" id="accept-run-challenge">Play ${esc(info.creator_name)}’s Run</button><p>Playing this won't use up your Daily attempt or put a score on its leaderboard.</p><p id="run-error" role="alert"></p></section>`;
       trackEvent('challenge_open',{mode:'draft_run',kind:'creator',creator_challenge_id:info.id,source_type:info.source_type});
       document.querySelector('#accept-run-challenge').onclick=async()=>{try{trackEvent('challenge_start',{mode:'draft_run',kind:'creator',creator_challenge_id:info.id});await launch({creatorChallenge:info.id});}catch(e){console.warn('Creator challenge failed to start',e?.message);renderLoadFailure(e,false);}};
     } else if((params.has('shared')||params.has('challenge'))&&!params.has('run')) {
@@ -608,6 +608,6 @@ export async function installDraftRunPage() {
 
 async function customPractice() {
   const {sets}=await api('/v1/practice-sets');
-  app().innerHTML=`<section class="practice-picker"><p class="eyebrow">Elite practice</p><h1>Choose your sets</h1><p>A fresh random run of eight decisions, balanced across your selected sets.</p><form id="practice-sets"><fieldset><legend>Choose one or more sets</legend>${sets.map((s,i)=>`<label><input type="checkbox" name="set" value="${esc(s.set_id)}" ${i===0?'checked':''}>${esc(s.set_name||s.set_id.toUpperCase())}</label>`).join('')}</fieldset><button class="button primary">Start random run</button></form><p id="run-error" role="alert"></p><a href="./">Back to Dailies</a></section>`;
+  app().innerHTML=`<section class="practice-picker"><p class="eyebrow">Elite practice</p><h1>Choose your sets</h1><p>Choose one or more sets and we'll put together eight picks from them.</p><form id="practice-sets"><fieldset><legend>Choose one or more sets</legend>${sets.map((s,i)=>`<label><input type="checkbox" name="set" value="${esc(s.set_id)}" ${i===0?'checked':''}>${esc(s.set_name||s.set_id.toUpperCase())}</label>`).join('')}</fieldset><button class="button primary">Start random run</button></form><p id="run-error" role="alert"></p><a href="./">Back to Dailies</a></section>`;
   document.querySelector('#practice-sets').onsubmit=async event=>{event.preventDefault();const setIds=new FormData(event.currentTarget).getAll('set');if(!setIds.length){document.querySelector('#run-error').textContent='Choose at least one set.';return;}try{environment='mixed';await launch({setIds});}catch(e){renderLoadFailure(e,false);}};
 }
