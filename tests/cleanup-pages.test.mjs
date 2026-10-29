@@ -41,7 +41,7 @@ test('Elite acquisition routes through the Pack One Patreon landing page',async(
   assert.match(page,/startPatreonOAuth\('patreon_landing'\)/);
   assert.match(page,/Open Practice/);
   assert.match(page,/Refresh Patreon access/);
-  assert.match(page,/Connect Patreon to activate Elite/);
+  assert.match(page,/Connect Patreon to check your membership benefits/);
   assert.match(page,/Patreon connected/);
   assert.match(growth,/location\.assign\('\/patreon\/'\)/);
   assert.doesNotMatch(growth,/handoffToPatreon/);
