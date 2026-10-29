@@ -1,0 +1,162 @@
+{
+  "catalog_sha256": "90becf3ba7e185673470bf189170220f8a8efbe44c87d63cf0150c227523ebb3",
+  "sets": 30,
+  "puzzles": 20231,
+  "candidate_awards": 183738,
+  "trophy_awards": 20231,
+  "alternative_awards": 163507,
+  "passed": true,
+  "per_set": [
+    {
+      "set": "ktk",
+      "puzzles": 704,
+      "candidate_awards": 6336
+    },
+    {
+      "set": "mom",
+      "puzzles": 561,
+      "candidate_awards": 5610
+    },
+    {
+      "set": "otj",
+      "puzzles": 714,
+      "candidate_awards": 6403
+    },
+    {
+      "set": "dmu",
+      "puzzles": 715,
+      "candidate_awards": 6435
+    },
+    {
+      "set": "woe",
+      "puzzles": 572,
+      "candidate_awards": 5148
+    },
+    {
+      "set": "dsk",
+      "puzzles": 668,
+      "candidate_awards": 5997
+    },
+    {
+      "set": "tmt",
+      "puzzles": 670,
+      "candidate_awards": 5651
+    },
+    {
+      "set": "hbg",
+      "puzzles": 836,
+      "candidate_awards": 7524
+    },
+    {
+      "set": "ltr",
+      "puzzles": 616,
+      "candidate_awards": 5544
+    },
+    {
+      "set": "mkm",
+      "puzzles": 659,
+      "candidate_awards": 5570
+    },
+    {
+      "set": "hob",
+      "puzzles": 825,
+      "candidate_awards": 7425
+    },
+    {
+      "set": "pio",
+      "puzzles": 825,
+      "candidate_awards": 8250
+    },
+    {
+      "set": "lci",
+      "puzzles": 649,
+      "candidate_awards": 6490
+    },
+    {
+      "set": "fin",
+      "puzzles": 715,
+      "candidate_awards": 6435
+    },
+    {
+      "set": "sir",
+      "puzzles": 550,
+      "candidate_awards": 5500
+    },
+    {
+      "set": "msh",
+      "puzzles": 726,
+      "candidate_awards": 6533
+    },
+    {
+      "set": "dft",
+      "puzzles": 528,
+      "candidate_awards": 4752
+    },
+    {
+      "set": "blb",
+      "puzzles": 570,
+      "candidate_awards": 4814
+    },
+    {
+      "set": "mh3",
+      "puzzles": 693,
+      "candidate_awards": 6213
+    },
+    {
+      "set": "neo",
+      "puzzles": 748,
+      "candidate_awards": 7480
+    },
+    {
+      "set": "fdn",
+      "puzzles": 539,
+      "candidate_awards": 4832
+    },
+    {
+      "set": "snc",
+      "puzzles": 814,
+      "candidate_awards": 7326
+    },
+    {
+      "set": "sos",
+      "puzzles": 682,
+      "candidate_awards": 6138
+    },
+    {
+      "set": "tla",
+      "puzzles": 590,
+      "candidate_awards": 5015
+    },
+    {
+      "set": "tdm",
+      "puzzles": 561,
+      "candidate_awards": 5049
+    },
+    {
+      "set": "bro",
+      "puzzles": 792,
+      "candidate_awards": 7920
+    },
+    {
+      "set": "eoe",
+      "puzzles": 590,
+      "candidate_awards": 5015
+    },
+    {
+      "set": "one",
+      "puzzles": 803,
+      "candidate_awards": 7227
+    },
+    {
+      "set": "ecl",
+      "puzzles": 594,
+      "candidate_awards": 4752
+    },
+    {
+      "set": "powered-cube",
+      "puzzles": 722,
+      "candidate_awards": 6354
+    }
+  ],
+  "scope": "Checked-in catalog only; excludes database-only additions and frozen historical scoring profiles."
+}
