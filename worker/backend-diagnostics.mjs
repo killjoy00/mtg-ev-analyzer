@@ -2,10 +2,34 @@ import {AsyncLocalStorage} from 'node:async_hooks';
 import {TRACE_HEADER,REASON_HEADER,traceId,backendReason,milliseconds} from '../edge/private-diagnostics.mjs';
 
 const databaseContext=new AsyncLocalStorage(),DATABASE_DETAIL_LIMIT=12;
+// Fixed PostgreSQL SQLSTATE identities, never provider messages, constraint
+// names or arbitrary error codes. Classification is diagnostic only and must
+// not expand the separate rollback-only retry policy.
+// https://www.postgresql.org/docs/current/errcodes-appendix.html
+const DATABASE_FAILURE_CODES=new Set([
+ '08001','08006','08007','08P01','22003','22P02',
+ '23502','23503','23505','23514','23P01','40001','40003','40P01',
+ '42501','42703','42804','42P01','53100','53200','53300','53400',
+ '55P03','57014','57P01','57P02','57P03','58030','XX000',
+ 'ECONNRESET','ETIMEDOUT',
+]);
+const DATABASE_FAILURE_CLASSES={
+ '08':'connection_exception','22':'data_exception','23':'integrity_constraint',
+ '25':'invalid_transaction_state','28':'invalid_authorization','40':'transaction_error',
+ '42':'syntax_or_access','53':'insufficient_resources','54':'program_limit',
+ '55':'prerequisite_state','57':'operator_intervention','58':'system_error',
+ 'P0':'application_exception','XX':'internal_error',
+};
 const databaseFailureCode=error=>{
  const code=error?.pgCode||error?.code;
- if(['40001','40P01','57014','57P01','ECONNRESET','ETIMEDOUT'].includes(code))return code;
+ if(DATABASE_FAILURE_CODES.has(code))return code;
  return error?.name==='AbortError'?'abort':error?.name==='TimeoutError'?'timeout':null;
+};
+const databaseFailureClass=error=>{
+ // Unlisted codes need the adapter's explicit pgCode provenance. A generic
+ // five-character application error code is not proof of a SQLSTATE.
+ const code=error?.pgCode||(DATABASE_FAILURE_CODES.has(error?.code)?error.code:null);
+ return typeof code==='string'&&/^[0-9A-Z]{5}$/.test(code)?DATABASE_FAILURE_CLASSES[code.slice(0,2)]||'other_sqlstate':null;
 };
 function databaseLog(record){try{console.log(JSON.stringify(record));}catch{/* Diagnostics must not change a database outcome. */}}
 function databaseSummary(context) {
@@ -36,7 +60,7 @@ export async function observedDatabaseCall(operation) {
    metric.phase='complete';metric.ok=true;
    return result;
  } catch(error) {
-   metric.ok=false;metric.failure_code=databaseFailureCode(error);throw error;
+   metric.ok=false;metric.failure_code=databaseFailureCode(error);metric.failure_class=databaseFailureClass(error);throw error;
  } finally {
    const ended=performance.now(),duration=ended-began;
    context.completed++;context.total+=duration;context.max=Math.max(context.max,duration);
@@ -73,7 +97,7 @@ export async function observedRoute(request,service,route) {
    return response;
  } catch(error) {
    const status=Number(error?.status)||500;
-   console.log(JSON.stringify({event:'backend_request',...base,status,duration_ms:milliseconds(performance.now()-began),reason:reasonFor(error,status),failure_code:databaseFailureCode(error),...databaseSummary(context)}));
+   console.log(JSON.stringify({event:'backend_request',...base,status,duration_ms:milliseconds(performance.now()-began),reason:reasonFor(error,status),failure_code:databaseFailureCode(error),failure_class:databaseFailureClass(error),...databaseSummary(context)}));
    throw error;
  } finally {if(context)context.open=false;}
  });
