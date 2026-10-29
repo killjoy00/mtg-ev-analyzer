@@ -393,7 +393,7 @@ function InsightSections({data,onReview,onLoadMore,morePhase}:{
   const dnaSection=data.drafting_dna?<DNASummary dna={data.drafting_dna}
     cardChoices={data.card_choices} onReview={onReview}/>:
     <Section title="Your pick patterns" caption="Recent picks across all formats">
-      <Text style={styles.caption}>We can't show your pick patterns right now.</Text>
+      <Text style={styles.caption}>{"We can't show your pick patterns right now."}</Text>
     </Section>;
   if (!data.unlocked) return <>
     <Section title="Picks to review">
