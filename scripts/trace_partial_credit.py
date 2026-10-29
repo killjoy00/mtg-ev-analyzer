@@ -20,6 +20,7 @@ from build_replays import (
 )
 from import_all_trophies import collect_isolated, digest, scan_metadata, trajectory
 from model_training import V5_MODEL, current_model_version
+from rules_mana_context import candidate_pool_context, card_mana_context
 
 
 def trace_card(model, card, pack_number, pick_number, pool):
@@ -79,6 +80,15 @@ def trace_decision(model, example, expected=None):
         row['model_only_credit'] = math.floor(95 * row['raw_support'] / leader + .5)
         row['trophy_match'] = row['name'] == example.historical_pick
         row['awarded_credit'] = 100 if row['trophy_match'] else row['model_only_credit']
+        if expected is not None:
+            metadata = next(c for c in expected['candidates'] if c['name'] == row['name'])
+            context = candidate_pool_context(metadata, expected['prior_picks'])
+            row['explicit_mana_context'] = context
+            cast = context['card'].get('cast')
+            affinity = row['inferred_color_affinity']
+            row['required_colors_missing_from_affinity'] = (
+                [c for c in cast['colors'] if c not in affinity]
+                if cast is not None and affinity != '?' else None)
     return {
         'model_version': V5_MODEL,
         'interpretation': 'Observed pick tendency; points are not win probability or confidence.',
@@ -88,6 +98,9 @@ def trace_decision(model, example, expected=None):
         'prior_pool_inferred_affinities': {
             name: (model.fit or {}).get('cards', {}).get(name, {}).get('colours', '?')
             for name in example.pool},
+        'prior_pool_explicit_mana': {
+            c['name']: card_mana_context(c) for c in expected['prior_picks']
+        } if expected is not None else None,
         'candidates': sorted(rows, key=lambda r: (-r['raw_support'], r['name'])),
     }
 

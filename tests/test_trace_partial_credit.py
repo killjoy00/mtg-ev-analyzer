@@ -102,6 +102,21 @@ class CreditTraceTests(unittest.TestCase):
         with patch.object(model, 'card_tendency', return_value=.99), self.assertRaises(ValueError):
             trace_decision(model, example)
 
+    def test_verified_report_exposes_colored_spell_with_flexible_affinity(self):
+        model, example = fixture()
+        model.fit_colours['Gold'] = frozenset()
+        model.fit['cards']['Gold']['colours'] = 'C'
+        before = trace_decision(model, example)
+        payload = stored(before)
+        for c in payload['candidates']:
+            if c['name'] == 'Gold':
+                c.update(mana_cost='{2}{R}{W}', type_line='Artifact — Equipment')
+        report = trace_decision(model, example, payload)
+        row = next(c for c in report['candidates'] if c['name'] == 'Gold')
+        self.assertEqual(row['required_colors_missing_from_affinity'], ['W', 'R'])
+        self.assertEqual([c['awarded_credit'] for c in report['candidates']],
+                         [c['awarded_credit'] for c in before['candidates']])
+
     def test_pinned_source_mismatch_fails(self):
         with tempfile.TemporaryDirectory() as directory:
             p = Path(directory) / 'source'
