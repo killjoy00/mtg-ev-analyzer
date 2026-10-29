@@ -377,7 +377,6 @@ function PackReview({
       {answer.puzzle.prior_picks.length ? (
         <>
           <Text style={styles.analysisSubhead}>Earlier picks</Text>
-          
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.poolRow}>
             {answer.puzzle.prior_picks.map((card, index) => (
               <Pressable

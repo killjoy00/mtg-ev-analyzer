@@ -169,7 +169,7 @@ for (const [access, session] of [['guest', guest()], ['free account', { ...guest
         await h.press(round === 7 ? 'See result' : 'Next pick');
       }
       assert.match(h.text(), /You beat Fixture Creator/);
-      assert.match(h.text(), /does not consume or modify your Daily attempt/);
+      assert.match(h.text(), /won’t use up your Daily attempt/);
       assert.equal(h.calls.filter(([kind]) => kind === 'start').length, 1);
       assert.equal(h.calls.filter(([kind]) => kind === 'pick').length, 8);
       for (const [kind, , , pickedSession] of h.calls.filter(([kind]) => kind === 'pick')) {
