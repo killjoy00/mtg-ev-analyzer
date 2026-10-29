@@ -21,7 +21,7 @@ assert.doesNotMatch(home, /id="home-editorial"/);
 assert.equal((home.match(/data-ad-slot="home"/g)||[]).length,1,'home has exactly one dormant ad slot');
 assert.match(home, /<main id="app" class="app"><\/main>\s*<aside class="ad-slot" data-ad-slot="home" hidden aria-label="Advertisement"><\/aside>\s*<\/div>\s*<footer class="site-footer app-footer">/,'home ad slot stays directly after main inside app-shell');
 assert.doesNotMatch(home, /googlesyndication/i,'Google loader stays out of index.html');
-assert.match(home, /href="visual-c\.css\?v=10"/,'home must bust the CSS cache for the hydration and mobile-nav styles');
+assert.match(home, /href="visual-c\.css\?v=11"/,'home must bust the CSS cache for the hydration and mobile-nav styles');
 assert.match(home, /id="how-nav"[^>]*href="\/how-it-works\/"[^>]*>How To Play<\/a>/);
 assert.doesNotMatch(home, /href="\/methodology\/"[^>]*>Method<\/a>/);
 assert.match(home, /class="topbar"/);
@@ -45,7 +45,7 @@ assert.match(howTo, /class="quick-start"/);
 assert.match(howTo, /class="quick-start-action"/);
 assert.match(howTo, /class="quick-start-action">[\s\S]*href="\/\?game=draft-run&daily=1">Play Daily Draft Run<\/a>[\s\S]*No account required\./);
 assert.match(howTo, /No account required/);
-assert.match(howTo, /src="\/site-nav\.mjs\?v=2"/);
+assert.match(howTo, /src="\/site-nav\.mjs\?v=3"/);
 assert.match(howTo, /sign in before midnight Pacific and add your score/);
 assert.match(howTo, /<h2>Scoring<\/h2>/);
 assert.match(howTo, /href="\/scoring\/">View scoring<\/a>/);
@@ -73,14 +73,14 @@ const publicStaticTopbarPages = [
 ];
 for (const path of publicStaticTopbarPages) {
   const html = await readFile(path, 'utf8');
-  assert.match(html, /href="\/visual-c\.css\?v=10"/, `${path} needs the refreshed app header styles`);
+  assert.match(html, /href="\/visual-c\.css\?v=11"/, `${path} needs the refreshed app header styles`);
   assert.match(html, /class="topbar"/, `${path} needs the standard app topbar`);
   assert.match(html, /data-site-nav/, `${path} needs account-aware navigation`);
   assert.match(html, /href="\/\?game=draft-run&daily=1">Daily Run<\/a>/, `${path} needs Daily Run navigation`);
   assert.doesNotMatch(html, /href="\/\?game=draft-run&board=daily">Leaders<\/a>/, `${path} guest markup must not expose Leaders`);
   assert.match(html, /href="\/how-it-works\/"[^>]*>How To Play<\/a>/, `${path} needs How To Play navigation`);
   assert.match(html, /id="account-nav" href="\/\?account=1">Sign in<\/a>/, `${path} needs Sign in navigation`);
-  assert.match(html, /src="\/site-nav\.mjs\?v=2"/, `${path} needs signed-in navigation enhancement`);
+  assert.match(html, /src="\/site-nav\.mjs\?v=3"/, `${path} needs signed-in navigation enhancement`);
   assert.doesNotMatch(html, /class="site-header"|class="admin-brand"/, `${path} must not use a legacy top-level header`);
 }
 const adminTopbar = await readFile('admin/index.html','utf8');
@@ -89,8 +89,8 @@ assert.match(adminTopbar, /href="\/\?game=draft-run&daily=1">Daily Run<\/a>/);
 assert.match(adminTopbar, /href="\/how-it-works\/"[^>]*>How To Play<\/a>/);
 assert.match(adminTopbar, /id="account-nav" href="\/\?account=1">Sign in<\/a>/, 'guest fallback stays a sign-in link');
 assert.doesNotMatch(adminTopbar, /href="\/\?game=draft-run&board=daily">Leaders<\/a>/, 'guest fallback stays minimal');
-assert.match(adminTopbar, /src="\/site-nav\.mjs\?v=2"/, 'admin hydrates the shared signed-in account navigation');
-assert.match(adminTopbar, /href="\/visual-c\.css\?v=10"/, 'admin receives responsive signed-in navigation styles');
+assert.match(adminTopbar, /src="\/site-nav\.mjs\?v=3"/, 'admin hydrates the shared signed-in account navigation');
+assert.match(adminTopbar, /href="\/visual-c\.css\?v=11"/, 'admin receives responsive signed-in navigation styles');
 for (const path of ['about/index.html','contact/index.html','privacy/index.html','terms/index.html']) {
   const html = await readFile(path, 'utf8');
   assert.doesNotMatch(html, /Make the decision before you read the answer\./, `${path} should not use the coaching CTA`);
