@@ -96,7 +96,7 @@ async function renderMembershipState() {
     ? 'Your Patreon account is connected. If you changed your membership, refresh here and Pack One will check your access.'
     : 'No Patreon account is connected to this Pack One account. Connect the Patreon account you use for Pack One membership.',patreon?.connected
       ? {state:'connected',heading:'Patreon connected',showPatreon:true,patreonLabel:'Manage Patreon membership'}
-      : {state:'unconnected',heading:'Connect Patreon to activate Elite',showPatreon:true});
+      : {state:'unconnected',heading:'Connect Patreon to check your membership benefits',showPatreon:true});
 }
 
 // This module and site-nav load independently. If this one starts first,

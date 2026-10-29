@@ -61,7 +61,7 @@ function performanceBars(profile) {
 function bestEnvironmentRows(profile,names,progress) {
   if(!progress)return '<p class="my-pack-empty">Live environments are temporarily unavailable.</p>';
   const rows=(profile.best_environments||[]).filter(row=>progress.ids.has(row.set_id)).slice(0,5);
-  if(!rows.length)return '<p class="my-pack-empty">Play at least three games in an environment to qualify it here.</p>';
+  if(!rows.length)return '<p class="my-pack-empty">Play at least three games in a set or format to see it here.</p>';
   return '<ol class="my-best-list">'+rows.map((row,index)=>
     '<li><span class="my-rank">'+(index+1)+'</span><strong>'+esc(environmentName(names,row.set_id))+'</strong><b>'+num(row.average_score).toFixed(1)+'</b><small>avg</small></li>'
   ).join('')+'</ol>';
@@ -111,7 +111,7 @@ function archiveMarkup(progress) {
   const pct=progress.total?Math.round((progress.played/progress.total)*100):0;
   return '<div class="my-archive-summary"><div><strong>'+progress.played+'/'+progress.total+'</strong><span>environments played</span></div><b>'+pct+'%</b></div>'+
     '<div class="my-archive-track" role="progressbar" aria-label="Archive progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+pct+'"><i style="width:'+pct+'%"></i></div>'+
-    '<details class="my-pack-details" data-profile-section="archive"><summary>View environments</summary><div class="my-archive-grid">'+progress.environments.map(entry=>
+    '<details class="my-pack-details" data-profile-section="archive"><summary>See all sets</summary><div class="my-archive-grid">'+progress.environments.map(entry=>
       '<a class="my-archive-item '+(entry.played?'is-played':'is-unplayed')+'" data-environment-id="'+esc(entry.id)+'" href="/sets/#'+encodeURIComponent(entry.id)+'"><strong>'+esc(entry.name)+'</strong><span>'+(entry.played?entry.games+' games · '+entry.averageScore.toFixed(1)+' avg':'Not played yet')+'</span></a>'
     ).join('')+'</div></details>';
 }
@@ -133,7 +133,7 @@ function profileAside(profile,progress,account,patreon) {
   const email=account?.user?.email||'';
   return '<section class="my-side-card my-profile-card" aria-labelledby="my-profile-card-title">'+
     '<div class="my-profile-head"><div class="my-avatar" aria-hidden="true">'+esc(initials(profile.player.display_name))+'</div><div><h2 id="my-profile-card-title" class="profile-name-line">'+esc(profile.player.display_name)+(showcased?achievementMark(showcased.id,{compact:true}):'')+'</h2>'+(email?'<p>'+esc(email)+'</p>':'')+'</div></div>'+
-    '<ul class="my-profile-facts"><li><span>Membership</span><strong>'+membershipLabel+'</strong></li><li><span>Public profile</span><strong>'+(profile.player.profile_public?'On':'Off')+'</strong></li>'+(favorite?'<li><span>Favorite environment</span><strong>'+esc(favorite.name)+'</strong></li>':'')+(showcased?'<li><span>Showcase</span><strong class="profile-showcase-label">'+achievementMark(showcased.id,{decorative:true,compact:true})+esc(showcased.label)+'</strong></li>':'')+'</ul>'+
+    '<ul class="my-profile-facts"><li><span>Membership</span><strong>'+membershipLabel+'</strong></li><li><span>Public profile</span><strong>'+(profile.player.profile_public?'On':'Off')+'</strong></li>'+(favorite?'<li><span>Favorite set or format</span><strong>'+esc(favorite.name)+'</strong></li>':'')+(showcased?'<li><span>Showcase</span><strong class="profile-showcase-label">'+achievementMark(showcased.id,{decorative:true,compact:true})+esc(showcased.label)+'</strong></li>':'')+'</ul>'+
   '</section>';
 }
 
@@ -204,7 +204,7 @@ function statsMarkup(profile,liveCatalog,account,patreon) {
       (recent.length?'<details class="my-pack-details"><summary>View all game history</summary><ol class="profile-history-list" id="profile-history-list">'+recent.map(row=>historyRow(row,names)).join('')+'</ol><button type="button" class="button secondary" id="profile-load-more" '+(recent.length<20?'hidden':'')+'>Load more</button></details>':'')+'</section>'+
     '<div class="my-two-up"><section class="my-pack-card"><div class="my-card-heading"><h2>Daily History</h2></div>'+(dailyPreview?'<ol class="my-daily-preview">'+dailyPreview+'</ol>':'<p class="my-pack-empty">No ranked Daily history yet.</p>')+
       (daily.length?'<details class="my-pack-details"><summary>View Daily finishes</summary><ol class="profile-daily-list">'+daily.map((row,index)=>dailyDetailRow(row,names,index)).join('')+'</ol></details>':'')+'</section>'+
-    '<div class="my-stack"><section class="my-pack-card"><div class="my-card-heading"><h2>Archive Progress</h2></div>'+archiveMarkup(progress)+'</section>'+challengeRecordMarkup(summary)+'</div></div>'+
+    '<div class="my-stack"><section class="my-pack-card"><div class="my-card-heading"><h2>Sets you\'ve played</h2></div>'+archiveMarkup(progress)+'</section>'+challengeRecordMarkup(summary)+'</div></div>'+
   '</main><aside class="my-pack-one-aside">'+profileAside(profile,progress,account,patreon)+membershipAside(patreon)+shareAside(profile)+'</aside></div>';
 }
 
