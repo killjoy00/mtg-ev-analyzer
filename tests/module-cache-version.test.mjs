@@ -18,14 +18,14 @@ test('account and profile entry modules use release-versioned imports', async ()
     readFile('practice-page.mjs', 'utf8'),
   ]);
 
-  assert.match(index, /bootstrap\.mjs\?v=47/);
+  assert.match(index, /bootstrap\.mjs\?v=48/);
   assert.match(bootstrap, /growth\.mjs\?v=32/);
   assert.match(bootstrap, /daily-home\.mjs\?v=27/);
   assert.match(bootstrap, /profile-product\.mjs\?v=24/);
-  assert.match(bootstrap, /draft-run-product\.mjs\?v=35/);
+  assert.match(bootstrap, /draft-run-product\.mjs\?v=36/);
   assert.match(daily, /growth\.mjs\?v=28/);
   assert.match(growth, /profile-product\.mjs\?v=24/);
-  assert.match(growth, /draft-run-product\.mjs\?v=35/);
+  assert.match(growth, /draft-run-product\.mjs\?v=36/);
   assert.match(growth, /patreon-activation\.mjs\?v=2/);
   assert.match(profile, /progression\.mjs\?v=10/);
   assert.match(profile, /growth\.mjs\?v=28/);
@@ -43,10 +43,10 @@ test('account and profile entry modules use release-versioned imports', async ()
   assert.match(draft, /draft-run-feedback\.mjs\?v=7/);
   assert.match(patreonHtml, /patreon-page\.mjs\?v=5/);
   assert.match(patreonPage, /patreon-activation\.mjs\?v=2/);
-  assert.match(practiceHtml, /bootstrap\.mjs\?v=47/);
+  assert.match(practiceHtml, /bootstrap\.mjs\?v=48/);
   assert.match(practiceHtml, /growth\.mjs\?v=28/);
-  assert.match(practiceHtml, /draft-run-product\.mjs\?v=35/);
-  assert.match(practiceHtml, /draft-run\.css\?v=24/);
+  assert.match(practiceHtml, /draft-run-product\.mjs\?v=36/);
+  assert.match(practiceHtml, /draft-run\.css\?v=25/);
   assert.match(practiceJs, /growth\.mjs\?v=28/);
   assert.match(patreonPage, /growth\.mjs\?v=10/);
 });
