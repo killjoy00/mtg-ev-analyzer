@@ -30,7 +30,7 @@ test('parser keeps finite failure evidence and rejects inconsistent complete-tai
   const parsed=parseGatewayEvent(row(event({status:503,sample_rate:1,upstream_calls:0,quota_attempts:2,quota_overloaded:true,quota_remote:true,error:'gateway_failure',cookie:'secret'})));
   assert.equal(parsed.quota_overloaded,true);assert.equal(parsed.upstream_calls,0);assert.equal(parsed.cookie,undefined);
   assert.equal(parseGatewayEvent(row(event({duration_ms:6000}))),null);
-  await assert.rejects(queryEvents(async()=>Response.json({result:{events:{events:[row(event({duration_ms:6000}))]}}}),'token','a'.repeat(32),0,1),/schema/);
+  await assert.rejects(queryEvents(async()=>Response.json({result:{events:{events:[row(event({duration_ms:6000}))]},statistics:{abr_level:1}}}),'token','a'.repeat(32),0,1),/schema/);
   const s=evaluate([parsed],{});assert.ok(s.diagnostic_categories.includes('quota_or_gateway'));
   assert.ok(s.diagnostic_categories.includes('quota_overloaded'));
 });
@@ -215,7 +215,7 @@ test('full alert-mode collection routes confirmed auth as a warning while unknow
       const events=Array.from({length:10},()=>row({...limit,id:crypto.randomUUID(),rate_limit_class:known?'player_auth':null}));
       const fetcher=async(url,options={})=>{
         if(url.includes('/zones?'))return Response.json({result:[{name:'packone.pro',status:'active',account:{id:'a'.repeat(32)}}]});
-        if(url.includes('/observability/telemetry/query'))return Response.json({result:{events:{events}}});
+        if(url.includes('/observability/telemetry/query'))return Response.json({result:{events:{events},statistics:{abr_level:1}}});
         if(url==='https://api.packone.pro/draft/health?quick=1')return Response.json({ok:true});
         if(url.endsWith('/issues/596')) {
           if(options.method==='PATCH')coverage=JSON.parse(options.body).body;

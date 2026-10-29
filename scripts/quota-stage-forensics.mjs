@@ -1,8 +1,11 @@
 // Read-only, one-shot Cloudflare diagnostic. Output is aggregate-only and
 // must never contain request traces, object/network keys, routes, or raw logs.
 import {pathToFileURL} from 'node:url';
+import {privateQuotaStore} from './private-quota-forensics.mjs';
+import {collectVerifiedTelemetry} from './verified-observability.mjs';
 
 const MAX_PAGES=12,PAGE_SIZE=2000;
+const RETENTION_MS=3*86400000,SETTLEMENT_MS=2*60000,MAX_WINDOW_MS=35*60000;
 const timing=v=>typeof v==='number'&&Number.isFinite(v)&&v>=0&&v<=600000?v:null;
 const key=v=>typeof v==='string'&&/^[a-f0-9]{32}$/.test(v)?v:null;
 const attempt=v=>Number.isInteger(v)&&v>0&&v<=2?v:null;
@@ -85,56 +88,75 @@ async function account(fetcher,token){
   return id;
 }
 
-async function query(fetcher,token,accountId,from,to,event,service){
+export async function collectQuotaEventRows({fetcher=fetch,token,accountId,from,to,event,service,maxRequests=48}){
   const url='https://api.cloudflare.com/client/v4/accounts/'+accountId+'/workers/observability/telemetry/query';
-  const rows=new Map();let offset=null;
-  for(let i=0;i<MAX_PAGES;i++){
-    const filters=[];
-    if(service)filters.push({key:'$metadata.service',operation:'eq',type:'string',value:service});
-    filters.push({key:'event',operation:'eq',type:'string',value:event});
-    const req={queryId:'pack1-launch-watch',timeframe:{from,to},dry:true,limit:PAGE_SIZE,
-      view:'events',parameters:{datasets:['cloudflare-workers'],filterCombination:'and',filters}};
-    if(offset){req.offset=offset;req.offsetDirection='next';}
-    const data=await requestJson(fetcher,url,token,req),page=data.result?.events?.events;
-    if(!Array.isArray(page))throw Error('Malformed Cloudflare telemetry page');
-    for(const row of page){
-      const id=row?.$metadata?.id;
-      if(typeof id!=='string'||!id||id.length>512)throw Error('Malformed telemetry event identifier');
-      rows.set(id,row);
-    }
-    if(page.length<PAGE_SIZE)return [...rows.values()];
-    const next=page.at(-1)?.$metadata?.id;
-    if(!next||next===offset)throw Error('Telemetry pagination stalled');
-    offset=next;
+  return collectVerifiedTelemetry({from,to,maxRequests,pageSize:PAGE_SIZE,maxPages:MAX_PAGES,
+    fetchPage:async({from:begin,to:end,limit,offset})=>{
+      const filters=[];
+      if(service)filters.push({key:'$metadata.service',operation:'eq',type:'string',value:service});
+      filters.push({key:'event',operation:'eq',type:'string',value:event});
+      const req={queryId:'pack1-quota-forensics',timeframe:{from:begin,to:end},dry:true,limit,
+        view:'events',parameters:{datasets:['cloudflare-workers'],filterCombination:'and',filters}};
+      if(offset){req.offset=offset;req.offsetDirection='next';}
+      const data=await requestJson(fetcher,url,token,req);
+      return {events:data.result?.events?.events,level:data.result?.statistics?.abr_level??data.result?.run?.statistics?.abr_level};
+    }});
+}
+
+export function forensicWindows(now,env={}){
+  if(!Number.isSafeInteger(now)||now<=0)throw Error('Invalid forensic clock');
+  const parse=value=>{
+    if(typeof value!=='string'||!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{3})?Z$/.test(value))return NaN;
+    const ms=Date.parse(value),canonical=value.includes('.')?value:value.replace('Z','.000Z');
+    return Number.isFinite(ms)&&new Date(ms).toISOString()===canonical?ms:NaN;
+  };
+  if(env.PACK1_QUOTA_FORENSICS_FROM!==undefined||env.PACK1_QUOTA_FORENSICS_TO!==undefined){
+    const from=parse(env.PACK1_QUOTA_FORENSICS_FROM),to=parse(env.PACK1_QUOTA_FORENSICS_TO);
+    if(!Number.isSafeInteger(from)||!Number.isSafeInteger(to)||from>=to||to-from>MAX_WINDOW_MS||now-from>RETENTION_MS||to>now-SETTLEMENT_MS)
+      throw Error('Explicit forensic window outside bounded retention or settlement');
+    return [{name:'requested',from,to,status:'collect'}];
   }
-  throw Error('Telemetry query exceeded bounded page count');
+  return [
+    {name:'historical_5xx_2026_10_26',from:Date.parse('2026-10-26T15:40:00Z'),to:Date.parse('2026-10-26T16:15:00Z')},
+    {name:'current_recent',from:now-35*60000,to:now-5*60000},
+  ].map(window=>({...window,status:now-window.from>RETENTION_MS?'skipped':'collect',
+    ...(now-window.from>RETENTION_MS?{reason:'outside_configured_retention'}:{})}));
 }
 
 export async function runQuotaForensics({fetcher=fetch,env=process.env,now=Date.now()}={}){
   const token=env.CLOUDFLARE_EDGE_TOKEN;
   if(typeof token!=='string'||token.length<20)throw Error('Private provider access unavailable');
+  const windows=forensicWindows(now,env);
   const accountId=await account(fetcher,token);
-  const windows=[
-    {name:'historical_5xx_2026_10_26',from:Date.parse('2026-10-26T15:40:00Z'),to:Date.parse('2026-10-26T16:15:00Z')},
-    {name:'current_recent',from:now-35*60000,to:now-5*60000},
-  ];
   const summaries=[];
-  for(const {name,from,to} of windows){
-    if(now-to>3*86400000||to>now-2*60000)throw Error('Forensic window outside bounded retention/settlement');
-    const gateway=await query(fetcher,token,accountId,from,to,'gateway_request','pack1-gateway');
-    let handlers=await query(fetcher,token,accountId,from,to,'quota_handler','pack1-gateway');
-    let starts=await query(fetcher,token,accountId,from,to,'quota_handler_start','pack1-gateway');
+  for(const {name,from,to,status,reason} of windows){
+    if(status==='skipped'){summaries.push({window:name,status,reason});continue;}
+    const query=(event,service)=>collectQuotaEventRows({fetcher,token,accountId,from,to,event,service});
+    const gateway=await query('gateway_request','pack1-gateway');
+    let handlers=await query('quota_handler','pack1-gateway');
+    let starts=await query('quota_handler_start','pack1-gateway');
     // DO logs may be under a different provider service; if so, correlate
     // account-wide candidates by random trace, not by anonymous object tag.
-    if(!handlers.length&&gateway.some(r=>timing(payload(r,'gateway_request')?.quota_ms)>1000)){
-      handlers=await query(fetcher,token,accountId,from,to,'quota_handler',null);
-      starts=await query(fetcher,token,accountId,from,to,'quota_handler_start',null);
+    if(!handlers.rows.length&&gateway.rows.some(r=>timing(payload(r,'gateway_request')?.quota_ms)>1000)){
+      handlers=await query('quota_handler',null);
+      starts=await query('quota_handler_start',null);
     }
-    summaries.push({window:name,...summarizeQuotaStages(gateway,handlers,starts)});
+    summaries.push({window:name,status:'collected',from,to,
+      ...summarizeQuotaStages(gateway.rows,handlers.rows,starts.rows),
+      query_coverage:Object.fromEntries(Object.entries({gateway,handlers,starts}).map(([key,value])=>[key,{requests:value.requests,partitions:value.coverage}]))});
   }
-  return {version:1,source:'cloudflare_read_only_telemetry',windows:summaries};
+  return {version:2,source:'cloudflare_read_only_telemetry',windows:summaries,
+    limitation:'Verified query partitions do not establish complete log retention. Missing records are not proof of nonexecution, and gateway summaries are sampled.'};
+}
+export async function publishQuotaForensics({fetcher=fetch,env=process.env,now=Date.now()}={}){
+  if(env.GITHUB_REF!=='refs/heads/main'||env.GITHUB_REPOSITORY!=='killjoy00/mtg-ev-analyzer'||
+    !/^[1-9]\d{0,19}$/.test(env.GITHUB_RUN_ID||'')||!/^[1-9]\d{0,2}$/.test(env.GITHUB_RUN_ATTEMPT||'')||!/^[a-f0-9]{40}$/.test(env.GITHUB_SHA||''))throw Error('Reviewed main context required');
+  const store=privateQuotaStore({token:env.CLOUDFLARE_PRIVATE_REPORT_TOKEN,fetcher});
+  await store.verify();
+  const report=await runQuotaForensics({fetcher,env,now});
+  await store.save(report,{runId:env.GITHUB_RUN_ID,attempt:env.GITHUB_RUN_ATTEMPT,sha:env.GITHUB_SHA,now});
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
-  runQuotaForensics().then(report=>console.log('QUOTA_STAGE_FORENSICS '+JSON.stringify(report)))
+  publishQuotaForensics().then(()=>console.log('Private quota timing report saved and readback verified.'))
     .catch(()=>{console.error('Quota stage investigation unavailable; provider details withheld.');process.exitCode=1;});
 }
