@@ -1,5 +1,6 @@
 {
   "operation": "rebuild-v6",
-  "request_id": "pack1-v6-rebuild-20261029",
-  "reason": "Build the owner-approved v6 splash-colour model (frozen held-out test passed; research/V6-COLOUR-MODEL.md) as corpus v10 from the exact inputs of all 31 production v9 environments, and rescore every measured Traditional source with v6 graders under the rule in research/V6-RELEASE.md. Opens the generated rollout PR only; nothing is staged and serving does not change."
+  "request_id": "pack1-v6-rebuild-dependencies-20261030",
+  "replay_of": "pack1-v6-rebuild-20261029",
+  "reason": "Retry the approved 31-environment v6 rebuild after run 40983952861 stopped in preparation because the full test suite lacked Pillow. Install the same pinned renderer dependencies as normal CI in preparation and finalization. All tests, admission gates, source pins and approved windows remain unchanged. No environment build completed in the failed run. Opens the generated rollout PR only; nothing is staged and serving does not change."
 }

@@ -88,6 +88,8 @@ jobs:
           if-no-files-found: error
       - name: Hydrate historical replay shards for the normal repository suite
         run: bash scripts/r2_replay_shards.sh hydrate
+      - name: Install creator card renderer dependencies for the full test suite
+        run: python3 -m pip install --quiet 'Pillow==11.3.0' 'fonttools[woff]==4.60.1'
       - run: REQUIRE_REPLAY_SHARDS=1 npm test
       - name: Check Python fixtures against the future serving version before expensive work
         run: |
@@ -222,6 +224,8 @@ jobs:
         run: node scripts/v6-cube-reroll-admission.mjs
       - name: Generate post-build v5 to v6 implementation QA
         run: python scripts/v6_rebuild_qa.py --baseline generated/v6-production-baseline
+      - name: Install creator card renderer dependencies for the full test suite
+        run: python3 -m pip install --quiet 'Pillow==11.3.0' 'fonttools[woff]==4.60.1'
       - name: Validate corpus accounting, source trajectories, models and Traditional gates
         run: |
           python scripts/audit_datasets.py --fail-on-error
