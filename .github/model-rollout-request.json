@@ -1,6 +1,7 @@
 {
   "operation": "rebuild-v6",
-  "request_id": "pack1-v6-finalize-reference-repair-20261030",
+  "request_id": "pack1-v6-finalize-post-admission-fixtures-20261030",
+  "replay_of": "pack1-v6-finalize-reference-repair-20261030",
   "reuse_run_id": "40987407495",
-  "reason": "Finalize the approved v6 candidate using all 31 successful environment builds from run 40987407495, subject to unchanged build-identity and provenance checks. Repair the finalizer's historical-reference handling: refresh current-corpus fixtures without changing accepted scoring expectations, pin complete inputs for frozen puzzle reviews, and replace the cross-pack path-influence ordering assertion with controlled fixed-evidence commitment tests. Keep real-data path diagnostics and the remaining invariants. Model code, source pins, Traditional admission thresholds, approved windows and release protections are unchanged. Opens the generated rollout PR only; nothing is staged and serving does not change."
+  "reason": "Retry guarded finalization after run 41065249302 passed preparation and 1740 JavaScript tests but found one Powered Cube fixture-provenance mismatch. Generate current-corpus fixtures after Cube admission has finalized corpus membership, preserving the historical scoring golden bytes. Reuse the same 31 successful environment builds from run 40987407495 only after the unchanged identity and provenance checks pass. Model code, Python build inputs, admission gates and release protections remain unchanged. Opens the generated rollout PR only; nothing is staged and serving does not change."
 }
