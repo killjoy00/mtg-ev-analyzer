@@ -1,6 +1,6 @@
 {
   "operation": "rebuild-v6",
-  "request_id": "pack1-v6-rebuild-dependencies-20261030",
-  "replay_of": "pack1-v6-rebuild-20261029",
-  "reason": "Retry the approved 31-environment v6 rebuild after run 40983952861 stopped in preparation because the full test suite lacked Pillow. Install the same pinned renderer dependencies as normal CI in preparation and finalization. All tests, admission gates, source pins and approved windows remain unchanged. No environment build completed in the failed run. Opens the generated rollout PR only; nothing is staged and serving does not change."
+  "request_id": "pack1-v6-finalize-reference-repair-20261030",
+  "reuse_run_id": "40987407495",
+  "reason": "Finalize the approved v6 candidate using all 31 successful environment builds from run 40987407495, subject to unchanged build-identity and provenance checks. Repair the finalizer's historical-reference handling: refresh current-corpus fixtures without changing accepted scoring expectations, pin complete inputs for frozen puzzle reviews, and replace the cross-pack path-influence ordering assertion with controlled fixed-evidence commitment tests. Keep real-data path diagnostics and the remaining invariants. Model code, source pins, Traditional admission thresholds, approved windows and release protections are unchanged. Opens the generated rollout PR only; nothing is staged and serving does not change."
 }

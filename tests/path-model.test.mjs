@@ -63,6 +63,43 @@ test('counterfactual pool moves support toward cards strong players pair with th
   assert.ok(pathTendency(toyModel, 'Y', 2, { 'Blue Start': 1 }) > pathTendency(toyModel, 'Y', 2, { 'Red Start': 1 }));
 });
 
+test('path commitment grows and saturates with fixed candidate evidence and pool composition', () => {
+  const candidates = [
+    { id: 'x', name: 'X', model_probability: 0.5 },
+    { id: 'y', name: 'Y', model_probability: 0.5 },
+  ];
+  // Hold the pack, pick-specific statistics and pair evidence fixed. Only the
+  // number of prior picks in each opposing path changes, up to commitment.
+  const atSize = size => conditionCandidatesForPath(candidates, {
+    pickNumber: 2,
+    historicalPool: { 'Red Start': size },
+    userPool: { 'Blue Start': size },
+    pathModel: toyModel,
+  });
+  const results = [1, 4, 8, 12].map(atSize);
+  assert.ok(results[0][1].model_probability > 0.5);
+  for (let i = 1; i < 3; i += 1) {
+    assert.ok(results[i][1].model_probability > results[i - 1][1].model_probability, 'supported Blue choice must gain with commitment');
+    assert.ok(results[i][0].model_probability < results[i - 1][0].model_probability, 'opposing Red choice must lose with commitment');
+  }
+  assert.deepEqual(results[3], results[2], 'commitment saturates at eight prior picks');
+  for (const result of results) {
+    assert.ok(result.every(card => Number.isFinite(card.model_probability) && card.model_probability >= 0));
+    assert.ok(Math.abs(result.reduce((sum, card) => sum + card.model_probability, 0) - 1) < 1e-9);
+  }
+});
+
+test('a forced single-card choice preserves probability even with strong path evidence', () => {
+  const [only] = conditionCandidatesForPath([{ id: 'x', name: 'X', model_probability: 1 }], {
+    pickNumber: 14,
+    historicalPool: { 'Red Start': 8 },
+    userPool: { 'Blue Start': 8 },
+    pathModel: toyModel,
+  });
+  assert.ok(only.path_adjustment < 1, 'pair evidence still penalizes the opposing path');
+  assert.equal(only.model_probability, 1, 'there is no alternative to receive redistributed support');
+});
+
 test('worker Full Pack grading follows the player path instead of reusing the historical path', () => {
   const replay = {
     picks: [

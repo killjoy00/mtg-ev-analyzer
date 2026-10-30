@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "corpus_version": "elite-trophy-colour-stage-v9",
+  "captured_from_commit": "5221048b6dcbc46ac3b7d189235db0d7bb50e937",
+  "sets": {
+    "blb": {
+      "corpus": {
+        "path": "blb/corpus.json.gz",
+        "sha256": "682743e1c1097769e9b7f18c205ee2bf2bd3cb72b2e4dcc4ca3ee5d19f886c18"
+      },
+      "strength": {
+        "path": "blb/strength.csv",
+        "sha256": "8f1153bc4f5aadcdb8fe291445ec410abe7cabbfeaf16176bc8e9a69a6172c75"
+      },
+      "trophy_decks": {
+        "path": "blb/trophy-decks.mjs",
+        "sha256": "e8a484c03c332dab9ced5f6a860d3636d173c0bd1861ce187bd9a426df12f4d7"
+      }
+    },
+    "ecl": {
+      "corpus": {
+        "path": "ecl/corpus.json.gz",
+        "sha256": "fdc7605592036296c8651ac72bdeecaf60d583614c27da3f1518dc92fca3604c"
+      },
+      "strength": {
+        "path": "ecl/strength.csv",
+        "sha256": "85c6edc0e24180e43a8a04486a5d83dc74d7a247f5ab549f8450163bd7b3c054"
+      },
+      "trophy_decks": {
+        "path": "ecl/trophy-decks.mjs",
+        "sha256": "9f8cf4e3fc7548edf5fda083f33a35f5b8e7aacb22e96ddb0d31ca33e22e284a"
+      }
+    },
+    "hob": {
+      "corpus": {
+        "path": "hob/corpus.json.gz",
+        "sha256": "39f11f4997137d9037f5bf47bd3a9f18dbe00b8780b9846f8cc1cdab45437aaf"
+      },
+      "strength": {
+        "path": "hob/strength.csv",
+        "sha256": "429bbb1de5fa2eceb11b239efa0b43d82568dcafa16aee73f4d8e027c0fb156a"
+      },
+      "trophy_decks": {
+        "path": "hob/trophy-decks.mjs",
+        "sha256": "637365c3af3ebbd74f892933f6a985373310df2d6587bff641cc9b103d2d34b5"
+      }
+    },
+    "msh": {
+      "corpus": {
+        "path": "msh/corpus.json.gz",
+        "sha256": "2538f8342abb513d52e2936ee503ecfbfe9e31e2517a77ccefbacbb520076012"
+      },
+      "strength": {
+        "path": "msh/strength.csv",
+        "sha256": "755fc0ae9881d522cd55525e725388d7eb9691175788c8124773da00b29e4805"
+      },
+      "trophy_decks": {
+        "path": "msh/trophy-decks.mjs",
+        "sha256": "5edab7bcc3a803d0af8c5d931b1f29fcc0257dfc316337363b407c3d9f652de7"
+      }
+    },
+    "sos": {
+      "corpus": {
+        "path": "sos/corpus.json.gz",
+        "sha256": "dd6f9e6b3360864fc6092bd2bdddb022a89d2328378013c34c4eb21b866b16e7"
+      },
+      "strength": {
+        "path": "sos/strength.csv",
+        "sha256": "23d0068327e67f6213a29ccf34d973205862a124b9ef9da7654d5babd9386c95"
+      },
+      "trophy_decks": {
+        "path": "sos/trophy-decks.mjs",
+        "sha256": "78b4926b89f4b9023b1108731eecf92c751bf22dd853142c414b10f87c7752c9"
+      }
+    }
+  }
+}

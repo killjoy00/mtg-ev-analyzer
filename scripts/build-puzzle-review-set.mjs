@@ -23,11 +23,13 @@ export const RULE=Object.freeze({
 });
 export const REVIEWS=Object.freeze({
   'puzzle-review-v1':Object.freeze({
+    input_snapshot:'v9',
     version:'puzzle-review-v1',seed:'pack-one-puzzle-review-2026-10-26',sets:['hob','msh','sos'],
     // Every pick appears once, then the even picks again: 12 pairs, 4 per set.
     pairPicks:[1,2,3,4,5,6,7,8,2,4,6,8],rule:RULE,
   }),
   'puzzle-review-v2':Object.freeze({
+    input_snapshot:'v9',
     version:'puzzle-review-v2',seed:'pack-one-puzzle-review-v2-2026-10-26',sets:['hob','msh','sos','blb','ecl'],
     // v1 repeated the even picks; v2 repeats picks 5 and 7. 10 pairs, 2 per set.
     pairPicks:[1,2,3,4,5,6,7,8,5,7],rule:Object.freeze({...RULE,no_land_answer_from_pick:5}),
@@ -36,6 +38,7 @@ export const REVIEWS=Object.freeze({
     excludeReviews:['puzzle-review-v1'],
   }),
   'puzzle-review-v3':Object.freeze({
+    input_snapshot:'v9',
     version:'puzzle-review-v3',seed:'pack-one-puzzle-review-v3-2026-10-26',sets:['sos','blb','ecl','hob','msh'],
     // Picks 1-8, then 3 and 6; set order rotated so no set/pick repeats v2's.
     pairPicks:[1,2,3,4,5,6,7,8,3,6],
@@ -153,18 +156,36 @@ function currentDraw(pool,pick,random) {
   return choices[Math.floor(random()*choices.length)];
 }
 
-const loaded=new Map();
-function loadSet(setId) {
-  if(loaded.has(setId))return loaded.get(setId);
-  const corpusBytes=readFileSync(path(`corpus/draft-run/${setId}.json.gz`));
-  const strengthBytes=readFileSync(path(`research/card-strength-v1-results/strengths-${setId.toUpperCase()}.csv`));
-  const deckModule=readFileSync(path(`corpus/trophy-decks/${setId}.mjs`),'utf8');
-  const encoded=deckModule.match(/export const encoded="([^"]+)"/)[1];
-  const catalog=decodeTrophyDeckCatalog(encoded);
-  const set={setId,puzzles:JSON.parse(gunzipSync(corpusBytes)),strength:strengthTable(strengthBytes.toString('utf8')),catalog,
-    hashes:{corpus:sha256(corpusBytes),strength:sha256(strengthBytes),trophy_decks:sha256(Buffer.from(deckModule))}};
-  loaded.set(setId,set);
-  return set;
+// Rated reviews keep the entire original selection pool, not just the selected
+// puzzles. Never substitute today's corpus or silently regenerate rated output.
+export function createReviewInputLoader(snapshot,{read=readFileSync}={}) {
+  if(!/^v[0-9]+$/.test(snapshot||''))throw Error('A pinned review input snapshot is required.');
+  const root=`research/puzzle-review-inputs/${snapshot}`;
+  const manifest=JSON.parse(read(path(`${root}/manifest.json`),'utf8'));
+  if(manifest.schema_version!==1)throw Error('Unsupported review input manifest.');
+  const loaded=new Map();
+  return setId=>{
+    if(loaded.has(setId))return loaded.get(setId);
+    const pins=manifest.sets[setId];
+    if(!pins)throw Error(`Missing frozen review inputs: ${snapshot}/${setId}`);
+    const bytes={},hashes={};
+    for(const kind of ['corpus','strength','trophy_decks']) {
+      bytes[kind]=read(path(`${root}/${pins[kind].path}`));
+      hashes[kind]=sha256(bytes[kind]);
+      if(hashes[kind]!==pins[kind].sha256)throw Error(`Frozen review input checksum mismatch: ${snapshot}/${setId}/${kind}`);
+    }
+    const encoded=bytes.trophy_decks.toString('utf8').match(/export const encoded="([^"]+)"/)[1];
+    const set={setId,puzzles:JSON.parse(gunzipSync(bytes.corpus)),strength:strengthTable(bytes.strength.toString('utf8')),
+      catalog:decodeTrophyDeckCatalog(encoded),hashes};
+    loaded.set(setId,set);
+    return set;
+  };
+}
+const loaders=new Map();
+export function reviewInputLoader(version) {
+  const snapshot=REVIEWS[version]?.input_snapshot;
+  if(!loaders.has(snapshot))loaders.set(snapshot,createReviewInputLoader(snapshot));
+  return loaders.get(snapshot);
 }
 
 function mainDeckFor(catalog,source) {
@@ -180,18 +201,19 @@ const cardView=({name,mana_cost,image_url,type_line,rarity,id,model_probability}
     ...(model_probability===undefined?{}:{model_probability})});
 
 // Source drafts a review served, so a later review never repeats them.
-export function reviewSources(version,{load=loadSet,setNames={}}={}) {
+export function reviewSources(version,{load,setNames={}}={}) {
   const {key}=buildReviewSet(version,{load,setNames});
+  const loadInputs=load||reviewInputLoader(version);
   const ids=new Set(Object.values(key.items).map(item=>item.puzzle_id));
-  return new Set(REVIEWS[version].sets.flatMap(id=>load(id).puzzles.filter(p=>ids.has(p.puzzle_id)).map(p=>p.source_draft_hash)));
+  return new Set(REVIEWS[version].sets.flatMap(id=>loadInputs(id).puzzles.filter(p=>ids.has(p.puzzle_id)).map(p=>p.source_draft_hash)));
 }
 
-export function buildReviewSet(version=LATEST_REVIEW,{load=loadSet,setNames={}}={}) {
+export function buildReviewSet(version=LATEST_REVIEW,{load,setNames={}}={}) {
   const config=REVIEWS[version];
   if(!config)throw Error(`Unknown review version ${version}.`);
   const {seed,rule}=config;
   const random=seededRandom(seed);
-  const sets=config.sets.map(load),bySet=new Map(sets.map(s=>[s.setId,s]));
+  const sets=config.sets.map(load||reviewInputLoader(version)),bySet=new Map(sets.map(s=>[s.setId,s]));
   const excluded=new Set((config.excludeReviews||[]).flatMap(v=>[...reviewSources(v,{load,setNames})]));
   const used=new Set(),items=[],key={},pairs=[],probes=[];
   const blocked=source=>used.has(source)||excluded.has(source);

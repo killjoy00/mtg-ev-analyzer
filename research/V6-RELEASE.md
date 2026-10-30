@@ -33,6 +33,14 @@ An earlier draft let failing sets fall back to a narrower window. The owner reje
 - Migration 0069 applies the same cross-version membership rule to both cache construction and exact-equivalence checking. Without the latter, activation rejects the still-valid v9 cache instead of carrying it to the new revision. The schema baseline accepts the measured definitions before and after the migration.
 - Preservation baselines contain private record fingerprints and activity counts. Release artifacts carry only authenticated encrypted baselines; logs report sanitized success indicators. The trusted workflow derives the encryption key from its existing `NEON_API_KEY` with a release-specific HKDF context and random salt. No new credential is created. Keep that credential available throughout the rollback window; rotating it requires an explicit evidence re-encryption plan before the old credential is discarded. Decryption fails closed on a wrong credential or modified artifact.
 
+## Finalization reference repair
+
+Run 40987407495 completed all 31 environment builds but stopped during finalization with six JavaScript test failures. Five were reference lifecycle errors: the current-corpus fixture inventory still described v9, and four frozen puzzle-review checks read the mutable live corpus. Finalization now refreshes the current-corpus fixtures and includes them in the rollout PR, while requiring the accepted historical scoring golden file to stay byte-identical. Rated puzzle reviews retain their complete original v9 selection inputs, verified against the hashes in their unchanged review keys.
+
+The remaining failure compared mean counterfactual probability movement across different early and late packs. In the v6 replay diagnostic, early movement was 2.57 percentage points and late movement was 2.52; 1,202 of the 7,500 late decisions had only one choice. The late multi-choice mean was 3.00. That aggregate ordering is not a model invariant: available choices, stored support and the simulated path all change. Controlled tests now hold candidate evidence and pool composition fixed, require conditioning to strengthen with commitment and saturate, and verify that a forced choice has probability one despite path evidence. Historical-path identity, random-path margins, leader response and multiplier bounds remain enforced on real replay data; early/late and per-pick movement remain diagnostics.
+
+The repair changes no Python build inputs, model implementation, Traditional admission thresholds or release protections. The reviewed finalize request reuses run 40987407495 only after the existing identity and successful-environment checks pass.
+
 ## Sequence
 
 Each step is a reviewed `.github/model-rollout-request.json` change on main.
