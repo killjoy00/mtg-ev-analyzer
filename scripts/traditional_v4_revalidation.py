@@ -54,14 +54,14 @@ from import_all_trophies import (
 )
 from traditional_puzzles import THRESHOLDS, compare, record
 from set_policy import corpus_version
-from model_training import VERSIONS
+from model_training import VERSIONS, colour_policy
 from run_import_all_trophies import resilient_request
 from fetch_card_metadata import compact_card, aliases
 
 EVENTS = ("PremierDraft", "TradDraft")
 CUBE = "powered-cube"
 SETS = (
-    "hob", "msh", "sos", "eoe", "fin", "tdm", "dft", "fdn", "dsk", "blb",
+    "msh", "sos", "eoe", "fin", "tdm", "dft", "fdn", "dsk", "blb",
     "mh3", "otj", "mkm", "ktk", "lci", "woe", "ltr", "mom", "one", "bro",
     "dmu", "snc", "neo", "hbg", "sir", "pio", CUBE,
 )
@@ -72,6 +72,7 @@ EXCLUSIONS = {
     "mid": "No public TradDraft draft archive in the original Phase 1 source study.",
     "vow": "No public TradDraft draft archive in the original Phase 1 source study.",
     "stx": "Traditional archive lacked the current skill-bucket evidence required by the frozen study and the environment is retired.",
+    "hob": "17Lands replaced the pinned v8 HOB Premier archive on 2026-10-01 and the original bytes are not recoverable. HOB was never admitted to Traditional, and v6 rescoring uses current inputs.",
 }
 PARENT = VERSIONS['v4']['corpus_version']
 MODEL = 'strong-player-colour-stage-v4'
@@ -309,9 +310,14 @@ def build_v4_models(sid: str, draft: Path, game: Path, pin: dict):
     )
     if training_picks != int(pin["training_picks"]):
         raise ValueError(f"{sid}: production training pick count changed")
-    fits = build_colour_tables_by_fold(game, colour_examples, fold_training, sid)
+    # Graders follow the pinned Premier model's colour policy, so a v6 parent
+    # scores Traditional decisions exactly as it scores its own puzzles.
+    policy = colour_policy(pin.get("model_version", MODEL))
+    fits = build_colour_tables_by_fold(game, colour_examples, fold_training, sid,
+                                       policy["deck_colours"])
     models = [
-        OutOfFoldModel(fold.counts, CountStore.empty(), fits[fold.fold])
+        OutOfFoldModel(fold.counts, CountStore.empty(), fits[fold.fold],
+                       policy["zero_rates_are_data"])
         for fold in fold_training
     ]
     if len(models) != 5:
@@ -474,11 +480,29 @@ def gate_failure_reasons(report: dict):
     return reasons
 
 
-def measure(sid: str, directory: Path, frozen: Path):
-    if sid not in SETS:
-        raise ValueError("Environment was not in the frozen Phase 2 testable scope")
+def measure(sid: str, directory: Path, frozen: Path, *, premier_pin=None, trad_pin=None, component=None):
+    # Historical callers keep their exact frozen scope and identities. A fresh
+    # measurement supplies a separately verified Premier pin (whose own puzzles
+    # under frozen/<sid> prove grader parity) and a pinned Traditional source.
+    if premier_pin is None:
+        if sid not in SETS:
+            raise ValueError("Environment was not in the frozen Phase 2 testable scope")
+        pin = frozen_manifest(frozen, sid)
+        parent, model_version, component = PARENT, MODEL, COMPONENT
+        parity_key = "v8_parity_picks"
+    else:
+        from model_training import UNCAPPED_MODELS, validate_training_manifest
+        if sid == CUBE or premier_pin.get("id") != sid or not trad_pin or not component:
+            raise ValueError("Fresh measurement requires an exact regular set, Traditional pin and component")
+        if premier_pin.get("model_version") not in UNCAPPED_MODELS:
+            raise ValueError("Fresh measurement requires an uncapped Premier model")
+        validate_training_manifest(premier_pin, premier_pin["model_version"])
+        if premier_pin.get("corpus_version") != corpus_version():
+            raise ValueError("Fresh evidence must match the declared parent corpus")
+        pin = premier_pin
+        parent, model_version = pin["corpus_version"], pin["model_version"]
+        parity_key = "parity_picks"
     directory.mkdir(parents=True, exist_ok=True)
-    pin = frozen_manifest(frozen, sid)
     draft = directory / "premier.csv.gz"
     game = directory / "premier-game.csv.gz"
     premier_source = pinned_archive(pin["source_archive"], draft)
@@ -500,6 +524,8 @@ def measure(sid: str, directory: Path, frozen: Path):
     trad_source = archive(
         f"{BASE}/draft_data/draft_data_public.{expansion(sid)}.TradDraft.csv.gz", trad
     )
+    if trad_pin and any(trad_source.get(key) != trad_pin.get(key) for key in ("url", "sha256", "compressed_bytes")):
+        raise ValueError(f"{sid}: Traditional archive differs from its pin")
     if sid == CUBE:
         groups[EVENTS[1]], trad_cohort = cube_traditional_cohort(trad, include_sources=True)
     else:
@@ -604,16 +630,16 @@ def measure(sid: str, directory: Path, frozen: Path):
                 if not first <= pick["pick_number"] <= last:
                     continue
                 pid = hashlib.sha256(
-                    f"{COMPONENT}|{sid}|{event}|{did}|{pick['pick_number']}".encode()
+                    f"{component}|{sid}|{event}|{did}|{pick['pick_number']}".encode()
                 ).hexdigest()[:32]
                 puzzles.append({
                     "puzzle_id": pid,
                     "set_id": sid,
                     "source_draft_hash": source_hash,
                     "source_fingerprint": fingerprint,
-                    "corpus_version": COMPONENT,
-                    "parent_corpus_version": PARENT,
-                    "model_version": MODEL,
+                    "corpus_version": component,
+                    "parent_corpus_version": parent,
+                    "model_version": model_version,
                     "model_input_signature": pin["input_signature"],
                     "model_source_event": "PremierDraft",
                     "source_event_type": event,
@@ -650,12 +676,14 @@ def measure(sid: str, directory: Path, frozen: Path):
 
     tags = {} if sid == CUBE else metadata_for_set(sid, built["models"][0])
     report = {
-        "schema": 3,
+        "schema": 3 if premier_pin is None else "fresh-traditional-v1",
         "set": sid,
-        "parent_corpus_version": PARENT,
-        "model_version": MODEL,
+        "parent_corpus_version": parent,
+        "model_version": model_version,
         "model_source_event": "PremierDraft",
         "traditional_used_for_training": False,
+        **({"training_mode": pin["training_mode"], "training_cap": pin["training_cap"],
+            "qualified_training_drafts": pin["qualified_training_drafts"]} if premier_pin is not None else {}),
         "source_hashes": {
             EVENTS[0]: {"draft": premier_source, "game": game_source},
             EVENTS[1]: {"draft": trad_source},
@@ -664,7 +692,7 @@ def measure(sid: str, directory: Path, frozen: Path):
         "production_manifest_sha256": pin["_manifest_sha256"],
         "production_puzzle_sha256": pin["puzzle_file_sha256"],
         "fold_training_ids_sha256": [fit["training_ids_sha256"] for fit in built["fits"]],
-        "v8_parity_picks": parity,
+        parity_key: parity,
         "training_drafts": len(built["training"]),
         "training_picks": built["training_picks"],
         "traditional_cohort": trad_cohort,
@@ -755,9 +783,9 @@ def measure(sid: str, directory: Path, frozen: Path):
     )
     atomic_json(directory / "manifest.json", {
         "id": sid,
-        "component_version": COMPONENT,
-        "parent_corpus_version": PARENT,
-        "model_version": MODEL,
+        "component_version": component,
+        "parent_corpus_version": parent,
+        "model_version": model_version,
         "model_input_signature": pin["input_signature"],
         "model_source_event": "PremierDraft",
         "source_event_type": "TradDraft",
@@ -768,7 +796,7 @@ def measure(sid: str, directory: Path, frozen: Path):
         "puzzle_file_sha256": digest(directory / "puzzles.jsonl.gz"),
         "ledger_file_sha256": digest(directory / "trophies.jsonl.gz"),
         "puzzles": len(puzzles),
-        "v8_parity_picks": parity,
+        parity_key: parity,
         "fold_training_ids_sha256": report["fold_training_ids_sha256"],
         "cube_snapshot": snapshot,
     })
@@ -777,8 +805,8 @@ def measure(sid: str, directory: Path, frozen: Path):
         path.unlink(missing_ok=True)
     print(json.dumps({
         "set": sid,
-        "model": MODEL,
-        "v8_parity_picks": parity,
+        "model": model_version,
+        parity_key: parity,
         "traditional_trajectories": trad_cohort["complete_trajectories"],
         "puzzles": len(puzzles),
         "pass": report["pass"],

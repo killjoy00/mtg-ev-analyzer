@@ -231,11 +231,11 @@ class FullTrophyTests(unittest.TestCase):
     def test_training_cap_default_matches_the_published_constant(self):
         import inspect
         from import_all_trophies import TRAINING_DRAFT_CAP, CONTEXT_MODEL_VERSION, build_set
-        from model_training import V4_MODEL, V5_MODEL
-        # The default follows the explicitly versioned serving model. A v9
-        # finalizer must remain uncapped while historical v8 remains at 5,000.
-        self.assertIn(CONTEXT_MODEL_VERSION, (V4_MODEL, V5_MODEL))
-        self.assertEqual(TRAINING_DRAFT_CAP, None if CONTEXT_MODEL_VERSION == V5_MODEL else 5000)
+        from model_training import V4_MODEL, UNCAPPED_MODELS
+        # The default follows the explicitly versioned serving model. v9 and
+        # v10 finalizers must remain uncapped while historical v8 remains at 5,000.
+        self.assertIn(CONTEXT_MODEL_VERSION, (V4_MODEL, *UNCAPPED_MODELS))
+        self.assertEqual(TRAINING_DRAFT_CAP, None if CONTEXT_MODEL_VERSION in UNCAPPED_MODELS else 5000)
         self.assertEqual(inspect.signature(build_set).parameters['training_cap'].default,
                          TRAINING_DRAFT_CAP)
 

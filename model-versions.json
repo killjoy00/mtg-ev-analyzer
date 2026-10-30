@@ -1,4 +1,5 @@
 {
   "v4": {"model_version": "strong-player-colour-stage-v4", "corpus_version": "elite-trophy-colour-stage-v8", "training_mode": "stable-hash-capped", "training_cap": 5000},
-  "v5": {"model_version": "strong-player-colour-stage-v5", "corpus_version": "elite-trophy-colour-stage-v9", "training_mode": "all-qualified", "training_cap": null}
+  "v5": {"model_version": "strong-player-colour-stage-v5", "corpus_version": "elite-trophy-colour-stage-v9", "training_mode": "all-qualified", "training_cap": null},
+  "v6": {"model_version": "strong-player-colour-stage-v6", "corpus_version": "elite-trophy-colour-stage-v10", "training_mode": "all-qualified", "training_cap": null, "deck_colours": "main+splash", "zero_rates_are_data": true}
 }

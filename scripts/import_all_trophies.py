@@ -30,15 +30,16 @@ from build_replays import (CountStore, OutOfFoldModel, DraftSkill, MODEL_VERSION
 from backfill_legacy_sets import arena_rank_proxy, arena_rank_tier, _game_order
 from fetch_card_metadata import aliases, fetch_named, metadata_for_alias
 from set_policy import corpus_version, supported_set, require_supported_set
-from model_training import V4_MODEL, V5_MODEL, ALL_QUALIFIED, current_model_version, training_cap as resolve_training_cap, validate_training_manifest
+from model_training import V4_MODEL, V5_MODEL, UNCAPPED_MODELS, ALL_QUALIFIED, colour_policy, current_model_version, training_cap as resolve_training_cap, validate_training_manifest
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = corpus_version()
 CONTEXT_MODEL_VERSION = current_model_version()
+COLOUR_POLICY = colour_policy(CONTEXT_MODEL_VERSION)
 IMPORT_VERSION = 'all-premier-trophies-v1'
-# Frozen v4 keeps its historical sample. The separately versioned v5 corpus
-# always uses the complete unchanged behavior-training cohort.
-TRAINING_DRAFT_CAP = None if CONTEXT_MODEL_VERSION == V5_MODEL else 5000
+# Frozen v4 keeps its historical sample. The separately versioned v5 and v6
+# corpora always use the complete unchanged behavior-training cohort.
+TRAINING_DRAFT_CAP = None if CONTEXT_MODEL_VERSION in UNCAPPED_MODELS else 5000
 SOURCE_PAGE = 'https://www.17lands.com/public_datasets'
 BASE = 'https://17lands-public.s3.amazonaws.com/analysis_data'
 USER_AGENT = 'PackOne-Trophy-Import/2.0 (https://github.com/killjoy00/mtg-ev-analyzer)'
@@ -561,8 +562,8 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
         training, calculated, _ = select_strong_drafts(training_skills,100,.15,training_cap)
         cutoff = None if legacy else max(.6,calculated,manifest.get('cohort',{}).get('win_rate_cutoff',0))
     qualified_training, _, _ = select_strong_drafts(training_skills,100,.15,None)
-    if CONTEXT_MODEL_VERSION == V5_MODEL and set(training) != set(qualified_training):
-        raise ValueError(f'{sid}: v5 omitted qualified behavior-training evidence')
+    if CONTEXT_MODEL_VERSION in UNCAPPED_MODELS and set(training) != set(qualified_training):
+        raise ValueError(f'{sid}: {CONTEXT_MODEL_VERSION} omitted qualified behavior-training evidence')
     if source_pin and not source_pin.get('source_refresh_authorized') and cutoff != source_pin.get('win_rate_cutoff'):
         raise ValueError(f'{sid}: pinned qualification cutoff changed')
     qualified, rejected = eligible_trophies(drafts, cutoff or .6, legacy, conflicts)
@@ -599,7 +600,8 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
         fold_training, output, invalid, training_picks, colour_examples = collect_isolated(
             path, set(training), set(qualified), header)
         deck_fits = build_colour_tables_by_fold(
-            directory/'games.csv.gz', colour_examples, fold_training, sid)
+            directory/'games.csv.gz', colour_examples, fold_training, sid,
+            COLOUR_POLICY['deck_colours'])
         all_names = {name for examples in output.values() for p in examples for name in list(p.candidates)+list(p.pool)}
         preferred_set = None if sid == 'powered-cube' else sid
         known = resolve_images(all_names, metadata(root, sid), directory/'images.json', preferred_set)
@@ -609,7 +611,7 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
             fold=stable_fold(did,5); fold_data=fold_training[fold]
             if did in training and (did not in fold_data.held_out_ids or did in fold_data.training_ids):
                 raise AssertionError(f'{sid}/{did}: held-out draft reached its training fold')
-            model=OutOfFoldModel(fold_data.counts,CountStore.empty(),deck_fits[fold])
+            model=OutOfFoldModel(fold_data.counts,CountStore.empty(),deck_fits[fold],COLOUR_POLICY['zero_rates_are_data'])
             rendered=render_replay(did,valid,model,1,1,known)['picks']
             fingerprint=hashlib.sha256(encoded([{'pick':p.raw_pick_number,'choice':p.historical_pick,'pack':p.candidates,'pool':p.pool} for p in valid])).hexdigest()
             included=0; new=0; skipped=Counter()
@@ -626,7 +628,7 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
                 absent=[c['name'] for c in cards+history if not c.get('image_url','').startswith('https://')]
                 if absent: missing_names.update(absent);skipped['image_unresolved']+=1;continue
                 if len({c['id'] for c in cards})!=len(cards): skipped['card_identity_collision']+=1;continue
-                additions.append({'puzzle_id':pid,'set_id':sid,'source_snapshot_id':snapshot_id,'source_draft_hash':source_hash,'source_fingerprint':fingerprint,'corpus_version':VERSION,**({'model_version':CONTEXT_MODEL_VERSION} if CONTEXT_MODEL_VERSION==V5_MODEL else {}),'source_evidence':'official_archive_trajectory','skill_evidence':'earliest_game_arena_rank' if legacy else 'win_rate_bucket','player_rank_tier':d.get('rank') if legacy else None,'pick_number':n,'historical_pick_id':p['historical_pick_id'],'prior_picks':history,'candidates':cards,'event_match_wins':7,'player_games_lower_bound':d['games'],'player_win_rate_bucket':None if legacy else d['rate']})
+                additions.append({'puzzle_id':pid,'set_id':sid,'source_snapshot_id':snapshot_id,'source_draft_hash':source_hash,'source_fingerprint':fingerprint,'corpus_version':VERSION,**({'model_version':CONTEXT_MODEL_VERSION} if CONTEXT_MODEL_VERSION in UNCAPPED_MODELS else {}),'source_evidence':'official_archive_trajectory','skill_evidence':'earliest_game_arena_rank' if legacy else 'win_rate_bucket','player_rank_tier':d.get('rank') if legacy else None,'pick_number':n,'historical_pick_id':p['historical_pick_id'],'prior_picks':history,'candidates':cards,'event_match_wins':7,'player_games_lower_bound':d['games'],'player_win_rate_bucket':None if legacy else d['rate']})
                 included+=1;new+=1
             status='included' if included else 'excluded'
             reason=why or ('invalid_source_pick' if invalid[did] else None)
@@ -646,8 +648,8 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
     write_gzip_jsonl(puzzle_file,sorted(additions,key=lambda p:p['puzzle_id']));write_gzip_jsonl(ledger_file,sorted(dispositions,key=lambda d:d['draft_id']))
     info={'id':sid,'import_version':IMPORT_VERSION,'corpus_version':VERSION,'source_snapshot_id':snapshot_id,'schema_version':schema_version,'input_signature':signature,'decision_semantics_sha256':semantics_sha256,'source_archive':source,'skill_source':skill_source,'schema_verified':True,'source_event_type':'PremierDraft','qualified_drafts':sum(1 for did,d in drafts.items() if did not in conflicts and (d.get('games') or 0)>=100 and (d.get('rank') in ('diamond','mythic') if legacy else d.get('rate') is not None and d['rate'] >= (cutoff or .6))),'trophy_outcomes':dict(Counter(f"7-{d.get('losses') if d.get('losses') is not None else 'unknown'}" for d in drafts.values() if d['wins']==7)),'source_rows':source_rows,'source_drafts':len(drafts),'source_trophies':trophy_count,'qualified_trophies':len(qualified),'included_trophies':sum(d['status']=='included' for d in dispositions),'excluded_trophies':sum(d['status']=='excluded' for d in dispositions),'exclusion_reasons':dict(reasons),'missing_image_names':sorted(missing_names),'existing_puzzles_preserved':len(retained),'additional_puzzles':len(additions),'total_puzzles':len(retained)+len(additions),'training_drafts':len(training),'training_cap':training_cap,'training_picks':training_picks,'model_version':CONTEXT_MODEL_VERSION,'holdout':'5-fold by draft_id','training_cohort':'broader elite players, independent of trophy outcome','win_rate_cutoff':cutoff,'minimum_games':100,'puzzle_file':puzzle_file.name,'puzzle_file_sha256':digest(puzzle_file),'ledger_file':ledger_file.name,'ledger_file_sha256':digest(ledger_file),'seconds':round(time.monotonic()-started)}
     info.update(qualified_training_drafts=len(qualified_training), training_mode=ALL_QUALIFIED if training_cap is None else 'stable-hash-capped')
-    if CONTEXT_MODEL_VERSION == V5_MODEL:
-        validate_training_manifest(info)
+    if CONTEXT_MODEL_VERSION in UNCAPPED_MODELS:
+        validate_training_manifest(info, CONTEXT_MODEL_VERSION)
         if not legacy and info['training_drafts'] != info['qualified_drafts']:
             raise ValueError(f'{sid}: qualified and trained populations differ')
     atomic_json(completed,info);print(json.dumps(info),flush=True);return info

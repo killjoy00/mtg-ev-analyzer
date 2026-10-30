@@ -72,7 +72,8 @@
     "0065_traditional_p1p6_component.sql",
     "0066_removal_aware_serving_carry.sql",
     "0067_restore_serving_invalidation.sql",
-    "0068_puzzle_selection_features.sql"
+    "0068_puzzle_selection_features.sql",
+    "0069_v6_colour_components.sql"
   ],
   "same_prefix_order": {
     "0037": [
@@ -152,6 +153,12 @@
         "0065_traditional_p1p6_component.sql"
       ]
     },
+    "release-v6-corpus": {
+      "workflow": ".github/workflows/release-v6-corpus.yml",
+      "migrations": [
+        "0069_v6_colour_components.sql"
+      ]
+    },
     "secure-auth-release": {
       "workflow": ".github/workflows/secure-auth-release.yml",
       "migrations": [
@@ -194,7 +201,8 @@
         "0065_traditional_p1p6_component.sql",
         "0066_removal_aware_serving_carry.sql",
         "0067_restore_serving_invalidation.sql",
-        "0068_puzzle_selection_features.sql"
+        "0068_puzzle_selection_features.sql",
+        "0069_v6_colour_components.sql"
       ]
     },
     "daily-calendar": {
@@ -257,7 +265,8 @@
         "0065_traditional_p1p6_component.sql",
         "0066_removal_aware_serving_carry.sql",
         "0067_restore_serving_invalidation.sql",
-        "0068_puzzle_selection_features.sql"
+        "0068_puzzle_selection_features.sql",
+        "0069_v6_colour_components.sql"
       ]
     },
     "launch-load": {
@@ -295,7 +304,8 @@
         "0065_traditional_p1p6_component.sql",
         "0066_removal_aware_serving_carry.sql",
         "0067_restore_serving_invalidation.sql",
-        "0068_puzzle_selection_features.sql"
+        "0068_puzzle_selection_features.sql",
+        "0069_v6_colour_components.sql"
       ]
     },
     "launch-distributed": {
@@ -335,7 +345,8 @@
         "0065_traditional_p1p6_component.sql",
         "0066_removal_aware_serving_carry.sql",
         "0067_restore_serving_invalidation.sql",
-        "0068_puzzle_selection_features.sql"
+        "0068_puzzle_selection_features.sql",
+        "0069_v6_colour_components.sql"
       ]
     },
     "practice-performance": {

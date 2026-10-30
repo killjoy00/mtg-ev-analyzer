@@ -23,15 +23,15 @@ def key(puzzle):
     return puzzle['source_draft_hash'],puzzle['pick_number']
 
 
-def compare(previous,candidate):
+def compare(previous,candidate,model=V5_MODEL):
     probability,score,rating,changes = [],[],[],[]
     old_bands,new_bands = Counter(),Counter()
     matched,leaders,bands = 0,0,0
     old = {key(p):p for p in previous}
     for p in candidate:
         values = [c['model_probability'] for c in p['candidates']]
-        if p.get('model_version')!=V5_MODEL or any(not math.isfinite(v) or v<0 for v in values) or abs(sum(values)-1)>.00005 or not max(values)>0:
-            raise ValueError('Invalid or mixed v5 support')
+        if p.get('model_version')!=model or any(not math.isfinite(v) or v<0 for v in values) or abs(sum(values)-1)>.00005 or not max(values)>0:
+            raise ValueError(f'Invalid or mixed {model} support')
         new_metric = puzzle_metrics(p)
         new_bands[new_metric['band']]+=1
         before = old.get(key(p))

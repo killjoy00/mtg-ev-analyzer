@@ -1,0 +1,535 @@
+{
+  "captured_at": "2026-10-29T20:20:00Z",
+  "policy": "Every environment with a measured Traditional source is rescored with v6 graders; widest window first, then the restricted-window precedent (regular P1-P6, Cube P2-P7). HOB is measured fresh because its original Traditional archive was replaced upstream on 2026-10-01.",
+  "sets": [
+    {
+      "artifact": {
+        "ledger_file_sha256": "17ba0dede48e5ec7b41d6ebe85767c53811c67e963309e57b985cc6ac1777ea7",
+        "puzzle_file_sha256": "c4db7a9286708b4a3c6ece7f3ed75f427ee06c3b43927b5a8a7ccd67d770f9df"
+      },
+      "artifact_name": "traditional-v4-revalidation-blb",
+      "origin": "phase2-v4",
+      "production_component": "traditional-premier-v5-phase2-v1",
+      "production_status": "Live",
+      "run_id": 35662906382,
+      "set_id": "blb",
+      "source_archive": {
+        "compressed_bytes": 31846423,
+        "etag": "\"678316d92a34a5bbbf8b87ef884d5d6e-4\"",
+        "last_modified": "Tue, 08 Oct 2024 15:16:16 GMT",
+        "sha256": "e35898caef8e87b504e778a7782868b30eccaf773049f4643f2b0f61f69f72b5",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.BLB.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "df71667919109c3354db65a4b2150149a21abaabc9d4f1df544600b93c88893b",
+        "puzzle_file_sha256": "1aa32b011773277cab53fc819f30aacf8f01738027a31fa361d297d8b15c2686"
+      },
+      "artifact_name": "traditional-v4-revalidation-bro",
+      "origin": "phase2-v4",
+      "production_component": "traditional-premier-v5-phase2-v1",
+      "production_status": "Live",
+      "run_id": 35662906382,
+      "set_id": "bro",
+      "source_archive": {
+        "compressed_bytes": 21883935,
+        "etag": "\"2fba4c4a0a8faafa1c21174c7201561c-3\"",
+        "last_modified": "Thu, 15 Dec 2022 05:04:21 GMT",
+        "sha256": "85a61dedaa6ae978458e71fc8323626bf17b11bcdc78f044c14dcb3bf6125785",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.BRO.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "3e93600b7c618c88e9e1dd2682e7eb37a7303a9b97dd9e9301b292d9f461522c",
+        "puzzle_file_sha256": "d2782f0774b4026b4fdb1051455981f7ee7fc6773f7b4a7b5ce705cbb539ef95"
+      },
+      "artifact_name": "traditional-v4-revalidation-dft",
+      "origin": "phase2-v4",
+      "production_component": "traditional-premier-v5-phase2-v1",
+      "production_status": "Live",
+      "run_id": 35662906382,
+      "set_id": "dft",
+      "source_archive": {
+        "compressed_bytes": 26873353,
+        "etag": "\"6859e645faeccae77b3cd986cae008eb-4\"",
+        "last_modified": "Sun, 23 Mar 2025 16:16:33 GMT",
+        "sha256": "cb221235fd95c17e91a521c0cce855279eab6ea52e8a026227e755d861ca2749",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.DFT.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "1bc10d2e93a3d67ff4a03b85b225e9de8a151e6682b0cc8c8591f6277584b065",
+        "puzzle_file_sha256": "c0d33bdd78a2f1ccc65114ddb5f5afc79cfe818dce2ffbcec4048658ceb517f1"
+      },
+      "artifact_name": "traditional-v4-revalidation-dmu",
+      "origin": "phase2-v4",
+      "production_component": "traditional-premier-v5-phase2-v1",
+      "production_status": "Live",
+      "run_id": 35662906382,
+      "set_id": "dmu",
+      "source_archive": {
+        "compressed_bytes": 42833400,
+        "etag": "\"e9af3e96c0ce5e6ce7107a6f6e320598-6\"",
+        "last_modified": "Fri, 28 Oct 2022 04:12:14 GMT",
+        "sha256": "a5bb025d2837ea0422ce2eb37d7f722a1f465ba8a83c68eabda81ec90d24d984",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.DMU.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "e57c9d8948f71f709abe6bd1a9c57c2d7be158b18ef5a21a06b8085a13df0886",
+        "puzzle_file_sha256": "78f90ec450bd45d6b5f750363d7d269354fb697fbd427b78cc255e5d679f9554"
+      },
+      "artifact_name": "traditional-v4-revalidation-dsk",
+      "origin": "phase2-v4",
+      "production_component": "traditional-premier-v5-phase2-v1",
+      "production_status": "Live",
+      "run_id": 35662906382,
+      "set_id": "dsk",
+      "source_archive": {
+        "compressed_bytes": 41684666,
+        "etag": "\"5a955987cbbdc623edbc91044b23a539-5\"",
+        "last_modified": "Wed, 30 Oct 2024 01:45:10 GMT",
+        "sha256": "70d7cd7771904d354ec27f9c0f81e47a668ec1bd7a15fc83295e3ce3d74c47b2",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.DSK.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "f8db137bd0ff64e1431079c808fe008811a63a4aff888c1c62a165e60c37c279",
+        "puzzle_file_sha256": "6f28d2b9a516a7a67d0ac74f9be392a18ac6fc59c7bc05ac0463a40ec1f7ad23"
+      },
+      "artifact_name": "traditional-v4-revalidation-eoe",
+      "origin": "phase2-v4",
+      "production_component": "traditional-premier-v5-phase2-v1",
+      "production_status": "Live",
+      "run_id": 35662906382,
+      "set_id": "eoe",
+      "source_archive": {
+        "compressed_bytes": 15271640,
+        "etag": "\"daf739d203ec6854b9bac9851b7d5328-2\"",
+        "last_modified": "Wed, 03 Sep 2025 12:42:34 GMT",
+        "sha256": "bf6843c790cfdb20de448e74373e9c0ff6a39fd26efb934ac35e2862a7942418",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.EOE.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "28969e290a6677e4bf958120bc746b5278de7678ae757667f29d73c28411b4d8",
+        "puzzle_file_sha256": "e73cfcdd1a0e21333677a8b1aa706ee32df18402e5fb5127a92be291f3a258a3"
+      },
+      "artifact_name": "traditional-v4-revalidation-fdn",
+      "origin": "phase2-v4",
+      "production_component": "traditional-premier-v5-phase2-v1",
+      "production_status": "Live",
+      "run_id": 35662906382,
+      "set_id": "fdn",
+      "source_archive": {
+        "compressed_bytes": 28075774,
+        "etag": "\"edc579aee1221d4ec4aecbea3e0c1a5d-4\"",
+        "last_modified": "Thu, 19 Dec 2024 13:09:16 GMT",
+        "sha256": "d673048bb2920203912eac6405ad958ebf5bb3aa7413b35eee3e7801e57a973d",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.FDN.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "ae5939091110520623c8d8ade94b9787a0d1f27a30b76c5ff5a0b6cfd7516803",
+        "puzzle_file_sha256": "69b0afa2189b3da0fa28502a571118c2b7ff07717d81e599d9f9671475f06ea4"
+      },
+      "artifact_name": "traditional-v4-revalidation-fin",
+      "origin": "phase2-v4",
+      "production_component": "traditional-premier-v5-phase2-v1",
+      "production_status": "Live",
+      "run_id": 35662906382,
+      "set_id": "fin",
+      "source_archive": {
+        "compressed_bytes": 23588531,
+        "etag": "\"9c9de4ffff4b2c1ed325183d5f735aeb-3\"",
+        "last_modified": "Sat, 19 Jul 2025 01:24:29 GMT",
+        "sha256": "cf49b2055369bfc644b00e698ff30fdc0db65f5de37c18e9bc5a8eea63ce72aa",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.FIN.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "f7449299160935beac4b9edc2391610c60fdade20ca26235b688faa1f7273cd8",
+        "puzzle_file_sha256": "dd6da08a25277e4499584e2115d29170579f29a1da0b36ce56d446a24551cd5a"
+      },
+      "artifact_name": "traditional-new-set-39451056661",
+      "origin": "new-set-v5",
+      "production_component": "traditional-premier-v5-p1p6-v1",
+      "production_status": "Live",
+      "run_id": 39451056661,
+      "set_id": "fra",
+      "source_archive": {
+        "compressed_bytes": 7106034,
+        "etag": "\"1d73c37cab0d529e90b143daedd6c46d\"",
+        "last_modified": "Mon, 19 Oct 2026 16:20:22 GMT",
+        "sha256": "3174999a6ea8c7523d3c221a6640ecdd8347fe1f0225d66960c3d8bf5421f4e0",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.FRA.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "f06819c6f019041eb521e3d7bfc17507e99b2741c0dbb31a54be6582662ad4a5",
+        "puzzle_file_sha256": "0ae73f15020e6f5e964a005e6a89ae20fd1b4bf6a84e81d0f6b55a842d039d83"
+      },
+      "artifact_name": "traditional-v4-revalidation-hbg",
+      "origin": "phase2-v4",
+      "production_component": null,
+      "production_status": null,
+      "run_id": 35662906382,
+      "set_id": "hbg",
+      "source_archive": {
+        "compressed_bytes": 12275609,
+        "etag": "\"f6027277870bf30ddf8088ef328cd173-2\"",
+        "last_modified": "Fri, 29 Jul 2022 20:54:17 GMT",
+        "sha256": "3f0f0bc3bf45e135f01ec7cd578ee14d86e079a54038bf0b03490c0e73e91248",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.HBG.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": null,
+      "artifact_name": null,
+      "origin": "fresh",
+      "production_component": null,
+      "production_status": null,
+      "run_id": null,
+      "set_id": "hob",
+      "source_archive": {
+        "compressed_bytes": 8082396,
+        "etag": "\"f2ef9842c90b8429b1a5b0a8d40eb126\"",
+        "last_modified": "Thu, 01 Oct 2026 13:17:11 GMT",
+        "sha256": "dfe410ce4ce98d00569f095b749f01819bcabc61d66506beb2b3efdf5c43490d",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.HOB.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "2c64bb3e423ce5cc4a93351cc1b90433bba9945d988cf44b5f9c3035a90e32db",
+        "puzzle_file_sha256": "f005ee24fb65ade4886171aa78c350c7ab0986a0dd1671ed154ee8b8fedbaf66"
+      },
+      "artifact_name": "traditional-v4-revalidation-ktk",
+      "origin": "phase2-v4",
+      "production_component": null,
+      "production_status": null,
+      "run_id": 35662906382,
+      "set_id": "ktk",
+      "source_archive": {
+        "compressed_bytes": 11051293,
+        "etag": "\"1645e6c1009e80723c8cd92db5afabf5-2\"",
+        "last_modified": "Thu, 18 Jan 2024 05:16:58 GMT",
+        "sha256": "38e3da61064d832e43309f58191b74da932f10307d41b5cbf67ac6b68c2edace",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.KTK.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "a081e77ad118f5218f247a6711f819d5e7cc8bc916095d0e6bd8258022d88686",
+        "puzzle_file_sha256": "7a8daad7fa3dbe9cd20d920f2d6edf054a4187f8c57fa5e8c73b80a4ffd1f7d2"
+      },
+      "artifact_name": "traditional-v4-revalidation-lci",
+      "origin": "phase2-v4",
+      "production_component": "traditional-premier-v5-phase2-v1",
+      "production_status": "Live",
+      "run_id": 35662906382,
+      "set_id": "lci",
+      "source_archive": {
+        "compressed_bytes": 38654647,
+        "etag": "\"fd22d5434584ec3b1785e84070d9a00d-5\"",
+        "last_modified": "Wed, 27 Dec 2023 18:31:44 GMT",
+        "sha256": "406ae23bdb2f2dbf19f3417fefa820ff0e40f0d0d1f9f8585b3fa53976d61870",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.LCI.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "dedf13693754029e4c236f5c4574ffcc32f3add78b368c48a05b1767ca65b659",
+        "puzzle_file_sha256": "41e91bde540cf7fe7fe8fb5edd2e1754c32f402dcbe3d086d6bead3774fbfaa5"
+      },
+      "artifact_name": "traditional-v4-revalidation-ltr",
+      "origin": "phase2-v4",
+      "production_component": "traditional-premier-v5-phase2-v1",
+      "production_status": "Live",
+      "run_id": 35662906382,
+      "set_id": "ltr",
+      "source_archive": {
+        "compressed_bytes": 31889469,
+        "etag": "\"8ed160c18c90b289256211721d84931e-4\"",
+        "last_modified": "Wed, 30 Aug 2023 16:25:07 GMT",
+        "sha256": "50fed66c068a911dbcd613e8051e8ddeb9a9238c5ff1509ee3811e88a8581cac",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.LTR.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "7a5d2e4094b7558ec1070d319a24132fae89441b2256ee4527ea83c9025eca6e",
+        "puzzle_file_sha256": "a268c3e32b14fc88b628a81e37aa44dd2e462f09b4a86d844377e03a1c59b7ea"
+      },
+      "artifact_name": "traditional-v4-revalidation-mh3",
+      "origin": "phase2-v4",
+      "production_component": "traditional-premier-v5-phase2-v1",
+      "production_status": "Live",
+      "run_id": 35662906382,
+      "set_id": "mh3",
+      "source_archive": {
+        "compressed_bytes": 28012118,
+        "etag": "\"6ab11e0c55a9b78e53eac1c9847c0fd4-4\"",
+        "last_modified": "Wed, 17 Jul 2024 16:29:47 GMT",
+        "sha256": "238263c0057828c64a4e316cb0ae2a11e22ab77b36348907af876866bf38cbb1",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.MH3.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "215602bed16518e8aabcc76affeb0fff0ec38cdeba7452384ebbcb78ea77a5c1",
+        "puzzle_file_sha256": "6aab0397b41c8c34757e50e2236373555da7f64edbb2bd2f551783f3e3daeff5"
+      },
+      "artifact_name": "traditional-v4-revalidation-mkm",
+      "origin": "phase2-v4",
+      "production_component": "traditional-premier-v5-phase2-v1",
+      "production_status": "Live",
+      "run_id": 35662906382,
+      "set_id": "mkm",
+      "source_archive": {
+        "compressed_bytes": 39114591,
+        "etag": "\"56c43e1e23dc510b239e1bfcca076192-5\"",
+        "last_modified": "Wed, 20 Mar 2024 14:44:19 GMT",
+        "sha256": "a10e823299490122cc583ff3ae4ab990299014172c900520f953a6a2c93cae99",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.MKM.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "032fbd78abd23851dfdc39f73648541782fbc802b5b4c02ccd4346b63d7fd07a",
+        "puzzle_file_sha256": "284c7d39045a9680b388848b94f304b438b64ccecbbf45c0b27dc8ed336158ec"
+      },
+      "artifact_name": "traditional-v4-revalidation-mom",
+      "origin": "phase2-v4",
+      "production_component": "traditional-premier-v5-phase2-v1",
+      "production_status": "Live",
+      "run_id": 35662906382,
+      "set_id": "mom",
+      "source_archive": {
+        "compressed_bytes": 47664359,
+        "etag": "\"fe611995c42cf2a8bcabc3fadbae351d-6\"",
+        "last_modified": "Wed, 14 Jun 2023 19:05:48 GMT",
+        "sha256": "7c2ac2ba098b1ba119aafb186ebca8c6407b813a8ff938ccd37a776a66c779c3",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.MOM.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "1d7abdb2e76f3049ad139960445a8b8bf838c430c829b7c48d149cf6a28f7b1e",
+        "puzzle_file_sha256": "637af35e251fe4ddc587e9691af5c8dc7a76d33eced14d37c5dfbcde4e01e134"
+      },
+      "artifact_name": "traditional-v4-revalidation-msh",
+      "origin": "phase2-v4",
+      "production_component": "traditional-premier-v5-phase2-v1",
+      "production_status": "Live",
+      "run_id": 35662906382,
+      "set_id": "msh",
+      "source_archive": {
+        "compressed_bytes": 10710055,
+        "etag": "\"a18db3de5b3ae0741e4b99925d829356-2\"",
+        "last_modified": "Mon, 27 Jul 2026 18:11:39 GMT",
+        "sha256": "509370ea6222bd1b142521eb5b27f78216371f3bc27277def5094edab0ea9738",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.MSH.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "251f4d791b20d9cf28e331e5ff9a5eaaf8d954474016968669128318b8651f3e",
+        "puzzle_file_sha256": "10f81393ed8e0e29d78ec75a4127a28b01b317c12c646e391dd74e10bdcc8ac2"
+      },
+      "artifact_name": "traditional-v4-revalidation-neo",
+      "origin": "phase2-v4",
+      "production_component": "traditional-premier-v5-phase2-v1",
+      "production_status": "Live",
+      "run_id": 35662906382,
+      "set_id": "neo",
+      "source_archive": {
+        "compressed_bytes": 34680800,
+        "etag": "\"ebda3b67cb964f7efa72f25e5d1d51ae-5\"",
+        "last_modified": "Sun, 13 Mar 2022 06:00:07 GMT",
+        "sha256": "ca747523d797e27d94f45c824c77d52dfe5849716e61c908bc16106e7f9b4535",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.NEO.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "589e6798f84a8d16c8e07dac4361cb7f070e7b4e28dccd50c77e965aabeb8eb7",
+        "puzzle_file_sha256": "2ca626fb5b76dadddcb3a22737e99160aa347038b4fa91f5e6ac56fa54328a54"
+      },
+      "artifact_name": "traditional-v4-revalidation-one",
+      "origin": "phase2-v4",
+      "production_component": "traditional-premier-v5-phase2-v1",
+      "production_status": "Live",
+      "run_id": 35662906382,
+      "set_id": "one",
+      "source_archive": {
+        "compressed_bytes": 22433677,
+        "etag": "\"b2d7381683913e7443402c0af06c32b4-3\"",
+        "last_modified": "Wed, 01 Mar 2023 03:55:35 GMT",
+        "sha256": "e716871eaea5a1b46dd1b7f578e75569abd81040856bd5da9c4c8ba597650913",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.ONE.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "c57ceb3a8d265730cd34f1843db692241695f6080d305b227fcd00170fd28d53",
+        "puzzle_file_sha256": "e93d7dcd6519dd118ddd675a8b9120862dc57cb1863f117d895bd14f40cd5437"
+      },
+      "artifact_name": "traditional-v4-revalidation-otj",
+      "origin": "phase2-v4",
+      "production_component": "traditional-premier-v5-phase2-v1",
+      "production_status": "Live",
+      "run_id": 35662906382,
+      "set_id": "otj",
+      "source_archive": {
+        "compressed_bytes": 47355368,
+        "etag": "\"88cf3892e81f9a1f838fc989bb503997-6\"",
+        "last_modified": "Thu, 27 Jun 2024 01:06:33 GMT",
+        "sha256": "85467209e9cd03899e19da0b07f8428960d0b753bf9a544e649c23392eb3cced",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.OTJ.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "2f6ad51f6ccdc0eaf0b2a1129e939e04fa244a92c7939636ebe231d969d4596f",
+        "puzzle_file_sha256": "7a41766a156458a7ee5d82b5e342361e1e8815b240f046fc0eb4e80728546ae8"
+      },
+      "artifact_name": "traditional-v4-revalidation-pio",
+      "origin": "phase2-v4",
+      "production_component": null,
+      "production_status": null,
+      "run_id": 35662906382,
+      "set_id": "pio",
+      "source_archive": {
+        "compressed_bytes": 12840016,
+        "etag": "\"e729a4b90cbd6327bbefcbf9347207d7-2\"",
+        "last_modified": "Wed, 15 Jan 2025 19:22:41 GMT",
+        "sha256": "fda981c662cced9a7fadceaaae14e3c46914be54c477398fc53ee6abeb7b26b0",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.PIO.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "99968c1f3fc69e9aa7a0538be623a1209e080c6a23e57d37585f89765088d1e3",
+        "puzzle_file_sha256": "17137108704f98f1dc4ae9498f3c45c14140ac07f305fa3fc2ee74ca2c96ecd9"
+      },
+      "artifact_name": "traditional-v4-revalidation-powered-cube",
+      "origin": "phase2-v4",
+      "production_component": "traditional-cube-p2p7-v5-v1",
+      "production_status": "Live",
+      "run_id": 35662906382,
+      "set_id": "powered-cube",
+      "source_archive": {
+        "compressed_bytes": 8715202,
+        "etag": "\"028f70515e688a80e9a249eee748a0e0-2\"",
+        "last_modified": "Mon, 01 Dec 2025 04:03:19 GMT",
+        "sha256": "95564bef8848e3ed1c507a2c9c503b8003d76eeafa923990bd887bf18d2fbe5a",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.Cube_-_Powered.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "27ef05102a8deb6b8e74c58642eff7f1e2f6fe2ffade0ccaf55bce33cc81a175",
+        "puzzle_file_sha256": "371d2a7129fb40e9406ff04dc72ee295df95b7ab3d0f78b3bde8aa4f0da37c6e"
+      },
+      "artifact_name": "traditional-v4-revalidation-sir",
+      "origin": "phase2-v4",
+      "production_component": "traditional-premier-v5-phase2-v1",
+      "production_status": "Candidate",
+      "run_id": 35662906382,
+      "set_id": "sir",
+      "source_archive": {
+        "compressed_bytes": 19512209,
+        "etag": "\"f1e54ea83ea2697da1096e2a0a9adff4-3\"",
+        "last_modified": "Fri, 21 Apr 2023 02:34:50 GMT",
+        "sha256": "59e7db197c439fba9d9c10460b1774df215f66ad4d7d2af7add9b55d8a8d963d",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.SIR.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "4278435f1e09a3f65d0012c0db67b662b1d1956929731ce959caccfb789cb839",
+        "puzzle_file_sha256": "10ad4e4c5f2ace34ad599da9e379f7078958636a1b66d09274927b1becbba8af"
+      },
+      "artifact_name": "traditional-v4-revalidation-snc",
+      "origin": "phase2-v4",
+      "production_component": "traditional-premier-v5-phase2-v1",
+      "production_status": "Live",
+      "run_id": 35662906382,
+      "set_id": "snc",
+      "source_archive": {
+        "compressed_bytes": 26251694,
+        "etag": "\"2efee0e2eccf09dcf12018102e5ce2e7-4\"",
+        "last_modified": "Tue, 24 May 2022 01:29:52 GMT",
+        "sha256": "774d48f6e066c304541a697519d41b8b0ba7e71cb64ecc588230656ba5a29b44",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.SNC.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "f53d857f5df99c3d1137051638f4f9984140f4cffb5e8ed245be618976c79886",
+        "puzzle_file_sha256": "bb50b65929fc1aa4713e5ec3e3254e940ab7ac981785d83967342d9bf785b5d3"
+      },
+      "artifact_name": "traditional-v4-revalidation-sos",
+      "origin": "phase2-v4",
+      "production_component": "traditional-premier-v5-phase2-v1",
+      "production_status": "Live",
+      "run_id": 35662906382,
+      "set_id": "sos",
+      "source_archive": {
+        "compressed_bytes": 15821616,
+        "etag": "\"9c2a39698bf25839940b918a254acfed-2\"",
+        "last_modified": "Fri, 05 Jun 2026 22:15:35 GMT",
+        "sha256": "6552b298a2af61d47d494654846222e8d5a011628168c073a5d9b09900a3434e",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.SOS.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "54dbd5c1f16fd257ed7a32c85d22eaff3e1b304c06562e9bb4b4183ae7bd0799",
+        "puzzle_file_sha256": "15a1e713943196889b705a6e7db676996b08750f0a667e463c50a1da210da13b"
+      },
+      "artifact_name": "traditional-v4-revalidation-tdm",
+      "origin": "phase2-v4",
+      "production_component": "traditional-premier-v5-phase2-v1",
+      "production_status": "Live",
+      "run_id": 35662906382,
+      "set_id": "tdm",
+      "source_archive": {
+        "compressed_bytes": 15324190,
+        "etag": "\"8c4015d2495e44d195eef6ec74e8baa3-2\"",
+        "last_modified": "Tue, 20 May 2025 02:14:41 GMT",
+        "sha256": "071494c2ee4229c8f93e61b217546d0f9ae53ae8cca6d96266c0df6b192ec561",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.TDM.TradDraft.csv.gz"
+      }
+    },
+    {
+      "artifact": {
+        "ledger_file_sha256": "c391755c238f4dcb2123e52e9b16bc1e841700c7a63314279c56f6300ebe4042",
+        "puzzle_file_sha256": "440b6c330f9a5a7880e581441e68339d1083b7bd8ea94e3efb2977c69102e033"
+      },
+      "artifact_name": "traditional-v4-revalidation-woe",
+      "origin": "phase2-v4",
+      "production_component": "traditional-premier-v5-phase2-v1",
+      "production_status": "Live",
+      "run_id": 35662906382,
+      "set_id": "woe",
+      "source_archive": {
+        "compressed_bytes": 42875026,
+        "etag": "\"43dbf4ea96568c024902ecf48f6f7275-6\"",
+        "last_modified": "Wed, 18 Oct 2023 03:07:22 GMT",
+        "sha256": "49ec10a1ef8fad16d2b77c7db3a29e06d730943e3afac72907cde3e3c79c74d4",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.WOE.TradDraft.csv.gz"
+      }
+    }
+  ]
+}

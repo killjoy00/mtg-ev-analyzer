@@ -1,0 +1,315 @@
+name: rebuild-v6-draft-run-corpus
+
+on:
+  workflow_dispatch:
+    inputs:
+      reuse_run_id:
+        description: 'Completed main rebuild whose 31 successful environments have the identical build identity'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: set-data-import-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PYTHONPATH: scripts:.
+  AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+  R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+  R2_BUCKET: ${{ secrets.R2_BUCKET }}
+  AWS_DEFAULT_REGION: auto
+
+jobs:
+  prepare:
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      build_id: ${{ steps.plan.outputs.build_id }}
+      environment_run_id: ${{ steps.origin.outputs.environment_run_id }}
+      environment_commit: ${{ steps.origin.outputs.environment_commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validate immutable build policy and plan one recoverable job per environment
+        id: plan
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from scripts.v6_rebuild import identity, pins
+
+          plan=pins()
+          catalog=json.loads(Path('data/catalog.json').read_text())
+          traditional={p['set_id']:p for p in json.loads(Path('research/v6-traditional-source-pins.json').read_text())['sets']}
+          if {sid for sid,p in plan.items() if p['replay']}!={p['id'] for p in catalog['sets']}:
+              raise SystemExit('Incomplete source/environment plan')
+          if {p['model_version'] for p in catalog['sets']}!={'strong-player-colour-stage-v5'}:
+              raise SystemExit('Expected the served v5 replay baseline')
+          if not set(traditional)<=set(plan) or len(traditional)!=28:
+              raise SystemExit('Expected 28 Traditional sources within the plan')
+          include=[]
+          for sid in sorted(plan):
+              t=traditional.get(sid) or {}
+              include.append({'set':sid,'replay':plan[sid]['replay'],
+                  'traditional_run':str(t.get('run_id') or ''),'traditional_artifact':t.get('artifact_name') or ''})
+          with open(os.environ['GITHUB_OUTPUT'],'a') as output:
+              output.write('matrix='+json.dumps({'include':include},separators=(',',':'))+'\n')
+              output.write('build_id='+identity()+'\n')
+          PY
+      - name: Verify exact environment provenance before reusing completed work
+        id: origin
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V6_BUILD_ID: ${{ steps.plan.outputs.build_id }}
+          REUSE_RUN_ID: ${{ inputs.reuse_run_id }}
+        run: node scripts/verify-v6-rebuild-reuse.mjs "$REUSE_RUN_ID"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v6-environment-origin
+          path: generated/v6-environment-origin.json
+          if-no-files-found: error
+      - name: Hydrate historical replay shards for the normal repository suite
+        run: bash scripts/r2_replay_shards.sh hydrate
+      - run: REQUIRE_REPLAY_SHARDS=1 npm test
+      - name: Check Python fixtures against the future serving version before expensive work
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import sys
+          from scripts.set_policy import set_corpus_version
+          from scripts.model_training import V6_CORPUS
+          path=Path('draft-run.mjs')
+          original=path.read_bytes()
+          try:
+              set_corpus_version(V6_CORPUS)
+              subprocess.run([sys.executable,'-m','unittest','discover','-s','tests','-p','test_*.py'],check=True)
+          finally:
+              path.write_bytes(original)
+          PY
+
+  environments:
+    if: inputs.reuse_run_id == ''
+    name: v6 ${{ matrix.set }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      V6_BUILD_ID: ${{ needs.prepare.outputs.build_id }}
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Download the exact measured Traditional source artifact
+        if: matrix.traditional_artifact != ''
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ matrix.traditional_run }}
+          name: ${{ matrix.traditional_artifact }}
+          path: generated/v6-original-traditional
+      - name: Rebuild replays, paths, all trophies and Traditional decisions
+        run: python -u scripts/v6_rebuild.py environment --set '${{ matrix.set }}'
+      - name: Verify isolated replay and path output
+        if: matrix.replay
+        run: |
+          python scripts/validate_dataset.py 'data/${{ matrix.set }}/manifest.json' --minimum-replays 100
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.model_training import validate_training_manifest, V6_MODEL
+          sid='${{ matrix.set }}'
+          manifest=json.loads(Path('data',sid,'manifest.json').read_text())
+          validate_training_manifest(manifest, V6_MODEL)
+          if manifest['model']['holdout']!='5-fold by draft_id':
+              raise SystemExit('Holdout drift')
+          path=json.loads(Path('data',sid,'path-model.json').read_text())
+          if path.get('context_model_version')!=V6_MODEL or path['training'].get('training_mode')!='all-qualified' or path['training'].get('training_cap') is not None:
+              raise SystemExit('Path evidence is mixed or capped')
+          PY
+      - name: Checkpoint replay shards in the new model namespace
+        if: matrix.replay
+        env:
+          REPLAY_MODEL_VERSION: strong-player-colour-stage-v6
+          REPLAY_SETS: ${{ matrix.set }}
+        run: |
+          bash scripts/r2_replay_shards.sh upload
+          bash scripts/r2_replay_shards.sh verify
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v6-environment-${{ matrix.set }}
+          retention-days: 90
+          if-no-files-found: error
+          path: generated/v6-build/${{ matrix.set }}
+
+  finalize:
+    name: Assemble, validate, publish exact candidate, open rollout PR
+    needs: [prepare, environments]
+    if: ${{ always() && needs.prepare.result == 'success' && (needs.environments.result == 'success' || needs.environments.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      V6_BUILD_ID: ${{ needs.prepare.outputs.build_id }}
+      GH_TOKEN: ${{ github.token }}
+      V6_ENVIRONMENT_RUN_ID: ${{ needs.prepare.outputs.environment_run_id }}
+      V6_ENVIRONMENT_COMMIT: ${{ needs.prepare.outputs.environment_commit }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ needs.prepare.outputs.environment_run_id }}
+          pattern: v6-environment-*
+          path: generated/v6-downloads
+      - uses: actions/download-artifact@v4
+        with:
+          name: v6-environment-origin
+          path: generated
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 37132557406
+          name: validated-v5-candidate-37132557406
+          path: generated/v6-production-baseline
+      - name: Assemble only the 31 complete identity-checked environments
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+          root=Path('generated/v6-build')
+          root.mkdir(parents=True,exist_ok=True)
+          for p in Path('generated/v6-downloads').glob('v6-environment-*'):
+              if not (p/'summary.json').exists():
+                  continue
+              shutil.copytree(p,root/p.name.removeprefix('v6-environment-'),dirs_exist_ok=True)
+          PY
+          python scripts/v6_rebuild.py assemble
+      - name: Prove Cube rerolls under complete session source exclusions
+        run: node scripts/v6-cube-reroll-admission.mjs
+      - name: Generate post-build v5 to v6 implementation QA
+        run: python scripts/v6_rebuild_qa.py --baseline generated/v6-production-baseline
+      - name: Validate corpus accounting, source trajectories, models and Traditional gates
+        run: |
+          python scripts/audit_datasets.py --fail-on-error
+          node scripts/load_all_trophies.mjs unused generated/v6-trophy-import --validate-only
+          node scripts/load-traditional-components.mjs unused generated/v6-traditional --validate-only > generated/v6-traditional-health.json
+          REQUIRE_REPLAY_SHARDS=1 npm test
+      - name: Verify every new replay byte against versioned R2
+        run: |
+          export REPLAY_MODEL_VERSION=strong-player-colour-stage-v6
+          REPLAY_SETS="$(python -c 'import json; print(",".join(s["id"] for s in json.load(open("data/catalog.json"))["sets"]))')"
+          export REPLAY_SETS
+          bash scripts/r2_replay_shards.sh verify
+          mkdir -p generated/v6-r2-readback
+          aws s3 sync "s3://$R2_BUCKET/replay-models/strong-player-colour-stage-v6/data/" generated/v6-r2-readback --endpoint-url "$R2_ENDPOINT" --exclude '*' --include '*/shards/*.json'
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.v6_rebuild import sha
+          for entry in json.loads(Path('data/catalog.json').read_text())['sets']:
+              for local in (Path('data')/entry['id']/'shards').glob('*.json'):
+                  remote=Path('generated/v6-r2-readback')/local.relative_to('data')
+                  if not remote.exists() or sha(local)!=sha(remote):
+                      raise SystemExit(f'R2 byte mismatch: {local}')
+          PY
+      - name: Preserve exact validated artifacts and reviewed QA
+        run: |
+          set -euo pipefail
+          mkdir -p results/v6-rebuild
+          cp generated/v6-rebuild-accounting.json generated/v6-rebuild-qa.json generated/V6-REBUILD-QA.md generated/v6-traditional-health.json generated/v6-cube-reroll-admission.json generated/v6-environment-origin.json results/v6-rebuild/
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from scripts.v6_rebuild import phase_files, write, sha
+          write('generated/v6-artifact-identity.json',{'run_id':os.environ['GITHUB_RUN_ID'],
+              'commit':os.environ['GITHUB_SHA'],'build_identity':os.environ['V6_BUILD_ID'],
+              'environment_run_id':os.environ['V6_ENVIRONMENT_RUN_ID'],
+              'environment_commit':os.environ['V6_ENVIRONMENT_COMMIT'],
+              'cube_admission_sha256':sha(Path('generated/v6-cube-reroll-admission.json')),
+              'premier_files':phase_files(Path('generated/v6-trophy-import')),
+              'traditional_files':phase_files(Path('generated/v6-traditional'))})
+          PY
+      - uses: actions/upload-artifact@v4
+        id: candidate
+        with:
+          name: validated-v6-candidate-${{ github.run_id }}
+          retention-days: 90
+          if-no-files-found: error
+          path: |
+            generated/v6-trophy-import
+            generated/v6-traditional
+            generated/v6-artifact-identity.json
+            generated/v6-rebuild-accounting.json
+            generated/v6-rebuild-qa.json
+            generated/V6-REBUILD-QA.md
+            generated/v6-cube-reroll-admission.json
+            generated/v6-environment-origin.json
+      - name: Open or update the generated-data rollout PR without switching serving
+        run: |
+          set -euo pipefail
+          branch="rollout/v6-v10-${V6_BUILD_ID:0:16}"
+          git switch -c "$branch"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          python - <<'PY'
+          import os
+          from scripts.v6_rebuild import write
+          write('research/v6-validated-release.json',{'run_id':os.environ['GITHUB_RUN_ID'],
+              'commit':os.environ['GITHUB_SHA'],'build_identity':os.environ['V6_BUILD_ID'],
+              'environment_run_id':os.environ['V6_ENVIRONMENT_RUN_ID'],
+              'environment_commit':os.environ['V6_ENVIRONMENT_COMMIT'],
+              'corpus_version':'elite-trophy-colour-stage-v10','model_version':'strong-player-colour-stage-v6'})
+          PY
+          git add data corpus/draft-run draft-run.mjs results/v6-rebuild research/v6-validated-release.json
+          git commit -m 'Build v6 splash-colour model as elite-trophy-colour-stage-v10 [data-generated]'
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            git fetch origin "$branch"
+            git merge --no-edit FETCH_HEAD
+          fi
+          git push origin "HEAD:$branch"
+          cat > "$RUNNER_TEMP/v6-pr-body.md" <<'EOF'
+          Rebuilds all 31 active environments under strong-player-colour-stage-v6 from the exact inputs of their production v9 snapshots and creates the separate elite-trophy-colour-stage-v10 corpus. v6 changes only the colour policy (splash colours count as deck colours; a 0.0 rate cell is data). FRA rebuilds trophies and Traditional only, as in v9.
+
+          Every measured Traditional source, including sets blocked under v5, is rescored with Premier-trained v6 graders and admitted only if its approved window (regular P1-P8, FRA P1-P6, Cube P2-P7) passes the unchanged gates; there is no fallback. Admissions and QA are in results/v6-rebuild. Exact validated load artifacts are attached to the rebuild run; v9 data remains available for rollback.
+
+          Validation: full npm test, replay/path audits, complete trophy accounting, Traditional gates, R2 byte readback. This PR does not stage or switch Neon serving.
+          EOF
+          if ! gh pr view "$branch" --json number >/dev/null 2>&1; then
+            gh pr create --base main --head "$branch" --title 'Release v6 splash-colour corpus v10' --body-file "$RUNNER_TEMP/v6-pr-body.md"
+          else
+            gh pr edit "$branch" --body-file "$RUNNER_TEMP/v6-pr-body.md"
+          fi

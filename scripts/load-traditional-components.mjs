@@ -10,6 +10,7 @@ import {
  TRADITIONAL_COMPONENT_VERSION,TRADITIONAL_PHASE2_COMPONENT_VERSION,CUBE_TRADITIONAL_COMPONENT_VERSION,
  TRADITIONAL_V4_PHASE2_COMPONENT_VERSION,CUBE_TRADITIONAL_V4_COMPONENT_VERSION,
  TRADITIONAL_V5_PHASE2_COMPONENT_VERSION,CUBE_TRADITIONAL_V5_COMPONENT_VERSION,TRADITIONAL_V5_P1P6_COMPONENT_VERSION,V5_CONTEXT_MODEL_VERSION,V5_PARENT_CORPUS_VERSION,
+ TRADITIONAL_V6_PHASE2_COMPONENT_VERSION,TRADITIONAL_V6_P1P6_COMPONENT_VERSION,CUBE_TRADITIONAL_V6_COMPONENT_VERSION,V6_CONTEXT_MODEL_VERSION,V6_PARENT_CORPUS_VERSION,
  FROZEN_CONTEXT_MODEL_VERSION,V4_CONTEXT_MODEL_VERSION,modelVersionForComponent,TRADITIONAL_GATE_VERSION as gate
 } from '../corpus-components.mjs';
 import {insertTrophyBatch} from '../worker/trophy-import.mjs';
@@ -28,24 +29,35 @@ const sameSet=(a,b)=>[...a].sort().join(',')===[...b].sort().join(',');
 // named explicitly; a restricted report for any other set is refused.
 const P1P6_POLICY='new-set-p1p6-v5-admission-v1',P1P6_SETS=['fra'];
 const isP1P6=report=>report.schema===P1P6_POLICY;
+// v6 rescoring scores each set on its approved window only; there is no
+// fallback. Each window has exactly one component and width.
+const V6_SCHEMA='v6-traditional-rescore-v1';
+const V6_WINDOWS=Object.freeze({
+ 'phase2':{component:TRADITIONAL_V6_PHASE2_COMPONENT_VERSION,first:1,last:8},
+ 'p1p6':{component:TRADITIONAL_V6_P1P6_COMPONENT_VERSION,first:1,last:6},
+ 'cube-p2p7':{component:CUBE_TRADITIONAL_V6_COMPONENT_VERSION,first:2,last:7},
+});
+const isV6=report=>report.schema===V6_SCHEMA;
+const v6Window=sid=>({'powered-cube':'cube-p2p7',fra:'p1p6'})[sid]||'phase2';
 const isV4Phase2=report=>report.schema===1&&report.corrected?.component_version===TRADITIONAL_V4_PHASE2_COMPONENT_VERSION&&report.corrected?.parent_corpus===modelVersions.v4.corpus_version&&report.corrected?.model===V4_CONTEXT_MODEL_VERSION;
 const isV4Cube=report=>report.schema==='cube-p2p7-v4-admission-v1';
 const expansionSupported=report=>report.expansion_supported===true||report.automatic_expansion_supported===true||
  (isV4Phase2(report)&&report.format_training_audit?.valid_despite_issue_164===true&&!report.persistent_category_patterns?.length&&!report.residuals?.persistent_category_patterns?.length);
 
 export function sourceQuality(report,sid,{puzzles,usable,metadataComplete,storedMetadataComplete=metadataComplete,imagesComplete},evidence=null) {
- const s=evidence||report.sets[sid];if(!s)throw Error('Missing per-set evidence');
- const checks=isP1P6(report)?['early_picks','serving_early_picks','quality']:sid==='powered-cube'?['all_picks','serving_picks','quality','snapshot']:['all_picks','late_picks','serving_picks','serving_late_picks','quality'];
+ const set=evidence||report.sets[sid];if(!set)throw Error('Missing per-set evidence');
+ const v6=isV6(report),s=v6?set.windows?.[set.admitted_window]:set;if(!s)throw Error('Missing admitted window evidence');
+ const checks=v6?s.checks:isP1P6(report)?['early_picks','serving_early_picks','quality']:sid==='powered-cube'?['all_picks','serving_picks','quality','snapshot']:['all_picks','late_picks','serving_picks','serving_late_picks','quality'];
  const gates=Object.fromEntries(checks.map(k=>[k,s[k]?.pass===true]));
  const v5=report.schema==='v5-traditional-rescore-v1'||isP1P6(report);
- const parity=Number(v5?s.v5_parity_picks:s.parity_picks??s.v8_parity_picks??0);
+ const parity=Number(v6?set.v6_parity_picks:v5?s.v5_parity_picks:s.parity_picks??s.v8_parity_picks??0);
  Object.assign(gates,{independent_expansion:expansionSupported(report)&&!report.residuals?.persistent_category_patterns?.length&&!report.persistent_category_patterns?.length,
-  [v5?'v5_model_reconstruction':'frozen_model_parity']:parity>=200,source_accounting:puzzles===s.quality?.usable_traditional_puzzles,
+  [v6?'v6_model_reconstruction':v5?'v5_model_reconstruction':'frozen_model_parity']:parity>=200,source_accounting:puzzles===s.quality?.usable_traditional_puzzles,
   metadata_complete:metadataComplete===puzzles,images_complete:imagesComplete===puzzles,usable_inventory:usable>=200});
  return {ready:Object.values(gates).every(Boolean),gates,usable_puzzles:usable,puzzles,
   metadata:{stored_complete_puzzles:storedMetadataComplete,resolved_complete_puzzles:metadataComplete,repaired_puzzles:metadataComplete-storedMetadataComplete},
   thresholds:report.thresholds,scoring_checks:Object.fromEntries(checks.filter(k=>k.includes('picks')).map(k=>[k,{gates:s[k].gates,intervals:s[k].intervals_traditional_minus_premier,difficulty_total_variation:s[k].difficulty_total_variation}])),
-  parity_picks:parity,premier_source_audit:s.premier_source_audit};
+  parity_picks:parity,premier_source_audit:set.premier_source_audit,...(v6?{admitted_window:set.admitted_window}:{})};
 }
 export async function validateComponents(root) {
  const all=files(root),reports=all.filter(f=>path.basename(f)==='report.json');
@@ -54,6 +66,14 @@ export async function validateComponents(root) {
  const v5=report.schema==='v5-traditional-rescore-v1';
  const pinnedV5=v5||isP1P6(report)?JSON.parse(fs.readFileSync(new URL('../research/v5-production-component-pins.json',import.meta.url))).sets:[];
  if(v5&&(report.model_version!==V5_CONTEXT_MODEL_VERSION||parent!==V5_PARENT_CORPUS_VERSION||report.parent_corpus_version!==parent||report.production_changed!==false||report.publication_authorized!==false||report.traditional_used_for_training!==false||report.source_membership_preserved!==true||report.failing_sets?.length))throw Error('Invalid or blocked complete v5 Traditional evidence');
+ const v6=isV6(report);
+ const pinnedV6=v6?JSON.parse(fs.readFileSync(new URL('../research/v6-traditional-source-pins.json',import.meta.url))).sets:[];
+ if(v6) {
+  const admitted=Object.entries(report.admitted||{});
+  if(report.model_version!==V6_CONTEXT_MODEL_VERSION||parent!==V6_PARENT_CORPUS_VERSION||report.parent_corpus_version!==parent||report.production_changed!==false||report.publication_authorized!==false||report.traditional_used_for_training!==false||report.source_membership_preserved!==true)throw Error('Invalid complete v6 Traditional evidence');
+  if(!sameSet(Object.keys(report.sets||{}),pinnedV6.map(p=>p.set_id))||admitted.some(([sid,window])=>window!==v6Window(sid)||report.sets[sid]?.admitted_window!==window||report.sets[sid]?.pass!==true)||
+     !sameSet(report.not_admitted||[],Object.keys(report.sets).filter(sid=>!report.admitted[sid]))||Object.values(report.sets).some(s=>s.pass!==Boolean(s.admitted_window)))throw Error('v6 admissions differ from their per-set evidence');
+ }
  const p1p6=isP1P6(report);
  if(p1p6&&(report.model_version!==V5_CONTEXT_MODEL_VERSION||parent!==V5_PARENT_CORPUS_VERSION||report.parent_corpus_version!==parent||report.production_changed!==false||report.model_training_changed!==false||report.publication_authorized!==false||report.traditional_used_for_training!==false))throw Error('Invalid restricted v5 Traditional evidence');
  const cubeV3=report.schema==='cube-p2p7-admission-v1',cubeV4=isV4Cube(report),cubeReport=cubeV3||cubeV4;
@@ -61,22 +81,22 @@ export async function validateComponents(root) {
  const phase2V3=!cube&&report.schema===2&&Array.isArray(report.passing_sets)&&Array.isArray(report.failed_sets);
  const phase2V4=!cube&&isV4Phase2(report)&&Array.isArray(report.passing_sets)&&Array.isArray(report.failing_sets);
  const phase2=phase2V3||phase2V4;
- const defaultComponent=p1p6?TRADITIONAL_V5_P1P6_COMPONENT_VERSION:cubeV4?CUBE_TRADITIONAL_V4_COMPONENT_VERSION:cubeV3?CUBE_TRADITIONAL_COMPONENT_VERSION:
+ const defaultComponent=v6?TRADITIONAL_V6_PHASE2_COMPONENT_VERSION:p1p6?TRADITIONAL_V5_P1P6_COMPONENT_VERSION:cubeV4?CUBE_TRADITIONAL_V4_COMPONENT_VERSION:cubeV3?CUBE_TRADITIONAL_COMPONENT_VERSION:
   phase2V4?TRADITIONAL_V4_PHASE2_COMPONENT_VERSION:phase2V3?TRADITIONAL_PHASE2_COMPONENT_VERSION:TRADITIONAL_COMPONENT_VERSION;
  const defaultModel=modelVersionForComponent(defaultComponent);
- const expectedSets=v5?pinnedV5.map(p=>p.set_id):cube?['powered-cube']:phase2?PHASE2_SCOPE:p1p6?P1P6_SETS.filter(sid=>report.sets?.[sid]):['blb','dft','fin','hob'];
+ const expectedSets=v6?Object.keys(report.admitted||{}):v5?pinnedV5.map(p=>p.set_id):cube?['powered-cube']:phase2?PHASE2_SCOPE:p1p6?P1P6_SETS.filter(sid=>report.sets?.[sid]):['blb','dft','fin','hob'];
  if(p1p6&&(expectedSets.length!==1||expectedSets.some(sid=>pinnedV5.some(p=>p.set_id===sid))))throw Error('Restricted admission must name exactly one approved new set');
  const preparedSets=phase2?PHASE2_SCOPE.filter(s=>s!=='powered-cube'):expectedSets;
  if(!defaultModel)throw Error('Unsupported component identity');
  if(phase2V4) {
   if(report.production_changed!==false||report.publication_authorized!==false||report.format_training_audit?.valid_despite_issue_164!==true||report.persistent_category_patterns?.length||report.residuals?.persistent_category_patterns?.length)throw Error('v4 revalidation report is not publication-safe');
   if(report.issue_164_review?.historical_components_are_comparison_only!==true)throw Error('v4 report does not preserve the issue #164 validity boundary');
- } else if(!v5&&(report.production_changed!==false||report.model_training_changed!==false))throw Error('Research report is not publication-safe');
+ } else if(!v5&&!v6&&(report.production_changed!==false||report.model_training_changed!==false))throw Error('Research report is not publication-safe');
  const passing=report.passing_sets||[],failing=report.failed_sets||report.failing_sets||[];
  if(phase2) {
   if(phase2V3&&(report.regression_ok!==true||report.automatic_expansion_supported!==true||report.persistent_category_patterns?.length))throw Error('Phase 2 expansion evidence is incomplete or blocked');
   if(!sameSet([...passing,...failing],expectedSets)||new Set([...passing,...failing]).size!==expectedSets.length)throw Error('Incorrect Phase 2 environment scope');
- } else if(!sameSet(Object.keys(report.sets||{}),expectedSets))throw Error('Incorrect research report');
+ } else if(!v6&&!sameSet(Object.keys(report.sets||{}),expectedSets))throw Error('Incorrect research report');
  const prepared=[],seen=new Set();
  for(const file of all.filter(f=>path.basename(f)==='manifest.json')) {
   const manifest=JSON.parse(fs.readFileSync(file)),sid=manifest.id,dir=path.dirname(file),reportSet=report.sets[sid];
@@ -84,14 +104,20 @@ export async function validateComponents(root) {
   seen.add(sid);
   if(phase2&&sid==='powered-cube'){if(passing.includes(sid))throw Error('Full-window Cube is not approved');continue;}
   const summaryFile=path.join(dir,'summary.json'),summary=fs.existsSync(summaryFile)?JSON.parse(fs.readFileSync(summaryFile)):null;
-  const cube=v5?sid==='powered-cube':cubeReport;
-  const component=v5?(cube?CUBE_TRADITIONAL_V5_COMPONENT_VERSION:TRADITIONAL_V5_PHASE2_COMPONENT_VERSION):defaultComponent;
+  const cube=v5||v6?sid==='powered-cube':cubeReport;
+  const window=v6?V6_WINDOWS[report.admitted[sid]]:null;
+  const component=v6?window.component:v5?(cube?CUBE_TRADITIONAL_V5_COMPONENT_VERSION:TRADITIONAL_V5_PHASE2_COMPONENT_VERSION):defaultComponent;
   const expectedModel=modelVersionForComponent(component);
   const s=phase2V4?summary:reportSet;
   if(v5){
    const pin=pinnedV5.find(p=>p.set_id===sid);
    if(!pin||!s||hashObject(manifest.source_archive)!==hashObject(pin.manifest.source_archive)||s.source_membership_preserved!==true||s.traditional_used_for_training!==false||s.model_version!==expectedModel||s.parent_corpus_version!==parent||s.training_mode!=='all-qualified'||s.training_cap!==null||!Number.isInteger(s.training_drafts)||s.training_drafts!==s.qualified_training_drafts||!Array.isArray(s.fold_training_ids_sha256)||s.fold_training_ids_sha256.length!==5||s.fold_training_ids_sha256.some(h=>!/^[a-f0-9]{64}$/.test(h))||s.historical_puzzle_file_sha256!==pin.manifest.puzzle_file_sha256||manifest.ledger_file_sha256!==pin.manifest.ledger_file_sha256||manifest.puzzles!==pin.manifest.puzzles)throw Error('v5 source membership or isolated training evidence changed');
    if(manifest.parent_corpus_version!==parent||manifest.source_status!==pin.status)throw Error('Invalid v5 parent/status');
+  }
+  if(v6){
+   const pin=pinnedV6.find(p=>p.set_id===sid);
+   if(!pin||!s||hashObject(manifest.source_archive)!==hashObject(pin.source_archive)||s.source_membership_preserved!==true||s.membership_origin!==pin.origin||s.traditional_used_for_training!==false||s.model_version!==expectedModel||s.parent_corpus_version!==parent||s.training_mode!=='all-qualified'||s.training_cap!==null||!Number.isInteger(s.training_drafts)||s.training_drafts!==s.qualified_training_drafts||!Array.isArray(s.fold_training_ids_sha256)||s.fold_training_ids_sha256.length!==5||s.fold_training_ids_sha256.some(h=>!/^[a-f0-9]{64}$/.test(h))||(pin.artifact&&s.historical_puzzle_file_sha256!==pin.artifact.puzzle_file_sha256))throw Error('v6 source membership or isolated training evidence changed');
+   if(manifest.parent_corpus_version!==parent||manifest.admission_policy!==`${report.admitted[sid]}-v6-admission-v1`||manifest.serving_window?.first_pick!==window.first||manifest.serving_window?.last_pick!==window.last)throw Error('Unapproved v6 Traditional window');
   }
   if(!s)throw Error('Missing per-set evidence');
   if(p1p6&&(manifest.parent_corpus_version!==parent||manifest.admission_policy!==P1P6_POLICY||manifest.serving_window?.first_pick!==1||manifest.serving_window?.last_pick!==6||
@@ -105,12 +131,13 @@ export async function validateComponents(root) {
   const manifestSignature=manifest.frozen_input_signature||manifest.model_input_signature;
   if(manifest.component_version!==component||manifest.model_version!==expectedModel||manifest.model_source_event!=='PremierDraft'||manifest.source_event_type!=='TradDraft'||manifest.publication_authorized!==false||!/^[a-f0-9]{64}$/.test(signature||'')||manifestSignature!==signature)throw Error('Invalid component identity');
   if(expectedModel===V4_CONTEXT_MODEL_VERSION&&manifest.parent_corpus_version!==modelVersions.v4.corpus_version)throw Error('v4 component is not pinned to the v8 parent');
-  if(summary&&!phase2V4&&!v5&&(summary.set!==sid||summary.model_version!==expectedModel||summary.model_training_changed!==false||summary.frozen_input_signature!==manifest.frozen_input_signature))throw Error('Invalid per-set Phase 2 evidence');
+  if(summary&&!phase2V4&&!v5&&!v6&&(summary.set!==sid||summary.model_version!==expectedModel||summary.model_training_changed!==false||summary.frozen_input_signature!==manifest.frozen_input_signature))throw Error('Invalid per-set Phase 2 evidence');
   if(!manifest.source_archive?.url?.endsWith(`/draft_data_public.${cube?'Cube_-_Powered':sid.toUpperCase()}.TradDraft.csv.gz`)||!manifest.source_archive.url.startsWith('https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/'))throw Error('Invalid source archive');
   for(const name of ['puzzles','trophies'])if(hash(path.join(dir,name+'.jsonl.gz'))!==manifest[name==='puzzles'?'puzzle_file_sha256':'ledger_file_sha256'])throw Error('Component checksum mismatch');
   const expectedPolicy=v5?'cube-p2p7-v5-admission-v1':cubeV4?'cube-p2p7-v4-admission-v1':'cube-p2p7-admission-v1';
-  if(cube&&(manifest.admission_policy!==expectedPolicy||manifest.serving_window?.first_pick!==2||manifest.serving_window?.last_pick!==7||!manifest.cube_snapshot?.pass))throw Error('Unapproved Cube window');
-  const width=cube||p1p6?6:8;
+  if(cube&&!v6&&(manifest.admission_policy!==expectedPolicy||manifest.serving_window?.first_pick!==2||manifest.serving_window?.last_pick!==7||!manifest.cube_snapshot?.pass))throw Error('Unapproved Cube window');
+  if(cube&&v6&&!manifest.cube_snapshot?.pass)throw Error('Unapproved Cube window');
+  const width=v6?window.last-window.first+1:cube||p1p6?6:8;
   const ledger=new Map();let qualified=0,included=0;
   for await(const d of records(path.join(dir,'trophies.jsonl.gz'))) {
    if(!/^[a-f0-9]{32}$/.test(d.source_draft_hash)||ledger.has(d.source_draft_hash)||d.event_type!=='TradDraft'||d.wins!==3||d.losses!==0||!['included','excluded'].includes(d.status))throw Error('Invalid Traditional source ledger');
@@ -127,7 +154,7 @@ export async function validateComponents(root) {
    puzzles++;usable+=Number(interestingDraftRunPuzzle(p));deckSources.set(p.source_draft_hash,(deckSources.get(p.source_draft_hash)||0)+1);
    const cards=[...p.candidates,...p.prior_picks];storedMetadataComplete+=Number(cards.every(c=>c.name&&c.rarity&&c.type_line));metadataComplete+=Number(cards.map(effectiveCardMetadata).every(c=>c.name&&c.rarity&&c.type_line));imagesComplete+=Number(cards.every(c=>c.image_url?.startsWith('https://')));
   }
-  if(puzzles!==manifest.puzzles||groups.size!==included||[...groups.values()].some(p=>p.length!==(cube?7:p1p6?6:8)))throw Error('Incomplete first-eight source accounting');
+  if(puzzles!==manifest.puzzles||groups.size!==included||[...groups.values()].some(p=>p.length!==width+(cube?1:0)))throw Error('Incomplete first-eight source accounting');
   const trophyDecks=await checkTrophyDecks(sid,deckSources,component);
   const health=sourceQuality(report,sid,{puzzles,usable,metadataComplete,storedMetadataComplete,imagesComplete},s);
   if(phase2&&health.ready!==passing.includes(sid))throw Error('Phase 2 pass status differs from reconstructed component health');
