@@ -1,8 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {gunzipSync} from 'node:zlib';
-import {buildReviewSet,serialize,assessPuzzle,proposedTop,parseCsv,strengthPercentile,REVIEWS,LATEST_REVIEW,OUTPUT_DIR,RULE} from '../scripts/build-puzzle-review-set.mjs';
+import {buildReviewSet,createReviewInputLoader,reviewInputLoader,serialize,assessPuzzle,proposedTop,parseCsv,strengthPercentile,REVIEWS,LATEST_REVIEW,OUTPUT_DIR,RULE} from '../scripts/build-puzzle-review-set.mjs';
 import {summarizeReview,ratedCount} from '../admin/puzzle-review-results.mjs';
 import {cardScores,loadState,emptyState,storageKey,resultsExport,REVIEW_VERSION} from '../admin/puzzle-review.mjs';
 import {adminArea,overviewMarkup,ADMIN_AREAS} from '../admin/overview.mjs';
@@ -14,8 +13,8 @@ const names=JSON.parse(fs.readFileSync('data/set-display-names.json','utf8')).na
 const versions=Object.keys(REVIEWS);
 const files=version=>({set:JSON.parse(read(`${version}-set.json`)),key:JSON.parse(read(`${version}-key.json`))});
 const corpusSources=new Map();
-for(const id of new Set(versions.flatMap(v=>REVIEWS[v].sets)))
-  for(const p of JSON.parse(gunzipSync(fs.readFileSync(`corpus/draft-run/${id}.json.gz`))))corpusSources.set(p.puzzle_id,p.source_draft_hash);
+for(const version of versions)for(const id of REVIEWS[version].sets)
+  for(const p of reviewInputLoader(version)(id).puzzles)corpusSources.set(p.puzzle_id,p.source_draft_hash);
 const sourcesOf=key=>Object.values(key.items).map(item=>corpusSources.get(item.puzzle_id));
 
 test('every checked-in review set and key regenerates exactly from checked-in inputs',()=>{
@@ -25,6 +24,32 @@ test('every checked-in review set and key regenerates exactly from checked-in in
     assert.equal(read(`${version}-key.json`),serialize(key),version);
   }
   assert.equal(REVIEW_VERSION,LATEST_REVIEW,'the admin page serves the latest review');
+});
+
+test('frozen review regeneration uses only pinned inputs even when the live corpus changes',()=>{
+  const readPinned=(path,...args)=>{
+    assert.ok(path.includes('/research/puzzle-review-inputs/v9/'),'must not read mutable live inputs');
+    return fs.readFileSync(path,...args);
+  };
+  const load=createReviewInputLoader('v9',{read:readPinned});
+  for(const version of versions) {
+    const {set,key}=buildReviewSet(version,{load,setNames:names});
+    assert.equal(serialize(set),read(`${version}-set.json`));
+    assert.equal(serialize(key),read(`${version}-key.json`));
+    for(const id of REVIEWS[version].sets)assert.deepEqual(load(id).hashes,files(version).key.inputs[id]);
+  }
+});
+
+test('frozen review input corruption fails closed for each input kind',()=>{
+  for(const suffix of ['/corpus.json.gz','/strength.csv','/trophy-decks.mjs']) {
+    const load=createReviewInputLoader('v9',{read:(path,...args)=>{
+      const bytes=fs.readFileSync(path,...args);
+      return path.endsWith(suffix)?Buffer.concat([bytes,Buffer.from('changed')]):bytes;
+    }});
+    assert.throws(()=>load('hob'),/Frozen review input checksum mismatch/);
+  }
+  assert.throws(()=>createReviewInputLoader(undefined),/pinned review input snapshot is required/);
+  assert.throws(()=>createReviewInputLoader('v9')('unknown'),/Missing frozen review inputs/);
 });
 
 test('every pair matches set and pick, uses distinct source drafts, and arms meet their rules',()=>{

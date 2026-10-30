@@ -220,6 +220,12 @@ jobs:
               shutil.copytree(p,root/p.name.removeprefix('v6-environment-'),dirs_exist_ok=True)
           PY
           python scripts/v6_rebuild.py assemble
+      - name: Refresh current-corpus fixtures while preserving accepted historical scores
+        run: |
+          set -euo pipefail
+          golden_sha="$(sha256sum tests/fixtures/draft-run/scoring-golden.json)"
+          node scripts/build-test-corpus-fixture.mjs
+          test "$golden_sha" = "$(sha256sum tests/fixtures/draft-run/scoring-golden.json)"
       - name: Prove Cube rerolls under complete session source exclusions
         run: node scripts/v6-cube-reroll-admission.mjs
       - name: Generate post-build v5 to v6 implementation QA
@@ -298,7 +304,7 @@ jobs:
               'environment_commit':os.environ['V6_ENVIRONMENT_COMMIT'],
               'corpus_version':'elite-trophy-colour-stage-v10','model_version':'strong-player-colour-stage-v6'})
           PY
-          git add data corpus/draft-run draft-run.mjs results/v6-rebuild research/v6-validated-release.json
+          git add data corpus/draft-run draft-run.mjs tests/fixtures/draft-run results/v6-rebuild research/v6-validated-release.json
           git commit -m 'Build v6 splash-colour model as elite-trophy-colour-stage-v10 [data-generated]'
           if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
             git fetch origin "$branch"
