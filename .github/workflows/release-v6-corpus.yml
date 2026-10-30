@@ -170,7 +170,7 @@ jobs:
               'corpus','data','model-versions.json','draft-run.mjs','research','results']);
           }
           NODE
-          cp generated/v6-stage-evidence/v6-release-baseline.json generated/v6-release-baseline.json
+          node scripts/v6-release-evidence.mjs open generated/v6-stage-evidence/v6-release-baseline.enc generated/v6-release-baseline.json
 
       - name: Stage immutable v10 candidate without switching serving
         if: inputs.action == 'stage'
@@ -327,6 +327,15 @@ jobs:
           },null,2)+'\n');
           NODE
 
+      - name: Protect private preservation evidence before artifact publication
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f generated/v6-release-baseline.json ]]; then
+            node scripts/v6-release-evidence.mjs seal generated/v6-release-baseline.json generated/v6-release-baseline.enc
+          fi
+
       - uses: actions/upload-artifact@v4
         if: always() && (inputs.action == 'stage' || inputs.action == 'rollback' || inputs.action == 'verify-active' || inputs.action == 'resume-activation')
         with:
@@ -334,7 +343,7 @@ jobs:
           retention-days: 90
           if-no-files-found: error
           path: |
-            generated/v6-release-baseline.json
+            generated/v6-release-baseline.enc
             generated/stage.json
             generated/v6-traditional-validated.json
 
@@ -345,6 +354,6 @@ jobs:
           retention-days: 90
           if-no-files-found: ignore
           path: |
-            generated/v6-release-baseline.json
+            generated/v6-release-baseline.enc
             generated/serving-quality-verification.json
             generated/cube-expansion-verification.json

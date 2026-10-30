@@ -27,6 +27,12 @@ An earlier draft let failing sets fall back to a narrower window. The owner reje
 - Standings continue: under v10 the leaderboard counts v9 and v10 results together (`STANDINGS_LINEAGE`). v9 itself started from v9 results only; that is unchanged.
 - Recorded scores, sessions and v9 data are not rewritten. Rollback restores the captured v9 pointers after the bridge is redeployed.
 
+## Cutover regression and private evidence
+
+- The PostgreSQL serving-carry contract executes the release script's actual activation and rollback SQL on synthetic snapshots. It checks exact v9 inventory preservation, continued ready-cache publication, v10 isolation, rejected incomplete activation and rollback. Same-version supersession must not enable the bridge.
+- Migration 0069 applies the same cross-version membership rule to both cache construction and exact-equivalence checking. Without the latter, activation rejects the still-valid v9 cache instead of carrying it to the new revision. The schema baseline accepts the measured definitions before and after the migration.
+- Preservation baselines contain private record fingerprints and activity counts. Release artifacts carry only authenticated encrypted baselines; logs report sanitized success indicators. The trusted workflow derives the encryption key from its existing `NEON_API_KEY` with a release-specific HKDF context and random salt. No new credential is created. Keep that credential available throughout the rollback window; rotating it requires an explicit evidence re-encryption plan before the old credential is discarded. Decryption fails closed on a wrong credential or modified artifact.
+
 ## Sequence
 
 Each step is a reviewed `.github/model-rollout-request.json` change on main.

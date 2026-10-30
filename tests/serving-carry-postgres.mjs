@@ -7,6 +7,7 @@ import {fixturePool} from './support/postgres-fixture.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {DRAFT_RUN_DIFFICULTY_VERSION} from '../draft-run-difficulty.mjs';
 import {SERVING_POLICY_VERSION} from '../serving-quality.mjs';
+import {verifyV6Cutover} from './support/v6-cutover-contract.mjs';
 
 const pool=fixturePool(),client=await pool.connect();
 const query=(text,values=[])=>client.query(text,values);
@@ -36,6 +37,9 @@ try {
   check(await matches(before)===false,'The cache that still holds the removed decision is not carried');
 
   console.log('PASS: '+tests+' real PostgreSQL serving-cache carry-forward assertions with a report-removed decision.');
+  await query('ROLLBACK');
+  await query('BEGIN');
+  await verifyV6Cutover(query);
 } finally {
   await query('ROLLBACK').catch(()=>{});
   client.release();

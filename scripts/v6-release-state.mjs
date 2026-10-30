@@ -6,9 +6,13 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import modelVersions from '../model-versions.json' with {type:'json'};
 import {corpusDatabase} from './neon-corpus-db.mjs';
-import {HISTORY_SQL,assertHistoryPreserved} from './v5-release-state.mjs';
+import {HISTORY_SQL,assertHistoryPreserved as checkHistoryPreserved} from './v5-release-state.mjs';
 
-export {HISTORY_SQL,assertHistoryPreserved};
+export {HISTORY_SQL};
+export function assertHistoryPreserved(before,after) {
+  try {checkHistoryPreserved(before,after);}
+  catch {throw Error('Release history preservation check failed.');}
+}
 export const ROLLBACK_SCHEMA='premier-modern-skill-buckets-v1';
 const PREVIOUS=modelVersions.v5.corpus_version;
 
@@ -55,22 +59,19 @@ async function main() {
        await manifestHash()!==before.v9_manifest_hash)throw Error('Active acceptance changed environment policy or retained v9 manifests.');
     const after=await history();
     assertHistoryPreserved(before.history,after);
-    console.log(JSON.stringify({preserved:true,sets:sets.length,original_stage_revision:before.serving_revision,
-      before_history_counts:before.history_counts,
-      after_history_counts:Object.fromEntries(Object.entries(after).map(([table,rows])=>[table,rows.reduce((n,row)=>n+Number(row.n),0)]))}));
+    console.log(JSON.stringify({preserved:true,sets:sets.length}));
   } else if(action==='capture') {
     const value=await snapshot();
     fs.mkdirSync(path.dirname(stateFile),{recursive:true});
     fs.writeFileSync(stateFile,JSON.stringify(value,null,2)+'\n');
-    console.log(JSON.stringify({captured:true,serving_revision:value.serving_revision,sets:value.sets.length,history_counts:value.history_counts}));
+    console.log(JSON.stringify({captured:true,sets:value.sets.length}));
   } else {
     const before=JSON.parse(fs.readFileSync(stateFile,'utf8')),after=await snapshot();
     for(const key of ['sets','environment','serving_revision','v9_manifest_hash']) {
       if(JSON.stringify(after[key])!==JSON.stringify(before[key]))throw Error('Stage changed serving/rollback state: '+key);
     }
     assertHistoryPreserved(before.history,after.history);
-    console.log(JSON.stringify({preserved:true,serving_revision:after.serving_revision,sets:after.sets.length,
-      before_history_counts:before.history_counts,after_history_counts:after.history_counts}));
+    console.log(JSON.stringify({preserved:true,sets:after.sets.length}));
   }
 }
 if(process.argv[1]&&pathToFileURL(path.resolve(process.argv[1])).href===import.meta.url)await main();

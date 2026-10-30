@@ -1113,7 +1113,10 @@
     "function:pack1_revoke_admin_member(uuid,uuid)": "197191b134526319d3e68080b7859a7d",
     "function:pack1_select_serving_run_v1(bigint,bigint,text,text,text,jsonb)": "a6655c43396c88cd8cf0b2e8bfd790e2",
     "function:pack1_serving_snapshot(text,text,text)": "5c0475b8163b451ef1e0ccaedd0fcdda",
-    "function:pack1_serving_snapshot_matches_current(text,text,text,bigint)": "681d070514119b04d283fb26b830abad",
+    "function:pack1_serving_snapshot_matches_current(text,text,text,bigint)": [
+      "681d070514119b04d283fb26b830abad",
+      "7a816e51a252ea03ea380eee446db28c"
+    ],
     "function:pack1_sync_creator_challenge_source_owner()": "33f700c22e08ae3f7097cf75743902d7",
     "function:pack1_username_key(text)": "1787cb10a56bcf72dbfadd561ca37090",
     "function:pack1_version_can_affect_serving(text)": "f54a0a8053adcc519ae437ebbddf8718",
