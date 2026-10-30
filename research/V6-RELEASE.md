@@ -41,6 +41,8 @@ The remaining failure compared mean counterfactual probability movement across d
 
 The repair changes no Python build inputs, model implementation, Traditional admission thresholds or release protections. The reviewed finalize request reuses run 40987407495 only after the existing identity and successful-environment checks pass.
 
+Recovery run 41065249302 passed preparation and 1,740 of 1,741 JavaScript tests. Its only failure was Powered Cube fixture provenance: fixture generation preceded the existing session-reroll admission, which reduced the Cube corpus from 781 to 688 decisions. Fixture generation now runs after admission and QA, so its fingerprints describe the final admitted corpus. A workflow regression check enforces that dependency before validation and publication. The retry keeps the same environment run and explicitly names the preceding equivalent request with `replay_of`.
+
 ## Sequence
 
 Each step is a reviewed `.github/model-rollout-request.json` change on main.
