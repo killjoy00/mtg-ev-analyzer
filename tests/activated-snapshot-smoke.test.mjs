@@ -28,9 +28,11 @@ test('first-class snapshots expect their own ID on puzzles; historical ones expe
 });
 
 test('mixed-only inheritance requires a recorded v8 historical to v9 cutover',async()=>{
- const inherited={...live,corpus_version:DRAFT_RUN_CORPUS_VERSION,previous_corpus_version:modelVersions.v4.corpus_version,previous_schema_version:'historical-frozen'};
+ // Pinned to the v8 to v9 cutover; a later modern parent never inherits legacy coverage.
+ const inherited={...live,corpus_version:modelVersions.v5.corpus_version,previous_corpus_version:modelVersions.v4.corpus_version,previous_schema_version:'historical-frozen'};
  assert.equal((await loadActivatedEnvironment(environment(inherited),'fra')).legacy_coverage_parent,true);
- for(const change of [{previous_corpus_version:DRAFT_RUN_CORPUS_VERSION},{previous_schema_version:'premier-modern-skill-buckets-v1'},{previous_corpus_version:null}])
+ for(const change of [{previous_corpus_version:modelVersions.v5.corpus_version},{previous_schema_version:'premier-modern-skill-buckets-v1'},{previous_corpus_version:null},
+   {corpus_version:modelVersions.v6.corpus_version,previous_corpus_version:modelVersions.v5.corpus_version,previous_schema_version:'premier-modern-skill-buckets-v1'}])
   assert.equal((await loadActivatedEnvironment(environment({...inherited,...change}),'fra')).legacy_coverage_parent,false);
 });
 

@@ -117,7 +117,7 @@ export function debateCopies(f,{legacySplit=false}={}) {
  const title=longTitle.length<=100?longTitle:
   'Which Would You Draft? '+f.players+' Players, '+leading+' Leading Picks | MTG #Shorts';
  const description=[
-  f.players+' Pack One players voted on Pick '+f.pick_number+' of a real '+set+
+  f.players+' Pack One players picked cards from Pick '+f.pick_number+' of a real '+set+
    ' trophy draft. These were the '+leading.toLowerCase()+' leading picks. Which would you take? Comment your pick.',
   '',
   'Pack One: eight real trophy-draft decisions every day. Free. No account required. '+

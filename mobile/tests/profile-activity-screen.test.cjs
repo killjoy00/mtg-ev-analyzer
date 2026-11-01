@@ -207,18 +207,18 @@ test('the existing ProfileOverview entry points preserve private versus exact pu
   let root;
   await act(async () => { root = Renderer.create(React.createElement(Overview, { profile: profile() })); });
   t.after(async () => { await act(async () => root.unmount()); });
-  for (const [label, tab] of [['Explore archive progress', 'archive'], ['Browse achievements and sharing', 'achievements'], ['Browse Daily finishes and sharing', 'daily']]) {
+  for (const [label, tab] of [['See all sets', 'archive'], ['Browse achievements and sharing', 'achievements'], ['Browse Daily finishes and sharing', 'daily']]) {
     const button = root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === label)[0];
     assert.ok(button); await act(async () => button.props.onPress());
     assert.deepEqual(h.routes.at(-1), { pathname: '/profile-activity', params: { tab } });
   }
   const publicRecord = profile(); publicRecord.player.profile_public = true;
   await act(async () => root.update(React.createElement(Overview, { profile: publicRecord, publicView: true })));
-  await act(async () => root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Explore archive progress')[0].props.onPress());
+  await act(async () => root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'See all sets')[0].props.onPress());
   assert.deepEqual(h.routes.at(-1), { pathname: '/profile-activity', params: { tab: 'archive', profileKey: KEY } });
   publicRecord.player.profile_key = null;
   await act(async () => root.update(React.createElement(Overview, { profile: publicRecord, publicView: true })));
-  assert.equal(root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Explore archive progress').length, 0);
+  assert.equal(root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'See all sets').length, 0);
 });
 
 

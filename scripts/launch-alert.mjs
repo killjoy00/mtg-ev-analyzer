@@ -1,5 +1,7 @@
 import fs from 'node:fs';
 import {pathToFileURL} from 'node:url';
+import {createHash} from 'node:crypto';
+import {collectVerifiedTelemetry,telemetryEventIdentity} from './verified-observability.mjs';
 import {SLOW_REQUEST_MS,SLOW_QUOTA_MS,alertSeverity} from '../launch-alert-policy.mjs';
 import {reconcileIncidents,persistentLatencyConditions} from './launch-incident-state.mjs';
 import {
@@ -29,7 +31,8 @@ export function parseGatewayEvent(row) {
   const duration=value=>Number.isFinite(value)&&value>=0?value:0;
   const boundedTiming=value=>Number.isFinite(value)&&value>=0&&value<=600000?Math.round(value):null;
   const integer=value=>Number.isInteger(value)&&value>=0&&value<=100?value:null;
-  const event={id:row?.$metadata?.id,route:/^[a-z_]{1,40}$/.test(p.route)?p.route:'other',status:p.status,sample_rate:p.sample_rate,duration_ms:p.duration_ms,quota_ms:duration(p.quota_ms),upstream_ms:duration(p.upstream_ms),quota_scope:['request','session','request,session'].includes(p.quota_scope)?p.quota_scope:null,release:/^[a-f0-9]{40}$/.test(p.release)?p.release:'unknown',
+  const identity=telemetryEventIdentity(row);
+  const event={id:identity&&identity!==row?.$metadata?.id?createHash('sha256').update(identity).digest('hex'):identity,route:/^[a-z_]{1,40}$/.test(p.route)?p.route:'other',status:p.status,sample_rate:p.sample_rate,duration_ms:p.duration_ms,quota_ms:duration(p.quota_ms),upstream_ms:duration(p.upstream_ms),quota_scope:['request','session','request,session'].includes(p.quota_scope)?p.quota_scope:null,release:/^[a-f0-9]{40}$/.test(p.release)?p.release:'unknown',
     tail_sampling_version:p.tail_sampling_version===1?1:0,rate_limit_class:p.rate_limit_class==='player_auth'&&p.status===429&&p.route==='account'&&p.upstream_status===429&&p.upstream_calls===1&&!p.quota_scope?'player_auth':null,
     upstream_calls:integer(p.upstream_calls),upstream_status:Number.isInteger(p.upstream_status)&&p.upstream_status>=100&&p.upstream_status<=599?p.upstream_status:null,
     quota_handler_ms:boundedTiming(p.quota_handler_ms),quota_transport_wait_ms:boundedTiming(p.quota_transport_wait_ms),
@@ -114,20 +117,15 @@ export function parseNeonUsage(data) {
 }
 
 export async function queryEvents(fetcher,token,account,from,to) {
-  const url=`https://api.cloudflare.com/client/v4/accounts/${account}/workers/observability/telemetry/query`,seen=new Map();
-  let offset=null;
-  for(let page=0;page<GATEWAY_MAX_PAGES;page++) {
-    const body={queryId:'pack1-launch-watch',timeframe:{from,to},dry:true,limit:GATEWAY_PAGE_SIZE,view:'events',parameters:{datasets:['cloudflare-workers'],filterCombination:'and',filters:[{key:'$metadata.service',operation:'eq',type:'string',value:'pack1-gateway'},{key:'event',operation:'eq',type:'string',value:'gateway_request'}]}};
-    if(offset){body.offset=offset;body.offsetDirection='next';}
-    const d=await json(fetcher,url,token,body);
-    const rows=d.result?.events?.events;if(!Array.isArray(rows))throw Error('Unexpected gateway log schema');
-    for(const row of rows){const event=parseGatewayEvent(row);if(!event?.id)throw Error('Unexpected gateway event schema');seen.set(event.id,event);}
-    if(rows.length<GATEWAY_PAGE_SIZE)return [...seen.values()];
-    const next=rows.at(-1)?.$metadata?.id;
-    if(typeof next!=='string'||!next||next.length>512||next===offset)throw Error('Gateway telemetry cursor invalid');
-    offset=next;
-  }
-  throw Error('Gateway telemetry exceeds bounded query capacity');
+  const url=`https://api.cloudflare.com/client/v4/accounts/${account}/workers/observability/telemetry/query`;
+  const result=await collectVerifiedTelemetry({from,to,pageSize:GATEWAY_PAGE_SIZE,maxPages:GATEWAY_MAX_PAGES,maxRequests:64,
+    fetchPage:async({from:begin,to:end,limit,offset})=>{
+      const body={queryId:'pack1-launch-watch',timeframe:{from:begin,to:end},dry:true,limit,view:'events',parameters:{datasets:['cloudflare-workers'],filterCombination:'and',filters:[{key:'$metadata.service',operation:'eq',type:'string',value:'pack1-gateway'},{key:'event',operation:'eq',type:'string',value:'gateway_request'}]}};
+      if(offset){body.offset=offset;body.offsetDirection='next';}
+      const data=await json(fetcher,url,token,body);
+      return {events:data.result?.events?.events,level:data.result?.statistics?.abr_level??data.result?.run?.statistics?.abr_level};
+    }});
+  return result.rows.map(row=>{const event=parseGatewayEvent(row);if(!event?.id)throw Error('Unexpected gateway event schema');return event;});
 }
 
 function dedupeEvents(events) {

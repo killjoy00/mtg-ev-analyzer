@@ -239,3 +239,15 @@ test('Neon scheduler release is fixed, reviewed, and exact-revision on enable',(
    {...enable,workflow:'other.yml'},
  ])assert.throws(()=>rolloutDispatch(bad));
 });
+
+test('v6 rebuild and release dispatch use their own fixed workflows and exact identities',()=>{
+ assert.deepEqual(rolloutDispatch({...common,operation:'rebuild-v6'}),{workflow:'rebuild-v6-draft-run-corpus.yml',body:{ref:'main',inputs:{}}});
+ assert.deepEqual(rolloutDispatch({...common,operation:'rebuild-v6',reuse_run_id:'41000000000'}).body.inputs,{reuse_run_id:'41000000000'});
+ for(const patch of [{reuse_run_id:'latest'},{training_cap:5000},{target:'production'}])assert.throws(()=>rolloutDispatch({...common,operation:'rebuild-v6',...patch}));
+ const base={...common,operation:'v6-corpus-release',target:'development',action:'stage',candidate_run_id:'41000000001',release_commit:'a'.repeat(40)};
+ assert.deepEqual(rolloutDispatch(base),{workflow:'release-v6-corpus.yml',body:{ref:'main',inputs:{target:'development',action:'stage',candidate_run_id:'41000000001',release_commit:'a'.repeat(40)}}});
+ const activate={...base,action:'activate',stage_run_id:'41000000002',bridge_commit:'b'.repeat(40)};
+ assert.equal(rolloutDispatch({...activate,action:'rollback',target:'production'}).workflow,'release-v6-corpus.yml');
+ for(const bad of [{...base,repair_game_metadata:true},{...base,action:'activate'},{...base,stage_run_id:'41000000002'},{...activate,bridge_commit:'main'},{...base,release_commit:'main'}])
+   assert.throws(()=>rolloutDispatch(bad));
+});

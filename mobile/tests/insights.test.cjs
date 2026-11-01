@@ -149,7 +149,7 @@ test('under-sampled groups remain descriptive, without repetitive threshold para
  assert.ok(ui.text().includes('8 picks included'));
  assert.ok(!ui.text().includes('3-pick average is a skill measure'));
  await ui.choose('More stats');
- assert.ok(ui.text().includes('Need 5 picks'));
+ assert.ok(ui.text().includes('Average after 5 picks'));
 });
 
 test('native scouting report renders evidence-backed DNA, original cards and Journey with owner-only review',async t=>{
@@ -360,7 +360,7 @@ test('native compact choice rows show the result first and hide method/examples 
   const ui=await mount(t,{respond:async()=>data});
   const text=ui.text();
   assert.ok(text.includes('The Independent Thinker'));
-  assert.ok(text.includes('Across formats · All available history'));
+  assert.ok(text.includes('Recent picks across all formats'));
   assert.ok(!text.includes('19 of 26 qualifying picks'),'conditional denominators stay collapsed');
   await ui.choose('Card type and rarity counts');
   assert.ok(ui.text().includes('19 of 26 qualifying picks'));
@@ -441,7 +441,7 @@ test('native filtered unlock never hides qualified all-history pick patterns',as
   const ui=await mount(t,{respond:async()=>data});
   assert.ok(ui.text().includes('You have 0 of 8 picks included for this view'));
   assert.ok(ui.text().includes('The Independent Thinker'));
-  assert.ok(ui.text().includes('Across formats · All available history'));
+  assert.ok(ui.text().includes('Recent picks across all formats'));
   assert.ok(!ui.text().includes('Your scores over time'),
     'the selected-format score report remains locked');
 });

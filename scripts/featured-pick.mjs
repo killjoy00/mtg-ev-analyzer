@@ -140,28 +140,28 @@ export function featureCopies(f,{legacyPatreon=false}={}) {
   ' split '+f.tier+' ways! 🃏';
  const trophy='The trophy drafter took '+f.trophy.name+
   ' ('+formatPercent(f.trophy.pct)+'%).';
- let blue=intro+'\n\n'+f.choices.map(pct).join('\n')+'\n\n'+f.players+' drafters. '+
+ let blue=intro+'\n\n'+f.choices.map(pct).join('\n')+'\n\n'+f.players+' Pack One players. '+
   trophy+'\n\nYour pick? packone.pro';
  if([...blue].length>300)blue=intro+'\n\n'+f.choices.map(c=>
   formatPercent(c.pct)+'% '+c.name).join(' · ')+
   '\n\nTrophy: '+f.trophy.name+'. Your pick? packone.pro';
  if([...blue].length>300)throw Error('Featured Bluesky post exceeds 300 characters.');
- const discord='**Yesterday\'s most debated Pack One pick!** 🃏\n\n'+
-  label+' · P1P'+f.pick_number+' · '+f.players+' unique drafters\n\n'+
+ const discord='**A contested pick from yesterday\'s Daily** 🃏\n\n'+
+  label+' · P1P'+f.pick_number+' · '+f.players+' Pack One players\n\n'+
   (f.prior_picks.length?'**Already drafted:** '+f.prior_picks.map(c=>c.name).join(', ')+'\n\n':'')+
   '**The community chose:**\n'+f.choices.map((c,i)=>
    '**'+String.fromCharCode(65+i)+'. '+c.name+'** — '+formatPercent(c.pct)+
    '% ('+c.votes+' votes)').join('\n')+
   (f.other_votes?'\nOther cards — '+f.other_votes+' votes':'')+
   '\n\n**Trophy choice:** ||'+f.trophy.name+'||\n\n'+
-  '**What would you take—and why?**\n'+featureLink('discord');
+  '**What would you take, and why?**\n'+featureLink('discord');
  const title='The Pick That Split '+f.players+' Drafters '+f.tier+
   ' Ways | Pack One '+label;
  const patreonTitle="Pack One's Contested Daily Pick "+f.day;
  const patreon='# '+(legacyPatreon?title:patreonTitle)+'\n\n'+label+' · P1P'+f.pick_number+
   ' · '+f.day+'\n\n'+
   (f.prior_picks.length?'**Prior picks:** '+f.prior_picks.map(c=>c.name).join(', ')+'.\n\n':'')+
-  'Of '+f.players+(legacyPatreon?' distinct Pack One players:\n\n':' Pack One players:\n\n')+
+  (legacyPatreon?'Of '+f.players+' distinct Pack One players:\n\n':"Here’s what "+f.players+' Pack One players picked:\n\n')+
   f.choices.map(c=>'- **'+formatPercent(c.pct)+'%** chose '+c.name+' ('+c.votes+' players)').join('\n')+
   (f.other_votes?'\n- **'+f.other_votes+'** chose other cards.':'')+
   '\n\nThe original trophy drafter took **'+f.trophy.name+

@@ -1,5 +1,5 @@
 import {escapeHtml as esc} from './html.mjs';
-import {openCardViewer} from './card-viewer.mjs?v=1';
+import {openCardViewer} from './card-viewer.mjs?v=2';
 
 const events={PremierDraft:'Premier Draft',TradDraft:'Traditional Draft',PickTwoDraft:'Pick Two Draft'};
 const mana=cost=>[...String(cost||'').matchAll(/\{([^}]+)\}/g)].map(([,symbol])=>`<span class="run-deck-mana ${/^[WUBRG]$/.test(symbol)?'mana-'+symbol:''}">${esc(symbol)}</span>`).join('');

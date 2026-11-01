@@ -143,7 +143,7 @@ export default function HomeScreen() {
           <Text style={styles.eyebrow}>THE DAILY DRAFT</Text>
           <Text style={styles.title}>Eight picks. Your call.</Text>
           <Text style={styles.lede}>
-            Make your pick, then see what the trophy drafter chose and how strong your pick was.
+            Make your pick, then see what the trophy drafter chose and how your pick scored.
           </Text>
           <Text style={styles.today}>{dailyDate(pacificDay(now))}’s Daily Runs</Text>
         </View>

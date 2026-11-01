@@ -80,7 +80,7 @@ test('feedback escapes names and attributes in the full comparison',()=>{
 test('result text is spoiler-free, dated, and distinguishes Cube, practice and trophy matches',()=>{
  const run={day:'2026-09-14',score:65,answers:[{score:100,historicalMatch:true,selectedName:'Secret card'},{score:95},{score:60},{score:25},{score:0}]};
  const text=draftRunShareText(run);assert.match(text,/I scored 65\/100 on the Pack One Draft Run Daily \(Sep 14\)\./);assert.match(text,/🟩🟦🟨🟧⬛/);assert.doesNotMatch(text,/Secret/);
- assert.match(text,/Play today’s Daily yourself\. Free, no account needed:$/,'recipients learn they can play their own Daily');
+ assert.match(text,/Try Pack One's Daily\. No account needed:$/,'recipients learn they can play their own Daily');
  assert.doesNotMatch(text,/beat|same picks|same 8/i,'a link opened on another day plays different decisions');
  assert.match(draftRunShareText({...run,environment:'latest'}),/Pack One Latest Set Daily/);
  assert.match(draftRunShareText({...run,day:null,environment:'powered-cube'}),/Powered Cube · Practice/);

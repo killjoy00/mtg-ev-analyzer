@@ -120,7 +120,7 @@ test('gateway telemetry uses bounded cursor pages for dense same-timestamp event
   assert.equal(url,'https://api.cloudflare.com/client/v4/accounts/'+('a'.repeat(32))+'/workers/observability/telemetry/query');
   assert.equal(body.limit,GATEWAY_PAGE_SIZE);assert.deepEqual(body.timeframe,{from:0,to:1000});
   assert.equal(body.parameters.filters[0].value,'pack1-gateway');assert.equal(body.parameters.filters[1].value,'gateway_request');
-  return Response.json({result:{events:{events:calls.length===1?first:[row('dense-'+(GATEWAY_PAGE_SIZE-1)),row('dense-'+GATEWAY_PAGE_SIZE)]}}});
+  return Response.json({result:{events:{events:calls.length===1?first:[row('dense-'+(GATEWAY_PAGE_SIZE-1)),row('dense-'+GATEWAY_PAGE_SIZE)]},statistics:{abr_level:1}}});
  };
  const events=await queryEvents(fetcher,'token','a'.repeat(32),0,1000);
  assert.equal(calls.length,2);assert.equal(calls[0].offset,undefined);
@@ -131,7 +131,7 @@ test('gateway telemetry uses bounded cursor pages for dense same-timestamp event
 
 test('duplicate telemetry IDs are counted once',async()=>{
  const row={$metadata:{id:'same'},source:{event:'gateway_request',status:503,sample_rate:1,duration_ms:20,route:'draft',release:'a'.repeat(40)}};
- const events=await queryEvents(async()=>Response.json({result:{events:{events:[row,row]}}}),'token','a'.repeat(32),0,1000);
+ const events=await queryEvents(async()=>Response.json({result:{events:{events:[row,row]},statistics:{abr_level:1}}}),'token','a'.repeat(32),0,1000);
  assert.equal(events.length,1);
  assert.equal(events[0].id,'same');
 });
@@ -139,12 +139,12 @@ test('duplicate telemetry IDs are counted once',async()=>{
 test('gateway telemetry pagination fails closed on stuck cursors and the page bound',async()=>{
  const row=id=>({$metadata:{id},source:{event:'gateway_request',status:200,sample_rate:.1,duration_ms:20,route:'draft',release:'a'.repeat(40)}});
  const stuck=Array.from({length:GATEWAY_PAGE_SIZE},(_,i)=>row('stuck-'+i));
- await assert.rejects(()=>queryEvents(async()=>Response.json({result:{events:{events:stuck}}}),'token','a'.repeat(32),0,1000),/Gateway telemetry cursor invalid/);
+ await assert.rejects(()=>queryEvents(async()=>Response.json({result:{events:{events:stuck},statistics:{abr_level:1}}}),'token','a'.repeat(32),0,1000),/Telemetry pagination stalled/);
  let calls=0;
  await assert.rejects(()=>queryEvents(async()=>{
   const page=calls++;
-  return Response.json({result:{events:{events:Array.from({length:GATEWAY_PAGE_SIZE},(_,i)=>row('page-'+page+'-'+i))}}});
- },'token','a'.repeat(32),0,1000),/Gateway telemetry exceeds bounded query capacity/);
+  return Response.json({result:{events:{events:Array.from({length:GATEWAY_PAGE_SIZE},(_,i)=>row('page-'+page+'-'+i))},statistics:{abr_level:1}}});
+ },'token','a'.repeat(32),0,1000),/Telemetry query exceeded bounded page count/);
  assert.equal(calls,GATEWAY_MAX_PAGES);
 });
 

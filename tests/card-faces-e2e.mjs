@@ -49,6 +49,7 @@ try {
     const dialog=page.locator('.card-face-dialog');await dialog.waitFor();
     await page.waitForFunction(()=>[...document.querySelectorAll('.card-face-dialog img')].every(img=>img.complete&&img.naturalWidth));
     assert.equal(await dialog.locator('[data-face]:visible').count(),width>=760?2:1);
+    assert.equal(await dialog.locator('figcaption').count(),2,'two-faced cards label each face');
     if(width<760) {
       await dialog.getByRole('button',{name:'Show back: Reflection of Kiki-Jiki'}).focus();
       await page.keyboard.press('Enter');
@@ -59,7 +60,10 @@ try {
       assert.ok(b.x>=a.x+a.width,'desktop faces are side by side');
     }
     assert.ok(await dialog.evaluate(el=>el.scrollWidth<=el.clientWidth+1),'viewer has no horizontal overflow');
-    await page.keyboard.press('Escape');await dialog.waitFor({state:'detached'});
+    assert.equal(await dialog.isVisible(),true,'the face toggle keeps the viewer open');
+    // Escape closes it, and so does a tap anywhere, including on the card itself.
+    if(width===390)await dialog.locator('[data-face="0"] img').click();else await page.keyboard.press('Escape');
+    await dialog.waitFor({state:'detached'});
     assert.ok(await zoom.evaluate(el=>document.activeElement===el),'focus returns to enlarge button');
     assert.equal(await page.locator(`[data-pick="${fable.id}"]`).getAttribute('aria-pressed'),'true');
     assert.equal(picks,0,'inspection never submits a pick');
@@ -85,7 +89,8 @@ try {
   // Shared viewer also handles single-image cards and meld, with no gameplay callbacks.
   await page.evaluate(async()=>{const {openCardViewer}=await import('/card-viewer.mjs');openCardViewer({name:'Single',image_url:'https://cards.scryfall.io/normal/front/single.jpg'});});
   assert.equal(await page.locator('[data-face-toggle]').count(),0);
-  await page.keyboard.press('Escape');
+  assert.equal(await page.locator('.card-face-dialog figcaption').count(),0,'single-faced cards show their name once, in the header');
+  await page.locator('.card-face-header strong').click();await page.locator('.card-face-dialog').waitFor({state:'detached'});
   assert.deepEqual(errors,[]);
   console.log('Card faces: pack, pool, saved feedback, 320/390/1440 widths, keyboard, retry and pick isolation passed.');
 } finally {await browser.close();}

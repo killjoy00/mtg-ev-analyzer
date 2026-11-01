@@ -173,7 +173,7 @@ test('season profile labels conservative rating and raw average separately', asy
 
 test('public profile uses an existing account session for block-aware identity lookup without creating a new session', async (t) => {
   const f = await fixture(t);
-  assert.match(f.text(), /Public Alice/); assert.match(f.text(), /Favorite environment:.*MSH/);
+  assert.match(f.text(), /Public Alice/); assert.match(f.text(), /Favorite set or format:.*MSH/);
   assert.match(f.text(), /Showcased achievement:.*First Run/); assert.match(f.text(), /Best final Daily finish: Top.*8/);
   assert.match(f.text(), /Played environments/); assert.deepEqual(f.rows().map((item) => item.cursor), ['100']);
   const profileCall=f.calls.find((call)=>call.path===`/growth/v1/mobile/profile/${KEY_A}`);
