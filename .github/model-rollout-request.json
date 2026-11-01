@@ -1,11 +1,11 @@
 {
   "operation": "v6-corpus-release",
-  "request_id": "pack1-v6-activate-development-20261101",
-  "reason": "Activate the v6 candidate from rebuild run 41273387825 on development, from the successful stage run 41309576375 at release commit 4a3c2b3. Atomically switches the 31 environment pointers to their staged v10 parents, builds v10 readiness while the deployed v9 bridge 914dac3 keeps serving the superseded v9 snapshots, and publishes only the eligible v6 Traditional components. Rollback restores the captured v9 pointers after the bridge is redeployed.",
+  "request_id": "pack1-v6-resume-activation-development-20261101",
+  "reason": "Resume the committed v6 activation on development (activation run 41313148190, stage run 41309576375) at release commit d3a2847. Activation switched all 31 pointers and built v10 readiness, but 0069's bridge membership stranded the verified v9 bridge cache. This applies the 0070 repair, carries that exact cache only if the equivalence check proves it matches current inputs, then publishes the eligible v6 Traditional components and verifies the active state with the deployed v9 bridge 914dac3. No pointer is changed.",
   "target": "development",
-  "action": "activate",
+  "action": "resume-activation",
   "candidate_run_id": "41273387825",
-  "release_commit": "4a3c2b33f0789d19c38ca43c1787a0187a4dc70e",
+  "release_commit": "d3a284729c54d32af630c328ca4beb59ccd72bfb",
   "stage_run_id": "41309576375",
   "bridge_commit": "914dac33830f0e744cd7572feb59ca101cc9b18c"
 }
