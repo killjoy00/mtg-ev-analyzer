@@ -1,0 +1,817 @@
+{
+  "build_identity": "fec87c6a7e62b145d467954eb76e55ce90b9b7118c3d69ec897dd92cd4e441af",
+  "corpus_version": "elite-trophy-colour-stage-v10",
+  "environments": 31,
+  "model_version": "strong-player-colour-stage-v6",
+  "replay_environments": 30,
+  "sets": [
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "blb",
+      "input_signature": "1afb333864c068199b8a3572eb32a2b44ec932986940dfb4aecfc88b72d91919",
+      "qualified_drafts": 16463,
+      "qualified_training_drafts": 16463,
+      "skill_source": {
+        "compressed_bytes": 69271450,
+        "etag": "\"384cef5fde564a20965e2883322f9e96-9\"",
+        "last_modified": "Sat, 07 Sep 2024 02:41:07 GMT",
+        "sha256": "61fed2a4db5854ca9f247eba9ea4176cf70a25ee253024928963335d32dbf281",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.BLB.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 202475107,
+        "etag": "\"09ce7005bf2b52ce473eef46762aa269-25\"",
+        "last_modified": "Tue, 08 Oct 2024 15:16:48 GMT",
+        "sha256": "a02f9ebbadcd03cbcfd387eb95b2f5dd244d28bb0416de41113662e8f8eae0ea",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.BLB.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "29db231a897fa43a29f92bcd622b44c2fc81b31d6c94f42759024888575926f4",
+      "training_cap": null,
+      "training_drafts": 16463,
+      "training_mode": "all-qualified",
+      "training_picks": 638314
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "bro",
+      "input_signature": "9fe031604be604bb027f99d9c921401e754867cc20ae770523a4c5ffe5eaedd6",
+      "qualified_drafts": 7898,
+      "qualified_training_drafts": 7898,
+      "skill_source": {
+        "compressed_bytes": 40827409,
+        "etag": "\"293178789dad67406382cbdb6f60dd61-5\"",
+        "last_modified": "Thu, 15 Dec 2022 05:02:35 GMT",
+        "sha256": "5cfd6046d106727523345cf2779251187f1e6f4677cbc73ee6ca00ad414a1a52",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.BRO.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 146211950,
+        "etag": "\"7d9b64d600c0a65d196731453b05b113-18\"",
+        "last_modified": "Thu, 15 Dec 2022 05:02:58 GMT",
+        "sha256": "1a8a9530271334045262fbb34cf367ffe27e6f0a7c057c5cb5890efc421e5733",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.BRO.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "c9b849c1f0addf1d6b301e7d2eb42361a8ebfad56988be0722028ab72f88f46f",
+      "training_cap": null,
+      "training_drafts": 7898,
+      "training_mode": "all-qualified",
+      "training_picks": 352175
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "dft",
+      "input_signature": "d3dca2c149886b9fc2cab364c774225268ade160d18f5bf10cbce428133ac800",
+      "qualified_drafts": 18966,
+      "qualified_training_drafts": 18966,
+      "skill_source": {
+        "compressed_bytes": 67859327,
+        "etag": "\"0822f66660c9eb178d02b824aedc34e5-9\"",
+        "last_modified": "Sun, 23 Mar 2025 16:16:14 GMT",
+        "sha256": "734325afbe5c023245e7769fab66c88dcf241407666becb06b956d7fee13a28b",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.DFT.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 205196136,
+        "etag": "\"26901de9f4eeea3925cc71393279344d-25\"",
+        "last_modified": "Sun, 23 Mar 2025 16:16:54 GMT",
+        "sha256": "7812d16e0de78ff7a69faf9981f7ff03be4dfc618a86f14369424ec2204580cd",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.DFT.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "fb4cd8310b2179914b4f2116827acf780b6bb09fdd256836cbef395f797d2773",
+      "training_cap": null,
+      "training_drafts": 18966,
+      "training_mode": "all-qualified",
+      "training_picks": 789851
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "dmu",
+      "input_signature": "61386fa9ea74515b16ac14e1156bf3723a9638add1ca7f7e5f5f429aef23692c",
+      "qualified_drafts": 18933,
+      "qualified_training_drafts": 18933,
+      "skill_source": {
+        "compressed_bytes": 81110022,
+        "etag": "\"8071a91aa9349ffe2861830cec558e64-10\"",
+        "last_modified": "Fri, 28 Oct 2022 04:12:39 GMT",
+        "sha256": "073f868bf18f680e47d530e288e3408816cea9bd135cf79b9f4186db86d34ee6",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.DMU.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 302724532,
+        "etag": "\"d8163d56ba5c7173a4c61e4831951307-37\"",
+        "last_modified": "Fri, 28 Oct 2022 04:09:47 GMT",
+        "sha256": "b1164ed811aec9abc32ef2ebde70adb2364dc5861e612efbcdbab4e67a1df0ba",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.DMU.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "48ca3b9c27008d6b547292b057e4c092cb19ea84f54629044fb9d6112f2a5225",
+      "training_cap": null,
+      "training_drafts": 18933,
+      "training_mode": "all-qualified",
+      "training_picks": 790341
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "dsk",
+      "input_signature": "3a3d95d9f863789f4013f9a56bac22df2f2c22644cbfd36a58f0757e3e302fae",
+      "qualified_drafts": 19189,
+      "qualified_training_drafts": 19189,
+      "skill_source": {
+        "compressed_bytes": 77145600,
+        "etag": "\"54588bf51bf49b951ab2c8bb82e5a35d-10\"",
+        "last_modified": "Wed, 30 Oct 2024 01:44:09 GMT",
+        "sha256": "9aca1d2f8b3f010fa48b2293c27b4fe0eb6ff5e040f020b9ad703bedd9996a0d",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.DSK.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 250466473,
+        "etag": "\"fbedc6da3a2370fff9185a7b9d94a439-30\"",
+        "last_modified": "Wed, 30 Oct 2024 01:45:39 GMT",
+        "sha256": "2a562c6c7998d218fd7951cacaf5a7767118edbbcde5b5d6de96139749d93014",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.DSK.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "6d9264f9ec0abbe770b3e4afe1b578a28f4a6ee7e43389cb54288c8b0f5656ce",
+      "training_cap": null,
+      "training_drafts": 19189,
+      "training_mode": "all-qualified",
+      "training_picks": 801601
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "ecl",
+      "input_signature": "053f1ebf959ab9be13a56096c99895025fd6fe234adba4ca07cf5ad83f3c352d",
+      "qualified_drafts": 11553,
+      "qualified_training_drafts": 11553,
+      "skill_source": {
+        "compressed_bytes": 42752573,
+        "etag": "\"94b23621b015925bf9a2c3eaafe6f592-6\"",
+        "last_modified": "Mon, 18 May 2026 20:28:10 GMT",
+        "sha256": "54b94edb0702dbcf20aa943d0e7da5a7987cf20232864083953e61b95b38ff48",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.ECL.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 127844879,
+        "etag": "\"257b03c1698b5c137af1d0a188373c3c-16\"",
+        "last_modified": "Mon, 18 May 2026 20:28:23 GMT",
+        "sha256": "77d14502147241bf5fff65abe7bdfdda5e18e90ece3f935316447386112bc876",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.ECL.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "66e4c3e66f33861fec0db4cf84ae9e46528060d1c29e9ada69f1c504feda7856",
+      "training_cap": null,
+      "training_drafts": 11553,
+      "training_mode": "all-qualified",
+      "training_picks": 439014
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "eoe",
+      "input_signature": "5fdc9325345d4721bce9c69ede66e7f04f200f4129d53a8ffda9fc1dd3434217",
+      "qualified_drafts": 13238,
+      "qualified_training_drafts": 13238,
+      "skill_source": {
+        "compressed_bytes": 45587793,
+        "etag": "\"f268cb1314ef567aa2b4da961392cad4-6\"",
+        "last_modified": "Wed, 03 Sep 2025 12:42:21 GMT",
+        "sha256": "130e7e7580a1cb4b4f635411d187a078bc7bdd9dd3436ef5ff7535e14cadaf1b",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.EOE.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 141599552,
+        "etag": "\"f1e4870059a656c11b175d4dc4e6a676-17\"",
+        "last_modified": "Wed, 03 Sep 2025 12:42:43 GMT",
+        "sha256": "1dd9d1baf31fa56e06bbd2d9d9bb8c2c87cf342bc15872b5a30dbe9d4ecab648",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.EOE.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "d93940eca9928d2645148afbb89c92891ad02a6dcf2efd87c973ab6884b0ace4",
+      "training_cap": null,
+      "training_drafts": 13238,
+      "training_mode": "all-qualified",
+      "training_picks": 516281
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "fdn",
+      "input_signature": "1deee11266b6ca6fde0a091cc737853120e5f9e61724908087c40d4b76a484fc",
+      "qualified_drafts": 13414,
+      "qualified_training_drafts": 13414,
+      "skill_source": {
+        "compressed_bytes": 59955163,
+        "etag": "\"8bf7cca32c9a2168f4e5dc2dc44bc1fa-8\"",
+        "last_modified": "Thu, 19 Dec 2024 13:08:51 GMT",
+        "sha256": "fcabe5abc61cd46cd355611dd0e1ccff10b428537c630104d7c5e8f1e090fe64",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.FDN.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 189717506,
+        "etag": "\"7e39af8ed061e55023f701edde663bc9-23\"",
+        "last_modified": "Thu, 19 Dec 2024 13:09:30 GMT",
+        "sha256": "4c454ec9b6ecb0d711daf79262ffb3de2e682bf4a7988470ecb733da13d63a53",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.FDN.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "3666632f087ff5ce97efe31073f0bdd57973efe4f177d2556746cb171b0cc9b3",
+      "training_cap": null,
+      "training_drafts": 13414,
+      "training_mode": "all-qualified",
+      "training_picks": 559635
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "fin",
+      "input_signature": "b1a9c111a6ff7ff6b44b329aa02e02289dd706c49c94ee2e481a7199659a421e",
+      "qualified_drafts": 20366,
+      "qualified_training_drafts": 20366,
+      "skill_source": {
+        "compressed_bytes": 65071559,
+        "etag": "\"b7435733b80870f9f3d35f89074a6e3f-8\"",
+        "last_modified": "Sat, 19 Jul 2025 01:24:08 GMT",
+        "sha256": "f6452e622976f66dd5420c55741da5b246c7e8d25d63c080e728635e1741a6a6",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.FIN.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 215700130,
+        "etag": "\"5fd76048baa94e79541b3043e07330c2-26\"",
+        "last_modified": "Sat, 19 Jul 2025 01:24:37 GMT",
+        "sha256": "9d5b2a3e908bb8daf0ea6e951097714b651546370a5c852893dc90a1f2f6ab8b",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.FIN.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "194e9b82ed784008f71042fc8c645c56236d5126381d84cbb5939e46c72f19b0",
+      "training_cap": null,
+      "training_drafts": 20366,
+      "training_mode": "all-qualified",
+      "training_picks": 855372
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "fra",
+      "input_signature": "bdb19da8e1f2a7c8503ecbe2fa0305d9949be96449feb7cc0e79c90304a4c69b",
+      "qualified_drafts": 4677,
+      "qualified_training_drafts": 4677,
+      "skill_source": {
+        "compressed_bytes": 24570968,
+        "etag": "\"454df37989dfa31c3c1f9f139ba0800d-3\"",
+        "last_modified": "Mon, 19 Oct 2026 16:20:14 GMT",
+        "sha256": "a350666bfd293bd14601105af0187f13353b16fa86e81307432a7b3a9a0bbfdc",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.FRA.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 86041756,
+        "etag": "\"2ab6de12ad35693a60cb9b9a8aab2304-11\"",
+        "last_modified": "Mon, 19 Oct 2026 16:20:26 GMT",
+        "sha256": "f9497000be929d3f8cef87be643dc0b010e406a966ece7d0fc05e5e8e0c4b43d",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.FRA.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "2d16cf63cb131eeb3ea937977a3ef7d46d2d06f94c806b6d60c3c5ee8d17c76a",
+      "training_cap": null,
+      "training_drafts": 4677,
+      "training_mode": "all-qualified",
+      "training_picks": 196432
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "hbg",
+      "input_signature": "2bfa77672093eb21ad2d7efdd2b6744e71b6b0b0176e8ee949df789eb54ee84c",
+      "qualified_drafts": 3048,
+      "qualified_training_drafts": 3048,
+      "skill_source": {
+        "compressed_bytes": 13227537,
+        "etag": "\"5c7d0eb93280a1988d2cc3b0721ed38a-2\"",
+        "last_modified": "Fri, 29 Jul 2022 20:54:45 GMT",
+        "sha256": "465db4c4e3a364d2cfbca5c520746544f568d786d47d85552f02a9ecf2257608",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.HBG.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 52354143,
+        "etag": "\"70fd985bbff942e289681c83180d3656-7\"",
+        "last_modified": "Fri, 29 Jul 2022 20:55:01 GMT",
+        "sha256": "a6916d7bece8734b542c103ad4a6b613c78a5f3bbe9e3ff3b2b8ed68ff9ae350",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.HBG.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "994c17369dd1f061491f385e4c963959589767fcabe2c3c898c689c5d902daba",
+      "training_cap": null,
+      "training_drafts": 3048,
+      "training_mode": "all-qualified",
+      "training_picks": 127059
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "hob",
+      "input_signature": "1cb578c7ca70452eac997dad9e3019f0489a9f5b85d80f83fcf4ff43439a05e4",
+      "qualified_drafts": 4191,
+      "qualified_training_drafts": 4191,
+      "skill_source": {
+        "compressed_bytes": 22072331,
+        "etag": "\"11103b69a197a8f351afd61debd8d4ba-3\"",
+        "last_modified": "Thu, 01 Oct 2026 13:17:00 GMT",
+        "sha256": "1ca977bb415ac8fce04b889b9b2d93a6540cf21a033dfa9fb0907af443000676",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.HOB.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 75309805,
+        "etag": "\"9ad61ad97cad3f8bc11b8c3239094e6a-9\"",
+        "last_modified": "Thu, 01 Oct 2026 13:17:15 GMT",
+        "sha256": "04b16ac6971ca9a3b77c666072fb066110632eaae7e09433501cdcefac5045c0",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.HOB.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "600021e243db196072b5bb5ee9b2041023390facc33e5dfb15e647eb6c9c0d00",
+      "training_cap": null,
+      "training_drafts": 4191,
+      "training_mode": "all-qualified",
+      "training_picks": 176022
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "ktk",
+      "input_signature": "3d664328c91aea2166d70d6a13edb49e79a81b9b4d7b9ba1854fc4914f6ac4e2",
+      "qualified_drafts": 2548,
+      "qualified_training_drafts": 2548,
+      "skill_source": {
+        "compressed_bytes": 16555076,
+        "etag": "\"90730b9827bef15c87b09022294b09ca-2\"",
+        "last_modified": "Thu, 18 Jan 2024 05:16:38 GMT",
+        "sha256": "69bc6aa4c4501452dc6247940bf1bc23edf49ad2e44f12318cb9da44363cb5a2",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.KTK.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 48775200,
+        "etag": "\"5358e3d0b327094ab80a7cae3a315f1d-6\"",
+        "last_modified": "Thu, 18 Jan 2024 05:17:11 GMT",
+        "sha256": "0e33cd6916a24eb621c12b6c9524c956881f260afa1d1168189dba027542b649",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.KTK.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "95eb13d46d64675c58acd6d59ee52413c70922e1df039a846a6d015a1dba66ee",
+      "training_cap": null,
+      "training_drafts": 2548,
+      "training_mode": "all-qualified",
+      "training_picks": 106502
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "lci",
+      "input_signature": "8ef5437ffbdf9eb2904424483e6c9849c410e38f3aa8bc96fc2c9ed7cc90781a",
+      "qualified_drafts": 19443,
+      "qualified_training_drafts": 19443,
+      "skill_source": {
+        "compressed_bytes": 64456721,
+        "etag": "\"335e4f97fad4a3d9a9388d6c0c943da0-8\"",
+        "last_modified": "Wed, 27 Dec 2023 18:31:11 GMT",
+        "sha256": "8c3a02c441b3741ab1f335d978fe842b8b9d030ae06e63a291b8f8b259b9c947",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.LCI.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 218767501,
+        "etag": "\"04d60c3c825751f728d3c51c1123eb99-27\"",
+        "last_modified": "Wed, 27 Dec 2023 18:32:05 GMT",
+        "sha256": "507a9b687109eb2b62ed25966ff0b2f4ccc3297e7522d706a45bb576460715d5",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.LCI.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "6e702a7115760f9fa2968c5ef4837a9c4a79d3c0379f9fb2763cc73f31edd3b0",
+      "training_cap": null,
+      "training_drafts": 19443,
+      "training_mode": "all-qualified",
+      "training_picks": 868359
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "ltr",
+      "input_signature": "c15b3941eaccfa2a63dd4a10fbf8a8200069eb8e0150fe94a9a1521617892b54",
+      "qualified_drafts": 28016,
+      "qualified_training_drafts": 28016,
+      "skill_source": {
+        "compressed_bytes": 74362301,
+        "etag": "\"dc09bd67d31f060da0add74591d24258-9\"",
+        "last_modified": "Wed, 30 Aug 2023 16:24:29 GMT",
+        "sha256": "34b5381cad4639c02ae77f274d7196334aee6f3e130197a07d89df963238fa9d",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.LTR.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 234828473,
+        "etag": "\"4e70aaa47fc3a1d4b04edd0a23bbd67c-28\"",
+        "last_modified": "Wed, 30 Aug 2023 16:25:30 GMT",
+        "sha256": "23ffe0676c46624ebf5ec1cbc334a8e2ea360bfd78f162618565043e034d536a",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.LTR.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "71a4da43655c7b1db5ea06ebaa9ad30466dacda5f1c732038676817127b5adbb",
+      "training_cap": null,
+      "training_drafts": 28016,
+      "training_mode": "all-qualified",
+      "training_picks": 1168236
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "mh3",
+      "input_signature": "162112cc5b9f5dd0de7682b1e4c8bf8b87309bfca521c650944c0ef2ce33f7cc",
+      "qualified_drafts": 18091,
+      "qualified_training_drafts": 18091,
+      "skill_source": {
+        "compressed_bytes": 61474848,
+        "etag": "\"8e5ca56c407d2ab4a17e18732a968410-8\"",
+        "last_modified": "Wed, 17 Jul 2024 16:29:23 GMT",
+        "sha256": "0188d66a067f961c81b538c0980dfdaa14904b8ac3355b4ce3b89efbb86aeb7c",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.MH3.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 190961245,
+        "etag": "\"4ae0b61c97f567c578bcfdaa738059a2-23\"",
+        "last_modified": "Wed, 17 Jul 2024 16:30:05 GMT",
+        "sha256": "c3a80b9ef8eeace2ab6e30441b93ab89ca2bb17a3cb4ed536d52960a804364b5",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.MH3.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "d4c6e116866886a3a291a72ef432225a782c5cfe4a04cea585fd2c4b98d470d6",
+      "training_cap": null,
+      "training_drafts": 18091,
+      "training_mode": "all-qualified",
+      "training_picks": 755561
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "mkm",
+      "input_signature": "c11a1170065ff7023e0df02dd915bff181c99a6c00b75ec240e06a757e0217f3",
+      "qualified_drafts": 21445,
+      "qualified_training_drafts": 21445,
+      "skill_source": {
+        "compressed_bytes": 76206592,
+        "etag": "\"2c41d4be306240c4723c85c49d835e23-10\"",
+        "last_modified": "Wed, 20 Mar 2024 14:43:51 GMT",
+        "sha256": "22ff0b49d51381e0488b015dad2b062d90866c9e6646e66202f6c7c6c7efc79a",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.MKM.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 218519611,
+        "etag": "\"5b730b02b635ae3c6f6b7bfabf4d2fa7-27\"",
+        "last_modified": "Wed, 20 Mar 2024 14:44:37 GMT",
+        "sha256": "7b81b76f23c81f9def1ac0ab88bc4d22a5f1adab93499096e13d2f5c1a3807df",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.MKM.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "3b6cf5d2fa98bbc75236d1f26d08640b5ace880d0750589fb9228771aeb87d95",
+      "training_cap": null,
+      "training_drafts": 21445,
+      "training_mode": "all-qualified",
+      "training_picks": 832598
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "mom",
+      "input_signature": "2b66faf5ca09b9ddf3783c389af6e08e1987c7929b3b0458f712fe1b95d37a0e",
+      "qualified_drafts": 29313,
+      "qualified_training_drafts": 29313,
+      "skill_source": {
+        "compressed_bytes": 96232781,
+        "etag": "\"3f6dcdb6dd38e940c53cc0ee3d882e5e-12\"",
+        "last_modified": "Wed, 14 Jun 2023 19:05:54 GMT",
+        "sha256": "a19eadcf9f3435f6c6db379c8119c28477f7037e770fe14b25424832c148de06",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.MOM.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 349736227,
+        "etag": "\"48f601904833d1c2b486e42e22f6383b-42\"",
+        "last_modified": "Wed, 14 Jun 2023 19:05:57 GMT",
+        "sha256": "628394aacee2dbd7e8edd6e5bdf296156a8f3cd0d29b65ca715bb88ce998a499",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.MOM.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "a9f18a447cfd76007ed3e996a5d90464bf164010ded49b6a062df1b7b81d6c18",
+      "training_cap": null,
+      "training_drafts": 29313,
+      "training_mode": "all-qualified",
+      "training_picks": 1309708
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "msh",
+      "input_signature": "b1f6c85af0056fc6b3f082d6db28aca38b31fd9aab4d22c3062430d41c1c84fc",
+      "qualified_drafts": 9728,
+      "qualified_training_drafts": 9728,
+      "skill_source": {
+        "compressed_bytes": 31463893,
+        "etag": "\"04762b8ce70225858c90a877a4579de8-4\"",
+        "last_modified": "Mon, 27 Jul 2026 18:11:30 GMT",
+        "sha256": "8a6bd93a5d50554a3d87703e93624d09e638dc6dd03eda12be9c3f2925484edf",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.MSH.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 108344950,
+        "etag": "\"9488e698a1b90a8b80822bd3f5bfe7c3-13\"",
+        "last_modified": "Mon, 27 Jul 2026 18:11:43 GMT",
+        "sha256": "64100d71db77e0f0ef8ba893b259a1024eb6d15816db337c7758e7d96bc29cf7",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.MSH.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "aeb170d65d8dc3455e77c6adca4890e70f0d162fc326b1cf3e6e040fe6c87290",
+      "training_cap": null,
+      "training_drafts": 9728,
+      "training_mode": "all-qualified",
+      "training_picks": 408573
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "neo",
+      "input_signature": "0013158acc02c51ae0b721cd674320f77d77f06c262267f5a8a871d25676dfa6",
+      "qualified_drafts": 15562,
+      "qualified_training_drafts": 15562,
+      "skill_source": {
+        "compressed_bytes": 43549860,
+        "etag": "\"d28b9e1e874c46cb57e9017929262fda-6\"",
+        "last_modified": "Sun, 13 Mar 2022 05:55:59 GMT",
+        "sha256": "2346aff37d6ece8e8248f2277fa9369ce5c740d8dec3f4e140f09f9be4c85db9",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.NEO.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 170265784,
+        "etag": "\"5aa8ca31c29ae1f2695539a793796342-21\"",
+        "last_modified": "Sun, 13 Mar 2022 05:57:35 GMT",
+        "sha256": "f86c03291dbfd07283674422f36f2ca00238a585a1c43aa053314ec4216bb53e",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.NEO.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "467429350486b7d7285f256ee355a15c37f15f87fa9733416798f3b8f9b97510",
+      "training_cap": null,
+      "training_drafts": 15562,
+      "training_mode": "all-qualified",
+      "training_picks": 695158
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "one",
+      "input_signature": "c6c1bdb3e6ac52e93e16c79361f1f784b1bb82de028b7e77f94eeb562e9626fd",
+      "qualified_drafts": 9722,
+      "qualified_training_drafts": 9722,
+      "skill_source": {
+        "compressed_bytes": 40021309,
+        "etag": "\"4a5d1cfef5ebe7da73f8590d362711fd-5\"",
+        "last_modified": "Wed, 01 Mar 2023 03:53:51 GMT",
+        "sha256": "157e82550f8790dd5df9373a5ed6f04002d3f25165aa628f520d4e6137f86804",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.ONE.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 139590645,
+        "etag": "\"8b2b3f9eb7cde5cd8170a134145c73df-17\"",
+        "last_modified": "Wed, 01 Mar 2023 03:54:14 GMT",
+        "sha256": "2a758f8dba7697de3b88f60ebb5085ac27e65c0b035c53cc89c7e0637347059d",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.ONE.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "9ac172ad5e1a04714740f583c44ba1a6f676d7f411aa31c441e2a7b6b765cd18",
+      "training_cap": null,
+      "training_drafts": 9722,
+      "training_mode": "all-qualified",
+      "training_picks": 405524
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "otj",
+      "input_signature": "cd181298aa06b92dff4b949865b6d83b623a95afcdeda3676ce2775b2044f398",
+      "qualified_drafts": 21902,
+      "qualified_training_drafts": 21902,
+      "skill_source": {
+        "compressed_bytes": 98173662,
+        "etag": "\"b205b622d3d9f2b4807d3eef28e9236f-12\"",
+        "last_modified": "Thu, 30 May 2024 14:43:27 GMT",
+        "sha256": "e8c4bfe8482710a59411c7e1f5b5e35e3583f4c7ff7b46f1702b2d95356acee6",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.OTJ.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 304577231,
+        "etag": "\"82d2e8dca8f32f5cf53d24b81ab1cb7e-37\"",
+        "last_modified": "Thu, 27 Jun 2024 01:06:56 GMT",
+        "sha256": "87fd00a2e92bb38b1883240cf0e79aa711a24fb3d0348a70333517c777b63015",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.OTJ.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "7c546f3388268427bb18f26d208bc15d8359029f753a49672b3871494667f047",
+      "training_cap": null,
+      "training_drafts": 21902,
+      "training_mode": "all-qualified",
+      "training_picks": 915447
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "pio",
+      "input_signature": "5af8c74b90e3c01d33caba0fdcccac958f1f4d40740f2b4c09b3e3cb0c77b714",
+      "qualified_drafts": 5029,
+      "qualified_training_drafts": 5029,
+      "skill_source": {
+        "compressed_bytes": 27518175,
+        "etag": "\"ced5cd58796631f01a12d59ff864c39a-4\"",
+        "last_modified": "Wed, 15 Jan 2025 19:22:27 GMT",
+        "sha256": "2a22a51b63c6caff6d8f20ccfec900ce9e5aa1fb963a57cad537495bcdb3f3ab",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.PIO.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 82912119,
+        "etag": "\"eef9ea966b7fe9ffbba20a3aabe3ac2b-10\"",
+        "last_modified": "Wed, 15 Jan 2025 19:22:53 GMT",
+        "sha256": "a7ffb8c49265ba02d30e428c19b184c937bc190e9120bc3af87681f34de878fa",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.PIO.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "fddeea95ee7af4fb5ee652a79c80e725174192179b740ca0d025751fc75e49a2",
+      "training_cap": null,
+      "training_drafts": 5029,
+      "training_mode": "all-qualified",
+      "training_picks": 224130
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "powered-cube",
+      "input_signature": "bc582acf1f9cd9695e932405f1abd86ea8c6201a1ea6dcd4e4c80396a06e2e81",
+      "qualified_drafts": 5438,
+      "qualified_training_drafts": 5438,
+      "skill_source": {
+        "compressed_bytes": 26937904,
+        "etag": "\"010e01dbb6e54a65d3e9e27f53a00738-4\"",
+        "last_modified": "Mon, 01 Dec 2025 04:03:09 GMT",
+        "sha256": "367bd4a831e891593f404a4ad141742b8e77e777dd80d7e93c9f319f10f0663d",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.Cube_-_Powered.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 92791954,
+        "etag": "\"7e0e9b065ee0c2039c2a7b178bee87d8-12\"",
+        "last_modified": "Mon, 01 Dec 2025 04:03:24 GMT",
+        "sha256": "eac816bfc246d3b7dfb666bcdb84dc0e81b563508b8f8ed1dee948fc80ce8956",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.Cube_-_Powered.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "3b992c0294611a7394cff2b803f7fe57b38a60effb8c0229b2647d66faa44796",
+      "training_cap": null,
+      "training_drafts": 5438,
+      "training_mode": "all-qualified",
+      "training_picks": 239270
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "sir",
+      "input_signature": "38fbf9b943dfa897a0d6a919edcb749f7087ea1a126fc7e2d6337ce09ac2c582",
+      "qualified_drafts": 5015,
+      "qualified_training_drafts": 5015,
+      "skill_source": {
+        "compressed_bytes": 24207462,
+        "etag": "\"d75174dc9f2005d0aac8bde8f6a15acb-3\"",
+        "last_modified": "Fri, 21 Apr 2023 02:35:30 GMT",
+        "sha256": "64ab0119e665182586107a887efb02251f45d542d65f7ce1b9462960b30ce442",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.SIR.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 81236207,
+        "etag": "\"3077f10472e4265b1ca473d422c62118-10\"",
+        "last_modified": "Fri, 21 Apr 2023 02:35:45 GMT",
+        "sha256": "ddc447a95f12089f1c60203f8104f8d041781e049b5a9ff8bcf011eee06b9d09",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.SIR.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "f578f42808ce1bac2b66c4e1b2b1dcd12c19f9548a536932e7dbece5e34d454f",
+      "training_cap": null,
+      "training_drafts": 5015,
+      "training_mode": "all-qualified",
+      "training_picks": 224406
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "snc",
+      "input_signature": "07d7c18058a7595a86b89b6502eb1234420f0718a7b2c09d7d8a59afad93156f",
+      "qualified_drafts": 18413,
+      "qualified_training_drafts": 18413,
+      "skill_source": {
+        "compressed_bytes": 55640990,
+        "etag": "\"0ee4ac737eed097fc5c824c26b8ab4a4-7\"",
+        "last_modified": "Thu, 07 Jul 2022 04:06:12 GMT",
+        "sha256": "c0e5f3c087889ef2ea38c5a8ac4cc68ba43b83db5b7c0c204d4dee0200379fdd",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.SNC.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 188791607,
+        "etag": "\"9689e040b5293f89989dbcc3100a5ea3-23\"",
+        "last_modified": "Thu, 07 Jul 2022 04:07:34 GMT",
+        "sha256": "9b558f819c7dd46b9b443bcc01ae029c89e9c5b66f65e3875559fa09e5649fdd",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.SNC.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "f07c4ef319ce5657b952eed2ac63c364ef50a8822b4e0e3acb078aadaf787bd2",
+      "training_cap": null,
+      "training_drafts": 18413,
+      "training_mode": "all-qualified",
+      "training_picks": 759839
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "sos",
+      "input_signature": "4145432001806d8c279bedd47c291100b4eb8245dfc9e39281fb41f45bbd7b29",
+      "qualified_drafts": 15477,
+      "qualified_training_drafts": 15477,
+      "skill_source": {
+        "compressed_bytes": 49412352,
+        "etag": "\"eff255089693f3a81a17419588a9581e-6\"",
+        "last_modified": "Fri, 05 Jun 2026 22:15:21 GMT",
+        "sha256": "1be513933918ca243c137af0314aae099c721c408786c9cb56f08027d9b113fb",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.SOS.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 162617186,
+        "etag": "\"69891b4e4735070327c68bab2b461274-20\"",
+        "last_modified": "Fri, 05 Jun 2026 22:15:41 GMT",
+        "sha256": "df6220d8941e99b7264a54a7a7427096246ee6510057a83d4c9424b472761853",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.SOS.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "f090322594ac0991feb98bbdc468faba3cac83e9c93c28a7d3572aecd1dd28f6",
+      "training_cap": null,
+      "training_drafts": 15477,
+      "training_mode": "all-qualified",
+      "training_picks": 650030
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "tdm",
+      "input_signature": "0d9064a88a4f88a8706ab5e55c3c2e62aa3d61ca8854f4097ba33d370bf20a4b",
+      "qualified_drafts": 11887,
+      "qualified_training_drafts": 11887,
+      "skill_source": {
+        "compressed_bytes": 45818734,
+        "etag": "\"80415fdac14a81ee756b841418ab1c2c-6\"",
+        "last_modified": "Tue, 20 May 2025 02:14:28 GMT",
+        "sha256": "e2e679168818d67d812972343ba541d626d0f57140bc22955e09dd07bc2086e4",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.TDM.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 148246714,
+        "etag": "\"0d683718158cd14fb2e71cd19568c3f2-18\"",
+        "last_modified": "Tue, 20 May 2025 02:14:46 GMT",
+        "sha256": "831ba8bc4be5eabe140fac00a8e6eaded3f3f931685be8f91403ad9cfde5cbf5",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.TDM.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "183b68e94ad41844eac69b0a2a8c108713aa83aaab8a4caf5ebf749b99ec30d2",
+      "training_cap": null,
+      "training_drafts": 11887,
+      "training_mode": "all-qualified",
+      "training_picks": 499254
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "tla",
+      "input_signature": "5466c8388c2dc7e21cc160c372e9cab88f0984312679b2015eac021a3e6b3ddf",
+      "qualified_drafts": 16683,
+      "qualified_training_drafts": 16683,
+      "skill_source": {
+        "compressed_bytes": 47153098,
+        "etag": "\"4f22ce4164e9cf3b7aa9e9e936e332f1-6\"",
+        "last_modified": "Sat, 10 Jan 2026 14:07:36 GMT",
+        "sha256": "6bb12e5cf17e57a2624ca8ac83f15fd4415ea347aa58eac0ed82feb1b17d536b",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.TLA.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 152942109,
+        "etag": "\"9410ca65896b7e2b3d7453e72be65062-19\"",
+        "last_modified": "Sat, 10 Jan 2026 14:07:57 GMT",
+        "sha256": "e4a801b12cbe3d711dce7d92bd2d256db64e0be18d22da14b477d512567627bb",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.TLA.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "c1c28f7d729a86357291c26196e9ce1b751f086126d1bba1002414c43499dff2",
+      "training_cap": null,
+      "training_drafts": 16683,
+      "training_mode": "all-qualified",
+      "training_picks": 684003
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "tmt",
+      "input_signature": "caa52e4bbf0ce51fc273ca95925e9e6be83b314c50e303eaa913beb332929a2c",
+      "qualified_drafts": 3126,
+      "qualified_training_drafts": 3126,
+      "skill_source": {
+        "compressed_bytes": 13216842,
+        "etag": "\"ecb6b4c530a0e12370e3c33d9e219815-2\"",
+        "last_modified": "Wed, 08 Apr 2026 22:00:52 GMT",
+        "sha256": "399f35cf89b4ad09ba811df0bc60936a5b443432f2fbad84d6264b597b49e4a9",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.TMT.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 42260985,
+        "etag": "\"f235860efeba2772f55217fbdaab05bf-6\"",
+        "last_modified": "Wed, 08 Apr 2026 22:00:58 GMT",
+        "sha256": "7819ed6532a3b2329b1d2e0f24aed6e21306d6744b3dcc7a96329644a0bd090c",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.TMT.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "f1603a82a7fd7a995f2462519cf3be3d3e1b7805495c94918898804511cfd091",
+      "training_cap": null,
+      "training_drafts": 3126,
+      "training_mode": "all-qualified",
+      "training_picks": 128166
+    },
+    {
+      "holdout": "5-fold by draft_id",
+      "id": "woe",
+      "input_signature": "63de2b139647a3b2ca80d128bf650a02778024c1034d7e41d60dbac9a1d6c24a",
+      "qualified_drafts": 23340,
+      "qualified_training_drafts": 23340,
+      "skill_source": {
+        "compressed_bytes": 82198920,
+        "etag": "\"5a86892a3ae3870a120782dfa4444021-10\"",
+        "last_modified": "Wed, 18 Oct 2023 03:06:42 GMT",
+        "sha256": "3d9a55acb2846905ea7fc930c6ec0b5954d1e6ff78187936b4db8da3baa8b8a6",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.WOE.PremierDraft.csv.gz"
+      },
+      "source_archive": {
+        "compressed_bytes": 252414156,
+        "etag": "\"c9e8024b62d66a52bfceb1a4995142da-31\"",
+        "last_modified": "Wed, 18 Oct 2023 03:07:46 GMT",
+        "sha256": "7c62add350ff9689e0da469bc2911860fb34df0ca2a468aa7e6e511c88675431",
+        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.WOE.PremierDraft.csv.gz"
+      },
+      "source_snapshot_id": "b088578b0d45f1c038fc9abfa71bedf24306f169a8570957eb06f37f575e5a96",
+      "training_cap": null,
+      "training_drafts": 23340,
+      "training_mode": "all-qualified",
+      "training_picks": 963614
+    }
+  ],
+  "total_qualified": 432114,
+  "total_trained": 432114
+}
