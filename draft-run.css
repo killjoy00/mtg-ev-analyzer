@@ -278,3 +278,14 @@ body .run-next-dock #run-next:disabled{opacity:1;cursor:default}
   body .run-next-dock{padding-top:8px;padding-bottom:max(8px,env(safe-area-inset-bottom))}
   body .run-report-prompt{padding:10px 12px;font-size:14px}
 }
+/* Recap rows show the card you took (blue), plus the trophy pick (gold) when it differs; a match is green.
+   Two slots are always reserved so the text lines up from row to row. */
+.run-review-list button{padding:10px 0}
+.run-review-list button>.run-review-cards{flex:none;display:flex;gap:6px;width:102px;color:inherit}
+.run-review-cards>span{width:48px;border:2px solid #335c85;border-radius:3px;overflow:hidden;background:var(--surface-soft,#edf1f5)}
+.run-review-cards>span.is-trophy{border-color:#b29a68}
+.run-review-cards>span.is-match{border-color:#39754e}
+.run-review-cards img{display:block;width:100%;height:auto;aspect-ratio:5/7;object-fit:cover}
+.run-review-cards .run-card-fallback{align-items:flex-start;justify-content:flex-start;padding:3px;font-size:11px;line-height:1.1;overflow:hidden}
+/* On phones each row already names its pick number, so the separate counter gives its width to the text. */
+@media(max-width:600px){.run-review-list button{gap:10px}.run-review-list button>span:first-child{display:none}.run-review-list button>.run-review-cards{gap:4px;width:80px}.run-review-cards>span{width:38px}}

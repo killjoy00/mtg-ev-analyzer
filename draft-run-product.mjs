@@ -1,7 +1,7 @@
 import {draftRunLength} from './draft-run-format.mjs';
 import { accountCsrfToken, ensurePackSession, firstPartyAuthEnabled, hasAccountSession, loadDailyStatus, storedAccountToken } from './growth-api.mjs';
 import { dailyShareUrl, draftRunShareText, shareDraftRunCard, shareDate } from './share-cards.mjs?v=10';
-import {openCardViewer,faceIndicatorMarkup} from './card-viewer.mjs?v=1';
+import {openCardViewer,faceIndicatorMarkup} from './card-viewer.mjs?v=2';
 import { trackEvent } from './retention-events.mjs';
 import {decisionClock} from './decision-clock.mjs';
 import { sortPackByRarity } from './replay-data.mjs';
@@ -10,7 +10,7 @@ import {achievementMark} from './achievement-icons.mjs';
 import { compactDraftRunFeedback, consensusFeedback, trophyDrafterDetails, trophyDrafterFacts, trophyRevealSentence } from './draft-run-feedback.mjs?v=7';
 import { tcgplayerUrl } from './tcgplayer.mjs';
 import {revealCardChoices,modelSupportLabel} from './draft-run-reveal.mjs?v=2';
-import {openTrophyDeck} from './trophy-deck-dialog.mjs?v=2';
+import {openTrophyDeck} from './trophy-deck-dialog.mjs?v=3';
 import { dailyResetCue, nextGameDateBoundary } from './game-date.mjs';
 import {completedAllDailies,nextUnfinishedDaily} from './today-status.mjs?v=2';
 import {sharedRunAppPath,sharedRunInvitationId} from './shared-run-links.mjs';
@@ -51,7 +51,7 @@ const app=()=>document.querySelector('#app');
 function styles() {
   installSetGuides();
   if(document.querySelector('[data-draft-run-style]')) return;
-  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=24';link.dataset.draftRunStyle='1';document.head.appendChild(link);
+  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=25';link.dataset.draftRunStyle='1';document.head.appendChild(link);
 }
 async function api(path,body,auth=true) {
   const method=body===undefined?'GET':'POST',headers={'content-type':'application/json'};
@@ -84,6 +84,14 @@ function prefetchPackImages(p) {
 function image(card,extra='') {
   const url=/^https:\/\//.test(card.image_url||'')?card.image_url:'';
   return url?`<img src="${esc(url)}" alt="${esc(card.name)}" decoding="async" ${extra}>`:`<span class="run-card-fallback">${esc(card.name)}</span>`;
+}
+// Recap rows show the card you took, plus the trophy pick when it differs.
+// The names are in the row's text, so the thumbnails are hidden from screen readers.
+function reviewCards(a) {
+  const byId=new Map((a.puzzle?.candidates||[]).map(card=>[card.id,card]));
+  const mine=byId.get(a.selectedId),trophy=a.historicalMatch?null:byId.get(a.historicalId)||null;
+  const thumb=(card,kind)=>card?`<span class="${kind}">${image(card,'loading="lazy"')}</span>`:'';
+  return {trophy,cards:`<span class="run-review-cards" aria-hidden="true">${thumb(mine,a.historicalMatch?'is-match':'is-mine')}${thumb(trophy,'is-trophy')}</span>`};
 }
 function steps() {
   return `<ol class="run-steps" aria-label="Run progress">${Array.from({length:runLength()},(_,i)=>`<li class="${run.answers[i]?'done':i===run.answers.length?'current':''}" aria-label="Round ${i+1}${run.answers[i]?`, ${run.answers[i].score} points`:''}" ${i===run.answers.length?'aria-current="step"':''}><span>${i+1}</span>${run.answers[i]?`<small>${run.answers[i].score} pts</small>`:''}</li>`).join('')}</ol>`;
@@ -198,13 +206,13 @@ function render({land=false}={}) {
   document.body.classList.add('is-game');
   app().innerHTML=`<section class="draft-run-page">${runHeading(p)}
     ${sharedDayNotice(answer)}
-    ${run.comparison?run.comparison.kind==='creator'?`<aside class="run-friend"><strong>BEAT THE CREATOR</strong> · ${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. You’re playing the same ${runLength()} decisions.</aside>`:`<aside class="run-friend">${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. ${run.comparison.exact?`You’re playing the same ${runLength()} packs.`:'Packs changed. This result counts as practice.'}</aside>`:''}
+    ${run.comparison?run.comparison.kind==='creator'?`<aside class="run-friend"><strong>BEAT THE CREATOR</strong> · ${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. You’re playing the same ${runLength()} decisions.</aside>`:`<aside class="run-friend">${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. ${run.comparison.exact?`You’re playing the same ${runLength()} packs.`:'You’re playing different packs from your friend, so this run counts as practice.'}</aside>`:''}
     ${answer?'':pool(p)}
     ${answer?`<section class="run-feedback ${answer.historicalMatch?'is-match':'is-miss'}"><strong class="run-feedback-score">${answer.score}<small>/100</small></strong><div class="run-feedback-copy"><h2 id="run-feedback-result" tabindex="-1" aria-label="${esc(compactResultLabel(answer,compactSentence))}">${esc(trophyRevealSentence(answer))}</h2>${compactSentence?`<p>${esc(compactSentence)}</p>`:''}<div id="run-peer-stats" class="run-peer-stats" role="status" hidden></div></div></section>${revealAnalysis(p,answer)}`:
     ''}
     ${answer?`<details class="run-pack-review"><summary>Review the pack</summary>${pool(p)}${cardGrid(p,answer)}</details>`:`<div class="run-pack-head"><h2>Choose one</h2><p>${p.candidates.length} cards in this pack</p></div>${cardGrid(p)}`}
     ${answer?`${reportDecisionMarkup(answer)}<div class="run-next-dock"><span class="run-next-note">${nextNote()}</span><button class="button primary" id="run-next">${run.complete?'See result':'Next pick'}</button></div>`:''}
-    ${answer?'':`<div class="run-lock${run.day||run.comparison?.exact?' is-awaiting':''}"><div class="run-lock-choice"><span id="run-selection-label">Choose a card</span><button class="button primary" id="run-lock" disabled>Lock pick</button></div>${run.day||run.comparison?.exact?'':`<div class="run-tools"><div>${cube()||run.custom_set_ids?.length?'':`<button class="button secondary" data-reroll="set" ${!run.rerolls.set||run.set_reroll_allowed===false?'disabled':''}>Reroll set · ${run.rerolls.set}</button>`}<button class="button secondary" data-reroll="pack" ${!run.rerolls.pack?'disabled':''}>Reroll pack · ${run.rerolls.pack}</button></div></div>`}</div>`}
+    ${answer?'':`<div class="run-lock${run.day||run.comparison?.exact?' is-awaiting':''}"><div class="run-lock-choice"><span id="run-selection-label">Choose a card</span><button class="button primary" id="run-lock" disabled>Lock pick</button></div>${run.day||run.comparison?.exact?'':`<div class="run-tools"><div>${cube()||run.custom_set_ids?.length?'':`<button class="button secondary" data-reroll="set" ${!run.rerolls.set||run.set_reroll_allowed===false?'disabled':''}>New set · ${run.rerolls.set}</button>`}<button class="button secondary" data-reroll="pack" ${!run.rerolls.pack?'disabled':''}>New pack · ${run.rerolls.pack}</button></div></div>`}</div>`}
     <p class="run-error" id="run-error" role="alert"></p></section>`;
   bind(p,answer);
   placeRun(land);
@@ -370,7 +378,7 @@ function dailySetCompleteMarkup() {
 // Sharing sits right under the score, compact enough on a phone that the
 // next-Daily button stays on screen. No card names, so nothing is spoiled.
 function dailySharePanelMarkup() {
-  return `<section class="run-share-panel" aria-labelledby="run-share-title"><div class="run-share-copy"><h2 id="run-share-title">Share your result</h2><p>Share your score and colored squares, not the cards. Friends can play the same Daily for free without signing up.</p></div>
+  return `<section class="run-share-panel" aria-labelledby="run-share-title"><div class="run-share-copy"><h2 id="run-share-title">Share your result</h2><p>Share your score and colored squares, not the cards. Friends can try their own Daily without signing up.</p></div>
     <div class="run-share-actions"><button class="button primary" id="run-share" type="button">Share result</button><button class="button secondary" id="run-copy-result" type="button">Copy result</button></div>
     <div id="run-share-status" role="status"></div></section>`;
 }
@@ -418,7 +426,7 @@ function renderResult() {
   const creator=run.comparison?.kind==='creator'?run.comparison:null;
   const creatorOutcome=creator?.outcome;
   const creatorHeadline=creatorOutcome==='win'?`You beat ${creator.name}`:creatorOutcome==='tie'?`You tied ${creator.name}`:creatorOutcome==='loss'?`${creator.name} got you this time`:null;
-  app().innerHTML=`<section class="run-result-page"><p class="eyebrow">${creator?'BEAT THE CREATOR · ':run.day?'Daily ':''}${title()} complete</p><h1>${creatorHeadline?esc(creatorHeadline):`Your ${cube()?'Cube Run':'Draft Run'}.`}</h1><div class="run-final-score"><strong>${run.score}</strong><span>/100<br>${creator?`${Number(creator.creator_matches||0)}/${runLength()} creator picks matched · ${Number(creator.trophy_matches||matches)}/${runLength()} trophy picks matched`:`${matches} trophy picks matched`}</span></div>
+  app().innerHTML=`<section class="run-result-page"><p class="eyebrow">${creator?'BEAT THE CREATOR · ':run.day?'Daily ':''}${title()} complete</p><h1>${creatorHeadline?esc(creatorHeadline):`Your ${cube()?'Cube Run':environment==='latest'?'Latest Set Run':'Draft Run'}.`}</h1><div class="run-final-score"><strong>${run.score}</strong><span>/100<br>${creator?`${Number(creator.creator_matches||0)}/${runLength()} creator picks matched · ${Number(creator.trophy_matches||matches)}/${runLength()} trophy picks matched`:`${matches} trophy picks matched`}</span></div>
     ${creator?`<p class="run-friend">You: <strong>${run.score}</strong> · ${esc(creator.name)}: <strong>${creator.score}</strong></p>`:''}
     <aside id="post-game-progress" class="post-game-progress" data-result-id="draft-run:${run.id}"></aside>
     ${run.standing?`<p class="run-standing">#${run.standing.rank} of ${run.standing.total} today${run.standing.percentile?` · Top ${run.standing.percentile}%`:''}. ${run.standing.final?'Final result.':'The board closes at midnight Pacific.'}</p>`:''}
@@ -430,7 +438,7 @@ function renderResult() {
     ${creator?.creator_post_run_note?`<blockquote class="run-friend"><strong>${esc(creator.name)} after the run:</strong> “${esc(creator.creator_post_run_note)}”</blockquote>`:''}
     <div class="run-result-actions"><a class="button primary" data-next-daily-action href="${repeat.href}">${repeat.label}</a>${run.day?'':'<button class="button secondary" id="run-share">Share this run and compare</button><button class="button secondary" id="run-copy-result" type="button">Copy result</button>'}<a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">${run.day&&!run.leaderboard_eligible?(['username_taken','username_required','name_not_allowed'].includes(run.ranking_identity?.reason)?'Choose display name to add score':hasAccountSession()?'Add score to leaderboard':'Sign in to add score'):'View your career'}</button></div>
     ${run.day?'<p data-all-dailies hidden><a class="text-button" href="./">All Dailies</a></p>':''}
-    <h2>Your ${runLength()} picks</h2><ol class="run-review-list">${run.answers.map((a,i)=>`<li><button data-review="${i}"><span>${i+1}</span><div><strong>${esc(setName(a.puzzle.set_id))} · Pick ${a.pickNumber}</strong><small>${esc(a.selectedName)}${a.historicalMatch?' · Trophy match':''}</small></div><b>${a.score}</b></button></li>`).join('')}</ol>
+    <h2>Your ${runLength()} picks</h2><ol class="run-review-list">${run.answers.map((a,i)=>{const {cards,trophy}=reviewCards(a);return `<li><button data-review="${i}"><span>${i+1}</span>${cards}<div><strong>${esc(setName(a.puzzle.set_id))} · Pick ${a.pickNumber}</strong><small>${esc(a.selectedName)}${a.historicalMatch?' · Trophy match':trophy?` · Trophy pick: ${esc(trophy.name)}`:''}</small></div><b>${a.score}</b></button></li>`;}).join('')}</ol>
     <p class="run-note">Your final score is the average of your ${runLength()} picks. Matching the trophy drafter earns 100; other picks can score up to 95 based on the model.</p>${run.day?'':'<div id="run-share-status" role="status"></div>'}<p id="run-error" role="alert"></p></section>`;
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render({land:true});});
   document.querySelector('#run-share').onclick=()=>shareResult();
@@ -528,7 +536,7 @@ async function showBoard(period='daily') {
   const seasonRating=period==='season'&&Boolean(data.scoring);
   const empty=period==='season'&&!data.season
     ? '<p class="run-empty">Season standings aren\'t available yet.</p>'
-    : `<p class="run-empty">No scores yet. Finish today's ${title()} to get on the leaderboard.</p>`;
+    : `<p class="run-empty">No scores on this leaderboard yet. Play a Daily to get started.</p>`;
   app().innerHTML=`<section class="run-board"><p class="eyebrow">Leaderboards</p><h1>${environment==='latest'?'Latest Set':cube()?'Cube':'Draft Run'}</h1><nav class="run-board-games" aria-label="Leaderboard game"><a class="${environment==='mixed'?'active':''}" href="${boardUrl('mixed',period)}">Draft Run</a><a class="${cube()?'active':''}" href="${boardUrl('powered-cube',period)}">Cube</a><a class="${environment==='latest'?'active':''}" href="${boardUrl('latest',period)}">Latest Set</a></nav><nav class="run-board-periods" aria-label="Leaderboard period">${[['daily','Today'],['week','This week'],['season','This season']].map(([id,name])=>`<a class="${period===id?'active':''}" href="${gameUrl('board='+id)}">${name}</a>`).join('')}</nav>${seasonContext}<p>${seasonRating?'Season rating uses every first-attempt Daily score, with a larger deduction when you have played fewer days. You rank after your first Daily; missed days do not count as zero.':period==='daily'?'First attempts on today’s shared starting packs.':`Average of your best ${data.best_of||(period==='week'?3:10)} first-attempt Daily scores ${period==='week'?'this week':'this season'}; days not played count as 0. Days played are shown alongside.`}</p>${data.rows.length?`<ol>${data.rows.map(r=>`<li><b>${r.rank}</b><span><span class="run-board-player">${r.profile_key?`<a href="?profile=${esc(r.profile_key)}">${esc(r.display_name)}</a>`:`<span>${esc(r.display_name)}</span>`}${achievementMark(r.showcase_achievement,{compact:true})}</span>${seasonRating?`<small class="run-board-average">Avg ${Number(r.average_score).toFixed(1)}</small>`:''}</span><small>${r.days} ${r.days===1?'day':'days'}</small><strong>${seasonRating?`<small>Rating</small>${Number(r.rating).toFixed(1)}`:r.score}</strong></li>`).join('')}</ol>`:empty}<div class="run-board-actions"><a class="button primary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a>${practiceAction}</div></section>`;
   trackEvent('leaderboard_view',{mode:'draft_run',set_id:environment,period,season_id:data.season?.id,season_set_id:data.season?.set_id});
 }

@@ -9,9 +9,9 @@
       "unique_candidates": 346
     },
     "consensus": {
-      "historical_pack_score_p10": 71.48,
-      "historical_pack_score_p50": 85.44,
-      "historical_pack_score_p90": 94.23,
+      "historical_pack_score_p10": 73.75,
+      "historical_pack_score_p50": 86.41,
+      "historical_pack_score_p90": 94.88,
       "opening_top_support_p10": 0.34,
       "opening_top_support_p50": 0.55,
       "opening_top_support_p90": 0.78

@@ -165,7 +165,7 @@ export async function shareProfileCard(profile, progress, catalogNames = new Map
     ],
     rows: [
       { label: 'Best score', value: summary.best },
-      { label: 'Best environments', value: labels.join(' · ') || 'Building the archive' },
+      { label: 'Sets where you’ve scored best', value: labels.join(' · ') || 'Building the archive' },
       { label: 'Progress', value: `${summary.environmentsPlayed}/${summary.environmentTotal}` },
     ],
   });
@@ -180,7 +180,7 @@ export async function shareProfileCard(profile, progress, catalogNames = new Map
 export async function shareProgressCard(profile, progress) {
   const name = profile?.player?.display_name || 'Pack Player';
   const blob = await cardBlob({
-    eyebrow: 'Archive progress',
+    eyebrow: 'Sets you’ve played',
     title: name,
     bigValue: `${progress.played}/${progress.total}`,
     subtitle: 'Pack One environments played',
@@ -270,7 +270,7 @@ export function draftRunShareText(run) {
   const label=dailyModeLabel(run.environment);
   const squares=pickGrades(run.answers).map(g=>GRADE_EMOJI[g]).join('');
   // Dated, and never "beat my score": a link opened tomorrow plays different picks.
-  if(run.day) return `I scored ${run.score}/100 on the Pack One ${label} Daily (${shareDate(run.day)}).\n${squares}\n${matches}/${draftRunLength(run)} trophy picks matched.\nPlay today’s Daily yourself. Free, no account needed:`;
+  if(run.day) return `I scored ${run.score}/100 on the Pack One ${label} Daily (${shareDate(run.day)}).\n${squares}\n${matches}/${draftRunLength(run)} trophy picks matched.\nTry Pack One's Daily. No account needed:`;
   return `Pack One · ${label} · Practice\n${run.score}/100  ${squares}\n${matches}/${draftRunLength(run)} trophy picks matched. Play this run and compare.`;
 }
 

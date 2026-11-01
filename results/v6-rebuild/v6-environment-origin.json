@@ -1,0 +1,194 @@
+{
+  "schema": "v6-environment-origin-v1",
+  "environment_run_id": "40987407495",
+  "environment_commit": "5221048b6dcbc46ac3b7d189235db0d7bb50e937",
+  "build_identity": "fec87c6a7e62b145d467954eb76e55ce90b9b7118c3d69ec897dd92cd4e441af",
+  "artifacts": [
+    {
+      "id": 12949658458,
+      "name": "v6-environment-blb",
+      "size_in_bytes": 26509679,
+      "digest": "sha256:430588aff7b6a8ea9f617e1378381e49837feea5c00baef10fc52d2eee81296d"
+    },
+    {
+      "id": 12949213338,
+      "name": "v6-environment-bro",
+      "size_in_bytes": 20037079,
+      "digest": "sha256:2d4339e049cc025c67fd74c886289e20e77b28d20098d7c29f192e4504b4afd1"
+    },
+    {
+      "id": 12949923220,
+      "name": "v6-environment-dft",
+      "size_in_bytes": 33519054,
+      "digest": "sha256:e64ad16daa732143ad2a26669416e83cf8908b6bc9d086ed878fdffcd2bb2869"
+    },
+    {
+      "id": 12952501259,
+      "name": "v6-environment-dmu",
+      "size_in_bytes": 46189834,
+      "digest": "sha256:bafd0fc93dab3bb2274242e79aa2bda56ca6a61c4ea5b977f7d3e0e5b8879a81"
+    },
+    {
+      "id": 12951549467,
+      "name": "v6-environment-dsk",
+      "size_in_bytes": 37158156,
+      "digest": "sha256:e17bd7ee14cd5c407dda055006f18ceacd501fd0c3d0593e2443b161c56ade89"
+    },
+    {
+      "id": 12951078552,
+      "name": "v6-environment-ecl",
+      "size_in_bytes": 17345795,
+      "digest": "sha256:fa1a957c0742720a3b8b938c9d8a2958619e5d914390362d3a49831e0210ed4d"
+    },
+    {
+      "id": 12953611473,
+      "name": "v6-environment-eoe",
+      "size_in_bytes": 23512086,
+      "digest": "sha256:261cc98838a746ba8cca48b8de3ee4bec971ab96768bfbfdae4962a996d4dfbb"
+    },
+    {
+      "id": 12953326277,
+      "name": "v6-environment-fdn",
+      "size_in_bytes": 27699010,
+      "digest": "sha256:5a344084d18deaac1292d45511e5be1fd3e8247faeeabb41a8968a75ae4ff19a"
+    },
+    {
+      "id": 12955875490,
+      "name": "v6-environment-fin",
+      "size_in_bytes": 45131375,
+      "digest": "sha256:efd01429a91db83afcf26ade4656dc2e07039994b1d69c677dc8e25c477cf60a"
+    },
+    {
+      "id": 12955270264,
+      "name": "v6-environment-fra",
+      "size_in_bytes": 8643141,
+      "digest": "sha256:600dc543bec5f9359f2aba03a534d31d8798c75c544fbb10ae0f8d1eaf47cf86"
+    },
+    {
+      "id": 12954170266,
+      "name": "v6-environment-hbg",
+      "size_in_bytes": 9857684,
+      "digest": "sha256:746b045d584e104326870c2bd85174cc6b5b2836ee73e1285ee963c73b7228f9"
+    },
+    {
+      "id": 12954277486,
+      "name": "v6-environment-hob",
+      "size_in_bytes": 12915964,
+      "digest": "sha256:253b2863c307b4ffdc593c7db3cf5aca1d7eae034dce1e09c65c64007577fb14"
+    },
+    {
+      "id": 12954836408,
+      "name": "v6-environment-ktk",
+      "size_in_bytes": 7187286,
+      "digest": "sha256:4d58a1b3670f123b802c3836de21aab1bd73172e3fcccb901d36aab907bc4ff4"
+    },
+    {
+      "id": 12957860336,
+      "name": "v6-environment-lci",
+      "size_in_bytes": 45401205,
+      "digest": "sha256:18139bb57e63dba86a829de16c9e9630cf7a1efbab78c3858effece9603c5c9f"
+    },
+    {
+      "id": 12957941903,
+      "name": "v6-environment-ltr",
+      "size_in_bytes": 44976606,
+      "digest": "sha256:6b13a8f89017baaac6e2d02cb49f27a1facd56fe1b7d1d9154eca1658b985d70"
+    },
+    {
+      "id": 12958390448,
+      "name": "v6-environment-mh3",
+      "size_in_bytes": 33433060,
+      "digest": "sha256:0f8365f69b8ccbc9385384fb366b42719726f2d6508170bbb36b72adde22c2cd"
+    },
+    {
+      "id": 12960202613,
+      "name": "v6-environment-mkm",
+      "size_in_bytes": 35777814,
+      "digest": "sha256:e7d6e96f774a10b489ae4f5f8fc06aa98f334a63e24f65b1bebfc78be041628e"
+    },
+    {
+      "id": 12962479831,
+      "name": "v6-environment-mom",
+      "size_in_bytes": 63224374,
+      "digest": "sha256:12e873142388132026e11f48268b27660e9a8a9a4205ec5649a5bb83dbea23e3"
+    },
+    {
+      "id": 12959536264,
+      "name": "v6-environment-msh",
+      "size_in_bytes": 21952163,
+      "digest": "sha256:027370ff28fd59512f2dec2454c9ddf85c071fcc123228475f0a9640b023d554"
+    },
+    {
+      "id": 12961447438,
+      "name": "v6-environment-neo",
+      "size_in_bytes": 42898260,
+      "digest": "sha256:613c86f00e7520c110512856e343695cbf3ab1bc5ded9a9609ad87274c1abf16"
+    },
+    {
+      "id": 12960563776,
+      "name": "v6-environment-one",
+      "size_in_bytes": 22690575,
+      "digest": "sha256:35bf74a081cf3a2c3459f08f61d1f37745651a7d59554090e829fdf7d18351ca"
+    },
+    {
+      "id": 12963858611,
+      "name": "v6-environment-otj",
+      "size_in_bytes": 43614182,
+      "digest": "sha256:653f2b4f31f5f26434bb7ba05a20c7b87b576fb78aee6dd58c97e4fa8d8138ee"
+    },
+    {
+      "id": 12961964259,
+      "name": "v6-environment-pio",
+      "size_in_bytes": 16711065,
+      "digest": "sha256:c93e1f3d24f1e9813bdcc02edf0b9bf03a26ca9e5b85ba4905a752fbbf7fdd7e"
+    },
+    {
+      "id": 12964839409,
+      "name": "v6-environment-powered-cube",
+      "size_in_bytes": 21186770,
+      "digest": "sha256:32ff4c709b6cd8f0fa1258de76b3a7e06b02edd81756eac91b6dbff23231a293"
+    },
+    {
+      "id": 12964498713,
+      "name": "v6-environment-sir",
+      "size_in_bytes": 16755815,
+      "digest": "sha256:d8b6b54f6e7d4c8ffb1a477245c1056cde7d3c0f0ce1127cb4fec39fe65a6ee1"
+    },
+    {
+      "id": 12967186727,
+      "name": "v6-environment-snc",
+      "size_in_bytes": 40136259,
+      "digest": "sha256:2a84cc7569fdb03d1de1fc7aa74a0366ee57173bf42daf523a3b7a07f9a27207"
+    },
+    {
+      "id": 12967182685,
+      "name": "v6-environment-sos",
+      "size_in_bytes": 31350409,
+      "digest": "sha256:f5e74aaaacbc72d09a71efcf3b55b26097d121a5a9329a66902b6aa42831b9b9"
+    },
+    {
+      "id": 12965814684,
+      "name": "v6-environment-tdm",
+      "size_in_bytes": 24490177,
+      "digest": "sha256:f38f196f086b61f1f87a12dd0fffa1a3854e0d01e0f9337e9b7d05b1c8eafced"
+    },
+    {
+      "id": 12967484572,
+      "name": "v6-environment-tla",
+      "size_in_bytes": 27768793,
+      "digest": "sha256:d345bf8565b8cd52aa8ae070334ea32052787310b8dc280554078f3218986761"
+    },
+    {
+      "id": 12967113704,
+      "name": "v6-environment-tmt",
+      "size_in_bytes": 7720926,
+      "digest": "sha256:28d2f77cb2e4ac624b625bd80a58b1878a59dc75eda369a06b2c8a9b0de7ba99"
+    },
+    {
+      "id": 12971413086,
+      "name": "v6-environment-woe",
+      "size_in_bytes": 42979154,
+      "digest": "sha256:eead4fe1cbfb612f7b6e2eeb6d95688be9bc7e68d2e4f79cb06c413b53acf4f6"
+    }
+  ]
+}

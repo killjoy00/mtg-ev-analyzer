@@ -10,6 +10,9 @@ function link(href,label,key,current=false){
   a.href=href;
   a.textContent=label;
   a.dataset.nav=key;
+  // The static markup ships this id; keep it so Sign in / My Pack One keeps
+  // the same placement as in the app shell after hydration.
+  if(key==='account')a.id='account-nav';
   if(current)a.setAttribute('aria-current','page');
   return a;
 }

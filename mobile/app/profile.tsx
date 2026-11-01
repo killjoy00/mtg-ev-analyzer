@@ -63,7 +63,7 @@ function PublicRecordDetails({ profile }: { profile: CareerProfile }) {
   return (
     <View style={styles.panel}>
       <Text style={styles.heading}>Player record details</Text>
-      {profile.player.favorite_set_id ? <Text style={styles.body}>Favorite environment: {environment(profile.player.favorite_set_id)}</Text> : null}
+      {profile.player.favorite_set_id ? <Text style={styles.body}>Favorite set or format: {environment(profile.player.favorite_set_id)}</Text> : null}
       {showcase ? <Text style={styles.body}>Showcased achievement: {showcase.label}</Text> : null}
       {profile.best_final_percentile != null && profile.best_final_percentile > 0
         ? <Text style={styles.body}>Best final Daily finish: Top {profile.best_final_percentile}%</Text> : null}

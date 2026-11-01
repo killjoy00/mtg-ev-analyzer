@@ -139,7 +139,7 @@ export default function PracticeScreen() {
           <Text style={styles.eyebrow}>PRACTICE</Text>
           <Text style={styles.title}>Choose your Draft Run.</Text>
           <Text style={styles.body}>
-            Build confidence with eight real draft decisions. Practice results save to your career; Daily runs are where you compete on the leaderboard.
+            Get more practice with eight picks from real trophy drafts. Practice results save to your career; Daily runs are where you compete on the leaderboard.
           </Text>
         </View>
 
@@ -181,16 +181,16 @@ export default function PracticeScreen() {
             pressed && cubeUnlocked && styles.pressed,
           ]}
         >
-          <Text style={styles.cardKicker}>ADDITIONAL PRACTICE</Text>
+          <Text style={styles.cardKicker}>PACK ONE ELITE</Text>
           <Text style={styles.cardTitle}>Powered Cube</Text>
           <Text style={styles.body}>Unlimited Powered Cube practice with two new-pack rerolls.</Text>
           <Text style={cubeUnlocked ? styles.cardAction : styles.lockedText}>
-            {cubeUnlocked ? 'Start Powered Cube →' : 'Additional account access required'}
+            {cubeUnlocked ? 'Start Powered Cube →' : 'Pack One Elite required'}
           </Text>
         </Pressable>
 
         <View style={[styles.optionCard, !customUnlocked && styles.lockedCard]}>
-          <Text style={styles.cardKicker}>ADDITIONAL PRACTICE</Text>
+          <Text style={styles.cardKicker}>PACK ONE ELITE</Text>
           <Text style={styles.cardTitle}>Choose your sets</Text>
           <Text style={styles.body}>Build an eight-pick practice run from the live sets you select.</Text>
 
@@ -236,7 +236,7 @@ export default function PracticeScreen() {
               </Pressable>
             </>
           ) : (
-            <Text style={styles.lockedText}>Additional account access required</Text>
+            <Text style={styles.lockedText}>Pack One Elite required</Text>
           )}
         </View>
 

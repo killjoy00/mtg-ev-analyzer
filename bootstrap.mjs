@@ -93,6 +93,15 @@ function syncPrimaryNavState(state) {
 }
 syncPrimaryNavState('checking');
 
+// Mark the section the reader is in; site-nav.mjs does the same on content pages.
+{
+  const current=params.has('account')||params.has('profile')||params.has('patreon')?'account-nav'
+    :params.has('board')?'leaderboard-nav'
+    :params.get('game')==='draft-run'&&params.get('daily')!=='1'?'practice-nav'
+    :'daily-nav';
+  document.querySelector('#'+current)?.setAttribute('aria-current','page');
+}
+
 const deletionState=params.get('account');
 if (deletionState==='deleted'||deletionState==='deleting') {
   syncPrimaryNavState('signed-out');
@@ -112,7 +121,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
   // Paint the real Daily layout immediately, but keep account/progress-specific
   // claims neutral until the cookie-backed session and Daily status resolve.
   const home = params.get('game') !== 'draft-run' && !params.has('profile') && !params.has('account') && !params.has('patreon')
-    ? await import('./daily-home.mjs?v=25') : null;
+    ? await import('./daily-home.mjs?v=28') : null;
   home?.renderDailyHome(null,'checking');
   const growthReady = import('./growth.mjs?v=32');
   const identityReady = growthReady.then(m => m.installGrowthLayer());
@@ -165,7 +174,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     await identityReady;
     (await import('./profile-product.mjs?v=24')).installProfileProductLayer();
   } else {
-    const game = await import('./draft-run-product.mjs?v=35');
+    const game = await import('./draft-run-product.mjs?v=37');
     await identityReady;
     await refreshPrimaryNav();
     await game.installDraftRunPage();

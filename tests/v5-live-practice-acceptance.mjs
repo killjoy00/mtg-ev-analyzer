@@ -5,6 +5,12 @@ import rebuiltCatalog from '../corpus/draft-run/catalog.json' with {type:'json'}
 import {corpusDatabase} from '../scripts/neon-corpus-db.mjs';
 import {assertPracticeReleaseCoverage} from '../scripts/practice-release-coverage.mjs';
 import {customPracticeCoverage} from '../worker/draft-run-selection.mjs';
+import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
+
+// Accepts the uncapped corpus this release serves: v9 (v5) or v10 (v6).
+const SERVED=DRAFT_RUN_CORPUS_VERSION;
+if(![modelVersions.v5.corpus_version,modelVersions.v6.corpus_version].includes(SERVED))
+  throw Error('Live Practice acceptance applies only to uncapped v9 or v10 releases');
 
 const [branch,commit,connectionFile]=process.argv.slice(2);
 const allowed=new Set(['br-twilight-hill-ayffyd2b','br-orange-feather-ayps8kep']);
@@ -70,7 +76,7 @@ async function start(body,user) {
   assert.equal(run.run_length,8);
   assert.equal(run.day,null);
   assert.equal(run.leaderboard_eligible,false);
-  assert.equal(run.corpus_version,modelVersions.v5.corpus_version);
+  assert.equal(run.corpus_version,SERVED);
   return run;
 }
 
@@ -110,7 +116,7 @@ async function finish(run,user) {
   assert.equal(persisted.answers.length,8);
   const stored=(await query(`SELECT corpus_version,score,result_persisted_at,measurement_qa,leaderboard_eligible
     FROM draft_run_sessions WHERE id=$1::uuid AND player_id=$2::uuid`,[run.id,user.playerId])).rows[0];
-  assert.equal(stored?.corpus_version,modelVersions.v5.corpus_version);
+  assert.equal(stored?.corpus_version,SERVED);
   assert.equal(Number(stored?.score),Number(run.score));
   assert.ok(stored?.result_persisted_at,'Completed Practice must persist its result transaction.');
   assert.equal(stored?.measurement_qa,true);
@@ -149,7 +155,7 @@ try {
   const health=await call('draftrunapi','/health');
   assert.equal(health.ok,true);
   assert.equal(health.release_commit,commit);
-  assert.equal(health.corpus_version,modelVersions.v5.corpus_version);
+  assert.equal(health.corpus_version,SERVED);
   assert.equal(health.unrated_puzzles,0);
   assert.deepEqual(health.missing_sets,[]);
 
@@ -160,7 +166,7 @@ try {
       AND k.difficulty_version=$2 AND k.serving_policy_version=$3 AND k.cache_schema='serving-cache-v1'
     JOIN draft_run_readiness_jobs j ON j.key_id=k.id AND j.revision=rv.revision
     JOIN draft_run_serving_snapshots s ON s.id=j.cache_snapshot_id AND s.revision=rv.revision
-    WHERE rv.singleton`,[modelVersions.v5.corpus_version,health.difficulty_version,health.serving_policy_version])).rows[0];
+    WHERE rv.singleton`,[SERVED,health.difficulty_version,health.serving_policy_version])).rows[0];
   assert.equal(readiness?.state,'ready');
   assert.equal(readiness?.job_revision,readiness?.current_revision);
   assert.ok(readiness?.snapshot_id);
@@ -169,11 +175,11 @@ try {
     FROM corpus_set_versions v
     LEFT JOIN draft_run_environment_policy p ON p.set_id=v.set_id
     LEFT JOIN corpus_source_snapshots s ON s.source_snapshot_id=p.active_snapshot_id
-    WHERE v.corpus_version=$1`,[modelVersions.v5.corpus_version])).rows;
-  assert.equal(rebuiltCatalog.corpus_version,modelVersions.v5.corpus_version);
+    WHERE v.corpus_version=$1`,[SERVED])).rows;
+  assert.equal(rebuiltCatalog.corpus_version,SERVED);
   assertPracticeReleaseCoverage(coverage,{
     requiredSetIds:rebuiltCatalog.sets.map(set=>set.id),
-    corpusVersion:modelVersions.v5.corpus_version,
+    corpusVersion:SERVED,
   });
 
   const ownerGuest=await guest('owner');
@@ -279,7 +285,7 @@ try {
     practice_sets:practice.sets.length,
     p1p2_opening_sets:lateSets,
     checks:[
-      'exact release and v9 health/readiness',
+      'exact release and served-corpus health/readiness',
       'guest Practice denied and account Practice granted',
       'mixed set reroll and persisted scoring',
       'shared friend replay identity and scores',

@@ -308,7 +308,7 @@ function dailyEmailHtml(unsubscribe) {
   const footerLink=(href,label)=>'<a href="'+htmlText(href)+'" style="'+font+'font-size:13px;line-height:20px;color:#555555;text-decoration:underline;">'+label+'</a>';
   return '<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta http-equiv="X-UA-Compatible" content="IE=edge"></head>'+
     '<body style="margin:0;padding:0;background-color:#f5f5f5;">'+
-    '<div style="display:none;max-height:0;overflow:hidden;">Three fresh draft decisions. They close at midnight Pacific.</div>'+
+    '<div style="display:none;max-height:0;overflow:hidden;">Three new Dailies, eight picks each. Play before midnight Pacific.</div>'+
     '<table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation"><tr><td align="center" style="padding-top:32px;padding-right:16px;padding-bottom:32px;padding-left:16px;background-color:#f5f5f5;">'+
     '<table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="max-width:600px;background-color:#ffffff;">'+
     '<tr><td style="padding-top:32px;padding-right:32px;padding-bottom:16px;padding-left:32px;"><table cellpadding="0" cellspacing="0" border="0" role="presentation"><tr>'+

@@ -90,7 +90,7 @@ export function dismissSetRefresher() {
 export function installSetGuides() {
   if(installed)return;installed=true;
   if(!document.querySelector('[data-set-guide-styles]')) {
-    const css=document.createElement('link');css.rel='stylesheet';css.href=new URL('./set-guides.css?v=1',import.meta.url).href;css.dataset.setGuideStyles='';document.head.append(css);
+    const css=document.createElement('link');css.rel='stylesheet';css.href=new URL('./set-guides.css?v=2',import.meta.url).href;css.dataset.setGuideStyles='';document.head.append(css);
   }
   document.addEventListener('click',event=>{
     const trigger=event.target.closest('[data-set-refresher]');

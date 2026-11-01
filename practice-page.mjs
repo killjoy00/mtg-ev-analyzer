@@ -32,7 +32,7 @@ function updateAccess({ state = 'checking', patreon = null, membershipUnavailabl
     } else if (!canStart) {
       action = mode.premium
         ? '<button class="button secondary" type="button" data-practice-upgrade>Upgrade to Elite</button>'
-        : '<a class="button secondary" href="/?account=1">Sign in to practice</a>';
+        : '<a class="button primary" href="/?account=1">Sign in to practice</a>';
     } else {
       action = `<a class="button ${mode.premium ? 'secondary' : 'primary'}" href="${mode.href}">${mode.cta}</a>`;
     }

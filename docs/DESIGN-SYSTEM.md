@@ -52,8 +52,26 @@ Future work should preserve this structure and avoid introducing gradients,
 glass panels, decorative AI imagery, unrelated fantasy/card illustration, or an
 unrelated typeface system.
 
-Daily home, Practice, and the custom-set picker share a 900px content column and
-a 600-weight display heading (60px desktop, 48px on phones). Mode labels use
+Every page shares one frame: the menu, the page content and the footer start and
+end at the same edges (a 1188px frame with a 24px gutter, 16px at 700px and
+narrower). Daily home, Practice, gameplay and set pages use the full frame width.
+Reading pages, results, leaderboards and the custom-set picker keep their narrower
+columns, but those columns start at the same left edge as the logo instead of
+being centered. Running text stops at 68 characters.
+
+At 700px and narrower the menu is one row: the logo, the section links, and the
+account link at the far end. At 600px and narrower the logo shows only the P¹ mark
+(the link keeps its "Return to Pack One home" label), so the bar is 48px tall.
+
+Text sizes come from one scale. Reading and interface text uses 11, 12, 13, 14,
+16, 17 (long-form prose), 18 and 20px. Display headings use 22, 24, 28, 32, 36,
+40, 48 and 60px. Page titles (`h1`) reach 60px on desktop and section titles
+(`h2`) default to 24px on phones and 32px on desktop; fluid headings pass through
+in-between sizes at middle widths. The "Pack One" wordmark, the final score, the
+gameplay screen and the in-game set refresher keep their own tuned sizes.
+
+Daily home and Practice use a 600-weight display heading (60px desktop, 48px on
+phones). Mode labels use
 12px, 700-weight reading type. Entry actions are centered, fill their card, and
 are at least 48px high. The set picker uses selectable rows with the shared blue,
 surface, and border tokens. Gameplay retains its wider card layout.

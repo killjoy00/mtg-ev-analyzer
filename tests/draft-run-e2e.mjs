@@ -149,15 +149,15 @@ try{
   if(cube){
     assert.equal(originalSet,'powered-cube');assert.equal(puzzles[0].pick_number,2);
     assert.equal(await page.locator('[data-reroll="set"]').count(),0);
-    await page.locator('[data-reroll="pack"]').click();await page.getByRole('button',{name:'Reroll pack · 1',exact:true}).waitFor();
+    await page.locator('[data-reroll="pack"]').click();await page.getByRole('button',{name:'New pack · 1',exact:true}).waitFor();
   }else{
-    await page.locator('[data-reroll="set"]').click();await page.getByRole('button',{name:'Reroll set · 0',exact:true}).waitFor();
+    await page.locator('[data-reroll="set"]').click();await page.getByRole('button',{name:'New set · 0',exact:true}).waitFor();
     assert.notEqual(puzzles[0].set_id,originalSet);
   }
   const replacementSet=puzzles[0].set_id;
   if(hasSetGuide(replacementSet))assert.equal(await guideTrigger.getAttribute('data-set-refresher'),replacementSet,'guide follows the rerolled set');
   else assert.equal(await guideTrigger.count(),0);
-  await page.locator('[data-reroll="pack"]').click();await page.getByRole('button',{name:'Reroll pack · 0',exact:true}).waitFor();
+  await page.locator('[data-reroll="pack"]').click();await page.getByRole('button',{name:'New pack · 0',exact:true}).waitFor();
   assert.equal(puzzles[0].set_id,replacementSet);
   }
   await noOverflow();
@@ -275,7 +275,7 @@ try{
     await page.locator('#run-next').click();
     if(round===0){const thumb=await page.locator('.run-pool-cards img').first().boundingBox(),pack=await page.locator('.run-card-select img').first().boundingBox();assert.ok(Math.abs(thumb.width/pack.width-.85)<.03,`Prior picks are about 85% of pack cards: ${thumb.width}/${pack.width}`);assert.equal(await page.locator('.run-pool-cards>button').count(),cube?2:1);await page.reload();await page.locator('.run-cards').waitFor();assert.equal(answers.length,1);}
   }
-  await page.locator('.run-result-page').waitFor();assert.equal(await page.locator('.run-image-share,#run-share-image').count(),0,'sharing is text and link only; the link preview supplies the image');assert.equal(await page.locator('.run-review-list li').count(),puzzles.length);assert.match(await page.locator('.run-final-score').innerText(),new RegExp(String(snapshot().score))); assert.equal(await page.locator('.run-result-actions .button').count(),daily?3:5);if(daily)assert.equal(await page.locator('.run-share-actions .button').count(),2);assert.ok(await page.getByRole('button',{name:'Copy result',exact:true}).isVisible());assert.equal(await page.locator('#home-editorial').count(),0);assert.ok(await page.getByRole('button',{name:'View your career',exact:true}).isVisible());assert.equal(await page.locator('.run-result-page .run-note').evaluate(el=>getComputedStyle(el).marginTop),'24px','result footnote retains its spacing');await noOverflow();
+  await page.locator('.run-result-page').waitFor();assert.equal(await page.locator('.run-image-share,#run-share-image').count(),0,'sharing is text and link only; the link preview supplies the image');assert.equal(await page.locator('.run-review-list li').count(),puzzles.length);assert.equal(await page.locator('.run-review-list li .run-review-cards[aria-hidden="true"] > span:first-child').count(),puzzles.length,'every recap row shows the card the player took');assert.equal(await page.locator('.run-review-cards > .is-trophy').count(),answers.filter(a=>!a.historicalMatch).length,'recap rows add the trophy pick only when it differs');assert.match(await page.locator('.run-final-score').innerText(),new RegExp(String(snapshot().score))); assert.equal(await page.locator('.run-result-actions .button').count(),daily?3:5);if(daily)assert.equal(await page.locator('.run-share-actions .button').count(),2);assert.ok(await page.getByRole('button',{name:'Copy result',exact:true}).isVisible());assert.equal(await page.locator('#home-editorial').count(),0);assert.ok(await page.getByRole('button',{name:'View your career',exact:true}).isVisible());assert.equal(await page.locator('.run-result-page .run-note').evaluate(el=>getComputedStyle(el).marginTop),'24px','result footnote retains its spacing');await noOverflow();
   if(daily){
     await page.locator('.post-game-daily-cue').waitFor();
     const cue=(await page.locator('.post-game-daily-cue').innerText()).trim();
@@ -318,7 +318,7 @@ try{
   }
   if(daily){
     assert.match(shared.text,/I scored \d+\/100 on the Pack One (Draft Run|Powered Cube|Latest Set) Daily \(Oct 7\)\./);
-    assert.match(shared.text,/Play today’s Daily yourself\. Free, no account needed:$/);
+    assert.match(shared.text,/Try Pack One's Daily\. No account needed:$/);
     const sharedUrl=new URL(shared.url);assert.equal(sharedUrl.pathname,'/share/daily/'+environment+'/');assert.equal(sharedUrl.searchParams.get('d'),fixtureDay);assert.equal(sharedUrl.searchParams.get('ref'),'result_share');assert.doesNotMatch(shared.url,/challenge=|shared=/);assert.equal(shareCalls,0);
     // The share panel sits above the next-Daily handoff and names no cards.
     const order=await page.evaluate(()=>{const panel=document.querySelector('.run-share-panel'),next=document.querySelector('[data-next-daily-action]');return Boolean(panel.compareDocumentPosition(next)&Node.DOCUMENT_POSITION_FOLLOWING);});

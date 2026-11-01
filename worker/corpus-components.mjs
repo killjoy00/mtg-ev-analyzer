@@ -2,6 +2,9 @@ import {modelVersionForComponent,supportedComponent} from '../corpus-components.
 import modelVersions from '../model-versions.json' with {type:'json'};
 export function corpusMembership({serving=false,parameter=1}={}) {
  const live=serving?" AND c.status='Live'":'';
+ // The last clause is the cross-version bridge (migration 0069): a runtime still
+ // on the previous parent keeps serving the exact snapshot the active one
+ // superseded, never a same-version refresh.
  const activeSnapshot=serving?`
  AND (p.corpus_version<>$${parameter} OR EXISTS(
    SELECT 1 FROM draft_run_environment_policy e
@@ -17,7 +20,14 @@ export function corpusMembership({serving=false,parameter=1}={}) {
            SELECT 1 FROM corpus_source_snapshots next_snapshot
            WHERE next_snapshot.source_snapshot_id=e.active_snapshot_id
              AND next_snapshot.corpus_version='${modelVersions.v5.corpus_version}'
-         )))
+         ))
+       OR (p.source_snapshot_id IS NOT NULL AND EXISTS(
+         SELECT 1 FROM corpus_source_snapshots previous
+         JOIN corpus_source_snapshots active_snapshot ON active_snapshot.source_snapshot_id=e.active_snapshot_id
+         WHERE previous.source_snapshot_id=p.source_snapshot_id AND previous.set_id=p.set_id
+           AND previous.superseded_by=e.active_snapshot_id
+           AND active_snapshot.corpus_version<>p.corpus_version
+       )))
  ))`:'';
  // Bound the version index, enforce publication independently per set, and for
  // the parent Premier corpus expose only the environment's explicitly active

@@ -161,9 +161,10 @@ def build(root=ROOT, selected=None):
         manifest = json.loads((root / 'data' / sid / 'manifest.json').read_text())
         assert manifest['model']['holdout'] == catalog['holdout']
         model = manifest['model']['model_version']
-        from model_training import V5_MODEL, V5_CORPUS, validate_training_manifest
-        if VERSION == V5_CORPUS:
-            validate_training_manifest(manifest)
+        from model_training import UNCAPPED_MODELS, V5_CORPUS, V5_MODEL, V6_CORPUS, V6_MODEL, validate_training_manifest
+        expected = {V5_CORPUS: V5_MODEL, V6_CORPUS: V6_MODEL}.get(VERSION)
+        if expected:
+            validate_training_manifest(manifest, expected)
         # One corpus, one model. A half-rebuilt data/ would otherwise publish a
         # corpus whose rows came from two models under a single label.
         assert catalog['model_version'] in (None, model), \
@@ -220,7 +221,7 @@ def build(root=ROOT, selected=None):
                         'puzzle_id': hashlib.sha256(f"{VERSION}|{sid}|{replay['draft_id']}|{n}".encode()).hexdigest()[:32],
                         'set_id': sid, 'source_draft_hash': hashlib.sha256(f"{sid}|{replay['draft_id']}".encode()).hexdigest()[:32],
                         'source_fingerprint': fingerprint, 'corpus_version': VERSION,
-                        **({'model_version': model} if model == V5_MODEL else {}),
+                        **({'model_version': model} if model in UNCAPPED_MODELS else {}),
                         'source_evidence': 'official_archive_trajectory',
                         'skill_evidence': 'earliest_game_arena_rank' if legacy else 'win_rate_bucket',
                         'player_rank_tier': rank if legacy else None,
