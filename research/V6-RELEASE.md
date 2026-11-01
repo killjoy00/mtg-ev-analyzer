@@ -54,11 +54,12 @@ Migration 0070 makes both `pack1_build_serving_snapshot` and `pack1_serving_snap
 - **Cutover contract fixture.** The serving-carry contract assumed its prepared database held v9. Once v10 became the checked-in corpus, that fixture was prepared at v10. Inside its disposable transaction, the contract now returns the fixture to the cutover-time state before executing the release SQL. The relabel is foreign-key safe and every assertion is unchanged.
 - **Resumed publication.** Publication's reverify step required every component to be an unpublished Candidate, so a resume after some components went Live was refused. On resume it now accepts components it already published. First activation still requires every component to be a Candidate.
 - **Concurrent readiness lease.** On development, a delayed scheduled smoke run, triggered by activity on main, took the readiness lease during publication, and the resume stopped at SOS. The identical request was re-run with `replay_of`. Nothing was merged to main between production activation and the production deploy. Publication still does not tolerate a concurrent readiness lease; that is open.
-- **Backend gate fixtures.** The backend gate clones production. After the production cutover, two fixtures failed:
+- **Backend gate fixtures.** The backend gate clones production. After the production cutover, three fixtures failed:
   - The Pacific report-date check placed its arrival before the first v10 session.
   - The corpus-transition smoke assumed HOB was Premier-only.
+  - The corpus admin smoke fell back to a v4 Traditional component on the v10 parent.
 
-  Both now derive their setup from the cloned state (#1469).
+  All three now derive their setup from the current corpus and the cloned state (#1469).
 
 ## Outcome
 
