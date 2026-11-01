@@ -6,7 +6,7 @@ import {DAILY_SELECTION_VERSION} from '../daily-selection.mjs';
 import {registerHealthyCandidate} from '../scripts/corpus-candidate.mjs';
 import {CORPUS_GATE_VERSION} from '../corpus-quality.mjs';
 import {SERVING_POLICY_VERSION} from '../serving-quality.mjs';
-import {TRADITIONAL_GATE_VERSION,TRADITIONAL_V4_PHASE2_COMPONENT_VERSION,V4_CONTEXT_MODEL_VERSION,TRADITIONAL_V5_PHASE2_COMPONENT_VERSION,V5_CONTEXT_MODEL_VERSION,V5_PARENT_CORPUS_VERSION} from '../corpus-components.mjs';
+import {TRADITIONAL_GATE_VERSION,TRADITIONAL_V4_PHASE2_COMPONENT_VERSION,V4_CONTEXT_MODEL_VERSION,TRADITIONAL_V5_PHASE2_COMPONENT_VERSION,V5_CONTEXT_MODEL_VERSION,V5_PARENT_CORPUS_VERSION,TRADITIONAL_V6_PHASE2_COMPONENT_VERSION,V6_CONTEXT_MODEL_VERSION,V6_PARENT_CORPUS_VERSION} from '../corpus-components.mjs';
 
 if(!process.argv.includes('--dev-fixtures'))throw Error('Isolated development branch required.');
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
@@ -19,9 +19,13 @@ let check,staleCheck;const discovered='qa-candidate-'+crypto.randomUUID().slice(
 const suffix=randomBytes(3).toString('hex'),snapshotSet=`qa-snapshot-${suffix}`,historicalSet=`qa-history-${suffix}`;
 const fixtureSets=[snapshotSet,historicalSet];
 const snapshotA=randomBytes(32).toString('hex'),snapshotB=randomBytes(32).toString('hex'),historicalSnapshot=randomBytes(32).toString('hex');
-const v5=DRAFT_RUN_CORPUS_VERSION===V5_PARENT_CORPUS_VERSION;
-const componentVersion=v5?TRADITIONAL_V5_PHASE2_COMPONENT_VERSION:TRADITIONAL_V4_PHASE2_COMPONENT_VERSION;
-const componentModel=v5?V5_CONTEXT_MODEL_VERSION:V4_CONTEXT_MODEL_VERSION;
+// The fixture's Live Traditional component must be the pair 0069 allows for
+// the current parent; v8 and earlier use the v4 pair.
+const componentPairs={
+ [V6_PARENT_CORPUS_VERSION]:[TRADITIONAL_V6_PHASE2_COMPONENT_VERSION,V6_CONTEXT_MODEL_VERSION],
+ [V5_PARENT_CORPUS_VERSION]:[TRADITIONAL_V5_PHASE2_COMPONENT_VERSION,V5_CONTEXT_MODEL_VERSION],
+};
+const [componentVersion,componentModel]=componentPairs[DRAFT_RUN_CORPUS_VERSION]||[TRADITIONAL_V4_PHASE2_COMPONENT_VERSION,V4_CONTEXT_MODEL_VERSION];
 const parse=x=>typeof x==='string'?JSON.parse(x):x;
 const yes=x=>x===true||x==='t';
 const findSet=(report,setId)=>{const row=report.sets.find(set=>set.set_id===setId);assert.ok(row,`${setId}: admin row missing`);return row;};
