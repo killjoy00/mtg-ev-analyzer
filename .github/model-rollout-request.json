@@ -1,9 +1,12 @@
 {
   "operation": "v6-corpus-release",
-  "request_id": "pack1-v6-stage-production-20261101",
-  "reason": "Stage the validated v6 candidate from rebuild run 41273387825 on production at release commit d3a2847, which carries the FRA database-only baseline, the FRA Live-set import fix and the 0070 bridge membership repair, all verified on development. Applies migrations 0069 and 0070 and loads the v10 parents and admitted Traditional components as Candidates without switching serving; serving and rollback state must be unchanged. The v9 bridge 914dac3 is deployed to production. Activation follows only after the development release deploy passes live acceptance.",
-  "target": "production",
-  "action": "stage",
+  "request_id": "pack1-v6-resume-activation-development-retry-20261101",
+  "replay_of": "pack1-v6-resume-activation-development-20261101",
+  "reason": "Retry the development resume (run 41317920409). It recovered the v9 bridge and published 21 v6 Traditional components, then stopped after SOS committed because a delayed scheduled activation smoke held that readiness lease; the readiness then completed and every activated environment passed that smoke on v10. The retry changes no pointer, skips Live components, publishes the remaining eligible ones and verifies the active state with the v9 bridge 914dac3.",
+  "target": "development",
+  "action": "resume-activation",
   "candidate_run_id": "41273387825",
-  "release_commit": "d3a284729c54d32af630c328ca4beb59ccd72bfb"
+  "release_commit": "d3a284729c54d32af630c328ca4beb59ccd72bfb",
+  "stage_run_id": "41309576375",
+  "bridge_commit": "914dac33830f0e744cd7572feb59ca101cc9b18c"
 }
