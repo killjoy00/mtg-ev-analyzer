@@ -220,14 +220,16 @@ jobs:
               shutil.copytree(p,root/p.name.removeprefix('v6-environment-'),dirs_exist_ok=True)
           PY
           python scripts/v6_rebuild.py assemble
+      - name: Prove Cube rerolls under complete session source exclusions
+        run: node scripts/v6-cube-reroll-admission.mjs
+      # Fixtures fingerprint the final corpus, so they follow the Cube admission
+      # that prunes the Cube corpus and rewrites its catalog entry.
       - name: Refresh current-corpus fixtures while preserving accepted historical scores
         run: |
           set -euo pipefail
           golden_sha="$(sha256sum tests/fixtures/draft-run/scoring-golden.json)"
           node scripts/build-test-corpus-fixture.mjs
           test "$golden_sha" = "$(sha256sum tests/fixtures/draft-run/scoring-golden.json)"
-      - name: Prove Cube rerolls under complete session source exclusions
-        run: node scripts/v6-cube-reroll-admission.mjs
       - name: Generate post-build v5 to v6 implementation QA
         run: python scripts/v6_rebuild_qa.py --baseline generated/v6-production-baseline
       - name: Install creator card renderer dependencies for the full test suite

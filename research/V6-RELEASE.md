@@ -16,7 +16,7 @@ v6 (`strong-player-colour-stage-v6`) passed its frozen held-out test ([V6-COLOUR
    - FRA's new-set artifact (run 39451056661);
    - for HOB, a fresh v6 measurement of its current pinned Traditional archive. 17Lands replaced HOB's original Traditional archive on 2026-10-01, so the original list cannot be reproduced.
 3. Each set is scored once, on its approved window only: regular P1P1-P1P8, FRA P1P1-P1P6 (approved 2026-10-20) and Powered Cube P1P2-P1P7 (approved for v3/v4).
-4. There is no fallback. A set that fails its window is not admitted. A set admitted under v9 that fails is reported in `no_longer_admitted`.
+4. There is no fallback. A set that fails its window is not admitted. A set admitted under v9 that fails is reported in `no_longer_admitted` and its Traditional puzzles are dropped from v10; the release continues (owner, 2026-11-01).
 
 An earlier draft let failing sets fall back to a narrower window. The owner rejected it on 2026-10-29, after local previews, before any rebuild ran.
 
