@@ -6,6 +6,7 @@ import gzip
 import hashlib
 import json
 from pathlib import Path
+import subprocess
 
 from decision_context import PickState, card_features, diagnostic_flags
 from model_training import V5_MODEL
@@ -13,6 +14,10 @@ from model_training import V5_MODEL
 ROOT = Path(__file__).resolve().parents[1]
 SETS = ('blb', 'dsk', 'neo', 'eoe', 'woe')
 SEED = 'decision-context-v1-review'
+# The live corpus moved to v6 (corpus v10). This audit stays a v5 record: it reads
+# the last main commit that carried the v5 corpus, verified against audit.json.
+SOURCE_COMMIT = 'f14936d32d80185b5bfc26fb0e046fc4294103d6'
+SOURCE_SHA256 = ROOT / 'research/decision-context-v1/audit.json'
 
 
 def digest(path):
@@ -30,12 +35,24 @@ def write(path, value):
     path.write_text(json.dumps(value, indent=2, sort_keys=True, allow_nan=False)+'\n')
 
 
+def pinned_source(root, name):
+    try:
+        raw = subprocess.run(['git', 'show', f'{SOURCE_COMMIT}:{name}'], cwd=root, capture_output=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError) as error:
+        raise ValueError(f'Audit source {name} at {SOURCE_COMMIT} is unavailable; fetch full history') from error
+    expected = json.loads(SOURCE_SHA256.read_text())['source_sha256'][name]
+    if hashlib.sha256(raw).hexdigest() != expected:
+        raise ValueError(f'Audit source {name} does not match its recorded digest')
+    return raw
+
+
 def load_public(root=ROOT):
     puzzles, metadata, sources = [], {}, {}
     for sid in SETS:
-        path = root / f'corpus/draft-run/{sid}.json.gz'
-        sources[str(path.relative_to(root))] = digest(path)
-        rows = json.loads(gzip.open(path, 'rt').read())
+        name = f'corpus/draft-run/{sid}.json.gz'
+        raw = pinned_source(root, name)
+        sources[name] = hashlib.sha256(raw).hexdigest()
+        rows = json.loads(gzip.decompress(raw))
         metadata[sid] = {}
         for p in rows:
             if p['model_version'] != V5_MODEL:
