@@ -19,9 +19,17 @@ async function call(path,body,token,status=200) {
   const data=await response.json();assert.equal(response.status,status,JSON.stringify(data));return data;
 }
 const player=await call('/v1/session',{displayName:`QA versions ${tag.slice(0,8)}`});
-// This fixture invents an older Premier revision. Use the Premier-only HOB
-// corpus: published Traditional components must retain their approved versions.
-let run=await call('/v1/runs',{qa:true,setIds:['hob']},player.token);
+// This fixture invents an older Premier revision, so it needs a Premier-only
+// environment: published Traditional components must retain their approved
+// versions. Which sets qualify changes with each release (HOB gained
+// Traditional in v10), so choose one from the serving state.
+const premierOnly=(await query(`SELECT e.set_id FROM draft_run_environment_policy e
+  JOIN corpus_source_snapshots s ON s.source_snapshot_id=e.active_snapshot_id
+  WHERE e.status='Live' AND e.set_id<>'powered-cube' AND s.corpus_version=$1
+    AND NOT EXISTS(SELECT 1 FROM corpus_components c WHERE c.set_id=e.set_id AND c.parent_version=$1 AND c.status='Live')
+  ORDER BY e.set_id LIMIT 1`,[DRAFT_RUN_CORPUS_VERSION])).rows[0]?.set_id;
+assert.ok(premierOnly,'corpus transition smoke requires a Live Premier-only environment');
+let run=await call('/v1/runs',{qa:true,setIds:[premierOnly]},player.token);
 const session=(await query('SELECT puzzle_ids FROM draft_run_sessions WHERE id=$1::uuid',[run.id])).rows[0];
 const ids=parse(session.puzzle_ids);
 await query(`INSERT INTO draft_run_verified_puzzles(puzzle_id,set_id,source_draft_hash,corpus_version,pick_number,candidate_count,consensus_top_gap,support_entropy,interesting,payload)
