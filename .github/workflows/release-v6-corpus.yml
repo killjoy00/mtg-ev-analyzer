@@ -179,6 +179,7 @@ jobs:
           set -euo pipefail
           connection=$(cat "$RUNNER_TEMP/target.connection")
           psql "$connection" -v ON_ERROR_STOP=1 --single-transaction -f migrations/0069_v6_colour_components.sql
+          psql "$connection" -v ON_ERROR_STOP=1 --single-transaction -f migrations/0070_v6_bridge_baseline_membership.sql
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           node scripts/v6-release-state.mjs "$RUNNER_TEMP/target.connection" capture generated/v6-candidate generated/v6-release-baseline.json
           # Stage the exact checked-in v10 baseline without replacing v9 serving.
@@ -228,6 +229,17 @@ jobs:
           connection=$(cat "$RUNNER_TEMP/target.connection")
           git show "$GITHUB_SHA:.github/scripts/maintain-serving-indexes.sql" > "$RUNNER_TEMP/maintain-serving-indexes.sql"
           psql "$connection" -X -v ON_ERROR_STOP=1 -f "$RUNNER_TEMP/maintain-serving-indexes.sql"
+      # Targets staged before 0070 still carry 0069's bridge membership, which
+      # strands the previous parent's verified cache on activation. Idempotent.
+      - name: Apply the reviewed bridge membership repair before readiness changes
+        if: inputs.action == 'activate' || inputs.action == 'resume-activation'
+        shell: bash
+        run: |
+          set -euo pipefail
+          connection=$(cat "$RUNNER_TEMP/target.connection")
+          psql "$connection" -v ON_ERROR_STOP=1 --single-transaction -f migrations/0070_v6_bridge_baseline_membership.sql
+          DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+
       - name: Require exact bridge revision before pointer mutation
         if: inputs.action != 'stage'
         run: node tests/release-functions-smoke.mjs "$TARGET_BRANCH" "$BRIDGE_COMMIT"

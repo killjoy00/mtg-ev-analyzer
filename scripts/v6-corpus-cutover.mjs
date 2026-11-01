@@ -82,10 +82,46 @@ if(action==='resume-activation') {
     ?await retryServingReadiness(query,before.operation_id,identity)
     :await advanceServingReadiness(query);
   if(!readiness.ready)throw Error('Published v10 parents are not ready after recovery: '+JSON.stringify(readiness));
+  // A failed activation carry leaves the bridge job queued at the activation
+  // revision while its last verified cache still exists. The release runtime
+  // cannot rebuild the previous parent, so carry that exact cache, as
+  // pack1_enqueue_readiness does, only when the equivalence check proves it
+  // still matches every current serving input. Otherwise nothing changes.
+  const recovered=(await query(`WITH rv AS (SELECT revision FROM draft_run_serving_revision WHERE singleton),
+    k AS (SELECT * FROM draft_run_readiness_keys WHERE corpus_version=$1 AND difficulty_version=$2
+      AND serving_policy_version=$3 AND cache_schema=$4),
+    next AS (SELECT j.id FROM draft_run_readiness_jobs j JOIN k ON k.id=j.key_id JOIN rv ON j.revision=rv.revision
+      WHERE j.state='queued'),
+    prior AS (SELECT j.revision,j.cache_snapshot_id,j.evidence,j.worker_release
+      FROM draft_run_readiness_jobs j JOIN k ON k.id=j.key_id JOIN rv ON j.revision<rv.revision
+      JOIN draft_run_serving_snapshots s ON s.id=j.cache_snapshot_id AND s.revision=j.revision
+      WHERE j.evidence->'inventory'->>'verified'='true' ORDER BY j.revision DESC LIMIT 1),
+    eligible AS (SELECT next.id next_job_id,prior.*,rv.revision current_revision FROM next,prior,k,rv
+      WHERE NOT EXISTS(SELECT 1 FROM draft_run_serving_snapshots s WHERE s.corpus_version=k.corpus_version
+          AND s.difficulty_version=k.difficulty_version AND s.serving_policy_version=k.serving_policy_version
+          AND s.cache_schema=k.cache_schema AND s.revision=rv.revision)
+        AND pack1_serving_snapshot_matches_current(k.corpus_version,k.difficulty_version,k.serving_policy_version,prior.cache_snapshot_id)),
+    moved AS (UPDATE draft_run_serving_snapshots s SET revision=e.current_revision FROM eligible e
+      WHERE s.id=e.cache_snapshot_id AND s.revision=e.revision RETURNING s.id),
+    carried AS (UPDATE draft_run_readiness_jobs j SET state='ready',attempts=0,lease_token=NULL,lease_expires_at=NULL,
+        next_attempt_at=clock_timestamp(),updated_at=clock_timestamp(),finished_at=clock_timestamp(),
+        cache_snapshot_id=e.cache_snapshot_id,worker_release=e.worker_release,last_error=NULL,
+        evidence=jsonb_build_object('revision',e.current_revision::text,'day',e.evidence->>'day',
+          'cache_snapshot_id',e.cache_snapshot_id::text,
+          'inventory',jsonb_build_object('verified',true,'expected',i.n,'actual',i.n,'missing',0,'extra',0),
+          'samples',jsonb_build_array(jsonb_build_object('mode','exact-serving-input-carry-forward',
+            'previous_revision',e.revision::text,'cache_snapshot_id',e.cache_snapshot_id::text,
+            'carried_evidence_day',e.evidence->>'day','recovery','v6-bridge-resume')))
+      FROM eligible e JOIN moved m ON m.id=e.cache_snapshot_id
+      CROSS JOIN LATERAL (SELECT count(*)::int n FROM draft_run_serving_inventory WHERE snapshot_id=e.cache_snapshot_id) i
+      WHERE j.id=e.next_job_id AND j.state='queued' RETURNING j.id)
+    SELECT (SELECT count(*) FROM next)::int queued,(SELECT count(*) FROM eligible)::int eligible,
+      (SELECT count(*) FROM carried)::int carried`,
+    [PREVIOUS,DRAFT_RUN_DIFFICULTY_VERSION,SERVING_POLICY_VERSION,READINESS_CACHE_SCHEMA])).rows[0];
   const v9=await parentReady(PREVIOUS);
-  if(!v9.ready)throw Error('Recovery did not preserve the v9 bridge readiness.');
+  if(!v9.ready)throw Error('Recovery did not preserve the v9 bridge readiness: '+JSON.stringify(recovered));
   await verifyPointers('target');
-  console.log(JSON.stringify({resumed:true,pointer_mutations:0,sets:mapping.length,v9,v10:readiness}));
+  console.log(JSON.stringify({resumed:true,pointer_mutations:0,sets:mapping.length,bridge_recovery:recovered,v9,v10:readiness}));
   process.exit(0);
 }
 

@@ -73,7 +73,8 @@
     "0066_removal_aware_serving_carry.sql",
     "0067_restore_serving_invalidation.sql",
     "0068_puzzle_selection_features.sql",
-    "0069_v6_colour_components.sql"
+    "0069_v6_colour_components.sql",
+    "0070_v6_bridge_baseline_membership.sql"
   ],
   "same_prefix_order": {
     "0037": [
@@ -156,7 +157,8 @@
     "release-v6-corpus": {
       "workflow": ".github/workflows/release-v6-corpus.yml",
       "migrations": [
-        "0069_v6_colour_components.sql"
+        "0069_v6_colour_components.sql",
+        "0070_v6_bridge_baseline_membership.sql"
       ]
     },
     "secure-auth-release": {
@@ -202,7 +204,8 @@
         "0066_removal_aware_serving_carry.sql",
         "0067_restore_serving_invalidation.sql",
         "0068_puzzle_selection_features.sql",
-        "0069_v6_colour_components.sql"
+        "0069_v6_colour_components.sql",
+        "0070_v6_bridge_baseline_membership.sql"
       ]
     },
     "daily-calendar": {
@@ -266,7 +269,8 @@
         "0066_removal_aware_serving_carry.sql",
         "0067_restore_serving_invalidation.sql",
         "0068_puzzle_selection_features.sql",
-        "0069_v6_colour_components.sql"
+        "0069_v6_colour_components.sql",
+        "0070_v6_bridge_baseline_membership.sql"
       ]
     },
     "launch-load": {
@@ -305,7 +309,8 @@
         "0066_removal_aware_serving_carry.sql",
         "0067_restore_serving_invalidation.sql",
         "0068_puzzle_selection_features.sql",
-        "0069_v6_colour_components.sql"
+        "0069_v6_colour_components.sql",
+        "0070_v6_bridge_baseline_membership.sql"
       ]
     },
     "launch-distributed": {
@@ -346,7 +351,8 @@
         "0066_removal_aware_serving_carry.sql",
         "0067_restore_serving_invalidation.sql",
         "0068_puzzle_selection_features.sql",
-        "0069_v6_colour_components.sql"
+        "0069_v6_colour_components.sql",
+        "0070_v6_bridge_baseline_membership.sql"
       ]
     },
     "practice-performance": {
