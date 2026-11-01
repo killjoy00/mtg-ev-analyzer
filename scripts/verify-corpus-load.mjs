@@ -50,7 +50,9 @@ for(const set of [...baseline.sets,...imported.sets.filter(s=>!baselineIds.has(s
     if([V5_CORPUS_VERSION,V6_CORPUS_VERSION].includes(DRAFT_RUN_CORPUS_VERSION)) {
       const snapshot=(await query('SELECT count(*)::int puzzles FROM draft_run_verified_puzzles WHERE set_id=$1 AND corpus_version=$2 AND source_snapshot_id=$3',[set.id,DRAFT_RUN_CORPUS_VERSION,supplement.source_snapshot_id])).rows[0];
       assert.equal(Number(snapshot?.puzzles),supplement.total_puzzles,`${set.id}: exact full snapshot count`);
-      assert.equal(Number(rows.puzzles),supplement.total_puzzles+set.puzzles,`${set.id}: separate baseline and complete snapshot count`);
+      // A database-only environment (FRA) has no checked-in baseline puzzles.
+      const baselinePuzzles=baselineIds.has(set.id)?set.puzzles:0;
+      assert.equal(Number(rows.puzzles),supplement.total_puzzles+baselinePuzzles,`${set.id}: separate baseline and complete snapshot count`);
     } else assert.equal(Number(rows.puzzles),supplement.total_puzzles,`${set.id}: full puzzle count`);
   } else assert.ok(Number(rows.puzzles)>=set.puzzles,`${set.id}: missing baseline puzzles`);
   total+=Number(rows.puzzles);

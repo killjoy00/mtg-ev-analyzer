@@ -186,6 +186,8 @@ jobs:
           # revision-neutral; the complete snapshot below remains separately
           # source-scoped and is the only v10 parent selected after activation.
           node scripts/load_verified_draft_run.mjs "$RUNNER_TEMP/target.connection" --stage-only
+          # Database-only environments (FRA) have no checked-in baseline to stage.
+          node scripts/v6-carry-database-environments.mjs "$RUNNER_TEMP/target.connection" generated/v6-candidate
           node scripts/load_all_trophies.mjs "$RUNNER_TEMP/target.connection" generated/v6-candidate/v6-trophy-import --stage-only
           node scripts/load-traditional-components.mjs "$RUNNER_TEMP/target.connection" generated/v6-candidate/v6-traditional
           node scripts/check-corpus-health.mjs "$RUNNER_TEMP/target.connection"
