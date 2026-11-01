@@ -1,7 +1,9 @@
 {
-  "operation": "deploy",
-  "request_id": "pack1-v6-bridge-production-20261101",
-  "reason": "Deploy the v6 release bridge 914dac3 to production. The same revision passed development deploy run 41273743363, including live Practice acceptance. It still serves v9 and adds the superseded-snapshot bridge required before v10 activation, plus the backend changes merged since the last deploy a3d73c4. No corpus, schema or saved-score change.",
-  "commit": "914dac33830f0e744cd7572feb59ca101cc9b18c",
-  "target": "production"
+  "operation": "v6-corpus-release",
+  "request_id": "pack1-v6-stage-development-20261101",
+  "reason": "Stage the validated v6 candidate from rebuild run 41273387825 at release commit 6fde1e2 on development. Applies migration 0069 and loads the v10 parents and admitted Traditional components as Candidates without switching serving; serving and rollback state must be unchanged. The v9 bridge 914dac3 is deployed to both targets.",
+  "target": "development",
+  "action": "stage",
+  "candidate_run_id": "41273387825",
+  "release_commit": "6fde1e2b5a6ada3ff0ac751c0034461db29383f4"
 }
