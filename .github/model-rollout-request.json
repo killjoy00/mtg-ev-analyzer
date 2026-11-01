@@ -1,9 +1,9 @@
 {
   "operation": "v6-corpus-release",
-  "request_id": "pack1-v6-stage-development-retry-20261101",
-  "reason": "Retry staging the validated v6 candidate from rebuild run 41273387825 on development at release commit 65e7e3d, which carries FRA's database-only v9 baseline to v10 before the trophy import. The first stage (run 41275079226) stopped at FRA before any serving change. Applies migration 0069 idempotently and loads the v10 parents and admitted Traditional components as Candidates without switching serving; serving and rollback state must be unchanged. The v9 bridge 914dac3 is deployed to both targets.",
+  "request_id": "pack1-v6-stage-development-retry2-20261101",
+  "reason": "Retry staging the validated v6 candidate from rebuild run 41273387825 on development at release commit 4a3c2b3, which registers FRA, a Live database-discovered environment, for its own Blocked v10 parent snapshot. The retry (run 41306972709) carried FRA's baseline and then stopped at FRA's first insert batch, before any serving change. Applies migration 0069 idempotently and loads the v10 parents and admitted Traditional components as Candidates without switching serving; serving and rollback state must be unchanged. The v9 bridge 914dac3 is deployed to both targets.",
   "target": "development",
   "action": "stage",
   "candidate_run_id": "41273387825",
-  "release_commit": "65e7e3d28214f30c7c8ab56092e61bb282a5f89f"
+  "release_commit": "4a3c2b33f0789d19c38ca43c1787a0187a4dc70e"
 }

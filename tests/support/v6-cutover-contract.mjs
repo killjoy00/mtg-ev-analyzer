@@ -32,6 +32,26 @@ export async function verifyV6Cutover(query) {
     await query('SET CONSTRAINTS serving_readiness_outbox DEFERRED');
     await query("SELECT set_config('pack1.serving_input_xid','',true)");
   };
+  // The contract simulates the cutover moment: v9 serves every environment and
+  // v10 is only staged. A fixture prepared from a v10 checkout holds its
+  // checked-in rows at v10, so first return them, inside the caller's
+  // disposable transaction, to the v9 state the release activates from.
+  if(!(await query('SELECT 1 FROM draft_run_verified_puzzles WHERE corpus_version=$1 LIMIT 1',[previous])).rows.length) {
+    // Copy the version rows, move every row that references them, then drop the originals.
+    await query(`INSERT INTO corpus_set_versions SELECT (jsonb_populate_record(NULL::corpus_set_versions,
+      to_jsonb(v)||jsonb_build_object('corpus_version',$1::text))).* FROM corpus_set_versions v WHERE v.corpus_version=$2`,[previous,target]);
+    for(const table of ['corpus_source_exclusions','corpus_health_checks','corpus_trophy_trajectories'])
+      await query(`UPDATE ${table} SET corpus_version=$1 WHERE corpus_version=$2`,[previous,target]);
+    await query('UPDATE corpus_components SET parent_version=$1 WHERE parent_version=$2',[previous,target]);
+    await query('DELETE FROM corpus_set_versions WHERE corpus_version=$1',[target]);
+    await query('UPDATE draft_run_verified_sets SET corpus_version=$1 WHERE corpus_version=$2',[previous,target]);
+    await query('UPDATE corpus_source_snapshots SET corpus_version=$1 WHERE corpus_version=$2',[previous,target]);
+    await query(`UPDATE draft_run_verified_puzzles SET corpus_version=$1,
+      payload=payload||jsonb_build_object('corpus_version',$1::text,'model_version',$3::text) WHERE corpus_version=$2`,
+      [previous,target,modelVersions.v5.model_version]);
+    assert.equal((await query('SELECT count(*)::int n FROM draft_run_verified_puzzles WHERE corpus_version=$1',[target])).rows[0].n,0,
+      'Only the synthetic v10 snapshot may exist before activation');
+  }
   for(const [id,version,status] of [[old,previous,'Approved'],[next,target,'Candidate'],[stale,previous,'Superseded']]) {
     await query(`INSERT INTO corpus_source_snapshots(source_snapshot_id,set_id,event_type,corpus_version,
       schema_version,importer_identity,model_identity,manifest,lifecycle_status)

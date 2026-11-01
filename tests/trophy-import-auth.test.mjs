@@ -102,6 +102,36 @@ test('a Candidate component row registers a database-discovered Live set for its
   assert.equal(plain.calls.some(sql=>sql.includes('FROM corpus_components')),false);
 });
 
+test('an exact Blocked parent snapshot registers a Live database-discovered set for its own import only',async()=>{
+  const blb=JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL('../corpus/draft-run/blb.json.gz',import.meta.url))));
+  const snapshot='a'.repeat(64);
+  const p={...structuredClone(blb.find(row=>row.pick_number===3)),set_id:'fra',source_snapshot_id:snapshot};
+  // Emulates the registration rule: a Live policy registers only through its own Blocked snapshot.
+  const database=registeredSnapshot=>{
+    const calls=[];
+    const query=async(sql,params=[])=>{
+      calls.push([sql,params]);
+      if(sql.includes("FROM corpus_source_snapshots WHERE source_snapshot_id=$1 AND lifecycle_status='Blocked'"))return {rows:[{}]};
+      if(sql.includes('FROM corpus_set_versions')) {
+        assert.deepEqual(params.slice(0,2),['fra',DRAFT_RUN_CORPUS_VERSION]);
+        assert.match(sql,/p\.status='Live' AND p\.source_event_type='PremierDraft' AND EXISTS\(SELECT 1 FROM corpus_source_snapshots ss WHERE ss\.source_snapshot_id=\$3::text AND ss\.set_id=v\.set_id AND ss\.corpus_version=v\.corpus_version AND ss\.lifecycle_status='Blocked'\)/);
+        return {rows:params[2]&&params[2]===registeredSnapshot?[{set_id:'fra'}]:[]};
+      }
+      if(sql.includes('INSERT INTO draft_run_verified_puzzles'))return {rows:[{conflicts:0,added:JSON.parse(params[0]).length}]};
+      throw new Error('Unexpected SQL in snapshot registration test: '+sql);
+    };
+    return {query,calls};
+  };
+  const accepted=database(snapshot);
+  assert.equal(await insertTrophyBatch(accepted.query,[p],{sourceSnapshotId:snapshot}),1);
+  assert.equal(accepted.calls.find(([sql])=>sql.includes('FROM corpus_set_versions'))[1][2],snapshot);
+  // Without its own snapshot the same Live set is refused before any insert.
+  const plain=database(snapshot);
+  await assert.rejects(insertTrophyBatch(plain.query,[{...p,source_snapshot_id:undefined}]),/Invalid verified puzzle/);
+  assert.equal(plain.calls.find(([sql])=>sql.includes('FROM corpus_set_versions'))[1][2],null);
+  assert.equal(plain.calls.some(([sql])=>sql.includes('INSERT INTO draft_run_verified_puzzles')),false);
+});
+
 test('only the signed main trophy import can request fixed serving statistics maintenance',async t=>{
   t.mock.method(globalThis,'fetch',async url=>{
     assert.equal(url,'https://token.actions.githubusercontent.com/.well-known/jwks');
