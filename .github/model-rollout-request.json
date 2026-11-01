@@ -1,7 +1,7 @@
 {
   "operation": "deploy",
-  "request_id": "pack1-v6-bridge-development-20261101",
-  "reason": "Deploy the v6 release bridge 914dac3 to development before staging corpus v10. It still serves v9 and adds the superseded-snapshot bridge, the v9-plus-v10 standings lineage (inactive until v10 serves), the v6 component identities and v10-aware live Practice acceptance. It also carries the backend changes merged since the last deploy a3d73c4 (private SQL failure classification diagnostics and reminder copy). No corpus, schema or saved-score change.",
+  "request_id": "pack1-v6-bridge-production-20261101",
+  "reason": "Deploy the v6 release bridge 914dac3 to production. The same revision passed development deploy run 41273743363, including live Practice acceptance. It still serves v9 and adds the superseded-snapshot bridge required before v10 activation, plus the backend changes merged since the last deploy a3d73c4. No corpus, schema or saved-score change.",
   "commit": "914dac33830f0e744cd7572feb59ca101cc9b18c",
-  "target": "development"
+  "target": "production"
 }
