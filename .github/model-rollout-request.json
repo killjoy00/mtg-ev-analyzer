@@ -1,7 +1,7 @@
 {
-  "operation": "rebuild-v6",
-  "request_id": "pack1-v6-finalize-fixture-order-20261101",
-  "reuse_run_id": "40987407495",
-  "replay_of": "pack1-v6-finalize-reference-repair-20261030",
-  "reason": "Finalize the approved v6 candidate again from the 31 successful environment builds of run 40987407495, subject to unchanged build-identity and provenance checks. Run 41065249302 failed only the fixture inventory check for Powered Cube: current-corpus fixtures were refreshed before the Cube reroll admission pruned the Cube corpus, so they recorded its pre-admission fingerprint. The fixture refresh now follows that admission. Model code, source pins, Traditional rules and release protections are unchanged. Opens the generated rollout PR only; nothing is staged and serving does not change."
+  "operation": "deploy",
+  "request_id": "pack1-v6-bridge-development-20261101",
+  "reason": "Deploy the v6 release bridge 914dac3 to development before staging corpus v10. It still serves v9 and adds the superseded-snapshot bridge, the v9-plus-v10 standings lineage (inactive until v10 serves), the v6 component identities and v10-aware live Practice acceptance. It also carries the backend changes merged since the last deploy a3d73c4 (private SQL failure classification diagnostics and reminder copy). No corpus, schema or saved-score change.",
+  "commit": "914dac33830f0e744cd7572feb59ca101cc9b18c",
+  "target": "development"
 }
