@@ -1,12 +1,7 @@
 {
-  "operation": "v6-corpus-release",
-  "request_id": "pack1-v6-resume-activation-development-retry2-20261101",
-  "replay_of": "pack1-v6-resume-activation-development-retry-20261101",
-  "reason": "Retry the development resume with the resume component check accepting already-published exact artifacts. The previous retry (run 41333229025) stopped in that check before any change, because 21 v6 Traditional components were already Live. No pointer changes; Live components are skipped, the remaining eligible ones are published and the active state is verified with the v9 bridge 914dac3.",
-  "target": "development",
-  "action": "resume-activation",
-  "candidate_run_id": "41273387825",
-  "release_commit": "d3a284729c54d32af630c328ca4beb59ccd72bfb",
-  "stage_run_id": "41309576375",
-  "bridge_commit": "914dac33830f0e744cd7572feb59ca101cc9b18c"
+  "operation": "deploy",
+  "request_id": "pack1-v6-release-development-20261101",
+  "reason": "Deploy the v6/v10 release commit d3a2847 to development after its successful activation, replacing the v9 bridge 914dac3. The deploy verifies schema and serving indexes, then runs the revision, coverage and Daily smoke and the live v10 Practice acceptance on development. Production keeps the bridge until its own stage and activation.",
+  "commit": "d3a284729c54d32af630c328ca4beb59ccd72bfb",
+  "target": "development"
 }
