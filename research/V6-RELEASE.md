@@ -41,6 +41,57 @@ The remaining failure compared mean counterfactual probability movement across d
 
 The repair changes no Python build inputs, model implementation, Traditional admission thresholds or release protections. The reviewed finalize request reuses run 40987407495 only after the existing identity and successful-environment checks pass.
 
+## Activation bridge repair (migration 0070)
+
+The first development activation committed the v10 pointers. It then stopped with "v9 bridge readiness was not preserved", before any Traditional publication. The cause was 0049's historical-parent clause, which 0069 kept. It bridges a set's v9 baseline rows that have no source snapshot, which is right for a set that served that baseline. After a cross-version activation, it also bridged those rows for sets whose v9 runtime actually served a first-class v9 snapshot. They were never served. So the membership rule disagreed with the ready v9 cache, and the exact-equivalence check refused to carry it.
+
+Migration 0070 makes both `pack1_build_serving_snapshot` and `pack1_serving_snapshot_matches_current` skip the historical-parent clause when a first-class v9 snapshot of the set was superseded by its active snapshot. Sets whose baseline was what they served keep 0049's bridge. On development, the corrected rule reproduced the existing ready v9 cache exactly, with no missing or extra entries; the 0069 rule did not. The release applies 0070 before any readiness or pointer change.
+
+`resume-activation` finishes a committed activation without moving pointers. After v10 is ready, it carries v9 readiness only from the latest prior ready job, and only if that job's cache passes the exact-equivalence check; otherwise it stops. The PostgreSQL contract covers the refusal of a non-equivalent cache, the exact carry and an idempotent rerun. Production activated with 0070 already applied. The ready v9 bridge cache carried to the new revision through the exact-equivalence check, and v9 Practice kept serving with no gap.
+
+## Release CI and resume repairs
+
+- **Cutover contract fixture.** The serving-carry contract assumed its prepared database held v9. Once v10 became the checked-in corpus, that fixture was prepared at v10. Inside its disposable transaction, the contract now returns the fixture to the cutover-time state before executing the release SQL. The relabel is foreign-key safe and every assertion is unchanged.
+- **Resumed publication.** Publication's reverify step required every component to be an unpublished Candidate, so a resume after some components went Live was refused. On resume it now accepts components it already published. First activation still requires every component to be a Candidate.
+- **Concurrent readiness lease.** On development, a delayed scheduled smoke run, triggered by activity on main, took the readiness lease during publication, and the resume stopped at SOS. The identical request was re-run with `replay_of`. Nothing was merged to main between production activation and the production deploy. Publication still does not tolerate a concurrent readiness lease; that is open.
+- **Backend gate fixtures.** The backend gate clones production. After the production cutover, two fixtures failed:
+  - The Pacific report-date check placed its arrival before the first v10 session.
+  - The corpus-transition smoke assumed HOB was Premier-only.
+
+  Both now derive their setup from the cloned state (#1469).
+
+## Outcome
+
+Development, then production, each completed:
+
+- stage
+- activation
+- Traditional publication
+- release deploy of `d3a2847`, replacing the v9 bridge `914dac3`
+- revision, coverage, Daily and live Practice acceptance
+
+On production:
+
+- **Corpus.** All 31 environments serve v10, and both the v10 cache and the v9 bridge cache are ready.
+- **Traditional.**
+  - **Measured and admitted.** Of the 28 measured environments, 24 passed their approved windows. 23 are Live, including FRA, HOB and Powered Cube. SIR is staged and stays a Candidate because its environment is a Candidate.
+  - **Newly admitted.** HOB, which had no Traditional in v9.
+  - **Dropped.** MH3 was admitted under v9 and failed under v6. It is reported in `no_longer_admitted` and its Traditional puzzles are dropped from v10.
+  - **Not admitted.** HBG, KTK and PIO, which were not admitted in v9 either.
+- **Standings.** The deployed code counts v9 and v10 results together on v10 leaderboards. This was checked in code; the production acceptance does not exercise it.
+
+Open follow-ups:
+
+- **Trophy decks.** HOB's Traditional puzzles have no trophy decks. The deck catalog was built on 2026-10-20 and covered only Traditional components already live, plus FRA's approved set; HOB Traditional is new in v6. SIR's Traditional puzzles have none either. The same cause is inferred there, since SIR's environment was a Candidate, but it was not verified. Both need a catalog backfill; the puzzles play without the trophy-deck view until then.
+- **Publication robustness.** Publication should tolerate another readiness job holding the lease.
+
+Rollback is the reverse of the deploy order:
+
+1. Redeploy the bridge `914dac3`.
+2. Run `rollback` with production stage run 41323586473.
+
+Keep `NEON_API_KEY` unrotated until the rollback window is closed (see above).
+
 ## Sequence
 
 Each step is a reviewed `.github/model-rollout-request.json` change on main.
