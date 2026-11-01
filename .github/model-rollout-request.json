@@ -1,7 +1,11 @@
 {
-  "operation": "deploy",
-  "request_id": "pack1-v6-release-development-20261101",
-  "reason": "Deploy the v6/v10 release commit d3a2847 to development after its successful activation, replacing the v9 bridge 914dac3. The deploy verifies schema and serving indexes, then runs the revision, coverage and Daily smoke and the live v10 Practice acceptance on development. Production keeps the bridge until its own stage and activation.",
-  "commit": "d3a284729c54d32af630c328ca4beb59ccd72bfb",
-  "target": "development"
+  "operation": "v6-corpus-release",
+  "request_id": "pack1-v6-activate-production-20261101",
+  "reason": "Activate the v6 candidate from rebuild run 41273387825 on production, from the successful stage run 41323586473 at release commit d3a2847, after the same release passed development activation, Traditional publication and its live acceptance deploy. Applies the 0070 bridge membership repair idempotently, atomically switches the 31 pointers to their staged v10 parents, carries the v9 bridge cache for the deployed bridge 914dac3, builds v10 readiness and publishes only the eligible v6 Traditional components. Rollback restores the captured v9 pointers after the bridge is redeployed.",
+  "target": "production",
+  "action": "activate",
+  "candidate_run_id": "41273387825",
+  "release_commit": "d3a284729c54d32af630c328ca4beb59ccd72bfb",
+  "stage_run_id": "41323586473",
+  "bridge_commit": "914dac33830f0e744cd7572feb59ca101cc9b18c"
 }
