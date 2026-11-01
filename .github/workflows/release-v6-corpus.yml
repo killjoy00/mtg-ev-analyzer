@@ -260,7 +260,9 @@ jobs:
         run: |
           set -euo pipefail
           node scripts/verify-corpus-load.mjs "$RUNNER_TEMP/target.connection" generated/v6-candidate/v6-trophy-import --complete
-          node scripts/verify-puzzle-components.mjs "$RUNNER_TEMP/target.connection" generated/v6-candidate/v6-traditional Candidate
+          # A resumed publication may already have made some exact artifacts Live
+          # under Live parents; the publish step below skips them.
+          node scripts/verify-puzzle-components.mjs "$RUNNER_TEMP/target.connection" generated/v6-candidate/v6-traditional staged
           node scripts/v6-release-state.mjs "$RUNNER_TEMP/target.connection" verify-preserved generated/v6-candidate generated/v6-release-baseline.json
           node scripts/v6-corpus-cutover.mjs "$RUNNER_TEMP/target.connection" resume-activation generated/v6-candidate generated/v6-release-baseline.json
 
