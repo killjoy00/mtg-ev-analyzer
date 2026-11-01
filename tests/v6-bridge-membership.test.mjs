@@ -44,3 +44,11 @@ test('resume recovers the bridge only by exact equivalence, after v10 is ready',
   // Activation and rollback remain the only pointer statements the contract executes.
   assert.equal([...cutover.matchAll(/const result=\(await query\(`/g)].length,2);
 });
+
+test('a resumed publication accepts components it already published',()=>{
+  const step=workflow.slice(workflow.indexOf('Reverify committed parents and recover readiness'),workflow.indexOf('Publish only eligible v6 Traditional components'));
+  assert.match(step,/verify-puzzle-components\.mjs "\$RUNNER_TEMP\/target\.connection" generated\/v6-candidate\/v6-traditional staged/);
+  // First activation still requires every component to be an unpublished Candidate.
+  const activate=workflow.slice(workflow.indexOf('Reverify staged bytes and preservation immediately before activation'),workflow.indexOf('Atomically activate all v10 parent snapshots'));
+  assert.match(activate,/v6-traditional Candidate/);
+});
