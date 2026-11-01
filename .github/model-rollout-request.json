@@ -1,8 +1,8 @@
 {
   "operation": "v6-corpus-release",
-  "request_id": "pack1-v6-resume-activation-development-retry-20261101",
-  "replay_of": "pack1-v6-resume-activation-development-20261101",
-  "reason": "Retry the development resume (run 41317920409). It recovered the v9 bridge and published 21 v6 Traditional components, then stopped after SOS committed because a delayed scheduled activation smoke held that readiness lease; the readiness then completed and every activated environment passed that smoke on v10. The retry changes no pointer, skips Live components, publishes the remaining eligible ones and verifies the active state with the v9 bridge 914dac3.",
+  "request_id": "pack1-v6-resume-activation-development-retry2-20261101",
+  "replay_of": "pack1-v6-resume-activation-development-retry-20261101",
+  "reason": "Retry the development resume with the resume component check accepting already-published exact artifacts. The previous retry (run 41333229025) stopped in that check before any change, because 21 v6 Traditional components were already Live. No pointer changes; Live components are skipped, the remaining eligible ones are published and the active state is verified with the v9 bridge 914dac3.",
   "target": "development",
   "action": "resume-activation",
   "candidate_run_id": "41273387825",
