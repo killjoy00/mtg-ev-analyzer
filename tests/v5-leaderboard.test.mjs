@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {draftRunLeaderboardRows} from '../worker/draft-run-season.mjs';
-import {V5_CORPUS_VERSION,V5_CONTEXT_MODEL_VERSION,validateDraftRunPuzzle} from '../draft-run.mjs';
+import {V5_CORPUS_VERSION,V5_CONTEXT_MODEL_VERSION,V6_CORPUS_VERSION,V6_CONTEXT_MODEL_VERSION,validateDraftRunPuzzle} from '../draft-run.mjs';
 import fs from 'node:fs';
 import {gunzipSync} from 'node:zlib';
 import versions from '../model-versions.json' with {type:'json'};
@@ -12,11 +12,18 @@ test('v5 standings exclude historical scores without deleting game history',asyn
       let captured;
       await draftRunLeaderboardRows(async(sql,params)=>{captured={sql,params};return {rows:[]};},
         {start,end:'2026-10-02',environment,corpusVersion:V5_CORPUS_VERSION});
-      assert.match(captured.sql,/details_json->>'corpus_version'=\$7/);
-      assert.equal(captured.params[6],V5_CORPUS_VERSION);
+      assert.match(captured.sql,/details_json->>'corpus_version'=ANY\(\$7::text\[\]\)/);
+      assert.equal(captured.params[6],`{${V5_CORPUS_VERSION}}`);
       assert.doesNotMatch(captured.sql,/DELETE|UPDATE/);
     }
   }
+});
+test('v6 standings continue from v9 instead of resetting',async()=>{
+  let captured;
+  await draftRunLeaderboardRows(async(sql,params)=>{captured={sql,params};return {rows:[]};},
+    {start:'2026-10-02',end:'2026-11-02',environment:'mixed',corpusVersion:V6_CORPUS_VERSION});
+  assert.equal(captured.params[6],`{${V5_CORPUS_VERSION},${V6_CORPUS_VERSION}}`);
+  assert.doesNotMatch(captured.sql,/DELETE|UPDATE/);
 });
 test('v4 retains its historical leaderboard behavior',async()=>{
   let params;
@@ -32,6 +39,10 @@ test('a new corpus rejects old or missing model labels while historical payloads
   assert.equal(validateDraftRunPuzzle(candidate,V5_CORPUS_VERSION),true);
   for(const model_version of [versions.v4.model_version,undefined])
     assert.equal(validateDraftRunPuzzle({...candidate,model_version},V5_CORPUS_VERSION),false);
+  const v6={...historical,corpus_version:V6_CORPUS_VERSION,model_version:V6_CONTEXT_MODEL_VERSION};
+  assert.equal(validateDraftRunPuzzle(v6,V6_CORPUS_VERSION),true);
+  for(const model_version of [V5_CONTEXT_MODEL_VERSION,undefined])
+    assert.equal(validateDraftRunPuzzle({...v6,model_version},V6_CORPUS_VERSION),false);
 });
 
 test('weekly boards retain best 3 scoring and daily boards retain plain averages',async()=>{

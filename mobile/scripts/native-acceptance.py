@@ -466,8 +466,8 @@ if platform == 'android':
         # Pick patterns come before score history.
         reveal('Your pick patterns')
         xml, _ = snapshot('insights-patterns-heading')
-        require('Your pick patterns' in xml and 'All available history' in xml,
-                'Pick patterns heading and all-history scope are missing')
+        require('Your pick patterns' in xml and 'Recent picks across all formats' in xml,
+                'Pick patterns heading or recent cross-format scope is missing')
         reveal('The Independent Thinker')
         xml, _ = snapshot('insights-qualified-patterns')
         require('The Independent Thinker' in xml,
@@ -493,7 +493,7 @@ if platform == 'android':
         reveal('Your pick patterns')
         xml, logs = snapshot('insights-sparse-320dp-large-text')
         require('PACKONE_INSIGHTS_READY' in logs, 'Sparse pick-review fixture did not render')
-        require('All available history' in xml, 'Sparse pattern scope is missing')
+        require('Recent picks across all formats' in xml, 'Sparse recent cross-format scope is missing')
         reveal('No clear pick pattern to show yet.')
         xml, _ = snapshot('insights-sparse-empty-pattern')
         require('No clear pick pattern to show yet.' in xml,

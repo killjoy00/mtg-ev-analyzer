@@ -419,20 +419,12 @@
     {
       "code": "NEO",
       "status": "live"
-    },
-    {
-      "code": "VOW",
-      "status": "pending"
-    },
-    {
-      "code": "MID",
-      "status": "pending"
     }
   ],
   "normal_queue_counts": {
     "blocked": 0,
     "live": 29,
-    "pending": 2
+    "pending": 0
   },
   "overall": "healthy",
   "published_dataset_count": 30,

@@ -1,5 +1,5 @@
 import {gameDateKey} from '../game-date.mjs';
-import {DRAFT_RUN_CORPUS_VERSION,V5_CORPUS_VERSION} from '../draft-run.mjs';
+import {DRAFT_RUN_CORPUS_VERSION,V5_CORPUS_VERSION,V6_CORPUS_VERSION} from '../draft-run.mjs';
 import {seasonRatingPolicy} from './season-rating.mjs';
 
 const num=value=>Number(value||0);
@@ -10,6 +10,15 @@ export const DRAFT_RUN_LEADERBOARD_ENVIRONMENTS=['mixed','powered-cube','latest'
 // Weekly scoring is unchanged. Season scoring uses all eligible Daily scores.
 // The all-time board is retired: old links and installed apps get the season.
 export const LEADERBOARD_BEST_OF=Object.freeze({week:3});
+
+// v9 started standings from its own results. v10 changes only the colour model,
+// so its standings continue from v9 rather than resetting (owner, 2026-10-29).
+// Older corpora keep their unfiltered historical boards.
+export const STANDINGS_LINEAGE=Object.freeze({
+  [V5_CORPUS_VERSION]:Object.freeze([V5_CORPUS_VERSION]),
+  [V6_CORPUS_VERSION]:Object.freeze([V5_CORPUS_VERSION,V6_CORPUS_VERSION]),
+});
+const lineageParameter=corpusVersion=>STANDINGS_LINEAGE[corpusVersion]?'{'+STANDINGS_LINEAGE[corpusVersion].join(',')+'}':null;
 
 export function normalizeLeaderboardPeriod(value='daily') {
   return value==='month'||value==='all'?'season':value;
@@ -51,7 +60,7 @@ export async function draftRunLeaderboardRows(query,{start,end,environment,playe
       SELECT player_id,score,row_number() OVER(PARTITION BY player_id ORDER BY score DESC,challenge_date) best_rank
       FROM scores
       WHERE mode='draft_run' AND set_id=$3
-        AND ($7::text IS NULL OR details_json->>'corpus_version'=$7)
+        AND ($7::text[] IS NULL OR details_json->>'corpus_version'=ANY($7::text[]))
         AND EXISTS (
           SELECT 1 FROM account_links a JOIN players owned ON owned.id=a.player_id
           WHERE a.player_id=scores.player_id
@@ -92,7 +101,7 @@ export async function draftRunLeaderboardRows(query,{start,end,environment,playe
     FROM ranked
     WHERE ($4::uuid IS NULL OR player_id=$4::uuid)
     ORDER BY score DESC,days DESC,display_name
-    LIMIT $5::int`,[start,end,environment,playerId,limit,blockedByPlayerId,corpusVersion===V5_CORPUS_VERSION?V5_CORPUS_VERSION:null,bestOf,
+    LIMIT $5::int`,[start,end,environment,playerId,limit,blockedByPlayerId,lineageParameter(corpusVersion),bestOf,
       ratingPolicy?.baseline??null,ratingPolicy?.prior_days??null,
       ratingPolicy?ratingPolicy.penalty_multiplier*ratingPolicy.variability:null]);
   return result.rows.map(row=>({

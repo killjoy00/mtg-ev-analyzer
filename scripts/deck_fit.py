@@ -69,6 +69,8 @@ MIN_STAGE_CELL = 200
 MISSING = object()
 # What the serialised table writes for each of the three states.
 COLOURLESS_MARK, UNKNOWN_MARK = "C", "?"
+# Which game columns count as a deck's colours. "main" is the published v5 rule.
+DECK_COLOUR_SOURCES = ("main", "main+splash")
 
 
 def colour_mark(value) -> str:
@@ -108,13 +110,18 @@ def stage_bucket(pool_size: int) -> str:
 # pass 1 and 2: decks and card colours, from game data
 # --------------------------------------------------------------------------
 
-def scan_deck_observations(archive: Path, keep: Optional[Set[str]] = None
+def scan_deck_observations(archive: Path, keep: Optional[Set[str]] = None,
+                           deck_colours: str = "main"
                            ) -> Tuple[Dict[str, set], Dict[str, str]]:
     """Read deck membership and one deterministic colour identity per draft.
 
     Keeping the per-draft observations separate is important for cross-fold
     production builds: each fold can derive its own colour statistics from its
     permitted training IDs without rereading the multi-million-row game archive.
+
+    `deck_colours="main+splash"` also counts splash colours. 17Lands lists a
+    splashed colour only in splash_colors, so reading main_colors alone files a
+    splashed card under decks outside its colour and can erase a printed colour.
     """
     played: Dict[str, set] = defaultdict(set)
     seen_draft_colours: Dict[str, Counter] = defaultdict(Counter)
@@ -126,10 +133,14 @@ def scan_deck_observations(archive: Path, keep: Optional[Set[str]] = None
         if not deck_at:
             raise ValueError("game data has no deck_* columns")
         index = {name: position for position, name in enumerate(header)}
-        for required in ("draft_id", "main_colors"):
+        if deck_colours not in DECK_COLOUR_SOURCES:
+            raise ValueError(f"unknown deck colour source {deck_colours!r}")
+        splash = deck_colours == "main+splash"
+        for required in ("draft_id", "main_colors") + (("splash_colors",) if splash else ()):
             if required not in index:
                 raise ValueError(f"game data has no {required} column")
         draft_at, colours_at = index["draft_id"], index["main_colors"]
+        splash_at = index["splash_colors"] if splash else None
 
         for values in reader:
             if len(values) != len(header):
@@ -138,6 +149,9 @@ def scan_deck_observations(archive: Path, keep: Optional[Set[str]] = None
             if not draft_id or (keep is not None and draft_id not in keep):
                 continue
             main = "".join(c for c in values[colours_at].strip().upper() if c in COLOURS)
+            if splash:
+                extra = values[splash_at].upper()
+                main = "".join(c for c in COLOURS if c in main or c in extra)
             seen_draft_colours[draft_id][main] += 1
             cards = played[draft_id]
             for position, name in deck_at:
@@ -171,7 +185,7 @@ def colour_hits_for_drafts(played: Mapping[str, set],
     return dict(colour_hits)
 
 
-def scan_decks(archive: Path, keep: Optional[Set[str]] = None
+def scan_decks(archive: Path, keep: Optional[Set[str]] = None, deck_colours: str = "main"
                ) -> Tuple[Dict[str, set], Dict[str, Counter]]:
     """draft_id -> cards played, and card -> counter of its decks' colours.
 
@@ -179,7 +193,7 @@ def scan_decks(archive: Path, keep: Optional[Set[str]] = None
     retained for the independent evaluation harness; production cross-fold
     builds use scan_deck_observations once and aggregate each fold explicitly.
     """
-    played, main_by_draft = scan_deck_observations(archive, keep)
+    played, main_by_draft = scan_deck_observations(archive, keep, deck_colours)
     return played, colour_hits_for_drafts(played, main_by_draft, keep)
 
 
@@ -360,7 +374,7 @@ def run(args: argparse.Namespace) -> int:
     guard_test_split(args.split, args.final_test)
     split = None if args.split == "all" else args.split
     keep = set(cache.split_drafts(split)) if split else None
-    played, colour_hits = scan_decks(Path(args.games), keep)
+    played, colour_hits = scan_decks(Path(args.games), keep, args.deck_colours)
     colours = card_colours(colour_hits)
     by_bucket, by_card, by_stage = observe(cache, played, colours, split)
     if not by_card:
@@ -372,6 +386,8 @@ def run(args: argparse.Namespace) -> int:
     summary["fit_schema_version"] = 2
     summary["cache_identity"] = cache_identity(cache)
     summary["matched_drafts"] = len({d for d, _ in cache.examples() if d in played})
+    if args.deck_colours != "main":
+        summary["deck_colours"] = args.deck_colours
     Path(args.out).write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
 
     spread = Counter(row["colours"] for row in summary["cards"].values())
@@ -409,6 +425,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
                              "the estimate never sees a draft the model is scored on)")
     parser.add_argument("--final-test", action="store_true",
                         help="required alongside --split test")
+    parser.add_argument("--deck-colours", default="main", choices=DECK_COLOUR_SOURCES,
+                        help="game columns that count as a deck's colours (v6: main+splash)")
     parser.add_argument("--out", required=True)
     return parser.parse_args(argv)
 

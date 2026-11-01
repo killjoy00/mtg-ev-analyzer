@@ -202,10 +202,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     # The path architecture has its own unchanged identity. Record the parent
     # consensus generation and the source/replay exclusion population separately.
     try:
-        from model_training import V5_MODEL, ALL_QUALIFIED
+        from model_training import UNCAPPED_MODELS, ALL_QUALIFIED
     except ModuleNotFoundError:
-        from scripts.model_training import V5_MODEL, ALL_QUALIFIED
-    if args.model_version == V5_MODEL:
+        from scripts.model_training import UNCAPPED_MODELS, ALL_QUALIFIED
+    if args.model_version in UNCAPPED_MODELS:
         model['context_model_version'] = args.model_version
         model['training'].update(training_mode=ALL_QUALIFIED, training_cap=None,
             qualified_training_drafts=len(strong_ids), excluded_replay_drafts=len(held_out))

@@ -29,9 +29,9 @@ from pathlib import Path
 from typing import Dict, List, Mapping, MutableMapping, Optional, Sequence, Tuple
 
 try:
-    from model_training import V5_MODEL, ALL_QUALIFIED, current_model_version, training_cap, parser_training_arguments, resolve_training_arguments
+    from model_training import V5_MODEL, ALL_QUALIFIED, colour_policy, current_model_version, training_cap, parser_training_arguments, resolve_training_arguments
 except ModuleNotFoundError:
-    from scripts.model_training import V5_MODEL, ALL_QUALIFIED, current_model_version, training_cap, parser_training_arguments, resolve_training_arguments
+    from scripts.model_training import V5_MODEL, ALL_QUALIFIED, colour_policy, current_model_version, training_cap, parser_training_arguments, resolve_training_arguments
 
 SCHEMA_VERSION = 2
 # v3 is the immutable model identity of the currently published corpus and is
@@ -338,9 +338,12 @@ def _colour_helpers():
 
 class OutOfFoldModel:
     def __init__(self, all_counts: CountStore, held_out_counts: CountStore,
-                 fit: Optional[dict] = None):
+                 fit: Optional[dict] = None, zero_rates_are_data: bool = False):
         self.all = all_counts
         self.held = held_out_counts
+        # v5 read a 0.0 rate cell as missing and gave no colour shift; the
+        # evaluation harness reads it as a measured zero. v6 follows the harness.
+        self.zero_rates_are_data = zero_rates_are_data
         # The colour table. Without one the colour term contributes nothing and
         # the model degrades to the stage-matched pair term alone, which is a
         # different model from the validated one - so build() requires it.
@@ -385,7 +388,10 @@ class OutOfFoldModel:
             # rather than to noise.
             conditioned = self.fit["by_commitment"].get(bucket)
             reference = self.fit.get("play_rate")
-        if not conditioned or not reference:
+        if self.zero_rates_are_data:
+            if conditioned is None or reference is None:
+                return 0.0
+        elif not conditioned or not reference:
             return 0.0
         clamp = lambda p: min(1 - 1e-6, max(1e-6, p))
         return logit(clamp(conditioned)) - logit(clamp(reference))
@@ -638,7 +644,7 @@ def build_colour_table(game_archive: Path, examples, contributing: set, set_id: 
 def build_colour_tables_by_fold(game_archive: Path,
                                 examples: Sequence[Tuple[str, PickExample]],
                                 fold_training: Sequence[FoldTrainingData],
-                                set_id: str) -> List[dict]:
+                                set_id: str, deck_colours: str = "main") -> List[dict]:
     """Build colour/stage reference tables from each fold's training IDs only.
 
     The game archive is scanned once into per-draft observations. Card colours,
@@ -651,7 +657,7 @@ def build_colour_tables_by_fold(game_archive: Path,
     example_ids = {draft_id for draft_id, _ in examples}
     allowed_union = set().union(*(set(fold.training_ids) for fold in fold_training))
     scan_ids = example_ids & allowed_union
-    played, main_by_draft = scan_deck_observations(game_archive, scan_ids)
+    played, main_by_draft = scan_deck_observations(game_archive, scan_ids, deck_colours)
     fits: List[dict] = []
 
     for fold in fold_training:
@@ -681,6 +687,8 @@ def build_colour_tables_by_fold(game_archive: Path,
         fit["cards_with_unknown_colour"] = sum(
             1 for row in fit["cards"].values()
             if row["colours"] == colour_mark(None))
+        if deck_colours != "main":
+            fit["deck_colours"] = deck_colours
         fits.append(fit)
 
     if len(fits) != len(fold_training):
@@ -714,6 +722,7 @@ def build(args: argparse.Namespace) -> dict:
     input_path = Path(args.input)
     skills, fieldnames = scan_draft_skill(input_path)
     model_version = getattr(args, 'model_version', current_model_version())
+    policy = colour_policy(model_version)
     cap = training_cap(model_version, args.max_training_drafts, 8000)
     strong_ids, cutoff, experienced_count = select_strong_drafts(skills, args.minimum_games, args.top_fraction, cap)
     qualified_ids, _, _ = select_strong_drafts(skills, args.minimum_games, args.top_fraction, None)
@@ -727,7 +736,8 @@ def build(args: argparse.Namespace) -> dict:
         input_path, set(strong_ids), set(output_ids), fieldnames, folds, colour_examples)
     metadata = load_card_metadata(Path(args.card_metadata) if args.card_metadata else None)
     deck_fits = build_colour_tables_by_fold(
-        Path(args.game_data), colour_examples, fold_training, args.expansion.lower())
+        Path(args.game_data), colour_examples, fold_training, args.expansion.lower(),
+        policy["deck_colours"])
     pack_offset = 1 if min_pack == 0 else 0
     pick_offset = 1 if min_pick == 0 else 0
 
@@ -740,7 +750,8 @@ def build(args: argparse.Namespace) -> dict:
         fold_data = fold_training[fold]
         if draft_id not in fold_data.held_out_ids or draft_id in fold_data.training_ids:
             raise AssertionError(f"{draft_id}: invalid fold provenance before scoring.")
-        model = OutOfFoldModel(fold_data.counts, CountStore.empty(), deck_fits[fold])
+        model = OutOfFoldModel(fold_data.counts, CountStore.empty(), deck_fits[fold],
+                               policy["zero_rates_are_data"])
         replays.append(render_replay(draft_id, picks, model, pack_offset, pick_offset, metadata))
 
     if not replays:

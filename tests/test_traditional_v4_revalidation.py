@@ -13,11 +13,12 @@ from traditional_puzzles import THRESHOLDS
 
 class TraditionalV4RevalidationTests(unittest.TestCase):
     def test_scope_and_historical_exclusions_are_frozen(self):
-        self.assertEqual(len(current.SETS), 27)
+        self.assertEqual(len(current.SETS), 26)
         self.assertEqual(
             set(current.EXCLUSIONS),
-            {"tmt", "ecl", "tla", "mid", "vow", "stx"},
+            {"tmt", "ecl", "tla", "mid", "vow", "stx", "hob"},
         )
+        self.assertFalse(set(current.SETS) & set(current.EXCLUSIONS))
         self.assertEqual(current.serving_window(current.CUBE), (2, 9))
         self.assertEqual(current.late_floor(current.CUBE), 8)
 

@@ -16,10 +16,10 @@ on:
         type: string
   push:
     branches: [main]
-    paths: ['scripts/launch-alert.mjs', 'scripts/launch-incident-state.mjs', 'launch-alert-policy.mjs', 'launch-monitoring.mjs', 'tests/launch-alert*.test.mjs', '.github/workflows/launch-alert.yml']
+    paths: ['scripts/launch-alert.mjs', 'scripts/verified-observability.mjs', 'scripts/launch-incident-state.mjs', 'launch-alert-policy.mjs', 'launch-monitoring.mjs', 'tests/launch-alert*.test.mjs', '.github/workflows/launch-alert.yml']
   pull_request:
     branches: [main]
-    paths: ['scripts/launch-alert.mjs', 'scripts/launch-incident-state.mjs', 'launch-alert-policy.mjs', 'launch-monitoring.mjs', 'tests/launch-alert*.test.mjs', '.github/workflows/launch-alert.yml']
+    paths: ['scripts/launch-alert.mjs', 'scripts/verified-observability.mjs', 'scripts/launch-incident-state.mjs', 'launch-alert-policy.mjs', 'launch-monitoring.mjs', 'tests/launch-alert*.test.mjs', '.github/workflows/launch-alert.yml']
 permissions:
   contents: read
 concurrency:

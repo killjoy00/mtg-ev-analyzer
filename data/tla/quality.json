@@ -9,12 +9,12 @@
       "unique_candidates": 338
     },
     "consensus": {
-      "historical_pack_score_p10": 73.75,
-      "historical_pack_score_p50": 85.57,
-      "historical_pack_score_p90": 93.94,
-      "opening_top_support_p10": 0.27,
-      "opening_top_support_p50": 0.39,
-      "opening_top_support_p90": 0.59
+      "historical_pack_score_p10": 72.66,
+      "historical_pack_score_p50": 85.66,
+      "historical_pack_score_p90": 94.19,
+      "opening_top_support_p10": 0.28,
+      "opening_top_support_p50": 0.41,
+      "opening_top_support_p90": 0.62
     },
     "path_model": {
       "bytes": 1669353,

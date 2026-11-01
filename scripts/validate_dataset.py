@@ -13,12 +13,13 @@ def validate(manifest_path: Path, minimum_replays: int = 1) -> dict:
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     errors = []
     try:
-        from model_training import V5_MODEL, validate_training_manifest
+        from model_training import UNCAPPED_MODELS, validate_training_manifest
     except ModuleNotFoundError:
-        from scripts.model_training import V5_MODEL, validate_training_manifest
-    if manifest.get('model', {}).get('model_version') == V5_MODEL:
+        from scripts.model_training import UNCAPPED_MODELS, validate_training_manifest
+    model_version = manifest.get('model', {}).get('model_version')
+    if model_version in UNCAPPED_MODELS:
         try:
-            validate_training_manifest(manifest)
+            validate_training_manifest(manifest, model_version)
         except ValueError as exc:
             errors.append(str(exc))
     if manifest.get("is_fixture"):

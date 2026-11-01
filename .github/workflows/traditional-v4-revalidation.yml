@@ -65,7 +65,6 @@ jobs:
       matrix:
         set:
           - powered-cube
-          - hob
           - msh
           - sos
           - eoe
