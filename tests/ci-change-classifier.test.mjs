@@ -39,6 +39,7 @@ test('documentation, static presentation, mobile, workflow, model/data, shared c
   plan(['scoring.mjs'],'heavy');
   plan(['data/msh/catalog.json'],'heavy');
   plan(['worker/core.mjs'],'app');
+  plan(['worker/retired-modes.mjs'],'app');
   assert.deepEqual(classifyChanges(['practice-page.mjs']).browserGroups,['practice']);
   assert.deepEqual(classifyChanges(['profile-product.mjs','progression.mjs']).browserGroups,['profile']);
   assert.deepEqual(classifyChanges(['draft-run-product.mjs','gameplay.mjs']).browserGroups,['draft_run']);

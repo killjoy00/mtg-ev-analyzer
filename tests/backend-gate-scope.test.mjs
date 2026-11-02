@@ -77,7 +77,7 @@ test('gate infrastructure, migrations, shared core, unmapped files, and empty di
     ['worker/request-json.mjs'],
     ['worker/ingress-auth.mjs'],
     ['game-date.mjs'],
-    ['worker/path-model.mjs'],
+    ['worker/retired-modes.mjs'],
     [],
   ]) {
     const result = classifyBackendChanges(paths, { map });
@@ -129,7 +129,7 @@ test('every worker module has an owning domain unless only full-path files impor
     .map((name) => `worker/${name}`)
     .filter((path) => !map.full_paths.some((glob) => matchesGlob(path, glob)))
     .filter((path) => classifyBackendChanges([path], { map }).reasons.some((reason) => reason.startsWith('unmapped:')));
-  assert.deepEqual(unowned, ['worker/path-model.mjs'], 'Assign new worker modules to a domain in scripts/backend-gate-map.json');
+  assert.deepEqual(unowned, [], 'Assign new worker modules to a domain in scripts/backend-gate-map.json');
 });
 
 test('files the backend gate never runs or names stay out of the domain selection', () => {
@@ -145,7 +145,7 @@ test('files the backend gate never runs or names stay out of the domain selectio
 });
 
 test('unowned files the backend gate imports or names still force the full suite', () => {
-  for (const path of ['edge/gateway.mjs', 'worker/path-model.mjs']) {
+  for (const path of ['edge/gateway.mjs']) {
     const result = classifyBackendChanges(['worker/draft-run-pool.mjs', path], { map });
     assert.equal(result.fullSuite, true, path);
     assert.ok(result.reasons.includes(`unmapped: ${path}`), path);

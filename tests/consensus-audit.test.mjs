@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
-import { gradePick, rankCandidates } from '../scoring.mjs';
+import { rankCandidates } from '../scoring.mjs';
+import { gradeDraftRunPick } from '../draft-run.mjs';
 
 async function loadSet(setId) {
   const manifest = JSON.parse(await readFile(`data/${setId}/manifest.json`, 'utf8'));
@@ -24,15 +25,15 @@ test('MSH Arc Reactor never looks like a strong opening pick', async () => {
       const index = ranked.findIndex((card) => card.name === 'Arc Reactor');
       if (index < 0) continue;
       const arc = ranked[index];
-      const grade = gradePick(pick.candidates, arc.id, pick.historical_pick_id);
+      const grade = gradeDraftRunPick(pick, arc.id);
       firstPicks.push({
         draftId: replay.draft_id,
         rank: index + 1,
         support: Number(arc.model_probability || 0),
         pickScore: grade.score,
-        bestName: grade.bestName,
-        bestSupport: grade.bestProbability,
-        verdictClass: grade.verdictClass,
+        bestName: grade.consensusName,
+        bestSupport: Number(ranked[0].model_probability),
+        highCredit: grade.score >= 55,
       });
     }
   }
@@ -55,5 +56,5 @@ test('MSH Arc Reactor never looks like a strong opening pick', async () => {
   // Raw support and sample membership change with the qualified training pool.
   // The actual product semantics must still classify every such choice as a
   // big disagreement, rather than an in-the-mix/close/consensus opening pick.
-  assert.ok(firstPicks.every(item=>item.verdictClass==='miss'), `Arc Reactor must remain a big disagreement; highest opening score ${highestScore}`);
+  assert.ok(firstPicks.every(item=>!item.highCredit), `Arc Reactor must remain a big disagreement; highest opening score ${highestScore}`);
 });

@@ -32,7 +32,8 @@
     "scripts/run-local-backend-domain.mjs",
     "scripts/verify-backend-execution.mjs",
     "tests/support/local-backend-suite.mjs",
-    "tests/local-backend-runner.test.mjs"
+    "tests/local-backend-runner.test.mjs",
+    "worker/retired-modes.mjs"
   ],
   "domains": {
     "account": {

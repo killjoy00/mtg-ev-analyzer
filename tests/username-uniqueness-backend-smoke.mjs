@@ -217,27 +217,11 @@ for(const [playerId,score] of [[first.playerId,91],[contender.playerId,89]]) {
     [playerId,today,legacySet,score],
   );
 }
-const legacyBoard=await call(legacy,`/v1/leaderboard?period=all&set=${legacySet}&mode=top3`,undefined,null,200);
-assert.equal(legacyBoard.filter(row=>row.display_name===username).length,1,
-  'the legacy board also exposes the owned username exactly once');
-
-// Public challenge attribution follows the same boundary. A guest/local
-// nickname may still be duplicated, but it is presented generically to others.
-const challengePayload={
-  setId:legacySet,setName:'QA',
-  pack:[
-    {id:`a-${tag}`,name:'A',model_probability:0.6,image_url:''},
-    {id:`b-${tag}`,name:'B',model_probability:0.3,image_url:''},
-    {id:`c-${tag}`,name:'C',model_probability:0.1,image_url:''},
-  ],
-  historicalId:`a-${tag}`,
-  selectedIds:[`a-${tag}`,`b-${tag}`,`c-${tag}`],
-  displayName:username,
-};
-const genericShare=await call(legacy,'/v1/challenges',challengePayload,contender.token,200);
-assert.equal(genericShare.displayName,'A friend','an unowned nickname is not public share attribution');
-const loadedGenericShare=await call(legacy,`/v1/challenges/${genericShare.id}`,undefined,null,200);
-assert.equal(loadedGenericShare.creator.displayName,'A friend');
+await call(legacy,`/v1/leaderboard?period=all&set=${legacySet}&mode=top3`,undefined,null,410);
+await call(legacy,'/v1/challenges',{},contender.token,410);
+await call(legacy,'/v1/challenges/abcdef012345',undefined,null,410);
+const retained=await query('SELECT count(*) n FROM scores WHERE set_id=$1 AND mode=\'top3\'',[legacySet]);
+assert.equal(Number(retained.rows[0].n),2,'retirement retains both historical score rows');
 
 assert.equal((await rename(contender,username,409)).error,USERNAME_TAKEN_MESSAGE,
   'and the duplicate cannot be taken later either');
@@ -253,12 +237,8 @@ assert.deepEqual(resolvedStatus.ranking_identity,{eligible:true,reason:null},
 const renamedDraftBoard=await call(draftRun,'/v1/leaderboard?period=all&environment=mixed',undefined,null,200);
 assert.ok(renamedDraftBoard.rows.some(row=>row.display_name===resolvedName),
   'the existing Draft Run score becomes visible under the newly owned username');
-const renamedLegacyBoard=await call(legacy,`/v1/leaderboard?period=all&set=${legacySet}&mode=top3`,undefined,null,200);
-assert.ok(renamedLegacyBoard.some(row=>row.display_name===resolvedName),
-  'the existing legacy score becomes visible under the newly owned username');
-
-const ownedShare=await call(legacy,'/v1/challenges',{...challengePayload,displayName:resolvedName},contender.token,200);
-assert.equal(ownedShare.displayName,resolvedName,'an owned username may be public share attribution');
+await call(legacy,`/v1/leaderboard?period=all&set=${legacySet}&mode=top3`,undefined,null,410);
+await call(legacy,'/v1/challenges',{displayName:resolvedName},contender.token,410);
 console.log('Linked collisions stay private until renamed',tag);
 
 // ---------------------------------------------------------------------------

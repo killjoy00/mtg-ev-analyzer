@@ -185,10 +185,6 @@ export async function sendEvents(events) {
     try{return await api('/v1/events',{method:'POST',body:{events},auth:true});}catch{return null;}
   }
 }
-export async function saveGameResult(result) {
-  if(!packApiConfigured())return null;
-  try{return await api('/v1/results',{method:'POST',body:result,auth:true});}catch{return null;}
-}
 export async function loadRemoteStats() {
   if(!packApiConfigured())return null;
   try{return await api('/v1/stats',{auth:true});}catch{return null;}

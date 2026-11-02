@@ -1,5 +1,7 @@
 > Historical review. Current authority: [CURRENT-STATE](CURRENT-STATE.md) and [CHARTER](CHARTER.md). Superseded product behavior below is not a current requirement.
 
+Historical record: references below to retaining Full Pack / Top 3 behavior are superseded by the owner-approved [retirement](FULL-PACK-TOP3-RETIREMENT.md). Stored results remain intact.
+
 # Eight-pick follow-up review
 
 Updated September 14, 2026. This follows the [initial detailed review](PRODUCT-REVIEW-2026-09-14.md). Trophy choices remain worth 100 and all existing game modes remain available.

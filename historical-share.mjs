@@ -1,18 +1,5 @@
-// Compatibility reader for previously published Full Pack / Top 3 links only.
-// No current navigation launches this module.
+// Old links remain understandable without fetching data or reviving a grader.
 export async function installHistoricalShare() {
-  const { installReplayDataWarmup } = await import('./replay-data.mjs');
-  installReplayDataWarmup();
-  await import('./social.mjs');
-  const layers = [
-    ['product.mjs', 'installProductLayer'],
-    ['legacy-product.mjs', 'installLegacyCohortLayer'],
-    ['leaderboard-product.mjs', 'installLeaderboardProductLayer'],
-    ['flow-fixes.mjs', 'installFlowFixes'],
-    ['growth.mjs?v=10', 'installGrowthLayer'],
-    ['historical-growth.mjs', 'installHistoricalGrowthLayer'],
-    ['retention.mjs', 'installRetentionLayer'],
-    ['profile-product.mjs?v=10', 'installProfileProductLayer'],
-  ];
-  for (const [file, install] of layers) await (await import(`./${file}`))[install]();
+  const app = document.querySelector('#app');
+  if (app) app.innerHTML = `<section class="growth-page"><header><p class="eyebrow">Older Pack One link</p><h1>This game mode has been retired.</h1><p>Full Pack and Top 3 are no longer available.</p></header><div class="account-actions"><a class="button primary" href="./?game=draft-run&daily=1">Play the Daily</a><a class="button secondary" href="./practice/">Practice Draft Run</a></div></section>`;
 }

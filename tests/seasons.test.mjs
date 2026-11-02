@@ -30,8 +30,9 @@ test('current leaderboard canonicalizes old month clients to season',()=>{
   assert.doesNotMatch(client,/This month/);
 });
 
-test('legacy monthly leaderboard remains unchanged',()=>{
-  assert.match(legacyWorker,/monthly/);
+test('retired leaderboard handlers are absent while date helpers remain',()=>{
+  assert.match(legacyWorker,/isRetiredLegacyRoute/);
+  assert.doesNotMatch(legacyWorker,/handleLeaderboard|FROM scores/);
   assert.match(legacyCore,/monthly/);
   assert.doesNotMatch(legacyWorker,/draft_run_seasons/);
   assert.doesNotMatch(legacyCore,/draft_run_seasons/);

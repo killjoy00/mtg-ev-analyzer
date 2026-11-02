@@ -268,7 +268,7 @@ At the September 23 deletion-release closeout, Google-only password-reset-to-pas
 
 The current public runtime is rooted in `bootstrap.mjs`. The homepage is served through `daily-home.mjs`, current gameplay through `draft-run-product.mjs`, and previously published historical challenge links through `historical-share.mjs`.
 
-`app.js` is intentionally preserved dormant architecture for the Top 3 / Full Pack implementation. It is not a current runtime entrypoint. Keep it for product optionality, and do not treat edits there as changes to the live Daily Draft Run unless the bootstrap/runtime boundary is intentionally changed. Tests may continue to cover preserved behavior even when that behavior is not currently served.
+Full Pack and Top 3 are fully retired in source. Their SPA, graders and game API handlers are removed; old share links show a retirement notice. Legacy identity endpoints remain pending traffic verification. Historical rows and play-date counting are unchanged. See [retirement and deployment notes](FULL-PACK-TOP3-RETIREMENT.md). This change still requires the normal deployment process.
 
 GitHub Pages hosts the client. Production functions use Neon branch `br-orange-feather-ayps8kep`; development uses `br-twilight-hill-ayffyd2b`, in project `patient-shadow-91417882`. Keep the existing architecture.
 

@@ -43,7 +43,7 @@ trackArrivalEvent('acquisition_touch',{
   ...(referrerHost?{referrer_host:referrerHost}:{})
 });
 if(resultShare)trackArrivalEvent('daily_share_arrival',{source:'result_share',daily:true,kind:sharedDay?'dated':'undated'});
-// Only previously published stored links load the historical game reader.
+// Previously published legacy links show a retirement notice.
 const historicalShare = params.has('challenge') && params.get('game') !== 'draft-run';
 if (!historicalShare && (params.has('legacy-board') || params.has('mode') || params.has('seed') || (params.get('set') === 'powered-cube' && params.get('game') !== 'draft-run'))) {
   const cube = params.get('set') === 'powered-cube', legacyBoard = params.has('legacy-board');
@@ -115,6 +115,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
   const { installHistoricalShare } = await import('./historical-share.mjs');
   await installHistoricalShare();
   const growth=await import('./growth.mjs?v=32');
+  await growth.installGrowthLayer();
   syncPrimaryNavState(growth.accountState());
   if(account)account.onclick=()=>void growth.renderAccount({source:'nav'});
 } else {
