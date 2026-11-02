@@ -1,6 +1,6 @@
 # Full Pack and Top 3 retirement
 
-Status: source change for review. Nothing is deployed by this work. The owner has retired both modes, superseding earlier instructions to preserve them for product optionality.
+Status: deployed on 2026-11-02 (see Deployment record). The owner has retired both modes, superseding earlier instructions to preserve them for product optionality.
 
 ## Behavior
 
@@ -16,7 +16,20 @@ Current web code uses Growth's `/v1/player/session` or `/v1/session`; native gue
 
 Route-level live traffic was not available in this review, and no production data was queried. Therefore `POST /legacy/v1/session`, `PATCH /legacy/v1/player`, the `pack1api` identity function and its health route remain. Their ingress/authentication protections and username ownership rules are unchanged. Do not retire the entire function without a separate aggregate traffic review covering older web/mobile clients and token migration. Health now reports no active scoring implementation rather than advertising the removed path scorer.
 
-## Deployment checklist for the owner
+## Deployment record
+
+Merged as #1440 (`8005fbf`) and released with the guarded secure-auth release requested in #1473 (run 41366790333, main `48a3e24`, completed 2026-11-02 00:26 UTC). That release also carried the HOB Traditional trophy decks (#1471).
+
+- **Functions:** `pack1api` and Growth were deployed to development, then production, and each passed the release smoke test.
+- **Gateway:** the first-party production gateway was deployed after production Functions and passed the live gateway smoke test.
+- **Live checks after release (read-only GETs).** These show the gateway tombstone answering the retired paths, so no live route override bypasses it:
+  - `/legacy/v1/leaderboard`, `/legacy/v1/distribution` and `/legacy/v1/challenges/<12-character id>` return 410 with the retirement message.
+  - `/draft/v1/leaderboard` returns 200.
+- **Web:** GitHub Pages published main on merge. Deleted files such as `app.js`, `leaderboard.mjs` and `path-model.mjs` return 404 on packone.pro. The old-link retirement notice is covered by the browser tests. It was not opened on the live site, so no production analytics were generated.
+- **Native:** the native notice was not released; the owner deferred native work before launch.
+- **Database:** none, as planned.
+
+## Deployment checklist (completed except the native notice)
 
 1. Use the existing release process and gates. Deploy the legacy `pack1api` function and Growth function first so direct-origin legacy writes return 410. Include the shared `retired-modes.mjs` module in both bundles. Existing identity and health endpoints must still pass acceptance.
 2. Deploy the Cloudflare gateway revision. Verify legacy retired paths return 410 with no upstream call, while Growth sessions and current Draft Run leaderboard/share routes retain their existing behavior. Keep ingress protections and the API gateway catch-all route.
