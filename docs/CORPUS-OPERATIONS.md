@@ -82,15 +82,15 @@ See [Card image maintenance](CARD-IMAGE-MAINTENANCE.md), [the September 23 rollo
 
 ## Supplemental Traditional components
 
-Current v4 supplemental identities are `traditional-premier-v4-phase2-v1` for regular environments and `traditional-cube-p2p7-v4-v1` for Powered Cube. They are pinned to parent `elite-trophy-colour-stage-v8` and model `strong-player-colour-stage-v4`.
+Current v6 supplemental identities are `traditional-premier-v6-phase2-v1` for regular environments, `traditional-premier-v6-p1p6-v1` for Reality Fracture and `traditional-cube-p2p7-v6-v1` for Powered Cube. They are pinned to parent `elite-trophy-colour-stage-v10` and model `strong-player-colour-stage-v6`. The earlier v4 (parent v8) and v5 (parent v9) components remain readable for historical sessions.
 
-Component publication is parent-aware. A ready component under a Live parent can move Candidate -> Live; a ready component under a Candidate parent remains Candidate. In the September 21 release this leaves SIR staged but non-serving. HBG, HOB, KTK and PIO failed the reviewed regular v4 admission gates and have no v4 component. Powered Cube v4 serves only P1P2-P1P7.
+Component publication is parent-aware. A ready component under a Live parent can move Candidate -> Live; a ready component under a Candidate parent remains Candidate. In the November 1 v6 release this left SIR staged but non-serving; SIR has since been Retired. HBG, KTK and PIO failed their admission gates and have no v6 component; MH3 failed under v6 and its Traditional puzzles were dropped. Powered Cube serves only P1P2-P1P7 and FRA only P1P1-P1P6.
 
 Component releases use `publish-puzzle-components.yml`. Development must be staged before production is staged, and production publication requires development publication eligibility. Either development stage -> production stage -> development publish -> production publish or development stage -> development publish -> production stage -> production publish is valid. Every stage needs the identical artifact, puzzle counts and ratings in development.
 
 Live Traditional components extend the same environment-level serving universe as retained Premier inventory. They do not replace the Premier parent or create a separate player-facing Traditional mode. Current new games use Live components only; existing schedules and sessions keep their pinned IDs and remain readable regardless of later component status.
 
-Reality Fracture has a separately versioned, owner-approved restricted component, `traditional-premier-v5-p1p6-v1`, on the v9 parent and `strong-player-colour-stage-v5`. It serves only P1P1-P1P6. P1P7-P1P8 failed the unchanged low-support gate and remain Premier-only. See [the FRA admission record](TRADITIONAL-PUZZLE-ADMISSION.md#october-22-reality-fracture-p1p1-p1p6-admission).
+Reality Fracture has a separately versioned, owner-approved restricted window. It was first admitted as `traditional-premier-v5-p1p6-v1` on the v9 parent and is now served by `traditional-premier-v6-p1p6-v1` on v10. It serves only P1P1-P1P6. P1P7-P1P8 failed the unchanged low-support gate and remain Premier-only. See [the FRA admission record](TRADITIONAL-PUZZLE-ADMISSION.md#october-22-reality-fracture-p1p1-p1p6-admission).
 
 The complete September 21 release evidence, including the safe blocked production publish that exposed the required development-publication prerequisite, is in [Traditional v4 production release closeout](reports/TRADITIONAL-V4-RELEASE-2026-09-21.md).
 

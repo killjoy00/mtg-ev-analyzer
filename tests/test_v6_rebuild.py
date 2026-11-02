@@ -95,6 +95,28 @@ class WindowTests(unittest.TestCase):
         self.assertAlmostEqual(result['quality']['unusable_fraction'], .5)
 
 
+class TraditionalArtTests(unittest.TestCase):
+    def test_traditional_cards_show_the_same_art_as_premier(self):
+        premier_card = {'name': 'Celestial Colonnade', 'id': 'cc', 'image_url': 'https://img/wwk.jpg',
+                        'mana_cost': '', 'rarity': 'rare', 'type_line': 'Land'}
+        puzzle = {'candidates': [premier_card], 'prior_picks': []}
+        shard = {'Shard Only': {'image_url': 'https://img/shard.jpg', 'type_line': 'Creature'}}
+        with patch.object(traditional, 'read_gzip_jsonl', return_value=[puzzle]), \
+                patch.object(traditional, 'metadata', return_value=shard):
+            display = traditional.premier_display('powered-cube')
+        art_series = {'name': 'Celestial Colonnade', 'id': 'cc', 'model_probability': .4,
+                      'image_url': 'https://img/aeoe-art-series.jpg', 'type_line': 'Card // Card',
+                      'display_faces': [{'name': 'x'}]}
+        self.assertEqual(traditional.with_premier_display(art_series, display),
+                         {'name': 'Celestial Colonnade', 'id': 'cc', 'model_probability': .4,
+                          'image_url': 'https://img/wwk.jpg', 'mana_cost': '', 'rarity': 'rare',
+                          'type_line': 'Land'})
+        self.assertEqual(traditional.with_premier_display({'name': 'Shard Only'}, display)['image_url'],
+                         'https://img/shard.jpg')
+        unknown = {'name': 'Unknown', 'image_url': 'https://img/kept.jpg'}
+        self.assertEqual(traditional.with_premier_display(unknown, display), unknown)
+
+
 class QATests(unittest.TestCase):
     def test_v6_qa_requires_v6_support_on_every_candidate_decision(self):
         def puzzle(a, b, model):

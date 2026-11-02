@@ -1,7 +1,5 @@
 {
-  "operation": "deploy",
-  "request_id": "pack1-v6-release-production-20261101",
-  "reason": "Deploy the v6/v10 release commit d3a2847 to production after its production activation and Traditional publication, replacing the v9 bridge 914dac3. The same revision passed development's deploy, Daily smoke and live v10 Practice acceptance (run 41337725869), which this deploy re-checks before upload, then verifies production's revision, coverage, Daily flows and live Practice.",
-  "commit": "d3a284729c54d32af630c328ca4beb59ccd72bfb",
-  "target": "production"
+  "operation": "card-images",
+  "request_id": "traditional-premier-art-20261102",
+  "reason": "Make the Live v6 Traditional components show the same card art as Premier. The full Pack One refresh builds one image mapping per environment and applies it to the v10 Premier rows and every Live component of that environment, replacing the Art Series, token and other-set reprint images the v6 Traditional build carried. All development and production functions report the same release commit, so no code is deployed."
 }

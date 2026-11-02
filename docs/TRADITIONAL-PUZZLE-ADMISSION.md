@@ -1,6 +1,15 @@
 # Traditional puzzle admission and publication
 
-Current production status updated September 21, 2026. Historical September 18 v3 evidence is retained below rather than rewritten.
+Current production status updated November 2, 2026. Earlier sections are retained below as historical evidence rather than rewritten.
+
+## November 1 v6 rescoring (corpus v10)
+
+The v6 release rescored every measured Traditional source with Premier-trained v6 graders on its approved window, with unchanged thresholds and no fallback window. The rule and evidence are in the [v6 release record](../research/V6-RELEASE.md#traditional-admission-rule).
+
+- 24 of 28 measured environments passed. 23 are Live: 21 regular sets under `traditional-premier-v6-phase2-v1` (HOB is newly admitted), FRA P1P1-P1P6 under `traditional-premier-v6-p1p6-v1` and Powered Cube P1P2-P1P7 under `traditional-cube-p2p7-v6-v1`.
+- SIR passed and is staged, but stays a Candidate. Its environment has since been Retired.
+- MH3 was admitted under v9 and failed under v6. Its Traditional puzzles were dropped from v10.
+- HBG, KTK and PIO failed, as under v9.
 
 ## October 22 Reality Fracture P1P1-P1P6 admission
 

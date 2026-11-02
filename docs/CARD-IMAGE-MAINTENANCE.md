@@ -111,6 +111,12 @@ Rows selected from a supplemental component must be validated against that row's
 
 The final protected-branch handoff uses an `automation/card-image-repair-...` branch and never pushes to `main` or creates a pull request from Actions. A no-op source publication is expected when checked-in/R2 display metadata was already correct and only the live backend state had drifted.
 
+## Traditional components
+
+Traditional puzzles must show the same art as Premier puzzles of the same environment. The v6 build copies each Traditional card's display fields from that environment's exact Premier import (`premier_display` in `scripts/v6_traditional.py`), and every refresh applies one mapping per environment to Premier and Live component rows alike. Publication itself does not normalize art. The Traditional research resolver (`scripts/traditional_v4_revalidation.py`) originally seeded metadata from every environment's replay shards and resolved missing images with Scryfall's exact-name lookup, which returns the newest printing: often an Art Series card, a token or a later reprint. It now seeds only from the measured environment and picks each card's printing with the shared `choose_main_printing` policy: the environment's own set, then its verified bonus sheet, then the earliest base printing (Powered Cube uses the earliest base printing). Its image cache is keyed by policy and environment and never overrides environment metadata. Which names count as resolvable is unchanged: an exact-name match with an image.
+
+After publishing new Traditional components, run the full card-image refresh (`card-images` request). The v6 components were published on November 1, after the last full refresh on October 23, so they carried the resolver's printings. Reality Fracture is not in the Draft Run catalog, so neither refresh mode covers it; its only differing v6 card is a same-set variant.
+
 ## Guarded release sequence
 
 Use `.github/workflows/card-image-release.yml` for reviewed card-image code changes. It requires a full reviewed `main` commit and runs:

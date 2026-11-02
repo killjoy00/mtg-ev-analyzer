@@ -12,7 +12,7 @@ The rebuild, serving optimization, leakage-corrected v8/v4 model release, Tradit
 
 ## Existing operating and research priorities
 
-1. Observe the next genuinely new archive through the automated Candidate pipeline. Keep explicit publication and existing quality gates. SIR's v4 Traditional component remains Candidate under its Candidate parent; HBG/HOB/KTK/PIO Traditional sources remain blocked.
+1. Observe the next genuinely new archive through the automated Candidate pipeline. Keep explicit publication and existing quality gates. SIR is Retired and its v6 Traditional component stays Candidate. HOB Traditional is Live under v6; HBG/KTK/PIO Traditional sources remain blocked and MH3's was dropped under v6.
 2. Validate physical-device authentication, native sharing, and assistive technology with real devices. Browser viewport tests do not establish those results.
 3. Observe the next genuine Patreon billing/tier change and correlate it with signed provider webhook/reconciliation evidence. Exact tier boundaries, revocation, ordering, expiry, manual-grant preservation, activation routing and authoritative `elite_activated` transitions have automated coverage; real OAuth, reconnect, premium practice, authoritative API reconciliation and the Welcome Note route have passed. This is continuing provider-observation work, not an open #181 acceptance blocker. Do not purchase or modify subscriptions merely to manufacture evidence.
 4. Watch hourly membership reconciliation and token-expiry failures. Use the reviewed sync workflow for recovery; keep stale-sync visibility in Admin Users.

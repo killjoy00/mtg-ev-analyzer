@@ -1,6 +1,11 @@
+import contextlib
+import io
+import json
 from pathlib import Path
 import sys
+import tempfile
 import unittest
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -82,6 +87,67 @@ class TraditionalV4RevalidationTests(unittest.TestCase):
         self.assertEqual(current.CUBE_COMPONENT, "traditional-cube-p2p7-v4-v1")
         self.assertNotIn("-v3-", current.COMPONENT)
         self.assertNotIn("-v3-", current.CUBE_COMPONENT)
+
+    def test_image_resolution_uses_main_art_not_newest_printing(self):
+        prints = "https://api.scryfall.com/cards/search?q=oracleid%3Acolonnade&unique=prints"
+
+        def card(set_code, set_type, released, number, layout="normal"):
+            return {
+                "name": "Celestial Colonnade", "layout": layout, "set": set_code,
+                "set_type": set_type, "released_at": released, "collector_number": number,
+                "lang": "en", "rarity": "rare", "type_line": "Land", "id": set_code,
+                "image_uris": {"normal": f"https://img.test/{set_code}.jpg"},
+                "prints_search_uri": prints,
+            }
+
+        art_series = card("aeoe", "memorabilia", "2025-08-01", "40", "art_series")
+        pages = {
+            "https://api.scryfall.com/cards/named?exact=Celestial%20Colonnade": art_series,
+            prints: {"data": [
+                art_series,
+                card("eos", "masterpiece", "2025-08-01", "3"),
+                card("uma", "masters", "2018-12-07", "238"),
+                card("wwk", "expansion", "2010-02-05", "133"),
+            ]},
+        }
+        requested = []
+
+        def request(url, method="GET"):
+            requested.append(url)
+            return contextlib.nullcontext(io.BytesIO(json.dumps(pages[url]).encode()))
+
+        with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.object(current, "resilient_request", request), \
+                mock.patch.object(current.time, "sleep"):
+            cache = Path(tmp) / "images.json"
+            cube = current.resolve_research_images({"Celestial Colonnade"}, {}, cache)
+            self.assertEqual(cube["Celestial Colonnade"]["image_url"], "https://img.test/wwk.jpg")
+            # The cache is scoped to its policy and environment: a set lookup
+            # re-resolves instead of reusing the global choice.
+            regular = current.resolve_research_images(
+                {"Celestial Colonnade"}, {}, cache, "eoe"
+            )
+            self.assertEqual(regular["Celestial Colonnade"]["image_url"], "https://img.test/eos.jpg")
+            self.assertEqual(requested.count(prints), 2)
+
+    def test_image_cache_never_overrides_environment_metadata(self):
+        stale = {"Loot, the Pathfinder": {"image_url": "https://img.test/art-series.jpg"}}
+        known = {"Loot, the Pathfinder": {"image_url": "https://img.test/dft.jpg"}}
+        with tempfile.TemporaryDirectory() as tmp, \
+                mock.patch.object(current, "resilient_request", side_effect=AssertionError):
+            cache = Path(tmp) / "images.json"
+            # A cache written before the main-art policy is ignored outright.
+            cache.write_text(json.dumps(stale))
+            self.assertEqual(current.resolve_research_images(set(known), dict(known), cache, "dft"), known)
+            # A current-policy cache still never replaces environment metadata.
+            cache.write_text(json.dumps({current.IMAGE_CACHE_POLICY_KEY: "main-art-v1:dft", **stale}))
+            self.assertEqual(current.resolve_research_images(set(known), dict(known), cache, "dft"), known)
+
+    def test_seed_metadata_is_scoped_to_the_measured_environment(self):
+        source = (ROOT / "scripts" / "traditional_v4_revalidation.py").read_text()
+        self.assertIn("known = metadata(ROOT, sid)", source)
+        self.assertNotIn("metadata(ROOT)", source)
+        self.assertNotIn("compact_card", source)
 
     def test_format_training_audit_is_disjoint(self):
         audit = current.format_training_audit()

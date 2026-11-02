@@ -53,7 +53,7 @@ Migration 0070 makes both `pack1_build_serving_snapshot` and `pack1_serving_snap
 
 - **Cutover contract fixture.** The serving-carry contract assumed its prepared database held v9. Once v10 became the checked-in corpus, that fixture was prepared at v10. Inside its disposable transaction, the contract now returns the fixture to the cutover-time state before executing the release SQL. The relabel is foreign-key safe and every assertion is unchanged.
 - **Resumed publication.** Publication's reverify step required every component to be an unpublished Candidate, so a resume after some components went Live was refused. On resume it now accepts components it already published. First activation still requires every component to be a Candidate.
-- **Concurrent readiness lease.** On development, a delayed scheduled smoke run, triggered by activity on main, took the readiness lease during publication, and the resume stopped at SOS. The identical request was re-run with `replay_of`. Nothing was merged to main between production activation and the production deploy. Publication still does not tolerate a concurrent readiness lease; that is open.
+- **Concurrent readiness lease.** On development, a delayed scheduled smoke run, triggered by activity on main, took the readiness lease during publication, and the resume stopped at SOS. The identical request was re-run with `replay_of`. Nothing was merged to main between production activation and the production deploy. Publication, cutover and cache warming now wait for a lease held by another job instead of failing (#1475).
 - **Backend gate fixtures.** The backend gate clones production. After the production cutover, three fixtures failed:
   - The Pacific report-date check placed its arrival before the first v10 session.
   - The corpus-transition smoke assumed HOB was Premier-only.
@@ -81,10 +81,11 @@ On production:
   - **Not admitted.** HBG, KTK and PIO, which were not admitted in v9 either.
 - **Standings.** The deployed code counts v9 and v10 results together on v10 leaderboards. This was checked in code; the production acceptance does not exercise it.
 
-Open follow-ups:
+Follow-ups:
 
-- **Trophy decks.** HOB's Traditional puzzles have no trophy decks. The deck catalog was built on 2026-10-20 and covered only Traditional components already live, plus FRA's approved set; HOB Traditional is new in v6. SIR's Traditional puzzles have none either. The same cause is inferred there, since SIR's environment was a Candidate, but it was not verified. Both need a catalog backfill; the puzzles play without the trophy-deck view until then.
-- **Publication robustness.** Publication should tolerate another readiness job holding the lease.
+- **Trophy decks (closed).** HOB's Traditional puzzles had no trophy decks: the deck catalog was built on 2026-10-20, before HOB Traditional existed. #1471 added 1,603 HOB decks, released with #1473. SIR needs none, since its environment was Retired and its component never served.
+- **Publication robustness (closed).** #1475 makes publication wait for another job's readiness lease.
+- **Traditional card art (open).** The v6 Traditional components kept the display metadata of their research builds. That resolver seeded images from every environment and fell back to Scryfall's newest printing, so some cards show an Art Series card, a token or a reprint from another set (for example Celestial Colonnade in Powered Cube). The components went Live after the last full card-image refresh. The resolver is fixed in source; the live repair is the guarded card-image refresh ([card image maintenance](../docs/CARD-IMAGE-MAINTENANCE.md#traditional-components)).
 
 Rollback is the reverse of the deploy order:
 
