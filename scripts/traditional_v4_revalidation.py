@@ -56,7 +56,7 @@ from traditional_puzzles import THRESHOLDS, compare, record
 from set_policy import corpus_version
 from model_training import VERSIONS, colour_policy
 from run_import_all_trophies import resilient_request
-from fetch_card_metadata import compact_card, aliases
+from fetch_card_metadata import aliases, choose_main_printing, metadata_for_alias
 
 EVENTS = ("PremierDraft", "TradDraft")
 CUBE = "powered-cube"
@@ -354,19 +354,54 @@ def grader_for(event: str, did: str, built: dict):
     return built["models"][fold_number]
 
 
-def resolve_research_images(names, known, cache_path: Path):
+IMAGE_CACHE_POLICY_KEY = "__packone_cache_policy__"
+
+
+def main_printing(card, name, preferred_set, request):
+    """Choose the deterministic main-art printing of an exact-name match.
+
+    Scryfall's exact-name endpoint returns the newest printing, which can be an
+    Art Series card, a token or an unrelated reprint. Pick from every printing
+    of the identity with the shared Pack One policy instead: the environment's
+    own set, then its verified bonus sheet, then the earliest base printing.
+    """
+    url = str(card.get("prints_search_uri") or "")
+    if not url.startswith("https://api.scryfall.com/cards/search"):
+        return card
+    printings = []
+    try:
+        while url:
+            with request(url) as response:
+                page = json.load(response)
+            printings.extend(page.get("data", []))
+            url = page.get("next_page") if page.get("has_more") else None
+    except urllib.error.HTTPError as exc:
+        # A missing printing list must not make a resolvable name unusable.
+        if exc.code != 404:
+            raise
+        return card
+    return choose_main_printing(printings, name, preferred_set) or card
+
+
+def resolve_research_images(names, known, cache_path: Path, preferred_set=None):
     """Resolve only image absence, matching the frozen Phase 2 usability gate.
 
     The production resolver also refreshes rows missing type_line. Type lines are
     optional display metadata and were never part of this experiment's source
     usability gate, so requesting them here adds rate-limit risk without changing
-    the predeclared decision rule.
+    the predeclared decision rule. Which names count as resolvable is unchanged:
+    an exact-name match with an image. Only the printing shown is the
+    environment's main art, as in the production resolver.
     """
+    cache_policy = f"main-art-v1:{preferred_set or 'global'}"
+    raw_cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
+    # A cache written under another policy holds Scryfall's default printings.
     cache = (
-        {key: value for key, value in json.loads(cache_path.read_text()).items() if value}
-        if cache_path.exists() else {}
+        {key: value for key, value in raw_cache.items() if key != IMAGE_CACHE_POLICY_KEY and value}
+        if raw_cache.get(IMAGE_CACHE_POLICY_KEY) == cache_policy else {}
     )
-    known = {**known, **cache}
+    # Environment-scoped metadata wins over a retained cache.
+    known = {**cache, **known}
 
     def research_request(url, method="GET"):
         # Combined with one research job's own pacing and a bounded workflow
@@ -384,7 +419,10 @@ def resolve_research_images(names, known, cache_path: Path):
             url = "https://api.scryfall.com/cards/named?exact=" + urllib.parse.quote(name)
             with research_request(url) as response:
                 card = json.load(response)
-            value = compact_card(card) if name in set(aliases(card)) else None
+            value = (
+                metadata_for_alias(main_printing(card, name, preferred_set, research_request), name)
+                if name in set(aliases(card)) else None
+            )
             if value and value.get("image_url", "").startswith("https://"):
                 known[name] = value
                 cache[name] = value
@@ -394,7 +432,7 @@ def resolve_research_images(names, known, cache_path: Path):
             if exc.code != 404:
                 raise
             cache[name] = None
-        atomic_json(cache_path, cache)
+        atomic_json(cache_path, {IMAGE_CACHE_POLICY_KEY: cache_policy, **cache})
     return known
 
 
@@ -431,7 +469,7 @@ def parity_with_v8(sid: str, frozen: Path, built: dict):
     }
     first, last = serving_window(sid)
     parity = 0
-    known = metadata(ROOT)
+    known = metadata(ROOT, sid)
     puzzle_path = frozen / sid / "reference.jsonl.gz"
     if not puzzle_path.exists():
         puzzle_path = frozen / sid / "puzzles.jsonl.gz"
@@ -551,7 +589,9 @@ def measure(sid: str, directory: Path, frozen: Path, *, premier_pin=None, trad_p
         for example in examples
         for card in (*example.candidates, *example.pool)
     }
-    known = resolve_research_images(names, known, directory / "images.json")
+    known = resolve_research_images(
+        names, known, directory / "images.json", None if sid == CUBE else sid
+    )
 
     records = []
     puzzles = []
