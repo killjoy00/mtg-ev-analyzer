@@ -20,7 +20,7 @@ class ReplayShardPaginationTests(unittest.TestCase):
 
 
 class ActiveReplayScopeTests(unittest.TestCase):
-    def run_hydrate(self, active, manifests, mode='hydrate', **overrides):
+    def run_hydrate(self, active, manifests, mode='hydrate', stub=None, **overrides):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'data').mkdir()
@@ -35,9 +35,9 @@ class ActiveReplayScopeTests(unittest.TestCase):
                 (path / 'shards/000.json').write_text('[]')
             bin_dir = root / 'bin'
             bin_dir.mkdir()
-            stub = bin_dir / 'aws'
-            stub.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$AWS_CALL_LOG"\n')
-            stub.chmod(0o755)
+            aws = bin_dir / 'aws'
+            aws.write_text(stub or '#!/bin/sh\nprintf "%s\\n" "$*" >> "$AWS_CALL_LOG"\n')
+            aws.chmod(0o755)
             log = root / 'aws.log'
             env = {**os.environ, 'PATH': str(bin_dir) + os.pathsep + os.environ['PATH'],
                    'R2_ENDPOINT': 'https://example.invalid', 'R2_BUCKET': 'fixture',
@@ -46,6 +46,26 @@ class ActiveReplayScopeTests(unittest.TestCase):
             result = subprocess.run(['bash', str(R2_SHARDS), mode], cwd=root, env=env,
                                     capture_output=True, text=True)
             return result, log.read_text() if log.exists() else ''
+
+    def test_sync_retries_a_transient_r2_failure(self):
+        v5 = 'strong-player-colour-stage-v5'
+        with tempfile.TemporaryDirectory() as directory:
+            marker = Path(directory) / 'failed-once'
+            stub = (f'#!/bin/sh\nprintf "%s\\n" "$*" >> "$AWS_CALL_LOG"\n'
+                    f'[ -e {marker} ] && exit 0\ntouch {marker}\nexit 1\n')
+            result, calls = self.run_hydrate([('msh', v5)], {'msh': v5}, stub=stub, R2_SYNC_BACKOFF='0')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(calls.splitlines()), 2)
+        self.assertIn('R2 sync attempt 1 failed; retrying', result.stderr)
+
+    def test_sync_gives_up_after_bounded_attempts(self):
+        v5 = 'strong-player-colour-stage-v5'
+        result, calls = self.run_hydrate([('msh', v5)], {'msh': v5},
+                                         stub='#!/bin/sh\nprintf "%s\\n" "$*" >> "$AWS_CALL_LOG"\nexit 1\n',
+                                         R2_SYNC_BACKOFF='0', R2_SYNC_ATTEMPTS='3')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(len(calls.splitlines()), 3)
+        self.assertIn('R2 sync failed after 3 attempts', result.stderr)
 
     def test_active_v5_does_not_hydrate_retired_v4_sets(self):
         v4, v5 = 'strong-player-colour-stage-v4', 'strong-player-colour-stage-v5'

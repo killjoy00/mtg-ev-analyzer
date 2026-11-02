@@ -10,6 +10,29 @@ export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-auto}"
 export AWS_RETRY_MODE="${AWS_RETRY_MODE:-adaptive}"
 export AWS_MAX_ATTEMPTS="${AWS_MAX_ATTEMPTS:-10}"
 
+# R2 answers bursts of parallel transfers with 503 ServiceUnavailable ("reduce
+# your rate of simultaneous reads/concurrent request rate"). The CLI's own
+# per-request retries are not always enough, and one failed object fails the
+# whole sync. Use fewer parallel transfers and retry the sync itself: sync is
+# idempotent, so a retry only transfers what is still missing or different.
+if [[ -z "${AWS_CONFIG_FILE:-}" ]]; then
+  AWS_CONFIG_FILE="$(mktemp)"
+  export AWS_CONFIG_FILE
+  printf '[default]\ns3 =\n  max_concurrent_requests = %s\n' "${R2_MAX_CONCURRENCY:-4}" > "$AWS_CONFIG_FILE"
+fi
+r2_sync() {
+  local attempt=1 attempts="${R2_SYNC_ATTEMPTS:-4}" backoff="${R2_SYNC_BACKOFF:-15}"
+  until aws s3 sync "$@"; do
+    if (( attempt >= attempts )); then
+      echo "R2 sync failed after $attempts attempts" >&2
+      return 1
+    fi
+    echo "R2 sync attempt $attempt failed; retrying" >&2
+    sleep $(( backoff * attempt ))
+    attempt=$(( attempt + 1 ))
+  done
+}
+
 # v3 predates namespaced replay storage and remains at data/. New model
 # versions must never overwrite those historical shards: a model rollout is
 # reversible only when both generations remain addressable.
@@ -109,11 +132,11 @@ case "$mode" in
     if [[ ${#scoped_sets[@]} -gt 0 ]]; then
       for sid in "${scoped_sets[@]}"; do
         mkdir -p "data/$sid/shards"
-        aws s3 sync "s3://${R2_BUCKET}/${replay_prefix}/${sid}/shards/" "data/$sid/shards/" \
+        r2_sync "s3://${R2_BUCKET}/${replay_prefix}/${sid}/shards/" "data/$sid/shards/" \
           --endpoint-url "$R2_ENDPOINT"
       done
     else
-      aws s3 sync "s3://${R2_BUCKET}/${replay_prefix}" data \
+      r2_sync "s3://${R2_BUCKET}/${replay_prefix}" data \
         --endpoint-url "$R2_ENDPOINT" \
         --exclude '*' \
         --include '*/shards/*.json'
@@ -128,14 +151,14 @@ case "$mode" in
           echo "No local replay shards for scoped set: $sid" >&2
           exit 1
         }
-        aws s3 sync "$shard_dir/" "s3://${R2_BUCKET}/${replay_prefix}/${sid}/shards/" \
+        r2_sync "$shard_dir/" "s3://${R2_BUCKET}/${replay_prefix}/${sid}/shards/" \
           --endpoint-url "$R2_ENDPOINT" \
           "${upload_delete[@]}" \
           --content-type 'application/json; charset=utf-8' \
           --cache-control 'public, max-age=3600'
       done
     else
-      aws s3 sync data "s3://${R2_BUCKET}/${replay_prefix}" \
+      r2_sync data "s3://${R2_BUCKET}/${replay_prefix}" \
         --endpoint-url "$R2_ENDPOINT" \
         --exclude '*' \
         --include '*/shards/*.json' \
