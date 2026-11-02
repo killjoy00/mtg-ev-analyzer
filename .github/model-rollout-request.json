@@ -1,5 +1,6 @@
 {
   "operation": "card-images",
-  "request_id": "traditional-premier-art-20261102",
-  "reason": "Make the Live v6 Traditional components show the same card art as Premier. The full Pack One refresh builds one image mapping per environment and applies it to the v10 Premier rows and every Live component of that environment, replacing the Art Series, token and other-set reprint images the v6 Traditional build carried. All development and production functions report the same release commit, so no code is deployed."
+  "request_id": "traditional-premier-art-20261102-r2",
+  "replay_of": "traditional-premier-art-20261102",
+  "reason": "Make the Live v6 Traditional components show the same card art as Premier. The full Pack One refresh builds one image mapping per environment and applies it to the v10 Premier rows and every Live component of that environment, replacing the Art Series, token and other-set reprint images the v6 Traditional build carried. All development and production functions report the same release commit, so no code is deployed. Replays traditional-premier-art-20261102, whose dispatch the replay guard refused because an equivalent full refresh was requested earlier; no workflow ran."
 }
