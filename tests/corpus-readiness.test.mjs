@@ -99,4 +99,3 @@ test('publication, activation, resume and warmup wait for readiness rather than 
  assert.equal([...cutover.matchAll(/const readiness=await awaitServingReadiness\(query\);/g)].length,2);
  assert.match(read('scripts/warm-practice-cache.mjs'),/awaitServingReadiness\(query,\{release,deadlineMs:8\*60\*1000,pollMs:2000\}\)/);
 });
-
