@@ -218,7 +218,7 @@ test('shared preview workflows queue both acceptance jobs while preserving exclu
 });
 
 
-test('backend CI retains PR coverage and only dispatches full suites on reviewed main weekly or manually',()=>{
+test('backend CI retains PR coverage and only runs full suites on reviewed main weekly, manually or after a production corpus change',()=>{
   const workflow=fs.readFileSync('.github/workflows/backend-gate.yml','utf8');
   assert.match(workflow,/cron: '17 7 \* \* 1'/);
   assert.match(workflow,/CI_BRANCH_SUSPEND: 300/);
@@ -232,4 +232,18 @@ test('backend CI retains PR coverage and only dispatches full suites on reviewed
   const sampler=workflow.split('- name: Start Neon compute sampler')[1].split('- name: Apply pending migrations')[0];
   assert.match(workflow,/sample_compute:[\s\S]*?type: boolean\n        default: false/);
   assert.match(sampler,/if: github\.event_name == 'workflow_dispatch' && inputs\.sample_compute == true/);
+});
+
+test('a successful production activation, rollback or publication starts a full backend sweep',()=>{
+  const workflow=fs.readFileSync('.github/workflows/backend-gate.yml','utf8');
+  assert.match(workflow,/workflow_run:\n    workflows: \['Release exact v6 corpus', 'Reviewed puzzle source release'\]\n    types: \[completed\]/);
+  const filter="github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' && contains(github.event.workflow_run.display_title, ' production') && (contains(github.event.workflow_run.display_title, 'activat') || contains(github.event.workflow_run.display_title, ' rollback ') || contains(github.event.workflow_run.display_title, ' publish '))";
+  // Every job is gated: other runs of these workflows provision nothing.
+  assert.ok(workflow.includes("    if: github.event_name != 'workflow_run' || ("+filter+")"),'postgres-contract skips unrelated release runs');
+  assert.equal(workflow.split("github.event_name == 'workflow_dispatch' || ("+filter+")) && github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/main'").length-1,2);
+  // A later release run cannot cancel the sweep started by an earlier one.
+  assert.match(workflow,/group: backend-gate-pr-\$\{\{ github\.event\.pull_request\.number \|\| \(github\.event_name == 'workflow_run' && format\('run-\{0\}', github\.event\.workflow_run\.id\)\) \|\| github\.event_name \}\}/);
+  // The filter reads the action and target from each release run's title.
+  assert.match(fs.readFileSync('.github/workflows/release-v6-corpus.yml','utf8'),/^name: Release exact v6 corpus\nrun-name: v6 corpus \$\{\{ inputs\.action \}\} \$\{\{ inputs\.target \}\}\n/);
+  assert.match(fs.readFileSync('.github/workflows/publish-puzzle-components.yml','utf8'),/^name: Reviewed puzzle source release\nrun-name: puzzle sources \$\{\{ inputs\.action \}\} \$\{\{ inputs\.source \}\} \$\{\{ inputs\.target \}\}\n/);
 });

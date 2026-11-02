@@ -143,6 +143,25 @@ export async function advanceServingReadiness(query,{operationId=null,release=pr
  return readServingReadiness(query,{operationId:job.id});
 }
 
+// Wait for the current serving revision to become ready without assuming this
+// caller owns the lease. Another worker (maintenance, a scheduled smoke, a
+// warmup) may already be building it, or a transient failure may be waiting
+// for its scheduled retry; both read as not ready on a single attempt. Each
+// pass is one bounded advanceServingReadiness attempt. A superseded operation
+// is followed to the current revision. Returns the last status: callers fail
+// on anything not ready, and nothing here claims rollback.
+export async function awaitServingReadiness(query,{operationId=null,deadlineMs=10*60*1000,pollMs=5000,
+ advance=advanceServingReadiness,sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),now=Date.now,...options}={}) {
+ const deadline=now()+deadlineMs;
+ let status=await advance(query,{...options,operationId});
+ while(!status.ready&&status.state!=='failed'&&now()<deadline) {
+  if(operationId&&status.current===false)operationId=null;
+  await sleep(pollMs);
+  status=await advance(query,{...options,operationId});
+ }
+ return status;
+}
+
 export async function retryServingReadiness(query,operationId,identity) {
  if(!/^[1-9][0-9]{0,18}$/.test(String(operationId)))throw error('Invalid readiness operation.');
  const accepted=yes(first(await query('SELECT pack1_retry_readiness($1::bigint,$2::jsonb) accepted',[operationId,JSON.stringify(identity)])).accepted);
