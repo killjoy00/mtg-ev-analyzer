@@ -1,4 +1,5 @@
 name: Reviewed puzzle source release
+run-name: puzzle sources ${{ inputs.action }} ${{ inputs.source }} ${{ inputs.target }}
 on:
   workflow_dispatch:
     inputs:

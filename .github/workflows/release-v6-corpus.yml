@@ -1,4 +1,5 @@
 name: Release exact v6 corpus
+run-name: v6 corpus ${{ inputs.action }} ${{ inputs.target }}
 
 on:
   workflow_dispatch:
