@@ -93,7 +93,7 @@ test('all published set catalogs have verified hashes, exact lists and complete 
       }
     }
   }
-  assert.equal(total,110373);assert.equal(total,coverage.decks);
+  assert.equal(total,110857);assert.equal(total,coverage.decks);
   assert.equal(coverage.source_drafts-coverage.matched_sources,181);
 });
 

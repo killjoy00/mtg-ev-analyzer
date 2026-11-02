@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
   "catalog_snapshot_date": "2026-10-20",
-  "matched_sources": 110373,
-  "source_drafts": 110554,
-  "decks": 110373,
+  "matched_sources": 110857,
+  "source_drafts": 111038,
+  "decks": 110857,
   "sets": [
     {
       "set_id": "blb",
@@ -122,12 +122,12 @@
     },
     {
       "set_id": "hob",
-      "source_drafts": 1119,
-      "matched_sources": 1119,
-      "decks": 1119,
+      "source_drafts": 1603,
+      "matched_sources": 1603,
+      "decks": 1603,
       "unavailable": 0,
       "unavailable_reasons": {},
-      "serving_sources": 1119
+      "serving_sources": 1603
     },
     {
       "set_id": "ktk",
@@ -624,6 +624,20 @@
       "wanted_sources": 1119,
       "matched_sources": 1119,
       "decks": 1119
+    },
+    {
+      "set_id": "hob",
+      "event_type": "TradDraft",
+      "archive_url": "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.HOB.TradDraft.csv.gz",
+      "archive_etag": "\"668aa2d07cbc028e2bb176169d6d8b8b\"",
+      "archive_sha256": "4b751c9c8ddf0631bf08cce04b14837a6d1328179cb34f6657968b103869ed29",
+      "archive_bytes": 2651223,
+      "archive_updated": "2026-10-01",
+      "ordering": "game_time_then_event_sequence",
+      "game_rows": 39541,
+      "wanted_sources": 484,
+      "matched_sources": 484,
+      "decks": 484
     },
     {
       "set_id": "ktk",

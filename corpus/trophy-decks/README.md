@@ -1,10 +1,14 @@
 # Trophy deck context
 
-The versioned, server-only catalogs cover **110,373 of 110,554 source drafts
-(99.8363%) across all 31 current environments**, including Powered Cube.
+The versioned, server-only catalogs cover **110,857 of 111,038 source drafts
+(99.8370%) across all 31 current environments**, including Powered Cube.
 `coverage.json` records source counts, archive hashes and unavailable-record
 reasons. FRA includes the separately approved Traditional supplement from
 #1303. Including its deck data does not activate or publish that component.
+HOB's Traditional component, first admitted in v6 (corpus v10), was added on
+2026-11-01 from its game archive dated 2026-10-01: all 484 of its source
+drafts have a deck. HOB's 1,119 Premier decks, card metadata and source
+aliases are unchanged.
 
 Each entry contains one exact main deck and sideboard from the last observed
 game. When the archive publishes game times, ordering uses game time, match,
