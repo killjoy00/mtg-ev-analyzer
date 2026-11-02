@@ -5,6 +5,7 @@ import {validateComponents} from './load-traditional-components.mjs';
 import {verifyComponents} from './verify-puzzle-components.mjs';
 import {verifyCorpusPublicationToken,CORPUS_PUBLICATION_AUDIENCE} from '../worker/trophy-import-auth.mjs';
 import {handleCorpusAdmin} from '../worker/corpus-admin.mjs';
+import {awaitServingReadiness} from '../worker/corpus-readiness.mjs';
 import {DRAFT_RUN_CORPUS_VERSION as parent} from '../draft-run.mjs';
 const query=corpusDatabase(process.argv[2]),prepared=await validateComponents(process.argv[3]);
 const endpoint=new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL);endpoint.searchParams.set('audience',CORPUS_PUBLICATION_AUDIENCE);
@@ -26,7 +27,10 @@ for(const s of prepared.filter(s=>s.health.ready)) {
  }
  const result=await handleCorpusAdmin(new Request(`https://packone.pro/v1/admin/corpus/${s.sid}/components/${component}/status`,{method:'POST'}),query,async()=>({oldStatus:'Candidate',status:'Live',corpusVersion:parent,reason:'Owner-authorized puzzle-source expansion; frozen Premier grader unchanged. Reviewed publication '+identity.run_id}),null,identity);
  console.log(JSON.stringify(result));
- if(!result.ok)throw Error('Publication committed but readiness did not complete: '+JSON.stringify(result.readiness));
+ // The component is committed. If another worker holds the readiness lease or a
+ // transient failure is waiting to retry, wait for it instead of failing.
+ const readiness=result.ok?result.readiness:await awaitServingReadiness(query,{operationId:result.readiness?.operation_id||null,deadlineMs:15*60*1000});
+ if(!readiness.ready)throw Error('Publication committed but readiness did not complete: '+JSON.stringify(readiness));
  live.push(s);
 }
 await verifyComponents(query,live,'Live');

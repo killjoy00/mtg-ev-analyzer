@@ -5,7 +5,7 @@ import {DRAFT_RUN_DIFFICULTY_VERSION} from '../draft-run-difficulty.mjs';
 import {SERVING_POLICY_VERSION} from '../serving-quality.mjs';
 import {CORPUS_GATE_VERSION} from '../corpus-quality.mjs';
 import {V6_PARENT_CORPUS_VERSION} from '../corpus-components.mjs';
-import {READINESS_CACHE_SCHEMA,registerServingReadiness,advanceServingReadiness,readServingReadiness,retryServingReadiness} from '../worker/corpus-readiness.mjs';
+import {READINESS_CACHE_SCHEMA,registerServingReadiness,readServingReadiness,retryServingReadiness,awaitServingReadiness} from '../worker/corpus-readiness.mjs';
 import {verifyCorpusPublicationToken,CORPUS_PUBLICATION_AUDIENCE} from '../worker/trophy-import-auth.mjs';
 import {corpusDatabase} from './neon-corpus-db.mjs';
 
@@ -78,9 +78,8 @@ if(action==='resume-activation') {
   await verifyPointers('target');
   await registerServingReadiness(query);
   const before=await readServingReadiness(query);
-  const readiness=before.current&&['failed','retry_wait'].includes(before.state)
-    ?await retryServingReadiness(query,before.operation_id,identity)
-    :await advanceServingReadiness(query);
+  if(before.current&&['failed','retry_wait'].includes(before.state))await retryServingReadiness(query,before.operation_id,identity);
+  const readiness=await awaitServingReadiness(query);
   if(!readiness.ready)throw Error('Published v10 parents are not ready after recovery: '+JSON.stringify(readiness));
   // A failed activation carry leaves the bridge job queued at the activation
   // revision while its last verified cache still exists. The release runtime
@@ -177,7 +176,7 @@ if(action==='activate') {
     [mapJson,PREVIOUS,TARGET,CORPUS_GATE_VERSION,mapping.length,reason,identityJson])).rows[0];
   if(Number(result?.changed)!==mapping.length||Number(result?.superseded)!==mapping.length||Number(result?.audited)!==mapping.length)throw Error('Cross-version activation compare-and-swap failed: '+JSON.stringify(result));
   await registerServingReadiness(query);
-  const readiness=await advanceServingReadiness(query);
+  const readiness=await awaitServingReadiness(query);
   if(!readiness.ready)throw Error('v10 parent activation committed but readiness is not ready: '+JSON.stringify(readiness));
   const v9=await parentReady(PREVIOUS);
   if(!v9.ready)throw Error('v9 bridge readiness was not preserved across the v10 pointer activation.');

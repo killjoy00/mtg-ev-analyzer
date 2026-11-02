@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readinessFailure,changedReadinessSets,advanceServingReadiness} from '../worker/corpus-readiness.mjs';
+import fs from 'node:fs';
+import {readinessFailure,changedReadinessSets,advanceServingReadiness,awaitServingReadiness} from '../worker/corpus-readiness.mjs';
 import {readinessMessage,readinessMarkup} from '../admin/corpus-readiness.mjs';
 
 test('transient failures retry, verification failures stop, and secrets are not persisted',()=>{
@@ -57,3 +58,45 @@ test('the real executor persists a timeout result rather than claiming activatio
  const result=await advanceServingReadiness(query,{build:async()=>{throw new DOMException('deadline','TimeoutError');}});
  assert.equal(result.state,'retry_wait');assert.equal(result.last_error.code,'transient_failure');assert.equal(result.ready,false);
 });
+
+// A fake clock and advance sequence: each call returns the next status.
+const waitFixture=statuses=>{
+ const calls=[];let t=0;
+ return {calls,options:{pollMs:1000,deadlineMs:5000,now:()=>t,sleep:async ms=>{t+=ms;},
+  advance:async(_q,options)=>{calls.push(options.operationId);return statuses[Math.min(calls.length-1,statuses.length-1)];}}};
+};
+
+test('a lease held by another worker is waited for instead of failing',async()=>{
+ const {calls,options}=waitFixture([{state:'warming',current:true,ready:false},{state:'verifying',current:true,ready:false},{state:'ready',current:true,ready:true}]);
+ const status=await awaitServingReadiness(null,{...options,operationId:'7'});
+ assert.equal(status.ready,true);assert.deepEqual(calls,['7','7','7']);
+});
+
+test('a terminal failure stops the wait at once',async()=>{
+ const {calls,options}=waitFixture([{state:'failed',current:true,ready:false}]);
+ assert.equal((await awaitServingReadiness(null,options)).state,'failed');assert.equal(calls.length,1);
+});
+
+test('a superseded operation is followed to the current revision',async()=>{
+ const {calls,options}=waitFixture([{state:'superseded',current:false,ready:false},{state:'ready',current:true,ready:true}]);
+ assert.equal((await awaitServingReadiness(null,{...options,operationId:'7'})).ready,true);
+ assert.deepEqual(calls,['7',null]);
+});
+
+test('the wait is bounded and returns the last status at the deadline',async()=>{
+ const {calls,options}=waitFixture([{state:'retry_wait',current:true,ready:false}]);
+ const status=await awaitServingReadiness(null,options);
+ assert.equal(status.ready,false);assert.equal(status.state,'retry_wait');assert.equal(calls.length,6);
+});
+
+test('publication, activation, resume and warmup wait for readiness rather than one attempt',()=>{
+ const read=path=>fs.readFileSync(new URL('../'+path,import.meta.url),'utf8');
+ const publish=read('scripts/publish-puzzle-components.mjs');
+ assert.match(publish,/result\.ok\?result\.readiness:await awaitServingReadiness\(query,\{operationId:result\.readiness\?\.operation_id/);
+ assert.ok(publish.indexOf('awaitServingReadiness(query')<publish.indexOf("throw Error('Publication committed but readiness did not complete"));
+ const cutover=read('scripts/v6-corpus-cutover.mjs');
+ assert.doesNotMatch(cutover,/advanceServingReadiness/);
+ assert.equal([...cutover.matchAll(/const readiness=await awaitServingReadiness\(query\);/g)].length,2);
+ assert.match(read('scripts/warm-practice-cache.mjs'),/awaitServingReadiness\(query,\{release,deadlineMs:8\*60\*1000,pollMs:2000\}\)/);
+});
+
