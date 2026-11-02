@@ -15,7 +15,7 @@ import json
 import shutil
 from unittest.mock import patch
 
-from import_all_trophies import read_gzip_jsonl, write_gzip_jsonl, digest, render_replay
+from import_all_trophies import read_gzip_jsonl, write_gzip_jsonl, digest, render_replay, metadata
 from model_training import V6_MODEL, V6_CORPUS, validate_training_manifest
 from traditional_v4_revalidation import (build_v4_models, grader_for, interesting,
     cube_traditional_cohort, complete_source, CUBE)
@@ -138,6 +138,35 @@ def parity(sid, built):
     return count
 
 
+# Traditional puzzles MUST show the same card art as Premier puzzles of the
+# same environment: both come from the same set's packs. Never resolve
+# Traditional images independently (e.g. Scryfall's default/newest printing):
+# that served Art Series cards, tokens and other sets' reprints in v6 (Celestial
+# Colonnade in Powered Cube). Display fields are copied from the environment's
+# exact v10 Premier import, then from its own replay shards for any card the
+# Premier puzzles do not contain. Live image refreshes apply one per-set mapping
+# to Premier and Traditional rows alike, so they stay identical afterwards.
+DISPLAY_FIELDS = ('image_url', 'mana_cost', 'rarity', 'type_line', 'display_faces')
+
+
+def premier_display(sid):
+    display = {name: {k: v for k, v in card.items() if k in DISPLAY_FIELDS}
+               for name, card in metadata(ROOT, sid).items()}
+    for puzzle in read_gzip_jsonl(BUILD/sid/'trophies'/sid/'puzzles.jsonl.gz'):
+        for card in puzzle['candidates'] + puzzle['prior_picks']:
+            if str(card.get('image_url', '')).startswith('https://'):
+                display[card['name']] = {k: card[k] for k in DISPLAY_FIELDS if k in card}
+    return display
+
+
+def with_premier_display(card, display):
+    """Replace a Traditional card's display fields with Premier's for the same name."""
+    premier = display.get(card['name'])
+    if not premier:
+        return card
+    return {**{k: v for k, v in card.items() if k not in DISPLAY_FIELDS}, **premier}
+
+
 def rescore(sid, premier_pin, component_pin, directory):
     validate_training_manifest(premier_pin, V6_MODEL)
     if premier_pin['corpus_version'] != V6_CORPUS:
@@ -171,6 +200,7 @@ def rescore(sid, premier_pin, component_pin, directory):
         for p in picks:
             if first <= p.raw_pick_number+1 <= last:
                 records.append(record(sid, 'TradDraft', did, p, grader_for('TradDraft', did, built)))
+    display = premier_display(sid)
     rescored = []
     for previous in old:
         did = identities[previous['source_draft_hash']]
@@ -183,7 +213,10 @@ def rescore(sid, premier_pin, component_pin, directory):
             raise ValueError(f'{sid}: measured Traditional source trajectory changed')
         rendered = render_replay(did, [p], grader_for('TradDraft', did, built), 1, 1, {})['picks'][0]
         support = {c['name']: c['model_probability'] for c in rendered['candidates']}
-        rescored.append({**previous, 'candidates': [{**c, 'model_probability': support[c['name']]} for c in previous['candidates']]})
+        rescored.append({**previous,
+            'candidates': [with_premier_display({**c, 'model_probability': support[c['name']]}, display)
+                           for c in previous['candidates']],
+            'prior_picks': [with_premier_display(c, display) for c in previous['prior_picks']]})
     snapshot = old_manifest.get('cube_snapshot') if sid == CUBE else None
     if sid == CUBE and not (snapshot or {}).get('pass'):
         raise ValueError('Powered Cube Premier/Traditional snapshot evidence is missing')
