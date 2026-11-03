@@ -115,7 +115,19 @@ The final protected-branch handoff uses an `automation/card-image-repair-...` br
 
 Traditional puzzles must show the same art as Premier puzzles of the same environment. The v6 build copies each Traditional card's display fields from that environment's exact Premier import (`premier_display` in `scripts/v6_traditional.py`), and every refresh applies one mapping per environment to Premier and Live component rows alike. Publication itself does not normalize art. The Traditional research resolver (`scripts/traditional_v4_revalidation.py`) originally seeded metadata from every environment's replay shards and resolved missing images with Scryfall's exact-name lookup, which returns the newest printing: often an Art Series card, a token or a later reprint. It now seeds only from the measured environment and picks each card's printing with the shared `choose_main_printing` policy: the environment's own set, then its verified bonus sheet, then the earliest base printing (Powered Cube uses the earliest base printing). Its image cache is keyed by policy and environment and never overrides environment metadata. Which names count as resolvable is unchanged: an exact-name match with an image.
 
-After publishing new Traditional components, run the full card-image refresh (`card-images` request). The v6 components were published on November 1, after the last full refresh on October 23, so they carried the resolver's printings. Reality Fracture is not in the Draft Run catalog, so neither refresh mode covers it; its only differing v6 card is a same-set variant.
+Do not run the full card-image refresh to repair Traditional art. It rewrites every environment's Premier and Traditional rows and does not finish a full v10 pass inside the workflow's 90-minute limit (development alone took 68 minutes). Repair Traditional components with a Traditional-only Premier copy instead:
+
+1. Per environment, build a map from each card name to the five display fields (`image_url`, `mana_cost`, `rarity`, `type_line`, `display_faces`) used by that environment's current Premier puzzles. When Premier rows disagree, take the most frequent variant.
+2. Update only rows whose `corpus_version` is a Live component of the current parent. In `candidates` and `prior_picks`, replace those five keys on each card whose name is in the map (removing `display_faces` where Premier has none), keep every other key and the card order, and write only rows whose payload actually changes.
+3. Verify that every Traditional card now matches its environment's Premier display, list Traditional names with no Premier match, and repeat on development.
+
+Premier rows for the same name can differ only by `mana_cost` being `""` or absent on lands. That difference is cosmetic, so the most frequent variant is safe.
+
+### November 2, 2026 v6 repair
+
+The v6 components were published on November 1, after the last full refresh on October 23, so they carried the resolver's printings. The repair used the Traditional-only copy above on all 23 Live v6 components (21 regular sets, Reality Fracture P1P1-P1P6 and Powered Cube P1P2-P1P7), directly in the database. On production it rewrote 112,901 of 158,382 Traditional puzzles; afterwards 0 of 2,224,732 Traditional cards differed from Premier on both production and development, and Celestial Colonnade in Powered Cube shows its Worldwake printing. Sword of Fire and Ice in MSH (8 cards) has no Premier occurrence, so it keeps its existing art. Premier rows, replay shards and checked-in card files were not changed by the repair.
+
+An earlier attempt on the same day ran the full refresh instead. Before it was cancelled at the 90-minute limit it had rewritten development Premier and Traditional rows, production KTK Premier, part of production MOM Premier and the replay shards with the refreshed mapping. Whether to keep or revert those changes is an open owner decision.
 
 ## Guarded release sequence
 
