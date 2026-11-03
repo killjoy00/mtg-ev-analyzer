@@ -5,15 +5,13 @@ import test from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('../', import.meta.url));
-const paths = [
-  'mobile/src/nativeEditorial.ts',
-];
-for (const directory of ['mobile/app', 'mobile/src/screens', 'mobile/src/components']) {
+const paths = [];
+for (const directory of ['mobile/app', 'mobile/src']) {
   function collect(dir) {
     for (const entry of readdirSync(join(root, dir), { withFileTypes: true })) {
       const file = join(dir, entry.name);
       if (entry.isDirectory()) collect(file);
-      else if (entry.isFile() && /\.tsx$/.test(entry.name)) paths.push(file);
+      else if (entry.isFile() && /\.[jt]sx?$/.test(entry.name)) paths.push(file);
     }
   }
   collect(directory);
@@ -23,6 +21,22 @@ test('native customer-facing screens and legal copy do not name competing mobile
   for (const path of paths) {
     const content = readFileSync(join(root, path), 'utf8');
     assert.doesNotMatch(content, /\bAndroid\b/, `${relative(root, join(root, path))} must not name Android in customer-facing iOS copy`);
+  }
+});
+
+test('native runtime string literals contain no visible Android brand mentions', () => {
+  for (const path of paths) {
+    const content = readFileSync(join(root, path), 'utf8');
+    const quotedLiterals = content.match(/'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`/g) || [];
+    for (const literal of quotedLiterals) {
+      assert.doesNotMatch(literal, /\\bAndroid\\b/, `${path} contains a potentially customer-visible Android string`);
+    }
+  }
+});
+
+test('linked canonical web privacy and terms pages are platform-neutral', () => {
+  for (const path of ['privacy/index.html', 'terms/index.html']) {
+    assert.doesNotMatch(readFileSync(join(root, path), 'utf8'), /\\bAndroid\\b/);
   }
 });
 
