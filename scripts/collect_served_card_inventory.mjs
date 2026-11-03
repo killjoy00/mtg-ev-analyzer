@@ -11,6 +11,25 @@ import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {importRequest} from './actions-import-auth.mjs';
 
+// Follow image-inventory pages for one environment. Each page is bounded on the
+// server, so no single request scans a whole environment.
+export async function servedNames(request,base,setId,maxPages=10000) {
+  const names=new Set();
+  let after='',corpusVersion=null;
+  for(let pages=0;pages<maxPages;pages++) {
+    const page=await request(base,{action:'image-inventory',setId,after});
+    if(page?.set_id!==setId||typeof page.corpus_version!=='string'||!Array.isArray(page.names)||typeof page.done!=='boolean'||page.names.some(name=>typeof name!=='string'||!name))
+      throw Error(`Unexpected served card inventory for ${setId} from ${base}`);
+    if(corpusVersion!==null&&page.corpus_version!==corpusVersion)throw Error(`Served card inventory changed corpus version mid-scan for ${setId}`);
+    corpusVersion=page.corpus_version;
+    for(const name of page.names)names.add(name);
+    if(page.done)return {corpus_version:corpusVersion,names:[...names].sort()};
+    if(typeof page.next_after!=='string'||!page.next_after||page.next_after<=after)throw Error(`Served card inventory cursor did not advance for ${setId}`);
+    after=page.next_after;
+  }
+  throw Error(`Served card inventory exceeded ${maxPages} pages for ${setId}`);
+}
+
 export async function collectServedInventory(bases,request=importRequest) {
   if(!bases.length||bases.some(base=>!String(base||'').startsWith('https://')))throw Error('HTTPS Draft Run API base URLs are required.');
   const environments={};
@@ -20,8 +39,8 @@ export async function collectServedInventory(bases,request=importRequest) {
     for(const entry of listing.environments) {
       const setId=String(entry?.set_id||'');
       if(!setId)throw Error(`Unexpected image environment entry from ${base}`);
-      const inventory=await request(base,{action:'image-inventory',setId});
-      if(inventory?.set_id!==setId||inventory.corpus_version!==listing.corpus_version||!Array.isArray(inventory.names)||!inventory.names.length||inventory.names.some(name=>typeof name!=='string'||!name))
+      const inventory=await servedNames(request,base,setId);
+      if(inventory.corpus_version!==listing.corpus_version||!inventory.names.length)
         throw Error(`Unexpected served card inventory for ${setId} from ${base}`);
       const target=environments[setId]??={catalog:false,names:new Set(),sources:[]};
       target.catalog||=entry.catalog===true;

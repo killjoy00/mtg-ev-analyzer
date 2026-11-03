@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {registeredImageEnvironment,imageEnvironments,imageInventory,normalizeResolvedImageMarkers} from '../worker/trophy-import.mjs';
-import {collectServedInventory} from '../scripts/collect_served_card_inventory.mjs';
+import {collectServedInventory,servedNames} from '../scripts/collect_served_card_inventory.mjs';
 import {refreshBackendImages,propagationSetIds} from '../scripts/refresh_card_backend_images.mjs';
 
 // FRA is a trophy-only environment: Live in the serving policy, absent from the
@@ -12,7 +12,7 @@ const backend=({policy={fra:'Live'},present=new Set(['ktk','fra']),names={ktk:['
     calls.push({sql,params});
     if(sql.includes('FROM draft_run_environment_policy WHERE set_id=$1'))return {rows:policy[params[0]]&&['Live','Candidate'].includes(policy[params[0]])?[{}]:[]};
     if(sql.includes('FROM draft_run_environment_policy'))return {rows:Object.entries(policy).filter(([,s])=>['Live','Candidate'].includes(s)).map(([set_id,status])=>({set_id,status}))};
-    if(sql.includes('SELECT DISTINCT card.value'))return {rows:(names[params[0]]||[]).map(name=>({name}))};
+    if(sql.includes('WITH page AS'))return {rows:[{puzzles:1,last_puzzle_id:'p1',names:names[params[0]]||[]}]};
     if(sql.includes('SELECT 1 FROM draft_run_verified_puzzles'))return {rows:present.has(params[0])?[{}]:[]};
     throw Error('unexpected SQL: '+sql.slice(0,80));
   };
@@ -30,8 +30,15 @@ test('environments outside the replay catalog are registered only through the se
 
 test('served inventory covers every served card of an environment, including FRA',async()=>{
   const {query,calls}=backend();
-  assert.deepEqual(await imageInventory(query,'fra'),{set_id:'fra',corpus_version:calls.find(c=>c.sql.includes('DISTINCT')).params[1],names:['Countersculpt']});
-  const scan=calls.find(c=>c.sql.includes('SELECT DISTINCT card.value')).sql;
+  const page=await imageInventory(query,'fra');
+  const scanCall=calls.find(c=>c.sql.includes('WITH page AS'));
+  assert.deepEqual(page,{set_id:'fra',corpus_version:scanCall.params[1],names:['Countersculpt'],puzzles:1,done:true,next_after:null});
+  // Each request is bounded: a cursor and a page size, never a whole-environment scan.
+  assert.equal(scanCall.params[2],'');
+  assert.ok(Number.isInteger(scanCall.params[3])&&scanCall.params[3]<=5000);
+  assert.match(scanCall.sql,/p\.puzzle_id>\$3/);
+  assert.match(scanCall.sql,/LIMIT \$4/);
+  const scan=scanCall.sql;
   assert.match(scan,/prior_picks/);
   assert.match(scan,/c\.status='Live'/);
   await assert.rejects(imageInventory(backend({policy:{}}).query,'fra'),/registered environment/);
@@ -59,7 +66,7 @@ test('the collector merges development and production inventories',async()=>{
   const request=async(base,body)=>{
     const r=responses[base.includes('dev')?'dev':'prod'];
     if(body.action==='image-environments')return {corpus_version:'v',environments:r.envs};
-    return {set_id:body.setId,corpus_version:'v',names:r.names[body.setId]};
+    return {set_id:body.setId,corpus_version:'v',names:r.names[body.setId],done:true,next_after:null};
   };
   const inventory=await collectServedInventory(['https://dev','https://prod'],request);
   assert.deepEqual(inventory.environments.ktk.names,['A','B']);
@@ -74,7 +81,7 @@ const propagation=({served={fra:{names:['Countersculpt']}},inventory={ktk:['Sieg
   const request=async(base,body)=>{
     calls.push(body);
     if(body.action==='refresh-image-page-v2')return {set_id:body.setId,mapping_entries:body.mapping.length,puzzles:1,updated_puzzles:0,updated_cards:0,done:true,corpus_available:true};
-    if(body.action==='image-inventory')return {set_id:body.setId,corpus_version:'v',names:inventory[body.setId]};
+    if(body.action==='image-inventory')return {set_id:body.setId,corpus_version:'v',names:inventory[body.setId],done:true,next_after:null};
     if(body.action==='normalize-image-markers')return {normalized:[{set_id:body.setIds[0],missing_images:0,puzzles:1}]};
     throw Error('unexpected action');
   };
@@ -92,4 +99,16 @@ test('propagation covers served-only environments and fails closed on unmapped s
   await assert.rejects(gap.run(),/ktk: 1 served cards have no card-image policy selection \(Lightning Bolt\)/);
   // Nothing is normalized after a coverage failure.
   assert.equal(gap.calls.some(c=>c.action==='normalize-image-markers'),false);
+});
+
+test('served names follow every inventory page and refuse a stuck cursor',async()=>{
+  const pages={'':{names:['A','B'],done:false,next_after:'p2000'},p2000:{names:['B','C'],done:false,next_after:'p4000'},p4000:{names:['D'],done:true,next_after:null}};
+  const seen=[];
+  const request=async(base,body)=>{seen.push(body.after);return {set_id:body.setId,corpus_version:'v',...pages[body.after]};};
+  assert.deepEqual(await servedNames(request,'https://api','dmu'),{corpus_version:'v',names:['A','B','C','D']});
+  assert.deepEqual(seen,['','p2000','p4000']);
+  const stuck=async(base,body)=>({set_id:body.setId,corpus_version:'v',names:['A'],done:false,next_after:body.after||'p1'});
+  await assert.rejects(servedNames(stuck,'https://api','dmu'),/cursor did not advance/);
+  const versionChange=async(base,body)=>({set_id:body.setId,corpus_version:body.after?'w':'v',names:['A'],done:!!body.after,next_after:'p1'});
+  await assert.rejects(servedNames(versionChange,'https://api','dmu'),/changed corpus version/);
 });

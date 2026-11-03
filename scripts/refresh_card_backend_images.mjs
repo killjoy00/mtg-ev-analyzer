@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {importRequest} from './actions-import-auth.mjs';
+import {servedNames} from './collect_served_card_inventory.mjs';
 
 // Environments to propagate: the replay catalog plus every environment in the
 // served card inventory (trophy-only environments such as FRA are not in the
@@ -60,8 +61,7 @@ export async function refreshBackendImages(base,{request=importRequest,catalog,s
     // Fail closed when the backend serves a card the policy did not resolve.
     // Unmapped cards keep whatever art they were imported with, which is how
     // cards outside the replay samples escaped the policy before.
-    const inventory=await request(base,{action:'image-inventory',setId});
-    if(inventory?.set_id!==setId||!Array.isArray(inventory.names))throw new Error(`Unexpected served card inventory for ${setId}`);
+    const inventory=await servedNames(request,base,setId);
     const mapped=new Set(mapping.map(entry=>entry.name));
     const unmapped=inventory.names.filter(name=>!mapped.has(name));
     if(unmapped.length)throw new Error(`${setId}: ${unmapped.length} served cards have no card-image policy selection (${unmapped.slice(0,10).join(', ')}). Collect the served inventory and rerun the refresh.`);
