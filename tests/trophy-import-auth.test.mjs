@@ -179,12 +179,18 @@ test('card image refresh changes display metadata only for registered environmen
   const original=structuredClone(sample);
   let stored=sample;
   const query=async(sql,params=[])=>{
-    if(sql.includes('SELECT p.puzzle_id,p.payload')){
-      assert.match(sql,/corpus_components/);
-      assert.match(sql,/c\.parent_version=\$2/);
-      assert.match(sql,/c\.component_version=p\.corpus_version/);
-      assert.match(sql,/c\.status='Live'/);
+    if(sql.includes('SELECT component_version FROM corpus_components')){
+      assert.match(sql,/parent_version=\$2/);assert.match(sql,/status='Live'/);
       assert.equal(params[1],DRAFT_RUN_CORPUS_VERSION);
+      return {rows:[]};
+    }
+    if(sql.includes('SELECT p.puzzle_id,p.payload')){
+      // Served rows are read through the (corpus_version, set_id) index and
+      // ordered without the primary key, so a page never walks the table.
+      assert.match(sql,/p\.corpus_version=ANY\(\$2::text\[\]\)/);
+      assert.match(sql,/p\.puzzle_id COLLATE "C">\$3/);
+      assert.match(sql,/ORDER BY p\.puzzle_id COLLATE "C"/);
+      assert.equal(params[1],`{"${DRAFT_RUN_CORPUS_VERSION}"}`);
       return {rows:stored.puzzle_id>String(params[2]||'')?[{puzzle_id:stored.puzzle_id,payload:stored}]:[]};
     }
     if(sql.includes('UPDATE draft_run_verified_puzzles')){
@@ -257,7 +263,10 @@ test('live component image refresh validates the stored component version',async
     source_evidence:'official_archive_trajectory',
   };
   const query=async(sql,params=[])=>{
+    if(sql.includes('SELECT component_version FROM corpus_components'))return {rows:[{component_version:TRADITIONAL_V4_PHASE2_COMPONENT_VERSION}]};
     if(sql.includes('SELECT p.puzzle_id,p.payload')){
+      // The Live component's version is one of the served versions read.
+      assert.equal(params[1],`{"${DRAFT_RUN_CORPUS_VERSION}","${TRADITIONAL_V4_PHASE2_COMPONENT_VERSION}"}`);
       return {rows:stored.puzzle_id>String(params[2]||'')?[{
         puzzle_id:stored.puzzle_id,
         payload:stored,
@@ -290,6 +299,7 @@ test('a blank mapped type line cannot erase stored metadata during image refresh
   const target={...original.candidates[0],type_line:'Artifact'};
   let stored={...structuredClone(original),candidates:[target,...structuredClone(original.candidates.slice(1))]};
   const query=async(sql,params=[])=>{
+    if(sql.includes('SELECT component_version FROM corpus_components'))return {rows:[]};
     if(sql.includes('SELECT p.puzzle_id,p.payload'))return {rows:stored.puzzle_id>String(params[2]||'')?[{puzzle_id:stored.puzzle_id,payload:stored}]:[]};
     if(sql.includes('UPDATE draft_run_verified_puzzles')){stored=JSON.parse(params[0])[0].payload;return {rows:[{puzzle_id:stored.puzzle_id}]};}
     // An environment outside the replay catalog is registered only through the serving policy.
@@ -318,6 +328,7 @@ test('image refresh filters already-correct payloads inside Postgres',async()=>{
   const calls=[];
   const query=async(sql,params=[])=>{
     calls.push({sql,params});
+    if(sql.includes('SELECT component_version FROM corpus_components'))return {rows:[]};
     if(sql.includes('SELECT p.puzzle_id,p.payload'))return {rows:[]};
     if(sql.includes('SELECT 1')&&sql.includes('FROM draft_run_verified_puzzles p'))return {rows:[{exists:1}]};
     throw new Error('Unexpected SQL in no-op image refresh test: '+sql);
@@ -326,20 +337,20 @@ test('image refresh filters already-correct payloads inside Postgres',async()=>{
   assert.equal(result.puzzles,0);
   assert.equal(result.updated_puzzles,0);
   assert.equal(result.updated_cards,0);
-  assert.equal(calls.length,2);
-  assert.match(calls[0].sql,/jsonb_array_elements\(\$4::jsonb\)/);
-  assert.match(calls[0].sql,/IS DISTINCT FROM/);
-  assert.match(calls[0].sql,/COALESCE\(p\.payload->'candidates'/);
-  assert.equal(calls[0].params[2],'');
-  assert.equal(calls[0].params[4],250);
-  assert.deepEqual(JSON.parse(calls[0].params[3]),mapping);
-  for(const call of calls) {
-    assert.match(call.sql,/corpus_components/);
-    assert.match(call.sql,/c\.parent_version=\$2/);
-    assert.match(call.sql,/c\.component_version=p\.corpus_version/);
-    assert.match(call.sql,/c\.status='Live'/);
-  }
-  assert.doesNotMatch(calls[1].sql,/payload/);
+  assert.equal(calls.length,3);
+  assert.match(calls[0].sql,/SELECT component_version FROM corpus_components/);
+  const page=calls[1];
+  assert.match(page.sql,/jsonb_array_elements\(\$4::jsonb\)/);
+  assert.match(page.sql,/IS DISTINCT FROM/);
+  assert.match(page.sql,/COALESCE\(p\.payload->'candidates'/);
+  assert.match(page.sql,/p\.corpus_version=ANY\(\$2::text\[\]\)/);
+  assert.equal(page.params[2],'');
+  assert.equal(page.params[4],250);
+  assert.deepEqual(JSON.parse(page.params[3]),mapping);
+  // The availability probe still scopes to the parent and Live components.
+  assert.match(calls[2].sql,/corpus_components/);
+  assert.match(calls[2].sql,/c\.status='Live'/);
+  assert.doesNotMatch(calls[2].sql,/payload/);
 });
 
 test('image markers clear only after every served v9 parent or Live component card has an HTTPS image',async()=>{
