@@ -4,6 +4,7 @@ on:
     paths:
       - 'scripts/load-traditional-components.mjs'
       - 'scripts/verify-puzzle-components.mjs'
+      - 'scripts/traditional-premier-art.mjs'
       - 'scripts/prepare_v4_cube_admission.py'
       - 'scripts/traditional_v4_revalidation.py'
       - 'corpus-components.mjs'

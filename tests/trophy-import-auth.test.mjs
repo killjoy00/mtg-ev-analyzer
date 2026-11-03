@@ -197,6 +197,8 @@ test('card image refresh changes display metadata only for registered environmen
       stored=updates[0].payload;
       return {rows:[{puzzle_id:stored.puzzle_id}]};
     }
+    // An environment outside the replay catalog is registered only through the serving policy.
+    if(sql.includes('FROM draft_run_environment_policy WHERE set_id=$1'))return {rows:[]};
     throw new Error('Unexpected SQL in image refresh test: '+sql);
   };
   const target=sample.candidates[0];
@@ -290,6 +292,8 @@ test('a blank mapped type line cannot erase stored metadata during image refresh
   const query=async(sql,params=[])=>{
     if(sql.includes('SELECT p.puzzle_id,p.payload'))return {rows:stored.puzzle_id>String(params[2]||'')?[{puzzle_id:stored.puzzle_id,payload:stored}]:[]};
     if(sql.includes('UPDATE draft_run_verified_puzzles')){stored=JSON.parse(params[0])[0].payload;return {rows:[{puzzle_id:stored.puzzle_id}]};}
+    // An environment outside the replay catalog is registered only through the serving policy.
+    if(sql.includes('FROM draft_run_environment_policy WHERE set_id=$1'))return {rows:[]};
     throw new Error('Unexpected SQL in image refresh test: '+sql);
   };
   const replacement='https://cards.example/blank-type-line.jpg';
@@ -356,6 +360,8 @@ test('image markers clear only after every served v9 parent or Live component ca
       // rows must not fail once served v9/Live-component puzzles were verified.
       return {rows:[]};
     }
+    // An environment outside the replay catalog is registered only through the serving policy.
+    if(sql.includes('FROM draft_run_environment_policy WHERE set_id=$1'))return {rows:[]};
     throw new Error('Unexpected SQL in image-marker test: '+sql);
   };
   const result=await normalizeResolvedImageMarkers(query,['powered-cube','hbg','tmt']);

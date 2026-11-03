@@ -35,9 +35,16 @@ test('image maintenance cannot deploy functions and checks revisions before remo
   const workflow=fs.readFileSync(new URL('../.github/workflows/refresh-powered-cube-images.yml',import.meta.url),'utf8');
   assert.doesNotMatch(workflow,/functions deploy|NEON_API_KEY|build-neon-functions/);
   assert.ok(workflow.indexOf('node scripts/verify-image-refresh-release.mjs')<workflow.indexOf('bash scripts/r2_replay_shards.sh upload'));
-  assert.match(workflow,/name: Normalize all served cards to deterministic main art\s+run: python scripts\/refresh_card_images.py/);
+  assert.match(workflow,/name: Normalize all served cards to deterministic main art\s+env:\s+REQUIRE_SERVED_INVENTORY: '1'\s+run: python scripts\/refresh_card_images.py/);
+  // The policy is resolved for what the backend serves: the release marker is
+  // verified, then the served inventory is collected, before resolution.
+  const full=workflow.slice(0,workflow.indexOf('\n  repair:'));
+  const verify=full.indexOf('node scripts/verify-image-refresh-release.mjs'),collect=full.indexOf('node scripts/collect_served_card_inventory.mjs "$DEV_IMPORT_API" "$PROD_IMPORT_API"'),resolve=full.indexOf('python scripts/refresh_card_images.py');
+  assert.ok(verify>0&&verify<collect&&collect<resolve);
+  assert.equal((full.match(/REQUIRE_SERVED_INVENTORY=1 node scripts\/refresh_card_backend_images\.mjs/g)||[]).length,2);
+  assert.match(full,/generated\/served-card-inventory\.json/);
   assert.match(workflow,/name: Publish normalized replay shards to R2\s+run: bash scripts\/r2_replay_shards.sh upload/);
-  assert.match(workflow,/name: Refresh production Draft Run image metadata\s+run: \|\s+node scripts\/verify-image-refresh-release.mjs "\$\{\{ inputs\.code_commit \}\}"\s+node scripts\/refresh_card_backend_images.mjs/);
+  assert.match(workflow,/name: Refresh production Draft Run image metadata\s+run: \|\s+node scripts\/verify-image-refresh-release.mjs "\$\{\{ inputs\.code_commit \}\}"\s+REQUIRE_SERVED_INVENTORY=1 node scripts\/refresh_card_backend_images.mjs/);
   assert.doesNotMatch(workflow,/pull-requests: write/);
   assert.match(workflow,/push origin "HEAD:refs\/heads\/\$branch"/);
   assert.doesNotMatch(workflow,/push origin "HEAD:\$branch"/);

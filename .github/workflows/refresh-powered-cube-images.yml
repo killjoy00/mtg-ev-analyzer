@@ -47,7 +47,10 @@ jobs:
   refresh:
     if: inputs.mode != 'targeted'
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    # A full v10 pass on development alone took 68 minutes on November 2, so
+    # 90 minutes could not cover both branches. Keep this below the release
+    # wait in scripts/card-image-release.mjs.
+    timeout-minutes: 210
     env:
       DEV_IMPORT_API: https://br-twilight-hill-ayffyd2b-draftrunapi.compute.c-5.us-east-2.aws.neon.tech
       PROD_IMPORT_API: https://br-orange-feather-ayps8kep-draftrunapi.compute.c-5.us-east-2.aws.neon.tech
@@ -90,7 +93,15 @@ jobs:
       - name: Hydrate replay shards from R2
         run: bash scripts/r2_replay_shards.sh hydrate
 
+      - name: Verify marked, matching backend releases before reading served inventory
+        run: node scripts/verify-image-refresh-release.mjs "${{ inputs.code_commit }}"
+
+      - name: Collect served card inventory from development and production
+        run: node scripts/collect_served_card_inventory.mjs "$DEV_IMPORT_API" "$PROD_IMPORT_API"
+
       - name: Normalize all served cards to deterministic main art
+        env:
+          REQUIRE_SERVED_INVENTORY: '1'
         run: python scripts/refresh_card_images.py
 
       - name: Run full test suite
@@ -109,6 +120,7 @@ jobs:
           path: |
             generated/card-image-refresh/*.json
             generated/card-image-refresh-report.json
+            generated/served-card-inventory.json
 
       - name: Verify marked, matching backend releases
         run: node scripts/verify-image-refresh-release.mjs "${{ inputs.code_commit }}"
@@ -117,7 +129,7 @@ jobs:
         run: bash scripts/r2_replay_shards.sh upload
 
       - name: Refresh development Draft Run image metadata
-        run: node scripts/refresh_card_backend_images.mjs "$DEV_IMPORT_API"
+        run: REQUIRE_SERVED_INVENTORY=1 node scripts/refresh_card_backend_images.mjs "$DEV_IMPORT_API"
 
       - name: Verify development gameplay
         run: |
@@ -128,7 +140,7 @@ jobs:
       - name: Refresh production Draft Run image metadata
         run: |
           node scripts/verify-image-refresh-release.mjs "${{ inputs.code_commit }}"
-          node scripts/refresh_card_backend_images.mjs "$PROD_IMPORT_API"
+          REQUIRE_SERVED_INVENTORY=1 node scripts/refresh_card_backend_images.mjs "$PROD_IMPORT_API"
 
       - name: Verify production gameplay
         run: |

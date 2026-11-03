@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {releasePlan} from '../scripts/card-image-release.mjs';
+import {releasePlan,completeAttemptsFor,WAIT_MINUTES} from '../scripts/card-image-release.mjs';
 
 test('card-image release plan is fixed dev -> prod -> image refresh',()=>{
   const commit='a'.repeat(40);
@@ -40,4 +40,14 @@ test('card-image release workflow cannot deploy directly or select arbitrary chi
   assert.match(source,/deploy-functions\.yml/);
   assert.match(source,/refresh-powered-cube-images\.yml/);
   assert.doesNotMatch(source,/process\.argv\[3\]|workflow=.*process|target=.*process/);
+});
+
+test('the release outwaits the full refresh job and fits inside its own job limit',()=>{
+  const refreshWorkflow=fs.readFileSync(new URL('../.github/workflows/refresh-powered-cube-images.yml',import.meta.url),'utf8');
+  const releaseWorkflow=fs.readFileSync(new URL('../.github/workflows/card-image-release.yml',import.meta.url),'utf8');
+  const refreshLimit=Number(refreshWorkflow.match(/if: inputs\.mode != 'targeted'[\s\S]*?timeout-minutes: (\d+)/)[1]);
+  const releaseLimit=Number(releaseWorkflow.match(/timeout-minutes: (\d+)/)[1]);
+  assert.ok(WAIT_MINUTES['refresh-powered-cube-images.yml']>refreshLimit,'the release must not give up before the refresh job can finish');
+  assert.ok(releaseLimit<=360&&releaseLimit>=refreshLimit+30);
+  assert.equal(completeAttemptsFor('refresh-powered-cube-images.yml'),WAIT_MINUTES['refresh-powered-cube-images.yml']*6);
 });

@@ -20,7 +20,9 @@ concurrency:
 jobs:
   release:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    # Two deploys plus a full development and production image refresh
+    # (up to 210 minutes). GitHub-hosted jobs stop at 360.
+    timeout-minutes: 350
     env:
       GH_TOKEN: ${{ github.token }}
     steps:

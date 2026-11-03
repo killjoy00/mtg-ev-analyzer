@@ -67,9 +67,11 @@ Custom-set practice requires P1P2–P1P8 coverage with at least 16 independent m
 
 ## Card-image maintenance
 
-Card-image repair is a separate explicit corpus mutation, not part of ingestion or lifecycle promotion. It is display-only, fail-closed, and serialized with other corpus writers. Regular environments prefer ordinary/base art from the intended set; Powered Cube uses the earliest ordinary/base printing globally. An original/only special-frame printing is allowed only when no ordinary alternative exists, while avoidable cosmetic selections remain publication blockers.
+Card-image repair is a separate explicit corpus mutation, not part of ingestion or lifecycle promotion. The art policy covers every card the backend serves in every registered environment, including trophy-only environments such as Reality Fracture that are not in the replay catalog: the full refresh collects the served inventory from development and production and fails if any served card is left without a policy selection ([coverage](CARD-IMAGE-MAINTENANCE.md#coverage-every-served-card-in-every-served-environment)). It is display-only, fail-closed, and serialized with other corpus writers. Regular environments prefer ordinary/base art from the intended set; Powered Cube uses the earliest ordinary/base printing globally. An original/only special-frame printing is allowed only when no ordinary alternative exists, while avoidable cosmetic selections remain publication blockers.
 
 Backend propagation is paged in idempotent 250-puzzle requests with an explicit cursor. Do not restore whole-environment refresh requests: large environments can exceed the authenticated import request timeout.
+
+Traditional component art that differs from Premier is not a card-image refresh case: it has its own Traditional-only repair and publication gate ([Traditional components](CARD-IMAGE-MAINTENANCE.md#traditional-components)).
 
 Current-serving image propagation includes the current parent corpus plus any `Live` supplemental component attached to that parent. Candidate/non-Live components and components under older parents are excluded. When a selected row belongs to a component, validate it against the row's stored component `corpus_version`; do not validate it against the parent version by default. This is a release-safety invariant, not just a test detail.
 
@@ -87,6 +89,8 @@ Current v6 supplemental identities are `traditional-premier-v6-phase2-v1` for re
 Component publication is parent-aware. A ready component under a Live parent can move Candidate -> Live; a ready component under a Candidate parent remains Candidate. In the November 1 v6 release this left SIR staged but non-serving; SIR has since been Retired. HBG, KTK and PIO failed their admission gates and have no v6 component; MH3 failed under v6 and its Traditional puzzles were dropped. Powered Cube serves only P1P2-P1P7 and FRA only P1P1-P1P6.
 
 Component releases use `publish-puzzle-components.yml`. Development must be staged before production is staged, and production publication requires development publication eligibility. Either development stage -> production stage -> development publish -> production publish or development stage -> development publish -> production stage -> production publish is valid. Every stage needs the identical artifact, puzzle counts and ratings in development.
+
+Every stage and publish verification also requires each Traditional card to show the same display fields (`image_url`, `mana_cost`, `rarity`, `type_line`, `display_faces`) as one of the Premier variants for that name in the same environment. A mismatch fails the release before anything goes Live. Repair it with `scripts/traditional-premier-art.mjs` on development and then production, never with the full card-image refresh. See [Traditional components](CARD-IMAGE-MAINTENANCE.md#traditional-components).
 
 Live Traditional components extend the same environment-level serving universe as retained Premier inventory. They do not replace the Premier parent or create a separate player-facing Traditional mode. Current new games use Live components only; existing schedules and sessions keep their pinned IDs and remain readable regardless of later component status.
 

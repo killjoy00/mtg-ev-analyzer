@@ -16,6 +16,7 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
+import os
 import time
 from pathlib import Path
 from typing import Optional
@@ -34,6 +35,11 @@ CATALOG_PATH = CORPUS_DIR / "catalog.json"
 CARD_IMAGES_PATH = CORPUS_DIR / "card-images.json"
 MAP_DIR = ROOT / "generated" / "card-image-refresh"
 REPORT_PATH = ROOT / "generated" / "card-image-refresh-report.json"
+# Every card name the backend serves per registered environment, collected by
+# scripts/collect_served_card_inventory.mjs. The replay catalog, checked-in
+# corpus samples and shards are not the whole served inventory, so the policy
+# must also resolve these. The release workflow requires the file.
+SERVED_INVENTORY_PATH = Path(os.environ.get("SERVED_INVENTORY_PATH") or ROOT / "generated" / "served-card-inventory.json")
 DISPLAY_FIELDS = ("image_url", "mana_cost", "rarity", "type_line", "display_faces")
 
 
@@ -85,7 +91,28 @@ def patch_cards(cards: list[dict], records: dict[str, dict], names_by_id: dict[s
     return output, changed
 
 
-def collect_inventory(catalog: dict) -> tuple[dict[str, set[str]], dict[str, set[str]]]:
+def load_served_inventory(path: Path = None, *, required: bool = False) -> dict[str, set[str]]:
+    path = path or SERVED_INVENTORY_PATH
+    if not path.exists():
+        if required:
+            raise ValueError(f"Served card inventory is required but missing: {path}")
+        return {}
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    environments = payload.get("environments")
+    if not isinstance(environments, dict) or not environments:
+        raise ValueError("Served card inventory has no environments.")
+    served: dict[str, set[str]] = {}
+    for sid, entry in environments.items():
+        names = entry.get("names") if isinstance(entry, dict) else None
+        if not sid or not isinstance(names, list) or not names or any(not isinstance(name, str) or not name for name in names):
+            raise ValueError(f"Served card inventory is invalid for {sid or '<unknown>'}.")
+        served[str(sid)] = set(names)
+    return served
+
+
+def collect_inventory(
+    catalog: dict, served: Optional[dict[str, set[str]]] = None
+) -> tuple[dict[str, set[str]], dict[str, set[str]]]:
     names_by_set: dict[str, set[str]] = {}
     names_by_id: dict[str, set[str]] = {}
     for entry in catalog.get("sets") or []:
@@ -116,6 +143,10 @@ def collect_inventory(catalog: dict) -> tuple[dict[str, set[str]], dict[str, set
                             names.add(name)
                         if name and card_id:
                             names_by_id.setdefault(card_id, set()).add(name)
+    # Served names extend catalog environments and add environments that have
+    # no replay catalog entry (trophy-only environments such as FRA).
+    for sid, names in (served or {}).items():
+        names_by_set.setdefault(sid, set()).update(names)
     return names_by_set, names_by_id
 
 
@@ -296,24 +327,33 @@ def mapping_entry(name: str, metadata: dict) -> dict:
 
 def main() -> int:
     catalog = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
-    names_by_set, names_by_id = collect_inventory(catalog)
+    served = load_served_inventory(required=os.environ.get("REQUIRE_SERVED_INVENTORY") == "1")
+    names_by_set, names_by_id = collect_inventory(catalog, served)
     records_by_set, global_records, selection_details = resolve_inventory(names_by_set)
     MAP_DIR.mkdir(parents=True, exist_ok=True)
 
     report = {
         "policy": "draft-booster-art-v1-bulk",
         "unique_card_names": len({name for names in names_by_set.values() for name in names}),
+        "served_inventory": bool(served),
         "sets": {},
         "card_id_name_collisions": {},
     }
 
-    for entry in catalog.get("sets") or []:
-        sid = entry["id"]
+    catalog_entries = {entry["id"]: entry for entry in catalog.get("sets") or []}
+    served_only = sorted(set(served) - set(catalog_entries))
+    for sid in [*catalog_entries, *served_only]:
+        entry = catalog_entries.get(sid)
         records = records_by_set.get(sid, {})
         unresolved = sorted(names_by_set[sid] - records.keys())
-        shard_files, shard_changes = patch_shards(sid, records, names_by_id)
-        puzzles, corpus_changes, sha = patch_verified_corpus(sid, records, names_by_id)
-        entry["sha256"] = sha
+        if entry is not None:
+            shard_files, shard_changes = patch_shards(sid, records, names_by_id)
+            puzzles, corpus_changes, sha = patch_verified_corpus(sid, records, names_by_id)
+            entry["sha256"] = sha
+        else:
+            # Trophy-only environment: no replay shards or checked-in corpus to
+            # patch. Its mapping still drives backend propagation.
+            shard_files, shard_changes, puzzles, corpus_changes, sha = 0, 0, 0, 0, None
         mapping = [mapping_entry(name, records[name]) for name in sorted(records) if records[name].get("image_url")]
         (MAP_DIR / f"{sid}.json").write_text(json.dumps(mapping, indent=2) + "\n", encoding="utf-8")
         special = {
@@ -345,9 +385,11 @@ def main() -> int:
             if sid != "powered-cube" and not detail.get("draft_source_bonus")
             and str(detail.get("selected_set") or "").lower() != sid.lower()
         }
-        if not unresolved and not special:
+        if entry is not None and not unresolved and not special:
             entry["unresolved_image_names"] = []
         report["sets"][sid] = {
+            "catalog": entry is not None,
+            "served_names": len(served.get(sid, ())),
             "card_names": len(names_by_set[sid]),
             "resolved_names": len(records),
             "unresolved_names": unresolved,
@@ -388,6 +430,8 @@ def main() -> int:
     cross_set_total = sum(len(item["cross_set_fallbacks"]) for item in report["sets"].values())
     summary = {
         "sets": len(report["sets"]),
+        "served_inventory": bool(served),
+        "served_only_sets": served_only,
         "unique_card_names": report["unique_card_names"],
         "unresolved_names": unresolved_total,
         "remaining_special_printings": special_total,
