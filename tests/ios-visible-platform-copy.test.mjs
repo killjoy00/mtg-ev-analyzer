@@ -30,8 +30,11 @@ test('account, privacy, and terms copy still cover website and mobile apps', () 
   const account = readFileSync(join(root, 'mobile/app/account.tsx'), 'utf8');
   const privacy = readFileSync(join(root, 'mobile/app/privacy.tsx'), 'utf8');
   const editorial = readFileSync(join(root, 'mobile/src/nativeEditorial.ts'), 'utf8');
+  const reminders = readFileSync(join(root, 'mobile/src/api/reminders.ts'), 'utf8');
   assert.match(account, /website and in the mobile apps/);
   assert.match(privacy, /website and in its mobile apps/);
   assert.match(editorial, /In the mobile apps, sign-in sessions/);
   assert.match(editorial, /These terms apply to the Pack One website and mobile apps/);
+  assert.match(reminders, /Push notifications require a supported mobile device/);
+  assert.doesNotMatch(reminders, /Push notifications are available on iOS and Android only/);
 });
