@@ -22,10 +22,10 @@ from pathlib import Path
 from typing import Optional
 
 try:
-    from fetch_card_metadata import aliases, fetch_named, image_url, metadata_for_alias, printing_rank, special_flags, draft_printing_priority
+    from fetch_card_metadata import aliases, fetch_named, image_url, metadata_for_alias, printing_rank, special_flags, draft_printing_priority, DRAFT_BONUS_PRINTINGS, DRAFT_BONUS_NONE, in_bonus_range, missing_bonus_decisions
     from refresh_powered_cube_images import all_printings
 except ModuleNotFoundError:
-    from scripts.fetch_card_metadata import aliases, fetch_named, image_url, metadata_for_alias, printing_rank, special_flags, draft_printing_priority
+    from scripts.fetch_card_metadata import aliases, fetch_named, image_url, metadata_for_alias, printing_rank, special_flags, draft_printing_priority, DRAFT_BONUS_PRINTINGS, DRAFT_BONUS_NONE, in_bonus_range, missing_bonus_decisions
     from scripts.refresh_powered_cube_images import all_printings
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -155,6 +155,7 @@ def resolve_inventory(
     *,
     allow_named_fallback: bool = True,
     diagnostics: Optional[dict] = None,
+    bonus_coverage: Optional[dict] = None,
 ) -> tuple[dict[str, dict[str, dict]], dict[str, dict], dict[str, dict]]:
     sets_by_name: dict[str, set[str]] = {}
     for sid, names in names_by_set.items():
@@ -173,6 +174,13 @@ def resolve_inventory(
 
     wanted = set(sets_by_name)
     for card in all_printings():
+        # Count bulk printings inside each registered bonus range during the
+        # same pass, so a wrong or empty range fails instead of silently
+        # sending that environment's guests to the cross-set fallback.
+        if bonus_coverage is not None:
+            for key in bonus_coverage:
+                if in_bonus_range(card, key[1], key[2]):
+                    bonus_coverage[key] += 1
         matched = set(aliases(card)) & wanted
         if not matched:
             continue
@@ -329,13 +337,37 @@ def main() -> int:
     catalog = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
     served = load_served_inventory(required=os.environ.get("REQUIRE_SERVED_INVENTORY") == "1")
     names_by_set, names_by_id = collect_inventory(catalog, served)
-    records_by_set, global_records, selection_details = resolve_inventory(names_by_set)
+    # Every served environment needs an explicit bonus-sheet decision before the
+    # policy can be applied to it: a registered draftable sheet, or "none".
+    undecided = missing_bonus_decisions(names_by_set)
+    if undecided:
+        raise SystemExit(
+            "No bonus-sheet decision for served environment(s) "
+            + ", ".join(undecided)
+            + ". Review their draft boosters and add DRAFT_BONUS_PRINTINGS or DRAFT_BONUS_NONE in scripts/fetch_card_metadata.py."
+        )
+    bonus_coverage = {
+        (sid, bonus_set, number_range): 0
+        for sid in names_by_set
+        for bonus_set, number_range in DRAFT_BONUS_PRINTINGS.get(sid, ())
+    }
+    records_by_set, global_records, selection_details = resolve_inventory(names_by_set, bonus_coverage=bonus_coverage)
+    empty_ranges = sorted(f"{sid}:{bonus_set}{list(number_range) if number_range else ''}" for (sid, bonus_set, number_range), hits in bonus_coverage.items() if not hits)
+    if empty_ranges:
+        raise SystemExit("Registered bonus-sheet range(s) match no Scryfall printing: " + ", ".join(empty_ranges))
     MAP_DIR.mkdir(parents=True, exist_ok=True)
 
     report = {
         "policy": "draft-booster-art-v1-bulk",
         "unique_card_names": len({name for names in names_by_set.values() for name in names}),
         "served_inventory": bool(served),
+        "bonus_sources": {
+            sid: [
+                {"set": bonus_set, "collector_numbers": list(number_range) if number_range else None, "bulk_printings": bonus_coverage[(sid, bonus_set, number_range)]}
+                for bonus_set, number_range in DRAFT_BONUS_PRINTINGS.get(sid, ())
+            ] or "none"
+            for sid in sorted(names_by_set)
+        },
         "sets": {},
         "card_id_name_collisions": {},
     }

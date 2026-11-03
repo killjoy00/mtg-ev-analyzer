@@ -39,8 +39,17 @@ The resolver must be deterministic with respect to API ordering. Ranking is base
 | TMT | PZA #1–20 | Non-source-material products |
 | SOS | SOA #1–65, SPG #149–158 | Japanese/silver-scroll SOA variants |
 | MSH | MAR #41–100 | Spider-Man's MAR #1–40 |
+| FRA | SPG #159–168 | Other SPG releases |
 
 Collector bounds were checked against Scryfall's printing records. Booster-source and variant distinctions are documented in Wizards' collecting guides for [MH3](https://magic.wizards.com/en/news/feature/collecting-modern-horizons-3), [DFT](https://magic.wizards.com/en/news/feature/collecting-aetherdrift), [TDM](https://magic.wizards.com/en/news/feature/collecting-tarkir-dragonstorm), [FIN](https://magic.wizards.com/en/news/feature/collecting-final-fantasy), [EOE](https://magic.wizards.com/en/news/feature/collecting-edge-of-eternities), [TLA](https://magic.wizards.com/en/news/feature/collecting-avatar-the-last-airbender), [ECL](https://magic.wizards.com/en/news/feature/collecting-lorwyn-eclipsed), [TMT](https://magic.wizards.com/en/news/feature/collecting-teenage-mutant-ninja-turtles), [SOS](https://magic.wizards.com/en/news/feature/collecting-secrets-of-strixhaven), and [MSH](https://magic.wizards.com/en/news/feature/collecting-marvel-super-heroes).
+
+FRA's Special Guests replace a common in 1 of 55 Play Boosters ([collecting guide](https://magic.wizards.com/news/feature/collecting-reality-fracture)). The guide does not state collector numbers; #159–168 continues SOS's #149–158 and matches the guide's image numbering, and was registered on November 3 after FRA had served for weeks without any entry. Each refresh report lists the selected set and collector number of every bonus selection, which is where this range is confirmed.
+
+#### Every served environment needs a bonus-sheet decision
+
+Each environment the backend serves must have an explicit decision in `scripts/fetch_card_metadata.py`: a registered draftable sheet in `DRAFT_BONUS_PRINTINGS`, or `DRAFT_BONUS_NONE`. The full refresh refuses to start while any served environment has neither, and it fails if a registered range matches no printing in Scryfall's bulk data. The report's `bonus_sources` records each decision with the number of bulk printings inside each range. This closes the gap that let FRA, which reached Live through the Traditional new-set path rather than the new-set release checklist, serve guest cards with no bonus-sheet review.
+
+Environments recorded with no draftable bonus sheet: KTK, DMU, SNC, NEO, ONE, LTR, HBG, HOB, PIO, LCI and Powered Cube. The evidence is that every served card in these environments resolves to the environment's own set, except four ONE praetors that resolve through the reported cross-set fallback.
 
 LCI's Special Guests were not in Draft Boosters, so LCI does not receive SPG priority. The List's reused `plst` code is not broadly eligible: unregistered inserts retain the ordinary-printing fallback and appear in the cross-set report. PIO's rotating sheets use PIO itself and already receive main-set priority.
 

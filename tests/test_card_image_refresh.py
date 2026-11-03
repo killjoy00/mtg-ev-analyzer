@@ -255,6 +255,29 @@ class CardImageRefreshTests(unittest.TestCase):
                 names_by_set, _ = refresh.collect_inventory({"sets": [{"id": "tla"}]})
                 self.assertNotIn("Lightning Bolt", names_by_set["tla"])
 
+    def test_every_served_environment_has_an_explicit_bonus_sheet_decision(self):
+        import json
+        from scripts import fetch_card_metadata as meta
+        catalog = json.loads(refresh.CATALOG_PATH.read_text(encoding="utf-8"))
+        served = {entry["id"] for entry in catalog["sets"]} | {"fra"}
+        self.assertEqual(meta.missing_bonus_decisions(served), [])
+        self.assertEqual(set(meta.DRAFT_BONUS_PRINTINGS) & meta.DRAFT_BONUS_NONE, set())
+        self.assertEqual(meta.missing_bonus_decisions(["fra", "zzz"]), ["zzz"])
+        # FRA's Special Guests are its verified draft bonus sheet.
+        guest = self.card("g", "spg", "2026-10-01", "https://img/g.jpg", collector_number="160")
+        self.assertEqual(meta.draft_printing_priority(guest, "fra"), 1)
+        self.assertEqual(meta.draft_printing_priority({**guest, "collector_number": "158"}, "fra"), 2)
+
+    def test_bonus_range_coverage_is_counted_during_the_bulk_pass(self):
+        printings = [
+            self.card("a", "spg", "2026-10-01", "https://img/a.jpg", collector_number="160"),
+            self.card("b", "spg", "2026-06-01", "https://img/b.jpg", collector_number="150"),
+        ]
+        coverage = {("fra", "spg", (159, 168)): 0, ("zzz", "spg", (900, 901)): 0}
+        with mock.patch.object(refresh, "all_printings", return_value=printings):
+            refresh.resolve_inventory({"fra": {"Alpha"}}, allow_named_fallback=False, bonus_coverage=coverage)
+        self.assertEqual(coverage, {("fra", "spg", (159, 168)): 1, ("zzz", "spg", (900, 901)): 0})
+
 
 if __name__ == "__main__":
     unittest.main()
