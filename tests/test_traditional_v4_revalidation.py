@@ -96,10 +96,14 @@ class TraditionalV4RevalidationTests(unittest.TestCase):
                 "name": "Celestial Colonnade", "layout": layout, "set": set_code,
                 "set_type": set_type, "released_at": released, "collector_number": number,
                 "lang": "en", "rarity": "rare", "type_line": "Land", "id": set_code,
+                "games": ["paper", "arena"],
                 "image_uris": {"normal": f"https://img.test/{set_code}.jpg"},
                 "prints_search_uri": prints,
             }
 
+        # EOS shipped with EOE (same release day, on Arena), so it is EOE's
+        # draft source; the shared resolver reads set release dates.
+        sys.modules[current.choose_main_printing.__module__].register_set_releases({"eoe": "2025-08-01"}, complete=True)
         art_series = card("aeoe", "memorabilia", "2025-08-01", "40", "art_series")
         pages = {
             "https://api.scryfall.com/cards/named?exact=Celestial%20Colonnade": art_series,

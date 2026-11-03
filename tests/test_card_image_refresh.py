@@ -4,7 +4,14 @@ from unittest import mock
 from scripts import refresh_card_images as refresh
 
 
+RELEASES = {"otj": "2024-04-19", "fra": "2026-10-02", "sos": "2026-04-24", "abc": "2026-01-01", "ktk": "2014-09-26"}
+
+
 class CardImageRefreshTests(unittest.TestCase):
+    def setUp(self):
+        from scripts import fetch_card_metadata as meta
+        meta.register_set_releases(RELEASES, complete=True)
+
     def card(self, card_id, set_code, released_at, image, **overrides):
         card = {
             "id": card_id,
@@ -58,7 +65,7 @@ class CardImageRefreshTests(unittest.TestCase):
         otp = self.card("otp-ride-down", "otp", "2024-04-19",
                         "https://img/ride-down-otp.jpg", name="Ride Down",
                         collector_number="52", border_color="borderless",
-                        frame_effects=["inverted"])
+                        frame_effects=["inverted"], games=["paper", "arena"], set_type="masterpiece")
         with mock.patch.object(refresh, "all_printings", return_value=iter([old, otp])):
             by_set, global_records, details = refresh.resolve_inventory({
                 "otj": {"Ride Down"},
@@ -73,16 +80,17 @@ class CardImageRefreshTests(unittest.TestCase):
         self.assertFalse(details["otj"]["Ride Down"]["special_unavoidable"])
         self.assertEqual(details["powered-cube"], {})
 
-    def test_bonus_sheet_refresh_rejects_collector_only_variant(self):
+    def test_bonus_sheet_base_number_beats_plainer_collector_variant(self):
         old = self.card("old", "ktk", "2014-09-26", "https://img/old.jpg",
                         name="Ride Down")
         standard = self.card("otp-standard", "otp", "2024-04-19",
                              "https://img/otp-standard.jpg", name="Ride Down",
                              collector_number="52", border_color="borderless",
-                             frame_effects=["showcase"])
+                             frame_effects=["showcase"], games=["arena"], set_type="masterpiece")
+        # Collector variants are numbered after the sheet and may look plainer.
         variant = self.card("otp-variant", "otp", "2024-04-19",
                             "https://img/otp-variant.jpg", name="Ride Down",
-                            collector_number="70")
+                            collector_number="70", games=["arena"], set_type="masterpiece")
         with mock.patch.object(refresh, "all_printings",
                                return_value=iter([variant, old, standard])):
             by_set, global_records, details = refresh.resolve_inventory({
@@ -255,29 +263,78 @@ class CardImageRefreshTests(unittest.TestCase):
                 names_by_set, _ = refresh.collect_inventory({"sets": [{"id": "tla"}]})
                 self.assertNotIn("Lightning Bolt", names_by_set["tla"])
 
-    def test_every_served_environment_has_an_explicit_bonus_sheet_decision(self):
-        import json
+    def test_same_release_arena_printings_are_draft_sources(self):
         from scripts import fetch_card_metadata as meta
-        catalog = json.loads(refresh.CATALOG_PATH.read_text(encoding="utf-8"))
-        served = {entry["id"] for entry in catalog["sets"]} | {"fra"}
-        self.assertEqual(meta.missing_bonus_decisions(served), [])
-        self.assertEqual(set(meta.DRAFT_BONUS_PRINTINGS) & meta.DRAFT_BONUS_NONE, set())
-        self.assertEqual(meta.missing_bonus_decisions(["fra", "zzz"]), ["zzz"])
-        # FRA's Special Guests are its verified draft bonus sheet.
-        guest = self.card("g", "spg", "2026-10-01", "https://img/g.jpg", collector_number="160")
+        guest = self.card("g", "spg", "2026-10-02", "https://img/g.jpg", collector_number="160",
+                          games=["paper", "arena"], set_type="masterpiece")
+        # FRA's Special Guests shipped with FRA on Arena: no per-set entry needed.
         self.assertEqual(meta.draft_printing_priority(guest, "fra"), 1)
-        self.assertEqual(meta.draft_printing_priority({**guest, "collector_number": "158"}, "fra"), 2)
+        # Another release's guest, a paper-only printing, and same-day Commander
+        # or Jumpstart products are not draft sources.
+        self.assertEqual(meta.draft_printing_priority({**guest, "released_at": "2026-04-24"}, "fra"), 2)
+        self.assertEqual(meta.draft_printing_priority({**guest, "games": ["paper", "mtgo"]}, "fra"), 2)
+        for set_type in ("commander", "draft_innovation", "alchemy", "box", "token"):
+            self.assertEqual(meta.draft_printing_priority({**guest, "set_type": set_type}, "fra"), 2, set_type)
+        # An environment with no known release date gets no draft-source tier.
+        self.assertEqual(meta.draft_printing_priority(guest, "zzz"), 2)
 
-    def test_bonus_range_coverage_is_counted_during_the_bulk_pass(self):
-        printings = [
-            self.card("a", "spg", "2026-10-01", "https://img/a.jpg", collector_number="160"),
-            self.card("b", "spg", "2026-06-01", "https://img/b.jpg", collector_number="150"),
-        ]
-        coverage = {("fra", "spg", (159, 168)): 0, ("zzz", "spg", (900, 901)): 0}
-        with mock.patch.object(refresh, "all_printings", return_value=printings):
-            refresh.resolve_inventory({"fra": {"Alpha"}}, allow_named_fallback=False, bonus_coverage=coverage)
-        self.assertEqual(coverage, {("fra", "spg", (159, 168)): 1, ("zzz", "spg", (900, 901)): 0})
+    def test_arena_substitute_guest_replaces_the_original_printing(self):
+        # On Arena, Library of Alexandria (SPG 158a) replaces SOS's paper guest
+        # Library of Leng (SPG 158).
+        original = self.card("loa-arn", "arn", "1993-12-17", "https://img/loa-arn.jpg",
+                             name="Library of Alexandria", collector_number="76")
+        arena = self.card("loa-spg", "spg", "2026-04-24", "https://img/loa-spg.jpg",
+                          name="Library of Alexandria", collector_number="158a", digital=True,
+                          border_color="borderless", games=["arena"], set_type="masterpiece")
+        with mock.patch.object(refresh, "all_printings", return_value=iter([original, arena])):
+            by_set, _, details = refresh.resolve_inventory({"sos": {"Library of Alexandria"}}, allow_named_fallback=False)
+        self.assertEqual(by_set["sos"]["Library of Alexandria"]["image_url"], "https://img/loa-spg.jpg")
+        self.assertEqual(refresh.printing_choices(details), {"sos": {"Library of Alexandria": "spg/158a"}})
 
+    def test_printing_choices_differences_need_review(self):
+        details = {
+            "sos": {"A": {"selected_set": "SPG", "collector_number": "158a"},
+                    "Main": {"selected_set": "sos", "collector_number": "1", "special_flags": ["showcase"]}},
+            "powered-cube": {"Cube": {"selected_set": "lea", "collector_number": "1"}},
+        }
+        choices = refresh.printing_choices(details)
+        # Own-set choices and Powered Cube (global earliest printing) are not recorded.
+        self.assertEqual(choices, {"sos": {"A": "spg/158a"}})
+        names = {"sos": {"A", "B", "C"}, "powered-cube": {"Cube"}}
+        self.assertEqual(refresh.compare_printing_choices(choices, choices, names), {"added": [], "changed": [], "removed": []})
+        recorded = {"sos": {"A": "arn/76", "B": "soa/1", "Gone": "soa/2"}, "old": {"X": "y/1"}}
+        current = {"sos": {"A": "spg/158a", "C": "spg/150"}}
+        # Names and environments that are no longer served are dropped silently.
+        self.assertEqual(refresh.compare_printing_choices(recorded, current, names), {
+            "added": [["sos", "C", "spg/150"]],
+            "changed": [["sos", "A", "arn/76", "spg/158a"]],
+            "removed": [["sos", "B", "soa/1"]],
+        })
+        self.assertEqual(refresh.compare_printing_choices({}, current, names)["added"], [["sos", "A", "spg/158a"], ["sos", "C", "spg/150"]])
+
+    def test_printing_record_round_trips_and_covers_reviewed_choices(self):
+        import json
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "card-printings.json"
+            refresh.write_printing_record(path, {"sos": {"A": "spg/158a"}})
+            self.assertEqual(refresh.load_printing_record(path), {"sos": {"A": "spg/158a"}})
+            self.assertEqual(refresh.load_printing_record(Path(tmp) / "missing.json"), {})
+        record = refresh.load_printing_record()
+        catalog = json.loads(refresh.CATALOG_PATH.read_text(encoding="utf-8"))
+        environments = {entry["id"] for entry in catalog["sets"]} | {"fra"}
+        self.assertLessEqual(set(record), environments)
+        self.assertNotIn("powered-cube", record)
+        for sid, choices in record.items():
+            for name, printing in choices.items():
+                self.assertRegex(printing, r"^[a-z0-9]+/[0-9]+[a-z]?$", f"{sid}: {name}")
+                self.assertFalse(printing.startswith(sid + "/"), f"{sid}: {name}")
+        self.assertEqual(record["sos"]["Library of Alexandria"], "spg/158a")
+        self.assertEqual(sorted(int(p.split("/")[1]) for p in record["fra"].values()), list(range(159, 169)))
+        self.assertEqual(record["msh"]["Counterspell"], "mar/52")
+        self.assertEqual(record["tla"]["Lightning Bolt"], "tle/32")
+        self.assertEqual(record["ecl"]["Bitterblossom"], "spg/133")
 
 if __name__ == "__main__":
     unittest.main()

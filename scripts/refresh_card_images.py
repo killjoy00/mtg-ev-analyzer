@@ -7,9 +7,11 @@ asserting that puzzle identity, scoring, probabilities, provenance, and draft
 trajectories remain unchanged.
 
 Scryfall's default_cards bulk export is downloaded once. Regular draft sets
-prefer their main-set base printings, then verified bonus-sheet base printings,
-then the earliest ordinary printing for that exact card identity. Powered Cube
-uses the global earliest-base policy directly.
+prefer their main-set base printings, then the Arena printing released with the
+set (bonus sheets, Special Guests, Arena substitutions), then the earliest
+ordinary printing for that exact card identity. Powered Cube uses the global
+earliest-base policy directly. Every choice outside an environment's own set
+must match the reviewed record in corpus/draft-run/card-printings.json.
 """
 from __future__ import annotations
 
@@ -22,10 +24,10 @@ from pathlib import Path
 from typing import Optional
 
 try:
-    from fetch_card_metadata import aliases, fetch_named, image_url, metadata_for_alias, printing_rank, special_flags, draft_printing_priority, DRAFT_BONUS_PRINTINGS, DRAFT_BONUS_NONE, in_bonus_range, missing_bonus_decisions
+    from fetch_card_metadata import aliases, fetch_named, image_url, metadata_for_alias, printing_rank, special_flags, draft_printing_priority
     from refresh_powered_cube_images import all_printings
 except ModuleNotFoundError:
-    from scripts.fetch_card_metadata import aliases, fetch_named, image_url, metadata_for_alias, printing_rank, special_flags, draft_printing_priority, DRAFT_BONUS_PRINTINGS, DRAFT_BONUS_NONE, in_bonus_range, missing_bonus_decisions
+    from scripts.fetch_card_metadata import aliases, fetch_named, image_url, metadata_for_alias, printing_rank, special_flags, draft_printing_priority
     from scripts.refresh_powered_cube_images import all_printings
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -41,6 +43,11 @@ REPORT_PATH = ROOT / "generated" / "card-image-refresh-report.json"
 # must also resolve these. The release workflow requires the file.
 SERVED_INVENTORY_PATH = Path(os.environ.get("SERVED_INVENTORY_PATH") or ROOT / "generated" / "served-card-inventory.json")
 DISPLAY_FIELDS = ("image_url", "mana_cost", "rarity", "type_line", "display_faces")
+# Reviewed printing choices outside each environment's own set. The refresh
+# refuses to publish when its choices differ, and writes the proposed record to
+# diagnostics so the difference can be reviewed and committed.
+PRINTINGS_PATH = CORPUS_DIR / "card-printings.json"
+PROPOSED_PRINTINGS_PATH = ROOT / "generated" / "card-printings-proposed.json"
 
 
 def read_corpus(path: Path) -> list[dict]:
@@ -155,7 +162,6 @@ def resolve_inventory(
     *,
     allow_named_fallback: bool = True,
     diagnostics: Optional[dict] = None,
-    bonus_coverage: Optional[dict] = None,
 ) -> tuple[dict[str, dict[str, dict]], dict[str, dict], dict[str, dict]]:
     sets_by_name: dict[str, set[str]] = {}
     for sid, names in names_by_set.items():
@@ -174,13 +180,6 @@ def resolve_inventory(
 
     wanted = set(sets_by_name)
     for card in all_printings():
-        # Count bulk printings inside each registered bonus range during the
-        # same pass, so a wrong or empty range fails instead of silently
-        # sending that environment's guests to the cross-set fallback.
-        if bonus_coverage is not None:
-            for key in bonus_coverage:
-                if in_bonus_range(card, key[1], key[2]):
-                    bonus_coverage[key] += 1
         matched = set(aliases(card)) & wanted
         if not matched:
             continue
@@ -329,6 +328,65 @@ def patch_verified_corpus(
     return len(rows), changed_cards, sha
 
 
+def printing_choices(selection_details: dict[str, dict]) -> dict[str, dict[str, str]]:
+    """Choices outside each environment's own set, as "set/collector_number".
+
+    Powered Cube is a cube, not a booster: it always uses the global earliest
+    printing, so it has no draft-source choices to review.
+    """
+    choices: dict[str, dict[str, str]] = {}
+    for sid, details in selection_details.items():
+        if sid == "powered-cube":
+            continue
+        picked = {
+            name: f"{str(detail.get('selected_set') or '').lower()}/{detail.get('collector_number')}"
+            for name, detail in details.items()
+            if str(detail.get("selected_set") or "").lower() != sid.lower()
+        }
+        if picked:
+            choices[sid] = dict(sorted(picked.items()))
+    return dict(sorted(choices.items()))
+
+
+def load_printing_record(path: Path = None) -> dict[str, dict[str, str]]:
+    path = path or PRINTINGS_PATH
+    if not path.exists():
+        return {}
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    environments = payload.get("environments")
+    if not isinstance(environments, dict):
+        raise ValueError(f"Card printing record is invalid: {path}")
+    return {str(sid): dict(choices) for sid, choices in environments.items()}
+
+
+def compare_printing_choices(
+    recorded: dict[str, dict[str, str]],
+    current: dict[str, dict[str, str]],
+    names_by_set: dict[str, set[str]],
+) -> dict[str, list]:
+    """Differences that need review. Names no longer served are dropped."""
+    added, changed, removed = [], [], []
+    for sid in sorted(names_by_set):
+        if sid == "powered-cube":
+            continue
+        before, after = recorded.get(sid, {}), current.get(sid, {})
+        for name in sorted(after):
+            if name not in before:
+                added.append([sid, name, after[name]])
+            elif before[name] != after[name]:
+                changed.append([sid, name, before[name], after[name]])
+        for name in sorted(before):
+            if name not in after and name in names_by_set[sid]:
+                removed.append([sid, name, before[name]])
+    return {"added": added, "changed": changed, "removed": removed}
+
+
+def write_printing_record(path: Path, choices: dict[str, dict[str, str]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {"policy": "same-release-arena-printings-v1", "environments": choices}
+    path.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
 def mapping_entry(name: str, metadata: dict) -> dict:
     return {"name": name, **{key: metadata[key] for key in DISPLAY_FIELDS if key in metadata}}
 
@@ -337,37 +395,30 @@ def main() -> int:
     catalog = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
     served = load_served_inventory(required=os.environ.get("REQUIRE_SERVED_INVENTORY") == "1")
     names_by_set, names_by_id = collect_inventory(catalog, served)
-    # Every served environment needs an explicit bonus-sheet decision before the
-    # policy can be applied to it: a registered draftable sheet, or "none".
-    undecided = missing_bonus_decisions(names_by_set)
-    if undecided:
+    records_by_set, global_records, selection_details = resolve_inventory(names_by_set)
+    # Every printing chosen outside an environment's own set must match the
+    # reviewed record before anything is written. A new set, a new Scryfall
+    # printing or a policy change shows up here as a difference to review.
+    choices = printing_choices(selection_details)
+    write_printing_record(PROPOSED_PRINTINGS_PATH, choices)
+    differences = compare_printing_choices(load_printing_record(), choices, names_by_set)
+    if any(differences.values()):
+        print(json.dumps({"card_printing_changes": differences}, ensure_ascii=False, sort_keys=True))
         raise SystemExit(
-            "No bonus-sheet decision for served environment(s) "
-            + ", ".join(undecided)
-            + ". Review their draft boosters and add DRAFT_BONUS_PRINTINGS or DRAFT_BONUS_NONE in scripts/fetch_card_metadata.py."
+            "Card printing choices outside the environments' own sets differ from "
+            "corpus/draft-run/card-printings.json (added "
+            f"{len(differences['added'])}, changed {len(differences['changed'])}, removed {len(differences['removed'])}). "
+            "Review generated/card-printings-proposed.json in the refresh diagnostics and commit it as "
+            "corpus/draft-run/card-printings.json if the choices are right."
         )
-    bonus_coverage = {
-        (sid, bonus_set, number_range): 0
-        for sid in names_by_set
-        for bonus_set, number_range in DRAFT_BONUS_PRINTINGS.get(sid, ())
-    }
-    records_by_set, global_records, selection_details = resolve_inventory(names_by_set, bonus_coverage=bonus_coverage)
-    empty_ranges = sorted(f"{sid}:{bonus_set}{list(number_range) if number_range else ''}" for (sid, bonus_set, number_range), hits in bonus_coverage.items() if not hits)
-    if empty_ranges:
-        raise SystemExit("Registered bonus-sheet range(s) match no Scryfall printing: " + ", ".join(empty_ranges))
+    write_printing_record(PRINTINGS_PATH, choices)
     MAP_DIR.mkdir(parents=True, exist_ok=True)
 
     report = {
-        "policy": "draft-booster-art-v1-bulk",
+        "policy": "draft-booster-art-v2-same-release-arena",
         "unique_card_names": len({name for names in names_by_set.values() for name in names}),
         "served_inventory": bool(served),
-        "bonus_sources": {
-            sid: [
-                {"set": bonus_set, "collector_numbers": list(number_range) if number_range else None, "bulk_printings": bonus_coverage[(sid, bonus_set, number_range)]}
-                for bonus_set, number_range in DRAFT_BONUS_PRINTINGS.get(sid, ())
-            ] or "none"
-            for sid in sorted(names_by_set)
-        },
+        "printing_choices": choices,
         "sets": {},
         "card_id_name_collisions": {},
     }
