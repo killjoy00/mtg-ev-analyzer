@@ -58,7 +58,7 @@ export const privacySections: ArticleSection[] = [
     title: 'What Pack One stores',
     body: [
       'Pack One keeps the information needed to run the game and remember your progress. On the website, that includes first-party cookies for player and account sessions and request security, plus browser storage for guest identity, game history, preferences, Daily history, and temporary product or sign-in flow state. Guest play is tied to a Pack One player identifier so progress can continue across visits. If you later sign in, eligible guest progress is merged into the account under Pack One’s existing ownership rules.',
-      'In the iPhone, iPad and Android apps, sign-in sessions, in-progress shared runs, and similar recovery state are kept in device secure storage. Gameplay records, account-linked progress, memberships, and other server-backed features are stored by Pack One’s backend services.',
+      'In the mobile apps, sign-in sessions, in-progress shared runs, and similar recovery state are kept in device secure storage. Gameplay records, account-linked progress, memberships, and other server-backed features are stored by Pack One’s backend services.',
     ],
   },
   {
@@ -140,7 +140,7 @@ export const termsSections: ArticleSection[] = [
     title: 'Use of the site',
     body: [
       'Pack One is provided as an educational and entertainment tool for comparing Limited draft decisions. Scores and model support are informational. They are not guarantees of tournament results, card value, or financial return.',
-      'These terms apply to the Pack One website and the Pack One apps for iPhone, iPad and Android.',
+      'These terms apply to the Pack One website and mobile apps.',
     ],
   },
   {
