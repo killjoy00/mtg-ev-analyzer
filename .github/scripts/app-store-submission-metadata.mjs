@@ -63,6 +63,8 @@ function descriptionWithRequiredLegalLinks(value){
   const footerIndex=description.indexOf(footerMarker);
   if(footerIndex>=0)description=description.slice(0,footerIndex).trimEnd();
   description=description.replace('See packone.pro/terms/ for attribution and source-license details.','See https://packone.pro/terms/ for attribution and source-license details.');
+  description=description.replace('Your Pack One account works across web, iPhone, iPad, and Android.','Your Pack One account works across the Pack One website, iPhone, and iPad.');
+  if(/\bAndroid\b/i.test(description))throw Error('iOS App Store description must not reference Android.');
   if(!description)throw Error('App Store description is unexpectedly empty.');
   return `${description}\n\n${legalFooter}`;
 }
