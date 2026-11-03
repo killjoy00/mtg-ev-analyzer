@@ -61,9 +61,11 @@ The policy applies to everything players can be served, not only to the replay s
 
 The refresh now works from the served inventory:
 
-1. `scripts/collect_served_card_inventory.mjs` asks the development and production backends (`image-environments`, `image-inventory`) for every registered environment that serves puzzles and every card name served in it: current-parent Premier rows plus Live components, candidates and prior picks. An environment is registered when it is in the catalog or the serving policy lists it as Live or Candidate. Inventory requests are paged by puzzle id (2,000 puzzles per request), like image refresh pages; the first release with this check failed on development when an unpaged whole-environment inventory request stalled past the 120-second client timeout.
+1. `scripts/collect_served_card_inventory.mjs` asks the development and production backends (`image-environments`, `image-inventory`) for every registered environment that serves puzzles and every card name served in it: current-parent Premier rows plus Live components, candidates and prior picks. An environment is registered when it is in the catalog or the serving policy lists it as Live or Candidate. Inventory requests are paged by puzzle id (2,000 puzzles per request), like image refresh pages.
 2. `scripts/refresh_card_images.py` resolves the policy for the union of the served names, the corpus sample and the shards. Environments outside the catalog get a mapping but have no shards or checked-in corpus to patch. In the release workflow the inventory is required (`REQUIRE_SERVED_INVENTORY=1`); a missing or empty inventory stops the refresh.
-3. `scripts/refresh_card_backend_images.mjs` propagates every environment in the catalog or the inventory, then re-reads each environment's served names and fails if any has no policy selection, before image markers are normalized.
+3. `scripts/refresh_card_backend_images.mjs` first checks every environment's mapping against the collected inventory and stops before writing anything if any served card has no policy selection. It then propagates every environment in the catalog or the inventory.
+
+The first two November 3 releases instead re-read each environment's served names from the backend after propagating it. On both runs, an inventory request issued right after KTK's development refresh page stalled past the 120-second client timeout through all retries, although the same requests completed throughout collection and the query takes about a second when run directly. The cause was not established, so the re-read was removed: it duplicated the policy step's check. Production was not changed by either failed run. Most corpus writers share the `packone-corpus-mutation` lock with the refresh, but the weekly Corpus Operations import does not; cards from a snapshot it publishes during a refresh are covered by the next refresh, whose checks include them.
 
 Unresolved names still fail the refresh, and served names are now part of that check, so a served card the policy cannot resolve blocks publication instead of being skipped.
 
@@ -84,7 +86,7 @@ Image maintenance may change only:
 The all-Pack-One refresh refuses publication when any of the following remain:
 
 - unresolved served card names, including names that only the backend's served inventory contains;
-- a served card that has no policy selection after propagation (checked per environment on development and production);
+- a served card that has no policy selection (checked against the collected inventory before propagation writes anything);
 - an avoidable cosmetic/special printing where an ordinary printing exists;
 - ambiguous card-ID/name mappings;
 - test-suite or production-data audit failures;
@@ -192,8 +194,8 @@ The refresh then:
 5. retains diagnostics, including the served inventory;
 6. re-verifies marked development/production backend revisions;
 7. publishes normalized replay shards to R2;
-8. refreshes development backend image metadata, fails if any served card has no policy selection, and verifies gameplay;
-9. re-verifies the production release marker, refreshes production image metadata with the same coverage check, and verifies gameplay;
+8. checks every served card has a policy selection, refreshes development backend image metadata and verifies gameplay;
+9. re-verifies the production release marker, repeats the coverage check, refreshes production image metadata and verifies gameplay;
 10. publishes the refreshed checked-in corpus/card-image source of truth through a pull request.
 
 The corpus-writer concurrency group serializes this with other corpus mutations. A failed normalization or verification stops before later publication stages.
