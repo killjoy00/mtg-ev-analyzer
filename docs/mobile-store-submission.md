@@ -98,7 +98,7 @@ Everyone gets the same decisions for each Daily, so scores are directly comparab
 
 Keep practicing between Dailies with regular random runs. A free Pack One account adds leaderboard participation, career history, and cross-device continuity.
 
-Your Pack One account works across web, iPhone, iPad, and Android. Sign in with Apple, Google, or email. Account deletion is available in the app.
+Your Pack One account works across the Pack One website, iPhone, and iPad. Sign in with Apple, Google, or email. Account deletion is available in the app.
 
 Pack One is unofficial Fan Content permitted under the Wizards Fan Content Policy and is not approved or endorsed by Wizards. Card metadata and images are sourced from Scryfall. See https://packone.pro/terms/ for attribution and source-license details.
 
