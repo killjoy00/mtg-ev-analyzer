@@ -215,6 +215,46 @@ class CardImageRefreshTests(unittest.TestCase):
         self.assertEqual(updated["image_url"], "https://img/main.jpg")
         self.assertEqual(refresh.scrub_card(updated), refresh.scrub_card(original))
 
+    def test_served_inventory_adds_names_and_trophy_only_environments(self):
+        import json, tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "served.json"
+            path.write_text(json.dumps({"environments": {
+                "fra": {"catalog": False, "names": ["Countersculpt"]},
+                "tla": {"catalog": True, "names": ["Lightning Bolt"]},
+            }}), encoding="utf-8")
+            served = refresh.load_served_inventory(path)
+            self.assertEqual(served, {"fra": {"Countersculpt"}, "tla": {"Lightning Bolt"}})
+            names_by_set, names_by_id = refresh.collect_inventory({"sets": []}, served)
+            self.assertEqual(names_by_set, {"fra": {"Countersculpt"}, "tla": {"Lightning Bolt"}})
+            self.assertEqual(names_by_id, {})
+            # The release requires the inventory; a missing file is not silently ignored.
+            with self.assertRaisesRegex(ValueError, "required but missing"):
+                refresh.load_served_inventory(Path(tmp) / "absent.json", required=True)
+            self.assertEqual(refresh.load_served_inventory(Path(tmp) / "absent.json"), {})
+            path.write_text(json.dumps({"environments": {"fra": {"names": []}}}), encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "invalid for fra"):
+                refresh.load_served_inventory(path)
+
+    def test_served_names_join_catalog_names_for_policy_resolution(self):
+        import gzip, json, tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as tmp:
+            corpus, data = Path(tmp) / "corpus", Path(tmp) / "data"
+            (data / "tla" / "shards").mkdir(parents=True)
+            corpus.mkdir()
+            (corpus / "tla.json.gz").write_bytes(gzip.compress(json.dumps(
+                [{"candidates": [{"id": "alpha", "name": "Alpha"}], "prior_picks": []}]).encode()))
+            (data / "tla" / "shards" / "0.json").write_text(json.dumps(
+                {"replays": [{"picks": [{"candidates": [{"id": "beta", "name": "Beta"}]}]}]}), encoding="utf-8")
+            with mock.patch.object(refresh, "CORPUS_DIR", corpus), mock.patch.object(refresh, "DATA_DIR", data):
+                names_by_set, _ = refresh.collect_inventory({"sets": [{"id": "tla"}]}, {"tla": {"Lightning Bolt"}})
+                self.assertEqual(names_by_set["tla"], {"Alpha", "Beta", "Lightning Bolt"})
+                # Without the served inventory, a served card outside the samples is invisible.
+                names_by_set, _ = refresh.collect_inventory({"sets": [{"id": "tla"}]})
+                self.assertNotIn("Lightning Bolt", names_by_set["tla"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -67,7 +67,7 @@ Custom-set practice requires P1P2–P1P8 coverage with at least 16 independent m
 
 ## Card-image maintenance
 
-Card-image repair is a separate explicit corpus mutation, not part of ingestion or lifecycle promotion. It is display-only, fail-closed, and serialized with other corpus writers. Regular environments prefer ordinary/base art from the intended set; Powered Cube uses the earliest ordinary/base printing globally. An original/only special-frame printing is allowed only when no ordinary alternative exists, while avoidable cosmetic selections remain publication blockers.
+Card-image repair is a separate explicit corpus mutation, not part of ingestion or lifecycle promotion. The art policy covers every card the backend serves in every registered environment, including trophy-only environments such as Reality Fracture that are not in the replay catalog: the full refresh collects the served inventory from development and production and fails if any served card is left without a policy selection ([coverage](CARD-IMAGE-MAINTENANCE.md#coverage-every-served-card-in-every-served-environment)). It is display-only, fail-closed, and serialized with other corpus writers. Regular environments prefer ordinary/base art from the intended set; Powered Cube uses the earliest ordinary/base printing globally. An original/only special-frame printing is allowed only when no ordinary alternative exists, while avoidable cosmetic selections remain publication blockers.
 
 Backend propagation is paged in idempotent 250-puzzle requests with an explicit cursor. Do not restore whole-environment refresh requests: large environments can exceed the authenticated import request timeout.
 

@@ -46,6 +46,18 @@ LCI's Special Guests were not in Draft Boosters, so LCI does not receive SPG pri
 
 Future trophy/component imports must seed card metadata from the environment being built, not from an arbitrary other environment that happens to contain the same card name. Retained per-build image caches may fill missing metadata but may not override current environment-scoped shard metadata. Any true miss is resolved through the shared exact-name selector with that environment as the preferred set (or with no preferred set for Powered Cube).
 
+### Coverage: every served card in every served environment
+
+The policy applies to everything players can be served, not only to the replay samples. Before November 3 the refresh built its card list from the checked-in corpus sample and the replay shards, and only for environments in the Draft Run catalog. Backend propagation then updated only the names in that list, so any served card outside it kept whatever art it was imported with. That left 17 guest and bonus-sheet cards in ECL, MSH, TLA and TMT, and all of Reality Fracture (FRA, which is trophy-only and not in the catalog), outside the policy.
+
+The refresh now works from the served inventory:
+
+1. `scripts/collect_served_card_inventory.mjs` asks the development and production backends (`image-environments`, `image-inventory`) for every registered environment that serves puzzles and every card name served in it: current-parent Premier rows plus Live components, candidates and prior picks. An environment is registered when it is in the catalog or the serving policy lists it as Live or Candidate.
+2. `scripts/refresh_card_images.py` resolves the policy for the union of the served names, the corpus sample and the shards. Environments outside the catalog get a mapping but have no shards or checked-in corpus to patch. In the release workflow the inventory is required (`REQUIRE_SERVED_INVENTORY=1`); a missing or empty inventory stops the refresh.
+3. `scripts/refresh_card_backend_images.mjs` propagates every environment in the catalog or the inventory, then re-reads each environment's served names and fails if any has no policy selection, before image markers are normalized.
+
+Unresolved names still fail the refresh, and served names are now part of that check, so a served card the policy cannot resolve blocks publication instead of being skipped.
+
 ## Display-only mutation boundary
 
 Image maintenance may change only:
@@ -62,7 +74,8 @@ Image maintenance may change only:
 
 The all-Pack-One refresh refuses publication when any of the following remain:
 
-- unresolved served card names;
+- unresolved served card names, including names that only the backend's served inventory contains;
+- a served card that has no policy selection after propagation (checked per environment on development and production);
 - an avoidable cosmetic/special printing where an ordinary printing exists;
 - ambiguous card-ID/name mappings;
 - test-suite or production-data audit failures;
@@ -87,6 +100,8 @@ REPAIR_ENVIRONMENTS='powered-cube' \
 python scripts/repair_card_image.py --dry-run
 cat generated/card-image-repair/report.json
 ```
+
+Targeted repair only covers catalog environments and cards present in both the checked-in corpus sample and the hydrated shards; it refuses anything else. Cards that only the served inventory contains, and environments outside the catalog such as FRA, are covered by the full refresh.
 
 The dry-run requires the same R2 read credentials as shard hydration. It validates exact catalog environment ids, exact case-sensitive served-name presence in both checked-in corpus and the selected environments' hydrated shards, global card-id/name collisions across every hydrated environment, and the deterministic bulk selector. Targeted mode never sends operator card text through Scryfall named/fuzzy resolution; a bulk miss fails closed and should be handled through the full refresh path instead.
 
@@ -141,7 +156,7 @@ node scripts/traditional-premier-art.mjs <connection-file> repair [set ...]
 
 It covers Candidate and Live components of the current parent (all of them when no set is named). `repair` replaces the five display keys only on cards that match no Premier variant, using the most frequent variant (ties broken by canonical text). It keeps every other key, such as `id` and `model_probability`, and the card order, writes only rows whose payload changes, works in 16 puzzle-id chunks to stay inside the SQL client timeout, and then reruns `check`. It refuses the Premier parent as a target and never writes Premier rows, replay shards or checked-in card files. Run it on development first, then production, and finish with `check` on both; it exits non-zero while any drift remains.
 
-Reality Fracture (FRA) is Live but is not in the Draft Run catalog (`corpus/draft-run/catalog.json`), so neither the full refresh nor targeted repair covers its Premier art, and the refresh report does not audit it. The Traditional gate and repair above do cover FRA's Traditional component, because they compare against FRA's Premier rows directly.
+Reality Fracture (FRA) is Live but is not in the Draft Run catalog (`corpus/draft-run/catalog.json`) because it has no replay shards. The full refresh covers its Premier and Traditional rows through the served inventory (see [Coverage](#coverage-every-served-card-in-every-served-environment)); targeted repair does not, because it validates names against the corpus sample and shards. The Traditional gate and repair above compare against FRA's Premier rows directly.
 
 ### November 2, 2026 v6 repair
 
@@ -162,16 +177,19 @@ The refresh workflow remains at `.github/workflows/refresh-powered-cube-images.y
 The refresh then:
 
 1. hydrates replay shards from the model-versioned R2 namespace;
-2. normalizes all served card display metadata;
-3. runs the full test suite and production-data audit;
-4. retains diagnostics;
-5. verifies marked development/production backend revisions;
-6. publishes normalized replay shards to R2;
-7. refreshes development backend image metadata and verifies gameplay;
-8. re-verifies the production release marker, refreshes production image metadata, and verifies gameplay;
-9. publishes the refreshed checked-in corpus/card-image source of truth through a pull request.
+2. verifies marked development/production backend revisions and collects the served card inventory from both;
+3. resolves the policy for every served card and normalizes display metadata;
+4. runs the full test suite and production-data audit;
+5. retains diagnostics, including the served inventory;
+6. re-verifies marked development/production backend revisions;
+7. publishes normalized replay shards to R2;
+8. refreshes development backend image metadata, fails if any served card has no policy selection, and verifies gameplay;
+9. re-verifies the production release marker, refreshes production image metadata with the same coverage check, and verifies gameplay;
+10. publishes the refreshed checked-in corpus/card-image source of truth through a pull request.
 
 The corpus-writer concurrency group serializes this with other corpus mutations. A failed normalization or verification stops before later publication stages.
+
+Time limits: the full refresh job has 210 minutes, and the release waits up to 220 minutes for it inside a 350-minute job. The November 2 refresh was cancelled at its old 90-minute limit after development alone took 68 minutes; the release itself only waited 120 minutes per step.
 
 ## Backend propagation is paged and resumable
 

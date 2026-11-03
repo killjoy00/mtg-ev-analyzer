@@ -71,9 +71,61 @@ function patchCards(cards,mapping,counters) {
 }
 
 const IMAGE_REFRESH_PAGE_SIZE=250;
+const SERVED_ROWS=`(p.corpus_version=$2 OR EXISTS (
+     SELECT 1 FROM corpus_components c
+     WHERE c.set_id=p.set_id AND c.parent_version=$2 AND c.component_version=p.corpus_version AND c.status='Live'))`;
+
+// Image maintenance must cover every environment players can be served, not
+// only the replay catalog: a trophy-only environment such as Reality Fracture
+// has no replay shards but still serves Premier and Traditional puzzles. An
+// environment is registered when it is in the catalog or the serving policy
+// lists it as Live or Candidate.
+export async function registeredImageEnvironment(query,setId) {
+  if(allowed.has(setId))return true;
+  if(typeof setId!=='string'||!/^[a-z0-9][a-z0-9-]{1,31}$/.test(setId))return false;
+  return (await query(
+    `SELECT 1 FROM draft_run_environment_policy WHERE set_id=$1 AND status IN ('Live','Candidate') LIMIT 1`,
+    [setId],
+  )).rows.length>0;
+}
+
+// Every registered environment that has current-parent puzzles. The card-image
+// policy must resolve each of these, so this is its environment list.
+export async function imageEnvironments(query) {
+  const policy=(await query(`SELECT set_id,status FROM draft_run_environment_policy WHERE status IN ('Live','Candidate')`)).rows;
+  const status=new Map(policy.map(row=>[row.set_id,row.status]));
+  const ids=[...new Set([...allowed,...status.keys()])].sort();
+  const environments=[];
+  for(const setId of ids) {
+    const present=(await query(
+      `SELECT 1 FROM draft_run_verified_puzzles p WHERE p.set_id=$1 AND ${SERVED_ROWS} LIMIT 1`,
+      [setId,VERSION],
+    )).rows.length>0;
+    if(present)environments.push({set_id:setId,catalog:allowed.has(setId),status:status.get(setId)||null});
+  }
+  return {corpus_version:VERSION,environments};
+}
+
+// The exact card names served for one environment: current parent plus Live
+// components, candidates and prior picks. The refresh resolves the policy for
+// every one of these and refuses to finish while any lacks a mapping.
+export async function imageInventory(query,setId) {
+  if(!await registeredImageEnvironment(query,setId))throw error('Image inventory requires a registered environment');
+  const names=(await query(
+    `SELECT DISTINCT card.value->>'name' AS name
+     FROM draft_run_verified_puzzles p
+     CROSS JOIN LATERAL jsonb_array_elements(
+       COALESCE(p.payload->'candidates','[]'::jsonb)||COALESCE(p.payload->'prior_picks','[]'::jsonb)
+     ) AS card(value)
+     WHERE p.set_id=$1 AND ${SERVED_ROWS}
+     ORDER BY 1`,
+    [setId,VERSION],
+  )).rows.map(row=>String(row.name||'')).filter(Boolean);
+  return {set_id:setId,corpus_version:VERSION,names};
+}
 
 export async function refreshTrophyImagePage(query,setId,rawMapping,rawAfter='') {
-  if(!allowed.has(setId))throw error('Image refresh requires a registered environment');
+  if(!await registeredImageEnvironment(query,setId))throw error('Image refresh requires a registered environment');
   const mapping=normalizeImageMapping(rawMapping);
   const after=String(rawAfter||'');
   const desired=JSON.stringify([...mapping].map(([name,display])=>({name,...display})));
@@ -224,9 +276,10 @@ export async function refreshTrophyImages(query,setId,rawMapping) {
 }
 
 export async function normalizeResolvedImageMarkers(query,rawSetIds) {
-  if(!Array.isArray(rawSetIds)||!rawSetIds.length||rawSetIds.length>allowed.size)throw error('Invalid image-marker set list');
+  if(!Array.isArray(rawSetIds)||!rawSetIds.length||rawSetIds.length>64)throw error('Invalid image-marker set list');
   const setIds=rawSetIds.map(value=>String(value||'').trim());
-  if(new Set(setIds).size!==setIds.length||setIds.some(setId=>!allowed.has(setId)))throw error('Image-marker normalization requires registered environments');
+  if(new Set(setIds).size!==setIds.length)throw error('Invalid image-marker set list');
+  for(const setId of setIds)if(!await registeredImageEnvironment(query,setId))throw error('Image-marker normalization requires registered environments');
   const normalized=[];
   for(const setId of setIds) {
     const status=(await query(
@@ -328,8 +381,10 @@ export async function handleTrophyImport(request,query) {
   let body;
   try{body=JSON.parse(Buffer.concat(chunks));}catch{throw error('Invalid JSON');}
 
-  if(body.action==='refresh-images'||body.action==='refresh-image-page'||body.action==='refresh-image-page-v2'||body.action==='normalize-image-markers') {
+  if(body.action==='refresh-images'||body.action==='refresh-image-page'||body.action==='refresh-image-page-v2'||body.action==='normalize-image-markers'||body.action==='image-environments'||body.action==='image-inventory') {
     if(identity.workflow_ref!==IMAGE_REFRESH_WORKFLOW)throw error('Image refresh identity denied',403);
+    if(body.action==='image-environments')return imageEnvironments(query);
+    if(body.action==='image-inventory')return imageInventory(query,body.setId);
     if(body.action==='refresh-images')return refreshTrophyImages(query,body.setId,body.mapping);
     if(body.action==='refresh-image-page'||body.action==='refresh-image-page-v2')return refreshTrophyImagePage(query,body.setId,body.mapping,body.after);
     return normalizeResolvedImageMarkers(query,body.setIds);

@@ -22,6 +22,13 @@ const PLAN=[
   },
 ];
 
+// How long the release waits for each child run. The full card-image refresh
+// covers development and production and has a 210-minute job limit in
+// refresh-powered-cube-images.yml, so the release must outwait it.
+export const WAIT_MINUTES=Object.freeze({'deploy-functions.yml':120,'refresh-powered-cube-images.yml':220});
+const POLL_MS=10000;
+export const completeAttemptsFor=workflow=>Math.ceil(WAIT_MINUTES[workflow]*60000/POLL_MS);
+
 export function releasePlan(commit) {
   if(!/^[a-f0-9]{40}$/.test(commit||''))throw Error('A full reviewed main commit SHA is required.');
   return PLAN.map(step=>({workflow:step.workflow,label:step.label,inputs:step.inputs(commit),title:step.title(commit)}));
@@ -82,7 +89,7 @@ export async function dispatchAndWait(workflow,inputs,label,title,{pollMs=10000,
 export async function runRelease(commit) {
   if(process.env.GITHUB_REPOSITORY!==REPO||process.env.GITHUB_REF!=='refs/heads/main')throw Error('Card-image release must run from reviewed main.');
   if(!process.env.GH_TOKEN)throw Error('GH_TOKEN is required.');
-  for(const step of releasePlan(commit))await dispatchAndWait(step.workflow,step.inputs,step.label,step.title);
+  for(const step of releasePlan(commit))await dispatchAndWait(step.workflow,step.inputs,step.label,step.title,{pollMs:POLL_MS,completeAttempts:completeAttemptsFor(step.workflow)});
 }
 
 if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url)await runRelease(process.argv[2]);
