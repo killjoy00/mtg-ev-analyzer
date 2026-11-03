@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {DRAFT_RUN_CORPUS_VERSION as parent} from '../draft-run.mjs';
 import {premierArt,artDrift,checkTraditionalArt,repairTraditionalArt,traditionalComponents,CHUNKS,SQL} from '../scripts/traditional-premier-art.mjs';
 
 const wwk={image_url:'https://cards.scryfall.io/normal/front/f/6/f6929259.jpg',rarity:'rare',type_line:'Land'};
@@ -53,14 +54,14 @@ const database=(traditional,calls=[])=>async(sql,params)=>{
 
 test('checks and repairs never accept the Premier parent as the target',async()=>{
  const query=database([]);
- await assert.rejects(checkTraditionalArt(query,'powered-cube','elite-trophy-colour-stage-v10','elite-trophy-colour-stage-v10'),/never the Premier parent/);
- await assert.rejects(repairTraditionalArt(query,'powered-cube','elite-trophy-colour-stage-v10','elite-trophy-colour-stage-v10'),/never the Premier parent/);
+ await assert.rejects(checkTraditionalArt(query,'powered-cube',parent,parent),/never the Premier parent/);
+ await assert.rejects(repairTraditionalArt(query,'powered-cube',parent,parent),/never the Premier parent/);
  await assert.rejects(checkTraditionalArt(query,'empty','traditional-x','parent'),/no Premier/);
 });
 
 test('repair writes only the component, in 16 puzzle-id chunks, with every Premier variant as acceptable',async()=>{
  const calls=[];
- const result=await repairTraditionalArt(database([],calls),'powered-cube','traditional-cube-p2p7-v6-v1','elite-trophy-colour-stage-v10');
+ const result=await repairTraditionalArt(database([],calls),'powered-cube','traditional-cube-p2p7-v6-v1',parent);
  const writes=calls.filter(c=>c.sql===SQL.repair);
  assert.equal(writes.length,CHUNKS.length);
  assert.deepEqual(writes.map(c=>c.params[3]),CHUNKS.map(c=>c+'%'));
