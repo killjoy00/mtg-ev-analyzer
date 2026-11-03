@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {registeredImageEnvironment,imageEnvironments,imageInventory,normalizeResolvedImageMarkers} from '../worker/trophy-import.mjs';
 import {collectServedInventory,servedNames} from '../scripts/collect_served_card_inventory.mjs';
 import {refreshBackendImages,propagationSetIds} from '../scripts/refresh_card_backend_images.mjs';
@@ -12,6 +13,7 @@ const backend=({policy={fra:'Live'},present=new Set(['ktk','fra']),names={ktk:['
     calls.push({sql,params});
     if(sql.includes('FROM draft_run_environment_policy WHERE set_id=$1'))return {rows:policy[params[0]]&&['Live','Candidate'].includes(policy[params[0]])?[{}]:[]};
     if(sql.includes('FROM draft_run_environment_policy'))return {rows:Object.entries(policy).filter(([,s])=>['Live','Candidate'].includes(s)).map(([set_id,status])=>({set_id,status}))};
+    if(sql.includes('SELECT component_version FROM corpus_components'))return {rows:params[0]==='fra'?[{component_version:'traditional-premier-v6-p1p6-v1'}]:[]};
     if(sql.includes('WITH page AS'))return {rows:[{puzzles:1,last_puzzle_id:'p1',names:names[params[0]]||[]}]};
     if(sql.includes('SELECT 1 FROM draft_run_verified_puzzles'))return {rows:present.has(params[0])?[{}]:[]};
     throw Error('unexpected SQL: '+sql.slice(0,80));
@@ -32,15 +34,18 @@ test('served inventory covers every served card of an environment, including FRA
   const {query,calls}=backend();
   const page=await imageInventory(query,'fra');
   const scanCall=calls.find(c=>c.sql.includes('WITH page AS'));
-  assert.deepEqual(page,{set_id:'fra',corpus_version:scanCall.params[1],names:['Countersculpt'],puzzles:1,done:true,next_after:null});
+  assert.deepEqual(page,{set_id:'fra',corpus_version:DRAFT_RUN_CORPUS_VERSION,names:['Countersculpt'],puzzles:1,done:true,next_after:null});
   // Each request is bounded: a cursor and a page size, never a whole-environment scan.
   assert.equal(scanCall.params[2],'');
   assert.ok(Number.isInteger(scanCall.params[3])&&scanCall.params[3]<=5000);
-  assert.match(scanCall.sql,/p\.puzzle_id>\$3/);
+  assert.match(scanCall.sql,/p\.puzzle_id COLLATE "C">\$3/);
   assert.match(scanCall.sql,/LIMIT \$4/);
   const scan=scanCall.sql;
   assert.match(scan,/prior_picks/);
-  assert.match(scan,/c\.status='Live'/);
+  // Served versions (parent plus Live components) through the index, never a primary-key walk.
+  assert.match(scan,/p\.corpus_version=ANY\(\$2::text\[\]\)/);
+  assert.match(scan,/ORDER BY p\.puzzle_id COLLATE "C"/);
+  assert.match(scanCall.params[1],/traditional-premier-v6-p1p6-v1/);
   await assert.rejects(imageInventory(backend({policy:{}}).query,'fra'),/registered environment/);
 });
 

@@ -5,6 +5,7 @@ import {validateDraftRunPuzzle,interestingDraftRunPuzzle,draftRunDifficulty,DRAF
 import {verifyImportToken,IMPORT_WORKFLOW,IMAGE_REFRESH_WORKFLOW} from './trophy-import-auth.mjs';
 import {refreshServingStatistics} from './serving-statistics.mjs';
 import {supportedComponent} from '../corpus-components.mjs';
+import {toPgArray} from './draft-run-selection.mjs';
 
 const allowed=new Set(catalog.sets.map(s=>s.id));
 const error=(message,status=400)=>Object.assign(Error(message),{status});
@@ -71,6 +72,23 @@ function patchCards(cards,mapping,counters) {
 }
 
 const IMAGE_REFRESH_PAGE_SIZE=250;
+
+// Served corpus versions for one environment: the current parent and its Live
+// components. Paged image queries filter on these through the
+// (corpus_version, set_id) index and order by puzzle_id COLLATE "C". Ordering
+// by the default collation let the planner walk the primary key across the
+// whole table looking for the first matching rows; once an environment was
+// already normalized there were none, so a single page read every row on
+// development (5.7 million, every historical corpus) and timed out three
+// card-image releases on November 3. The database collation is C.UTF-8, so
+// "C" gives the same order while keeping these queries on the set's own rows.
+async function servedImageVersions(query,setId) {
+  const rows=(await query(
+    `SELECT component_version FROM corpus_components WHERE set_id=$1 AND parent_version=$2 AND status='Live' ORDER BY component_version`,
+    [setId,VERSION],
+  )).rows;
+  return [VERSION,...rows.map(row=>String(row.component_version))];
+}
 const SERVED_ROWS=`(p.corpus_version=$2 OR EXISTS (
      SELECT 1 FROM corpus_components c
      WHERE c.set_id=p.set_id AND c.parent_version=$2 AND c.component_version=p.corpus_version AND c.status='Live'))`;
@@ -114,16 +132,17 @@ const IMAGE_INVENTORY_PAGE_SIZE=2000;
 export async function imageInventory(query,setId,rawAfter='') {
   if(!await registeredImageEnvironment(query,setId))throw error('Image inventory requires a registered environment');
   const after=String(rawAfter||'');
+  const versions=await servedImageVersions(query,setId);
   const page=(await query(
     `WITH page AS (
        SELECT p.puzzle_id,p.payload
        FROM draft_run_verified_puzzles p
-       WHERE p.set_id=$1 AND ${SERVED_ROWS} AND p.puzzle_id>$3
-       ORDER BY p.puzzle_id
+       WHERE p.set_id=$1 AND p.corpus_version=ANY($2::text[]) AND p.puzzle_id COLLATE "C">$3
+       ORDER BY p.puzzle_id COLLATE "C"
        LIMIT $4
      )
      SELECT (SELECT count(*)::int FROM page) AS puzzles,
-       (SELECT max(page.puzzle_id) FROM page) AS last_puzzle_id,
+       (SELECT max(page.puzzle_id COLLATE "C") FROM page) AS last_puzzle_id,
        COALESCE((
          SELECT jsonb_agg(DISTINCT card.value->>'name')
          FROM page CROSS JOIN LATERAL jsonb_array_elements(
@@ -131,7 +150,7 @@ export async function imageInventory(query,setId,rawAfter='') {
          ) AS card(value)
          WHERE card.value->>'name' IS NOT NULL
        ),'[]'::jsonb) AS names`,
-    [setId,VERSION,after,IMAGE_INVENTORY_PAGE_SIZE],
+    [setId,toPgArray(versions),after,IMAGE_INVENTORY_PAGE_SIZE],
   )).rows[0]||{};
   const puzzles=Number(page.puzzles||0);
   const names=parse(page.names||'[]').map(name=>String(name||'')).filter(Boolean).sort();
@@ -144,6 +163,7 @@ export async function refreshTrophyImagePage(query,setId,rawMapping,rawAfter='')
   const mapping=normalizeImageMapping(rawMapping);
   const after=String(rawAfter||'');
   const desired=JSON.stringify([...mapping].map(([name,display])=>({name,...display})));
+  const versions=await servedImageVersions(query,setId);
   // Filter inside Postgres before returning payloads. Image maintenance still
   // validates every row it changes, but already-correct puzzle JSON never
   // crosses the Neon proxy merely to prove that it is unchanged.
@@ -154,18 +174,8 @@ export async function refreshTrophyImagePage(query,setId,rawMapping,rawAfter='')
      SELECT p.puzzle_id,p.payload,p.corpus_version
      FROM draft_run_verified_puzzles p
      WHERE p.set_id=$1
-       AND (
-         p.corpus_version=$2
-         OR EXISTS (
-           SELECT 1
-           FROM corpus_components c
-           WHERE c.set_id=p.set_id
-             AND c.parent_version=$2
-             AND c.component_version=p.corpus_version
-             AND c.status='Live'
-         )
-       )
-       AND p.puzzle_id>$3
+       AND p.corpus_version=ANY($2::text[])
+       AND p.puzzle_id COLLATE "C">$3
        AND EXISTS (
          SELECT 1
          FROM jsonb_array_elements(
@@ -180,9 +190,9 @@ export async function refreshTrophyImagePage(query,setId,rawMapping,rawAfter='')
            OR ((d.display ? 'type_line') AND (card.value->>'type_line') IS DISTINCT FROM (d.display->>'type_line'))
            OR ((d.display ? 'display_faces') AND (card.value->'display_faces') IS DISTINCT FROM (d.display->'display_faces'))
        )
-     ORDER BY p.puzzle_id
+     ORDER BY p.puzzle_id COLLATE "C"
      LIMIT $5`,
-    [setId,VERSION,after,desired,IMAGE_REFRESH_PAGE_SIZE],
+    [setId,toPgArray(versions),after,desired,IMAGE_REFRESH_PAGE_SIZE],
   );
   if(!page.rows.length) {
     const available=(await query(

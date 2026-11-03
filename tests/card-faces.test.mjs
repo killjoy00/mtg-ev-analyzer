@@ -101,6 +101,7 @@ test('image maintenance carries faces, rejects malformed pairs and remains idemp
   const frozen=structuredClone(stored);
   let writes=0;
   const query=async(sql,params)=>{
+    if(sql.includes('SELECT component_version FROM corpus_components'))return {rows:[]};
     if(sql.includes('SELECT p.puzzle_id,p.payload')) {
       assert.match(sql,/card\.value->'display_faces'/);
       return {rows:[{puzzle_id:stored.puzzle_id,payload:stored,corpus_version:stored.corpus_version}]};
