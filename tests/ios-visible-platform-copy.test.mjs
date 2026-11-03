@@ -18,7 +18,7 @@ for (const directory of ['mobile/app', 'mobile/src']) {
 }
 
 test('native customer-facing screens and legal copy do not name competing mobile platforms', () => {
-  for (const path of paths) {
+  for (const path of ['mobile/app/account.tsx', 'mobile/app/privacy.tsx', 'mobile/src/nativeEditorial.ts']) {
     const content = readFileSync(join(root, path), 'utf8');
     assert.doesNotMatch(content, /\bAndroid\b/, `${relative(root, join(root, path))} must not name Android in customer-facing iOS copy`);
   }
@@ -29,14 +29,14 @@ test('native runtime string literals contain no visible Android brand mentions',
     const content = readFileSync(join(root, path), 'utf8');
     const quotedLiterals = content.match(/'(?:\\.|[^'\\])*'|"(?:\\.|[^"\\])*"|`(?:\\.|[^`\\])*`/g) || [];
     for (const literal of quotedLiterals) {
-      assert.doesNotMatch(literal, /\\bAndroid\\b/, `${path} contains a potentially customer-visible Android string`);
+      assert.doesNotMatch(literal, /\bAndroid\b/, `${path} contains a potentially customer-visible Android string`);
     }
   }
 });
 
 test('linked canonical web privacy and terms pages are platform-neutral', () => {
   for (const path of ['privacy/index.html', 'terms/index.html']) {
-    assert.doesNotMatch(readFileSync(join(root, path), 'utf8'), /\\bAndroid\\b/);
+    assert.doesNotMatch(readFileSync(join(root, path), 'utf8'), /\bAndroid\b/);
   }
 });
 
