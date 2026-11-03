@@ -106,22 +106,37 @@ export async function imageEnvironments(query) {
   return {corpus_version:VERSION,environments};
 }
 
-// The exact card names served for one environment: current parent plus Live
-// components, candidates and prior picks. The refresh resolves the policy for
-// every one of these and refuses to finish while any lacks a mapping.
-export async function imageInventory(query,setId) {
+// The card names served for one page of an environment: current parent plus
+// Live components, candidates and prior picks. Like image refresh, this is
+// paged by puzzle id: one whole-environment scan can exceed the import client's
+// request timeout (it did on November 3). Callers follow next_after until done.
+const IMAGE_INVENTORY_PAGE_SIZE=2000;
+export async function imageInventory(query,setId,rawAfter='') {
   if(!await registeredImageEnvironment(query,setId))throw error('Image inventory requires a registered environment');
-  const names=(await query(
-    `SELECT DISTINCT card.value->>'name' AS name
-     FROM draft_run_verified_puzzles p
-     CROSS JOIN LATERAL jsonb_array_elements(
-       COALESCE(p.payload->'candidates','[]'::jsonb)||COALESCE(p.payload->'prior_picks','[]'::jsonb)
-     ) AS card(value)
-     WHERE p.set_id=$1 AND ${SERVED_ROWS}
-     ORDER BY 1`,
-    [setId,VERSION],
-  )).rows.map(row=>String(row.name||'')).filter(Boolean);
-  return {set_id:setId,corpus_version:VERSION,names};
+  const after=String(rawAfter||'');
+  const page=(await query(
+    `WITH page AS (
+       SELECT p.puzzle_id,p.payload
+       FROM draft_run_verified_puzzles p
+       WHERE p.set_id=$1 AND ${SERVED_ROWS} AND p.puzzle_id>$3
+       ORDER BY p.puzzle_id
+       LIMIT $4
+     )
+     SELECT (SELECT count(*)::int FROM page) AS puzzles,
+       (SELECT max(page.puzzle_id) FROM page) AS last_puzzle_id,
+       COALESCE((
+         SELECT jsonb_agg(DISTINCT card.value->>'name')
+         FROM page CROSS JOIN LATERAL jsonb_array_elements(
+           COALESCE(page.payload->'candidates','[]'::jsonb)||COALESCE(page.payload->'prior_picks','[]'::jsonb)
+         ) AS card(value)
+         WHERE card.value->>'name' IS NOT NULL
+       ),'[]'::jsonb) AS names`,
+    [setId,VERSION,after,IMAGE_INVENTORY_PAGE_SIZE],
+  )).rows[0]||{};
+  const puzzles=Number(page.puzzles||0);
+  const names=parse(page.names||'[]').map(name=>String(name||'')).filter(Boolean).sort();
+  const done=puzzles<IMAGE_INVENTORY_PAGE_SIZE;
+  return {set_id:setId,corpus_version:VERSION,names,puzzles,done,next_after:done?null:String(page.last_puzzle_id||'')};
 }
 
 export async function refreshTrophyImagePage(query,setId,rawMapping,rawAfter='') {
@@ -384,7 +399,7 @@ export async function handleTrophyImport(request,query) {
   if(body.action==='refresh-images'||body.action==='refresh-image-page'||body.action==='refresh-image-page-v2'||body.action==='normalize-image-markers'||body.action==='image-environments'||body.action==='image-inventory') {
     if(identity.workflow_ref!==IMAGE_REFRESH_WORKFLOW)throw error('Image refresh identity denied',403);
     if(body.action==='image-environments')return imageEnvironments(query);
-    if(body.action==='image-inventory')return imageInventory(query,body.setId);
+    if(body.action==='image-inventory')return imageInventory(query,body.setId,body.after);
     if(body.action==='refresh-images')return refreshTrophyImages(query,body.setId,body.mapping);
     if(body.action==='refresh-image-page'||body.action==='refresh-image-page-v2')return refreshTrophyImagePage(query,body.setId,body.mapping,body.after);
     return normalizeResolvedImageMarkers(query,body.setIds);
