@@ -13,7 +13,7 @@ for (const directory of ['mobile/app', 'mobile/src/screens', 'mobile/src/compone
     for (const entry of readdirSync(join(root, dir), { withFileTypes: true })) {
       const file = join(dir, entry.name);
       if (entry.isDirectory()) collect(file);
-      else if (entry.isFile() && /\\.tsx$/.test(entry.name)) paths.push(file);
+      else if (entry.isFile() && /\.tsx$/.test(entry.name)) paths.push(file);
     }
   }
   collect(directory);
@@ -22,7 +22,7 @@ for (const directory of ['mobile/app', 'mobile/src/screens', 'mobile/src/compone
 test('native customer-facing screens and legal copy do not name competing mobile platforms', () => {
   for (const path of paths) {
     const content = readFileSync(join(root, path), 'utf8');
-    assert.doesNotMatch(content, /\\bAndroid\\b/, `${relative(root, join(root, path))} must not name Android in customer-facing iOS copy`);
+    assert.doesNotMatch(content, /\bAndroid\b/, `${relative(root, join(root, path))} must not name Android in customer-facing iOS copy`);
   }
 });
 
