@@ -115,7 +115,7 @@ function expoProjectId():string {
   return project;
 }
 async function prepareChannel() {
-  if(Platform.OS!=='ios'&&Platform.OS!=='android')throw Error('Push notifications are available on iOS and Android only.');
+  if(Platform.OS!=='ios'&&Platform.OS!=='android')throw Error('Push notifications require a supported mobile device.');
   // Android 13+ needs a channel before the explicit runtime-permission prompt.
   if(Platform.OS==='android')await Notifications.setNotificationChannelAsync('daily-reminders',{
     name:'Daily reminders',importance:Notifications.AndroidImportance.DEFAULT,
