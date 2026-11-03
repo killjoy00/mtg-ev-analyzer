@@ -547,7 +547,7 @@ export default function AccountScreen() {
             <Text style={styles.body}>
               {validateDailyRunId
                 ? 'Sign in to save this Daily score to your Pack One career and add it to the leaderboard when eligible.'
-                : 'Use the same Pack One account across web, iPhone, iPad, and Android.'}
+                : 'Use the same Pack One account on the website and in the mobile apps.'}
             </Text>
             <View style={styles.panel}>
               {Platform.OS === 'ios' ? (
