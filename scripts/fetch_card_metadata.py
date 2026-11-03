@@ -113,69 +113,56 @@ def special_flags(card: dict) -> list[str]:
     return flags
 
 
-# Bonus-sheet collector ranges are the canonical/basic treatment for those
-# sheets, *not* every numbered variant Scryfall associates with that set code.
-# For example, OTP 1-65 are the standard newspaper-style cards; OTP 66-80 are
-# alternate anime art. BRR's later schematic printings and WOT/MUL's later
-# collector versions likewise do not become Pack One's default art. The
-# underlying set's normal printings are still chosen by printing_rank.
-# SPG/MAR span unrelated releases; TLE also includes non-booster products.
-# Keep their eligibility bounded to each environment's actual base sheet.
-# Source references and excluded treatments: docs/CARD-IMAGE-MAINTENANCE.md.
-DRAFT_BONUS_PRINTINGS = {
-    "bro": (("brr", (1, 63)),),     # Retro Artifacts; schematic starts at 64.
-    "mom": (("mul", (1, 65)),),     # Multiverse Legends; etched starts at 66.
-    "sir": (("sis", None),),       # Digital Shadows of the Past.
-    "woe": (("wot", (1, 63)),),     # Enchanting Tales; anime starts at 64.
-    "mkm": (("spg", (19, 28)),),
-    "otj": (("otp", (1, 65)), ("big", (1, 30)), ("spg", (29, 38))),
-    "mh3": (("spg", (39, 48)),),   # Textured foil Elementals start at 49.
-    "blb": (("spg", (54, 63)),),
-    "dsk": (("spg", (64, 73)),),
-    "fdn": (("spg", (74, 83)),),
-    "dft": (("spg", (84, 93)),),   # First-place foil box toppers start at 94.
-    "tdm": (("spg", (104, 113)),), # Dragonscale foil fetch lands start at 114.
-    "fin": (("fca", (1, 64)),),
-    "eoe": (("eos", (1, 45)), ("spg", (119, 128))),
-    "tla": (("tle", (1, 61)),),   # Source material only, not scene/Jumpstart cards.
-    "ecl": (("spg", (129, 148)),),
-    "tmt": (("pza", (1, 20)),),
-    "sos": (("soa", (1, 65)), ("spg", (149, 158))),
-    "msh": (("mar", (41, 100)),), # MAR 1-40 belong to Marvel's Spider-Man.
-    # Special Guests replace a common in 1 of 55 Play Boosters (Wizards'
-    # "Collecting Reality Fracture"); the ten FRA guests are SPG 159-168.
-    "fra": (("spg", (159, 168)),),
-}
+# Draft sources beyond the main set are found from Scryfall data, not from
+# hand-typed collector ranges. The draft rows come from 17Lands, which records
+# MTG Arena drafts by card name, so a bonus-sheet card is shown in the printing
+# that shipped on Arena with the environment's own set: released the same day,
+# available on Arena, and from a set type that carries booster sheets. Among
+# those, the lowest collector number wins (see printing_rank). This covers Special Guests, bonus sheets and
+# Arena-only substitutions (SOS's Library of Alexandria, SPG 158a) without a
+# per-set entry. Commander decks, Jumpstart, Alchemy and box products released
+# the same day are excluded by set type. A new set type stays excluded until it
+# is reviewed and added here. Every choice outside the environment's own set is
+# checked against the reviewed record in corpus/draft-run/card-printings.json.
+DRAFT_SHEET_SET_TYPES = frozenset({"masterpiece", "expansion", "core", "masters", "eternal"})
 
-# Environments reviewed with no draftable bonus sheet. Every served environment
-# must appear here or in DRAFT_BONUS_PRINTINGS: the card-image refresh refuses
-# to run while any environment lacks an explicit decision, so a new set cannot
-# go Live through any admission path without this review. Evidence for "none"
-# is that every served card resolves to the environment's own set (cross-set
-# fallbacks, if any, are reported separately and allowed by policy).
-DRAFT_BONUS_NONE = frozenset({
-    "ktk", "dmu", "snc", "neo", "one", "ltr", "hbg", "hob", "pio",
-    "lci",           # Special Guests were not in LCI Draft Boosters.
-    "powered-cube",  # A cube, not a booster; uses the global earliest printing.
-})
+_SET_RELEASES: Dict[str, str] = {}
 
 
-def missing_bonus_decisions(environments: Iterable[str]) -> list[str]:
-    """Served environments with neither a registered bonus sheet nor 'none'."""
-    return sorted(sid for sid in environments if sid not in DRAFT_BONUS_PRINTINGS and sid not in DRAFT_BONUS_NONE)
+def register_set_releases(releases: Dict[str, str], *, complete: bool = False) -> None:
+    """Record Scryfall set release dates (set code -> YYYY-MM-DD).
+
+    complete=True marks the list as the whole catalogue, so unknown set codes
+    are not looked up on Scryfall (used by offline tests).
+    """
+    _SET_RELEASES.update({str(code).lower(): str(date) for code, date in releases.items() if code and date})
+    if complete:
+        _SET_RELEASES["__loaded__"] = "1"
 
 
-def in_bonus_range(card: dict, bonus_set: str, number_range: Optional[tuple[int, int]]) -> bool:
-    if str(card.get("set") or "").lower() != bonus_set:
+def set_release_date(set_code: str) -> Optional[str]:
+    code = str(set_code or "").lower()
+    if code not in _SET_RELEASES and not _SET_RELEASES.get("__loaded__"):
+        payload = request_json("https://api.scryfall.com/sets")
+        if payload.get("has_more"):
+            raise ValueError("Scryfall set list is paginated; expected one page.")
+        register_set_releases({item.get("code"): item.get("released_at") for item in payload.get("data") or []})
+        _SET_RELEASES["__loaded__"] = "1"
+    return _SET_RELEASES.get(code)
+
+
+def is_same_release_draft_printing(card: dict, draft_set: str) -> bool:
+    """A printing that shipped on Arena alongside the environment's set."""
+    if "arena" not in (card.get("games") or []):
         return False
-    if number_range is None:
-        return True
-    number = str(card.get("collector_number") or "")
-    return number.isdigit() and number_range[0] <= int(number) <= number_range[1]
+    if card.get("set_type") not in DRAFT_SHEET_SET_TYPES:
+        return False
+    released = set_release_date(draft_set)
+    return bool(released) and card.get("released_at") == released
 
 
 def draft_printing_priority(card: dict, draft_set: Optional[str]) -> int:
-    """0: main set, 1: verified draft bonus sheet, 2: other printing.
+    """0: main set, 1: same-release Arena draft printing, 2: other printing.
 
     17Lands' draft rows identify pack cards by name, not the exact art variant.
     Within the appropriate source set we therefore still prefer readable/base
@@ -194,9 +181,8 @@ def draft_printing_priority(card: dict, draft_set: Optional[str]) -> int:
     intended = draft_set.lower()
     if source == intended:
         return 0
-    for bonus_set, number_range in DRAFT_BONUS_PRINTINGS.get(intended, ()):
-        if in_bonus_range(card, bonus_set, number_range):
-            return 1
+    if is_same_release_draft_printing(card, intended):
+        return 1
     return 2
 
 
@@ -237,9 +223,16 @@ def printing_rank(card: dict, alias: Optional[str] = None, preferred_set: Option
         release_rank = int(released)
     except ValueError:
         release_rank = 99_999_999
+    # A bonus sheet's base printings come first in collector order and their
+    # default frame is often borderless or showcase; collector variants of the
+    # same card (etched, schematic, anime) are numbered after the sheet. Within
+    # same-release draft printings, collector order therefore decides before
+    # cosmetic flags do.
+    sheet_order = collector_number_rank(card.get("collector_number")) if set_rank == 1 else (0, 0, "")
     return (
         language_penalty,
         set_rank,
+        sheet_order,
         penalty,
         digital_rank,
         release_rank,

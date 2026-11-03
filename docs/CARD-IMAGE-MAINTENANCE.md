@@ -4,54 +4,49 @@ Pack One card-image maintenance is an explicit, display-only corpus operation. I
 
 ## Selection policy
 
-The shared resolver in `scripts/fetch_card_metadata.py` owns card identity, aliases, face selection, and printing rank.
+The shared resolver in `scripts/fetch_card_metadata.py` owns card identity, aliases, face selection, and printing rank. Served puzzles come from 17Lands, which records MTG Arena drafts by card name, so the policy shows each card in the printing that shipped in that environment's Arena packs.
 
-- **Use the simplest base/non-variant printing for each card in its draft set.** First prefer the main set, then a verified bonus sheet that was actually draftable in that environment. Within the eligible source, prefer an ordinary, readable version over promos, showcases, extended-art, textless or other cosmetic alternatives.
-- Bonus sheets explicitly restrict **source eligibility to their standard/base printings**. The registry below covers the bonus-sheet sources in the checked-in draft catalog, including newer source-material sheets and release-specific Special Guests. Commander products, unrelated releases sharing a set code, and collector-only variants do not get draft-source priority.
-- **The basic style of a bonus sheet may itself be special.** For example, OTP's standard newspaper-style printing is tagged `borderless`/`showcase` in Scryfall. That is the correct *base* OTP printing, not an invitation to pick its alternate anime version or a KTK reprint.
-- In every set, the existing printing rank favors normal/non-variant art within the same source, and treats variation, promo, textless or oversized versions as ineligible for draft-source priority. If no suitable source printing exists, prefer the earliest ordinary/base printing from elsewhere; Powered Cube retains its separate globally earliest ordinary-printing policy.
-- 17Lands' draft archives identify the **card by name, not its exact artwork**. This policy consistently shows the default version of the source set, regardless of which cosmetic variant the original player may have opened.
-- Digital/rebalanced identities omitted from Scryfall's `default_cards` bulk export are resolved through the same exact-name resolver and their `prints_search_uri`. The HBG `A-Monster Manual` draft name is canonicalized to Scryfall's full rebalanced Adventure identity before lookup.
-- Double-faced aliases, flavor/printed names, and the Prepare-card collision rule remain part of the shared identity contract.
+For every served card in a draft environment:
 
-The resolver must be deterministic with respect to API ordering. Ranking is based on language, verified main-set/standard-bonus-printing priority (including known collector bounds), cosmetic-treatment penalty within that source, paper/digital tie-breaking, release date, collector number, and card ID. A standard source-set frame can be inherently borderless/showcase, but an avoidable variant should never displace the simplest eligible base printing.
+1. **The environment's own set.** Within it, the plain base printing wins over promos, showcases, extended art, textless and other cosmetic alternatives.
+2. **Otherwise, the Arena printing released with the set.** A printing counts when Scryfall says it is on Arena (`games` includes `arena`), it was released the same day as the environment's set (Scryfall's set `released_at`), and its set type carries booster sheets: `masterpiece`, `expansion`, `core`, `masters` or `eternal`. This covers bonus sheets, Special Guests and Arena-only substitutions without any per-set entry. Commander decks, Jumpstart, Alchemy and box products released the same day have other set types and are excluded; a new set type stays excluded until it is reviewed and added. Among eligible printings the **lowest collector number wins**: a sheet's base printings come first, and their default frame is often borderless or showcase (OTP's newspaper style, MUL's showcase legends), while collector variants of the same card (etched, schematic, anime) are numbered after the sheet.
+3. **Otherwise, the earliest ordinary printing** of that exact card. Powered Cube, a cube rather than a booster, always uses this.
 
-### Verified bonus sources
+17Lands identifies the **card, not its exact artwork**, so the policy shows the default version from the source the player drafted, regardless of which cosmetic variant they opened. Digital and rebalanced identities missing from Scryfall's `default_cards` bulk export are resolved through the same exact-name resolver. The HBG `A-Monster Manual` draft name is canonicalized to Scryfall's full rebalanced Adventure identity first. Double-faced aliases, flavor and printed names, and the Prepare-card collision rule remain part of the shared identity contract. The ranking is deterministic regardless of API order: language, source tier, collector order within a same-release sheet, cosmetic penalty, paper before digital, release date, collector number, card ID.
 
-| Draft environment | Base bonus printings | Excluded variants/products |
-| --- | --- | --- |
-| BRO | BRR #1–63 | Schematic art and serialized variants |
-| MOM | MUL #1–65 | Etched, halo and serialized variants |
-| SIR | SIS | Digital Shadows of the Past |
-| WOE | WOT #1–63 | Anime/confetti variants |
-| MKM | SPG #19–28 | Other SPG releases |
-| OTJ | OTP #1–65, BIG #1–30, SPG #29–38 | Anime, vault and extended art |
-| MH3 | SPG #39–48 | Textured Elementals #49–53 |
-| BLB | SPG #54–63 | Other SPG releases |
-| DSK | SPG #64–73 | Other SPG releases |
-| FDN | SPG #74–83 | Other SPG releases |
-| DFT | SPG #84–93 | First-place foil box toppers #94–103 |
-| TDM | SPG #104–113 | Dragonscale fetch lands #114–118 |
-| FIN | FCA #1–64 | Suffixed/other printings |
-| EOE | EOS #1–45, SPG #119–128 | Poster and galaxy-foil EOS printings |
-| TLA | TLE #1–61 | Scene, Jumpstart and other Eternal-product cards |
-| ECL | SPG #129–148 | Other SPG releases |
-| TMT | PZA #1–20 | Non-source-material products |
-| SOS | SOA #1–65, SPG #149–158 | Japanese/silver-scroll SOA variants |
-| MSH | MAR #41–100 | Spider-Man's MAR #1–40 |
-| FRA | SPG #159–168 | Other SPG releases |
+### Reviewed printing record
 
-Collector bounds were checked against Scryfall's printing records. Booster-source and variant distinctions are documented in Wizards' collecting guides for [MH3](https://magic.wizards.com/en/news/feature/collecting-modern-horizons-3), [DFT](https://magic.wizards.com/en/news/feature/collecting-aetherdrift), [TDM](https://magic.wizards.com/en/news/feature/collecting-tarkir-dragonstorm), [FIN](https://magic.wizards.com/en/news/feature/collecting-final-fantasy), [EOE](https://magic.wizards.com/en/news/feature/collecting-edge-of-eternities), [TLA](https://magic.wizards.com/en/news/feature/collecting-avatar-the-last-airbender), [ECL](https://magic.wizards.com/en/news/feature/collecting-lorwyn-eclipsed), [TMT](https://magic.wizards.com/en/news/feature/collecting-teenage-mutant-ninja-turtles), [SOS](https://magic.wizards.com/en/news/feature/collecting-secrets-of-strixhaven), and [MSH](https://magic.wizards.com/en/news/feature/collecting-marvel-super-heroes).
+Every printing chosen **outside an environment's own set** is recorded in `corpus/draft-run/card-printings.json` as `set/collector_number`. The full refresh computes its choices and refuses to publish if any differ from the record: a choice added, changed, or no longer outside the set. It writes the proposed record to `generated/card-printings-proposed.json` in the refresh diagnostics and lists the differences in the log. To accept them, review the proposal and commit it as `corpus/draft-run/card-printings.json` through a pull request, then rerun the release. A new set, a new Scryfall printing, a policy change and a product type the rule did not anticipate all surface here as a short list instead of silently changing art. Names that are no longer served drop out of the record on their own. Powered Cube is not recorded.
 
-FRA's Special Guests replace a common in 1 of 55 Play Boosters ([collecting guide](https://magic.wizards.com/news/feature/collecting-reality-fracture)). The ten guests are SPG #159–168 ([checklist](https://www.cardsphere.com/sets/2178)): Eye of Ugin, Austere Command, Flesh Duplicate, Consign to Memory, Sublime Epiphany, Consider, Necrodominance, Mind Twist, Splinter Twin and Root Maze. These are exactly the ten FRA cards the November 3 refresh resolved outside FRA before the entry existed. The range was registered on November 3, after FRA had served for weeks without any entry.
+This replaced hand-typed collector ranges per environment, which had to be added for each new set and missed both Reality Fracture's Special Guests and an Arena-only substitution: on Arena, Library of Alexandria (SPG #158a) replaces SOS's paper guest Library of Leng (SPG #158). Before switching, the rule was run against every card served on November 3 in all 31 environments. It reproduced every existing choice, including all 20 previously verified bonus ranges, and changed only Library of Alexandria, from its 1993 Arabian Nights printing to SPG #158a.
 
-#### Every served environment needs a bonus-sheet decision
+Printings recorded outside each environment's own set (November 3, 2026):
 
-Each environment the backend serves must have an explicit decision in `scripts/fetch_card_metadata.py`: a registered draftable sheet in `DRAFT_BONUS_PRINTINGS`, or `DRAFT_BONUS_NONE`. The full refresh refuses to start while any served environment has neither, and it fails if a registered range matches no printing in Scryfall's bulk data. The report's `bonus_sources` records each decision with the number of bulk printings inside each range. This closes the gap that let FRA, which reached Live through the Traditional new-set path rather than the new-set release checklist, serve guest cards with no bonus-sheet review.
+| Environment | Source sets (cards) |
+| --- | --- |
+| BLB | SPG (10) |
+| BRO | BRR (63) |
+| DFT | SPG (10) |
+| DSK | SPG (10) |
+| ECL | SPG (20) |
+| EOE | EOS (45), SPG (10) |
+| FDN | SPG (10) |
+| FIN | FCA (64) |
+| FRA | SPG (10) |
+| MH3 | SPG (10); M3C (8), MH3 Commander legends |
+| MKM | SPG (10); 40 cards from earlier sets, each in its earliest ordinary printing |
+| MOM | MUL (65) |
+| MSH | MAR (58) |
+| ONE | 4 praetors in their earliest ordinary printings (DMU, KHM, NEO, SNC) |
+| OTJ | BIG (30), OTP (65), SPG (10) |
+| SIR | SIS (75) |
+| SOS | SOA (65), SPG (10) |
+| TDM | SPG (10) |
+| TLA | TLE (61) |
+| TMT | PZA (20) |
+| WOE | WOT (63) |
 
-Environments recorded with no draftable bonus sheet: KTK, DMU, SNC, NEO, ONE, LTR, HBG, HOB, PIO, LCI and Powered Cube. The evidence is that every served card in these environments resolves to the environment's own set, except four ONE praetors that resolve through the reported cross-set fallback.
-
-LCI's Special Guests were not in Draft Boosters, so LCI does not receive SPG priority. The List's reused `plst` code is not broadly eligible: unregistered inserts retain the ordinary-printing fallback and appear in the cross-set report. PIO's rotating sheets use PIO itself and already receive main-set priority.
+Every other served environment (KTK, DMU, SNC, NEO, LTR, HBG, HOB, PIO, LCI) uses only its own set: every card it serves is printed in that set.
 
 Future trophy/component imports must seed card metadata from the environment being built, not from an arbitrary other environment that happens to contain the same card name. Retained per-build image caches may fill missing metadata but may not override current environment-scoped shard metadata. Any true miss is resolved through the shared exact-name selector with that environment as the preferred set (or with no preferred set for Powered Cube).
 
@@ -157,7 +152,7 @@ The check reads each environment's Premier rows once per verification (about 11 
 
 ### Building new components
 
-A Traditional build should copy Premier's display fields onto its cards, as `premier_display` and `with_premier_display` do in `scripts/v6_traditional.py`, so the gate passes on the first try. The Traditional research resolver (`scripts/traditional_v4_revalidation.py`) originally seeded metadata from every environment's replay shards and resolved missing images with Scryfall's exact-name lookup, which returns the newest printing: often an Art Series card, a token or a later reprint. It now seeds only from the measured environment and picks each card's printing with the shared `choose_main_printing` policy: the environment's own set, then its verified bonus sheet, then the earliest base printing (Powered Cube uses the earliest base printing). Its image cache is keyed by policy and environment and never overrides environment metadata. Which names count as resolvable is unchanged: an exact-name match with an image. Research art is only a fallback; Premier's art is what ships.
+A Traditional build should copy Premier's display fields onto its cards, as `premier_display` and `with_premier_display` do in `scripts/v6_traditional.py`, so the gate passes on the first try. The Traditional research resolver (`scripts/traditional_v4_revalidation.py`) originally seeded metadata from every environment's replay shards and resolved missing images with Scryfall's exact-name lookup, which returns the newest printing: often an Art Series card, a token or a later reprint. It now seeds only from the measured environment and picks each card's printing with the shared `choose_main_printing` policy: the environment's own set, then the Arena printing released with it, then the earliest base printing (Powered Cube uses the earliest base printing). Its image cache is keyed by policy and environment and never overrides environment metadata. Which names count as resolvable is unchanged: an exact-name match with an image. Research art is only a fallback; Premier's art is what ships.
 
 ### Repairing Traditional art
 

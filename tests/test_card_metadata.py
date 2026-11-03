@@ -7,10 +7,18 @@ import urllib.error
 from unittest import mock
 from pathlib import Path
 
-from scripts.fetch_card_metadata import aliases, choose_main_printing, draft_printing_priority, compact_card, discover_draft_data, draft_candidate_names, fetch_named, fetch_set, image_url, request_json
+from scripts.fetch_card_metadata import aliases, choose_main_printing, draft_printing_priority, compact_card, discover_draft_data, draft_candidate_names, fetch_named, fetch_set, image_url, register_set_releases, request_json
+
+RELEASES = {"otj": "2024-04-19", "bro": "2024-04-19", "mom": "2024-04-19", "sir": "2024-04-19",
+            "woe": "2024-04-19", "fin": "2024-04-19", "eoe": "2024-04-19", "tla": "2024-04-19",
+            "tmt": "2024-04-19", "sos": "2024-04-19", "mkm": "2024-02-09", "fra": "2026-10-02"}
+ARENA_SHEET = {"games": ["paper", "arena"], "set_type": "masterpiece"}
 
 
 class CardMetadataTests(unittest.TestCase):
+    def setUp(self):
+        register_set_releases(RELEASES, complete=True)
+
     def test_single_face_card(self):
         card = {"name":"Alpha","image_uris":{"normal":"https://img/alpha.jpg"},"mana_cost":"{1}{U}","rarity":"common","type_line":"Creature"}
         self.assertEqual(image_url(card), "https://img/alpha.jpg")
@@ -33,7 +41,7 @@ class CardMetadataTests(unittest.TestCase):
         old = {"id": "ktk-ride-down", "name": "Ride Down", "set": "ktk",
                "lang": "en", "released_at": "2014-09-26", "collector_number": "194",
                "image_uris": {"normal": "https://img/ktk-ride-down.jpg"}}
-        otp = {"id": "otp-ride-down", "name": "Ride Down", "set": "otp",
+        otp = {"id": "otp-ride-down", "name": "Ride Down", "set": "otp", **ARENA_SHEET,
                "lang": "en", "released_at": "2024-04-19", "collector_number": "52",
                "border_color": "borderless", "frame_effects": ["inverted"],
                "image_uris": {"normal": "https://img/otp-ride-down.jpg"}}
@@ -43,20 +51,23 @@ class CardMetadataTests(unittest.TestCase):
         self.assertEqual(choose_main_printing([old, collector_only, otp], "Ride Down")["id"], "ktk-ride-down")
         self.assertEqual(draft_printing_priority(otp, "otj"), 1)
 
-    def test_only_verified_bonus_sheets_count_as_draft_sources(self):
+    def test_same_release_arena_printings_count_as_draft_sources(self):
         base = {"id": "old", "name": "Alpha", "set": "old", "lang": "en",
                 "released_at": "2000-01-01", "collector_number": "1",
                 "image_uris": {"normal": "https://img/old.jpg"}}
         for draft_set, bonus_set in (("bro", "brr"), ("mom", "mul"), ("sir", "sis"),
                                      ("woe", "wot"), ("otj", "big")):
             with self.subTest(draft_set=draft_set):
-                bonus = {**base, "id": bonus_set, "set": bonus_set, "released_at": "2024-04-19",
+                bonus = {**base, **ARENA_SHEET, "id": bonus_set, "set": bonus_set, "released_at": "2024-04-19",
                          "border_color": "borderless", "image_uris": {"normal": f"https://img/{bonus_set}.jpg"}}
                 self.assertEqual(choose_main_printing([base, bonus], "Alpha", draft_set)["id"], bonus_set)
                 self.assertEqual(draft_printing_priority(bonus, draft_set), 1)
-        commander = {**base, "id": "commander", "set": "otc", "released_at": "2024-04-19"}
+        # Same-day Commander decks are on Arena too, but are not draft boosters.
+        commander = {**base, **ARENA_SHEET, "id": "commander", "set": "otc", "released_at": "2024-04-19", "set_type": "commander"}
         self.assertEqual(draft_printing_priority(commander, "otj"), 2)
         self.assertEqual(choose_main_printing([base, commander], "Alpha", "otj")["id"], "old")
+        paper_only = {**commander, "id": "paper", "set_type": "masterpiece", "games": ["paper"]}
+        self.assertEqual(draft_printing_priority(paper_only, "otj"), 2)
         token = {**base, "id": "token", "set": "otj", "set_type": "token",
                  "released_at": "2024-04-19"}
         self.assertEqual(draft_printing_priority(token, "otj"), 2)
@@ -64,74 +75,50 @@ class CardMetadataTests(unittest.TestCase):
 
     def test_bonus_sheet_base_numbers_win_even_if_variant_looks_plainer(self):
         # Scryfall's special-frame metadata is not by itself a reliable signal:
-        # a bonus sheet's default art may itself be borderless/showcase.
+        # a bonus sheet's default art may itself be borderless/showcase, while
+        # its collector variants (etched, schematic, anime) are numbered after it.
         old = {"id": "old", "name": "Alpha", "set": "old",
                "lang": "en", "released_at": "2000-01-01", "collector_number": "1",
                "image_uris": {"normal": "https://img/old.jpg"}}
         cases = (
-            ("bro", "brr", 63),
-            ("mom", "mul", 65),
-            ("woe", "wot", 63),
-            ("otj", "otp", 65),
-            ("otj", "big", 30),
-            ("fin", "fca", 64),
-            ("eoe", "eos", 45),
-            ("tla", "tle", 61),
-            ("tmt", "pza", 20),
+            ("bro", "brr", 63), ("mom", "mul", 65), ("woe", "wot", 63),
+            ("otj", "otp", 65), ("otj", "big", 30), ("fin", "fca", 64),
+            ("eoe", "eos", 45), ("tla", "tle", 61), ("tmt", "pza", 20),
             ("sos", "soa", 65),
         )
         for draft_set, source_set, max_base in cases:
             with self.subTest(draft_set=draft_set, source_set=source_set):
-                base = {**old, "id": "source-base", "set": source_set,
+                base = {**old, **ARENA_SHEET, "id": "source-base", "set": source_set,
                         "collector_number": str(max_base), "released_at": "2024-04-19",
                         "border_color": "borderless", "frame_effects": ["showcase"],
                         "image_uris": {"normal": "https://img/base.jpg"}}
-                alternate = {**old, "id": "alternate", "set": source_set,
+                alternate = {**old, **ARENA_SHEET, "id": "alternate", "set": source_set,
                              "collector_number": str(max_base + 1),
-                             "released_at": "2024-04-19",
+                             "released_at": "2024-04-19", "finishes": ["etched"],
                              "image_uris": {"normal": "https://img/alternate.jpg"}}
                 self.assertEqual(draft_printing_priority(base, draft_set), 1)
-                self.assertEqual(draft_printing_priority(alternate, draft_set), 2)
-                self.assertEqual(
-                    choose_main_printing([old, alternate, base], "Alpha", draft_set)["id"],
-                    "source-base",
-                )
-                # If the bonus sheet has no official base art for this name,
-                # never choose its collector-only printing instead of plain art.
-                self.assertEqual(
-                    choose_main_printing([old, alternate], "Alpha", draft_set)["id"],
-                    "old",
-                )
+                for options in ([old, alternate, base], [base, alternate, old]):
+                    self.assertEqual(choose_main_printing(options, "Alpha", draft_set)["id"], "source-base")
 
     def test_shared_bonus_set_codes_are_scoped_to_the_correct_release(self):
         old = {"id": "old", "name": "Alpha", "set": "old", "lang": "en",
                "released_at": "2000-01-01", "collector_number": "1",
                "image_uris": {"normal": "https://img/old.jpg"}}
-        cases = (
-            ("mkm", "spg", 19, 28), ("otj", "spg", 29, 38),
-            ("mh3", "spg", 39, 48), ("blb", "spg", 54, 63),
-            ("dsk", "spg", 64, 73), ("fdn", "spg", 74, 83),
-            ("dft", "spg", 84, 93), ("tdm", "spg", 104, 113),
-            ("eoe", "spg", 119, 128), ("ecl", "spg", 129, 148),
-            ("sos", "spg", 149, 158), ("msh", "mar", 41, 100),
-        )
-        for draft_set, source, first, last in cases:
-            with self.subTest(draft_set=draft_set):
-                base = {**old, "id": "base", "set": source,
-                        "collector_number": str(first), "released_at": "2026-01-01",
-                        "border_color": "borderless", "frame_effects": ["inverted"]}
-                for number in (first, last):
-                    self.assertEqual(draft_printing_priority(
-                        {**base, "collector_number": str(number)}, draft_set), 1)
-                for number in (first - 1, last + 1, f"{first}z", "", "invalid"):
-                    outside = {**old, "id": "outside", "set": source,
-                               "collector_number": str(number), "released_at": "2026-01-01"}
-                    self.assertEqual(draft_printing_priority(outside, draft_set), 2)
-                    for options in ([outside, old, base], [base, old, outside]):
-                        self.assertEqual(choose_main_printing(options, "Alpha", draft_set)["id"], "base")
-                        self.assertEqual(choose_main_printing(options, "Alpha")["id"], "old")
-                primary = {**base, "id": "primary", "set": draft_set}
-                self.assertEqual(choose_main_printing([old, base, primary], "Alpha", draft_set)["id"], "primary")
+        # SPG spans many releases; only the guests released with the
+        # environment's own set count for it.
+        mkm_guest = {**old, **ARENA_SHEET, "id": "mkm-guest", "set": "spg", "collector_number": "19",
+                     "released_at": "2024-02-09", "border_color": "borderless"}
+        fra_guest = {**mkm_guest, "id": "fra-guest", "collector_number": "160", "released_at": "2026-10-02"}
+        self.assertEqual(draft_printing_priority(mkm_guest, "mkm"), 1)
+        self.assertEqual(draft_printing_priority(fra_guest, "mkm"), 2)
+        self.assertEqual(draft_printing_priority(fra_guest, "fra"), 1)
+        self.assertEqual(draft_printing_priority(mkm_guest, "fra"), 2)
+        for options in ([fra_guest, old, mkm_guest], [mkm_guest, old, fra_guest]):
+            self.assertEqual(choose_main_printing(options, "Alpha", "mkm")["id"], "mkm-guest")
+            self.assertEqual(choose_main_printing(options, "Alpha", "fra")["id"], "fra-guest")
+            self.assertEqual(choose_main_printing(options, "Alpha")["id"], "old")
+        primary = {**mkm_guest, "id": "primary", "set": "mkm"}
+        self.assertEqual(choose_main_printing([old, mkm_guest, primary], "Alpha", "mkm")["id"], "primary")
 
     def test_non_draft_products_do_not_gain_bonus_source_priority(self):
         card = {"set": "spg", "collector_number": "1"}
@@ -167,13 +154,13 @@ class CardMetadataTests(unittest.TestCase):
             choose_main_printing([promo, old], "Alpha", "otj")["id"], "old"
         )
 
-    def test_otj_special_guests_are_limited_to_the_2024_collector_range(self):
+    def test_otj_special_guests_are_limited_to_the_otj_release(self):
         old = {"id": "old", "name": "Stoneforge Mystic", "set": "wwk", "lang": "en",
                "released_at": "2010-02-05", "collector_number": "20",
                "image_uris": {"normal": "https://img/old.jpg"}}
-        guest = {**old, "id": "guest-29", "set": "spg", "collector_number": "29",
+        guest = {**old, **ARENA_SHEET, "id": "guest-29", "set": "spg", "collector_number": "29",
                  "border_color": "borderless", "released_at": "2024-04-19"}
-        unrelated = {**old, "id": "guest-200", "set": "spg", "collector_number": "200",
+        unrelated = {**old, **ARENA_SHEET, "id": "guest-200", "set": "spg", "collector_number": "200",
                      "released_at": "2026-01-01"}
         self.assertEqual(draft_printing_priority(guest, "otj"), 1)
         self.assertEqual(draft_printing_priority(unrelated, "otj"), 2)
