@@ -6,7 +6,7 @@ export default function PrivacyScreen() {
     <ArticleScreen
       kicker="Policy"
       title="Privacy"
-      deck="A plain-English description of what Pack One stores on the website and in the iPhone, iPad and Android apps: analytics, optional accounts, memberships, commerce links, and third-party services."
+      deck="A plain-English description of what Pack One stores on the website and in its mobile apps: analytics, optional accounts, memberships, commerce links, and third-party services."
       sections={privacySections}
     />
   );
