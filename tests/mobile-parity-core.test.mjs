@@ -114,7 +114,7 @@ test('native instructional copy preserves current web Daily eligibility semantic
 
   assert.match(leaderboardScreen, /validated to an eligible account/);
   assert.doesNotMatch(leaderboardScreen, /signed-in Pack One Daily runs/);
-  assert.match(accountScreen, /web, iPhone, iPad, and Android/);
+  assert.match(accountScreen, /website and in the mobile apps/);
 });
 
 
