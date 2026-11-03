@@ -10,6 +10,7 @@ The v6 release rescored every measured Traditional source with Premier-trained v
 - SIR passed and is staged, but stays a Candidate. Its environment has since been Retired.
 - MH3 was admitted under v9 and failed under v6. Its Traditional puzzles were dropped from v10.
 - HBG, KTK and PIO failed, as under v9.
+- The 23 components went Live carrying art from their research builds instead of Premier's. They were repaired on November 2, and publication now blocks that case. See the [November 2 repair](CARD-IMAGE-MAINTENANCE.md#november-2-2026-v6-repair).
 
 ## October 22 Reality Fracture P1P1-P1P6 admission
 
@@ -88,7 +89,7 @@ BLB, DFT and FIN pass the separate frozen-model puzzle gates, including late and
 
 Versioned source components extend the retained v7 parent corpus independently of the model. `traditional-cube-p2p7-v3-v1` is the restricted Cube component; `traditional-premier-v3-v1` identifies the original regular study. Existing Premier manifests and payloads are not copied or replaced. Source hashes include event identity; all source trophies, exclusions and fingerprints remain traceable.
 
-Import validates complete trajectories, qualification, support normalization, artifact checksums, frozen model signatures, metadata/images and accounting before mutation. Only passing sources enter Candidate. Failed research sources are visible as blocked before Candidate. Publication requires a separate authenticated administrative action and a fresh passing report for the exact manifest; parent set must be Live. Pause/retirement affects only newly generated inventory.
+Import validates complete trajectories, qualification, support normalization, artifact checksums, frozen model signatures, metadata/images and accounting before mutation. Component verification, which runs at every stage and publication, also requires every Traditional card to show its environment's Premier art; see [Traditional components](CARD-IMAGE-MAINTENANCE.md#traditional-components). Only passing sources enter Candidate. Failed research sources are visible as blocked before Candidate. Publication requires a separate authenticated administrative action and a fresh passing report for the exact manifest; parent set must be Live. Pause/retirement affects only newly generated inventory.
 
 Schedules and sessions retain exact IDs, parent version and component snapshots. Historical reads allow retained components regardless of current publication state; current generation uses Live components only. Existing Dailies are never regenerated. Admin decision measurements add source-event groups for score distributions, trophy matches and abandonment; the original decision-quality reports remain intact.
 

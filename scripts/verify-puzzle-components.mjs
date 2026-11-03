@@ -3,6 +3,7 @@ import {createHash} from 'node:crypto';
 import {corpusDatabase} from './neon-corpus-db.mjs';
 import {validateComponents} from './load-traditional-components.mjs';
 import {DRAFT_RUN_CORPUS_VERSION as parent} from '../draft-run.mjs';
+import {checkTraditionalArt} from './traditional-premier-art.mjs';
 const parse=x=>typeof x==='string'?JSON.parse(x):x;
 const sorted=x=>Array.isArray(x)?x.map(sorted):x&&typeof x==='object'?Object.fromEntries(Object.keys(x).sort().map(k=>[k,sorted(x[k])])):x;
 const hash=x=>createHash('sha256').update(JSON.stringify(sorted(x))).digest('hex');
@@ -22,7 +23,14 @@ export async function verifyComponents(query,prepared,status=null) {
   assert.equal(hash(parse(row.manifest)),hash(s.manifest),s.sid+': immutable artifact differs');
   const n=(await query("SELECT count(*)::int n,count(*) FILTER(WHERE interesting)::int usable,count(*) FILTER(WHERE NOT EXISTS(SELECT 1 FROM draft_run_puzzle_ratings r WHERE r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'))::int unrated FROM draft_run_verified_puzzles p WHERE set_id=$1 AND corpus_version=$2",[s.sid,v])).rows[0];
   assert.equal(Number(n.n),s.health.puzzles);assert.equal(Number(n.usable),s.health.usable_puzzles);assert.equal(Number(n.unrated),0);
-  console.log(JSON.stringify({set:s.sid,component:v,status:row.status,parent_status:row.parent_status,puzzles:Number(n.n),usable:Number(n.usable),verified:true}));
+  // Traditional cards must show Premier's art for the same environment. This
+  // runs before and after every publication, so a component carrying art from
+  // its research build cannot go Live. Names with no Premier occurrence cannot
+  // be checked and are reported, not failed.
+  const art=await checkTraditionalArt(query,s.sid,v,parent);
+  assert.equal(art.mismatched_cards,0,`${s.sid}: ${art.mismatched_cards} Traditional cards show different art from Premier (${art.mismatched.slice(0,5).map(m=>m.name).join(', ')}). Repair Traditional rows with scripts/traditional-premier-art.mjs, not the full card-image refresh.`);
+  console.log(JSON.stringify({set:s.sid,component:v,status:row.status,parent_status:row.parent_status,puzzles:Number(n.n),usable:Number(n.usable),
+   art:{cards:art.cards,matches_premier:true,unmatched_names:art.unmatched},verified:true}));
  }
 }
 if(process.argv[1]?.endsWith('/verify-puzzle-components.mjs'))await verifyComponents(corpusDatabase(process.argv[2]),await validateComponents(process.argv[3]),process.argv[4]||null);

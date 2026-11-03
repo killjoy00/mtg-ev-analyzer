@@ -71,6 +71,8 @@ Card-image repair is a separate explicit corpus mutation, not part of ingestion 
 
 Backend propagation is paged in idempotent 250-puzzle requests with an explicit cursor. Do not restore whole-environment refresh requests: large environments can exceed the authenticated import request timeout.
 
+Traditional component art that differs from Premier is not a card-image refresh case: it has its own Traditional-only repair and publication gate ([Traditional components](CARD-IMAGE-MAINTENANCE.md#traditional-components)).
+
 Current-serving image propagation includes the current parent corpus plus any `Live` supplemental component attached to that parent. Candidate/non-Live components and components under older parents are excluded. When a selected row belongs to a component, validate it against the row's stored component `corpus_version`; do not validate it against the parent version by default. This is a release-safety invariant, not just a test detail.
 
 The guarded release deploys the same reviewed code revision to development and production before running the Pack One-wide image refresh. Live propagation must pass normalization, tests, dataset audit, exact backend-revision verification, R2 publication, development/production backend refreshes, and gameplay verification. The checked-in corpus is then published separately through a generated branch because protected `main` does not accept workflow direct pushes. An authorized operator/app opens that branch as the pull request; GitHub Actions itself is not currently allowed to create PRs in this repository.
@@ -87,6 +89,8 @@ Current v6 supplemental identities are `traditional-premier-v6-phase2-v1` for re
 Component publication is parent-aware. A ready component under a Live parent can move Candidate -> Live; a ready component under a Candidate parent remains Candidate. In the November 1 v6 release this left SIR staged but non-serving; SIR has since been Retired. HBG, KTK and PIO failed their admission gates and have no v6 component; MH3 failed under v6 and its Traditional puzzles were dropped. Powered Cube serves only P1P2-P1P7 and FRA only P1P1-P1P6.
 
 Component releases use `publish-puzzle-components.yml`. Development must be staged before production is staged, and production publication requires development publication eligibility. Either development stage -> production stage -> development publish -> production publish or development stage -> development publish -> production stage -> production publish is valid. Every stage needs the identical artifact, puzzle counts and ratings in development.
+
+Every stage and publish verification also requires each Traditional card to show the same display fields (`image_url`, `mana_cost`, `rarity`, `type_line`, `display_faces`) as one of the Premier variants for that name in the same environment. A mismatch fails the release before anything goes Live. Repair it with `scripts/traditional-premier-art.mjs` on development and then production, never with the full card-image refresh. See [Traditional components](CARD-IMAGE-MAINTENANCE.md#traditional-components).
 
 Live Traditional components extend the same environment-level serving universe as retained Premier inventory. They do not replace the Premier parent or create a separate player-facing Traditional mode. Current new games use Live components only; existing schedules and sessions keep their pinned IDs and remain readable regardless of later component status.
 
