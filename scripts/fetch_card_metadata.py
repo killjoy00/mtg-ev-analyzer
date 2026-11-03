@@ -142,7 +142,37 @@ DRAFT_BONUS_PRINTINGS = {
     "tmt": (("pza", (1, 20)),),
     "sos": (("soa", (1, 65)), ("spg", (149, 158))),
     "msh": (("mar", (41, 100)),), # MAR 1-40 belong to Marvel's Spider-Man.
+    # Special Guests replace a common in 1 of 55 Play Boosters (Wizards'
+    # "Collecting Reality Fracture"). SPG numbering continues from SOS's
+    # 149-158; the refresh report must show FRA guests selected inside it.
+    "fra": (("spg", (159, 168)),),
 }
+
+# Environments reviewed with no draftable bonus sheet. Every served environment
+# must appear here or in DRAFT_BONUS_PRINTINGS: the card-image refresh refuses
+# to run while any environment lacks an explicit decision, so a new set cannot
+# go Live through any admission path without this review. Evidence for "none"
+# is that every served card resolves to the environment's own set (cross-set
+# fallbacks, if any, are reported separately and allowed by policy).
+DRAFT_BONUS_NONE = frozenset({
+    "ktk", "dmu", "snc", "neo", "one", "ltr", "hbg", "hob", "pio",
+    "lci",           # Special Guests were not in LCI Draft Boosters.
+    "powered-cube",  # A cube, not a booster; uses the global earliest printing.
+})
+
+
+def missing_bonus_decisions(environments: Iterable[str]) -> list[str]:
+    """Served environments with neither a registered bonus sheet nor 'none'."""
+    return sorted(sid for sid in environments if sid not in DRAFT_BONUS_PRINTINGS and sid not in DRAFT_BONUS_NONE)
+
+
+def in_bonus_range(card: dict, bonus_set: str, number_range: Optional[tuple[int, int]]) -> bool:
+    if str(card.get("set") or "").lower() != bonus_set:
+        return False
+    if number_range is None:
+        return True
+    number = str(card.get("collector_number") or "")
+    return number.isdigit() and number_range[0] <= int(number) <= number_range[1]
 
 
 def draft_printing_priority(card: dict, draft_set: Optional[str]) -> int:
@@ -166,13 +196,8 @@ def draft_printing_priority(card: dict, draft_set: Optional[str]) -> int:
     if source == intended:
         return 0
     for bonus_set, number_range in DRAFT_BONUS_PRINTINGS.get(intended, ()):
-        if source != bonus_set:
-            continue
-        if number_range is not None:
-            number = str(card.get("collector_number") or "")
-            if not number.isdigit() or not number_range[0] <= int(number) <= number_range[1]:
-                continue
-        return 1
+        if in_bonus_range(card, bonus_set, number_range):
+            return 1
     return 2
 
 
