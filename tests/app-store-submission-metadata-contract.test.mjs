@@ -17,6 +17,8 @@ test('guarded App Store metadata repair includes required legal links and reject
   }
   assert.match(script,/appStoreVersionLocalizations/);
   assert.match(script,/attributes:\{description:repairedDescription\}/);
+  assert.match(script,/iOS App Store description must not reference Android/);
+  assert.match(script,/the Pack One website, iPhone, and iPad/);
   assert.doesNotMatch(script,/\/reviewSubmissions/);
   assert.doesNotMatch(script,/relationships\/build/);
 });
@@ -34,6 +36,10 @@ test('reviewed Apple description source keeps explicit EULA, Pack One Terms, and
   }
   assert.match(appleDescription,/Terms of Use \(EULA\): https:\/\/www\.apple\.com\/legal\/internet-services\/itunes\/dev\/stdeula\//);
   assert.doesNotMatch(appleDescription,/See packone\.pro\/terms\//);
+  assert.doesNotMatch(appleDescription,/\bAndroid\b/i);
+  const docDescription=docs.split('### Description\n')[1].split('\n### App Review notes')[0];
+  assert.doesNotMatch(docDescription,/\bAndroid\b/i);
+  assert.match(appleDescription,/the Pack One website, iPhone, and iPad/);
 });
 
 test('guarded request is scoped to metadata repair and does not authorize submission or release',()=>{
