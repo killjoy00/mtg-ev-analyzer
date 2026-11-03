@@ -143,8 +143,7 @@ DRAFT_BONUS_PRINTINGS = {
     "sos": (("soa", (1, 65)), ("spg", (149, 158))),
     "msh": (("mar", (41, 100)),), # MAR 1-40 belong to Marvel's Spider-Man.
     # Special Guests replace a common in 1 of 55 Play Boosters (Wizards'
-    # "Collecting Reality Fracture"). SPG numbering continues from SOS's
-    # 149-158; the refresh report must show FRA guests selected inside it.
+    # "Collecting Reality Fracture"); the ten FRA guests are SPG 159-168.
     "fra": (("spg", (159, 168)),),
 }
 
