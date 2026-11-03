@@ -69,6 +69,10 @@ The first three November 3 releases stopped on development at the same point, ri
 
 Unresolved names still fail the refresh, and served names are now part of that check, so a served card the policy cannot resolve blocks publication instead of being skipped.
 
+### November 3, 2026 release
+
+The fourth release, card-image release 41604895831 on `43bf016` (#1485), succeeded. Development propagation took 12.5 minutes. Production took 61 minutes, writing rows throughout. Gameplay verification passed on both. Afterwards every served card on production, in current Premier rows and Live Traditional components of all 31 served environments, had exactly one `image_url`, and it equalled the refresh's policy mapping for that environment. Policy resolution reported 0 unresolved names and no remaining special printings. Reality Fracture's ten guests are on SPG #159–168. No Live Traditional component has a card whose display fields match no Premier variant. The source update was merged as #1486.
+
 ## Display-only mutation boundary
 
 Image maintenance may change only:
@@ -157,7 +161,7 @@ A Traditional build should copy Premier's display fields onto its cards, as `pre
 
 ### Repairing Traditional art
 
-Never use the full card-image refresh (`card-images` request) to repair Traditional art. It rewrites every environment's Premier rows as well, re-uploads the replay shards, and does not finish a full v10 pass inside the workflow's 90-minute limit (development alone took 68 minutes). Use the Traditional-only repair:
+Never use the full card-image refresh (`card-images` request) to repair Traditional art. It rewrites every environment's Premier rows as well, re-uploads the replay shards, and takes far longer (the November 3 pass took about 100 of its 210 minutes, 61 of them writing production). Use the Traditional-only repair:
 
 ```
 node scripts/traditional-premier-art.mjs <connection-file> check [set ...]
@@ -171,9 +175,9 @@ Reality Fracture (FRA) is Live but is not in the Draft Run catalog (`corpus/draf
 
 ### November 2, 2026 v6 repair
 
-The v6 components were published on November 1, after the last full refresh on October 23, so they carried the resolver's printings. The repair applied the same Traditional-only copy that `scripts/traditional-premier-art.mjs` now performs, by hand, on all 23 Live v6 components (21 regular sets, Reality Fracture P1P1-P1P6 and Powered Cube P1P2-P1P7), directly in the database. On production it rewrote 112,901 of 158,382 Traditional puzzles; afterwards 0 of 2,224,732 Traditional cards differed from Premier on both production and development, and Celestial Colonnade in Powered Cube shows its Worldwake printing. Sword of Fire and Ice in MSH (8 cards) has no Premier occurrence, so it keeps its existing art. Premier rows, replay shards and checked-in card files were not changed by the repair.
+The v6 components were published on November 1, after the last full refresh on October 23, so they carried the resolver's printings. The repair applied the same Traditional-only copy that `scripts/traditional-premier-art.mjs` now performs, by hand, on all 23 Live v6 components (21 regular sets, Reality Fracture P1P1-P1P6 and Powered Cube P1P2-P1P7), directly in the database. On production it rewrote 112,901 of 158,382 Traditional puzzles; afterwards 0 of 2,224,732 Traditional cards differed from Premier on both production and development, and Celestial Colonnade in Powered Cube shows its Worldwake printing. Sword of Fire and Ice in MSH (8 cards) has no Premier occurrence, so the repair left it alone; the November 3 release put it on its policy printing (MAR #100). Premier rows, replay shards and checked-in card files were not changed by the repair.
 
-An earlier attempt on the same day ran the full refresh instead. Before it was cancelled at the 90-minute limit it had rewritten development Premier and Traditional rows, production KTK Premier, part of production MOM Premier and the replay shards with the refreshed mapping. Whether to keep or revert those changes is an open owner decision.
+An earlier attempt on the same day ran the full refresh instead. Before it was cancelled at the 90-minute limit it had rewritten development Premier and Traditional rows, production KTK Premier, part of production MOM Premier and the replay shards with the refreshed mapping. The [November 3 release](#november-3-2026-release) brought every served row to the policy, so that partial state no longer matters.
 
 ## Guarded release sequence
 
@@ -196,7 +200,7 @@ The refresh then:
 7. publishes normalized replay shards to R2;
 8. checks every served card has a policy selection, refreshes development backend image metadata and verifies gameplay;
 9. re-verifies the production release marker, repeats the coverage check, refreshes production image metadata and verifies gameplay;
-10. publishes the refreshed checked-in corpus/card-image source of truth through a pull request.
+10. pushes the refreshed checked-in corpus/card-image source of truth to an `automation/card-image-refresh-<run>-<attempt>` branch. Actions does not open the pull request; open it from that branch and merge it once its checks pass.
 
 The corpus-writer concurrency group serializes this with other corpus mutations. A failed normalization or verification stops before later publication stages.
 
