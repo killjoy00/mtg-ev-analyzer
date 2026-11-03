@@ -76,29 +76,31 @@ test('the collector merges development and production inventories',async()=>{
   await assert.rejects(collectServedInventory(['https://dev'],async()=>({corpus_version:'v',environments:[]})),/Unexpected image environment listing/);
 });
 
-const propagation=({served={fra:{names:['Countersculpt']}},inventory={ktk:['Siege Rhino'],fra:['Countersculpt']}}={})=>{
+const propagation=({served={ktk:{names:['Siege Rhino']},fra:{names:['Countersculpt']}}}={})=>{
   const calls=[];
   const request=async(base,body)=>{
     calls.push(body);
     if(body.action==='refresh-image-page-v2')return {set_id:body.setId,mapping_entries:body.mapping.length,puzzles:1,updated_puzzles:0,updated_cards:0,done:true,corpus_available:true};
-    if(body.action==='image-inventory')return {set_id:body.setId,corpus_version:'v',names:inventory[body.setId],done:true,next_after:null};
     if(body.action==='normalize-image-markers')return {normalized:[{set_id:body.setIds[0],missing_images:0,puzzles:1}]};
-    throw Error('unexpected action');
+    throw Error('unexpected action '+body.action);
   };
   const mappings={ktk:[{name:'Siege Rhino',image_url:'https://k'}],fra:[{name:'Countersculpt',image_url:'https://f'}]};
   return {calls,run:()=>refreshBackendImages('https://api',{request,catalog:{sets:[{id:'ktk'}]},served,readMapping:sid=>mappings[sid]})};
 };
 
-test('propagation covers served-only environments and fails closed on unmapped served cards',async()=>{
+test('propagation covers served-only environments and fails closed on unmapped served cards before writing',async()=>{
   assert.deepEqual(propagationSetIds({sets:[{id:'ktk'}]},{fra:{},ktk:{}}),['ktk','fra']);
   const ok=propagation();
   const result=await ok.run();
   assert.deepEqual(result.refreshed.map(r=>r.set_id),['ktk','fra']);
   assert.deepEqual(result.normalized.map(r=>r.set_id),['ktk','fra']);
-  const gap=propagation({inventory:{ktk:['Siege Rhino','Lightning Bolt'],fra:['Countersculpt']}});
-  await assert.rejects(gap.run(),/ktk: 1 served cards have no card-image policy selection \(Lightning Bolt\)/);
-  // Nothing is normalized after a coverage failure.
-  assert.equal(gap.calls.some(c=>c.action==='normalize-image-markers'),false);
+  // Coverage comes from the inventory collected at the start; propagation makes
+  // no inventory requests of its own.
+  assert.equal(ok.calls.some(c=>c.action==='image-inventory'),false);
+  const gap=propagation({served:{ktk:{names:['Siege Rhino']},fra:{names:['Countersculpt','Splinter Twin']}}});
+  await assert.rejects(gap.run(),/fra: 1 served cards have no card-image policy selection \(Splinter Twin\)/);
+  // A gap in any environment stops the refresh before anything is written.
+  assert.equal(gap.calls.length,0);
 });
 
 test('served names follow every inventory page and refuse a stuck cursor',async()=>{

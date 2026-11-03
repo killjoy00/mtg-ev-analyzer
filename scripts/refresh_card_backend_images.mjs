@@ -3,7 +3,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {importRequest} from './actions-import-auth.mjs';
-import {servedNames} from './collect_served_card_inventory.mjs';
 
 // Environments to propagate: the replay catalog plus every environment in the
 // served card inventory (trophy-only environments such as FRA are not in the
@@ -23,11 +22,24 @@ export async function refreshBackendImages(base,{request=importRequest,catalog,s
     return JSON.parse(fs.readFileSync(mappingPath,'utf8'));
   };
 
-  const refreshed=[];
+  // Coverage is checked against the served inventory collected at the start of
+  // the refresh, for every environment, before anything is written. A second
+  // backend read after propagation stalled on development in the first two
+  // releases with this check; it is not needed, because the policy step already
+  // refuses unresolved served names and this repeats that check per mapping.
+  const mappings=new Map();
   for(const setId of setIds) {
     const mapping=readMapping(setId);
     if(!Array.isArray(mapping)||!mapping.length)throw new Error(`Image mapping is empty for ${setId}`);
+    const mapped=new Set(mapping.map(entry=>entry.name));
+    const unmapped=(served?.[setId]?.names||[]).filter(name=>!mapped.has(name));
+    if(unmapped.length)throw new Error(`${setId}: ${unmapped.length} served cards have no card-image policy selection (${unmapped.slice(0,10).join(', ')}). Collect the served inventory and rerun the refresh.`);
+    mappings.set(setId,mapping);
+  }
 
+  const refreshed=[];
+  for(const setId of setIds) {
+    const mapping=mappings.get(setId);
     let after='',puzzles=0,updatedPuzzles=0,updatedCards=0;
     for(;;) {
       const page=await request(base,{action:'refresh-image-page-v2',setId,mapping,after});
@@ -58,15 +70,7 @@ export async function refreshBackendImages(base,{request=importRequest,catalog,s
     // matching JSON before it crosses the Neon proxy. The normalization pass
     // below independently verifies that the set exists and contains puzzles.
 
-    // Fail closed when the backend serves a card the policy did not resolve.
-    // Unmapped cards keep whatever art they were imported with, which is how
-    // cards outside the replay samples escaped the policy before.
-    const inventory=await servedNames(request,base,setId);
-    const mapped=new Set(mapping.map(entry=>entry.name));
-    const unmapped=inventory.names.filter(name=>!mapped.has(name));
-    if(unmapped.length)throw new Error(`${setId}: ${unmapped.length} served cards have no card-image policy selection (${unmapped.slice(0,10).join(', ')}). Collect the served inventory and rerun the refresh.`);
-
-    refreshed.push({set_id:setId,mapping_entries:mapping.length,served_names:inventory.names.length,puzzles,updated_puzzles:updatedPuzzles,updated_cards:updatedCards});
+    refreshed.push({set_id:setId,mapping_entries:mapping.length,served_names:served?.[setId]?.names?.length??null,puzzles,updated_puzzles:updatedPuzzles,updated_cards:updatedCards});
   }
 
   const normalized=[];
