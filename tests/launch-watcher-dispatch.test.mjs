@@ -166,7 +166,7 @@ test('authentication failures, recovery state errors, and exhaustion remain imme
 
 test('production launch signal uses the retry-aware operator escalation decision',()=>{
   const source=fs.readFileSync(new URL('../worker/growth-function.js',import.meta.url),'utf8');
-  assert.match(source,/const urgentOperatorAlert=launchWatcherRecoveryNeedsUrgentAlert\\(\\{recoveryDispatch,recoveryDispatchError\\}\\);/);
+  assert.ok(source.includes('const urgentOperatorAlert=launchWatcherRecoveryNeedsUrgentAlert({recoveryDispatch,recoveryDispatchError});'));
 });
 
 test('accepted dispatch with no coverage progress retries only after the no-progress guard',async()=>{
