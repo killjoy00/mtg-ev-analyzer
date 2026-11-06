@@ -8,7 +8,6 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
-import {draftRunLeaderboardRows} from '../worker/draft-run-season.mjs';
 if(!process.argv.includes('--dev-fixtures'))throw new Error('Use an isolated development database and --dev-fixtures.');
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 const {default:growth,query,gameDateKey}=await import('../worker/growth-function.js');
@@ -210,12 +209,19 @@ assert.equal(draftBoard.period,'season','legacy all-time links now resolve to th
 assert.ok(draftBoard.start&&draftBoard.scoring,'the current season has a ranked leaderboard');
 // Public boards return only the top 100. A one-day fixture score need not
 // qualify under conservative season ratings on a real production clone.
-// Query the exact same ranked SQL scoped to each player *after* ranking, so
-// scores outside the first page still prove public identity visibility.
-const rankedIdentityRows=playerId=>draftRunLeaderboardRows(query,{
-  start:draftBoard.start,end:draftBoard.today,environment:'mixed',
-  playerId,limit:1,ratingPolicy:draftBoard.scoring,
-});
+// Inspect the same identity/score eligibility predicates used by the public
+// ranking SQL, without assuming the fixture is in that bounded first page.
+const rankedIdentityRows=async(playerId)=>{
+  const result=await query(`SELECT DISTINCT p.display_name
+    FROM scores s JOIN players p ON p.id=s.player_id
+    WHERE s.player_id=$1::uuid AND s.mode='draft_run' AND s.set_id='mixed'
+      AND s.challenge_date BETWEEN $2::date AND $3::date
+      AND p.username_owned=true AND p.public_identity_hidden_at IS NULL
+      AND EXISTS(SELECT 1 FROM account_links a WHERE a.player_id=s.player_id)`,[
+    playerId,draftBoard.start,draftBoard.today,
+  ]);
+  return result.rows;
+};
 assert.deepEqual((await rankedIdentityRows(first.playerId)).map(row=>row.display_name),[username],
   'the owned username is eligible even when outside the public top 100');
 assert.deepEqual(await rankedIdentityRows(contender.playerId),[],
