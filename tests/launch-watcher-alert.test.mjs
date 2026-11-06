@@ -76,6 +76,8 @@ test('stale coverage alerts once after the automatic recovery grace period expir
   assert.equal(duplicate.action,'deduplicated');
   assert.equal(requests.length,1);
   assert.equal(JSON.parse(requests[0].options.body).subject,'[Pack One] Launch coverage stale');
+  assert.match(JSON.parse(requests[0].options.body).text,/Coverage remained stale after the 30-minute operator notification grace period/);
+  assert.doesNotMatch(JSON.parse(requests[0].options.body).text,/grace period was bypassed/);
   assert.match(requests[0].options.headers['Idempotency-Key'],/^pack1-launch-stale-[a-f0-9]{24}$/);
   assert.equal(store.state().status,'stale');
 });
@@ -89,6 +91,9 @@ test('recovery dispatcher failure bypasses grace and alerts immediately',async()
   assert.equal(result.action,'alerted');
   assert.equal(requests.length,1);
   assert.equal(requests[0].subject,'[Pack One] Launch coverage stale');
+  assert.match(requests[0].text,/Automatic recovery dispatch failed or could not be verified/);
+  assert.match(requests[0].text,/notification grace period was bypassed/);
+  assert.doesNotMatch(requests[0].text,/remained stale after the 30-minute/);
 });
 
 test('service-principal email cannot redirect the established operator destination',async()=>{
