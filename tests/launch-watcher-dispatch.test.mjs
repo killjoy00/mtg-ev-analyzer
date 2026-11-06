@@ -5,6 +5,7 @@ import {
   LAUNCH_WATCHER_DISPATCH_MAX_ATTEMPTS,
   LAUNCH_WATCHER_DISPATCH_STATE_KEY,
   parseLaunchWatcherDispatchState,
+  launchWatcherRecoveryNeedsUrgentAlert,
   reconcileLaunchWatcherDispatch,
 } from '../worker/launch-watcher-dispatch.mjs';
 
@@ -119,6 +120,53 @@ test('dispatch failure retries on the next independent interval and can recover'
   assert.equal(recovered.action,'recovered');
   assert.equal(store.state().status,'fresh');
   assert.equal(calls,2);
+});
+
+test('a first transient GitHub 502 gets the existing bounded interval retry before urgent email',async()=>{
+  const store=memoryState();let calls=0;
+  const fetcher=async()=>{
+    calls++;
+    return calls<=2?new Response('{}',{status:502}):new Response(null,{status:204});
+  };
+  const start=Date.parse('2026-09-27T13:40:00Z');
+  const first=await reconcileLaunchWatcherDispatch({query:store.query,freshness:STALE,now:start,env:ENV,fetcher});
+  assert.equal(first.action,'failed');
+  assert.equal(first.reason,'dispatch_http_502');
+  assert.equal(first.attempts,1);
+  assert.equal(launchWatcherRecoveryNeedsUrgentAlert({recoveryDispatch:first}),false);
+
+  const waiting=await reconcileLaunchWatcherDispatch({query:store.query,freshness:STALE,now:start+5*60_000,env:ENV,fetcher});
+  assert.equal(waiting.action,'cooldown');
+  assert.equal(calls,1,'no early duplicate root dispatch');
+
+  const second=await reconcileLaunchWatcherDispatch({query:store.query,freshness:STALE,now:start+10*60_000,env:ENV,fetcher});
+  assert.equal(second.action,'failed');
+  assert.equal(second.reason,'dispatch_http_502');
+  assert.equal(second.attempts,2);
+  assert.equal(launchWatcherRecoveryNeedsUrgentAlert({recoveryDispatch:second}),true);
+
+  const third=await reconcileLaunchWatcherDispatch({query:store.query,freshness:STALE,now:start+20*60_000,env:ENV,fetcher});
+  assert.equal(third.action,'dispatched');
+  assert.equal(third.attempts,3);
+  assert.equal(launchWatcherRecoveryNeedsUrgentAlert({recoveryDispatch:third}),false);
+  assert.equal(calls,3,'the existing three-attempt root limit is preserved');
+});
+
+test('authentication failures, recovery state errors, and exhaustion remain immediately urgent',()=>{
+  assert.equal(launchWatcherRecoveryNeedsUrgentAlert({recoveryDispatch:{action:'failed',attempts:1,reason:'dispatch_http_401'}}),true);
+  assert.equal(launchWatcherRecoveryNeedsUrgentAlert({recoveryDispatch:{action:'failed',attempts:1,reason:'dispatch_request_failed'}}),true);
+  for(const reason of ['dispatch_http_500','dispatch_http_503','dispatch_http_504']) {
+    assert.equal(launchWatcherRecoveryNeedsUrgentAlert({recoveryDispatch:{action:'failed',attempts:1,reason}}),false);
+    assert.equal(launchWatcherRecoveryNeedsUrgentAlert({recoveryDispatch:{action:'failed',attempts:2,reason}}),true);
+  }
+  assert.equal(launchWatcherRecoveryNeedsUrgentAlert({recoveryDispatch:{action:'exhausted',attempts:3}}),true);
+  assert.equal(launchWatcherRecoveryNeedsUrgentAlert({recoveryDispatchError:'database unavailable'}),true);
+  assert.equal(launchWatcherRecoveryNeedsUrgentAlert({recoveryDispatch:{action:'healthy'}}),false);
+});
+
+test('production launch signal uses the retry-aware operator escalation decision',()=>{
+  const source=fs.readFileSync(new URL('../worker/growth-function.js',import.meta.url),'utf8');
+  assert.ok(source.includes('const urgentOperatorAlert=launchWatcherRecoveryNeedsUrgentAlert({recoveryDispatch,recoveryDispatchError});'));
 });
 
 test('accepted dispatch with no coverage progress retries only after the no-progress guard',async()=>{

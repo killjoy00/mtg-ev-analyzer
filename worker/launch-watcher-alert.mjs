@@ -79,10 +79,14 @@ function field(value) {
   return value===null||value===undefined?'unknown':String(value);
 }
 
-async function sendStaleOperatorEmail({env,fetcher,episode,freshness,detectedAt,startedAt}) {
+async function sendStaleOperatorEmail({env,fetcher,episode,freshness,detectedAt,startedAt,urgent}) {
   const {apiKey,destination}=alertConfig(env);
   const text=[
-    'Pack One launch-monitor coverage has remained stale beyond the automatic recovery grace period.',
+    'Pack One launch-monitor coverage is stale and needs operator attention.',
+    '',
+    urgent
+      ? 'Why this alert was sent: Automatic recovery dispatch failed or could not be verified, so the notification grace period was bypassed.'
+      : 'Why this alert was sent: Coverage remained stale after the 30-minute operator notification grace period.',
     '',
     'Detected at: '+detectedAt,
     'Stale episode started: '+field(startedAt),
@@ -148,7 +152,7 @@ export async function reconcileLaunchWatcherAlert({query,freshness,now=Date.now(
   }
 
   await sendStaleOperatorEmail({
-    env,fetcher,episode:pending.episode_id,freshness,detectedAt,startedAt:pending.started_at,
+    env,fetcher,episode:pending.episode_id,freshness,detectedAt,startedAt:pending.started_at,urgent,
   });
   await saveState(query,{
     ...pending,status:'stale',alerted_at:detectedAt,reason:freshness.reason||pending.reason,
