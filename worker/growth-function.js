@@ -24,7 +24,7 @@ import {neonTriggerInvocationHeader,verifyNeonScheduleTrigger} from './neon-trig
 import {DAILY_SOCIAL_TRIGGER_NAME,dispatchDailySocialFromNeon} from './daily-social-dispatch.mjs';
 import {inspectLaunchCoverageFreshness} from './launch-watcher-stale.mjs';
 import {reconcileLaunchWatcherAlert} from './launch-watcher-alert.mjs';
-import {launchWatcherRecoveryConfigured,reconcileLaunchWatcherCadence,reconcileLaunchWatcherDispatch} from './launch-watcher-dispatch.mjs';
+import {launchWatcherRecoveryConfigured,launchWatcherRecoveryNeedsUrgentAlert,reconcileLaunchWatcherCadence,reconcileLaunchWatcherDispatch} from './launch-watcher-dispatch.mjs';
 import {campaignLinkPublishConfigured,handleCampaignLinkPublish} from './campaign-link-publish.mjs';
 import {handleCreatorChallengePublication,handleCreatorChallengePurge,requestCreatorPrivacyRetirement} from './creator-challenge-publish.mjs';
 import {CREATOR_PRIVACY_WITHDRAWN_SQL} from './creator-challenges.mjs';
@@ -2019,9 +2019,7 @@ async function launchWatcherSignal(trigger,response) {
     }));
   }
 
-  const urgentOperatorAlert=Boolean(
-    recoveryDispatchError||recoveryDispatch?.action==='failed'||recoveryDispatch?.action==='exhausted'
-  );
+  const urgentOperatorAlert=launchWatcherRecoveryNeedsUrgentAlert({recoveryDispatch,recoveryDispatchError});
   let operatorAlert=null;
   try {
     operatorAlert=await reconcileLaunchWatcherAlert({query,freshness,now:scheduledAt,urgent:urgentOperatorAlert});
