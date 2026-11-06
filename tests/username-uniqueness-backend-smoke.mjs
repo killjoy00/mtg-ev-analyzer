@@ -8,6 +8,7 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
+import {draftRunLeaderboardRows} from '../worker/draft-run-season.mjs';
 if(!process.argv.includes('--dev-fixtures'))throw new Error('Use an isolated development database and --dev-fixtures.');
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 const {default:growth,query,gameDateKey}=await import('../worker/growth-function.js');
@@ -205,8 +206,22 @@ for(const [playerId,score] of [[first.playerId,91],[contender.playerId,89]]) {
   );
 }
 const draftBoard=await call(draftRun,'/v1/leaderboard?period=all&environment=mixed',undefined,null,200);
-assert.equal(draftBoard.rows.filter(row=>row.display_name===username).length,1,
-  'Draft Run exposes the owned username exactly once');
+assert.equal(draftBoard.period,'season','legacy all-time links now resolve to the current season');
+assert.ok(draftBoard.start&&draftBoard.scoring,'the current season has a ranked leaderboard');
+// Public boards return only the top 100. A one-day fixture score need not
+// qualify under conservative season ratings on a real production clone.
+// Query the exact same ranked SQL scoped to each player *after* ranking, so
+// scores outside the first page still prove public identity visibility.
+const rankedIdentityRows=playerId=>draftRunLeaderboardRows(query,{
+  start:draftBoard.start,end:draftBoard.today,environment:'mixed',
+  playerId,limit:1,ratingPolicy:draftBoard.scoring,
+});
+assert.deepEqual((await rankedIdentityRows(first.playerId)).map(row=>row.display_name),[username],
+  'the owned username is eligible even when outside the public top 100');
+assert.deepEqual(await rankedIdentityRows(contender.playerId),[],
+  'an unowned colliding nickname is excluded from the ranked leaderboard');
+assert.ok(draftBoard.rows.filter(row=>row.display_name===username).length<=1,
+  'the bounded public leaderboard never duplicates the owned username');
 
 const legacySet=`q${tag}`;
 for(const [playerId,score] of [[first.playerId,91],[contender.playerId,89]]) {
@@ -235,8 +250,9 @@ assert.deepEqual(resolvedStatus.ranking_identity,{eligible:true,reason:null},
   'the Daily warning clears immediately after a successful rename');
 
 const renamedDraftBoard=await call(draftRun,'/v1/leaderboard?period=all&environment=mixed',undefined,null,200);
-assert.ok(renamedDraftBoard.rows.some(row=>row.display_name===resolvedName),
-  'the existing Draft Run score becomes visible under the newly owned username');
+assert.equal(renamedDraftBoard.period,'season');
+assert.deepEqual((await rankedIdentityRows(contender.playerId)).map(row=>row.display_name),[resolvedName],
+  'the existing Draft Run score becomes rank-eligible under the newly owned username');
 await call(legacy,`/v1/leaderboard?period=all&set=${legacySet}&mode=top3`,undefined,null,410);
 await call(legacy,'/v1/challenges',{displayName:resolvedName},contender.token,410);
 console.log('Linked collisions stay private until renamed',tag);
