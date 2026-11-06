@@ -8,6 +8,16 @@ export const LAUNCH_WATCHER_DISPATCH_IN_FLIGHT_TIMEOUT_MS=10*60*1000;
 
 const GITHUB_DISPATCH_URL='https://api.github.com/repos/killjoy00/mtg-ev-analyzer/actions/workflows/launch-alert.yml/dispatches';
 const STATUS=new Set(['fresh','stale','dispatching','dispatched','failed','exhausted']);
+// One transient GitHub 5xx is retried by the existing ten-minute watchdog interval.
+// Do not treat that first failure as an urgent operator incident; subsequent
+// failures, exhausted attempts, and non-transient failures remain urgent.
+const TRANSIENT_DISPATCH_ERRORS=new Set(['dispatch_http_500','dispatch_http_502','dispatch_http_503','dispatch_http_504']);
+
+export function launchWatcherRecoveryNeedsUrgentAlert({recoveryDispatch=null,recoveryDispatchError=null}={}) {
+  if(recoveryDispatchError||recoveryDispatch?.action==='exhausted')return true;
+  if(recoveryDispatch?.action!=='failed')return false;
+  return !(recoveryDispatch.attempts===1&&TRANSIENT_DISPATCH_ERRORS.has(recoveryDispatch.reason));
+}
 
 function iso(value) {
   const time=Number(value);
