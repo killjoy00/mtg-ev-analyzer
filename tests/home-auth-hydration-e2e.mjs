@@ -61,7 +61,7 @@ try {
     const f=await fixture({auth:'signed-in',claimed:true,complete:true,holdAuth:true,holdDaily:true});
     await f.page.goto(base);
     await f.page.locator('[data-home-state="checking"]').waitFor();
-    assert.equal((await f.page.locator('#account-nav').textContent())?.trim(),'Account');
+    assert.equal((await f.page.locator('#account-nav').textContent())?.trim(),'My Pack One');
     assert.equal(await f.page.locator('#how-nav').isHidden(),true);
     assert.equal(await f.page.locator('.daily-home-game.is-unplayed').count(),0);
     assert.equal(await f.page.locator('.daily-home-game.is-pending').count(),3);
