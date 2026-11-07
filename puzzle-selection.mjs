@@ -1,11 +1,12 @@
-// Selection features for one verified puzzle, and the latest-set Daily rule
-// that uses them. Features are computed once, when a puzzle is imported
+// Selection features for one verified puzzle, and the Daily stakes rule
+// shared by Latest Set and Main Daily. Features are computed once, when a puzzle is imported
 // (scripts/score-puzzle-selection.mjs), from checked-in inputs only: the
 // puzzle's model supports, the set's card strength table and the trophy
 // decklist. They never change grading. The rule was chosen in the blinded owner
 // review (docs/PUZZLE-REVIEW.md); docs/LATEST-DAILY-SELECTION.md describes it.
 export const SELECTION_FEATURE_VERSION='stakes-v1';
 export const LATEST_DAILY_RULE='latest-stakes-v1';
+export const MIXED_DAILY_RULE='mixed-stakes-v1';
 
 export const STAKES_RULE=Object.freeze({
   // An option is credible with at least 35% of the leader's model support;
