@@ -37,6 +37,11 @@ test('reports reject malformed dates and filters and bound the query range',()=>
   assert.equal(filters.start,'2026-09-01');
   assert.equal(filters.corpus_version,DRAFT_RUN_CORPUS_VERSION);
   assert.equal(filters.params.at(-1),DRAFT_RUN_CORPUS_VERSION);
+  const all=reportFilters(new URL('https://test/?from=2026-09-01&to=2026-09-12&corpus=all'));
+  assert.equal(all.corpus_version,'all');
+  assert.equal(all.params.length,filters.params.length,'corpus=all keeps the parameter positions');
+  assert.equal(all.params.at(-1),'all');
+  assert.throws(()=>reportFilters(new URL('https://test/?corpus=elite-trophy-colour-stage-v9')));
 });
 test('admin report defaults stay on the Pack One Pacific day across the UTC boundary',()=>{
   const filters=reportFilters(new URL('https://test/'),new Date('2026-10-07T01:30:00Z'));
@@ -65,14 +70,17 @@ test('core admin measurements cannot regress to deferred habit or review aggrega
 });
 
 
-test('admin measurement baseline is pinned to the current parent corpus without deleting history',()=>{
+test('decision metrics default to the current corpus while player metrics span every corpus version',()=>{
   const source=fs.readFileSync('worker/measurement-admin.mjs','utf8');
-  assert.match(source,/AND corpus_version=\$9/,'decision aggregates must filter the session parent corpus');
-  assert.match(source,/s\.corpus_version=\$3/,'Daily habit sessions must be current-corpus only');
-  assert.match(source,/s\.corpus_version=\$4/,'share starts and completions must be current-corpus sessions');
-  assert.match(source,/SELECT min\(created_at\) started_at FROM draft_run_sessions WHERE corpus_version=\$4/,'best-effort share arrivals must not predate the current-corpus epoch');
+  assert.match(source,/AND \(\$9='all' OR corpus_version=\$9\)/,'decision aggregates filter the session parent corpus unless corpus=all');
   assert.match(source,/puzzle_id=\$10/,'decision detail must keep its puzzle parameter after the corpus scope parameter');
-  assert.match(source,/Historical measurements remain stored but are excluded from this dashboard baseline/);
+  const habits=source.match(/const HABIT_METRICS_SQL=`([\s\S]*?)`;/)?.[1];
+  assert.ok(habits,'the habit SQL must be defined');
+  assert.doesNotMatch(habits,/corpus_version/,'Daily habit cohorts count every corpus version');
+  const funnel=source.slice(source.indexOf("'share_funnel'"),source.indexOf('dated_arrivals'));
+  assert.ok(funnel.length>0,'the share funnel SQL must be present');
+  assert.doesNotMatch(funnel,/corpus_version|corpus_epoch/,'the share funnel counts every corpus version');
+  assert.match(source,/Historical measurements remain stored\./);
 });
 
 // The core must compute the expensive first-encounter view once, not in
@@ -89,7 +97,7 @@ test('Insights core reuses a single scoped scan and returns all report fields',a
       groups:JSON.stringify([{dimension:'difficulty',label:'hard',answers:3}]),
     }]};
     if(sql.includes('SELECT set_id FROM draft_run_environment_policy'))return {rows:[{set_id:'blb'}]};
-    if(sql.includes('WITH corpus_epoch AS'))return {rows:[{arrivals:3,starts:2,completions:1}]};
+    if(sql.includes('WITH arrivals AS'))return {rows:[{arrivals:3,starts:2,completions:1}]};
     throw Error('Unexpected SQL in admin Insights mock: '+sql.slice(0,75));
   };
   const request=new Request('https://packone.pro/v1/admin/measurements?from=2026-10-01&to=2026-10-24',{

@@ -51,6 +51,7 @@ export async function runOverviewChecks(browser) {
     const measured=requests.find(r=>r.path==='/v1/admin/measurements');
     assert.equal(new URLSearchParams(measured.query).get('from'),gameDateKey());
     assert.equal(new URLSearchParams(measured.query).get('to'),gameDateKey());
+    assert.equal(new URLSearchParams(measured.query).get('corpus'),'all','Overview player counts span every corpus version');
 
     fs.mkdirSync('artifacts',{recursive:true});
     for(const width of [320,390,1280]) {

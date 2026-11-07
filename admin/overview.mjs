@@ -142,10 +142,10 @@ export async function renderOverview(root,request,{role='admin',isCurrent=()=>tr
   await Promise.all([
     section('overview-trends','/v1/admin/overview/trends',trendsMarkup,{optional:true}),
     section('overview-health','/v1/admin/overview/health',data=>healthMarkup(data,serviceRelease),{optional:true}),
-    section('overview-activity','/v1/admin/measurements?'+today,data=>{
+    section('overview-activity','/v1/admin/measurements?'+today+'&corpus=all',data=>{
       if(!data.summary)throw Error('Missing activity summary');
       const s=data.summary,f=data.share_funnel||{},href='?area=insights&'+today;
-      return `<div class="overview-metrics">${metric('Observed players',count(s.players),href,'Viewed at least one draft decision')}${metric('Completed / observed runs',`${count(s.completed_runs)} / ${count(s.runs)}`,href)}${metric('Share-link arrivals',count(f.arrivals),href,'Best-effort client analytics')}${metric('Share arrival to Daily start',percent(f.start_pct),href,`${count(f.starts)} attributed starts`)}</div><p class="overview-footnote">Today\'s current-corpus first-encounter decision viewers, with QA excluded, including unfinished runs. These are neither site visitors nor the Users page\'s completed-run players: identity grouping and Daily date attribution also differ. Do not subtract the counts to estimate abandonment. Open Insights for detailed filters or Users for completed-run activity.</p>`;
+      return `<div class="overview-metrics">${metric('Observed players',count(s.players),href,'Viewed at least one draft decision')}${metric('Completed / observed runs',`${count(s.completed_runs)} / ${count(s.runs)}`,href)}${metric('Share-link arrivals',count(f.arrivals),href,'Best-effort client analytics')}${metric('Share arrival to Daily start',percent(f.start_pct),href,`${count(f.starts)} attributed starts`)}</div><p class="overview-footnote">Today\'s first-encounter decision viewers on every corpus version, with QA excluded, including unfinished runs. These are neither site visitors nor the Users page\'s completed-run players: identity grouping and Daily date attribution also differ. Do not subtract the counts to estimate abandonment. Open Insights for detailed filters or Users for completed-run activity.</p>`;
     }),
     section('overview-reports','/v1/admin/player-reports/summary',data=>{
       const d=data.summary?.decisions,p=data.summary?.profiles;

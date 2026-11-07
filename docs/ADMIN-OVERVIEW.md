@@ -24,14 +24,20 @@ entry pages but reuse the existing publishing implementation and safety gates.
 ## Summary semantics
 
 - Activity and sharing use today's Pacific date and existing measurement definitions.
-  **Observed players** means distinct player identities with a browser-observed,
-  current-corpus first encounter with a draft decision on that date. It can include
+  **Observed players** means distinct player identities with a browser-observed
+  first encounter with a draft decision on that date, on any corpus version. It can include
   players who have not completed a run; it is not a site-wide visitor count.
-- **Users → Signed out vs signed in** counts distinct current-corpus players with
-  *completed runs*, excluding QA and admin players. Linked accounts are merged,
+- **Users → Signed out vs signed in** counts distinct players with *completed runs*
+  on any corpus version, excluding QA and admin players. Linked accounts are merged,
   guests remain per browser, Daily runs use their assigned Daily date, and practice
   uses run creation time. The two metrics cannot be subtracted to estimate abandonment.
 - Account totals and 30-day counts retain the Users report's definitions.
+- **Corpus releases.** Player counts (Overview trends and activity, Users activity,
+  Daily habit cohorts, campaign performance and the share funnel) include sessions on
+  every corpus version, so a release does not reset them and "first Daily" means a
+  player's first-ever Daily. Decision-quality reports (Insights decisions and reviews,
+  the quality watchlist) stay on the current parent corpus because the model and
+  ratings change with it. Overview requests `corpus=all` from the measurements route.
 - Users account-directory column headers sort the **entire filtered account list**, not only the displayed 100-account page. Sorting resets pagination and reverses when the same column is selected again.
 - Return rates aggregate mature cohort denominators, not averages of percentages.
 - Corpus readiness is healthy only when both current and verified. Live-set metadata

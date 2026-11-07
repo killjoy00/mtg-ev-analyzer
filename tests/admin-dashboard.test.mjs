@@ -24,6 +24,20 @@ test('dashboard routes return bounded read-only reports',async()=>{
   }
   await assert.rejects(handleAdmin(request('/v1/admin/campaign-performance?from=2025-01-01&to=2026-10-24'),queryFixture,async()=>({})),x=>x.status===400);
 });
+test('player activity trends and campaign performance count every corpus version',async()=>{
+  const calls=[];
+  const query=async(sql,params)=>{calls.push({sql,params});return queryFixture(sql,params);};
+  const trends=await handleAdmin(request('/v1/admin/overview/trends'),query,async()=>({}));
+  const campaign=await handleAdmin(request('/v1/admin/campaign-performance?from=2026-10-01&to=2026-10-24'),query,async()=>({}));
+  const trendCall=calls.find(c=>c.sql.includes('FROM dimensions d LEFT JOIN observation_metrics'));
+  const campaignCall=calls.find(c=>c.sql.includes('FROM keys k LEFT JOIN arrivals'));
+  assert.doesNotMatch(trendCall.sql,/corpus_version/,'a corpus release must not erase earlier days from the trend');
+  assert.equal(trendCall.params.length,1);
+  assert.doesNotMatch(campaignCall.sql,/corpus_version/,'campaign starts and completions count every corpus version');
+  assert.deepEqual(campaignCall.params,['2026-10-01','2026-10-24']);
+  assert.equal(trends.corpus_scope,'all');
+  assert.equal(campaign.corpus_scope,'all');
+});
 test('trend changes handle zeros and rates use real denominators',()=>{
   assert.equal(trendChange(20,10),'+100.0%');
   assert.equal(trendChange(0,0),'No change');
