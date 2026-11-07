@@ -359,7 +359,11 @@ if platform == 'android':
         tap('Review pick 1,')
         snapshot('journey-final-review')
         tap('See result', exact=True)
-        tap('Back to Dailies', exact=True)
+        # Today's status shows only the Draft Run done, so the result offers
+        # the next unfinished Daily first and All Dailies as the way home.
+        reveal('Play Daily Powered Cube', exact=True)
+        snapshot('journey-result-next-daily')
+        tap('All Dailies', exact=True)
         xml, _ = snapshot('journey-home')
         require('View result' in xml, 'Completed Daily action missing')
         require('Navigate up' not in xml, 'Root tab has a Back button')
