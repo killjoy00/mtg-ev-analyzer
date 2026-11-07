@@ -58,7 +58,13 @@ try {
     const expected=selectDraftRun(pool,seed,environment,{daily,selectionVersion,metadata:selectionVersion==='eight-pick-v4'?metadata:null});
     const actual=await selectDatabaseRun(fixtureQuery,version,seed,environment,{daily,selectionVersion,metadata:selectionVersion==='eight-pick-v4'?metadata:null});
     assert.ok(actual.every(p=>impliedTrophyScore(p)>=20),'New selections respect the implied trophy score floor');
-    assert.deepEqual(actual.map(p=>p.puzzle_id),expected.map(p=>p.puzzle_id),`${selectionVersion}/${environment}/${daily}/${seed}: exact selector parity`);
+    if(selectionVersion==='eight-pick-v4'&&environment==='mixed'&&daily) {
+      // Main Daily intentionally switches its puzzle draw while retaining
+      // the established per-round set plan. Other selectors retain exact parity.
+      assert.deepEqual(actual.map(p=>p.set_id),expected.map(p=>p.set_id),
+        `${selectionVersion}/${environment}/${daily}/${seed}: identical Main Daily set mix`);
+    } else assert.deepEqual(actual.map(p=>p.puzzle_id),expected.map(p=>p.puzzle_id),
+      `${selectionVersion}/${environment}/${daily}/${seed}: exact selector parity`);
     if(selectionVersion==='eight-pick-v4'&&!daily&&seed==='selection-check-a')
       await checkRerollPlan(expected[0],{type:'pack',round:0,seed,environment,selectionVersion,excludedSources:expected.map(p=>p.source_draft_hash)});
     for(const type of environment==='powered-cube'?['pack']:['pack','set'])for(const round of (selectionVersion.startsWith('eight-pick')?[0,4,7]:[0,5,9])) {
@@ -88,7 +94,7 @@ try {
     ${REROLL_INDEX_SCHEMA_SQL}; ROLLBACK;`);
   assert.equal(weakened,'f','incorrect partial predicate fails release verification');
   await verifyRerollIndexSchema(query);
-  console.log('Database selection matches the exhaustive reference across mixed/Cube, practice/Daily and rerolls; missing ratings are isolated.');
+  console.log('Database selection preserves Main Daily set mix, exact parity for other modes, reroll parity and missing-rating isolation.');
 } finally {
   await query(`DROP TABLE IF EXISTS ${rTable}`);
   await query(`DROP TABLE IF EXISTS ${pTable}`);
