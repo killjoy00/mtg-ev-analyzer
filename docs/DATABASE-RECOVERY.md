@@ -10,13 +10,17 @@ Serving production database branch: `br-orange-feather-ayps8kep`, named `product
 
 At the September 30 audit, Neon initially reported a **6-hour** history-retention window. After the restore drill and cost review, Pack One intentionally increased the production Neon history-retention setting to **86,400 seconds / 24 hours**.
 
-Current recovery assets (verified 2026-10-01):
+Current recovery assets (verified 2026-11-07):
 
 - Neon point-in-time history: **24 hours**;
-- one manual snapshot: `pre-0033-unique-usernames` from September 22;
+- no manual or scheduled snapshots;
 - serving branch: `br-orange-feather-ayps8kep` (`production`), with endpoint `ep-young-hall-ayl0754j`.
 
 The drill's restored branch `br-dark-sound-ayxhwq1u`, its `ep-hidden-bonus-ayfmcpys` endpoint and the drill snapshot `pack1-dr-drill-2026-09-30` were removed on 2026-10-01 (see `docs/AUTH-HARDENING.md`). The only other long-lived branch is the development/QA branch `br-twilight-hill-ayffyd2b`.
+
+On 2026-11-07 the September 22 manual snapshot `pre-0033-unique-usernames` was deleted to reduce storage cost. Restoring it would have discarded more than six weeks of later data. The 24-hour history window is now the only rewind point; take a fresh pre-risk snapshot (below) when an operation needs a longer one.
+
+The same day the development/QA branch was reset from production. It had diverged into a near-full copy of production's data. A reset also copies production's Neon Auth configuration onto the child branch, so the branch's own auth settings (shared Google and email providers, localhost access, preview trusted origin, webhook disabled) were reapplied and checked against their pre-reset values. Repeat that check after any future reset.
 
 This is deliberately lightweight disaster recovery. Pack One's user/account/history data is useful but not treated as high-value financial or safety-critical data. The goal is a practical one-day rewind window for bad migrations or accidental writes, not a high-availability or archival backup program.
 
