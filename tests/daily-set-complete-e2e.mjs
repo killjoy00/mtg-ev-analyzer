@@ -16,7 +16,7 @@ const browser=await chromium.launch({headless:true});
 const errors=[];
 async function guestPage({clock=today+'T18:00:00Z',install=false,signedIn=false}={}) {
   const page=await browser.newPage({viewport:{width:1440,height:1000}});
-  const state={environment:'mixed',day:today,statusDay:today,history:[]};
+  const state={environment:'mixed',day:today,statusDay:today,history:[],runs:{},events:[]};
   if(install)await page.clock.install({time:new Date(clock)});else await page.clock.setFixedTime(new Date(clock));
   page.on('pageerror',error=>errors.push(error.message));
   await page.addInitScript(signed=>{
@@ -30,12 +30,14 @@ async function guestPage({clock=today+'T18:00:00Z',install=false,signedIn=false}
     if(path==='/v1/session')body={token:'test-token'};
     if(path==='/v1/account/session')body=signedIn?{user:{id:'synthetic-user'}}:{};
     if(path==='/v1/profile/me')body={player:{display_name:'Guest',claimed:signedIn},summary:{games:0},achievements:[]};
+    if(path==='/v1/events')state.events.push(...(route.request().postDataJSON()?.events||[]));
     await route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
   });
   await page.route('**/*-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/**',async route=>{
     const path=new URL(route.request().url()).pathname;let body;
     if(path==='/v1/daily-status')body={day:state.statusDay,daily_history:state.history,player:{claimed:signedIn},capabilities:signedIn?['account','unlimited_regular_practice']:[],daily_streak:1,ranking_identity:{eligible:false,reason:signedIn?null:'account_required'}};
     else if(path===`/v1/runs/${id}`)body={id,environment:state.environment,day:state.day,leaderboard_eligible:false,ranked_name:null,ranking_identity:{eligible:false,reason:signedIn?null:'account_required'},run_length:8,set_reroll_allowed:false,revision:8,round:9,answers,rerolls:{set:0,pack:0},complete:true,score:85,current:null,standing:null};
+    else if(state.runs[path.replace('/v1/runs/','')])body=state.runs[path.replace('/v1/runs/','')];
     else body={};
     await route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
   });
@@ -165,6 +167,63 @@ try {
   await late.page.locator(callout).waitFor({state:'hidden'});
   await late.page.close();
 
+  // The third Daily of the day offers one message with all three results.
+  const daySet=await guestPage();
+  const uuid=n=>`${n}${n}${n}${n}${n}${n}${n}${n}-3333-4333-8333-333333333333`;
+  const otherRun=(n,environment,score,matches)=>({id:uuid(n),environment,day:today,complete:true,run_length:8,score,
+    answers:Array.from({length:8},(_,i)=>({puzzle:{set_id:'mkm',puzzle_id:'q'+i},pickNumber:1,selectedName:'Other card '+i,historicalMatch:i<matches,score:i<matches?100:60}))});
+  daySet.state.runs={[uuid(1)]:otherRun(1,'mixed',77,4),[uuid(2)]:otherRun(2,'powered-cube',66,0)};
+  const setHistory=[{...finished('mixed'),run_id:uuid(1)},{...finished('powered-cube'),run_id:uuid(2)},finished('latest')];
+  const dayPanel='.run-share-panel[data-share-scope="day"]',runPanel='.run-share-panel[data-share-scope="run"]';
+  const expectedDayText=['Pack One · Oct 7','Draft Run 77 🟩🟩🟩🟩🟨🟨🟨🟨','Powered Cube 66 🟨🟨🟨🟨🟨🟨🟨🟨','Latest Set 85 🟩🟨🟩🟨🟩🟨🟩🟨'].join('\n');
+  await openResult(daySet.page,daySet.state,{environment:'latest',history:setHistory});
+  await daySet.page.locator(dayPanel).waitFor();
+  assert.equal(await daySet.page.locator('#run-share-title').textContent(),'Share today’s Dailies');
+  assert.deepEqual((await daySet.page.locator('.run-share-actions .button').allTextContents()).map(text=>text.trim()),['Share all 3','Copy all 3']);
+  assert.equal((await daySet.page.locator('#run-share-scope').textContent()).trim(),'Share just this Daily');
+  assert.doesNotMatch(await daySet.page.locator('.run-share-panel').innerText(),/Card \d|Other card/,'no card names in the share panel');
+  await daySet.page.locator('#run-share').click();await daySet.page.waitForFunction(()=>Boolean(window.__runShare));
+  const dayShare=await daySet.page.evaluate(()=>window.__runShare);
+  assert.equal(dayShare.text,expectedDayText,'rows in fixed order with each Daily\'s own squares');
+  assert.equal(dayShare.url,`${base}/d/?d=${today}`,'the day share opens the recipient\'s own regular Daily');
+  await daySet.page.locator('#run-copy-result').click();await daySet.page.waitForFunction(()=>Boolean(window.__runCopied));
+  assert.equal(await daySet.page.evaluate(()=>window.__runCopied),`${expectedDayText}\n${base}/d/?d=${today}`);
+  assert.match(await daySet.page.locator('#run-share-status').innerText(),/Copied all three scores/);
+  for(let i=0;i<30&&daySet.state.events.filter(event=>event.name==='daily_result_shared').length<2;i++)await daySet.page.waitForTimeout(100);
+  const dayShares=daySet.state.events.filter(event=>event.name==='daily_result_shared');
+  assert.deepEqual(dayShares.map(event=>[event.props.method,event.props.context]),[['native','daily_set'],['copy_button','daily_set']],'day shares still count as Daily shares, tagged as the set');
+  for(const width of [390,320]) {
+    await daySet.page.setViewportSize({width,height:844});
+    await noOverflow(daySet.page);
+    const toggle=await daySet.page.locator('#run-share-scope').boundingBox();
+    assert.ok(toggle.height>=44,`${width}px switch keeps a full tap target`);
+  }
+  await daySet.page.locator('.run-share-panel').screenshot({path:'artifacts/ui-daily-set-share-panel-mobile.png'});
+  // Switching back shares only the result on screen, with its own short link.
+  await daySet.page.evaluate(()=>{window.__runShare=null;});
+  await daySet.page.locator('#run-share-scope').click();
+  await daySet.page.locator(runPanel).waitFor();
+  assert.equal(await daySet.page.evaluate(()=>document.activeElement?.id),'run-share-scope','focus stays on the switch');
+  assert.equal((await daySet.page.locator('#run-share-scope').textContent()).trim(),'Share all 3 Dailies');
+  await daySet.page.locator('#run-share').click();await daySet.page.waitForFunction(()=>Boolean(window.__runShare));
+  const single=await daySet.page.evaluate(()=>window.__runShare);
+  assert.match(single.text,/^I scored 85\/100 on the Pack One Latest Set Daily \(Oct 7\)\./);
+  assert.equal(single.url,`${base}/d/l/?d=${today}`);
+  await daySet.page.locator('#run-share-scope').click();
+  await daySet.page.locator(dayPanel).waitFor();
+  // Two of three, or a failed read of another Daily, keeps the single share.
+  await daySet.page.setViewportSize({width:1440,height:1000});
+  await openResult(daySet.page,daySet.state,{environment:'powered-cube',history:[{...finished('mixed'),run_id:uuid(1)}]});
+  assert.equal(await daySet.page.locator('#run-share-scope').count(),0,'2 of 3 offers no day share');
+  assert.equal(await daySet.page.locator(runPanel).count(),1);
+  await daySet.page.route(`**/*-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/v1/runs/${uuid(2)}`,route=>route.fulfill({status:500,contentType:'application/json',body:'{"error":"unavailable"}'}),{times:1});
+  const failedRead=daySet.page.waitForResponse(response=>response.url().endsWith(`/v1/runs/${uuid(2)}`));
+  await openResult(daySet.page,daySet.state,{environment:'latest',history:setHistory});
+  await failedRead;await daySet.page.waitForTimeout(200);
+  assert.equal(await daySet.page.locator('#run-share-scope').count(),0,'a failed read leaves the single share');
+  assert.equal((await daySet.page.locator('#run-share').textContent()).trim(),'Share result');
+  await daySet.page.close();
+
   assert.deepEqual(errors,[]);
-  console.log('Guest daily-set-complete callout passed: 1/3, 2/3, 3/3, any order, signed in, reset, CTA, desktop/mobile.');
+  console.log('Guest daily-set-complete callout passed: 1/3, 2/3, 3/3, any order, signed in, reset, CTA, desktop/mobile, all-three share.');
 } finally {await browser.close();}

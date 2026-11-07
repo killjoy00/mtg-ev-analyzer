@@ -65,6 +65,29 @@ test('per-mode Daily share pages open the recipient\'s own Daily and carry the s
   }
  }
 });
+test('short Daily share links mark the visit as a result share and carry only the sharer\'s date',()=>{
+ for(const [route,mode,label] of [['/d/','mixed','Draft Run'],['/d/c/','powered-cube','Powered Cube'],['/d/l/','latest','Latest Set']]){
+  const html=fs.readFileSync(route.slice(1)+'index.html','utf8');
+  assert.match(html,new RegExp('property="og:title" content="Pack One '+label+' Daily"'));
+  assert.match(html,/Play today’s Daily free, no account needed/);
+  assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/share-daily-v1\.png"/);
+  assert.match(html,/name="robots" content="noindex,nofollow"/);
+  assert.ok(html.includes('property="og:url" content="https://packone.pro'+route+'"'));
+  const script=html.match(/<script>([\s\S]*?)<\/script>/)[1];
+  for(const [search,day] of [['?d=2026-10-27','2026-10-27'],['?d=<script>',null],['',null],['?d=2026-10-27&ref=other&set=powered-cube','2026-10-27']]){
+   let redirected;
+   vm.runInNewContext(script,{URL,URLSearchParams,location:{origin:'https://packone.pro',search,replace(value){redirected=new URL(value,'https://packone.pro');}}});
+   assert.equal(redirected.pathname,'/');
+   assert.equal(redirected.searchParams.get('game'),'draft-run');
+   assert.equal(redirected.searchParams.get('daily'),'1');
+   assert.equal(redirected.searchParams.get('ref'),'result_share','the short path alone attributes the visit');
+   assert.equal(redirected.searchParams.get('set'),mode==='mixed'?null:mode,'the path, not the query, picks the mode');
+   assert.equal(redirected.searchParams.get('d'),day);
+   assert.equal(redirected.searchParams.has('challenge')||redirected.searchParams.has('shared'),false,
+    'a Daily share never becomes a replay of revealed decisions');
+  }
+ }
+});
 test('share assets are complete PNGs with genuinely shallow banner dimensions',()=>{
  for(const [file,width,height] of [['social-preview-v6.png',1200,240],['pack-one-icon-v1.png',1024,1024],['share-daily-v1.png',1200,630]]){
   const png=fs.readFileSync(file);

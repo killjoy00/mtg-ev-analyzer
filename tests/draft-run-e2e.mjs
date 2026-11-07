@@ -322,7 +322,8 @@ try{
   if(daily){
     assert.match(shared.text,/I scored \d+\/100 on the Pack One (Draft Run|Powered Cube|Latest Set) Daily \(Oct 7\)\./);
     assert.match(shared.text,/Try Pack One's Daily\. No account needed:$/);
-    const sharedUrl=new URL(shared.url);assert.equal(sharedUrl.pathname,'/share/daily/'+environment+'/');assert.equal(sharedUrl.searchParams.get('d'),fixtureDay);assert.equal(sharedUrl.searchParams.get('ref'),'result_share');assert.doesNotMatch(shared.url,/challenge=|shared=/);assert.equal(shareCalls,0);
+    // The short route marks the share by its path, so the date is the only parameter.
+    const sharedUrl=new URL(shared.url);assert.equal(sharedUrl.pathname,{mixed:'/d/','powered-cube':'/d/c/',latest:'/d/l/'}[environment]);assert.deepEqual([...sharedUrl.searchParams.keys()],['d']);assert.equal(sharedUrl.searchParams.get('d'),fixtureDay);assert.doesNotMatch(shared.url,/challenge=|shared=/);assert.equal(shareCalls,0);
     // The share panel sits above the next-Daily handoff and names no cards.
     const order=await page.evaluate(()=>{const panel=document.querySelector('.run-share-panel'),next=document.querySelector('[data-next-daily-action]');return Boolean(panel.compareDocumentPosition(next)&Node.DOCUMENT_POSITION_FOLLOWING);});
     assert.equal(order,true,'sharing comes first, the next Daily stays one tap below');

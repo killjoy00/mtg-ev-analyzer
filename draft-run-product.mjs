@@ -1,6 +1,6 @@
 import {draftRunLength} from './draft-run-format.mjs';
 import { accountCsrfToken, ensurePackSession, firstPartyAuthEnabled, hasAccountSession, loadDailyStatus, storedAccountToken } from './growth-api.mjs';
-import { dailyShareUrl, draftRunShareText, shareDraftRunCard, shareDate } from './share-cards.mjs?v=10';
+import { dailySetRunIds, dailySetShareRuns, dailySetShareText, dailyShareUrl, draftRunShareText, shareDailySet, shareDraftRunCard, shareDate } from './share-cards.mjs?v=11';
 import {openCardViewer,faceIndicatorMarkup} from './card-viewer.mjs?v=2';
 import { trackEvent } from './retention-events.mjs';
 import {decisionClock} from './decision-clock.mjs';
@@ -20,6 +20,9 @@ const base = () => String(window.PACK1_API?.draftRunUrl||'').replace(/\/$/,'');
 const webClientBuild=()=>new URL(import.meta.url).searchParams.get('v')||null;
 const reportSentText='Thanks for letting us know.';
 let run=null,selection=null,review=null,busy=false,dailyValidationConfirmation=null,sharedDay=null;
+// Today's three finished Dailies in share order, once the result on screen
+// completes the set, and whether the share panel shares the set or this run.
+let dailySet=null,dailySetRunId=null,shareScope='run',sharing=false,sharePanelStale=false;
 const reportedDecisions=new Set();
 const dailyPeerCache=new Map();
 const trophyDeckCache=new Map();
@@ -51,7 +54,7 @@ const app=()=>document.querySelector('#app');
 function styles() {
   installSetGuides();
   if(document.querySelector('[data-draft-run-style]')) return;
-  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=25';link.dataset.draftRunStyle='1';document.head.appendChild(link);
+  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=26';link.dataset.draftRunStyle='1';document.head.appendChild(link);
 }
 async function api(path,body,auth=true) {
   const method=body===undefined?'GET':'POST',headers={'content-type':'application/json'};
@@ -377,10 +380,46 @@ function dailySetCompleteMarkup() {
 }
 // Sharing sits right under the score, compact enough on a phone that the
 // next-Daily button stays on screen. No card names, so nothing is spoiled.
+// After the third Daily of the day the same panel shares all three in one
+// message; a text button switches back to sharing only this Daily.
 function dailySharePanelMarkup() {
-  return `<section class="run-share-panel" aria-labelledby="run-share-title"><div class="run-share-copy"><h2 id="run-share-title">Share your result</h2><p>Share your score and colored squares, not the cards. Friends can try their own Daily without signing up.</p></div>
-    <div class="run-share-actions"><button class="button primary" id="run-share" type="button">Share result</button><button class="button secondary" id="run-copy-result" type="button">Copy result</button></div>
+  const set=Boolean(dailySet)&&shareScope==='day';
+  return `<section class="run-share-panel" data-share-scope="${set?'day':'run'}" aria-labelledby="run-share-title"><div class="run-share-copy"><h2 id="run-share-title">${set?'Share today’s Dailies':'Share your result'}</h2><p>${set?'All three scores and colored squares in one message, not the cards.':'Share your score and colored squares, not the cards. Friends can try their own Daily without signing up.'}</p></div>
+    <div class="run-share-actions"><button class="button primary" id="run-share" type="button">${set?'Share all 3':'Share result'}</button><button class="button secondary" id="run-copy-result" type="button">${set?'Copy all 3':'Copy result'}</button></div>
+    ${dailySet?`<button class="text-button run-share-scope" id="run-share-scope" type="button">${set?'Share just this Daily':'Share all 3 Dailies'}</button>`:''}
     <div id="run-share-status" role="status"></div></section>`;
+}
+function bindSharePanel() {
+  document.querySelector('#run-share').onclick=()=>shareResult();
+  document.querySelector('#run-copy-result').onclick=()=>shareResult({copy:true});
+  const scope=document.querySelector('#run-share-scope');
+  if(scope)scope.onclick=()=>{shareScope=shareScope==='day'?'run':'day';refreshSharePanel();document.querySelector('#run-share-scope')?.focus();};
+}
+// keepStatus carries a confirmation from a share that already happened.
+function refreshSharePanel({keepStatus=false}={}) {
+  const panel=document.querySelector('.run-share-panel');
+  if(!panel)return;
+  const previous=keepStatus?[...(panel.querySelector('#run-share-status')?.childNodes||[])]:[];
+  panel.outerHTML=dailySharePanelMarkup();
+  if(previous.length)document.querySelector('#run-share-status')?.append(...previous);
+  bindSharePanel();
+}
+// Loads the other two Dailies only when today's status shows all three are
+// finished. Any missing or failed read leaves the single-Daily share in place.
+async function loadDailySet(resultId,status) {
+  if(dailySetRunId===resultId&&dailySet)return;
+  const current={...run,environment:run.environment||environment};
+  const ids=dailySetRunIds(status?.daily_history,current);
+  if(!ids)return;
+  let others;
+  try {others=await Promise.all(ids.map(id=>api(`/v1/runs/${encodeURIComponent(id)}`)));}
+  catch {return;}
+  if(run?.id!==resultId||!document.querySelector('.run-share-panel'))return;
+  const set=dailySetShareRuns([current,...others]);
+  if(!set)return;
+  dailySet=set;dailySetRunId=resultId;shareScope='day';
+  // Never swap the panel under a share that is already open.
+  if(sharing)sharePanelStale=true;else refreshSharePanel({keepStatus:true});
 }
 function resultRepeatAction() {
   if(run.day||run.comparison?.kind==='creator')return {href:'./',label:'Back to Dailies'};
@@ -413,10 +452,12 @@ async function renderDailyResultCue(resultId) {
   // A guest sees the sign-in handoff only once today's authoritative history
   // shows all three Dailies, and never after the Pacific reset.
   const setComplete=root.closest('.run-result-page')?.querySelector('[data-daily-set-complete]');
-  if(setComplete&&!hasAccountSession()&&completedAllDailies(status,{completedDay:run.day,completedEnvironment:run.environment})) {
+  const allDone=completedAllDailies(status,{completedDay:run.day,completedEnvironment:run.environment});
+  if(setComplete&&!hasAccountSession()&&allDone) {
     setComplete.hidden=false;
     setTimeout(()=>{setComplete.hidden=true;},Math.max(0,nextGameDateBoundary()-Date.now()));
   }
+  if(allDone)void loadDailySet(resultId,status);
 }
 function renderResult() {
   document.body.classList.remove('is-game');
@@ -426,6 +467,7 @@ function renderResult() {
   const creator=run.comparison?.kind==='creator'?run.comparison:null;
   const creatorOutcome=creator?.outcome;
   const creatorHeadline=creatorOutcome==='win'?`You beat ${creator.name}`:creatorOutcome==='tie'?`You tied ${creator.name}`:creatorOutcome==='loss'?`${creator.name} got you this time`:null;
+  if(dailySetRunId!==run.id){dailySet=null;dailySetRunId=null;shareScope='run';}
   app().innerHTML=`<section class="run-result-page"><p class="eyebrow">${creator?'BEAT THE CREATOR · ':run.day?'Daily ':''}${title()} complete</p><h1>${creatorHeadline?esc(creatorHeadline):`Your ${cube()?'Cube Run':environment==='latest'?'Latest Set Run':'Draft Run'}.`}</h1><div class="run-final-score"><strong>${run.score}</strong><span>/100<br>${creator?`${Number(creator.creator_matches||0)}/${runLength()} creator picks matched · ${Number(creator.trophy_matches||matches)}/${runLength()} trophy picks matched`:`${matches} trophy picks matched`}</span></div>
     ${creator?`<p class="run-friend">You: <strong>${run.score}</strong> · ${esc(creator.name)}: <strong>${creator.score}</strong></p>`:''}
     <aside id="post-game-progress" class="post-game-progress" data-result-id="draft-run:${run.id}"></aside>
@@ -441,8 +483,7 @@ function renderResult() {
     <h2>Your ${runLength()} picks</h2><ol class="run-review-list">${run.answers.map((a,i)=>{const {cards,trophy}=reviewCards(a);return `<li><button data-review="${i}"><span>${i+1}</span>${cards}<div><strong>${esc(setName(a.puzzle.set_id))} · Pick ${a.pickNumber}</strong><small>${esc(a.selectedName)}${a.historicalMatch?' · Trophy match':trophy?` · Trophy pick: ${esc(trophy.name)}`:''}</small></div><b>${a.score}</b></button></li>`;}).join('')}</ol>
     <p class="run-note">Your final score is the average of your ${runLength()} picks. Matching the trophy drafter earns 100; other picks can score up to 95 based on the model.</p>${run.day?'':'<div id="run-share-status" role="status"></div>'}<p id="run-error" role="alert"></p></section>`;
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render({land:true});});
-  document.querySelector('#run-share').onclick=()=>shareResult();
-  document.querySelector('#run-copy-result').onclick=()=>shareResult({copy:true});
+  bindSharePanel();
   document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=32')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
   const setCompleteSignIn=document.querySelector('[data-daily-set-complete] button');
   if(setCompleteSignIn)setCompleteSignIn.onclick=async()=>(await import('./growth.mjs?v=32')).renderAccount({validateDailyRunId:run.id,source:'daily_set_complete'});
@@ -466,6 +507,7 @@ export async function returnToValidatedDaily(runId,{standing=null,confirmed=true
 async function shareResult({copy=false}={}) {
   const buttons=[...document.querySelectorAll('#run-share,#run-copy-result')];
   buttons.forEach(button=>{button.disabled=true;});
+  sharing=true;
   const status=document.querySelector('#run-share-status');
   status.replaceChildren();
   try {
@@ -479,20 +521,25 @@ async function shareResult({copy=false}={}) {
         throw new Error('Pack One could not verify this share link. Try Share again.');
       }
     }
-    const url=run.day
+    // The whole day shares the regular Daily's link; recipients open their own.
+    const daySet=run.day&&shareScope==='day'&&dailySetRunId===run.id?dailySet:null;
+    const shareContext=daySet?{context:'daily_set'}:{};
+    const url=daySet
+      ? dailyShareUrl({day:run.day,environment:'mixed'},location.origin)
+      : run.day
       ? dailyShareUrl({...run,environment:run.environment||environment},location.origin)
       : share?.creator&&share.url
         ? new URL(share.url,location.origin).toString()
         : new URL(sharedRunAppPath(share.id),location.origin).toString();
-    trackEvent('share_click',{surface:'draft_run_result',method:copy?'copy_button':'native'});
+    trackEvent('share_click',{surface:'draft_run_result',method:copy?'copy_button':'native',...shareContext});
     if(copy) {
-      const payload=`${draftRunShareText(run)}\n${url}`;
+      const payload=`${daySet?dailySetShareText(daySet):draftRunShareText(run)}\n${url}`;
       try {
         if(!navigator.clipboard?.writeText)throw new Error('Clipboard unavailable');
         await navigator.clipboard.writeText(payload);
-        status.textContent='Copied your score, squares, and link. Paste it wherever you want to share.';
-        document.dispatchEvent(new CustomEvent('pack1:share-completed',{detail:{method:'copy_button',context:'draft_run_result',challenge:false}}));
-        trackEvent(run.day?'daily_result_shared':'shared_run_shared',{mode:'draft_run',method:'copy_button'});
+        status.textContent=daySet?'Copied all three scores, squares, and the link. Paste it wherever you want to share.':'Copied your score, squares, and link. Paste it wherever you want to share.';
+        document.dispatchEvent(new CustomEvent('pack1:share-completed',{detail:{method:'copy_button',context:daySet?'daily_set_result':'draft_run_result',challenge:false}}));
+        trackEvent(run.day?'daily_result_shared':'shared_run_shared',{mode:'draft_run',method:'copy_button',...shareContext});
       } catch {
         status.textContent='Automatic copy unavailable. Select and copy this complete result:';
         const field=document.createElement('textarea');
@@ -500,18 +547,22 @@ async function shareResult({copy=false}={}) {
         field.readOnly=true;
         field.rows=6;
         field.value=payload;
-        field.setAttribute('aria-label','Complete result with colored squares and link');
+        field.setAttribute('aria-label',daySet?'All three results with colored squares and link':'Complete result with colored squares and link');
         status.append(field);
         field.focus();
         field.select();
       }
       return;
     }
-    const result=await shareDraftRunCard(run,url);
+    const result=daySet?await shareDailySet(daySet,url):await shareDraftRunCard(run,url);
     if(result.failed) {status.textContent='Copy this link: ';const a=document.createElement('a');a.href=url;a.textContent=url;status.append(a);}
-    else if(!result.cancelled) {status.textContent=result.method==='copy_fallback'?'Result and run link copied.':'';trackEvent(run.day?'daily_result_shared':'shared_run_shared',{mode:'draft_run',method:result.method});}
+    else if(!result.cancelled) {status.textContent=result.method==='copy_fallback'?(daySet?'All three results and the link copied.':'Result and run link copied.'):'';trackEvent(run.day?'daily_result_shared':'shared_run_shared',{mode:'draft_run',method:result.method,...shareContext});}
   } catch(e) {status.textContent=e.message;}
-  finally {buttons.forEach(button=>{button.disabled=false;});}
+  finally {
+    buttons.forEach(button=>{button.disabled=false;});
+    sharing=false;
+    if(sharePanelStale){sharePanelStale=false;refreshSharePanel({keepStatus:true});}
+  }
 }
 async function showBoard(period='daily') {
   period=canonicalBoardPeriod(period);
