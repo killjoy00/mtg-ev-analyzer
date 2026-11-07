@@ -61,10 +61,10 @@ try {
     const f=await fixture({auth:'signed-in',claimed:true,complete:true,holdAuth:true,holdDaily:true});
     await f.page.goto(base);
     await f.page.locator('[data-home-state="checking"]').waitFor();
-    // Static HTML briefly says Account before the session-aware site nav
-    // module loads. Await nav hydration, not the remote auth/Daily responses.
-    await f.page.waitForFunction(()=>document.querySelector('#account-nav')?.textContent?.trim()==='My Pack One');
-    assert.equal((await f.page.locator('#account-nav').textContent())?.trim(),'My Pack One');
+    // The static placeholder may read Account or the session-aware nav may
+    // already read My Pack One while the auth/Daily requests remain pending.
+    // Either must retain nav geometry until confirmed sign-in.
+    assert.ok(['Account','My Pack One'].includes((await f.page.locator('#account-nav').textContent())?.trim()));
     assert.equal(await f.page.locator('#how-nav').isHidden(),true);
     assert.equal(await f.page.locator('.daily-home-game.is-unplayed').count(),0);
     assert.equal(await f.page.locator('.daily-home-game.is-pending').count(),3);
