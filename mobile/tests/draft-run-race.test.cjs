@@ -116,6 +116,7 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
 
   const mocks = {
     'expo-application': { nativeApplicationVersion: '1.0', nativeBuildVersion: '1' },
+    'expo-web-browser': { openBrowserAsync: async () => ({ type: 'dismiss' }) },
     'expo-haptics': {
       selectionAsync: async () => {},
       notificationAsync: async () => {},
@@ -247,6 +248,7 @@ test('a committed pick with a lost response is reconciled into feedback', async 
 
   const mocks = {
     'expo-application': { nativeApplicationVersion: '1.0', nativeBuildVersion: '1' },
+    'expo-web-browser': { openBrowserAsync: async () => ({ type: 'dismiss' }) },
     'expo-haptics': {
       selectionAsync: async () => {},
       notificationAsync: async () => {},

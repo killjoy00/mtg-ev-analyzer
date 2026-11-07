@@ -47,6 +47,9 @@ function completed(status: DailyStatus | null, environment: DailyEnvironment) {
   ));
 }
 
+// Card labels from daily-home.mjs.
+const HOME_LABELS: Record<string, string> = { mixed: 'A MIX OF SETS', 'powered-cube': 'POWERED CUBE PICKS', latest: 'ONLY THE NEWEST SET' };
+
 export default function HomeScreen() {
   const accountState = useNavigationSession();
   const [status, setStatus] = useState<DailyStatus | null>(null);
@@ -143,7 +146,7 @@ export default function HomeScreen() {
           <Text style={styles.eyebrow}>THE DAILY DRAFT</Text>
           <Text style={styles.title}>Eight picks. Your call.</Text>
           <Text style={styles.lede}>
-            Make your pick, then see what the trophy drafter chose and how your pick scored.
+            These picks come from real trophy drafts. You decide what you&apos;d take, then see what the drafter chose and how your pick scored.
           </Text>
           <Text style={styles.today}>{dailyDate(pacificDay(now))}’s Daily Runs</Text>
         </View>
@@ -198,7 +201,7 @@ export default function HomeScreen() {
                 ]}
               >
                 <View style={styles.cardHeading}>
-                  <Text style={styles.cardKicker}>{startHere ? 'Start here' : meta.eyebrow}</Text>
+                  <Text style={styles.cardKicker}>{startHere ? 'Start here' : HOME_LABELS[environment]}</Text>
                   {isComplete ? <Text style={styles.completeBadge}>COMPLETE</Text> : null}
                 </View>
                 <Text style={index === 0 && !isComplete ? styles.cardTitle : styles.dailyTitle}>{meta.title}</Text>
@@ -230,7 +233,7 @@ export default function HomeScreen() {
             <Text style={styles.utilityTitle}>Keep drafting.</Text>
             <Text style={styles.cardBody}>
               {claimed
-                ? 'Your practice options are all in one place.'
+                ? 'Keep playing regular Draft Runs, or any sets with Pack One Elite.'
                 : 'A free account adds unlimited regular Draft Run practice.'}
             </Text>
             <Pressable

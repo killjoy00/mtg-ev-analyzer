@@ -153,6 +153,7 @@ async function fixture(options = {}) {
       },
     },
     'expo-web-browser': {
+      openBrowserAsync: async () => ({ type: 'dismiss' }),
       maybeCompleteAuthSession() {},
       openAuthSessionAsync: async (url) => ({ type: 'success', url: `packone://account?${url.includes('apple') ? 'apple' : 'google'}Handoff=fixture` }),
     },
@@ -306,7 +307,7 @@ test('a cold remount restores saved progress by UUID without another start or in
     await h.press('Pick Card A');
     await h.press('Confirm pick');
     await h.remount();
-    assert.match(h.text(), /You chose\s+Card A/);
+    assert.match(h.text(), /You picked\s+Card A/);
     assert.doesNotMatch(h.text(), /Play this run and compare/);
     assert.equal(h.count('start'), 1);
     assert.ok(h.calls.some(([kind, id]) => kind === 'get' && id === RUN));
@@ -344,7 +345,7 @@ test('lost pick response reconciles on the same UUID and renders recovered feedb
     await h.press('Play or resume this run');
     await h.press('Pick Card A');
     await h.press('Confirm pick');
-    assert.match(h.text(), /You chose\s+Card A/);
+    assert.match(h.text(), /You picked\s+Card A/);
     assert.doesNotMatch(h.text(), /Pick response lost/);
     assert.equal(h.count('pick'), 1);
     assert.equal(h.count('get'), 1);
@@ -360,7 +361,7 @@ test('an old foreground read cannot overwrite shared-run feedback', async () => 
     await h.press('Pick Card A');
     await h.press('Confirm pick');
     await act(async () => { old.resolve(run()); await pending; await flush(); });
-    assert.match(h.text(), /You chose\s+Card A/);
+    assert.match(h.text(), /You picked\s+Card A/);
     assert.equal(h.count('start'), 1);
   } finally { await h.close(); }
 });
@@ -397,7 +398,7 @@ test('a session change during a pick cannot display the old account response', a
     await h.switchSession(signedSession(OTHER_ACCOUNT));
     await act(async () => { response.resolve(run(1)); await flush(); });
     assert.match(h.text(), /Play this run and compare/);
-    assert.doesNotMatch(h.text(), /You chose/);
+    assert.doesNotMatch(h.text(), /You picked/);
     assert.equal(h.count('start'), 1);
   } finally { await h.close(); }
 });
@@ -482,7 +483,7 @@ test('a lost start response can be retried without a client practice key', async
     await h.press('Play or resume this run');
     assert.match(h.text(), /Start response lost/);
     await h.press('Play or resume this run');
-    assert.match(h.text(), /You chose\s+Card A/);
+    assert.match(h.text(), /You picked\s+Card A/);
     assert.equal(JSON.parse(h.store.get(CHECKPOINT_KEY)).runId, RUN);
     assert.equal(h.count('start'), 2);
   } finally { await h.close(); }
@@ -534,14 +535,16 @@ for (const sourceType of ['practice', 'daily']) test(`${sourceType} creator repl
   const h = await fixture({ checkpoint: true, run: creatorRun(0, false, sourceType),
     submitPick: async () => creatorRun(1, false, sourceType) });
   try {
-    assert.doesNotMatch(h.text(), /Fixture Creator’s Pick/);
+    assert.doesNotMatch(h.text(), /Fixture Creator(’s pick| picked)/);
     assert.doesNotMatch(h.text(), /P3 was/);
     await h.press('Pick Card A');
     assert.equal(h.count('pick'), 0);
     await h.press('Confirm pick');
-    assert.ok(h.button('Your Pick: Card A. Open enlarged card.'));
-    assert.ok(h.button('Fixture Creator’s Pick: Card C. Open enlarged card.'));
-    assert.ok(h.button('Trophy Pick: Card B. Open enlarged card.'));
+    // Web reveal: trophy and your pick as cards; a creator pick outside them
+    // is named in a line that still opens the enlarged card.
+    assert.ok(h.button('Your pick: Card A. Open enlarged card.'));
+    assert.ok(h.button('Trophy pick: Card B. Open enlarged card.'));
+    assert.ok(h.button('Fixture Creator picked Card C. Open enlarged card.'));
     assert.doesNotMatch(h.text(), /P3 was/);
     assert.equal(h.count('pick'), 1);
     assert.equal(h.count('daily') + h.count('practice') + h.count('reroll'), 0);
@@ -551,9 +554,11 @@ for (const sourceType of ['practice', 'daily']) test(`${sourceType} creator repl
 test('creator and trophy agreement shares one card with both role labels', async () => {
   const h = await fixture({ checkpoint: true, run: creatorRun(1, false, 'practice', 'win', 'b') });
   try {
-    assert.ok(h.button('Fixture Creator’s Pick · Trophy Pick: Card B. Open enlarged card.'));
+    assert.ok(h.button('Trophy pick · Fixture Creator’s pick: Card B. Open enlarged card.'));
+    assert.ok(h.button('Your pick: Card A. Open enlarged card.'));
     const cards = h.root.root.findAll((node) => node.type === 'Pressable' && String(node.props.accessibilityLabel).endsWith('. Open enlarged card.'));
     assert.equal(cards.length, 2, 'three roles with one matching pair require two card presentations');
+    assert.doesNotMatch(h.text(), /Fixture Creator picked/, 'a creator pick already shown is not repeated');
   } finally { await h.close(); }
 });
 

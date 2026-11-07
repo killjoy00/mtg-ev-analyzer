@@ -98,6 +98,7 @@ async function fixture(options = {}) {
   Image.prefetch = async () => {};
   const mocks = {
     'expo-application': { nativeApplicationVersion: '1.0', nativeBuildVersion: '1' },
+    'expo-web-browser': { openBrowserAsync: async () => ({ type: 'dismiss' }) },
     'expo-haptics': {
       selectionAsync: async () => {}, notificationAsync: async () => {},
       NotificationFeedbackType: { Success: 'success' },
@@ -132,6 +133,8 @@ async function fixture(options = {}) {
       submitDraftRunPick: options.submitPick ?? (async () => { throw new Error('Response lost.'); }),
       submitDraftRunDecisionReport: options.submitReport ?? (async () => ({ ok: true, id: 'report-id' })),
       rerollDraftRun: async () => runZero(),
+      loadDailyStatus: options.loadStatus ?? (async () => ({ day: '2000-01-01', capabilities: [], player: { claimed: true }, daily_streak: 0, daily_history: [] })),
+      loadTrophyDeck: options.loadDeck ?? (async () => { throw new Error('No deck.'); }),
     },
     '@/src/hooks/useAppResume': { useAppResume() {} },
     '@/src/storage/idempotency': {
@@ -185,8 +188,8 @@ test('reconciliation keeps all server progress but shows the exact recovered rou
   const screen = await fixture({ loadRun: async () => reconciled });
   try {
     await screen.chooseAndConfirm();
-    assert.match(screen.text(), /You chose\s+Card A/);
-    assert.doesNotMatch(screen.text(), /You chose\s+Card B/);
+    assert.match(screen.text(), /You picked\s+Card A/);
+    assert.doesNotMatch(screen.text(), /You picked\s+Card B/);
     assert.ok(screen.root.root.findAll((node) => node.type === 'Text' && node.props.testID === 'feedback-score' && node.props.children[0] === 88).length);
     const progress = screen.root.root.findAll((node) => node.type === 'View' && node.props.accessibilityRole === 'progressbar')[0];
     assert.equal(progress.props.accessibilityValue.now, 2, 'do not truncate the authoritative run to the recovered round');
@@ -238,21 +241,22 @@ test('finishing an old practice-key cleanup cannot restore a previous run after 
     assert.match(screen.text(), /POWERED CUBE PRACTICE/);
     await act(async () => { cleanup.resolve(); await flush(); });
     assert.match(screen.text(), /POWERED CUBE PRACTICE/);
-    assert.doesNotMatch(screen.text(), /You chose/);
+    assert.doesNotMatch(screen.text(), /You picked/);
     const progress = screen.root.root.findAll((node) => node.type === 'View' && node.props.accessibilityRole === 'progressbar')[0];
     assert.equal(progress.props.accessibilityValue.now, 0);
   } finally { await screen.close(); }
 });
 
 
-const RECORD_LINE = 'This trophy draft finished 7–2.';
-const WIN_RATE_LINE = '17Lands reports the trophy drafter’s overall game win rate as about 62%. It describes the drafter, not this draft or this card.';
+const RECORD_LINE = 'This trophy draft finished 7-2.';
+const WIN_RATE_LINE = 'The drafter wins about 62% of their games on 17Lands.';
+const pressable = (screen, label) => screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes(label))[0];
 for (const [label, fields, expected] of [
   ['record and win rate', { trophyDrafter: { record: '7–2', winRate: 62, rank: null } }, [RECORD_LINE, WIN_RATE_LINE]],
   ['saved win rate string', { trophyRecord: 'has a 62% win rate' }, [WIN_RATE_LINE]],
   ['saved record string', { trophyRecord: 'went 7–2' }, [RECORD_LINE]],
 ]) {
-  test(`trophy drafter ${label} appears only in expanded native analysis`, async () => {
+  test(`trophy drafter ${label} appears below the score explanation, never in the headline`, async () => {
     const revealed = { ...answer(0, 'a', 88), ...fields };
     const completedPick = { ...runZero(), revision: 5, round: 1, answers: [revealed], current: puzzle(1) };
     const screen = await fixture({ submitPick: async () => completedPick });
@@ -261,34 +265,63 @@ for (const [label, fields, expected] of [
       const title = screen.root.root.findAll((node) => node.type === 'Text' && node.props.testID === 'feedback-title')[0];
       assert.ok(title);
       assert.equal(renderedText(title), 'The trophy drafter took Card B.');
-      assert.doesNotMatch(screen.text(), /17Lands reports|finished 7–/, 'source-drafter background stays out of the compact reveal');
-      const why = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Why this score?'))[0];
-      assert.ok(why);
-      await act(async () => why.props.onPress());
+      const feedback = screen.root.root.findAll((node) => node.type === 'View' && node.props.testID === 'pick-feedback')[0];
+      assert.doesNotMatch(renderedText(feedback), /17Lands|finished 7-/, 'source-drafter background stays out of the score headline');
       const lines = screen.root.root.findAll((node) => node.type === 'Text' && expected.includes(renderedText(node)));
       assert.deepEqual(lines.map(renderedText), expected, 'record and win rate are separate lines, in order');
-      if (expected.length === 1) assert.doesNotMatch(screen.text(), expected[0] === RECORD_LINE ? /17Lands reports/ : /finished 7–/);
+      if (expected.length === 1) assert.doesNotMatch(screen.text(), expected[0] === RECORD_LINE ? /wins about/ : /finished 7-/);
+      assert.doesNotMatch(screen.text(), /drafter’s deck/, 'no decklist link unless the server says one exists');
     } finally { await screen.close(); }
   });
 }
 
-test('TCGplayer affiliate destinations stay hidden until score analysis is opened', async () => {
+test('the decklist link opens only when the server reports a deck, and loads that revealed round', async () => {
+  const decks = [];
+  const deck = {
+    deck: [{ id: 'd1', name: 'Card B', count: 1, mana_cost: '{1}{W}', mana_value: 2, type_line: 'Creature' },
+      { id: 'd2', name: 'Plains', count: 17, mana_value: 0, type_line: 'Basic Land' }],
+    sideboard: [], size: 40, event_type: 'PremierDraft', colors: 'W', splash_colors: '',
+    source: { name: '17Lands', url: 'https://www.17lands.com/public_datasets', license: 'CC BY 4.0', note: 'Last recorded deck.', draft_url: 'https://www.17lands.com/draft/' + 'a'.repeat(32) },
+  };
+  const revealed = { ...answer(0, 'a', 88), trophyDrafter: { record: '7–1' }, deckAvailable: true };
+  const completedPick = { ...runZero(), revision: 5, round: 1, answers: [revealed], current: puzzle(1) };
+  const screen = await fixture({ submitPick: async () => completedPick, loadDeck: async (...args) => { decks.push(args); return deck; } });
+  try {
+    await screen.chooseAndConfirm();
+    const link = pressable(screen, 'See the trophy drafter’s deck');
+    assert.ok(link);
+    assert.equal(decks.length, 0, 'the decklist is not fetched before it is opened');
+    await act(async () => { link.props.onPress(); await flush(); });
+    assert.equal(decks.length, 1);
+    assert.equal(decks[0][0], completedPick.id);
+    assert.equal(decks[0][1], 0);
+    assert.match(screen.text(), /Trophy Drafter’s Decklist/);
+    assert.match(screen.text(), /7-1 · Premier Draft · 40 cards/);
+    assert.match(screen.text(), /View full draft on 17Lands/);
+    assert.match(screen.text(), /Card B\s+Trophy pick/);
+    assert.match(screen.text(), /You picked\s+Card A/, 'the reveal stays mounted under the decklist');
+  } finally { await screen.close(); }
+});
+
+test('TCGplayer affiliate destinations stay hidden until all cards are expanded', async () => {
   const completedPick = { ...runZero(), revision: 5, round: 1, answers: [answer(0, 'a', 88)], current: puzzle(1) };
   const screen = await fixture({ submitPick: async () => completedPick });
+  const affiliate = () => screen.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityRole === 'link'
+    && String(node.props.accessibilityLabel).includes('TCGplayer'));
   try {
     assert.doesNotMatch(screen.text(), /TCGplayer/);
     await screen.chooseAndConfirm();
-    assert.doesNotMatch(screen.text(), /TCGplayer/, 'compact reveal must not contain affiliate links');
-    const why = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Why this score?'))[0];
-    assert.ok(why);
-    await act(async () => why.props.onPress());
-    assert.equal(screen.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityRole === 'link').length, 2);
+    assert.doesNotMatch(screen.text(), /TCGplayer/, 'the visible reveal must not contain affiliate links');
+    const all = pressable(screen, 'Compare all');
+    assert.ok(all);
+    await act(async () => all.props.onPress());
+    assert.equal(affiliate().length, 2, 'one link per revealed card');
     assert.match(screen.text(), /Affiliate links\. Pack One may earn a commission/);
   } finally { await screen.close(); }
 });
 
 
-test('decision report stays inside score analysis and preserves the run', async () => {
+test('decision report is offered on the reveal and preserves the run', async () => {
   const reports = [];
   const completedPick = { ...runZero(), revision: 5, round: 1, answers: [answer(0, 'a', 88)], current: puzzle(1) };
   const screen = await fixture({
@@ -296,20 +329,19 @@ test('decision report stays inside score analysis and preserves the run', async 
     submitReport: async (...args) => { reports.push(args); return { ok: true, id: 'report-id' }; },
   });
   try {
+    assert.equal(screen.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Does something look wrong? Let us know.').length, 0,
+      'no report prompt before a pick is revealed');
     await screen.chooseAndConfirm();
-    assert.doesNotMatch(screen.text(), /Report this decision/);
-    const why = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Why this score?'))[0];
-    await act(async () => why.props.onPress());
-    const report = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Report this decision'))[0];
+    const report = pressable(screen, 'Does something look wrong?');
     assert.ok(report);
     await act(async () => report.props.onPress());
     const reason = screen.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityRole === 'radio'
-      && renderedText(node).includes('Score / recommendation seems wrong'))[0];
+      && renderedText(node).includes('The pick or score looks wrong'))[0];
     assert.ok(reason);
     await act(async () => reason.props.onPress());
     const comment = screen.root.root.findAll((node) => node.type === 'TextInput' && node.props.accessibilityLabel === 'Anything else?')[0];
     await act(async () => comment.props.onChangeText('The recommendation looks reversed.'));
-    const send = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Send report'))[0];
+    const send = pressable(screen, 'Send report');
     await act(async () => { send.props.onPress(); await flush(); });
     assert.equal(reports.length, 1);
     assert.equal(reports[0][0].id, completedPick.id);
@@ -317,8 +349,8 @@ test('decision report stays inside score analysis and preserves the run', async 
     assert.equal(reports[0][2], 'score_recommendation');
     assert.equal(reports[0][3], 'The recommendation looks reversed.');
     assert.match(reports[0][4].playerToken, /^p1_11111111-1111-4111-8111-111111111111\./);
-    assert.match(screen.text(), /Thanks — report sent\./);
-    assert.match(screen.text(), /Hide score analysis/);
+    assert.match(screen.text(), /Thanks for letting us know\./);
+    assert.match(screen.text(), /You picked\s+Card A/);
   } finally { await screen.close(); }
 });
 
@@ -331,23 +363,20 @@ test('decision report submits successfully without an optional comment', async (
   });
   try {
     await screen.chooseAndConfirm();
-    const why = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Why this score?'))[0];
-    await act(async () => why.props.onPress());
-    const report = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Report this decision'))[0];
+    const report = pressable(screen, 'Does something look wrong?');
     await act(async () => report.props.onPress());
     const reason = screen.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityRole === 'radio'
-      && renderedText(node).includes('Draft context looks wrong'))[0];
+      && renderedText(node).includes('The draft context looks wrong'))[0];
     assert.ok(reason);
     await act(async () => reason.props.onPress());
-    const send = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Send report'))[0];
+    const send = pressable(screen, 'Send report');
     await act(async () => { send.props.onPress(); await flush(); });
     assert.equal(reports.length, 1);
     assert.equal(reports[0][0].id, completedPick.id);
     assert.equal(reports[0][1], 0);
     assert.equal(reports[0][2], 'draft_context');
     assert.equal(reports[0][3], '');
-    assert.match(screen.text(), /Thanks — report sent\./);
-    assert.match(screen.text(), /Hide score analysis/);
+    assert.match(screen.text(), /Thanks for letting us know\./);
   } finally { await screen.close(); }
 });
 
@@ -360,8 +389,8 @@ test('revealed-card affiliate link opens the approved card-specific Impact desti
   const screen = await fixture({ submitPick: async () => completedPick, openURL: async (url) => { opened.push(url); } });
   try {
     await screen.chooseAndConfirm();
-    const why = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Why this score?'))[0];
-    await act(async () => why.props.onPress());
+    const all = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Compare all'))[0];
+    await act(async () => all.props.onPress());
     const link = screen.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Find Black Lotus & Co on TCGplayer, affiliate link')[0];
     assert.ok(link);
     await act(async () => { link.props.onPress(); await flush(); });
@@ -370,17 +399,17 @@ test('revealed-card affiliate link opens the approved card-specific Impact desti
   } finally { await screen.close(); }
 });
 
-test('failed revealed-card affiliate handoff stays in analysis and offers a retryable error', async () => {
+test('failed revealed-card affiliate handoff stays in the expanded cards and offers a retryable error', async () => {
   const completedPick = { ...runZero(), revision: 5, round: 1, answers: [answer(0, 'a', 88)], current: puzzle(1) };
   const screen = await fixture({ submitPick: async () => completedPick, openURL: async () => { throw new Error('no handler'); } });
   try {
     await screen.chooseAndConfirm();
-    const why = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Why this score?'))[0];
-    await act(async () => why.props.onPress());
+    const all = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Compare all'))[0];
+    await act(async () => all.props.onPress());
     const link = screen.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Find Card A on TCGplayer, affiliate link')[0];
     await act(async () => { link.props.onPress(); await flush(); });
     assert.match(screen.text(), /Could not open TCGplayer\. You can try the affiliate link again\./);
-    assert.match(screen.text(), /Hide score analysis/);
+    assert.match(screen.text(), /Hide all cards/);
   } finally { await screen.close(); }
 });
 
@@ -403,7 +432,7 @@ test('account switching invalidates mounted gameplay and discards a delayed pick
     await screen.switchAccount();
     assert.match(screen.text(), /Your account changed/);
     await act(async () => { pending.resolve({ ...runZero(), revision: 5, round: 1, answers: [answer(0, 'a', 88)], current: puzzle(1) }); await flush(); });
-    assert.doesNotMatch(screen.text(), /You chose/);
+    assert.doesNotMatch(screen.text(), /You picked/);
     assert.match(screen.text(), /Your account changed/);
   } finally { await screen.close(); }
 });

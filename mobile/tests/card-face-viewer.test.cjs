@@ -7,6 +7,8 @@ const {act} = Renderer;
 const host = name => function Host(props) { return React.createElement(name,props,props.children); };
 const text = node => typeof node==='string'?node:Array.isArray(node)?node.map(text).join(' '):node?text(node.children):'';
 const flatten = value => Object.assign({},...(Array.isArray(value)?value.map(flatten):[value||{}]));
+// The full-screen dismiss target is not a control of its own; count the rest.
+const buttons = root => root.root.findAllByType('Pressable').filter(n=>n.props.testID!=='card-viewer-dismiss');
 const url = name => `https://cards.scryfall.io/normal/${name}.jpg`;
 const card={name:'Front',image_url:url('front'),display_faces:[
   {name:'Front',image_url:url('front'),large_image_url:url('large-front'),role:'front'},
@@ -47,7 +49,7 @@ test('phone switches faces, resets on reopen and close is separate from any pick
     assert.ok(f.root.root.findByProps({accessibilityLabel:'Show back: Back'}));
     await f.setCard({name:'Single',image_url:url('single')});
     assert.equal(f.root.root.findAllByType('Image').length,1);
-    assert.equal(f.root.root.findAllByType('Pressable').length,1);
+    assert.equal(buttons(f.root).length,1);
   } finally {await f.close();}
 });
 
@@ -56,7 +58,7 @@ test('tablet shows both faces and resize retains a usable phone switcher',async(
   try {
     assert.equal(f.root.root.findAllByType('Image').length,2);
     assert.equal(f.root.root.findAllByType('View').filter(n=>flatten(n.props.style).display==='none').length,0);
-    assert.equal(f.root.root.findAllByType('Pressable').length,1);
+    assert.equal(buttons(f.root).length,1);
     await f.resize(320);
     assert.ok(f.root.root.findByProps({accessibilityLabel:'Show back: Back'}));
   } finally {await f.close();}
@@ -82,5 +84,32 @@ test('meld labels explain the other card instead of offering an ordinary back',a
     await f.setCard({...card,display_faces:[card.display_faces[0],{...card.display_faces[1],role:'meld_result',partner_name:'Partner'}]});
     await f.press('Show meld result: Back');
     assert.match(text(f.root.toJSON()),/Melds with\s+Partner\s*\. Both cards are required/);
+  } finally {await f.close();}
+});
+
+test('a tap anywhere on the viewer closes it, while the face toggle and retry keep it open',async()=>{
+  const f=await fixture();
+  try {
+    const dismiss=f.root.root.findByProps({testID:'card-viewer-dismiss'});
+    assert.equal(dismiss.props.accessible,false,'dismiss area is not announced as an extra control');
+    await f.press('Show back: Back');
+    assert.equal(f.closed(),0,'face toggle is its own target');
+    await act(async()=>f.root.root.findAllByType('Image').find(n=>n.props.accessibilityLabel==='Back — Back').props.onError());
+    await act(async()=>f.root.root.findAllByType('Image').find(n=>n.props.accessibilityLabel==='Back — Back').props.onError());
+    await f.press('Retry image for Back');
+    assert.equal(f.closed(),0,'retry is its own target');
+    await act(async()=>dismiss.props.onPress());
+    assert.equal(f.closed(),1);
+  } finally {await f.close();}
+});
+
+test('single-faced cards name the card once; two faces keep their labels',async()=>{
+  const f=await fixture();
+  try {
+    assert.match(text(f.root.toJSON()),/Front · Front/);
+    assert.match(text(f.root.toJSON()),/Back · Back/);
+    await f.setCard({name:'Single',image_url:url('single')});
+    const names=f.root.root.findAllByType('Text').filter(n=>text(n.props.children)==='Single');
+    assert.equal(names.length,1,'header only');
   } finally {await f.close();}
 });

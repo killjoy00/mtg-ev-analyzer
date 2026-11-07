@@ -104,6 +104,7 @@ async function fixture(options = {}) {
     },
     'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
     'expo-image': { Image },
+    'expo-web-browser': { openBrowserAsync: async () => ({ type: 'dismiss' }) },
     'expo-haptics': { selectionAsync: async () => {}, notificationAsync: async () => {}, NotificationFeedbackType: { Success: 'success' } },
     'expo-secure-store': {
       WHEN_UNLOCKED_THIS_DEVICE_ONLY: 'device-only',

@@ -1,7 +1,8 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import * as WebBrowser from 'expo-web-browser';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
@@ -23,6 +24,7 @@ import {
 } from 'react-native';
 import { Text } from '@/src/components/Text';
 import { CardFaceViewer } from '@/src/components/CardFaceViewer';
+import { TrophyDeckSheet } from '@/src/components/TrophyDeckSheet';
 import { cardFaceIndicator } from '../../card-faces.mjs';
 
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
@@ -33,7 +35,9 @@ import {
   DAILY_ENVIRONMENT_META,
   isDailyEnvironment,
   loadDailyPeerStats,
+  loadDailyStatus,
   loadDraftRun,
+  loadTrophyDeck,
   rerollDraftRun,
   startDailyDraftRun,
   startPracticeDraftRun,
@@ -41,11 +45,13 @@ import {
   submitDraftRunPick,
   type DailyEnvironment,
   type DailyPeerStats,
+  type DailyStatus,
   type DecisionReportReason,
   type DraftRunAnswer,
   type DraftRunCard,
   type DraftRunState,
   type PracticeEnvironment,
+  type TrophyDeck,
 } from '@/src/api/draftRun';
 import { config } from '@/src/config';
 import { useAppResume } from '@/src/hooks/useAppResume';
@@ -55,6 +61,27 @@ import type { SharedRunSurface } from '@/src/state/sharedRunSurface';
 import { tcgplayerUrl } from '@/src/tcgplayer';
 import { colors, spacing } from '@/src/theme';
 import { trophyDrafterFacts, trophyDrafterSentences } from '@/src/trophyDrafter';
+import {
+  compactRevealFeedback,
+  compareAllRanking,
+  MODEL_NOTE,
+  modelSupportLabel,
+  revealCardChoices,
+  revealChoiceScore,
+  SCORING_COPY,
+  trophyRevealSentence,
+} from '@/src/reveal';
+import {
+  completedAllDailies,
+  dailySetRunIds,
+  dailySetShareRuns,
+  dailySetShareText,
+  dailyShareUrl,
+  draftRunShareText,
+  nextUnfinishedDaily,
+} from '@/src/dailyShare';
+import { dailyResetCue } from '@/src/dailyClock';
+import { setGuideUrl } from '@/src/setGuides';
 import setDisplayNames from '../../data/set-display-names.json';
 
 const resultSetName = (id: string) => (setDisplayNames.names as Record<string, string>)[String(id || '').toLowerCase()] || String(id || '').toUpperCase();
@@ -175,61 +202,57 @@ function CardTile({
 }
 
 
-function relativeSupport(support: number | undefined, leader: number) {
-  if (!Number.isFinite(Number(support)) || leader <= 0) return 'Unavailable';
-  return `${Math.round(100 * Number(support) / leader)}%`;
-}
-
-const REPORT_SENT_TEXT = 'Thanks \u2014 report sent.';
+// Same copy as the web report dialog in draft-run-product.mjs.
+const REPORT_SENT_TEXT = 'Thanks for letting us know.';
 const ReportKeyboardAvoidingView = KeyboardAvoidingView ?? View;
 
 const DECISION_REPORT_OPTIONS: readonly { value: DecisionReportReason; label: string }[] = [
-  { value: 'draft_context', label: 'Draft context looks wrong' },
-  { value: 'card_or_image', label: 'Card or image issue' },
-  { value: 'score_recommendation', label: 'Score / recommendation seems wrong' },
-  { value: 'uninteresting', label: 'Uninteresting / forced decision' },
-  { value: 'broken', label: 'Something is broken' },
+  { value: 'draft_context', label: 'The draft context looks wrong' },
+  { value: 'card_or_image', label: 'The card or image looks wrong' },
+  { value: 'score_recommendation', label: 'The pick or score looks wrong' },
+  { value: 'uninteresting', label: 'This isn’t an interesting decision' },
+  { value: 'broken', label: 'Something isn’t working' },
   { value: 'other', label: 'Other' },
 ];
 
-function trophyRevealSentence(answer: DraftRunAnswer) {
-  return answer.historicalMatch
-    ? 'You matched the trophy drafter.'
-    : `The trophy drafter took ${answer.historicalName ?? 'another card'}.`;
+type ChoiceTone = 'mine' | 'trophy' | 'match' | 'other';
+type CardShares = Record<string, number> | null;
+
+// Per-card shares arrive with an available Daily summary. Cards nobody picked show 0%.
+function peerShare(shares: CardShares, id: string) {
+  if (!shares) return null;
+  const value = Number(shares[id]);
+  return `${Number.isFinite(value) ? value : 0}%`;
 }
 
-function compactFeedback(answer: DraftRunAnswer) {
-  if (answer.historicalMatch) return '';
-  const prefix = answer.selectedName ? `You chose ${answer.selectedName}. ` : '';
-  if (answer.modelTargetDisagreement) return `${prefix}The trophy drafter made an unusual choice relative to the model.`;
-  if (answer.score >= 85) return `${prefix}A strongly supported alternative.`;
-  if (answer.score >= 60) return `${prefix}A plausible alternative.`;
-  return `${prefix}The model found less support for this choice.`;
-}
-
-function FeedbackCard({
+function RevealChoiceCard({
   card,
   label,
+  tone,
+  score,
+  support,
+  players,
   onZoom,
-  affiliate = false,
-  onAffiliatePress,
 }: {
-  card: DraftRunCard | undefined;
+  card: DraftRunCard;
   label: string;
+  tone: ChoiceTone;
+  score: number | null;
+  support: string;
+  players: string | null;
   onZoom: (card: DraftRunCard) => void;
-  affiliate?: boolean;
-  onAffiliatePress?: (card: DraftRunCard) => void;
 }) {
-  if (!card) return null;
+  const toneStyle = tone === 'match' ? styles.choiceMatch : tone === 'trophy' ? styles.choiceTrophy : tone === 'mine' ? styles.choiceMine : null;
+  const labelStyle = tone === 'match' ? styles.choiceLabelMatch : tone === 'trophy' ? styles.choiceLabelTrophy : tone === 'mine' ? styles.choiceLabelMine : null;
   return (
-    <View style={styles.feedbackCard}>
+    <View style={[styles.feedbackCard, toneStyle]}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${card.name}. Open enlarged card.`}
         onPress={() => onZoom(card)}
         style={styles.feedbackCardZoom}
       >
-        <Text style={styles.feedbackCardLabel}>{label}</Text>
+        <Text style={[styles.feedbackCardLabel, labelStyle]}>{label}</Text>
         {card.image_url ? (
           <CardArtwork key={card.image_url} uri={card.image_url} name={card.name} style={styles.feedbackCardImage} />
         ) : (
@@ -239,128 +262,162 @@ function FeedbackCard({
         )}
         <Text style={styles.feedbackCardName}>{card.name}</Text>
       </Pressable>
-      {affiliate && onAffiliatePress ? (
-        <Pressable
-          accessibilityRole="link"
-          accessibilityLabel={`Find ${card.name} on TCGplayer, affiliate link`}
-          onPress={() => onAffiliatePress(card)}
-          style={styles.shopLink}
-        >
-          <Text style={styles.shopLinkText}>Find on TCGplayer (affiliate link)</Text>
-        </Pressable>
-      ) : null}
+      <View accessible accessibilityLabel={`Score ${score == null ? 'not available' : `${score} out of 100`}. Model support ${support === '-' ? 'not shown for the trophy pick' : support}.${players ? ` Players’ picks ${players}.` : ''}`} style={styles.choiceStats}>
+        <Text style={styles.choiceStatLabel}>Score</Text>
+        <Text style={styles.choiceScore}>{score == null ? 'N/A' : score}<Text style={styles.feedbackScoreSuffix}>/100</Text></Text>
+        <View style={styles.choiceStatRow}>
+          <Text style={styles.choiceStatLabel}>Model support</Text>
+          <Text style={styles.choiceStatValue}>{support}</Text>
+        </View>
+        {players ? (
+          <View style={styles.choiceStatRow}>
+            <Text style={styles.choiceStatLabel}>Players’ picks</Text>
+            <Text style={styles.choiceStatValue}>{players}</Text>
+          </View>
+        ) : null}
+      </View>
     </View>
   );
 }
 
-function FeedbackAnalysis({
+// The trophy pick, your pick, then the model's next strongest card, as on the
+// web reveal. Points are the saved scores; support is relative to the leader.
+function RevealComparison({
   answer,
+  creatorName,
+  shares,
+  stack,
+  onZoom,
+}: {
+  answer: DraftRunAnswer;
+  creatorName: string | null;
+  shares: CardShares;
+  stack: boolean;
+  onZoom: (card: DraftRunCard) => void;
+}) {
+  const byId = new Map(answer.puzzle.candidates.map((card) => [card.id, card]));
+  const choices = revealCardChoices(answer);
+  const creator = creatorName && answer.creatorId && !choices.some((choice) => choice.id === answer.creatorId)
+    ? byId.get(answer.creatorId)
+    : null;
+  return (
+    <>
+      <View style={[styles.feedbackComparison, stack && { flexDirection: 'column' }]}>
+        {choices.map((choice) => {
+          const card = byId.get(choice.id);
+          if (!card) return null;
+          const mine = card.id === answer.selectedId;
+          const trophy = card.id === answer.historicalId;
+          const ranked = answer.ranking?.find((item) => item.id === card.id);
+          return (
+            <RevealChoiceCard
+              key={card.id}
+              card={card}
+              label={choice.label + (creatorName && card.id === answer.creatorId ? ` · ${creatorName}’s pick` : '')}
+              tone={mine && trophy ? 'match' : trophy ? 'trophy' : mine ? 'mine' : 'other'}
+              score={revealChoiceScore(answer, card.id)}
+              support={modelSupportLabel(ranked?.support, answer.consensusSupport, trophy)}
+              players={peerShare(shares, card.id)}
+              onZoom={onZoom}
+            />
+          );
+        })}
+      </View>
+      {creator ? (
+        <Pressable accessibilityRole="button" accessibilityLabel={`${creatorName} picked ${creator.name}. Open enlarged card.`} onPress={() => onZoom(creator)} style={styles.inlineLink}>
+          <Text style={styles.analysisBody}>{creatorName} picked <Text style={styles.inlineLinkText}>{creator.name}</Text>.</Text>
+        </Pressable>
+      ) : null}
+    </>
+  );
+}
+
+// Source-drafter background stays below the score explanation. The decklist
+// link appears only when the server says this revealed pick has one.
+function TrophyDrafterDetails({ answer, onOpenDeck }: { answer: DraftRunAnswer; onOpenDeck: () => void }) {
+  const lines = trophyDrafterSentences(trophyDrafterFacts(answer));
+  const deck = answer.deckAvailable === true;
+  if (!lines.length && !deck) return null;
+  return (
+    <View style={styles.trophyRecord}>
+      {lines.slice(0, 1).map((line) => <Text key={line} style={styles.trophyRecordLead}>{line}</Text>)}
+      {deck ? (
+        <Pressable accessibilityRole="button" accessibilityHint="Opens the decklist" onPress={onOpenDeck} style={styles.inlineLink}>
+          <Text style={styles.inlineLinkText}>See the trophy drafter’s deck</Text>
+        </Pressable>
+      ) : null}
+      {lines.slice(1).map((line) => <Text key={line} style={styles.analysisBody}>{line}</Text>)}
+    </View>
+  );
+}
+
+// Expanded analysis: every card by model support, plus the affiliate links
+// for the revealed cards. The links stay inside this expanded section, the
+// reviewed native placement, with their disclosure.
+function CompareAllCards({
+  answer,
+  shares,
   onZoom,
   onAffiliatePress,
 }: {
   answer: DraftRunAnswer;
+  shares: CardShares;
   onZoom: (card: DraftRunCard) => void;
   onAffiliatePress: (card: DraftRunCard) => void;
 }) {
-  const { width, fontScale } = useWindowDimensions();
-  const stackComparison = width < 360 || fontScale > 1.35;
-  const candidates = answer.puzzle.candidates;
-  const selected = candidates.find((card) => card.id === answer.selectedId);
-  const trophy = candidates.find((card) => card.id === answer.historicalId);
-  const supportRanking = [...(answer.ranking ?? [])].sort((a, b) => Number(b.support) - Number(a.support));
-  const displayRanking = [...(answer.ranking ?? [])].sort(
-    (a, b) => Number(b.id === answer.historicalId) - Number(a.id === answer.historicalId)
-      || Number(b.support) - Number(a.support),
-  );
-  const leaderSupport = Number(answer.consensusSupport ?? supportRanking[0]?.support ?? 0);
-  const leader = supportRanking[0];
-  const modelLeaderName = answer.consensusName ?? leader?.name;
-  const disagreement = Boolean(
-    answer.historicalId
-      && (answer.consensusId ?? leader?.id)
-      && (answer.consensusId ?? leader?.id) !== answer.historicalId,
-  );
-
+  const byId = new Map(answer.puzzle.candidates.map((card) => [card.id, card]));
+  // Every scored answer carries a ranking; an older one without it still
+  // lists the pack, using only the saved scores.
+  const ranked = compareAllRanking(answer);
+  const ranking = ranked.length ? ranked : answer.puzzle.candidates.map((card) => ({
+    id: card.id, name: card.name, support: undefined as number | undefined, score: revealChoiceScore(answer, card.id),
+  }));
+  const revealed = revealCardChoices(answer).map((choice) => byId.get(choice.id)).filter((card): card is DraftRunCard => Boolean(card));
   return (
     <View style={styles.analysisPanel}>
-      <View style={[styles.feedbackComparison, stackComparison && { flexDirection: 'column' }]}>
-        <FeedbackCard
-          affiliate
-          card={selected}
-          label={answer.historicalMatch ? 'Your pick · Trophy pick' : 'Your pick'}
-          onAffiliatePress={onAffiliatePress}
-          onZoom={onZoom}
-        />
-        {!answer.historicalMatch ? (
-          <FeedbackCard affiliate card={trophy} label="Trophy pick" onAffiliatePress={onAffiliatePress} onZoom={onZoom} />
-        ) : null}
-      </View>
-      <Text style={styles.affiliateDisclosure}>
-        Affiliate links. Pack One may earn a commission from eligible TCGplayer purchases at no added cost to you.
-      </Text>
-
-      {compactFeedback(answer) ? <Text style={styles.analysisLead}>{compactFeedback(answer)}</Text> : null}
-      {trophyDrafterSentences(trophyDrafterFacts(answer)).map((line) => (
-        <Text key={line} style={styles.analysisBody}>{line}</Text>
-      ))}
-
-      {modelLeaderName ? (
-        <>
-          <Text style={styles.analysisTitle}>Model&apos;s strongest choice: {modelLeaderName}</Text>
-          {answer.historicalName ? (
-            <Text style={styles.analysisBody}>
-              Trophy drafter: {answer.historicalName}: 100.
-              {disagreement
-                ? ` Model's strongest alternative: ${modelLeaderName}: 95. This was an excellent alternative according to the model; ${answer.historicalName} was the choice in this successful trophy draft.`
-                : ''}
-            </Text>
-          ) : null}
-          <Text style={styles.analysisBody}>
-            {answer.historicalId && answer.selectedId === answer.historicalId
-              ? 'You matched the trophy pick.'
-              : `Your pick has ${relativeSupport(answer.selectedSupport, leaderSupport)} of the leading model support.`}
-            {' '}Matching the trophy drafter is the goal of this game: trophy matches earn 100 regardless of model support. Other choices receive partial credit, up to 95, based on how strongly the model supports them.
-          </Text>
-        </>
-      ) : null}
-
-      {displayRanking.length ? (
-        <>
-          <Text style={styles.analysisSubhead}>Leading choices</Text>
-          {displayRanking.slice(0, 3).map((item) => (
-            <View key={item.id} style={styles.rankingLine}>
-              <Text style={styles.rankingName}>
-                {item.name}
-                {item.id === answer.selectedId ? ' · Your pick' : ''}
-                {item.id === answer.historicalId ? ' · Trophy pick' : ''}
-              </Text>
-              <Text style={styles.rankingMeta}>
-                {item.id === answer.historicalId
-                  ? '100 points'
-                  : `${relativeSupport(item.support, leaderSupport)} of leader · ${item.score} points`}
-              </Text>
-            </View>
-          ))}
-          <Text style={styles.analysisSubhead}>Compare all {displayRanking.length} choices</Text>
-          {supportRanking.map((item) => (
-            <View key={`all-${item.id}`} style={styles.rankingLine}>
-              <Text style={styles.rankingName}>
-                {item.name}
-                {item.id === answer.selectedId ? ' · Your pick' : ''}
-                {item.id === answer.historicalId ? ' · Trophy pick' : ''}
-              </Text>
-              <Text style={styles.rankingMeta}>
-                {item.id === answer.historicalId ? 'N/A support' : `${relativeSupport(item.support, leaderSupport)} support`}
-                {' · '}{item.score} points
-              </Text>
-            </View>
-          ))}
-        </>
-      ) : null}
-
       <Text style={styles.modelNote}>
-        Model support reflects held-out strong-player choices. It does not establish a correct pick or predict a win rate.
+        Model support is relative to the model’s top choice.{shares ? ' See what other Pack One players picked today.' : ''}
       </Text>
+      {ranking.map((item) => {
+        const card = byId.get(item.id);
+        const players = peerShare(shares, item.id);
+        return (
+          <View key={`all-${item.id}`} style={styles.rankingLine}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={`${item.name}${item.id === answer.selectedId ? ', your pick' : ''}${item.id === answer.historicalId ? ', trophy pick' : ''}. Open enlarged card.`}
+              disabled={!card}
+              onPress={() => { if (card) onZoom(card); }}
+            >
+              <Text style={styles.rankingName}>
+                {item.name}
+                {item.id === answer.selectedId ? ' · Your pick' : ''}
+                {item.id === answer.historicalId ? ' · Trophy pick' : ''}
+              </Text>
+            </Pressable>
+            <Text style={styles.rankingMeta}>
+              Model support {modelSupportLabel(item.support, answer.consensusSupport, item.id === answer.historicalId)} · Score {item.score == null ? 'N/A' : Number(item.score)}
+              {players ? ` · Players’ picks ${players}` : ''}
+            </Text>
+          </View>
+        );
+      })}
+      <View style={styles.shopLinks}>
+        {revealed.map((card) => (
+          <Pressable
+            key={`shop-${card.id}`}
+            accessibilityRole="link"
+            accessibilityLabel={`Find ${card.name} on TCGplayer, affiliate link`}
+            onPress={() => onAffiliatePress(card)}
+            style={styles.shopLink}
+          >
+            <Text style={styles.shopLinkText}>Find {card.name} on TCGplayer (affiliate link)</Text>
+          </Pressable>
+        ))}
+        <Text style={styles.affiliateDisclosure}>
+          Affiliate links. Pack One may earn a commission from eligible TCGplayer purchases at no added cost to you.
+        </Text>
+      </View>
     </View>
   );
 }
@@ -529,6 +586,15 @@ export default function DraftRunScreen({
   const [reportError, setReportError] = useState<string | null>(null);
   const [reportedDecision, setReportedDecision] = useState<string | null>(null);
   const [dailyPeers, setDailyPeers] = useState<{ runId: string; round: number; stats: DailyPeerStats } | null>(null);
+  const [deckOpen, setDeckOpen] = useState(false);
+  const deckCache = useRef(new Map<string, Promise<TrophyDeck>>());
+  // Result-screen Daily status for the next-Daily action, reset cue, guest
+  // handoff and three-Daily share. Bound to the run it was read for.
+  const [resultStatus, setResultStatus] = useState<{ runId: string; status: DailyStatus } | null>(null);
+  const [dailySet, setDailySet] = useState<{ runId: string; runs: DraftRunState[] } | null>(null);
+  const [shareScope, setShareScope] = useState<'day' | 'run'>('run');
+  const [sharing, setSharing] = useState(false);
+  const dailySetDefaulted = useRef<string | null>(null);
   const scroll = useRef<ScrollView>(null);
 
   const commitState = (next: LoadState) => {
@@ -547,6 +613,49 @@ export default function DraftRunScreen({
       .catch(() => undefined); // Peer comparison is optional, never block a reveal.
     return () => { current = false; };
   }, [state, mode, reviewIndex]);
+
+  // After a completed real Daily, one authoritative status read decides the
+  // next-Daily action, the reset cue, the guest handoff and whether all three
+  // Dailies can be shared together. Any failed read keeps the safe defaults.
+  useEffect(() => {
+    if (state.status !== 'ready' || mode !== 'result' || shared || !state.run.day || !state.run.complete) return;
+    const { run, session } = state;
+    let current = true;
+    void loadDailyStatus(session)
+      .then(async (status) => {
+        if (!current) return;
+        setResultStatus({ runId: run.id, status });
+        if (!completedAllDailies(status, run.day, run.environment)) return;
+        const ids = dailySetRunIds(status.daily_history, run);
+        if (!ids) return;
+        const others = await Promise.all(ids.map((id) => loadDraftRun(id, session)));
+        const runs = current ? dailySetShareRuns([run, ...others]) : null;
+        if (!runs) return;
+        setDailySet({ runId: run.id, runs });
+        // Default to the whole day once, without undoing a later choice.
+        if (dailySetDefaulted.current !== run.id) {
+          dailySetDefaulted.current = run.id;
+          setShareScope('day');
+        }
+      })
+      .catch(() => undefined);
+    return () => { current = false; };
+  }, [state, mode, shared]);
+
+  const openTrophyDeck = useCallback(() => setDeckOpen(true), []);
+  const loadDeckForReview = useCallback(() => {
+    const current = stateRef.current;
+    if (current.status !== 'ready' || reviewIndex === null) return Promise.reject(new Error('No revealed pick.'));
+    const key = `${current.run.id}:${reviewIndex}`;
+    let pending = deckCache.current.get(key);
+    if (!pending) {
+      pending = loadTrophyDeck(current.run.id, reviewIndex, current.session);
+      deckCache.current.set(key, pending);
+      // A failed read is retried on the next open, not served from the cache.
+      pending.catch(() => { if (deckCache.current.get(key) === pending) deckCache.current.delete(key); });
+    }
+    return pending;
+  }, [reviewIndex]);
 
   useEffect(() => subscribeSession((next) => {
     const current = stateRef.current;
@@ -747,6 +856,7 @@ export default function DraftRunScreen({
     setReviewIndex(feedbackIndex);
     setShowAnalysis(false);
     setShowPackReview(false);
+    setDeckOpen(false);
     setReportOpen(false);
     setReportReason(null);
     setReportComment('');
@@ -858,34 +968,36 @@ export default function DraftRunScreen({
   };
 
   const shareResult = async () => {
-    if (state.status !== 'ready' || !state.run.complete) return;
-    const matches = state.run.answers.filter((item) => item.historicalMatch).length;
-    const resultEnvironment = state.run.environment;
-    const label = resultEnvironment === 'latest' ? 'Latest Set' : resultEnvironment === 'powered-cube' ? 'Powered Cube' : 'Draft Run';
-    const squares = state.run.answers.map((item) => (
-      item.historicalMatch ? '🟩' : item.score >= 85 ? '🟦' : item.score >= 60 ? '🟨' : item.score >= 25 ? '🟧' : '⬛'
-    )).join('');
+    if (state.status !== 'ready' || !state.run.complete || sharing) return;
+    const resultRun = state.run;
     setShareError(null);
+    setSharing(true);
     try {
-      const share = state.run.day ? null : (shared ? await shared.createShare() : await createDraftRunShare(state.run.id, state.session));
-      if (!state.run.day && !share?.creator && !/^[a-f0-9]{24}$/.test(share?.id ?? '')) {
+      // After all three Dailies the whole day shares the regular Daily's link;
+      // recipients open their own Daily. No card names in either message.
+      const daySet = resultRun.day && shareScope === 'day' && dailySet?.runId === resultRun.id ? dailySet.runs : null;
+      if (resultRun.day) {
+        const url = dailyShareUrl(daySet ? { day: resultRun.day, environment: 'mixed' } : resultRun);
+        const text = daySet ? dailySetShareText(daySet) : draftRunShareText({ ...resultRun, score: resultRun.score ?? 0 });
+        await Share.share({ message: `${text}\n${url}` });
+        return;
+      }
+      const share = shared ? await shared.createShare() : await createDraftRunShare(resultRun.id, state.session);
+      if (!share?.creator && !/^[a-f0-9]{24}$/.test(share?.id ?? '')) {
         setShareError('Could not create this challenge link. Try sharing again.');
         return;
       }
-      const url = state.run.day
-        ? `https://packone.pro/share/daily/v2/?environment=${encodeURIComponent(resultEnvironment)}&ref=result_share`
-        : share?.creator && share.url
-          ? share.url
-          : `https://packone.pro/open/shared/?id=${share?.id}`;
-      const creator = state.run.comparison?.kind === 'creator' ? state.run.comparison : null;
-      const text = state.run.day
-        ? `I scored ${state.run.score ?? 0}/100 on today’s Pack One ${label}. Can you beat it?\n${squares}\n${matches}/${state.run.run_length} trophy picks matched · Daily ${state.run.day}`
-        : creator
-          ? `I scored ${state.run.score ?? 0}/100 trying to beat ${creator.name} on Pack One.\n${Number(creator.creator_matches ?? 0)}/${state.run.run_length} creator picks matched · ${Number(creator.trophy_matches ?? matches)}/${state.run.run_length} trophy picks matched.`
-          : `Pack One · ${label} · ${shared ? 'Shared run' : 'Practice'}\n${state.run.score ?? 0}/100  ${squares}\n${matches}/${state.run.run_length} trophy picks matched. Play this run and compare.`;
+      const url = share?.creator && share.url ? share.url : `https://packone.pro/open/shared/?id=${share?.id}`;
+      const creator = resultRun.comparison?.kind === 'creator' ? resultRun.comparison : null;
+      const matches = resultRun.answers.filter((item) => item.historicalMatch).length;
+      const text = creator
+        ? `I scored ${resultRun.score ?? 0}/100 trying to beat ${creator.name} on Pack One.\n${Number(creator.creator_matches ?? 0)}/${resultRun.run_length} creator picks matched · ${Number(creator.trophy_matches ?? matches)}/${resultRun.run_length} trophy picks matched.`
+        : draftRunShareText({ ...resultRun, score: resultRun.score ?? 0 }).replace(' · Practice\n', shared ? ' · Shared run\n' : ' · Practice\n');
       await Share.share({ message: `${text}\n${url}` });
     } catch {
       setShareError('Could not open sharing. Your result is still saved.');
+    } finally {
+      setSharing(false);
     }
   };
 
@@ -920,6 +1032,7 @@ export default function DraftRunScreen({
     setReviewIndex(null);
     setShowAnalysis(false);
     setShowPackReview(false);
+    setDeckOpen(false);
     setAffiliateError(null);
     if (state.run.complete) {
       setMode('result');
@@ -934,6 +1047,7 @@ export default function DraftRunScreen({
     setReviewIndex(index);
     setShowAnalysis(false);
     setShowPackReview(false);
+    setDeckOpen(false);
     setAffiliateError(null);
     setSelected(null);
     setMode('feedback');
@@ -1002,6 +1116,24 @@ export default function DraftRunScreen({
           : creator.outcome === 'loss' ? `${creator.name} got you this time`
             : surfaceMeta.resultTitle
       : surfaceMeta.resultTitle;
+    const realDaily = Boolean(run.day) && !shared;
+    const dailyStatus = realDaily && resultStatus?.runId === run.id ? resultStatus.status : null;
+    // Only an authoritative current-day status can turn the safe fallback into
+    // a direct next Daily or show the guest handoff (today-status.mjs).
+    const nextDaily = realDaily ? nextUnfinishedDaily(dailyStatus, run.day, run.environment) : null;
+    const allDailiesDone = realDaily && completedAllDailies(dailyStatus, run.day, run.environment);
+    const guest = !state.session.accountToken;
+    const daySet = realDaily && dailySet?.runId === run.id ? dailySet.runs : null;
+    const shareDay = Boolean(daySet) && shareScope === 'day';
+    const streak = Number(dailyStatus?.daily_streak || 0);
+    const back = creatorChallenge || realDaily
+      ? { label: 'Back to Dailies', go: () => router.dismissTo('/') }
+      : practice || shared
+        ? { label: 'Return to Practice', go: () => router.dismissTo('/practice') }
+        : { label: 'Back to Dailies', go: () => router.dismissTo('/') };
+    const primary = nextDaily && !creatorChallenge
+      ? { label: nextDaily.label, go: () => router.replace({ pathname: '/draft-run', params: { environment: nextDaily.environment } }) }
+      : back;
     return (
       <SafeAreaView style={styles.safe}>
         <ScrollView contentContainerStyle={styles.resultPage}>
@@ -1024,47 +1156,117 @@ export default function DraftRunScreen({
               {creator?.creator_post_run_note ? <Text style={styles.resultBody}>{creator.name} after the run: “{creator.creator_post_run_note}”</Text> : null}
             </View>
           ) : null}
+          {dailyStatus ? (
+            <Text style={styles.resultCue}>{dailyResetCue()}{streak >= 2 ? ` · ${streak}-day streak` : ''}</Text>
+          ) : null}
           {run.standing ? (
             <Text style={styles.resultBody}>
               #{run.standing.rank} of {run.standing.total} today
               {run.standing.percentile ? ` · Top ${run.standing.percentile}%` : ''}
+              {run.standing.final ? '. Final result.' : '. The board closes at midnight Pacific.'}
             </Text>
+          ) : null}
+          {realDaily ? (
+            <View accessibilityLabel={shareDay ? 'Share today’s Dailies' : 'Share your result'} style={styles.sharePanel}>
+              <Text accessibilityRole="header" style={styles.analysisSubhead}>{shareDay ? 'Share today’s Dailies' : 'Share your result'}</Text>
+              <Text style={styles.resultBody}>
+                {shareDay
+                  ? 'All three scores and colored squares in one message, not the cards.'
+                  : 'Share your score and colored squares, not the cards. Friends can try their own Daily without signing up.'}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Share Pack One result"
+                disabled={sharing}
+                onPress={() => void shareResult()}
+                style={[styles.primaryButton, sharing && styles.primaryButtonDisabled]}
+              >
+                <Text style={styles.primaryButtonText}>{shareDay ? 'Share all 3' : 'Share result'}</Text>
+              </Pressable>
+              {daySet ? (
+                <Pressable accessibilityRole="button" onPress={() => setShareScope((value) => value === 'day' ? 'run' : 'day')} style={styles.inlineLink}>
+                  <Text style={styles.inlineLinkText}>{shareDay ? 'Share just this Daily' : 'Share all 3 Dailies'}</Text>
+                </Pressable>
+              ) : null}
+              {shareError ? <Text accessibilityRole="alert" style={styles.actionError}>{shareError}</Text> : null}
+            </View>
+          ) : null}
+          {realDaily && guest && !run.leaderboard_eligible && allDailiesDone ? (
+            <View style={styles.setComplete}>
+              <Text style={styles.cardKicker}>FINISHED ALL 3 FREE DAILIES</Text>
+              <Text style={styles.analysisSubhead}>Finished today&apos;s Dailies? Keep drafting.</Text>
+              <Text style={styles.resultBody}>Sign in or create a free account to play unlimited regular Draft Runs, save your scores, and join the leaderboard.</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push({ pathname: '/account', params: { validateDailyRunId: run.id, environment } })}
+                style={styles.primaryButton}
+              >
+                <Text style={styles.primaryButtonText}>Sign in for unlimited runs</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          <Pressable accessibilityRole="button" onPress={primary.go} style={styles.primaryButton}>
+            <Text style={styles.primaryButtonText}>{primary.label}</Text>
+          </Pressable>
+          {nextDaily && !creatorChallenge ? (
+            <Pressable accessibilityRole="button" onPress={back.go} style={styles.inlineLink}>
+              <Text style={styles.inlineLinkText}>All Dailies</Text>
+            </Pressable>
+          ) : null}
+          {!realDaily ? (
+            <>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Share Pack One result"
+                disabled={sharing}
+                onPress={() => void shareResult()}
+                style={[styles.secondaryButton, sharing && styles.primaryButtonDisabled]}
+              >
+                <Text style={styles.secondaryButtonText}>Share this run and compare</Text>
+              </Pressable>
+              {shareError ? <Text accessibilityRole="alert" style={styles.actionError}>{shareError}</Text> : null}
+            </>
           ) : null}
           <View style={styles.resultReview}>
             <Text style={styles.analysisTitle}>Your {run.run_length} picks</Text>
-            {run.answers.map((item, index) => (
-              <Pressable
-                key={`${item.puzzle.puzzle_id}-result-review`}
-                accessibilityRole="button"
-                accessibilityLabel={`Review pick ${index + 1}, ${item.selectedName}, ${item.score} points`}
-                onPress={() => reviewAnswer(index)}
-                style={styles.resultReviewRow}
-              >
-                <Text style={styles.resultReviewIndex}>{index + 1}</Text>
-                <View style={styles.resultReviewCopy}>
-                  <Text style={styles.resultReviewTitle}>
-                    {resultSetName(item.puzzle.set_id)} · P1P{item.pickNumber ?? item.puzzle.pick_number}
-                  </Text>
-                  <Text style={styles.rankingMeta}>
-                    {item.selectedName}{item.historicalMatch ? ' · Trophy match' : ''}
-                  </Text>
-                </View>
-                <Text style={styles.resultReviewScore}>{item.score}</Text>
-              </Pressable>
-            ))}
+            {run.answers.map((item, index) => {
+              const byId = new Map(item.puzzle.candidates.map((card) => [card.id, card]));
+              const mine = byId.get(item.selectedId);
+              const trophy = item.historicalMatch || !item.historicalId ? null : byId.get(item.historicalId) ?? null;
+              return (
+                <Pressable
+                  key={`${item.puzzle.puzzle_id}-result-review`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Review pick ${index + 1}, ${item.selectedName}, ${item.score} points`}
+                  onPress={() => reviewAnswer(index)}
+                  style={styles.resultReviewRow}
+                >
+                  <Text style={styles.resultReviewIndex}>{index + 1}</Text>
+                  {/* Names are in the row text, so thumbnails stay out of the accessibility tree. */}
+                  <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.resultThumbs}>
+                    {[mine ? { card: mine, style: item.historicalMatch ? styles.thumbMatch : styles.thumbMine } : null,
+                      trophy ? { card: trophy, style: styles.thumbTrophy } : null].map((thumb, slot) => (
+                      <View key={slot} style={[styles.resultThumb, thumb?.style]}>
+                        {thumb?.card.image_url ? <Image source={thumb.card.image_url} style={StyleSheet.absoluteFill} contentFit="cover" cachePolicy="memory-disk" /> : null}
+                      </View>
+                    ))}
+                  </View>
+                  <View style={styles.resultReviewCopy}>
+                    <Text style={styles.resultReviewTitle}>
+                      {resultSetName(item.puzzle.set_id)} · Pick {item.pickNumber ?? item.puzzle.pick_number}
+                    </Text>
+                    <Text style={styles.rankingMeta}>
+                      {item.selectedName}{item.historicalMatch ? ' · Trophy match' : trophy ? ` · Trophy pick: ${trophy.name}` : ''}
+                    </Text>
+                  </View>
+                  <Text style={styles.resultReviewScore}>{item.score}</Text>
+                </Pressable>
+              );
+            })}
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Share Pack One result"
-            onPress={() => void shareResult()}
-            style={styles.secondaryButton}
-          >
-            <Text style={styles.secondaryButtonText}>Share result</Text>
-          </Pressable>
-          <Pressable accessibilityRole="button" onPress={() => router.dismissTo(creatorChallenge ? '/' : practice || shared ? '/practice' : '/')} style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>{creatorChallenge ? 'Back to Dailies' : practice || shared ? 'Return to Practice' : 'Home'}</Text>
-          </Pressable>
-          {shareError ? <Text accessibilityRole="alert" style={styles.actionError}>{shareError}</Text> : null}
+          <Text style={styles.modelNote}>
+            Your final score is the average of your {run.run_length} picks. Matching the trophy drafter earns 100; other picks can score up to 95 based on the model.
+          </Text>
           <View style={styles.guestNote}>
             <Text style={styles.guestNoteTitle}>
               {creatorChallenge ? 'Creator replay saved' : practice || shared ? 'Saved to your career' : state.session.accountToken ? 'Saved to your account' : 'Guest result'}
@@ -1100,6 +1302,13 @@ export default function DraftRunScreen({
 
   const puzzle = mode === 'feedback' ? answer?.puzzle : run.current;
   if (!puzzle) return null;
+  const guideUrl = setGuideUrl(puzzle.set_id);
+  const peersForReview = mode === 'feedback' && run.day && dailyPeers?.runId === run.id && dailyPeers.round === reviewIndex && dailyPeers.stats.available
+    ? dailyPeers.stats
+    : null;
+  const cardShares: CardShares = peersForReview?.card_pick_pct && typeof peersForReview.card_pick_pct === 'object' ? peersForReview.card_pick_pct : null;
+  const compactSentence = answer ? compactRevealFeedback(answer) : '';
+  const picksLeft = run.run_length - run.answers.length;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -1111,45 +1320,53 @@ export default function DraftRunScreen({
           <Text style={styles.title}>
             {puzzle.set_id.toUpperCase()} <Text style={styles.titleMeta}>· Pack 1 · Pick {puzzle.pick_number}</Text>
           </Text>
+          {guideUrl ? (
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel={`Set refresher for ${resultSetName(puzzle.set_id)}, opens packone.pro`}
+              onPress={() => { void WebBrowser.openBrowserAsync(guideUrl).catch(() => undefined); }}
+              style={styles.inlineLink}
+            >
+              <Text style={styles.inlineLinkText}>Set refresher ↗</Text>
+            </Pressable>
+          ) : null}
           <Progress run={run} />
 
           {mode === 'feedback' && answer ? (
             <>
-              <View testID="pick-feedback" onLayout={(event) => { setFeedbackWidth(event.nativeEvent.layout.width); recordLayout('feedback', event); }} style={[styles.feedback, wideFeedback && styles.feedbackWide]}>
+              <View testID="pick-feedback" onLayout={(event) => { setFeedbackWidth(event.nativeEvent.layout.width); recordLayout('feedback', event); }} style={[styles.feedback, wideFeedback && styles.feedbackWide, answer.historicalMatch && styles.feedbackMatch]}>
                 <Text testID="feedback-score" onLayout={(event) => recordLayout('score', event)} onTextLayout={(event) => recordText('score', event)} style={styles.feedbackScoreNumber}>{answer.score}<Text style={styles.feedbackScoreSuffix}>/100</Text></Text>
                 <View testID="feedback-copy" onLayout={(event) => recordLayout('copy', event)} style={[styles.feedbackCopy, wideFeedback && styles.feedbackCopyWide]}>
                   <Text testID="feedback-title" onLayout={(event) => recordLayout('title', event)} onTextLayout={(event) => recordText('title', event)} style={styles.feedbackTitle}>
                     {trophyRevealSentence(answer)}
                   </Text>
-                  <Text testID="feedback-choice" onLayout={(event) => recordLayout('choice', event)} onTextLayout={(event) => recordText('choice', event)} style={styles.feedbackBody}>You chose {answer.selectedName}.</Text>
+                  {compactSentence ? (
+                    <Text testID="feedback-choice" onLayout={(event) => recordLayout('choice', event)} onTextLayout={(event) => recordText('choice', event)} style={styles.feedbackBody}>{compactSentence}</Text>
+                  ) : null}
+                  {peersForReview ? (
+                    <Text accessibilityRole="text" style={styles.dailyPeerStats}>
+                      {peersForReview.matching_pick_pct}% of players picked this · {peersForReview.trophy_pick_pct}% matched the trophy drafter ({peersForReview.players} players)
+                    </Text>
+                  ) : null}
                 </View>
               </View>
-              {run.day && dailyPeers?.runId === run.id && dailyPeers.round === reviewIndex && dailyPeers.stats.available ? (
-                <Text accessibilityRole="text" style={styles.dailyPeerStats}>
-                  {dailyPeers.stats.matching_pick_pct}% of players picked this · {dailyPeers.stats.trophy_pick_pct}% matched the trophy drafter ({dailyPeers.stats.players} players)
-                </Text>
-              ) : null}
 
-              <View style={[styles.feedbackComparison, stackComparison && { flexDirection: 'column' }]}>
-                {(() => {
-                  const roles: { id: string; label: string }[] = [
-                    { id: answer.selectedId, label: 'Your Pick' },
-                    ...(run.comparison?.kind === 'creator' && answer.creatorId
-                      ? [{ id: answer.creatorId, label: `${run.comparison.name}’s Pick` }]
-                      : []),
-                    ...(answer.historicalId ? [{ id: answer.historicalId, label: 'Trophy Pick' }] : []),
-                  ];
-                  const grouped = new Map<string, string[]>();
-                  for (const role of roles) grouped.set(role.id, [...(grouped.get(role.id) ?? []), role.label]);
-                  return [...grouped].map(([id, labels]) => (
-                    <FeedbackCard
-                      key={id}
-                      card={puzzle.candidates.find((card) => card.id === id)}
-                      label={labels.join(' · ')}
-                      onZoom={setZoomedCard}
-                    />
-                  ));
-                })()}
+              <View style={styles.revealSection}>
+                <Text accessibilityRole="header" style={styles.analysisTitle}>Why this score?</Text>
+                <RevealComparison
+                  answer={answer}
+                  creatorName={run.comparison?.kind === 'creator' ? run.comparison.name : null}
+                  shares={cardShares}
+                  stack={stackComparison}
+                  onZoom={setZoomedCard}
+                />
+                {answer.consensusName ? (
+                  <>
+                    <Text style={styles.analysisLead}>{SCORING_COPY}</Text>
+                    <Text style={styles.modelNote}>{MODEL_NOTE}</Text>
+                  </>
+                ) : null}
+                <TrophyDrafterDetails answer={answer} onOpenDeck={openTrophyDeck} />
               </View>
 
               <Pressable
@@ -1158,20 +1375,12 @@ export default function DraftRunScreen({
                 onPress={() => setShowAnalysis((value) => !value)}
                 style={styles.disclosureButton}
               >
-                <Text style={styles.disclosureText}>{showAnalysis ? 'Hide score analysis' : 'Why this score?'}</Text>
+                <Text style={styles.disclosureText}>{showAnalysis ? 'Hide all cards' : `Compare all ${answer.ranking?.length || answer.puzzle.candidates.length} cards`}</Text>
               </Pressable>
               {showAnalysis ? (
                 <>
-                  <FeedbackAnalysis answer={answer} onAffiliatePress={openAffiliateCard} onZoom={setZoomedCard} />
+                  <CompareAllCards answer={answer} shares={cardShares} onAffiliatePress={openAffiliateCard} onZoom={setZoomedCard} />
                   {affiliateError ? <Text accessibilityRole="alert" style={styles.actionError}>{affiliateError}</Text> : null}
-                  <View style={styles.decisionReport}>
-                    <Pressable accessibilityRole="button" onPress={openDecisionReport} style={styles.decisionReportButton}>
-                      <Text style={styles.decisionReportText}>Report this decision</Text>
-                    </Pressable>
-                    {reportedDecision === answer.puzzle.puzzle_id ? (
-                      <Text style={styles.decisionReportStatus}>{REPORT_SENT_TEXT}</Text>
-                    ) : null}
-                  </View>
                 </>
               ) : null}
 
@@ -1184,13 +1393,26 @@ export default function DraftRunScreen({
                 <Text style={styles.disclosureText}>{showPackReview ? 'Hide revealed pack' : 'Review the pack'}</Text>
               </Pressable>
               {showPackReview ? <PackReview answer={answer} onZoom={setZoomedCard} /> : null}
+
+              <View style={styles.decisionReport}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Does something look wrong? Let us know." onPress={openDecisionReport} style={styles.decisionReportButton}>
+                  <Text style={styles.decisionReportText}>Does something look wrong? <Text style={styles.decisionReportLink}>Let us know.</Text></Text>
+                </Pressable>
+                {reportedDecision === answer.puzzle.puzzle_id ? (
+                  <Text accessibilityRole="text" style={styles.decisionReportStatus}>{REPORT_SENT_TEXT}</Text>
+                ) : null}
+              </View>
             </>
           ) : (
             <>
-              {puzzle.prior_picks.length ? (
-                <View style={styles.pool}>
-                  <Text style={styles.sectionTitle}>Their earlier picks</Text>
-                  <Text style={styles.sectionBody}>Choose for this drafter&apos;s pool.</Text>
+              <View style={styles.pool}>
+                <Text style={styles.sectionTitle}>Earlier picks</Text>
+                <Text style={styles.sectionBody}>
+                  {puzzle.prior_picks.length
+                    ? `${puzzle.prior_picks.length} card${puzzle.prior_picks.length === 1 ? '' : 's'} · in pick order`
+                    : 'No earlier picks yet.'}
+                </Text>
+                {puzzle.prior_picks.length ? (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.poolRow}>
                     {puzzle.prior_picks.map((card, index) => (
                       <Pressable
@@ -1207,8 +1429,8 @@ export default function DraftRunScreen({
                       </Pressable>
                     ))}
                   </ScrollView>
-                </View>
-              ) : null}
+                ) : null}
+              </View>
 
               {practice && (run.rerolls.pack > 0 || (run.set_reroll_allowed && run.rerolls.set > 0)) ? (
                 <View style={styles.rerollPanel}>
@@ -1239,8 +1461,8 @@ export default function DraftRunScreen({
                 </View>
               ) : actionError ? <Text style={styles.actionError}>{actionError}</Text> : null}
 
-              <Text style={styles.sectionTitle}>Choose a card</Text>
-              <Text style={styles.sectionBody}>Tap to choose. Press and hold a card to zoom.</Text>
+              <Text style={styles.sectionTitle}>Choose one</Text>
+              <Text style={styles.sectionBody}>{puzzle.candidates.length} cards in this pack. Tap to choose. Press and hold a card to zoom.</Text>
               <View style={styles.grid}>
                 {puzzle.candidates.map((card) => (
                   <CardTile
@@ -1266,7 +1488,8 @@ export default function DraftRunScreen({
           <SafeAreaView edges={['top', 'right', 'bottom', 'left']} style={styles.reportModalSafe}>
             <ReportKeyboardAvoidingView behavior={Platform?.OS === 'ios' ? 'padding' : undefined} style={styles.reportKeyboard}>
               <View accessibilityViewIsModal style={styles.reportSheet}>
-                <Text style={styles.reportTitle}>What seems wrong?</Text>
+                <Text style={styles.reportTitle}>Does something look wrong?</Text>
+                <Text style={styles.feedbackBody}>Tell us what you noticed.</Text>
                 <View accessibilityRole="radiogroup" style={styles.reportReasons}>
                   {DECISION_REPORT_OPTIONS.map((option) => (
                     <Pressable
@@ -1318,6 +1541,18 @@ export default function DraftRunScreen({
         </Modal>
 
         <CardFaceViewer card={zoomedCard} onClose={() => setZoomedCard(null)} />
+        {mode === 'feedback' && answer ? (
+          <TrophyDeckSheet
+            visible={deckOpen}
+            load={loadDeckForReview}
+            context={{
+              record: trophyDrafterFacts(answer)?.record,
+              trophyName: answer.historicalName,
+              priorNames: answer.puzzle.prior_picks.map((card) => card.name),
+            }}
+            onClose={() => setDeckOpen(false)}
+          />
+        ) : null}
 
         <View style={styles.actionDock}>
           {mode === 'pick' ? (
@@ -1330,9 +1565,12 @@ export default function DraftRunScreen({
               {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Confirm pick</Text>}
             </Pressable>
           ) : (
-            <Pressable accessibilityRole="button" onPress={next} style={styles.primaryButton}>
-              <Text style={styles.primaryButtonText}>{run.complete ? 'See result' : 'Next pick'}</Text>
-            </Pressable>
+            <View style={styles.nextDock}>
+              <Text style={styles.nextNote}>{run.complete ? 'Run complete' : `${picksLeft} of ${run.run_length} picks left`}</Text>
+              <Pressable accessibilityRole="button" onPress={next} style={[styles.primaryButton, styles.nextButton]}>
+                <Text style={styles.primaryButtonText}>{run.complete ? 'See result' : 'Next pick'}</Text>
+              </Pressable>
+            </View>
           )}
         </View>
       </View>
@@ -1459,6 +1697,38 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceSoft,
   },
   feedbackCardName: { color: colors.ink, fontSize: 12, lineHeight: 16, fontWeight: '700' },
+  // Reveal role colors match draft-run.css: blue yours, gold trophy, green match.
+  feedbackMatch: { borderTopColor: '#39754e' },
+  choiceMine: { borderColor: '#335c85' },
+  choiceTrophy: { borderColor: '#b29a68' },
+  choiceMatch: { borderColor: '#39754e', borderWidth: 2 },
+  choiceLabelMine: { color: '#214f7d' },
+  choiceLabelTrophy: { color: '#775c26' },
+  choiceLabelMatch: { color: '#245c3a' },
+  choiceStats: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.xs, gap: 2 },
+  choiceStatLabel: { color: colors.muted, fontSize: 11, lineHeight: 15 },
+  choiceScore: { color: colors.ink, fontSize: 26, lineHeight: 30, fontWeight: '800' },
+  choiceStatRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: 4 },
+  choiceStatValue: { color: colors.ink, fontSize: 13, lineHeight: 18, fontWeight: '700' },
+  revealSection: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: spacing.md, gap: spacing.md },
+  inlineLink: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
+  inlineLinkText: { color: colors.accentDark, fontSize: 14, lineHeight: 20, fontWeight: '800', textDecorationLine: 'underline' },
+  trophyRecord: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.sm, gap: spacing.xs },
+  trophyRecordLead: { color: colors.ink, fontSize: 15, lineHeight: 22, fontWeight: '700' },
+  shopLinks: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.sm, gap: 0 },
+  sharePanel: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: spacing.md, gap: spacing.sm },
+  setComplete: { borderWidth: 1, borderColor: colors.line, borderLeftWidth: 3, borderLeftColor: colors.accent, backgroundColor: colors.surface, padding: spacing.md, gap: spacing.sm },
+  cardKicker: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
+  resultCue: { color: colors.accentDark, fontSize: 14, lineHeight: 20, fontWeight: '700' },
+  resultThumbs: { flexDirection: 'row', gap: 4 },
+  resultThumb: { width: 30, aspectRatio: 0.716, borderWidth: 2, borderColor: 'transparent', overflow: 'hidden' },
+  thumbMine: { borderColor: '#335c85', backgroundColor: colors.surfaceSoft },
+  thumbTrophy: { borderColor: '#b29a68', backgroundColor: colors.surfaceSoft },
+  thumbMatch: { borderColor: '#39754e', backgroundColor: colors.surfaceSoft },
+  nextDock: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, flexWrap: 'wrap' },
+  nextNote: { color: colors.muted, fontSize: 13, lineHeight: 18, fontWeight: '700', flexShrink: 1 },
+  nextButton: { flexGrow: 1 },
+  decisionReportLink: { textDecorationLine: 'underline', color: colors.accentDark },
   disclosureButton: {
     minHeight: 48,
     borderWidth: 1,
@@ -1484,7 +1754,7 @@ const styles = StyleSheet.create({
   modelNote: { color: colors.muted, fontSize: 12, lineHeight: 18, fontStyle: 'italic' },
   decisionReport: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.sm, gap: spacing.xs, alignItems: 'flex-start' },
   decisionReportButton: { minHeight: 44, justifyContent: 'center', paddingVertical: spacing.xs },
-  decisionReportText: { color: colors.muted, fontSize: 13, fontWeight: '700', textDecorationLine: 'underline' },
+  decisionReportText: { color: colors.muted, fontSize: 14, lineHeight: 20, fontWeight: '700' },
   decisionReportStatus: { color: colors.muted, fontSize: 12, lineHeight: 17 },
   reportModalSafe: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(16, 24, 32, 0.58)' },
   reportKeyboard: { flex: 1, justifyContent: 'flex-end' },

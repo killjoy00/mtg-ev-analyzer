@@ -38,10 +38,8 @@ export function trophyDrafterFacts(answer: Pick<DraftRunAnswer, 'trophyDrafter' 
 export function trophyDrafterSentences(facts: TrophyDrafterFacts | null): string[] {
   if (!facts) return [];
   return [
-    facts.record ? `This trophy draft finished ${facts.record}.` : null,
-    facts.winRate != null
-      ? `17Lands reports the trophy drafter’s overall game win rate as about ${facts.winRate}%. It describes the drafter, not this draft or this card.`
-      : null,
+    facts.record ? `This trophy draft finished ${facts.record.replace('–', '-')}.` : null,
+    facts.winRate != null ? `The drafter wins about ${facts.winRate}% of their games on 17Lands.` : null,
     facts.rank ? `The trophy drafter reached ${facts.rank} rank.` : null,
   ].filter((line): line is string => Boolean(line));
 }

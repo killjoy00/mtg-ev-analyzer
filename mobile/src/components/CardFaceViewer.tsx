@@ -31,8 +31,11 @@ function FaceContent({ card, onClose }: { card: FaceCard; onClose: () => void })
   const wide = width >= 760;
   const next = faces[active === 0 ? 1 : 0];
   const imageHeight = Math.max(180, Math.min(height - 250, 700));
+  // A tap anywhere closes the viewer, on the card or outside it (#1435). The
+  // face toggle and image retry are their own touch targets, so they keep it
+  // open, and a scroll gesture cancels the tap. Close stays for screen readers.
   return <ScreenArea edges={['top', 'right', 'bottom', 'left']} style={styles.safe}>
-    <View accessibilityViewIsModal style={styles.panel}>
+    <Pressable accessible={false} testID="card-viewer-dismiss" onPress={onClose} accessibilityViewIsModal style={styles.panel}>
       <View style={styles.header}>
         <Text accessibilityRole="header" style={styles.title}>{card.name}</Text>
         <Pressable accessibilityRole="button" accessibilityLabel="Close card viewer" onPress={onClose} style={styles.button}>
@@ -47,13 +50,14 @@ function FaceContent({ card, onClose }: { card: FaceCard; onClose: () => void })
       <ScrollView contentContainerStyle={[styles.faces, wide && styles.wide]}>
         {faces.map((face, index) => <View key={face.image_url}
           style={[styles.face, !wide && index !== active && styles.hidden]}>
-          <Text style={styles.light}>{faces.length === 2 ? `${faceLabel(face)} · ` : ''}{face.name}</Text>
+          {/* The header already names a single-faced card; only two faces need labels. */}
+          {faces.length === 2 ? <Text style={styles.light}>{`${faceLabel(face)} · ${face.name}`}</Text> : null}
           <FaceArtwork face={face} height={imageHeight} />
           {face.partner_name ? <Text style={styles.light}>Melds with {face.partner_name}. Both cards are required.</Text> : null}
         </View>)}
         {!faces.length ? <Text style={styles.light}>Artwork unavailable.</Text> : null}
       </ScrollView>
-    </View>
+    </Pressable>
   </ScreenArea>;
 }
 
