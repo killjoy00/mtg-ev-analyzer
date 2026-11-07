@@ -618,7 +618,10 @@ if platform == 'android':
         require('Trophy Drafter’s Decklist' in xml and 'Premier Draft · 40 cards' in xml, 'Decklist sheet did not load')
         tap('Close decklist', exact=True, scroll=False)
         xml, _ = snapshot('trophy-decklist-closed')
-        require('You picked' in xml, 'Closing the decklist lost the reveal')
+        require('Trophy Drafter’s Decklist' not in xml, 'Decklist sheet did not close')
+        # Reaching the deck link scrolled the reveal, so its header may be
+        # off screen; scroll to it rather than assume it is still visible.
+        reveal('You picked')
     attempt('trophy-decklist-opens-and-returns-to-reveal', trophy_decklist)
 
     def account_switch():
