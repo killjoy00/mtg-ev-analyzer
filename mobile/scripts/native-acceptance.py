@@ -171,7 +171,7 @@ def launch(scenario, screen='home', width=390, scale=1, landscape=False):
     time.sleep(12)
 
 
-def measure(logs):
+def measure(logs, match=False):
     layouts, texts = {}, {}
     for line in logs.splitlines():
         for marker, target in [('PACKONE_LAYOUT', layouts), ('PACKONE_TEXT', texts)]:
@@ -183,15 +183,17 @@ def measure(logs):
                 continue
             record = json.loads(raw[start:end+1])
             target[record['label']] = record
-    for label in ['feedback', 'copy', 'score', 'title', 'choice']:
+    # A trophy match has no "You picked" line, as on the web reveal.
+    labels = ['score', 'title'] + ([] if match else ['choice'])
+    for label in ['feedback', 'copy'] + labels:
         require(label in layouts, f'Missing native layout measurement: {label}')
-    for child, parent in [('copy', 'feedback'), ('score', 'feedback'), ('title', 'copy'), ('choice', 'copy')]:
+    for child, parent in [('copy', 'feedback'), ('score', 'feedback'), ('title', 'copy')] + ([] if match else [('choice', 'copy')]):
         box, container = layouts[child], layouts[parent]
         require(box['x'] >= -1 and box['x']+box['width'] <= container['width']+1,
                 f'{child} overflows {parent} horizontally: {box} / {container}')
         require(box['y'] >= -1 and box['y']+box['height'] <= container['height']+1,
                 f'{child} overflows {parent} vertically: {box} / {container}')
-    for label in ['score', 'title', 'choice']:
+    for label in labels:
         require(label in texts and texts[label]['lines'], f'Missing real text metrics: {label}')
         # Native line widths can include trailing whitespace and fractional
         # glyph overhang. Check their actual extent against the feedback border,
@@ -281,14 +283,15 @@ if platform == 'android':
         if landscape:
             swipe_page(up=True)
         xml, logs = snapshot(name)
-        metric = measure(logs)
+        metric = measure(logs, match='match' in scenario)
         metrics[name] = metric
         manifest['scenes'].append({'name': name, 'width_dp': width, 'font_scale': scale, 'metrics': metric,
                                   'observed_font_scale': adb('shell', 'settings', 'get', 'system', 'font_scale')})
-        require('You chose' in xml, 'Feedback text was not rendered')
         if 'match' in scenario:
-            require('You matched the trophy drafter' in xml, 'Trophy-match fixture missing')
-        tap('Why this score?')
+            require('You matched the trophy pick' in xml, 'Trophy-match fixture missing')
+        else:
+            require('You picked' in xml, 'Feedback text was not rendered')
+        tap('Compare all')
         swipe_page(up=True)
         snapshot(name+'-analysis')
         tap('Review the pack')
@@ -343,7 +346,7 @@ if platform == 'android':
             tap('Pick Hero in Training')
             tap('Confirm pick', exact=True)
             xml, _ = snapshot(f'journey-pick-{pick+1}')
-            require('You chose' in xml, f'No feedback after pick {pick+1}')
+            require('You picked' in xml, f'No feedback after pick {pick+1}')
             tap('See result' if pick == 7 else 'Next pick', exact=True)
             if pick == 0:
                 adb('shell', 'input', 'keyevent', '4')
@@ -356,7 +359,7 @@ if platform == 'android':
         tap('Review pick 1,')
         snapshot('journey-final-review')
         tap('See result', exact=True)
-        tap('Home', exact=True)
+        tap('Back to Dailies', exact=True)
         xml, _ = snapshot('journey-home')
         require('View result' in xml, 'Completed Daily action missing')
         require('Navigate up' not in xml, 'Root tab has a Back button')
@@ -532,7 +535,7 @@ if platform == 'android':
         time.sleep(4)
         tap('Open Practice', exact=True)
         xml, _ = snapshot('archive-return-to-practice')
-        require('Choose your Draft Run' in xml and 'Navigate up' not in xml, 'Archive return did not restore the Practice tab')
+        require('Regular Draft Run' in xml and 'Navigate up' not in xml, 'Archive return did not restore the Practice tab')
         adb('shell', 'input', 'keyevent', '4')
         xml, _ = snapshot('archive-return-hardware-back')
         require('Eight picks. Your call.' in xml, 'Archive return did not preserve Daily tab history')
@@ -553,7 +556,7 @@ if platform == 'android':
         tap('See result', exact=True)
         tap('Return to Practice', exact=True)
         xml, _ = snapshot('practice-return')
-        require('Choose your Draft Run' in xml, 'Practice tab was not restored')
+        require('Regular Draft Run' in xml, 'Practice tab was not restored')
         require('Navigate up' not in xml, 'Practice root has a Back button')
     attempt('practice-complete-review-return', practice_journey)
 
@@ -573,7 +576,7 @@ if platform == 'android':
         adb('shell', f"am start -W -a android.intent.action.VIEW -d 'packone://resume-shared-run' -p '{PACKAGE}'")
         time.sleep(12)
         xml, after = snapshot('shared-after-relaunch')
-        require('You chose' in xml, 'Shared feedback was not restored')
+        require('You picked' in xml, 'Shared feedback was not restored')
         require('"method":"GET","id":"33333333-3333-4333-8333-333333333333","round":1' in after, 'Exact attempt and progress were not loaded')
         require('"method":"POST"' not in after, 'Relaunch created another shared attempt')
     attempt('shared-invitation-auth-accept-kill-relaunch', shared_journey)
@@ -591,7 +594,7 @@ if platform == 'android':
             raise AssertionError('Missing image failure and retry state')
 
         launch('member-image-error', 'feedback')
-        tap('Your Pick: Hero in Training. Open enlarged card.', exact=True)
+        tap('Your pick: Hero in Training. Open enlarged card.', exact=True)
         wait_for_image_failure()
         xml, _ = snapshot('card-image-unavailable')
         require('Image unavailable' in xml and 'Retry image' in xml, 'Missing image failure and retry state')
@@ -601,8 +604,18 @@ if platform == 'android':
         require('Image unavailable' in xml, 'Deterministic broken image should remain retryable')
         tap('Close card viewer', exact=True, scroll=False)
         xml, _ = snapshot('card-image-close')
-        require('You chose' in xml, 'Closing card zoom lost the run')
+        require('You picked' in xml, 'Closing card zoom lost the run')
     attempt('image-failure-retry-keeps-run', image_failure)
+
+    def trophy_decklist():
+        launch('member', 'feedback')
+        tap('See the trophy drafter’s deck', exact=True)
+        xml, _ = snapshot('trophy-decklist')
+        require('Trophy Drafter’s Decklist' in xml and 'Premier Draft · 40 cards' in xml, 'Decklist sheet did not load')
+        tap('Close decklist', exact=True, scroll=False)
+        xml, _ = snapshot('trophy-decklist-closed')
+        require('You picked' in xml, 'Closing the decklist lost the reveal')
+    attempt('trophy-decklist-opens-and-returns-to-reveal', trophy_decklist)
 
     def account_switch():
         launch('member', 'career')

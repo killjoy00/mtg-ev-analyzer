@@ -18,20 +18,20 @@ export const DAILY_ENVIRONMENT_META: Record<DailyEnvironment, {
   mixed: {
     title: 'Draft Run',
     eyebrow: 'DAILY DRAFT RUN',
-    description: 'Eight decisions drawn across Pack One’s current draft environments.',
+    description: 'Eight decisions from real trophy drafts.',
     resultTitle: 'Your Draft Run.',
   },
   'powered-cube': {
     title: 'Powered Cube',
     eyebrow: 'POWERED CUBE DAILY',
-    description: 'Eight decisions from the live Powered Cube environment.',
-    resultTitle: 'Your Powered Cube.',
+    description: 'Eight decisions from Powered Cube trophy drafts.',
+    resultTitle: 'Your Cube Run.',
   },
   latest: {
     title: 'Latest Set',
     eyebrow: 'LATEST SET DAILY',
-    description: 'Eight decisions from Pack One’s newest live regular set.',
-    resultTitle: 'Your Latest Set run.',
+    description: 'Eight decisions from trophy drafts in the latest set.',
+    resultTitle: 'Your Latest Set Run.',
   },
 };
 
@@ -88,6 +88,8 @@ export type DraftRunAnswer = {
   pickNumber?: number;
   modelTargetDisagreement?: boolean;
   ranking?: DraftRunRanking[];
+  /** True only when the server can return this revealed pick's trophy decklist. */
+  deckAvailable?: boolean;
   puzzle: DraftRunPuzzle;
 };
 
@@ -193,6 +195,7 @@ export type DailyStatus = {
     total?: number | null;
     percentile?: number | null;
     final?: boolean;
+    run_id?: string;
   })[];
 };
 
@@ -389,10 +392,44 @@ export type DailyPeerStats = {
   players?: number;
   matching_pick_pct?: number;
   trophy_pick_pct?: number;
+  /** Share of today's locked picks per card id, sent only with an available summary. */
+  card_pick_pct?: Record<string, number>;
 };
 
 export function loadDailyPeerStats(id: string, round: number, session: MobileSession) {
   return requestJson<DailyPeerStats>(`/draft/v1/runs/${encodeURIComponent(id)}/stats?round=${round}`, {
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    timeoutMs: 15_000,
+  });
+}
+
+export type TrophyDeckCard = {
+  id: string;
+  name: string;
+  count: number;
+  mana_cost?: string;
+  mana_value?: number;
+  type_line?: string;
+  image_url?: string;
+  display_faces?: DisplayFace[];
+};
+
+export type TrophyDeck = {
+  deck: TrophyDeckCard[];
+  sideboard: TrophyDeckCard[];
+  size: number;
+  event_type: string;
+  colors?: string;
+  splash_colors?: string;
+  last_game_time?: string;
+  source: { name: string; url: string; license: string; note: string; draft_url?: string };
+};
+
+// Same owner-bound, reveal-gated read the web decklist dialog makes. The
+// server refuses unrevealed rounds, so this is only called after a pick locks.
+export function loadTrophyDeck(id: string, round: number, session: MobileSession) {
+  return requestJson<TrophyDeck>(`/draft/v1/runs/${encodeURIComponent(id)}/deck?round=${round}`, {
     mobileSessionToken: session.playerToken,
     mobileAccountToken: session.accountToken,
     timeoutMs: 15_000,

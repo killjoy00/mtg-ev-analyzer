@@ -106,6 +106,7 @@ function feedbackRun(selectedId: string): DraftRunState {
     supportRatio: selected.id === 'hero-in-training' ? 1 : 0.52,
     pickNumber: current.pick_number,
     modelTargetDisagreement: selected.id !== historical.id,
+    deckAvailable: true,
     ranking: [
       { id: 'hero-in-training', name: 'Hero in Training', support: 0.46, score: 100 },
       { id: 'web-up', name: 'Web Up', support: 0.24, score: 96 },
@@ -362,6 +363,17 @@ export async function requestScreenshotFixture<T>(
     next.current = next.complete ? null : puzzle(next.round);
     await SecureStore.setItemAsync(RUN_KEY, JSON.stringify(next));
     return clone(next) as T;
+  }
+  if (path.startsWith('/draft/v1/runs/33333333-3333-4333-8333-333333333333/deck?')) {
+    // Synthetic decklist for the reveal's trophy-deck sheet. Not 17Lands data.
+    const lands = { id: 'fixture-island', name: 'Island', count: 17, mana_value: 0, type_line: 'Basic Land — Island' };
+    const spells = [...candidates, ...priorPicks].map((item, index) => ({
+      id: item.id, name: item.name, count: 1, image_url: item.image_url,
+      mana_cost: index % 2 ? '{1}{U}' : '{2}{U}{U}', mana_value: index % 2 ? 2 : 4,
+      type_line: index % 3 ? 'Creature — Fixture' : 'Instant',
+    }));
+    return { deck: [...spells, lands], sideboard: [], size: 40, event_type: 'PremierDraft', colors: 'U', splash_colors: '',
+      source: { name: '17Lands', url: 'https://www.17lands.com/public_datasets', license: 'CC BY 4.0', note: 'Fixture deck for native acceptance.' } } as T;
   }
   if (path === '/draft/v1/runs/33333333-3333-4333-8333-333333333333/report' && method === 'POST') return { ok: true, id: '77777777-7777-4777-8777-777777777777' } as T;
   if (path === '/draft/v1/runs/33333333-3333-4333-8333-333333333333/reroll' && method === 'POST') return clone(initialRun) as T;

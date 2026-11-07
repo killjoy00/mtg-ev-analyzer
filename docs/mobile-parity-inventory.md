@@ -11,6 +11,35 @@ Status vocabulary:
 - **Policy decision open** — code intentionally does not claim storefront approval.
 - **Release evidence open** — implementation exists but required device/signing/live-host evidence is still missing.
 
+## November 7, 2026 web-to-native parity update (next Android candidate)
+
+The last signed Android build, Internal Testing **1.0/100925**, was built from `e76119e1` (October 21). Closed Testing is still 100772. This update brings native up to the web as of `2b396c18`. Every user-facing web change since `e76119e1` is classified below. **Implemented** means merged source with mounted or parity-test coverage; it is not a signed build, device acceptance, or store release.
+
+| Web change | Native state | Evidence |
+| --- | --- | --- |
+| Score review rewrite and trophy pick support dash (0daa5910, 8dd1c68e) | **Implemented** | Reveal shows the trophy pick, your pick and the model's next card, each with saved score, model support (`-` for the trophy pick) and players' picks. Scoring copy, drafter sentences and the all-cards list match the web. `mobile/src/reveal.ts` is checked against `draft-run-reveal.mjs` and `draft-run-feedback.mjs` in `mobile/tests/reveal-parity.test.mjs`. |
+| Next highest on a trophy match (#1297) | **Implemented** | Same `revealCardChoices` labels as the web. |
+| Per-card players' picks (#1295) | **Implemented** | `card_pick_pct` from the Daily stats read; cards nobody picked show 0%. |
+| Trophy drafter decklist and 17Lands draft link (0daa5910, #1341) | **Implemented** | `See the trophy drafter’s deck` appears only when the server sends `deckAvailable`. The sheet loads `GET /draft/v1/runs/:id/deck?round=` on open, shows curve, groups, tags, sideboard, source and license, and a canonical 17Lands draft link. Mounted test plus `mobile/tests/trophy-deck.test.mjs` on a real catalog deck. |
+| Report prompt and dialog copy | **Implemented** | `Does something look wrong? Let us know.` on the reveal, with the web reason labels. |
+| Card zoom closes on any tap; single name (#1435) | **Implemented** | Face toggle and retry keep the viewer open; `mobile/tests/card-face-viewer.test.cjs`. |
+| Result recap thumbnails and trophy pick name (#1432) | **Implemented** | Thumbnails are hidden from screen readers; the row text names both cards. |
+| Dated Daily share text and `/d/` short links (#1412, #1498) | **Implemented** | Text and links mirror `share-cards.mjs` (`mobile/src/dailyShare.ts`, parity-tested). |
+| Share all three Dailies in one message (#1498) | **Implemented** | Offered only when today's status lists all three run IDs and each run loads complete; `Share just this Daily` switches back. `mobile/tests/draft-run-result.test.cjs`. |
+| Next unfinished Daily on the result screen (#1152) | **Implemented** | Only from today's authoritative status; otherwise `Back to Dailies`. Reset cue and streak shown as on the web. |
+| Guest sign-in handoff after the third Daily (#1294) | **Implemented** | Guests only, and only when all three are complete today. |
+| Practice shown to guests (#1298, #1432) | **Implemented** | Same three cards; `Sign in to practice` is the primary action. Card and note copy match the web. |
+| Shared Challenges card and singular label (#1297) | **Implemented** | My Pack One only; `mobile/tests/profile-shared-challenges.test.cjs`. |
+| Set refreshers (#1246, before the cutoff but never on native) | **Deliberate continuation** | `Set refresher ↗` opens the published `/sets/<id>/guide/` page in the in-app browser. `mobile/src/setGuides.ts` is checked against `GUIDE_IDS`. |
+| Pick screen labels (#1423) | **Implemented** | `Earlier picks · N cards · in pick order`, `Choose one`, and `N of M picks left` beside Next pick. Native already had a fixed action bar. |
+| Public wording (62d998d2): How to Play, Scoring, Method, About, Learn, Daily home | **Implemented** | Native strings now match the published pages; `tests/mobile-parity-core.test.mjs` requires the Daily eligibility sentences verbatim. |
+| Custom practice opening at P1P2 (c97ccd19), stakes ranking (#1378), card art policy (#1480, d09580ab), v6 model and corpus v10 | **Server-delivered** | No native change; the app renders what the server returns. |
+| Phone menu, text scale, page frame, content sizes, desktop reveal sizes (#1428, #1430, #1431, #1433, f9dc1390) | **Not applicable** | Responsive web layout. Native has its own layout and accepted text-scaling evidence. |
+| Removal of the Share image button (#1414) | **Not applicable** | Native never had an image share. |
+| Earlier-Daily notice on a friend's share link (#1412) | **Not applicable** | `/d/` links open the web Daily; native does not claim those paths. |
+
+New deliberate differences from this update are listed in section D. The native acceptance driver (`mobile/scripts/native-acceptance.py`) was updated for the new copy and adds a decklist open/close check; it needs a passing emulator run before a signed candidate.
+
 ## October 10 TestFlight 1.1 — what is and is not parity-complete
 
 - **Included in the signed binary:** Beat the Creator native flow (#985/#1001), responsive native UI/navigation and brand, October 7 in-app About/Support/Privacy/Terms + Stats/Account settings + larger Daily actions (#1057), post-lock peer-percentage UI and trophy match record (#1129).
@@ -63,7 +92,7 @@ Automated browser evidence for this candidate emits screenshots for compact auth
 | --- | --- | --- |
 | Daily home: all three Dailies, completion state, View result, ordering, streak/reset cue, ranking-identity warning, resume | **Implemented** | Home refresh/rollover and stale-response guards are covered in the lifecycle suite. |
 | Draft Run gameplay | **Implemented** | Server-authoritative eight-pick flow, prior-pool context/zoom, stale-response protection, reroll rules and full result/review behavior are mounted-tested. |
-| Post-pick comparison | **Implemented** | Your Pick vs Trophy Pick, score explanation, pack review and reopened completed decisions. |
+| Post-pick comparison | **Implemented** | Trophy pick, your pick and the model's next card with score, support and players' picks; scoring copy, drafter details, trophy decklist, all-cards list, pack review and reopened completed decisions (November 7 update). |
 | Revealed-card TCGplayer links | **Implemented** | Links appear only inside expanded score analysis, use exact card-specific destinations, carry visible affiliate disclosure, and fail visibly if OS handoff fails. |
 | Practice | **Implemented** | Regular/custom/Cube access remains server-capability-authoritative. |
 | Shared practice / friend run | **Implemented** | Explicit invitation acceptance, exact server run continuity, no silent replacement on failed GET, no recipient reroll, creator/result recovery and kill/relaunch. #910 moves local checkpoint discovery from Home to conditional Practice shared activity. |
@@ -126,6 +155,10 @@ Automated browser evidence for this candidate emits screenshots for compact auth
 | Guides and policy copy are not duplicated into native source | Canonical HTTPS continuation prevents editorial/legal drift. |
 | External credential reset remains canonical HTTPS | Avoids exposing reset credentials to interceptable custom schemes. |
 | Affiliate links are restricted to reviewed surfaces | Revealed-card links live inside expanded score analysis; Daily-home fallback is outside active gameplay/results and fail-closed for ad-free/unknown signed-in membership. |
+| Revealed-card affiliate links stay behind an expansion | The web now shows TCGplayer links on the always-visible reveal cards. Native keeps them inside the expanded `Compare all N cards` section with their disclosure, the reviewed placement. Moving them needs an explicit owner decision. |
+| No Elite upgrade button on native Practice | The web shows `Upgrade to Elite` on locked premium cards (#1299). Android has no Play billing, so native shows `Pack One Elite required` and the Membership link instead. |
+| One Share button instead of Share plus Copy | The OS share sheet already offers copy; adding a clipboard module would change native dependencies for no user-visible gain. |
+| No dated new-set callout on Practice | The web's `Now includes Reality Fracture.` line is hand-updated at each set launch; in a binary it would go stale between builds. |
 | Public-profile reads omit native account credentials | Public visibility is server-authoritative and should not create guest/native identity side effects. |
 | iPad uses bounded responsive content widths rather than a separate product fork | Practice, Draft Run/results, article surfaces and other first-class screens are bounded; physical portrait/landscape acceptance is still required. |
 

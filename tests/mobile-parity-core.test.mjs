@@ -44,6 +44,8 @@ const [
   readFile(new URL('../scoring/index.html', import.meta.url), 'utf8'),
 ]);
 
+const nativeShare = await readFile(new URL('../mobile/src/dailyShare.ts', import.meta.url), 'utf8');
+
 test('native Draft Run keeps web feedback and result-review parity', () => {
   assert.match(draftApi, /DraftRunRanking/);
   assert.match(draftApi, /consensusSupport/);
@@ -53,26 +55,33 @@ test('native Draft Run keeps web feedback and result-review parity', () => {
   assert.match(draftApi, /\/report/);
   assert.match(draftScreen, /Why this score\?/);
   assert.match(draftScreen, /Review the pack/);
-  assert.match(draftScreen, /Report this decision/);
-  assert.match(draftScreen, /What seems wrong\?/);
-  assert.match(draftScreen, /Draft context looks wrong/);
-  assert.match(draftScreen, /Card or image issue/);
-  assert.match(draftScreen, /Score \/ recommendation seems wrong/);
-  assert.match(draftScreen, /Something is broken/);
+  // Report dialog copy matches openDecisionReport in draft-run-product.mjs.
+  assert.match(draftScreen, /Does something look wrong\? Let us know\./);
+  assert.match(draftScreen, /Tell us what you noticed\./);
+  assert.match(draftScreen, /The draft context looks wrong/);
+  assert.match(draftScreen, /The card or image looks wrong/);
+  assert.match(draftScreen, /The pick or score looks wrong/);
+  assert.match(draftScreen, /Something isn’t working/);
   assert.match(draftScreen, /Anything else\?/);
-  assert.match(draftScreen, /Thanks \\u2014 report sent\./);
+  assert.match(draftScreen, /Thanks for letting us know\./);
   assert.match(draftApi, /Application\.nativeApplicationVersion/);
   assert.match(draftApi, /Application\.nativeBuildVersion/);
   assert.match(draftApi, /import \* as Application from 'expo-application'/);
   assert.match(draftApi, /import \{ Platform \} from 'react-native'/);
   assert.match(draftApi, /Platform\.OS === 'ios'/);
   assert.doesNotMatch(draftApi, /import\('expo-application'\)|import\('react-native'\)/);
-  assert.match(draftScreen, /Model&apos;s strongest choice/);
+  // The reveal, scoring copy and share text come from native mirrors of the
+  // web modules; mobile/tests/reveal-parity.test.mjs runs both side by side.
+  assert.match(draftScreen, /revealCardChoices/);
+  assert.match(draftScreen, /SCORING_COPY/);
+  assert.match(draftScreen, /loadTrophyDeck/);
   assert.match(draftScreen, /Compare all/);
   assert.match(draftScreen, /Your \{run\.run_length\} picks/);
   assert.match(draftScreen, /\/open\/shared\/\?id=\$\{/);
-  assert.match(draftScreen, /🟩/);
-  assert.match(draftScreen, /Play this run and compare/);
+  assert.match(draftScreen, /dailySetShareText/);
+  assert.match(nativeShare, /🟩/);
+  assert.match(nativeShare, /Play this run and compare/);
+  assert.match(nativeShare, /SHORT_SHARE_PATHS/);
 });
 
 test('native leaderboard uses current competitive season semantics', () => {
@@ -98,18 +107,17 @@ function normalizeMarkupText(value) {
 test('native instructional copy preserves current web Daily eligibility semantics', () => {
   const webHowToText = normalizeMarkupText(webHowTo);
   const webScoringText = normalizeMarkupText(webScoring);
-  const webDailyIntro = 'Pick one of three Dailies.';
-  const nativeDailyIntro = 'Pack One has three fixed Daily challenges.';
-  const howToGuestValidation = 'an eligible guest can also sign in or link the completed first attempt on the same Pacific date to validate it for the leaderboard';
-  const scoringGuestValidation = 'an eligible guest can sign in or link that completed first attempt on the same Pacific date to validate it for the leaderboard';
-
-  assert.ok(webHowToText.includes(webDailyIntro));
-  assert.ok(howToScreen.includes(nativeDailyIntro));
-  assert.ok(webHowToText.includes('If you already finished a Daily as a guest, you can still sign in before midnight Pacific and add your score.'));
-  assert.ok(howToScreen.includes(howToGuestValidation));
-
-  assert.ok(webScoringText.includes('Played as a guest? You can still add your first completed attempt by signing in before the Daily resets at midnight Pacific.'));
-  assert.ok(scoringScreen.includes(scoringGuestValidation));
+  // Native carries the published wording itself, so each sentence must match.
+  for (const sentence of [
+    'Pick one of three Dailies.',
+    'If you already finished a Daily as a guest, you can still sign in before midnight Pacific and add your score.',
+  ]) {
+    assert.ok(webHowToText.includes(sentence), sentence);
+    assert.ok(howToScreen.includes(sentence), sentence);
+  }
+  const scoringSentence = 'Played as a guest? You can still add your first completed attempt by signing in before the Daily resets at midnight Pacific.';
+  assert.ok(webScoringText.includes(scoringSentence));
+  assert.ok(scoringScreen.includes(scoringSentence));
   assert.doesNotMatch(scoringScreen, /requires an authenticated account when starting/);
 
   assert.match(leaderboardScreen, /validated to an eligible account/);

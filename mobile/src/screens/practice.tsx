@@ -91,25 +91,6 @@ export default function PracticeScreen() {
     );
   }
 
-  if (state.status === 'signin-required') {
-    return (
-      <SafeAreaView style={styles.safe}>
-        <View style={styles.center}>
-          <Text style={styles.eyebrow}>PRACTICE</Text>
-          <Text style={styles.centerTitle}>Keep drafting with a free account.</Text>
-          <Text style={styles.centerBody}>A free Pack One account unlocks unlimited regular Draft Run practice.</Text>
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push({ pathname: '/account', params: { returnTo: 'practice' } })}
-            style={styles.primaryButton}
-          >
-            <Text style={styles.primaryButtonText}>Sign in or create an account</Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   if (state.status === 'error') {
     return (
       <SafeAreaView style={styles.safe}>
@@ -124,47 +105,66 @@ export default function PracticeScreen() {
     );
   }
 
-  const regularUnlocked = state.capabilities.includes('unlimited_regular_practice');
-  const cubeUnlocked = state.capabilities.includes('unlimited_cube_practice');
-  const customUnlocked = state.capabilities.includes('custom_corpus');
-  const orderedSets = [...state.sets].sort((a, b) => (
+  // Guests see the same Practice page as the web (#1298): sign-in is the
+  // primary action on the free card, and premium cards stay plainly locked.
+  // Android offers no Elite purchase, so no upgrade button is shown here.
+  const guest = state.status === 'signin-required';
+  const capabilities = state.status === 'ready' ? state.capabilities : [];
+  const sets = state.status === 'ready' ? state.sets : [];
+  const regularUnlocked = capabilities.includes('unlimited_regular_practice');
+  const cubeUnlocked = capabilities.includes('unlimited_cube_practice');
+  const customUnlocked = capabilities.includes('custom_corpus');
+  const elite = cubeUnlocked && customUnlocked;
+  const orderedSets = [...sets].sort((a, b) => (
     String(b.release_date ?? '').localeCompare(String(a.release_date ?? ''))
       || a.set_name.localeCompare(b.set_name)
   ));
+  const signIn = () => router.push({ pathname: '/account', params: { returnTo: 'practice' } });
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.page}>
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>PRACTICE</Text>
-          <Text style={styles.title}>Choose your Draft Run.</Text>
+          <Text style={styles.title}>Keep drafting.</Text>
           <Text style={styles.body}>
-            Get more practice with eight picks from real trophy drafts. Practice results save to your career; Daily runs are where you compete on the leaderboard.
+            A free account lets you play unlimited regular Draft Runs. With Elite, you can also practice Powered Cube or choose your sets, including just the newest one.
           </Text>
         </View>
 
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Start regular Draft Run practice"
-          accessibilityState={{ disabled: !regularUnlocked }}
-          disabled={!regularUnlocked}
-          onPress={() => router.push({
-            pathname: '/draft-run',
-            params: { mode: 'practice', environment: 'mixed' },
-          })}
-          style={({ pressed }) => [
-            styles.optionCard,
-            !regularUnlocked && styles.lockedCard,
-            pressed && regularUnlocked && styles.pressed,
-          ]}
-        >
-          <Text style={styles.cardKicker}>FREE ACCOUNT</Text>
-          <Text style={styles.cardTitle}>Regular Draft Run</Text>
-          <Text style={styles.body}>Unlimited mixed-set practice with one new-set reroll and one new-pack reroll.</Text>
-          <Text style={regularUnlocked ? styles.cardAction : styles.lockedText}>
-            {regularUnlocked ? 'Start practice →' : 'Sign in again to refresh access'}
-          </Text>
-        </Pressable>
+        {guest ? (
+          <View style={styles.optionCard}>
+            <Text style={styles.cardKicker}>FREE ACCOUNT</Text>
+            <Text style={styles.cardTitle}>Regular Draft Run</Text>
+            <Text style={styles.body}>Unlimited eight-decision runs from real trophy drafts.</Text>
+            <Pressable accessibilityRole="button" onPress={signIn} style={styles.primaryButton}>
+              <Text style={styles.primaryButtonText}>Sign in to practice</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Start regular Draft Run practice"
+            accessibilityState={{ disabled: !regularUnlocked }}
+            disabled={!regularUnlocked}
+            onPress={() => router.push({
+              pathname: '/draft-run',
+              params: { mode: 'practice', environment: 'mixed' },
+            })}
+            style={({ pressed }) => [
+              styles.optionCard,
+              !regularUnlocked && styles.lockedCard,
+              pressed && regularUnlocked && styles.pressed,
+            ]}
+          >
+            <Text style={styles.cardKicker}>FREE ACCOUNT</Text>
+            <Text style={styles.cardTitle}>Regular Draft Run</Text>
+            <Text style={styles.body}>Unlimited eight-decision runs from real trophy drafts.</Text>
+            <Text style={regularUnlocked ? styles.cardAction : styles.lockedText}>
+              {regularUnlocked ? 'Start Draft Run →' : 'Sign in again to refresh access'}
+            </Text>
+          </Pressable>
+        )}
 
         <Pressable
           accessibilityRole="button"
@@ -183,7 +183,7 @@ export default function PracticeScreen() {
         >
           <Text style={styles.cardKicker}>PACK ONE ELITE</Text>
           <Text style={styles.cardTitle}>Powered Cube</Text>
-          <Text style={styles.body}>Unlimited Powered Cube practice with two new-pack rerolls.</Text>
+          <Text style={styles.body}>Eight decisions from Powered Cube trophy drafts, available whenever you want another run.</Text>
           <Text style={cubeUnlocked ? styles.cardAction : styles.lockedText}>
             {cubeUnlocked ? 'Start Powered Cube →' : 'Pack One Elite required'}
           </Text>
@@ -192,7 +192,7 @@ export default function PracticeScreen() {
         <View style={[styles.optionCard, !customUnlocked && styles.lockedCard]}>
           <Text style={styles.cardKicker}>PACK ONE ELITE</Text>
           <Text style={styles.cardTitle}>Choose your sets</Text>
-          <Text style={styles.body}>Build an eight-pick practice run from the live sets you select.</Text>
+          <Text style={styles.body}>Pick the sets you want and play as many eight-pick practice runs as you like. Want to focus on the newest set? You can practice just that one.</Text>
 
           {customUnlocked ? (
             <>
@@ -240,12 +240,16 @@ export default function PracticeScreen() {
           )}
         </View>
 
-        <SharedRunRecovery />
+        {guest ? null : <SharedRunRecovery />}
         {refreshError ? <Pressable accessibilityRole="button" onPress={() => void refresh()} style={styles.note}><Text style={styles.body}>{refreshError}</Text><Text style={styles.cardAction}>Retry</Text></Pressable> : null}
         <View style={styles.note}>
           <Text style={styles.noteTitle}>Your practice access</Text>
-          <Text style={styles.body}>
-            A free account includes regular Draft Runs. Elite adds Powered Cube and custom-set practice.
+          <Text accessibilityRole="text" style={styles.body}>
+            {guest
+              ? 'Sign in or create a free account for unlimited regular Draft Runs. Elite adds Powered Cube and custom-set practice.'
+              : elite
+                ? 'Elite is active. All three practice modes are unlocked.'
+                : 'Your free account includes unlimited regular Draft Runs. Elite adds Powered Cube and custom-set practice.'}
           </Text>
           <Pressable accessibilityRole="button" onPress={() => router.push('/membership')} style={styles.secondaryButton}><Text style={styles.cardAction}>Membership & access →</Text></Pressable>
         </View>

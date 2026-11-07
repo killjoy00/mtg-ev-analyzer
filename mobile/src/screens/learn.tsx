@@ -11,18 +11,18 @@ import { canonicalContentUrl, type CanonicalContentKey } from '@/src/contentLink
 import { colors, spacing } from '@/src/theme';
 
 const nativeLinks = [
-  { kicker: 'START HERE', title: 'How to Play', body: 'Learn the eight-decision loop and what to look at before you lock a pick.', route: '/how-to' as const },
-  { kicker: 'POINTS', title: 'Scoring', body: 'See how trophy matches and model-supported alternatives become your run score.', route: '/scoring' as const },
-  { kicker: 'BEHIND THE MODEL', title: 'Method', body: 'See how Pack One qualifies evidence and builds the comparison model.', route: '/method' as const },
-  { kicker: 'COVERAGE', title: 'Sets', body: 'Browse current Pack One set coverage and supported Draft Run environments.', route: '/sets' as const },
+  { kicker: 'START HERE', title: 'How to Play', body: 'Learn the basic loop: choose a Daily, read the draft context, make your pick, and compare with the trophy drafter.', route: '/how-to' as const },
+  { kicker: 'POINTS', title: 'Scoring', body: 'See why an exact trophy match earns 100 and how model support gives partial credit to strong alternatives.', route: '/scoring' as const },
+  { kicker: 'BEHIND THE MODEL', title: 'Method', body: 'See how Pack One selects trophy decisions, qualifies evidence, and builds the model used for comparison.', route: '/method' as const },
+  { kicker: 'COVERAGE', title: 'Sets', body: 'See which sets are in the game and how many real draft picks are available from each.', route: '/sets' as const },
   { kicker: 'ABOUT', title: 'About Pack One', body: 'Learn about the project, its data sources, and credits.', route: '/about' as const },
 ];
 
 const externalLinks: { key: CanonicalContentKey; title: string; body: string }[] = [
-  { key: 'firstPick', title: 'First-pick discipline: commit before the reveal', body: 'A repeatable way to separate card strength, confidence, and hindsight.' },
-  { key: 'consensus', title: 'How to read consensus without treating it as truth', body: 'Distinguish strong signals from legitimately close Limited decisions.' },
-  { key: 'stayingOpen', title: 'Staying open is not the same as avoiding commitment', body: 'Know when flexibility has value and when to take the best card.' },
-  { key: 'deckFit', title: 'Card strength vs. deck fit: know what changed', body: 'Use your pool, curve, mana, and synergies to put card strength in context.' },
+  { key: 'firstPick', title: 'First-pick discipline: commit before the reveal', body: 'Pick your top three cards and decide how close they are before seeing the trophy pick.' },
+  { key: 'consensus', title: 'How to read consensus without treating it as truth', body: 'See how close the model thinks a pick is, not just which card it likes best.' },
+  { key: 'stayingOpen', title: 'Staying open is not the same as avoiding commitment', body: 'When is it worth staying open, and when should you just take the better card?' },
+  { key: 'deckFit', title: 'Card strength vs. deck fit: know what changed', body: 'Separate a card’s baseline power from the ways your pool, curve, mana, and synergies should change the pick.' },
 ];
 
 export default function LearnScreen() {
@@ -45,7 +45,7 @@ export default function LearnScreen() {
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>LEARN</Text>
           <Text style={styles.title}>Go deeper on Pack One.</Text>
-          <Text style={styles.lede}>Read the draft with more confidence. Start with the basics, then explore scoring and guides for your next decision.</Text>
+          <Text style={styles.lede}>Want to know where a pick came from or why it scored the way it did? Here&apos;s where you&apos;ll find the rules, scoring details, supported sets, and a few drafting guides.</Text>
         </View>
 
         <Text style={styles.sectionTitle}>Game & model</Text>

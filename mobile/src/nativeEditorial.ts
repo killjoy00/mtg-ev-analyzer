@@ -4,13 +4,13 @@ export const aboutSections: ArticleSection[] = [
   {
     title: 'Make a pick, then compare.',
     body: [
-      'Pack One is a short Limited decision game. Play eight independent decisions from qualified trophy drafts, with the original drafter’s earlier cards visible. Lock your choice before seeing their pick and the model’s alternatives.',
+      'The idea for Pack One came from a Reddit post about studying trophy drafts to get better at Limited. I thought it would be fun to see the same packs successful drafters did, make my own picks, and then compare. So I built a daily game around eight decisions from eight different trophy drafts.',
     ],
   },
   {
-    title: 'Three Dailies, ready to play.',
+    title: 'Three free Dailies.',
     body: [
-      'Daily Draft Run, Daily Powered Cube, and Daily Latest Set are free, fixed challenges shared by everyone that day. No account is needed to play, score or share. A free account adds leaderboard participation and unlimited regular random practice.',
+      "Every day there are three challenges: Draft Run, Powered Cube, and Latest Set. Everyone gets the same picks. You don't need an account to play or share your results. A free account lets you join the leaderboard and play as many regular practice runs as you want.",
     ],
   },
   {

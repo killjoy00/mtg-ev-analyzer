@@ -1,40 +1,41 @@
 import { ArticleScreen, type ArticleSection } from '@/src/components/ArticleScreen';
 
+// Same wording as the published methodology page (methodology/index.html).
 const sections: ArticleSection[] = [
   {
     title: 'Real packs and earlier picks.',
     body: [
-      'Pack One builds eight-pick runs from 17Lands public archives. Each decision uses a different source draft and its original pool. Your answers do not rewrite another historical state.',
+      "Each pick comes from a real draft in the public 17Lands data. You're seeing the pack that player saw, along with their earlier picks. Because every question comes from a different draft, your answer doesn't change the cards in the next one.",
     ],
   },
   {
-    title: 'All seven-win Premier finishes count.',
+    title: 'Which Premier drafts count?',
     body: [
-      '7-0, 7-1 and 7-2 are trophies. Drafters also meet the established experience and quality standard: at least 100 prior games and the per-set high-quality cohort. Older archives without win-rate fields retain their documented rank qualification.',
+      "A 7-0, 7-1, or 7-2 finish counts as a trophy. We only use drafts from experienced players who've played at least 100 previous games and meet our performance requirements for that set. For older sets without win-rate data, we use rank instead.",
     ],
   },
   {
-    title: 'Model evidence supports partial credit.',
+    title: 'What goes into the model?',
     body: [
-      'The model learns from a broader qualified cohort, not only trophies, and excludes a puzzle’s source draft from its own grading evidence. Card preferences, pick position and earlier pool context inform support. Probability and score calibration are separate. The exact trophy pick always earns 100; alternatives receive at most 95.',
+      'The model learns from picks made by experienced 17Lands drafters, not just trophy winners. It considers which cards were available, where the pick happened, and what the drafter had already taken. We also leave out the specific draft being used for the puzzle when evaluating its picks.',
     ],
   },
   {
-    title: 'Published corpus, fixed Daily.',
+    title: 'When a new set gets added',
     body: [
-      'Only Live eligible sets enter new games. Ingestion validates sources, trajectories, metadata, images, model evidence and accounting; an admin explicitly publishes a ready set. Older sets remain in the corpus. A generated Daily keeps its decisions and versions after later serving-status changes.',
+      'We add new sets once we’ve checked the draft records, card images, and scoring data. Once a Daily is published, its eight picks stay the same for everyone that day.',
     ],
   },
   {
-    title: 'Cube’s missing opening packs.',
+    title: 'Why Cube starts at Pick 2',
     body: [
-      'The public Cube archive lacks complete first-pick packs. Its eight decisions therefore use Picks 2–9 with the actual first card visible. Missing packs are never invented.',
+      "The public 17Lands Cube data doesn't include complete opening packs, so we don't use Pick 1. Instead, the Cube puzzles come from Picks 2–9, with the drafter's first pick shown for context. We don't make up missing cards.",
     ],
   },
   {
-    title: 'Qualified Traditional trophies add variety.',
+    title: 'Traditional drafts are in the mix, too.',
     body: [
-      'Some 3-0 Traditional trophy drafts are also used when their picks meet Pack One’s publication requirements. Each published decision must pass trajectory, metadata, image and puzzle-quality checks. The scoring model remains trained on Premier draft data; Traditional drafts supply eligible puzzle decisions, not model-training evidence.',
+      "Some 3-0 Traditional drafts show up in Pack One, as long as the draft record and cards pass our checks. They give us more real picks to play, but aren't used to train the scoring model. That still comes from Premier draft data.",
     ],
   },
   {
@@ -50,7 +51,7 @@ export default function MethodScreen() {
     <ArticleScreen
       kicker="Model notes"
       title="Methodology"
-      deck="Real trophy trajectories, qualified drafters, and held-out model evidence."
+      deck="Where the picks come from, who drafted them, and what goes into your score."
       sections={sections}
     />
   );

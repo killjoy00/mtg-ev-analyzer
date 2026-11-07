@@ -84,6 +84,7 @@ async function fixture(options = {}) {
       useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       AccessibilityInfo: { announceForAccessibility() {} }, Share: { share: async value => calls.push(['share', value]) } },
     'expo-image': { Image },
+    'expo-web-browser': { openBrowserAsync: async () => ({ type: 'dismiss' }) },
     'expo-haptics': { selectionAsync: async () => {}, notificationAsync: async () => {}, NotificationFeedbackType: { Success: 'success' } },
     '@/src/components/Text': { Text: host('Text') },
     '@/src/components/ScreenArea': { ScreenArea: host('SafeArea') },
@@ -165,7 +166,7 @@ for (const [access, session] of [['guest', guest()], ['free account', { ...guest
         assert.doesNotMatch(h.text(), /Sign in|Elite|Upgrade/);
         await h.press('Pick Card A');
         await h.press('Confirm pick');
-        assert.match(h.text(), /Fixture Creator’s Pick/);
+        assert.match(h.text(), /Fixture Creator(\s+picked\s+Card C|’s pick)/);
         await h.press(round === 7 ? 'See result' : 'Next pick');
       }
       assert.match(h.text(), /You beat Fixture Creator/);

@@ -134,8 +134,9 @@ export function ProfileOverview({ profile, publicView = false }: { profile: Care
           <Stat label="Dailies" value={summary.daily_games} />
           <Stat label="Daily streak" value={summary.current_streak} />
           <Stat label="Best streak" value={summary.best_streak} />
+          {!publicView ? <Stat label={challengeGames === 1 ? 'Shared challenge played' : 'Shared challenges played'} value={challengeGames} /> : null}
         </View>
-        {challengeGames ? (
+        {publicView && challengeGames ? (
           <>
             <Text style={styles.meta}>
               Shared challenges played · {Number(summary.challenge_wins || 0)} beaten · {Number(summary.challenge_losses || 0)} below target · {Number(summary.challenge_ties || 0)} tied
@@ -202,6 +203,19 @@ export function ProfileOverview({ profile, publicView = false }: { profile: Care
           </View>
         ) : null}
       </Section>
+
+      {!publicView ? (
+        <Section title="Shared Challenges">
+          <Text style={styles.meta}>Other people’s shared runs</Text>
+          {challengeGames ? (
+            <View style={styles.statsGrid}>
+              <Stat label="Beaten" value={Number(summary.challenge_wins || 0)} />
+              <Stat label="Below target" value={Number(summary.challenge_losses || 0)} />
+              <Stat label="Tied" value={Number(summary.challenge_ties || 0)} />
+            </View>
+          ) : <Text style={styles.empty}>Play someone’s shared run to start your record.</Text>}
+        </Section>
+      ) : null}
     </View>
   );
 }
