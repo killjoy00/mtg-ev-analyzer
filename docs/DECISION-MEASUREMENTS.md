@@ -63,6 +63,14 @@ while starts and completions are server-written. The funnel follows the selected
 date range and environment only; the decision-specific run type, set, difficulty,
 pick and selection-version filters do not apply.
 
+New Daily shares link to the short routes `/d/`, `/d/c/` (Powered Cube) and
+`/d/l/` (Latest Set) with only the sharer's date (`?d=`). The route adds
+`ref=result_share` when it redirects, so these arrivals count exactly like the
+older `/share/daily/` links, which keep working. After a player finishes all
+three Dailies, one share can carry the whole day; its `share_click` and
+`daily_result_shared` events add `context=daily_set` and still count as Daily
+shares in the funnel.
+
 Filters cover Pacific calendar days (up to one year), environment, run
 type, set, difficulty band, real pick number and selection version. Groups show
 difficulty, pick depth, game position, set, trophy support brackets and the
@@ -92,7 +100,8 @@ sanitized `utm_source`, `utm_campaign`, and optional `utm_medium` values;
 when there is no UTM source it may use the external referrer hostname. The
 `utm_*` parameters are removed from the address bar after capture. A Daily
 result-share arrival keeps its existing `ref=result_share` behavior and is
-attributed as `result_share`.
+attributed as `result_share`, whether it came through a short `/d/` link or an
+older `/share/daily/` link.
 
 The admin report derives first-touch attribution from the earliest acquisition
 event associated with the merged player identity. If product activity predates

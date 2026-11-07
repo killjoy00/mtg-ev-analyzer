@@ -123,7 +123,7 @@ async function shareBlob(blob, { text, url, filename, context }) {
   const payloadText = String(text || 'Pack One');
   const shareUrl = String(url || SHARE_ORIGIN);
   let method = 'copy_fallback';
-  const draftRunTextOnly = !blob && (context === 'draft_run_result' || context === 'draft_run_challenge');
+  const draftRunTextOnly = !blob && ['draft_run_result', 'draft_run_challenge', 'daily_set_result'].includes(context);
   const nativeData = draftRunTextOnly
     ? draftRunNativeShareData(payloadText, shareUrl, { userAgent: navigator.userAgent, platform: navigator.platform, maxTouchPoints: navigator.maxTouchPoints })
     : { title: 'Pack One', text: payloadText, url: shareUrl };
@@ -248,7 +248,11 @@ const GRADE_EMOJI={match:'🟩',strong:'🟦',good:'🟨',fair:'🟧',miss:'⬛'
 export function pickGrades(answers) {
   return answers.map(a=>a.historicalMatch?'match':a.score>=85?'strong':a.score>=60?'good':a.score>=25?'fair':'miss');
 }
-const SHARE_PATHS={latest:'latest','powered-cube':'powered-cube',mixed:'mixed'};
+const shareSquares=answers=>pickGrades(answers).map(g=>GRADE_EMOJI[g]).join('');
+// Short share routes. The path itself marks a result share, so the visible
+// link carries only the sharer's date. The older /share/daily/ routes keep
+// working for links that were already posted.
+const SHORT_SHARE_PATHS={mixed:'/d/','powered-cube':'/d/c/',latest:'/d/l/'};
 export function dailyModeLabel(environment) {
   return environment==='latest'?'Latest Set':environment==='powered-cube'?'Powered Cube':'Draft Run';
 }
@@ -259,16 +263,53 @@ export function shareDate(day) {
 // landing explain when a friend's score came from an earlier Daily.
 export function dailyShareUrl(run,origin=SHARE_ORIGIN) {
   if(!/^\d{4}-\d{2}-\d{2}$/.test(String(run?.day||'')))throw new Error('A Daily share needs its Daily date.');
-  const url=new URL(`/share/daily/${SHARE_PATHS[run.environment]||'mixed'}/`,origin);
-  url.searchParams.set('ref','result_share');
+  const url=new URL(SHORT_SHARE_PATHS[run.environment]||SHORT_SHARE_PATHS.mixed,origin);
   url.searchParams.set('d',run.day);
   return url.toString();
+}
+
+// The day's three Dailies in one message, offered only after all three are
+// finished. Rows keep a fixed order so friends can compare them at a glance.
+// Still no card names, and the link opens the recipient's own regular Daily.
+const DAILY_SET_ENVIRONMENTS=Object.freeze(['mixed','powered-cube','latest']);
+const DAILY_RUN_ID=/^[a-f0-9-]{8,64}$/i;
+// Run IDs of the two other Dailies finished on the result's day, or null when
+// today's status cannot vouch for both of them.
+export function dailySetRunIds(history,current) {
+  if(!Array.isArray(history)||!/^\d{4}-\d{2}-\d{2}$/.test(String(current?.day||''))||!DAILY_SET_ENVIRONMENTS.includes(current?.environment))return null;
+  const ids=[];
+  for(const environment of DAILY_SET_ENVIRONMENTS) {
+    if(environment===current.environment)continue;
+    const row=history.find(item=>String(item?.date||'')===current.day&&String(item?.mode||'')==='draft_run'
+      &&String(item?.set_id||'')===environment&&DAILY_RUN_ID.test(String(item?.run_id||'')));
+    if(!row)return null;
+    ids.push(String(row.run_id));
+  }
+  return ids;
+}
+// The three finished runs in share order, or null unless they are exactly one
+// complete Daily per environment from the same day.
+export function dailySetShareRuns(runs) {
+  if(!Array.isArray(runs)||runs.length!==DAILY_SET_ENVIRONMENTS.length)return null;
+  const day=String(runs[0]?.day||'');
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(day))return null;
+  const ordered=DAILY_SET_ENVIRONMENTS.map(environment=>runs.find(item=>item?.environment===environment));
+  const valid=ordered.every(item=>item&&item.day===day&&item.complete===true&&Number.isFinite(Number(item.score))
+    &&Array.isArray(item.answers)&&item.answers.length===draftRunLength(item));
+  return valid?ordered:null;
+}
+export function dailySetShareText(runs) {
+  const rows=runs.map(item=>`${dailyModeLabel(item.environment)} ${Number(item.score)} ${shareSquares(item.answers)}`);
+  return `Pack One · ${shareDate(runs[0].day)}\n${rows.join('\n')}`;
+}
+export function shareDailySet(runs,url) {
+  return shareBlob(null,{text:dailySetShareText(runs),url,context:'daily_set_result'});
 }
 
 export function draftRunShareText(run) {
   const matches=run.answers.filter(a=>a.historicalMatch).length;
   const label=dailyModeLabel(run.environment);
-  const squares=pickGrades(run.answers).map(g=>GRADE_EMOJI[g]).join('');
+  const squares=shareSquares(run.answers);
   // Dated, and never "beat my score": a link opened tomorrow plays different picks.
   if(run.day) return `I scored ${run.score}/100 on the Pack One ${label} Daily (${shareDate(run.day)}).\n${squares}\n${matches}/${draftRunLength(run)} trophy picks matched.\nTry Pack One's Daily. No account needed:`;
   return `Pack One · ${label} · Practice\n${run.score}/100  ${squares}\n${matches}/${draftRunLength(run)} trophy picks matched. Play this run and compare.`;
