@@ -97,7 +97,7 @@ try {
   const disabledReport={};
   const disabledMixed=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,mixedSeed(mixedDay),'mixed',
     {daily:true,day:mixedDay,mixedStakesEnabled:false,report:disabledReport});
-  check(disabledReport.selectionRule===null&&disabledMixed.length===8,'Main Daily's independent switch restores the band draw');
+  check(disabledReport.selectionRule===null&&disabledMixed.length===8,"Main Daily's independent switch restores the band draw");
   const latestWithMixedDisabled=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed(mixedDay),'latest',
     {daily:true,day:mixedDay,mixedStakesEnabled:false,report:disabledReport});
   check(disabledReport.selectionRule===LATEST_DAILY_RULE&&latestWithMixedDisabled.length===8,
@@ -160,7 +160,7 @@ try {
     check((await query("SELECT selection_rule FROM draft_run_schedules WHERE day=$1::date AND environment='mixed'",[day])).rows[0].selection_rule===MIXED_DAILY_RULE,
       'Main Daily records its own selection rule');
     check(JSON.parse(mixedSchedule.puzzle_ids).join()===mixedExpected.map(p=>p.puzzle_id).join(),
-      'Main Daily's scheduled decisions match the deterministic stakes draw');
+      "Main Daily's scheduled decisions match the deterministic stakes draw");
   } finally {
     await query('DELETE FROM draft_run_schedules WHERE day=$1::date',[day]);
   }
