@@ -688,7 +688,10 @@ elif platform == 'ios':
                         logs = app_log.read_bytes()[offset:].decode(errors='replace')
                         scene_ready = any('PACKONE_SCENE' in line and f'"scenario":"{scenario}"' in line
                                           and f'"destination":"{screen}"' in line for line in logs.splitlines())
-                        layout_ready = ('"label":"choice"' in logs if screen == 'feedback' else
+                        # A trophy match has no "You picked" line, so its last
+                        # feedback layout is the title rather than the choice.
+                        feedback_label = '"label":"title"' if 'match' in scenario else '"label":"choice"'
+                        layout_ready = (feedback_label in logs if screen == 'feedback' else
                                         'PACKONE_BRAND' in logs if screen == 'home' else
                                         'PACKONE_CAREER_READY' in logs if screen == 'career' else
                                         'PACKONE_INSIGHTS_READY' in logs if screen == 'insights' else
@@ -723,7 +726,7 @@ elif platform == 'ios':
                                     scene['tab_metrics']['rows'] == 1,
                                     'Roomy iPad should retain one-row navigation at large text')
                     if screen == 'feedback':
-                        scene['metrics'] = measure(logs)
+                        scene['metrics'] = measure(logs, match='match' in scenario)
                         ios_metrics[(scenario, setting)] = scene['metrics']
                     manifest['scenes'].append(scene)
                 attempt(name, ios_scene)
