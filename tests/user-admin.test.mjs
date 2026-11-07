@@ -52,7 +52,8 @@ test('users list reports signed-out and signed-in play with the habit report exc
     return {rows:[],rowCount:0};
   };
   const result=await handleUserAdmin(new Request('https://packone.pro/v1/admin/users?activity_from=2026-10-10&activity_to=2026-10-16'),query,undefined,{adminAuthUserId:ADMIN});
-  assert.deepEqual(activityCall.params.slice(0,2),['2026-10-10','2026-10-16']);
+  assert.deepEqual(activityCall.params,['2026-10-10','2026-10-16']);
+  assert.doesNotMatch(activityCall.sql,/corpus_version/,'first-ever Daily and return counts span every corpus version');
   assert.match(activityCall.sql,/NOT s\.measurement_qa/);
   assert.match(activityCall.sql,/pack1_admins/);
   assert.match(activityCall.sql,/first_day\+1<today\.current_day/);

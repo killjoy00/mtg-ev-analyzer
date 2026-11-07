@@ -26,6 +26,8 @@ async function timed(query,label,sql,params) {
 // Daily observations and completed sessions are evaluated once over fourteen
 // Pacific days. Weekly distinct players are DISTINCT over the whole week, not
 // a sum of the daily counts (which double-counts returning people).
+// Player activity counts sessions on every corpus version, so a corpus release
+// does not erase the days before it from the trend or the week comparison.
 export const ADMIN_TRENDS_SQL=`WITH
 days AS (
   SELECT generate_series($1::date-13,$1::date,interval '1 day')::date report_day
@@ -41,7 +43,7 @@ days AS (
   JOIN players p ON p.id=s.player_id
   WHERE o.first_seen_at>= (($1::date-13)::timestamp AT TIME ZONE 'America/Los_Angeles')
     AND o.first_seen_at< (($1::date+1)::timestamp AT TIME ZONE 'America/Los_Angeles')
-    AND o.observed AND s.corpus_version=$2
+    AND o.observed
     AND NOT s.measurement_qa
     AND NOT coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
 ), observation_metrics AS (
@@ -58,8 +60,7 @@ days AS (
     s.player_id,(s.day IS NOT NULL) daily,
     (jsonb_array_length(s.answers)=jsonb_array_length(s.puzzle_ids)) complete
   FROM draft_run_sessions s JOIN players p ON p.id=s.player_id
-  WHERE s.corpus_version=$2
-    AND s.created_at>= (($1::date-15)::timestamp AT TIME ZONE 'America/Los_Angeles')
+  WHERE s.created_at>= (($1::date-15)::timestamp AT TIME ZONE 'America/Los_Angeles')
     AND s.created_at< (($1::date+1)::timestamp AT TIME ZONE 'America/Los_Angeles')
     AND NOT s.measurement_qa
     AND NOT coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
@@ -180,7 +181,8 @@ LIMIT 20`;
 
 // Acquisition touches are client-observed arrivals (not total clicks). Daily
 // starts/completions are authoritative run rows with earliest observed source
-// present *before* the run. First-touch player counts are not signups.
+// present *before* the run, on every corpus version. First-touch player counts
+// are not signups.
 export const ADMIN_CAMPAIGN_SQL=`WITH first_touch AS MATERIALIZED (
   SELECT DISTINCT ON (e.player_id) e.player_id,e.created_at,
     coalesce(nullif(e.event_props->>'source',''),'direct') source,
@@ -204,7 +206,7 @@ export const ADMIN_CAMPAIGN_SQL=`WITH first_touch AS MATERIALIZED (
   FROM draft_run_sessions s
   JOIN players p ON p.id=s.player_id
   LEFT JOIN first_touch t ON t.player_id=s.player_id AND t.created_at<=s.created_at
-  WHERE s.corpus_version=$3 AND s.day BETWEEN $1::date AND $2::date
+  WHERE s.day BETWEEN $1::date AND $2::date
     AND NOT s.measurement_qa
     AND NOT coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
     AND NOT EXISTS(SELECT 1 FROM account_links l JOIN pack1_admins a ON a.auth_user_id=l.auth_user_id WHERE l.player_id=s.player_id)
@@ -235,9 +237,9 @@ export async function handleDashboardAdmin(request,query) {
   const url=new URL(request.url),path=url.pathname;
   if(request.method!=='GET')throw Object.assign(Error('Method not allowed.'),{status:405});
   if(path==='/v1/admin/overview/trends') {
-    const day=gameDateKey(),data=await timed(query,'trends',ADMIN_TRENDS_SQL,[day,DRAFT_RUN_CORPUS_VERSION]);
+    const day=gameDateKey(),data=await timed(query,'trends',ADMIN_TRENDS_SQL,[day]);
     const found=rows(data);
-    return {generated_at:new Date().toISOString(),day,corpus_version:DRAFT_RUN_CORPUS_VERSION,
+    return {generated_at:new Date().toISOString(),day,corpus_scope:'all',
       daily:found.filter(x=>x.kind==='day'),weekly:found.filter(x=>x.kind==='week')};
   }
   if(path==='/v1/admin/overview/health') {
@@ -257,8 +259,8 @@ export async function handleDashboardAdmin(request,query) {
   }
   if(path==='/v1/admin/campaign-performance') {
     const {from,to}=dateRange(url,{days:30,maxDays:90});
-    const data=await timed(query,'campaign_performance',ADMIN_CAMPAIGN_SQL,[from,to,DRAFT_RUN_CORPUS_VERSION]);
-    return {generated_at:new Date().toISOString(),from,to,corpus_version:DRAFT_RUN_CORPUS_VERSION,rows:rows(data)};
+    const data=await timed(query,'campaign_performance',ADMIN_CAMPAIGN_SQL,[from,to]);
+    return {generated_at:new Date().toISOString(),from,to,corpus_scope:'all',rows:rows(data)};
   }
   throw Object.assign(Error('Not found.'),{status:404});
 }

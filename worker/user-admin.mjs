@@ -1,4 +1,3 @@
-import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {gameDateKey} from '../game-date.mjs';
 
 const UUID=/^[a-f0-9-]{36}$/i;
@@ -64,14 +63,15 @@ export function playActivityWindow(url,now=new Date()) {
 
 // Same people, exclusions and next-day maturity as the Daily habit cohorts report, split by
 // whether the player is linked to an account today. Guests count once per browser identity.
+// Runs on every corpus version count, so "first Daily" is a player's first-ever Daily and a
+// corpus release does not make returning players look new.
 const PLAY_ACTIVITY_SQL=`WITH eligible AS (
   SELECT coalesce(a.auth_user_id::text,'guest:'||s.player_id::text) person_id,s.day,
     coalesce(s.day,(s.created_at AT TIME ZONE 'America/Los_Angeles')::date) play_day
   FROM draft_run_sessions s
   JOIN players p ON p.id=s.player_id
   LEFT JOIN account_links a ON a.player_id=s.player_id
-  WHERE s.corpus_version=$3
-    AND jsonb_array_length(s.answers)=jsonb_array_length(s.puzzle_ids)
+  WHERE jsonb_array_length(s.answers)=jsonb_array_length(s.puzzle_ids)
     AND NOT s.measurement_qa
     AND NOT coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
     AND NOT EXISTS (
@@ -110,8 +110,8 @@ ORDER BY g.position`;
 
 async function playActivity(query,window) {
   try {
-    const result=await query(PLAY_ACTIVITY_SQL,[window.start,window.end,DRAFT_RUN_CORPUS_VERSION]);
-    return {...window,corpus_version:DRAFT_RUN_CORPUS_VERSION,groups:result.rows.map(row=>({
+    const result=await query(PLAY_ACTIVITY_SQL,[window.start,window.end]);
+    return {...window,corpus_scope:'all',groups:result.rows.map(row=>({
       group:row.group,players:num(row.players),completed_runs:num(row.completed_runs),
       first_daily_people:num(row.first_daily_people),next_day_mature:num(row.next_day_mature),
       next_day_returned:num(row.next_day_returned),next_day_immature:num(row.next_day_immature),

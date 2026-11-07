@@ -28,7 +28,12 @@ export function reportFilters(url,now=new Date()) {
   const band=url.searchParams.get('difficulty')||'all',pick=url.searchParams.get('pick')||'all';
   if(!['all','mixed','powered-cube'].includes(environment)||!['all','daily','practice','challenge'].includes(type)||!/^([a-z0-9-]{2,40}|all)$/.test(set)||!/^([a-z0-9-]{1,60}|all)$/.test(version))fail('Invalid report filter.');
   if(!['all','easy','medium','hard'].includes(band)||!['all',...Array.from({length:12},(_,i)=>String(i+1))].includes(pick))fail('Invalid difficulty or pick filter.');
-  return {start,end,environment,type,set,version,band,pick,corpus_version:DRAFT_RUN_CORPUS_VERSION,params:[start,end,environment,type,set,version,band,pick,DRAFT_RUN_CORPUS_VERSION]};
+  // Decision-quality reports default to the current parent corpus because the
+  // model and ratings change with it. Player counts (Overview) pass corpus=all.
+  const corpus=url.searchParams.get('corpus')||'current';
+  if(!['current','all'].includes(corpus))fail('Invalid corpus filter.');
+  const corpusVersion=corpus==='all'?'all':DRAFT_RUN_CORPUS_VERSION;
+  return {start,end,environment,type,set,version,band,pick,corpus_version:corpusVersion,params:[start,end,environment,type,set,version,band,pick,corpusVersion]};
 }
 // The serving floor is 20 model-implied points (see serving-quality.mjs).
 // Use the *trophy card's* support relative to the top-supported card, not
@@ -46,7 +51,7 @@ const PACIFIC_RANGE_END="(($2::date + 1)::timestamp AT TIME ZONE 'America/Los_An
 const SCOPE=`FROM draft_run_source_measurements WHERE first_seen_at >= ${PACIFIC_RANGE_START} AND first_seen_at < ${PACIFIC_RANGE_END}
   AND ($3='all' OR environment=$3) AND ($4='all' OR run_type=$4) AND ($5='all' OR set_id=$5)
   AND ($6='all' OR selection_version=$6) AND ($7='all' OR band=$7) AND ($8='all' OR pick_number::text=$8)
-  AND corpus_version=$9`;
+  AND ($9='all' OR corpus_version=$9)`;
 const METRICS=`count(*)::int exposures,count(DISTINCT player_id)::int players,
   count(*) FILTER(WHERE outcome='pick')::int answers,
   count(*) FILTER(WHERE trophy_match)::int trophy_matches,
@@ -65,13 +70,14 @@ const METRICS=`count(*)::int exposures,count(DISTINCT player_id)::int players,
   count(active_ms) FILTER(WHERE outcome='pick')::int timed_answers,
   round((percentile_cont(.5) WITHIN GROUP(ORDER BY active_ms) FILTER(WHERE outcome='pick'))::numeric/1000,1) median_seconds,
   round((percentile_cont(.9) WITHIN GROUP(ORDER BY active_ms) FILTER(WHERE outcome='pick'))::numeric/1000,1) p90_seconds`;
+// Daily habits count completed Dailies on every corpus version, so a player's
+// first Daily is their first-ever Daily and cohorts survive corpus releases.
 const HABIT_METRICS_SQL=`WITH eligible_daily_sessions AS (
   SELECT s.id,s.player_id,coalesce(a.auth_user_id::text,'guest:'||s.player_id::text) person_id,s.day,s.created_at
   FROM draft_run_sessions s
   JOIN players p ON p.id=s.player_id
   LEFT JOIN account_links a ON a.player_id=s.player_id
   WHERE s.day IS NOT NULL
-    AND s.corpus_version=$3
     AND jsonb_array_length(s.answers)=jsonb_array_length(s.puzzle_ids)
     AND NOT s.measurement_qa
     AND NOT coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
@@ -196,9 +202,9 @@ export async function handleAdmin(request,query,readJson) {
     return youtubeReport().catch(error=>({configured:true,error:String(error?.message||'YouTube results are unavailable.')}));
   const filters=reportFilters(url);
   if(url.pathname==='/v1/admin/measurements/habits') {
-    const habitMetrics=await timedAdminQuery(query,'measurements_habits','habit_metrics',HABIT_METRICS_SQL,[filters.start,filters.end,DRAFT_RUN_CORPUS_VERSION]);
+    const habitMetrics=await timedAdminQuery(query,'measurements_habits','habit_metrics',HABIT_METRICS_SQL,[filters.start,filters.end]);
     const habit=habitMetrics.rows[0]||{};
-    return {generated_at:new Date().toISOString(),corpus_version:DRAFT_RUN_CORPUS_VERSION,filters:{start:filters.start,end:filters.end,corpus_version:DRAFT_RUN_CORPUS_VERSION},
+    return {generated_at:new Date().toISOString(),corpus_scope:'all',filters:{start:filters.start,end:filters.end,corpus_scope:'all'},
       habit_metrics:{cohorts:jsonArray(habit.cohorts),daily_health:jsonArray(habit.daily_health)}};
   }
   if(url.pathname==='/v1/admin/measurements/reviews') {
@@ -208,7 +214,7 @@ export async function handleAdmin(request,query,readJson) {
       ORDER BY bool_or(model_disagreement) DESC,count(*) FILTER(WHERE outcome='pick') DESC LIMIT 30)
       SELECT c.*,p.set_id,p.pick_number,p.payload->>'historical_pick_id' trophy_id
       FROM chosen c JOIN draft_run_verified_puzzles p USING(puzzle_id)`,filters.params);
-    return {generated_at:new Date().toISOString(),corpus_version:DRAFT_RUN_CORPUS_VERSION,filters:{...filters,params:undefined},reviews:reviews.rows};
+    return {generated_at:new Date().toISOString(),corpus_version:filters.corpus_version,filters:{...filters,params:undefined},reviews:reviews.rows};
   }
   if(url.pathname==='/v1/admin/measurements') {
     // Materialize the expensive first-encounter decision scan once. Previously
@@ -236,14 +242,13 @@ export async function handleAdmin(request,query,readJson) {
           coalesce((SELECT json_agg(to_jsonb(g) ORDER BY g.dimension,g.label) FROM grouped g),'[]'::json) groups
         FROM coverage CROSS JOIN summary`,filters.params),
       timedAdminQuery(query,'measurements','set_options','SELECT set_id FROM draft_run_environment_policy ORDER BY set_id'),
-      timedAdminQuery(query,'measurements','share_funnel',`WITH corpus_epoch AS (
-          SELECT min(created_at) started_at FROM draft_run_sessions WHERE corpus_version=$4
-        ), arrivals AS (
+      // The share funnel counts players, so it spans every corpus version:
+      // a corpus release does not reset arrivals, starts or completions.
+      timedAdminQuery(query,'measurements','share_funnel',`WITH arrivals AS (
           SELECT e.player_id,e.created_at,e.event_props->>'kind' kind
-          FROM analytics_events e JOIN players p ON p.id=e.player_id CROSS JOIN corpus_epoch epoch
+          FROM analytics_events e JOIN players p ON p.id=e.player_id
           WHERE e.event_name='daily_share_arrival'
             AND e.created_at >= ${PACIFIC_RANGE_START} AND e.created_at < ${PACIFIC_RANGE_END}
-            AND epoch.started_at IS NOT NULL AND e.created_at>=epoch.started_at
             AND ($3='all' OR coalesce(e.event_props->>'set','mixed')=$3)
             AND NOT coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
         ), starts AS (
@@ -253,29 +258,27 @@ export async function handleAdmin(request,query,readJson) {
           WHERE e.event_name='daily_started' AND e.event_props->>'source'='result_share'
             AND e.created_at >= ${PACIFIC_RANGE_START} AND e.created_at < ${PACIFIC_RANGE_END}
             AND ($3='all' OR e.event_props->>'set_id'=$3)
-            AND s.corpus_version=$4
             AND NOT s.measurement_qa
         ), completed AS (
           SELECT DISTINCT e.event_props->>'run_id' run_id
           FROM analytics_events e
           JOIN draft_run_sessions s ON s.id::text=e.event_props->>'run_id'
-          WHERE e.event_name='daily_completed' AND s.corpus_version=$4
+          WHERE e.event_name='daily_completed'
         ), finishers AS (
           -- Sharing participation: browser players who finished a Daily in the
           -- range, against those who completed a share (text, copy or image).
           SELECT count(DISTINCT s.player_id)::int people
           FROM draft_run_sessions s JOIN players p ON p.id=s.player_id
-          WHERE s.corpus_version=$4 AND s.day BETWEEN $1::date AND $2::date
+          WHERE s.day BETWEEN $1::date AND $2::date
             AND jsonb_array_length(s.answers)=jsonb_array_length(s.puzzle_ids)
             AND NOT s.measurement_qa AND ($3='all' OR s.environment=$3)
             AND NOT coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
         ), sharers AS (
           SELECT count(DISTINCT e.player_id)::int people,
             count(*) FILTER(WHERE e.event_props->>'surface'='image')::int image_shares
-          FROM analytics_events e JOIN players p ON p.id=e.player_id CROSS JOIN corpus_epoch epoch
+          FROM analytics_events e JOIN players p ON p.id=e.player_id
           WHERE e.event_name='daily_result_shared'
             AND e.created_at >= ${PACIFIC_RANGE_START} AND e.created_at < ${PACIFIC_RANGE_END}
-            AND epoch.started_at IS NOT NULL AND e.created_at>=epoch.started_at
             AND ($3='all' OR coalesce(e.event_props->>'set','mixed')=$3)
             AND NOT coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
         )
@@ -289,11 +292,11 @@ export async function handleAdmin(request,query,readJson) {
           round(100.0*(SELECT people FROM sharers)/nullif((SELECT people FROM finishers),0),1) share_pct,
           (SELECT image_shares FROM sharers) image_shares,
           (SELECT count(*) FROM arrivals WHERE kind='dated')::int dated_arrivals`,
-        [filters.start,filters.end,filters.environment,DRAFT_RUN_CORPUS_VERSION])
+        [filters.start,filters.end,filters.environment])
     ]);
-    return {generated_at:new Date().toISOString(),corpus_version:DRAFT_RUN_CORPUS_VERSION,filters:{...filters,params:undefined},coverage:jsonObject(aggregates.rows[0]?.coverage),summary:jsonObject(aggregates.rows[0]?.summary),share_funnel:shareFunnel.rows[0],
+    return {generated_at:new Date().toISOString(),corpus_version:filters.corpus_version,filters:{...filters,params:undefined},coverage:jsonObject(aggregates.rows[0]?.coverage),summary:jsonObject(aggregates.rows[0]?.summary),share_funnel:shareFunnel.rows[0],
       groups:jsonArray(aggregates.rows[0]?.groups),sets:options.rows.map(r=>r.set_id),reviews_deferred:true,habit_metrics_deferred:true,
-      definitions:{scope:'All decision, review, result-share and Daily habit metrics are scoped to sessions on the current parent corpus. Historical measurements remain stored but are excluded from this dashboard baseline.',primary:'First recorded encounter per player and puzzle inside the current corpus; observed in the browser; QA excluded.',abandonment:'Unfinished run with an open viewed decision and no activity for 24 hours. A return removes this classification.',timing:'Client-reported foreground time; missing for reloads, multiple tabs, old clients, or invalid timing. This is not a trusted gameplay score.',sample:'Fewer than 30 answers is an early signal, not a calibrated difficulty estimate.',review:'Decisions with at least five first-encounter answers; model disagreement first, then sample size.',habit_person:'Habit metrics count linked accounts as one person after identity merges; guests remain one browser/player identity.',habit_completion:'A Daily day is one or more completed Mixed, Powered Cube, or Latest Set sessions on the stored Pacific Daily date. Multiple Dailies on one date count once.',habit_exclusions:'All habit metrics exclude measurement-QA sessions, QA-pattern display names, and players linked to Pack One admin accounts.',habit_maturity:'Next-day, 7-day, and 3-in-7 rates include only cohorts whose full measurement window has closed; immature cohort counts are shown separately.',habit_attribution:'First touch is the earliest acquisition event for the merged player. Earlier product activity is pre_tracking; missing post-launch attribution is direct. Campaign is (none) when absent.',habit_ever:'Ever 3-in-7 is a lifetime observed status as of report generation, not a fixed-horizon cohort rate. Daily health counts people with 3+ distinct Daily days in each trailing seven-day window.'}};
+      definitions:{scope:'Decision and review metrics are scoped to sessions on the current parent corpus unless corpus=all is requested, because the model and ratings change with each corpus. Historical measurements remain stored. Result-share and Daily habit metrics count players on every corpus version, so corpus releases do not reset them.',primary:'First recorded encounter per player and puzzle inside the selected corpus scope; observed in the browser; QA excluded.',abandonment:'Unfinished run with an open viewed decision and no activity for 24 hours. A return removes this classification.',timing:'Client-reported foreground time; missing for reloads, multiple tabs, old clients, or invalid timing. This is not a trusted gameplay score.',sample:'Fewer than 30 answers is an early signal, not a calibrated difficulty estimate.',review:'Decisions with at least five first-encounter answers; model disagreement first, then sample size.',habit_person:'Habit metrics count linked accounts as one person after identity merges; guests remain one browser/player identity.',habit_completion:'A Daily day is one or more completed Mixed, Powered Cube, or Latest Set sessions on the stored Pacific Daily date. Multiple Dailies on one date count once.',habit_exclusions:'All habit metrics exclude measurement-QA sessions, QA-pattern display names, and players linked to Pack One admin accounts.',habit_maturity:'Next-day, 7-day, and 3-in-7 rates include only cohorts whose full measurement window has closed; immature cohort counts are shown separately.',habit_attribution:'First touch is the earliest acquisition event for the merged player. Earlier product activity is pre_tracking; missing post-launch attribution is direct. Campaign is (none) when absent.',habit_ever:'Ever 3-in-7 is a lifetime observed status as of report generation, not a fixed-horizon cohort rate. Daily health counts people with 3+ distinct Daily days in each trailing seven-day window.'}};
   }
   const match=url.pathname.match(/^\/v1\/admin\/decisions\/([a-f0-9]{32})$/);
   if(match) {

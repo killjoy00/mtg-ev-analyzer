@@ -96,12 +96,8 @@ try {
  // midnights. 18:30 Pacific is already the following UTC date during DST but
  // must remain inside the report for its Pacific calendar day.
  const boundaryPlayer=await addPlayer('Pacific edge '+tag);
- // The funnel counts arrivals only from the current corpus's first session.
- // On a corpus release day the cloned database starts that corpus after this
- // fixture's evening, so a QA session (excluded from habits) anchors the epoch
- // at the start of the Pacific day and the window alone decides.
- const crossDayStart=(await query("SELECT ($1::date::timestamp AT TIME ZONE 'America/Los_Angeles') AS at",[crossDay])).rows[0].at;
- await completeDaily(boundaryPlayer.player,crossDay,'mixed',{qa:true,createdAt:new Date(crossDayStart).toISOString()});
+ // The funnel spans every corpus version, so the Pacific date window alone
+ // decides whether this arrival counts.
  const boundaryUrl=`https://packone.pro/v1/admin/measurements?from=${crossDay}&to=${crossDay}`;
  const boundaryBefore=await handleAdmin(new Request(boundaryUrl,{headers:{'x-pack1-auth-session':token}}),query,readJson);
  await query(`INSERT INTO analytics_events(player_id,event_name,event_props,created_at)
