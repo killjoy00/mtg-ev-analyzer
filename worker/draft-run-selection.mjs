@@ -6,7 +6,7 @@ import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,SELECTABLE_ONLY_S
 import {gameDateKey} from '../game-date.mjs';
 import {corpusMembership} from './corpus-components.mjs';
 import {DRAFT_RUN_DIFFICULTY_VERSION,LEGACY_DIFFICULTY_VERSION,MAX_REROLL_RATING_DELTA} from '../draft-run-difficulty.mjs';
-import {LATEST_DAILY_RULE,SELECTION_FEATURE_VERSION,STAKES_RULE,stakesTopPoolSize} from '../puzzle-selection.mjs';
+import {LATEST_DAILY_RULE,MIXED_DAILY_RULE,SELECTION_FEATURE_VERSION,STAKES_RULE,stakesTopPoolSize} from '../puzzle-selection.mjs';
 
 const columns = `p.puzzle_id,p.set_id,p.corpus_version,p.source_draft_hash,p.pack_number,p.pick_number,p.candidate_count,
   p.consensus_top_gap,p.support_entropy,r.difficulty_version,r.rating,r.top_two_ratio,r.target_support_ratio,r.band`;
@@ -99,20 +99,23 @@ function repeatExclusionSql(exclude,params) {
 }
 export const decisionKey=p=>`${p.source_draft_hash}:${Number(p.pick_number)}`;
 
-// The latest-set Daily ranks contested decisions by stakes (puzzle-selection.mjs)
-// once every serving P1P1-P1P8 puzzle of its set is scored against a strength
-// table. A partly scored set, or a database without the features table, keeps
-// the band draw for the whole Daily.
-async function latestStakesReady(query,version,setId) {
+// Daily stakes require every serving puzzle of each planned set to have
+// features scored with a strength table. Main Daily validates just its chosen
+// sets, not the whole archive, and either applies the rule for the entire run
+// or uses the existing band draw. A partly scored set never gets partial stakes.
+async function dailyStakesReady(query,version,setIds) {
+  const sets=[...new Set(setIds)];
+  if(!sets.length)return false;
   try {
-    const counts=(await query(`SELECT count(*)::int total,count(f.puzzle_id)::int scored ${from}
+    const rows=(await query(`SELECT p.set_id,count(*)::int total,count(f.puzzle_id)::int scored ${from}
       LEFT JOIN draft_run_puzzle_selection_features f
         ON f.puzzle_id=p.puzzle_id AND f.feature_version=$2 AND f.strength_version IS NOT NULL
-      WHERE ${servingBase} AND p.set_id=$3 AND p.pick_number BETWEEN 1 AND 8`,[version,SELECTION_FEATURE_VERSION,setId])).rows[0];
-    return Number(counts.total)>0&&Number(counts.scored)===Number(counts.total);
+      WHERE ${servingBase} AND p.set_id=ANY($3::text[]) AND p.pick_number BETWEEN 1 AND 8
+      GROUP BY p.set_id`,[version,SELECTION_FEATURE_VERSION,toPgArray(sets)])).rows;
+    return rows.length===sets.length&&rows.every(row=>Number(row.total)>0&&Number(row.scored)===Number(row.total));
   } catch(error) {
     if(String(error?.pgCode||error?.code||'')!=='42P01')throw error;
-    console.warn('Latest-set Daily stakes rule unavailable: selection features table missing.');
+    console.warn('Daily stakes rule unavailable: selection features table missing.');
     return false;
   }
 }
@@ -142,7 +145,7 @@ async function stakesRound(query,where,params,{setId,band,draw}) {
 
 // report, when given, receives selectionRule: the rule that chose this run, or
 // null for the band draw.
-export async function selectDatabaseRun(query,version,seed,environment='mixed',{daily=false,day=gameDateKey(),selectionVersion=DRAFT_RUN_SELECTION_VERSION,setIds=[],snapshot=null,exclude=null,report=null}={}) {
+export async function selectDatabaseRun(query,version,seed,environment='mixed',{daily=false,day=gameDateKey(),selectionVersion=DRAFT_RUN_SELECTION_VERSION,setIds=[],snapshot=null,exclude=null,report=null,mixedStakesEnabled=process.env.PACK1_MIXED_DAILY_STAKES!=='off'}={}) {
   const random=seededRandom(seed),bands=runDifficultyBands(random,selectionVersion),selected=[],sources=[],sets=new Set();
   let windows=runPickWindows(environment,selectionVersion);
   const released=new Set(releasedRunSets(day));
@@ -171,8 +174,10 @@ export async function selectDatabaseRun(query,version,seed,environment='mixed',{
     ({windows,groups}=customRunShape(required,coverage,groups,environment,selectionVersion));
   }
   const forced=requiredSetRounds(groups,bands,windows,random,required);
-  const stakes=daily&&environment==='latest'&&!snapshot&&selectionVersion===DAILY_SELECTION_VERSION&&await latestStakesReady(query,version,required[0]);
-  if(report)report.selectionRule=stakes?LATEST_DAILY_RULE:null;
+  const stakesRequested=daily&&!snapshot&&selectionVersion===DAILY_SELECTION_VERSION
+    &&(environment==='latest'||environment==='mixed'&&mixedStakesEnabled);
+  const stakes=stakesRequested&&await dailyStakesReady(query,version,required);
+  if(report)report.selectionRule=stakes?(environment==='latest'?LATEST_DAILY_RULE:MIXED_DAILY_RULE):null;
   const key=p=>`${p.set_id}:${p.pick_number}:${p.band}`;
   const remaining=new Map(groups.map(g=>[key(g),g]));
   for(let round=0;round<windows.length;round++) {
