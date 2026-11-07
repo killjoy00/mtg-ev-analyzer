@@ -1,13 +1,17 @@
-# Latest-set Daily selection
+# Daily stakes selection
 
-The latest-set Daily always draws from the newest Live regular set; today that
-is Reality Fracture (`fra`). From release of this change it chooses puzzles
-with the stakes rule the owner chose in the blinded puzzle review
-(`docs/PUZZLE-REVIEW.md`). Grading, scoring, the run shape (P1P1–P1P8, one
-puzzle per pick) and the difficulty plan are unchanged. The mixed and Powered
-Cube Dailies and Practice keep today's band draw.
+The latest-set Daily always draws from the newest Live regular set; its initial
+stakes rollout on 2026-10-27 used Reality Fracture (`fra`). The Main (`mixed`)
+Daily now applies the **same stakes puzzle ranking within each chosen set**,
+without changing its eight-slot set plan: two newest, four from the next three,
+and two weighted across all Live regular sets. Its rollout is independent of
+Latest Set and opt-out controlled.
 
-## The rule (`latest-stakes-v1`)
+The rule was chosen in the blinded puzzle review (`docs/PUZZLE-REVIEW.md`).
+Grading, scoring, the run shape (P1P1–P1P8, one puzzle per pick) and the
+difficulty plan are unchanged. Powered Cube and Practice keep the band draw.
+
+## The shared stakes rule (`latest-stakes-v1` / `mixed-stakes-v1`)
 
 Each round keeps the Daily's planned band (one easy, five medium, two hard)
 as its type. Every round:
@@ -25,9 +29,10 @@ The existing serving filters, the `interesting` flag, source exclusion within
 a run and the 28-day decision / 7-day source repeat windows all still apply
 first, so the top quarter is taken over what remains.
 
-If no puzzle qualifies in a round, that round makes today's band draw. The
-schedule records `selection_rule='latest-stakes-v1'` when the rule chose the
-Daily, and null for the band draw.
+If no puzzle qualifies in a round, that round makes today's band draw.
+When enabled and scored, the schedule records `selection_rule='latest-stakes-v1'`
+for Latest Set or `selection_rule='mixed-stakes-v1'` for Main Daily. It records
+null if the whole Daily falls back to the original selector.
 
 ## Inputs
 
@@ -43,10 +48,18 @@ Daily, and null for the band draw.
 
 ## Activation guard
 
-The rule runs only when **every** serving P1P1–P1P8 puzzle of the latest set
-has a features row scored against a strength table. Otherwise the whole Daily
-makes today's band draw. So deploying the code changes nothing until the
-latest set is scored, and a partly scored set never runs a half-applied rule.
+The rule runs only when **every** serving P1P1–P1P8 puzzle of **each set in
+the Daily's selected set plan** has a features row scored against a strength
+table. Main Daily checks its selected sets, not all 27 Live sets on every run.
+If any planned set is incompletely scored, the **whole Daily** uses the old
+band draw, never a partially converted run. A round with no eligible stakes
+puzzle also independently falls back to its planned band.
+
+The `mixed` enable check is separate from `latest`: setting the Draft Run
+worker's environment variable `PACK1_MIXED_DAILY_STAKES=off` disables
+Main Daily stakes only, at the next deployment/configuration update. Unset
+or any other value leaves it enabled. Main Daily's `selection_rule` is
+recorded independently, and **existing schedules are never rewritten**.
 
 ## Release steps (Reality Fracture)
 
@@ -67,8 +80,8 @@ Done on 2026-10-27: release run 105, FRA scored on development and production
 (12,175 puzzles each), and the 2026-10-27 latest-set Daily was the first
 generated with `latest-stakes-v1`.
 
-Every puzzle is scored, so the rule can later cover the other Dailies and
-Practice. A set imported from now on is scored as it loads. **Score puzzle
+Every puzzle is scored, so the rule can cover Main Daily in addition to
+Latest Set. A set imported from now on is scored as it loads. **Score puzzle
 selection** with `sets` empty backfills everything: it reads the table once
 in physical order, about 1,000 puzzles per sequential block-range read, in
 four parallel stripes. It fails if any puzzle is still unscored at the end
@@ -77,11 +90,15 @@ the rest. The first version paged through each set with a sort per page; a
 development run over all sets reached about 1.6 of 4.4 million puzzles before
 its 3-hour limit.
 
-To check it took effect: `SELECT day,selection_rule FROM draft_run_schedules
-WHERE environment='latest' ORDER BY day DESC LIMIT 3`.
+To check it took effect: `SELECT day,environment,selection_rule FROM draft_run_schedules
+WHERE environment IN ('latest','mixed') ORDER BY day DESC,environment LIMIT 6`.
 
-To turn it off: delete the latest set's features rows (or one of them); the
-guard returns the Daily to the band draw from the next generated day.
+To roll back Main Daily without changing Latest Set, set
+`PACK1_MIXED_DAILY_STAKES=off` in the Draft Run deployment configuration
+and roll out that configuration through the guarded release process. New
+Main Daily schedules use the old band selector; already-published schedules
+stay frozen. The latest-set guard continues to fall back automatically if
+its features become incomplete.
 
 ## Reality Fracture at a glance
 

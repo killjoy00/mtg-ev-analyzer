@@ -1,21 +1,24 @@
 // Runs ONLY after the disposable local PostgreSQL fixture was created.
-// The latest-set Daily applies the stakes rule (puzzle-selection.mjs) once
-// every serving puzzle of its set is scored, records the rule on the schedule,
-// and falls back to the band draw otherwise. Other environments are unchanged.
+// Both Latest Set and Main Daily apply the same per-set stakes rule once
+// every serving puzzle of the planned sets is scored, record their own rule,
+// and fall back to the existing band draw if their data is incomplete.
 import assert from 'node:assert/strict';
 import {fixturePool,textTypes} from './support/postgres-fixture.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
-import {DRAFT_RUN_SELECTION_VERSION} from '../draft-run-policy.mjs';
-import {selectDatabaseRun} from '../worker/draft-run-selection.mjs';
+import {DRAFT_RUN_SELECTION_VERSION,runDifficultyBands} from '../draft-run-policy.mjs';
+import {dailySetPlan} from '../daily-selection.mjs';
+import {seededRandom} from '../gameplay.mjs';
+import {loadLiveSetMetadata,selectDatabaseRun} from '../worker/draft-run-selection.mjs';
 import {ensureDailySchedule,RECENT_DAILY_DECISIONS,DAILY_REPEAT_WINDOW_DAYS,dailyRepeatExclusion,selectDailyWithoutRepeats} from '../worker/draft-run-daily.mjs';
 import {decisionKey} from '../worker/draft-run-selection.mjs';
-import {LATEST_DAILY_RULE,SELECTION_FEATURE_VERSION,STAKES_RULE,stakesTopPoolSize} from '../puzzle-selection.mjs';
+import {LATEST_DAILY_RULE,MIXED_DAILY_RULE,SELECTION_FEATURE_VERSION,STAKES_RULE,stakesTopPoolSize} from '../puzzle-selection.mjs';
 import {scorePuzzleSelection} from '../scripts/score-puzzle-selection.mjs';
 
 const pool=fixturePool();
 const query=async(text,values=[])=>pool.query({text,values,types:textTypes});
 const array=values=>`{${values.join(',')}}`;
 const seed=day=>`daily:latest:${day}:${DRAFT_RUN_CORPUS_VERSION}:${DRAFT_RUN_SELECTION_VERSION}`;
+const mixedSeed=day=>`daily:mixed:${day}:${DRAFT_RUN_CORPUS_VERSION}:${DRAFT_RUN_SELECTION_VERSION}`;
 // Returns the run and the rule that chose it.
 const select=async(environment,day,seedText)=>{
   const report={};
@@ -23,6 +26,7 @@ const select=async(environment,day,seedText)=>{
   return {run,rule:report.selectionRule};
 };
 const latest=day=>select('latest',day,seed(day));
+const mixed=day=>select('mixed',day,mixedSeed(day));
 const DAYS=['2026-11-02','2026-11-03','2026-11-04','2026-11-05','2026-11-06'];
 // The fixture's serving filters, as the selector applies them.
 const SERVING=`p.interesting AND r.target_support_ratio>=0.2 AND NOT EXISTS(SELECT 1 FROM draft_run_pick_removal_members m
@@ -78,7 +82,36 @@ try {
   assert.deepStrictEqual(plain,(await latest(DAYS[0])).run,'The report option does not change the returned run');tests++;
   check(contested>=DAYS.length*5&&ruleRounds===contested,`Every contested round came from its top stakes pool (${ruleRounds}/${contested})`);
 
-  check((await select('mixed',DAYS[0],`daily:mixed:${DAYS[0]}`)).rule===null,'The mixed Daily keeps the band draw');
+  // Main Daily keeps its eight-slot set plan and uses the same stakes rule
+  // independently of Latest Set. Turning off its flag restores the band draw.
+  const mixedDay=DAYS[0],mixedResult=await mixed(mixedDay);
+  check(mixedResult.rule===MIXED_DAILY_RULE&&mixedResult.run.length===8,'Main Daily applies its stakes rule to eight picks');
+  const plannedRandom=seededRandom(mixedSeed(mixedDay));
+  runDifficultyBands(plannedRandom,DRAFT_RUN_SELECTION_VERSION);
+  const metadata=await loadLiveSetMetadata(query,DRAFT_RUN_CORPUS_VERSION);
+  const expectedSets=dailySetPlan(metadata,mixedDay,plannedRandom);
+  check(JSON.stringify(mixedResult.run.map(p=>p.set_id).sort())===JSON.stringify([...expectedSets].sort()),
+    'Main Daily keeps its exact set composition under stakes selection');
+  check(new Set(mixedResult.run.map(p=>p.source_draft_hash)).size===8,'Main Daily uses eight distinct trophy sources');
+
+  const disabledReport={};
+  const disabledMixed=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,mixedSeed(mixedDay),'mixed',
+    {daily:true,day:mixedDay,mixedStakesEnabled:false,report:disabledReport});
+  check(disabledReport.selectionRule===null&&disabledMixed.length===8,"Main Daily's independent switch restores the band draw");
+  const latestWithMixedDisabled=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed(mixedDay),'latest',
+    {daily:true,day:mixedDay,mixedStakesEnabled:false,report:disabledReport});
+  check(disabledReport.selectionRule===LATEST_DAILY_RULE&&latestWithMixedDisabled.length===8,
+    'Disabling Main Daily stakes does not affect Latest Set');
+
+  const mixedVictim=mixedResult.run.at(-1);
+  await query('DELETE FROM draft_run_puzzle_selection_features WHERE puzzle_id=$1',[mixedVictim.puzzle_id]);
+  const mixedFallback=await mixed(mixedDay);
+  check(mixedFallback.rule===null&&JSON.stringify(mixedFallback.run.map(p=>p.puzzle_id))===JSON.stringify(disabledMixed.map(p=>p.puzzle_id)),
+    'One unscored Main Daily set returns the entire Daily to the old selector');
+  const mixedRestored=await scorePuzzleSelection(query,{setIds:[mixedVictim.set_id],log:()=>{}});
+  check(mixedRestored.remaining===0&&JSON.stringify((await mixed(mixedDay)).run.map(p=>p.puzzle_id))===
+    JSON.stringify(mixedResult.run.map(p=>p.puzzle_id)),
+    'Backfilling the missing feature restores exactly the same Main Daily');
 
   // One unscored serving puzzle of the latest set turns the rule off.
   const setId=(await latest(DAYS[0])).run[0].set_id;
@@ -115,13 +148,23 @@ try {
     const stored=(await query("SELECT selection_rule FROM draft_run_schedules WHERE day=$1::date AND environment='latest'",[day])).rows[0];
     check(stored.selection_rule===LATEST_DAILY_RULE,'The schedule records the stakes rule');
     check(JSON.parse(schedule.puzzle_ids).join()===expected.map(p=>p.puzzle_id).join(),'The schedule holds the rule selection');
-    await ensureDailySchedule(query,day,'mixed');
-    check((await query("SELECT selection_rule FROM draft_run_schedules WHERE day=$1::date AND environment='mixed'",[day])).rows[0].selection_rule===null,
-      'A mixed schedule records no rule');
+    // Main Daily's schedule is generated after Latest Set and uses the same
+    // cross-environment repeat exclusions, without changing its set mix.
+    const mixedRecent=(await query(RECENT_DAILY_DECISIONS,[day,DAILY_REPEAT_WINDOW_DAYS.decision-1,DAILY_REPEAT_WINDOW_DAYS.source-1])).rows;
+    const mixedReport={};
+    const mixedExpected=await selectDailyWithoutRepeats(exclude=>selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,
+      mixedSeed(day),'mixed',{daily:true,day,exclude,report:mixedReport}),
+      dailyRepeatExclusion(mixedRecent),{environment:'mixed',day,warn:()=>{}});
+    const {schedule:mixedSchedule,created:mixedCreated}=await ensureDailySchedule(query,day,'mixed');
+    check(mixedCreated&&mixedReport.selectionRule===MIXED_DAILY_RULE,'Main Daily creates a new stakes schedule');
+    check((await query("SELECT selection_rule FROM draft_run_schedules WHERE day=$1::date AND environment='mixed'",[day])).rows[0].selection_rule===MIXED_DAILY_RULE,
+      'Main Daily records its own selection rule');
+    check(JSON.parse(mixedSchedule.puzzle_ids).join()===mixedExpected.map(p=>p.puzzle_id).join(),
+      "Main Daily's scheduled decisions match the deterministic stakes draw");
   } finally {
     await query('DELETE FROM draft_run_schedules WHERE day=$1::date',[day]);
   }
-  console.log('PASS: '+tests+' real PostgreSQL latest-set Daily selection assertions.');
+  console.log('PASS: '+tests+' real PostgreSQL Main and Latest Set Daily stakes assertions.');
 } finally {
   await pool.end();
 }
