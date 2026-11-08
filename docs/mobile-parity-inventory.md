@@ -38,7 +38,9 @@ The last signed Android build, Internal Testing **1.0/100925**, was built from `
 | Removal of the Share image button (#1414) | **Not applicable** | Native never had an image share. |
 | Earlier-Daily notice on a friend's share link (#1412) | **Not applicable** | `/d/` links open the web Daily; native does not claim those paths. |
 
-New deliberate differences from this update are listed in section D. The native acceptance driver (`mobile/scripts/native-acceptance.py`) was updated for the new copy and adds a decklist open/close check; it needs a passing emulator run before a signed candidate.
+New deliberate differences from this update are listed in section D. The native acceptance driver (`mobile/scripts/native-acceptance.py`) was updated for the new copy and adds a decklist open/close check. It passed on the Android emulator and iPhone/iPad in [run 42421017777](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/42421017777).
+
+**Delivered:** Android 1.0/**100963**, built from this source, has been on production-access Closed Testing since November 7, replacing 100772 (see [current state](CURRENT-STATE.md)). Physical-device acceptance is still open.
 
 ## October 10 TestFlight 1.1 — what is and is not parity-complete
 
