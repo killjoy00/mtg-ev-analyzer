@@ -25,16 +25,22 @@
     "medium": "social"
   },
   {
-    "slug": "youtube",
-    "destination": "/",
-    "source": "youtube",
-    "campaign": "rfalaunch"
-  },
-  {
     "slug": "shorts",
     "destination": "/",
     "source": "youtube",
     "campaign": "organic_shorts",
     "medium": "social"
+  },
+  {
+    "slug": "week2",
+    "destination": "/",
+    "source": "reddit",
+    "campaign": "week2"
+  },
+  {
+    "slug": "youtube",
+    "destination": "/",
+    "source": "youtube",
+    "campaign": "rfalaunch"
   }
 ]
