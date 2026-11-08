@@ -60,6 +60,10 @@ Compared to main `ae0bbaf84773d25e9ccb543752c53745f14f2e33` (October 11), build 
 
 Separately, Android **1.0/100740** (same source `67c6d259` as iOS 100733) was uploaded to the Google Play bundle library and, on October 11, authorized for promotion to the existing `production-access` closed-test track, replacing 100698 (see #575 for the run). The promotion replaces only the track's release; keep testers continuously opted in for the 14-day Production-access requirement.
 
+## November 7 Android candidate (100963 on production-access)
+
+Built from main `0b32b1e5`, whose native source is the #1499 web-parity merge `e0e4b543`, after exact-main RC smoke [run 42424772116](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/42424772116) passed. The signed bundle was built by [run 42426407405](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/42426407405) (#1502). Next, the pinned existing-AAB workflow imported it without a track ([run 42428456928](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/42428456928), #1503). Last, it was promoted to the existing `production-access` track ([run 42428588837](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/42428588837), #1504) with `completed` and no Console rollout, replacing 100772. Internal Testing stays on 100925. `android-upload-existing-aab.yml` remains pinned to 100963 and must be re-pinned (run, artifact, digest, versionCode and expected Internal/Closed) for the next candidate.
+
 ## October 12 candidates (iOS 1.1/100765, Android 100772)
 
 Both were built from `f449b8b0b36c77b7d7d219f5de53842871f848ec`. Android 100772 went through the pinned existing-AAB upload ([run 38197217062](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/38197217062)) and the closed-track promotion ([run 38197383817](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/38197383817), `completed`). iOS 100765 is `VALID` / `APP_STORE_ELIGIBLE` ([run 38195844543](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/38195844543)); the finalizer still finds no App Store version `1.1`, so select the build on 1.1 by hand.
