@@ -1,4 +1,4 @@
-name: Import reviewed Android 100925 AAB without changing Google Play tracks
+name: Import reviewed Android 100963 AAB without changing Google Play tracks
 
 # A one-time, source-pinned import. The reviewed artifact was already built,
 # Android-audited and signed by the protected release workflow.
@@ -41,43 +41,43 @@ jobs:
             echo 'Main moved; refusing an unreviewed artifact upload.' >&2
             exit 1
           }
-          run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/39661127682")"
+          run="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/42426407405")"
           jq -e '
             .name == "Android production bundle" and
             .event == "push" and
             .status == "completed" and
             .conclusion == "success" and
-            .head_sha == "e76119e14181f63fe4216163d32dd9195f97562d"
+            .head_sha == "0b32b1e50b2138155f1f563c7b3d696194e7db47"
           ' <<< "$run" >/dev/null || {
             echo 'Source build is not the reviewed successful Pack One build.' >&2
             exit 1
           }
-          artifact="$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/12375542620")"
+          artifact="$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/13595993143")"
           jq -e '
-            .id == 12375542620 and
+            .id == 13595993143 and
             .name == "pack-one-play-signed-aab" and
             .expired == false and
-            .workflow_run.id == 39661127682 and
-            .digest == "sha256:406889dc5fe541e0ea9859571a636b985bf18a11ae881a15636339900183e786"
+            .workflow_run.id == 42426407405 and
+            .digest == "sha256:8d4bbb5af5668671deb4b571e149ee0c465eba120a10b577ff5659a796056bc5"
           ' <<< "$artifact" >/dev/null || {
             echo 'Signed AAB source artifact has changed or expired.' >&2
             exit 1
           }
           # Reject a source-equivalent candidate if later commits changed
           # mobile binary inputs; web/API/docs/test changes do not alter it.
-          comparison="$(gh api "repos/$GITHUB_REPOSITORY/compare/e76119e14181f63fe4216163d32dd9195f97562d...$GITHUB_SHA")"
+          comparison="$(gh api "repos/$GITHUB_REPOSITORY/compare/0b32b1e50b2138155f1f563c7b3d696194e7db47...$GITHUB_SHA")"
           jq -e '[.files[] | .filename | select(startswith("mobile/") or startswith(".github/actions/mobile-validate/") or . == ".github/workflows/android-production-bundle.yml")] | length == 0' <<< "$comparison" >/dev/null || {
             echo 'Native build inputs changed since signed artifact; refusing stale release.' >&2
             exit 1
           }
           echo 'Verified original Android app binary inputs remain unchanged.'
-          echo 'Verified existing AAB artifact #12375542620 from successful run #39661127682.'
+          echo 'Verified existing AAB artifact #13595993143 from successful run #42426407405.'
 
       - name: Download exact already-signed AAB (no rebuild)
         uses: actions/download-artifact@v4
         with:
           name: pack-one-play-signed-aab
-          run-id: 39661127682
+          run-id: 42426407405
           github-token: ${{ github.token }}
           path: ${{ runner.temp }}/existing-signed-aab
 
@@ -141,21 +141,21 @@ jobs:
           try{
             const base='/edits/'+encodeURIComponent(edit.id);
             const bundles=await req(base+'/bundles');
-            if((bundles?.bundles||[]).some(b=>Number(b.versionCode)===100925))
-              throw Error('Version 100925 is already present in Google Play; refusing duplicate upload');
+            if((bundles?.bundles||[]).some(b=>Number(b.versionCode)===100963))
+              throw Error('Version 100963 is already present in Google Play; refusing duplicate upload');
             const all=await req(base+'/tracks');
             const internal=await req(base+'/tracks/internal','GET',true);
             const closed=await req(base+'/tracks/production-access','GET',true);
             const hasCompleted=(track,code)=>(track?.releases||[]).some(
               r=>r.status==='completed'&&(r.versionCodes||[]).map(String).includes(code));
-            if(!hasCompleted(internal,'100858'))
-              throw Error('Expected completed Internal Testing version 100858; refusing changed Play state');
+            if(!hasCompleted(internal,'100925'))
+              throw Error('Expected completed Internal Testing version 100925; refusing changed Play state');
             if(!hasCompleted(closed,'100772'))
               throw Error('Expected completed production-access Closed Testing 100772; refusing changed qualification state');
             writeFileSync(process.env.RUNNER_TEMP+'/android-play-tracks-before.json',JSON.stringify({
               internal,closed,all:all?.tracks||[]
             }));
-            console.log('Checked: version 100925 unused; Internal 100858 and Closed 100772 are completed. All tracks will be preserved.');
+            console.log('Checked: version 100963 unused; Internal 100925 and Closed 100772 are completed. All tracks will be preserved.');
           } finally {
             await req('/edits/'+encodeURIComponent(edit.id),'DELETE');
           }
@@ -194,8 +194,8 @@ jobs:
               root:upload,method:'POST',body:bundle,contentType:'application/octet-stream'
             });
             const version=String(uploaded?.versionCode??'');
-            if(version!=='100925')
-              throw Error('Uploaded AAB version code mismatch: expected 100925, got '+version);
+            if(version!=='100963')
+              throw Error('Uploaded AAB version code mismatch: expected 100963, got '+version);
             const before=JSON.parse(readFileSync(process.env.RUNNER_TEMP+'/android-play-tracks-before.json','utf8'));
             const all=await req(base+'/tracks');
             const internal=await req(base+'/tracks/internal',{optional:true});
@@ -243,8 +243,8 @@ jobs:
           try{
             const base='/edits/'+encodeURIComponent(edit.id);
             const bundles=await req(base+'/bundles');
-            assert.ok((bundles?.bundles||[]).some(b=>String(b.versionCode)==='100925'),
-              'Existing AAB version 100925 must be present in Google Play bundles');
+            assert.ok((bundles?.bundles||[]).some(b=>String(b.versionCode)==='100963'),
+              'Existing AAB version 100963 must be present in Google Play bundles');
             const before=JSON.parse(readFileSync(process.env.RUNNER_TEMP+'/android-play-tracks-before.json','utf8'));
             const all=await req(base+'/tracks');
             const internal=await req(base+'/tracks/internal','GET',true);
@@ -252,18 +252,18 @@ jobs:
             assert.deepEqual(all?.tracks||[],before.all,'All preexisting Play tracks must remain unchanged');
             assert.deepEqual(internal,before.internal,'Active Internal Testing release must remain unchanged');
             assert.deepEqual(closed,before.closed,'Active production-access Closed Testing release must remain unchanged');
-            console.log('Verified Google Play accepted signed AAB 100925 into the bundle library.');
-            console.log('Verified Internal Testing 100858, production-access Closed Testing 100772 and all other tracks are unchanged.');
+            console.log('Verified Google Play accepted signed AAB 100963 into the bundle library.');
+            console.log('Verified Internal Testing 100925, production-access Closed Testing 100772 and all other tracks are unchanged.');
           } finally {
             await req('/edits/'+encodeURIComponent(edit.id),'DELETE');
           }
           NODE
           {
             echo '## Google Play existing AAB upload'
-            echo '- Reused exact signed AAB artifact #12375542620, without rebuilding.'
+            echo '- Reused exact signed AAB artifact #13595993143, without rebuilding.'
             echo '- Package: `pro.packone.app`'
-            echo '- Uploaded version code: `100925`'
+            echo '- Uploaded version code: `100963`'
             echo '- Stored in Google Play bundle library; no track or release assigned.'
-            echo '- Existing Internal 100858 and Closed 100772: unchanged (verified).'
+            echo '- Existing Internal 100925 and Closed 100772: unchanged (verified).'
             echo '- No Production release or tester settings changed.'
           } >> "$GITHUB_STEP_SUMMARY"
