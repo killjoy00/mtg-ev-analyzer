@@ -35,15 +35,17 @@ function formatNumber(value) {
 
 function card(entry, { special = false } = {}) {
   const id = String(entry.set_id || '').toLowerCase();
-  const practiceUrl = special
-    ? '/?game=draft-run&set=powered-cube'
-    : '/?game=draft-run';
+  const actions = [
+    ...(special ? ['<a href="/?game=draft-run&set=powered-cube">Elite Cube Practice</a>'] : []),
+    ...(hasSetGuide(id) ? [`<a href="${setGuidePath(id)}">Set guide</a>`] : []),
+    ...(detailPages.has(id) ? [`<a href="/sets/${encodeURIComponent(id)}/">Data notes</a>`] : []),
+  ];
   return `<article class="content-card set-catalog-card" data-set-id="${esc(id)}">
     <p class="kicker">Data through ${esc(dateLabel(entry.data_date))}</p>
     <h2>${esc(entry.set_name || id.toUpperCase())}</h2>
     <p>${formatNumber(entry.verified_decisions)} first-pack picks from ${formatNumber(entry.qualified_trophy_drafts)} Premier Draft trophies.</p>
     <p>${esc(cohortLabel(entry))}${entry.training_drafts ? ` · ${formatNumber(entry.training_drafts)} training drafts` : ''}.</p>
-    <div class="set-card-actions"><a href="${practiceUrl}">${special ? 'Elite Cube Practice' : 'Play a mixed-set Draft Run'}</a>${hasSetGuide(id)?`<a href="${setGuidePath(id)}">Set guide</a>`:''}${detailPages.has(id) ? `<a href="/sets/${encodeURIComponent(id)}/">Data notes</a>` : ''}</div>
+    ${actions.length ? `<div class="set-card-actions">${actions.join('')}</div>` : ''}
   </article>`;
 }
 

@@ -45,8 +45,11 @@ try {
   assert.equal((await page.locator('#set-archive-summary strong').first().textContent())?.trim(),'28');
   assert.equal((await page.locator('#set-archive-summary strong').nth(1).textContent())?.trim(),'Newest Set');
 
-  const regularCta=page.locator('#set-archive-grid .set-catalog-card').first().getByRole('link',{name:'Play a mixed-set Draft Run'});
+  const regularCta=page.getByRole('link',{name:'Play a mixed-set Draft Run',exact:true});
+  assert.equal(await regularCta.count(),1,'one mixed-practice CTA appears above the catalog');
   assert.equal(await regularCta.getAttribute('href'),'/?game=draft-run');
+  assert.ok(await regularCta.isVisible(),'archive-level practice CTA is visible without opening a set card');
+  assert.equal(await page.locator('#set-archive-grid a[href="/?game=draft-run"]').count(),0,'no duplicate mixed-practice links within set cards');
   assert.equal(await page.locator('a[href*="custom=1"]').count(),0,'public set archive must not route free users into custom-corpus practice');
 
   const cubeCta=page.locator('#special-format-grid').getByRole('link',{name:'Elite Cube Practice'});
@@ -91,13 +94,14 @@ try {
   const failurePage=await browser.newPage({viewport:{width:390,height:844}});
   await failurePage.route('**/*.neon.tech/**',route=>route.fulfill({status:503,contentType:'application/json',body:'{"error":"unavailable"}'}));
   await failurePage.goto(base+'/sets/',{waitUntil:'domcontentloaded'});
-  const fallback=failurePage.getByRole('link',{name:'Draft Run'});
+  const fallback=failurePage.locator('.set-archive-error a');
   await fallback.waitFor();
   assert.equal(await fallback.getAttribute('href'),'/?game=draft-run');
+  assert.equal(await failurePage.getByRole('link',{name:'Play a mixed-set Draft Run',exact:true}).count(),1,'global CTA remains usable when the catalog is unavailable');
   assert.equal(await failurePage.locator('a[href*="custom=1"]').count(),0);
   await failurePage.close();
 
-  console.log('Set archive passed: 28 regular sets + Cube render, free-practice CTA, Cube CTA and failure fallback.');
+  console.log('Set archive passed: 28 regular sets + Cube render, one archive-level mixed-practice CTA, Cube CTA and failure fallback.');
 } finally {
   await browser.close();
 }
