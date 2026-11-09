@@ -1,18 +1,18 @@
 import {draftRunLength} from './draft-run-format.mjs';
 import { accountCsrfToken, ensurePackSession, firstPartyAuthEnabled, hasAccountSession, loadDailyStatus, storedAccountToken } from './growth-api.mjs';
-import { dailySetRunIds, dailySetShareRuns, dailySetShareText, dailyShareUrl, draftRunShareText, shareDailySet, shareDraftRunCard, shareDate } from './share-cards.mjs?v=11';
+import { dailySetRunIds, dailySetShareRuns, dailySetShareText, dailyShareUrl, draftRunShareText, shareDailySet, shareDraftRunCard, shareDate } from './share-cards.mjs';
 import {openCardViewer,faceIndicatorMarkup} from './card-viewer.mjs?v=2';
 import { trackEvent } from './retention-events.mjs';
 import {decisionClock} from './decision-clock.mjs';
 import { sortPackByRarity } from './replay-data.mjs';
 import { escapeHtml as esc } from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
-import { compactDraftRunFeedback, consensusFeedback, trophyDrafterDetails, trophyDrafterFacts, trophyRevealSentence } from './draft-run-feedback.mjs?v=7';
+import { compactDraftRunFeedback, consensusFeedback, trophyDrafterDetails, trophyDrafterFacts, trophyRevealSentence } from './draft-run-feedback.mjs';
 import { tcgplayerUrl } from './tcgplayer.mjs';
 import {revealCardChoices,modelSupportLabel} from './draft-run-reveal.mjs?v=2';
 import {openTrophyDeck} from './trophy-deck-dialog.mjs?v=3';
 import { dailyResetCue, nextGameDateBoundary } from './game-date.mjs';
-import {completedAllDailies,nextUnfinishedDaily} from './today-status.mjs?v=2';
+import {completedAllDailies,nextUnfinishedDaily} from './today-status.mjs';
 import {sharedRunAppPath,sharedRunInvitationId} from './shared-run-links.mjs';
 import {dismissSetRefresher,installSetGuides,setRefresherButton} from './set-guides.mjs?v=2';
 

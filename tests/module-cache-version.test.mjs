@@ -2,51 +2,48 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-test('account and profile entry modules use release-versioned imports', async () => {
-  const [index, bootstrap, daily, growth, profile, myPackOne, progression, draft, patreonHtml, patreonPage, practiceHtml, practiceJs] = await Promise.all([
-    readFile('index.html', 'utf8'),
-    readFile('bootstrap.mjs', 'utf8'),
-    readFile('daily-home.mjs', 'utf8'),
-    readFile('growth.mjs', 'utf8'),
-    readFile('profile-product.mjs', 'utf8'),
-    readFile('my-pack-one.mjs', 'utf8'),
-    readFile('progression.mjs', 'utf8'),
-    readFile('draft-run-product.mjs', 'utf8'),
-    readFile('patreon/index.html', 'utf8'),
-    readFile('patreon-page.mjs', 'utf8'),
-    readFile('practice/index.html', 'utf8'),
-    readFile('practice-page.mjs', 'utf8'),
-  ]);
+// A version suffix is part of an ES module's identity. The same file must
+// never be imported with mixed ?v= values (or with and without a suffix).
+// Audit every route capable of loading the account and profile module graph.
+const routes=[
+  'bootstrap.mjs','growth.mjs','daily-home.mjs','home-today.mjs',
+  'draft-run-product.mjs','draft-run.mjs','profile-product.mjs',
+  'progression.mjs','daily-reminder-settings.mjs','my-pack-one.mjs',
+  'my-pack-insights.mjs','trophy-deck-dialog.mjs','practice-page.mjs',
+  'patreon-page.mjs','practice/index.html','patreon/index.html',
+];
+const expected={
+  'growth.mjs':'?v=32',
+  'growth-api.mjs':'',
+  'profile-product.mjs':'?v=24',
+  'draft-run-product.mjs':'?v=38',
+  'today-status.mjs':'',
+  'share-cards.mjs':'',
+  'draft-run-feedback.mjs':'',
+  'card-viewer.mjs':'?v=2',
+};
 
-  assert.match(index, /bootstrap\.mjs\?v=51/);
-  assert.match(bootstrap, /growth\.mjs\?v=32/);
-  assert.match(bootstrap, /daily-home\.mjs\?v=28/);
-  assert.match(bootstrap, /profile-product\.mjs\?v=24/);
-  assert.match(bootstrap, /draft-run-product\.mjs\?v=38/);
-  assert.match(daily, /growth\.mjs\?v=28/);
-  assert.match(growth, /profile-product\.mjs\?v=24/);
-  assert.match(growth, /draft-run-product\.mjs\?v=38/);
-  assert.match(growth, /patreon-activation\.mjs\?v=2/);
-  assert.match(profile, /progression\.mjs\?v=10/);
-  assert.match(profile, /growth\.mjs\?v=28/);
-  assert.match(profile, /my-pack-one\.mjs\?v=13/);
-  assert.match(profile, /profile\.css\?v=18/);
-  assert.match(profile, /daily-reminder-settings\.mjs\?v=5/);
-  assert.match(await readFile('daily-reminder-settings.mjs','utf8'), /growth-api\.mjs\?v=2/);
-  assert.match(myPackOne, /my-pack-insights\.mjs\?v=5/);
-  assert.match(progression, /growth\.mjs\?v=10/);
-  assert.match(draft, /growth\.mjs\?v=32/);
-  assert.match(draft, /trophy-deck-dialog\.mjs\?v=3/);
-  assert.match(draft, /share-cards\.mjs\?v=11/);
-  assert.match(draft, /today-status\.mjs\?v=2/);
-  assert.match(draft, /set-guides\.mjs\?v=2/);
-  assert.match(draft, /draft-run-feedback\.mjs\?v=7/);
-  assert.match(patreonHtml, /patreon-page\.mjs\?v=5/);
-  assert.match(patreonPage, /patreon-activation\.mjs\?v=2/);
-  assert.match(practiceHtml, /bootstrap\.mjs\?v=51/);
-  assert.match(practiceHtml, /growth\.mjs\?v=28/);
-  assert.match(practiceHtml, /draft-run-product\.mjs\?v=38/);
-  assert.match(practiceHtml, /draft-run\.css\?v=26/);
-  assert.match(practiceJs, /growth\.mjs\?v=28/);
-  assert.match(patreonPage, /growth\.mjs\?v=10/);
+test('browser module identities are canonical across profile, practice and Daily routes',async()=>{
+  const contents=await Promise.all(routes.map(route=>readFile(route,'utf8')));
+  const references=new Map(Object.keys(expected).map(name=>[name,[]]));
+  for(let i=0;i<routes.length;i++){
+    for(const match of contents[i].matchAll(/['"](?:\.\.?\/|\/)([\w./-]+\.mjs)(\?v=\d+)?['"]/g)){
+      const name=match[1].split('/').at(-1);
+      if(references.has(name))references.get(name).push({route:routes[i],suffix:match[2]||''});
+    }
+  }
+  for(const [name,suffix] of Object.entries(expected)){
+    const refs=references.get(name);
+    assert.ok(refs.length>0,name+' must be covered');
+    for(const ref of refs)assert.equal(ref.suffix,suffix,name+' has a distinct browser module in '+ref.route);
+  }
+});
+
+test('main entrypoint and practice preloads keep matching release cache versions',async()=>{
+  const index=await readFile('index.html','utf8');
+  const practice=await readFile('practice/index.html','utf8');
+  const main=index.match(/bootstrap\.mjs(\?v=\d+)/)?.[1];
+  const preload=practice.match(/bootstrap\.mjs(\?v=\d+)/)?.[1];
+  assert.ok(main,'main bootstrap must be release-versioned');
+  assert.equal(preload,main,'preloading a different URL fetches a second module');
 });

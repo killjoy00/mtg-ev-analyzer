@@ -1,4 +1,4 @@
-import {getAuthSession,loadDailyReminders,saveDailyReminders,requestVerificationEmail,ACCOUNT_SIGNAL_KEY} from './growth-api.mjs?v=2';
+import {getAuthSession,loadDailyReminders,saveDailyReminders,requestVerificationEmail,ACCOUNT_SIGNAL_KEY} from './growth-api.mjs';
 
 const safe=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 let ownerGeneration=0;

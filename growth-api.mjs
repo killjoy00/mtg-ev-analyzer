@@ -19,7 +19,10 @@ function cookie(name) {
   if(typeof document==='undefined')return null;
   for(const part of String(document.cookie||'').split(';')) {
     const index=part.indexOf('=');
-    if(index>=0&&part.slice(0,index).trim()===name)return decodeURIComponent(part.slice(index+1).trim());
+    if(index>=0&&part.slice(0,index).trim()===name) {
+      try { return decodeURIComponent(part.slice(index+1).trim()); }
+      catch { return null; }
+    }
   }
   return null;
 }
