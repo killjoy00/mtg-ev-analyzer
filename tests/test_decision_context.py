@@ -1,6 +1,7 @@
 import dataclasses
 import importlib.util
 import json
+import subprocess
 from pathlib import Path
 import sys
 import unittest
@@ -12,7 +13,7 @@ import gzip
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT/'scripts'))
 from decision_context import PickState, card_features, feature_blocks
-from decision_context_audit import build,load_public
+from decision_context_audit import SOURCE_COMMIT,build,load_public
 
 
 class Features(unittest.TestCase):
@@ -56,7 +57,37 @@ class Features(unittest.TestCase):
         self.assertEqual(feature_blocks(s,'A',plain),feature_blocks(s,'A',contaminated))
         with self.assertRaises(ValueError):feature_blocks(s,'B',plain)
 
+    def test_checked_in_blind_sample_is_complete_without_git_history(self):
+        """Fast offline check: review artifacts are versioned fixtures, not Git objects."""
+        directory = ROOT / 'research/decision-context-v1'
+        with gzip.open(directory / 'review-blind.json.gz', 'rt', encoding='utf-8') as source:
+            blind = json.load(source)
+        with gzip.open(directory / 'review-key.json.gz', 'rt', encoding='utf-8') as source:
+            key = json.load(source)
+        audit = json.loads((directory / 'audit.json').read_text(encoding='utf-8'))
+        self.assertEqual(len(blind), 240)
+        self.assertEqual(len(key), 240)
+        self.assertEqual(audit['sample_count'], 240)
+        self.assertEqual(audit['unique_sources'], 240)
+        self.assertEqual({row['id'] for row in blind}, {row['id'] for row in key})
+        self.assertEqual(len({(row['set'], row['source_draft_hash']) for row in key}), 240)
+        self.assertEqual(set(audit['strata']), {'representative', 'targeted'})
+        sample = json.dumps(blind)
+        for forbidden in ('historical_pick', 'model_probability', 'source_draft_hash',
+                          'stratum', 'v5_support', 'event_match_wins'):
+            self.assertNotIn(forbidden, sample)
+
     def test_diagnostic_is_repeatable_blind_and_source_distinct(self):
+        # A shallow checkout must not turn an otherwise offline fast suite red.
+        # The pinned historical replay still runs on full-history CI/research clones.
+        present = subprocess.run(
+            ['git', 'cat-file', '-e', f'{SOURCE_COMMIT}^{{commit}}'],
+            cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            check=False,
+        ).returncode == 0
+        if not present:
+            self.skipTest('pinned v5 historical Git commit absent from shallow clone')
+
         p,m,_=load_public();a,k,s=build(p,m)
         self.assertEqual((a,k,s),build(list(reversed(p)),m))
         self.assertEqual(len(a),240)

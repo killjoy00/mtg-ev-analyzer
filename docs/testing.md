@@ -5,6 +5,11 @@ non-replay JavaScript suite, and Python tests without downloading replay shards
 or contacting services. The JavaScript runner blocks remote network access.
 Corpus behavior uses a checked-in sample of real decisions, not generated packs.
 
+Install the pinned Python test tools once with `python -m pip install -r requirements-test.txt`.
+The fast suite never downloads data. The historical v5 audit recomputation runs
+when the pinned Git commit is available; shallow checkouts instead verify the
+checked-in blinded review fixtures and skip only that historical recomputation.
+
 | Command or gate | Purpose | Required inputs |
 | --- | --- | --- |
 | `npm run test:fast` | Offline development and fast PR feedback | Installed dependencies |
