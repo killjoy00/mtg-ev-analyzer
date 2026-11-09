@@ -86,7 +86,7 @@ jobs:
             echo "No /dev/kvm exposed on this hosted runner; emulator action may fall back to software acceleration."
           fi
       - name: Capture Android screenshots
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         # The action runs each script line through /bin/sh. Keep the Bash
         # program in one environment value and explicitly invoke Bash once.
         env:
