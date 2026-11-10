@@ -374,7 +374,7 @@ function dailySetCompleteMarkup() {
   if(!run.day||!run.complete||run.leaderboard_eligible||hasAccountSession())return '';
   return `<aside class="run-daily-set-complete" data-daily-set-complete aria-labelledby="run-daily-set-complete-title" hidden>
     <span class="run-daily-set-complete-icon" aria-hidden="true"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8"/><path d="m6.5 10.2 2.3 2.3 4.7-4.9"/></svg></span>
-    <div><p class="eyebrow">Finished all 3 free dailies</p><h2 id="run-daily-set-complete-title">Finished today's Dailies? Keep drafting.</h2><p>Sign in or create a free account to play unlimited regular Draft Runs, save your scores, and join the leaderboard.</p></div>
+    <div><p class="eyebrow">Finished all 3 free dailies</p><h2 id="run-daily-set-complete-title">Want another eight picks?</h2><p>Sign in or create a free account to play unlimited regular Draft Runs, save your scores, and join the leaderboard.</p></div>
     <button class="button primary" type="button">Sign in for unlimited runs</button>
   </aside>`;
 }

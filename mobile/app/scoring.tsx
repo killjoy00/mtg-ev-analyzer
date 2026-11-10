@@ -43,7 +43,7 @@ const sections: ArticleSection[] = [
     ],
   },
   {
-    title: 'Use disagreement to learn.',
+    title: 'What if the model disagrees?',
     body: [
       'Model support estimates drafting preferences in context. It cannot prove every historical choice optimal. An unusual trophy pick may reflect a blind spot or considerations missing from the data. It still earns 100.',
     ],

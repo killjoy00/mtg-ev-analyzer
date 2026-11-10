@@ -27,12 +27,10 @@ export const aboutSections: ArticleSection[] = [
     ],
   },
   {
-    title: 'Built by one person, with AI.',
+    title: 'How I built Pack One',
     body: [
-      "Pack One is a one-person project. I'm not a programmer, and I couldn't have built it without AI tools like Claude and ChatGPT. I've used them extensively to write code, solve technical problems, and turn ideas into working features.",
-      'But the vision and decisions are mine.',
-      'The game itself is grounded in real data. Every puzzle comes from an actual recorded draft, and scoring uses a statistical model based on real drafting behavior. Neither the model nor the trophy drafter is right every time.',
-      "AI made it possible for one Magic player without a coding background to build something I wanted to play. I'm responsible for what ends up in Pack One, including its mistakes, and I'm always working to make it better.",
+      "I'm not a programmer, and I built Pack One with a lot of help from AI tools. I decide what goes into the game, and I'm responsible when something doesn't work.",
+      'Every puzzle comes from an actual recorded draft, and scoring uses a statistical model based on real drafting behavior. Neither the model nor the trophy drafter is right every time.',
       'The site has also been improved by feedback from Magic players like you, so don’t hesitate to let me know your suggestions for improvements.',
     ],
   },

@@ -20,7 +20,7 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), state = 'ready') {
   const displayNameAttention=['username_taken','username_required','name_not_allowed'].includes(rankingReason);
   const dailyStreak=ready?Number(profile?.daily_streak||0):0;
   return `<section class="daily-home" data-daily-home data-home-state="${state}" data-completed="${ready?status.completed:'pending'}">
-    <header class="daily-home-heading"><p class="eyebrow">The daily draft</p><h1>Eight picks. Your call.</h1><p>These picks come from real trophy drafts. You decide what you'd take, then see what the drafter chose and how your pick scored.</p><time datetime="${day}">${dailyDate}’s Daily Runs</time></header>
+    <header class="daily-home-heading"><p class="eyebrow">The daily draft</p><h1>Eight picks. What would you take?</h1><p>These picks come from real trophy drafts.<br>You decide what you'd take, then see what the drafter chose and how your pick scored.</p><time datetime="${day}">${dailyDate}’s Daily Runs</time></header>
     <div class="daily-home-status" role="status" aria-label="Daily reset and streak"><strong data-daily-reset>${dailyResetCue()}</strong>${ready&&dailyStreak>0?`<span class="daily-home-streak">${dailyStreak}-day streak</span>`:checking?'<span class="daily-home-streak is-loading">Checking streak…</span>':''}</div>
     ${displayNameAttention?`<aside class="daily-home-identity-warning" role="alert"><div><strong>${rankingReason==='name_not_allowed'?'That display name is not allowed. Choose another to join Daily leaderboards.':rankingReason==='username_taken'?'Choose a different display name. That one is already taken.':'Choose a display name before playing a Daily.'}</strong><p>Until you choose an available display name, Daily results will not appear on the leaderboard.</p></div><button class="button secondary" type="button" data-home-username>Change display name</button></aside>`:''}
     <div class="daily-home-games">${games.map(game => {
@@ -36,8 +36,8 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), state = 'ready') {
       </article>`;
     }).join('')}</div>
     ${ready&&status.completed === 3 ? `<section class="daily-home-practice${claimed?' is-practice-handoff':''}">${claimed
-      ? `<div><p class="eyebrow">Dailies complete</p><h2>Keep drafting.</h2><p>Keep playing regular Draft Runs, or any sets with Pack One Elite.</p></div><a class="button primary" href="/practice/">Go to Practice</a>`
-      : `<p class="eyebrow">Dailies complete</p><h2>Keep drafting.</h2><p>A free account adds unlimited regular Draft Runs.</p><button class="button primary" data-home-account>Create a free account</button>`}</section>` : ''}
+      ? `<div><p class="eyebrow">Dailies complete</p><h2>Want another eight picks?</h2><p>Keep playing regular Draft Runs, or any sets with Pack One Elite.</p></div><a class="button primary" href="/practice/">Go to Practice</a>`
+      : `<p class="eyebrow">Dailies complete</p><h2>Want another eight picks?</h2><p>A free account adds unlimited regular Draft Runs.</p><button class="button primary" data-home-account>Create a free account</button>`}</section>` : ''}
     ${unavailable ? '<div class="daily-home-unavailable" role="status"><span>Daily progress is temporarily unavailable. Play now still resumes your saved attempt.</span><button class="text-button" type="button" data-home-retry>Retry</button></div>' : ''}
   </section>`;
 }

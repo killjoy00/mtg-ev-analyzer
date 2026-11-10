@@ -126,7 +126,7 @@ export default function PracticeScreen() {
       <ScrollView contentContainerStyle={styles.page}>
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>PRACTICE</Text>
-          <Text style={styles.title}>Keep drafting.</Text>
+          <Text style={styles.title}>Want another eight picks?</Text>
           <Text style={styles.body}>
             A free account lets you play unlimited regular Draft Runs. With Elite, you can also practice Powered Cube or choose your sets, including just the newest one.
           </Text>

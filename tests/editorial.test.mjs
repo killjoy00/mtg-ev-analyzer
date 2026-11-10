@@ -112,7 +112,7 @@ assert.match(dailyHome, /Eight decisions from Powered Cube trophy drafts\./);
 assert.match(dailyHome, /Eight decisions from trophy drafts in the latest set\./);
 assert.doesNotMatch(dailyHome, /Free practice|Elite practice|data-home-elite/);
 const learnHub = await readFile('learn/index.html','utf8');
-assert.match(learnHub, /<h1>Go deeper on Pack One\.<\/h1>/);
+assert.match(learnHub, /<h1>How Pack One works\.<\/h1>/);
 assert.match(learnHub, /<h2>How to Play<\/h2>/);
 assert.match(learnHub, /<h2>Scoring<\/h2>/);
 assert.match(learnHub, /<h2>Method<\/h2>/);

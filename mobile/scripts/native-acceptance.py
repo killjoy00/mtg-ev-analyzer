@@ -542,7 +542,7 @@ if platform == 'android':
         require('Regular Draft Run' in xml and 'Navigate up' not in xml, 'Archive return did not restore the Practice tab')
         adb('shell', 'input', 'keyevent', '4')
         xml, _ = snapshot('archive-return-hardware-back')
-        require('Eight picks. Your call.' in xml, 'Archive return did not preserve Daily tab history')
+        require('Eight picks. What would you take?' in xml, 'Archive return did not preserve Daily tab history')
     attempt('archive-deep-link-return-without-duplicate-tabs', archive_return)
 
 

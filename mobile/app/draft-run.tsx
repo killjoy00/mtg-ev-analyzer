@@ -1194,7 +1194,7 @@ export default function DraftRunScreen({
           {realDaily && guest && !run.leaderboard_eligible && allDailiesDone ? (
             <View style={styles.setComplete}>
               <Text style={styles.cardKicker}>FINISHED ALL 3 FREE DAILIES</Text>
-              <Text style={styles.analysisSubhead}>Finished today&apos;s Dailies? Keep drafting.</Text>
+              <Text style={styles.analysisSubhead}>Want another eight picks?</Text>
               <Text style={styles.resultBody}>Sign in or create a free account to play unlimited regular Draft Runs, save your scores, and join the leaderboard.</Text>
               <Pressable
                 accessibilityRole="button"

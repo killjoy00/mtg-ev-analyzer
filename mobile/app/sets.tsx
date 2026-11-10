@@ -160,7 +160,7 @@ export default function SetsScreen() {
       <ScrollView contentContainerStyle={styles.page}>
         <View style={styles.hero}>
           <Text style={styles.kicker}>SET ARCHIVE</Text>
-          <Text style={styles.title}>Every set in Pack One.</Text>
+          <Text style={styles.title}>Which sets are available?</Text>
           <Text style={styles.deck}>
             Browse the sets in Pack One and see how many real draft picks are available from each.
           </Text>

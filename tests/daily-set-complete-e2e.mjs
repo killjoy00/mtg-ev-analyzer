@@ -72,7 +72,7 @@ try {
   await page.locator(callout).waitFor({state:'visible'});
   assert.equal(await page.locator(callout).count(),1,'one callout on the page');
   assert.equal(await page.locator(`${callout} .eyebrow`).textContent(),'Finished all 3 free dailies');
-  assert.equal(await page.locator(`${callout} h2`).textContent(),"Finished today's Dailies? Keep drafting.");
+  assert.equal(await page.locator(`${callout} h2`).textContent(),"Want another eight picks?");
   assert.equal(await page.locator(`${callout} h2 + p`).textContent(),'Sign in or create a free account to play unlimited regular Draft Runs, save your scores, and join the leaderboard.');
   assert.deepEqual(await page.locator(`${callout} button, ${callout} a`).allTextContents(),['Sign in for unlimited runs'],'one CTA, no dismiss or secondary action');
   assert.doesNotMatch(await page.locator(callout).innerText(),/maybe later|dismiss|not now/i);

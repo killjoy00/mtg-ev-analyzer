@@ -144,9 +144,9 @@ export default function HomeScreen() {
 
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>THE DAILY DRAFT</Text>
-          <Text style={styles.title}>Eight picks. Your call.</Text>
+          <Text style={styles.title}>Eight picks. What would you take?</Text>
           <Text style={styles.lede}>
-            These picks come from real trophy drafts. You decide what you&apos;d take, then see what the drafter chose and how your pick scored.
+            These picks come from real trophy drafts.{'\n'}You decide what you&apos;d take, then see what the drafter chose and how your pick scored.
           </Text>
           <Text style={styles.today}>{dailyDate(pacificDay(now))}’s Daily Runs</Text>
         </View>
@@ -230,7 +230,7 @@ export default function HomeScreen() {
         {completedCount === 3 ? (
           <View style={styles.practiceHandoff}>
             <Text style={styles.cardKicker}>DAILIES COMPLETE</Text>
-            <Text style={styles.utilityTitle}>Keep drafting.</Text>
+            <Text style={styles.utilityTitle}>Want another eight picks?</Text>
             <Text style={styles.cardBody}>
               {claimed
                 ? 'Keep playing regular Draft Runs, or any sets with Pack One Elite.'
