@@ -110,10 +110,12 @@ test('share assets are complete PNGs with genuinely shallow banner dimensions',(
 test('Daily hero tagline and second-line invitation match website and mobile',()=>{
  const html=dailyHomeMarkup(null,day);
  assert.ok(html.includes("<h1>Eight picks. What would you take?</h1>"),'web hero heading');
- assert.ok(html.includes("These picks come from real trophy drafts.<br>You decide what you'd take, then see what the drafter chose and how your pick scored."),'web invitation starts on a new line');
+ assert.ok(html.includes("These picks come from real trophy drafts.<br>You decide what you'd take, then see what the drafter chose."),'web invitation starts on a new line');
  const native=fs.readFileSync('mobile/src/screens/index.tsx','utf8');
  assert.ok(native.includes("<Text style={styles.title}>Eight picks. What would you take?</Text>"),'native hero heading');
- assert.ok(native.includes("These picks come from real trophy drafts.{'\\n'}You decide what you&apos;d take"),'native invitation starts on a new line');
+ assert.ok(native.includes("These picks come from real trophy drafts.{'\\n'}You decide what you&apos;d take, then see what the drafter chose."),'native invitation starts on a new line');
+ assert.ok(!html.includes('and how your pick scored.'),'web hero should not mention scoring');
+ assert.ok(!native.includes('and how your pick scored.'),'native hero should not mention scoring');
 });
 
 test('approved editorial copy is consistent across web and native app',()=>{
