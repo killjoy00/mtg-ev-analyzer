@@ -107,6 +107,15 @@ test('share assets are complete PNGs with genuinely shallow banner dimensions',(
   assert.ok(inflateSync(Buffer.concat(compressed)).length>width*height,'image data must decompress');
  }
 });
+test('Daily hero tagline and second-line invitation match website and mobile',()=>{
+ const html=dailyHomeMarkup(null,day);
+ assert.match(html,/<h1>Eight picks\\. What would you take\\?<\\/h1>/);
+ assert.match(html,/These picks come from real trophy drafts\\.<br>You decide what you'd take, then see what the drafter chose and how your pick scored\\./);
+ const native=fs.readFileSync('mobile/src/screens/index.tsx','utf8');
+ assert.match(native,/<Text style=\\{styles\\.title\\}>Eight picks\\. What would you take\\?<\\/Text>/);
+ assert.ok(native.includes("These picks come from real trophy drafts.{'\\n'}You decide what you&amp;apos;d take".replace('&amp;apos;','&apos;')),'native hero must put You decide on a new line');
+});
+
 test('Daily descriptions reinforce trophy-draft provenance',()=>{
  const html=dailyHomeMarkup(null,day);
  assert.match(html,/Eight decisions from real trophy drafts\./);
