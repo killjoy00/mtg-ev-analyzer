@@ -1,7 +1,9 @@
 import dataclasses
 import importlib.util
 import json
+import os
 import subprocess
+from types import SimpleNamespace
 from pathlib import Path
 import sys
 import unittest
@@ -77,6 +79,12 @@ class Features(unittest.TestCase):
                           'stratum', 'v5_support', 'event_match_wins'):
             self.assertNotIn(forbidden, sample)
 
+    def test_required_history_flag_fails_instead_of_skipping(self):
+        with patch.dict(os.environ, {'PACK1_REQUIRE_HISTORICAL_AUDIT': '1'}), \\
+             patch('subprocess.run', return_value=SimpleNamespace(returncode=1)):
+            with self.assertRaisesRegex(AssertionError, 'Required historical v5 Git commit is missing'):
+                self.test_diagnostic_is_repeatable_blind_and_source_distinct()
+
     def test_diagnostic_is_repeatable_blind_and_source_distinct(self):
         # A shallow checkout must not turn an otherwise offline fast suite red.
         # The pinned historical replay still runs on full-history CI/research clones.
@@ -86,6 +94,8 @@ class Features(unittest.TestCase):
             check=False,
         ).returncode == 0
         if not present:
+            if os.environ.get('PACK1_REQUIRE_HISTORICAL_AUDIT') == '1':
+                self.fail('Required historical v5 Git commit is missing; restore full checkout history (fetch-depth: 0)')
             self.skipTest('pinned v5 historical Git commit absent from shallow clone')
 
         p,m,_=load_public();a,k,s=build(p,m)

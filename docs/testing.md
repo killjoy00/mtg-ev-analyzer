@@ -9,6 +9,9 @@ Install the pinned Python test tools once with `python -m pip install -r require
 The fast suite never downloads data. The historical v5 audit recomputation runs
 when the pinned Git commit is available; shallow checkouts instead verify the
 checked-in blinded review fixtures and skip only that historical recomputation.
+CI sets `PACK1_REQUIRE_HISTORICAL_AUDIT=1` in both the fast and research jobs:
+missing historical commits are then test failures, not skips, so reducing CI
+checkout depth cannot silently disable that verification.
 
 | Command or gate | Purpose | Required inputs |
 | --- | --- | --- |

@@ -18,6 +18,8 @@ jobs:
   fast:
     name: fast-core
     timeout-minutes: 8
+    env:
+      PACK1_REQUIRE_HISTORICAL_AUDIT: '1'
     outputs:
       dataset_audit: ${{ steps.scope.outputs.dataset_audit }}
     runs-on: ubuntu-latest
