@@ -124,7 +124,7 @@ export default function SetArchiveScreen() {
         </View>
 
         <View style={styles.cta}>
-          <Text style={styles.kicker}>PUT IT INTO PRACTICE</Text>
+          <Text style={styles.kicker}>TRY A PRACTICE RUN</Text>
           <Text style={styles.sectionTitle}>Think you’d make a different pick?</Text>
           <Text style={styles.body}>Commit first, then use the consensus as a comparison point rather than an instruction sheet.</Text>
           <Pressable accessibilityRole="button" onPress={() => router.dismissTo('/practice')} style={styles.primaryButton}>
