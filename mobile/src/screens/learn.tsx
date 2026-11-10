@@ -44,7 +44,7 @@ export default function LearnScreen() {
       <ScrollView contentContainerStyle={styles.page}>
         <View style={styles.hero}>
           <Text style={styles.eyebrow}>LEARN</Text>
-          <Text style={styles.title}>Go deeper on Pack One.</Text>
+          <Text style={styles.title}>How Pack One works.</Text>
           <Text style={styles.lede}>Want to know where a pick came from or why it scored the way it did? Here&apos;s where you&apos;ll find the rules, scoring details, supported sets, and a few drafting guides.</Text>
         </View>
 
