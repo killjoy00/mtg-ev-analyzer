@@ -36,8 +36,8 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), state = 'ready') {
       </article>`;
     }).join('')}</div>
     ${ready&&status.completed === 3 ? `<section class="daily-home-practice${claimed?' is-practice-handoff':''}">${claimed
-      ? `<div><p class="eyebrow">Dailies complete</p><h2>Keep drafting.</h2><p>Keep playing regular Draft Runs, or any sets with Pack One Elite.</p></div><a class="button primary" href="/practice/">Go to Practice</a>`
-      : `<p class="eyebrow">Dailies complete</p><h2>Keep drafting.</h2><p>A free account adds unlimited regular Draft Runs.</p><button class="button primary" data-home-account>Create a free account</button>`}</section>` : ''}
+      ? `<div><p class="eyebrow">Dailies complete</p><h2>Want another eight picks?</h2><p>Keep playing regular Draft Runs, or any sets with Pack One Elite.</p></div><a class="button primary" href="/practice/">Go to Practice</a>`
+      : `<p class="eyebrow">Dailies complete</p><h2>Want another eight picks?</h2><p>A free account adds unlimited regular Draft Runs.</p><button class="button primary" data-home-account>Create a free account</button>`}</section>` : ''}
     ${unavailable ? '<div class="daily-home-unavailable" role="status"><span>Daily progress is temporarily unavailable. Play now still resumes your saved attempt.</span><button class="text-button" type="button" data-home-retry>Retry</button></div>' : ''}
   </section>`;
 }
