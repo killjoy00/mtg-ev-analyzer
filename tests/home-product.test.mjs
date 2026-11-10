@@ -116,6 +116,36 @@ test('Daily hero tagline and second-line invitation match website and mobile',()
  assert.ok(native.includes("These picks come from real trophy drafts.{'\\n'}You decide what you&apos;d take"),'native invitation starts on a new line');
 });
 
+test('approved editorial copy is consistent across web and native app',()=>{
+ const expected={
+  'practice/index.html':'<h1>Want another eight picks?</h1>',
+  'learn/index.html':'<h1>How Pack One works.</h1>',
+  'methodology/index.html':"Try today's Daily.",
+  'scoring/index.html':'<h2>What if the model disagrees?</h2>',
+  'sets/index.html':'<h1>Which sets are available?</h1>',
+  'mobile/src/screens/index.tsx':'<Text style={styles.utilityTitle}>Want another eight picks?</Text>',
+  'mobile/src/screens/practice.tsx':'<Text style={styles.title}>Want another eight picks?</Text>',
+  'mobile/src/screens/learn.tsx':'<Text style={styles.title}>How Pack One works.</Text>',
+  'mobile/app/scoring.tsx':"title: 'What if the model disagrees?'",
+  'mobile/app/sets.tsx':'<Text style={styles.title}>Which sets are available?</Text>',
+  'mobile/app/set-archive.tsx':'TRY A PRACTICE RUN',
+ };
+ for(const [path,phrase] of Object.entries(expected)){
+  assert.ok(fs.readFileSync(path,'utf8').includes(phrase),path+' missing approved copy');
+ }
+ const learn=fs.readFileSync('learn/index.html','utf8');
+ assert.ok(learn.includes('Compare your picks with the trophy drafter.'));
+ const about=fs.readFileSync('about/index.html','utf8');
+ const nativeAbout=fs.readFileSync('mobile/src/nativeEditorial.ts','utf8');
+ for(const copy of [about,nativeAbout]){
+  assert.ok(copy.includes("I'm not a programmer, and I built Pack One with a lot of help from AI tools."));
+  assert.ok(copy.includes("I'm responsible when something doesn't work."));
+  assert.ok(!copy.includes('But the vision and decisions are mine.'));
+ }
+ const completed=dailyHomeMarkup({daily_history:['mixed','powered-cube','latest'].map(row),player:{claimed:true},capabilities:['account']},day);
+ assert.ok(completed.includes('<h2>Want another eight picks?</h2>'));
+});
+
 test('Daily descriptions reinforce trophy-draft provenance',()=>{
  const html=dailyHomeMarkup(null,day);
  assert.match(html,/Eight decisions from real trophy drafts\./);
