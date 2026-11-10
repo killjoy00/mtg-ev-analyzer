@@ -119,12 +119,14 @@ export async function draftRunLeaderboardRows(query,{start,end,environment,playe
 export async function currentSeasonForPlayer(query,playerId,{today=gameDateKey(),ensureSchedule=null}={}) {
   const season=await resolveCurrentSeason(query,{today,ensureSchedule});
   if(!season)return null;
-  const standings=[];
-  for(const environment of DRAFT_RUN_LEADERBOARD_ENVIRONMENTS) {
+  // Each environment is independent. Keep display order deterministic while
+  // overlapping the three existing HTTPS round trips; do not alter rating SQL.
+  const rows=await Promise.all(DRAFT_RUN_LEADERBOARD_ENVIRONMENTS.map(async environment=>{
     const scoring=seasonRatingPolicy(environment,season.start_date);
     const row=(await draftRunLeaderboardRows(query,{start:season.start_date,end:today,environment,playerId,limit:1,ratingPolicy:scoring}))[0];
     // average is the legacy ranking-value field; average_score is the raw mean.
-    if(row)standings.push({environment,rank:row.rank,average:row.score,rating:row.rating,average_score:row.average_score,days:row.days,scoring});
-  }
+    return row?{environment,rank:row.rank,average:row.score,rating:row.rating,average_score:row.average_score,days:row.days,scoring}:null;
+  }));
+  const standings=rows.filter(Boolean);
   return {...season,standings};
 }

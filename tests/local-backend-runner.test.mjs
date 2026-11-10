@@ -21,12 +21,15 @@ test('local qualification cannot run an unreviewed domain or arbitrary imported 
 });
 
 test('only qualified narrow account scope can omit a Neon branch; broad and invalid scope fail closed',async()=>{
-  const {backendExecutionPlan}=await import('../scripts/backend-gate-scope.mjs');
+  const {backendExecutionPlan,loadBackendMap}=await import('../scripts/backend-gate-scope.mjs');
+  const allDomains=Object.keys(loadBackendMap().domains);
+  assert.ok(allDomains.includes('corpus_readiness'),'slow corpus tests must remain a required domain');
   assert.deepEqual(backendExecutionPlan({fullSuite:false,domains:['account']}),{localDomains:['account'],neonDomains:[]});
   assert.deepEqual(backendExecutionPlan({fullSuite:false,domains:['account','daily']}),{localDomains:['account'],neonDomains:['daily']});
   for(const result of [{},{fullSuite:true,domains:['account']},{fullSuite:false,domains:[]},
     {fullSuite:false,domains:['unknown']},{fullSuite:false,domains:['account','account']}])
-    assert.equal(backendExecutionPlan(result).neonDomains.length,6);
+    assert.equal(backendExecutionPlan(result).neonDomains.length,allDomains.length);
+  assert.ok(backendExecutionPlan({fullSuite:true,domains:['account']}).neonDomains.includes('corpus_readiness'));
 });
 
 test('aggregate cannot accept a missing local contract, skipped required Neon domain or inconsistent classification',async()=>{

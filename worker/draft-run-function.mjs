@@ -142,10 +142,16 @@ async function dailyPeerStatsFor(request,id,searchParams) {
 async function responseFor(s,timing=null) {
   const complete=s.answers.length===runLength(s);
   if(complete && !s.result_persisted_at) await persistResult(s);
-  const current=complete ? null : publicDraftRunPuzzle(await (timing?
-    timing.step('first_puzzle',()=>puzzle(s.puzzle_ids[s.answers.length],s.corpus_version)):
-    puzzle(s.puzzle_ids[s.answers.length],s.corpus_version)));
-  const creator=s.creator_challenge_id?await loadCreatorChallengeForExistingSession(query,s.creator_challenge_id):null;
+  // The current puzzle, creator metadata, and ranking identity use independent
+  // reads. Start them together so a mid-run Daily does not pay their HTTPS
+  // round-trip times in sequence. Persist completed results before any reads.
+  const [current,creator,identityStatus]=await Promise.all([
+    complete?null:(timing?
+      timing.step('first_puzzle',()=>puzzle(s.puzzle_ids[s.answers.length],s.corpus_version)):
+      puzzle(s.puzzle_ids[s.answers.length],s.corpus_version)).then(publicDraftRunPuzzle),
+    s.creator_challenge_id?loadCreatorChallengeForExistingSession(query,s.creator_challenge_id):null,
+    s.day?rankingIdentityStatus(query,s.player_id):null,
+  ]);
   const shared=!creator&&s.challenge_id ? await share(s.challenge_id) : null;
   const other=shared?.owner_player_id===s.player_id ? null : shared;
   let answers=s.answers,comparison=null;
@@ -156,7 +162,6 @@ async function responseFor(s,timing=null) {
   } else if(other) {
     comparison={kind:'friend',name:other.display_name,score:other.score,exact:JSON.stringify(other.puzzle_ids)===JSON.stringify(s.puzzle_ids)};
   }
-  const identityStatus=s.day?await rankingIdentityStatus(query,s.player_id):null;
   const rankedIdentity=s.day&&s.leaderboard_eligible&&identityStatus?.eligible?identityStatus:null;
   let standing=null;
   if(complete && s.day && s.leaderboard_eligible && rankedIdentity) {

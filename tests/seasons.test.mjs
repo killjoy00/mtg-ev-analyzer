@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {normalizeLeaderboardPeriod,resolveCurrentSeason} from '../worker/draft-run-season.mjs';
+import {currentSeasonForPlayer,normalizeLeaderboardPeriod,resolveCurrentSeason,DRAFT_RUN_LEADERBOARD_ENVIRONMENTS} from '../worker/draft-run-season.mjs';
 
 const [migration,hardeningMigration,seasonModule,backend,client,legacyWorker,legacyCore,growth,myPack,migrationWorkflow,hardeningWorkflow,releaseSmoke]=await Promise.all([
   readFile(new URL('../migrations/0037_pack_one_seasons.sql',import.meta.url),'utf8'),
@@ -77,6 +77,27 @@ test('expected Latest Set unavailability retains persisted season, unexpected fa
   const season=await resolveCurrentSeason(query,{today:'2026-09-23',ensureSchedule:async()=>{throw Object.assign(new Error('unavailable'),{status:503});}});
   assert.equal(season.id,'hob');
   await assert.rejects(()=>resolveCurrentSeason(query,{ensureSchedule:async()=>{throw Object.assign(new Error('broken'),{status:500});}}),/broken/);
+});
+
+test('season standings start all independent environment queries together',async()=>{
+  const pending=new Map(),called=[];
+  const query=async(sql,params)=>{
+    if(sql.includes('pack1_reconcile_draft_run_seasons'))
+      return {rows:[{id:'season-1',set_id:'hob',set_name:'The Hobbit',set_release_date:'2026-08-14',start_date:'2026-09-10',end_date:null,established_by_day:'2026-09-19'}]};
+    assert.match(sql,/WITH day_scores AS/);
+    const environment=params[2];called.push(environment);
+    return new Promise(resolve=>pending.set(environment,resolve));
+  };
+  const run=currentSeasonForPlayer(query,'11111111-1111-4111-8111-111111111111',{today:'2026-11-09'});
+  await new Promise(resolve=>setImmediate(resolve));
+  assert.deepEqual(called,DRAFT_RUN_LEADERBOARD_ENVIRONMENTS,
+    'all three ratings should be in flight before any finishes');
+  for(const environment of called)
+    pending.get(environment)({rows:[{rank:'3',score:'52.123',average_score:'57',days:'4'}]});
+  const season=await run;
+  assert.deepEqual(season.standings.map(row=>row.environment),DRAFT_RUN_LEADERBOARD_ENVIRONMENTS);
+  assert.deepEqual(season.standings.map(row=>row.rank),[3,3,3]);
+  assert.deepEqual(season.standings.map(row=>row.average_score),[57,57,57]);
 });
 
 test('profiles and leaderboard use the same current season implementation',()=>{

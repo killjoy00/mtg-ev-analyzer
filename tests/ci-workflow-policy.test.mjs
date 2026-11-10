@@ -233,7 +233,8 @@ test('backend Neon branches are capped, sampled, gated on local contracts and sw
   assert.match(domain, /github\.event_name == 'workflow_dispatch'/);
   assert.match(domain, /github\.ref == 'refs\/heads\/main'/);
   assert.match(domain, /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
-  assert.match(domain, /    env:\n(?:      #.*\n)*      CI_BRANCH_MAX_CU: \$\{\{ \(matrix\.domain == 'draft_run' \|\| matrix\.domain == 'corpus'\) && 2 \|\| 1 \}\}\n/);
+  assert.match(domain, /CI_BRANCH_MAX_CU:[^\n]*matrix\.domain == 'draft_run'[^\n]*matrix\.domain == 'corpus'[^\n]*matrix\.domain == 'corpus_readiness'[^\n]*&& 2 \|\| 1/);
+  assert.match(domain, /if: matrix\.domain == 'corpus' \|\| matrix\.domain == 'corpus_readiness' \|\| matrix\.domain == 'subscriptions'/);
   assert.match(domain, /CI_BRANCH_PREFIX: ci-pr-\$\{\{ github\.event\.pull_request\.number \|\| 0 \}\}/);
   assert.doesNotMatch(domain, /HEAD_SHA: \$\{\{ github\.event\.pull_request\.head\.sha \}\}/);
   const summary = domain.indexOf('name: Summarize Neon compute allocation');

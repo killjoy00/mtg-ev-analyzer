@@ -159,7 +159,7 @@ jobs:
             echo 'needs_neon=true' >> "$GITHUB_OUTPUT"
             echo 'full_suite=true' >> "$GITHUB_OUTPUT"
             echo 'domains=' >> "$GITHUB_OUTPUT"
-            echo 'domains_json=["account","subscriptions","draft_run","daily","corpus","seasons"]' >> "$GITHUB_OUTPUT"
+            echo 'domains_json=["account","subscriptions","draft_run","daily","corpus","corpus_readiness","seasons"]' >> "$GITHUB_OUTPUT"
             echo 'suites_json=[]' >> "$GITHUB_OUTPUT"
             echo 'season_destructive=true' >> "$GITHUB_OUTPUT"
           }
@@ -192,14 +192,16 @@ jobs:
       fail-fast: false
       max-parallel: 3
       matrix:
-        domain: ${{ fromJSON(needs.precheck.result == 'success' && needs.precheck.outputs.neon_domains_json || '["account","subscriptions","draft_run","daily","corpus","seasons"]') }}
+        domain: ${{ fromJSON(needs.precheck.result == 'success' && needs.precheck.outputs.neon_domains_json || '["account","subscriptions","draft_run","daily","corpus","corpus_readiness","seasons"]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     env:
       # Routine suites stay below the project's 8 CU ceiling. At 2 CU on #1323,
-      # draft_run and corpus sat at the cap 74% and 92% of the time; the other
-      # domains rarely needed more than 1 CU. The sampler summary shows this.
-      CI_BRANCH_MAX_CU: ${{ (matrix.domain == 'draft_run' || matrix.domain == 'corpus') && 2 || 1 }}
+      # draft_run and corpus saturated 2 CU in prior measurements. Split the
+      # serial 40-minute corpus lane into separate corpus/corpus_readiness
+      # branches without reducing coverage; keep both within the same 2 CU cap.
+      # The other domains rarely needed more than 1 CU.
+      CI_BRANCH_MAX_CU: ${{ (matrix.domain == 'draft_run' || matrix.domain == 'corpus' || matrix.domain == 'corpus_readiness') && 2 || 1 }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -286,7 +288,7 @@ jobs:
 
       - name: Resolve accepted v5 fixtures for custom Practice domains
         id: v5_fixture
-        if: matrix.domain == 'corpus' || matrix.domain == 'subscriptions'
+        if: matrix.domain == 'corpus' || matrix.domain == 'corpus_readiness' || matrix.domain == 'subscriptions'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -388,7 +390,9 @@ jobs:
             # The destructive season suite is deliberately deferred to the end.
             [[ "$suite" == 'tests/season-backend-smoke.mjs' ]] && continue
             echo "Running isolated backend suite: $suite"
+            suite_started=$SECONDS
             node "$suite" "$PACK1_CI_CONNECTION" --dev-fixtures
+            echo "Completed isolated backend suite: $suite ($((SECONDS-suite_started)) seconds)"
           done
 
           if [[ "$BACKEND_DOMAIN" == 'seasons' ]]; then
