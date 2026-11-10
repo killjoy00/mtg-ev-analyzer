@@ -18,6 +18,8 @@ jobs:
   fast:
     name: fast-core
     timeout-minutes: 8
+    env:
+      PACK1_REQUIRE_HISTORICAL_AUDIT: '1'
     outputs:
       dataset_audit: ${{ steps.scope.outputs.dataset_audit }}
     runs-on: ubuntu-latest
@@ -159,7 +161,7 @@ jobs:
           python-version: '3.12'
       - name: Install creator card renderer dependencies
         if: steps.scope.outputs.unit_plan == 'full' || (steps.scope.outputs.plan == 'publication' && steps.publication.outputs.kind == 'creator' && steps.publication.outputs.action == 'publish')
-        run: python3 -m pip install --quiet 'Pillow==11.3.0' 'fonttools[woff]==4.60.1'
+        run: python3 -m pip install --quiet -r requirements-test.txt
 
       - name: Verify deployment bundles and embedded revisions
         if: steps.scope.outputs.build_bundles == 'true'
