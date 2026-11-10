@@ -230,7 +230,7 @@ export default function HomeScreen() {
         {completedCount === 3 ? (
           <View style={styles.practiceHandoff}>
             <Text style={styles.cardKicker}>DAILIES COMPLETE</Text>
-            <Text style={styles.utilityTitle}>Keep drafting.</Text>
+            <Text style={styles.utilityTitle}>Want another eight picks?</Text>
             <Text style={styles.cardBody}>
               {claimed
                 ? 'Keep playing regular Draft Runs, or any sets with Pack One Elite.'
