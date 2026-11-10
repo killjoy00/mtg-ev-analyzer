@@ -1,4 +1,4 @@
-import {openCardViewer,faceIndicatorMarkup} from './card-viewer.mjs?v=1';
+import {openCardViewer,faceIndicatorMarkup} from './card-viewer.mjs?v=2';
 import {escapeHtml as esc} from './html.mjs';
 import {safeCardImageUrl} from './card-image-policy.mjs';
 import {loadMyInsights,firstPartyAuthEnabled,ensurePackSession,storedAccountToken} from './growth-api.mjs';

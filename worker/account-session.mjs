@@ -13,7 +13,11 @@ function cookieValue(request,name) {
   for(const part of raw.split(';')) {
     const index=part.indexOf('=');
     if(index<0)continue;
-    if(part.slice(0,index).trim()===name)return decodeURIComponent(part.slice(index+1).trim());
+    if(part.slice(0,index).trim()===name) {
+      // A malformed percent-escape is untrusted input, not a server error.
+      try { return decodeURIComponent(part.slice(index+1).trim()); }
+      catch { return null; }
+    }
   }
   return null;
 }

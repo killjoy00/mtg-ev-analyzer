@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {COOKIE_SEPARATOR,accountSession,clearAccountCookies,clearPlayerCookie,digest,withAccountCookies,withPlayerCookie} from '../worker/account-session.mjs';
+import {COOKIE_SEPARATOR,accountCookie as readAccountCookie,accountSession,csrfCookie,playerCookie,clearAccountCookies,clearPlayerCookie,digest,withAccountCookies,withPlayerCookie} from '../worker/account-session.mjs';
 
 const opaque=x=>x.repeat(43).slice(0,43);
 const LIVE=opaque('a'),STALE=opaque('b'),CSRF=opaque('c');
@@ -41,6 +41,22 @@ test('ordinary growth bootstrap preserves unavailable as a third account state',
   assert.doesNotMatch(source,/getAuthSession\(\)\.catch\(\(\)=>null\)/,'auth infrastructure failures must not be collapsed into signed out');
   assert.match(source,/currentAccountState='unavailable'/);
   assert.match(source,/export async function refreshAccountSession\(\)/);
+});
+
+test('malformed percent-encoded cookies are ignored instead of causing 500s',async()=>{
+  const invalid='%E0%A4%A';
+  assert.equal(readAccountCookie(request(accountCookie(invalid))),null);
+  assert.equal(playerCookie(request('__Host-pack1_player='+invalid)),null);
+  assert.equal(csrfCookie(request('__Secure-pack1_csrf='+invalid)),null);
+  assert.equal(await accountSession(request(accountCookie(invalid)),fakeQuery(),{required:false}),null);
+  await assert.rejects(accountSession(request(accountCookie(invalid)),fakeQuery()),
+    error=>error.status===401);
+  // Malformed cookies must not prevent a still-valid legacy session.
+  const fallback=await accountSession(
+    request(accountCookie(invalid),{headers:{'x-pack1-auth-session':'legacy-token'}}),
+    fakeQuery({legacy:'legacy-token'}),
+  );
+  assert.equal(fallback.source,'legacy');
 });
 
 test('a live first-party cookie resolves to its account',async()=>{

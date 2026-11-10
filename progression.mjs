@@ -1,6 +1,6 @@
 import { escapeHtml as esc } from './html.mjs';
 import { loadMyProfile } from './growth-api.mjs';
-import { renderAccount } from './growth.mjs?v=10';
+import { renderAccount } from './growth.mjs?v=32';
 import { trackEvent } from './retention-events.mjs';
 
 export function nextMilestones(profile,limit=3) {

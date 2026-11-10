@@ -46,7 +46,7 @@ try {
   assert.doesNotMatch(await page.locator('#daily-reminder-settings').innerText(),/push|notification|device/i,'web settings never mention push');
   assert.equal(saves.length,0);
   assert.ok(assets.includes('/daily-reminder-settings.mjs?v=5'),'new settings asset is loaded');
-  assert.ok(assets.includes('/growth-api.mjs?v=2'),'new reminder API exports cannot come from a stale cached module');
+  assert.ok(assets.includes('/growth-api.mjs'),'reminder settings reuse the singleton API module');
   await page.getByRole('button',{name:'Turn on',exact:true}).click();
   await page.getByText('Email reminders turned on.',{exact:true}).waitFor();assert.equal(saves.length,1);assert.equal(state.push.enabled,false);
   assert.equal(saves[0].enabled,true);assert.match(await page.locator('#daily-reminder-settings').innerText(),/Next email:/);
