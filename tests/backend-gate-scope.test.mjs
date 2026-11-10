@@ -167,6 +167,33 @@ test('narrow routes are limited to backend smoke tests or mapped modules outside
   }
 });
 
+
+test('long-running corpus admin/readiness suites use their own isolated Neon domain without dropping checks', () => {
+  const first=map.domains.corpus;
+  const slow=map.domains.corpus_readiness;
+  assert.ok(first&&slow,'Both corpus domains must remain defined');
+  assert.deepEqual(slow.suites,[
+    'tests/corpus-admin-backend-smoke.mjs',
+    'tests/corpus-readiness-backend-smoke.mjs',
+  ]);
+  assert.equal(first.suites.length,11,'All other corpus integrations remain in the original domain');
+  for(const path of slow.suites) {
+    assert.ok(!first.suites.includes(path),'Each long suite should run only once');
+    const route=classifyBackendChanges([path],{map});
+    assert.ok(route.domains.includes('corpus_readiness'),path+' must trigger a Neon job');
+  }
+  const all=Object.values(map.domains).flatMap(domain=>domain.suites);
+  assert.equal(new Set(all).size,all.length,'No backend suite may run in two domains');
+  const core=classifyBackendChanges(['worker/corpus-readiness.mjs'],{map});
+  assert.ok(core.domains.includes('corpus'));
+  assert.ok(core.domains.includes('corpus_readiness'),
+    'Changes to corpus internals must still run both isolated groups');
+  const full=classifyBackendChanges(['scripts/backend-gate-map.json'],{map});
+  assert.equal(full.fullSuite,true);
+  assert.deepEqual(full.domains,Object.keys(map.domains),
+    'A routing change must still run all backend domains, including the new one');
+});
+
 test('season smoke suite itself remains a narrow seasons route and schedules destructive fixtures last', () => {
   const result = classifyBackendChanges(['tests/season-backend-smoke.mjs'], { map });
   assert.equal(result.fullSuite, false);

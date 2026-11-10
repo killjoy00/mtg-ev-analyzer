@@ -441,7 +441,10 @@ test('protected campaign publication workflow has a creator path without direct 
   assert.match(workflow,/generate-creator-social-card\.py/);
   assert.match(workflow,/--square-output "creator\/\$\{CAMPAIGN_SLUG\}\/creator-card-square\.png"/);
   assert.match(workflow,/--headline "\$CREATOR_HEADLINE"/);
-  assert.match(workflow,/fonttools\[woff\]==4\.60\.1/);
+  assert.match(workflow,/pip install --quiet -r requirements-test\.txt/);
+  const pinned=await readFile('requirements-test.txt','utf8');
+  assert.match(pinned,/^Pillow==11\.3\.0$/m);
+  assert.match(pinned,/^fonttools\[woff\]==4\.60\.1$/m);
   assert.match(workflow,/check-creator-challenges\.mjs/);
   assert.match(workflow,/node scripts\/ci-publication-validate\.mjs/);
   assert.match(workflow,/python3 scripts\/check-creator-social-card\.py/);

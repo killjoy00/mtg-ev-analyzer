@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {PRIVILEGED_ACTION_PINS} from './support/privileged-action-pins.mjs';
 import {controlRequest} from '../scripts/control-read.mjs';
 import {createCiBranch} from '../scripts/create-ci-neon-branch.mjs';
 import {attachPreviewDomain,detachPreviewDomain,recoverablePreviewDomain,recoveryRecordMatches,reviewedPreviewRecovery,verifyRecoveryConflict} from '../scripts/edge-control.mjs';
@@ -228,7 +229,7 @@ test('backend CI retains PR coverage and only runs full suites on reviewed main 
   assert.match(workflow,/github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
   assert.match(workflow,/if: github\.event_name == 'pull_request'/);
   assert.match(workflow,/needs\.precheck\.outputs\.domains_json/);
-  assert.match(workflow,/delete-branch-action@v3/);
+  assert.ok(workflow.includes('neondatabase/delete-branch-action@'+PRIVILEGED_ACTION_PINS['neondatabase/delete-branch-action']));
   const sampler=workflow.split('- name: Start Neon compute sampler')[1].split('- name: Apply pending migrations')[0];
   assert.match(workflow,/sample_compute:[\s\S]*?type: boolean\n        default: false/);
   assert.match(sampler,/if: github\.event_name == 'workflow_dispatch' && inputs\.sample_compute == true/);
