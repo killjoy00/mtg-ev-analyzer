@@ -80,10 +80,10 @@ class Features(unittest.TestCase):
             self.assertNotIn(forbidden, sample)
 
     def test_required_history_flag_fails_instead_of_skipping(self):
-        with patch.dict(os.environ, {'PACK1_REQUIRE_HISTORICAL_AUDIT': '1'}), \\
-             patch('subprocess.run', return_value=SimpleNamespace(returncode=1)):
-            with self.assertRaisesRegex(AssertionError, 'Required historical v5 Git commit is missing'):
-                self.test_diagnostic_is_repeatable_blind_and_source_distinct()
+        with patch.dict(os.environ, {'PACK1_REQUIRE_HISTORICAL_AUDIT': '1'}):
+            with patch('subprocess.run', return_value=SimpleNamespace(returncode=1)):
+                with self.assertRaisesRegex(AssertionError, 'Required historical v5 Git commit is missing'):
+                    self.test_diagnostic_is_repeatable_blind_and_source_distinct()
 
     def test_diagnostic_is_repeatable_blind_and_source_distinct(self):
         # A shallow checkout must not turn an otherwise offline fast suite red.
