@@ -32,6 +32,12 @@
     "medium": "social"
   },
   {
+    "slug": "tcg",
+    "destination": "/",
+    "source": "reddit",
+    "campaign": "redditposts"
+  },
+  {
     "slug": "week2",
     "destination": "/",
     "source": "reddit",
