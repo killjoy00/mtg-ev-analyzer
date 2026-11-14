@@ -48,13 +48,13 @@ Do not close #541 solely because the earlier no-op scan was fixed or because the
 
 The **One-shot private quota timing investigation** workflow already collects
 verified, read-only Cloudflare gateway records with quota handler records. Its
-private report now includes a \`slow_request_stages\` section from those *same*
+private report now includes a `slow_request_stages` section from those *same*
 gateway rows, without additional provider queries or production traffic. Run
 it on reviewed main or through its protected manual dispatch; the original
 privacy, time-window, retention and readback controls still apply.
 
 The section counts only observed responses taking **more than five seconds**
-with \`tail_sampling_version: 1\` and \`sample_rate: 1\`. Incomplete or legacy
+with `tail_sampling_version: 1` and `sample_rate: 1`. Incomplete or legacy
 sampling is counted separately, never used to assert a total or a traffic SLO.
 Slow responses are grouped into gameplay, account/profile, admin and other,
 without raw request paths, user information, IPs or traces. Overlap with
