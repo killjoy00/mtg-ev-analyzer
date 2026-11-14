@@ -44,6 +44,40 @@ The evidence collector rejects comparisons across period, scope, metric or ident
 
 Do not close #541 solely because the earlier no-op scan was fixed or because the counter stopped changing. The egress warning threshold was increased at owner request on October 27, 2026, from 50 GiB to 200 GB (200,000,000,000 decimal bytes), applying to the provider's cumulative whole-project billing-period transfer counter. This changes only the operator warning threshold: it does not change Neon billing allowances, consumption, or the compute threshold. After rollout, verify the watcher reports the new threshold and that the former egress warning is recovered; close #1338 only with this change documented, not as evidence of lower consumption. Keep the evidence collector's distinct 5-GiB daily threshold and independent error/latency/quota/coverage incidents unchanged. No automatic closure is performed by the evidence workflow.
 
+## Investigating slow requests (#1272) alongside quota latency (#1273)
+
+The **One-shot private quota timing investigation** workflow already collects
+verified, read-only Cloudflare gateway records with quota handler records. Its
+private report now includes a \`slow_request_stages\` section from those *same*
+gateway rows, without additional provider queries or production traffic. Run
+it on reviewed main or through its protected manual dispatch; the original
+privacy, time-window, retention and readback controls still apply.
+
+The section counts only observed responses taking **more than five seconds**
+with \`tail_sampling_version: 1\` and \`sample_rate: 1\`. Incomplete or legacy
+sampling is counted separately, never used to assert a total or a traffic SLO.
+Slow responses are grouped into gameplay, account/profile, admin and other,
+without raw request paths, user information, IPs or traces. Overlap with
+quota checks over one second and upstream calls over five seconds is retained,
+as are slow 5xx counts and the no-upstream subset.
+
+A complete gateway-stage row has bounded total, quota and upstream durations.
+The remaining gateway time is calculated only if the parts do not exceed the
+total beyond five milliseconds of rounding allowance. Missing or inconsistent
+timings remain explicitly unclassified. Dominance is **an observation, not a
+root-cause assertion**: the residual can include request handling, queueing or
+instrumentation, while gateway completion time excludes downstream body
+delivery and browser rendering. Do not infer full-traffic p95 from a retained
+slow-tail-only sample or treat a recovered incident as a verified fix.
+
+If quota dominates, evaluate the existing preview-only reservation experiment
+and its failed/pending provider tail-latency gates before considering rollout.
+If upstream dominates, inspect the corresponding private Neon function and
+SQL evidence without repeating writes or waking computes for diagnosis.
+If residual dominates or stages are missing, examine the private gateway
+failure classification and instrumentation before changing timeouts. Keep both
+issues open until a reviewed fix is measured against equivalent traffic.
+
 ## Responding to a launch incident
 
 1. Pause outreach and further load escalation. Inspect the watcher artifact, exact gateway release, latest secure-auth release, and load artifacts. Do not repeat mutations as diagnostic probes.
