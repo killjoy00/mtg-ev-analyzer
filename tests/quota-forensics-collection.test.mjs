@@ -69,6 +69,8 @@ test('expired default history is explicit and never prevents a current settled c
     queries.push(JSON.parse(request.body));return page([]);
   }});
   assert.equal(queries.length,3);assert.equal(report.windows[1].status,'collected');
+  assert.equal(report.windows[1].slow_request_stages.slow_retained,0);
+  assert.equal(report.windows[1].slow_request_stages.gateway_records,0);
   assert.ok(queries.every(q=>q.timeframe.from===now-35*60000&&q.timeframe.to===now-5*60000));
 });
 test('explicit windows must be complete, canonical, settled and within bounds',()=>{
