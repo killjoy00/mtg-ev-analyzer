@@ -169,6 +169,11 @@ export async function collectQuotaEventRows({fetcher=fetch,token,accountId,from,
 // Replay only the fixed GitHub incident categories, from their machine-managed
 // marker, and only when the exact bounded window is still safely retained.
 // Issue bodies are untrusted input: never accept arbitrary URLs or time ranges.
+const parseCanonicalTime=value=>{
+  if(typeof value!=='string'||!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{3})?Z$/.test(value))return NaN;
+  const ms=Date.parse(value),canonical=value.includes('.')?value:value.replace('Z','.000Z');
+  return Number.isFinite(ms)&&new Date(ms).toISOString()===canonical?ms:NaN;
+};
 const INCIDENT_REPLAYS=[[1272,'slow_requests'],[1273,'slow_quota']];
 const INCIDENT_MARKER=/<!-- pack1-launch-incident-v1\s*\n(\{[^\r\n]{20,4000}\})\s*\n-->/;
 export function incidentReplayWindow(issue,number,condition,now) {
