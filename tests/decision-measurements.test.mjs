@@ -142,8 +142,8 @@ test('habits query keeps first-Daily attribution and rolling seven-day math with
   assert.match(sql,/cohort_first_daily AS \(/);
   assert.match(sql,/FROM first_daily\s+WHERE first_day BETWEEN \$1::date AND \$2::date/);
   assert.match(sql,/JOIN cohort_first_daily f ON f\.player_id=e\.player_id/);
-  assert.equal((sql.match(/FROM cohort_first_daily f/g)||[]).length,3,
-    'activity, attribution and cohorts must share the identical first-Daily date filter');
+  assert.equal((sql.match(/FROM cohort_first_daily f/g)||[]).length,4,
+    'activity, attribution, cohort flags and cohorts must share the identical first-Daily date filter');
   assert.match(sql,/cohort_completed_days AS MATERIALIZED/);
   assert.match(sql,/cohort_flags AS MATERIALIZED/);
   assert.match(sql,/JOIN cohort_flags flags USING\(person_id\)/);
