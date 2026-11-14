@@ -103,6 +103,22 @@ The full measurements remain in private storage; the public line
 does not expose timestamps, individual timings, exact counts,
 routes, request traces, provider IDs, user data or arbitrary text.
 
+The fixed public triage now also describes the **coarse traffic group** behind
+the #1272 slow samples (`gameplay`, `admin`, `account`, `other`, `mixed`
+or `unverified`). For #1273, if quota dispatch/wait is dominant and
+handler-completion coverage meets the established gate, it prints a coarse
+`wait_signal`: `retry`, `handler_concurrency`, `cleanup_overlap`,
+`multiple`, `no_majority` or `unverified`. A signal requires at least
+three corroborating slow samples and a two-thirds majority of its own
+measured population. Retry is assessed over all retained slow gateway
+calls; concurrency and cleanup are assessed only over matched slow handler
+completions. These populations must not be conflated. A fixed-label
+signal is **correlation, not a causal diagnosis**: gateway dispatch/wait
+also includes unmeasured remote queueing and response acknowledgement,
+and handler concurrency does not prove queue delay. Sensitive traces,
+exact counts, durations, request routes, network identities and customer
+data remain solely in the verified private report.
+
 Classification uses only the latest settled and retained issue-breach
 window, never a quiet recent window as proof of recovery. A candidate
 stage requires at least three observed slow samples, stage measurements
