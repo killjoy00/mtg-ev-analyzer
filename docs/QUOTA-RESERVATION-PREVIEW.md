@@ -136,6 +136,35 @@ does not invalidate that test. Control variation never waives a failed A/B gate.
 `latency_confirmation_passed` requires each A/B repeat independently to meet
 both aggregate tail conditions and the original six-of-eight rule. A full
 isolated gameplay rehearsal follows only if that confirmation passes.
+
+### Additional candidate tail attribution (next hosted confirmation)
+
+The 2026-10-27 same-actor hosted confirmation completed all 8,256 calls and
+verified cleanup. Both A/B repeats cut counter-write decisions from 1,032 to
+136 (about 87%), and both improved aggregate client and handler p95/p99.
+However, only **5/8 and 4/8** cohorts met every unchanged tail criterion.
+Identical per-request A/A controls also showed large fluctuations; in several
+A/B cohorts the difference was a 0–3 ms handler tie/regression. These facts
+do **not** convert a failed gate into a pass or prove safety in production.
+See [run 40571942379](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/40571942379).
+
+The next provider rehearsal retains the *same fixed sequence, unchanged gate,
+8,256-call budget, cleanup checks and synthetic-only Worker*. Its read-only
+response headers now distinguish admitted candidate calls **waiting for a batch
+commit** from calls spending already-confirmed credits. For each cohort and
+A/B repeat, only bounded aggregate counts and client timing distributions are
+retained, plus queue/durability p50/p95/p99 and maximum coalesced batch size.
+A batch-wait participant is not necessarily the request that wrote the row;
+write-count evidence remains a separate confirmed decision counter. Client
+latency is measured before decoding the new headers. Missing or malformed
+synthetic stage evidence fails the test instead of being interpreted as zero
+latency. The A/A control remains unchanged; old reports without candidate
+stage fields remain valid historical evidence.
+
+The new breakdown can establish whether candidate tails correlate with
+commit wait or with apparently cached-credit calls. It cannot identify a
+provider-level root cause, quantify production savings, replace distributed
+shared-network acceptance or waive the existing six-of-eight criterion.
 `production_ready` remains false. Any proposed change to the heuristic needs
 an explicit, evidence-backed review; the measurement job cannot change it.
 

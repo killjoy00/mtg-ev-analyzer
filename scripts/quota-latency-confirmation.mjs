@@ -9,6 +9,29 @@ const COHORTS=8,CHUNKS=16,WIDTH=8,EXPECTED_CALLS=8256,MAX_CALLS=10000;
 const METRICS=['client_p95','client_p99','handler_p95','handler_p99'];
 const value=(row,key)=>{const [scope,p]=key.split('_');return row[scope][p+'_ms'];};
 const stats=rows=>({client:summarizeSamples(rows.map(r=>r.client)),handler:summarizeSamples(rows.map(r=>r.handler))});
+
+const parseStage=(header,name)=>{
+  const value=header(name);
+  assert(typeof value==='string'&&/^\d{1,6}(?:\.\d{1,2})?$/.test(value)&&Number(value)<=600000,'missing_reservation_stage_evidence');
+  return Number(value);
+};
+// The probe exposes only bounded timing/credit classifications. Store cohort
+// aggregates, never individual traces, network IDs or request-level records.
+// A "batch wait" is not necessarily the request that owned a counter write.
+function summarizeCandidateMechanics(rows) {
+  assert(rows.length===128||rows.length===1024,'incomplete_candidate_stage_coverage');
+  const waiting=rows.filter(r=>r.reservation?.batch_wait),cached=rows.filter(r=>r.reservation&&!r.reservation.batch_wait);
+  assert(waiting.length+cached.length===rows.length,'incomplete_candidate_stage_coverage');
+  return {samples:rows.length,batch_wait:waiting.length,cached_credit:cached.length,
+    coalesced_wait_samples:waiting.filter(r=>r.reservation.batch_size>1).length,
+    max_batch_size:Math.max(...rows.map(r=>r.reservation.batch_size)),
+    queue:summarizeSamples(rows.map(r=>r.reservation.queue_ms)),
+    durability:summarizeSamples(rows.map(r=>r.reservation.durability_ms)),
+    client_batch_wait:summarizeSamples(waiting.map(r=>r.client)),
+    client_cached_credit:summarizeSamples(cached.map(r=>r.client)),
+  };
+}
+
 const difference=(left,right)=>Math.round((right-left)*100)/100;
 const delta=(left,right)=>Object.fromEntries(METRICS.map(key=>[key,difference(value(left,key),value(right,key))]));
 const quantile=(values,p)=>values.toSorted((a,b)=>a-b)[Math.max(0,Math.ceil(p*values.length)-1)];
@@ -64,7 +87,17 @@ export async function confirmQuotaLatency({url,key,fetcher=fetch,clock=performan
     assert(header('x-pack1-quota-handler-ms')!==null&&Number.isFinite(handler)&&handler>=0&&Number.isFinite(client)&&client>=0&&
       header('x-quota-counter-write-total')!==null&&Number.isSafeInteger(writes)&&writes>=0&&/^[a-f0-9]{32}$/.test(instance||'')&&/^[a-f0-9]{32}$/.test(actor||''),'missing_confirmation_evidence');
     assert(implementation===(mode==='candidate'?'coalesced-preview':'per-request'),'wrong_confirmation_implementation');
-    await response.body?.cancel();return {client,handler,writes,instance,actor};
+    let reservation;
+    if(mode==='candidate') {
+      const batchWait=header('x-quota-reservation-write');
+      assert(['true','false'].includes(batchWait),'missing_reservation_stage_evidence');
+      const queue_ms=parseStage(header,'x-quota-queue-ms'),durability_ms=parseStage(header,'x-quota-durability-ms');
+      const batch_size=parseStage(header,'x-quota-batch-size');
+      assert(Number.isSafeInteger(batch_size)&&batch_size>=1&&batch_size<=256&&
+        (batchWait==='true'||durability_ms===0),'invalid_reservation_stage_evidence');
+      reservation={batch_wait:batchWait==='true',queue_ms,durability_ms,batch_size};
+    }
+    await response.body?.cancel();return {client,handler,writes,instance,actor,reservation};
   };
   for(let repeat=0;repeat<CONFIRMATION_PLAN.length;repeat++) {
     const comparison=CONFIRMATION_PLAN[repeat],right=comparison==='aa'?'control':'candidate',modes=['baseline',right],
@@ -91,17 +124,19 @@ export async function confirmQuotaLatency({url,key,fetcher=fetch,clock=performan
       if(comparison==='ab')assert(last[right]<last.baseline/2,'confirmation_write_reduction_unverified');
       baselineWrites+=last.baseline;rightWrites+=last[right];
       const baseline=stats(local.baseline),rightStats=stats(local.right);
-      cohorts.push({cohort:cohortIndex+1,baseline,right:rightStats,delta_ms:delta(baseline,rightStats)});
+      cohorts.push({cohort:cohortIndex+1,baseline,right:rightStats,delta_ms:delta(baseline,rightStats),
+        ...(comparison==='ab'?{candidate_mechanics:summarizeCandidateMechanics(local.right)}:{})});
     }
     const row={repeat:repeat+1,comparison,right_implementation:comparison==='aa'?'per-request':'coalesced-preview',
       baseline:stats(rows.baseline),right:stats(rows.right),cold:{baseline:summarizeSamples(cold.baseline),right:summarizeSamples(cold.right)},
-      counter_write_decisions:{baseline:baselineWrites,right:rightWrites},cohorts};
+      counter_write_decisions:{baseline:baselineWrites,right:rightWrites},
+      ...(comparison==='ab'?{candidate_mechanics:summarizeCandidateMechanics(rows.right)}:{}),cohorts};
     repeats.push(row);onRepeat(structuredClone(row));
   }
   assert(requests===EXPECTED_CALLS,'confirmation_request_count_mismatch');
   return {source:'synthetic-quota-only',profile:'fixed-aa-ab-crossover-v2',placement:'same-actor-shared-counter',plan:[...CONFIRMATION_PLAN],requests,
     repetitions:repeats,analysis:analyzeConfirmation(repeats),production_ready:false,
-    limitation:'Fixed same-actor crossover from one client region. Both modes share the unchanged quota counter; no resets or separated key spaces are used. P99 per cohort has 128 warm samples and is noisy. Control spread is descriptive and cannot establish the cause of an individual A/B regression. No thresholds or production settings are changed.'};
+    limitation:'Fixed same-actor crossover from one client region. Both modes share the unchanged quota counter; no resets or separated key spaces are used. P99 per cohort has 128 warm samples and is noisy. Candidate queue/durability and batch-wait classifications are synthetic, per-request header timing aggregates, not production telemetry or a causal decomposition of transport. Control spread is descriptive and cannot establish the cause of an individual A/B regression. No thresholds or production settings are changed.'};
 }
 if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url) {
   try {
