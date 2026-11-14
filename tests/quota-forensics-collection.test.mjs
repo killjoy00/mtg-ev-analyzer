@@ -104,8 +104,10 @@ test('incident replay admits only canonical, settled, retained fixed issue windo
 });
 test('issue body is untrusted: malformed, spoofed and future alert windows fail closed',()=>{
   const good=makeIncident(1272,'slow_requests',lastSlow);
+  assert.deepEqual(incidentReplayWindow({...good,state:'closed'},1272,'slow_requests',replayNow),
+    {name:'slow_requests_last_breach',status:'skipped',reason:'incident_closed'});
   const rejects=[
-    {...good,number:1273},{...good,state:'closed'},
+    {...good,number:1273},{...good,state:'invalid'},
     {...good,body:'No machine marker'},
     makeIncident(1272,'slow_requests',lastSlow,undefined,{condition:'slow_quota'}),
     makeIncident(1272,'slow_requests',lastSlow,undefined,{version:2}),
