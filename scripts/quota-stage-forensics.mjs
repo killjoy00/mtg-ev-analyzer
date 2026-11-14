@@ -165,13 +165,50 @@ export async function collectQuotaEventRows({fetcher=fetch,token,accountId,from,
     }});
 }
 
+// A late incident may have recovered before the routine 30-minute diagnostic.
+// Replay only the fixed GitHub incident categories, from their machine-managed
+// marker, and only when the exact bounded window is still safely retained.
+// Issue bodies are untrusted input: never accept arbitrary URLs or time ranges.
+const INCIDENT_REPLAYS=[[1272,'slow_requests'],[1273,'slow_quota']];
+const INCIDENT_MARKER=/<!-- pack1-launch-incident-v1\s*\n(\{[^\r\n]{20,4000}\})\s*\n-->/;
+export function incidentReplayWindow(issue,number,condition,now) {
+  if(issue?.number!==number||issue?.state!=='open'||typeof issue?.body!=='string')throw Error('Invalid launch incident source');
+  const marker=issue.body.match(INCIDENT_MARKER);
+  if(!marker)throw Error('Missing launch incident state');
+  let state;
+  try {state=JSON.parse(marker[1]);} catch {throw Error('Invalid launch incident state');}
+  if(state?.version!==1||state?.condition!==condition||!['active','recovered'].includes(state.status))
+    throw Error('Mismatched launch incident condition');
+  const seen=parseCanonicalTime(state.last_seen),checked=parseCanonicalTime(state.checked_through);
+  if(!Number.isSafeInteger(seen)||!Number.isSafeInteger(checked)||seen<=0||seen>checked||
+    seen>now||checked>now+2*60000)throw Error('Invalid launch incident chronology');
+  const from=seen-20*60000,to=seen+5*60000;
+  if(now-from>RETENTION_MS)return {name:condition+'_last_breach',from,to,status:'skipped',reason:'outside_configured_retention'};
+  if(to>now-SETTLEMENT_MS)return {name:condition+'_last_breach',from,to,status:'skipped',reason:'not_settled'};
+  return {name:condition+'_last_breach',from,to,status:'collect'};
+}
+export async function recentIncidentWindows({fetcher=fetch,env={},now}) {
+  if(env.PACK1_READ_RECENT_ALERTS!=='1'||env.PACK1_QUOTA_FORENSICS_FROM!==undefined||
+    env.PACK1_QUOTA_FORENSICS_TO!==undefined)return [];
+  if(env.GITHUB_REF!=='refs/heads/main'||env.GITHUB_REPOSITORY!=='killjoy00/mtg-ev-analyzer'||
+    typeof env.GITHUB_TOKEN!=='string'||env.GITHUB_TOKEN.length<20)
+    throw Error('Trusted incident read access unavailable');
+  const windows=[];
+  for(const [number,condition] of INCIDENT_REPLAYS) {
+    const response=await fetcher('https://api.github.com/repos/killjoy00/mtg-ev-analyzer/issues/'+number,{
+      method:'GET',redirect:'error',signal:AbortSignal.timeout(20000),
+      headers:{authorization:'Bearer '+env.GITHUB_TOKEN,accept:'application/vnd.github+json'},
+    });
+    if(!response.ok)throw Error('Read-only incident lookup unavailable');
+    const issue=await response.json().catch(()=>null);
+    windows.push(incidentReplayWindow(issue,number,condition,now));
+  }
+  return windows;
+}
+
 export function forensicWindows(now,env={}){
   if(!Number.isSafeInteger(now)||now<=0)throw Error('Invalid forensic clock');
-  const parse=value=>{
-    if(typeof value!=='string'||!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(?:\.\d{3})?Z$/.test(value))return NaN;
-    const ms=Date.parse(value),canonical=value.includes('.')?value:value.replace('Z','.000Z');
-    return Number.isFinite(ms)&&new Date(ms).toISOString()===canonical?ms:NaN;
-  };
+  const parse=parseCanonicalTime;
   if(env.PACK1_QUOTA_FORENSICS_FROM!==undefined||env.PACK1_QUOTA_FORENSICS_TO!==undefined){
     const from=parse(env.PACK1_QUOTA_FORENSICS_FROM),to=parse(env.PACK1_QUOTA_FORENSICS_TO);
     if(!Number.isSafeInteger(from)||!Number.isSafeInteger(to)||from>=to||to-from>MAX_WINDOW_MS||now-from>RETENTION_MS||to>now-SETTLEMENT_MS)
@@ -188,7 +225,7 @@ export function forensicWindows(now,env={}){
 export async function runQuotaForensics({fetcher=fetch,env=process.env,now=Date.now()}={}){
   const token=env.CLOUDFLARE_EDGE_TOKEN;
   if(typeof token!=='string'||token.length<20)throw Error('Private provider access unavailable');
-  const windows=forensicWindows(now,env);
+  const windows=[...forensicWindows(now,env),...await recentIncidentWindows({fetcher,env,now})];
   const accountId=await account(fetcher,token);
   const summaries=[];
   for(const {name,from,to,status,reason} of windows){
@@ -209,7 +246,7 @@ export async function runQuotaForensics({fetcher=fetch,env=process.env,now=Date.
       query_coverage:Object.fromEntries(Object.entries({gateway,handlers,starts}).map(([key,value])=>[key,{requests:value.requests,partitions:value.coverage}]))});
   }
   return {version:2,source:'cloudflare_read_only_telemetry',windows:summaries,
-    limitation:'Verified query partitions do not establish complete log retention. Missing records are not proof of nonexecution. Ordinary successes are sampled; full-tail slow-response counts need tail_sampling_version 1. Gateway timings end when the response is constructed, not when the client receives the body. Stage dominance is diagnostic, not proof of root cause.'};
+    limitation:'Verified query partitions do not establish complete log retention. Missing records are not proof of nonexecution. Replayed incident intervals come from bounded machine-managed last-breach markers, not a guarantee of complete log retention. Ordinary successes are sampled; full-tail slow-response counts need tail_sampling_version 1. Gateway timings end when the response is constructed, not when the client receives the body. Stage dominance is diagnostic, not proof of root cause.'};
 }
 export async function publishQuotaForensics({fetcher=fetch,env=process.env,now=Date.now()}={}){
   let stage='trusted_context';
