@@ -5,6 +5,12 @@
     "untracked": true
   },
   {
+    "slug": "dailygame",
+    "destination": "/",
+    "source": "randomdailies",
+    "campaign": "ongoing"
+  },
+  {
     "slug": "discord",
     "destination": "/?game=draft-run&daily=1",
     "source": "discord",
