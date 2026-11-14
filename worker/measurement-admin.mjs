@@ -128,20 +128,34 @@ const HABIT_METRICS_SQL=`WITH eligible_daily_sessions AS (
   LEFT JOIN first_touch touch ON touch.player_id=f.player_id
   LEFT JOIN first_activity activity ON activity.player_id=f.player_id
   CROSS JOIN tracking_start tracking
-), ever_three_in_seven AS (
-  -- Three distinct completed days within seven calendar days are detected
-  -- from the two preceding days, without a quadratic self-join.
+), cohort_completed_days AS MATERIALIZED (
+  -- Retention is reported only for first-Daily cohorts in the requested range.
+  -- Materialize the person's distinct completed days once instead of scanning
+  -- the full completed_days CTE repeatedly for every rate denominator.
+  SELECT d.person_id,d.day FROM completed_days d
+  JOIN cohort_first_daily f USING(person_id)
+), cohort_flags AS MATERIALIZED (
+  SELECT f.person_id,
+    bool_or(d.day=f.first_day+1) next_day_return,
+    bool_or(d.day BETWEEN f.first_day+1 AND f.first_day+7) seven_day_return,
+    (count(*) FILTER(WHERE d.day BETWEEN f.first_day AND f.first_day+6)>=3) three_in_seven
+  FROM cohort_first_daily f
+  JOIN cohort_completed_days d USING(person_id)
+  GROUP BY f.person_id
+), ever_three_in_seven AS MATERIALIZED (
+  -- The third completed day in a seven-day span proves 3-in-7 ever reached.
   SELECT DISTINCT person_id FROM (
     SELECT person_id,day,lag(day,2) OVER(PARTITION BY person_id ORDER BY day) third_day
-    FROM completed_days
+    FROM cohort_completed_days
   ) reached WHERE third_day>=day-6
 ), cohorts AS (
   SELECT f.person_id,f.first_day,a.source,a.campaign,
-    EXISTS(SELECT 1 FROM completed_days d WHERE d.person_id=f.person_id AND d.day=f.first_day+1) next_day_return,
-    EXISTS(SELECT 1 FROM completed_days d WHERE d.person_id=f.person_id AND d.day BETWEEN f.first_day+1 AND f.first_day+7) seven_day_return,
-    (SELECT count(*) FROM completed_days d WHERE d.person_id=f.person_id AND d.day BETWEEN f.first_day AND f.first_day+6)>=3 three_in_seven,
-    EXISTS(SELECT 1 FROM ever_three_in_seven e WHERE e.person_id=f.person_id) ever_three_in_seven
-  FROM cohort_first_daily f JOIN attribution a USING(person_id)
+    flags.next_day_return,flags.seven_day_return,flags.three_in_seven,
+    (ever.person_id IS NOT NULL) ever_three_in_seven
+  FROM cohort_first_daily f
+  JOIN attribution a USING(person_id)
+  JOIN cohort_flags flags USING(person_id)
+  LEFT JOIN ever_three_in_seven ever USING(person_id)
   WHERE f.first_day BETWEEN $1::date AND $2::date
 ), today AS (
   SELECT (now() AT TIME ZONE 'America/Los_Angeles')::date AS current_day
