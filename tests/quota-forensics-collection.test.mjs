@@ -203,17 +203,23 @@ test('publication requires trusted main context and private credentials before q
   assert.match(workflow,/PACK1_READ_RECENT_ALERTS: '1'/);
   assert.match(workflow,/diagnosis:[\s\S]*environment: pack-one-mobile-release/);
   const source=fs.readFileSync('scripts/quota-stage-forensics.mjs','utf8');
-  assert.doesNotMatch(source,/console\.log\([^\n]*JSON\.stringify/);
+  assert.match(source,/PACK1_LATENCY_TRIAGE/);
+  assert.match(source,/return publicLatencyTriage\(report\)/);
+  assert.ok(source.indexOf('await store.save(report')<source.indexOf('return publicLatencyTriage(report)'),
+    'no public diagnosis before private report write/readback');
+  assert.doesNotMatch(source,/console\.log\([^\n]*report\.windows/);
 });
 const trustedEnv={GITHUB_REF:'refs/heads/main',GITHUB_REPOSITORY:'killjoy00/mtg-ev-analyzer',GITHUB_RUN_ID:'12345',GITHUB_RUN_ATTEMPT:'1',GITHUB_SHA:'a'.repeat(40),CLOUDFLARE_EDGE_TOKEN:token,CLOUDFLARE_PRIVATE_REPORT_TOKEN:token};
 test('publisher completes collection, private write and readback in trusted context',async()=>{
   const storage=storageFixture();let queries=0;
-  await publishQuotaForensics({now,env:trustedEnv,fetcher:async(url,options)=>{
+  const triage=await publishQuotaForensics({now,env:trustedEnv,fetcher:async(url,options)=>{
     if(url.includes('/zones?'))return Response.json({success:true,result:[{name:'packone.pro',status:'active',account:{id:account}}]});
     if(url.includes('/observability/')){queries++;return page([]);}
     return storage.fetcher(url,options);
   }});
   assert.equal(queries,3);assert.equal(storage.calls.filter(x=>x.method==='PUT').length,1);
+  assert.deepEqual(triage.findings.map(f=>f.outcome),['missing_or_duplicate_window','missing_or_duplicate_window']);
+  assert.equal(triage.version,1);
   assert.equal(storage.calls.filter(x=>x.url.endsWith('/domains/managed')).length,2);
 });
 test('public failure categories retain stages and HTTP status but never arbitrary messages or codes',async()=>{
