@@ -26,6 +26,64 @@ const metrics=(arr,field)=>{
     gt_1000ms:values.filter(x=>x>1000).length,p50_ms:percentile(.5),p95_ms:percentile(.95)};
 };
 
+
+// The gateway retains every >5-second response only under tail sampling v1.
+// Keep this separate from the 10% sample of ordinary successes: these counts
+// describe observed slow responses, not a weighted population latency SLO.
+const CORE_GAMEPLAY=/^draft_(?:start|view|pick|reroll|read|daily_status|shared_read|creator_challenge_read)$/;
+function slowRouteGroup(value) {
+  const route=typeof value==='string'&&/^[a-z_]{1,40}$/.test(value)?value:'other';
+  if(CORE_GAMEPLAY.test(route)||route==='player_session')return 'gameplay';
+  if(route==='account'||route==='profile')return 'account';
+  if(route.startsWith('admin_'))return 'admin';
+  return 'other';
+}
+export function summarizeSlowRequestStages(gatewayRows) {
+  const route_groups={gameplay:0,account:0,admin:0,other:0};
+  const dominant={quota:0,origin:0,gateway_or_unmeasured:0};
+  let gateway_records=0,slow_retained=0,slow_unverified_retention=0;
+  let slow_5xx=0,slow_5xx_before_origin=0,slow_quota_overlap=0,slow_origin_over_5s=0;
+  let missing_stages=0,inconsistent_stages=0;
+  const complete=[];
+  for(const row of gatewayRows) {
+    const p=payload(row,'gateway_request');
+    if(!p||!Number.isInteger(p.status)||p.status<100||p.status>599)continue;
+    gateway_records++;
+    const duration=timing(p.duration_ms);
+    if(duration===null||duration<=5000)continue;
+    if(p.tail_sampling_version!==1||p.sample_rate!==1) {
+      slow_unverified_retention++;
+      continue;
+    }
+    slow_retained++;
+    route_groups[slowRouteGroup(p.route)]++;
+    if(p.status>=500) {
+      slow_5xx++;
+      if(p.upstream_calls===0)slow_5xx_before_origin++;
+    }
+    const quota=timing(p.quota_ms),origin=timing(p.upstream_ms);
+    if(quota!==null&&quota>1000)slow_quota_overlap++;
+    if(origin!==null&&origin>5000)slow_origin_over_5s++;
+    if(quota===null||origin===null) {missing_stages++;continue;}
+    // Each duration is rounded separately. More than 5ms disagreement
+    // invalidates stage attribution; never force negative "other" time to 0.
+    if(quota+origin>duration+5) {inconsistent_stages++;continue;}
+    const residual=Math.max(0,duration-quota-origin);
+    if(quota>=origin&&quota>=residual)dominant.quota++;
+    else if(origin>=residual)dominant.origin++;
+    else dominant.gateway_or_unmeasured++;
+    complete.push({duration_ms:duration,quota_ms:quota,origin_ms:origin,residual_ms:residual});
+  }
+  return {gateway_records,slow_retained,slow_unverified_retention,
+    slow_5xx,slow_5xx_before_origin,slow_quota_overlap,slow_origin_over_5s,
+    route_groups,missing_stages,inconsistent_stages,dominant,
+    stages_of_attributable_slow:{
+      total:metrics(complete,'duration_ms'),quota:metrics(complete,'quota_ms'),
+      origin:metrics(complete,'origin_ms'),gateway_or_unmeasured:metrics(complete,'residual_ms'),
+    },
+  };
+}
+
 export function summarizeQuotaStages(gatewayRows,handlerRows,startRows){
   const handlers=new Map(),starts=new Set(),slow=[],layout={current:0,legacy:0,empty:0,unread:0,other:0},
     phases={complete:0,transaction:0,durability:0,other:0};
@@ -147,10 +205,11 @@ export async function runQuotaForensics({fetcher=fetch,env=process.env,now=Date.
     }
     summaries.push({window:name,status:'collected',from,to,
       ...summarizeQuotaStages(gateway.rows,handlers.rows,starts.rows),
+      slow_request_stages:summarizeSlowRequestStages(gateway.rows),
       query_coverage:Object.fromEntries(Object.entries({gateway,handlers,starts}).map(([key,value])=>[key,{requests:value.requests,partitions:value.coverage}]))});
   }
   return {version:2,source:'cloudflare_read_only_telemetry',windows:summaries,
-    limitation:'Verified query partitions do not establish complete log retention. Missing records are not proof of nonexecution, and gateway summaries are sampled.'};
+    limitation:'Verified query partitions do not establish complete log retention. Missing records are not proof of nonexecution. Ordinary successes are sampled; full-tail slow-response counts need tail_sampling_version 1. Gateway timings end when the response is constructed, not when the client receives the body. Stage dominance is diagnostic, not proof of root cause.'};
 }
 export async function publishQuotaForensics({fetcher=fetch,env=process.env,now=Date.now()}={}){
   let stage='trusted_context';
