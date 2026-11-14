@@ -813,6 +813,8 @@ test('Daily home shows the disclosed TCGplayer fallback to guests without a memb
 test('Daily home hides promotion for signed-in ad-free, failed, or unverified membership status', async () => {
   for (const membership of [
     async () => ({ ads_allowed: false }),
+    async () => ({ ads_allowed: true, ad_free: true }),
+    async () => ({ ads_allowed: true, account_capabilities: ['custom_corpus','unlimited_cube_practice'] }),
     async () => { throw new Error('offline'); },
     async () => ({ ads_allowed: null }),
   ]) {

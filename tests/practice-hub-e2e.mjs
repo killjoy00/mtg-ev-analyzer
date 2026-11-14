@@ -98,7 +98,9 @@ try {
   await guest.page.getByRole('link', { name: 'Practice', exact: true }).click();
   await guest.page.locator('[data-practice-hub][data-account-state="guest"]').waitFor();
   await guest.page.getByRole('button', { name: 'Upgrade to Elite', exact: true }).first().click();
-  await guest.page.getByRole('heading', { name: 'Unlock Elite practice.', exact: true }).waitFor();
+  await guest.page.waitForURL(base + '/patreon/');
+  await guest.page.getByRole('heading', { name: 'Practice the sets you want.', exact: true }).waitFor();
+  assert.equal(await guest.page.locator('#account-signup').count(), 0);
   assert.equal(guest.requests.some(r => r.method === 'POST' && r.path === '/v1/runs'), false);
   assert.deepEqual(guest.errors, []);
   await guest.context.close();

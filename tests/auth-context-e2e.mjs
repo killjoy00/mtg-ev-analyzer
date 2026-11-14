@@ -357,7 +357,7 @@ try {
   assert.deepEqual(savedFlow,{intent:'patreon-activate',source:'welcome_note',validateDailyRunId:null});
   nextLinkNewlyClaimed=false;
   await resumeVerificationAfterReload();
-  await page.getByRole('heading',{name:'Activate Pack One Elite'}).waitFor();
+  await page.getByRole('heading',{name:'Connect your membership'}).waitFor();
   await page.getByRole('heading',{name:'Authorize Patreon to activate Elite.'}).waitFor();
   await page.evaluate(()=>sessionStorage.removeItem('pack1-patreon-activation-v1'));
 

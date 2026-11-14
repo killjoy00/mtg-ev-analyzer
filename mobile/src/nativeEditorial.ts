@@ -170,7 +170,7 @@ export const termsSections: ArticleSection[] = [
   {
     title: 'TCGplayer affiliate relationship',
     body: [
-      "Pack One participates in TCGplayer's affiliate program through Impact. TCGplayer links and the Daily-home TCGplayer promotion are sponsored/affiliate links, and Pack One may earn a commission from eligible purchases. The price a buyer pays is not increased by Pack One's commission. The Daily-home promotion includes an adjacent commission disclosure and is excluded for visitors whose verified membership is ad-free.",
+      "Pack One participates in TCGplayer's affiliate program through Impact. TCGplayer links and the Daily-home TCGplayer promotion are sponsored/affiliate links, and Pack One may earn a commission from eligible purchases. The price a buyer pays is not increased by Pack One's commission. The Daily-home promotion includes an adjacent commission disclosure. Verified ad-free memberships hide that promotion and individual-card TCGplayer links on the website and app.",
     ],
   },
   {

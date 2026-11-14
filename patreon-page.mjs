@@ -85,8 +85,8 @@ async function renderMembershipState() {
   }
 
   if(patreon?.connected && patreon?.ad_free===true) {
-    action.textContent='Open Practice';action.disabled=false;
-    action.onclick=()=>location.assign('/practice/');
+    action.textContent='Refresh Patreon access';action.disabled=false;
+    action.onclick=()=>void openPatreonConnection();
     setStatus('Display ads and TCGplayer promotions are hidden while you are signed in. Elite adds Powered Cube and your choice of sets.',
       {state:'supporter',heading:'Supporter is active',showPatreon:true,patreonLabel:'Manage Patreon membership'});
     return;
@@ -129,6 +129,7 @@ async function bootMembershipState() {
       {state:'error',heading:'Account status unavailable'});
     return;
   }
+  trackEvent('membership_offer_viewed',{source:'membership_page',context:'web'});
   await renderMembershipState();
 }
 
@@ -146,4 +147,4 @@ offsite?.addEventListener('click',()=>{
   trackEvent('membership_provider_opened',{source:'patreon',context:'manage'});
   void flushEvents();
 });
-void bootMembershipState().then(()=>trackEvent('membership_offer_viewed',{source:'membership_page',context:'web'}));
+void bootMembershipState();

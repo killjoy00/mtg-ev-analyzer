@@ -480,7 +480,7 @@ export default function MembershipScreen() {
                 ? 'Elite from Patreon is active.'
                 : current.capabilities.length
                   ? 'Some Pack One benefits from Patreon are active.'
-                  : current.ad_free ? 'Supporter is active. Display ads and TCGplayer promotions are hidden.'
+                  : (current.patreon_ad_free === true || (current.ad_free && !current.apple_subscription_active)) ? 'Supporter is active. Display ads and TCGplayer promotions are hidden.'
                     : 'Patreon is connected. No paid membership is active.'}</Text>
             ) : null}
             {readableTimestamp(current.membership?.last_synced_at) ? <Text style={styles.help}>Last Patreon sync: {readableTimestamp(current.membership?.last_synced_at)}</Text> : null}

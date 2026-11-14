@@ -124,9 +124,10 @@ async function openEliteLanding(source='account') {
   if(['membership_elite','membership_supporter'].includes(source)) {
     const membership=await loadPatreonStatus();
     const tier=source==='membership_supporter'?'supporter':'elite';
-    if(eliteSource(membership)||(tier==='supporter'&&membership?.ad_free===true)) {
+    if(eliteSource(membership)||membership?.membership?.sync_pending||(tier==='supporter'&&membership?.ad_free===true)) {
       location.assign('/patreon/#connect');return;
     }
+    if(membership?.configured!==true)throw Error('Membership checkout is temporarily unavailable. Please try again.');
     event('membership_checkout_started',{source:'patreon',type:tier,context:'web'});
     await flushEvents().catch(()=>{});
     location.assign('https://www.patreon.com/checkout/PackOne?rid='+(tier==='elite'?'29631843':'29631835'));

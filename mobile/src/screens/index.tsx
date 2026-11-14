@@ -82,7 +82,8 @@ export default function HomeScreen() {
       const [dailyResult, promotionResult] = await Promise.allSettled([
         loadDailyStatus(session),
         session.accountToken
-          ? loadNativePatreonStatus(session).then((membership) => membership.ads_allowed === true)
+          ? loadNativePatreonStatus(session).then((membership) => membership.ads_allowed === true && !membership.ad_free
+            && !['custom_corpus', 'unlimited_cube_practice'].every(cap => membership.account_capabilities?.includes(cap)))
           : Promise.resolve(true),
       ]);
       const current = await readSession();
