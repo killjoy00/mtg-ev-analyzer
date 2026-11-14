@@ -105,7 +105,7 @@ const HABIT_METRICS_SQL=`WITH eligible_daily_sessions AS (
   ORDER BY e.player_id,e.created_at,e.id
 ), tracking_start AS (
   SELECT min(created_at) started_at FROM analytics_events WHERE event_name='acquisition_touch'
-), first_activity AS (
+), first_activity AS MATERIALIZED (
   SELECT f.player_id,least(
     coalesce((SELECT min(s.created_at) FROM draft_run_sessions s WHERE s.player_id=f.player_id),'infinity'::timestamptz),
     coalesce((SELECT min(e.created_at) FROM analytics_events e WHERE e.player_id=f.player_id AND e.event_name<>'acquisition_touch'),'infinity'::timestamptz),
@@ -113,7 +113,7 @@ const HABIT_METRICS_SQL=`WITH eligible_daily_sessions AS (
     coalesce((SELECT min(sc.created_at) FROM scores sc WHERE sc.player_id=f.player_id),'infinity'::timestamptz)
   ) first_activity
   FROM cohort_first_daily f
-), attribution AS (
+), attribution AS MATERIALIZED (
   SELECT f.person_id,f.player_id,
     CASE
       WHEN tracking.started_at IS NOT NULL AND activity.first_activity<tracking.started_at THEN 'pre_tracking'
