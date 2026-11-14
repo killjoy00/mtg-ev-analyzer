@@ -2,6 +2,7 @@
 // must never contain request traces, object/network keys, routes, or raw logs.
 import {pathToFileURL} from 'node:url';
 import {privateQuotaStore} from './private-quota-forensics.mjs';
+import {publicLatencyTriage} from './quota-forensic-triage.mjs';
 import {collectVerifiedTelemetry} from './verified-observability.mjs';
 
 const MAX_PAGES=12,PAGE_SIZE=2000;
@@ -266,12 +267,18 @@ export async function publishQuotaForensics({fetcher=fetch,env=process.env,now=D
     const report=await runQuotaForensics({fetcher,env,now});
     stage='private_storage_save';
     await store.save(report,{runId:env.GITHUB_RUN_ID,attempt:env.GITHUB_RUN_ATTEMPT,sha:env.GITHUB_SHA,now});
+    // Only after readback proves private persistence, emit a constant-vocabulary
+    // conclusion that cannot contain any original telemetry or incident text.
+    return publicLatencyTriage(report);
   } catch(error) {
     if(quotaForensicsFailureCode(error)==='collection_unavailable')throw Object.assign(Error('Private quota investigation unavailable'),{forensicCode:stage});
     throw error;
   }
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
-  publishQuotaForensics().then(()=>console.log('Private quota timing report saved and readback verified.'))
+  publishQuotaForensics().then(triage=>{
+    console.log('Private quota timing report saved and readback verified.');
+    console.log('PACK1_LATENCY_TRIAGE '+JSON.stringify(triage));
+  })
     .catch(error=>{console.error('Quota stage investigation unavailable ('+quotaForensicsFailureCode(error)+'); provider details withheld.');process.exitCode=1;});
 }

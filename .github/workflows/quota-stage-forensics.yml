@@ -5,18 +5,22 @@ on:
     paths:
       - '.github/workflows/quota-stage-forensics.yml'
       - 'scripts/quota-stage-forensics.mjs'
+      - 'scripts/quota-forensic-triage.mjs'
       - 'scripts/private-quota-forensics.mjs'
       - 'scripts/verified-observability.mjs'
       - 'tests/quota-stage-forensics.test.mjs'
+      - 'tests/quota-forensic-triage.test.mjs'
       - 'tests/quota-forensics-collection.test.mjs'
   pull_request:
     branches: [main]
     paths:
       - '.github/workflows/quota-stage-forensics.yml'
       - 'scripts/quota-stage-forensics.mjs'
+      - 'scripts/quota-forensic-triage.mjs'
       - 'scripts/private-quota-forensics.mjs'
       - 'scripts/verified-observability.mjs'
       - 'tests/quota-stage-forensics.test.mjs'
+      - 'tests/quota-forensic-triage.test.mjs'
       - 'tests/quota-forensics-collection.test.mjs'
   workflow_dispatch:
 permissions:
@@ -33,7 +37,7 @@ jobs:
         with:
           node-version: 24
       - name: Test read-only analyzer without provider credentials
-        run: node --test tests/quota-stage-forensics.test.mjs tests/quota-forensics-collection.test.mjs
+        run: node --test tests/quota-stage-forensics.test.mjs tests/quota-forensics-collection.test.mjs tests/quota-forensic-triage.test.mjs
   diagnosis:
     if: github.event_name != 'pull_request'
     environment: pack-one-mobile-release
@@ -50,6 +54,6 @@ jobs:
         with:
           node-version: 24
       - name: Test read-only analyzer
-        run: node --test tests/quota-stage-forensics.test.mjs tests/quota-forensics-collection.test.mjs
+        run: node --test tests/quota-stage-forensics.test.mjs tests/quota-forensics-collection.test.mjs tests/quota-forensic-triage.test.mjs
       - name: Save private settled last-breach and recent stage evidence with verified query coverage
         run: node scripts/quota-stage-forensics.mjs
