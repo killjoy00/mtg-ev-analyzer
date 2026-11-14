@@ -19,6 +19,30 @@ const stageChoice=(entries)=>{
     return 'mixed';
   return sorted[0][0];
 };
+// These labels report coarse association within retained slow cohorts, not
+// trace-level identities, a representative latency distribution, or causality.
+const trafficContext=(groups,total)=>{
+  const keys=['gameplay','admin','account','other'];
+  const values=keys.map(key=>count(groups?.[key]));
+  if(values.some(value=>value===null))return 'unverified';
+  const included=values.reduce((sum,value)=>sum+value,0);
+  if(included>total||included<3||included*4<total*3)return 'unverified';
+  const winner=stageChoice(keys.map((key,i)=>[key,values[i]]));
+  return winner==='mixed'?'mixed':winner;
+};
+const quotaWaitSignal=(window,total,matched)=>{
+  const retry=count(window.slow_with_retry),concurrent=count(window.matched_concurrent),
+    cleanup=count(window.matched_cleanup_overlap);
+  if(retry===null||concurrent===null||cleanup===null||
+    retry>total||concurrent>matched||cleanup>matched)return 'unverified';
+  // Retry is observed on all slow gateway calls; concurrency and cleanup
+  // are only known for slow calls with matched handler completions.
+  const candidates=[];
+  if(retry>=3&&retry*3>=total*2)candidates.push('retry');
+  if(concurrent>=3&&concurrent*3>=matched*2)candidates.push('handler_concurrency');
+  if(cleanup>=3&&cleanup*3>=matched*2)candidates.push('cleanup_overlap');
+  return candidates.length===1?candidates[0]:candidates.length?'multiple':'no_majority';
+};
 function classifyRequestWindow(window) {
   const issue=1272;
   if(window?.status==='skipped')return {...blank(issue),'outcome':'not_collected'};
@@ -35,13 +59,14 @@ function classifyRequestWindow(window) {
   if(attributable<3||attributable*4<total*3)
     return {...base,outcome:'stage_coverage_incomplete',next_action:'verify_gateway_stage_coverage'};
   const stage=stageChoice([['quota',quota],['origin',origin],['gateway_or_unmeasured',other]]);
+  const traffic_context=trafficContext(slow.route_groups,total);
   if(stage==='mixed')
     return {...base,outcome:'mixed_stages',suspected_stage:'mixed',evidence:'directional',
-      next_action:'compare_private_request_stage_cohorts'};
+      traffic_context,next_action:'compare_private_request_stage_cohorts'};
   const actions={quota:'inspect_quota_path',origin:'inspect_origin_backend',
     gateway_or_unmeasured:'inspect_gateway_residual'};
   return {...base,outcome:'dominant_observed_stage',suspected_stage:stage,
-    evidence:total>=10?'moderate':'preliminary',next_action:actions[stage]};
+    evidence:total>=10?'moderate':'preliminary',traffic_context,next_action:actions[stage]};
 }
 function classifyQuotaWindow(window) {
   const issue=1273;
@@ -67,6 +92,13 @@ function classifyQuotaWindow(window) {
     return {...base,outcome:'correlation_incomplete',suspected_stage:stage,evidence:'preliminary',
       next_action:'verify_handler_completion_correlation'};
   let action=stage==='quota_transport_wait'?'inspect_quota_transport_dispatch':'inspect_quota_handler';
+  const wait_signal=stage==='quota_transport_wait'?quotaWaitSignal(window,total,matched):undefined;
+  if(stage==='quota_transport_wait') {
+    const actions={retry:'inspect_retry_attempt_timing',
+      handler_concurrency:'inspect_handler_concurrency_wait',
+      cleanup_overlap:'inspect_quota_cleanup_overlap'};
+    action=actions[wait_signal]||action;
+  }
   if(stage==='quota_handler') {
     const durability=count(window.stages?.durability?.gt_1000ms);
     const transaction=count(window.stages?.transaction?.gt_1000ms);
@@ -76,7 +108,8 @@ function classifyQuotaWindow(window) {
       action='inspect_quota_storage_transaction';
   }
   return {...base,outcome:'dominant_observed_stage',suspected_stage:stage,
-    evidence:total>=10?'moderate':'preliminary',next_action:action};
+    evidence:total>=10?'moderate':'preliminary',
+    ...(wait_signal===undefined?{}:{wait_signal}),next_action:action};
 }
 export function publicLatencyTriage(report) {
   // Exact named incident windows only. Duplicate or malformed window names
