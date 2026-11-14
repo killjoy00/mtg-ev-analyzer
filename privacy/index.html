@@ -51,6 +51,7 @@
       <h2>Gameplay, analytics, and decision reports</h2>
       <p>Pack One stores gameplay inputs and results needed to score runs, preserve progress, show history, support Daily leaderboards, and operate account features. Pack One also records product events such as page views, game starts, reveals, challenge opens and completions, shares, and outbound commerce clicks so it can understand whether the product works and where players stop in the experience.</p>
       <p>Analytics use a Pack One player identifier and a random browser-session identifier to understand repeat play. Gameplay properties are allowlisted; email addresses, passwords, auth tokens, and raw page URLs are not included in product events. Campaign tags may be recorded, and when no campaign source is present Pack One may record only the referring site&rsquo;s hostname, not its path or query.</p>
+      <p>On packone.pro, the information pages (such as Learn, the set guides, and How to Play) use Cloudflare Web Analytics to count visits. It does not record query strings, and Cloudflare says it does not collect or use personal data from visitors.</p>
       <p>If you use Report this decision, Pack One stores the selected reason, optional comment, the reported decision and run context, scoring/corpus/release context, client platform/version/build when available, a timestamp, and the existing Pack One player identifier. Decision reports do not include email addresses, passwords, or auth tokens. If the associated player record is deleted, a report may remain without that player identifier so product-quality evidence can still be reviewed in aggregate.</p>
 
       <h2>Profiles and shared challenges</h2>
@@ -92,5 +93,6 @@
 <script type="module" src="/ads.mjs"></script>
 <script type="module" src="/tcgplayer.mjs"></script>
 <script type="module" src="/site-nav.mjs?v=3"></script>
+<!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "1e5f4bc7354743d6be1c6382ad704dd2"}'></script><!-- End Cloudflare Web Analytics -->
 </body>
 </html>

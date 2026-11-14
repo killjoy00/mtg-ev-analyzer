@@ -46,6 +46,7 @@ for(const id of GUIDE_IDS) {
 <script src="/leaderboard-config.js"></script>
 <script type="module" src="/site-nav.mjs?v=3"></script>
 <script type="module" src="/sets/guide-page.mjs?v=1"></script>
+<!-- Cloudflare Web Analytics --><script type='module' src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "1e5f4bc7354743d6be1c6382ad704dd2"}'></script><!-- End Cloudflare Web Analytics -->
 </body>
 </html>
 `;
