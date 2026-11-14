@@ -177,7 +177,8 @@ const parseCanonicalTime=value=>{
 const INCIDENT_REPLAYS=[[1272,'slow_requests'],[1273,'slow_quota']];
 const INCIDENT_MARKER=/<!-- pack1-launch-incident-v1\s*\n(\{[^\r\n]{20,4000}\})\s*\n-->/;
 export function incidentReplayWindow(issue,number,condition,now) {
-  if(issue?.number!==number||issue?.state!=='open'||typeof issue?.body!=='string')throw Error('Invalid launch incident source');
+  if(issue?.number!==number||!['open','closed'].includes(issue?.state)||typeof issue?.body!=='string')throw Error('Invalid launch incident source');
+  if(issue.state==='closed')return {name:condition+'_last_breach',status:'skipped',reason:'incident_closed'};
   const marker=issue.body.match(INCIDENT_MARKER);
   if(!marker)throw Error('Missing launch incident state');
   let state;
