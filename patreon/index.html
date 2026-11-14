@@ -13,8 +13,8 @@
   <meta property="og:image" content="https://packone.pro/mobile/assets/images/icon.png" />
   <meta property="og:image:alt" content="Pack One" />
   <link rel="canonical" href="https://packone.pro/patreon/" />
-  <link rel="stylesheet" href="/visual-c.css?v=13" />
-  <link rel="stylesheet" href="/editorial.css?v=9" />
+  <link rel="stylesheet" href="/visual-c.css?v=14" />
+  <link rel="stylesheet" href="/editorial.css?v=10" />
   <title>Pack One Elite</title>
 </head>
 <body data-page="editorial">
@@ -33,49 +33,43 @@
 
 <main id="app" class="editorial-main">
   <section class="landing-hero">
-    <p class="kicker">Membership</p>
-    <h1>Pack One Elite</h1>
-    <p class="deck">Check your membership and see what’s unlocked.</p>
+    <p class="kicker">Pack One membership</p>
+    <h1>Practice the sets you want.</h1>
+    <p class="deck">Elite lets you choose your sets and play unlimited Powered Cube runs. Your three Dailies stay free.</p>
   </section>
 
+  <section class="membership-plans" aria-label="Compare Pack One memberships">
+    <article class="content-card">
+      <p class="kicker">Free</p><h2>Play every day</h2><p class="membership-price">$0</p>
+      <ul><li>All three daily challenges, with no account required.</li><li>Unlimited regular, mixed-set practice with a free account.</li></ul>
+      <a class="button secondary" href="/">Play the Dailies</a>
+    </article>
+    <article class="content-card">
+      <p class="kicker">Supporter</p><h2>Help keep Pack One going</h2><p class="membership-price">$3/month <small>on Patreon</small></p>
+      <ul><li>Support development and new set coverage.</li><li>No display ads or TCGplayer promotions while signed in with your membership connected.</li><li>All the free features.</li></ul>
+      <button class="button secondary" type="button" data-membership-purchase="supporter">Become a Supporter</button>
+    </article>
+    <article class="content-card membership-elite">
+      <p class="kicker">Pack One Elite</p><h2>Choose what to practice</h2><p class="membership-price">$7/month <small>on Patreon</small></p>
+      <ul><li>Choose one set or combine several for your practice runs.</li><li>Play unlimited Powered Cube practice.</li><li>All Supporter benefits, including ad-free browsing.</li></ul>
+      <button class="button primary" type="button" data-membership-purchase="elite">Get Elite</button>
+    </article>
+  </section>
+  <p class="membership-how">Choose a membership, sign in to Pack One, then subscribe on Patreon. After payment, return here and connect Patreon to unlock your benefits. Use the same Pack One account on the website and app. Patreon shows the final price and any taxes before you pay.</p>
+  <p data-membership-purchase-status role="status"></p>
+
   <aside class="article-cta" id="connect" data-patreon-connect-card data-state="loading" aria-labelledby="patreon-current-title">
-    <p class="kicker">Current access</p>
-    <h2 id="patreon-current-title" data-patreon-title>Checking this account…</h2>
-    <p data-patreon-status role="status">Checking your Pack One and Patreon status…</p>
+    <p class="kicker">Already subscribed?</p>
+    <h2 id="patreon-current-title" data-patreon-title>Connect your membership</h2>
+    <p data-patreon-status role="status">Checking your account…</p>
     <div class="account-actions">
       <button class="button primary" type="button" data-patreon-connect disabled>Checking…</button>
       <a class="button secondary" data-patreon-offsite href="https://www.patreon.com/c/PackOne" rel="noopener noreferrer" hidden>View Patreon membership</a>
     </div>
   </aside>
-
-  <div class="editorial-section-head">
-    <p class="kicker">Membership benefits</p>
-    <h2>Ad-free play, plus more practice with Elite.</h2>
-    <p>Supporter and Elite members get ad-free browsing when they connect their active Patreon membership to Pack One. Elite also gives you unlimited Powered Cube practice and lets you choose the sets for your regular Draft Runs. If you're only drafting the newest set, you can play as many runs of that set as you want. All three daily challenges are still free for everyone.</p>
-  </div>
-  <section class="learn-directory" aria-label="Pack One membership benefits">
-    <article class="content-card">
-      <p class="kicker">Supporter + Elite</p>
-      <h2>Ad-free browsing</h2>
-      <p>Both Supporter and Elite include ad-free browsing. Connect your Patreon membership to your Pack One account and we'll confirm your access.</p>
-    </article>
-    <article class="content-card">
-      <p class="kicker">Elite · Powered Cube</p>
-      <h2>Practice whenever you want</h2>
-      <p>Play eight-decision sessions from real Powered Cube trophy drafts.</p>
-      <a href="/?game=draft-run&set=powered-cube">See Powered Cube practice</a>
-    </article>
-    <article class="content-card">
-      <p class="kicker">Elite · Custom sets</p>
-      <h2>Choose what to work on</h2>
-      <p>Build practice runs from the regular sets you want instead of taking whatever comes next.</p>
-      <a href="/?game=draft-run&custom=1">See custom-set practice</a>
-    </article>
-  </section>
-
   <details class="article-cta patreon-troubleshooting">
-    <summary><strong>Having trouble with Patreon access?</strong></summary>
-    <p>Already subscribed? Don't pay again. Sign in to the Pack One account you want to use, then reconnect or refresh Patreon and check your access. You can manage your membership on Patreon.</p>
+    <summary><strong>Having trouble with membership access?</strong></summary>
+    <p>Already subscribed? Don't pay again. Sign in to the Pack One account you used for your membership. For Patreon, reconnect or refresh your access here. For an Apple subscription, use Restore Purchases in the iOS app. Manage or cancel billing with the provider you subscribed through.</p>
   </details>
 </main>
 
@@ -84,6 +78,6 @@
   <nav aria-label="Footer"><a href="/about/">About</a><a href="/contact/">Contact</a><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a></nav>
 </footer>
 <script type="module" src="/site-nav.mjs?v=3"></script>
-<script type="module" src="/patreon-page.mjs?v=5"></script>
+<script type="module" src="/patreon-page.mjs?v=6"></script>
 </body>
 </html>

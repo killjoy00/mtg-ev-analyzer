@@ -1,8 +1,9 @@
 import { escapeHtml as esc } from './html.mjs';
 import {sanitizeAdminDestination} from './admin/admin-return.mjs';
-import { accountAuthCompleted, completeAppleDeletion, completeAppleSignIn, completeEmailVerification, completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, linkAccount, loadMyProfile, requestPasswordReset, requestVerificationEmail, signInAccount, signOutAccount, signUpAccount, startAppleSignIn, startGoogleSignIn, updateProfile } from './growth-api.mjs';
-import { clearPatreonActivation, hasPatreonActivationIntent, rememberPatreonActivation, renderPatreonActivation as renderPatreonActivationPage } from './patreon-activation.mjs?v=2';
+import { accountAuthCompleted, completeAppleDeletion, completeAppleSignIn, completeEmailVerification, completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, loadPatreonStatus, linkAccount, loadMyProfile, requestPasswordReset, requestVerificationEmail, signInAccount, signOutAccount, signUpAccount, startAppleSignIn, startGoogleSignIn, updateProfile } from './growth-api.mjs';
+import { clearPatreonActivation, hasPatreonActivationIntent, rememberPatreonActivation, renderPatreonActivation as renderPatreonActivationPage } from './patreon-activation.mjs?v=3';
 import { flushEvents, trackEvent as event } from './retention-events.mjs';
+import {eliteSource} from './membership-source.mjs';
 import {sharedRunId,sharedRunInvitationId,sharedRunInvitationPath} from './shared-run-links.mjs';
 
 let currentAccount = null;
@@ -120,6 +121,18 @@ function formMarkup(kind) {
 }
 
 async function openEliteLanding(source='account') {
+  if(['membership_elite','membership_supporter'].includes(source)) {
+    const membership=await loadPatreonStatus();
+    const tier=source==='membership_supporter'?'supporter':'elite';
+    if(eliteSource(membership)||membership?.membership?.sync_pending||(tier==='supporter'&&membership?.ad_free===true)) {
+      location.assign('/patreon/#connect');return;
+    }
+    if(membership?.configured!==true)throw Error('Membership checkout is temporarily unavailable. Please try again.');
+    event('membership_checkout_started',{source:'patreon',type:tier,context:'web'});
+    await flushEvents().catch(()=>{});
+    location.assign('https://www.patreon.com/checkout/PackOne?rid='+(tier==='elite'?'29631843':'29631835'));
+    return;
+  }
   event('elite_upgrade_handoff',{source});
   await flushEvents().catch(()=>{});
   location.assign('/patreon/');
@@ -157,7 +170,13 @@ async function claimCurrentSession() {
 
 export async function beginEliteUpgrade({ source='unknown' } = {}) {
   event('elite_upgrade_clicked',{source});
-  return renderAccount({intent:'elite',source});
+  return openEliteLanding(source);
+}
+
+export async function beginMembershipPurchase(tier) {
+  if(!['supporter','elite'].includes(tier))throw Error('Choose a membership.');
+  event('membership_purchase_clicked',{source:'patreon',type:tier,context:'web'});
+  return renderAccount({intent:'elite',source:'membership_'+tier});
 }
 
 export async function renderForgotPassword() {
@@ -404,15 +423,15 @@ export async function renderAccount({ validateDailyRunId = null, sharedRunId: in
   const upgradingElite=intent==='elite';
   const activatingPatreon=intent==='patreon-activate';
   const authMode=reauthenticate||activeAdminReturn()?'signin':mode==='signup'||mode==='signin'?mode:(validatingDaily||upgradingElite||activatingPatreon?'signup':'signin');
-  const heading=reauthenticate?'Sign in again':validatingDaily?'Add your score to the leaderboard.':activatingPatreon?'Activate Pack One Elite':upgradingElite?'Unlock Elite practice.':authMode==='signup'?'Create Account':'Sign In';
+  const heading=reauthenticate?'Sign in again':validatingDaily?'Add your score to the leaderboard.':activatingPatreon?'Connect your membership':upgradingElite?(source==='membership_supporter'?'Become a Supporter.':'Get Pack One Elite.'):authMode==='signup'?'Create Account':'Sign In';
   const intro=reauthenticate
     ? 'Use your existing Pack One account to renew your secure session. This will not clear your saved progress.'
     : validatingDaily
       ? 'Sign in or create a free account to validate this Daily score and add it to today’s leaderboard.'
     : activatingPatreon
-      ? 'Sign in or create your free Pack One account. Then authorize Patreon so Pack One can verify and activate Elite.'
+      ? 'Sign in to the Pack One account you want to use, then connect Patreon to unlock your membership benefits.'
       : upgradingElite
-        ? 'Create or sign in to your free Pack One account first. Then we’ll show you the Elite benefits and Patreon connection steps.'
+        ? 'Sign in or create your free Pack One account, then continue to Patreon to subscribe. After payment, connect Patreon to unlock your benefits.'
         : '';
   const providerVerb=authMode==='signup'?'Create':'Sign in';
   const social=firstPartyAuthEnabled()

@@ -78,8 +78,8 @@ export const privacySections: ArticleSection[] = [
   {
     title: 'Gameplay, analytics, and decision reports',
     body: [
-      'Pack One stores gameplay inputs and results needed to score runs, preserve progress, show history, support Daily leaderboards, and operate account features. Pack One also records product events such as page views, game starts, reveals, challenge opens and completions, shares, and outbound commerce clicks so it can understand whether the product works and where players stop in the experience.',
-      'Analytics use a Pack One player identifier and a random browser-session identifier to understand repeat play. Gameplay properties are allowlisted; email addresses, passwords, auth tokens, and raw page URLs are not included in product events. Campaign tags may be recorded, and when no campaign source is present Pack One may record only the referring site’s hostname, not its path or query.',
+      'Pack One stores gameplay inputs and results needed to score runs, preserve progress, show history, support Daily leaderboards, and operate account features. Pack One also records product events such as page views, game starts, reveals, challenge opens and completions, shares, membership checkout and restoration steps, and outbound commerce clicks so it can understand whether the product works and where players stop in the experience.',
+      'Analytics use a Pack One player identifier and a random browser or app-session identifier to understand repeat play. Gameplay properties are allowlisted; email addresses, passwords, auth tokens, and raw page URLs are not included in product events. Campaign tags may be recorded, and when no campaign source is present Pack One may record only the referring site’s hostname, not its path or query.',
       'If you use Report this decision, Pack One stores the selected reason, optional comment, the reported decision and run context, scoring/corpus/release context, client platform/version/build when available, a timestamp, and the existing Pack One player identifier. Decision reports do not include email addresses, passwords, or auth tokens. If the associated player record is deleted, a report may remain without that player identifier so product-quality evidence can still be reviewed in aggregate.',
     ],
   },
@@ -170,7 +170,7 @@ export const termsSections: ArticleSection[] = [
   {
     title: 'TCGplayer affiliate relationship',
     body: [
-      "Pack One participates in TCGplayer's affiliate program through Impact. TCGplayer links and the Daily-home TCGplayer promotion are sponsored/affiliate links, and Pack One may earn a commission from eligible purchases. The price a buyer pays is not increased by Pack One's commission. The Daily-home promotion includes an adjacent commission disclosure and is excluded for visitors whose verified membership is ad-free.",
+      "Pack One participates in TCGplayer's affiliate program through Impact. TCGplayer links and the Daily-home TCGplayer promotion are sponsored/affiliate links, and Pack One may earn a commission from eligible purchases. The price a buyer pays is not increased by Pack One's commission. The Daily-home promotion includes an adjacent commission disclosure. Verified ad-free memberships hide that promotion and individual-card TCGplayer links on the website and app.",
     ],
   },
   {

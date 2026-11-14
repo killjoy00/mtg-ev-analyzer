@@ -1,4 +1,6 @@
--- Patreon purchase-to-activation funnel. Read-only; safe to run against production.
+-- LEGACY internal-offer-to-activation funnel (not Patreon checkout). Read-only; safe to run against production.
+-- elite_upgrade_handoff navigates to /patreon/ inside Pack One.
+-- Use membership_funnel.sql for explicit checkout and restore stages.
 -- Browser events are UX-stage markers only. The authoritative numerator is the
 -- server-written elite_activated transition emitted when Patreon premium grants
 -- move from revoked/not-present to active.

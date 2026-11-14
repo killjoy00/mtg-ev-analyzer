@@ -31,12 +31,13 @@ export function clearPatreonActivation() {
 function shell(body,actions='') {
   document.body.classList.remove('is-game');
   const app=document.querySelector('#app');if(!app)return;
-  app.innerHTML=`<section class="account-page growth-page patreon-activation-page"><header><p class="eyebrow">Membership</p><h1>Activate Pack One Elite</h1><p>Pack One verifies Elite directly with Patreon before unlocking premium practice.</p></header><div class="message-card">${body}${actions?`<div class="account-actions">${actions}</div>`:''}</div></section>`;
+  app.innerHTML=`<section class="account-page growth-page patreon-activation-page"><header><p class="eyebrow">Membership</p><h1>Connect your membership</h1><p>Use the same Pack One account on the website and app.</p></header><div class="message-card">${body}${actions?`<div class="account-actions">${actions}</div>`:''}</div></section>`;
   document.querySelectorAll('[data-patreon-activation-exit]').forEach(link=>link.addEventListener('click',clearPatreonActivation));
 }
 
 export async function startPatreonOAuth(source) {
   rememberPatreonActivation(source);
+  event('membership_connection_started',{source:'patreon',context:'web'});
   event('patreon_activation_oauth_started',{source:activationSource(source)});
   const result=await connectPatreon();
   let target=null;
@@ -78,6 +79,7 @@ export async function renderPatreonActivation({result=null,source='welcome_note'
   const elite=patreon?.capabilities?.includes('custom_corpus')&&patreon?.capabilities?.includes('unlimited_cube_practice');
   if(elite) {
     signalAccountChange();
+    event('membership_connection_succeeded',{source:'patreon',type:'elite',context:'web'});
     event('patreon_activation_succeeded',{source:activationSource(source)});
     clearPatreonActivation();
     shell('<h2>Elite is active.</h2><p>Powered Cube practice and custom-set practice are unlocked.</p>',
@@ -117,11 +119,11 @@ export async function renderPatreonActivation({result=null,source='welcome_note'
     return;
   }
   if(!patreon?.connected) {
-    shell('<h2>Authorize Patreon to activate Elite.</h2><p>You are signed in to Pack One. Patreon authorization is the remaining step.</p><p id="patreon-activation-status" aria-live="polite">Opening Patreon…</p>',
-      '<button class="button primary" id="patreon-activation-oauth" type="button">Activate Elite</button><a class="button secondary" data-patreon-activation-exit href="./">Not now</a>');
+    shell('<h2>Connect your Patreon membership.</h2><p>You are signed in to Pack One. Connect Patreon to check your benefits.</p><p id="patreon-activation-status" aria-live="polite">Opening Patreon…</p>',
+      '<button class="button primary" id="patreon-activation-oauth" type="button">Connect Patreon</button><a class="button secondary" data-patreon-activation-exit href="./">Not now</a>');
     bindOAuth(source);
     try {await startPatreonOAuth(source);} catch(error) {
-      const status=document.querySelector('#patreon-activation-status');if(status)status.textContent=error?.message||'Use Activate Elite to try again.';
+      const status=document.querySelector('#patreon-activation-status');if(status)status.textContent=error?.message||'Use Connect Patreon to try again.';
       const button=document.querySelector('#patreon-activation-oauth');if(button)button.disabled=false;
     }
     return;
@@ -131,6 +133,13 @@ export async function renderPatreonActivation({result=null,source='welcome_note'
   if(patreon?.membership?.sync_pending||(result==='connected'&&state==='unknown')) {
     shell('<h2>Your Patreon account is connected.</h2><p>We’re waiting for the latest membership update.</p><p id="patreon-activation-status" aria-live="polite"></p>',retry+'<a class="button secondary" data-patreon-activation-exit href="./">Back to Pack One</a>');
     bindOAuth(source);return;
+  }
+  if(state==='active_non_elite' && patreon?.ad_free===true) {
+    signalAccountChange();clearPatreonActivation();
+    event('membership_connection_succeeded',{source:'patreon',type:'supporter',context:'web'});
+    shell('<h2>Supporter is active.</h2><p>Display ads and TCGplayer promotions are hidden while you are signed in. Thank you for supporting Pack One.</p>',
+      '<a class="button primary" href="/">Play the Dailies</a><a class="button secondary" href="/practice/">Open Practice</a>');
+    return;
   }
   if(state==='active_non_elite') {
     shell('<h2>Patreon is connected, but Elite is not active.</h2><p>Pack One currently sees a non-Elite Patreon membership. If you just upgraded, check Patreon again.</p><p id="patreon-activation-status" aria-live="polite"></p>',

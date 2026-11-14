@@ -99,6 +99,7 @@ async function fixture(options = {}) {
   const Tabs = host('Tabs'); Tabs.Screen = host('TabScreen');
   const native = Object.fromEntries(['Pressable', 'Text', 'View', 'ScrollView', 'ActivityIndicator'].map(name => [name, host(name)]));
   const mocks = {
+    '@/src/hooks/useCardCommerce': { useCardCommerce: () => true },
     'react-native': { ...native, StyleSheet: { create: x => x }, useWindowDimensions: () => ({ width: 320, height: 740, fontScale: 1.5 }) },
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: 24, bottom: 20, left: 0, right: 0 }) },
     'expo-image': { Image: host('Image') },
@@ -375,6 +376,7 @@ test('archive play action returns to the existing Practice tab', async () => {
   const stack = returnStack('set-archive');
   const native = Object.fromEntries(['Pressable', 'Text', 'View', 'ScrollView'].map(name => [name, host(name)]));
   const load = compiler({
+    '@/src/hooks/useCardCommerce': { useCardCommerce: () => true },
     'react-native': { ...native, StyleSheet: { create: x => x }, Linking: { openURL: async () => {} } },
     'expo-image': { Image: host('Image') },
     'expo-router': { useLocalSearchParams: () => ({ setId: 'msh' }), router: { dismissTo: to => stack.dispatch('POP_TO', to) } },
