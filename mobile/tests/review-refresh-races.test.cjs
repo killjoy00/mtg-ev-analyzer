@@ -98,6 +98,7 @@ test('Home refreshes loaded Daily state on focus and Pacific rollover without bl
   globalThis.clearInterval = () => {};
 
   const mocks = {
+    '@/src/hooks/useCardCommerce': { useCardCommerce: () => true },
     'expo-image': { Image: host('Image') },
     'expo-router': {
       router: { push() {} },
@@ -214,6 +215,7 @@ test('Career rejects a stale pagination page after account identity changes', as
   let sessionCalls = 0;
 
   const mocks = {
+    '@/src/hooks/useCardCommerce': { useCardCommerce: () => true },
     'expo-router': { router: { push() {} }, useFocusEffect: focus.useFocusEffect },
     'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       ActivityIndicator: host('ActivityIndicator'),
@@ -330,6 +332,7 @@ test('successful authentication returns to Practice even when optional profile/c
   };
 
   const mocks = {
+    '@/src/hooks/useCardCommerce': { useCardCommerce: () => true },
     'expo-apple-authentication': {
       isAvailableAsync: async () => true,
       signInAsync: async () => { throw new Error('not used'); },
@@ -475,6 +478,7 @@ test('Profile visibility toggles an initially public profile off on the first ta
   };
   const writes = [];
   const mocks = {
+    '@/src/hooks/useCardCommerce': { useCardCommerce: () => true },
     'expo-router': { router: { push() {} } },
     'expo-web-browser': { openBrowserAsync: async () => ({ type: 'cancel' }) },
     'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
@@ -626,6 +630,7 @@ test('Learn keeps core education native and opens each selected drafting guide d
   const pushed = [];
   const opened = [];
   const mocks = {
+    '@/src/hooks/useCardCommerce': { useCardCommerce: () => true },
     'expo-router': { router: { push(value) { pushed.push(value); } } },
     'expo-web-browser': { openBrowserAsync: async (url) => { opened.push(url); } },
     'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
@@ -664,6 +669,7 @@ test('Learn keeps core education native and opens each selected drafting guide d
 
 test('Learn exposes a visible retry message when the canonical browser handoff fails', async () => {
   const mocks = {
+    '@/src/hooks/useCardCommerce': { useCardCommerce: () => true },
     'expo-router': { router: { push() {} } },
     'expo-web-browser': { openBrowserAsync: async () => { throw new Error('browser unavailable'); } },
     'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
@@ -694,6 +700,7 @@ test('published set archive renders current editorial evidence and exact disclos
     closeDecisions: [{ first: 'Cosmic Cube', second: 'The Mighty Thor, Jane Foster', firstSupport: '37.7%', secondSupport: '37.6%', gap: '0.1%' }],
   };
   const mocks = {
+    '@/src/hooks/useCardCommerce': { useCardCommerce: () => true },
     'expo-image': { Image: host('Image') },
     'expo-router': { router: { replace() {}, push() {} }, useLocalSearchParams: () => ({ setId: 'msh' }) },
     'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
@@ -731,6 +738,7 @@ test('published set archive keeps the analysis mounted when affiliate browser ha
     topCards: [{ name: 'Cosmic Cube', imageUrl: 'https://cards.example/cube.jpg' }], closeDecisions: [],
   };
   const mocks = {
+    '@/src/hooks/useCardCommerce': { useCardCommerce: () => true },
     'expo-image': { Image: host('Image') },
     'expo-router': { router: { replace() {}, push() {} }, useLocalSearchParams: () => ({ setId: 'msh' }) },
     'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
@@ -767,6 +775,7 @@ test('Daily home shows the disclosed TCGplayer fallback to guests without a memb
   let membershipCalls = 0;
   const opened = [];
   const mocks = {
+    '@/src/hooks/useCardCommerce': { useCardCommerce: () => true },
     'expo-image': { Image: host('Image') },
     'expo-router': { router: { push() {} }, useFocusEffect: focus.useFocusEffect },
     'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
@@ -809,6 +818,7 @@ test('Daily home hides promotion for signed-in ad-free, failed, or unverified me
   ]) {
     const focus = focusControl();
     const mocks = {
+    '@/src/hooks/useCardCommerce': { useCardCommerce: () => true },
       'expo-image': { Image: host('Image') },
       'expo-router': { router: { push() {} }, useFocusEffect: focus.useFocusEffect },
       'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
@@ -845,6 +855,7 @@ test('Daily home rejects late promotion eligibility from a previous signed-in ac
   const accountA = { playerToken: 'player-a', accountToken: 'account-a' };
   const accountB = { playerToken: 'player-b', accountToken: 'account-b' };
   const mocks = {
+    '@/src/hooks/useCardCommerce': { useCardCommerce: () => true },
     'expo-image': { Image: host('Image') },
     'expo-router': { router: { push() {} }, useFocusEffect: focus.useFocusEffect },
     'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
@@ -881,6 +892,7 @@ test('Daily home rejects late promotion eligibility from a previous signed-in ac
 test('Daily home keeps the promo mounted and reports a retryable error when TCGplayer handoff fails', async () => {
   const focus = focusControl();
   const mocks = {
+    '@/src/hooks/useCardCommerce': { useCardCommerce: () => true },
     'expo-image': { Image: host('Image') },
     'expo-router': { router: { push() {} }, useFocusEffect: focus.useFocusEffect },
     'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),

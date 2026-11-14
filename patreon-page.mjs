@@ -1,5 +1,6 @@
 import { getAuthSession, loadPatreonStatus } from '/growth-api.mjs';
-import { startPatreonOAuth } from '/patreon-activation.mjs?v=2';
+import { startPatreonOAuth } from '/patreon-activation.mjs?v=3';
+import {trackEvent,flushEvents} from '/retention-events.mjs';
 import { eliteSource } from '/membership-source.mjs';
 
 const statusNode=document.querySelector('[data-patreon-status]');
@@ -49,10 +50,9 @@ async function renderMembershipState() {
     action.disabled=false;
     action.onclick=async()=>{
       action.disabled=true;
-      const { beginEliteUpgrade }=await import('/growth.mjs?v=32');
-      await beginEliteUpgrade({source:'patreon_landing'});
+      location.assign('/?patreon=activate');
     };
-    setStatus('Sign in or create a free Pack One account to connect membership and keep Elite access with the right player record.',{state:'signed-out',heading:'Sign in to check your access'});
+    setStatus('Sign in to the Pack One account you want to use, then connect your existing Patreon membership.',{state:'signed-out',heading:'Sign in to check your access'});
     return;
   }
 
@@ -68,16 +68,27 @@ async function renderMembershipState() {
   }
 
   const source=eliteSource(patreon);
+  document.querySelectorAll('[data-membership-purchase]').forEach(button=>{
+    button.hidden=Boolean(source)||(button.dataset.membershipPurchase==='supporter'&&patreon?.ad_free===true);
+  });
   if(source) {
     action.textContent='Open Practice';
     action.disabled=false;
     action.onclick=()=>location.assign('/practice/');
     // Only Patreon-sourced Elite is managed on Patreon; an Apple subscriber is not sent there.
     setStatus(source==='apple'
-      ? 'Powered Cube and custom-set practice are unlocked through your Apple App Store subscription. Manage it in your Apple subscription settings.'
-      : 'Powered Cube and custom-set practice are unlocked on this Pack One account.',source==='patreon'
+      ? 'Elite is active through Apple, including ad-free browsing. Use the same Pack One account in the app. Manage billing in Apple subscription settings.'
+      : 'Your choice of sets, Powered Cube practice, and ad-free browsing are unlocked on this Pack One account.',source==='patreon'
       ? {state:'elite',heading:'Elite is active',showPatreon:true,patreonLabel:'Manage Patreon membership'}
       : {state:'elite',heading:'Elite is active'});
+    return;
+  }
+
+  if(patreon?.connected && patreon?.ad_free===true) {
+    action.textContent='Open Practice';action.disabled=false;
+    action.onclick=()=>location.assign('/practice/');
+    setStatus('Display ads and TCGplayer promotions are hidden while you are signed in. Elite adds Powered Cube and your choice of sets.',
+      {state:'supporter',heading:'Supporter is active',showPatreon:true,patreonLabel:'Manage Patreon membership'});
     return;
   }
 
@@ -121,4 +132,18 @@ async function bootMembershipState() {
   await renderMembershipState();
 }
 
-void bootMembershipState();
+document.querySelectorAll('[data-membership-purchase]').forEach(button=>button.addEventListener('click',async()=>{
+  button.disabled=true;
+  const status=document.querySelector('[data-membership-purchase-status]');
+  try {
+    if(!globalThis.PACK1_API)await import('/leaderboard-config.js');
+    const {beginMembershipPurchase}=await import('/growth.mjs?v=33');
+    await beginMembershipPurchase(button.dataset.membershipPurchase);
+  } catch(error) {if(status)status.textContent=error?.message||'Could not open membership. Please try again.';}
+  finally {button.disabled=false;}
+}));
+offsite?.addEventListener('click',()=>{
+  trackEvent('membership_provider_opened',{source:'patreon',context:'manage'});
+  void flushEvents();
+});
+void bootMembershipState().then(()=>trackEvent('membership_offer_viewed',{source:'membership_page',context:'web'}));

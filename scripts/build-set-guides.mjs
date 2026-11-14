@@ -21,8 +21,8 @@ for(const id of GUIDE_IDS) {
   <meta property="og:url" content="https://packone.pro/sets/${id}/guide/" />
   <meta property="og:image" content="https://packone.pro/mobile/assets/images/icon.png" />
   <link rel="canonical" href="https://packone.pro/sets/${id}/guide/" />
-  <link rel="stylesheet" href="/visual-c.css?v=13" />
-  <link rel="stylesheet" href="/editorial.css?v=9" />
+  <link rel="stylesheet" href="/visual-c.css?v=14" />
+  <link rel="stylesheet" href="/editorial.css?v=10" />
   <link rel="stylesheet" href="/set-guides.css?v=4" data-set-guide-styles />
   <title>${esc(title)}</title>
 </head>

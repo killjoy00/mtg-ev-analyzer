@@ -44,6 +44,7 @@ async function fixture({ environment = 'mixed', guest = false, dailyStatus = sta
   const Image = host('Image');
   Image.prefetch = async () => {};
   const mocks = {
+    '@/src/hooks/useCardCommerce': { useCardCommerce: () => true },
     'expo-web-browser': { openBrowserAsync: async () => ({ type: 'dismiss' }) },
     'expo-haptics': { selectionAsync: async () => {}, notificationAsync: async () => {}, NotificationFeedbackType: { Success: 'success' } },
     'expo-image': { Image },

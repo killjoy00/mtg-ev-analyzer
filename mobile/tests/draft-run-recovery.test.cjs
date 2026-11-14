@@ -97,6 +97,7 @@ async function fixture(options = {}) {
   const Image = host('Image');
   Image.prefetch = async () => {};
   const mocks = {
+    '@/src/hooks/useCardCommerce': { useCardCommerce: () => options.commerceAllowed ?? true },
     'expo-application': { nativeApplicationVersion: '1.0', nativeBuildVersion: '1' },
     'expo-web-browser': { openBrowserAsync: async () => ({ type: 'dismiss' }) },
     'expo-haptics': {
@@ -434,5 +435,17 @@ test('account switching invalidates mounted gameplay and discards a delayed pick
     await act(async () => { pending.resolve({ ...runZero(), revision: 5, round: 1, answers: [answer(0, 'a', 88)], current: puzzle(1) }); await flush(); });
     assert.doesNotMatch(screen.text(), /You picked/);
     assert.match(screen.text(), /Your account changed/);
+  } finally { await screen.close(); }
+});
+
+
+test('paid membership hides every card promotion even after Compare all is expanded', async () => {
+  const completedPick = { ...runZero(), revision: 5, round: 1, answers: [answer(0, 'a', 88)], current: puzzle(1) };
+  const screen = await fixture({ commerceAllowed: false, submitPick: async () => completedPick });
+  try {
+    await screen.chooseAndConfirm();
+    await act(async () => pressable(screen, 'Compare all').props.onPress());
+    assert.doesNotMatch(screen.text(), /TCGplayer|Affiliate links|commission/);
+    assert.equal(screen.root.root.findAll(node => node.type === 'Pressable' && String(node.props.accessibilityLabel).includes('TCGplayer')).length, 0);
   } finally { await screen.close(); }
 });
