@@ -186,7 +186,7 @@ assert.doesNotMatch(sets, /href="\/sets\/">View sets<\/a>/, 'Sets should not lin
     assert.equal((html.match(beacon) || []).length, 1, `${path} loads the Cloudflare Web Analytics beacon once`);
   }
   assert.doesNotMatch(await readFile('index.html','utf8'), /cloudflareinsights/, 'homepage keeps first-party analytics only');
-  assert.match(await readFile('privacy/index.html','utf8'), /use Cloudflare Web Analytics to count visits/);
+  assert.match(await readFile('privacy/index.html','utf8'), /uses Cloudflare Web Analytics to count visits/);
 }
 const setCatalog = await readFile('sets/catalog.mjs','utf8');
 assert.match(sets, /leaderboard-config\.js/);
