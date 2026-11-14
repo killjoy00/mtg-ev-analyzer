@@ -39,6 +39,7 @@ try {
   });
   await page.goto(base+'/sets/',{waitUntil:'domcontentloaded'});
   await page.locator('#set-archive-grid .set-catalog-card').first().waitFor();
+  assert.equal(await page.locator('[data-set-guide-index]').count(),0,'live catalog replaces the static set-guide index');
 
   assert.equal(await page.locator('#set-archive-grid .set-catalog-card').count(),28,'renders all 28 Live regular sets');
   assert.equal(await page.locator('#special-format-grid .set-catalog-card').count(),1,'renders Powered Cube separately');
@@ -99,6 +100,8 @@ try {
   assert.equal(await fallback.getAttribute('href'),'/?game=draft-run');
   assert.equal(await failurePage.getByRole('link',{name:'Play a mixed-set Draft Run',exact:true}).count(),1,'global CTA remains usable when the catalog is unavailable');
   assert.equal(await failurePage.locator('a[href*="custom=1"]').count(),0);
+  assert.equal(await failurePage.locator('[data-set-guide-index] a[href$="/guide/"]').count(),28,'set-guide links from the served HTML survive a catalog failure');
+  assert.equal(await failurePage.locator('#set-archive-grid .set-archive-loading:not([data-set-guide-index])').count(),0,'loading state is cleared on failure');
   await failurePage.close();
 
   console.log('Set archive passed: 28 regular sets + Cube render, one archive-level mixed-practice CTA, Cube CTA and failure fallback.');

@@ -72,7 +72,9 @@ async function renderCatalog() {
       specialSection.hidden = false;
     }
   } catch (error) {
-    grid.innerHTML = '<p class="set-archive-error">Couldn’t load the set list. You can still play a <a href="/?game=draft-run">Draft Run</a>.</p>';
+    // Keep the static set-guide links from the served HTML; drop only the loading state.
+    grid.querySelectorAll(':scope > :not([data-set-guide-index])').forEach((node) => node.remove());
+    grid.insertAdjacentHTML('afterbegin', '<p class="set-archive-error">Couldn’t load the set list. You can still play a <a href="/?game=draft-run">Draft Run</a>.</p>');
   }
 }
 
