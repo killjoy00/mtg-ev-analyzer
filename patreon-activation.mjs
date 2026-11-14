@@ -123,7 +123,7 @@ export async function renderPatreonActivation({result=null,source='welcome_note'
       '<button class="button primary" id="patreon-activation-oauth" type="button">Connect Patreon</button><a class="button secondary" data-patreon-activation-exit href="./">Not now</a>');
     bindOAuth(source);
     try {await startPatreonOAuth(source);} catch(error) {
-      const status=document.querySelector('#patreon-activation-status');if(status)status.textContent=error?.message||'Use Activate Elite to try again.';
+      const status=document.querySelector('#patreon-activation-status');if(status)status.textContent=error?.message||'Use Connect Patreon to try again.';
       const button=document.querySelector('#patreon-activation-oauth');if(button)button.disabled=false;
     }
     return;

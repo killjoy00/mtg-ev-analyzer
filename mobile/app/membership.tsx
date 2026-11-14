@@ -441,7 +441,7 @@ export default function MembershipScreen() {
       <ScrollView contentContainerStyle={styles.page}>
         <Text style={styles.eyebrow}>PACK ONE MEMBERSHIP</Text>
         <Text style={styles.title}>Your membership</Text>
-        <Text style={styles.body}>All three Dailies are free. A free account adds unlimited regular, mixed-set practice. Elite adds your choice of sets, unlimited Powered Cube, and ad-free browsing.</Text>
+        <Text style={styles.body}>All three Dailies are free. A free account adds unlimited regular, mixed-set practice. Supporter helps fund Pack One and removes promotions. Elite includes those benefits plus your choice of sets and unlimited Powered Cube.</Text>
         <Text style={styles.help}>Use the same Pack One account on the website and app.</Text>
         <View style={styles.panel}>
           <Text style={styles.heading}>{accountAccessLabel(state)}</Text>
