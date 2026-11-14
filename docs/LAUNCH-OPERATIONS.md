@@ -70,6 +70,37 @@ instrumentation, while gateway completion time excludes downstream body
 delivery and browser rendering. Do not infer full-traffic p95 from a retained
 slow-tail-only sample or treat a recovered incident as a verified fix.
 
+### Read-only replay of recent latency breaches
+
+The protected **One-shot private quota timing investigation** workflow now
+reads the fixed machine-managed incident markers from #1272 (slow_requests)
+and #1273 (slow_quota) using the job's read-only GitHub issue permission.
+On reviewed main, it collects the existing settled recent window **and**
+up to two latest breached intervals, if they remain inside the conservative
+three-day provider retention bound. For each issue, it queries only from
+20 minutes before the reported breached-window end to five minutes after
+(25 minutes total). It never treats that incident timestamp as the exact
+offending request time. Missing, malformed, mismatched or future issue
+state fails the private diagnosis; windows already past retention or not
+yet settled are explicitly skipped. An explicit operator time-window
+override takes precedence and makes no incident lookups.
+
+Replayed records use the **same verified, read-only telemetry queries**,
+private report destination, fail-closed access checks and verified readback.
+The workflow does not add a schedule, change alert thresholds, query Neon
+or call application APIs. No raw traces, IPs, account details or request
+paths appear in public Actions output or GitHub issue comments. A passing
+workflow proves that the scoped report was saved privately, **not** that
+the production latency root cause has been fixed.
+
+The November 14 hosted synthetic confirmation
+([run 43627818113](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/43627818113))
+failed the unchanged quota reservation tail gate: only one of eight cohorts
+in each A/B repeat improved all required tails. Although cached-credit
+calls were fast and write decisions fell roughly 87%, the batch-write
+path showed long client waits and aggregate client p99 regressions.
+Keep production reservations off and do not close #1273 on that evidence.
+
 If quota dominates, evaluate the existing preview-only reservation experiment
 and its failed/pending provider tail-latency gates before considering rollout.
 If upstream dominates, inspect the corresponding private Neon function and
