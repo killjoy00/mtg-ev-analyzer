@@ -36,7 +36,7 @@ for(const id of GUIDE_IDS) {
 </header>
 <main class="editorial-main">
   <article class="set-guide-page">
-    <nav class="guide-breadcrumb" aria-label="Guide navigation"><a href="/sets/">← All sets</a>${dataNotes.has(id)?`<a href="/sets/${id}/">${id.toUpperCase()} data notes</a>`:''}</nav>
+    <nav class="guide-breadcrumb" aria-label="Guide navigation"><a href="/sets/">← All sets</a>${dataNotes.has(id)?`<a href="/sets/${id}/">${esc(guide.name)} first picks</a>`:''}</nav>
     <header class="article-header"><p class="kicker">Set guide · ${esc(id==='powered-cube'?'Cube':id.toUpperCase())}</p><h1>${esc(guide.name)}</h1><p class="article-deck">A quick refresher before your next pick.</p></header>
     ${renderSetGuide(guide)}
     <aside class="article-cta"><p class="kicker">Put it into practice</p><h2>Ready for your next pick?</h2><a class="button-link" href="/?game=draft-run${id==='powered-cube'?'&amp;set=powered-cube':''}">${id==='powered-cube'?'Elite Cube Practice':'Play Draft Run'}</a></aside>

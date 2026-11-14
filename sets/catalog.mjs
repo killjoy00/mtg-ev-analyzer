@@ -38,7 +38,7 @@ function card(entry, { special = false } = {}) {
   const actions = [
     ...(special ? ['<a href="/?game=draft-run&set=powered-cube">Elite Cube Practice</a>'] : []),
     ...(hasSetGuide(id) ? [`<a href="${setGuidePath(id)}">Set guide</a>`] : []),
-    ...(detailPages.has(id) ? [`<a href="/sets/${encodeURIComponent(id)}/">Data notes</a>`] : []),
+    ...(detailPages.has(id) ? [`<a href="/sets/${encodeURIComponent(id)}/">First picks</a>`] : []),
   ];
   return `<article class="content-card set-catalog-card" data-set-id="${esc(id)}">
     <p class="kicker">Data through ${esc(dateLabel(entry.data_date))}</p>
