@@ -81,8 +81,8 @@ three-day provider retention bound. For each issue, it queries only from
 20 minutes before the reported breached-window end to five minutes after
 (25 minutes total). It never treats that incident timestamp as the exact
 offending request time. Missing, malformed, mismatched or future issue
-state fails the private diagnosis; closed incidents are skipped, as are windows already past retention or not
-yet settled are explicitly skipped. An explicit operator time-window
+state fails the private diagnosis; closed incidents, expired retention
+windows and windows not yet settled are explicitly skipped. An explicit operator time-window
 override takes precedence and makes no incident lookups.
 
 Replayed records use the **same verified, read-only telemetry queries**,
