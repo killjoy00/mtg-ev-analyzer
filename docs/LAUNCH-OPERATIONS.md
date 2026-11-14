@@ -93,6 +93,37 @@ paths appear in public Actions output or GitHub issue comments. A passing
 workflow proves that the scoped report was saved privately, **not** that
 the production latency root cause has been fixed.
 
+### Automated, privacy-safe latency classification
+
+The protected private forensics job now emits exactly one
+`PACK1_LATENCY_TRIAGE` line **after** the private report has passed
+verified readback. Each of #1272 and #1273 gets a fixed-vocabulary
+stage classification and a narrowly scoped next engineering action.
+The full measurements remain in private storage; the public line
+does not expose timestamps, individual timings, exact counts,
+routes, request traces, provider IDs, user data or arbitrary text.
+
+Classification uses only the latest settled and retained issue-breach
+window, never a quiet recent window as proof of recovery. A candidate
+stage requires at least three observed slow samples, stage measurements
+for at least 75% of them, and a two-thirds majority of attributable
+samples. Small samples are explicitly **preliminary**, not confirmation
+or proof of root cause. For quota-handler versus transport attribution,
+the workflow also requires enough matched handler completions before
+directing an investigation toward a specific provider substage.
+Missing logs, expired windows, malformed telemetry, mixed stages and
+unmatched completion records produce an explicit evidence gap instead
+of an invented root cause. The corresponding private report remains
+the definitive detailed source.
+
+If the public stage is origin, investigate the corresponding Neon
+function and SQL read-only evidence. For the quota handler, examine
+durability versus transaction time without enabling the failed
+reservation candidate. For quota transport/wait or gateway residual,
+inspect boundary/dispatch instrumentation before changing timeouts
+or blaming provider latency. Keep both incidents open until a tested
+fix and independent real-traffic evidence justify closure.
+
 The November 14 hosted synthetic confirmation
 ([run 43627818113](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/43627818113))
 failed the unchanged quota reservation tail gate: only one of eight cohorts
