@@ -21,6 +21,7 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+  issues: read
 jobs:
   validate:
     if: github.event_name == 'pull_request'
@@ -41,6 +42,8 @@ jobs:
     env:
       CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
       CLOUDFLARE_PRIVATE_REPORT_TOKEN: ${{ secrets.CLOUDFLARE_PRIVATE_REPORT_TOKEN }}
+      GITHUB_TOKEN: ${{ github.token }}
+      PACK1_READ_RECENT_ALERTS: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -48,5 +51,5 @@ jobs:
           node-version: 24
       - name: Test read-only analyzer
         run: node --test tests/quota-stage-forensics.test.mjs tests/quota-forensics-collection.test.mjs
-      - name: Save private historical and current stage evidence with verified query coverage
+      - name: Save private settled last-breach and recent stage evidence with verified query coverage
         run: node scripts/quota-stage-forensics.mjs
