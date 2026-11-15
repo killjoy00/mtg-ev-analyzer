@@ -66,6 +66,7 @@ try {
   for(const view of [
     {width:1440,height:970,name:'packone-2026-11-14-p1p7-desktop.png'},
     {width:980,height:930,name:'packone-2026-11-14-p1p7-compact.png'},
+    {width:768,height:2100,name:'packone-2026-11-14-p1p7-four-column.png',crop:true},
   ]) {
     await page.setViewportSize({width:view.width,height:view.height});
     await page.evaluate(async()=>{
@@ -73,7 +74,9 @@ try {
       await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
     });
     const file='artifacts/reddit-nov14/'+view.name;
-    await page.screenshot({path:file,fullPage:true,animations:'disabled'});
+    const bounds=await page.locator('.draft-run-page').boundingBox();
+    const clip=view.crop?{x:0,y:0,width:view.width,height:Math.min(view.height,Math.ceil(bounds.y+bounds.height+30))}:undefined;
+    await page.screenshot({path:file,fullPage:!view.crop,clip,animations:'disabled'});
     console.log('Captured '+file);
   }
   assert.deepEqual(errors,[]);
