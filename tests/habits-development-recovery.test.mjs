@@ -6,14 +6,15 @@ import {recoverDevelopmentHabitsIndex} from '../scripts/recover-habits-developme
 const migration='0071_habits_completed_covering_index.sql';
 const sha=migrationIdentity(migration);
 const guard={branchId:'br-twilight-hill-ayffyd2b',reviewToken:'reviewed-1272-dev-ledger-recovery-20261115'};
-const failure={name:migration,sha256:sha,state:'failed',method:'executed',recorded_at:new Date('2026-11-15T16:03:06.221Z')};
+const exactFailureAt='2026-11-15T16:03:06.221368Z';
+const failure={name:migration,sha256:sha,state:'failed',method:'executed',recorded_at:exactFailureAt};
 const fake=(row,existing=0)=>{
  const calls=[];
  const query=async(sql,params=[])=>{
    calls.push({sql,params});
-   if(sql.includes('FOR UPDATE'))return {rows:row?[row]:[]};
+   if(sql.includes('FOR UPDATE'))return {rows:row?[{...row,timestamp_exact:row.recorded_at===params[1]}]:[]};
    if(sql.includes('pg_catalog.pg_class'))return {rows:[{n:existing}]};
-   if(sql.startsWith('DELETE FROM'))return {rows:[{name:migration}]};
+   if(sql.startsWith('DELETE FROM'))return {rows:row&&row.recorded_at===params[2]&&row.sha256===params[1]&&row.state==='failed'&&row.method==='executed'?[{name:migration}]:[]};
    return {rows:[]};
  };
  return {query,calls};
@@ -33,11 +34,16 @@ test('exact reviewed failure and absent index permit one development-only retry'
  assert.deepEqual(calls.map(x=>x.sql.startsWith('SELECT count')?'index_check':x.sql.startsWith('DELETE')?'delete':x.sql.startsWith('SELECT name')?'lock':x.sql),
    ['BEGIN','lock','index_check','delete','COMMIT']);
  assert.equal(calls.find(x=>x.sql.startsWith('DELETE')).params[1],sha);
+ assert.equal(calls.find(x=>x.sql.startsWith('DELETE')).params[2],exactFailureAt);
+ const lock=calls.find(x=>x.sql.includes('FOR UPDATE'));
+ assert.equal(lock.params[1],exactFailureAt);
+ assert.match(lock.sql,/recorded_at=\$2::timestamptz AS timestamp_exact/);
 });
 test('recovery refuses changed migration identities, later failure and existing invalid index',async()=>{
  for(const changed of [{...failure,sha256:'b'.repeat(64)},
    {...failure,state:'running'},
-   {...failure,recorded_at:new Date('2026-11-15T16:03:07Z')},
+   {...failure,recorded_at:'2026-11-15T16:03:06.221369Z'},
+   {...failure,recorded_at:'2026-11-15T16:03:07Z'},
    {...failure,method:'verified-baseline'}]){
    const {query,calls}=fake(changed);
    await assert.rejects(recoverDevelopmentHabitsIndex(query,guard));
@@ -54,6 +60,15 @@ test('absent or already-applied migration is idempotent and cannot delete ledger
    assert.equal(await recoverDevelopmentHabitsIndex(query,guard),result);
    assert.ok(!calls.some(x=>x.sql.startsWith('DELETE')));
  }
+});
+test('a mismatched exact ledger delete rolls back even after an observed locked row',async()=>{
+ const {query:original,calls}=fake(failure);
+ const query=(sql,params)=>{
+   if(sql.startsWith('DELETE FROM')){calls.push({sql,params});return Promise.resolve({rows:[]});}
+   return original(sql,params);
+ };
+ await assert.rejects(recoverDevelopmentHabitsIndex(query,guard),/Migration ledger changed/);
+ assert.ok(calls.some(x=>x.sql==='ROLLBACK'));
 });
 test('psql runner passes the reviewed database URI as positional argument, not PGDATABASE',()=>{
  const calls=[];
