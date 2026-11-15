@@ -7,7 +7,9 @@ import {migrationIdentity} from './apply-release-migrations.mjs';
 
 const MIGRATION='0071_habits_completed_covering_index.sql';
 const EXPECTED_BRANCH='br-twilight-hill-ayffyd2b';
-const FAILED_AT='2026-11-15T16:03:06.221Z';
+// PostgreSQL records microseconds; node-postgres JS Date truncates to milliseconds.
+// Match the full observed instant in PostgreSQL, never through JS Date.
+const FAILED_AT='2026-11-15T16:03:06.221368Z';
 const INDEX='draft_run_habits_completed_cover_idx';
 const REVIEW_TOKEN='reviewed-1272-dev-ledger-recovery-20261115';
 export async function recoverDevelopmentHabitsIndex(query,{branchId,reviewToken}={}) {
@@ -16,7 +18,7 @@ export async function recoverDevelopmentHabitsIndex(query,{branchId,reviewToken}
  const expectedSha=migrationIdentity(MIGRATION);
  await query('BEGIN');
  try {
-   const rows=(await query('SELECT name,sha256,state,method,recorded_at FROM public.pack1_applied_migrations WHERE name=$1 FOR UPDATE',[MIGRATION])).rows;
+   const rows=(await query('SELECT name,sha256,state,method,recorded_at,recorded_at=$2::timestamptz AS timestamp_exact FROM public.pack1_applied_migrations WHERE name=$1 FOR UPDATE',[MIGRATION,FAILED_AT])).rows;
    if(rows.length>1)throw Error('Unexpected duplicate migration ledger rows');
    const row=rows[0];
    if(!row){await query('COMMIT');return 'no_failed_entry';}
@@ -25,7 +27,7 @@ export async function recoverDevelopmentHabitsIndex(query,{branchId,reviewToken}
      await query('COMMIT');return 'already_applied';
    }
    if(row.state!=='failed'||row.method!=='executed'||row.sha256!==expectedSha||
-       new Date(row.recorded_at).toISOString()!==FAILED_AT)
+       row.timestamp_exact!==true)
      throw Error('Unreviewed migration state, identity or incident timestamp');
    const present=(await query('SELECT count(*)::int AS n FROM pg_catalog.pg_class WHERE relname=$1',[INDEX])).rows[0]?.n;
    if(Number(present)!==0)throw Error('Existing index requires separately reviewed manual recovery');
