@@ -153,11 +153,18 @@ const HABIT_METRICS_SQL=`WITH eligible_daily_sessions AS (
   SELECT f.person_id,f.first_day,a.source,a.campaign,
     flags.next_day_return,flags.seven_day_return,flags.three_in_seven,
     (ever.person_id IS NOT NULL) ever_three_in_seven
+  -- These three CTEs contain exactly one row per same first-Daily cohort
+  -- person: attribution is derived from f; cohort_flags is derived from
+  -- completed days joined to f (including each person's first Daily).
+  -- PostgreSQL grossly underestimates the cohort cardinality and chooses
+  -- quadratic nested-loop rescans for ordinary INNER JOINs. FULL JOINs are
+  -- equivalent over these proven-identical key sets while forcing a
+  -- non-quadratic hash/merge plan. The cohort date predicate is already
+  -- applied when building cohort_first_daily.
   FROM cohort_first_daily f
-  JOIN attribution a USING(person_id)
-  JOIN cohort_flags flags USING(person_id)
+  FULL JOIN attribution a USING(person_id)
+  FULL JOIN cohort_flags flags USING(person_id)
   LEFT JOIN ever_three_in_seven ever USING(person_id)
-  WHERE f.first_day BETWEEN $1::date AND $2::date
 ), today AS (
   SELECT (now() AT TIME ZONE 'America/Los_Angeles')::date AS current_day
 ), cohort_summary AS (
