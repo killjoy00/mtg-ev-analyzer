@@ -33,6 +33,10 @@ test('exact reviewed failure and absent index permit one development-only retry'
  assert.deepEqual(calls.map(x=>x.sql.startsWith('SELECT count')?'index_check':x.sql.startsWith('DELETE')?'delete':x.sql.startsWith('SELECT name')?'lock':x.sql),
    ['BEGIN','lock','index_check','delete','COMMIT']);
  assert.equal(calls.find(x=>x.sql.startsWith('DELETE')).params[1],sha);
+ // PostgreSQL retains six-digit fractional seconds even though a JS Date
+ // returns only three. Recovery must compare the exact stored timestamp.
+ assert.equal(calls.find(x=>x.sql.startsWith('DELETE')).params[2],'2026-11-15T16:03:06.221368Z');
+ assert.match(calls.find(x=>x.sql.startsWith('DELETE')).sql,/recorded_at=\$3::timestamptz/);
 });
 test('recovery refuses changed migration identities, later failure and existing invalid index',async()=>{
  for(const changed of [{...failure,sha256:'b'.repeat(64)},

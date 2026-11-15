@@ -7,7 +7,10 @@ import {migrationIdentity} from './apply-release-migrations.mjs';
 
 const MIGRATION='0071_habits_completed_covering_index.sql';
 const EXPECTED_BRANCH='br-twilight-hill-ayffyd2b';
-const FAILED_AT='2026-11-15T16:03:06.221Z';
+// JavaScript Date truncates PostgreSQL microseconds, so keep both values.
+// The write guard requires the *exact six-digit* timestamp from read-only SQL.
+const FAILED_AT_MS='2026-11-15T16:03:06.221Z';
+const FAILED_AT_EXACT='2026-11-15T16:03:06.221368Z';
 const INDEX='draft_run_habits_completed_cover_idx';
 const REVIEW_TOKEN='reviewed-1272-dev-ledger-recovery-20261115';
 export async function recoverDevelopmentHabitsIndex(query,{branchId,reviewToken}={}) {
@@ -25,11 +28,11 @@ export async function recoverDevelopmentHabitsIndex(query,{branchId,reviewToken}
      await query('COMMIT');return 'already_applied';
    }
    if(row.state!=='failed'||row.method!=='executed'||row.sha256!==expectedSha||
-       new Date(row.recorded_at).toISOString()!==FAILED_AT)
+       new Date(row.recorded_at).toISOString()!==FAILED_AT_MS)
      throw Error('Unreviewed migration state, identity or incident timestamp');
    const present=(await query('SELECT count(*)::int AS n FROM pg_catalog.pg_class WHERE relname=$1',[INDEX])).rows[0]?.n;
    if(Number(present)!==0)throw Error('Existing index requires separately reviewed manual recovery');
-   const cleared=(await query("DELETE FROM public.pack1_applied_migrations WHERE name=$1 AND sha256=$2 AND state='failed' AND method='executed' AND recorded_at=$3::timestamptz RETURNING name",[MIGRATION,expectedSha,FAILED_AT])).rows;
+   const cleared=(await query("DELETE FROM public.pack1_applied_migrations WHERE name=$1 AND sha256=$2 AND state='failed' AND method='executed' AND recorded_at=$3::timestamptz RETURNING name",[MIGRATION,expectedSha,FAILED_AT_EXACT])).rows;
    if(cleared.length!==1)throw Error('Migration ledger changed during reviewed recovery');
    await query('COMMIT');return 'cleared_exact_failed_entry';
  } catch(error){await query('ROLLBACK').catch(()=>{});throw error;}
