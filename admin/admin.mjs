@@ -219,6 +219,24 @@ async function loadQualityWatch(loadId,queryString){
     target.innerHTML=qualityWatchMarkup(data.rows||[]);bindReviewDetails(target,queryString);
   }catch(error){if(loadId===deferredLoad)target.innerHTML='<p class="error" role="alert">'+esc(error.message||'Quality watchlist unavailable.')+'</p>';}
 }
+function modelAuditMarkup(audit) {
+  const rows=Array.isArray(audit?.rows)?audit.rows:[];
+  if(!audit)return '<p class="muted">Player/model audit is not available in this backend release.</p>';
+  if(!rows.length)return '<p class="muted">No Daily puzzles reached 50 qualifying first-time answers in the selected period.</p>';
+  const meta=audit.window||{};
+  return '<p class="subpage-help">Measured '+esc(meta.from||'')+' through '+esc(meta.to||'')+
+    (meta.clipped?' (capped at 90 days for performance)':'')+
+    '. Each puzzle needs at least '+fmt(audit.min_choices)+' first-time answers. Ties and incomplete model distributions are excluded.</p>'+
+    '<div class="scroll"><table><thead><tr><th>Daily</th><th>Puzzles</th><th>Answers</th><th>Different favorites</th><th>Player favorite matched trophy</th><th>Model favorite matched trophy</th><th>Player votes for model favorite</th><th>Model prediction for its favorite</th></tr></thead><tbody>'+
+    rows.map(r=>'<tr><th>'+esc(r.environment==='latest'?'Latest Set':r.environment==='powered-cube'?'Powered Cube':'Mixed')+
+      '</th><td>'+fmt(r.qualified_puzzles)+'</td><td>'+fmt(r.choices)+'</td><td>'+pct(r.differing_pct)+
+      '<small> ('+fmt(r.differing_leaders)+' puzzles)</small></td><td>'+fmt(r.player_majority_trophy)+
+      ' / '+fmt(r.qualified_puzzles)+'</td><td>'+fmt(r.model_leader_trophy)+' / '+fmt(r.qualified_puzzles)+
+      '</td><td>'+pct(r.voted_model_leader_pct)+'</td><td>'+pct(r.predicted_model_leader_pct)+
+      '</td></tr>').join('')+'</tbody></table></div>'+
+    '<p class="subpage-help">First observed answers only, excluding QA and repeat exposures. Model percentages are stored puzzle probabilities, not grading points. Players aim to match a trophy drafter; agreement is a diagnostic, not proof that a card improves winning chances. Guest identities may represent repeat humans.</p>';
+}
+
 async function loadDeferredSections(loadId,queryString){
   const suffix=queryString?'?'+queryString:'';
   const quality=loadQualityWatch(loadId,queryString);
@@ -237,10 +255,14 @@ async function loadDeferredSections(loadId,queryString){
     if(loadId!==deferredLoad)return;
     const reviewTarget=document.querySelector('#reviews');
     if(reviewTarget){reviewTarget.innerHTML=reviewMarkup(data.reviews||[]);bindReviewDetails(reviewTarget,queryString);}
+    const modelTarget=document.querySelector('#player-model-audit');
+    if(modelTarget)modelTarget.innerHTML=modelAuditMarkup(data.player_model_audit);
   }).catch(error=>{
     if(loadId!==deferredLoad)return;
     const reviewTarget=document.querySelector('#reviews');
     if(reviewTarget)reviewTarget.innerHTML=`<p class="error" role="alert">${esc(error?.message||'Review candidates are temporarily unavailable.')}</p>`;
+    const modelTarget=document.querySelector('#player-model-audit');
+    if(modelTarget)modelTarget.textContent=error?.message||'Player/model audit temporarily unavailable.';
   });
   const youtube=request('/v1/admin/youtube').then(data=>{
     if(loadId!==deferredLoad)return;
@@ -287,6 +309,7 @@ function render() {
     <p class="insights-report-meta">Excluded: ${fmt(c.qa_excluded)} QA observations, ${fmt(c.repeats_excluded)} repeat encounters, ${fmt(c.unobserved_excluded)} outcomes without a recorded view. Pending choices: ${fmt(s.pending)}. Timing available for ${fmt(s.timed_answers)} answers; reloads and multiple tabs omit timing. P90: ${s.p90_seconds==null?'N/A':fmt(s.p90_seconds)+'s'}.</p>
     </section><section class="subpage-section" aria-labelledby="insights-breakdowns-heading"><h2 id="insights-breakdowns-heading">Decision breakdowns</h2><p class="subpage-help">Open a breakdown to compare outcomes for that dimension. Sections with few answers should be treated as exploratory.</p><div class="insights-breakdowns">
     ${[['difficulty','By difficulty'],['pick','By real draft pick'],['round','By game position'],['set','By set'],['source_event','By source event'],['trophy_support','How strongly the model supports the trophy pick'],['version','By scoring and selection version']].map(([dimension,title])=>`<details class="insights-breakdown" ${['difficulty','pick'].includes(dimension)?'open':''}><summary>${title}</summary>${dimension==='trophy_support'?'<p class="subpage-help">Brackets show the trophy card’s model-implied credit (rounded 95 × trophy support / top-card support), not the points earned by players. Current puzzles must have at least 20 implied points to be served; the maximum implied value is 95. Below-floor or unrated historical decisions appear separately if present.</p>':''}${table(dimension==='trophy_support'?supportBracketRows(report.groups.filter(r=>r.dimension===dimension)):report.groups.filter(r=>r.dimension===dimension).sort((a,b)=>dimension==='difficulty'?['easy','medium','hard','unrated'].indexOf(a.label)-['easy','medium','hard','unrated'].indexOf(b.label):a.label.localeCompare(b.label,undefined,{numeric:true})),dimension==='trophy_support'?'Implied points':'Group')}</details>`).join('')}</div></section>
+    <section class="subpage-section" aria-labelledby="insights-model-heading"><h2 id="insights-model-heading">Player choices vs. model</h2><p class="subpage-help">How often is the model favorite also the player favorite? Exploratory evidence, not a measure of drafting correctness.</p><div id="player-model-audit"><p class="muted">Comparing first-time answers with saved model predictions…</p></div></section>
     <section class="subpage-section" aria-labelledby="insights-quality-heading"><h2 id="insights-quality-heading">Puzzle quality watchlist</h2><div id="quality-watch"><p class="muted">Checking puzzle quality signals…</p></div></section>
     <section class="subpage-section" aria-labelledby="insights-reviews-heading"><h2 id="insights-reviews-heading">Decisions to review</h2>
     <details class="insights-note-details"><summary>Alternative-credit distribution</summary><p>${[['0–24',s.partial_0_24],['25–49',s.partial_25_49],['50–74',s.partial_50_74],['75–95',s.partial_75_95]].map(([label,n])=>`${label} points: <strong>${fmt(n)}</strong>`).join(' · ')}</p>
