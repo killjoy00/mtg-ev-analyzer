@@ -247,10 +247,10 @@ export async function handleAdmin(request,query,readJson) {
       ORDER BY bool_or(model_disagreement) DESC,count(*) FILTER(WHERE outcome='pick') DESC LIMIT 30)
       SELECT c.*,p.set_id,p.pick_number,p.payload->>'historical_pick_id' trophy_id
       FROM chosen c JOIN draft_run_verified_puzzles p USING(puzzle_id)`,filters.params),
-      timedAdminQuery(query,'measurements_reviews','player_model_audit',PLAYER_MODEL_AUDIT_SQL,[auditWindow.from,auditWindow.to,PLAYER_MODEL_AUDIT_MIN_CHOICES]),
+      timedAdminQuery(query,'measurements_reviews','player_model_audit',PLAYER_MODEL_AUDIT_SQL,[auditWindow.from,auditWindow.to,PLAYER_MODEL_AUDIT_MIN_CHOICES]).catch(()=>({rows:[],unavailable:true})),
     ]);
     return {generated_at:new Date().toISOString(),corpus_version:filters.corpus_version,filters:{...filters,params:undefined},reviews:reviews.rows,
-      player_model_audit:{window:auditWindow,min_choices:PLAYER_MODEL_AUDIT_MIN_CHOICES,rows:modelAudit.rows}};
+      player_model_audit:{window:auditWindow,min_choices:PLAYER_MODEL_AUDIT_MIN_CHOICES,rows:modelAudit.rows,unavailable:!!modelAudit.unavailable}};
   }
   if(url.pathname==='/v1/admin/measurements') {
     // Materialize the expensive first-encounter decision scan once. Previously
