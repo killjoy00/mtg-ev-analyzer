@@ -119,3 +119,14 @@ test('completed Trends index preserves exact completed-session eligibility and c
   for(const key of ['secure-auth-release','backend-gate-backlog','launch-load','launch-distributed'])
     assert.ok(releasePaths[key].migrations.includes('0072_admin_trends_completed_covering_index.sql'),key);
 });
+
+
+test('Habits acquisition first-touch index is narrow, concurrent and in protected release paths',()=>{
+  const sql=fs.readFileSync('migrations/0073_habits_acquisition_first_touch_idx.sql','utf8');
+  assert.match(sql,/CREATE INDEX CONCURRENTLY IF NOT EXISTS analytics_events_acquisition_first_touch_idx/);
+  assert.match(sql,/ON analytics_events\(player_id,created_at,id\)/);
+  assert.match(sql,/WHERE event_name='acquisition_touch' AND player_id IS NOT NULL/);
+  assert.match(sql,/i\.indisvalid AND i\.indisready/);
+  for(const key of ['secure-auth-release','backend-gate-backlog','launch-load','launch-distributed'])
+    assert.ok(releasePaths[key].migrations.includes('0073_habits_acquisition_first_touch_idx.sql'),key);
+});

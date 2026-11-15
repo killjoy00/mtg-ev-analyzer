@@ -76,7 +76,8 @@
     "0069_v6_colour_components.sql",
     "0070_v6_bridge_baseline_membership.sql",
     "0071_habits_completed_covering_index.sql",
-    "0072_admin_trends_completed_covering_index.sql"
+    "0072_admin_trends_completed_covering_index.sql",
+    "0073_habits_acquisition_first_touch_idx.sql"
   ],
   "same_prefix_order": {
     "0037": [
@@ -209,7 +210,8 @@
         "0069_v6_colour_components.sql",
         "0070_v6_bridge_baseline_membership.sql",
         "0071_habits_completed_covering_index.sql",
-        "0072_admin_trends_completed_covering_index.sql"
+        "0072_admin_trends_completed_covering_index.sql",
+    "0073_habits_acquisition_first_touch_idx.sql"
       ]
     },
     "daily-calendar": {
@@ -276,7 +278,8 @@
         "0069_v6_colour_components.sql",
         "0070_v6_bridge_baseline_membership.sql",
         "0071_habits_completed_covering_index.sql",
-        "0072_admin_trends_completed_covering_index.sql"
+        "0072_admin_trends_completed_covering_index.sql",
+    "0073_habits_acquisition_first_touch_idx.sql"
       ]
     },
     "launch-load": {
@@ -318,7 +321,8 @@
         "0069_v6_colour_components.sql",
         "0070_v6_bridge_baseline_membership.sql",
         "0071_habits_completed_covering_index.sql",
-        "0072_admin_trends_completed_covering_index.sql"
+        "0072_admin_trends_completed_covering_index.sql",
+    "0073_habits_acquisition_first_touch_idx.sql"
       ]
     },
     "launch-distributed": {
@@ -362,7 +366,8 @@
         "0069_v6_colour_components.sql",
         "0070_v6_bridge_baseline_membership.sql",
         "0071_habits_completed_covering_index.sql",
-        "0072_admin_trends_completed_covering_index.sql"
+        "0072_admin_trends_completed_covering_index.sql",
+    "0073_habits_acquisition_first_touch_idx.sql"
       ]
     },
     "practice-performance": {
