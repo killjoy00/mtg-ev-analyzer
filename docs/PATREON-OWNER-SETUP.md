@@ -92,77 +92,87 @@ invalidate previous eligibility.
 
 ### Published Patreon copy (verified November 15, 2026)
 
-The existing Supporter and Elite tiers were updated in the creator editor and
-verified in the public membership preview. **Elite Member** is now **Pack One
-Elite**; the duplicate “Unlimited power cube draft runs” benefit was removed.
-Existing tier IDs and the $3/$7 monthly prices are unchanged. The Supporter, Elite,
-and free-member welcome notes were saved and verified again after reloading.
-Activation links below use explicit anchors so punctuation cannot become part of
-the destination URL. No credentials or further creator setup are needed.
+The About page, existing Supporter and Pack One Elite tier descriptions, and all
+three welcome notes were updated in the creator editor. About and the tiers were
+verified publicly; welcome notes were verified after reloading their editor.
+Existing tier IDs and the $3/$7 monthly prices are unchanged. Activation links
+use explicit anchors so punctuation cannot become part of the destination URL.
+No credentials or further creator setup are needed.
+
+**About**
+
+Pack One is a daily Magic: The Gathering draft game. Each Daily has eight picks
+from eight different trophy drafts. Make your pick, then see what the drafter took.
+
+All three Dailies are free. A free Pack One account also gives you unlimited
+practice with a mix of sets.
+
+Patreon helps me keep Pack One running and add new sets. Supporter removes ads,
+including TCGplayer card links. Elite also lets you choose your practice sets and
+play unlimited Powered Cube runs.
+
+After joining, sign in to Pack One and
+[connect Patreon](https://packone.pro/?patreon=activate). Use that same Pack One
+account on the website and app.
 
 **Supporter description**
 
-Help keep Pack One going. Your membership supports development, infrastructure,
-and new set coverage. Supporters get ad-free browsing, including no individual-card
-TCGplayer promotions, while signed in with their membership connected.
+Help me keep Pack One running and add new sets. Supporter removes ads, including
+TCGplayer card links.
 
-All three Dailies are free. A free Pack One account also includes unlimited regular,
-mixed-set practice. Supporter adds ad-free browsing; Elite adds more ways to practice.
+All three Dailies are free. A free Pack One account also gives you unlimited
+practice with a mix of sets.
 
-After joining, [connect your membership](https://packone.pro/?patreon=activate):
-sign in to Pack One, then connect Patreon. Use that same Pack One account on the
-website and app.
+After joining, sign in to Pack One and
+[connect Patreon](https://packone.pro/?patreon=activate). Use that same Pack One
+account on the website and app.
 
 **Pack One Elite description**
 
-Choose what you practice. Pack One Elite includes:
+Practice the sets you want.
 
-- Custom-set practice: choose one set or combine several.
-- Unlimited Powered Cube practice.
-- All Supporter benefits, including no display ads or individual-card TCGplayer promotions.
+- Choose one set or mix several for your practice runs.
+- Play unlimited Powered Cube runs.
+- No ads, including TCGplayer card links.
 
-All three Dailies are free. A free Pack One account also includes unlimited regular,
-mixed-set practice.
+All three Dailies are free. A free Pack One account also gives you unlimited
+practice with a mix of sets.
 
-After joining, [connect your membership](https://packone.pro/?patreon=activate):
-sign in to Pack One, then connect Patreon. Use that same Pack One account on the
-website and app.
+After joining, sign in to Pack One and
+[connect Patreon](https://packone.pro/?patreon=activate). Use that same Pack One
+account on the website and app.
 
 **Supporter welcome note introduction**
 
-Thanks for supporting Pack One. Your Supporter membership helps fund development
-and new set coverage, and includes ad-free browsing with no individual-card
-TCGplayer promotions.
+Thanks for supporting Pack One. You’re helping me keep it running and add new sets.
+
+Your membership removes ads, including TCGplayer card links.
 
 **Elite welcome note introduction**
 
-Welcome to Pack One Elite. Thanks for supporting Pack One.
+Thanks for joining Pack One Elite.
 
-Your membership includes custom-set practice, unlimited Powered Cube practice,
-and ad-free browsing with no individual-card TCGplayer promotions.
+Elite lets you choose your practice sets and play unlimited Powered Cube runs.
+It also removes ads, including TCGplayer card links.
 
 **Access instructions in both paid welcome notes**
 
-[Connect your membership](https://packone.pro/?patreon=activate): sign in to Pack
-One, then connect Patreon.
-
-Your benefits work on the website and app when you use the same Pack One account.
+Sign in to Pack One and [connect Patreon](https://packone.pro/?patreon=activate).
+Use that same Pack One account on the website and app.
 
 Already connected? [Check your membership](https://packone.pro/patreon/).
 
 **Free-member welcome note**
 
-Welcome to Pack One. Thanks for following the project.
+Thanks for following Pack One. I share game updates and contested picks here.
 
-All three Dailies are free to play. A free Pack One account also gives you unlimited
-regular, mixed-set practice.
+All three Dailies are free. A free Pack One account also gives you unlimited
+practice with a mix of sets.
 
 [Play Pack One](https://packone.pro/).
 
-Patreon is where I share major updates, new features, and development news. Paid
-memberships are optional: Supporter helps fund Pack One and removes promotions;
-Elite adds custom-set and unlimited Powered Cube practice.
-[Compare memberships](https://packone.pro/patreon/).
+If you’d like to help keep Pack One running,
+[compare memberships](https://packone.pro/patreon/).
 
 ### Conversion measurement
 
