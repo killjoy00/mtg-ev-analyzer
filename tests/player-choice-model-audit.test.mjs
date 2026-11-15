@@ -56,3 +56,24 @@ test('existing authenticated reviews route and deferred Insights UI keep the aud
   assert.match(frontend,/id="player-model-audit"/);
   assert.doesNotMatch(reviews,/console\.(log|info|warn)\(/,'never log private data');
 });
+
+
+test('optional model-audit SQL failure does not block existing protected review results',async()=>{
+  const {handleAdmin}=await import('../worker/measurement-admin.mjs');
+  let auditCalled=0;
+  const query=async sql=>{
+    if(sql.includes('FROM neon_auth.session s'))return {rows:[{user_id:'11111111-1111-4111-8111-111111111111'}]};
+    if(sql.includes('SELECT role FROM pack1_admins'))return {rows:[{role:'owner'}]};
+    if(sql.includes('WITH scoped AS ('))return {rows:[{puzzle_id:'synthetic',answers:51}]};
+    if(sql.includes('WITH votes AS MATERIALIZED')){auditCalled++;throw Error('synthetic timeout');}
+    throw Error('Unexpected query');
+  };
+  const request=new Request('https://packone.pro/v1/admin/measurements/reviews?from=2026-11-01&to=2026-11-15',{
+    headers:{'x-pack1-auth-session':'synthetic-admin-token'},
+  });
+  const result=await handleAdmin(request,query,async()=>({}));
+  assert.equal(auditCalled,1);
+  assert.equal(result.reviews.length,1);
+  assert.equal(result.player_model_audit.unavailable,true);
+  assert.deepEqual(result.player_model_audit.rows,[]);
+});
