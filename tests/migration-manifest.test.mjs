@@ -95,3 +95,16 @@ test('manifest release paths reference only registered migrations and real workf
     }
   }
 });
+
+
+test('Habits completion scan index is concurrent, exact and included in all release/fixture schema paths',()=>{
+  const sql=fs.readFileSync('migrations/0071_habits_completed_covering_index.sql','utf8');
+  assert.match(sql,/CREATE INDEX CONCURRENTLY IF NOT EXISTS draft_run_habits_completed_cover_idx/);
+  assert.match(sql,/ON draft_run_sessions\(player_id,day,created_at\)/);
+  assert.match(sql,/WHERE day IS NOT NULL AND NOT measurement_qa/);
+  assert.match(sql,/jsonb_array_length\(answers\)=jsonb_array_length\(puzzle_ids\)/);
+  assert.match(sql,/i\.indisvalid AND i\.indisready/);
+  for(const path of ['secure-auth-release','backend-gate-backlog','launch-load','launch-distributed']){
+    assert.ok(releasePaths[path].migrations.includes('0071_habits_completed_covering_index.sql'),path);
+  }
+});
