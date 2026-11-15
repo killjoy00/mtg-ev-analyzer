@@ -680,7 +680,7 @@ try {
 
   insightsMode='versions';
   await page.locator('#my-insights-refresh').click();
-  assert.match(await page.locator('.my-insights-journey-warning').textContent(),/cannot be read as one continuous trend/);
+  assert.match(await page.locator('.my-insights-journey-warning').textContent(),/so these groups don’t make one trend/);
   assert.equal(await page.locator('.my-insights-journey-break').count(),1);
 
   insightsMode='offline';
