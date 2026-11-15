@@ -213,3 +213,48 @@ test('quota stage-coverage gaps require verified missing timing status evidence'
   assert.ok(!output.includes('secret-trace-id'));
   assert.ok(!output.includes('private-network'));
 });
+
+test('incomplete quota timing distinguishes corroborated handler error phases only',()=>{
+  const outcomes={success:0,denied_429:0,failed_5xx:9,other:0};
+  const mk=(phases,total=9,matched=2)=>quotaWindow(total,0,0,matched,{
+    missing_gateway_timing_outcomes:outcomes,
+    failed_quota_without_timing:9,failed_quota_phase:phases,
+  });
+  const candidate=(key,n)=>({
+    transaction:0,durability:0,complete:0,handler_other:0,
+    started_no_completion:0,not_observed:0,[key]:n,
+  });
+  for(const [stage,label,action] of [
+    ['transaction','handler_transaction_error','inspect_quota_storage_transaction'],
+    ['durability','handler_durability_error','inspect_quota_durability'],
+    ['complete','handler_completed_then_error','inspect_quota_acknowledgement'],
+    ['started_no_completion','handler_completion_not_observed','verify_handler_completion_correlation'],
+    ['not_observed','no_correlated_handler_logs','verify_quota_start_log_coverage'],
+  ]){
+    const result=read([mk(candidate(stage,9))])[1];
+    assert.equal(result.outcome,'stage_coverage_incomplete');
+    assert.equal(result.timing_gap,'error_missing_timing');
+    assert.equal(result.error_stage,label);
+    assert.equal(result.next_action,action);
+  }
+  const invalid=read([mk({...candidate('transaction',8),durability:2})])[1];
+  assert.equal(invalid.error_stage,'unverified');
+  const mixed=read([mk({...candidate('transaction',4),durability:5})])[1];
+  assert.equal(mixed.error_stage,'mixed');
+  const absent=read([quotaWindow(9,0,0,2,{
+    missing_gateway_timing_outcomes:outcomes,
+  })])[1];
+  assert.equal(absent.error_stage,'unverified');
+  const noError=read([quotaWindow(9,0,0,2,{
+    missing_gateway_timing_outcomes:{success:9,denied_429:0,failed_5xx:0,other:0},
+    failed_quota_without_timing:9,failed_quota_phase:candidate('transaction',9),
+  })])[1];
+  assert.ok(!Object.hasOwn(noError,'error_stage'));
+  const small=read([quotaWindow(3,0,0,0,{
+    missing_gateway_timing_outcomes:{success:0,denied_429:0,failed_5xx:3,other:0},
+    failed_quota_without_timing:2,failed_quota_phase:candidate('transaction',2),
+  })])[1];
+  assert.equal(small.error_stage,'unverified');
+  const safe=JSON.stringify(read([mk({...candidate('transaction',9),trace:'private-secret'})])[1]);
+  assert.doesNotMatch(safe,/private-secret|trace|account/);
+});
