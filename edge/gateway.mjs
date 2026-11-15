@@ -176,6 +176,7 @@ function validMobileAccount(value) {
   return /^[A-Za-z0-9_-]{43}$/.test(String(value||''));
 }
 function mobileSessionRoute(service,path,method) {
+  if(service==='growth'&&path==='/v1/events'&&method==='POST')return true;
   if(service==='growth'&&(nativePatreonAction(path,method)||nativeAppleSubscriptionAction(path,method)))return true;
   if(service==='growth') {
     if((path==='/v1/mobile/account/reminders'&&['GET','PATCH'].includes(method))||

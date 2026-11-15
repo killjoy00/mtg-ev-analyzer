@@ -9,7 +9,7 @@ const errors=[];
 const accountUser={id:'22222222-2222-4222-8222-222222222222',email:'qa@example.invalid',name:'QA Player'};
 const disconnected={configured:true,connected:false,membership:null,capabilities:[],support_url:'https://www.patreon.com/c/PackOne'};
 const elite={configured:true,connected:true,membership:{effective_state:'elite_entitled',sync_pending:false},capabilities:['custom_corpus','unlimited_cube_practice'],support_url:'https://www.patreon.com/c/PackOne'};
-const supporter={configured:true,connected:true,membership:{effective_state:'active_non_elite',sync_pending:false},capabilities:[],support_url:'https://www.patreon.com/c/PackOne'};
+const supporter={configured:true,connected:true,ad_free:true,ads_allowed:false,membership:{effective_state:'active_non_elite',sync_pending:false},capabilities:[],support_url:'https://www.patreon.com/c/PackOne'};
 const pending={configured:true,connected:true,membership:{effective_state:'active_non_elite',sync_pending:true},capabilities:[],support_url:'https://www.patreon.com/c/PackOne'};
 const notEntitled={configured:true,connected:true,membership:{effective_state:'not_entitled',sync_pending:false},capabilities:[],support_url:'https://www.patreon.com/c/PackOne'};
 
@@ -112,8 +112,7 @@ async function fill(kind){
 }
 
 try {
-  // The public Patreon page leads with authoritative current access and one
-  // relevant next action instead of repeating the activation explanation.
+  // Visitors see benefits and prices before the separate account connection panel.
   await reset();
   await page.goto(base+'/patreon/');
   await page.getByRole('heading',{name:'Sign in to check your access',exact:true}).waitFor();
@@ -121,6 +120,38 @@ try {
   assert.equal(await page.getByRole('button',{name:'Sign in to Pack One',exact:true}).count(),1);
   assert.equal(await page.locator('.patreon-troubleshooting').count(),1);
   await page.screenshot({path:'artifacts/ui-patreon-page-signed-out-390.png',fullPage:true});
+  assert.equal(await page.locator('.membership-plans article').count(),3);
+  assert.match(await page.locator('.membership-plans').textContent(), /\$3\/month[\s\S]*\$7\/month/);
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+  assert.equal(await page.locator('#account-signup').count(),0);
+
+  // The Supporter purchase goes to its existing tier, separately from linking.
+  await reset({isSigned:true,status:disconnected});
+  await page.goto(base+'/patreon/');
+  await page.getByRole('heading',{name:'Connect Patreon to check your membership benefits',exact:true}).waitFor();
+  await page.getByRole('button',{name:'Become a Supporter',exact:true}).click();
+  await page.waitForURL('https://www.patreon.com/checkout/PackOne?rid=29631835');
+  assert.ok(eventNames.includes('membership_checkout_started'));
+  assert.equal(connectCalls,0);
+
+  // Apple-backed Elite never sees another purchase or Patreon billing action.
+  await reset({isSigned:true,status:{...disconnected,account_capabilities:['custom_corpus','unlimited_cube_practice'],apple_subscription_active:true,ad_free:true,ads_allowed:false}});
+  await page.goto(base+'/patreon/');
+  await page.getByRole('heading',{name:'Elite is active',exact:true}).waitFor();
+  assert.equal(await page.locator('[data-membership-purchase]:visible').count(),0);
+  assert.equal(await page.locator('[data-patreon-offsite]:visible').count(),0);
+  assert.match(await page.locator('[data-patreon-status]').textContent(),/through Apple/);
+
+  // Free readers retain archive commerce; connected paid readers do not.
+  for(const [isSigned,status,visible] of [[false,disconnected,true],[true,supporter,false],[true,elite,false]]) {
+    await reset({isSigned,status});
+    await page.goto(base+'/sets/msh/');
+    await page.locator('[data-tcgplayer-card]').first().waitFor({state:'attached'});
+    await page.waitForFunction(expected=>document.documentElement.dataset.cardCommerceAllowed===String(expected),visible);
+    assert.equal(await page.locator('[data-tcgplayer-card]').first().isVisible(),visible);
+    if(!visible)assert.equal(await page.locator('.affiliate-note:visible').count(),0);
+  }
+
 
   await reset({isSigned:true,status:disconnected});
   await page.goto(base+'/patreon/');
@@ -144,7 +175,7 @@ try {
   await reset();
   await page.goto(base+'/?patreon=activate');
   await page.locator('#account-signup').waitFor();
-  assert.equal((await page.locator('.account-page h1').textContent())?.trim(),'Activate Pack One Elite');
+  assert.equal((await page.locator('.account-page h1').textContent())?.trim(),'Connect your membership');
   assert.equal(await page.evaluate(()=>Boolean(sessionStorage.getItem('pack1-patreon-activation-v1'))),true);
   await fill('signin');
   await page.waitForURL(/https:\/\/www\.patreon\.com\/oauth2\/authorize/);
@@ -215,15 +246,13 @@ try {
   assert.equal(connectCalls,0);
   assert.equal(await page.evaluate(()=>sessionStorage.getItem('pack1-patreon-activation-v1')),null);
 
-  // A connected active Supporter is explicitly non-Elite, not pending.
+  // Supporter gets an unambiguous success, without an Elite purchase claim.
   await reset({isSigned:true,status:supporter});
   await page.goto(base+'/?patreon=activate');
-  await page.getByText('Patreon is connected, but Elite is not active.',{exact:true}).waitFor();
-  assert.doesNotMatch((await page.locator('.patreon-activation-page').textContent())||'',/waiting for the latest membership update/i);
+  await page.getByRole('heading',{name:'Supporter is active.',exact:true}).waitFor();
   assert.equal(connectCalls,0);
-  await page.getByRole('button',{name:'Check Patreon again',exact:true}).click();
-  await page.waitForURL(/https:\/\/www\.patreon\.com\/oauth2\/authorize/);
-  assert.equal(connectCalls,1);
+  assert.equal(await page.evaluate(()=>sessionStorage.getItem('pack1-patreon-activation-v1')),null);
+  assert.equal(await page.getByRole('link',{name:'Play the Dailies',exact:true}).count(),1);
 
   // Real sync_pending is pending even if the last authoritative row was a Supporter.
   await reset({isSigned:true,status:pending});

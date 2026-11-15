@@ -676,3 +676,13 @@ body[data-page="editorial"] > .topbar {
   .content-card { padding: 18px 18px 12px; }
 }
 @media (max-width: 600px) { .prose h2 { margin-top: 36px; } }
+
+.membership-plans{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;margin:24px 0}
+.membership-plans .content-card{display:flex;flex-direction:column;align-items:flex-start;min-width:0}
+.membership-plans ul{padding-left:20px;line-height:1.6;flex:1}
+.membership-plans li{margin-bottom:10px}
+.membership-price{font-size:24px;font-weight:700;margin:8px 0}
+.membership-price small{font-size:14px;font-weight:400;display:block}
+.membership-elite{border:2px solid #214f70}
+.membership-how{max-width:72ch;line-height:1.65}
+@media(max-width:760px){.membership-plans{grid-template-columns:1fr}.membership-plans .button{width:100%;white-space:normal}.membership-plans .content-card{padding:22px}}

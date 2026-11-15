@@ -7,6 +7,7 @@ import { Text } from '@/src/components/Text';
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 
 import { setArchive } from '@/src/content/setArchives';
+import { useCardCommerce } from '@/src/hooks/useCardCommerce';
 import { tcgplayerUrl } from '@/src/tcgplayer';
 import { colors, spacing } from '@/src/theme';
 
@@ -18,6 +19,7 @@ export default function SetArchiveScreen() {
   const params = useLocalSearchParams<{ setId?: string }>();
   const setId = typeof params.setId === 'string' ? params.setId.toLowerCase() : '';
   const archive = setArchive(setId);
+  const commerceAllowed = useCardCommerce();
   const [affiliateError, setAffiliateError] = useState<string | null>(null);
 
   if (!archive) {
@@ -37,6 +39,7 @@ export default function SetArchiveScreen() {
 
   const code = archive.setId.toUpperCase();
   const openCard = async (name: string) => {
+    if (!commerceAllowed) return;
     setAffiliateError(null);
     try {
       await Linking.openURL(tcgplayerUrl(name));
@@ -85,17 +88,17 @@ export default function SetArchiveScreen() {
               <View key={card.name} style={styles.marketCard}>
                 <Image source={card.imageUrl} style={styles.cardImage} contentFit="cover" cachePolicy="memory-disk" accessibilityLabel={card.name} />
                 <Text style={styles.cardName}>{card.name}</Text>
-                <Pressable accessibilityRole="link" accessibilityLabel={`Find ${card.name} on TCGplayer, affiliate link`}
+                {commerceAllowed ? <Pressable accessibilityRole="link" accessibilityLabel={`Find ${card.name} on TCGplayer, affiliate link`}
                   onPress={() => void openCard(card.name)} style={styles.shopLink}>
                   <Text style={styles.shopLinkText}>TCGplayer (affiliate link)</Text>
-                </Pressable>
+                </Pressable> : null}
               </View>
             ))}
           </View>
-          <Text style={styles.disclosure}>
+          {commerceAllowed ? <Text style={styles.disclosure}>
             Affiliate disclosure: Pack One may earn a commission from eligible purchases through these TCGplayer affiliate links, at no added cost to the buyer.
-          </Text>
-          {affiliateError ? <Text accessibilityRole="alert" style={styles.error}>{affiliateError}</Text> : null}
+          </Text> : null}
+          {commerceAllowed && affiliateError ? <Text accessibilityRole="alert" style={styles.error}>{affiliateError}</Text> : null}
         </View>
 
         <View style={styles.section}>

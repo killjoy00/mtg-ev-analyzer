@@ -6,6 +6,8 @@ export type NativePatreonStatus = {
   connected: boolean;
   ad_free: boolean;
   ads_allowed: boolean;
+  patreon_ad_free?: boolean;
+  apple_subscription_active?: boolean;
   capabilities: string[];
   account_capabilities: string[];
   account_user_id: string;

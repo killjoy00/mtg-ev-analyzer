@@ -26,7 +26,9 @@ export function accountAccessLabel(state: MembershipState) {
   const caps = state.data.account_capabilities;
   const cube = caps.includes('unlimited_cube_practice');
   const custom = caps.includes('custom_corpus');
-  return cube && custom ? 'Additional practice access active' : cube || custom ? 'Additional practice access' : 'Regular practice access';
+  if (cube && custom) return 'Elite active';
+  if (cube || custom) return 'Additional practice access';
+  return state.data.ad_free ? 'Supporter active' : 'Free account';
 }
 
 export function createMembershipController(io: MembershipIO) {
@@ -81,13 +83,13 @@ export function createMembershipController(io: MembershipIO) {
         await assertCurrent();
         await io.openBrowser(url);
         await assertCurrent();
-        notice = 'Browser closed or opened separately. Only the checked account status below confirms a connection.';
+        notice = 'Checking your membership after returning from Patreon.';
       } else if (action === 'refresh' || action === 'disconnect') {
         await assertCurrent();
         await io.mutate(session, action);
         await assertCurrent();
         notice = action === 'refresh'
-          ? 'Refresh requested. Patreon reconciliation may still be pending; use Check status to verify it.'
+          ? 'Membership refresh requested. Check status again shortly.'
           : 'Disconnect acknowledged. Verifying the remaining account access.';
       }
       await assertCurrent();

@@ -982,3 +982,7 @@ body .run-review-list li {
 body .run-board li > small, body .run-review-list small { font-size: 13px; }
 body .run-share-copy p { font-size: 16px; }
 @media (max-width: 600px) { body .run-final-score span { font-size: 16px; } }
+
+/* Commercial card links follow the same ad-free membership promise. */
+html:not([data-card-commerce-allowed="true"]) [data-tcgplayer-card],
+html:not([data-card-commerce-allowed="true"]) .affiliate-note { display: none !important; }

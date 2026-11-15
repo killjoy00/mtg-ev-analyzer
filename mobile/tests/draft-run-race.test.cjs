@@ -115,6 +115,7 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
   Image.prefetch = async () => {};
 
   const mocks = {
+    '@/src/hooks/useCardCommerce': { useCardCommerce: () => true },
     'expo-application': { nativeApplicationVersion: '1.0', nativeBuildVersion: '1' },
     'expo-web-browser': { openBrowserAsync: async () => ({ type: 'dismiss' }) },
     'expo-haptics': {
@@ -247,6 +248,7 @@ test('a committed pick with a lost response is reconciled into feedback', async 
   Image.prefetch = async () => {};
 
   const mocks = {
+    '@/src/hooks/useCardCommerce': { useCardCommerce: () => true },
     'expo-application': { nativeApplicationVersion: '1.0', nativeBuildVersion: '1' },
     'expo-web-browser': { openBrowserAsync: async () => ({ type: 'dismiss' }) },
     'expo-haptics': {

@@ -128,21 +128,14 @@ try {
   await page.locator('[data-daily-home]').waitFor();
   assert.equal(await page.locator('[data-home-elite]').count(),0);
   await page.evaluate(async()=>{const growth=await import('./growth.mjs');await growth.beginEliteUpgrade({source:'e2e_explicit_premium'});});
-  await page.locator('#account-signup').waitFor();
-  assert.equal(await page.locator('#account-signin').count(),0);
-  assert.match(await page.locator('.account-page').textContent(),/Unlock Elite practice/);
-  assert.match(await page.locator('.account-page').textContent(),/Elite benefits and Patreon connection steps/);
-  await fillAuth('signin');
   await page.waitForURL(base+'/patreon/');
-  assert.equal(page.url(),base+'/patreon/');
-  await page.getByRole('heading',{name:'Pack One Elite',exact:true}).waitFor();
-  await page.locator('[data-patreon-connect-card]').waitFor();
-  assert.equal(page.url(),base+'/patreon/');
-  // Account E2E owns the authenticated handoff into the Patreon page. The
-  // disconnected/Elite membership-state matrix is exercised independently by
-  // patreon-activation-e2e with isolated state fixtures; duplicating that async
-  // transition here made this unrelated account journey race page hydration.
-  await page.screenshot({path:'artifacts/ui-patreon-account-handoff-390.png',fullPage:true});
+  await page.getByRole('heading',{name:'Practice the sets you want.',exact:true}).waitFor();
+  assert.equal(await page.locator('#account-signup').count(),0);
+  await page.getByRole('button',{name:'Get Elite',exact:true}).click();
+  await page.locator('#account-signup').waitFor();
+  assert.match(await page.locator('.account-page').textContent(),/Get Pack One Elite/);
+  await fillAuth('signin');
+  await page.waitForURL('https://www.patreon.com/checkout/PackOne?rid=29631843');
 
   // A signed-in free member keeps the Daily home focused and upgrades from Practice.
   await page.goto(base);

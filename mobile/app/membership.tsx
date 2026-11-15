@@ -33,6 +33,7 @@ import type {
 import { accountAccessLabel, createMembershipController, initialMembershipState } from '@/src/state/membership';
 import { readSession, subscribeSession } from '@/src/storage/session';
 import type { MobileSession } from '@/src/storage/session';
+import { trackMembershipEvent } from '@/src/api/membership-events';
 import { colors, spacing } from '@/src/theme';
 
 function billingSession(session: MobileSession | null) {
@@ -165,6 +166,7 @@ function AppleElitePanel({
 
       // StoreKit is finished only after the Pack One backend has accepted the
       // Apple-signed transaction and projected the provider-owned entitlement.
+      void trackMembershipEvent('membership_verification_succeeded', 'apple', verified.subscription.active ? 'active' : 'inactive');
       await finishTransaction({ purchase, isConsumable: false });
       return { status: verified, accountId };
     })();
@@ -211,10 +213,12 @@ function AppleElitePanel({
       setRequesting(false);
       setVerifying(false);
       if (purchaseError.code === 'user-cancelled') {
+        void trackMembershipEvent('membership_purchase_cancelled', 'apple');
         setNotice('Purchase canceled. No subscription change was made.');
         setError(null);
         return;
       }
+      void trackMembershipEvent('membership_purchase_failed', 'apple');
       setError(purchaseError.message || 'The App Store could not complete the purchase.');
     };
 
@@ -232,6 +236,7 @@ function AppleElitePanel({
   const otherProviderActive = hasAccountElite && !appleActive;
 
   const purchase = async () => {
+    void trackMembershipEvent('membership_purchase_clicked', 'apple');
     const current = billingSession(await readSession());
     if (!current) {
       setError('Sign in to a Pack One account before subscribing.');
@@ -249,6 +254,7 @@ function AppleElitePanel({
     setNotice(null);
     setError(null);
     try {
+      void trackMembershipEvent('membership_checkout_started', 'apple');
       await requestPurchase({
         type: 'subs',
         request: {
@@ -283,6 +289,7 @@ function AppleElitePanel({
     setNotice(null);
     setError(null);
     try {
+      void trackMembershipEvent('membership_restore_started', 'apple');
       await restorePurchases({ onlyIncludeActiveItemsIOS: true });
       const purchases = await getAvailableApplePurchases({ onlyIncludeActiveItemsIOS: true });
       const eligible = purchases.filter((item) => item.productId === APPLE_ELITE_PRODUCT_ID);
@@ -316,8 +323,8 @@ function AppleElitePanel({
 
   return (
     <View style={styles.panel}>
-      <Text style={styles.heading}>Pack One Elite with Apple</Text>
-      <Text style={styles.body}>Elite unlocks Powered Cube practice and custom-set practice on this Pack One account.</Text>
+      <Text style={styles.heading}>Pack One Elite</Text>
+      <Text style={styles.body}>Choose one set or combine several for unlimited practice. Play unlimited Powered Cube. Browse without display ads or TCGplayer promotions.</Text>
       {appleActive ? (
         <Text style={styles.body}>Your Apple subscription is active{status?.subscription.expiresAt
           ? ` through ${new Date(status.subscription.expiresAt).toLocaleDateString()}`
@@ -401,6 +408,7 @@ export default function MembershipScreen() {
   }));
 
   useEffect(() => {
+    void trackMembershipEvent('membership_offer_viewed', 'membership');
     controller.activate();
     const unsubscribe = subscribeSession((next) => controller.sessionChanged(next));
     return () => { unsubscribe(); controller.dispose(); };
@@ -432,7 +440,9 @@ export default function MembershipScreen() {
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.page}>
         <Text style={styles.eyebrow}>PACK ONE MEMBERSHIP</Text>
-        <Text style={styles.title}>Your account access</Text>
+        <Text style={styles.title}>Your membership</Text>
+        <Text style={styles.body}>All three Dailies are free. A free account adds unlimited regular, mixed-set practice. Supporter helps fund Pack One and removes promotions. Elite includes those benefits plus your choice of sets and unlimited Powered Cube.</Text>
+        <Text style={styles.help}>Use the same Pack One account on the website and app.</Text>
         <View style={styles.panel}>
           <Text style={styles.heading}>{accountAccessLabel(state)}</Text>
           {state.busy ? <ActivityIndicator accessibilityLabel="Checking membership" /> : null}
@@ -442,6 +452,8 @@ export default function MembershipScreen() {
               <Text style={styles.body}>Regular Draft Run practice: included</Text>
               <Text style={styles.body}>Powered Cube practice: {current.account_capabilities.includes('unlimited_cube_practice') ? 'available' : 'not currently included'}</Text>
               <Text style={styles.body}>Custom-set practice: {current.account_capabilities.includes('custom_corpus') ? 'available' : 'not currently included'}</Text>
+              <Text style={styles.body}>Display ads and TCGplayer promotions: {hasAccountElite || current.ad_free ? 'hidden' : 'may appear'}</Text>
+              {hasAccountElite ? <Text style={styles.help}>{current.apple_subscription_active ? 'Billed through Apple.' : current.capabilities.includes('custom_corpus') ? 'Billed through Patreon.' : 'Elite is available on this account.'}</Text> : null}
               <Text style={styles.help}>Elite works the same whether it comes from Apple or Patreon.</Text>
             </>
           ) : state.phase === 'error' ? (
@@ -468,12 +480,13 @@ export default function MembershipScreen() {
                 ? 'Elite from Patreon is active.'
                 : current.capabilities.length
                   ? 'Some Pack One benefits from Patreon are active.'
-                  : 'Patreon is connected, but Elite is not currently active. Manage your membership on Patreon.'}</Text>
+                  : (current.patreon_ad_free === true || (current.ad_free && !current.apple_subscription_active)) ? 'Supporter is active. Display ads and TCGplayer promotions are hidden.'
+                    : 'Patreon is connected. No paid membership is active.'}</Text>
             ) : null}
             {readableTimestamp(current.membership?.last_synced_at) ? <Text style={styles.help}>Last Patreon sync: {readableTimestamp(current.membership?.last_synced_at)}</Text> : null}
             {current.configured && !current.connected ? (
               <Pressable accessibilityRole="button" accessibilityLabel="Connect Patreon" disabled={state.busy}
-                onPress={() => void controller.connect()} style={[styles.button, state.busy && styles.disabled]}>
+                onPress={() => { void trackMembershipEvent('membership_connection_started', 'patreon'); void controller.connect(); }} style={[styles.button, state.busy && styles.disabled]}>
                 <Text style={styles.buttonText}>Connect Patreon</Text>
               </Pressable>
             ) : null}
@@ -504,7 +517,7 @@ export default function MembershipScreen() {
           </Pressable>
         ) : null}
         <Text style={styles.help}>Connect Patreon links an existing Patreon account. Patreon membership changes remain managed through Patreon.</Text>
-        <Text style={styles.help}>When Patreon authorization finishes, close the browser and return here. Check status verifies the current account; a browser message alone does not grant access.</Text>
+        <Text style={styles.help}>After connecting Patreon, return to the app. Your membership updates here. If it has not appeared yet, tap Check status.</Text>
       </ScrollView>
     </SafeAreaView>
   );

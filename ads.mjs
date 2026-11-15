@@ -1,4 +1,5 @@
 import {ACCOUNT_SIGNAL_KEY,hasAccountSession,loadPatreonStatus} from './growth-api.mjs';
+import {cardCommerceAllowed} from './membership-source.mjs';
 import {onAppRender} from './render-lifecycle.mjs';
 import {tcgplayerHomeBannerActive,tcgplayerMagicUrl} from './tcgplayer.mjs';
 
@@ -22,7 +23,7 @@ export function syncAccountNavigation({doc=document,signedIn=null}={}) {
 export async function promotionalContentAllowed({active=true,game=false,accountToken,checkMembership}) {
   if(!active||game)return false;
   if(!accountToken)return true;
-  try{return (await checkMembership()).ads_allowed===true;}catch{return false;}
+  try{return cardCommerceAllowed(await checkMembership());}catch{return false;}
 }
 
 export async function advertisingAllowed({enabled,client,game=false,accountToken,checkMembership}) {

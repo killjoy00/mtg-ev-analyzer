@@ -389,3 +389,19 @@ test('profile block DELETE preflight advertises the method the gateway permits',
   assert.equal(response.status,204);
   assert.match(response.headers.get('access-control-allow-methods')||'',/(?:^|,)DELETE(?:,|$)/);
 });
+
+test('native membership telemetry permits player-only POST events, never account access',async()=>{
+  let forwarded;
+  const response=await gateway(new Request('https://api.packone.pro/growth/v1/events',{
+    method:'POST',headers:headers({'content-type':'application/json','x-pack1-mobile-session':token}),
+    body:JSON.stringify({events:[{name:'membership_offer_viewed',props:{context:'ios'}}]}),
+  }),env(),async(_url,options)=>{forwarded=new Headers(options.headers);return Response.json({ok:true});});
+  assert.equal(response.status,200);
+  assert.equal(forwarded.get('authorization'),'Bearer '+token);
+  for(const extra of [{method:'GET'},{method:'POST',account:true}]) {
+    const r=await gateway(new Request('https://api.packone.pro/growth/v1/events',{
+      method:extra.method,headers:headers({'x-pack1-mobile-session':token,...(extra.account?{'x-pack1-mobile-account':account}:{})}),
+    }),env(),async()=>{throw Error('must not reach upstream');});
+    assert.equal(r.status,extra.method==='GET'?404:403);
+  }
+});

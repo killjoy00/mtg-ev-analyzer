@@ -58,6 +58,7 @@ import { useAppResume } from '@/src/hooks/useAppResume';
 import { clearPracticeIdempotencyKey, practiceIdempotencyKey } from '@/src/storage/idempotency';
 import { readSession, subscribeSession, type MobileSession } from '@/src/storage/session';
 import type { SharedRunSurface } from '@/src/state/sharedRunSurface';
+import { useCardCommerce } from '@/src/hooks/useCardCommerce';
 import { tcgplayerUrl } from '@/src/tcgplayer';
 import { colors, spacing } from '@/src/theme';
 import { trophyDrafterFacts, trophyDrafterSentences } from '@/src/trophyDrafter';
@@ -359,11 +360,13 @@ function CompareAllCards({
   shares,
   onZoom,
   onAffiliatePress,
+  commerceAllowed,
 }: {
   answer: DraftRunAnswer;
   shares: CardShares;
   onZoom: (card: DraftRunCard) => void;
   onAffiliatePress: (card: DraftRunCard) => void;
+  commerceAllowed: boolean;
 }) {
   const byId = new Map(answer.puzzle.candidates.map((card) => [card.id, card]));
   // Every scored answer carries a ranking; an older one without it still
@@ -402,7 +405,7 @@ function CompareAllCards({
           </View>
         );
       })}
-      <View style={styles.shopLinks}>
+      {commerceAllowed ? <View style={styles.shopLinks}>
         {revealed.map((card) => (
           <Pressable
             key={`shop-${card.id}`}
@@ -417,7 +420,7 @@ function CompareAllCards({
         <Text style={styles.affiliateDisclosure}>
           Affiliate links. Pack One may earn a commission from eligible TCGplayer purchases at no added cost to you.
         </Text>
-      </View>
+      </View> : null}
     </View>
   );
 }
@@ -575,6 +578,7 @@ export default function DraftRunScreen({
   const [actionError, setActionError] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
   const [affiliateError, setAffiliateError] = useState<string | null>(null);
+  const commerceAllowed = useCardCommerce();
   const [zoomedCard, setZoomedCard] = useState<DraftRunCard | null>(null);
   const [reviewIndex, setReviewIndex] = useState<number | null>(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
@@ -954,6 +958,7 @@ export default function DraftRunScreen({
   };
 
   const openAffiliateCard = (card: DraftRunCard) => {
+    if (!commerceAllowed) return;
     setAffiliateError(null);
     let url: string;
     try {
@@ -1379,8 +1384,8 @@ export default function DraftRunScreen({
               </Pressable>
               {showAnalysis ? (
                 <>
-                  <CompareAllCards answer={answer} shares={cardShares} onAffiliatePress={openAffiliateCard} onZoom={setZoomedCard} />
-                  {affiliateError ? <Text accessibilityRole="alert" style={styles.actionError}>{affiliateError}</Text> : null}
+                  <CompareAllCards commerceAllowed={commerceAllowed} answer={answer} shares={cardShares} onAffiliatePress={openAffiliateCard} onZoom={setZoomedCard} />
+                  {commerceAllowed && affiliateError ? <Text accessibilityRole="alert" style={styles.actionError}>{affiliateError}</Text> : null}
                 </>
               ) : null}
 

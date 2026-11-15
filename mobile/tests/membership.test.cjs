@@ -132,7 +132,7 @@ async function mount(t, options = {}) {
 
 test('non-Patreon additional access is shown independently from an unconnected Patreon', async (t) => {
   const h = await mount(t);
-  assert.match(h.text(), /Additional practice access active/);
+  assert.match(h.text(), /Elite active/);
   assert.match(h.text(), /No Patreon account is connected/);
   assert.equal(h.posts('connect').length, 0);
 });
@@ -140,7 +140,7 @@ test('non-Patreon additional access is shown independently from an unconnected P
 test('partial capabilities are not mislabeled full access or Free', async (t) => {
   const h = await mount(t, { data: data({ account_capabilities: ['account', 'unlimited_regular_practice', 'custom_corpus'] }) });
   assert.match(h.text(), /Additional practice access/);
-  assert.doesNotMatch(h.text(), /Additional practice access active|Free member/);
+  assert.doesNotMatch(h.text(), /Elite active|Free member/);
 });
 
 test('loading, timeout and retry never turn unknown membership into Free', async (t) => {
@@ -149,16 +149,16 @@ test('loading, timeout and retry never turn unknown membership into Free', async
   assert.match(h.text(), /Account access not verified/);
   await act(async () => { pending.reject(Error('Status timeout')); await drain(); });
   assert.match(h.text(), /Status timeout/);
-  assert.doesNotMatch(h.text(), /Additional practice access active|Free member/);
+  assert.doesNotMatch(h.text(), /Elite active|Free member/);
   h.handler = null;
   await h.press('Check membership status');
-  assert.match(h.text(), /Additional practice access active/);
+  assert.match(h.text(), /Elite active/);
 });
 
 test('expired or revoked Patreon grants do not erase current grants from another provider', async (t) => {
   const h = await mount(t, { data: connected({ capabilities: [] }) });
-  assert.match(h.text(), /Additional practice access active/);
-  assert.match(h.text(), /Patreon is connected, but Elite is not currently active/);
+  assert.match(h.text(), /Elite active/);
+  assert.match(h.text(), /Patreon is connected. No paid membership is active/);
 });
 
 test('refresh has explicit pending semantics and never reports completed reconciliation', async (t) => {
@@ -166,7 +166,7 @@ test('refresh has explicit pending semantics and never reports completed reconci
   h.value = connected({ membership: { effective_state: 'elite_entitled', sync_pending: true } });
   await h.press('Refresh Patreon access');
   assert.deepEqual(h.posts('refresh')[0].config.body, { confirm: true });
-  assert.match(h.text(), /Refresh requested/);
+  assert.match(h.text(), /refresh requested/);
   assert.match(h.text(), /still updating your membership/);
   assert.doesNotMatch(h.text(), /successfully refreshed|membership status refreshed/);
 });
@@ -182,7 +182,7 @@ test('failed refresh is exposed and access becomes unverified rather than Free',
 test('Patreon stays passive while iOS exposes Apple-native Elite billing', async (t) => {
   const h = await mount(t);
   const copy = h.text();
-  assert.match(copy, /Pack One Elite with Apple/);
+  assert.match(copy, /Pack One Elite/);
   assert.match(copy, /Subscribe with Apple/);
   assert.match(copy, /Connect Patreon links an existing Patreon account/);
   assert.match(copy, /Patreon membership changes remain managed through Patreon/);
@@ -196,7 +196,7 @@ test('browser cancellation is not reported as successful connection', async (t) 
   await h.press('Connect Patreon');
   assert.equal(h.opened.length, 1);
   assert.match(h.text(), /No Patreon account is connected/);
-  assert.match(h.text(), /Only the checked account status/);
+  assert.match(h.text(), /Checking your membership after returning from Patreon/);
   assert.doesNotMatch(h.text(), /successfully connected|membership status refreshed/);
 });
 
@@ -222,8 +222,8 @@ test('a stale status result cannot replace a new account result', async (t) => {
   h.handler = null;
   await h.switchAccount(session(OTHER), data({ account_user_id: OTHER, account_capabilities: ['account', 'unlimited_regular_practice'] }));
   await act(async () => { pending.resolve(data()); await drain(); });
-  assert.match(h.text(), /Regular practice access/);
-  assert.doesNotMatch(h.text(), /Additional practice access active/);
+  assert.match(h.text(), /Free account/);
+  assert.doesNotMatch(h.text(), /Elite active/);
 });
 
 test('signing out during the browser flow discards its late result', async (t) => {
@@ -233,7 +233,7 @@ test('signing out during the browser flow discards its late result', async (t) =
   await h.switchAccount({ playerToken: session().playerToken });
   await act(async () => { pending.resolve({ type: 'cancel' }); await drain(); });
   assert.match(h.text(), /Sign in to manage membership/);
-  assert.doesNotMatch(h.text(), /Additional practice access active|Only the checked account status/);
+  assert.doesNotMatch(h.text(), /Elite active|Checking your membership after returning from Patreon/);
 });
 
 test('duplicate connection taps join no second mutation', async (t) => {
@@ -254,7 +254,7 @@ test('disconnect requires confirmation and preserves other-provider access', asy
   await act(async () => { confirm.onPress(); await drain(); });
   assert.equal(h.posts('disconnect').length, 1);
   assert.match(h.text(), /Patreon disconnected/);
-  assert.match(h.text(), /Additional practice access active/);
+  assert.match(h.text(), /Elite active/);
 });
 
 test('an old confirmation cannot disconnect a newly signed-in account', async (t) => {
@@ -270,7 +270,7 @@ test('an old confirmation cannot disconnect a newly signed-in account', async (t
 test('malformed and wrong-account payloads are never interpreted as entitlements', async (t) => {
   const h = await mount(t, { data: data({ account_user_id: OTHER }) });
   assert.match(h.text(), /did not match the current account/);
-  assert.doesNotMatch(h.text(), /Additional practice access active/);
+  assert.doesNotMatch(h.text(), /Elite active/);
   h.value = {};
   await h.press('Check membership status');
   assert.match(h.text(), /Account access not verified/);
@@ -339,6 +339,6 @@ test('Restore Purchases verifies the signed Apple transaction before finishing i
 
 test('Android keeps Apple billing out of the native membership surface', async (t) => {
   const h = await mount(t, { platform: 'android' });
-  assert.doesNotMatch(h.text(), /Pack One Elite with Apple|Subscribe with Apple|Restore Purchases/);
+  assert.doesNotMatch(h.text(), /Pack One Elite|Subscribe with Apple|Restore Purchases/);
   assert.match(h.text(), /Connect Patreon/);
 });

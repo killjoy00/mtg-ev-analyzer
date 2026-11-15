@@ -72,3 +72,68 @@ secrets. Existing client and creator-token secrets remain separate.
 The initial real billing-change/signed-webhook observation is still outstanding;
 fixture coverage and successful API reconciliation are documented separately in
 [the runbook](PATREON.md). No purchase or subscription change was made on your behalf.
+
+## Membership offer and ad-free contract
+
+The website offers Free, Supporter ($3/month on Patreon), and Pack One Elite
+($7/month on Patreon) before account creation. A new purchase and connecting an
+existing membership have separate actions. Apple pricing comes from StoreKit,
+including its localized price and billing period. Do not change provider prices
+as part of a copy update.
+
+Free includes all three Dailies and unlimited regular mixed-set practice with a
+free account. Supporter funds ongoing development and removes promotions. Elite
+adds custom-set and unlimited Powered Cube practice. Both paid tiers suppress
+individual-card TCGplayer links and affiliate disclosures in web/native reveals
+and set archives, as well as the web promotional slot. Full Elite capabilities
+from Apple or manual grants suppress those promotions too. Unknown membership
+status keeps card promotions hidden. Identity changes and foreground/focus checks
+invalidate previous eligibility.
+
+### Patreon editor copy (prepared; requires creator publication)
+
+Keep the existing tier IDs and prices. Rename **Elite Member** to **Pack One Elite**.
+Remove the duplicate “Unlimited power cube draft runs” benefit when replacing the
+benefit list. These are proposed editor values, not proof of a live Patreon change.
+
+**Supporter description**
+
+Help keep Pack One going. Your membership supports development, infrastructure,
+and new set coverage. Supporters get ad-free browsing, including no individual-card
+TCGplayer promotions, while signed in with their membership connected.
+
+All three Dailies are free. A free Pack One account also includes unlimited regular,
+mixed-set practice. Supporter adds ad-free browsing; Elite adds more ways to practice.
+
+After joining, open https://packone.pro/?patreon=activate, sign in to Pack One, and
+connect Patreon. Use that same Pack One account on the website and app.
+
+**Pack One Elite description**
+
+Choose what you practice. Pack One Elite includes:
+
+- Custom-set practice: choose one set or combine several.
+- Unlimited Powered Cube practice.
+- All Supporter benefits, including no display ads or individual-card TCGplayer promotions.
+
+All three Dailies and regular mixed-set practice remain free. After joining, open
+https://packone.pro/?patreon=activate, sign in to Pack One, and connect Patreon.
+Use that same Pack One account on the website and app.
+
+**Welcome note for both tiers**
+
+Thanks for supporting Pack One. Connect your membership at
+https://packone.pro/?patreon=activate. Sign in to Pack One, then connect Patreon.
+Your benefits work on the website and app when you use the same Pack One account.
+Already connected? Check your membership at https://packone.pro/patreon/.
+
+### Conversion measurement
+
+`analytics/membership_funnel.sql` reports offer, purchase intent, actual provider
+handoff, connection, restoration, cancellation, and verified-status UX stages.
+It separately reports server-owned Patreon grant transitions and Apple first
+subscription observations, then premium usage within 24 hours. Exclude staff/QA,
+keep Apple Sandbox separate, and let cohorts mature for 24 hours. These are not
+payment receipts: a restore or reactivation must not count as a new purchase.
+`elite_upgrade_handoff` is an internal membership-page visit, not checkout.
+Do not publish production analytics outputs in this public repository.

@@ -6,6 +6,10 @@ const ELITE_CAPABILITIES = ['custom_corpus', 'unlimited_cube_practice'];
 
 const hasElite = (list) => Array.isArray(list) && ELITE_CAPABILITIES.every((capability) => list.includes(capability));
 
+export function cardCommerceAllowed(status) {
+  return status?.ads_allowed === true && status?.ad_free !== true && !eliteSource(status);
+}
+
 export function eliteSource(status) {
   if (hasElite(status?.capabilities)) return 'patreon';
   if (!hasElite(status?.account_capabilities)) return null;

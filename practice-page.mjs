@@ -89,7 +89,7 @@ document.querySelector('[data-practice-hub]')?.addEventListener('click', async e
   if (!button || button.disabled) return;
   button.disabled = true;
   try {
-    const { beginEliteUpgrade } = await import('/growth.mjs?v=32');
+    const { beginEliteUpgrade } = await import('/growth.mjs?v=33');
     await beginEliteUpgrade({ source: 'practice_hub' });
   } finally {
     button.disabled = false;
