@@ -255,7 +255,7 @@ assert.ok(privacy.indexOf('<h2 id="accounts">Accounts and sign-in</h2>') < priva
 assert.doesNotMatch(privacy, /may earn a commission|membership cannot be verified/i);
 
 const patreonPageHtml = await readFile('patreon/index.html','utf8');
-assert.match(patreonPageHtml, /No display ads or TCGplayer promotions/i);
+assert.match(patreonPageHtml, /No ads, including TCGplayer card links/i);
 assert.match(patreonPageHtml, /\$3\/month/);
 assert.match(patreonPageHtml, /\$7\/month/);
 assert.match(patreonPageHtml, /All Supporter benefits, including ad-free browsing/i);

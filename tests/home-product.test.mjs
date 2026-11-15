@@ -122,7 +122,7 @@ test('approved editorial copy is consistent across web and native app',()=>{
  const expected={
   'practice/index.html':'<h1>Want another eight picks?</h1>',
   'learn/index.html':'<h1>How Pack One works.</h1>',
-  'methodology/index.html':"Try today's Daily.",
+  'methodology/index.html':'Try today’s eight picks.',
   'scoring/index.html':'<h2>What if the model disagrees?</h2>',
   'sets/index.html':'<h1>Which sets are available?</h1>',
   'mobile/src/screens/index.tsx':'<Text style={styles.utilityTitle}>Want another eight picks?</Text>',
