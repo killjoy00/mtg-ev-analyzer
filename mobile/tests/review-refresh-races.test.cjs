@@ -655,10 +655,10 @@ test('Learn keeps core education native and opens each selected drafting guide d
   };
   await press('Open How to Play');
   assert.deepEqual(pushed, ['/how-to']);
-  await press('Open First-pick discipline: commit before the reveal on packone.pro');
-  await press('Open How to read consensus without treating it as truth on packone.pro');
-  await press('Open Staying open is not the same as avoiding commitment on packone.pro');
-  await press('Open Card strength vs. deck fit: know what changed on packone.pro');
+  await press('Open Rank your top three before the reveal on packone.pro');
+  await press('Open What the model’s numbers actually tell you on packone.pro');
+  await press('Open When staying open is worth it on packone.pro');
+  await press('Open When to take the card that fits your deck on packone.pro');
   assert.deepEqual(opened, [
     'https://packone.pro/learn/first-pick-discipline/', 'https://packone.pro/learn/reading-consensus/',
     'https://packone.pro/learn/staying-open/', 'https://packone.pro/learn/card-strength-vs-fit/',
@@ -683,9 +683,9 @@ test('Learn exposes a visible retry message when the canonical browser handoff f
   const Screen = compileScreen('src/screens/learn.tsx', mocks);
   let root;
   await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); });
-  const contact = root.root.findAll((item) => item.type === 'Pressable' && item.props.accessibilityLabel === 'Open First-pick discipline: commit before the reveal on packone.pro')[0];
+  const contact = root.root.findAll((item) => item.type === 'Pressable' && item.props.accessibilityLabel === 'Open Rank your top three before the reveal on packone.pro')[0];
   await act(async () => { contact.props.onPress(); await Promise.resolve(); await Promise.resolve(); });
-  assert.match(renderedText(root.toJSON()), /Could not open First-pick discipline: commit before the reveal\. Try again when your browser is available\./);
+  assert.match(renderedText(root.toJSON()), /Could not open Rank your top three before the reveal\. Try again when your browser is available\./);
   await act(async () => root.unmount());
 });
 

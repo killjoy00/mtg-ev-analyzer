@@ -216,7 +216,7 @@ try{
       assert.match(await page.locator('.run-feedback-copy p').innerText(),new RegExp('You picked '));
       assert.ok((await page.locator('.run-feedback-copy p').innerText()).includes(p.candidates.find(c=>c.id===selected).name));
     } else assert.equal(await page.locator('.run-feedback-copy p').count(),0);
-    assert.ok(await page.getByRole('button',{name:'Does something look wrong? Let us know.'}).isVisible());
+    assert.ok(await page.getByRole('button',{name:'Does something look wrong? Let me know.'}).isVisible());
     const revealCardBox=await shown.first().boundingBox();
     assert.ok(revealCardBox&&revealCardBox.width>=80,`reveal card remains visible (${revealCardBox?.width}px)`);
     if(round===0){
@@ -359,7 +359,7 @@ try{
     await page.evaluate(()=>{window.__runShare=null;});
     failSharedRead=true;
     await page.locator('#run-share').click();
-    await page.getByText('Pack One could not verify this share link. Try Share again.',{exact:true}).waitFor();
+    await page.getByText('Couldn’t check this share link. Try sharing again.',{exact:true}).waitFor();
     assert.equal(await page.evaluate(()=>window.__runShare),null,'an unresolvable practice share is never handed to the share sheet');
     assert.equal(sharedReadCalls,3);
     failSharedRead=false;

@@ -27,7 +27,7 @@ async function openPatreonConnection() {
     await startPatreonOAuth('patreon_landing');
   } catch(error) {
     action.disabled=false;
-    setStatus(error?.message||'Patreon could not be opened. Please try again.',{state:'error',heading:'Patreon connection needs attention',showPatreon:true});
+    setStatus(error?.message||'Couldn’t open Patreon. Try again.',{state:'error',heading:'Patreon connection needs attention',showPatreon:true});
   }
 }
 
@@ -41,7 +41,7 @@ async function renderMembershipState() {
     action.textContent='Try again';
     action.disabled=false;
     action.onclick=()=>void renderMembershipState();
-    setStatus(error?.message||'Pack One could not check your account right now.',{state:'error',heading:'Account status unavailable'});
+    setStatus(error?.message||'Couldn’t check your account. Try again.',{state:'error',heading:'Account status unavailable'});
     return;
   }
 
@@ -63,7 +63,7 @@ async function renderMembershipState() {
     action.textContent='Try again';
     action.disabled=false;
     action.onclick=()=>void renderMembershipState();
-    setStatus(error?.message||'Pack One could not check Patreon right now.',{state:'error',heading:'Patreon status unavailable',showPatreon:true});
+    setStatus(error?.message||'Couldn’t check Patreon. Try again.',{state:'error',heading:'Patreon status unavailable',showPatreon:true});
     return;
   }
 
@@ -125,7 +125,7 @@ async function bootMembershipState() {
       action.disabled=false;
       action.onclick=()=>location.reload();
     }
-    setStatus('Pack One could not load its account service configuration. Please try again.',
+    setStatus('Something went wrong loading your account. Try again.',
       {state:'error',heading:'Account status unavailable'});
     return;
   }
@@ -140,7 +140,7 @@ document.querySelectorAll('[data-membership-purchase]').forEach(button=>button.a
     if(!globalThis.PACK1_API)await import('/leaderboard-config.js');
     const {beginMembershipPurchase}=await import('/growth.mjs?v=33');
     await beginMembershipPurchase(button.dataset.membershipPurchase);
-  } catch(error) {if(status)status.textContent=error?.message||'Could not open membership. Please try again.';}
+  } catch(error) {if(status)status.textContent=error?.message||'Couldn’t open membership. Try again.';}
   finally {button.disabled=false;}
 }));
 offsite?.addEventListener('click',()=>{

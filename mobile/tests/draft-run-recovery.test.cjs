@@ -330,7 +330,7 @@ test('decision report is offered on the reveal and preserves the run', async () 
     submitReport: async (...args) => { reports.push(args); return { ok: true, id: 'report-id' }; },
   });
   try {
-    assert.equal(screen.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Does something look wrong? Let us know.').length, 0,
+    assert.equal(screen.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Does something look wrong? Let me know.').length, 0,
       'no report prompt before a pick is revealed');
     await screen.chooseAndConfirm();
     const report = pressable(screen, 'Does something look wrong?');
@@ -350,7 +350,7 @@ test('decision report is offered on the reveal and preserves the run', async () 
     assert.equal(reports[0][2], 'score_recommendation');
     assert.equal(reports[0][3], 'The recommendation looks reversed.');
     assert.match(reports[0][4].playerToken, /^p1_11111111-1111-4111-8111-111111111111\./);
-    assert.match(screen.text(), /Thanks for letting us know\./);
+    assert.match(screen.text(), /Thanks for letting me know\./);
     assert.match(screen.text(), /You picked\s+Card A/);
   } finally { await screen.close(); }
 });
@@ -377,7 +377,7 @@ test('decision report submits successfully without an optional comment', async (
     assert.equal(reports[0][1], 0);
     assert.equal(reports[0][2], 'draft_context');
     assert.equal(reports[0][3], '');
-    assert.match(screen.text(), /Thanks for letting us know\./);
+    assert.match(screen.text(), /Thanks for letting me know\./);
   } finally { await screen.close(); }
 });
 

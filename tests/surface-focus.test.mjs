@@ -48,8 +48,8 @@ test('Draft Run review retains result focus, the pack and a separate continuatio
 
 test('decision reporting is visible outside score and pack disclosures',async()=>{
  const source=await readFile('draft-run-product.mjs','utf8');
- assert.match(source,/Does something look wrong\?/);assert.match(source,/Let us know\./);
- assert.match(source,/Thanks for letting us know\./);assert.match(source,/function reportDecisionMarkup/);
+ assert.match(source,/Does something look wrong\?/);assert.match(source,/Let me know\./);
+ assert.match(source,/Thanks for letting me know\./);assert.match(source,/function reportDecisionMarkup/);
  assert.match(source,/Anything else\?/);assert.match(source,/data-report-decision/);
  const css=await readFile('draft-run.css','utf8');assert.match(css,/\.run-report-prompt/);
 });
@@ -71,7 +71,7 @@ test('practice share verification uses the public recipient path without owner c
   assert.match(helper, /credentials:'omit'/);
   assert.match(helper, /method:'GET'/);
   assert.match(share, /publicApi\('\/v1\/shared-runs\/'\+encodeURIComponent\(share\.id\)\)/);
-  assert.match(share, /Pack One could not verify this share link\. Try Share again\./);
+  assert.match(share, /Couldn’t check this share link\. Try sharing again\./);
 });
 
 test('Draft Run result footnote keeps its muted spacing', async () => {

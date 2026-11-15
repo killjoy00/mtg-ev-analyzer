@@ -136,7 +136,7 @@ export default function PracticeScreen() {
           <View style={styles.optionCard}>
             <Text style={styles.cardKicker}>FREE ACCOUNT</Text>
             <Text style={styles.cardTitle}>Regular Draft Run</Text>
-            <Text style={styles.body}>Unlimited eight-decision runs from real trophy drafts.</Text>
+            <Text style={styles.body}>Unlimited eight-pick runs from real trophy drafts.</Text>
             <Pressable accessibilityRole="button" onPress={signIn} style={styles.primaryButton}>
               <Text style={styles.primaryButtonText}>Sign in to practice</Text>
             </Pressable>
@@ -159,7 +159,7 @@ export default function PracticeScreen() {
           >
             <Text style={styles.cardKicker}>FREE ACCOUNT</Text>
             <Text style={styles.cardTitle}>Regular Draft Run</Text>
-            <Text style={styles.body}>Unlimited eight-decision runs from real trophy drafts.</Text>
+            <Text style={styles.body}>Unlimited eight-pick runs from real trophy drafts.</Text>
             <Text style={regularUnlocked ? styles.cardAction : styles.lockedText}>
               {regularUnlocked ? 'Start Draft Run →' : 'Sign in again to refresh access'}
             </Text>
@@ -183,7 +183,7 @@ export default function PracticeScreen() {
         >
           <Text style={styles.cardKicker}>PACK ONE ELITE</Text>
           <Text style={styles.cardTitle}>Powered Cube</Text>
-          <Text style={styles.body}>Eight decisions from Powered Cube trophy drafts, available whenever you want another run.</Text>
+          <Text style={styles.body}>Eight picks from Powered Cube trophy drafts, whenever you want another run.</Text>
           <Text style={cubeUnlocked ? styles.cardAction : styles.lockedText}>
             {cubeUnlocked ? 'Start Powered Cube →' : 'Pack One Elite required'}
           </Text>

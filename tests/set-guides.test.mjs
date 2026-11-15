@@ -33,7 +33,7 @@ test('published guides have complete, sourced content and valid comparable snaps
 test('results suppress small samples and separate themes from observed deck colors',()=>{
   const guide={archetypes:[],results:{formatLabel:'Premier Draft (BO1)',colorCount:2,retrievedAt:'2026-10-18',rows:[{colors:'WU',wins:499,games:499},{colors:'BG',wins:280,games:500}],sourceUrl:'https://www.17lands.com/deck_color_data'}};
   const html=renderResults(guide);
-  assert.match(html,/Black–Green<\/strong> has the highest/);assert.doesNotMatch(html,/100\.0%/);assert.match(html,/56\.0%/);assert.match(html,/not confirmed archetype classifications/);
+  assert.match(html,/Black–Green<\/strong> has the highest/);assert.doesNotMatch(html,/100\.0%/);assert.match(html,/56\.0%/);assert.match(html,/results by deck color, not by archetype/);
 });
 
 test('unknown sets never publish dead links or fetch arbitrary paths',async()=>{

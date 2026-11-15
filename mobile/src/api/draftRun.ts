@@ -18,19 +18,19 @@ export const DAILY_ENVIRONMENT_META: Record<DailyEnvironment, {
   mixed: {
     title: 'Draft Run',
     eyebrow: 'DAILY DRAFT RUN',
-    description: 'Eight decisions from real trophy drafts.',
+    description: 'Eight picks from real trophy drafts.',
     resultTitle: 'Your Draft Run.',
   },
   'powered-cube': {
     title: 'Powered Cube',
     eyebrow: 'POWERED CUBE DAILY',
-    description: 'Eight decisions from Powered Cube trophy drafts.',
+    description: 'Eight picks from Powered Cube trophy drafts.',
     resultTitle: 'Your Cube Run.',
   },
   latest: {
     title: 'Latest Set',
     eyebrow: 'LATEST SET DAILY',
-    description: 'Eight decisions from trophy drafts in the latest set.',
+    description: 'Eight picks from trophy drafts in the latest set.',
     resultTitle: 'Your Latest Set Run.',
   },
 };

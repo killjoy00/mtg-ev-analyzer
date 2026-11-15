@@ -440,7 +440,7 @@ try {
    const tops=await page.locator('.my-career-metrics strong').evaluateAll(nodes=>nodes.map(node=>Math.round(node.getBoundingClientRect().top)));
    for(let i=0;i<tops.length;i+=2)assert.equal(tops[i],tops[i+1],`two-column snapshot row ${i/2+1} is aligned`);
    await page.setViewportSize(vp);}
-  assert.match(await page.locator('.my-archive-summary').textContent(), /3\/3\s*environments played/);
+  assert.match(await page.locator('.my-archive-summary').textContent(), /3\/3\s*sets played/);
   assert.equal(await page.locator('[data-environment-id="pio"]').count(), 0,
     'Candidate environments must not be visible to players');
   assert.equal(await page.locator('[data-environment-id="vow"]').count(), 0,
@@ -707,7 +707,7 @@ try {
   const activePlayed = fixture.by_set.filter(row => liveIds.includes(row.set_id)).length;
   assert.equal(await page.locator('.my-archive-item').count(), liveIds.length, 'Only Live sets appear in the player archive');
   assert.match((await page.locator('.my-archive-summary').textContent()) || '',
-    new RegExp(`${activePlayed}/${liveIds.length}\\s*environments played`));
+    new RegExp(`${activePlayed}/${liveIds.length}\\s*sets played`));
   assert.equal(await page.locator('#profile-settings-form select[name="favoriteSetId"] option').count(),
     liveIds.length + 1, 'favorite choices must be Live-only');
   assert.equal(await page.locator('[data-environment-id="powered-cube"].is-played').count(), 1, 'Powered Cube must be part of archive progression');

@@ -59,7 +59,7 @@ function performanceBars(profile) {
 }
 
 function bestEnvironmentRows(profile,names,progress) {
-  if(!progress)return '<p class="my-pack-empty">Live environments are temporarily unavailable.</p>';
+  if(!progress)return '<p class="my-pack-empty">Couldn’t load the sets.</p>';
   const rows=(profile.best_environments||[]).filter(row=>progress.ids.has(row.set_id)).slice(0,5);
   if(!rows.length)return '<p class="my-pack-empty">Play at least three games in a set or format to see it here.</p>';
   return '<ol class="my-best-list">'+rows.map((row,index)=>
@@ -107,9 +107,9 @@ function dailyDetailRow(row,names,index) {
 }
 
 function archiveMarkup(progress) {
-  if(!progress)return '<p class="my-pack-empty">Live environments are temporarily unavailable. Refresh to try again.</p>';
+  if(!progress)return '<p class="my-pack-empty">Couldn’t load the sets. Refresh to try again.</p>';
   const pct=progress.total?Math.round((progress.played/progress.total)*100):0;
-  return '<div class="my-archive-summary"><div><strong>'+progress.played+'/'+progress.total+'</strong><span>environments played</span></div><b>'+pct+'%</b></div>'+
+  return '<div class="my-archive-summary"><div><strong>'+progress.played+'/'+progress.total+'</strong><span>sets played</span></div><b>'+pct+'%</b></div>'+
     '<div class="my-archive-track" role="progressbar" aria-label="Archive progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+pct+'"><i style="width:'+pct+'%"></i></div>'+
     '<details class="my-pack-details" data-profile-section="archive"><summary>See all sets</summary><div class="my-archive-grid">'+progress.environments.map(entry=>
       '<a class="my-archive-item '+(entry.played?'is-played':'is-unplayed')+'" data-environment-id="'+esc(entry.id)+'" href="/sets/#'+encodeURIComponent(entry.id)+'"><strong>'+esc(entry.name)+'</strong><span>'+(entry.played?entry.games+' games · '+entry.averageScore.toFixed(1)+' avg':'Not played yet')+'</span></a>'
@@ -216,7 +216,7 @@ function usernameAttentionMarkup(profile) {
     : reason==='username_taken'
       ? 'Choose a different display name. That one is already taken.'
       : 'Choose a display name to join Daily leaderboards.';
-  return '<aside class="profile-claim profile-username-attention" role="alert"><div><span>Display name needs attention</span><strong>'+esc(message)+'</strong><p>Your account is linked, but this display name cannot be shown on Daily leaderboards yet.</p></div><button type="button" class="button secondary" id="profile-username-fix">Change display name</button></aside>';
+  return '<aside class="profile-claim profile-username-attention" role="alert"><div><span>Display name needs attention</span><strong>'+esc(message)+'</strong><p>Your account is linked, but this display name can’t show on Daily leaderboards yet.</p></div><button type="button" class="button secondary" id="profile-username-fix">Change display name</button></aside>';
 }
 export function resetMyPackOneTab() {
   // Entering My Pack One from account navigation or completing a new sign-in

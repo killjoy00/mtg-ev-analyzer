@@ -14,7 +14,7 @@ const sections: ArticleSection[] = [
   {
     title: 'How partial credit works.',
     body: [
-      'Other picks can score up to 95. We compare the model’s support for your card with its top choice to calculate partial credit. Model support isn’t a win rate, and it isn’t the same as points.',
+      'Other picks can score up to 95. Partial credit compares the model’s support for your card with its top choice. Model support isn’t a win rate, and it isn’t the same as points.',
     ],
     extra: (
       <View style={articleStyles.callout}>
@@ -33,7 +33,7 @@ const sections: ArticleSection[] = [
   {
     title: 'Eight picks count equally.',
     body: [
-      "Every pick counts the same toward your final score. Harder picks don't earn bonus points. We also show how many times you matched the trophy drafter.",
+      "Every pick counts the same toward your final score. Harder picks don't earn bonus points. You’ll also see how many times you matched the trophy drafter.",
     ],
   },
   {
@@ -45,7 +45,7 @@ const sections: ArticleSection[] = [
   {
     title: 'What if the model disagrees?',
     body: [
-      'Model support estimates drafting preferences in context. It cannot prove every historical choice optimal. An unusual trophy pick may reflect a blind spot or considerations missing from the data. It still earns 100.',
+      'The model estimates what strong drafters would take in that spot. It can’t prove a pick was the best one. When a trophy drafter did something unusual, they may have seen something the data doesn’t capture, or the model may just be wrong. Either way, the trophy pick still gets 100.',
     ],
   },
 ];

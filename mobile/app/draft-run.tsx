@@ -204,14 +204,14 @@ function CardTile({
 
 
 // Same copy as the web report dialog in draft-run-product.mjs.
-const REPORT_SENT_TEXT = 'Thanks for letting us know.';
+const REPORT_SENT_TEXT = 'Thanks for letting me know.';
 const ReportKeyboardAvoidingView = KeyboardAvoidingView ?? View;
 
 const DECISION_REPORT_OPTIONS: readonly { value: DecisionReportReason; label: string }[] = [
   { value: 'draft_context', label: 'The draft context looks wrong' },
   { value: 'card_or_image', label: 'The card or image looks wrong' },
   { value: 'score_recommendation', label: 'The pick or score looks wrong' },
-  { value: 'uninteresting', label: 'This isn’t an interesting decision' },
+  { value: 'uninteresting', label: 'This isn’t an interesting pick' },
   { value: 'broken', label: 'Something isn’t working' },
   { value: 'other', label: 'Other' },
 ];
@@ -1400,8 +1400,8 @@ export default function DraftRunScreen({
               {showPackReview ? <PackReview answer={answer} onZoom={setZoomedCard} /> : null}
 
               <View style={styles.decisionReport}>
-                <Pressable accessibilityRole="button" accessibilityLabel="Does something look wrong? Let us know." onPress={openDecisionReport} style={styles.decisionReportButton}>
-                  <Text style={styles.decisionReportText}>Does something look wrong? <Text style={styles.decisionReportLink}>Let us know.</Text></Text>
+                <Pressable accessibilityRole="button" accessibilityLabel="Does something look wrong? Let me know." onPress={openDecisionReport} style={styles.decisionReportButton}>
+                  <Text style={styles.decisionReportText}>Does something look wrong? <Text style={styles.decisionReportLink}>Let me know.</Text></Text>
                 </Pressable>
                 {reportedDecision === answer.puzzle.puzzle_id ? (
                   <Text accessibilityRole="text" style={styles.decisionReportStatus}>{REPORT_SENT_TEXT}</Text>
@@ -1494,7 +1494,7 @@ export default function DraftRunScreen({
             <ReportKeyboardAvoidingView behavior={Platform?.OS === 'ios' ? 'padding' : undefined} style={styles.reportKeyboard}>
               <View accessibilityViewIsModal style={styles.reportSheet}>
                 <Text style={styles.reportTitle}>Does something look wrong?</Text>
-                <Text style={styles.feedbackBody}>Tell us what you noticed.</Text>
+                <Text style={styles.feedbackBody}>Tell me what you noticed.</Text>
                 <View accessibilityRole="radiogroup" style={styles.reportReasons}>
                   {DECISION_REPORT_OPTIONS.map((option) => (
                     <Pressable

@@ -89,7 +89,7 @@ function formatsMarkup(rows,current) {
 }
 
 function progressMarkup(result) {
-  if(!result.progress)return '<p class="my-pack-empty">Once there’s enough history, we can compare the more recent picks with the earlier ones.</p>';
+  if(!result.progress)return '<p class="my-pack-empty">Once you have enough history, this compares your recent picks with your earlier ones.</p>';
   const p=result.progress;
   return '<div class="my-insights-progress">'+
     '<div><span>Previous 40 picks</span><strong>'+score(p.previous.average_score)+'</strong><small>'+esc(p.previous.from)+' to '+esc(p.previous.to)+'</small></div>'+
@@ -109,7 +109,7 @@ function monthMarkup(rows) {
 function dnaMarkup(data) {
   const dna=data.drafting_dna;
   if(!dna)return '<section class="my-pack-card my-insights-wide my-insights-dna"><h2>Your pick patterns</h2>'+
-    '<p class="my-insights-note">We can’t show your pick patterns right now.</p></section>';
+    '<p class="my-insights-note">Couldn’t load your pick patterns. Try again.</p></section>';
   const traits=[dna.primary,...(dna.secondary||[])].filter(t=>t?.status==='qualified');
   const distinct=[...new Map(traits.map(t=>[t.id,t])).values()];
   const traitHtml=distinct.length?'<div class="my-insights-qualified-traits">'+distinct.map(trait=>
@@ -137,7 +137,7 @@ function dnaMarkup(data) {
     '<div class="my-card-heading"><h2>Your pick patterns</h2><span>Recent picks across all formats</span></div>'+
     traitHtml+choiceHtml+
     '<details class="my-insights-dna-method"><summary>How this works</summary>'+
-    '<p class="my-insights-note">'+number(dna.eligible_decisions)+' picks included, regardless of the Format and time filters. We count each puzzle once, even if you play it again. History is bounded to recent eligible runs, so older picks may not appear.</p>'+
+    '<p class="my-insights-note">'+number(dna.eligible_decisions)+' picks included, whatever the Format and time filters are set to. Each pick counts once, even if you play it again. Only recent runs are included, so older picks may be missing.</p>'+
     '<p class="my-insights-note">Traits describe patterns in your picks, not measured skill. '+esc(dna.note||'')+'</p>'+
     (data.card_choices?'<p class="my-insights-note">'+esc(data.card_choices.note||'')+'</p>':'')+
     '</details></section>';
@@ -174,7 +174,7 @@ function highlightCards(rows,kind,expanded=false,showFinding=false) {
 }
 function highlightsMarkup(data) {
   if(!data.highlights)return '<section class="my-pack-card my-insights-wide my-insights-highlights">'+
-    '<h2>Picks to review</h2><p class="my-insights-note">We can’t show examples from your saved picks right now.</p></section>';
+    '<h2>Picks to review</h2><p class="my-insights-note">Couldn’t load examples from your saved picks. Try again.</p></section>';
   const selected=data.highlights.misses?.length?'misses':'best';
   const more=kind=>data.highlights?.[kind]?.length>3||data.highlights.has_more?.[kind]
     ?'<button type="button" class="button secondary" data-insights-more="'+kind+'" data-insights-page2="'+String(Boolean(data.highlights.has_more?.[kind]))+'">See more picks</button>':'';
@@ -199,7 +199,7 @@ function highlightsMarkup(data) {
       highlightCards(data.highlights.best,'best',false,Boolean(finding))+more('best')+'</div>'+
     '<details class="my-insights-how"><summary>How scores work</summary>'+
     '<p>Matching the trophy pick earns 100 points. Other picks earn up to 95 based on the model. Scores reflect the original result, not a measure of drafting skill.</p>'+
-    '<p>We count each puzzle once, even if you play it again.</p></details></section>';
+    '<p>Each pick counts once, even if you play it again.</p></details></section>';
 }
 function journeyMarkup(data) {
   const journey=data.journey;
@@ -226,7 +226,7 @@ function journeyMarkup(data) {
     (change===0?'the same as':(change>0?'up ':'down ')+score(Math.abs(change))+' points from')+
     ' the previous 40 ('+score(data.progress.previous.average_score)+'/100).</p>':'';
   const warning=!compatible||versionBoundary?
-    '<p class="my-insights-journey-warning" role="note">Scoring or card-pool versions changed. These windows cannot be read as one continuous trend.</p>':'';
+    '<p class="my-insights-journey-warning" role="note">The scoring or card pool changed partway through, so these groups don’t make one trend.</p>':'';
   const milestones=(journey.milestones||[]).map(m=>'<li>'+esc(m.text)+' · '+esc(insightLocalRange(m,m.date,m.date))+'</li>').join('');
   return '<section class="my-pack-card my-insights-wide my-insights-journey">'+
     '<div class="my-card-heading"><h2>Your scores over time</h2><span>40-pick groups · Average points out of 100</span></div>'+
@@ -239,7 +239,7 @@ function journeyMarkup(data) {
       windows.length+' of '+journey.total_windows+' groups.</p>':'')+
     '<ol>'+windows.map(w=>'<li>'+esc(insightLocalRange(w))+' · '+w.count+' picks · '+
       (w.complete?'complete':'partial')+' · '+score(w.average_score)+'/100</li>').join('')+'</ol>'+
-    (!compatible?'<p>We can’t fairly compare these picks because the scoring system or card pools changed.</p>':
+    (!compatible?'<p>These picks can’t be compared fairly because the scoring or card pool changed.</p>':
       '<h3>Last 40 versus previous 40</h3>'+progressMarkup(data))+
     (milestones?'<h3>Milestones</h3><ol class="my-insights-milestones">'+milestones+'</ol>':'')+
     '<h3>Pacific calendar months</h3>'+monthMarkup(data.months||[])+'</details></section>';
@@ -257,7 +257,7 @@ function lockedDecisionMarkup(value) {
       '<div><strong>Trophy pick</strong>'+figure(trophy,'Trophy pick')+'</div></div></div>'+
       '<div><h4>Trophy drafter’s earlier picks</h4>'+
       (pool.length?'<div class="my-insights-original-pool">'+pool.map(c=>figure(c,c.name)).join('')+'</div>':
-        '<p class="my-insights-note">Earlier picks aren’t available for this puzzle.</p>')+'</div></div>'+
+        '<p class="my-insights-note">Earlier picks aren’t available for this one.</p>')+'</div></div>'+
     '<h4>Full pack</h4><div class="my-insights-original-pack">'+pack.map(c=>
       '<figure>'+cardVisual(c,c.name,true)+'<figcaption>'+esc(c.name)+
       (c.id===chosen?.id?' · Your pick':'')+(c.id===trophy?.id?' · Trophy pick':'')+'</figcaption></figure>'
@@ -273,7 +273,7 @@ function lockedDecisionMarkup(value) {
 }
 async function loadSavedInsightDecision({session_id,round,puzzle_id}) {
   const base=String(window.PACK1_API?.growthUrl||window.PACK1_API?.url||'').replace(/\/$/,'');
-  if(!/^https:\/\//.test(base))throw Error('Insights server is unavailable.');
+  if(!/^https:\/\//.test(base))throw Error('Couldn’t load Insights. Try again.');
   const params=new URLSearchParams({session_id,round:String(round),puzzle_id});
   const headers={};
   if(!firstPartyAuthEnabled()){
@@ -285,7 +285,7 @@ async function loadSavedInsightDecision({session_id,round,puzzle_id}) {
     method:'GET',headers,credentials:firstPartyAuthEnabled()?'include':'omit',signal:AbortSignal.timeout(20000),
   });
   const result=await response.json().catch(()=>({}));
-  if(!response.ok)throw Error(result.error||'Saved decision is unavailable.');
+  if(!response.ok)throw Error(result.error||'Couldn’t load that pick.');
   return result;
 }
 function bindInsightCards(root,state,ticket,gen) {
@@ -341,7 +341,7 @@ function bindInsightCards(root,state,ticket,gen) {
         dialogBody.querySelector('[data-insights-close]')?.focus({preventScroll:true});
       }catch{
         if(current()&&viewTicket===state.viewTicket&&dialog.open)
-          dialogBody.innerHTML='<p role="alert">That pick could not be loaded. Close and try again.</p>'+
+          dialogBody.innerHTML='<p role="alert">Couldn’t load that pick. Close it and try again.</p>'+
             '<button type="button" class="button secondary" data-insights-close>Close</button>';
         dialogBody.querySelector('[data-insights-close]')?.addEventListener('click',()=>dialog.close());
       }
@@ -373,7 +373,7 @@ function bindInsightCards(root,state,ticket,gen) {
 
 function insightsContent(data) {
   if(data.unlocked!==true)return '<div class="my-insights-grid"><section class="my-pack-card my-insights-wide">'+
-    '<h2>Picks to review</h2><p>Play a few more puzzles in '+esc(labelOf(data.environment))+
+    '<h2>Picks to review</h2><p>Play a few more picks in '+esc(labelOf(data.environment))+
     '. '+number(data.eligible_decisions)+' of '+number(data.unlock_at)+
     ' picks included for this view.</p>'+
     '<a class="button primary" href="/?game=draft-run&daily=1">Play today’s Daily</a></section>'+
@@ -383,7 +383,7 @@ function insightsContent(data) {
   return '<div class="my-insights-grid">'+highlightsMarkup(data)+dnaMarkup(data)+journeyMarkup(data)+
     '<details class="my-pack-card my-insights-wide my-insights-explore"><summary>More stats</summary>'+
     '<div class="my-insights-explore-content">'+
-    '<section><h3>Scores by original draft pick</h3><p class="my-insights-note">These are the pick numbers from the original drafts, not the order of questions in Pack One. We show averages once you’ve made at least five picks.</p>'+
+    '<section><h3>Scores by original draft pick</h3><p class="my-insights-note">These are the pick numbers from the original drafts, not the order you saw them in Pack One. Averages show up once you’ve made at least five picks.</p>'+
       barRows(data.pick_depth||[])+'</section>'+
     '<section><h3>How close were the model’s top picks?</h3>'+
       '<p class="my-insights-note">Here, “hard” means the model gave two cards similar support. It doesn’t necessarily mean players found the pick hard.</p>'+
@@ -394,7 +394,7 @@ function insightsContent(data) {
     (extras.length?'<section><h3>More comparisons from this format</h3><ul class="my-insights-observations">'+
       extras.map(x=>'<li>'+esc(x.text)+'</li>').join('')+'</ul></section>':'')+
     '<section><h3>How this works</h3><p class="my-insights-note">'+
-       esc(data.methodology||'We count each puzzle once, even if you play it again. Scores are not a skill rating.')+'</p></section>'+
+       esc(data.methodology||'Each pick counts once, even if you play it again. Scores aren’t a skill rating.')+'</p></section>'+
     '</div></details></div>';
 }
 // The Mixed sets note only applies while that format is selected.

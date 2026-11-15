@@ -119,7 +119,7 @@ try {
     await f.page.waitForFunction(()=>document.querySelector('#account-nav')?.dataset.accountState==='unavailable');
     await f.page.locator('[data-home-state="unavailable"]').waitFor();
     assert.equal((await f.page.locator('#account-nav').textContent())?.trim(),'Retry account');
-    assert.match((await f.page.locator('.daily-home').textContent())||'',/Daily progress is temporarily unavailable/);
+    assert.match((await f.page.locator('.daily-home').textContent())||'',/Couldn’t load your Daily progress/);
     assert.doesNotMatch((await f.page.locator('.daily-home').textContent())||'',/Start here|Free · No account required/);
 
     f.state.auth='signed-in';

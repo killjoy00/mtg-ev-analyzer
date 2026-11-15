@@ -45,7 +45,7 @@ test('verification-required signup offers resend and expired-link recovery',()=>
   assert.match(growth,/Send a new verification link/);
   assert.match(growth,/setVerificationRequestStatus/);
   assert.match(growth,/VERIFICATION_COOLDOWN/);
-  assert.match(growth,/Cooldown active/);
+  assert.match(growth,/You just asked for a link/);
   assert.doesNotMatch(growth.slice(growth.indexOf('function formMarkup'),growth.indexOf('async function openEliteLanding')),/Display name<input/);
   assert.match(growth,/id="account-ready"/);
   assert.match(growth,/Shown on Daily leaderboards and your public profile\./);

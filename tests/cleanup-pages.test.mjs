@@ -12,12 +12,12 @@ test('Practice copy and Learn guide cleanup are present',async()=>{
     read('learn/card-strength-vs-fit/index.html'),
   ]);
   assert.doesNotMatch(practice,/included with your free account/);
-  assert.match(practiceHtml,/Unlimited eight-decision runs from real trophy drafts\./);
+  assert.match(practiceHtml,/Unlimited eight-pick runs from real trophy drafts\./);
   assert.match(practiceHtml,/A free account lets you play unlimited regular Draft Runs/);
-  assert.match(learn,/Card strength vs\. deck fit: know what changed/);
+  assert.match(learn,/When to take the card that fits your deck/);
   assert.match(learn,/\/learn\/card-strength-vs-fit\//);
   assert.match(guide,/How much weaker is the card you're taking\?/);
-  assert.match(guide,/grade the adjustment, not memorize the answer/);
+  assert.match(guide,/check your reasoning, not to memorize answers/);
 });
 
 test('Elite acquisition routes through the Pack One Patreon landing page',async()=>{
