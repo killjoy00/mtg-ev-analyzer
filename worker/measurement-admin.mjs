@@ -7,6 +7,7 @@ import {handleUserAdmin} from './user-admin.mjs';
 import {handleCreatorChallengeAdmin} from './creator-challenges.mjs';
 import {handleDashboardAdmin} from './admin-dashboard.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
+import {PLAYER_MODEL_AUDIT_SQL,PLAYER_MODEL_AUDIT_MIN_CHOICES,playerModelAuditWindow} from './player-choice-model-audit.mjs';
 import {gameDateKey} from '../game-date.mjs';
 const fail=(message,status=400)=>{throw Object.assign(Error(message),{status});};
 const jsonArray=value=>Array.isArray(value)?value:(typeof value==='string'?JSON.parse(value):[]);
@@ -239,12 +240,17 @@ export async function handleAdmin(request,query,readJson) {
   }
   if(url.pathname==='/v1/admin/measurements/reviews') {
     const scope=`WITH scoped AS (SELECT * ${SCOPE}), primary_data AS (SELECT * FROM scoped WHERE observed AND NOT is_qa AND first_encounter)`;
-    const reviews=await timedAdminQuery(query,'measurements_reviews','reviews',`${scope}, chosen AS (SELECT puzzle_id,${METRICS},bool_or(model_disagreement) model_disagreement
+    const auditWindow=playerModelAuditWindow(filters.start,filters.end);
+    const [reviews,modelAudit]=await Promise.all([
+      timedAdminQuery(query,'measurements_reviews','reviews',`${scope}, chosen AS (SELECT puzzle_id,${METRICS},bool_or(model_disagreement) model_disagreement
       FROM primary_data GROUP BY puzzle_id HAVING count(*) FILTER(WHERE outcome='pick')>=5
       ORDER BY bool_or(model_disagreement) DESC,count(*) FILTER(WHERE outcome='pick') DESC LIMIT 30)
       SELECT c.*,p.set_id,p.pick_number,p.payload->>'historical_pick_id' trophy_id
-      FROM chosen c JOIN draft_run_verified_puzzles p USING(puzzle_id)`,filters.params);
-    return {generated_at:new Date().toISOString(),corpus_version:filters.corpus_version,filters:{...filters,params:undefined},reviews:reviews.rows};
+      FROM chosen c JOIN draft_run_verified_puzzles p USING(puzzle_id)`,filters.params),
+      timedAdminQuery(query,'measurements_reviews','player_model_audit',PLAYER_MODEL_AUDIT_SQL,[auditWindow.from,auditWindow.to,PLAYER_MODEL_AUDIT_MIN_CHOICES]),
+    ]);
+    return {generated_at:new Date().toISOString(),corpus_version:filters.corpus_version,filters:{...filters,params:undefined},reviews:reviews.rows,
+      player_model_audit:{window:auditWindow,min_choices:PLAYER_MODEL_AUDIT_MIN_CHOICES,rows:modelAudit.rows}};
   }
   if(url.pathname==='/v1/admin/measurements') {
     // Materialize the expensive first-encounter decision scan once. Previously
