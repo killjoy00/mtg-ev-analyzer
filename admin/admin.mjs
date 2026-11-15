@@ -226,10 +226,10 @@ function modelAuditMarkup(audit) {
   const meta=audit.window||{};
   return '<p class="subpage-help">Measured '+esc(meta.from||'')+' through '+esc(meta.to||'')+
     (meta.clipped?' (capped at 90 days for performance)':'')+
-    '. Each puzzle needs at least '+fmt(audit.min_choices)+' first-time answers. Ties and incomplete model distributions are excluded.</p>'+
-    '<div class="scroll"><table><thead><tr><th>Daily</th><th>Puzzles</th><th>Answers</th><th>Different favorites</th><th>Player favorite matched trophy</th><th>Model favorite matched trophy</th><th>Player votes for model favorite</th><th>Model prediction for its favorite</th></tr></thead><tbody>'+
+    '. Each puzzle needs at least '+fmt(audit.min_choices)+' first-time answers. Ties and incomplete model distributions are excluded. Model eras and Traditional components are reported separately.</p>'+
+    '<div class="scroll"><table><thead><tr><th>Daily</th><th>Source corpus</th><th>Puzzles</th><th>Answers</th><th>Different favorites</th><th>Player favorite matched trophy</th><th>Model favorite matched trophy</th><th>Player votes for model favorite</th><th>Model prediction for its favorite</th></tr></thead><tbody>'+
     rows.map(r=>'<tr><th>'+esc(r.environment==='latest'?'Latest Set':r.environment==='powered-cube'?'Powered Cube':'Mixed')+
-      '</th><td>'+fmt(r.qualified_puzzles)+'</td><td>'+fmt(r.choices)+'</td><td>'+pct(r.differing_pct)+
+      '</th><td>'+esc(r.corpus_version||'Unspecified')+'</td><td>'+fmt(r.qualified_puzzles)+'</td><td>'+fmt(r.choices)+'</td><td>'+pct(r.differing_pct)+
       '<small> ('+fmt(r.differing_leaders)+' puzzles)</small></td><td>'+fmt(r.player_majority_trophy)+
       ' / '+fmt(r.qualified_puzzles)+'</td><td>'+fmt(r.model_leader_trophy)+' / '+fmt(r.qualified_puzzles)+
       '</td><td>'+pct(r.voted_model_leader_pct)+'</td><td>'+pct(r.predicted_model_leader_pct)+
