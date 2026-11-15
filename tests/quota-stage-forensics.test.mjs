@@ -109,3 +109,18 @@ test('slow quota outcomes distinguish successful first calls, retries and denial
   assert.equal(summary.slow_gateway_quota,5);
   assert.doesNotMatch(JSON.stringify(summary),/unknown_secret|private|aaaaaaaa|bbbbbbbb/);
 });
+
+test('missing slow quota handler timings are categorized by status, never treated as fast',()=>{
+  const summary=summarizeQuotaStages([
+    gateway('a',1800,{quota_handler_ms:null,quota_transport_wait_ms:null,status:200,quota_attempts:1}),
+    gateway('b',2000,{quota_handler_ms:null,quota_transport_wait_ms:null,status:200,quota_attempts:1}),
+    gateway('c',2300,{quota_handler_ms:null,quota_transport_wait_ms:null,status:429}),
+    gateway('d',2100,{quota_handler_ms:null,quota_transport_wait_ms:null,status:503}),
+    gateway('e',2400,{status:200,quota_attempts:1}),
+  ],[handler('a'),handler('b'),handler('c'),handler('d'),handler('e')],[]);
+  assert.deepEqual(summary.missing_gateway_timing_outcomes,
+    {success:2,denied_429:1,failed_5xx:1,other:0});
+  assert.equal(summary.slow_gateway_quota,5);
+  assert.equal(summary.slow_handler_dominant+summary.slow_residual_dominant,1);
+  assert.ok(!JSON.stringify(summary).includes('aaaaaaaa'));
+});
