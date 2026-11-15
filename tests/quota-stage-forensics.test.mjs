@@ -124,3 +124,29 @@ test('missing slow quota handler timings are categorized by status, never treate
   assert.equal(summary.slow_handler_dominant+summary.slow_residual_dominant,1);
   assert.ok(!JSON.stringify(summary).includes('aaaaaaaa'));
 });
+
+test('slow pre-origin quota errors correlate only with matched Durable Object phase',()=>{
+  const g=(c,extra={})=>gateway(c,2000,{status:503,upstream_calls:0,
+    quota_handler_ms:null,quota_transport_wait_ms:null,...extra});
+  const summary=summarizeQuotaStages([
+    g('a'),g('b'),g('c'),g('d'),g('e'),g('f'),g('g'),
+    // An origin 5xx after successful quota is not a quota failure.
+    g('h',{upstream_calls:1}),
+    // A normal success with absent timing is not a failed quota.
+    g('i',{status:200}),
+  ],[
+    handler('a',{phase:'transaction',status:503}),
+    handler('b',{phase:'transaction',status:503}),
+    handler('c',{phase:'durability',status:503}),
+    handler('d',{phase:'complete',status:503}),
+    handler('e',{phase:'complete',status:204}),
+    handler('h',{phase:'durability',status:503}),
+  ],[row('quota_handler_start',{trace:trace('f')},'sf')]);
+  assert.equal(summary.failed_quota_without_timing,7);
+  assert.deepEqual(summary.failed_quota_phase,{
+    transaction:2,durability:1,complete:1,handler_other:1,
+    started_no_completion:1,not_observed:1,
+  });
+  assert.equal(summary.slow_gateway_quota,9);
+  assert.doesNotMatch(JSON.stringify(summary),/aaaaaaaa|bbbbbbbb|secret/);
+});
