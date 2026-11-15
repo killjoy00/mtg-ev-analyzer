@@ -196,3 +196,37 @@ jobs:
         if: always()
         run: |
           test -f "$RUNNER_TEMP/browser-validation-complete" || { echo '::error::Selected browser validation did not complete successfully.'; exit 1; }
+
+  capture_reddit_nov14_p1p7:
+    name: Capture historical Reddit pick (no production changes)
+    if: ${{ github.event_name == 'pull_request' && github.head_ref == 'capture/nov14-pick7-reddit-20261115' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install Playwright
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Serve the actual Pack One frontend
+        run: |
+          python3 -m http.server 4173 > /tmp/packone-reddit-capture.log 2>&1 &
+          for n in $(seq 1 20); do
+            curl --silent --fail http://127.0.0.1:4173/ -o /dev/null && break
+            sleep 1
+          done
+      - name: Render the recorded November 14 pick
+        run: node tests/reddit-nov14-pick7-capture.mjs
+      - name: Upload authentic UI screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: packone-2026-11-14-p1p7
+          path: artifacts/reddit-nov14/
+          retention-days: 14
+          if-no-files-found: warn
