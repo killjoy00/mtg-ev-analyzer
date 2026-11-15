@@ -71,3 +71,33 @@ test('psql runner passes the reviewed database URI as positional argument, not P
    return true;
  });
 });
+
+
+test('microsecond-precision failed timestamp matches only the locked, verified incident millisecond',async()=>{
+  // pg decodes PostgreSQL's 16:03:06.221368 as a JavaScript Date at
+  // 16:03:06.221; bare recorded_at=$3 would not delete the actual row.
+  const locked={...failure,recorded_at:new Date('2026-11-15T16:03:06.221Z')};
+  const actualTime='2026-11-15T16:03:06.221368Z';
+  const queries=[];
+  const query=async(sql,params=[])=>{
+    queries.push({sql,params});
+    if(sql.includes('FOR UPDATE'))return {rows:[locked]};
+    if(sql.includes('pg_catalog.pg_class'))return {rows:[{n:0}]};
+    if(sql.startsWith('DELETE FROM')){
+      // Simulate the exact fractional precision retained by PostgreSQL, not
+      // the milliseconds exposed by the pg driver's Date conversion.
+      const within=Date.parse(actualTime)>=Date.parse(params[2]) &&
+        Date.parse(actualTime)<Date.parse(params[2])+1;
+      const bounded=sql.includes("recorded_at >= $3::timestamptz") &&
+        sql.includes("recorded_at < ($3::timestamptz + INTERVAL '1 millisecond')");
+      return {rows:bounded&&within?[{name:migration}]:[]};
+    }
+    return {rows:[]};
+  };
+  assert.equal(await recoverDevelopmentHabitsIndex(query,guard),'cleared_exact_failed_entry');
+  const del=queries.find(q=>q.sql.startsWith('DELETE FROM'));
+  assert.ok(del);
+  for(const guardPredicate of ['name=$1','sha256=$2',"state='failed'","method='executed'"])
+    assert.ok(del.sql.includes(guardPredicate),guardPredicate);
+  assert.equal(del.params[2],'2026-11-15T16:03:06.221Z');
+});
