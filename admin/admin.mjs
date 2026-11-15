@@ -222,6 +222,7 @@ async function loadQualityWatch(loadId,queryString){
 function modelAuditMarkup(audit) {
   const rows=Array.isArray(audit?.rows)?audit.rows:[];
   if(!audit)return '<p class="muted">Player/model audit is not available in this backend release.</p>';
+  if(audit.unavailable)return '<p class="muted">Player/model audit is temporarily unavailable. Other decision reports are unaffected.</p>';
   if(!rows.length)return '<p class="muted">No Daily puzzles reached 50 qualifying first-time answers in the selected period.</p>';
   const meta=audit.window||{};
   return '<p class="subpage-help">Measured '+esc(meta.from||'')+' through '+esc(meta.to||'')+
