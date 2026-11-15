@@ -17,8 +17,16 @@ export function migrationIdentity(name,root='.') {
 export function runNontransactionalPsql(file,{databaseUrl=process.env.DATABASE_URL,exec=execFileSync}={}) {
  if(typeof databaseUrl!=='string'||!/^postgres(?:ql)?:\/\//i.test(databaseUrl))
    throw Error('Direct PostgreSQL connection URI required for concurrent migration');
- return exec('psql',[databaseUrl,'-X','-v','ON_ERROR_STOP=1','-f',file],
-   {stdio:'pipe',timeout:600000});
+ try {return exec('psql',[databaseUrl,'-X','-v','ON_ERROR_STOP=1','-f',file],
+   {stdio:'pipe',timeout:600000});}
+ catch(error) {
+   // Never interpolate stderr or argv: both can expose a secret connection URI.
+   // Exit status alone distinguishes a connection failure from a SQL failure.
+   const status=Number.isInteger(error?.status)&&error.status>=1&&error.status<=3?error.status:'unknown';
+   const safe=Error('Reviewed concurrent psql migration failed');
+   safe.releaseDiagnostic='concurrent_psql_exit_'+status;
+   throw safe;
+ }
 }
 
 export function transactionalSQL(sql,name) {
@@ -105,6 +113,10 @@ if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url) {
    const result=await applyReleaseMigrations(client,{plan:process.argv[2]||'secure-auth-release',baseline,
      runNontransactional:file=>runNontransactionalPsql(file)});
    console.log('Reviewed migration plan complete: '+result.applied+' applied, '+result.skipped+' already applied.');
- } catch {console.error('Reviewed migration plan failed; inspect schema or incomplete ledger state privately.');process.exitCode=1;}
+ } catch(error) {
+   const label=/^concurrent_psql_exit_(?:[123]|unknown)$/.test(error?.releaseDiagnostic||'')?error.releaseDiagnostic:'unclassified';
+   console.error('Reviewed migration plan failed ('+label+'); inspect schema or incomplete ledger privately.');
+   process.exitCode=1;
+ }
  finally {await client.end();}
 }
