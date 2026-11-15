@@ -101,6 +101,20 @@ export function summarizeQuotaStages(gatewayRows,handlerRows,startRows){
     if(p.status>=500){errors++;if(p.upstream_calls===0)preOriginErrors++;}
     if(timing(p.quota_ms)>1000&&p.sample_rate===1)slow.push(p);
   }
+  // Evidence for whether the transport-dominant cohort completed normally
+  // on its first call, rather than merely lacking a majority among retries,
+  // storage concurrency and cleanup. Unknown attempts never count as first.
+  // Route classification is aggregate-only and uses a fixed vocabulary.
+  const slow_route_groups={gameplay:0,account:0,admin:0,other:0};
+  const slow_outcomes={successful_first_attempt:0,retried:0,denied_429:0,failed_5xx:0,other_or_unknown:0};
+  for(const p of slow){
+    slow_route_groups[slowRouteGroup(p.route)]++;
+    if(p.status===429)slow_outcomes.denied_429++;
+    else if(p.status>=500)slow_outcomes.failed_5xx++;
+    else if(Number.isInteger(p.quota_attempts)&&p.quota_attempts>1)slow_outcomes.retried++;
+    else if(p.status>=200&&p.status<400&&p.quota_attempts===1)slow_outcomes.successful_first_attempt++;
+    else slow_outcomes.other_or_unknown++;
+  }
   const matched=[],missing=[];
   for(const p of slow){
     const t=key(p.trace),h=t?handlers.get(t):null;
@@ -115,6 +129,7 @@ export function summarizeQuotaStages(gatewayRows,handlerRows,startRows){
     gateway_records:gatewayRecords,handler_records:handlers.size,handler_start_records:starts.size,
     gateway_5xx:errors,gateway_5xx_before_upstream:preOriginErrors,
     slow_gateway_quota:slow.length,matched_slow:matched.length,
+    slow_route_groups,slow_outcomes,
     missing_handler_completion:missing.length,missing_handler_with_start:missing.filter(x=>x.start).length,
     slow_handler_dominant:slow.filter(p=>timing(p.quota_handler_ms)!==null&&timing(p.quota_transport_wait_ms)!==null&&p.quota_handler_ms>=p.quota_transport_wait_ms).length,
     slow_residual_dominant:slow.filter(p=>timing(p.quota_handler_ms)!==null&&timing(p.quota_transport_wait_ms)!==null&&p.quota_transport_wait_ms>p.quota_handler_ms).length,

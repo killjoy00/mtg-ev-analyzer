@@ -144,3 +144,39 @@ test('observed quota wait correlations prioritize retry, handler concurrency or 
   assert.equal(noMatch.outcome,'correlation_incomplete');
   assert.ok(!Object.hasOwn(noMatch,'wait_signal'));
 });
+
+test('quota transport wait classifies first-attempt successes and affected traffic conservatively',()=>{
+  const base={slow_outcomes:{successful_first_attempt:8,retried:1,denied_429:0,failed_5xx:0,other_or_unknown:1},
+    slow_route_groups:{gameplay:8,account:1,admin:1,other:0},
+    slow_with_retry:1,matched_concurrent:1,matched_cleanup_overlap:0};
+  const found=read([quotaWindow(10,1,9,9,base)])[1];
+  assert.equal(found.suspected_stage,'quota_transport_wait');
+  assert.equal(found.wait_signal,'no_majority');
+  assert.equal(found.wait_profile,'single_attempt_success');
+  assert.equal(found.traffic_context,'gameplay');
+  assert.equal(found.next_action,'inspect_first_attempt_dispatch_or_ack');
+
+  const noEvidence=read([quotaWindow(10,1,9,9,{...base,slow_outcomes:{...base.slow_outcomes,successful_first_attempt:'8'}})])[1];
+  assert.equal(noEvidence.wait_profile,'unverified');
+  assert.equal(noEvidence.next_action,'inspect_quota_transport_dispatch');
+  const invalidTotal=read([quotaWindow(10,1,9,9,{...base,slow_outcomes:{...base.slow_outcomes,retried:20}})])[1];
+  assert.equal(invalidTotal.wait_profile,'unverified');
+  const mixed=read([quotaWindow(10,1,9,9,{...base,slow_outcomes:{
+    successful_first_attempt:4,retried:3,denied_429:2,failed_5xx:1,other_or_unknown:0}})])[1];
+  assert.equal(mixed.wait_profile,'mixed');
+  assert.equal(mixed.next_action,'inspect_quota_transport_dispatch');
+  const denied=read([quotaWindow(10,1,9,9,{...base,slow_outcomes:{
+    successful_first_attempt:1,retried:0,denied_429:9,failed_5xx:0,other_or_unknown:0}})])[1];
+  assert.equal(denied.wait_profile,'rate_limit_denials');
+  assert.equal(denied.next_action,'inspect_quota_transport_dispatch');
+
+  const incomplete=read([quotaWindow(10,1,9,3,base)])[1];
+  assert.equal(incomplete.outcome,'correlation_incomplete');
+  assert.ok(!Object.hasOwn(incomplete,'wait_profile'));
+  const low=read([quotaWindow(2,0,2,2,base)])[1];
+  assert.equal(low.outcome,'insufficient_samples');
+  assert.ok(!Object.hasOwn(low,'wait_profile'));
+  const payload=JSON.stringify(found);
+  assert.ok(payload.length<700);
+  assert.ok(!/secret|trace|route|\\d{4}-\\d\\d-\\d\\d/.test(payload));
+});

@@ -43,6 +43,15 @@ const quotaWaitSignal=(window,total,matched)=>{
   if(cleanup>=3&&cleanup*3>=matched*2)candidates.push('cleanup_overlap');
   return candidates.length===1?candidates[0]:candidates.length?'multiple':'no_majority';
 };
+const quotaFlowProfile=(outcomes,total)=>{
+  const keys=['successful_first_attempt','retried','denied_429','failed_5xx','other_or_unknown'];
+  const values=keys.map(key=>count(outcomes?.[key]));
+  if(values.some(value=>value===null)||values.reduce((sum,value)=>sum+value,0)!==total)return 'unverified';
+  const winner=stageChoice(keys.map((key,i)=>[key,values[i]]));
+  const labels={successful_first_attempt:'single_attempt_success',retried:'retries',
+    denied_429:'rate_limit_denials',failed_5xx:'errors',other_or_unknown:'unverified',mixed:'mixed'};
+  return labels[winner]||'unverified';
+};
 function classifyRequestWindow(window) {
   const issue=1272;
   if(window?.status==='skipped')return {...blank(issue),'outcome':'not_collected'};
@@ -93,11 +102,18 @@ function classifyQuotaWindow(window) {
       next_action:'verify_handler_completion_correlation'};
   let action=stage==='quota_transport_wait'?'inspect_quota_transport_dispatch':'inspect_quota_handler';
   const wait_signal=stage==='quota_transport_wait'?quotaWaitSignal(window,total,matched):undefined;
+  const wait_profile=stage==='quota_transport_wait'?quotaFlowProfile(window.slow_outcomes,total):undefined;
+  const traffic_context=stage==='quota_transport_wait'?trafficContext(window.slow_route_groups,total):undefined;
   if(stage==='quota_transport_wait') {
     const actions={retry:'inspect_retry_attempt_timing',
       handler_concurrency:'inspect_handler_concurrency_wait',
       cleanup_overlap:'inspect_quota_cleanup_overlap'};
     action=actions[wait_signal]||action;
+    // A slow successful first attempt points to normal quota dispatch or
+    // acknowledgement, not retry or 429 handling. The label remains a lead,
+    // never a claim that a particular provider queue is at fault.
+    if(action==='inspect_quota_transport_dispatch'&&wait_profile==='single_attempt_success')
+      action='inspect_first_attempt_dispatch_or_ack';
   }
   if(stage==='quota_handler') {
     const durability=count(window.stages?.durability?.gt_1000ms);
@@ -109,7 +125,7 @@ function classifyQuotaWindow(window) {
   }
   return {...base,outcome:'dominant_observed_stage',suspected_stage:stage,
     evidence:total>=10?'moderate':'preliminary',
-    ...(wait_signal===undefined?{}:{wait_signal}),next_action:action};
+    ...(wait_signal===undefined?{}:{wait_signal,wait_profile,traffic_context}),next_action:action};
 }
 export function publicLatencyTriage(report) {
   // Exact named incident windows only. Duplicate or malformed window names

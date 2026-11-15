@@ -92,3 +92,20 @@ test('exact five seconds is not slow; unverified tails and invalid rows do not i
   assert.deepEqual(s.dominant,{quota:0,origin:0,gateway_or_unmeasured:0});
   assert.equal(s.stages_of_attributable_slow.total.observed,0);
 });
+
+test('slow quota outcomes distinguish successful first calls, retries and denials with fixed aggregate labels',()=>{
+  const summary=summarizeQuotaStages([
+    gateway('a',1800,{status:200,quota_attempts:1,route:'draft_pick'}),
+    gateway('b',1900,{status:200,quota_attempts:2,route:'draft_pick'}),
+    gateway('c',2100,{status:429,quota_attempts:1,route:'account'}),
+    gateway('d',2300,{status:503,quota_attempts:1,route:'admin_users'}),
+    gateway('e',1600,{status:200,quota_attempts:null,route:'unknown_secret'}),
+    gateway('f',190,{status:200,quota_attempts:1,route:'draft_pick'}),
+  ],[handler('a'),handler('b'),handler('c'),handler('d')],[]);
+  assert.deepEqual(summary.slow_outcomes,{
+    successful_first_attempt:1,retried:1,denied_429:1,failed_5xx:1,other_or_unknown:1,
+  });
+  assert.deepEqual(summary.slow_route_groups,{gameplay:2,account:1,admin:1,other:1});
+  assert.equal(summary.slow_gateway_quota,5);
+  assert.doesNotMatch(JSON.stringify(summary),/unknown_secret|private|aaaaaaaa|bbbbbbbb/);
+});

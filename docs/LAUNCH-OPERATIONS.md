@@ -112,7 +112,20 @@ handler-completion coverage meets the established gate, it prints a coarse
 three corroborating slow samples and a two-thirds majority of its own
 measured population. Retry is assessed over all retained slow gateway
 calls; concurrency and cleanup are assessed only over matched slow handler
-completions. These populations must not be conflated. A fixed-label
+completions. These populations must not be conflated. The private replay also summarizes retained slow-quota responses into
+**mutually exclusive** completion classes: normal 2xx/3xx one-attempt
+responses, retries, 429 rate-limit denials, 5xx failures, and unavailable
+or unexpected results. After the established handler/timing coverage gate,
+the public `wait_profile` is an allowlisted majority label only
+(`single_attempt_success`, `retries`, `rate_limit_denials`, `errors`,
+`mixed` or `unverified`). Its optional `traffic_context` uses the same
+aggregate-only gameplay/account/admin/other vocabulary as #1272. A
+`single_attempt_success` majority changes the *investigation* target to
+first-attempt Durable Object dispatch/queue/acknowledgement rather than to
+retry policy; it is **not** evidence of a provider fault. No exact request
+routes, counts, timings, tokens or user data are published.
+
+A fixed-label
 signal is **correlation, not a causal diagnosis**: gateway dispatch/wait
 also includes unmeasured remote queueing and response acknowledgement,
 and handler concurrency does not prove queue delay. Sensitive traces,
