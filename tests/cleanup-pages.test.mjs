@@ -17,7 +17,7 @@ test('Practice copy and Learn guide cleanup are present',async()=>{
   assert.match(learn,/When to take the card that fits your deck/);
   assert.match(learn,/\/learn\/card-strength-vs-fit\//);
   assert.match(guide,/How much weaker is the card you're taking\?/);
-  assert.match(guide,/check your reasoning, not to memorize answers/);
+  assert.match(guide,/Would you still make the same pick\?/);
 });
 
 test('Elite acquisition routes through the Pack One Patreon landing page',async()=>{

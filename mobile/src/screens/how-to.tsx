@@ -10,7 +10,7 @@ const sections: ArticleSection[] = [
     title: '1. Choose a Daily.',
     body: [
       'Pick one of three Dailies. Draft Run mixes regular sets, mostly newer ones. Latest Set uses just the newest release. Powered Cube uses Cube drafts. Each game has eight picks, and everyone gets the same ones each day.',
-      'If this is your first visit, start with Daily Draft Run. It’s the broadest version of Pack One, and you don’t need an account.',
+      'If this is your first visit, start with Daily Draft Run. You don’t need an account.',
     ],
   },
   {
@@ -29,7 +29,7 @@ const sections: ArticleSection[] = [
   {
     title: '4. Compare your pick with what happened.',
     body: [
-      'After you lock in, you’ll see what the trophy drafter actually took and which other cards the model liked. Matching the trophy drafter earns 100 points. Other picks can still score up to 95 if the model likes them.',
+      'After you lock in, Pack One shows what the trophy drafter took and how the model rates the other cards. Matching the trophy drafter earns 100 points. Other choices can earn up to 95 points, depending on how much the model likes them.',
       "A trophy doesn't mean every pick was perfect. The model isn't always right either. If you disagree with either one, look at the other options and decide whether you'd still make the same pick.",
     ],
   },
@@ -37,7 +37,7 @@ const sections: ArticleSection[] = [
     title: '5. Finish all eight picks.',
     body: [
       "Your final score is the average of your eight picks. You'll also see how many times you matched the trophy drafter. Since everyone gets the same Daily picks, you can compare scores with friends.",
-      'New Dailies come out every day at midnight Pacific.',
+      'All three Dailies reset at midnight Pacific.',
     ],
   },
   {

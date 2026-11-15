@@ -45,7 +45,7 @@ const sections: ArticleSection[] = [
   {
     title: 'What if the model disagrees?',
     body: [
-      'The model estimates what strong drafters would take in that spot. It can’t prove a pick was the best one. When a trophy drafter did something unusual, they may have seen something the data doesn’t capture, or the model may just be wrong. Either way, the trophy pick still gets 100.',
+      'The model learns from real drafting choices, but it can miss things. The trophy drafter can make mistakes too. If you disagree, look at the pack and earlier picks and decide whether you’d still take the same card. Matching the trophy drafter earns 100 either way.',
     ],
   },
 ];

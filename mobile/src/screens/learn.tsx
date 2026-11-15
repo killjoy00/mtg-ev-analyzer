@@ -11,7 +11,7 @@ import { canonicalContentUrl, type CanonicalContentKey } from '@/src/contentLink
 import { colors, spacing } from '@/src/theme';
 
 const nativeLinks = [
-  { kicker: 'START HERE', title: 'How to Play', body: 'Choose a Daily, read the pack, make your pick, and see what the trophy drafter took.', route: '/how-to' as const },
+  { kicker: 'START HERE', title: 'How to Play', body: 'Choose a Daily, make your picks, and see what the trophy drafters took.', route: '/how-to' as const },
   { kicker: 'POINTS', title: 'Scoring', body: 'How the 100 works, and why other picks can still get up to 95.', route: '/scoring' as const },
   { kicker: 'BEHIND THE MODEL', title: 'Method', body: 'Where the picks come from and how the model works.', route: '/method' as const },
   { kicker: 'COVERAGE', title: 'Sets', body: 'Which sets are in the game and how many picks each one has.', route: '/sets' as const },
@@ -22,7 +22,7 @@ const externalLinks: { key: CanonicalContentKey; title: string; body: string }[]
   { key: 'firstPick', title: 'Rank your top three before the reveal', body: 'Pick your top three cards and decide how close they are before seeing the trophy pick.' },
   { key: 'consensus', title: 'What the model’s numbers actually tell you', body: 'See how close the model thinks a pick is, not just which card it likes best.' },
   { key: 'stayingOpen', title: 'When staying open is worth it', body: 'When is it worth staying open, and when should you just take the better card?' },
-  { key: 'deckFit', title: 'When to take the card that fits your deck', body: 'How to tell when your pool, curve, mana or synergies should beat raw card strength.' },
+  { key: 'deckFit', title: 'When to take the card that fits your deck', body: 'How much should the cards already in your pool change what you take?' },
 ];
 
 export default function LearnScreen() {
