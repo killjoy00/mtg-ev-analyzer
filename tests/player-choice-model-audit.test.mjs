@@ -19,6 +19,7 @@ test('model comparison uses original candidate probabilities and historical trop
   const sql=PLAYER_MODEL_AUDIT_SQL;
   assert.match(sql,/model_probability/);
   assert.match(sql,/historical_pick_id/);
+  assert.match(sql,/max\(corpus_version\) corpus_version/,'source eras must be distinct');
   assert.match(sql,/model_sum BETWEEN 0\.99 AND 1\.01/);
   assert.match(sql,/accounted_votes=n/);
   assert.match(sql,/trophy_present/);
@@ -28,7 +29,7 @@ test('model comparison uses original candidate probabilities and historical trop
   assert.match(sql,/player_leader=trophy_id/);
   assert.doesNotMatch(sql,/score\s*[><=]/i,'awarded score cannot be a validation target');
   assert.doesNotMatch(sql,/\bSELECT\s+player_id\b/i,'no individual player identifiers returned');
-  assert.match(sql,/FROM valid GROUP BY environment/,'only format-level aggregates returned');
+  assert.match(sql,/FROM valid GROUP BY environment,corpus_version/,'only source-corpus and format aggregates returned');
 });
 
 test('read-only audit window keeps at most 90 Pacific dates',()=>{
