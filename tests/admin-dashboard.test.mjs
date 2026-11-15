@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {handleAdmin} from '../worker/measurement-admin.mjs';
 import {trendChange,trendsMarkup,healthMarkup} from '../admin/overview.mjs';
 const authSql=sql=>sql.includes('FROM neon_auth.session s JOIN')?[{user_id:'11111111-1111-4111-8111-111111111111'}]:sql.includes('SELECT role FROM pack1_admins')?[{role:'owner'}]:null;
@@ -52,4 +53,22 @@ test('quality watchlist is advisory and guards small samples',async()=>{
   assert.match(ADMIN_QUALITY_SQL,/count\(DISTINCT player_id\)/);
   assert.match(ADMIN_QUALITY_SQL,/LIMIT 20/);
   assert.doesNotMatch(ADMIN_QUALITY_SQL,/UPDATE |DELETE FROM/);
+});
+
+
+test('Trends prefilters only completed non-QA sessions for its unchanged three completion metrics',()=>{
+  const source=fs.readFileSync('worker/admin-dashboard.mjs','utf8');
+  const sql=source.match(/const ADMIN_TRENDS_SQL=\x60([\s\S]*?)\x60;/)?.[1];
+  assert.ok(sql);
+  const sessions=sql.slice(sql.indexOf('), sessions AS MATERIALIZED ('));
+  assert.match(sessions,/FROM draft_run_sessions s JOIN players p ON p\.id=s\.player_id/);
+  assert.match(sessions,/AND NOT s\.measurement_qa/);
+  assert.match(sessions,/AND jsonb_array_length\(s\.answers\)=jsonb_array_length\(s\.puzzle_ids\)/);
+  assert.match(sessions,/s\.created_at>=/);
+  assert.match(sessions,/s\.created_at</);
+  assert.match(sessions,/count\(\*\)::int completed_runs/);
+  assert.match(sessions,/count\(DISTINCT s\.player_id\) FILTER\(WHERE s\.daily\)::int daily_players/);
+  assert.match(sessions,/count\(\*\) FILTER\(WHERE s\.daily\)::int daily_completions/);
+  assert.doesNotMatch(sessions,/\bs\.complete\b/);
+  assert.match(sessions,/s\.report_day BETWEEN \$1::date-13 AND \$1::date/);
 });

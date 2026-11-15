@@ -108,3 +108,14 @@ test('Habits completion scan index is concurrent, exact and included in all rele
     assert.ok(releasePaths[path].migrations.includes('0071_habits_completed_covering_index.sql'),path);
   }
 });
+
+
+test('completed Trends index preserves exact completed-session eligibility and concurrent release',()=>{
+  const sql=fs.readFileSync('migrations/0072_admin_trends_completed_covering_index.sql','utf8');
+  assert.match(sql,/CREATE INDEX CONCURRENTLY IF NOT EXISTS draft_run_completed_trends_cover_idx/);
+  assert.match(sql,/ON draft_run_sessions\(created_at,player_id,day\)/);
+  assert.match(sql,/WHERE NOT measurement_qa\s+AND jsonb_array_length\(answers\)=jsonb_array_length\(puzzle_ids\)/);
+  assert.match(sql,/i\.indisvalid AND i\.indisready/);
+  for(const key of ['secure-auth-release','backend-gate-backlog','launch-load','launch-distributed'])
+    assert.ok(releasePaths[key].migrations.includes('0072_admin_trends_completed_covering_index.sql'),key);
+});
