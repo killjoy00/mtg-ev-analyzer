@@ -107,8 +107,18 @@ export function summarizeQuotaStages(gatewayRows,handlerRows,startRows){
   // Route classification is aggregate-only and uses a fixed vocabulary.
   const slow_route_groups={gameplay:0,account:0,admin:0,other:0};
   const slow_outcomes={successful_first_attempt:0,retried:0,denied_429:0,failed_5xx:0,other_or_unknown:0};
+  const missing_gateway_timing_outcomes={success:0,denied_429:0,failed_5xx:0,other:0};
   for(const p of slow){
     slow_route_groups[slowRouteGroup(p.route)]++;
+    // A quota response can be slow without a handler timing header (e.g.
+    // provider errors, interrupted requests, or an uninstrumented path).
+    // The public report must never assume missing means fast or successful.
+    if(timing(p.quota_handler_ms)===null||timing(p.quota_transport_wait_ms)===null){
+      if(p.status===429)missing_gateway_timing_outcomes.denied_429++;
+      else if(p.status>=500)missing_gateway_timing_outcomes.failed_5xx++;
+      else if(p.status>=200&&p.status<400)missing_gateway_timing_outcomes.success++;
+      else missing_gateway_timing_outcomes.other++;
+    }
     if(p.status===429)slow_outcomes.denied_429++;
     else if(p.status>=500)slow_outcomes.failed_5xx++;
     else if(Number.isInteger(p.quota_attempts)&&p.quota_attempts>1)slow_outcomes.retried++;
@@ -129,7 +139,7 @@ export function summarizeQuotaStages(gatewayRows,handlerRows,startRows){
     gateway_records:gatewayRecords,handler_records:handlers.size,handler_start_records:starts.size,
     gateway_5xx:errors,gateway_5xx_before_upstream:preOriginErrors,
     slow_gateway_quota:slow.length,matched_slow:matched.length,
-    slow_route_groups,slow_outcomes,
+    slow_route_groups,slow_outcomes,missing_gateway_timing_outcomes,
     missing_handler_completion:missing.length,missing_handler_with_start:missing.filter(x=>x.start).length,
     slow_handler_dominant:slow.filter(p=>timing(p.quota_handler_ms)!==null&&timing(p.quota_transport_wait_ms)!==null&&p.quota_handler_ms>=p.quota_transport_wait_ms).length,
     slow_residual_dominant:slow.filter(p=>timing(p.quota_handler_ms)!==null&&timing(p.quota_transport_wait_ms)!==null&&p.quota_transport_wait_ms>p.quota_handler_ms).length,
