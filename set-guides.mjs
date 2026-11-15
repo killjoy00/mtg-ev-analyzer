@@ -26,7 +26,7 @@ export function renderRefresher(guide) {
 
 export function renderResults(guide) {
   const result=guide.results;
-  if(!result?.rows?.length)return `<h3>Results</h3><p>${esc(guide.resultsNote||'A comparable results snapshot is not available for this format yet.')}</p><p class="guide-caption">The archetype guide remains available in Refresher.</p>`;
+  if(!result?.rows?.length)return `<h3>Results</h3><p>${esc(guide.resultsNote||'There aren’t comparable results for this format yet.')}</p><p class="guide-caption">The archetype guide is still in the Refresher tab.</p>`;
   const relevant=result.rows.filter(row=>row.games>=500);
   const ranked=[...relevant].sort((a,b)=>b.wins/b.games-a.wins/a.games);
   const names=new Map(guide.archetypes.map(a=>[[...a.colors].sort().join(''),a.name]));
@@ -36,7 +36,7 @@ export function renderResults(guide) {
     ${ranked.length?`<p class="guide-results-lead"><strong>${esc(colorNames(ranked[0].colors))}</strong> has the highest observed win rate in this sample among combinations with at least 500 games.</p>`:''}
     <div class="guide-table-wrap"><table class="guide-results-table"><caption>Game win rates · all-time snapshot retrieved ${esc(date(result.retrievedAt))}</caption><thead><tr><th scope="col">Colors / theme</th><th scope="col">Win rate</th><th scope="col">Games</th></tr></thead><tbody>${[...result.rows].sort((a,b)=>(b.games>=500)-(a.games>=500)||b.wins/b.games-a.wins/a.games).map(row=>`<tr><th scope="row">${colorMark(row.colors)}<span>${esc(colorNames(row.colors))}${label(row)?`<small>${esc(label(row))}</small>`:''}</span></th><td>${row.games>=500?percent(row):'—'}</td><td>${count(row.games)}</td></tr>`).join('')}</tbody></table></div>
     ${result.baseline?.games?`<p class="guide-baseline">All ${result.colorCount===3?'three':'two'}-color decks without splashes <strong>${percent(result.baseline)}</strong><span>${count(result.baseline.games)} games · same sample</span></p>`:''}
-    <p class="guide-caption">These are deck-color results, not confirmed archetype classifications. Win rates reflect the players and decks in the sample; use the same-sample baseline, not 50%. Combinations below 500 games show their count but no rate.</p>
+    <p class="guide-caption">These are results by deck color, not by archetype. Compare each rate with the all-decks average for this sample, not with 50%. Pairs with fewer than 500 games show the count but no rate.</p>
     <p class="guide-caption">All-time data may include return events. A high rate is context, not a reason to force a color combination. <a href="${esc(safeLink(result.sourceUrl))}" target="_blank" rel="noopener noreferrer">Explore the 17Lands data ↗</a></p>`;
 }
 
@@ -73,7 +73,7 @@ export async function loadSetGuide(id) {
   const key=String(id||'').toLowerCase();
   if(!hasSetGuide(key))throw new Error('No guide is available for this set.');
   if(!cache.has(key))cache.set(key,fetch(new URL(`./sets/guides/data/${key}.json`,import.meta.url),{signal:AbortSignal.timeout(10000)}).then(async response=>{
-    if(!response.ok)throw new Error('The set guide could not be loaded.');
+    if(!response.ok)throw new Error('Couldn’t load the set guide.');
     const guide=await response.json();
     if(guide.id!==key||!Array.isArray(guide.archetypes)||!Array.isArray(guide.notes)||!Array.isArray(guide.sources))throw new Error('The set guide is unavailable.');
     return guide;
@@ -150,7 +150,7 @@ export async function openSetGuide(id,opener) {
       bindGuidePanels(body);
     } catch {
       if(!current.isConnected)return;
-      current.querySelector('.set-guide-dialog-body').innerHTML=`<p role="alert">The set guide could not be loaded. Your run is still here.</p><button type="button" class="button secondary" data-guide-retry>Try again</button><p><a href="${esc(setGuidePath(id))}" target="_blank" rel="noopener noreferrer">Open the guide page ↗</a></p>`;
+      current.querySelector('.set-guide-dialog-body').innerHTML=`<p role="alert">Couldn’t load the set guide. Your run is still here.</p><button type="button" class="button secondary" data-guide-retry>Try again</button><p><a href="${esc(setGuidePath(id))}" target="_blank" rel="noopener noreferrer">Open the guide page ↗</a></p>`;
       current.querySelector('[data-guide-retry]').addEventListener('click',render,{once:true});
     }
   };

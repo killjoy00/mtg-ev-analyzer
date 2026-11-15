@@ -26,7 +26,7 @@ function dateLabel(value) {
 
 function cohortLabel(entry) {
   if (entry.win_rate_cutoff) return `Drafters with at least a ${Math.round(Number(entry.win_rate_cutoff) * 100)}% win rate`;
-  return 'For older sets, we used Arena rank to decide which drafters qualified';
+  return 'For older sets, I used Arena rank to decide which drafters qualified';
 }
 
 function formatNumber(value) {
@@ -66,7 +66,7 @@ async function renderCatalog() {
     if (!standard.length) throw new Error('The serving catalog did not contain any playable sets.');
 
     grid.innerHTML = standard.map((entry) => card(entry)).join('');
-    summary.innerHTML = `<div><strong>${standard.length}</strong><span>Draft sets</span></div><div><strong>${esc(standard[0].set_name || standard[0].set_id.toUpperCase())}</strong><span>Newest set</span></div><div><strong>${esc(dateLabel(standard[0].data_date))}</strong><span>latest data date</span></div>`;
+    summary.innerHTML = `<div><strong>${standard.length}</strong><span>Draft sets</span></div><div><strong>${esc(standard[0].set_name || standard[0].set_id.toUpperCase())}</strong><span>Newest set</span></div><div><strong>${esc(dateLabel(standard[0].data_date))}</strong><span>Latest data</span></div>`;
     if (special.length) {
       specialGrid.innerHTML = special.map((entry) => card(entry, { special: true })).join('');
       specialSection.hidden = false;

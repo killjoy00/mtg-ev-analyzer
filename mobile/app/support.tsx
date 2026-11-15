@@ -18,7 +18,7 @@ export default function SupportScreen() {
     <ArticleScreen
       kicker="Contact"
       title="Contact Pack One"
-      deck="Contact Pack One for product support, data corrections, methodology questions, and business inquiries."
+      deck="Found a bug or a pick that looks wrong, or have an idea? Email me."
       sections={supportSections}
       footer={(
         <View style={styles.actions}>

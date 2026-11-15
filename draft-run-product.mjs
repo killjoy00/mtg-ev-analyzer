@@ -18,7 +18,7 @@ import {dismissSetRefresher,installSetGuides,setRefresherButton} from './set-gui
 
 const base = () => String(window.PACK1_API?.draftRunUrl||'').replace(/\/$/,'');
 const webClientBuild=()=>new URL(import.meta.url).searchParams.get('v')||null;
-const reportSentText='Thanks for letting us know.';
+const reportSentText='Thanks for letting me know.';
 let run=null,selection=null,review=null,busy=false,dailyValidationConfirmation=null,sharedDay=null;
 // Today's three finished Dailies in share order, once the result on screen
 // completes the set, and whether the share panel shares the set or this run.
@@ -66,11 +66,11 @@ async function api(path,body,auth=true) {
     const token=storedAccountToken();if(token)headers['x-pack1-auth-session']=token;
   }
   const r=await fetch(base()+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),credentials:firstPartyAuthEnabled()?'include':'omit',signal:AbortSignal.timeout(30000)});
-  const data=await r.json();if(!r.ok) throw Object.assign(new Error(data.error||'Could not reach the game. Try again.'),{status:r.status,capability:data.capability});return data;
+  const data=await r.json();if(!r.ok) throw Object.assign(new Error(data.error||'Couldn’t reach the game. Try again.'),{status:r.status,capability:data.capability});return data;
 }
 async function publicApi(path) {
   const r=await fetch(base()+path,{method:'GET',headers:{accept:'application/json'},credentials:'omit',signal:AbortSignal.timeout(30000)});
-  const data=await r.json();if(!r.ok)throw Object.assign(new Error(data.error||'Could not reach the game. Try again.'),{status:r.status});return data;
+  const data=await r.json();if(!r.ok)throw Object.assign(new Error(data.error||'Couldn’t reach the game. Try again.'),{status:r.status});return data;
 }
 // While a pick's reveal is on screen, the next pack is already known
 // (run.current). Fetch its images then, so Next shows the pack immediately
@@ -127,7 +127,7 @@ function revealAnalysis(p,answer) {
 }
 function reportDecisionMarkup(answer) {
   const sent=reportedDecisions.has(answer.puzzle.puzzle_id);
-  return `<div class="run-decision-report"><button type="button" class="run-report-prompt" data-report-decision aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V3m0 1c5-4 10 4 15 0v10c-5 4-10-4-15 0"/></svg><span>Does something look wrong? <u>Let us know.</u></span><span aria-hidden="true">→</span></button><span id="run-report-status" role="status">${sent?esc(reportSentText):''}</span></div>`;
+  return `<div class="run-decision-report"><button type="button" class="run-report-prompt" data-report-decision aria-haspopup="dialog"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 21V3m0 1c5-4 10 4 15 0v10c-5 4-10-4-15 0"/></svg><span>Does something look wrong? <u>Let me know.</u></span><span aria-hidden="true">→</span></button><span id="run-report-status" role="status">${sent?esc(reportSentText):''}</span></div>`;
 }
 function compactResultLabel(answer,sentence='') {
   return `${answer.score} out of 100. ${trophyRevealSentence(answer)}${sentence?` ${sentence}`:''}`;
@@ -264,11 +264,11 @@ function openDecisionReport(answer) {
   if(!Number.isInteger(round)||!run?.answers?.[round])return;
   const dialog=document.createElement('dialog');
   dialog.className='run-report-dialog';
-  dialog.innerHTML=`<form method="dialog" class="run-report-form"><h2>Does something look wrong?</h2><p>Tell us what you noticed.</p><fieldset>
+  dialog.innerHTML=`<form method="dialog" class="run-report-form"><h2>Does something look wrong?</h2><p>Tell me what you noticed.</p><fieldset>
     <label><input type="radio" name="reason" value="draft_context" required> The draft context looks wrong</label>
     <label><input type="radio" name="reason" value="card_or_image"> The card or image looks wrong</label>
     <label><input type="radio" name="reason" value="score_recommendation"> The pick or score looks wrong</label>
-    <label><input type="radio" name="reason" value="uninteresting"> This isn’t an interesting decision</label>
+    <label><input type="radio" name="reason" value="uninteresting"> This isn’t an interesting pick</label>
     <label><input type="radio" name="reason" value="broken"> Something isn’t working</label>
     <label><input type="radio" name="reason" value="other"> Other</label>
   </fieldset><label class="run-report-comment">Anything else?<textarea name="comment" maxlength="500" rows="3"></textarea></label>
@@ -293,7 +293,7 @@ function openDecisionReport(answer) {
       const status=document.querySelector('#run-report-status');
       if(status)status.textContent=reportSentText;
     } catch(e) {
-      error.textContent=e.message||'Could not send the report. Try again.';
+      error.textContent=e.message||'Couldn’t send the report. Try again.';
       submit.disabled=false;
     }
   };
@@ -494,7 +494,7 @@ export async function returnToValidatedDaily(runId,{standing=null,confirmed=true
   styles();
   await loadSetNames();
   if(!run||run.id!==runId||!run.complete)run=await api(`/v1/runs/${runId}`);
-  if(!run?.day||!run?.complete)throw new Error('Completed Daily result is unavailable.');
+  if(!run?.day||!run?.complete)throw new Error('Couldn’t load your Daily result.');
   environment=run.environment||environment;
   selection=null;review=null;
   if(confirmed)run.leaderboard_eligible=true;
@@ -513,12 +513,12 @@ async function shareResult({copy=false}={}) {
   try {
     const share=run.day?null:await api(`/v1/runs/${run.id}/share`,{});
     if(!run.day&&!share?.creator) {
-      if(!/^[a-f0-9]{24}$/.test(String(share?.id||'')))throw new Error('Pack One could not verify this share link. Try Share again.');
+      if(!/^[a-f0-9]{24}$/.test(String(share?.id||'')))throw new Error('Couldn’t check this share link. Try sharing again.');
       try {
         const verified=await publicApi('/v1/shared-runs/'+encodeURIComponent(share.id));
         if(verified?.id!==share.id)throw new Error('Share identity mismatch.');
       } catch {
-        throw new Error('Pack One could not verify this share link. Try Share again.');
+        throw new Error('Couldn’t check this share link. Try sharing again.');
       }
     }
     // The whole day shares the regular Daily's link; recipients open their own.
@@ -588,7 +588,7 @@ async function showBoard(period='daily') {
   const empty=period==='season'&&!data.season
     ? '<p class="run-empty">Season standings aren\'t available yet.</p>'
     : `<p class="run-empty">No scores on this leaderboard yet. Play a Daily to get started.</p>`;
-  app().innerHTML=`<section class="run-board"><p class="eyebrow">Leaderboards</p><h1>${environment==='latest'?'Latest Set':cube()?'Cube':'Draft Run'}</h1><nav class="run-board-games" aria-label="Leaderboard game"><a class="${environment==='mixed'?'active':''}" href="${boardUrl('mixed',period)}">Draft Run</a><a class="${cube()?'active':''}" href="${boardUrl('powered-cube',period)}">Cube</a><a class="${environment==='latest'?'active':''}" href="${boardUrl('latest',period)}">Latest Set</a></nav><nav class="run-board-periods" aria-label="Leaderboard period">${[['daily','Today'],['week','This week'],['season','This season']].map(([id,name])=>`<a class="${period===id?'active':''}" href="${gameUrl('board='+id)}">${name}</a>`).join('')}</nav>${seasonContext}<p>${seasonRating?'Season rating uses every first-attempt Daily score, with a larger deduction when you have played fewer days. You rank after your first Daily; missed days do not count as zero.':period==='daily'?'First attempts on today’s shared starting packs.':`Average of your best ${data.best_of||(period==='week'?3:10)} first-attempt Daily scores ${period==='week'?'this week':'this season'}; days not played count as 0. Days played are shown alongside.`}</p>${data.rows.length?`<ol>${data.rows.map(r=>`<li><b>${r.rank}</b><span><span class="run-board-player">${r.profile_key?`<a href="?profile=${esc(r.profile_key)}">${esc(r.display_name)}</a>`:`<span>${esc(r.display_name)}</span>`}${achievementMark(r.showcase_achievement,{compact:true})}</span>${seasonRating?`<small class="run-board-average">Avg ${Number(r.average_score).toFixed(1)}</small>`:''}</span><small>${r.days} ${r.days===1?'day':'days'}</small><strong>${seasonRating?`<small>Rating</small>${Number(r.rating).toFixed(1)}`:r.score}</strong></li>`).join('')}</ol>`:empty}<div class="run-board-actions"><a class="button primary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a>${practiceAction}</div></section>`;
+  app().innerHTML=`<section class="run-board"><p class="eyebrow">Leaderboards</p><h1>${environment==='latest'?'Latest Set':cube()?'Cube':'Draft Run'}</h1><nav class="run-board-games" aria-label="Leaderboard game"><a class="${environment==='mixed'?'active':''}" href="${boardUrl('mixed',period)}">Draft Run</a><a class="${cube()?'active':''}" href="${boardUrl('powered-cube',period)}">Cube</a><a class="${environment==='latest'?'active':''}" href="${boardUrl('latest',period)}">Latest Set</a></nav><nav class="run-board-periods" aria-label="Leaderboard period">${[['daily','Today'],['week','This week'],['season','This season']].map(([id,name])=>`<a class="${period===id?'active':''}" href="${gameUrl('board='+id)}">${name}</a>`).join('')}</nav>${seasonContext}<p>${seasonRating?'Season rating uses every first-attempt Daily score, with a larger deduction when you have played fewer days. You rank after your first Daily; missed days do not count as zero.':period==='daily'?'First attempts only. Everyone gets the same packs.':`Average of your best ${data.best_of||(period==='week'?3:10)} first-attempt Daily scores ${period==='week'?'this week':'this season'}; days not played count as 0. Days played are shown alongside.`}</p>${data.rows.length?`<ol>${data.rows.map(r=>`<li><b>${r.rank}</b><span><span class="run-board-player">${r.profile_key?`<a href="?profile=${esc(r.profile_key)}">${esc(r.display_name)}</a>`:`<span>${esc(r.display_name)}</span>`}${achievementMark(r.showcase_achievement,{compact:true})}</span>${seasonRating?`<small class="run-board-average">Avg ${Number(r.average_score).toFixed(1)}</small>`:''}</span><small>${r.days} ${r.days===1?'day':'days'}</small><strong>${seasonRating?`<small>Rating</small>${Number(r.rating).toFixed(1)}`:r.score}</strong></li>`).join('')}</ol>`:empty}<div class="run-board-actions"><a class="button primary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a>${practiceAction}</div></section>`;
   trackEvent('leaderboard_view',{mode:'draft_run',set_id:environment,period,season_id:data.season?.id,season_set_id:data.season?.set_id});
 }
 async function launch(options={}) {
@@ -608,9 +608,9 @@ async function launch(options={}) {
 // the thing that failed.
 function failureMessage(error) {
   const raw=String(error?.message||'');
-  if(/fetch|network|load failed|connection/i.test(raw)) return 'We couldn’t reach Pack One’s servers. This is usually a brief hiccup or a dropped connection.';
+  if(/fetch|network|load failed|connection/i.test(raw)) return 'Couldn’t reach Pack One’s servers. This is usually a brief hiccup or a dropped connection.';
   if(/^5\d\d|server|unavailable|temporarily/i.test(raw)) return 'Pack One’s servers are busy right now. Give it a moment and try again.';
-  return 'Something went wrong on our side while loading this page.';
+  return 'Something went wrong loading this page.';
 }
 
 function renderLoadFailure(error,isBoard) {
@@ -667,6 +667,6 @@ export async function installDraftRunPage() {
 
 async function customPractice() {
   const {sets}=await api('/v1/practice-sets');
-  app().innerHTML=`<section class="practice-picker"><p class="eyebrow">Elite practice</p><h1>Choose your sets</h1><p>Choose one or more sets and we'll put together eight picks from them.</p><form id="practice-sets"><fieldset><legend>Choose one or more sets</legend>${sets.map((s,i)=>`<label><input type="checkbox" name="set" value="${esc(s.set_id)}" ${i===0?'checked':''}>${esc(s.set_name||s.set_id.toUpperCase())}</label>`).join('')}</fieldset><button class="button primary">Start random run</button></form><p id="run-error" role="alert"></p><a href="./">Back to Dailies</a></section>`;
+  app().innerHTML=`<section class="practice-picker"><p class="eyebrow">Elite practice</p><h1>Choose your sets</h1><p>Choose one or more sets and you’ll get eight picks from them.</p><form id="practice-sets"><fieldset><legend>Choose one or more sets</legend>${sets.map((s,i)=>`<label><input type="checkbox" name="set" value="${esc(s.set_id)}" ${i===0?'checked':''}>${esc(s.set_name||s.set_id.toUpperCase())}</label>`).join('')}</fieldset><button class="button primary">Start random run</button></form><p id="run-error" role="alert"></p><a href="./">Back to Dailies</a></section>`;
   document.querySelector('#practice-sets').onsubmit=async event=>{event.preventDefault();const setIds=new FormData(event.currentTarget).getAll('set');if(!setIds.length){document.querySelector('#run-error').textContent='Choose at least one set.';return;}try{environment='mixed';await launch({setIds});}catch(e){renderLoadFailure(e,false);}};
 }

@@ -122,7 +122,7 @@ test('approved editorial copy is consistent across web and native app',()=>{
  const expected={
   'practice/index.html':'<h1>Want another eight picks?</h1>',
   'learn/index.html':'<h1>How Pack One works.</h1>',
-  'methodology/index.html':'Try today’s eight picks.',
+  'methodology/index.html':'Play today&rsquo;s Daily',
   'scoring/index.html':'<h2>What if the model disagrees?</h2>',
   'sets/index.html':'<h1>Which sets are available?</h1>',
   'mobile/src/screens/index.tsx':'<Text style={styles.utilityTitle}>Want another eight picks?</Text>',
@@ -150,9 +150,9 @@ test('approved editorial copy is consistent across web and native app',()=>{
 
 test('Daily descriptions reinforce trophy-draft provenance',()=>{
  const html=dailyHomeMarkup(null,day);
- assert.match(html,/Eight decisions from real trophy drafts\./);
- assert.match(html,/Eight decisions from Powered Cube trophy drafts\./);
- assert.match(html,/Eight decisions from trophy drafts in the latest set\./);
+ assert.match(html,/Eight picks from real trophy drafts\./);
+ assert.match(html,/Eight picks from Powered Cube trophy drafts\./);
+ assert.match(html,/Eight picks from trophy drafts in the latest set\./);
  assert.doesNotMatch(html,/Magic’s most powerful cards|Only the latest set/);
 });
 
@@ -185,7 +185,7 @@ test('failed Daily hydration stays unknown and offers a retry',()=>{
  const html=dailyHomeMarkup(null,day,'unavailable');
  assert.match(html,/data-home-state="unavailable"/);
  assert.equal((html.match(/is-pending/g)||[]).length,3);
- assert.match(html,/Daily progress is temporarily unavailable/);
+ assert.match(html,/Couldn’t load your Daily progress/);
  assert.match(html,/data-home-retry/);
  assert.doesNotMatch(html,/Start here|Free · No account required|Create a free account/);
 });
@@ -216,7 +216,7 @@ test('linked accounts with unresolved usernames are warned before Dailies',()=>{
  const profile={player:{claimed:true},capabilities:['account'],ranking_identity:{eligible:false,reason:'username_taken'},daily_history:[]};
  const html=dailyHomeMarkup(profile,day);
  assert.match(html,/Choose a different display name\. That one is already taken/);
- assert.match(html,/Daily results will not appear on the leaderboard/);
+ assert.match(html,/your Daily scores won’t show on the leaderboard/);
  assert.match(html,/data-home-username/);
  const owned=dailyHomeMarkup({...profile,ranking_identity:{eligible:true,reason:null}},day);
  assert.doesNotMatch(owned,/data-home-username|Display name needs attention|Choose a different display name/);

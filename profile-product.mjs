@@ -226,11 +226,11 @@ function settingsMarkup(profile, progress, account, patreon) {
         <label class="profile-leaderboard-name" id="profile-display-name"><span>Display name</span><input class="select" type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(profile.player.display_name)}" required ${identityHidden?'disabled':''} aria-describedby="profile-display-name-help profile-display-name-error"><small id="profile-display-name-help">${identityHidden?'This display name is hidden by moderation.':'Shown on Daily leaderboards and your public profile.'}</small><small class="profile-field-error" id="profile-display-name-error" role="alert">${esc(identityHidden?`Display name hidden. ${profile.player.public_identity_hidden_reason||'Contact Pack One support if you believe this is a mistake.'}`:nameAttention)}</small></label>
         ${!identityHidden?`<p class="profile-identity-rules"><small>Display names and public profiles follow the <a href="/terms/#public-identity-rules" target="_blank" rel="noopener">Pack One Public Identity rules</a>.</small></p>`:''}
         <label class="profile-toggle"><input type="checkbox" role="switch" name="profilePublic" ${profile.player.profile_public ? 'checked' : ''} ${identityHidden?'disabled':''}><span><strong>Public profile</strong> <small>Let players view your Pack One record from leaderboards and shared links.</small></span></label>
-        ${progress ? `<label><span>Favorite set or format</span><select class="select" name="favoriteSetId"><option value="">No favorite selected</option>${progress.environments.map((entry) => `<option value="${esc(entry.id)}" ${entry.id === profile.player.favorite_set_id ? 'selected' : ''}>${esc(entry.name)}</option>`).join('')}</select></label>` : '<p class="profile-empty">Favorite set or formats are temporarily unavailable.</p>'}
+        ${progress ? `<label><span>Favorite set or format</span><select class="select" name="favoriteSetId"><option value="">No favorite selected</option>${progress.environments.map((entry) => `<option value="${esc(entry.id)}" ${entry.id === profile.player.favorite_set_id ? 'selected' : ''}>${esc(entry.name)}</option>`).join('')}</select></label>` : '<p class="profile-empty">Couldn’t load your favorite set or format. Try again.</p>'}
         <label><span>Showcase achievement</span><select class="select" name="showcaseAchievement"><option value="">No showcase selected</option>${unlocked.map((item) => `<option value="${esc(item.id)}" ${item.id === profile.player.showcase_achievement ? 'selected' : ''}>${esc(item.label)}</option>`).join('')}</select></label>
         <div class="profile-settings-actions"><button class="button primary" type="submit">Save profile</button><span class="profile-settings-status profile-save-status" id="profile-save-status" aria-live="polite"></span></div>
       </form></div>
-    </section>`:`<p class="profile-empty">${account?.unavailable?'Profile settings are temporarily unavailable.':'Sign in to edit your profile settings.'}</p>`}
+    </section>`:`<p class="profile-empty">${account?.unavailable?'Couldn’t load your profile settings. Try again.':'Sign in to edit your profile settings.'}</p>`}
     ${account?.user?`<section class="settings-row profile-membership profile-settings-membership profile-settings-group" aria-labelledby="patreon-membership-title">
       <div class="settings-row-label"><h3 id="patreon-membership-title">Membership</h3><p class="profile-settings-intro">Your Pack One Elite access.</p></div>
       <div class="settings-row-body"><div class="membership-status">
@@ -246,7 +246,7 @@ function settingsMarkup(profile, progress, account, patreon) {
               ? `<p><strong>Patreon connected</strong><br><span>Elite unlocks Powered Cube practice and custom-set practice. If you just upgraded on Patreon, refresh your access here.</span></p>${patreonAdFree?'<p>Your current paid membership includes ad-free browsing.</p>':''}`
               : `<p><strong>Unlock Elite practice.</strong><br><span>Join on Patreon, then connect your Patreon account here so Pack One can activate the benefits.</span></p>`}
       </div>
-      ${new URLSearchParams(location.search).has('patreon')?`<p role="status">${esc(({connected:'Patreon connected.',expired:'The connection expired. Please try again.',unavailable:'Patreon linking is not available yet.',conflict:'This Patreon account is already connected to another Pack One account.','identity-mismatch':'This Pack One account is already connected to a different Patreon account. Disconnect Patreon before switching accounts.',error:'Patreon could not be connected. Please try again.'})[new URLSearchParams(location.search).get('patreon')]||'Patreon connection returned.')}</p>`:''}
+      ${new URLSearchParams(location.search).has('patreon')?`<p role="status">${esc(({connected:'Patreon connected.',expired:'The connection expired. Please try again.',unavailable:'Patreon linking is not available yet.',conflict:'This Patreon account is already connected to another Pack One account.','identity-mismatch':'This Pack One account is already connected to a different Patreon account. Disconnect Patreon before switching accounts.',error:'Couldn’t connect Patreon. Try again.'})[new URLSearchParams(location.search).get('patreon')]||'Patreon connection returned.')}</p>`:''}
       <div class="profile-membership-actions">
         ${nonPatreonElite?'':`<a class="button ${patreon?.configured===true&&!elite?'primary':'secondary'}" href="${membershipUrl}"${elite?' rel="noopener noreferrer"':''}>${patreon?.configured!==true?'Learn about Elite':elite?'Open Patreon':patreon?.connected?'Upgrade to Elite':'Become Elite'}</a>`}
         ${patreon?.configured===true&&!(nonPatreonElite&&!patreon?.connected)?`<button type="button" class="button secondary" id="patreon-connect">${patreon?.connected?'Refresh Patreon access':'Already a member? Connect Patreon'}</button>`:''}
@@ -335,12 +335,12 @@ function profileMarkup(profile, liveCatalog, { own = false, publicKey = null, ac
     ${publicUrl ? `<p class="profile-public-url">Public profile: <button type="button" class="text-button" id="profile-copy-link">Copy link</button></p>` : ''}
 
     <section class="profile-section archive-progress-section">
-      <div class="profile-section-heading"><div><p class="eyebrow">Archive progress</p><h2>${progress ? `${progress.played}/${progress.total} environments played` : 'Live environments unavailable'}</h2></div>${progress ? `<strong>${Math.round((progress.played / progress.total) * 100)}%</strong>` : ''}</div>
-      ${progress ? `<div class="archive-progress-track"><i style="width:${(progress.played / progress.total) * 100}%"></i></div><details class="profile-disclosure" data-profile-section="archive"><summary>Explore environments</summary><div class="environment-progress-grid">${progress.environments.map(entry => environmentCard(entry, profile.player.favorite_set_id)).join('')}</div></details>` : '<p class="profile-empty">Refresh to see currently available environments.</p>'}
+      <div class="profile-section-heading"><div><p class="eyebrow">Archive progress</p><h2>${progress ? `${progress.played}/${progress.total} sets played` : 'Couldn’t load the sets'}</h2></div>${progress ? `<strong>${Math.round((progress.played / progress.total) * 100)}%</strong>` : ''}</div>
+      ${progress ? `<div class="archive-progress-track"><i style="width:${(progress.played / progress.total) * 100}%"></i></div><details class="profile-disclosure" data-profile-section="archive"><summary>Explore sets</summary><div class="environment-progress-grid">${progress.environments.map(entry => environmentCard(entry, profile.player.favorite_set_id)).join('')}</div></details>` : '<p class="profile-empty">Refresh to see the current sets.</p>'}
     </section>
 
     <section class="profile-grid-two">
-      <div class="profile-section"><p class="eyebrow">Best environments</p><h2>Sets where you’ve scored best</h2>${bestRows.length ? `<ol class="best-environment-list">${bestRows.map((row, index) => `<li><b>#${index + 1}</b><div><strong>${esc(names.get(String(row.set_id || '').toLowerCase()) || String(row.set_id || '').toUpperCase())}</strong><span>${Number(row.games || 0)} games</span></div><em>${Number(row.average_score || 0).toFixed(1)} avg</em></li>`).join('')}</ol>` : '<p class="profile-empty">Play at least three games in an environment to qualify it here.</p>'}</div>
+      <div class="profile-section"><p class="eyebrow">Best sets</p><h2>Sets where you’ve scored best</h2>${bestRows.length ? `<ol class="best-environment-list">${bestRows.map((row, index) => `<li><b>#${index + 1}</b><div><strong>${esc(names.get(String(row.set_id || '').toLowerCase()) || String(row.set_id || '').toUpperCase())}</strong><span>${Number(row.games || 0)} games</span></div><em>${Number(row.average_score || 0).toFixed(1)} avg</em></li>`).join('')}</ol>` : '<p class="profile-empty">Play at least three games in a set for it to show up here.</p>'}</div>
       <div class="profile-section"><p class="eyebrow">Draft Run</p><h2>Your run record</h2><div class="profile-mode-grid">${modeCards(profile)}</div>${profile.cube ? `<div class="cube-profile-callout"><span>Powered Cube</span><strong>${Number(profile.cube.average_score || 0).toFixed(1)} avg</strong><small>${Number(profile.cube.games || 0)} runs · ${Number(profile.cube.best_score || 0)} best</small></div>` : ''}</div>
     </section>
 
@@ -388,7 +388,7 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
       track('account_password_changed');
       await renderAccount({notice:'Password changed. You have been signed out everywhere.'});
     } catch(error) {
-      status.textContent=error?.message||'Password could not be changed.';
+      status.textContent=error?.message||'Couldn’t change your password. Try again.';
       button.disabled=false;
     } finally {
       form.reset();
@@ -499,7 +499,7 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
     try { await navigator.clipboard.writeText(url); event.currentTarget.textContent = 'Copied'; } catch {}
   });
   document.querySelector('#profile-share')?.addEventListener('click', async (event) => {
-    await performShare(event.currentTarget,()=>{if(!progress)throw Error('Live environments unavailable');return shareProfileCard({...profile,best_environments:(profile.best_environments||[]).filter(row=>progress.ids.has(row.set_id))}, progress, names);},'profile_share',{public:profile.player.profile_public,environments:progress?.played});
+    await performShare(event.currentTarget,()=>{if(!progress)throw Error('Couldn’t load the sets');return shareProfileCard({...profile,best_environments:(profile.best_environments||[]).filter(row=>progress.ids.has(row.set_id))}, progress, names);},'profile_share',{public:profile.player.profile_public,environments:progress?.played});
   });
   document.querySelector('#profile-report')?.addEventListener('click',async()=>{
     const status=document.querySelector('#profile-safety-status');
@@ -511,7 +511,7 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
       return;
     }
     try { await reportPublicProfile(profileKey,{reason}); if(status)status.textContent='Report sent to Pack One.'; }
-    catch(error) { if(status)status.textContent=error?.message||'Could not send this report.'; }
+    catch(error) { if(status)status.textContent=error?.message||'Couldn’t send this report. Try again.'; }
   });
   document.querySelector('#profile-block')?.addEventListener('click',async()=>{
     const status=document.querySelector('#profile-safety-status');
@@ -523,7 +523,7 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
     }
     if(!window.confirm('Block this public profile? You will no longer be able to open it while signed in.'))return;
     try { await blockPublicProfile(profileKey); if(status)status.textContent='Profile blocked.'; window.location.href='./'; }
-    catch(error) { if(status)status.textContent=error?.message||'Could not block this profile.'; }
+    catch(error) { if(status)status.textContent=error?.message||'Couldn’t block this profile. Try again.'; }
   });
   async function performShare(button,makeCard,name,props) {
     const original=button.textContent;button.disabled=true;button.textContent='Making card…';
@@ -576,7 +576,7 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
         status.className='profile-settings-status profile-save-status is-error';
         status.textContent=nameError
           ? 'Profile not saved. Fix the display name and try again.'
-          : (error?.message||'Profile could not be saved.')+' Your edits are still here.';
+          : (error?.message||'Couldn’t save your profile. Try again.')+' Your edits are still here.';
       }
     } finally {
       if(button)button.disabled=false;

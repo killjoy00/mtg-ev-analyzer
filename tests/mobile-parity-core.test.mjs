@@ -56,14 +56,14 @@ test('native Draft Run keeps web feedback and result-review parity', () => {
   assert.match(draftScreen, /Why this score\?/);
   assert.match(draftScreen, /Review the pack/);
   // Report dialog copy matches openDecisionReport in draft-run-product.mjs.
-  assert.match(draftScreen, /Does something look wrong\? Let us know\./);
-  assert.match(draftScreen, /Tell us what you noticed\./);
+  assert.match(draftScreen, /Does something look wrong\? Let me know\./);
+  assert.match(draftScreen, /Tell me what you noticed\./);
   assert.match(draftScreen, /The draft context looks wrong/);
   assert.match(draftScreen, /The card or image looks wrong/);
   assert.match(draftScreen, /The pick or score looks wrong/);
   assert.match(draftScreen, /Something isn’t working/);
   assert.match(draftScreen, /Anything else\?/);
-  assert.match(draftScreen, /Thanks for letting us know\./);
+  assert.match(draftScreen, /Thanks for letting me know\./);
   assert.match(draftApi, /Application\.nativeApplicationVersion/);
   assert.match(draftApi, /Application\.nativeBuildVersion/);
   assert.match(draftApi, /import \* as Application from 'expo-application'/);

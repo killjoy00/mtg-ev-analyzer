@@ -17,7 +17,7 @@ export default function AboutScreen() {
     <ArticleScreen
       kicker="About"
       title="About Pack One"
-      deck="Eight decisions from real trophy drafts."
+      deck="Eight picks from real trophy drafts."
       sections={aboutSections}
       footer={(
         <View style={styles.links}>

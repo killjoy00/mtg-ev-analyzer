@@ -114,6 +114,22 @@ def reveal(label, exact=False):
     raise AssertionError(f'{label!r} never scrolled into view (both directions)')
 
 
+def reveal_together(*labels, exact=False):
+    # A section title can stop on the bottom edge of the screen with its
+    # caption just below the fold, so revealing the title alone does not put
+    # both on screen. Reveal the first label, then nudge in short, slow steps
+    # (no fling) until every label is visible in the same hierarchy.
+    reveal(labels[0], exact)
+    for up in (True, False):
+        for _ in range(4):
+            _, root = hierarchy()
+            if all(visible_bounds(root, label, exact) for label in labels):
+                return
+            swipe_page(up=up, span=0.25, duration=600)
+            time.sleep(0.2)
+    raise AssertionError(f'{labels!r} were never on screen together')
+
+
 def enter_field(label, value):
     tap(label, exact=True)
     _, root = hierarchy()
@@ -471,7 +487,7 @@ if platform == 'android':
         xml, _ = snapshot('insights-modal-back-restores-pick')
         require_highlight(xml, 'screenshot-insight-1', 'Hero in Training', 92)
         # Pick patterns come before score history.
-        reveal('Your pick patterns')
+        reveal_together('Your pick patterns', 'Recent picks across all formats')
         xml, _ = snapshot('insights-patterns-heading')
         require('Your pick patterns' in xml and 'Recent picks across all formats' in xml,
                 'Pick patterns heading or recent cross-format scope is missing')
@@ -497,7 +513,7 @@ if platform == 'android':
 
     def native_insights_sparse():
         launch('member-insights-sparse', 'insights', 320, 1.5)
-        reveal('Your pick patterns')
+        reveal_together('Your pick patterns', 'Recent picks across all formats')
         xml, logs = snapshot('insights-sparse-320dp-large-text')
         require('PACKONE_INSIGHTS_READY' in logs, 'Sparse pick-review fixture did not render')
         require('Recent picks across all formats' in xml, 'Sparse recent cross-format scope is missing')

@@ -214,7 +214,7 @@ try {
   assert.equal(connectCalls,1);
   patreonStatus=disconnected;
   await page.goto(base+'/?patreon=expired');
-  await page.getByText('Your Patreon authorization expired.',{exact:true}).waitFor();
+  await page.getByText('Your Patreon sign-in expired.',{exact:true}).waitFor();
   assert.equal(await page.evaluate(()=>Boolean(sessionStorage.getItem('pack1-patreon-activation-v1'))),true,'recoverable OAuth result keeps activation intent');
   await page.getByRole('link',{name:'Back to Pack One',exact:true}).click();
   await page.waitForURL(base+'/');
@@ -228,8 +228,8 @@ try {
 
   // Provider-unavailable and generic callback errors stay distinct and recoverable.
   for(const [result,heading] of [
-    ['unavailable','Patreon linking is temporarily unavailable.'],
-    ['error','Patreon could not be connected.'],
+    ['unavailable','Couldn’t reach Patreon.'],
+    ['error','Couldn’t connect Patreon.'],
   ]) {
     await reset({isSigned:true,status:disconnected});
     await page.evaluate(()=>sessionStorage.setItem('pack1-patreon-activation-v1',JSON.stringify({source:'oauth_return'})));
@@ -257,7 +257,7 @@ try {
   // Real sync_pending is pending even if the last authoritative row was a Supporter.
   await reset({isSigned:true,status:pending});
   await page.goto(base+'/?patreon=activate');
-  await page.getByText('We’re waiting for the latest membership update.',{exact:true}).waitFor();
+  await page.getByText('Still waiting for the latest membership update.',{exact:true}).waitFor();
   assert.equal(connectCalls,0);
 
   // Authoritative non-entitlement is truthful and is not mislabeled pending.

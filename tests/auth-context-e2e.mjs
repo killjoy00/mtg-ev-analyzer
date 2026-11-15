@@ -380,7 +380,7 @@ try {
   assert.equal(await unverified.getByRole('button',{name:'Sign in',exact:true}).isEnabled(),true);
   resendCooldown=true;
   await page.getByRole('button',{name:'Send a new verification link',exact:true}).click();
-  await page.getByText('Cooldown active. Try again in about 2 minutes.',{exact:true}).waitFor();
+  await page.getByText('You just asked for a link. Try again in about 2 minutes.',{exact:true}).waitFor();
   assert.equal(await page.locator('[data-state="cooldown"]').count(),1);
   // Once verified, the same form must still sign in after a resend cooldown.
   unverifiedSignin=false;

@@ -43,7 +43,7 @@ function updateAccess({ state = 'checking', patreon = null, membershipUnavailabl
   note.textContent = state === 'checking'
     ? 'Checking your practice access…'
     : state === 'unavailable'
-      ? 'Your practice options will be available after your account can be checked.'
+      ? 'Your practice options will show up once your account has been checked.'
       : !signedIn
         ? 'Sign in or create a free account for unlimited regular Draft Runs. Elite adds Powered Cube and custom-set practice.'
         : source === 'apple'
@@ -51,7 +51,7 @@ function updateAccess({ state = 'checking', patreon = null, membershipUnavailabl
           : elite
             ? 'Elite is active. All three practice modes are unlocked.'
             : membershipUnavailable
-              ? 'Regular Draft Runs are available. Elite practice is unavailable until your membership can be checked.'
+              ? 'Regular Draft Runs are ready. Elite practice opens once your membership has been checked.'
               : patreon?.connected
                 ? 'Your Patreon account is connected. Upgrade to Elite to unlock Powered Cube and custom-set practice.'
                 : 'Your free account includes unlimited regular Draft Runs. Elite adds Powered Cube and custom-set practice.';
@@ -59,8 +59,8 @@ function updateAccess({ state = 'checking', patreon = null, membershipUnavailabl
   const error = hub.querySelector('[data-practice-error]');
   error.hidden = state !== 'unavailable' && !membershipUnavailable;
   error.querySelector('p').textContent = state === 'unavailable'
-    ? 'Pack One could not check your account right now.'
-    : membershipUnavailable ? 'Pack One could not check your Elite membership right now.' : '';
+    ? 'Couldn’t check your account. Try again.'
+    : membershipUnavailable ? 'Couldn’t check your Elite membership. Try again.' : '';
 }
 
 async function render() {

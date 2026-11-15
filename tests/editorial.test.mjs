@@ -108,8 +108,8 @@ assert.doesNotMatch(dailyHome, /trophy drafter chose —/);
 assert.match(dailyHome, /Start here/);
 assert.match(dailyHome, /Free · No account required/);
 assert.match(dailyHome, /p1-card/);
-assert.match(dailyHome, /Eight decisions from Powered Cube trophy drafts\./);
-assert.match(dailyHome, /Eight decisions from trophy drafts in the latest set\./);
+assert.match(dailyHome, /Eight picks from Powered Cube trophy drafts\./);
+assert.match(dailyHome, /Eight picks from trophy drafts in the latest set\./);
 assert.doesNotMatch(dailyHome, /Free practice|Elite practice|data-home-elite/);
 const learnHub = await readFile('learn/index.html','utf8');
 assert.match(learnHub, /<h1>How Pack One works\.<\/h1>/);
@@ -164,7 +164,7 @@ assert.match(method, /See the <a href="\/terms\/">Terms<\/a> for full attributio
 assert.doesNotMatch(method, /No endorsement is implied|card rights remain with their owners/i);
 const sets = await readFile('sets/index.html','utf8');
 assert.match(sets, /id="set-archive-grid"/);
-assert.match(sets, /\/sets\/catalog\.mjs\?v=6/, 'Set catalog changes invalidate cached module');
+assert.match(sets, /\/sets\/catalog\.mjs\?v=7/, 'Set catalog changes invalidate cached module');
 {
   // Crawlers must reach every guide from the served HTML, not only from the API-built catalog.
   const {GUIDE_IDS} = await import('../set-guides.mjs');

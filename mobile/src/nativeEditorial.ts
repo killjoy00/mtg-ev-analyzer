@@ -4,7 +4,7 @@ export const aboutSections: ArticleSection[] = [
   {
     title: 'Make a pick, then compare.',
     body: [
-      'The idea for Pack One came from a Reddit post about studying trophy drafts to get better at Limited. I thought it would be fun to see the same packs successful drafters did, make my own picks, and then compare. So I built a daily game around eight decisions from eight different trophy drafts.',
+      'The idea for Pack One came from a Reddit post about studying trophy drafts to get better at Limited. I thought it would be fun to see the same packs successful drafters did, make my own picks, and then compare. So I built a daily game around eight picks from eight different trophy drafts.',
     ],
   },
   {
@@ -30,8 +30,8 @@ export const aboutSections: ArticleSection[] = [
     title: 'How I built Pack One',
     body: [
       "I'm not a programmer, and I built Pack One with a lot of help from AI tools. I decide what goes into the game, and I'm responsible when something doesn't work.",
-      'Every puzzle comes from an actual recorded draft, and scoring uses a statistical model based on real drafting behavior. Neither the model nor the trophy drafter is right every time.',
-      'The site has also been improved by feedback from Magic players like you, so don’t hesitate to let me know your suggestions for improvements.',
+      'Every pick comes from an actual recorded draft, and scoring uses a statistical model based on real drafting behavior. Neither the model nor the trophy drafter is right every time.',
+      'A lot of the site has gotten better because players told me what wasn’t working. If something bugs you or you have an idea, email me.',
     ],
   },
 ];
@@ -40,13 +40,13 @@ export const supportSections: ArticleSection[] = [
   {
     title: 'Product and support',
     body: [
-      'For bug reports, methodology questions, data corrections, accessibility issues, or feature requests, email admin@packone.pro.',
+      'For bugs, picks that look wrong, questions about scoring, accessibility problems, or ideas, email admin@packone.pro.',
     ],
   },
   {
     title: 'Partnerships and business',
     body: [
-      'For advertising, sponsorship, affiliate, or other business inquiries, email partner@packone.pro.',
+      'For advertising, sponsorships, affiliates, or other business questions, email partner@packone.pro.',
     ],
   },
 ];

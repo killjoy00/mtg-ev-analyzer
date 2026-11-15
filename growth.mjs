@@ -127,7 +127,7 @@ async function openEliteLanding(source='account') {
     if(eliteSource(membership)||membership?.membership?.sync_pending||(tier==='supporter'&&membership?.ad_free===true)) {
       location.assign('/patreon/#connect');return;
     }
-    if(membership?.configured!==true)throw Error('Membership checkout is temporarily unavailable. Please try again.');
+    if(membership?.configured!==true)throw Error('Couldn’t open membership checkout. Try again.');
     event('membership_checkout_started',{source:'patreon',type:tier,context:'web'});
     await flushEvents().catch(()=>{});
     location.assign('https://www.patreon.com/checkout/PackOne?rid='+(tier==='elite'?'29631843':'29631835'));
@@ -143,11 +143,11 @@ function renderAccountError(app, error, retry=()=>renderAccount(), reauth=()=>re
   if(error?.status===403&&error?.message==='Account request could not be verified.') {
     // A valid account cookie with a failed CSRF proof cannot be repaired by
     // retrying the same protected write. Require a fresh provider sign-in instead.
-    app.innerHTML=`<section class="message-card"><p class="eyebrow">Account</p><h1>Confirm your sign-in.</h1><p>We couldn't confirm your sign-in. Sign in again to restore access. Your saved progress won't be cleared.</p><button class="button primary" id="account-reauth">Sign in again</button><a class="button secondary" href="./">Back to Dailies</a></section>`;
+    app.innerHTML=`<section class="message-card"><p class="eyebrow">Account</p><h1>Confirm your sign-in.</h1><p>Couldn’t confirm your sign-in. Sign in again. You won’t lose any progress.</p><button class="button primary" id="account-reauth">Sign in again</button><a class="button secondary" href="./">Back to Dailies</a></section>`;
     document.querySelector('#account-reauth')?.addEventListener('click',()=>void reauth());
     return;
   }
-  app.innerHTML=`<section class="message-card"><p class="eyebrow">Account</p><h1>Account access is temporarily unavailable.</h1><p>${esc(error?.message||'Please try again.')}</p><button class="button primary" id="account-retry">Try again</button><a class="button secondary" href="./">Back to Dailies</a></section>`;
+  app.innerHTML=`<section class="message-card"><p class="eyebrow">Account</p><h1>Couldn’t reach your account.</h1><p>${esc(error?.message||'Please try again.')}</p><button class="button primary" id="account-retry">Try again</button><a class="button secondary" href="./">Back to Dailies</a></section>`;
   document.querySelector('#account-retry')?.addEventListener('click',()=>void retry());
 }
 
@@ -182,7 +182,7 @@ export async function beginMembershipPurchase(tier) {
 export async function renderForgotPassword() {
   document.body.classList.remove('is-game');
   const app=document.querySelector('#app');if(!app)return;
-  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account recovery</p><h1>Reset your password.</h1><p>Enter your account email. We’ll send a reset link if a password account exists.</p></header><div class="account-columns"><div><form class="account-form" id="account-recovery-request"><label>Email<input required type="email" name="email" autocomplete="email"></label><button class="button primary" type="submit">Send reset link</button><p class="form-error" aria-live="polite"></p></form></div></div><div class="account-actions"><button class="button secondary" id="account-recovery-back" type="button">Back to sign in</button></div></section>`;
+  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account recovery</p><h1>Reset your password.</h1><p>Enter your account email. If it has a password, you’ll get a reset link.</p></header><div class="account-columns"><div><form class="account-form" id="account-recovery-request"><label>Email<input required type="email" name="email" autocomplete="email"></label><button class="button primary" type="submit">Send reset link</button><p class="form-error" aria-live="polite"></p></form></div></div><div class="account-actions"><button class="button secondary" id="account-recovery-back" type="button">Back to sign in</button></div></section>`;
   document.querySelector('#account-recovery-back')?.addEventListener('click',()=>void renderAccount());
   document.querySelector('#account-recovery-request')?.addEventListener('submit',async e=>{
     e.preventDefault();const form=e.currentTarget,button=form.querySelector('button[type="submit"]'),status=form.querySelector('.form-error');
@@ -192,7 +192,7 @@ export async function renderForgotPassword() {
       const result=await requestPasswordReset(email);
       form.innerHTML=`<p class="form-success" role="status">${esc(result?.message||"If an account exists for that email, we've sent a password reset link.")}</p>`;
     } catch(error) {
-      status.textContent=error?.message||'Password recovery is temporarily unavailable.';
+      status.textContent=error?.message||'Couldn’t start password recovery. Try again.';
       button.disabled=false;
     }
   });
@@ -224,9 +224,9 @@ function verificationCooldownMessage(error) {
   if(Number.isFinite(retryAfter)&&retryAfter>0) {
     const amount=retryAfter>=60?Math.ceil(retryAfter/60):Math.ceil(retryAfter);
     const unit=retryAfter>=60?'minute':'second';
-    return `Cooldown active. Try again in about ${amount} ${unit}${amount===1?'':'s'}.`;
+    return `You just asked for a link. Try again in about ${amount} ${unit}${amount===1?'':'s'}.`;
   }
-  return 'Cooldown active. Please wait before requesting another verification link.';
+  return 'You just asked for a link. Wait a bit before asking for another one.';
 }
 function setVerificationRequestStatus(target,{message=null,error=null}={}) {
   if(!target)return;
@@ -234,8 +234,8 @@ function setVerificationRequestStatus(target,{message=null,error=null}={}) {
   target.dataset.state=error?(cooldown?'cooldown':'failed'):'accepted';
   target.className=error?(cooldown?'form-cooldown':'form-error'):'form-success';
   target.textContent=error
-    ? (cooldown?verificationCooldownMessage(error):(error?.message||'Email verification is temporarily unavailable.'))
-    : (message||'Request accepted. If that address belongs to an unverified Pack One account, a new verification link will be sent.');
+    ? (cooldown?verificationCooldownMessage(error):(error?.message||'Couldn’t send a verification link. Try again.'))
+    : (message||'If that email belongs to an unverified Pack One account, you’ll get a new verification link.');
 }
 function googleError(message='') {
   const target=document.querySelector('#account-google-error');
@@ -329,7 +329,7 @@ async function openSignupNamePrompt({linked,validationRunId=null,intent=null,sou
         setFormPending(form,false);
       }
     } catch(error) {
-      status.textContent=error?.message||'Could not save your display name.';
+      status.textContent=error?.message||'Couldn’t save your display name. Try again.';
       setFormPending(form,false);
     }
   });
@@ -425,9 +425,9 @@ export async function renderAccount({ validateDailyRunId = null, sharedRunId: in
   const authMode=reauthenticate||activeAdminReturn()?'signin':mode==='signup'||mode==='signin'?mode:(validatingDaily||upgradingElite||activatingPatreon?'signup':'signin');
   const heading=reauthenticate?'Sign in again':validatingDaily?'Add your score to the leaderboard.':activatingPatreon?'Connect your membership':upgradingElite?(source==='membership_supporter'?'Become a Supporter.':'Get Pack One Elite.'):authMode==='signup'?'Create Account':'Sign In';
   const intro=reauthenticate
-    ? 'Use your existing Pack One account to renew your secure session. This will not clear your saved progress.'
+    ? 'Sign in again with the same account. You won’t lose any progress.'
     : validatingDaily
-      ? 'Sign in or create a free account to validate this Daily score and add it to today’s leaderboard.'
+      ? 'Sign in or make a free account to add this score to today’s leaderboard.'
     : activatingPatreon
       ? 'Sign in to the Pack One account you want to use, then connect Patreon to unlock your membership benefits.'
       : upgradingElite
@@ -442,7 +442,7 @@ export async function renderAccount({ validateDailyRunId = null, sharedRunId: in
     : authMode==='signup'
       ? 'Already have an account? <button class="text-button" id="account-mode-toggle" type="button">Sign in</button>'
     : activeAdminReturn()?'Administrator sign-in uses an existing account.':'New to Pack One? <button class="text-button" id="account-mode-toggle" type="button">Create account</button>';
-  const accountNote=authMode==='signin'?'<small>A free account saves your record and enables leaderboard participation.</small>':'';
+  const accountNote=authMode==='signin'?'<small>A free account saves your record and puts you on the leaderboard.</small>':'';
   const accountConsent=authMode==='signup'
     ? '<p class="account-identity-rules account-creation-consent"><small>By creating an account, you agree to the <a href="https://packone.pro/terms/">Pack One Terms</a>.</small></p>'
     : '';

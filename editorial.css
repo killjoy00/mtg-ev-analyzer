@@ -246,6 +246,7 @@ body[data-page="editorial"] > .topbar {
   line-height: 1.15;
 }
 .article-cta p:not(.kicker) { color: var(--muted); }
+.article-cta.is-plain { padding: 0; border: 0; background: none; }
 
 .button-link {
   display: inline-flex;

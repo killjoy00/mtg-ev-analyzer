@@ -58,8 +58,8 @@ try{
   }
   await page.setViewportSize({width:390,height:844});
   if(sets.length===0){
-   assert.equal(await page.getByText('Eight decisions from Powered Cube trophy drafts.',{exact:true}).count(),1);
-   assert.equal(await page.getByText('Eight decisions from trophy drafts in the latest set.',{exact:true}).count(),1);
+   assert.equal(await page.getByText('Eight picks from Powered Cube trophy drafts.',{exact:true}).count(),1);
+   assert.equal(await page.getByText('Eight picks from trophy drafts in the latest set.',{exact:true}).count(),1);
   }
   await page.screenshot({path:`artifacts/home-${sets.join('-')||'unplayed'}-mobile.png`,fullPage:true});
  }
