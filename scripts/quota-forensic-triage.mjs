@@ -63,6 +63,19 @@ const missingTimingProfile=(window,total,measured)=>{
     failed_5xx:'error_missing_timing',other:'unverified',mixed:'mixed'};
   return labels[stage]||'unverified';
 };
+const failedQuotaPhaseSignal=window=>{
+  const total=count(window?.failed_quota_without_timing),phases=window?.failed_quota_phase||{};
+  const names=['transaction','durability','complete','handler_other','started_no_completion','not_observed'];
+  const values=names.map(n=>count(phases[n]));
+  if(total===null||total<3||values.some(v=>v===null)||
+    values.reduce((sum,value)=>sum+value,0)!==total)return 'unverified';
+  const winner=stageChoice(names.map((name,i)=>[name,values[i]]));
+  const labels={transaction:'handler_transaction_error',
+    durability:'handler_durability_error',complete:'handler_completed_then_error',
+    handler_other:'unverified',started_no_completion:'handler_completion_not_observed',
+    not_observed:'no_correlated_handler_logs',mixed:'mixed'};
+  return labels[winner]||'unverified';
+};
 function classifyRequestWindow(window) {
   const issue=1272;
   if(window?.status==='skipped')return {...blank(issue),'outcome':'not_collected'};
@@ -104,8 +117,17 @@ function classifyQuotaWindow(window) {
     const actions={successful_response_missing_timing:'inspect_successful_quota_timing_header',
       denial_missing_timing:'inspect_quota_denial_timing_header',
       error_missing_timing:'inspect_quota_error_timing_header'};
+    const error_stage=timing_gap==='error_missing_timing'?failedQuotaPhaseSignal(window):undefined;
+    // This is an observed handler-log stage, NOT an explanation of why the
+    // provider returned an error or whether the debit was committed.
+    const phaseActions={handler_transaction_error:'inspect_quota_storage_transaction',
+      handler_durability_error:'inspect_quota_durability',
+      handler_completed_then_error:'inspect_quota_acknowledgement',
+      handler_completion_not_observed:'verify_handler_completion_correlation',
+      no_correlated_handler_logs:'verify_quota_start_log_coverage'};
     return {...base,outcome:'stage_coverage_incomplete',timing_gap,
-      next_action:actions[timing_gap]||'verify_quota_handler_timing'};
+      ...(error_stage===undefined?{}:{error_stage}),
+      next_action:phaseActions[error_stage]||actions[timing_gap]||'verify_quota_handler_timing'};
   }
   const stage=stageChoice([['quota_handler',handler],['quota_transport_wait',wait]]);
   if(stage==='mixed')
