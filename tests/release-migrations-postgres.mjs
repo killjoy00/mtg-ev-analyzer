@@ -2,18 +2,16 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import {execFileSync} from 'node:child_process';
+
 import assert from 'node:assert/strict';
 import {fixturePool} from './support/postgres-fixture.mjs';
-import {applyReleaseMigrations as applyReleaseMigrationsCore} from '../scripts/apply-release-migrations.mjs';
+import {applyReleaseMigrations as applyReleaseMigrationsCore,runNontransactionalPsql} from '../scripts/apply-release-migrations.mjs';
 import {verifyBaselineSchema} from '../scripts/migration-schema.mjs';
 // Mirror the production guarded migration executor: concurrent indexes must
 // be built by a separate psql session outside the ledger transaction. This
 // runs only against fixturePool's guarded local disposable PostgreSQL URL.
 const applyReleaseMigrations=(client,options={})=>applyReleaseMigrationsCore(client,{
-  runNontransactional:file=>execFileSync('psql',[
-    process.env.PACK1_TEST_DATABASE_URL,'-X','-v','ON_ERROR_STOP=1','-f',file,
-  ],{stdio:'pipe',timeout:600000}),
+  runNontransactional:file=>runNontransactionalPsql(file,{databaseUrl:process.env.PACK1_TEST_DATABASE_URL}),
   ...options,
 });
 const pool=fixturePool(),client=await pool.connect();

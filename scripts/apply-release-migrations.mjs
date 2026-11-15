@@ -10,6 +10,25 @@ export function migrationIdentity(name,root='.') {
  const bytes=fs.readFileSync(`${root}/migrations/${name}`);
  return hash(bytes);
 }
+// Concurrent index migrations run in a separate PostgreSQL connection, not
+// through the migration-ledger client's transaction. Pass the reviewed direct
+// connection URI as psql's positional database argument (like the guarded CI
+// fixture), instead of relying on PGDATABASE environment expansion.
+export function runNontransactionalPsql(file,{databaseUrl=process.env.DATABASE_URL,exec=execFileSync}={}) {
+ if(typeof databaseUrl!=='string'||!/^postgres(?:ql)?:\/\//i.test(databaseUrl))
+   throw Error('Direct PostgreSQL connection URI required for concurrent migration');
+ try {return exec('psql',[databaseUrl,'-X','-v','ON_ERROR_STOP=1','-f',file],
+   {stdio:'pipe',timeout:600000});}
+ catch(error) {
+   // Never interpolate stderr or argv: both can expose a secret connection URI.
+   // Exit status alone distinguishes a connection failure from a SQL failure.
+   const status=Number.isInteger(error?.status)&&error.status>=1&&error.status<=3?error.status:'unknown';
+   const safe=Error('Reviewed concurrent psql migration failed');
+   safe.releaseDiagnostic='concurrent_psql_exit_'+status;
+   throw safe;
+ }
+}
+
 export function transactionalSQL(sql,name) {
  // Only these immutable legacy files own an outer transaction. Removing those
  // two delimiters makes the DDL and ledger commit one transaction.
@@ -92,9 +111,12 @@ if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url) {
    await client.connect();
    const baseline=JSON.parse(fs.readFileSync('migrations/baseline.json'));
    const result=await applyReleaseMigrations(client,{plan:process.argv[2]||'secure-auth-release',baseline,
-     runNontransactional:file=>execFileSync('psql',['-X','-v','ON_ERROR_STOP=1','-f',file],{
-       env:{...process.env,PGDATABASE:process.env.DATABASE_URL},stdio:'pipe',timeout:600000})});
+     runNontransactional:file=>runNontransactionalPsql(file)});
    console.log('Reviewed migration plan complete: '+result.applied+' applied, '+result.skipped+' already applied.');
- } catch {console.error('Reviewed migration plan failed; inspect schema or incomplete ledger state privately.');process.exitCode=1;}
+ } catch(error) {
+   const label=/^concurrent_psql_exit_(?:[123]|unknown)$/.test(error?.releaseDiagnostic||'')?error.releaseDiagnostic:'unclassified';
+   console.error('Reviewed migration plan failed ('+label+'); inspect schema or incomplete ledger privately.');
+   process.exitCode=1;
+ }
  finally {await client.end();}
 }
