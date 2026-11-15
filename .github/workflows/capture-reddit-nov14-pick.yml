@@ -1,0 +1,46 @@
+name: Capture archived Pack One Nov 14 Reddit pick
+on:
+  push:
+    branches:
+      - capture/nov14-pick7-real-ui
+    paths:
+      - 'tests/fixtures/reddit-2026-11-14-latest-p1p7.json'
+      - 'tests/capture-reddit-nov14-p1p7.mjs'
+      - '.github/workflows/capture-reddit-nov14-pick.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  screenshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install browser dependencies
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Start local Pack One frontend
+        run: |
+          nohup python3 -m http.server 4173 > /tmp/packone-reddit-capture.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4173/ > /dev/null; then exit 0; fi
+            sleep 1
+          done
+          cat /tmp/packone-reddit-capture.log
+          exit 1
+      - name: Capture original UI using archived public puzzle
+        run: node --import ./tests/e2e-production-guard.mjs tests/capture-reddit-nov14-p1p7.mjs
+      - name: Upload original-interface screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: packone-nov14-p1p7-actual-ui
+          path: artifacts/historical-reddit/*.png
+          if-no-files-found: warn
+          retention-days: 30
