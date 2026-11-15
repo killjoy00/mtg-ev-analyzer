@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {collectQuotaEventRows,forensicWindows,publishQuotaForensics,runQuotaForensics,quotaForensicsFailureCode} from '../scripts/quota-stage-forensics.mjs';
+import {collectQuotaEventRows,forensicWindows,incidentReplayWindow,recentIncidentWindows,publishQuotaForensics,runQuotaForensics,quotaForensicsFailureCode} from '../scripts/quota-stage-forensics.mjs';
 import {privateQuotaStore} from '../scripts/private-quota-forensics.mjs';
 import {collectVerifiedTelemetry} from '../scripts/verified-observability.mjs';
 
@@ -69,6 +69,8 @@ test('expired default history is explicit and never prevents a current settled c
     queries.push(JSON.parse(request.body));return page([]);
   }});
   assert.equal(queries.length,3);assert.equal(report.windows[1].status,'collected');
+  assert.equal(report.windows[1].slow_request_stages.slow_retained,0);
+  assert.equal(report.windows[1].slow_request_stages.gateway_records,0);
   assert.ok(queries.every(q=>q.timeframe.from===now-35*60000&&q.timeframe.to===now-5*60000));
 });
 test('explicit windows must be complete, canonical, settled and within bounds',()=>{
@@ -78,6 +80,90 @@ test('explicit windows must be complete, canonical, settled and within bounds',(
     {PACK1_QUOTA_FORENSICS_FROM:'2026-10-25T18:30:00Z'},{PACK1_QUOTA_FORENSICS_TO:'2026-10-29T19:00:00Z'},
     {PACK1_QUOTA_FORENSICS_FROM:'2026-10-29T17:00:00Z'},{PACK1_QUOTA_FORENSICS_FROM:'2026-10-29T18:30:00-05:00'}])
     assert.throws(()=>forensicWindows(now,{...good,...changes}),/bounded retention or settlement/);
+});
+
+
+const replayNow=Date.parse('2026-11-14T19:00:00Z');
+const makeIncident=(number,condition,last,checked='2026-11-14T18:25:00.000Z',changes={})=>({
+  number,state:'open',body:'Public category incident\n\n<!-- pack1-launch-incident-v1\n'+JSON.stringify({
+    version:1,condition,status:'recovered',episodes:43,last_seen:last,checked_through:checked,...changes,
+  })+'\n-->',
+});
+const lastSlow='2026-11-13T22:05:00.000Z',lastQuota='2026-11-12T22:20:00.000Z';
+test('incident replay admits only canonical, settled, retained fixed issue windows',()=>{
+  const slow=incidentReplayWindow(makeIncident(1272,'slow_requests',lastSlow),1272,'slow_requests',replayNow);
+  assert.deepEqual(slow,{name:'slow_requests_last_breach',
+    from:Date.parse('2026-11-13T21:45:00Z'),to:Date.parse('2026-11-13T22:10:00Z'),status:'collect'});
+  const quota=incidentReplayWindow(makeIncident(1273,'slow_quota',lastQuota),1273,'slow_quota',replayNow);
+  assert.equal(quota.status,'collect');assert.equal(quota.to-quota.from,25*60000);
+  const expired=incidentReplayWindow(makeIncident(1272,'slow_requests','2026-11-09T22:05:00.000Z'),1272,'slow_requests',replayNow);
+  assert.equal(expired.status,'skipped');assert.equal(expired.reason,'outside_configured_retention');
+  const unsettled=incidentReplayWindow(makeIncident(1272,'slow_requests','2026-11-14T18:59:00.000Z',
+    '2026-11-14T18:59:00.000Z'),1272,'slow_requests',replayNow);
+  assert.equal(unsettled.status,'skipped');assert.equal(unsettled.reason,'not_settled');
+});
+test('issue body is untrusted: malformed, spoofed and future alert windows fail closed',()=>{
+  const good=makeIncident(1272,'slow_requests',lastSlow);
+  assert.deepEqual(incidentReplayWindow({...good,state:'closed'},1272,'slow_requests',replayNow),
+    {name:'slow_requests_last_breach',status:'skipped',reason:'incident_closed'});
+  const rejects=[
+    {...good,number:1273},{...good,state:'invalid'},
+    {...good,body:'No machine marker'},
+    makeIncident(1272,'slow_requests',lastSlow,undefined,{condition:'slow_quota'}),
+    makeIncident(1272,'slow_requests',lastSlow,undefined,{version:2}),
+    makeIncident(1272,'slow_requests','2026-11-16T22:05:00.000Z'),
+    makeIncident(1272,'slow_requests','2026-11-13T22:05:00-06:00'),
+    makeIncident(1272,'slow_requests',lastSlow,'2026-11-13T21:00:00.000Z'),
+    makeIncident(1272,'slow_requests',lastSlow,'2026-11-15T22:05:00.000Z'),
+    makeIncident(1272,'slow_requests',lastSlow,undefined,{status:'unknown'}),
+  ];
+  for(const item of rejects)assert.throws(()=>incidentReplayWindow(item,1272,'slow_requests',replayNow));
+});
+test('protected read-only replay uses fixed issue IDs and no speculative retention queries',async()=>{
+  const env={GITHUB_REF:'refs/heads/main',GITHUB_REPOSITORY:'killjoy00/mtg-ev-analyzer',
+    GITHUB_TOKEN:token,CLOUDFLARE_EDGE_TOKEN:token,PACK1_READ_RECENT_ALERTS:'1'};
+  const issues=[
+    makeIncident(1272,'slow_requests',lastSlow),
+    makeIncident(1273,'slow_quota',lastQuota),
+  ];
+  const calls=[],queries=[];
+  const report=await runQuotaForensics({env,now:replayNow,fetcher:async(url,request)=>{
+    if(url.includes('/issues/')) {
+      calls.push({url,method:request.method,auth:request.headers.authorization,redirect:request.redirect});
+      assert.equal(request.method,'GET');assert.equal(request.redirect,'error');
+      return Response.json(issues[calls.length-1]);
+    }
+    if(url.includes('/zones?'))return Response.json({success:true,result:[{name:'packone.pro',status:'active',account:{id:account}}]});
+    queries.push(JSON.parse(request.body));return page([]);
+  }});
+  assert.deepEqual(calls.map(c=>c.url),[
+    'https://api.github.com/repos/killjoy00/mtg-ev-analyzer/issues/1272',
+    'https://api.github.com/repos/killjoy00/mtg-ev-analyzer/issues/1273',
+  ]);
+  assert.ok(calls.every(c=>c.auth==='Bearer '+token&&c.redirect==='error'));
+  assert.deepEqual(report.windows.map(w=>[w.window,w.status]),[
+    ['historical_5xx_2026_10_26','skipped'],['current_recent','collected'],
+    ['slow_requests_last_breach','collected'],['slow_quota_last_breach','collected'],
+  ]);
+  assert.equal(queries.length,9,'one bounded query per event type per collected window');
+  assert.deepEqual(queries.slice(3,6).map(x=>x.timeframe.from),Array(3).fill(Date.parse('2026-11-13T21:45:00Z')));
+  assert.deepEqual(queries.slice(6,9).map(x=>x.timeframe.to),Array(3).fill(Date.parse('2026-11-12T22:25:00Z')));
+  assert.doesNotMatch(JSON.stringify(report),/Bearer|private-token|Public category incident|issues\/1272/);
+  let called=0;
+  await assert.rejects(recentIncidentWindows({env:{...env,GITHUB_TOKEN:''},now:replayNow,fetcher:async()=>{called++;}}),
+    /Trusted incident read access unavailable/);
+  assert.equal(called,0);
+  const explicit={...env,PACK1_QUOTA_FORENSICS_FROM:'2026-11-14T18:00:00Z',PACK1_QUOTA_FORENSICS_TO:'2026-11-14T18:25:00Z'};
+  assert.deepEqual(await recentIncidentWindows({env:explicit,now:replayNow,fetcher:async()=>{called++;}}),[]);
+  assert.equal(called,0);
+});
+test('incident lookup errors are never silently replaced by a healthy current window',async()=>{
+  const env={GITHUB_REF:'refs/heads/main',GITHUB_REPOSITORY:'killjoy00/mtg-ev-analyzer',
+    GITHUB_TOKEN:token,CLOUDFLARE_EDGE_TOKEN:token,PACK1_READ_RECENT_ALERTS:'1'};
+  let calls=0;
+  await assert.rejects(runQuotaForensics({env,now:replayNow,fetcher:async()=>{calls++;return new Response('access details',{status:403});}}),
+    /Read-only incident lookup unavailable/);
+  assert.equal(calls,1);
 });
 
 function storageFixture({publicAccess=false,domains=[],ambiguous=false,mismatch=false}={}){
@@ -113,19 +199,27 @@ test('publication requires trusted main context and private credentials before q
   assert.equal(calls,0);
   const workflow=fs.readFileSync('.github/workflows/quota-stage-forensics.yml','utf8');
   assert.match(workflow,/CLOUDFLARE_PRIVATE_REPORT_TOKEN/);assert.doesNotMatch(workflow,/upload-artifact|schedule:/);
+  assert.match(workflow,/  issues: read/);assert.match(workflow,/GITHUB_TOKEN: \$\{\{ github\.token \}\}/);
+  assert.match(workflow,/PACK1_READ_RECENT_ALERTS: '1'/);
   assert.match(workflow,/diagnosis:[\s\S]*environment: pack-one-mobile-release/);
   const source=fs.readFileSync('scripts/quota-stage-forensics.mjs','utf8');
-  assert.doesNotMatch(source,/console\.log\([^\n]*JSON\.stringify/);
+  assert.match(source,/PACK1_LATENCY_TRIAGE/);
+  assert.match(source,/return publicLatencyTriage\(report\)/);
+  assert.ok(source.indexOf('await store.save(report')<source.indexOf('return publicLatencyTriage(report)'),
+    'no public diagnosis before private report write/readback');
+  assert.doesNotMatch(source,/console\.log\([^\n]*report\.windows/);
 });
 const trustedEnv={GITHUB_REF:'refs/heads/main',GITHUB_REPOSITORY:'killjoy00/mtg-ev-analyzer',GITHUB_RUN_ID:'12345',GITHUB_RUN_ATTEMPT:'1',GITHUB_SHA:'a'.repeat(40),CLOUDFLARE_EDGE_TOKEN:token,CLOUDFLARE_PRIVATE_REPORT_TOKEN:token};
 test('publisher completes collection, private write and readback in trusted context',async()=>{
   const storage=storageFixture();let queries=0;
-  await publishQuotaForensics({now,env:trustedEnv,fetcher:async(url,options)=>{
+  const triage=await publishQuotaForensics({now,env:trustedEnv,fetcher:async(url,options)=>{
     if(url.includes('/zones?'))return Response.json({success:true,result:[{name:'packone.pro',status:'active',account:{id:account}}]});
     if(url.includes('/observability/')){queries++;return page([]);}
     return storage.fetcher(url,options);
   }});
   assert.equal(queries,3);assert.equal(storage.calls.filter(x=>x.method==='PUT').length,1);
+  assert.deepEqual(triage.findings.map(f=>f.outcome),['missing_or_duplicate_window','missing_or_duplicate_window']);
+  assert.equal(triage.version,1);
   assert.equal(storage.calls.filter(x=>x.url.endsWith('/domains/managed')).length,2);
 });
 test('public failure categories retain stages and HTTP status but never arbitrary messages or codes',async()=>{

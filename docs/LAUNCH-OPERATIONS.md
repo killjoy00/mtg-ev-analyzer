@@ -44,6 +44,118 @@ The evidence collector rejects comparisons across period, scope, metric or ident
 
 Do not close #541 solely because the earlier no-op scan was fixed or because the counter stopped changing. The egress warning threshold was increased at owner request on October 27, 2026, from 50 GiB to 200 GB (200,000,000,000 decimal bytes), applying to the provider's cumulative whole-project billing-period transfer counter. This changes only the operator warning threshold: it does not change Neon billing allowances, consumption, or the compute threshold. After rollout, verify the watcher reports the new threshold and that the former egress warning is recovered; close #1338 only with this change documented, not as evidence of lower consumption. Keep the evidence collector's distinct 5-GiB daily threshold and independent error/latency/quota/coverage incidents unchanged. No automatic closure is performed by the evidence workflow.
 
+## Investigating slow requests (#1272) alongside quota latency (#1273)
+
+The **One-shot private quota timing investigation** workflow already collects
+verified, read-only Cloudflare gateway records with quota handler records. Its
+private report now includes a `slow_request_stages` section from those *same*
+gateway rows, without additional provider queries or production traffic. Run
+it on reviewed main or through its protected manual dispatch; the original
+privacy, time-window, retention and readback controls still apply.
+
+The section counts only observed responses taking **more than five seconds**
+with `tail_sampling_version: 1` and `sample_rate: 1`. Incomplete or legacy
+sampling is counted separately, never used to assert a total or a traffic SLO.
+Slow responses are grouped into gameplay, account/profile, admin and other,
+without raw request paths, user information, IPs or traces. Overlap with
+quota checks over one second and upstream calls over five seconds is retained,
+as are slow 5xx counts and the no-upstream subset.
+
+A complete gateway-stage row has bounded total, quota and upstream durations.
+The remaining gateway time is calculated only if the parts do not exceed the
+total beyond five milliseconds of rounding allowance. Missing or inconsistent
+timings remain explicitly unclassified. Dominance is **an observation, not a
+root-cause assertion**: the residual can include request handling, queueing or
+instrumentation, while gateway completion time excludes downstream body
+delivery and browser rendering. Do not infer full-traffic p95 from a retained
+slow-tail-only sample or treat a recovered incident as a verified fix.
+
+### Read-only replay of recent latency breaches
+
+The protected **One-shot private quota timing investigation** workflow now
+reads the fixed machine-managed incident markers from #1272 (slow_requests)
+and #1273 (slow_quota) using the job's read-only GitHub issue permission.
+On reviewed main, it collects the existing settled recent window **and**
+up to two latest breached intervals, if they remain inside the conservative
+three-day provider retention bound. For each issue, it queries only from
+20 minutes before the reported breached-window end to five minutes after
+(25 minutes total). It never treats that incident timestamp as the exact
+offending request time. Missing, malformed, mismatched or future issue
+state fails the private diagnosis; closed incidents, expired retention
+windows and windows not yet settled are explicitly skipped. An explicit operator time-window
+override takes precedence and makes no incident lookups.
+
+Replayed records use the **same verified, read-only telemetry queries**,
+private report destination, fail-closed access checks and verified readback.
+The workflow does not add a schedule, change alert thresholds, query Neon
+or call application APIs. No raw traces, IPs, account details or request
+paths appear in public Actions output or GitHub issue comments. A passing
+workflow proves that the scoped report was saved privately, **not** that
+the production latency root cause has been fixed.
+
+### Automated, privacy-safe latency classification
+
+The protected private forensics job now emits exactly one
+`PACK1_LATENCY_TRIAGE` line **after** the private report has passed
+verified readback. Each of #1272 and #1273 gets a fixed-vocabulary
+stage classification and a narrowly scoped next engineering action.
+The full measurements remain in private storage; the public line
+does not expose timestamps, individual timings, exact counts,
+routes, request traces, provider IDs, user data or arbitrary text.
+
+The fixed public triage now also describes the **coarse traffic group** behind
+the #1272 slow samples (`gameplay`, `admin`, `account`, `other`, `mixed`
+or `unverified`). For #1273, if quota dispatch/wait is dominant and
+handler-completion coverage meets the established gate, it prints a coarse
+`wait_signal`: `retry`, `handler_concurrency`, `cleanup_overlap`,
+`multiple`, `no_majority` or `unverified`. A signal requires at least
+three corroborating slow samples and a two-thirds majority of its own
+measured population. Retry is assessed over all retained slow gateway
+calls; concurrency and cleanup are assessed only over matched slow handler
+completions. These populations must not be conflated. A fixed-label
+signal is **correlation, not a causal diagnosis**: gateway dispatch/wait
+also includes unmeasured remote queueing and response acknowledgement,
+and handler concurrency does not prove queue delay. Sensitive traces,
+exact counts, durations, request routes, network identities and customer
+data remain solely in the verified private report.
+
+Classification uses only the latest settled and retained issue-breach
+window, never a quiet recent window as proof of recovery. A candidate
+stage requires at least three observed slow samples, stage measurements
+for at least 75% of them, and a two-thirds majority of attributable
+samples. Small samples are explicitly **preliminary**, not confirmation
+or proof of root cause. For quota-handler versus transport attribution,
+the workflow also requires enough matched handler completions before
+directing an investigation toward a specific provider substage.
+Missing logs, expired windows, malformed telemetry, mixed stages and
+unmatched completion records produce an explicit evidence gap instead
+of an invented root cause. The corresponding private report remains
+the definitive detailed source.
+
+If the public stage is origin, investigate the corresponding Neon
+function and SQL read-only evidence. For the quota handler, examine
+durability versus transaction time without enabling the failed
+reservation candidate. For quota transport/wait or gateway residual,
+inspect boundary/dispatch instrumentation before changing timeouts
+or blaming provider latency. Keep both incidents open until a tested
+fix and independent real-traffic evidence justify closure.
+
+The November 14 hosted synthetic confirmation
+([run 43627818113](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/43627818113))
+failed the unchanged quota reservation tail gate: only one of eight cohorts
+in each A/B repeat improved all required tails. Although cached-credit
+calls were fast and write decisions fell roughly 87%, the batch-write
+path showed long client waits and aggregate client p99 regressions.
+Keep production reservations off and do not close #1273 on that evidence.
+
+If quota dominates, evaluate the existing preview-only reservation experiment
+and its failed/pending provider tail-latency gates before considering rollout.
+If upstream dominates, inspect the corresponding private Neon function and
+SQL evidence without repeating writes or waking computes for diagnosis.
+If residual dominates or stages are missing, examine the private gateway
+failure classification and instrumentation before changing timeouts. Keep both
+issues open until a reviewed fix is measured against equivalent traffic.
+
 ## Responding to a launch incident
 
 1. Pause outreach and further load escalation. Inspect the watcher artifact, exact gateway release, latest secure-auth release, and load artifacts. Do not repeat mutations as diagnostic probes.

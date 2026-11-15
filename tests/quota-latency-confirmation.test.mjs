@@ -32,7 +32,13 @@ function transport({alias=false,wrongImplementation=false,actorMismatch=false,fa
     return new Response(null,{status:204,headers:{'x-quota-counter-write-total':String(mode==='candidate'?Math.ceil(count/8):count),
       'x-pack1-quota-handler-ms':mode==='candidate'?'2':'20','x-quota-instance':(alias?'a':{baseline:'a',control:'b',candidate:'c'}[mode]).repeat(32),
       'x-quota-actor-instance':(actorMismatch&&mode!=='baseline'?'e':'d').repeat(32),
-      'x-quota-implementation':mode==='candidate'||(wrongImplementation&&mode==='control')?'coalesced-preview':'per-request'}});
+      'x-quota-implementation':mode==='candidate'||(wrongImplementation&&mode==='control')?'coalesced-preview':'per-request',
+      ...(mode==='candidate'?{
+        'x-quota-reservation-write':String(count%8===1),
+        'x-quota-queue-ms':String(count%8===1?3:0),
+        'x-quota-durability-ms':String(count%8===1?12:0),
+        'x-quota-batch-size':'1',
+      }:{})}});
   }};
 }
 test('the entire fixed balanced experiment runs once within budget and retains all repeats',async()=>{
@@ -44,9 +50,44 @@ test('the entire fixed balanced experiment runs once within budget and retains a
     assert.equal(repeat.baseline.client.samples,1024);assert.equal(repeat.right.client.samples,1024);assert.equal(repeat.cohorts.length,8);
     assert.equal(repeat.counter_write_decisions.baseline,1032);
     assert.equal(repeat.counter_write_decisions.right,repeat.comparison==='aa'?1032:136);
+    if(repeat.comparison==='ab') {
+      assert.equal(repeat.candidate_mechanics.samples,1024);
+      assert.equal(repeat.candidate_mechanics.batch_wait,128);
+      assert.equal(repeat.candidate_mechanics.cached_credit,896);
+      assert.equal(repeat.candidate_mechanics.max_batch_size,1);
+      assert.equal(repeat.candidate_mechanics.queue.samples,1024);
+      assert.equal(repeat.candidate_mechanics.durability.samples,1024);
+      assert.equal(repeat.candidate_mechanics.client_batch_wait.samples,128);
+      assert.equal(repeat.candidate_mechanics.client_cached_credit.samples,896);
+      assert.ok(repeat.cohorts.every(c=>c.candidate_mechanics?.samples===128&&c.candidate_mechanics?.batch_wait===16));
+    } else {
+      assert.equal(repeat.candidate_mechanics,undefined,'identical controls have no candidate stages');
+    }
   }
   assert.equal(report.production_ready,false);assert.doesNotMatch(JSON.stringify(report),/synthetic-key|authorization|synthetic\.invalid|aaaaaaaa/);
 });
+test('candidate stage headers are required and bounded without weakening the comparison gate',async()=>{
+  const f=transport();
+  const inject=async (url,request)=>{
+    const result=await f.fetcher(url,request);
+    if(JSON.parse(request.body).mode!=='candidate')return result;
+    const headers=new Headers(result.headers);
+    headers.delete('x-quota-queue-ms');
+    return new Response(null,{status:204,headers});
+  };
+  await assert.rejects(confirmQuotaLatency({url:'https://synthetic.invalid',key:'key',fetcher:inject}),
+    /missing_reservation_stage_evidence/);
+  const g=transport();
+  const invalid=async(url,request)=>{
+    const result=await g.fetcher(url,request);
+    if(JSON.parse(request.body).mode!=='candidate')return result;
+    const headers=new Headers(result.headers);headers.set('x-quota-batch-size','999');
+    return new Response(null,{status:204,headers});
+  };
+  await assert.rejects(confirmQuotaLatency({url:'https://synthetic.invalid',key:'key',fetcher:invalid}),
+    /invalid_reservation_stage_evidence/);
+});
+
 test('the control must be a separate per-request implementation with real evidence',async()=>{
   for(const [options,reason] of [[{alias:true},/confirmation_wrappers_not_distinct/],[{wrongImplementation:true},/wrong_confirmation_implementation/],[{actorMismatch:true},/confirmation_actor_not_shared/]])
     await assert.rejects(confirmQuotaLatency({url:'https://synthetic.invalid',key:'key',fetcher:transport(options).fetcher}),reason);

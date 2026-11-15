@@ -5,22 +5,27 @@ on:
     paths:
       - '.github/workflows/quota-stage-forensics.yml'
       - 'scripts/quota-stage-forensics.mjs'
+      - 'scripts/quota-forensic-triage.mjs'
       - 'scripts/private-quota-forensics.mjs'
       - 'scripts/verified-observability.mjs'
       - 'tests/quota-stage-forensics.test.mjs'
+      - 'tests/quota-forensic-triage.test.mjs'
       - 'tests/quota-forensics-collection.test.mjs'
   pull_request:
     branches: [main]
     paths:
       - '.github/workflows/quota-stage-forensics.yml'
       - 'scripts/quota-stage-forensics.mjs'
+      - 'scripts/quota-forensic-triage.mjs'
       - 'scripts/private-quota-forensics.mjs'
       - 'scripts/verified-observability.mjs'
       - 'tests/quota-stage-forensics.test.mjs'
+      - 'tests/quota-forensic-triage.test.mjs'
       - 'tests/quota-forensics-collection.test.mjs'
   workflow_dispatch:
 permissions:
   contents: read
+  issues: read
 jobs:
   validate:
     if: github.event_name == 'pull_request'
@@ -32,7 +37,7 @@ jobs:
         with:
           node-version: 24
       - name: Test read-only analyzer without provider credentials
-        run: node --test tests/quota-stage-forensics.test.mjs tests/quota-forensics-collection.test.mjs
+        run: node --test tests/quota-stage-forensics.test.mjs tests/quota-forensics-collection.test.mjs tests/quota-forensic-triage.test.mjs
   diagnosis:
     if: github.event_name != 'pull_request'
     environment: pack-one-mobile-release
@@ -41,12 +46,14 @@ jobs:
     env:
       CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
       CLOUDFLARE_PRIVATE_REPORT_TOKEN: ${{ secrets.CLOUDFLARE_PRIVATE_REPORT_TOKEN }}
+      GITHUB_TOKEN: ${{ github.token }}
+      PACK1_READ_RECENT_ALERTS: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
       - name: Test read-only analyzer
-        run: node --test tests/quota-stage-forensics.test.mjs tests/quota-forensics-collection.test.mjs
-      - name: Save private historical and current stage evidence with verified query coverage
+        run: node --test tests/quota-stage-forensics.test.mjs tests/quota-forensics-collection.test.mjs tests/quota-forensic-triage.test.mjs
+      - name: Save private settled last-breach and recent stage evidence with verified query coverage
         run: node scripts/quota-stage-forensics.mjs

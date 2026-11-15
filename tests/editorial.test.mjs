@@ -164,10 +164,30 @@ assert.match(method, /See the <a href="\/terms\/">Terms<\/a> for full attributio
 assert.doesNotMatch(method, /No endorsement is implied|card rights remain with their owners/i);
 const sets = await readFile('sets/index.html','utf8');
 assert.match(sets, /id="set-archive-grid"/);
-assert.match(sets, /\/sets\/catalog\.mjs\?v=4/, 'Set catalog changes invalidate cached module');
+assert.match(sets, /\/sets\/catalog\.mjs\?v=6/, 'Set catalog changes invalidate cached module');
+{
+  // Crawlers must reach every guide from the served HTML, not only from the API-built catalog.
+  const {GUIDE_IDS} = await import('../set-guides.mjs');
+  const staticIndex = sets.match(/<!-- set-guide-index:start -->([\s\S]*?)<!-- set-guide-index:end -->/);
+  assert.ok(staticIndex, 'set archive keeps the generated set-guide index markers');
+  for (const id of GUIDE_IDS) assert.match(staticIndex[1], new RegExp(`<a href="/sets/${id}/guide/">[^<]+</a>`), `served set archive links the ${id} guide`);
+  assert.equal((staticIndex[1].match(/<a href=/g) || []).length, GUIDE_IDS.length, 'static guide index links each guide once');
+}
 assert.match(sets, /class="quick-start-action">\s*<a class="button-link" href="\/\?game=draft-run">Play a mixed-set Draft Run<\/a>/, 'mixed practice CTA lives once above the archive');
 assert.ok(sets.indexOf('Play a mixed-set Draft Run') < sets.indexOf('id="set-archive-summary"'), 'mixed practice CTA appears above the catalog summary');
 assert.doesNotMatch(sets, /href="\/sets\/">View sets<\/a>/, 'Sets should not link to itself in related content');
+{
+  // Cloudflare Web Analytics counts visits to the static information pages; the
+  // homepage and game keep their own first-party analytics and a strict CSP.
+  const beacon = /<script type='module' src='https:\/\/static\.cloudflareinsights\.com\/beacon\.min\.js' data-cf-beacon='\{"token": "1e5f4bc7354743d6be1c6382ad704dd2"\}'><\/script>/g;
+  const sitemapPaths = [...(await readFile('sitemap.xml','utf8')).matchAll(/<loc>https:\/\/packone\.pro\/([^<]*)<\/loc>/g)].map(match => match[1]);
+  for (const path of sitemapPaths.filter(Boolean)) {
+    const html = await readFile(`${path}index.html`,'utf8');
+    assert.equal((html.match(beacon) || []).length, 1, `${path} loads the Cloudflare Web Analytics beacon once`);
+  }
+  assert.doesNotMatch(await readFile('index.html','utf8'), /cloudflareinsights/, 'homepage keeps first-party analytics only');
+  assert.match(await readFile('privacy/index.html','utf8'), /uses Cloudflare Web Analytics to count visits/);
+}
 const setCatalog = await readFile('sets/catalog.mjs','utf8');
 assert.match(sets, /leaderboard-config\.js/);
 assert.match(setCatalog, /v1\/set-catalog/);

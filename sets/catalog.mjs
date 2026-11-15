@@ -38,7 +38,7 @@ function card(entry, { special = false } = {}) {
   const actions = [
     ...(special ? ['<a href="/?game=draft-run&set=powered-cube">Elite Cube Practice</a>'] : []),
     ...(hasSetGuide(id) ? [`<a href="${setGuidePath(id)}">Set guide</a>`] : []),
-    ...(detailPages.has(id) ? [`<a href="/sets/${encodeURIComponent(id)}/">Data notes</a>`] : []),
+    ...(detailPages.has(id) ? [`<a href="/sets/${encodeURIComponent(id)}/">First picks</a>`] : []),
   ];
   return `<article class="content-card set-catalog-card" data-set-id="${esc(id)}">
     <p class="kicker">Data through ${esc(dateLabel(entry.data_date))}</p>
@@ -72,7 +72,9 @@ async function renderCatalog() {
       specialSection.hidden = false;
     }
   } catch (error) {
-    grid.innerHTML = '<p class="set-archive-error">Couldn’t load the set list. You can still play a <a href="/?game=draft-run">Draft Run</a>.</p>';
+    // Keep the static set-guide links from the served HTML; drop only the loading state.
+    grid.querySelectorAll(':scope > :not([data-set-guide-index])').forEach((node) => node.remove());
+    grid.insertAdjacentHTML('afterbegin', '<p class="set-archive-error">Couldn’t load the set list. You can still play a <a href="/?game=draft-run">Draft Run</a>.</p>');
   }
 }
 

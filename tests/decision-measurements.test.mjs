@@ -132,3 +132,38 @@ test('Insights groups by model-implied trophy credit without re-scoring or chang
   assert.match(core,/WITH scoped AS MATERIALIZED/);
   assert.match(core,/primary_data AS MATERIALIZED/);
 });
+
+
+test('habits query keeps first-Daily attribution and rolling seven-day math without repeated historical self-joins',()=>{
+  const source=fs.readFileSync('worker/measurement-admin.mjs','utf8');
+  const sql=source.match(/const HABIT_METRICS_SQL=\x60([\s\S]*?)\x60;/)?.[1];
+  assert.ok(sql,'the admin habits SQL must exist as an explicit bounded statement');
+  assert.match(sql,/first_daily AS \(/);
+  assert.match(sql,/cohort_first_daily AS \(/);
+  assert.match(sql,/FROM first_daily\s+WHERE first_day BETWEEN \$1::date AND \$2::date/);
+  assert.match(sql,/JOIN cohort_first_daily f ON f\.player_id=e\.player_id/);
+  assert.equal((sql.match(/FROM cohort_first_daily f/g)||[]).length,4,
+    'activity, attribution, cohort flags and cohorts must share the identical first-Daily date filter');
+  assert.match(sql,/first_activity AS MATERIALIZED/);
+  assert.match(sql,/attribution AS MATERIALIZED/);
+  assert.match(sql,/cohort_completed_days AS MATERIALIZED/);
+  assert.match(sql,/cohort_flags AS MATERIALIZED/);
+  assert.match(sql,/JOIN cohort_flags flags USING\(person_id\)/);
+  assert.match(sql,/LEFT JOIN ever_three_in_seven ever USING\(person_id\)/);
+  assert.match(sql,/bool_or\(d\.day=f\.first_day\+1\) next_day_return/);
+  assert.match(sql,/bool_or\(d\.day BETWEEN f\.first_day\+1 AND f\.first_day\+7\) seven_day_return/);
+  assert.doesNotMatch(sql,/EXISTS\(SELECT 1 FROM completed_days d WHERE d\.person_id=f\.person_id/);
+  assert.doesNotMatch(sql,/EXISTS\(SELECT 1 FROM ever_three_in_seven e/);
+  assert.doesNotMatch(sql,/\(SELECT count\(\*\) FROM completed_days d WHERE d\.person_id=f\.person_id/);
+  assert.match(sql,/lag\(day,2\) OVER\(PARTITION BY person_id ORDER BY day\)/);
+  assert.match(sql,/WHERE third_day>=day-6/);
+  assert.match(sql,/CROSS JOIN generate_series\(0,6\) offsets\(n\)/);
+  assert.match(sql,/d\.day\+offsets\.n BETWEEN \$1::date AND \$2::date/);
+  assert.match(sql,/GROUP BY d\.person_id,d\.day\+offsets\.n/);
+  assert.doesNotMatch(sql,/JOIN completed_days recent/);
+  assert.doesNotMatch(sql,/LEFT JOIN LATERAL/);
+  assert.match(sql,/FROM cohorts CROSS JOIN today/);
+  assert.match(sql,/jsonb_agg\(to_jsonb\(h\) ORDER BY h\.day\)/);
+  assert.match(sql,/NOT s\.measurement_qa/);
+  assert.match(sql,/NOT EXISTS \(\s*SELECT 1 FROM account_links admin_link/);
+});

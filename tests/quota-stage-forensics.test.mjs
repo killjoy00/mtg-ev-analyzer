@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {summarizeQuotaStages} from '../scripts/quota-stage-forensics.mjs';
+import {summarizeQuotaStages,summarizeSlowRequestStages} from '../scripts/quota-stage-forensics.mjs';
 const trace=c=>c.repeat(32);
 const row=(event,p,id)=>({$metadata:{id},source:{event,...p}});
 const gateway=(c,ms,extra={})=>row('gateway_request',{trace:trace(c),quota_ms:ms,
@@ -44,4 +44,51 @@ test('malformed or stringified storage timings are never treated as successful f
     [handler('d',{durability_ms:'unknown',transaction_ms:-1})],[]);
   assert.equal(s.stages.durability.observed,0);
   assert.equal(s.stages.transaction.observed,0);
+});
+
+
+const slowGateway=(trace,quota,duration,origin,other={})=>gateway(trace,quota,{
+  duration_ms:duration,upstream_ms:origin,tail_sampling_version:1,route:'draft_pick',...other,
+});
+test('slow-request forensics separates quota, origin and gateway stages without sensitive data',()=>{
+  const s=summarizeSlowRequestStages([
+    slowGateway('a',1500,6000,4000),
+    slowGateway('b',6200,7000,100,{route:'player_session',status:503,upstream_calls:0}),
+    slowGateway('c',150,7600,7100,{route:'profile'}),
+    slowGateway('d',150,8200,200,{route:'admin_users'}),
+    slowGateway('e',150,6100,6100,{route:'draft_view'}), // inconsistent sum
+    slowGateway('f',150,6400,null,{route:'other'}), // missing origin
+    slowGateway('g',150,7100,100,{tail_sampling_version:undefined}),
+    slowGateway('h',150,8000,100,{sample_rate:.1}),
+    slowGateway('i',150,4000,100),
+  ]);
+  assert.equal(s.gateway_records,9);
+  assert.equal(s.slow_retained,6);
+  assert.equal(s.slow_unverified_retention,2);
+  assert.equal(s.slow_5xx,1);
+  assert.equal(s.slow_5xx_before_origin,1);
+  assert.equal(s.slow_quota_overlap,2);
+  assert.equal(s.slow_origin_over_5s,2);
+  assert.deepEqual(s.route_groups,{gameplay:3,account:1,admin:1,other:1});
+  assert.equal(s.missing_stages,1);
+  assert.equal(s.inconsistent_stages,1);
+  assert.deepEqual(s.dominant,{quota:1,origin:2,gateway_or_unmeasured:1});
+  assert.equal(s.stages_of_attributable_slow.total.observed,4);
+  assert.equal(s.stages_of_attributable_slow.total.p95_ms,8200);
+  assert.doesNotMatch(JSON.stringify(s),/private|aaaaaaaa|bbbbbbbb|trace|ip_address/);
+});
+test('exact five seconds is not slow; unverified tails and invalid rows do not imply stage evidence',()=>{
+  const s=summarizeSlowRequestStages([
+    slowGateway('a',1200,5000,3000),
+    slowGateway('b',1000,5001,3000,{tail_sampling_version:0}),
+    slowGateway('c',1000,5002,3000,{sample_rate:.1}),
+    slowGateway('d',1000,-5,3000),
+    row('quota_handler',{duration_ms:6000,quota_ms:3000,upstream_ms:0},'h'),
+    slowGateway('e',1000,6001,3000,{status:'503'}),
+  ]);
+  assert.equal(s.gateway_records,4);
+  assert.equal(s.slow_retained,0);
+  assert.equal(s.slow_unverified_retention,2);
+  assert.deepEqual(s.dominant,{quota:0,origin:0,gateway_or_unmeasured:0});
+  assert.equal(s.stages_of_attributable_slow.total.observed,0);
 });

@@ -91,24 +91,29 @@ const HABIT_METRICS_SQL=`WITH eligible_daily_sessions AS (
 ), first_daily AS (
   SELECT person_id,(min(player_id::text))::uuid player_id,min(day) first_day
   FROM completed_days GROUP BY person_id
+), cohort_first_daily AS (
+  -- Attribution only contributes to the requested first-Daily cohort.
+  SELECT person_id,player_id,first_day FROM first_daily
+  WHERE first_day BETWEEN $1::date AND $2::date
 ), first_touch AS (
   SELECT DISTINCT ON (e.player_id) e.player_id,e.created_at,
     coalesce(nullif(e.event_props->>'source',''),'direct') source,
     nullif(e.event_props->>'campaign','') campaign
   FROM analytics_events e
+  JOIN cohort_first_daily f ON f.player_id=e.player_id
   WHERE e.event_name='acquisition_touch' AND e.player_id IS NOT NULL
   ORDER BY e.player_id,e.created_at,e.id
 ), tracking_start AS (
   SELECT min(created_at) started_at FROM analytics_events WHERE event_name='acquisition_touch'
-), first_activity AS (
+), first_activity AS MATERIALIZED (
   SELECT f.player_id,least(
     coalesce((SELECT min(s.created_at) FROM draft_run_sessions s WHERE s.player_id=f.player_id),'infinity'::timestamptz),
     coalesce((SELECT min(e.created_at) FROM analytics_events e WHERE e.player_id=f.player_id AND e.event_name<>'acquisition_touch'),'infinity'::timestamptz),
     coalesce((SELECT min(g.played_at) FROM game_results g WHERE g.player_id=f.player_id),'infinity'::timestamptz),
     coalesce((SELECT min(sc.created_at) FROM scores sc WHERE sc.player_id=f.player_id),'infinity'::timestamptz)
   ) first_activity
-  FROM first_daily f
-), attribution AS (
+  FROM cohort_first_daily f
+), attribution AS MATERIALIZED (
   SELECT f.person_id,f.player_id,
     CASE
       WHEN tracking.started_at IS NOT NULL AND activity.first_activity<tracking.started_at THEN 'pre_tracking'
@@ -119,24 +124,38 @@ const HABIT_METRICS_SQL=`WITH eligible_daily_sessions AS (
       WHEN tracking.started_at IS NOT NULL AND activity.first_activity<tracking.started_at THEN '(none)'
       ELSE coalesce(touch.campaign,'(none)')
     END campaign
-  FROM first_daily f
+  FROM cohort_first_daily f
   LEFT JOIN first_touch touch ON touch.player_id=f.player_id
   LEFT JOIN first_activity activity ON activity.player_id=f.player_id
   CROSS JOIN tracking_start tracking
-), ever_three_in_seven AS (
+), cohort_completed_days AS MATERIALIZED (
+  -- Retention is reported only for first-Daily cohorts in the requested range.
+  -- Materialize the person's distinct completed days once instead of scanning
+  -- the full completed_days CTE repeatedly for every rate denominator.
+  SELECT d.person_id,d.day FROM completed_days d
+  JOIN cohort_first_daily f USING(person_id)
+), cohort_flags AS MATERIALIZED (
+  SELECT f.person_id,
+    bool_or(d.day=f.first_day+1) next_day_return,
+    bool_or(d.day BETWEEN f.first_day+1 AND f.first_day+7) seven_day_return,
+    (count(*) FILTER(WHERE d.day BETWEEN f.first_day AND f.first_day+6)>=3) three_in_seven
+  FROM cohort_first_daily f
+  JOIN cohort_completed_days d USING(person_id)
+  GROUP BY f.person_id
+), ever_three_in_seven AS MATERIALIZED (
+  -- The third completed day in a seven-day span proves 3-in-7 ever reached.
   SELECT DISTINCT person_id FROM (
-    SELECT anchor.person_id,anchor.day
-    FROM completed_days anchor
-    JOIN completed_days recent ON recent.person_id=anchor.person_id AND recent.day BETWEEN anchor.day-6 AND anchor.day
-    GROUP BY anchor.person_id,anchor.day HAVING count(*)>=3
-  ) reached
+    SELECT person_id,day,lag(day,2) OVER(PARTITION BY person_id ORDER BY day) third_day
+    FROM cohort_completed_days
+  ) reached WHERE third_day>=day-6
 ), cohorts AS (
   SELECT f.person_id,f.first_day,a.source,a.campaign,
-    EXISTS(SELECT 1 FROM completed_days d WHERE d.person_id=f.person_id AND d.day=f.first_day+1) next_day_return,
-    EXISTS(SELECT 1 FROM completed_days d WHERE d.person_id=f.person_id AND d.day BETWEEN f.first_day+1 AND f.first_day+7) seven_day_return,
-    (SELECT count(*) FROM completed_days d WHERE d.person_id=f.person_id AND d.day BETWEEN f.first_day AND f.first_day+6)>=3 three_in_seven,
-    EXISTS(SELECT 1 FROM ever_three_in_seven e WHERE e.person_id=f.person_id) ever_three_in_seven
-  FROM first_daily f JOIN attribution a USING(person_id)
+    flags.next_day_return,flags.seven_day_return,flags.three_in_seven,
+    (ever.person_id IS NOT NULL) ever_three_in_seven
+  FROM cohort_first_daily f
+  JOIN attribution a USING(person_id)
+  JOIN cohort_flags flags USING(person_id)
+  LEFT JOIN ever_three_in_seven ever USING(person_id)
   WHERE f.first_day BETWEEN $1::date AND $2::date
 ), today AS (
   SELECT (now() AT TIME ZONE 'America/Los_Angeles')::date AS current_day
@@ -160,17 +179,20 @@ const HABIT_METRICS_SQL=`WITH eligible_daily_sessions AS (
   GROUP BY source,campaign ORDER BY source,campaign
 ), report_days AS (
   SELECT generate_series($1::date,$2::date,interval '1 day')::date AS date_key
+), daily_counts AS (
+  -- Every completed day contributes to just seven trailing-day windows.
+  SELECT d.person_id,d.day+offsets.n AS date_key,count(*)::int completed_days
+  FROM completed_days d
+  CROSS JOIN generate_series(0,6) offsets(n)
+  WHERE d.day BETWEEN $1::date-6 AND $2::date
+    AND d.day+offsets.n BETWEEN $1::date AND $2::date
+  GROUP BY d.person_id,d.day+offsets.n
 ), daily_health AS (
-  SELECT report_days.date_key::text AS "day",
+  SELECT r.date_key::text AS "day",
     count(health.person_id) FILTER(WHERE health.completed_days>=3)::int people
-  FROM report_days
-  LEFT JOIN LATERAL (
-    SELECT d.person_id,count(*)::int completed_days
-    FROM completed_days d
-    WHERE d.day BETWEEN report_days.date_key-6 AND report_days.date_key
-    GROUP BY d.person_id
-  ) health ON true
-  GROUP BY report_days.date_key ORDER BY report_days.date_key
+  FROM report_days r
+  LEFT JOIN daily_counts health ON health.date_key=r.date_key
+  GROUP BY r.date_key ORDER BY r.date_key
 )
 SELECT
   coalesce((SELECT jsonb_agg(to_jsonb(c) ORDER BY c.source,c.campaign) FROM cohort_summary c),'[]'::jsonb) cohorts,
