@@ -150,9 +150,9 @@ test('habits query keeps first-Daily attribution and rolling seven-day math with
   assert.match(sql,/cohort_flags AS MATERIALIZED/);
   // Every cohort person has at least their first completed day, so carrying
   // first_day forward preserves all retention flags without a second join.
-  assert.match(sql,/SELECT d\\.person_id,d\\.day,f\\.first_day FROM completed_days d/);
-  assert.match(sql,/FROM cohort_completed_days d\\s+GROUP BY d\\.person_id/);
-  assert.doesNotMatch(sql,/FROM cohort_first_daily f\\s+JOIN cohort_completed_days d/);
+  assert.match(sql,/SELECT d\.person_id,d\.day,f\.first_day FROM completed_days d/);
+  assert.match(sql,/FROM cohort_completed_days d\s+GROUP BY d\.person_id/);
+  assert.doesNotMatch(sql,/FROM cohort_first_daily f\s+JOIN cohort_completed_days d/);
   assert.match(sql,/JOIN cohort_flags flags USING\(person_id\)/);
   assert.match(sql,/LEFT JOIN ever_three_in_seven ever USING\(person_id\)/);
   assert.match(sql,/bool_or\(d\.day=d\.first_day\+1\) next_day_return/);
