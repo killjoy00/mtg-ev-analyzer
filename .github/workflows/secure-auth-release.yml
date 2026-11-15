@@ -129,6 +129,12 @@ jobs:
           neon="$RUNNER_TEMP/edge-tools/node_modules/.bin/neon"
           connection=$("$neon" connection-string "$DEV_BRANCH" --project-id "$PROJECT_ID" --database-name pack1 --role-name pack1_owner)
           echo "::add-mask::$connection"
+          # One-time, reviewed recovery for the exact 2026-11-15 failed
+          # development-only #0071 ledger row. Timestamp/hash/index guards
+          # refuse any other state; never run this on production.
+          PACK1_RECOVERY_BRANCH_ID="$DEV_BRANCH" \\
+            PACK1_RECOVERY_REVIEW_TOKEN="reviewed-1272-dev-ledger-recovery-20261115" \\
+            DATABASE_URL="$connection" node scripts/recover-habits-development-migration.mjs
           DATABASE_URL="$connection" node scripts/apply-release-migrations.mjs secure-auth-release
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
