@@ -52,6 +52,17 @@ const quotaFlowProfile=(outcomes,total)=>{
     denied_429:'rate_limit_denials',failed_5xx:'errors',other_or_unknown:'unverified',mixed:'mixed'};
   return labels[winner]||'unverified';
 };
+const missingTimingProfile=(window,total,measured)=>{
+  const missing=total-measured;
+  const fields=['success','denied_429','failed_5xx','other'];
+  const values=fields.map(k=>count(window.missing_gateway_timing_outcomes?.[k]));
+  if(missing<3||values.some(v=>v===null)||values.reduce((a,b)=>a+b,0)!==missing)
+    return 'unverified';
+  const stage=stageChoice(fields.map((k,i)=>[k,values[i]]));
+  const labels={success:'successful_response_missing_timing',denied_429:'denial_missing_timing',
+    failed_5xx:'error_missing_timing',other:'unverified',mixed:'mixed'};
+  return labels[stage]||'unverified';
+};
 function classifyRequestWindow(window) {
   const issue=1272;
   if(window?.status==='skipped')return {...blank(issue),'outcome':'not_collected'};
@@ -88,8 +99,14 @@ function classifyQuotaWindow(window) {
     matched>total||handler+wait>total)return blank(issue,'invalid_stage_evidence');
   if(total<3)return base;
   const measured=handler+wait;
-  if(measured<3||measured*4<total*3)
-    return {...base,outcome:'stage_coverage_incomplete',next_action:'verify_quota_handler_timing'};
+  if(measured<3||measured*4<total*3){
+    const timing_gap=missingTimingProfile(window,total,measured);
+    const actions={successful_response_missing_timing:'inspect_successful_quota_timing_header',
+      denial_missing_timing:'inspect_quota_denial_timing_header',
+      error_missing_timing:'inspect_quota_error_timing_header'};
+    return {...base,outcome:'stage_coverage_incomplete',timing_gap,
+      next_action:actions[timing_gap]||'verify_quota_handler_timing'};
+  }
   const stage=stageChoice([['quota_handler',handler],['quota_transport_wait',wait]]);
   if(stage==='mixed')
     return {...base,outcome:'mixed_stages',suspected_stage:'mixed',evidence:'directional',
