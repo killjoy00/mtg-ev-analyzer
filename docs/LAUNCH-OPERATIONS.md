@@ -136,6 +136,20 @@ is observed. Sparse or inconsistent evidence remains unverified, and the
 next action is just to inspect the corresponding timing-header path.
 A status-group finding does not establish why the header was absent.
 
+When missing handler timings are concentrated in HTTP 5xx responses,
+the private replay can now also correlate **pre-origin** slow gateway failures
+with already retained Durable Object `quota_handler_start` and final
+`quota_handler` events. The coarse `error_stage` is only published if at
+least three such failures exist, the phase classes exactly cover them, and
+one category has a verified two-thirds majority. Allowlisted possibilities
+are `handler_transaction_error`, `handler_durability_error`,
+`handler_completed_then_error`, `handler_completion_not_observed`,
+`no_correlated_handler_logs`, `mixed` or `unverified`. A missing
+completion or start log is missing **observation**, not proof the handler
+never ran. A handler failure during durability does not reveal whether a
+debit was committed. No protected quota policy, retries, storage.sync(),
+per-user data or exact request traces change.
+
 A fixed-label
 signal is **correlation, not a causal diagnosis**: gateway dispatch/wait
 also includes unmeasured remote queueing and response acknowledgement,
