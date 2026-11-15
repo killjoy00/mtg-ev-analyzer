@@ -216,7 +216,7 @@ test('quota stage-coverage gaps require verified missing timing status evidence'
 
 test('incomplete quota timing distinguishes corroborated handler error phases only',()=>{
   const outcomes={success:0,denied_429:0,failed_5xx:9,other:0};
-  const mk=(phases,total=9,matched=2)=>quotaWindow(total,0,2,matched,{
+  const mk=(phases,total=9,matched=2)=>quotaWindow(total,0,0,matched,{
     missing_gateway_timing_outcomes:outcomes,
     failed_quota_without_timing:9,failed_quota_phase:phases,
   });
@@ -241,11 +241,11 @@ test('incomplete quota timing distinguishes corroborated handler error phases on
   assert.equal(invalid.error_stage,'unverified');
   const mixed=read([mk({...candidate('transaction',4),durability:5})])[1];
   assert.equal(mixed.error_stage,'mixed');
-  const absent=read([quotaWindow(9,0,2,2,{
+  const absent=read([quotaWindow(9,0,0,2,{
     missing_gateway_timing_outcomes:outcomes,
   })])[1];
   assert.equal(absent.error_stage,'unverified');
-  const noError=read([quotaWindow(9,0,2,2,{
+  const noError=read([quotaWindow(9,0,0,2,{
     missing_gateway_timing_outcomes:{success:9,denied_429:0,failed_5xx:0,other:0},
     failed_quota_without_timing:9,failed_quota_phase:candidate('transaction',9),
   })])[1];
