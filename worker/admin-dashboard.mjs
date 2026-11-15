@@ -57,18 +57,20 @@ days AS (
   GROUP BY d.kind,d.label
 ), sessions AS MATERIALIZED (
   SELECT coalesce(s.day,(s.created_at AT TIME ZONE 'America/Los_Angeles')::date) report_day,
-    s.player_id,(s.day IS NOT NULL) daily,
-    (jsonb_array_length(s.answers)=jsonb_array_length(s.puzzle_ids)) complete
+    s.player_id,(s.day IS NOT NULL) daily
   FROM draft_run_sessions s JOIN players p ON p.id=s.player_id
   WHERE s.created_at>= (($1::date-15)::timestamp AT TIME ZONE 'America/Los_Angeles')
     AND s.created_at< (($1::date+1)::timestamp AT TIME ZONE 'America/Los_Angeles')
     AND NOT s.measurement_qa
+    -- Only completed sessions contribute to completed_runs/daily_players/
+    -- daily_completions. Filter now to use the narrow completion index.
+    AND jsonb_array_length(s.answers)=jsonb_array_length(s.puzzle_ids)
     AND NOT coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
 ), session_metrics AS (
   SELECT d.kind,d.label,
-    count(*) FILTER(WHERE s.complete)::int completed_runs,
-    count(DISTINCT s.player_id) FILTER(WHERE s.complete AND s.daily)::int daily_players,
-    count(*) FILTER(WHERE s.complete AND s.daily)::int daily_completions
+    count(*)::int completed_runs,
+    count(DISTINCT s.player_id) FILTER(WHERE s.daily)::int daily_players,
+    count(*) FILTER(WHERE s.daily)::int daily_completions
   FROM sessions s CROSS JOIN LATERAL (VALUES
     ('day',s.report_day::text),
     ('week',CASE WHEN s.report_day>$1::date-7 THEN 'current' ELSE 'previous' END)
