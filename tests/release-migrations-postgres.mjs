@@ -2,10 +2,20 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import {execFileSync} from 'node:child_process';
 import assert from 'node:assert/strict';
 import {fixturePool} from './support/postgres-fixture.mjs';
-import {applyReleaseMigrations} from '../scripts/apply-release-migrations.mjs';
+import {applyReleaseMigrations as applyReleaseMigrationsCore} from '../scripts/apply-release-migrations.mjs';
 import {verifyBaselineSchema} from '../scripts/migration-schema.mjs';
+// Mirror the production guarded migration executor: concurrent indexes must
+// be built by a separate psql session outside the ledger transaction. This
+// runs only against fixturePool's guarded local disposable PostgreSQL URL.
+const applyReleaseMigrations=(client,options={})=>applyReleaseMigrationsCore(client,{
+  runNontransactional:file=>execFileSync('psql',[
+    process.env.PACK1_TEST_DATABASE_URL,'-X','-v','ON_ERROR_STOP=1','-f',file,
+  ],{stdio:'pipe',timeout:600000}),
+  ...options,
+});
 const pool=fixturePool(),client=await pool.connect();
 const baseline=JSON.parse(fs.readFileSync('migrations/baseline.json'));
 const manifest=JSON.parse(fs.readFileSync('migrations/manifest.json'));
@@ -38,7 +48,7 @@ try {
  const first=await applyReleaseMigrations(client,{baseline});
  // Every release migration after the frozen baseline executes once.
  const afterBaseline=manifest.release_paths['secure-auth-release'].migrations.filter(m=>!Object.hasOwn(baseline.migrations,m));
- assert.deepEqual(afterBaseline,['0067_restore_serving_invalidation.sql','0068_puzzle_selection_features.sql','0069_v6_colour_components.sql','0070_v6_bridge_baseline_membership.sql']);
+ assert.deepEqual(afterBaseline,['0067_restore_serving_invalidation.sql','0068_puzzle_selection_features.sql','0069_v6_colour_components.sql','0070_v6_bridge_baseline_membership.sql','0071_habits_completed_covering_index.sql']);
  assert.equal(first.applied,afterBaseline.length);
  assert.deepEqual(await applyReleaseMigrations(client,{baseline}),{applied:0,skipped:manifest.release_paths['secure-auth-release'].migrations.length});
  assert.equal(await state(),before,'Actual release plan must preserve serving/readiness and historical results');
