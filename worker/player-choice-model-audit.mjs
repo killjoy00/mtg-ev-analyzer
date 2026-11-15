@@ -13,7 +13,7 @@ WITH votes AS MATERIALIZED (
   SELECT environment,puzzle_id,sum(votes)::int n
   FROM votes GROUP BY environment,puzzle_id HAVING sum(votes)>=$3::int
 ), cards AS (
-  SELECT e.environment,e.puzzle_id,e.n,p.pick_number,
+  SELECT e.environment,e.puzzle_id,e.n,p.corpus_version,p.pick_number,
     p.payload->>'historical_pick_id' trophy_id,
     c->>'id' card_id,coalesce((c->>'model_probability')::numeric,0) model_p,
     coalesce(v.votes,0)::int votes,coalesce(v.votes,0)::numeric/e.n player_p
@@ -25,7 +25,7 @@ WITH votes AS MATERIALIZED (
     row_number() OVER(PARTITION BY environment,puzzle_id ORDER BY votes DESC,card_id) player_rank
   FROM cards
 ), puzzle AS (
-  SELECT environment,puzzle_id,max(n)::int n,max(pick_number)::int pick_number,
+  SELECT environment,puzzle_id,max(corpus_version) corpus_version,max(n)::int n,max(pick_number)::int pick_number,
     max(trophy_id) trophy_id,
     sum(votes)::int accounted_votes,sum(model_p) model_sum,
     bool_or(card_id=trophy_id) trophy_present,
@@ -47,7 +47,7 @@ WITH votes AS MATERIALIZED (
     AND trophy_present AND player_leader_votes>coalesce(second_player_votes,-1)
     AND top_model_probability>coalesce(second_model_probability,-1)
 )
-SELECT environment,count(*)::int qualified_puzzles,sum(n)::int choices,
+SELECT environment,corpus_version,count(*)::int qualified_puzzles,sum(n)::int choices,
   count(*) FILTER(WHERE player_leader<>model_leader)::int differing_leaders,
   round(100.0*count(*) FILTER(WHERE player_leader<>model_leader)/nullif(count(*),0),1) differing_pct,
   count(*) FILTER(WHERE player_leader=trophy_id)::int player_majority_trophy,
@@ -57,7 +57,7 @@ SELECT environment,count(*)::int qualified_puzzles,sum(n)::int choices,
   round(100.0*sum(model_leader_votes)/nullif(sum(n),0),1) voted_model_leader_pct,
   round(100.0*sum(n*top_model_probability)/nullif(sum(n),0),1) predicted_model_leader_pct,
   round(avg(js_bits)::numeric,3) mean_js_bits
-FROM valid GROUP BY environment ORDER BY environment
+FROM valid GROUP BY environment,corpus_version ORDER BY environment,corpus_version
 `;
 
 // Keep the expensive first-encounter scan to at most 90 Pacific calendar days.
