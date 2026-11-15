@@ -125,6 +125,17 @@ first-attempt Durable Object dispatch/queue/acknowledgement rather than to
 retry policy; it is **not** evidence of a provider fault. No exact request
 routes, counts, timings, tokens or user data are published.
 
+If the gateway's **handler-vs-residual timing coverage is incomplete**,
+the private report additionally groups only the missing-timing records by
+validated gateway response status (success, HTTP 429, HTTP 5xx, or other).
+The public `timing_gap` is then one of
+`successful_response_missing_timing`, `denial_missing_timing`,
+`error_missing_timing`, `mixed`, or `unverified`, but only when at
+least three missing-timing records exist and a two-thirds status majority
+is observed. Sparse or inconsistent evidence remains unverified, and the
+next action is just to inspect the corresponding timing-header path.
+A status-group finding does not establish why the header was absent.
+
 A fixed-label
 signal is **correlation, not a causal diagnosis**: gateway dispatch/wait
 also includes unmeasured remote queueing and response acknowledgement,

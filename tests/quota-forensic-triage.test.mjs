@@ -180,3 +180,36 @@ test('quota transport wait classifies first-attempt successes and affected traff
   assert.ok(payload.length<700);
   assert.ok(!/secret|trace|route|\\d{4}-\\d\\d-\\d\\d/.test(payload));
 });
+
+test('quota stage-coverage gaps require verified missing timing status evidence',()=>{
+  for(const [statuses,label,action] of [
+    [{success:7,denied_429:0,failed_5xx:1,other:0},
+      'successful_response_missing_timing','inspect_successful_quota_timing_header'],
+    [{success:1,denied_429:7,failed_5xx:0,other:0},
+      'denial_missing_timing','inspect_quota_denial_timing_header'],
+    [{success:1,denied_429:0,failed_5xx:7,other:0},
+      'error_missing_timing','inspect_quota_error_timing_header'],
+    [{success:3,denied_429:3,failed_5xx:2,other:0},
+      'mixed','verify_quota_handler_timing'],
+  ]){
+    const f=read([quotaWindow(10,1,1,2,{missing_gateway_timing_outcomes:statuses})])[1];
+    assert.equal(f.outcome,'stage_coverage_incomplete');
+    assert.equal(f.timing_gap,label);
+    assert.equal(f.next_action,action);
+  }
+  const invalid=read([quotaWindow(10,1,1,2,{missing_gateway_timing_outcomes:
+    {success:9,denied_429:0,failed_5xx:0,other:0}})])[1];
+  assert.equal(invalid.timing_gap,'unverified');
+  assert.equal(invalid.next_action,'verify_quota_handler_timing');
+  const absent=read([quotaWindow(10,1,1,2)])[1];
+  assert.equal(absent.timing_gap,'unverified');
+  const low=read([quotaWindow(3,1,1,2,{missing_gateway_timing_outcomes:
+    {success:1,denied_429:0,failed_5xx:0,other:0}})])[1];
+  assert.equal(low.timing_gap,'unverified');
+  const privateData={...quotaWindow(10,1,1,2,{missing_gateway_timing_outcomes:
+    {success:8,denied_429:0,failed_5xx:0,other:0}}),trace:'secret-trace-id',
+    network_key:'private-network'};
+  const output=JSON.stringify(read([privateData])[1]);
+  assert.ok(!output.includes('secret-trace-id'));
+  assert.ok(!output.includes('private-network'));
+});

@@ -132,16 +132,17 @@ const HABIT_METRICS_SQL=`WITH eligible_daily_sessions AS (
   -- Retention is reported only for first-Daily cohorts in the requested range.
   -- Materialize the person's distinct completed days once instead of scanning
   -- the full completed_days CTE repeatedly for every rate denominator.
-  SELECT d.person_id,d.day FROM completed_days d
+  -- Carry the unique first-Daily cohort date into the materialized days
+  -- snapshot so retention flags need no second per-person join/CTE scan.
+  SELECT d.person_id,d.day,f.first_day FROM completed_days d
   JOIN cohort_first_daily f USING(person_id)
 ), cohort_flags AS MATERIALIZED (
-  SELECT f.person_id,
-    bool_or(d.day=f.first_day+1) next_day_return,
-    bool_or(d.day BETWEEN f.first_day+1 AND f.first_day+7) seven_day_return,
-    (count(*) FILTER(WHERE d.day BETWEEN f.first_day AND f.first_day+6)>=3) three_in_seven
-  FROM cohort_first_daily f
-  JOIN cohort_completed_days d USING(person_id)
-  GROUP BY f.person_id
+  SELECT d.person_id,
+    bool_or(d.day=d.first_day+1) next_day_return,
+    bool_or(d.day BETWEEN d.first_day+1 AND d.first_day+7) seven_day_return,
+    (count(*) FILTER(WHERE d.day BETWEEN d.first_day AND d.first_day+6)>=3) three_in_seven
+  FROM cohort_completed_days d
+  GROUP BY d.person_id
 ), ever_three_in_seven AS MATERIALIZED (
   -- The third completed day in a seven-day span proves 3-in-7 ever reached.
   SELECT DISTINCT person_id FROM (

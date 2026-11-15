@@ -74,7 +74,8 @@
     "0067_restore_serving_invalidation.sql",
     "0068_puzzle_selection_features.sql",
     "0069_v6_colour_components.sql",
-    "0070_v6_bridge_baseline_membership.sql"
+    "0070_v6_bridge_baseline_membership.sql",
+    "0071_habits_completed_covering_index.sql"
   ],
   "same_prefix_order": {
     "0037": [
@@ -205,7 +206,8 @@
         "0067_restore_serving_invalidation.sql",
         "0068_puzzle_selection_features.sql",
         "0069_v6_colour_components.sql",
-        "0070_v6_bridge_baseline_membership.sql"
+        "0070_v6_bridge_baseline_membership.sql",
+        "0071_habits_completed_covering_index.sql"
       ]
     },
     "daily-calendar": {
@@ -270,7 +272,8 @@
         "0067_restore_serving_invalidation.sql",
         "0068_puzzle_selection_features.sql",
         "0069_v6_colour_components.sql",
-        "0070_v6_bridge_baseline_membership.sql"
+        "0070_v6_bridge_baseline_membership.sql",
+        "0071_habits_completed_covering_index.sql"
       ]
     },
     "launch-load": {
@@ -310,7 +313,8 @@
         "0067_restore_serving_invalidation.sql",
         "0068_puzzle_selection_features.sql",
         "0069_v6_colour_components.sql",
-        "0070_v6_bridge_baseline_membership.sql"
+        "0070_v6_bridge_baseline_membership.sql",
+        "0071_habits_completed_covering_index.sql"
       ]
     },
     "launch-distributed": {
@@ -352,7 +356,8 @@
         "0067_restore_serving_invalidation.sql",
         "0068_puzzle_selection_features.sql",
         "0069_v6_colour_components.sql",
-        "0070_v6_bridge_baseline_membership.sql"
+        "0070_v6_bridge_baseline_membership.sql",
+        "0071_habits_completed_covering_index.sql"
       ]
     },
     "practice-performance": {
