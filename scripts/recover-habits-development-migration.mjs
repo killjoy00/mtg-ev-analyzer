@@ -29,7 +29,11 @@ export async function recoverDevelopmentHabitsIndex(query,{branchId,reviewToken}
      throw Error('Unreviewed migration state, identity or incident timestamp');
    const present=(await query('SELECT count(*)::int AS n FROM pg_catalog.pg_class WHERE relname=$1',[INDEX])).rows[0]?.n;
    if(Number(present)!==0)throw Error('Existing index requires separately reviewed manual recovery');
-   const cleared=(await query("DELETE FROM public.pack1_applied_migrations WHERE name=$1 AND sha256=$2 AND state='failed' AND method='executed' AND recorded_at=$3::timestamptz RETURNING name",[MIGRATION,expectedSha,FAILED_AT])).rows;
+   // PostgreSQL records microseconds; pg's JavaScript Date truncates them to
+   // milliseconds. The locked row passed the exact millisecond incident guard
+   // above. Preserve the ledger identity/state/hash predicates, but match only
+   // its verified 1 ms interval instead of a timestamp that loses precision.
+   const cleared=(await query("DELETE FROM public.pack1_applied_migrations WHERE name=$1 AND sha256=$2 AND state='failed' AND method='executed' AND recorded_at >= $3::timestamptz AND recorded_at < ($3::timestamptz + INTERVAL '1 millisecond') RETURNING name",[MIGRATION,expectedSha,FAILED_AT])).rows;
    if(cleared.length!==1)throw Error('Migration ledger changed during reviewed recovery');
    await query('COMMIT');return 'cleared_exact_failed_entry';
  } catch(error){await query('ROLLBACK').catch(()=>{});throw error;}
