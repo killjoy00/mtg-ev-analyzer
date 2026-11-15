@@ -64,4 +64,10 @@ test('psql runner passes the reviewed database URI as positional argument, not P
  assert.equal(calls[0][2].timeout,600000);
  assert.ok(!Object.hasOwn(calls[0][2],'env'));
  assert.throws(()=>runNontransactionalPsql('dummy',{databaseUrl:'not-a-uri',exec}),/URI/);
+ const bad=Object.assign(Error('postgresql://private:secret@db.example/pack1'),{status:2});
+ assert.throws(()=>runNontransactionalPsql('migration.sql',{databaseUrl:uri,exec:()=>{throw bad;}}),error=>{
+   assert.equal(error.releaseDiagnostic,'concurrent_psql_exit_2');
+   assert.doesNotMatch(error.message,/private|secret|db\\.example/);
+   return true;
+ });
 });
