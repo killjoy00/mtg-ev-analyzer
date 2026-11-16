@@ -52,7 +52,7 @@ export function bindModelResearch(root,request,queryString) {
         'The model favored <strong>'+esc(answer.model_favorite.name)+'</strong>. '+
         'Player-favorite model probability: '+percent(answer.player_favorite.model_probability)+
         '. Historical trophy pick: '+esc(item.candidates.find(c=>c.id===answer.trophy_pick_id)?.name||'Unknown')+'.</p>'+
-        '<p class="subpage-help">Research flags: '+esc(answer.tags.join(', ')||'None')+
+        '<p class="subpage-help">Review sample: '+esc(answer.selection_group||'unknown')+'. Research flags: '+esc(answer.tags.join(', ')||'None')+
         '. Flags identify questions for expert review, not grading mistakes.</p></div>'
         :'')+
       '<div class="actions"><button type="button" id="model-research-prev" class="secondary"'+(index===0?' disabled':'')+'>Previous</button>'+
