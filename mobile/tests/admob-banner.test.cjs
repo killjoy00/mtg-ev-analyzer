@@ -13,7 +13,10 @@ test('Daily-home monetization is mutually exclusive and fails closed', () => {
   assert.equal(dailyHomePromotion(null, true), 'none');
   assert.equal(dailyHomePromotion(false, true), 'none');
   assert.equal(dailyHomePromotion(true, true), 'admob');
-  assert.equal(dailyHomePromotion(true, false), 'affiliate');
+  assert.equal(dailyHomePromotion(true, false, 'ios'), 'none', 'iOS never falls back to TCGplayer');
+  assert.equal(dailyHomePromotion(true, false, 'android'), 'affiliate', 'Android keeps its existing home slot');
+  assert.equal(dailyHomePromotion(true, true, 'ios'), 'admob');
+  assert.equal(dailyHomePromotion(false, false, 'android'), 'none');
 });
 
 async function fixture(t, { consent, eligible = false } = {}) {
