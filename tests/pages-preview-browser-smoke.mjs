@@ -34,7 +34,7 @@ try{
   const context=await browser.newContext({serviceWorkers:'block'});
   await context.route('**/*',route=>{
     // Disallow any traffic to real APIs, ad partners or identity providers.
-    if(route.request().url.startsWith(origin+'/'))return route.continue();
+    if(route.request().url().startsWith(origin+'/'))return route.continue();
     return route.abort();
   });
   for(const path of [
