@@ -49,14 +49,23 @@ three independent signals agree on one card (`EASY_RULE`):
   coloured prior picks. One prior pick is not a colour commitment.
 
 Qualifying puzzles are drawn uniformly, not ranked: ranking by strength would
-serve the same few cards. The late-land and trophy-deck gates above still
-apply. If no easy puzzle qualifies in a round, the round draws uniformly from
-all easy puzzles, as `-v1` did.
+serve the same few cards. For the same reason answer cards **rotate**: an Easy
+round first avoids any answer card that was the trophy pick of an easy-band
+puzzle in a Latest Set or Main Daily in the last 28 days, today included. If
+every qualifying puzzle has a recent answer, the round ignores rotation and
+draws from all qualifying puzzles. The late-land and trophy-deck gates above
+still apply. If no easy puzzle qualifies in a round, the round draws uniformly
+from all easy puzzles, as `-v1` did.
+
+A puzzle with no strength table, an unrated trophy pick or no other rated card
+in its pack has no strength margin and never qualifies. A card with no printed
+mana cost counts as colourless.
 
 The rule and its evidence are in the
-[November 2026 difficulty review](DIFFICULTY-REVIEW-2026-11.md). It was
-validated on held-out practice answers from 27 sets, uses no player data as
-an input, and keeps roughly 40 to 75% of each Easy pool.
+[November 2026 difficulty review](DIFFICULTY-REVIEW-2026-11.md), including
+what was and was not tested on untouched data and the forward check the rule
+still owes. It uses no player data as an input and keeps roughly 40 to 75% of
+each Easy pool.
 
 ## Inputs
 
@@ -68,7 +77,8 @@ an input, and keeps roughly 40 to 75% of each Easy pool.
   trophy pick made the main deck (null without a decklist) and whether it is a
   land. Migration 0077 adds the clear-Easy features: the trophy pick's strength
   margin over the strongest other rated card (null without a table or a
-  rating) and whether it is off-colour. Every loader scores each batch as it inserts it
+  rating), whether it is off-colour, and its card id (for answer rotation).
+  Every loader scores each batch as it inserts it
   (`scripts/score-puzzle-selection.mjs`); `tests/puzzle-selection.test.mjs`
   checks these values equal the review generator's on the reviewed sets.
 
@@ -99,18 +109,31 @@ the uniform easy draw; the schedule then records the `-v1` rule.
 1. Merge. Until the release applies 0077, workflows that run
    `scripts/verify-neon-schema.mjs` against a database without it stop at that
    check, as they did for 0068.
-2. Release through `secure-auth-release`, which applies 0077 (two nullable
+2. Release through `secure-auth-release`, which applies 0077 (three nullable
    columns) and deploys. Dailies keep the `-v1` behaviour: existing feature
    rows predate the new columns.
-3. Run **Score puzzle selection** with `target=development` and `sets` empty,
-   then with `target=production` and that run's ID as `validated_run_id`. The
-   backfill treats rows without the new features as stale and rewrites them.
-   Running `sets=fra` first activates Latest Set sooner; Main Daily follows as
-   each day's planned sets finish. The full backfill rewrites every feature
-   row once; if a run reaches its time limit, running it again resumes with
-   the rows that remain.
+3. Run **Score puzzle selection** in stages, smallest first, and record each
+   run's duration and rows written before starting the next:
+   1. `target=development`, `sets=fra` (about 12,000 puzzles). This is the
+      benchmark: it shows the per-row cost of a rewrite on Neon.
+   2. `target=production`, `sets=fra`, with that run's ID as
+      `validated_run_id`. Latest Set can now use the rule.
+   3. `target=development`, `sets` empty (every puzzle, about 5.7 million
+      feature rows rewritten once).
+   4. `target=production`, `sets` empty, with run 3's ID. Stop here if run 3
+      was slow or failed. Main Daily follows as each day's planned sets finish.
+
+   The backfill treats rows without the new features as stale and rewrites
+   them. For scale, the two successful runs that followed the heap-order
+   backfill on 2026-10-27 each took about 12 minutes; they are taken to be
+   the first full passes over about 4.4 million puzzles, which the run
+   records do not state. This pass updates rows in place, so expect it to be
+   somewhat slower and to leave dead rows for autovacuum. If a run reaches its 180-minute limit, running it again resumes
+   with the rows that remain. Dailies are unaffected while it runs: a partly
+   scored set keeps the `-v1` Easy draw.
 4. The next Daily generated after its sets are complete uses the rule.
    Schedules already generated are never changed.
+5. About four weeks later, run the forward check in the difficulty review.
 
 ## Release steps (Reality Fracture)
 
@@ -174,7 +197,9 @@ omits snapshot membership and removed picks):
 - Stakes are a static ranking, so a top-quarter puzzle can return once the
   28-day decision window passes.
 - Strength is observational: winning decks that played a card.
-- The clear-Easy rule was validated on player outcomes (fewer low scores,
-  more trophy matches), which are proxies, not a measurement of enjoyment. It
-  narrows the Easy slot's answer cards: in a simulated year of Latest Set
-  Dailies, about 73 distinct answer cards against 118.
+- The clear-Easy rule was checked on player outcomes (fewer low scores, more
+  trophy matches), which are proxies, not a measurement of enjoyment, and the
+  rule as shipped has not yet passed an untouched holdout. It narrows the Easy
+  slot's answer cards: in a simulated year of Latest Set Dailies, about 84
+  distinct answer cards against 119. Rotation keeps any one of them from
+  returning inside 28 days.

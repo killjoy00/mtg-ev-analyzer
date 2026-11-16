@@ -1,6 +1,6 @@
 -- Clear-Easy selection features (puzzle-selection.mjs, EASY_RULE), written by
 -- scripts/score-puzzle-selection.mjs beside the stakes features. Payloads,
--- ratings and grading are untouched. Both columns are null on rows scored
+-- ratings and grading are untouched. All three columns are null on rows scored
 -- before this migration; the backfill treats such rows as stale, and a Daily
 -- whose planned sets still hold one keeps the previous uniform Easy draw.
 ALTER TABLE draft_run_puzzle_selection_features
@@ -10,4 +10,7 @@ ALTER TABLE draft_run_puzzle_selection_features
   ADD COLUMN IF NOT EXISTS trophy_strength_margin real,
   -- The trophy pick is coloured and shares no colour with the coloured prior
   -- picks. Null only on rows scored before this migration.
-  ADD COLUMN IF NOT EXISTS trophy_off_colour boolean;
+  ADD COLUMN IF NOT EXISTS trophy_off_colour boolean,
+  -- The trophy pick's card id within its set, so an Easy round can avoid an
+  -- answer card that a recent Daily already used as an Easy answer.
+  ADD COLUMN IF NOT EXISTS trophy_card_id text;

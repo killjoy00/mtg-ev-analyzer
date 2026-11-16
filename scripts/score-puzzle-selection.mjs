@@ -64,8 +64,9 @@ function setInputs(setId,strengthDir) {
 export async function selectionFeaturesAvailable(query) {
   // The table (migration 0068) with the clear-Easy columns (migration 0077).
   const {present}=(await query(`SELECT to_regclass('draft_run_puzzle_selection_features') IS NOT NULL
-    AND (SELECT count(*)=2 FROM information_schema.columns WHERE table_schema='public'
-      AND table_name='draft_run_puzzle_selection_features' AND column_name IN ('trophy_strength_margin','trophy_off_colour')) present`)).rows[0];
+    AND (SELECT count(*)=3 FROM information_schema.columns WHERE table_schema='public'
+      AND table_name='draft_run_puzzle_selection_features'
+      AND column_name IN ('trophy_strength_margin','trophy_off_colour','trophy_card_id')) present`)).rows[0];
   return present===true||present==='t';
 }
 
@@ -74,19 +75,19 @@ async function writeFeatures(query,features) {
   const result=await query(`WITH incoming AS (
       SELECT * FROM jsonb_to_recordset($1::jsonb) AS f(puzzle_id text,feature_version text,strength_version text,strength_sha256 text,
         stakes_points real,credible_count smallint,trophy_in_main_deck boolean,trophy_is_land boolean,
-        trophy_strength_margin real,trophy_off_colour boolean)
+        trophy_strength_margin real,trophy_off_colour boolean,trophy_card_id text)
     ), written AS (
       INSERT INTO draft_run_puzzle_selection_features AS t(puzzle_id,feature_version,strength_version,strength_sha256,stakes_points,credible_count,
-        trophy_in_main_deck,trophy_is_land,trophy_strength_margin,trophy_off_colour)
+        trophy_in_main_deck,trophy_is_land,trophy_strength_margin,trophy_off_colour,trophy_card_id)
       SELECT * FROM incoming
       ON CONFLICT(puzzle_id,feature_version) DO UPDATE SET strength_version=excluded.strength_version,strength_sha256=excluded.strength_sha256,
         stakes_points=excluded.stakes_points,credible_count=excluded.credible_count,trophy_in_main_deck=excluded.trophy_in_main_deck,
         trophy_is_land=excluded.trophy_is_land,trophy_strength_margin=excluded.trophy_strength_margin,
-        trophy_off_colour=excluded.trophy_off_colour,computed_at=now()
+        trophy_off_colour=excluded.trophy_off_colour,trophy_card_id=excluded.trophy_card_id,computed_at=now()
       WHERE (t.strength_version,t.strength_sha256,t.stakes_points,t.credible_count,t.trophy_in_main_deck,t.trophy_is_land,
-          t.trophy_strength_margin,t.trophy_off_colour)
+          t.trophy_strength_margin,t.trophy_off_colour,t.trophy_card_id)
         IS DISTINCT FROM (excluded.strength_version,excluded.strength_sha256,excluded.stakes_points,excluded.credible_count,
-          excluded.trophy_in_main_deck,excluded.trophy_is_land,excluded.trophy_strength_margin,excluded.trophy_off_colour)
+          excluded.trophy_in_main_deck,excluded.trophy_is_land,excluded.trophy_strength_margin,excluded.trophy_off_colour,excluded.trophy_card_id)
       RETURNING t.puzzle_id
     ) SELECT coalesce(jsonb_agg(puzzle_id),'[]'::jsonb) written FROM written`,[JSON.stringify(features)]);
   return parse(result.rows[0].written);

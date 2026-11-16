@@ -142,8 +142,8 @@ const result=await query(`SELECT
   to_regprocedure('pack1_reconcile_draft_run_seasons()') IS NOT NULL season_reconcile,
   position('last_reconciled_day' in pg_get_functiondef('pack1_reconcile_draft_run_seasons()'::regprocedure))>0 season_reconcile_incremental,
   to_regclass('draft_run_puzzle_selection_features') IS NOT NULL puzzle_selection_features,
-  (SELECT count(*)=2 FROM information_schema.columns WHERE table_schema='public' AND table_name='draft_run_puzzle_selection_features'
-    AND column_name IN ('trophy_strength_margin','trophy_off_colour')) clear_easy_features,
+  (SELECT count(*)=3 FROM information_schema.columns WHERE table_schema='public' AND table_name='draft_run_puzzle_selection_features'
+    AND column_name IN ('trophy_strength_margin','trophy_off_colour','trophy_card_id')) clear_easy_features,
   EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='draft_run_schedules' AND column_name='selection_rule') daily_selection_rule,
   (SELECT count(*)=3 FROM pg_indexes WHERE indexname IN ('draft_run_serving_window_idx','draft_run_serving_source_idx','draft_run_rating_band_idx')) indexes,
   (SELECT count(*)=3 FROM information_schema.columns WHERE table_schema='public' AND

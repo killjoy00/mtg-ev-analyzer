@@ -141,34 +141,56 @@ async function dailyStakesReady(query,version,setIds) {
 // clear-Easy decisions (EASY_RULE: the trophy pick is the model's leader and
 // the strongest rated card in the pack, and from P1P3 is not off-colour). When
 // that rule is not active, or no decision qualifies, it draws uniformly from
-// all easy decisions as before. Returns null when nothing qualifies, so the
-// caller makes the band draw instead.
-async function stakesRound(query,where,params,{setId,band,draw,clearEasy=false}) {
+// all easy decisions as before. Among clear-Easy decisions it first avoids
+// answer cards a recent Daily used as an Easy answer (recentEasyAnswers), and
+// drops that preference rather than leave the clear pool. Returns null when
+// nothing qualifies, so the caller makes the band draw instead.
+async function stakesRound(query,where,params,{setId,band,draw,clearEasy=false,recentEasyAnswers=[]}) {
   const contested=band!=='easy';
   const rule=[...params,SELECTION_FEATURE_VERSION,setId,STAKES_RULE.no_land_answer_from_pick,STAKES_RULE.deck_gate_from_pick];
   const n=rule.length;
   const clear=`r.band='easy' AND r.target_support_ratio>=${Number(EASY_RULE.min_trophy_support_ratio)}::float8
       AND f.trophy_strength_margin>=${Number(EASY_RULE.min_strength_margin)}::real
       AND (p.pick_number<${Number(EASY_RULE.colour_fit_from_pick)} OR f.trophy_off_colour IS FALSE)`;
-  const counted=async kind=>{
+  // extra: values for placeholders after the rule's own, used only by `kind`.
+  const counted=async(kind,extra=[])=>{
+    const values=[...rule,...extra];
     const pool=`${from} JOIN draft_run_puzzle_selection_features f ON f.puzzle_id=p.puzzle_id AND f.feature_version=$${n-3}
     WHERE ${where} AND p.set_id=$${n-2}
       AND ${kind}
       AND NOT (p.pick_number>=$${n-1}::int AND f.trophy_is_land) AND (p.pick_number<$${n}::int OR f.trophy_in_main_deck IS TRUE)`;
-    return {pool,count:Number((await query(`SELECT count(*)::int n ${pool}`,rule)).rows[0].n)};
+    return {pool,values,count:Number((await query(`SELECT count(*)::int n ${pool}`,values)).rows[0].n)};
   };
-  let chosen=contested?await counted("r.band IN ('medium','hard') AND f.credible_count>=2 AND f.stakes_points IS NOT NULL")
-    :clearEasy?await counted(clear):null;
-  if(!contested&&!chosen?.count)chosen=await counted("r.band='easy'");
-  const {pool,count}=chosen;
+  let chosen;
+  if(contested)chosen=await counted("r.band IN ('medium','hard') AND f.credible_count>=2 AND f.stakes_points IS NOT NULL");
+  else {
+    if(clearEasy&&recentEasyAnswers.length)
+      chosen=await counted(`${clear} AND (p.set_id||':'||coalesce(f.trophy_card_id,''))<>ALL($${n+1}::text[])`,[toPgArray(recentEasyAnswers)]);
+    if(clearEasy&&!chosen?.count)chosen=await counted(clear);
+    if(!chosen?.count)chosen=await counted("r.band='easy'");
+  }
+  const {pool,values,count}=chosen;
   if(!count)return null;
   const offset=Math.floor(draw*(contested?stakesTopPoolSize(count):count));
   return query(`WITH chosen AS (
       SELECT p.puzzle_id,p.source_draft_hash ${pool}
-      ORDER BY ${contested?'f.stakes_points DESC,':''}p.puzzle_id COLLATE "C" LIMIT 1 OFFSET $${n+1}::int
+      ORDER BY ${contested?'f.stakes_points DESC,':''}p.puzzle_id COLLATE "C" LIMIT 1 OFFSET $${values.length+1}::int
     ) SELECT ${columns},chosen.puzzle_id selected_id ${from} JOIN chosen ON chosen.source_draft_hash=p.source_draft_hash WHERE ${servingBase}`,
-    [...rule,offset]);
+    [...values,offset]);
 }
+
+// Answer cards ("set:card id") that were the trophy pick of an easy-band
+// puzzle in a Latest Set or Main Daily within the answer repeat window, today
+// included. $1 day, $2 window days minus one, $3 feature version. Read only
+// when the clear-Easy rule is active, so its columns exist.
+export const RECENT_EASY_ANSWERS=`SELECT DISTINCT p.set_id,f.trophy_card_id
+  FROM draft_run_schedules s
+  CROSS JOIN LATERAL jsonb_array_elements_text(s.puzzle_ids) scheduled(puzzle_id)
+  JOIN draft_run_verified_puzzles p ON p.puzzle_id=scheduled.puzzle_id
+  JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1' AND r.band='easy'
+  JOIN draft_run_puzzle_selection_features f ON f.puzzle_id=p.puzzle_id AND f.feature_version=$3 AND f.trophy_card_id IS NOT NULL
+  WHERE s.environment IN ('latest','mixed') AND s.day BETWEEN $1::date-$2::int AND $1::date`;
+export const easyAnswerKey=row=>`${row.set_id}:${row.trophy_card_id}`;
 
 // report, when given, receives selectionRule: the rule that chose this run, or
 // null for the band draw. clearEasyEnabled=false (PACK1_DAILY_CLEAR_EASY=off)
@@ -206,6 +228,7 @@ export async function selectDatabaseRun(query,version,seed,environment='mixed',{
     &&(environment==='latest'||environment==='mixed'&&mixedStakesEnabled);
   const ready=stakesRequested?await dailyStakesReady(query,version,required):{stakes:false,clearEasy:false};
   const stakes=ready.stakes,clearEasy=stakes&&clearEasyEnabled&&ready.clearEasy;
+  const recentEasyAnswers=clearEasy?(await query(RECENT_EASY_ANSWERS,[day,EASY_RULE.answer_repeat_days-1,SELECTION_FEATURE_VERSION])).rows.map(easyAnswerKey).sort():[];
   if(report)report.selectionRule=!stakes?null:environment==='latest'
     ?(clearEasy?LATEST_DAILY_CLEAR_EASY_RULE:LATEST_DAILY_RULE):(clearEasy?MIXED_DAILY_CLEAR_EASY_RULE:MIXED_DAILY_RULE);
   const key=p=>`${p.set_id}:${p.pick_number}:${p.band}`;
@@ -228,7 +251,7 @@ export async function selectDatabaseRun(query,version,seed,environment='mixed',{
     const count=Number(available.find(g=>g.set_id===setId)?.n||0);
     if(!count)throw Object.assign(new Error('Not enough verified puzzles for a balanced run.'),{status:503});
     const draw=random();
-    let result=stakes?await stakesRound(query,where,params,{setId,band,draw,clearEasy}):null;
+    let result=stakes?await stakesRound(query,where,params,{setId,band,draw,clearEasy,recentEasyAnswers}):null;
     params.push(setId,band,Math.floor(draw*count));
     if(!result&&snapshot) {
       // Preserve the live selector's C ordering and random offset exactly.

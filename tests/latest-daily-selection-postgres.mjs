@@ -10,7 +10,7 @@ import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {DRAFT_RUN_SELECTION_VERSION,runDifficultyBands} from '../draft-run-policy.mjs';
 import {dailySetPlan} from '../daily-selection.mjs';
 import {seededRandom} from '../gameplay.mjs';
-import {loadLiveSetMetadata,selectDatabaseRun} from '../worker/draft-run-selection.mjs';
+import {loadLiveSetMetadata,selectDatabaseRun,RECENT_EASY_ANSWERS,easyAnswerKey} from '../worker/draft-run-selection.mjs';
 import {ensureDailySchedule,RECENT_DAILY_DECISIONS,DAILY_REPEAT_WINDOW_DAYS,dailyRepeatExclusion,selectDailyWithoutRepeats} from '../worker/draft-run-daily.mjs';
 import {decisionKey} from '../worker/draft-run-selection.mjs';
 import {LATEST_DAILY_RULE,MIXED_DAILY_RULE,LATEST_DAILY_CLEAR_EASY_RULE,MIXED_DAILY_CLEAR_EASY_RULE,SELECTION_FEATURE_VERSION,STAKES_RULE,EASY_RULE,isClearEasy,stakesTopPoolSize} from '../puzzle-selection.mjs';
@@ -36,6 +36,25 @@ const SERVING=`p.interesting AND r.target_support_ratio>=0.2 AND NOT EXISTS(SELE
   JOIN draft_run_pick_removals q USING(decision_key) WHERE m.puzzle_id=p.puzzle_id AND q.removed)`;
 let tests=0;
 const check=(ok,message)=>{assert.ok(ok,message);tests++;};
+// One Easy round's pools as the selector builds them: `clear` is every
+// clear-Easy decision still available, `fresh` those whose answer card was not
+// an Easy answer of a recent Daily. used: sources taken earlier in the run;
+// exclusion: the Daily repeat windows, when the run was selected with them.
+const recentAnswers=async day=>(await query(RECENT_EASY_ANSWERS,[day,EASY_RULE.answer_repeat_days-1,SELECTION_FEATURE_VERSION])).rows.map(easyAnswerKey);
+async function easyPools({setId,pick,used,day,exclusion={sources:[],decisions:[]}}) {
+  const recent=new Set(await recentAnswers(day));
+  const rows=(await query(`SELECT p.puzzle_id,p.set_id,f.trophy_card_id FROM draft_run_verified_puzzles p
+    JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'
+    JOIN draft_run_puzzle_selection_features f ON f.puzzle_id=p.puzzle_id AND f.feature_version=$1
+    WHERE ${SERVING} AND p.set_id=$2 AND p.pick_number=$3 AND p.source_draft_hash<>ALL($4::text[])
+      AND (p.source_draft_hash||':'||p.pick_number)<>ALL($10::text[])
+      AND r.band='easy' AND r.target_support_ratio>=$7::float8 AND f.trophy_strength_margin>=$8::real
+      AND (p.pick_number<$9 OR f.trophy_off_colour IS FALSE)
+      AND NOT (p.pick_number>=$5 AND f.trophy_is_land) AND (p.pick_number<$6 OR f.trophy_in_main_deck)`,
+    [SELECTION_FEATURE_VERSION,setId,pick,array([...used,...exclusion.sources]),STAKES_RULE.no_land_answer_from_pick,STAKES_RULE.deck_gate_from_pick,
+      EASY_RULE.min_trophy_support_ratio,EASY_RULE.min_strength_margin,EASY_RULE.colour_fit_from_pick,array(exclusion.decisions)])).rows;
+  return {clear:rows.map(r=>r.puzzle_id),fresh:rows.filter(r=>!recent.has(easyAnswerKey(r))).map(r=>r.puzzle_id),recent};
+}
 
 try {
   check((await query("SELECT count(*)::int n FROM draft_run_verified_puzzles p LEFT JOIN draft_run_puzzle_selection_features f ON f.puzzle_id=p.puzzle_id AND f.feature_version=$1 WHERE f.puzzle_id IS NULL",[SELECTION_FEATURE_VERSION])).rows[0].n==='0',
@@ -80,20 +99,12 @@ try {
       } else {
         easyRounds++;
         // Recompute the round's clear-Easy pool with the sources already used.
-        const clear=(await query(`SELECT p.puzzle_id FROM draft_run_verified_puzzles p
-          JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'
-          JOIN draft_run_puzzle_selection_features f ON f.puzzle_id=p.puzzle_id AND f.feature_version=$1
-          WHERE ${SERVING} AND p.set_id=$2 AND p.pick_number=$3 AND p.source_draft_hash<>ALL($4::text[])
-            AND r.band='easy' AND r.target_support_ratio>=$7::float8 AND f.trophy_strength_margin>=$8::real
-            AND (p.pick_number<$9 OR f.trophy_off_colour IS FALSE)
-            AND NOT (p.pick_number>=$5 AND f.trophy_is_land) AND (p.pick_number<$6 OR f.trophy_in_main_deck)`,
-          [SELECTION_FEATURE_VERSION,choice.set_id,pick,array(used),STAKES_RULE.no_land_answer_from_pick,STAKES_RULE.deck_gate_from_pick,
-            EASY_RULE.min_trophy_support_ratio,EASY_RULE.min_strength_margin,EASY_RULE.colour_fit_from_pick])).rows.map(r=>r.puzzle_id);
+        const {clear,fresh}=await easyPools({setId:choice.set_id,pick,used,day});
         const features={pick_number:pick,target_support_ratio:f.target_support_ratio,
           trophy_strength_margin:f.trophy_strength_margin,trophy_off_colour:f.trophy_off_colour===null?null:f.trophy_off_colour==='t'};
         if(clear.length) {
           clearRounds++;
-          check(clear.includes(choice.puzzle_id)&&isClearEasy(features),`${day}: the Easy P1P${pick} is a clear-Easy decision`);
+          check((fresh.length?fresh:clear).includes(choice.puzzle_id)&&isClearEasy(features),`${day}: the Easy P1P${pick} is a clear-Easy decision`);
         } else check(!isClearEasy(features),`${day}: without a clear-Easy decision P1P${pick} uses the uniform easy draw`);
       }
       used.push(f.source_draft_hash);
@@ -211,6 +222,53 @@ try {
   } finally {
     await query('DELETE FROM draft_run_schedules WHERE day=$1::date',[day]);
   }
+
+  // Answer-card rotation. Find a latest-set Daily whose Easy round has clear
+  // decisions with at least two different answer cards, publish its answer in
+  // the previous day's schedule, and select it again: the Easy round must
+  // move to another answer card, stay clear, and return once that schedule
+  // leaves the window. With every answer recent it stays in the clear pool.
+  const cardsOf=async puzzleIds=>new Map((await query(`SELECT p.puzzle_id,p.set_id,p.pick_number,p.source_draft_hash,r.band,f.trophy_card_id
+    FROM draft_run_verified_puzzles p JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'
+    JOIN draft_run_puzzle_selection_features f ON f.puzzle_id=p.puzzle_id AND f.feature_version=$2 WHERE p.puzzle_id=ANY($1::text[])`,
+    [array(puzzleIds),SELECTION_FEATURE_VERSION])).rows.map(r=>[r.puzzle_id,r]));
+  let scenario=null;
+  for(let i=1;i<=28&&!scenario;i++) {
+    const date=`2026-12-${String(i).padStart(2,'0')}`,{run}=await latest(date),rows=await cardsOf(run.map(p=>p.puzzle_id)),used=[];
+    for(const choice of run) {
+      const row=rows.get(choice.puzzle_id);
+      if(row.band==='easy') {
+        const {clear}=await easyPools({setId:row.set_id,pick:Number(row.pick_number),used,day:date});
+        const answers=new Set([...(await cardsOf(clear)).values()].map(r=>r.trophy_card_id));
+        if(clear.includes(choice.puzzle_id)&&answers.size>=2)scenario={date,run,row,used:[...used],clear,answers};
+      }
+      used.push(row.source_draft_hash);
+    }
+  }
+  check(scenario,'The fixture has an Easy round with two clear answer cards');
+  const previous=new Date(Date.parse(scenario.date)-86400000).toISOString().slice(0,10);
+  try {
+    check((await ensureDailySchedule(query,previous,'latest')).created,'A schedule exists for the previous day');
+    const publish=puzzleIds=>query("UPDATE draft_run_schedules SET puzzle_ids=$2::jsonb WHERE day=$1::date AND environment='latest'",[previous,JSON.stringify(puzzleIds)]);
+    await publish(scenario.run.map(p=>p.puzzle_id));
+    check((await recentAnswers(scenario.date)).includes(easyAnswerKey(scenario.row)),'The published Easy answer is recent on the next day');
+    const rotated=await latest(scenario.date),round=scenario.run.findIndex(p=>p.puzzle_id===scenario.row.puzzle_id);
+    const next=(await cardsOf([rotated.run[round].puzzle_id])).get(rotated.run[round].puzzle_id);
+    check(rotated.rule===LATEST_DAILY_CLEAR_EASY_RULE&&next.band==='easy'&&scenario.clear.includes(next.puzzle_id),'The rotated Easy round is still a clear-Easy decision');
+    check(next.trophy_card_id!==scenario.row.trophy_card_id,'The Easy round avoids yesterday\'s Easy answer card');
+    // Publish one clear decision per answer card: nothing fresh remains.
+    const clearRows=[...(await cardsOf(scenario.clear)).values()];
+    const perCard=[...scenario.answers].map(card=>clearRows.find(r=>r.trophy_card_id===card).puzzle_id);
+    const filler=scenario.run.map(p=>p.puzzle_id).filter(id=>!perCard.includes(id));
+    await publish([...perCard,...filler].slice(0,8));
+    check(perCard.length<=8&&(await easyPools({setId:scenario.row.set_id,pick:Number(scenario.row.pick_number),used:scenario.used,day:scenario.date})).fresh.length===0,
+      'Every clear answer card can be made recent');
+    const exhausted=await latest(scenario.date);
+    check(scenario.clear.includes(exhausted.run[round].puzzle_id),'With every clear answer recent, the Easy round stays in the clear pool');
+  } finally {
+    await query('DELETE FROM draft_run_schedules WHERE day=$1::date',[previous]);
+  }
+  check(ids((await latest(scenario.date)).run)===ids(scenario.run),'Outside the window the original Easy answer returns');
   console.log('PASS: '+tests+' real PostgreSQL Main and Latest Set Daily stakes and clear-Easy assertions.');
 } finally {
   await pool.end();

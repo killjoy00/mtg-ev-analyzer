@@ -1,8 +1,9 @@
 -- Read-only exports for research/difficulty-review-2026-11/evaluate.mjs.
 -- Run each statement against the production pack1 database with a read-only
--- role and save its rows as JSON. Every row is one puzzle with aggregate
--- counts. The person key exists only inside the query, to keep each person's
--- first encounter with a puzzle; it is never selected.
+-- role and save its rows as JSON. Rows are per-puzzle aggregates, except the
+-- practice answers, which carry an anonymous player index. The person key
+-- exists only inside each query, to keep each person's first encounter with a
+-- puzzle; it is never selected.
 
 -- answers.json: first-encounter Daily answers per puzzle.
 WITH obs AS (
@@ -53,6 +54,23 @@ SELECT jsonb_build_object('id',p.puzzle_id,'set',p.set_id,'pick',p.pick_number,'
 FROM agg JOIN draft_run_verified_puzzles p ON p.puzzle_id=agg.puzzle_id
 JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'
 WHERE r.band='easy' AND p.pack_number=1 AND p.pick_number<=8;
+
+-- practice_answers.json: one row per first-encounter practice answer on an
+-- easy-band puzzle. `p` is an anonymous index (a dense rank over a hash of
+-- the in-query person key); it identifies no one and changes with the data.
+WITH obs AS (
+  SELECT o.puzzle_id,o.score,o.trophy_match,o.first_seen_at,s.day,s.challenge_id,s.environment,
+    coalesce((SELECT min(a.auth_user_id::text) FROM account_links a WHERE a.player_id=s.player_id),'g:'||s.player_id::text) person
+  FROM draft_run_decision_observations o JOIN draft_run_sessions s ON s.id=o.session_id JOIN players p ON p.id=s.player_id
+  WHERE o.observed AND o.outcome='pick' AND NOT s.measurement_qa
+    AND NOT coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
+    AND NOT EXISTS (SELECT 1 FROM account_links al JOIN pack1_admins ad ON ad.auth_user_id=al.auth_user_id WHERE al.player_id=s.player_id)
+), ranked AS (SELECT *,row_number() OVER (PARTITION BY person,puzzle_id ORDER BY first_seen_at) rn FROM obs),
+f AS (SELECT r.* FROM ranked r JOIN draft_run_verified_puzzles p ON p.puzzle_id=r.puzzle_id
+  JOIN draft_run_puzzle_ratings t ON t.puzzle_id=p.puzzle_id AND t.difficulty_version='support-ratio-v1'
+  WHERE r.rn=1 AND r.day IS NULL AND r.challenge_id IS NULL AND r.environment IN ('mixed','latest')
+    AND t.band='easy' AND p.pack_number=1 AND p.pick_number<=8)
+SELECT jsonb_build_object('p',dense_rank() OVER (ORDER BY md5(person)),'id',puzzle_id,'s',score,'m',trophy_match)::text j FROM f;
 
 -- pool_<sets>.json: the current serving easy pool, P1P1-P1P5, for chosen sets
 -- (approximate serving filter: it omits active-snapshot membership). `src` is

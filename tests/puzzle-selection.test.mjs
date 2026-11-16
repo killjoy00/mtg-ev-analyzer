@@ -20,7 +20,7 @@ test('features: credible options, stakes, deck membership and land answers',()=>
   // pack, credible or not: Weak (20) is 15.75 points stronger than Runner.
   assert.deepEqual(features,{puzzle_id:'p',feature_version:SELECTION_FEATURE_VERSION,strength_version:'gih-shrunk-400-v1',
     strength_sha256:'a'.repeat(64),stakes_points:4.25,credible_count:3,trophy_in_main_deck:true,trophy_is_land:true,
-    trophy_strength_margin:-15.75,trophy_off_colour:false});
+    trophy_strength_margin:-15.75,trophy_off_colour:false,trophy_card_id:'b'});
   const bare=puzzleSelectionFeatures(puzzle,{});
   assert.equal(bare.stakes_points,null);assert.equal(bare.strength_version,null);assert.equal(bare.trophy_in_main_deck,null);
   assert.equal(bare.trophy_strength_margin,null);assert.equal(bare.trophy_off_colour,false);
@@ -65,7 +65,7 @@ test('clear-Easy rule: leader, strongest card, and colour fit from P1P3',()=>{
   // One prior pick is not a colour commitment.
   assert.equal(isClearEasy({...clear,pick_number:2,trophy_off_colour:true}),true);
   assert.equal(isClearEasy({...clear,pick_number:1,trophy_off_colour:false}),true);
-  assert.deepEqual(EASY_RULE,{min_trophy_support_ratio:1,min_strength_margin:0,colour_fit_from_pick:3});
+  assert.deepEqual(EASY_RULE,{min_trophy_support_ratio:1,min_strength_margin:0,colour_fit_from_pick:3,answer_repeat_days:28});
 });
 
 test('owner-judged Easy puzzles: the good ones stay eligible, the bad ones do not',()=>{

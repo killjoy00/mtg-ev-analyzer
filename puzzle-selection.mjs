@@ -35,7 +35,8 @@ export const STAKES_RULE=Object.freeze({
 // twice the runner-up's support), and no other rated card in the pack is
 // stronger. Once two picks have been made, the card must also not ask the
 // player to leave every colour drafted so far. Qualifying decisions are drawn
-// uniformly: ranking them by strength would serve the same few bombs.
+// uniformly: ranking them by strength would serve the same few bombs. For the
+// same reason an answer card rests after it has been an Easy answer.
 export const EASY_RULE=Object.freeze({
   // The trophy pick is the model's leading card.
   min_trophy_support_ratio:1,
@@ -43,6 +44,9 @@ export const EASY_RULE=Object.freeze({
   min_strength_margin:0,
   // From this pick a coloured trophy pick shares a colour with the prior picks.
   colour_fit_from_pick:3,
+  // An Easy round avoids a trophy card that was the Easy answer of a Latest Set
+  // or Main Daily in this many days, today included (the decision repeat window).
+  answer_repeat_days:28,
 });
 
 export const isLandCard=card=>/\bLand\b/.test(card?.type_line||'');
@@ -81,6 +85,7 @@ export function puzzleSelectionFeatures(puzzle,{strength=null,mainDeck=null}={},
     // Null without a table, an unrated trophy pick or no other rated card.
     trophy_strength_margin:Number.isFinite(targetStrength)&&others.length?targetStrength-Math.max(...others):null,
     trophy_off_colour:isOffColour(target,puzzle.prior_picks),
+    trophy_card_id:String(target.id),
   };
 }
 

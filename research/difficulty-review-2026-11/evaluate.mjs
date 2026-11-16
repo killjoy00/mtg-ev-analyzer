@@ -2,14 +2,15 @@
 //
 //   node research/difficulty-review-2026-11/evaluate.mjs PRIVATE_EXPORT_DIR
 //
-// PRIVATE_EXPORT_DIR holds the read-only exports described in README.md
-// (per-puzzle aggregates only: no player, account or session identifiers).
-// The directory is never committed. The script prints aggregate tables and
-// writes nothing. It scores every puzzle with the shipped feature code
+// PRIVATE_EXPORT_DIR holds the read-only exports described in README.md. They
+// carry no player, account or session identifier: practice answers use an
+// anonymous per-export index so intervals can resample whole players. The
+// directory is never committed. The script prints aggregate tables and writes
+// nothing. It scores every puzzle with the shipped feature code
 // (puzzle-selection.mjs), so the numbers describe the rule as released.
 import fs from 'node:fs';
 import path from 'node:path';
-import {puzzleSelectionFeatures,isClearEasy,STAKES_RULE} from '../../puzzle-selection.mjs';
+import {puzzleSelectionFeatures,isClearEasy,EASY_RULE,STAKES_RULE} from '../../puzzle-selection.mjs';
 import {rateDraftRunPuzzle} from '../../draft-run-difficulty.mjs';
 import {loadStrengthTable} from '../../scripts/score-puzzle-selection.mjs';
 
@@ -32,19 +33,23 @@ function scored(row) {
   const rating=rateDraftRunPuzzle(puzzle),features=puzzleSelectionFeatures(puzzle,{strength:strength(row.set)});
   const total=puzzle.candidates.reduce((sum,c)=>sum+c.model_probability,0);
   const shares=puzzle.candidates.map(c=>c.model_probability/total);
+  const inputs={pick_number:row.pick,target_support_ratio:rating.targetSupportRatio,...features};
+  const easy=rating.band==='easy';
   return {row,puzzle,rating,features,band:rating.band,
-    leader:rating.targetSupportRatio>=1,
     trophyShare:puzzle.candidates.find(c=>c.id===row.hist).model_probability/total,
     entropy:-shares.reduce((sum,q)=>sum+(q>0?q*Math.log(q):0),0),
-    clear:rating.band==='easy'&&isClearEasy({pick_number:row.pick,target_support_ratio:rating.targetSupportRatio,...features})};
+    clear:easy&&isClearEasy(inputs),
+    // The rule as first written down, before the practice export was read.
+    preregistered:easy&&isClearEasy(inputs,{...EASY_RULE,colour_fit_from_pick:2}),
+    clearAt:margin=>easy&&isClearEasy(inputs,{...EASY_RULE,min_strength_margin:margin})};
 }
 const mean=values=>values.reduce((a,b)=>a+b,0)/values.length;
 const pct=value=>(100*value).toFixed(1).padStart(5)+'%';
+const points=value=>(100*value).toFixed(1);
 // Deterministic bootstrap (linear congruential generator).
 let state=20261116;
 const random=()=>{state=(state*1664525+1013904223)>>>0;return state/2**32;};
-const resample=items=>items.map(()=>items[Math.floor(random()*items.length)]);
-const interval=(draws)=>{draws.sort((a,b)=>a-b);return `[${(100*draws[Math.floor(.025*draws.length)]).toFixed(1)}, ${(100*draws[Math.floor(.975*draws.length)]).toFixed(1)}]`;};
+const interval=draws=>{draws=draws.filter(Number.isFinite).sort((a,b)=>a-b);return `[${points(draws[Math.floor(.025*draws.length)])}, ${points(draws[Math.floor(.975*draws.length)])}]`;};
 const REGULAR=row=>row.set!=='powered-cube';
 
 // 1. Served Dailies: per-puzzle first-encounter aggregates joined to payloads.
@@ -98,7 +103,7 @@ if(answers&&meta) {
     console.log(name.padEnd(34),cells.join(''));
   }
   const easy=panel.filter(p=>p.band==='easy'&&REGULAR(p.row));
-  const line=(label,group)=>console.log(' '+label.padEnd(12),String(group.length).padStart(3),'puzzles | under 50',pct(mean(group.map(p=>p.under50))),'| trophy match',pct(mean(group.map(p=>p.match))),
+  const line=(label,group)=>console.log(' '+label.padEnd(18),String(group.length).padStart(3),'puzzles | under 50',group.length?pct(mean(group.map(p=>p.under50))):'    -','| trophy match',group.length?pct(mean(group.map(p=>p.match))):'    -',
     '| majority under 50:',group.filter(p=>p.under50>=.5).length,'| 90%+ match:',group.filter(p=>p.match>=.9).length);
   console.log('\nSERVED EASY PUZZLES, REGULAR SETS (the sample the rule was shaped on; per-puzzle means)');
   for(const [label,keep] of [['all sets',()=>true],['FRA',p=>p.row.set==='fra'],['other sets',p=>p.row.set!=='fra']]) {
@@ -106,69 +111,107 @@ if(answers&&meta) {
     const group=easy.filter(keep);
     line('current',group);line('rule keeps',group.filter(p=>p.clear));line('rule drops',group.filter(p=>!p.clear));
   }
+  // The forward check: Easy puzzles by the rule that scheduled them. The
+  // -v2 rows are empty until Dailies have been generated with the rule.
+  console.log('\nSERVED EASY PUZZLES BY SELECTION RULE (latest and mixed; the forward check reads the -v2 rows)');
+  for(const rule of [null,'latest-stakes-v1','mixed-stakes-v1','latest-stakes-v2','mixed-stakes-v2'])
+    line(rule||'band draw',easy.filter(p=>(p.row.rule||null)===rule&&['latest','mixed'].includes(p.row.env)));
 }
 
-// 2. Practice holdout: easy-band practice answers, one row per puzzle.
-const practice=load('practice_easy.json');
-if(practice) {
-  const rows=practice.map(scored).filter(p=>p.band==='easy');
-  const rate=(group,key)=>group.reduce((sum,p)=>sum+p.row[key],0)/Math.max(1,group.reduce((sum,p)=>sum+p.row.n,0));
-  const kept=rows.filter(p=>p.clear),dropped=rows.filter(p=>!p.clear);
-  console.log(`\nPRACTICE HOLDOUT: ${rows.length} easy puzzles, ${rows.reduce((n,p)=>n+p.row.n,0)} first-encounter answers, ${new Set(rows.map(p=>p.row.set)).size} sets; rule keeps ${kept.length} (${pct(kept.length/rows.length).trim()})`);
-  for(const [key,label] of [['lt50','under 50'],['tm','trophy match'],['n75','75+ credit']]) {
-    const versusDropped=[],versusAll=[];
-    for(let i=0;i<4000;i++) {
-      versusDropped.push(rate(resample(kept),key)-rate(resample(dropped),key));
-      const sample=resample(rows);versusAll.push(rate(sample.filter(p=>p.clear),key)-rate(sample,key));
-    }
-    console.log(' '+label.padEnd(13),'current',pct(rate(rows,key)),'| rule',pct(rate(kept,key)),'| dropped',pct(rate(dropped,key)),
-      '| rule - dropped',(100*(rate(kept,key)-rate(dropped,key))).toFixed(1),interval(versusDropped),'| rule - current',(100*(rate(kept,key)-rate(rows,key))).toFixed(1),interval(versusAll));
+// 2. Practice holdout: one row per first-encounter answer, with an anonymous
+// player index, joined to the easy-band practice puzzles.
+const practice=load('practice_easy.json'),practiceAnswers=load('practice_answers.json');
+if(practice&&practiceAnswers) {
+  const puzzles=new Map(practice.map(scored).filter(p=>p.band==='easy').map(p=>[p.row.id,p]));
+  const rows=practiceAnswers.filter(a=>puzzles.has(a.id)).map(a=>({...puzzles.get(a.id),player:a.p,under:a.s<50?1:0,match:a.m?1:0,high:a.s>=75?1:0}));
+  const players=new Map();
+  for(const row of rows){if(!players.has(row.player))players.set(row.player,[]);players.get(row.player).push(row);}
+  const groups=[...players.values()],sizes=groups.map(g=>g.length).sort((a,b)=>b-a);
+  const rate=(group,key)=>group.length?group.reduce((sum,p)=>sum+p[key],0)/group.length:NaN;
+  // Resample whole players: one player's answers are not independent.
+  const bootstrap=statistic=>{const draws=[];for(let i=0;i<5000;i++)draws.push(statistic(groups.flatMap(()=>groups[Math.floor(random()*groups.length)])));return interval(draws);};
+  console.log(`\nPRACTICE HOLDOUT: ${new Set(rows.map(p=>p.row.id)).size} easy puzzles, ${rows.length} first-encounter answers, ${groups.length} players, ${new Set(rows.map(p=>p.row.set)).size} sets`);
+  console.log(` answers per player: median ${sizes[Math.floor(sizes.length/2)]}, largest ${sizes[0]}, five most active ${sizes.slice(0,5).reduce((a,b)=>a+b,0)} (${pct(sizes.slice(0,5).reduce((a,b)=>a+b,0)/rows.length).trim()})`);
+  const report=(label,keep)=>{
+    const kept=rows.filter(keep),dropped=rows.filter(p=>!keep(p));
+    console.log(`${label}: keeps ${kept.length} answers (${pct(kept.length/rows.length).trim()}); intervals resample players`);
+    for(const [key,name] of [['under','under 50'],['match','trophy match'],['high','75+ credit']])
+      console.log(' '+name.padEnd(13),'current',pct(rate(rows,key)),'| rule',pct(rate(kept,key)),'| dropped',pct(rate(dropped,key)),
+        '| rule - dropped',points(rate(kept,key)-rate(dropped,key)),bootstrap(s=>rate(s.filter(keep),key)-rate(s.filter(p=>!keep(p)),key)),
+        '| rule - current',points(rate(kept,key)-rate(rows,key)),bootstrap(s=>rate(s.filter(keep),key)-rate(s,key)));
+    // Each player against themselves, then with the heaviest players removed.
+    const both=groups.filter(g=>g.some(keep)&&g.some(p=>!keep(p)));
+    const within=both.map(g=>rate(g.filter(keep),'under')-rate(g.filter(p=>!keep(p)),'under'));
+    const centre=mean(within),error=Math.sqrt(within.reduce((sum,d)=>sum+(d-centre)**2,0)/(within.length-1)/within.length);
+    console.log(` within-player under-50 difference: ${both.length} players with both kinds, mean ${points(centre)} [${points(centre-1.96*error)}, ${points(centre+1.96*error)}]; lower for ${within.filter(d=>d<0).length}, equal for ${within.filter(d=>d===0).length}, higher for ${within.filter(d=>d>0).length}`);
+    const heavy=new Set([...players.entries()].sort((a,b)=>b[1].length-a[1].length).slice(0,5).map(([player])=>player)),rest=rows.filter(p=>!heavy.has(p.player));
+    console.log(` without the five most active players: current ${pct(rate(rest,'under')).trim()}, rule ${pct(rate(rest.filter(keep),'under')).trim()}, dropped ${pct(rate(rest.filter(p=>!keep(p)),'under')).trim()}`);
+  };
+  report('PRE-REGISTERED RULE (colour fit from P1P2)',p=>p.preregistered);
+  report('SHIPPED RULE (colour fit from P1P3; exploratory on this export)',p=>p.clear);
+  console.log('SHIPPED RULE BY SET (40+ answers): answers | kept, under 50 | dropped, under 50 | difference');
+  const differences=[];
+  for(const set of [...new Set(rows.map(p=>p.row.set))].sort()) {
+    const group=rows.filter(p=>p.row.set===set),kept=group.filter(p=>p.clear),dropped=group.filter(p=>!p.clear);
+    if(kept.length>=10&&dropped.length>=10)differences.push(rate(kept,'under')-rate(dropped,'under'));
+    if(group.length>=40)console.log(' '+set.padEnd(5),String(group.length).padStart(4),'|',String(kept.length).padStart(3),pct(rate(kept,'under')),'|',String(dropped.length).padStart(3),pct(rate(dropped,'under')),'|',points(rate(kept,'under')-rate(dropped,'under')).padStart(6));
   }
-  let agree=0,compared=0;
-  for(const set of new Set(rows.map(p=>p.row.set))) {
-    const a=kept.filter(p=>p.row.set===set),b=dropped.filter(p=>p.row.set===set);
-    if(a.reduce((n,p)=>n+p.row.n,0)<15||b.reduce((n,p)=>n+p.row.n,0)<15)continue;
-    compared++;if(rate(a,'lt50')<rate(b,'lt50'))agree++;
+  differences.sort((a,b)=>a-b);
+  const quantile=q=>points(differences[Math.floor(q*(differences.length-1))]);
+  console.log(` sets with 10+ answers in each arm: ${differences.length}; rule arm lower in ${differences.filter(d=>d<0).length}; difference min ${quantile(0)}, quartiles ${quantile(.25)} / ${quantile(.5)} / ${quantile(.75)}, max ${quantile(1)}`);
+  // Sensitivity to the strength cutoff. The shipped value is 0; nothing here
+  // is used to choose it.
+  console.log('STRENGTH-MARGIN SENSITIVITY (leader and colour fit unchanged): cutoff | kept share | under 50 kept | dropped | kept - dropped');
+  for(const cutoff of [-2,-1,-0.5,-0.25,-0.1,0,0.1,0.25,0.5,1]) {
+    const keep=p=>p.clearAt(cutoff),kept=rows.filter(keep),dropped=rows.filter(p=>!keep(p));
+    console.log(' '+String(cutoff).padStart(5),'|',pct(kept.length/rows.length),'|',pct(rate(kept,'under')),'|',pct(rate(dropped,'under')),'|',points(rate(kept,'under')-rate(dropped,'under')).padStart(6),bootstrap(s=>rate(s.filter(keep),'under')-rate(s.filter(p=>!keep(p)),'under')));
   }
-  console.log(` sets with 15+ answers in each arm where the rule arm has fewer under-50 answers: ${agree}/${compared}`);
-  const others=rows.filter(p=>p.row.set!=='fra');
-  console.log(' excluding FRA: rule',pct(rate(others.filter(p=>p.clear),'lt50')),'| dropped',pct(rate(others.filter(p=>!p.clear),'lt50')));
+  const near=rows.filter(p=>!p.clear&&p.clearAt(-0.25)).length;
+  console.log(` answers rejected only by a deficit under 0.25 points: ${near} (${pct(near/rows.length).trim()}); answers with no strength margin: ${rows.filter(p=>p.features.trophy_strength_margin==null).length}`);
 }
 
 // 3. Current unserved inventory: serving easy pools, P1P1-P1P5.
 for(const file of fs.readdirSync(dir).filter(name=>/^pool_.*\.json$/.test(name)).sort()) {
   const rows=load(file).map(scored).filter(p=>p.band==='easy')
     .filter(p=>!(p.row.pick>=STAKES_RULE.no_land_answer_from_pick&&p.row.land)&&(p.row.pick<STAKES_RULE.deck_gate_from_pick||p.row.deck===true));
-  const trophy=p=>p.puzzle.candidates.find(c=>c.id===p.row.hist).name;
-  console.log(`\nINVENTORY ${file}: easy pool -> clear-Easy pool, distinct answer cards`);
+  const trophy=p=>p.features.trophy_card_id;
+  console.log(`\nINVENTORY ${file}: easy pool -> clear-Easy pool, distinct answer cards; no strength margin: ${rows.filter(p=>p.features.trophy_strength_margin==null).length} of ${rows.length}`);
   for(const set of [...new Set(rows.map(p=>p.row.set))].sort())for(let pick=1;pick<=5;pick++) {
     const pool=rows.filter(p=>p.row.set===set&&p.row.pick===pick),clear=pool.filter(p=>p.clear);
     if(pool.length)console.log(` ${set} P1P${pick}: ${pool.length} -> ${clear.length} (${pct(clear.length/pool.length).trim()}), cards ${new Set(pool.map(trophy)).size} -> ${new Set(clear.map(trophy)).size}`);
   }
   // One Easy a day for a year from one set, under the Daily repeat windows
-  // (28-day decision, 7-day source), averaged over 20 simulated years. A day
-  // is unfilled only if both the clear pool and the whole easy pool are empty
-  // (a set whose archive starts at P1P2 has no P1P1 pool under either rule;
-  // the live selector then serves a medium decision).
-  const YEARS=20;
-  for(const set of [...new Set(rows.map(p=>p.row.set))].sort())for(const rule of [false,true]) {
-    const total={unfilled:0,fallback:0,distinct:0,top:0,repeats:0};
+  // (28-day decision, 7-day source), averaged over 20 simulated years. With
+  // rotation, an answer card rests for EASY_RULE.answer_repeat_days after it is
+  // served, unless that would leave the clear pool empty. A day is unfilled
+  // only if the whole easy pool is empty (a set whose archive starts at P1P2
+  // has no P1P1 pool under any rule; the live selector then serves a medium
+  // decision).
+  const YEARS=20,WINDOW=EASY_RULE.answer_repeat_days;
+  for(const set of [...new Set(rows.map(p=>p.row.set))].sort())for(const mode of ['current draw','clear-Easy, no rotation','clear-Easy with rotation']) {
+    const total={unfilled:0,relaxed:0,fallback:0,distinct:0,top:0,week:0,margin:0,served:0};
     for(let year=0;year<YEARS;year++) {
-      const decision=new Map(),source=new Map(),cards=new Map(),recent=[];
+      const decision=new Map(),source=new Map(),last=new Map(),cards=new Map();
       for(let day=0;day<365;day++) {
         const pick=1+Math.floor(random()*5);
         const open=p=>p.row.set===set&&p.row.pick===pick&&!(day-(decision.get(p.row.id)??-99)<28)&&!(day-(source.get(p.row.src)??-99)<7);
-        let pool=rows.filter(p=>open(p)&&(!rule||p.clear));
-        if(!pool.length&&rule){total.fallback++;pool=rows.filter(open);}
+        const rested=p=>day-(last.get(trophy(p))??-999)>=WINDOW;
+        let pool=rows.filter(open);
+        if(mode!=='current draw') {
+          const clear=pool.filter(p=>p.clear);
+          let chosen=mode==='clear-Easy with rotation'?clear.filter(rested):clear;
+          if(!chosen.length&&clear.length&&mode==='clear-Easy with rotation'){total.relaxed++;chosen=clear;}
+          if(!chosen.length)total.fallback++;else pool=chosen;
+        }
         if(!pool.length){total.unfilled++;continue;}
         const chosen=pool[Math.floor(random()*pool.length)],card=trophy(chosen);
-        decision.set(chosen.row.id,day);source.set(chosen.row.src,day);cards.set(card,(cards.get(card)||0)+1);
-        if(recent.slice(-7).includes(card))total.repeats++;
-        recent.push(card);
+        if(day-(last.get(card)??-999)<=7)total.week++;
+        decision.set(chosen.row.id,day);source.set(chosen.row.src,day);last.set(card,day);cards.set(card,(cards.get(card)||0)+1);
+        total.margin+=chosen.features.trophy_strength_margin??0;total.served++;
       }
       total.distinct+=cards.size;total.top+=Math.max(0,...cards.values());
     }
     const per=key=>(total[key]/YEARS).toFixed(0);
-    console.log(` ${set} ${rule?'clear-Easy rule':'current draw   '} (per year): unfilled ${per('unfilled')}, fell back ${per('fallback')}, distinct answer cards ${per('distinct')}, most frequent answer ${per('top')} days, same answer within a week ${per('repeats')} days`);
+    console.log(` ${set} ${mode.padEnd(25)} per year: distinct answer cards ${per('distinct')}, most frequent answer ${per('top')} days, same answer within a week ${per('week')} days, rotation relaxed ${per('relaxed')}, left clear pool ${per('fallback')}, unfilled ${per('unfilled')}; mean strength margin ${(total.margin/total.served).toFixed(2)}`);
   }
 }
