@@ -9,7 +9,7 @@ let account=a,active=true,presentation='prompt',state='unanswered',exclude=false
 const edits=[];
 const server=http.createServer(async(req,res)=>{
  if(req.url==='/fixture'){
-  res.setHeader('content-type','text/html');res.end('<!doctype html><html><head><script>window.PACK1_API={firstParty:true,growthUrl:"https://api.results.invalid/growth"};</script></head><body><main><button id="play">Play now</button><aside data-results-ui data-results-invitation hidden></aside><section data-results-ui id="results-settings" hidden></section></main><script type="module">import {bindResultsInvitation,bindResultsSettings} from "/results-settings.mjs";window.bindInvitation=bindResultsInvitation;window.bindSettings=bindResultsSettings;window.ready=true;</script></body></html>');return;
+  res.setHeader('content-type','text/html');res.end('<!doctype html><html><head><script>window.PACK1_API={firstParty:true,growthUrl:"https://api.results.invalid/growth"};</script></head><body><main><button id="play">Play now</button><aside data-results-ui data-results-invitation hidden></aside><section data-results-ui id="results-settings" hidden></section><section data-results-ui id="results-publications-settings" hidden></section></main><script type="module">import {bindResultsInvitation,bindResultsSettings} from "/results-settings.mjs";window.bindInvitation=bindResultsInvitation;window.bindSettings=bindResultsSettings;window.ready=true;</script></body></html>');return;
  }
  try{const file=path.resolve(root,'.'+new URL(req.url,'http://local').pathname);if(!file.startsWith(root+path.sep))throw Error();const bytes=await fs.readFile(file);res.setHeader('content-type',file.endsWith('.json')?'application/json':'text/javascript');res.end(bytes);}catch{res.statusCode=404;res.end();}
 });
@@ -45,17 +45,20 @@ try{
  assert.equal(await page.evaluate(()=>document.activeElement.tagName),'BODY');assert.equal(await page.locator('#play').isEnabled(),true);
  await no.click();await page.waitForFunction(()=>!document.querySelector('[data-results-invitation]').textContent);assert.equal(state,'off');
  await open();await page.evaluate(()=>window.bindInvitation());assert.equal(await page.getByRole('heading',{name:'Get your results by email?'}).count(),0);
- await page.evaluate(()=>window.bindSettings());await page.getByRole('button',{name:'On',exact:true}).click();await page.waitForFunction(()=>document.querySelector('[data-results-action="settings:on"]').getAttribute('aria-pressed')==='true');assert.equal(state,'on');
+ await page.evaluate(()=>window.bindSettings());await page.locator('#results-settings').getByRole('button',{name:'Turn on',exact:true}).click();await page.locator('#results-settings').getByRole('button',{name:'Turn off',exact:true}).waitFor();assert.equal(state,'on');
+ assert.equal(await page.locator('#results-settings .reminder-state').innerText(),'On');
+ await page.locator('#results-settings').getByRole('button',{name:'Turn off',exact:true}).click();await page.locator('#results-settings').getByRole('button',{name:'Turn on',exact:true}).waitFor();assert.equal(state,'off');
  await page.getByRole('checkbox').check();await page.waitForFunction(()=>document.querySelector('#results-exclude').checked&&!document.querySelector('#results-exclude').disabled);assert.equal(exclude,true);
  // Existing players get only the notice, and the action stays on the page.
  presentation='notice';state='unanswered';await open();await page.evaluate(()=>window.bindInvitation());
  const url=page.url();await page.getByRole('button',{name:'Turn on emails'}).click();await page.waitForFunction(()=>!document.querySelector('[data-results-invitation]').textContent);assert.equal(state,'on');assert.equal(page.url(),url);
  presentation='notice';state='unanswered';await open();await page.evaluate(()=>window.bindInvitation());await page.getByRole('button',{name:'Dismiss',exact:true}).click();await page.waitForFunction(()=>!document.querySelector('[data-results-invitation]').textContent);assert.equal(state,'off');
  // A response belonging to the previous account cannot repaint the new account.
- await page.evaluate(()=>window.bindSettings());holdNext=true;await page.getByRole('button',{name:'On',exact:true}).click();
+ state='off';await page.evaluate(()=>window.bindSettings());holdNext=true;await page.getByRole('button',{name:'Turn on',exact:true}).click();
  await new Promise(resolve=>{const poll=()=>held?resolve():setTimeout(poll,10);poll();});
+ assert.equal(await page.getByRole('checkbox').isDisabled(),true,'publication choice stays disabled during an email save');
  account=b;await page.evaluate(()=>window.dispatchEvent(new Event('packone-account-changed')));held();held=null;
- await page.waitForTimeout(50);assert.equal(await page.locator('#results-settings').textContent(),'');
+ await page.waitForTimeout(50);assert.equal(await page.locator('#results-settings').textContent(),'');assert.equal(await page.locator('#results-publications-settings').textContent(),'');
  active=false;await open();await page.evaluate(()=>Promise.all([window.bindInvitation(),window.bindSettings()]));assert.equal(await page.locator('#results-settings').isVisible(),false);assert.equal(await page.locator('[data-results-invitation]').isVisible(),false);
  assert.ok(edits.filter(e=>e.action!=='present').every(e=>e.expectedAccountId===a));
  console.log('PASS Chromium: exact prompt/notice copy, equal choices, saved settings, dismissal, one ask, account isolation and launch gate.');

@@ -1,4 +1,4 @@
-import {bindResultsInvitation} from './results-settings.mjs?v=1';
+import {bindResultsInvitation} from './results-settings.mjs?v=2';
 import { loadDailyStatus } from './growth-api.mjs';
 import { todayStatus, gameDateKey } from './today-status.mjs';
 import { dailyResetCue } from './game-date.mjs';
@@ -52,10 +52,10 @@ export function renderDailyHome(profile = null, state = 'ready') {
   lastDay = gameDateKey();
   document.querySelector('#app').innerHTML = dailyHomeMarkup(profile, lastDay, state);
   void bindResultsInvitation();
-  document.querySelector('[data-home-account]')?.addEventListener('click', async () => (await import('./growth.mjs?v=34')).renderAccount());
+  document.querySelector('[data-home-account]')?.addEventListener('click', async () => (await import('./growth.mjs?v=35')).renderAccount());
   document.querySelector('[data-home-username]')?.addEventListener('click', async () => {
-    if(!profile?.player?.claimed){await (await import('./growth.mjs?v=34')).renderAccount({notice:'Choose a display name to join Daily leaderboards.'});return;}
-    const profiles=await import('./profile-product.mjs?v=25');
+    if(!profile?.player?.claimed){await (await import('./growth.mjs?v=35')).renderAccount({notice:'Choose a display name to join Daily leaderboards.'});return;}
+    const profiles=await import('./profile-product.mjs?v=26');
     await profiles.renderMyProfile();
     document.querySelector('#profile-account-tab')?.click();
     document.querySelector('#profile-account input[name="displayName"]')?.focus();
