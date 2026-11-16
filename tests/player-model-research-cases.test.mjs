@@ -109,7 +109,7 @@ test('case endpoints are separately GET allowlisted and behind the same authenti
     if(sql.includes('WITH votes AS MATERIALIZED')){count++;assert.deepEqual(params.slice(2),[50,RESEARCH_CORPUS]);return {rows:[makeRow('puzzle-one')]};}
     throw Error('Unexpected SQL: '+sql.slice(0,50));
   };
-  const req=mode=>new Request('https://packone.pro/v1/admin/measurements/research-cases?from=2020-01-01&to=2020-01-15&view='+mode,{
+  const req=mode=>new Request('https://packone.pro/v1/admin/measurements/reviews?from=2020-01-01&to=2020-01-15&research='+mode,{
     headers:{'x-pack1-auth-session':'synthetic-admin-token'},
   });
   const packet=await handleAdmin(req('blind'),query,async()=>({}));
