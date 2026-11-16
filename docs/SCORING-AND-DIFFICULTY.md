@@ -8,6 +8,10 @@ Probability calibration and score calibration are separate. Displayed calibrated
 
 `support-ratio-v1` rates ambiguity as `round(100 × runner-up support / leading support)`: easy 0–49, medium 50–79, hard 80–100. This is not measured human solve rate. Target/model disagreement is separate and explained only after locking.
 
+The bands describe the shape of a decision, not how players score on it. **Easy** is a clear pick: one card stands out. **Medium** is a real choice among two or three credible options. **Hard** is a close call between nearly tied options. Because partial credit follows the same support ratio, a close runner-up always earns high credit and a distant one never does: across 624 served Daily puzzles, 13.5% of answers to hard decisions scored under 50 against 32.6% for easy ones, and the rating had no relation to decision time. The [November 2026 difficulty review](DIFFICULTY-REVIEW-2026-11.md) has the measurements and explains why the thresholds and the scoring curve were kept.
+
+Because a miss on an easy decision is costly, the Latest Set and Main Dailies serve an Easy round only from **clear-Easy** decisions: the trophy pick is the model's leading card, no other rated card in the pack is stronger, and from P1P3 a coloured trophy pick shares a colour with the prior picks ([Daily selection](LATEST-DAILY-SELECTION.md)). This changes which easy decisions are chosen, never a rating, a band or a score.
+
 New runs target one easy, five medium and two hard decisions. Easy belongs in the first five and a hard decision in the final three; unavailable easy can become medium, while medium/hard shortages fail. All questions count equally.
 
 Unshared practice rerolls preserve band, stay within ten rating points of both original/current choices, retain source pick windows, exclude seen source drafts and satisfy existing matching distance. Regular random practice has one set and one pack reroll; Cube/custom practice has two pack rerolls. Dailies and exact shared recipients have none.

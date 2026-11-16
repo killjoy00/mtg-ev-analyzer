@@ -1,7 +1,9 @@
 // Runs ONLY after the disposable local PostgreSQL fixture was created.
 // Both Latest Set and Main Daily apply the same per-set stakes rule once
 // every serving puzzle of the planned sets is scored, record their own rule,
-// and fall back to the existing band draw if their data is incomplete.
+// and fall back to the existing band draw if their data is incomplete. Easy
+// rounds additionally apply the clear-Easy rule, with its own switch and
+// fallback to the previous uniform easy draw.
 import assert from 'node:assert/strict';
 import {fixturePool,textTypes} from './support/postgres-fixture.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
@@ -11,7 +13,7 @@ import {seededRandom} from '../gameplay.mjs';
 import {loadLiveSetMetadata,selectDatabaseRun} from '../worker/draft-run-selection.mjs';
 import {ensureDailySchedule,RECENT_DAILY_DECISIONS,DAILY_REPEAT_WINDOW_DAYS,dailyRepeatExclusion,selectDailyWithoutRepeats} from '../worker/draft-run-daily.mjs';
 import {decisionKey} from '../worker/draft-run-selection.mjs';
-import {LATEST_DAILY_RULE,MIXED_DAILY_RULE,SELECTION_FEATURE_VERSION,STAKES_RULE,stakesTopPoolSize} from '../puzzle-selection.mjs';
+import {LATEST_DAILY_RULE,MIXED_DAILY_RULE,LATEST_DAILY_CLEAR_EASY_RULE,MIXED_DAILY_CLEAR_EASY_RULE,SELECTION_FEATURE_VERSION,STAKES_RULE,EASY_RULE,isClearEasy,stakesTopPoolSize} from '../puzzle-selection.mjs';
 import {scorePuzzleSelection} from '../scripts/score-puzzle-selection.mjs';
 
 const pool=fixturePool();
@@ -20,12 +22,13 @@ const array=values=>`{${values.join(',')}}`;
 const seed=day=>`daily:latest:${day}:${DRAFT_RUN_CORPUS_VERSION}:${DRAFT_RUN_SELECTION_VERSION}`;
 const mixedSeed=day=>`daily:mixed:${day}:${DRAFT_RUN_CORPUS_VERSION}:${DRAFT_RUN_SELECTION_VERSION}`;
 // Returns the run and the rule that chose it.
-const select=async(environment,day,seedText)=>{
+const select=async(environment,day,seedText,options={},run=query)=>{
   const report={};
-  const run=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seedText,environment,{daily:true,day,report});
-  return {run,rule:report.selectionRule};
+  const selected=await selectDatabaseRun(run,DRAFT_RUN_CORPUS_VERSION,seedText,environment,{daily:true,day,report,...options});
+  return {run:selected,rule:report.selectionRule};
 };
-const latest=day=>select('latest',day,seed(day));
+const latest=(day,options,run)=>select('latest',day,seed(day),options,run);
+const ids=run=>run.map(p=>p.puzzle_id).join();
 const mixed=day=>select('mixed',day,mixedSeed(day));
 const DAYS=['2026-11-02','2026-11-03','2026-11-04','2026-11-05','2026-11-06'];
 // The fixture's serving filters, as the selector applies them.
@@ -45,11 +48,12 @@ try {
   check(full.sets.reduce((n,r)=>n+r.scored,0)===total,'A full rescore visits every puzzle exactly once');
   check(full.sets.every(r=>r.written===0),'Backfill scoring equals import scoring, so a rescore writes nothing');
 
-  let contested=0,ruleRounds=0;
+  let contested=0,ruleRounds=0,easyRounds=0,clearRounds=0;
   for(const day of DAYS) {
     const {run,rule}=await latest(day);
-    check(rule===LATEST_DAILY_RULE&&run.length===8,`${day}: the scored latest set uses the stakes rule`);
-    const rows=new Map((await query(`SELECT p.puzzle_id,p.source_draft_hash,p.pick_number,r.band,f.stakes_points,f.credible_count,f.trophy_in_main_deck,f.trophy_is_land
+    check(rule===LATEST_DAILY_CLEAR_EASY_RULE&&run.length===8,`${day}: the scored latest set uses the stakes and clear-Easy rules`);
+    const rows=new Map((await query(`SELECT p.puzzle_id,p.source_draft_hash,p.pick_number,r.band,r.target_support_ratio,f.stakes_points,f.credible_count,f.trophy_in_main_deck,f.trophy_is_land,
+        f.trophy_strength_margin,f.trophy_off_colour
       FROM draft_run_verified_puzzles p JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'
       JOIN draft_run_puzzle_selection_features f ON f.puzzle_id=p.puzzle_id AND f.feature_version=$2 WHERE p.puzzle_id=ANY($1::text[])`,
       [array(run.map(p=>p.puzzle_id)),SELECTION_FEATURE_VERSION])).rows.map(r=>[r.puzzle_id,r]));
@@ -73,6 +77,24 @@ try {
           [SELECTION_FEATURE_VERSION,choice.set_id,pick,array(used),STAKES_RULE.no_land_answer_from_pick,STAKES_RULE.deck_gate_from_pick])).rows.map(r=>r.puzzle_id);
         const top=ranked.slice(0,stakesTopPoolSize(ranked.length));
         if(top.includes(choice.puzzle_id))ruleRounds++;
+      } else {
+        easyRounds++;
+        // Recompute the round's clear-Easy pool with the sources already used.
+        const clear=(await query(`SELECT p.puzzle_id FROM draft_run_verified_puzzles p
+          JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'
+          JOIN draft_run_puzzle_selection_features f ON f.puzzle_id=p.puzzle_id AND f.feature_version=$1
+          WHERE ${SERVING} AND p.set_id=$2 AND p.pick_number=$3 AND p.source_draft_hash<>ALL($4::text[])
+            AND r.band='easy' AND r.target_support_ratio>=$7::float8 AND f.trophy_strength_margin>=$8::real
+            AND (p.pick_number<$9 OR f.trophy_off_colour IS FALSE)
+            AND NOT (p.pick_number>=$5 AND f.trophy_is_land) AND (p.pick_number<$6 OR f.trophy_in_main_deck)`,
+          [SELECTION_FEATURE_VERSION,choice.set_id,pick,array(used),STAKES_RULE.no_land_answer_from_pick,STAKES_RULE.deck_gate_from_pick,
+            EASY_RULE.min_trophy_support_ratio,EASY_RULE.min_strength_margin,EASY_RULE.colour_fit_from_pick])).rows.map(r=>r.puzzle_id);
+        const features={pick_number:pick,target_support_ratio:f.target_support_ratio,
+          trophy_strength_margin:f.trophy_strength_margin,trophy_off_colour:f.trophy_off_colour===null?null:f.trophy_off_colour==='t'};
+        if(clear.length) {
+          clearRounds++;
+          check(clear.includes(choice.puzzle_id)&&isClearEasy(features),`${day}: the Easy P1P${pick} is a clear-Easy decision`);
+        } else check(!isClearEasy(features),`${day}: without a clear-Easy decision P1P${pick} uses the uniform easy draw`);
       }
       used.push(f.source_draft_hash);
     }
@@ -81,11 +103,36 @@ try {
   const plain=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed(DAYS[0]),'latest',{daily:true,day:DAYS[0]});
   assert.deepStrictEqual(plain,(await latest(DAYS[0])).run,'The report option does not change the returned run');tests++;
   check(contested>=DAYS.length*5&&ruleRounds===contested,`Every contested round came from its top stakes pool (${ruleRounds}/${contested})`);
+  check(easyRounds>=1&&clearRounds>=1,`Easy rounds drew from the clear-Easy pool (${clearRounds}/${easyRounds})`);
+
+  // The clear-Easy switch, a row scored before its columns existed, and a
+  // database without those columns all keep the stakes rule and return Easy
+  // rounds to the uniform draw: the same Daily in each case.
+  const switched=await latest(DAYS[0],{clearEasyEnabled:false});
+  check(switched.rule===LATEST_DAILY_RULE&&switched.run.length===8,'The clear-Easy switch keeps the stakes rule and restores the uniform Easy draw');
+  const legacyQuery=async(text,values)=>{
+    if(text.includes('trophy_off_colour'))throw Object.assign(Error('column f.trophy_off_colour does not exist'),{code:'42703'});
+    return query(text,values);
+  };
+  const legacy=await latest(DAYS[0],{},legacyQuery);
+  check(legacy.rule===LATEST_DAILY_RULE&&ids(legacy.run)===ids(switched.run),'A database without the clear-Easy columns keeps the stakes rule');
+  const latestSet=switched.run[0].set_id;
+  const unscored=(await query(`SELECT p.puzzle_id FROM draft_run_verified_puzzles p
+    JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'
+    WHERE ${SERVING} AND p.set_id=$1 AND p.pick_number=8 ORDER BY p.puzzle_id DESC LIMIT 1`,[latestSet])).rows[0].puzzle_id;
+  const clearRun=ids((await latest(DAYS[0])).run);
+  await query('UPDATE draft_run_puzzle_selection_features SET trophy_strength_margin=NULL,trophy_off_colour=NULL WHERE puzzle_id=$1',[unscored]);
+  const partial=await latest(DAYS[0]);
+  check(partial.rule===LATEST_DAILY_RULE&&ids(partial.run)===ids(switched.run),'One row without clear-Easy features returns every Easy round to the uniform draw');
+  const refreshed=await scorePuzzleSelection(query,{setIds:[latestSet],log:()=>{}});
+  check(refreshed.sets[0].written===1&&refreshed.remaining===0,'The backfill rescores a row that predates the clear-Easy features');
+  const again=await latest(DAYS[0]);
+  check(again.rule===LATEST_DAILY_CLEAR_EASY_RULE&&ids(again.run)===clearRun,'Scored again, the clear-Easy rule returns the same Daily');
 
   // Main Daily keeps its eight-slot set plan and uses the same stakes rule
   // independently of Latest Set. Turning off its flag restores the band draw.
   const mixedDay=DAYS[0],mixedResult=await mixed(mixedDay);
-  check(mixedResult.rule===MIXED_DAILY_RULE&&mixedResult.run.length===8,'Main Daily applies its stakes rule to eight picks');
+  check(mixedResult.rule===MIXED_DAILY_CLEAR_EASY_RULE&&mixedResult.run.length===8,'Main Daily applies its stakes and clear-Easy rules to eight picks');
   const plannedRandom=seededRandom(mixedSeed(mixedDay));
   runDifficultyBands(plannedRandom,DRAFT_RUN_SELECTION_VERSION);
   const metadata=await loadLiveSetMetadata(query,DRAFT_RUN_CORPUS_VERSION);
@@ -100,7 +147,7 @@ try {
   check(disabledReport.selectionRule===null&&disabledMixed.length===8,"Main Daily's independent switch restores the band draw");
   const latestWithMixedDisabled=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed(mixedDay),'latest',
     {daily:true,day:mixedDay,mixedStakesEnabled:false,report:disabledReport});
-  check(disabledReport.selectionRule===LATEST_DAILY_RULE&&latestWithMixedDisabled.length===8,
+  check(disabledReport.selectionRule===LATEST_DAILY_CLEAR_EASY_RULE&&latestWithMixedDisabled.length===8,
     'Disabling Main Daily stakes does not affect Latest Set');
 
   const mixedVictim=mixedResult.run.at(-1);
@@ -140,13 +187,13 @@ try {
   const report={};
   const expected=await selectDailyWithoutRepeats(exclude=>selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed(day),'latest',{daily:true,day,exclude,report}),
     exclusion,{environment:'latest',day,warn:()=>{}});
-  check(report.selectionRule===LATEST_DAILY_RULE,'The stakes rule still applies with the repeat window');
+  check(report.selectionRule===LATEST_DAILY_CLEAR_EASY_RULE,'The stakes and clear-Easy rules still apply with the repeat window');
   check(!expected.some(p=>exclusion.decisions.includes(decisionKey(p))),'The rule never repeats a decision from the repeat window');
   try {
     const {schedule,created}=await ensureDailySchedule(query,day,'latest');
     check(created,'The latest-set Daily schedule is created');
     const stored=(await query("SELECT selection_rule FROM draft_run_schedules WHERE day=$1::date AND environment='latest'",[day])).rows[0];
-    check(stored.selection_rule===LATEST_DAILY_RULE,'The schedule records the stakes rule');
+    check(stored.selection_rule===LATEST_DAILY_CLEAR_EASY_RULE,'The schedule records the rule that chose it');
     check(JSON.parse(schedule.puzzle_ids).join()===expected.map(p=>p.puzzle_id).join(),'The schedule holds the rule selection');
     // Main Daily's schedule is generated after Latest Set and uses the same
     // cross-environment repeat exclusions, without changing its set mix.
@@ -156,15 +203,15 @@ try {
       mixedSeed(day),'mixed',{daily:true,day,exclude,report:mixedReport}),
       dailyRepeatExclusion(mixedRecent),{environment:'mixed',day,warn:()=>{}});
     const {schedule:mixedSchedule,created:mixedCreated}=await ensureDailySchedule(query,day,'mixed');
-    check(mixedCreated&&mixedReport.selectionRule===MIXED_DAILY_RULE,'Main Daily creates a new stakes schedule');
-    check((await query("SELECT selection_rule FROM draft_run_schedules WHERE day=$1::date AND environment='mixed'",[day])).rows[0].selection_rule===MIXED_DAILY_RULE,
+    check(mixedCreated&&mixedReport.selectionRule===MIXED_DAILY_CLEAR_EASY_RULE,'Main Daily creates a new stakes schedule');
+    check((await query("SELECT selection_rule FROM draft_run_schedules WHERE day=$1::date AND environment='mixed'",[day])).rows[0].selection_rule===MIXED_DAILY_CLEAR_EASY_RULE,
       'Main Daily records its own selection rule');
     check(JSON.parse(mixedSchedule.puzzle_ids).join()===mixedExpected.map(p=>p.puzzle_id).join(),
       "Main Daily's scheduled decisions match the deterministic stakes draw");
   } finally {
     await query('DELETE FROM draft_run_schedules WHERE day=$1::date',[day]);
   }
-  console.log('PASS: '+tests+' real PostgreSQL Main and Latest Set Daily stakes assertions.');
+  console.log('PASS: '+tests+' real PostgreSQL Main and Latest Set Daily stakes and clear-Easy assertions.');
 } finally {
   await pool.end();
 }

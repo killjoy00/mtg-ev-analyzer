@@ -23,16 +23,40 @@ A contested round (planned medium or hard) draws from medium and hard puzzles
 together, keeps those with at least two credible options (model support at
 least 35% of the leader's, top three counted), ranks them by **stakes** (the
 strongest credible option's strength) and draws uniformly from the top quarter
-(at least three). An easy round draws uniformly from easy puzzles.
+(at least three). An easy round draws uniformly from the clear-Easy puzzles
+described next.
 
 The existing serving filters, the `interesting` flag, source exclusion within
 a run and the 28-day decision / 7-day source repeat windows all still apply
 first, so the top quarter is taken over what remains.
 
 If no puzzle qualifies in a round, that round makes today's band draw.
-When enabled and scored, the schedule records `selection_rule='latest-stakes-v1'`
-for Latest Set or `selection_rule='mixed-stakes-v1'` for Main Daily. It records
-null if the whole Daily falls back to the original selector.
+When enabled and scored, the schedule records `selection_rule='latest-stakes-v2'`
+for Latest Set or `selection_rule='mixed-stakes-v2'` for Main Daily. It records
+the `-v1` names when the stakes rule ran without the clear-Easy rule, and null
+if the whole Daily falls back to the original selector.
+
+## The clear-Easy rule (`latest-stakes-v2` / `mixed-stakes-v2`)
+
+An easy decision leaves little room for partial credit: every card but the
+leader earns under 50. So an Easy round serves an easy-band puzzle only when
+three independent signals agree on one card (`EASY_RULE`):
+
+- the trophy pick is the model's leading card (trophy support ratio 1);
+- no other rated card in the pack is stronger than the trophy pick (strength
+  margin of zero or more, from the same card strength tables);
+- from P1P3 on, a coloured trophy pick shares at least one colour with the
+  coloured prior picks. One prior pick is not a colour commitment.
+
+Qualifying puzzles are drawn uniformly, not ranked: ranking by strength would
+serve the same few cards. The late-land and trophy-deck gates above still
+apply. If no easy puzzle qualifies in a round, the round draws uniformly from
+all easy puzzles, as `-v1` did.
+
+The rule and its evidence are in the
+[November 2026 difficulty review](DIFFICULTY-REVIEW-2026-11.md). It was
+validated on held-out practice answers from 27 sets, uses no player data as
+an input, and keeps roughly 40 to 75% of each Easy pool.
 
 ## Inputs
 
@@ -42,7 +66,9 @@ null if the whole Daily falls back to the original selector.
 - **Selection features:** `draft_run_puzzle_selection_features` (migration
   0068), one row per puzzle: stakes points, credible-option count, whether the
   trophy pick made the main deck (null without a decklist) and whether it is a
-  land. Every loader scores each batch as it inserts it
+  land. Migration 0075 adds the clear-Easy features: the trophy pick's strength
+  margin over the strongest other rated card (null without a table or a
+  rating) and whether it is off-colour. Every loader scores each batch as it inserts it
   (`scripts/score-puzzle-selection.mjs`); `tests/puzzle-selection.test.mjs`
   checks these values equal the review generator's on the reviewed sets.
 
@@ -60,6 +86,31 @@ worker's environment variable `PACK1_MIXED_DAILY_STAKES=off` disables
 Main Daily stakes only, at the next deployment/configuration update. Unset
 or any other value leaves it enabled. Main Daily's `selection_rule` is
 recorded independently, and **existing schedules are never rewritten**.
+
+The clear-Easy rule has its own guard on top of the stakes guard: every
+serving P1P1–P1P8 puzzle of the planned sets must carry the 0075 features. A
+row scored before 0075, or a database without those columns, keeps the stakes
+rule for contested rounds and returns **every Easy round of that Daily** to
+the uniform easy draw; the schedule then records the `-v1` rule.
+`PACK1_DAILY_CLEAR_EASY=off` does the same on purpose, for both Dailies.
+
+## Release steps (clear-Easy rule)
+
+1. Merge. Until the release applies 0075, workflows that run
+   `scripts/verify-neon-schema.mjs` against a database without it stop at that
+   check, as they did for 0068.
+2. Release through `secure-auth-release`, which applies 0075 (two nullable
+   columns) and deploys. Dailies keep the `-v1` behaviour: existing feature
+   rows predate the new columns.
+3. Run **Score puzzle selection** with `target=development` and `sets` empty,
+   then with `target=production` and that run's ID as `validated_run_id`. The
+   backfill treats rows without the new features as stale and rewrites them.
+   Running `sets=fra` first activates Latest Set sooner; Main Daily follows as
+   each day's planned sets finish. The full backfill rewrites every feature
+   row once; if a run reaches its time limit, running it again resumes with
+   the rows that remain.
+4. The next Daily generated after its sets are complete uses the rule.
+   Schedules already generated are never changed.
 
 ## Release steps (Reality Fracture)
 
@@ -100,6 +151,10 @@ Main Daily schedules use the old band selector; already-published schedules
 stay frozen. The latest-set guard continues to fall back automatically if
 its features become incomplete.
 
+To roll back only the clear-Easy rule, set `PACK1_DAILY_CLEAR_EASY=off` the
+same way. Both Dailies keep the stakes rule and draw Easy rounds uniformly
+from the easy band again.
+
 ## Reality Fracture at a glance
 
 Read-only production checks on 2026-10-27 (approximate serving filter: it
@@ -119,3 +174,7 @@ omits snapshot membership and removed picks):
 - Stakes are a static ranking, so a top-quarter puzzle can return once the
   28-day decision window passes.
 - Strength is observational: winning decks that played a card.
+- The clear-Easy rule was validated on player outcomes (fewer low scores,
+  more trophy matches), which are proxies, not a measurement of enjoyment. It
+  narrows the Easy slot's answer cards: in a simulated year of Latest Set
+  Dailies, about 73 distinct answer cards against 118.
