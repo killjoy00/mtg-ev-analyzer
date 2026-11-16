@@ -259,11 +259,12 @@ test('account-wide fallback rescues failed 5xx handler/start traces despite unre
     if(event==='gateway_request')return page([...failed,...ordinary]);
     if(event==='quota_handler')return page(scoped?hNormal:[...hNormal,...hFailed]);
     if(event==='quota_handler_start')return page(scoped?starts.slice(chars.length):starts);
+    if(event==='quota_commit_wait')return page([]);
     throw Error('Unexpected provider query');
   }});
   const w=report.windows[0];
-  assert.equal(queries.length,5,'three scoped queries plus independent account-wide error trace checks');
-  assert.equal(queries.filter(q=>!q.parameters.filters.some(f=>f.key==='$metadata.service')).length,2);
+  assert.equal(queries.length,6,'three scoped queries plus separate handler/start/commit account-wide checks');
+  assert.equal(queries.filter(q=>!q.parameters.filters.some(f=>f.key==='$metadata.service')).length,3);
   assert.equal(w.failed_quota_without_timing,3);
   assert.equal(w.failed_quota_phase.transaction,3);
   assert.equal(w.failed_quota_phase.not_observed,0);
@@ -271,5 +272,38 @@ test('account-wide fallback rescues failed 5xx handler/start traces despite unre
     {observed:4,with_start:4,with_completion:4});
   assert.ok(w.query_coverage.handlers_account_wide);
   assert.ok(w.query_coverage.starts_account_wide);
+  assert.ok(w.query_coverage.commit_wait_account_wide);
+  assert.equal(w.failed_quota_commit_stages.no_correlated_stage,0);
   assert.doesNotMatch(JSON.stringify(report),/aaaaaaaa|bbbbbbbb|secret|quota-tag|private-token/);
+});
+
+
+test('commit-wait account-wide evidence is gathered only for the failed trace and is not claimed durable',async()=>{
+  const failing=Array.from('abc',c=>({$metadata:{id:'g'+c},source:{
+    event:'gateway_request',trace:c.repeat(32),sample_rate:1,quota_ms:5045,
+    quota_handler_ms:null,quota_transport_wait_ms:null,status:503,upstream_calls:0,
+    quota_timeout:true,quota_attempts:1}}));
+  const events=[],env={CLOUDFLARE_EDGE_TOKEN:token,
+    PACK1_QUOTA_FORENSICS_FROM:'2026-10-29T18:30:00Z',
+    PACK1_QUOTA_FORENSICS_TO:'2026-10-29T18:55:00Z'};
+  const report=await runQuotaForensics({now,env,fetcher:async(url,request)=>{
+    if(url.includes('/zones?'))return Response.json({success:true,result:[{
+      name:'packone.pro',status:'active',account:{id:account}}]});
+    const q=JSON.parse(request.body);
+    const event=q.parameters.filters.find(f=>f.key==='event')?.value;
+    const scoped=q.parameters.filters.some(f=>f.key==='$metadata.service');
+    events.push({event,scoped});
+    if(event==='gateway_request')return page(failing);
+    if(event==='quota_commit_wait')return page(Array.from('abc',c=>({
+      $metadata:{id:'commit'+c},source:{event:'quota_commit_wait',trace:c.repeat(32),
+        decision_status:204,attempt:1,private_msg:'never-publish'}})));
+    return page([]);
+  }});
+  const p=report.windows[0];
+  assert.deepEqual(p.failed_quota_commit_stages,{confirmed_admission:0,
+    confirmed_denial:0,commit_wait_only:3,handler_seen_without_commit:0,no_correlated_stage:0});
+  assert.ok(events.some(e=>e.event==='quota_commit_wait'&&e.scoped===false));
+  assert.equal(events.length,6);
+  assert.equal(p.query_coverage.commit_wait_account_wide.requests,1);
+  assert.doesNotMatch(JSON.stringify(report),/aaaaaaa|bbbbbbb|never-publish|quota-tag|private-token/);
 });
