@@ -42,7 +42,7 @@ jobs:
       PACK1_EXPO_PUSH_ACCESS_TOKEN: ${{ secrets.PACK1_EXPO_PUSH_ACCESS_TOKEN }}
       PACK1_REMINDER_EMAIL_APPROVED: ${{ vars.PACK1_REMINDER_EMAIL_APPROVED }}
       PACK1_REMINDER_PUSH_APPROVED: ${{ vars.PACK1_REMINDER_PUSH_APPROVED }}
-      PACK1_RESULTS_POSTAL_ADDRESS: ${{ vars.PACK1_RESULTS_POSTAL_ADDRESS }}
+      PACK1_RESULTS_POSTAL_ADDRESS: ${{ secrets.PACK1_RESULTS_POSTAL_ADDRESS }}
       PACK1_RESULTS_SENDER_NAME: ${{ vars.PACK1_RESULTS_SENDER_NAME }}
       PACK1_RESULTS_SENDER_EMAIL: ${{ vars.PACK1_RESULTS_SENDER_EMAIL }}
       PACK1_RESULTS_RESEND_API_KEY: ${{ secrets.PACK1_RESULTS_RESEND_API_KEY }}
@@ -67,6 +67,8 @@ jobs:
           npm ci --ignore-scripts --no-audit --no-fund
 
       - name: Prepare private results sender and dedicated webhook
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: node scripts/configure-results-email-release.mjs
 
       - name: Verify production gateway ownership before backend changes

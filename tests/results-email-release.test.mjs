@@ -45,7 +45,18 @@ test('scoped activation verifies the exact configured backend and mutates only t
 });
 test('the secure release keeps development sends off and reconciles the scoped scheduler after production verification',()=>{
  const s=fs.readFileSync('.github/workflows/secure-auth-release.yml','utf8');
- assert.match(s,/environment: pack-one-mobile-release/);assert.match(s,/PACK1_RESULTS_POSTAL_ADDRESS: \$\{\{ vars\.PACK1_RESULTS_POSTAL_ADDRESS \}\}/);
+ assert.match(s,/environment: pack-one-mobile-release/);assert.match(s,/PACK1_RESULTS_POSTAL_ADDRESS: \$\{\{ secrets\.PACK1_RESULTS_POSTAL_ADDRESS \}\}/);
+ assert.ok(!s.includes('vars.PACK1_RESULTS_POSTAL_ADDRESS'),'A normal private variable must not be printed by the runner before masking.');
  assert.match(s,/PACK1_RESULTS_EMAIL_ENABLED=0/);assert.match(s,/configure-results-email-release\.mjs/);
  assert.ok(s.indexOf('Reconcile only the reviewed results email scheduler')>s.indexOf('Verify retained gateway timings for this production release'));
+});
+test('a normal private postal variable is read only at runtime on protected main, never echoed in step configuration',async()=>{
+ const calls=[];const fetcher=async(url)=>{calls.push(url);return Response.json({name:'PACK1_RESULTS_POSTAL_ADDRESS',value:'Synthetic private footer'});};
+ const values=await configureResultsEmailRelease({enabled:true,env:{...env,PACK1_RESULTS_POSTAL_ADDRESS:'',GITHUB_TOKEN:'synthetic-token',GITHUB_REPOSITORY:'killjoy00/mtg-ev-analyzer',GITHUB_REF:'refs/heads/main',PACK1_RESULTS_RESEND_WEBHOOK_SECRET:secret},fetcher});
+ assert.equal(values.PACK1_RESULTS_POSTAL_ADDRESS,'Synthetic private footer');assert.equal(calls.length,1);assert.ok(calls[0].endsWith('/variables/PACK1_RESULTS_POSTAL_ADDRESS'));
+ await assert.rejects(configureResultsEmailRelease({enabled:true,env:{...env,PACK1_RESULTS_POSTAL_ADDRESS:'',GITHUB_TOKEN:'synthetic-token',GITHUB_REPOSITORY:'killjoy00/mtg-ev-analyzer',GITHUB_REF:'refs/heads/unsafe'},fetcher}),/protected main/);
+ assert.equal(calls.length,1);
+});
+test('a private-variable permission failure exposes neither the value nor provider response',async()=>{
+ await assert.rejects(configureResultsEmailRelease({enabled:true,env:{...env,PACK1_RESULTS_POSTAL_ADDRESS:'',GITHUB_TOKEN:'synthetic-token',GITHUB_REPOSITORY:'killjoy00/mtg-ev-analyzer',GITHUB_REF:'refs/heads/main'},fetcher:async()=>new Response('PRIVATE_CONFIGURATION_BODY',{status:403})}),error=>/HTTP 403/.test(error.message)&&!error.message.includes('PRIVATE_CONFIGURATION_BODY'));
 });

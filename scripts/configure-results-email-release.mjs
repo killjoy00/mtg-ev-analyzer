@@ -10,7 +10,20 @@ export function readResultsEmailRelease(value){
 export async function configureResultsEmailRelease({enabled,env=process.env,fetcher=fetch}={}){
  if(enabled===false)return {PACK1_RESULTS_EMAIL_ENABLED:'0'};
  if(enabled!==true)throw Error('Explicit delivery state required.');
- const postal=String(env.PACK1_RESULTS_POSTAL_ADDRESS||'').trim(),name=String(env.PACK1_RESULTS_SENDER_NAME||'Pack One').trim(),from=String(env.PACK1_RESULTS_SENDER_EMAIL||'news@packone.pro').trim();
+ let postal=String(env.PACK1_RESULTS_POSTAL_ADDRESS||'').trim();
+ if(!postal&&env.GITHUB_TOKEN){
+  // A normal GitHub variable must never be interpolated into step/job env:
+  // the runner prints that environment BEFORE add-mask can execute.
+  if(env.GITHUB_REPOSITORY!=='killjoy00/mtg-ev-analyzer'||env.GITHUB_REF!=='refs/heads/main')throw Error('Private postal configuration may only be read by the protected main release.');
+  let response;try{response=await fetcher('https://api.github.com/repos/killjoy00/mtg-ev-analyzer/environments/pack-one-mobile-release/variables/PACK1_RESULTS_POSTAL_ADDRESS',{
+   headers:{authorization:'Bearer '+env.GITHUB_TOKEN,accept:'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'},redirect:'error',signal:AbortSignal.timeout(15000),
+  });}catch{throw Error('Private postal configuration could not be read securely.');}
+  if(!response.ok)throw Error('Private postal variable could not be read (HTTP '+response.status+'). Set the same-named Environment secret to enable automatic log redaction.');
+  const variable=await response.json().catch(()=>null);
+  if(variable?.name!=='PACK1_RESULTS_POSTAL_ADDRESS'||typeof variable.value!=='string')throw Error('Private postal configuration was not verified.');
+  postal=variable.value.trim();
+ }
+ const name=String(env.PACK1_RESULTS_SENDER_NAME||'Pack One').trim(),from=String(env.PACK1_RESULTS_SENDER_EMAIL||'news@packone.pro').trim();
  const apiKey=String(env.PACK1_RESULTS_RESEND_API_KEY||env.PACK1_REMINDER_RESEND_API_KEY||env.PACK1_ACCOUNT_DELETE_RESEND_API_KEY||'');
  if(!postal||postal.length>500)throw Error('PACK1_RESULTS_POSTAL_ADDRESS is required in the private release environment.');
  if(!name||name.length>200||/[\r\n<>]/.test(name)||!/^[-.\w+]+@[-.\w]+\.packone\.pro$|^[-.\w+]+@packone\.pro$/.test(from))throw Error('Use the approved Pack One sender configuration.');
