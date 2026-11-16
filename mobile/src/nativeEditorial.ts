@@ -64,7 +64,10 @@ export const privacySections: ArticleSection[] = [
     body: [
       'Accounts are optional. You can sign in with an email address and password, with Google, or with Sign in with Apple. Pack One stores your account email address, the display name you choose, and the sign-in methods linked to the account. Pack One does not receive your Google or Apple password.',
       'Google sign-in shares your email address, name, and basic profile information with Pack One’s sign-in service. Sign in with Apple shares an email address, which can be an Apple private relay address if you choose to hide your email, and, on the first sign-in, the name you choose to share. For Sign in with Apple, Pack One also stores the Apple account identifier and an encrypted Apple token used to revoke Sign in with Apple when you delete the Pack One account.',
-      'Email/password signup requires email verification. Pack One also sends account emails for verification, password recovery, deletion verification where applicable, and certain account notices. The email-delivery provider receives the destination address and message data needed to deliver those emails.',
+      "Email/password signup requires email verification. Pack One uses your account email for verification, password recovery, account deletion, security notices, and important account updates.",
+      "We may also contact you individually about your account, your results, or your experience with the game, including to ask for feedback. You can ask us to stop nonessential individual messages by replying or emailing admin@packone.pro. Promotional emails are covered by the separate email preference described below.",
+      "Pack One also sends optional emails about results, updates, community news, and offers. Those are described below.",
+      "Our email provider receives the address and message information needed to send these emails.",
     ],
   },
   {
@@ -74,6 +77,16 @@ export const privacySections: ArticleSection[] = [
       'To deliver reminders, Pack One stores your reminder choices and when you made them, a minimal change history, delivery attempts and provider receipt states, and, for the mobile app, device registrations with protected push tokens. Resend receives the verified email and email contents for reminder emails; Expo and device push providers handle native notification tokens and message content. A provider accepting a message does not guarantee its appearance or delivery. Bounce and complaint events can turn off email reminders.',
       'Pack One removes reminder preferences, send records, and device registrations when your account is deleted. Delivery records are otherwise kept for up to 90 days, change history for up to 365 days, and revoked device registrations for up to 30 days; cleanup runs with the daily reminder job. Bounce and complaint suppression fingerprints remain until account deletion to honor delivery restrictions. Changing accounts or signing out revokes the corresponding device registration. Unsubscribing from email does not affect push. A message already handed to an email or device provider cannot be recalled. Pack One does not sell reminder destinations or publicly report individual reminder activity.'
     ],
+  },
+  {
+    title: "Results and news emails",
+    body: [
+  "Pack One sends emails about your results, usually weekly, along with occasional game updates, community news, and offers.",
+  "We only send these emails if you've turned them on. We'll ask once after you sign in, and you can change your answer anytime in Account settings.",
+  "Every results and news email includes an unsubscribe link. Unsubscribing stops these emails, but doesn't affect important account or security messages, permitted non-promotional individual messages, or your Daily reminder preference. You can also ask us to stop nonessential individual messages.",
+  "We keep a record of your email choices and changes, along with the delivery information needed to handle unsubscribes, bounces, and complaints.",
+  "If you change your account email, an unsubscribe stays in effect. If you had turned emails on, we'll ask again before sending results and news to the new address."
+],
   },
   {
     title: 'Gameplay, analytics, and decision reports',
@@ -89,6 +102,18 @@ export const privacySections: ArticleSection[] = [
     body: [
       'Profiles are private by default. Publishing requires an account and an explicit choice. Public profiles show the display name, game record, and selected career details; they exclude email and account/session identifiers. Private profile shares link to the general site. Creating a friend challenge makes its display name, score, and the run’s final packs available to anyone with that challenge link. Do not put sensitive personal information into a display name.',
     ],
+  },
+  {
+    title: "Public leaderboards and results",
+    body: [
+  "Pack One shows leaderboards for eligible signed-in players. These can include your display name, rank, scores, season rating, and number of Dailies played.",
+  "Your leaderboard results can be public even if your player profile is private.",
+  "We may also publish weekly and season results, past standings, notable performances, and player features. These might appear on Pack One, in our emails, or on our official accounts on services such as Reddit, Patreon, YouTube, and Bluesky. Unlike the live leaderboards, these posts may stay up after a week or season ends.",
+  "We won't include your account email, sign-in details, private account information, or anything from a private profile.",
+  "You can ask us to leave your display name out of these publications in Account settings or by emailing admin@packone.pro. This won't remove you from the regular leaderboards.",
+  "If you share comments or other material for a player feature, we'll show you what we plan to publish and ask for your approval first.",
+  "We'll give existing players advance notice before introducing these publications, along with a chance to opt out."
+],
   },
   {
     title: 'Memberships and subscriptions',
@@ -114,7 +139,7 @@ export const privacySections: ArticleSection[] = [
   {
     title: 'Third-party services and email delivery',
     body: [
-      'Pack One uses third-party services where needed to provide the product: Google and Apple for optional sign-in, Patreon for connected membership, Apple for iOS subscriptions, Resend for transactional account email delivery, Scryfall for card images, and infrastructure providers for hosting, authentication, databases, and related operations. Card-image requests can be made to Scryfall from your device. When you follow a link to an external service, that service applies its own privacy practices.',
+      'Pack One uses third-party services where needed to provide the product: Google and Apple for optional sign-in, Patreon for connected membership, Apple for iOS subscriptions, Resend for account and optional emails, Scryfall for card images, and infrastructure providers for hosting, authentication, databases, and related operations. Card-image requests can be made to Scryfall from your device. When you follow a link to an external service, that service applies its own privacy practices.',
     ],
   },
   {
@@ -122,14 +147,28 @@ export const privacySections: ArticleSection[] = [
     body: [
       'Pack One keeps ordinary account and gameplay records to provide account features, saved history, leaderboards, and product operations. Account deletion removes attributable data as described below. Short-lived verification, sign-in, and similar technical records expire or are removed through cleanup processes.',
       'For supported sign-in methods, Account settings lets you permanently delete your Pack One account after fresh verification. Password accounts use the current password. Accounts without a password use a short-lived one-time code sent to the verified email address already associated with the account; Pack One does not ask the browser to choose the destination. Sign in with Apple accounts may be asked to verify with Apple instead.',
-      'Deletion removes attributable Pack One data including the account/player record, public profile, leaderboard entry, individual gameplay and career history, and linked Patreon, Apple-subscription, and other account associations. Deleting a Pack One account does not cancel an Apple App Store subscription; Apple subscriptions must be managed or canceled through Apple. Genuinely aggregate or otherwise non-attributable statistics may remain where applicable.',
-      'Deletion normally completes immediately. If identity-provider completion is temporarily unavailable after deletion has committed, Pack One signs you out and finishes the irreversible operation through server-side recovery. No further user action is required, and the deletion cannot be canceled after it enters the committed pending state.',
+      "Deleting your Pack One account removes your account and player records, public profile, live leaderboard entries, game history, career history, and linked account information, including Patreon and Apple subscription connections.",
+      "Deleting your Pack One account does not cancel an Apple App Store subscription. You must manage or cancel that through Apple.",
+      "Anonymous or aggregate statistics may remain.",
+      "Published results and player features are stored separately from live leaderboards. If you delete your account, we'll remove or anonymize your display name in the published results and player features we control within 28 days. You don't need to make another request.",
+      "You can also ask us to remove your name from published results without deleting your account. Email admin@packone.pro.",
+      "We can't recall emails already sent or remove copies that other people have saved, quoted, or republished.",
+      "Account deletion normally happens immediately. If a sign-in provider is temporarily unavailable after deletion has started, we'll sign you out and finish the process automatically. You don't need to do anything else, and the deletion can't be canceled.",
+
     ],
+  },
+  {
+    title: "Changes to this Privacy Policy",
+    body: [
+  "We may update this policy as Pack One changes. The date at the top shows when it was last updated.",
+  "If we make a significant change to how we collect or use personal information, we'll give you advance notice through Pack One, an account email, or another suitable method.",
+  "If the law requires your consent, we'll ask before making the change."
+],
   },
   {
     title: 'Your choices and contact',
     body: [
-      'You can play without an account, choose whether to publish a profile, disconnect Patreon, sign out, and use Account settings to request account deletion. In the apps, open Account settings and choose Delete account. If you cannot complete deletion in the app or Account settings, email admin@packone.pro from the email address associated with the account; Pack One may require verification before acting on the request.',
+      'You can play without an account, keep your profile private, manage optional emails, ask to be left out of published results, disconnect Patreon, sign out, or delete your account in Account settings. In the apps, open Account settings and choose Delete account. If you cannot complete deletion in the app or Account settings, email admin@packone.pro from the email address associated with the account; Pack One may require verification before acting on the request.',
     ],
   },
 ];
@@ -145,11 +184,24 @@ export const termsSections: ArticleSection[] = [
   {
     title: 'Public identity and community rules',
     body: [
-      'Account-owned leaderboard names, public profiles, and the identity attached to shared Pack One activity are user-provided public content. Leaderboards are for signed-in accounts. By signing in, or by saving a leaderboard name or public profile, you agree to these Public Identity rules.',
+      "Leaderboard names, public profiles, and names attached to shared Pack One activity are public content provided by players. Leaderboards are for signed-in accounts. By signing in or saving a leaderboard name or public profile, you agree to these Public Identity rules.",
+      "Your display name and results can appear on leaderboards even if your player profile is private.",
+      "Pack One may also publish weekly and season results, historical standings, notable performances, and player features using public leaderboard information. These posts may remain available after a week or season ends.",
+      "You can ask to be left out of these separate publications without leaving the regular leaderboards.",
+      "Being on a leaderboard doesn't give Pack One permission to publish your private messages, contact information, or other nonpublic material without appropriate authorization.",
       'Do not use a public identity to threaten, harass, impersonate, spam, publish private contact information, evade moderation, or display hateful, sexually explicit, or otherwise abusive content. Do not present yourself as Pack One staff, support, or an official Pack One account unless Pack One has authorized that role.',
       'Pack One may reject a leaderboard name, hide a public identity, remove its name from public/shared surfaces, or restrict republication when these rules are violated. Moderation of public identity does not by itself delete the underlying gameplay or career record. Players can report a public profile and block another public identity from the in-app profile controls. Reports are reviewed by Pack One; false or abusive reporting is itself misuse.',
       'For a moderation or safety concern that cannot be handled in-app, contact admin@packone.pro.',
     ],
+  },
+  {
+    title: "Communications",
+    body: [
+  "Pack One may contact you about your account, results, or experience with the game, including requests for feedback.",
+  "We also offer optional emails about results, news, and offers. We only send these if you've turned them on.",
+  "Creating an account or agreeing to these Terms doesn't turn optional emails on.",
+  "You can unsubscribe anytime or ask us to stop nonessential individual messages."
+],
   },
   {
     title: 'Data and attribution',
@@ -211,4 +263,7 @@ export const termsSections: ArticleSection[] = [
       'The site and model are provided as-is. Draft datasets, card metadata, third-party services, and model outputs can contain errors or change over time. Pack One may update the product, scoring, or supported data. Material model, corpus, selection, and scoring changes are versioned so historical results retain the versions under which they were produced.',
     ],
   },
+  {title: "Changes to these Terms", body: ["We may update these Terms as Pack One changes. The date at the top shows when they were last updated.","We'll give notice of significant changes. Where the law requires your agreement or consent, we'll ask for it first."]},
 ];
+
+export const resultsPolicyReleaseDate = "2026-11-16";

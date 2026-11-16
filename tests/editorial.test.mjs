@@ -245,7 +245,7 @@ assert.match(privacy, /TCGplayer links are routed through Impact/i);
 assert.match(privacy, /records outbound TCGplayer clicks/i);
 assert.match(privacy, /first-party cookies for player and account sessions and request security/i);
 assert.match(privacy, /Email\/password signup requires email verification/i);
-assert.match(privacy, /Resend for transactional account email delivery/i);
+assert.match(privacy, /Resend for account and optional emails/i);
 assert.match(privacy, /keeps ordinary account and gameplay records to provide account features, saved history, leaderboards, and product operations/i);
 assert.match(privacy, /Account deletion removes attributable data as described below/i);
 assert.doesNotMatch(privacy, /does not currently state a fixed retention period/i);

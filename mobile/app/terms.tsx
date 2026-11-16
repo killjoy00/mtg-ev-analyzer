@@ -6,7 +6,7 @@ import { ArticleScreen } from '@/src/components/ArticleScreen';
 import { Text } from '@/src/components/Text';
 import { fontLicenses } from '@/src/fontLicenses';
 import { config } from '@/src/config';
-import { termsSections } from '@/src/nativeEditorial';
+import { termsSections, resultsPolicyReleaseDate } from '@/src/nativeEditorial';
 import { colors, spacing } from '@/src/theme';
 
 export default function TermsScreen() {
@@ -19,6 +19,7 @@ export default function TermsScreen() {
       kicker="Policy"
       title="Terms"
       deck="Terms for using Pack One, including scoring limitations, licensing and attribution, advertising and affiliate disclosures, external links, and independence."
+      intro={<Text>Last updated: {resultsPolicyReleaseDate}</Text>}
       sections={termsSections}
       scrollToEnd={previewLicensesOpen}
       footer={(

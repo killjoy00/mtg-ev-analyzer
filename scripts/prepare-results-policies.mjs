@@ -16,6 +16,23 @@ export function prepareResultsPolicies(root='.',date='{{RELEASE_DATE}}'){
  let privacy=fs.readFileSync(path.join(root,'privacy/index.html'),'utf8');
  let terms=fs.readFileSync(path.join(root,'terms/index.html'),'utf8');
  let native=fs.readFileSync(path.join(root,'mobile/src/nativeEditorial.ts'),'utf8');
+ const published=native.match(/^export const resultsPolicyReleaseDate = ("[^"\n]+");$/m);
+ if(published){
+  const previous=JSON.parse(published[1]);
+  const restamp=source=>{
+   const markers=source.match(/<p>Last updated: [^<]+<\/p>/g)||[];
+   if(markers.length!==1||markers[0]!=='<p>Last updated: '+previous+'</p>')throw Error('Policy dates differ; review required.');
+   return source.replace(markers[0],'<p>Last updated: '+date+'</p>');
+  };
+  const files={'privacy/index.html':restamp(privacy),'terms/index.html':restamp(terms),
+   'mobile/src/nativeEditorial.ts':once(native,/^export const resultsPolicyReleaseDate = "[^"\n]+";$/gm,'export const resultsPolicyReleaseDate = '+JSON.stringify(date)+';')};
+  for(const name of ['privacy','terms']){
+   const file='mobile/app/'+name+'.tsx',screen=fs.readFileSync(path.join(root,file),'utf8');
+   if(!screen.includes('Last updated: {resultsPolicyReleaseDate}'))throw Error('Native policy date is missing.');
+   files[file]=screen;
+  }
+  return files;
+ }
  privacy=once(privacy,/<h1>Privacy<\/h1>/,'<h1>Privacy</h1><p>Last updated: '+date+'</p>');
  privacy=replaceParagraph(privacy,'Email/password signup requires email verification\\.',copy.accounts);
  privacy=insertBefore(privacy,'Gameplay, analytics, and decision reports','Results and news emails',copy.emails);

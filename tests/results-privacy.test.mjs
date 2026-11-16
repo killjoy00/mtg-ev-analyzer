@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import os from 'node:os';
+import path from 'node:path';
 import {prepareResultsPolicies} from '../scripts/prepare-results-policies.mjs';
 import {resultsRoute,recordResultsPublication} from '../worker/results-privacy.mjs';
 const copy=JSON.parse(fs.readFileSync('docs/releases/results-policy-copy.json'));
@@ -30,6 +32,17 @@ test('preparing policies leaves live files unchanged and release dates fail clos
  assert.equal(fs.readFileSync('privacy/index.html','utf8'),before);
  assert.throws(()=>prepareResultsPolicies('.','2026-02-30'),/Real release date/);
  assert.throws(()=>prepareResultsPolicies('.','unreleased'),/Real release date/);
+});
+test('preparing already published copies preserves every paragraph without duplication',()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'results-policy-repeat-'));
+ try{
+  const first=prepareResultsPolicies('.','2026-11-16');
+  for(const [file,contents] of Object.entries(first)){fs.mkdirSync(path.dirname(path.join(root,file)),{recursive:true});fs.writeFileSync(path.join(root,file),contents);}
+  assert.deepEqual(prepareResultsPolicies(root,'2026-11-16'),first);
+  const preview=prepareResultsPolicies(root);
+  assert.equal((preview['privacy/index.html'].match(/Results and news emails/g)||[]).length,1);
+  assert.match(preview['privacy/index.html'],/Last updated: \{\{RELEASE_DATE\}\}/);
+ }finally{fs.rmSync(root,{recursive:true,force:true});}
 });
 test('web and native use identical exact choice copy and equal prompt buttons',()=>{
  const web=JSON.parse(fs.readFileSync('results-copy.json'));
