@@ -250,18 +250,9 @@ try{
       const unpicked=p.candidates.find(c=>c.id!==selected&&c.id!==p.historical_pick_id);
       if(unpicked)assert.equal(await share(unpicked.id),'0%','cards nobody picked show 0%');
     }else assert.equal(await page.locator('.run-consensus [data-peer-col]:not([hidden]),.run-consensus [data-peer-card]:not([hidden])').count(),0,'no Chosen column without available peer stats');
-    const shops=page.locator('.run-analysis .run-card-shop');
-    assert.ok(await shops.count()>=1,'revealed-card commerce links remain in analysis');
-    assert.equal(await shops.first().getAttribute('rel'),'sponsored noopener');
-    assert.equal(await shops.first().getAttribute('data-tcgplayer-surface'),'draft_run_reveal');
-    assert.match(await shops.first().getAttribute('href'),/^https:\/\/partner\.tcgplayer\.com\//);
+    // Card imagery, zoom, score and model support remain; card storefront links do not.
+    assert.equal(await page.locator('.run-analysis .run-card-shop, .run-analysis [data-tcgplayer-card]').count(),0);
     if(round===0){
-      const beforeClicks=events.filter(event=>event.name==='tcgplayer_click').length;
-      await shops.first().evaluate(el=>{el.addEventListener('click',event=>event.preventDefault(),{once:true});el.click();});
-      for(let i=0;i<30&&events.filter(event=>event.name==='tcgplayer_click').length===beforeClicks;i++)await page.waitForTimeout(50);
-      const commerce=events.filter(event=>event.name==='tcgplayer_click').at(-1);
-      assert.ok(commerce,'TCGplayer reveal click is instrumented');
-      assert.equal(commerce.props.surface,'draft_run_reveal');
       await page.locator('.run-consensus').scrollIntoViewIfNeeded();
       await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-consensus-mobile.png`});
     }

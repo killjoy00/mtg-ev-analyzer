@@ -8,7 +8,6 @@ import { sortPackByRarity } from './replay-data.mjs';
 import { escapeHtml as esc } from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
 import { compactDraftRunFeedback, consensusFeedback, trophyDrafterDetails, trophyDrafterFacts, trophyRevealSentence } from './draft-run-feedback.mjs';
-import { tcgplayerUrl } from './tcgplayer.mjs';
 import {revealCardChoices,modelSupportLabel} from './draft-run-reveal.mjs?v=2';
 import {openTrophyDeck} from './trophy-deck-dialog.mjs?v=3';
 import { dailyResetCue, nextGameDateBoundary } from './game-date.mjs';
@@ -117,7 +116,7 @@ function revealComparison(p,answer) {
     const score=ranked?.score??(card.id===answer.historicalId?100:card.id===answer.selectedId?answer.score:null);
     const mine=card.id===answer.selectedId,trophy=card.id===answer.historicalId;
     const label=choice.label+(creatorName&&card.id===answer.creatorId?` · ${creatorName}’s pick`:'');
-    return `<figure class="run-choice-card ${mine?'is-mine':''} ${trophy?'is-trophy':''} ${mine&&trophy?'is-match':''}" data-choice-id="${esc(card.id)}"><div class="run-choice-label">${esc(label)}</div><button type="button" class="run-choice-image" data-zoom="${esc(card.id)}" aria-label="Enlarge ${esc(card.name)}">${image(card)}</button><figcaption>${esc(card.name)}</figcaption><dl class="run-choice-stats"><div class="run-choice-points"><dt>Score</dt><dd>${score==null?'N/A':Number(score)}<small>/100</small></dd></div><div class="run-choice-support"><dt>Model support</dt><dd>${modelSupportLabel(ranked?.support,answer.consensusSupport,trophy)}</dd></div><div class="run-choice-peer" data-peer-col hidden><dt>Players’ picks</dt><dd data-peer-card="${esc(card.id)}" hidden></dd></div></dl><a class="run-card-shop" href="${esc(tcgplayerUrl(card.name))}" target="_blank" rel="sponsored noopener" data-tcgplayer-card="${esc(card.name)}" data-tcgplayer-surface="draft_run_reveal">Find on TCGplayer (affiliate link)</a></figure>`;
+    return `<figure class="run-choice-card ${mine?'is-mine':''} ${trophy?'is-trophy':''} ${mine&&trophy?'is-match':''}" data-choice-id="${esc(card.id)}"><div class="run-choice-label">${esc(label)}</div><button type="button" class="run-choice-image" data-zoom="${esc(card.id)}" aria-label="Enlarge ${esc(card.name)}">${image(card)}</button><figcaption>${esc(card.name)}</figcaption><dl class="run-choice-stats"><div class="run-choice-points"><dt>Score</dt><dd>${score==null?'N/A':Number(score)}<small>/100</small></dd></div><div class="run-choice-support"><dt>Model support</dt><dd>${modelSupportLabel(ranked?.support,answer.consensusSupport,trophy)}</dd></div><div class="run-choice-peer" data-peer-col hidden><dt>Players’ picks</dt><dd data-peer-card="${esc(card.id)}" hidden></dd></div></dl></figure>`;
   }).join('');
   const creator=creatorName&&answer.creatorId&&!choices.some(c=>c.id===answer.creatorId)?byId.get(answer.creatorId):null;
   return `<div class="run-reveal-choices">${figures}</div>${creator?`<p class="run-creator-pick">${esc(creatorName)} picked <button type="button" class="text-button" data-zoom="${esc(creator.id)}">${esc(creator.name)}</button>.</p>`:''}`;
