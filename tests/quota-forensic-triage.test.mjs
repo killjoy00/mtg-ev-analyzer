@@ -314,3 +314,42 @@ test('quota 5xx failure signal is disjoint, privacy-safe and requires a corrobor
     {provider_reset:20,timeout_or_abort:0,overloaded:0,provider_internal:0,other_or_unknown:0}})])[1];
   assert.equal(inconsistent.failure_signal,'unverified');
 });
+
+
+test('quota commit correlation distinguishes confirmed debits from pre-sync and missing events only with evidence',()=>{
+  const phase={transaction:0,durability:0,complete:0,handler_other:0,
+    started_no_completion:0,not_observed:9};
+  const base={missing_gateway_timing_outcomes:{success:0,denied_429:0,failed_5xx:9,other:0},
+    failed_quota_without_timing:9,failed_quota_phase:phase,
+    sampled_success_log_coverage:{observed:9,with_start:9,with_completion:9},
+    failed_quota_failure_signals:{provider_reset:0,timeout_or_abort:9,
+      overloaded:0,provider_internal:0,other_or_unknown:0}};
+  const keys=['confirmed_admission','confirmed_denial','commit_wait_only',
+    'handler_seen_without_commit','no_correlated_stage'];
+  const labels=['completed_quota_debit','completed_quota_denial','commit_pending_unconfirmed',
+    'handler_seen_no_commit','no_correlated_commit_evidence'];
+  const actions=['inspect_ambiguous_confirmed_debit_ack',
+    'inspect_ambiguous_confirmed_denial_ack','inspect_unacknowledged_storage_sync',
+    'inspect_quota_timeout_or_abort_signal','inspect_quota_timeout_or_abort_signal'];
+  for(let i=0;i<keys.length;i++){
+    const stages=Object.fromEntries(keys.map((key,j)=>[key,i===j?9:0]));
+    const result=read([quotaWindow(9,0,0,0,{...base,failed_quota_commit_stages:stages})])[1];
+    assert.equal(result.outcome,'stage_coverage_incomplete');
+    assert.equal(result.error_stage,'no_correlated_handler_logs');
+    assert.equal(result.failure_signal,'timeout_or_abort');
+    assert.equal(result.commit_evidence,labels[i]);
+    assert.equal(result.next_action,actions[i]);
+    assert.doesNotMatch(JSON.stringify(result),/private|secret|trace|network|2026-11-16/);
+  }
+  const inconsistent=read([quotaWindow(9,0,0,0,{...base,
+    failed_quota_commit_stages:{confirmed_admission:20,confirmed_denial:0,
+      commit_wait_only:0,handler_seen_without_commit:0,no_correlated_stage:0}})])[1];
+  assert.equal(inconsistent.commit_evidence,'unverified');
+  assert.equal(inconsistent.next_action,'inspect_quota_timeout_or_abort_signal');
+  const noCoverage=read([quotaWindow(9,0,0,0,base)])[1];
+  assert.equal(Object.hasOwn(noCoverage,'commit_evidence'),false);
+  const mixed=read([quotaWindow(9,0,0,0,{...base,
+    failed_quota_commit_stages:{confirmed_admission:3,confirmed_denial:0,
+      commit_wait_only:3,handler_seen_without_commit:0,no_correlated_stage:3}})])[1];
+  assert.equal(mixed.commit_evidence,'mixed');
+});
