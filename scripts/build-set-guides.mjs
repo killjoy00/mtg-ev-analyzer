@@ -8,8 +8,21 @@ for(const id of GUIDE_IDS) {
   const guide=JSON.parse(await readFile(`sets/guides/data/${id}.json`,'utf8'));
   if(guide.id!==id)throw new Error(`Guide id mismatch: ${id}`);
   guideNames.set(id,guide.name);
-  const title=`${guide.name} draft guide · Pack One`;
-  const description=`A quick ${guide.name} draft refresher: archetypes, format reminders, mechanics, and observed color results.`;
+  const title=`${guide.name} MTG Draft Guide | Pack One`;
+  const description=`Explore ${guide.name} MTG Limited archetypes, mechanics, and format reminders, with 17Lands color results where available.`;
+  const guideUrl=`https://packone.pro/sets/${id}/guide/`;
+  const seoData={
+    "@context":"https://schema.org",
+    "@graph":[
+      {"@type":"WebPage","@id":`${guideUrl}#webpage`,name:title,url:guideUrl,description,isPartOf:{"@id":"https://packone.pro/#website"},breadcrumb:{"@id":`${guideUrl}#breadcrumb`}},
+      {"@type":"BreadcrumbList","@id":`${guideUrl}#breadcrumb`,itemListElement:[
+        {"@type":"ListItem",position:1,name:"Pack One",item:"https://packone.pro/"},
+        {"@type":"ListItem",position:2,name:"Set guides",item:"https://packone.pro/sets/"},
+        {"@type":"ListItem",position:3,name:`${guide.name} draft guide`,item:guideUrl}
+      ]}
+    ]
+  };
+  const seoJson=JSON.stringify(seoData).replace(/</g,"\\u003c");
   const page=`<!doctype html>
 <html lang="en">
 <head>
@@ -23,6 +36,7 @@ for(const id of GUIDE_IDS) {
   <meta property="og:url" content="https://packone.pro/sets/${id}/guide/" />
   <meta property="og:image" content="https://packone.pro/mobile/assets/images/icon.png" />
   <link rel="canonical" href="https://packone.pro/sets/${id}/guide/" />
+  <script type="application/ld+json">${seoJson}</script>
   <link rel="stylesheet" href="/visual-c.css?v=14" />
   <link rel="stylesheet" href="/editorial.css?v=11" />
   <link rel="stylesheet" href="/set-guides.css?v=4" data-set-guide-styles />
