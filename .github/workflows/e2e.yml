@@ -144,6 +144,17 @@ jobs:
           nohup python -m http.server 4173 >/tmp/pack1-http.log 2>&1 &
           echo $! > /tmp/pack1-http.pid
           curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 http://127.0.0.1:4173/ -o /dev/null
+      - name: Stage and smoke allowlisted Pages preview
+        if: steps.scope.outputs.browser_plan != 'none'
+        shell: bash
+        run: |
+          set -euo pipefail
+          trap 'rm -rf artifacts/pages-preview' EXIT
+          node scripts/build-pages-preview.mjs --out artifacts/pages-preview
+          nohup python -m http.server 4174 --directory artifacts/pages-preview >/tmp/pack1-pages-preview-http.log 2>&1 &
+          echo $! > /tmp/pack1-pages-preview.pid
+          curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 http://127.0.0.1:4174/ -o /dev/null
+          node tests/pages-preview-browser-smoke.mjs
       - name: Run focused publication browser smoke
         if: steps.scope.outputs.browser_plan == 'publication'
         env:
@@ -192,6 +203,10 @@ jobs:
         if: always() && steps.scope.outputs.browser_plan != 'none'
         run: |
           if [ -f /tmp/pack1-http.pid ]; then kill "$(cat /tmp/pack1-http.pid)" || true; fi
+      - name: Stop allowlisted Pages preview
+        if: always() && steps.scope.outputs.browser_plan != 'none'
+        run: |
+          if [ -f /tmp/pack1-pages-preview.pid ]; then kill "$(cat /tmp/pack1-pages-preview.pid)" || true; fi
       - name: Verify selected browser validation completed
         if: always()
         run: |
