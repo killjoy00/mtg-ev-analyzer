@@ -1,5 +1,5 @@
 // Isolated synthetic probe only. No application origins or production bindings.
-import {NetworkQuota} from './gateway.mjs';
+import {NetworkQuota,chargeNetworkQuota} from './gateway.mjs';
 import {readJson} from '../worker/request-json.mjs';
 import {failureIndicators} from './private-diagnostics.mjs';
 
@@ -29,6 +29,19 @@ class MeasuredQuota extends NetworkQuota {
     }
   }
   async fetch(request) {
+    // Read-only synthetic counter inspection; never exposed by the production
+    // gateway or its real Durable Object. No write/recharge on inspection.
+    const probePath=new URL(request.url).pathname;
+    if(probePath==='/inspect') {
+      if(request.method!=='GET')return new Response(null,{status:405});
+      const snapshot=await this.storage.get('buckets');
+      const count=snapshot?.request?.count;
+      return Response.json({request_count:Number.isSafeInteger(count)&&count>=0?count:0});
+    }
+    // An isolated controlled delay *before* the actual DO handler begins.
+    // The caller's deadline may fire while the runtime is scheduling this.
+    if(probePath==='/request'&&request.headers.get('x-quota-probe-entry-delay')==='1')
+      await new Promise(resolve=>setTimeout(resolve,5250));
     // This control exists only in the disposable, authenticated probe Worker.
     // abort preserves storage and discards instance credits; it never resets counters.
     if(new URL(request.url).pathname==='/restart')this.probeState.abort('synthetic quota restart');
@@ -84,12 +97,61 @@ export class CrossoverQuota {
   }
 }
 
+const TIMEOUT_SCENARIOS=new Set(['normal','dispatch_timeout','handler_entry_timeout','ack_timeout','client_abort']);
+async function runTimeoutScenario(env,scenario,cohort){
+  const actual=env.BASELINE_QUOTA,id=actual.idFromName(cohort),started=performance.now();
+  let attempts=0,timer=null;
+  const controller=scenario==='client_abort'?new AbortController():null;
+  const signal=controller?.signal||AbortSignal.timeout(5000);
+  if(controller)timer=setTimeout(()=>controller.abort(new DOMException('Synthetic cancellation','AbortError')),30);
+  const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+  const proxy={get:()=>({fetch:async request=>{
+    if(scenario==='dispatch_timeout'||scenario==='client_abort'){
+      await pause(scenario==='client_abort'?125:5250);
+      signal.throwIfAborted(); // the Durable Object was never invoked
+    }
+    let forwarded=request;
+    if(scenario==='handler_entry_timeout'){
+      const headers=new Headers(request.headers);
+      headers.set('x-quota-probe-entry-delay','1');
+      forwarded=new Request(request,{headers});
+    }
+    const response=await actual.get(id,{locationHint:'enam'}).fetch(forwarded);
+    if(scenario==='ack_timeout')await pause(5250); // handler finished; acknowledgment is held
+    return response;
+  }})};
+  try {
+    const result=await chargeNetworkQuota(proxy,id,'request',{signal,onAttempt:()=>attempts++});
+    const elapsed_ms=Math.round(performance.now()-started);
+    const timing=result.headers.get('x-pack1-quota-handler-ms');
+    return Response.json({scenario,outcome:result.status===204?'success':'unexpected_status',
+      attempts,elapsed_ms,handler_timing_observed:timing!==null});
+  } catch(error) {
+    const elapsed_ms=Math.round(performance.now()-started);
+    const outcome=signal.aborted?
+      (signal.reason?.name==='TimeoutError'?'timeout':'abort'):'other_failure';
+    return Response.json({scenario,outcome,attempts,elapsed_ms,handler_timing_observed:false});
+  } finally {if(timer!==null)clearTimeout(timer);}
+}
+
 export default {async fetch(request,env) {
   const denial=!/^[a-f0-9]{64}$/.test(env.BENCHMARK_KEY||'')?'key_unavailable':
     request.headers.get('authorization')!=='Bearer '+env.BENCHMARK_KEY?'key_mismatch':
     !Number.isFinite(Number(env.EXPIRES_AT))?'expiry_unavailable':Date.now()>=Number(env.EXPIRES_AT)?'expired':null;
   if(denial)return new Response(null,{status:403,headers:{'x-quota-probe-auth':'required','x-quota-probe-denial':denial}});
   const path=new URL(request.url).pathname;
+  if(request.method==='POST'&&(path==='/timeout-probe'||path==='/timeout-inspect')){
+    let input;try{input=await readJson(request,256);}catch{return new Response(null,{status:400});}
+    if(!input||Array.isArray(input)||!/^[a-f0-9]{32}$/.test(input.cohort||''))return new Response(null,{status:400});
+    if(path==='/timeout-inspect'){
+      if(Object.keys(input).some(k=>k!=='cohort'))return new Response(null,{status:400});
+      return env.BASELINE_QUOTA.get(env.BASELINE_QUOTA.idFromName(input.cohort),{locationHint:'enam'})
+        .fetch(new Request('https://quota/inspect',{method:'GET'}));
+    }
+    if(Object.keys(input).some(k=>!['scenario','cohort'].includes(k))||!TIMEOUT_SCENARIOS.has(input.scenario))
+      return new Response(null,{status:400});
+    return runTimeoutScenario(env,input.scenario,input.cohort);
+  }
   if(request.method!=='POST'||!['/request','/session','/session-only','/restart'].includes(path))return new Response(null,{status:400});
   let body;try{body=await readJson(request,256);}catch{return new Response(null,{status:400});}
   if(!body||Array.isArray(body)||!['baseline','control','candidate'].includes(body.mode)||!/^[a-f0-9]{32}$/.test(body.cohort||'')||
