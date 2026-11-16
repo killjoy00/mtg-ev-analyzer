@@ -50,7 +50,8 @@ export function ResultsPreferences({settings=false}:{settings?:boolean}){
   </View>:null}
   {settings?<View style={styles.section}>
    <Text style={styles.heading}>{copy.emailTitle}</Text><Text style={styles.heading}>{copy.emailLabel}</Text><Text style={styles.body}>{copy.emailBody}</Text>
-   <View style={styles.actions}>{button('On','settings:on',state.emailState==='on')}{button('Off','settings:off',state.emailState!=='on')}</View>
+   <Text style={styles.body}>Results and news emails: {state.emailState==='on'?'On':'Off'}</Text>
+   <View style={styles.actions}>{button(state.emailState==='on'?'Turn off':'Turn on',state.emailState==='on'?'settings:off':'settings:on')}</View>
    <Text style={styles.body}>{copy.emailFoot}</Text><Text style={styles.heading}>{copy.publishedTitle}</Text>
    <Pressable accessibilityRole="checkbox" accessibilityState={{checked:state.excludePublications,disabled:saving}} disabled={saving} onPress={()=>void save('exclude:'+(state.excludePublications?'off':'on'))} style={styles.button}><Text style={styles.body}>{state.excludePublications?'☑':'☐'} {copy.exclude}</Text></Pressable>
    <Text style={styles.body}>{copy.publishedFoot}</Text>

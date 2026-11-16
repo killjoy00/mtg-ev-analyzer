@@ -27,6 +27,12 @@ const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 function loadConfig(profile, extraEnv = {}) {
   const env = { ...process.env, PACKONE_BUILD_PROFILE: profile };
   delete env.PACKONE_IOS_MARKETING_VERSION;
+  for (const key of [
+    'PACKONE_ADMOB_IOS_ENABLED', 'PACKONE_ADMOB_ANDROID_ENABLED',
+    'PACKONE_ADMOB_IOS_APP_ID', 'PACKONE_ADMOB_IOS_BANNER_ID',
+    'PACKONE_ADMOB_ANDROID_APP_ID', 'PACKONE_ADMOB_ANDROID_BANNER_ID',
+    'PACKONE_ADMOB_TEST_BANNERS',
+  ]) delete env[key];
   Object.assign(env, extraEnv);
   const result = spawnSync(npx, ['expo', 'config', '--type', 'public', '--json'], {
     cwd: new URL('..', import.meta.url),
@@ -87,6 +93,18 @@ assert.equal(production.android.edgeToEdgeEnabled, undefined);
 assert.equal(production.extra.buildProfile, 'production');
 assert.equal(production.extra.adMob.iosEnabled, false, 'production AdMob is opt-in');
 assert.equal(production.extra.adMob.androidEnabled, false, 'production AdMob is opt-in');
+const testAdsPreview = loadConfig('preview', { PACKONE_ADMOB_TEST_BANNERS: '1' });
+assert.equal(testAdsPreview.extra.adMob.testBanners, true);
+assert.equal(testAdsPreview.extra.adMob.iosEnabled, true);
+assert.match(testAdsPreview.extra.adMob.iosBannerUnitId, /^ca-app-pub-3940256099942544\//);
+const liveIos = loadConfig('production', {
+  PACKONE_ADMOB_IOS_ENABLED: '1',
+  PACKONE_ADMOB_IOS_APP_ID: 'ca-app-pub-1234567890123456~1234567890',
+  PACKONE_ADMOB_IOS_BANNER_ID: 'ca-app-pub-1234567890123456/1234567890',
+});
+assert.equal(liveIos.extra.adMob.iosEnabled, true);
+assert.equal(liveIos.extra.adMob.androidEnabled, false);
+assert.equal(liveIos.extra.adMob.iosBannerUnitId, 'ca-app-pub-1234567890123456/1234567890');
 assert.equal(production.plugins.some(plugin => Array.isArray(plugin)
   && plugin[0] === 'react-native-google-mobile-ads'
   && plugin[1].delayAppMeasurementInit === true), true);

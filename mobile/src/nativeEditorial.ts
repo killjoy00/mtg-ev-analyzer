@@ -125,15 +125,16 @@ export const privacySections: ArticleSection[] = [
   {
     title: 'Advertising and commerce links',
     body: [
-      'Google advertising is currently disabled, so Pack One does not currently load Google display ads. While Google advertising is disabled, the Daily home can show a TCGplayer affiliate promotion to visitors who are eligible to see advertising.',
+      'Google advertising is currently disabled on the website, so the website does not load Google display ads. While it is disabled, the Daily home can show a TCGplayer affiliate promotion to visitors who are eligible to see advertising.',
+      'Pack One’s mobile apps can show one Google AdMob banner on the Daily home to players eligible for advertising. When a banner is enabled, Google may process device or app identifiers, ad interactions, diagnostics, and approximate location inferred from IP address to deliver, measure, and protect ads. Where required, the apps use Google’s consent choices before requesting an ad and provide an ad privacy choices control. Pack One does not send account details or draft picks as ad targeting data. A verified Supporter or Elite membership prevents Google ad requests.',
       'TCGplayer links are routed through Impact. The Daily-home promotion uses a logo image served by Pack One; merely viewing it does not load a TCGplayer or Impact script or tracking pixel. Pack One records outbound TCGplayer clicks, including the card, set, page surface, and affiliate-routing status. Purchases and payment details are handled by TCGplayer and its partners, not by Pack One.',
     ],
   },
   {
     title: 'Pack One apps',
     body: [
-      'The Pack One apps use the same Pack One accounts and backend services as the website, so the rest of this page applies to them. The apps do not include third-party analytics, advertising, or crash-reporting SDKs. When you play, the apps send picks and run results to Pack One’s servers for scoring and recordkeeping, and the servers record gameplay events linked to the Pack One player identifier.',
-      'Connecting Patreon from the apps opens Patreon in your browser. The apps’ Daily home can show the TCGplayer promotion to players who are eligible to see advertising, and TCGplayer links open in the browser through the same Impact affiliate routes. The apps do not separately record those outbound clicks. Apple subscriptions are offered only in the iOS app.',
+      'The Pack One apps use the same Pack One accounts and backend services as the website, so the rest of this page applies to them. The apps do not include third-party analytics or crash-reporting SDKs; builds that enable an AdMob banner include Google’s advertising SDK. When you play, the apps send picks and run results to Pack One’s servers for scoring and recordkeeping, and the servers record gameplay events linked to the Pack One player identifier.',
+      'Connecting Patreon from the apps opens Patreon in your browser. The apps’ Daily home can show either a TCGplayer promotion or a Google AdMob banner, never both. TCGplayer links open in the browser through the same Impact affiliate routes. The apps do not separately record those outbound clicks. Apple subscriptions are offered only in the iOS app.',
     ],
   },
   {

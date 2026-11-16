@@ -14,6 +14,21 @@ Guests may see the affiliate promotion without a membership lookup. Signed-in ac
 
 Account, Patreon-connect/disconnect and Elite-activation flows emit a nonce-only localStorage signal plus a same-tab event. An open tab clears any rendered Google or affiliate promotion on those signals and never refills it before a full reload. Changes made directly on patreon.com or by backend webhooks/scheduled reconciliation do not pass through a Pack One tab, so an already-open tab can retain its existing promotion until reload.
 
+## Native Google AdMob: iOS-first draft (November 16)
+
+A separate native AdMob banner integration is staged in draft PR #1601.
+It is not the website's AdSense publisher, slot or approval. The native
+Daily-home banner replaces (never stacks with) the TCGplayer affiliate fallback
+for advertising-eligible players and does not appear in gameplay or result review.
+Supporter, Elite, stale/unknown and failed membership states remain ad-free.
+Non-personalized, G-rated requests wait for Google UMP consent.
+
+Production stays off unless a new signed build explicitly enables the platform
+with `PACKONE_ADMOB_IOS_ENABLED=1` or `PACKONE_ADMOB_ANDROID_ENABLED=1`
+and a matching Pack One-specific App ID and banner unit ID. App Store
+privacy disclosures, UMP messages, device tests, privacy-manifest review and
+a new App Review remain mandatory. See `docs/mobile-admob-release.md`.
+
 ## Google AdSense: deferred
 
 `ad-config.js` remains `enabled: false`. The public client is `ca-pub-1217971050094766` and the dormant Daily-home unit is `1543495960`; `articleTop` remains empty and Auto Ads are not used. Publisher verification metadata and `ads.txt` remain in place. With the release gate disabled, the loader makes no membership request and no Google advertising request. Static ad placeholders remain hidden even with JavaScript disabled, and `?adpreview=1` cannot bypass the disabled release gate.

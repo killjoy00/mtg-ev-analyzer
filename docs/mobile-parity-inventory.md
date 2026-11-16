@@ -1,3 +1,26 @@
+# November 16, 2026 parity review: latest web vs iOS 1.1/101002
+
+The source used for signed iOS **1.1/101002** is `c1d838cacb27027913be01cc968a78bf3b1ac522`. As of `b04c87a9b8c04304bd13ae9dccf729dff23f2191` on November 16, compare shows **no intervening native source/config/build changes**. Exact-main RC 43902562499 and signed iOS run 43925032542 passed; Apple internal TestFlight distribution was confirmed. The owner subsequently reported App Store approval; repository records alone do not establish which binary was made public.
+
+## Source-level web parity since November 7
+
+| Web change | Native source state | Still needs verification |
+| --- | --- | --- |
+| Three Dailies, shared runs, reveal, trophy decklists, result review, sharing | Covered by November 7 code/CI sweep, plus later copy fixes | Physical iPhone/iPad full run and sharing |
+| Plain-language Daily, Practice, Learn, scoring, report dialog (#1516, #1542) | Native copies included in 101002 | Actual screens, system text sizes |
+| Supporter/Elite benefits, StoreKit restore and affiliate suppression (#1523) | Native membership and `useCardCommerce` in 101002; server authoritative | Apple purchase/restore, Patreon changes on device |
+| Results/news opt-in, published-results exclusions and Nov 16 policy (#1581–#1590) | Native `ResultsPreferences` and policy included in 101002 | Signed-in settings, prompt, delivery state |
+| Unified web Account Email preferences layout (#1593) | Same underlying independent consent; native keeps distinct Account/Reminders navigation. Draft #1601 changes native results email to single On/Off status and action | Check settings save and no cross-consent |
+| Weekly personal results/news (#1596, #1599) | Backend/email work: no new binary feature needed | Separate server email acceptance |
+| SEO and static analytics (#1527, #1598) | Website-only, not missing gameplay features | None for native |
+| Native AdMob Daily banner (#1601) | New draft, **not in approved build** | IDs, UMP, App Privacy/ATT, new signed candidate, device QA |
+
+Automated simulator success and source parity are **not** evidence of physical-device sign-in, exact App Store approval binary, StoreKit renewal/revocation, Apple Universal Links, larger-text/VoiceOver, in-app UMP or production ad serving. This draft does not enable advertising or change public release state.
+
+This record supplements the original inventory below.
+
+---
+
 # Mobile web/native parity inventory
 
 Tracking: #575. Reconciled **October 10, 2026 (CDT)**: the latest iOS native TestFlight candidate is **1.1/100733**, not the older 1.0/100505 shown in the historical October 4 section below. The current feature inclusion/exclusion and production dependency matrix is [iOS 1.1 exact-build feature and release inventory](mobile-ios-1.1-testflight-inventory-2026-10-10.md). Production secure-auth baseline evidence is retained historically; Apple-IAP physical/provider acceptance is separately tracked in #673.
