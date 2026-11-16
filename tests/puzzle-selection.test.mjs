@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync,readdirSync} from 'node:fs';
 import {gunzipSync} from 'node:zlib';
-import {puzzleSelectionFeatures,stakesTopPoolSize,isLandCard,STAKES_RULE,SELECTION_FEATURE_VERSION} from '../puzzle-selection.mjs';
+import {puzzleSelectionFeatures,stakesTopPoolSize,isLandCard,isOffColour,isClearEasy,costColours,STAKES_RULE,EASY_RULE,SELECTION_FEATURE_VERSION} from '../puzzle-selection.mjs';
+import {rateDraftRunPuzzle} from '../draft-run-difficulty.mjs';
 import {assessPuzzle,strengthTable,isLand,RULE} from '../scripts/build-puzzle-review-set.mjs';
 import {loadStrengthTable,loadMainDecks,scoreImportedPuzzles,scorePuzzleSelection} from '../scripts/score-puzzle-selection.mjs';
 
@@ -15,16 +16,76 @@ test('features: credible options, stakes, deck membership and land answers',()=>
   const features=puzzleSelectionFeatures(puzzle,{strength:strength({Leader:1.5,Runner:4.25,Fourth:9,Weak:20}),mainDeck:new Map([['Runner',1]])});
   // Credible: at least 35% of the leader (0.175), top three only, so Fourth
   // (0.176) is credible but cut, and Weak never counts.
+  // The margin compares the trophy pick with every other rated card in the
+  // pack, credible or not: Weak (20) is 15.75 points stronger than Runner.
   assert.deepEqual(features,{puzzle_id:'p',feature_version:SELECTION_FEATURE_VERSION,strength_version:'gih-shrunk-400-v1',
-    strength_sha256:'a'.repeat(64),stakes_points:4.25,credible_count:3,trophy_in_main_deck:true,trophy_is_land:true});
+    strength_sha256:'a'.repeat(64),stakes_points:4.25,credible_count:3,trophy_in_main_deck:true,trophy_is_land:true,
+    trophy_strength_margin:-15.75,trophy_off_colour:false,trophy_card_id:'b'});
   const bare=puzzleSelectionFeatures(puzzle,{});
   assert.equal(bare.stakes_points,null);assert.equal(bare.strength_version,null);assert.equal(bare.trophy_in_main_deck,null);
+  assert.equal(bare.trophy_strength_margin,null);assert.equal(bare.trophy_off_colour,false);
+  // Unrated trophy pick, or no other rated card: no margin.
+  assert.equal(puzzleSelectionFeatures(puzzle,{strength:strength({Leader:1})}).trophy_strength_margin,null);
+  assert.equal(puzzleSelectionFeatures(puzzle,{strength:strength({Runner:1})}).trophy_strength_margin,null);
+  assert.equal(puzzleSelectionFeatures(puzzle,{strength:strength({Runner:2.5,Leader:2.5,Weak:-1})}).trophy_strength_margin,0);
   assert.equal(puzzleSelectionFeatures(puzzle,{strength:strength({}),mainDeck:new Map()}).stakes_points,null);
   assert.equal(puzzleSelectionFeatures(puzzle,{mainDeck:new Map([['Leader',2]])}).trophy_in_main_deck,false);
   assert.throws(()=>puzzleSelectionFeatures({...puzzle,historical_pick_id:'z'},{}),/no trophy pick/);
   assert.equal(isLandCard({type_line:'Artifact Land'}),true);
   assert.equal(isLandCard({type_line:'Sorcery // Land'}),true);
   assert.equal(isLandCard({type_line:'Creature — Elf'}),false);
+});
+
+test('colour fit: off-colour needs a coloured card and coloured prior picks that share nothing',()=>{
+  const cost=mana_cost=>({mana_cost});
+  assert.deepEqual([...costColours(cost('{2}{W/U}{G/P}{X}{C}{S}'))].sort(),['G','U','W']);
+  assert.equal(costColours(cost('')).size+costColours({}).size+costColours(null).size,0);
+  assert.equal(isOffColour(cost('{1}{U}'),[cost('{2}{B}'),cost('{3}{R}{R}{G}{G}')]),true);
+  assert.equal(isOffColour(cost('{1}{U}'),[cost('{2}{B}'),cost('{W/U}')]),false,'a hybrid prior pick shares blue');
+  assert.equal(isOffColour(cost('{1}{U}{R}'),[cost('{R}')]),false,'sharing one colour is enough');
+  assert.equal(isOffColour(cost('{1}{U}'),[]),false,'a first pick has nothing to conflict with');
+  assert.equal(isOffColour(cost('{1}{U}'),undefined),false);
+  assert.equal(isOffColour(cost('{3}'),[cost('{R}')]),false,'a colourless card fits any pool');
+  assert.equal(isOffColour(cost(''),[cost('{R}')]),false,'a land has no mana cost');
+  assert.equal(isOffColour(cost('{1}{U}'),[cost('{4}'),cost('')]),false,'colourless prior picks commit to nothing');
+  const puzzle={puzzle_id:'p',historical_pick_id:'a',candidates:[{...card('a','Leader',.6),mana_cost:'{1}{U}'},card('b','Runner',.2)],
+    prior_picks:[{name:'First',mana_cost:'{R}'}]};
+  assert.equal(puzzleSelectionFeatures(puzzle,{}).trophy_off_colour,true);
+  assert.equal(puzzleSelectionFeatures({...puzzle,prior_picks:[]},{}).trophy_off_colour,false);
+});
+
+test('clear-Easy rule: leader, strongest card, and colour fit from P1P3',()=>{
+  const clear={pick_number:3,target_support_ratio:1,trophy_strength_margin:0,trophy_off_colour:false};
+  assert.equal(isClearEasy(clear),true);
+  assert.equal(isClearEasy({...clear,target_support_ratio:0.99}),false,'the trophy pick must be the model leader');
+  assert.equal(isClearEasy({...clear,trophy_strength_margin:-0.01}),false,'another rated card is stronger');
+  assert.equal(isClearEasy({...clear,trophy_strength_margin:null}),false,'no strength evidence is not agreement');
+  assert.equal(isClearEasy({...clear,trophy_off_colour:true}),false);
+  assert.equal(isClearEasy({...clear,trophy_off_colour:null}),false,'a row scored before the feature existed never qualifies from P1P3');
+  // One prior pick is not a colour commitment.
+  assert.equal(isClearEasy({...clear,pick_number:2,trophy_off_colour:true}),true);
+  assert.equal(isClearEasy({...clear,pick_number:1,trophy_off_colour:false}),true);
+  assert.deepEqual(EASY_RULE,{min_trophy_support_ratio:1,min_strength_margin:0,colour_fit_from_pick:3,answer_repeat_days:28});
+});
+
+test('owner-judged Easy puzzles: the good ones stay eligible, the bad ones do not',()=>{
+  // Diagnostic examples from issue #1585, not training data: the rule was
+  // validated on held-out practice answers (docs/DIFFICULTY-REVIEW-2026-11.md).
+  // The three good examples must stay eligible; the "uncertain" one is
+  // computed but deliberately not asserted either way.
+  const examples=JSON.parse(readFileSync('tests/fixtures/easy-owner-examples.json','utf8'));
+  assert.deepEqual(examples.map(e=>e.owner_judgement),['good','good','good','bad','bad','bad','bad','uncertain']);
+  for(const example of examples) {
+    const rating=rateDraftRunPuzzle(example.puzzle);
+    assert.equal(rating.band,'easy',example.label);
+    const features=puzzleSelectionFeatures(example.puzzle,{strength:loadStrengthTable(example.set_id)});
+    const eligible=isClearEasy({pick_number:example.pick_number,target_support_ratio:rating.targetSupportRatio,...features});
+    if(example.owner_judgement==='good')assert.equal(eligible,true,`${example.label} must stay eligible`);
+    if(example.owner_judgement==='bad')assert.equal(eligible,false,`${example.label} must not be a clear Easy`);
+  }
+  // None of the three good examples made the trophy main deck check part of
+  // the rule: two of them were cut from the final deck (issue #1585).
+  assert.equal(Object.keys(EASY_RULE).some(key=>/deck/.test(key)),false);
 });
 
 test('the top pool keeps a quarter, at least three',()=>{
@@ -86,7 +147,7 @@ test('import scoring skips a database without the features table',async()=>{
   assert.equal(await scoreImportedPuzzles(query,[{puzzle_id:'p'}],{log:m=>messages.push(m)}),0);
   assert.equal(await scoreImportedPuzzles(query,[{puzzle_id:'q'}],{log:m=>messages.push(m)}),0);
   assert.equal(sql.length,1,'the table check runs once per database adapter');
-  assert.match(messages.join('\n'),/migration 0068 is not applied/);
+  assert.match(messages.join('\n'),/migrations 0068 and 0077 are not both applied/);
 });
 
 test('completed feature backfill avoids reading the entire puzzle corpus again',async()=>{

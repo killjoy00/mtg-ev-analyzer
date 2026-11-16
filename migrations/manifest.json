@@ -80,7 +80,8 @@
     "0073_habits_acquisition_first_touch_idx.sql",
     "0074_results_privacy_controls.sql",
     "0075_results_privacy_launch.sql",
-    "0076_results_email_delivery.sql"
+    "0076_results_email_delivery.sql",
+    "0077_clear_easy_features.sql"
   ],
   "same_prefix_order": {
     "0037": [
@@ -217,7 +218,8 @@
         "0073_habits_acquisition_first_touch_idx.sql",
         "0074_results_privacy_controls.sql",
         "0075_results_privacy_launch.sql",
-        "0076_results_email_delivery.sql"
+        "0076_results_email_delivery.sql",
+        "0077_clear_easy_features.sql"
       ]
     },
     "daily-calendar": {
@@ -288,7 +290,8 @@
         "0073_habits_acquisition_first_touch_idx.sql",
         "0074_results_privacy_controls.sql",
         "0075_results_privacy_launch.sql",
-        "0076_results_email_delivery.sql"
+        "0076_results_email_delivery.sql",
+        "0077_clear_easy_features.sql"
       ]
     },
     "launch-load": {
@@ -334,7 +337,8 @@
         "0073_habits_acquisition_first_touch_idx.sql",
         "0074_results_privacy_controls.sql",
         "0075_results_privacy_launch.sql",
-        "0076_results_email_delivery.sql"
+        "0076_results_email_delivery.sql",
+        "0077_clear_easy_features.sql"
       ]
     },
     "launch-distributed": {
@@ -382,7 +386,8 @@
         "0073_habits_acquisition_first_touch_idx.sql",
         "0074_results_privacy_controls.sql",
         "0075_results_privacy_launch.sql",
-        "0076_results_email_delivery.sql"
+        "0076_results_email_delivery.sql",
+        "0077_clear_easy_features.sql"
       ]
     },
     "practice-performance": {

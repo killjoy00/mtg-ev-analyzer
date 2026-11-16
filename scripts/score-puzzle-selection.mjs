@@ -7,8 +7,9 @@
 //
 // The backfill reads the table once in physical order, a chunk of heap blocks
 // at a time (a sequential TID range read; four stripes in parallel), and
-// scores each puzzle that has no row for the current feature version or whose
-// row used a different strength table than the checked-in one. --rescore
+// scores each puzzle that has no row for the current feature version, whose
+// row used a different strength table than the checked-in one, or whose row
+// predates the clear-Easy features (migration 0077). --rescore
 // recomputes every puzzle in scope. Rows are written only when a value
 // changes. Payloads, ratings and grading are never touched. The run fails if
 // any puzzle in scope is still unscored at the end (for example, a row that
@@ -61,7 +62,11 @@ function setInputs(setId,strengthDir) {
 }
 
 export async function selectionFeaturesAvailable(query) {
-  const {present}=(await query("SELECT to_regclass('draft_run_puzzle_selection_features') IS NOT NULL present")).rows[0];
+  // The table (migration 0068) with the clear-Easy columns (migration 0077).
+  const {present}=(await query(`SELECT to_regclass('draft_run_puzzle_selection_features') IS NOT NULL
+    AND (SELECT count(*)=3 FROM information_schema.columns WHERE table_schema='public'
+      AND table_name='draft_run_puzzle_selection_features'
+      AND column_name IN ('trophy_strength_margin','trophy_off_colour','trophy_card_id')) present`)).rows[0];
   return present===true||present==='t';
 }
 
@@ -69,29 +74,35 @@ async function writeFeatures(query,features) {
   if(!features.length)return [];
   const result=await query(`WITH incoming AS (
       SELECT * FROM jsonb_to_recordset($1::jsonb) AS f(puzzle_id text,feature_version text,strength_version text,strength_sha256 text,
-        stakes_points real,credible_count smallint,trophy_in_main_deck boolean,trophy_is_land boolean)
+        stakes_points real,credible_count smallint,trophy_in_main_deck boolean,trophy_is_land boolean,
+        trophy_strength_margin real,trophy_off_colour boolean,trophy_card_id text)
     ), written AS (
-      INSERT INTO draft_run_puzzle_selection_features AS t(puzzle_id,feature_version,strength_version,strength_sha256,stakes_points,credible_count,trophy_in_main_deck,trophy_is_land)
+      INSERT INTO draft_run_puzzle_selection_features AS t(puzzle_id,feature_version,strength_version,strength_sha256,stakes_points,credible_count,
+        trophy_in_main_deck,trophy_is_land,trophy_strength_margin,trophy_off_colour,trophy_card_id)
       SELECT * FROM incoming
       ON CONFLICT(puzzle_id,feature_version) DO UPDATE SET strength_version=excluded.strength_version,strength_sha256=excluded.strength_sha256,
         stakes_points=excluded.stakes_points,credible_count=excluded.credible_count,trophy_in_main_deck=excluded.trophy_in_main_deck,
-        trophy_is_land=excluded.trophy_is_land,computed_at=now()
-      WHERE (t.strength_version,t.strength_sha256,t.stakes_points,t.credible_count,t.trophy_in_main_deck,t.trophy_is_land)
-        IS DISTINCT FROM (excluded.strength_version,excluded.strength_sha256,excluded.stakes_points,excluded.credible_count,excluded.trophy_in_main_deck,excluded.trophy_is_land)
+        trophy_is_land=excluded.trophy_is_land,trophy_strength_margin=excluded.trophy_strength_margin,
+        trophy_off_colour=excluded.trophy_off_colour,trophy_card_id=excluded.trophy_card_id,computed_at=now()
+      WHERE (t.strength_version,t.strength_sha256,t.stakes_points,t.credible_count,t.trophy_in_main_deck,t.trophy_is_land,
+          t.trophy_strength_margin,t.trophy_off_colour,t.trophy_card_id)
+        IS DISTINCT FROM (excluded.strength_version,excluded.strength_sha256,excluded.stakes_points,excluded.credible_count,
+          excluded.trophy_in_main_deck,excluded.trophy_is_land,excluded.trophy_strength_margin,excluded.trophy_off_colour,excluded.trophy_card_id)
       RETURNING t.puzzle_id
     ) SELECT coalesce(jsonb_agg(puzzle_id),'[]'::jsonb) written FROM written`,[JSON.stringify(features)]);
   return parse(result.rows[0].written);
 }
 
 // Loaders: score the exact puzzles of one inserted batch from memory. A
-// database without the features table (migration 0068) is skipped with one
-// message, never failed, so release plans that predate it can still load
-// puzzles; the latest-set Daily keeps the band draw until its set is scored.
+// database without the features table (migration 0068) or its clear-Easy
+// columns (migration 0077) is skipped with one message, never failed, so
+// release plans that predate them can still load puzzles; the Daily keeps the
+// band draw until its set is scored.
 const tablePresent=new WeakMap();
 export async function scoreImportedPuzzles(query,puzzles,{strengthDir=STRENGTH_DIR,log=console.log}={}) {
   if(!tablePresent.has(query)) {
     tablePresent.set(query,selectionFeaturesAvailable(query).then(present=>{
-      if(!present)log('Puzzle selection features skipped: migration 0068 is not applied. Run scripts/score-puzzle-selection.mjs after it is.');
+      if(!present)log('Puzzle selection features skipped: migrations 0068 and 0077 are not both applied. Run scripts/score-puzzle-selection.mjs after they are.');
       return present;
     }));
   }
@@ -115,10 +126,12 @@ function currentStrength(directory) {
   return current;
 }
 
-// Puzzles in scope with no current row: none of the version, or scored against
-// a different strength table. $1 feature version, $2 current strength map.
+// Puzzles in scope with no current row: none of the version, scored against
+// a different strength table, or scored before the clear-Easy features existed
+// (trophy_off_colour is null only then). $1 feature version, $2 current
+// strength map.
 const STALE=`NOT EXISTS(SELECT 1 FROM draft_run_puzzle_selection_features f
-  WHERE f.puzzle_id=p.puzzle_id AND f.feature_version=$1
+  WHERE f.puzzle_id=p.puzzle_id AND f.feature_version=$1 AND f.trophy_off_colour IS NOT NULL
     AND f.strength_version IS NOT DISTINCT FROM ($2::jsonb->p.set_id->>0)
     AND f.strength_sha256 IS NOT DISTINCT FROM ($2::jsonb->p.set_id->>1))`;
 const setFilter=(setIds,params)=>setIds?(params.push(toPgArray(setIds)),`AND p.set_id=ANY($${params.length}::text[])`):'';
@@ -143,8 +156,10 @@ async function scoreStripe(query,{first,last,open},{chunk,setIds,rescore,strengt
     const params=[SELECTION_FEATURE_VERSION,JSON.stringify(current),`(${block},0)`,`(${upper},0)`,rescore];
     const sets=setFilter(setIds,params);
     const page=(await query(`SELECT p.puzzle_id,p.set_id,p.source_draft_hash,p.payload->>'historical_pick_id' historical_pick_id,
-        (SELECT jsonb_agg(jsonb_build_object('id',c->>'id','name',c->>'name','type_line',c->>'type_line',
-          'model_probability',(c->>'model_probability')::float8)) FROM jsonb_array_elements(p.payload->'candidates') c) candidates
+        (SELECT jsonb_agg(jsonb_build_object('id',c->>'id','name',c->>'name','type_line',c->>'type_line','mana_cost',c->>'mana_cost',
+          'model_probability',(c->>'model_probability')::float8)) FROM jsonb_array_elements(p.payload->'candidates') c) candidates,
+        (SELECT jsonb_agg(jsonb_build_object('mana_cost',c->>'mana_cost'))
+          FROM jsonb_array_elements(CASE WHEN jsonb_typeof(p.payload->'prior_picks')='array' THEN p.payload->'prior_picks' ELSE '[]'::jsonb END) c) prior_picks
       FROM draft_run_verified_puzzles p
       WHERE p.ctid>=$3::tid AND p.ctid<$4::tid ${sets} AND ($5::boolean OR ${STALE})`,params)).rows;
     if(page.length) {
@@ -152,7 +167,7 @@ async function scoreStripe(query,{first,last,open},{chunk,setIds,rescore,strengt
       for(const row of page) {
         const {strength,decks}=await setInputs(row.set_id,strengthDir);
         features.push(puzzleSelectionFeatures(
-          {puzzle_id:row.puzzle_id,historical_pick_id:row.historical_pick_id,candidates:parse(row.candidates)},
+          {puzzle_id:row.puzzle_id,historical_pick_id:row.historical_pick_id,candidates:parse(row.candidates),prior_picks:parse(row.prior_picks)||[]},
           {strength,mainDeck:decks(row.source_draft_hash)}));
       }
       const written=new Set(await writeFeatures(query,features));
@@ -177,7 +192,7 @@ export async function unscoredPuzzles(query,{setIds=null,strengthDir=STRENGTH_DI
 // features table. Returns {sets, remaining}: one summary per set scored (and
 // per requested set), and the number of puzzles in scope still unscored.
 export async function scorePuzzleSelection(query,{setIds=null,rescore=false,strengthDir=STRENGTH_DIR,log=console.log,stripes=STRIPES}={}) {
-  if(!await selectionFeaturesAvailable(query))throw Error('Apply migration 0068 before scoring puzzle selection features.');
+  if(!await selectionFeaturesAvailable(query))throw Error('Apply migrations 0068 and 0077 before scoring puzzle selection features.');
   const current=currentStrength(strengthDir),totals=new Map();
   const tally=setId=>{
     if(!totals.has(setId))totals.set(setId,{set_id:setId,scored:0,written:0,strength:current[setId]?.[1].slice(0,12)??null,decklists:Object.hasOwn(catalogLoaders,setId)});
