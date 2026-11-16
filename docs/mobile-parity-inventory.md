@@ -1,4 +1,4 @@
-# November 16, 2026 parity review: approved 1.0 and TestFlight 1.1 versus web
+# November 16, 2026 parity review: iOS 1.2 candidate versus approved 1.0 and TestFlight 1.1
 
 **Apple approved iOS 1.0 on November 16 and reported Ready for Distribution.**
 The last repository-verified 1.0 App Store attachment is **100505**, built from
@@ -13,7 +13,10 @@ November 7 reveal/share/trophy-deck and Daily update (#1499), the newer ad-free
 membership copy/affiliate rules (#1523), and November 16 native results/news
 preferences and policies (#1590). These features are present in the newer
 **1.1/101002 TestFlight** source, but **that build has not been approved for
-public App Store distribution**.
+public App Store distribution**. The next candidate targets **iOS 1.2**,
+retires native card shopping links, removes iOS TCGplayer banner fallback and
+adds consent-gated AdMob. Android remains version 1.0; its home fallback is
+unchanged.
 
 The source used for signed iOS **1.1/101002** is `c1d838cacb27027913be01cc968a78bf3b1ac522`. As of `b04c87a9b8c04304bd13ae9dccf729dff23f2191` on November 16, compare shows **no intervening native source/config/build changes**. Exact-main RC 43902562499 and signed iOS run 43925032542 passed; Apple internal TestFlight distribution was confirmed. Apple approval notifications separately confirm only public version 1.0; they do not provide its exact binary build number.
 
@@ -28,7 +31,7 @@ The source used for signed iOS **1.1/101002** is `c1d838cacb27027913be01cc968a78
 | Unified web Account Email preferences layout (#1593) | Same underlying independent consent; native keeps distinct Account/Reminders navigation. Draft #1601 changes native results email to single On/Off status and action | Check settings save and no cross-consent |
 | Weekly personal results/news (#1596, #1599) | Backend/email work: no new binary feature needed | Separate server email acceptance |
 | SEO and static analytics (#1527, #1598) | Website-only, not missing gameplay features | None for native |
-| Native AdMob Daily banner (#1601) | New draft, **not in approved build** | IDs, UMP, App Privacy/ATT, new signed candidate, device QA |
+| iOS 1.2 AdMob, iOS TCGplayer removal, mobile card-link retirement (#1601) | New draft, **not in approved build**; website card links retire separately in #1602 | IDs, UMP, App Privacy/ATT, signed 1.2 candidate, device QA |
 
 Automated simulator success and source parity are **not** evidence of physical-device sign-in, exact App Store approval binary, StoreKit renewal/revocation, Apple Universal Links, larger-text/VoiceOver, in-app UMP or production ad serving. This draft does not enable advertising or change public release state.
 
@@ -133,7 +136,7 @@ Automated browser evidence for this candidate emits screenshots for compact auth
 | Daily home: all three Dailies, completion state, View result, ordering, streak/reset cue, ranking-identity warning, resume | **Implemented** | Home refresh/rollover and stale-response guards are covered in the lifecycle suite. |
 | Draft Run gameplay | **Implemented** | Server-authoritative eight-pick flow, prior-pool context/zoom, stale-response protection, reroll rules and full result/review behavior are mounted-tested. |
 | Post-pick comparison | **Implemented** | Trophy pick, your pick and the model's next card with score, support and players' picks; scoring copy, drafter details, trophy decklist, all-cards list, pack review and reopened completed decisions (November 7 update). |
-| Revealed-card TCGplayer links | **Implemented** | Links appear only inside expanded score analysis, use exact card-specific destinations, carry visible affiliate disclosure, and fail visibly if OS handoff fails. |
+| Revealed-card TCGplayer links | **Retired in 1.2 draft** | No native per-card affiliate links in expanded score analysis; card zoom, scores, model support and player-pick comparisons remain. |
 | Practice | **Implemented** | Regular/custom/Cube access remains server-capability-authoritative. |
 | Shared practice / friend run | **Implemented** | Explicit invitation acceptance, exact server run continuity, no silent replacement on failed GET, no recipient reroll, creator/result recovery and kill/relaunch. #910 moves local checkpoint discovery from Home to conditional Practice shared activity. |
 | Historical challenge compatibility | **Implemented** | Genuine 12-hex historical challenge links remain distinct from modern 24-hex shared runs. |
@@ -145,9 +148,9 @@ Automated browser evidence for this candidate emits screenshots for compact auth
 | Elite subscription purchase | **Implemented on iOS; deliberate difference on Android** | iOS offers Pack One Elite as an Apple auto-renewable subscription using StoreKit, StoreKit-displayed pricing, Restore Purchases, and Apple subscription management. Patreon remains an existing-access provider with no native Patreon purchase/upgrade CTA. Google Play billing is deliberately outside this v1 change. |
 | Learn: How to Play / Scoring / Method / Sets | **Implemented** | Core education is native. |
 | Editorial drafting guides | **Deliberate continuation** | In #910, Learn opens the selected, individually described article directly; browser close returns to the native screen. Native member Learn captures pass; article browser-return behavior has source/mounted coverage and physical return acceptance remains open. |
-| Published MSH/ECL/TMT/SOS archive analyses | **Implemented** | Native archive screen uses current checked-in web evidence, native routing and disclosed card links. |
+| Published MSH/ECL/TMT/SOS archive analyses | **Implemented; commerce retired in 1.2 draft** | Native archive screen uses current published evidence and native routing; individual cards no longer link to shopping. |
 | About / Support / Privacy / Terms | **Deliberate continuation** | First-class native entries open canonical Pack One HTTPS pages; no native credential is placed in the URL. |
-| Daily-home TCGplayer fallback | **Implemented** | Guest visibility; signed-in visibility only when authoritative `ads_allowed===true`; unknown/pending/failure hides it; no gameplay/result placement. |
+| Daily-home TCGplayer fallback | **Retired on iOS in 1.2 draft; Android preserved** | iOS permits only consent-gated AdMob or no banner. Android retains the existing affiliate home slot; no gameplay/result placement. |
 | Account sign-in / credential management | **Implemented, device evidence open** | Email/Google/Apple, password recovery/change, verification resend, sign-out/deletion and identity guards exist. A successfully consumed password-reset link now verifies that exact account email; merely requesting a reset does not. Exact-device Apple/relay/deletion acceptance remains open. |
 
 ## B. Routing, sharing and continuation parity
@@ -194,8 +197,8 @@ Automated browser evidence for this candidate emits screenshots for compact auth
 | Provider-specific purchase surfaces | Patreon remains passive existing-account OAuth with no Patreon purchase link, price, or upgrade CTA. iOS sells equivalent Elite digital access only through Apple IAP. Android has no Google Play billing in this v1 change and therefore retains the passive existing-access membership surface. |
 | Guides and policy copy are not duplicated into native source | Canonical HTTPS continuation prevents editorial/legal drift. |
 | External credential reset remains canonical HTTPS | Avoids exposing reset credentials to interceptable custom schemes. |
-| Affiliate links are restricted to reviewed surfaces | Revealed-card links live inside expanded score analysis; Daily-home fallback is outside active gameplay/results and fail-closed for ad-free/unknown signed-in membership. |
-| Revealed-card affiliate links stay behind an expansion | The web now shows TCGplayer links on the always-visible reveal cards. Native keeps them inside the expanded `Compare all N cards` section with their disclosure, the reviewed placement. Moving them needs an explicit owner decision. |
+| Advertising is restricted to Daily home | iOS 1.2 permits only AdMob after consent and a verified eligible account (or guest); Android keeps its Daily-home affiliate fallback; all per-card links are retired. |
+| No per-card shopping links | Web Draft Run and set archives retire these links in PR #1602; native cards retire them in iOS 1.2/Android source. Card zoom still works. |
 | No Elite upgrade button on native Practice | The web shows `Upgrade to Elite` on locked premium cards (#1299). Android has no Play billing, so native shows `Pack One Elite required` and the Membership link instead. |
 | One Share button instead of Share plus Copy | The OS share sheet already offers copy; adding a clipboard module would change native dependencies for no user-visible gain. |
 | No dated new-set callout on Practice | The web's `Now includes Reality Fracture.` line is hand-updated at each set launch; in a binary it would go stale between builds. |

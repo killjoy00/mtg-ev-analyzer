@@ -1,18 +1,22 @@
-# Pack One native AdMob: iOS-first release checklist
+# Pack One iOS 1.2: native AdMob release checklist
 
 Prepared November 16, 2026. Apple approved **iOS 1.0** and marked it
 Ready for Distribution on November 16. The repository's last documented build
 attached to App Store 1.0 is **100505**; Apple's approval email does not
 identify its build number. The newer **iOS 1.1/101002 is TestFlight only**.
-Neither is modified by this draft implementation.
+The next App Store marketing version is **1.2**, not 1.1. Its implementation
+remains unmerged and unsigned as a public App Store update.
 
 ## Placement and ads policy
 
 - One Google AdMob **banner** on the native Daily home **after** the Daily cards,
   never during picks, result review, shared challenges or the editorial guides.
-- The AdMob banner **replaces** the existing Daily-home TCGplayer fallback; the
-  two placements never stack. When AdMob is disabled, TCGplayer remains as before.
-  The web AdSense gate in `ad-config.js` remains **disabled**.
+- **iOS never shows the TCGplayer banner.** Its Daily home can show AdMob,
+  and if AdMob is disabled, consent is declined, or loading fails, it displays
+  no advertising promotion instead. Android retains the previously existing
+  Daily-home TCGplayer fallback. The website's separate Daily-home affiliate
+  promotion remains unchanged; the web AdSense gate in `ad-config.js`
+  remains **disabled**.
 - A guest is eligible. A signed-in player must have a *fresh* account-specific
   `ads_allowed: true` and `ad_free: false`; Supporter, Patreon/Apple Elite,
   manual Elite, unknown provider status and failed refreshes see no Google banner.
@@ -22,8 +26,10 @@ Neither is modified by this draft implementation.
   until then. The banner requests **non-personalized ads only** with maximum
   content rating G. A required UMP privacy-options action appears on both the
   banner and the Account screen.
-- Consent failure or ad load failure leaves a blank slot; neither blocks play,
-  adds an interstitial, nor falls through to the affiliate promotion.
+- Consent failure or ad load failure leaves a blank slot on iOS; neither
+  blocks play, adds an interstitial, nor falls back to TCGplayer.
+- All card-specific shopping links are gone from native Draft Run and set
+  archives; website card-specific links are removed in separate PR #1602.
 
 ## What the owner must set up in AdMob
 
@@ -95,7 +101,8 @@ existing subscription purchase/restore unchanged.
 5. Test three Dailies, scoring/reveal, practice, My Pack One, sign-in and sharing,
    links, subscription restoration, device orientation, screenshots/VoiceOver,
    and native deeplinks on physical iOS.
-6. Ship **new version/build number** through the guarded iOS release workflow,
+6. Create App Store version **1.2** and ship a **new 1.2 build number**
+   through the guarded iOS release workflow,
    inspect signed privacy manifests and Apple App Privacy again, verify TestFlight,
    complete device acceptance and **then** request Apple App Review. The already
    approved App Store binary cannot gain a native ad SDK without a new review.

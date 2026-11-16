@@ -34,7 +34,7 @@ This file satisfies that operational-documentation requirement.
 
 ## Versioning
 
-- iOS and Android have **independent user-facing marketing versions**. `mobile/store-release.json` currently pins **App Store iOS 1.1** and **Google Play Android 1.0**; production generation must use the correct platform override. The Expo base version in `mobile/app.json` remains 1.0, not the effective iOS release version.
+- iOS and Android have **independent user-facing marketing versions**. `mobile/store-release.json` now targets **App Store iOS 1.2** and **Google Play Android 1.0**; production generation must use the correct platform override. The Expo base version in `mobile/app.json` remains 1.0, not the effective iOS release version.
 - A replacement build within the same App Store/Play marketing version advances only the platform build number/code. Never interpret TestFlight 1.1 as an Android 1.1 rollout.
 - Change a store marketing version only for a separately intended new version (for example `1.0.1` or `1.1`).
 - iOS `CFBundleVersion` and Android `versionCode` advance for every store upload.
