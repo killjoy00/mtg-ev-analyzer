@@ -133,7 +133,11 @@ the uniform easy draw; the schedule then records the `-v1` rule.
    scored set keeps the `-v1` Easy draw.
 4. The next Daily generated after its sets are complete uses the rule.
    Schedules already generated are never changed.
-5. About four weeks later, run the forward check in the difficulty review.
+5. Nothing to run afterwards: the weekly **Clear-Easy forward check**
+   workflow reads the outcomes and applies the locked thresholds in the
+   difficulty review. It fails, and so notifies the owner, only if the rule
+   should be turned off. Turning it off is not automatic: set
+   `PACK1_DAILY_CLEAR_EASY=off` as below.
 
 ## Release steps (Reality Fracture)
 

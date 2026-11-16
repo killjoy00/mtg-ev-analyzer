@@ -353,9 +353,22 @@ aggregate column in the readiness check.
 ## Forward check (locked)
 
 This is the independent test the shipped rule still owes. It needs no manual
-review: each schedule records the rule that chose it, and
-`research/difficulty-review-2026-11/evaluate.mjs` prints Easy outcomes by
-`selection_rule` from fresh read-only exports.
+review. Each schedule records the rule that chose it, and a scheduled
+workflow (**Clear-Easy forward check**, weekly, `scripts/easy-forward-check.mjs`)
+reads the outcomes and applies the thresholds below. It is read-only: two
+SELECT statements, and only per-puzzle counts leave the database, with no
+player-level export.
+
+What is automated, and what is not:
+
+- **Automated:** collecting the sample, computing the outcome, writing it to
+  the run summary, and failing the run on a reversal while the rule is still
+  choosing Dailies. A failed scheduled run notifies the owner.
+- **Not automated:** turning the rule off. That is a configuration change
+  (`PACK1_DAILY_CLEAR_EASY=off`) made through the guarded release, by a person
+  or an agent acting on the failed run. Until then the rule keeps running.
+- The workflow exists only once this change is merged, and reports "not
+  started" until a Daily has been scheduled by a `-v2` rule.
 
 - **Sample:** the first 56 Easy puzzles scheduled by `latest-stakes-v2` or
   `mixed-stakes-v2` that reach 50 first-encounter answers (about four weeks
@@ -367,6 +380,10 @@ review: each schedule records the rule that chose it, and
 - **Reversed** if it is above 36.7%: turn the rule off with
   `PACK1_DAILY_CLEAR_EASY=off` and report.
 - **Otherwise** unconfirmed: keep the rule and repeat once on the next 56.
+
+A puzzle counts once, whatever its number of answers, and today's unfinished
+Daily is left out. After a final outcome the weekly run keeps reporting it;
+after a reversal it stops failing once the rule is off.
 
 It is a before-and-after comparison, so player mix and the age of the set
 differ between the two periods, and 56 puzzles can confirm only an effect of

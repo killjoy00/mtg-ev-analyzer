@@ -15,6 +15,7 @@ import {ensureDailySchedule,RECENT_DAILY_DECISIONS,DAILY_REPEAT_WINDOW_DAYS,dail
 import {decisionKey} from '../worker/draft-run-selection.mjs';
 import {LATEST_DAILY_RULE,MIXED_DAILY_RULE,LATEST_DAILY_CLEAR_EASY_RULE,MIXED_DAILY_CLEAR_EASY_RULE,SELECTION_FEATURE_VERSION,STAKES_RULE,EASY_RULE,isClearEasy,stakesTopPoolSize} from '../puzzle-selection.mjs';
 import {scorePuzzleSelection} from '../scripts/score-puzzle-selection.mjs';
+import {loadForwardCheck,forwardCheckOutcome} from '../scripts/easy-forward-check.mjs';
 
 const pool=fixturePool();
 const query=async(text,values=[])=>pool.query({text,values,types:textTypes});
@@ -219,6 +220,13 @@ try {
       'Main Daily records its own selection rule');
     check(JSON.parse(mixedSchedule.puzzle_ids).join()===mixedExpected.map(p=>p.puzzle_id).join(),
       "Main Daily's scheduled decisions match the deterministic stakes draw");
+    // The forward check's queries run on the real schema: they find the Easy
+    // puzzles of these -v2 schedules once the day is over, and only then.
+    const during=await loadForwardCheck(query,day),after=await loadForwardCheck(query,'2026-11-21');
+    check(after.rows.length>during.rows.length&&after.rows.every(row=>Number.isInteger(row.answers)&&Number.isInteger(row.under_50)),
+      'The forward check reads Easy puzzles of -v2 schedules and leaves out the unfinished day');
+    check(typeof after.ruleActive==='boolean'&&['collecting','not_started'].includes(forwardCheckOutcome(during.rows).status)
+      &&forwardCheckOutcome(after.rows).status==='collecting','Without answers the forward check only reports progress');
   } finally {
     await query('DELETE FROM draft_run_schedules WHERE day=$1::date',[day]);
   }
