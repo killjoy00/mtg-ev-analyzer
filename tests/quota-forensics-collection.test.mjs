@@ -96,6 +96,12 @@ test('incident replay admits only canonical, settled, retained fixed issue windo
     from:Date.parse('2026-11-13T21:45:00Z'),to:Date.parse('2026-11-13T22:10:00Z'),status:'collect'});
   const quota=incidentReplayWindow(makeIncident(1273,'slow_quota',lastQuota),1273,'slow_quota',replayNow);
   assert.equal(quota.status,'collect');assert.equal(quota.to-quota.from,25*60000);
+  // The launch watcher enters recovering before it is fully recovered.
+  // It must not lose the last breached window during that transition.
+  const recovering=incidentReplayWindow(makeIncident(1273,'slow_quota',lastQuota,
+    '2026-11-14T18:25:00.000Z',{status:'recovering'}),1273,'slow_quota',replayNow);
+  assert.equal(recovering.status,'collect');
+  assert.deepEqual([recovering.from,recovering.to],[quota.from,quota.to]);
   const expired=incidentReplayWindow(makeIncident(1272,'slow_requests','2026-11-09T22:05:00.000Z'),1272,'slow_requests',replayNow);
   assert.equal(expired.status,'skipped');assert.equal(expired.reason,'outside_configured_retention');
   const unsettled=incidentReplayWindow(makeIncident(1272,'slow_requests','2026-11-14T18:59:00.000Z',
