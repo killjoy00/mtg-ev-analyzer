@@ -1,5 +1,12 @@
 name: Pages post-deployment public allowlist
 on:
+  # Run immediately if this checker itself changes; the site was already
+  # published by the earlier release, so there is no publish race.
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/pages-post-deploy-verify.yml'
+      - 'scripts/verify-pages-production.mjs'
   workflow_run:
     # Built-in dynamic Pages runs do not reliably emit workflow_run hooks.
     # Use the repo-owned successful Jekyll parity workflow, which itself
