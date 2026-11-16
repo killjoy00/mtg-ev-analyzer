@@ -67,6 +67,7 @@ export function adminPath(path,method) {
 
 export function adminGrowthPath(path,method,mode) {
   if(mode!=='production')return false;
+  if(path==='/v1/admin/results'&&['GET','PATCH'].includes(method))return true;
   if(method==='POST'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/delete$/.test(path))return true;
   if(method==='GET'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/deletion$/.test(path))return true;
   if(method==='PATCH'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/username$/.test(path))return true;
@@ -79,6 +80,10 @@ function permitted(service,path,method,search,mode) {
   if(service==='growth'&&(nativePatreonAction(path,method)||appleSubscriptionAction(path,method)))return true;
   if(method==='GET'&&path==='/health')return search==='?quick=1';
   if(service==='growth') {
+    if(['/v1/account/results','/v1/mobile/account/results'].includes(path)&&['GET','PATCH'].includes(method))return true;
+    if(path==='/v1/results/launch'&&method==='GET')return true;
+    if(path==='/v1/results/unsubscribe'&&['GET','POST'].includes(method))return true;
+    if(path==='/v1/results/provider-event'&&method==='POST')return true;
     if((path==='/v1/account/reminders'||path==='/v1/mobile/account/reminders')&&['GET','PATCH'].includes(method))return true;
     if(path==='/v1/mobile/account/reminders/devices'&&['POST','DELETE'].includes(method))return true;
     if(path==='/v1/reminders/unsubscribe'&&['GET','POST'].includes(method))return true;
@@ -179,7 +184,8 @@ function mobileSessionRoute(service,path,method) {
   if(service==='growth'&&path==='/v1/events'&&method==='POST')return true;
   if(service==='growth'&&(nativePatreonAction(path,method)||nativeAppleSubscriptionAction(path,method)))return true;
   if(service==='growth') {
-    if((path==='/v1/mobile/account/reminders'&&['GET','PATCH'].includes(method))||
+    if((path==='/v1/mobile/account/results'&&['GET','PATCH'].includes(method))||
+      (path==='/v1/mobile/account/reminders'&&['GET','PATCH'].includes(method))||
       (path==='/v1/mobile/account/reminders/devices'&&['POST','DELETE'].includes(method)))return true;
     if(method==='POST'&&[
       '/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/link','/v1/mobile/account/apple/start',
@@ -205,7 +211,8 @@ function mobileSessionRoute(service,path,method) {
 function mobileAccountRoute(service,path,method) {
   if(service==='growth'&&(nativePatreonAction(path,method)||nativeAppleSubscriptionAction(path,method)))return true;
   if(service==='growth') {
-    if((path==='/v1/mobile/account/reminders'&&['GET','PATCH'].includes(method))||
+    if((path==='/v1/mobile/account/results'&&['GET','PATCH'].includes(method))||
+      (path==='/v1/mobile/account/reminders'&&['GET','PATCH'].includes(method))||
       (path==='/v1/mobile/account/reminders/devices'&&['POST','DELETE'].includes(method)))return true;
     if(method==='POST'&&['/v1/mobile/account/link','/v1/mobile/account/signout','/v1/mobile/account/password-change','/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete/apple/start','/v1/mobile/account/delete/apple/finish','/v1/mobile/account/delete'].includes(path))return true;
     if(method==='PATCH'&&path==='/v1/mobile/profile')return true;
@@ -547,8 +554,8 @@ export async function gateway(request,env,fetcher=fetch) {
       headers.set('x-pack1-player-session',request.headers.get('x-pack1-player-session'));
 
     let body;
-    const reminderProviderEvent=method==='POST'&&match[1]==='growth'&&match[2]==='/v1/reminders/provider-event';
-    const reminderUnsubscribe=method==='POST'&&match[1]==='growth'&&match[2]==='/v1/reminders/unsubscribe';
+    const reminderProviderEvent=method==='POST'&&match[1]==='growth'&&['/v1/reminders/provider-event','/v1/results/provider-event'].includes(match[2]);
+    const reminderUnsubscribe=method==='POST'&&match[1]==='growth'&&['/v1/reminders/unsubscribe','/v1/results/unsubscribe'].includes(match[2]);
     if(reminderProviderEvent) {
       body=await request.text();
       if(body.length>32768)throw Object.assign(Error('Payload too large.'),{status:413});

@@ -1,3 +1,4 @@
+import { ResultsPreferences } from '@/src/components/ResultsPreferences';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -483,6 +484,7 @@ export default function AccountScreen() {
                 </View>
                 <Text style={styles.rowArrow}>›</Text>
               </Pressable>
+              <ResultsPreferences settings />
               <Pressable accessibilityRole="button" onPress={() => router.push('/account-reminders')} style={styles.row}>
                 <View style={styles.rowCopy}>
                   <Text style={styles.rowTitle}>Daily reminders</Text>

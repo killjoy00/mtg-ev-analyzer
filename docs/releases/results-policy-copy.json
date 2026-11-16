@@ -1,0 +1,58 @@
+{
+  "accounts": [
+    "Email/password signup requires email verification. Pack One uses your account email for verification, password recovery, account deletion, security notices, and important account updates.",
+    "We may also contact you individually about your account, your results, or your experience with the game, including to ask for feedback. You can ask us to stop nonessential individual messages by replying or emailing admin@packone.pro. Promotional emails are covered by the separate email preference described below.",
+    "Pack One also sends optional emails about results, updates, community news, and offers. Those are described below.",
+    "Our email provider receives the address and message information needed to send these emails."
+  ],
+  "emails": [
+    "Pack One sends emails about your results, usually weekly, along with occasional game updates, community news, and offers.",
+    "We only send these emails if you've turned them on. We'll ask once after you sign in, and you can change your answer anytime in Account settings.",
+    "Every results and news email includes an unsubscribe link. Unsubscribing stops these emails, but doesn't affect important account or security messages, permitted non-promotional individual messages, or your Daily reminder preference. You can also ask us to stop nonessential individual messages.",
+    "We keep a record of your email choices and changes, along with the delivery information needed to handle unsubscribes, bounces, and complaints.",
+    "If you change your account email, an unsubscribe stays in effect. If you had turned emails on, we'll ask again before sending results and news to the new address."
+  ],
+  "public": [
+    "Pack One shows leaderboards for eligible signed-in players. These can include your display name, rank, scores, season rating, and number of Dailies played.",
+    "Your leaderboard results can be public even if your player profile is private.",
+    "We may also publish weekly and season results, past standings, notable performances, and player features. These might appear on Pack One, in our emails, or on our official accounts on services such as Reddit, Patreon, YouTube, and Bluesky. Unlike the live leaderboards, these posts may stay up after a week or season ends.",
+    "We won't include your account email, sign-in details, private account information, or anything from a private profile.",
+    "You can ask us to leave your display name out of these publications in Account settings or by emailing admin@packone.pro. This won't remove you from the regular leaderboards.",
+    "If you share comments or other material for a player feature, we'll show you what we plan to publish and ask for your approval first.",
+    "We'll give existing players advance notice before introducing these publications, along with a chance to opt out."
+  ],
+  "retention": [
+    "Deleting your Pack One account removes your account and player records, public profile, live leaderboard entries, game history, career history, and linked account information, including Patreon and Apple subscription connections.",
+    "Deleting your Pack One account does not cancel an Apple App Store subscription. You must manage or cancel that through Apple.",
+    "Anonymous or aggregate statistics may remain.",
+    "Published results and player features are stored separately from live leaderboards. If you delete your account, we'll remove or anonymize your display name in the published results and player features we control within 28 days. You don't need to make another request.",
+    "You can also ask us to remove your name from published results without deleting your account. Email admin@packone.pro.",
+    "We can't recall emails already sent or remove copies that other people have saved, quoted, or republished.",
+    "Account deletion normally happens immediately. If a sign-in provider is temporarily unavailable after deletion has started, we'll sign you out and finish the process automatically. You don't need to do anything else, and the deletion can't be canceled."
+  ],
+  "privacyChanges": [
+    "We may update this policy as Pack One changes. The date at the top shows when it was last updated.",
+    "If we make a significant change to how we collect or use personal information, we'll give you advance notice through Pack One, an account email, or another suitable method.",
+    "If the law requires your consent, we'll ask before making the change."
+  ],
+  "choices": [
+    "You can play without an account, keep your profile private, manage optional emails, ask to be left out of published results, disconnect Patreon, sign out, or delete your account in Account settings."
+  ],
+  "identity": [
+    "Leaderboard names, public profiles, and names attached to shared Pack One activity are public content provided by players. Leaderboards are for signed-in accounts. By signing in or saving a leaderboard name or public profile, you agree to these Public Identity rules.",
+    "Your display name and results can appear on leaderboards even if your player profile is private.",
+    "Pack One may also publish weekly and season results, historical standings, notable performances, and player features using public leaderboard information. These posts may remain available after a week or season ends.",
+    "You can ask to be left out of these separate publications without leaving the regular leaderboards.",
+    "Being on a leaderboard doesn't give Pack One permission to publish your private messages, contact information, or other nonpublic material without appropriate authorization."
+  ],
+  "communications": [
+    "Pack One may contact you about your account, results, or experience with the game, including requests for feedback.",
+    "We also offer optional emails about results, news, and offers. We only send these if you've turned them on.",
+    "Creating an account or agreeing to these Terms doesn't turn optional emails on.",
+    "You can unsubscribe anytime or ask us to stop nonessential individual messages."
+  ],
+  "termsChanges": [
+    "We may update these Terms as Pack One changes. The date at the top shows when they were last updated.",
+    "We'll give notice of significant changes. Where the law requires your agreement or consent, we'll ask for it first."
+  ]
+}

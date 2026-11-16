@@ -1,3 +1,4 @@
+import { ResultsPreferences } from '@/src/components/ResultsPreferences';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -141,6 +142,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.page}>
+        <ResultsPreferences />
         <View onLayout={event => recordBrandLayout('row', event)} style={styles.brandRow}><Brand /></View>
 
         <View style={styles.hero}>

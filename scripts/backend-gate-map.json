@@ -47,7 +47,8 @@
         "worker/admin-username-change.mjs",
         "worker/admin-user-notifications.mjs",
         "worker/mobile-version.mjs",
-        "worker/daily-reminder*.mjs"
+        "worker/daily-reminder*.mjs",
+        "worker/results-privacy.mjs"
       ],
       "suites": [
         "tests/account-session-backend-smoke.mjs",

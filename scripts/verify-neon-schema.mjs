@@ -5,6 +5,11 @@ import {verifyCreatorEventSchema} from './creator-event-schema.mjs';
 import {verifyRerollIndexSchema} from './reroll-index-schema.mjs';
 import {verifyServingStatistics} from '../worker/serving-statistics.mjs';
 const result=await query(`SELECT
+  to_regprocedure('pack1_results_update(uuid,text,text,text)') IS NOT NULL results_preferences,
+  to_regprocedure('pack1_results_admit(uuid,text,text)') IS NOT NULL results_email_gate,
+  to_regprocedure('pack1_results_publishable_name(uuid)') IS NOT NULL results_identity,
+  to_regclass('results_removal_tasks') IS NOT NULL results_removals,
+  EXISTS(SELECT 1 FROM pg_trigger WHERE tgname='pack1_results_on_deletion' AND tgenabled='O') results_deletion_capture,
   to_regprocedure('pack1_moderate_reported_pick(uuid,boolean,integer,text,uuid)') IS NOT NULL report_pick_removal,
   to_regclass('draft_run_pick_removal_members') IS NOT NULL report_pick_removal_members,
   to_regclass('draft_run_pick_removal_events') IS NOT NULL report_pick_removal_audit,

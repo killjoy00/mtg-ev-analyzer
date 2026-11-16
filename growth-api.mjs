@@ -586,3 +586,6 @@ export async function signOutAccount() {
   signalAccountChange();
   return {ok:true};
 }
+
+export async function loadResultsPreferences(){await ensureMigrations();return api('/v1/account/results',{auth:false});}
+export async function saveResultsPreferences(settings){await ensureMigrations();return api('/v1/account/results',{method:'PATCH',body:settings,auth:false});}

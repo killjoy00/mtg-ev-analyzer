@@ -1,4 +1,6 @@
 // Public media only. Local account data and publishing credentials never enter this feed.
+// Never use this public-branch feed for named results or player features.
+// Those require the private bookkeeping and removal path in docs/RESULTS-PRIVACY.md.
 import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {fileURLToPath} from 'node:url';

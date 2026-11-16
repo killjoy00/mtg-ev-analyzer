@@ -66,6 +66,7 @@ export async function renderUsers(root,request,growthRequest=request,viewerRole=
       data=accountsOnly&&data?{...next,play_activity:data.play_activity}:next;
       sorting=next.sort||sorting;
       render();
+      void refreshResultsAdmin();
     } catch(error) {
       if(serial!==loadSerial)return;
       if(!data)throw error;
@@ -73,6 +74,20 @@ export async function renderUsers(root,request,growthRequest=request,viewerRole=
       const indicator=root.querySelector('#users-loading');
       if(indicator){indicator.classList.add('error');indicator.textContent=error.message||'Unable to refresh users. Try again.';}
     }
+  }
+
+  async function refreshResultsAdmin() {
+    const mount=root.querySelector('#results-admin-summary');if(!mount)return;
+    try {
+      const result=await growthRequest('/v1/admin/results');if(!mount.isConnected)return;
+      const labels={unanswered:'Unanswered',on:'Emails on',off:'Emails off',shown:'Notice shown',turned_on:'Notice: turned on',dismissed:'Notice: dismissed',exclusions:'Publication exclusions'};
+      mount.innerHTML='<h2>Results privacy</h2><div class="cards">'+Object.entries(labels).map(([key,label])=>'<div class="card"><span>'+esc(label)+'</span><strong>'+fmt(result.counts?.[key])+'</strong></div>').join('')+'</div><h3>Publication name removals</h3>'+((result.tasks||[]).length?'<ul>'+result.tasks.map(task=>'<li>'+esc(task.name_to_remove)+' · '+esc(task.channel)+' · Due '+esc(dateTime(task.due_at))+' · <a target="_blank" rel="noreferrer" href="'+esc(task.link)+'">Open publication</a>'+(viewerRole==='owner'?' <button type="button" data-results-complete="'+esc(task.id)+'">Mark removed</button>':'')+'</li>').join('')+'</ul>':'<p>No open removal tasks.</p>')+'<p role="status"></p>';
+      mount.querySelectorAll('[data-results-complete]').forEach(button=>button.onclick=async()=>{
+        button.disabled=true;
+        try{await growthRequest('/v1/admin/results',{action:'complete',task:button.dataset.resultsComplete},'PATCH');await refreshResultsAdmin();}
+        catch(error){if(mount.isConnected){mount.querySelector('[role="status"]').textContent=error.message;button.disabled=false;}}
+      });
+    }catch{if(mount.isConnected)mount.innerHTML='<p>Results privacy controls are not available from this backend revision.</p>';}
   }
 
   function activityPreset(days) {
@@ -120,6 +135,7 @@ function render() {
     root.innerHTML=`<section class="users-page">
       <header class="users-heading"><div><p class="users-kicker">PACK ONE ADMINISTRATION</p><h1>Users</h1><p class="muted">Authenticated Pack One accounts only. Anonymous and guest gameplay identities are intentionally not listed here.</p></div></header>
       <section class="play-activity" aria-labelledby="play-activity-heading">${playActivity()}</section>
+      <section id="results-admin-summary" class="user-section" aria-label="Results privacy"></section>
       <section class="user-directory" aria-labelledby="user-directory-heading">
         <div class="users-section-heading"><div><p class="users-kicker">ACCOUNT MANAGEMENT</p><h2 id="user-directory-heading">Account directory</h2><p class="muted">Search and account status filters apply only to this directory, not to the activity report above. Totals below describe all authenticated accounts.</p></div></div>
         <div class="cards user-cards">
@@ -337,6 +353,7 @@ function render() {
             <p id="username-status" role="status"></p>
           </form>`:'<p class="muted">This account has no linked Pack One player, so it has no public username to change.</p>'}
         </section>
+        <section class="user-section" id="results-user-controls"><h3>Individual contact and published results</h3><p role="status">Loading…</p></section>
         <section class="user-section"><h3>Public identity action history</h3>${identityHistory(actions)}</section>
         <section class="user-section" id="permanent-deletion-section"><h3>Permanent account deletion</h3>${deletionPanel(u,id,null,{statusLoading:true})}</section>
         <section class="user-section"><h3>Connected providers</h3>
@@ -352,6 +369,24 @@ function render() {
           ${events.length?`<div class="scroll"><table class="user-events"><thead><tr><th>When</th><th>Event</th><th>Context</th></tr></thead><tbody>${events.map(event=>`<tr><td>${esc(dateTime(event.created_at))}</td><td>${esc(event.event_name)}</td><td><small>${props(event.event_props)}</small></td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No recent tracked activity for this account.</p>'}
         </section>`;
       document.querySelector('#user-detail-close').onclick=()=>{detailLoadSerial++;dialog.close();};
+
+      void (async()=>{
+        const mount=body.querySelector('#results-user-controls');
+        try {
+          const state=await growthRequest('/v1/admin/results?target='+encodeURIComponent(id));
+          if(detailSerial!==detailLoadSerial||!dialog.open||!mount.isConnected)return;
+          mount.innerHTML='<h3>Individual contact and published results</h3><p>'+esc(state.doNotContactAt?'Do not contact · '+dateTime(state.doNotContactAt):'Individual contact allowed')+'</p>'+(viewerRole==='owner'?'<label><input type="checkbox" id="results-no-contact" '+(state.doNotContactAt?'checked':'')+'> Do not contact individually</label><button type="button" id="results-request-removal">Request removal from published results</button>':'')+'<p role="status"></p>';
+          let contactAt=state.doNotContactAt;
+          const change=async action=>{
+            const controls=mount.querySelectorAll('input,button');controls.forEach(el=>el.disabled=true);
+            try{const result=await growthRequest('/v1/admin/results',{action,target:id,...(action==='contact'?{value:mount.querySelector('input').checked}:{})},'PATCH');if(detailSerial===detailLoadSerial&&mount.isConnected){if(action==='contact')contactAt=result.doNotContactAt;mount.querySelector('[role="status"]').textContent=action==='contact'?(result.doNotContactAt?'Do not contact · '+dateTime(result.doNotContactAt):'Individual contact allowed'):'Removal tasks created.';await refreshResultsAdmin();}}
+            catch(error){if(detailSerial===detailLoadSerial&&mount.isConnected){mount.querySelector('[role="status"]').textContent=error.message;mount.querySelector('input').checked=Boolean(contactAt);}}
+            finally{if(detailSerial===detailLoadSerial&&mount.isConnected)controls.forEach(el=>el.disabled=false);}
+          };
+          mount.querySelector('#results-no-contact')?.addEventListener('change',()=>void change('contact'));
+          mount.querySelector('#results-request-removal')?.addEventListener('click',()=>void change('request-removal'));
+        }catch{if(detailSerial===detailLoadSerial&&mount?.isConnected)mount.innerHTML='<p>Results privacy controls are not available from this backend revision.</p>';}
+      })();
 
       function disableRenameForDeletion() {
         const form=body.querySelector('#change-username-form');
