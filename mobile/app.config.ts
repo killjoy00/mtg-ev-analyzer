@@ -12,8 +12,8 @@ const ADMOB_DEMO = {
   iosBannerId: 'ca-app-pub-3940256099942544/2934735716',
   androidBannerId: 'ca-app-pub-3940256099942544/6300978111',
 } as const;
-const ADMOB_APP_ID = /^ca-app-pub-\\d{16}~\\d{10}$/;
-const ADMOB_UNIT_ID = /^ca-app-pub-\\d{16}\\/\\d{10}$/;
+const ADMOB_APP_ID = /^ca-app-pub-\d{16}~\d{10}$/;
+const ADMOB_UNIT_ID = /^ca-app-pub-\d{16}\/\d{10}$/;
 
 function adMobPlatformConfig(
   production: boolean,
