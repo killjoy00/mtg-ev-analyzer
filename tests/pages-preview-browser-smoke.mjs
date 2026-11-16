@@ -39,7 +39,7 @@ try{
   });
   for(const path of [
     '/', '/practice/', '/admin/', '/learn/', '/sets/fra/guide/',
-    '/creator/lordsoflimited/', '/privacy/', '/terms/'
+    '/reset-password/', '/privacy/', '/terms/'
   ]){
     const page=await context.newPage(),missing=[];
     page.on('response',response=>{
