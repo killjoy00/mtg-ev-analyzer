@@ -13,8 +13,8 @@ test('homepage social metadata has no escaped-newline pollution',()=>{
 });
 test('homepage metadata uses a shallow branded preview with a compact Twitter icon',()=>{
  const html=fs.readFileSync('index.html','utf8');
- assert.match(html,/<title>Pack One: Eight Picks from Real Trophy Drafts<\/title>/);
- assert.match(html,/Magic: The Gathering draft decisions every day/);
+ assert.match(html,/<title>Pack One: Free Daily MTG Draft Practice Game<\/title>/);
+ assert.match(html,/Free daily MTG draft practice: make eight picks from real Magic: The Gathering trophy drafts/);
  assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/social-preview-v6\.png"/);
  assert.match(html,/property="og:image:width" content="1200"/);
  assert.match(html,/property="og:image:height" content="240"/);

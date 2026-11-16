@@ -23,7 +23,7 @@ function parsedMetadata(html,path){
 test('homepage describes the free daily MTG game without changing the rendered shell',async()=>{
   const html=await readFile('index.html','utf8');
   const {head,graph}=parsedMetadata(html,'index.html');
-  assert.match(head,/<title>Pack One — Free Daily MTG Draft Practice Game<\/title>/);
+  assert.match(head,/<title>Pack One: Free Daily MTG Draft Practice Game<\/title>/);
   assert.match(head,/<meta name="description" content="Free daily MTG draft practice:/);
   assert.match(head,/<link rel="canonical" href="https:\/\/packone\.pro\/" \/>/);
   const site=graph.find(node=>node['@type']==='WebSite');
