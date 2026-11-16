@@ -63,6 +63,19 @@ const missingTimingProfile=(window,total,measured)=>{
     failed_5xx:'error_missing_timing',other:'unverified',mixed:'mixed'};
   return labels[stage]||'unverified';
 };
+// A same-window *sample* of normal quota-approved requests can show whether
+// provider handler start/completion logs are captured at all. Neither a good
+// control cohort nor missing error logs proves the fault's location.
+const normalQuotaLogCoverage=window=>{
+  const sample=window?.sampled_success_log_coverage||{};
+  const total=count(sample.observed),start=count(sample.with_start),
+    completion=count(sample.with_completion);
+  if(total===null||start===null||completion===null||total<3||
+    start>total||completion>total)return 'unverified';
+  if(start*4>=total*3&&completion*4>=total*3)return 'normal_path_correlated';
+  if(start*4<total&&completion*4<total)return 'normal_path_missing';
+  return 'partial';
+};
 const failedQuotaPhaseSignal=window=>{
   const total=count(window?.failed_quota_without_timing),phases=window?.failed_quota_phase||{};
   const names=['transaction','durability','complete','handler_other','started_no_completion','not_observed'];
@@ -125,9 +138,15 @@ function classifyQuotaWindow(window) {
       handler_completed_then_error:'inspect_quota_acknowledgement',
       handler_completion_not_observed:'verify_handler_completion_correlation',
       no_correlated_handler_logs:'verify_quota_start_log_coverage'};
+    const normal_path_logs=error_stage==='no_correlated_handler_logs'?
+      normalQuotaLogCoverage(window):undefined;
+    const next_action=normal_path_logs==='normal_path_correlated'?
+      'inspect_error_dispatch_or_provider_log_gaps':
+      phaseActions[error_stage]||actions[timing_gap]||'verify_quota_handler_timing';
     return {...base,outcome:'stage_coverage_incomplete',timing_gap,
       ...(error_stage===undefined?{}:{error_stage}),
-      next_action:phaseActions[error_stage]||actions[timing_gap]||'verify_quota_handler_timing'};
+      ...(normal_path_logs===undefined?{}:{normal_path_logs}),
+      next_action};
   }
   const stage=stageChoice([['quota_handler',handler],['quota_transport_wait',wait]]);
   if(stage==='mixed')
