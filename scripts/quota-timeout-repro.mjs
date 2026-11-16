@@ -27,7 +27,8 @@ export async function reproduceQuotaTimeouts({url,key,fetcher=fetch,
     assert(response.status===200,'repro_endpoint_status');
     const data=await response.json().catch(()=>null);
     assert(data&&typeof data==='object'&&!Array.isArray(data),'invalid_repro_response');
-    await response.body?.cancel();
+    // response.json() already consumed the body; canceling its locked stream
+    // would throw ERR_INVALID_STATE and hide the actual probe result.
     return data;
   };
   for(let repeat=1;repeat<=repeats;repeat++){
