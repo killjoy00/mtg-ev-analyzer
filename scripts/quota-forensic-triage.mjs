@@ -88,6 +88,24 @@ const gatewayQuotaFailureSignal=window=>{
   const stage=stageChoice(fields.map((key,i)=>[key,values[i]]));
   return stage==='other_or_unknown'?'unverified':stage;
 };
+// Commit-wait is logged BEFORE the storage sync gate. Only a matched final
+// handler status 204 with durability_confirmed can establish admission.
+// Missing logs are never proof of a never-dispatched request or a free retry.
+const quotaCommitEvidence=window=>{
+  if(!window||!Object.hasOwn(window,'failed_quota_commit_stages'))return undefined;
+  const total=count(window.failed_quota_without_timing);
+  const keys=['confirmed_admission','confirmed_denial','commit_wait_only',
+    'handler_seen_without_commit','no_correlated_stage'];
+  const values=keys.map(k=>count(window.failed_quota_commit_stages?.[k]));
+  if(total===null||total<3||values.some(v=>v===null)||
+    values.reduce((sum,v)=>sum+v,0)!==total)return 'unverified';
+  const found=stageChoice(keys.map((k,i)=>[k,values[i]]));
+  const labels={confirmed_admission:'completed_quota_debit',
+    confirmed_denial:'completed_quota_denial',commit_wait_only:'commit_pending_unconfirmed',
+    handler_seen_without_commit:'handler_seen_no_commit',
+    no_correlated_stage:'no_correlated_commit_evidence',mixed:'mixed'};
+  return labels[found]||'unverified';
+};
 const failedQuotaPhaseSignal=window=>{
   const total=count(window?.failed_quota_without_timing),phases=window?.failed_quota_phase||{};
   const names=['transaction','durability','complete','handler_other','started_no_completion','not_observed'];
@@ -144,6 +162,7 @@ function classifyQuotaWindow(window) {
       error_missing_timing:'inspect_quota_error_timing_header'};
     const error_stage=timing_gap==='error_missing_timing'?failedQuotaPhaseSignal(window):undefined;
     const failure_signal=timing_gap==='error_missing_timing'?gatewayQuotaFailureSignal(window):undefined;
+    const commit_evidence=timing_gap==='error_missing_timing'?quotaCommitEvidence(window):undefined;
     // This is an observed handler-log stage, NOT an explanation of why the
     // provider returned an error or whether the debit was committed.
     const phaseActions={handler_transaction_error:'inspect_quota_storage_transaction',
@@ -157,14 +176,19 @@ function classifyQuotaWindow(window) {
       timeout_or_abort:'inspect_quota_timeout_or_abort_signal',
       overloaded:'inspect_quota_overload_signal',
       provider_internal:'inspect_quota_provider_internal_signal'};
-    const next_action=normal_path_logs==='normal_path_correlated'&&
+    const commitActions={completed_quota_debit:'inspect_ambiguous_confirmed_debit_ack',
+      completed_quota_denial:'inspect_ambiguous_confirmed_denial_ack',
+      commit_pending_unconfirmed:'inspect_unacknowledged_storage_sync'};
+    const next_action=commitActions[commit_evidence]||
+      (normal_path_logs==='normal_path_correlated'&&
       error_stage==='no_correlated_handler_logs'?
       (lead[failure_signal]||'inspect_error_dispatch_or_provider_log_gaps'):
-      phaseActions[error_stage]||actions[timing_gap]||'verify_quota_handler_timing';
+      phaseActions[error_stage]||actions[timing_gap]||'verify_quota_handler_timing');
     return {...base,outcome:'stage_coverage_incomplete',timing_gap,
       ...(error_stage===undefined?{}:{error_stage}),
       ...(failure_signal===undefined?{}:{failure_signal}),
       ...(normal_path_logs===undefined?{}:{normal_path_logs}),
+      ...(commit_evidence===undefined?{}:{commit_evidence}),
       next_action};
   }
   const stage=stageChoice([['quota_handler',handler],['quota_transport_wait',wait]]);
