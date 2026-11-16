@@ -131,7 +131,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         androidAppId: androidAds.appId,
         delayAppMeasurementInit: true,
       }],
-    ],
+    ] as ExpoConfig['plugins'],
     ...(iosMarketingVersion ? { version: iosMarketingVersion } : {}),
     description: 'Practice real draft decisions, compare trophy picks, and track your Pack One career.',
     backgroundColor: '#f7f8fa',

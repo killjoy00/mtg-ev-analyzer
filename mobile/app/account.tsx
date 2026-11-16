@@ -1,4 +1,5 @@
 import { ResultsPreferences } from '@/src/components/ResultsPreferences';
+import { AdMobPrivacyChoices } from '@/src/components/AdMobPrivacyChoices';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
@@ -645,6 +646,7 @@ export default function AccountScreen() {
 
         {message || routeNotice ? <Text accessibilityRole="alert" style={styles.message}>{message || routeNotice}</Text> : null}
         {enrichmentWarning ? <Text accessibilityRole="alert" style={styles.enrichmentWarning}>{enrichmentWarning}</Text> : null}
+        <AdMobPrivacyChoices />
         {account ? null : <AboutLink />}
       </ScrollView>
     </SafeAreaView>
