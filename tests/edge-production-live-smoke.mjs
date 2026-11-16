@@ -1,3 +1,4 @@
+import {verifyResultsLaunch} from '../scripts/verify-results-launch.mjs';
 import assert from 'node:assert/strict';
 import {PROD_AUTH_BASE} from '../worker/account-config.mjs';
 import {ADMIN_API_VERSION} from '../admin-api-contract.mjs';
@@ -64,6 +65,7 @@ async function awaitAdminVersionAlignment(){
   },'Admin Pages/gateway/Draft API versions must converge before release acceptance');
 }
 await awaitAdminVersionAlignment();
+console.log(JSON.stringify({event:'results_privacy_launch_verified',...await verifyResultsLaunch({expectedActive:true})}));
 // A version-aligned release can still omit new Admin endpoints from the
 // Cloudflare gateway allowlist. A no-session GET must reach the Neon Admin
 // guard (401), not die at the gateway as an unrecognized route (404).
