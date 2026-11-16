@@ -66,6 +66,9 @@ jobs:
           node .github/scripts/install-wrangler-tool.mjs "$RUNNER_TEMP/edge-tools" neon@4.17.4 esbuild@0.28.2
           npm ci --ignore-scripts --no-audit --no-fund
 
+      - name: Capture immutable results notice timing
+        run: node scripts/verify-results-email-release.mjs capture "$RUNNER_TEMP/results-notice-before.json"
+
       - name: Prepare private results sender and dedicated webhook
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -146,6 +149,7 @@ jobs:
           PACK1_RECOVERY_BRANCH_ID="$DEV_BRANCH" PACK1_RECOVERY_REVIEW_TOKEN="reviewed-1272-dev-ledger-recovery-20261115" DATABASE_URL="$connection" node scripts/recover-habits-development-migration.mjs
           DATABASE_URL="$connection" node scripts/apply-release-migrations.mjs secure-auth-release
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+          DATABASE_URL="$connection" node scripts/verify-results-email-release.mjs schema
           DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
 
       - name: Deploy exact revision to development
@@ -181,14 +185,17 @@ jobs:
                 extra+=(--env "PACK1_REMINDER_RESEND_API_KEY=$PACK1_ACCOUNT_DELETE_RESEND_API_KEY")
               fi
               if [[ -n "$PACK1_EXPO_PUSH_ACCESS_TOKEN" ]]; then extra+=(--env "PACK1_EXPO_PUSH_ACCESS_TOKEN=$PACK1_EXPO_PUSH_ACCESS_TOKEN"); fi
+              # Development must not have credentials for even the Owner-only
+              # delivery check. Clear stale values rather than preserving them.
               for result_name in PACK1_RESULTS_SENDER_NAME PACK1_RESULTS_SENDER_EMAIL PACK1_RESULTS_POSTAL_ADDRESS PACK1_RESULTS_RESEND_API_KEY PACK1_RESULTS_RESEND_WEBHOOK_SECRET; do
-                if [[ -n "${!result_name:-}" ]]; then extra+=(--env "$result_name=${!result_name}"); fi
+                extra+=(--env "$result_name=")
               done
               extra+=(--env "PACK1_RESULTS_EMAIL_ENABLED=0")
             fi
             "$neon" functions deploy "$slug" --src "$RUNNER_TEMP/pack1-bundles/$slug" --no-bundle               --project-id "$PROJECT_ID" --branch "$DEV_BRANCH" --runtime nodejs24 --wait "${extra[@]}"
           done < .github/neon-functions.txt
           node tests/secure-auth-release-smoke.mjs "$DEV_BRANCH" "$GITHUB_SHA" --settle --expect-deletion-email=false --expect-launch-recovery=false
+          node scripts/verify-results-email-release.mjs development
 
       - name: Verify activated Patreon secrets before production
         shell: bash
@@ -215,6 +222,7 @@ jobs:
           echo "::add-mask::$connection"
           DATABASE_URL="$connection" node scripts/apply-release-migrations.mjs secure-auth-release
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+          DATABASE_URL="$connection" node scripts/verify-results-email-release.mjs schema
           DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
 
       - name: Deploy the development-tested revision to production
@@ -279,6 +287,9 @@ jobs:
           PACK1_EXPECT_RELEASE: ${{ github.sha }}
           PACK1_WORKERS_PLAN: ${{ vars.PACK1_WORKERS_PLAN }}
         run: node scripts/launch-alert.mjs check
+
+      - name: Verify results sender controls and unchanged notice cutoff
+        run: node scripts/verify-results-email-release.mjs verify "$RUNNER_TEMP/results-notice-before.json"
 
       - name: Reconcile only the reviewed results email scheduler
         shell: bash
