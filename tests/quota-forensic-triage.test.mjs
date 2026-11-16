@@ -258,3 +258,31 @@ test('incomplete quota timing distinguishes corroborated handler error phases on
   const safe=JSON.stringify(read([mk({...candidate('transaction',9),trace:'private-secret'})])[1]);
   assert.doesNotMatch(safe,/private-secret|trace|account/);
 });
+
+
+test('verified normal-path log controls distinguish error-only gaps without claiming causality',()=>{
+  const failed={transaction:0,durability:0,complete:0,handler_other:0,
+    started_no_completion:0,not_observed:8};
+  const base=quotaWindow(8,0,0,0,{
+    missing_gateway_timing_outcomes:{success:0,denied_429:0,failed_5xx:8,other:0},
+    failed_quota_without_timing:8,failed_quota_phase:failed,
+    sampled_success_log_coverage:{observed:8,with_start:8,with_completion:8},
+  });
+  const f=read([base])[1];
+  assert.equal(f.outcome,'stage_coverage_incomplete');
+  assert.equal(f.error_stage,'no_correlated_handler_logs');
+  assert.equal(f.normal_path_logs,'normal_path_correlated');
+  assert.equal(f.next_action,'inspect_error_dispatch_or_provider_log_gaps');
+  for(const [sample,label] of [
+    [{observed:8,with_start:0,with_completion:0},'normal_path_missing'],
+    [{observed:8,with_start:3,with_completion:8},'partial'],
+    [{observed:2,with_start:2,with_completion:2},'unverified'],
+    [{observed:8,with_start:9,with_completion:0},'unverified'],
+  ]){
+    const g=read([quotaWindow(8,0,0,0,{...base,
+      sampled_success_log_coverage:sample})])[1];
+    assert.equal(g.normal_path_logs,label);
+    assert.equal(g.next_action,'verify_quota_start_log_coverage');
+    assert.doesNotMatch(JSON.stringify(g),/trace|network|\\d{4}-\\d{2}-\\d{2}/);
+  }
+});
