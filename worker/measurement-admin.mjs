@@ -233,8 +233,8 @@ export async function handleAdmin(request,query,readJson) {
   if(url.pathname==='/v1/admin/youtube')
     return youtubeReport().catch(error=>({configured:true,error:String(error?.message||'YouTube results are unavailable.')}));
   const filters=reportFilters(url);
-  if(url.pathname==='/v1/admin/measurements/research-cases') {
-    const view=url.searchParams.get('view')||'blind';
+  if(url.pathname==='/v1/admin/measurements/reviews'&&url.searchParams.has('research')) {
+    const view=url.searchParams.get('research');
     if(!['blind','diagnosis'].includes(view))fail('Invalid research view.');
     // Never include an unfinished Daily: selection and reviewer blinding should
     // not change simply because more players answered during the current day.
