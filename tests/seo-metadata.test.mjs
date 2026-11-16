@@ -12,7 +12,7 @@ function parsedMetadata(html,path){
   const end=html.indexOf('</head>');
   assert.ok(end>0,`${path}: document head is present`);
   const head=html.slice(0,end);
-  const matches=[...head.matchAll(/<script type="application\\/ld\\+json">([\\s\\S]*?)<\\/script>/g)];
+  const matches=[...head.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)];
   assert.equal(matches.length,1,`${path}: exactly one JSON-LD block in the head`);
   const data=JSON.parse(matches[0][1]);
   assert.equal(data['@context'],'https://schema.org');
@@ -23,9 +23,9 @@ function parsedMetadata(html,path){
 test('homepage describes the free daily MTG game without changing the rendered shell',async()=>{
   const html=await readFile('index.html','utf8');
   const {head,graph}=parsedMetadata(html,'index.html');
-  assert.match(head,/<title>Pack One — Free Daily MTG Draft Practice Game<\\/title>/);
+  assert.match(head,/<title>Pack One — Free Daily MTG Draft Practice Game<\/title>/);
   assert.match(head,/<meta name="description" content="Free daily MTG draft practice:/);
-  assert.match(head,/<link rel="canonical" href="https:\\/\\/packone\\.pro\\/" \\/>/);
+  assert.match(head,/<link rel="canonical" href="https:\/\/packone\.pro\/" \/>/);
   const site=graph.find(node=>node['@type']==='WebSite');
   const app=graph.find(node=>node['@type']==='WebApplication');
   assert.equal(site?.url,ORIGIN+'/');
@@ -36,9 +36,9 @@ test('homepage describes the free daily MTG game without changing the rendered s
   // The SEO change must remain in the document head: gameplay and its UI
   // continue to be owned by the existing application scripts.
   const body=html.slice(html.indexOf('</head>')+'</head>'.length);
-  assert.match(body,/<main id="app" class="app"><\\/main>/);
-  assert.match(body,/src="bootstrap\\.mjs\\?v=53"/);
-  assert.doesNotMatch(body,/application\\/ld\\+json/);
+  assert.match(body,/<main id="app" class="app"><\/main>/);
+  assert.match(body,/src="bootstrap\.mjs\?v=53"/);
+  assert.doesNotMatch(body,/application\/ld\+json/);
 });
 
 test('all published set guides have accurate, consistent structured metadata',async()=>{
@@ -76,6 +76,6 @@ test('all published set guides have accurate, consistent structured metadata',as
 test('member practice remains intentionally noindex and absent from the sitemap',async()=>{
   const practice=await readFile('practice/index.html','utf8');
   const sitemap=await readFile('sitemap.xml','utf8');
-  assert.match(practice,/<meta name="robots" content="noindex,follow" \\/>/);
-  assert.doesNotMatch(sitemap,/https:\\/\\/packone\\.pro\\/practice\\//);
+  assert.match(practice,/<meta name="robots" content="noindex,follow" \/>/);
+  assert.doesNotMatch(sitemap,/https:\/\/packone\.pro\/practice\//);
 });
