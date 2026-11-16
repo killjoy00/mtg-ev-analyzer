@@ -72,6 +72,11 @@ async function assertOneFill(page,state,slotId=HOME_SLOT){
     }));
     throw new Error('Ad fill timed out: '+JSON.stringify(debug),{cause:error});
   }
+  // The page inserts the ad element and the Google script tag together, but
+  // the route handler that counts the request runs asynchronously in this
+  // process, so the element can be attached before the request is counted.
+  // Wait for the count, then require it to be exactly one.
+  await waitFor(state,'google',1);
   assert.equal(state.google,1,'one Google script request');
   assert.equal(await page.locator('script[src*="googlesyndication"]').count(),1);
   assert.equal(await page.locator('ins.adsbygoogle').count(),1);
