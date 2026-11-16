@@ -261,7 +261,9 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   assert.match(dataSafetyScript, /PSL_SUPPORT_DATA_DELETION_BY_USER/);
   assert.match(dataSafetyScript, /DATA_DELETION_NO/);
   assert.match(dataSafetyScript, /Unexpected sharing declarations/);
-  assert.match(dataSafetyScript, /Advertising\/marketing purpose must not be selected/);
+  assert.match(dataSafetyScript, /for\(const purpose of \['PSL_ADVERTISING','PSL_DEVELOPER_COMMUNICATIONS'\]\)/);
+  assert.match(dataSafetyScript, /active\.length!==1\|\|active\[0\]\[COL_Q\]!==emailPurposeQuestion/);
+  assert.match(dataSafetyScript, /Results\/news email purposes must be limited to Email address/);
 
   const playFeatureRequest = JSON.parse(read('.github/google-play-feature-graphic-request.json'));
   assert.deepEqual(Object.keys(playFeatureRequest).sort(), ['language','operation','reason','source_png_sha256']);
