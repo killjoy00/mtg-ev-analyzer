@@ -12,7 +12,7 @@ exclude:
   - "docs"
   - "edge"
   - "migrations"
-  - "mobile"
+  - "mobile/**"
   - "reports"
   - "research"
   - "results"
@@ -21,6 +21,9 @@ exclude:
   - "worker"
   # Root documentation, package metadata, source declarations.
   - "**/*.md"
+  - "README.md"
+  - "AGENTS.md"
+  - "MONETIZATION.md"
   - "ads.txt.example"
   - "package.json"
   - "package-lock.json"
