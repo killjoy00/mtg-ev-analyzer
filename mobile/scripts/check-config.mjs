@@ -63,6 +63,9 @@ assert.equal(development.name, 'Pack One Dev');
 assert.equal(development.ios.bundleIdentifier, 'pro.packone.development');
 assert.equal(development.android.package, 'pro.packone.development');
 assert.equal(development.scheme, 'packone');
+assert.equal(development.extra.adMob.iosEnabled, false);
+assert.equal(development.extra.adMob.androidEnabled, false);
+assert.equal(development.plugins.some(plugin => Array.isArray(plugin) && plugin[0] === 'react-native-google-mobile-ads'), true);
 
 const preview = loadConfig('preview');
 assert.equal(preview.name, 'Pack One Preview');
@@ -82,6 +85,11 @@ assert.deepEqual(production.android.adaptiveIcon, {
 });
 assert.equal(production.android.edgeToEdgeEnabled, undefined);
 assert.equal(production.extra.buildProfile, 'production');
+assert.equal(production.extra.adMob.iosEnabled, false, 'production AdMob is opt-in');
+assert.equal(production.extra.adMob.androidEnabled, false, 'production AdMob is opt-in');
+assert.equal(production.plugins.some(plugin => Array.isArray(plugin)
+  && plugin[0] === 'react-native-google-mobile-ads'
+  && plugin[1].delayAppMeasurementInit === true), true);
 assert.equal(production.extra?.eas?.projectId, undefined);
 assert.deepEqual(
   new Set(production.android.blockedPermissions || []),

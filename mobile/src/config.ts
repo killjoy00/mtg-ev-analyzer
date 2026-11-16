@@ -1,3 +1,5 @@
+import Constants from 'expo-constants';
+
 export type MobileEnvironment = 'development' | 'preview' | 'production';
 
 function environment(): MobileEnvironment {
@@ -16,6 +18,11 @@ if (screenshotFixtures && resolvedEnvironment !== 'preview') {
   throw new Error('Store screenshot fixtures are allowed only in the preview mobile environment.');
 }
 
+const nativeAdMob = Constants.expoConfig?.extra?.adMob as
+  | { iosEnabled?: boolean; androidEnabled?: boolean; iosBannerUnitId?: string | null;
+      androidBannerUnitId?: string | null; testBanners?: boolean }
+  | undefined;
+
 const apiOrigin = cleanOrigin(
   process.env.EXPO_PUBLIC_PACKONE_API_ORIGIN ?? 'https://api.packone.pro',
 );
@@ -24,6 +31,13 @@ export const config = Object.freeze({
   environment: resolvedEnvironment,
   screenshots: Object.freeze({
     fixtures: screenshotFixtures,
+  }),
+  adMob: Object.freeze({
+    iosEnabled: nativeAdMob?.iosEnabled === true && !screenshotFixtures,
+    androidEnabled: nativeAdMob?.androidEnabled === true && !screenshotFixtures,
+    iosBannerUnitId: nativeAdMob?.iosBannerUnitId || null,
+    androidBannerUnitId: nativeAdMob?.androidBannerUnitId || null,
+    testBanners: nativeAdMob?.testBanners === true,
   }),
   api: Object.freeze({
     origin: apiOrigin,

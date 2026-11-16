@@ -40,6 +40,7 @@
     "expo-web-browser": "~57.0.3",
     "react": "19.2.3",
     "react-native": "0.86.3",
+    "react-native-google-mobile-ads": "17.4.0",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
     "expo-apple-authentication": "~57.0.2",
