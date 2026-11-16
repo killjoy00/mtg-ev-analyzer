@@ -1,0 +1,131 @@
+{
+  "date": "2026-11-08",
+  "puzzle": {
+    "set_id": "powered-cube",
+    "puzzle_id": "66ec08f95085723b93841c92bac84a51",
+    "candidates": [
+      {
+        "id": "adeline-resplendent-cathar",
+        "name": "Adeline, Resplendent Cathar",
+        "rarity": "rare",
+        "image_url": "https://cards.scryfall.io/normal/front/1/8/18092f68-b96e-4084-9eba-b240d2195d81.jpg?1783925668",
+        "mana_cost": "{1}{W}{W}",
+        "type_line": "Legendary Creature — Human Knight"
+      },
+      {
+        "id": "boseiju-who-endures",
+        "name": "Boseiju, Who Endures",
+        "rarity": "rare",
+        "image_url": "https://cards.scryfall.io/normal/front/2/1/2135ac5a-187b-4dc9-8f82-34e8d1603416.jpg?1783923818",
+        "type_line": "Legendary Land"
+      },
+      {
+        "id": "brazen-borrower",
+        "name": "Brazen Borrower",
+        "rarity": "mythic",
+        "image_url": "https://cards.scryfall.io/normal/front/c/2/c2089ec9-0665-448f-bfe9-d181de127814.jpg?1783932663",
+        "mana_cost": "{1}{U}{U}",
+        "type_line": "Creature — Faerie Rogue"
+      },
+      {
+        "id": "breeding-pool",
+        "name": "Breeding Pool",
+        "rarity": "rare",
+        "image_url": "https://cards.scryfall.io/normal/front/b/9/b98b2a35-ec2b-47fe-903d-dd292e469a3c.jpg?1783943378",
+        "type_line": "Land — Forest Island"
+      },
+      {
+        "id": "field-of-the-dead",
+        "name": "Field of the Dead",
+        "rarity": "rare",
+        "image_url": "https://cards.scryfall.io/normal/front/4/7/470ca3f4-29aa-4c4c-8ff2-8cdd70c69943.jpg?1783932937",
+        "type_line": "Land"
+      },
+      {
+        "id": "hedge-maze",
+        "name": "Hedge Maze",
+        "rarity": "rare",
+        "image_url": "https://cards.scryfall.io/normal/front/5/2/5260f8ae-805b-4eae-badf-62de0f768867.jpg?1783912824",
+        "type_line": "Land — Forest Island"
+      },
+      {
+        "id": "restless-vents",
+        "name": "Restless Vents",
+        "rarity": "rare",
+        "image_url": "https://cards.scryfall.io/normal/front/e/6/e628e89b-bee9-408d-bb05-1784fda6b8a1.jpg?1783913713",
+        "type_line": "Land"
+      },
+      {
+        "id": "scythecat-cub",
+        "name": "Scythecat Cub",
+        "rarity": "rare",
+        "image_url": "https://cards.scryfall.io/normal/front/b/3/b3dd3c7d-4685-4579-b483-14ddaaaddf5b.jpg?1783908863",
+        "mana_cost": "{1}{G}",
+        "type_line": "Creature — Cat"
+      },
+      {
+        "id": "timetwister",
+        "name": "Timetwister",
+        "rarity": "rare",
+        "image_url": "https://cards.scryfall.io/normal/front/9/a/9a49dc44-616e-4bdd-8220-0bb71eccc512.jpg?1783948700",
+        "mana_cost": "{2}{U}",
+        "type_line": "Sorcery"
+      },
+      {
+        "id": "vampiric-tutor",
+        "name": "Vampiric Tutor",
+        "rarity": "rare",
+        "image_url": "https://cards.scryfall.io/normal/front/0/a/0a07cba3-2e8d-48ec-a6f8-4d2edfcd833d.jpg?1783946991",
+        "mana_cost": "{B}",
+        "type_line": "Instant"
+      },
+      {
+        "id": "wheel-of-fortune",
+        "name": "Wheel of Fortune",
+        "rarity": "rare",
+        "image_url": "https://cards.scryfall.io/normal/front/6/7/67b369c4-faa8-45c8-a1b9-98f228b69682.jpg?1783948679",
+        "mana_cost": "{2}{R}",
+        "type_line": "Sorcery"
+      },
+      {
+        "id": "bitter-triumph",
+        "name": "Bitter Triumph",
+        "rarity": "uncommon",
+        "image_url": "https://cards.scryfall.io/normal/front/0/5/05bdd22c-3e11-4c29-bdfa-d3dfc0e90a9f.jpg?1783913783",
+        "mana_cost": "{1}{B}",
+        "type_line": "Instant"
+      },
+      {
+        "id": "night-s-whisper",
+        "name": "Night's Whisper",
+        "rarity": "uncommon",
+        "image_url": "https://cards.scryfall.io/normal/front/6/1/61f0c6f6-b90d-4eb1-a5db-86e0a3997501.jpg?1783944398",
+        "mana_cost": "{1}{B}",
+        "type_line": "Sorcery"
+      },
+      {
+        "id": "reclamation-sage",
+        "name": "Reclamation Sage",
+        "rarity": "uncommon",
+        "image_url": "https://cards.scryfall.io/normal/front/4/7/47227cfa-4cef-4874-b331-d2f628f29dae.jpg?1783939163",
+        "mana_cost": "{2}{G}",
+        "type_line": "Creature — Elf Shaman"
+      }
+    ],
+    "pack_number": 1,
+    "pick_number": 2,
+    "prior_picks": [
+      {
+        "id": "mox-jet",
+        "name": "Mox Jet",
+        "rarity": "rare",
+        "image_url": "https://cards.scryfall.io/normal/front/9/2/92bcd1ce-19b1-4d78-8b09-95242ca08d76.jpg?1783948663",
+        "mana_cost": "{0}",
+        "type_line": "Artifact"
+      }
+    ]
+  },
+  "trophy": "Wheel of Fortune",
+  "model_pick": "Timetwister",
+  "environment": "powered-cube"
+}
