@@ -9,6 +9,7 @@ function key(env){const value=String(env.PACK1_RATE_LIMIT_SECRET||'');if(value.l
 // Same destination digest as reminders, so adverse delivery evidence from either
 // optional email stream is respected. Consent remains entirely independent.
 export const resultsEmailHash=(email,env=process.env)=>createHmac('sha256',key(env)).update('pack1-reminder-email:'+String(email).trim().toLowerCase()).digest('hex');
+export const resultsEmailProof=(env=process.env)=>createHmac('sha256',key(env)).update('pack1-results-config:'+JSON.stringify(['PACK1_RESULTS_SENDER_NAME','PACK1_RESULTS_SENDER_EMAIL','PACK1_RESULTS_POSTAL_ADDRESS','PACK1_RESULTS_RESEND_WEBHOOK_SECRET'].map(k=>String(env[k]||'').trim()))).digest('hex');
 function token(nonce,env){return nonce+'.'+createHmac('sha256',key(env)).update('pack1-results-unsubscribe:'+nonce).digest('base64url');}
 function nonceFromToken(value,env){
  const [nonce,mac,...extra]=String(value||'').split('.');
@@ -65,7 +66,7 @@ export async function recordResultsPublication(query,{authId,channel,link,publis
 }
 // The only admission path for future results/news senders. Returns an envelope;
 // performs no network call and contains no weekly-email composition or schedule.
-export async function prepareResultsEmail(query,authId,content,{env=process.env}={}){
+export async function prepareResultsEmail(query,authId,content,{env=process.env,deliveryId=null}={}){
  const postal=String(env.PACK1_RESULTS_POSTAL_ADDRESS||'').trim();
  const name=String(env.PACK1_RESULTS_SENDER_NAME||'').trim();
  const from=String(env.PACK1_RESULTS_SENDER_EMAIL||'').trim();
@@ -73,14 +74,16 @@ export async function prepareResultsEmail(query,authId,content,{env=process.env}
  if(!content||typeof content.subject!=='string'||!content.subject.trim()||/[\r\n]/.test(content.subject)||typeof content.text!=='string'||typeof content.html!=='string')fail('Email content is incomplete.');
  const user=await identity(query,authId);if(!user||!truth(user.verified))fail('Results email is not permitted.',409);
  await updateResultsPreferences(query,{user_id:authId},{expectedAccountId:authId,action:'sync'},{env});
- const admitted=(await query('SELECT pack1_results_admit($1::uuid,$2,$3) id',[authId,resultsEmailHash(user.email,env),user.email])).rows[0]?.id;
+ if(deliveryId!==null&&!UUID.test(String(deliveryId)))fail('Invalid email delivery.');
+ const admitted=(await query(deliveryId?'SELECT pack1_results_admit_delivery($1::uuid,$2::uuid,$3,$4) id':'SELECT pack1_results_admit($1::uuid,$2,$3) id',
+  deliveryId?[deliveryId,authId,resultsEmailHash(user.email,env),user.email]:[authId,resultsEmailHash(user.email,env),user.email])).rows[0]?.id;
  if(!admitted)fail('Results email is not permitted.',409);
  const nonce=(await query('SELECT unsubscribe_nonce FROM results_preferences WHERE auth_user_id=$1::uuid',[authId])).rows[0]?.unsubscribe_nonce;
  if(!nonce)fail('Results email is not permitted.',409);
  const unsubscribe='https://api.packone.pro/growth/v1/results/unsubscribe?token='+token(nonce,env);
  return {from:name+' <'+from+'>',to:[user.email],subject:content.subject,
   text:content.text+'\n\n'+name+'\n'+postal+'\nUnsubscribe: '+unsubscribe,
-  html:content.html+'<footer><p>'+escape(name)+'<br>'+escape(postal).replaceAll('\n','<br>')+'</p><a href="'+escape(unsubscribe)+'">Unsubscribe</a></footer>',
+  html:'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+escape(content.subject)+'</title></head><body style="margin:0;padding:24px;background:#f5f5f5;font-family:Arial,Helvetica,sans-serif;line-height:1.6;color:#182535"><div style="max-width:600px;margin:auto;padding:24px;background:white">'+content.html+'<footer><div style="border-top:1px solid #dbe1e8;margin-top:24px;padding-top:16px;font-size:13px"><p>'+escape(name)+'<br>'+escape(postal).replaceAll('\n','<br>')+'</p><a href="'+escape(unsubscribe)+'">Unsubscribe</a></div></footer></div></body></html>',
   headers:{'List-Unsubscribe':'<'+unsubscribe+'>','List-Unsubscribe-Post':'List-Unsubscribe=One-Click'},
   tags:[{name:'pack1_results',value:admitted}]};
 }
@@ -107,7 +110,7 @@ async function providerEvent(request,query,env){
  });
  if(!valid)fail('Invalid email event.',401);
  let event;try{event=JSON.parse(raw);}catch{fail('Invalid email event.');}
- if(!['email.bounced','email.complained'].includes(event?.type))return {ok:true};
+ if(!['email.sent','email.delivered','email.bounced','email.complained'].includes(event?.type))return {ok:true};
  const tags=event.data?.tags,hint=Array.isArray(tags)?tags.find(t=>t.name==='pack1_results')?.value:tags?.pack1_results;
  if(!UUID.test(String(hint||'')))return {ok:true};
  // Match to our immutable admitted destination. Never trust a later account
@@ -115,8 +118,8 @@ async function providerEvent(request,query,env){
  const destinations=event.data?.to;
  if(!Array.isArray(destinations)||destinations.length!==1||typeof destinations[0]!=='string')fail('Invalid email event.');
  const digest=resultsEmailHash(destinations[0],env);
- await query('SELECT pack1_results_suppress($1::uuid,$2,$3)',
- [hint,digest,event.type==='email.complained'?'complaint':'bounce']);
+ const providerId=typeof event.data?.email_id==='string'&&event.data.email_id.length<=200?event.data.email_id:null;
+ await query('SELECT pack1_results_delivery_event($1::uuid,$2,$3,$4,$5)',[hint,digest,event.type,providerId,resultsEmailProof(env)]);
  return {ok:true};
 }
 export async function resultsAdmin(query,authId,{action,target,value,task}={}){

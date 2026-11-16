@@ -33,6 +33,12 @@ export const NEON_SCHEDULERS=Object.freeze([
     function_path:'/internal/daily-reminders',
     schedule:Object.freeze({cron:'5 23 * * *'}),
   }),
+  Object.freeze({
+    name:'pack1-results-email',
+    function_slug:'pack1growth',
+    function_path:'/internal/results-email',
+    schedule:Object.freeze({cron:'*/10 * * * *'}),
+  }),
 ]);
 
 const API='https://console.neon.tech/api/v2';
