@@ -225,3 +225,37 @@ jobs:
         if: always()
         run: |
           test -f "$RUNNER_TEMP/browser-validation-complete" || { echo '::error::Selected browser validation did not complete successfully.'; exit 1; }
+
+  capture_reddit_cube_nov08_p1p2:
+    name: Capture Powered Cube Reddit pick (no production changes)
+    if: ${{ github.event_name == 'pull_request' && github.head_ref == 'capture/cube-nov08-p1p2-reddit-20261116' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install Playwright
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+      - name: Serve the actual Pack One frontend
+        run: |
+          python3 -m http.server 4173 > /tmp/packone-reddit-capture.log 2>&1 &
+          for n in $(seq 1 20); do
+            curl --silent --fail http://127.0.0.1:4173/ -o /dev/null && break
+            sleep 1
+          done
+      - name: Render the recorded November 14 pick
+        run: node tests/reddit-cube-nov08-p1p2-capture.mjs
+      - name: Upload authentic UI screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: packone-2026-11-08-cube-p1p2
+          path: artifacts/reddit-cube-nov08/
+          retention-days: 14
+          if-no-files-found: warn
