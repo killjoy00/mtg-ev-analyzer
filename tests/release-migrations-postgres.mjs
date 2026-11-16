@@ -42,12 +42,19 @@ try {
    EXISTS(SELECT 1 FROM game_results) scores,
    EXISTS(SELECT 1 FROM draft_run_shares) replays`)).rows[0];
  assert.ok(Object.values(histories).every(Boolean),'All preserved history fixtures must be populated');
+ // prepare-test-database applies the complete current manifest before this
+ // suite. Recreate the frozen production baseline for the first-ledger test:
+ // 0074's known new trigger must be absent until the release runner installs it.
+ // Prove the real baseline verifier rejects it before changing the fixture.
+ await assert.rejects(verifyBaselineSchema(q,baseline.schema),/Unreviewed baseline triggers:.*pack1_results_on_deletion/);
+ await q('DROP TRIGGER pack1_results_on_deletion ON account_deletion_operations');
  const before=await state();
  const first=await applyReleaseMigrations(client,{baseline});
  // Every release migration after the frozen baseline executes once.
  const afterBaseline=manifest.release_paths['secure-auth-release'].migrations.filter(m=>!Object.hasOwn(baseline.migrations,m));
- assert.deepEqual(afterBaseline,['0067_restore_serving_invalidation.sql','0068_puzzle_selection_features.sql','0069_v6_colour_components.sql','0070_v6_bridge_baseline_membership.sql','0071_habits_completed_covering_index.sql','0072_admin_trends_completed_covering_index.sql','0073_habits_acquisition_first_touch_idx.sql']);
+ assert.deepEqual(afterBaseline,['0067_restore_serving_invalidation.sql','0068_puzzle_selection_features.sql','0069_v6_colour_components.sql','0070_v6_bridge_baseline_membership.sql','0071_habits_completed_covering_index.sql','0072_admin_trends_completed_covering_index.sql','0073_habits_acquisition_first_touch_idx.sql','0074_results_privacy_controls.sql']);
  assert.equal(first.applied,afterBaseline.length);
+ assert.equal((await q("SELECT count(*)::int n FROM pg_trigger WHERE tgname='pack1_results_on_deletion' AND tgenabled='O'")).rows[0].n,1,'Reviewed release restores the deletion publication-removal guard');
  assert.deepEqual(await applyReleaseMigrations(client,{baseline}),{applied:0,skipped:manifest.release_paths['secure-auth-release'].migrations.length});
  assert.equal(await state(),before,'Actual release plan must preserve serving/readiness and historical results');
  // Two independent sessions are serialized by the ledger advisory lock.
@@ -55,8 +62,9 @@ try {
  try {const result=await Promise.all([applyReleaseMigrations(client,{baseline}),applyReleaseMigrations(other,{baseline})]);assert.ok(result.every(r=>r.applied===0));}finally{other.release();}
  // The baseline rejects obsolete/unknown triggers before recording application.
  await q('BEGIN');
+ await q('DROP TRIGGER pack1_results_on_deletion ON account_deletion_operations');
  await q("CREATE TRIGGER obsolete_replay AFTER UPDATE ON draft_run_environment_policy FOR EACH STATEMENT EXECUTE FUNCTION pack1_invalidate_serving_inputs()");
- await assert.rejects(verifyBaselineSchema(q,baseline.schema),/Unreviewed baseline triggers/);
+ await assert.rejects(verifyBaselineSchema(q,baseline.schema),/Unreviewed baseline triggers:.*obsolete_replay/);
  await q('ROLLBACK');
  const victim=(await q('SELECT p.* FROM draft_run_verified_puzzles p JOIN draft_run_serving_inventory i USING(puzzle_id) ORDER BY p.puzzle_id LIMIT 1')).rows[0];
  assert.ok(victim);
