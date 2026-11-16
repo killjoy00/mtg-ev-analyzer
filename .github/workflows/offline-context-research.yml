@@ -5,6 +5,8 @@ on:
     paths:
       - 'scripts/offline_context_model.py'
       - 'tests/test_offline_context_model.py'
+      - 'scripts/build_cube_rules_metadata.py'
+      - 'tests/test_cube_rules_metadata.py'
       - 'research/OFFLINE-CONTEXT-MODEL.md'
       - '.github/workflows/offline-context-research.yml'
 
@@ -21,7 +23,9 @@ jobs:
         with:
           python-version: '3.11'
       - name: Focused safety and source-separation contracts
-        run: python -m unittest discover -s tests -p 'test_offline_context_model.py' -v
+        run: |
+          python -m unittest discover -s tests -p 'test_offline_context_model.py' -v
+          python -m unittest discover -s tests -p 'test_cube_rules_metadata.py' -v
       - name: Research-only evaluation of frozen public Cube corpus
         run: |
           python scripts/offline_context_model.py \
@@ -31,3 +35,27 @@ jobs:
       - name: Print aggregate-only results
         run: |
           python -c 'import json,os; p=json.load(open(os.environ["RUNNER_TEMP"]+"/offline-context-aggregate.json")); print(json.dumps({k:p[k] for k in ("status","features","learned_weights","partitions","excluded_puzzles_by_reason")},sort_keys=True,indent=2))'
+      - name: Build one-time checksum-pinned canonical Cube metadata
+        id: metadata
+        continue-on-error: true
+        run: |
+          python scripts/build_cube_rules_metadata.py \
+            --input corpus/draft-run/powered-cube.json.gz \
+            --output "$RUNNER_TEMP/cube-rules.json.gz"
+      - name: Run canonical offline model when metadata is available
+        if: steps.metadata.outcome == 'success'
+        run: |
+          metadata_sha="$(sha256sum "$RUNNER_TEMP/cube-rules.json.gz" | cut -d ' ' -f1)"
+          python scripts/offline_context_model.py \
+            --input corpus/draft-run/powered-cube.json.gz \
+            --metadata "$RUNNER_TEMP/cube-rules.json.gz" \
+            --metadata-sha256 "$metadata_sha" \
+            --output "$RUNNER_TEMP/offline-context-canonical.json"
+          python -c 'import json,os; p=json.load(open(os.environ["RUNNER_TEMP"]+"/offline-context-canonical.json")); print(json.dumps({k:p[k] for k in ("status","features","learned_weights","partitions","excluded_puzzles_by_reason")},sort_keys=True,indent=2))'
+      - name: Save public metadata snapshot for reproducibility
+        if: steps.metadata.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cube-canonical-rules-research
+          path: ${{ runner.temp }}/cube-rules.json.gz
+          retention-days: 30
