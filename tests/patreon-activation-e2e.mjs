@@ -142,14 +142,14 @@ try {
   assert.equal(await page.locator('[data-patreon-offsite]:visible').count(),0);
   assert.match(await page.locator('[data-patreon-status]').textContent(),/through Apple/);
 
-  // Free readers retain archive commerce; connected paid readers do not.
-  for(const [isSigned,status,visible] of [[false,disconnected,true],[true,supporter,false],[true,elite,false]]) {
+  // Static archives keep their card art and published evidence for every membership,
+  // without marketplace actions for guests or paying members.
+  for(const [isSigned,status] of [[false,disconnected],[true,supporter],[true,elite]]) {
     await reset({isSigned,status});
     await page.goto(base+'/sets/msh/');
-    await page.locator('[data-tcgplayer-card]').first().waitFor({state:'attached'});
-    await page.waitForFunction(expected=>document.documentElement.dataset.cardCommerceAllowed===String(expected),visible);
-    assert.equal(await page.locator('[data-tcgplayer-card]').first().isVisible(),visible);
-    if(!visible)assert.equal(await page.locator('.affiliate-note:visible').count(),0);
+    await page.locator('.market-card img').first().waitFor({state:'visible'});
+    assert.equal(await page.locator('.market-card').count(),5);
+    assert.equal(await page.locator('[data-tcgplayer-card],.market-card a,.affiliate-note').count(),0);
   }
 
 

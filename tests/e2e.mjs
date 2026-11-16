@@ -45,8 +45,10 @@ try{
    const titles=await page.locator('.daily-home-game h2').allTextContents();
    assert.deepEqual(titles,['Daily Draft Run','Daily Powered Cube','Daily Latest Set'],'Daily card positions stay stable while completion hydrates');
    const completedEnvironment=sets[0];
-   // One atomic DOM read, reported in full on failure: this assertion failed
-   // once in CI without a reproducible cause.
+   // The total stays at one when completion moves from mixed to powered-cube.
+   // Wait for the specific environment before asserting or taking screenshots.
+   await page.waitForFunction(environment=>[...document.querySelectorAll('.daily-home-game')]
+    .some(card=>card.dataset.environment===environment&&card.classList.contains('is-complete')),completedEnvironment);
    const home=await page.evaluate(()=>({completed:document.querySelector('[data-daily-home]')?.dataset.completed,
     cards:[...document.querySelectorAll('.daily-home-game')].map(card=>[card.dataset.environment,card.className])}));
    assert.ok(home.cards.some(([environment,className])=>environment===completedEnvironment&&className.split(/\s+/).includes('is-complete')),
