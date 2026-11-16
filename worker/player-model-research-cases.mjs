@@ -137,18 +137,18 @@ function sortControl(a,b) {
 }
 function sampleCases(valid) {
   const selected=[],usedSources=new Set(),picked=new Set();
-  const push=c=>{if(usedSources.has(c.caseSource)||picked.has(c.puzzleId))return false;
-    usedSources.add(c.caseSource);picked.add(c.puzzleId);selected.push(c);return true;};
+  const push=(c,group)=>{if(usedSources.has(c.caseSource)||picked.has(c.puzzleId))return false;
+    usedSources.add(c.caseSource);picked.add(c.puzzleId);selected.push({...c,selectionGroup:group});return true;};
   // Frozen design: up to six high-gap cases and three deterministic controls
   // in each environment × real-source pick-stage cell; selected once per draft.
   for(const environment of FORMATS)for(const stage of STAGES){
     const group=valid.filter(c=>c.environment===environment&&c.stage===stage);
     let n=0;
     for(const c of group.filter(c=>c.disagree&&c.supportGap>=0.10)
-      .sort(sortTarget)){if(push(c)&&++n===6)break;}
+      .sort(sortTarget)){if(push(c,'targeted')&&++n===6)break;}
     n=0;
     for(const c of group.filter(c=>!picked.has(c.puzzleId))
-      .sort(sortControl)){if(push(c)&&++n===3)break;}
+      .sort(sortControl)){if(push(c,'control')&&++n===3)break;}
   }
   return selected.sort((a,b)=>stableHash(a.environment+':'+a.puzzleId)
     -stableHash(b.environment+':'+b.puzzleId)||a.puzzleId.localeCompare(b.puzzleId));
@@ -165,7 +165,7 @@ export function buildModelResearchCases(rows,{view='blind'}={}) {
       candidates:[...c.cards].sort((a,b)=>stableHash(review_id+':'+a.id)
         -stableHash(review_id+':'+b.id)||a.id.localeCompare(b.id)).map(cardView)};
     if(view==='blind')return base;
-    return {...base,sample_size:c.n,player_favorite:{id:c.player.id,name:c.player.name,
+    return {...base,selection_group:c.selectionGroup,sample_size:c.n,player_favorite:{id:c.player.id,name:c.player.name,
         votes:c.playerVotes,share:Math.round(c.playerShare*1000)/1000,
         model_probability:c.player.model_probability},
       model_favorite:{id:c.model.id,name:c.model.name,
