@@ -9,7 +9,7 @@ function key(env){const value=String(env.PACK1_RATE_LIMIT_SECRET||'');if(value.l
 // Same destination digest as reminders, so adverse delivery evidence from either
 // optional email stream is respected. Consent remains entirely independent.
 export const resultsEmailHash=(email,env=process.env)=>createHmac('sha256',key(env)).update('pack1-reminder-email:'+String(email).trim().toLowerCase()).digest('hex');
-export const resultsEmailProof=(env=process.env)=>createHmac('sha256',key(env)).update('pack1-results-config:'+JSON.stringify(['PACK1_RESULTS_SENDER_NAME','PACK1_RESULTS_SENDER_EMAIL','PACK1_RESULTS_POSTAL_ADDRESS','PACK1_RESULTS_RESEND_WEBHOOK_SECRET'].map(k=>String(env[k]||'').trim()))).digest('hex');
+export const resultsEmailProof=(env=process.env)=>createHmac('sha256',key(env)).update('pack1-results-config:'+JSON.stringify(['PACK1_RESULTS_SENDER_NAME','PACK1_RESULTS_SENDER_EMAIL','PACK1_RESULTS_POSTAL_ADDRESS','PACK1_RESULTS_RESEND_WEBHOOK_SECRET','PACK1_RESULTS_RESEND_API_KEY'].map(k=>String(env[k]||'').trim()))).digest('hex');
 function token(nonce,env){return nonce+'.'+createHmac('sha256',key(env)).update('pack1-results-unsubscribe:'+nonce).digest('base64url');}
 function nonceFromToken(value,env){
  const [nonce,mac,...extra]=String(value||'').split('.');
@@ -75,8 +75,8 @@ export async function prepareResultsEmail(query,authId,content,{env=process.env,
  const user=await identity(query,authId);if(!user||!truth(user.verified))fail('Results email is not permitted.',409);
  await updateResultsPreferences(query,{user_id:authId},{expectedAccountId:authId,action:'sync'},{env});
  if(deliveryId!==null&&!UUID.test(String(deliveryId)))fail('Invalid email delivery.');
- const admitted=(await query(deliveryId?'SELECT pack1_results_admit_delivery($1::uuid,$2::uuid,$3,$4) id':'SELECT pack1_results_admit($1::uuid,$2,$3) id',
-  deliveryId?[deliveryId,authId,resultsEmailHash(user.email,env),user.email]:[authId,resultsEmailHash(user.email,env),user.email])).rows[0]?.id;
+ const admitted=(await query(deliveryId?'SELECT pack1_results_admit_delivery($1::uuid,$2::uuid,$3,$4,$5) id':'SELECT pack1_results_admit($1::uuid,$2,$3) id',
+  deliveryId?[deliveryId,authId,resultsEmailHash(user.email,env),user.email,resultsEmailProof(env)]:[authId,resultsEmailHash(user.email,env),user.email])).rows[0]?.id;
  if(!admitted)fail('Results email is not permitted.',409);
  const nonce=(await query('SELECT unsubscribe_nonce FROM results_preferences WHERE auth_user_id=$1::uuid',[authId])).rows[0]?.unsubscribe_nonce;
  if(!nonce)fail('Results email is not permitted.',409);

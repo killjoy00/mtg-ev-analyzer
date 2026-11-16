@@ -14,7 +14,9 @@ export async function reconcileResultsEmailScheduler({enabled,commit,apiKey=proc
   const response=await fetcher(url,{method:body?'POST':'GET',redirect:'error',signal:AbortSignal.timeout(30000),headers:{authorization:'Bearer '+apiKey,...(body?{'content-type':'application/json'}:{})},...(body?{body:JSON.stringify(body)}:{})});
   if(!response.ok)throw Error('Results scheduler control failed (HTTP '+response.status+').');return response.json();
  };
- const matches=(await call(base)).triggers?.filter(t=>t.name===RESULTS_EMAIL_SCHEDULE.name)||[];
+ const inventory=await call(base);
+ if(!Array.isArray(inventory.triggers))throw Error('Results scheduler inventory could not be verified.');
+ const matches=inventory.triggers.filter(t=>t.name===RESULTS_EMAIL_SCHEDULE.name);
  if(matches.length>1||matches.some(t=>t.inherited||t.type!=='schedule'||t.function_slug!==RESULTS_EMAIL_SCHEDULE.function_slug||t.function_path!==RESULTS_EMAIL_SCHEDULE.function_path))throw Error('Results scheduler ownership is ambiguous.');
  const existing=matches[0];
  if(!existing&&!enabled)return {enabled:false};

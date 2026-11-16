@@ -21,6 +21,7 @@ CREATE TABLE IF NOT EXISTS results_email_deliveries (
  campaign_id uuid NOT NULL REFERENCES results_email_campaigns(id) ON DELETE CASCADE,
  auth_user_id uuid NOT NULL REFERENCES neon_auth."user"(id) ON DELETE CASCADE,
  admission_id uuid REFERENCES results_email_admissions(id) ON DELETE CASCADE,
+ config_hash text CHECK(config_hash ~ '^[a-f0-9]{64}$'),
  state text NOT NULL DEFAULT 'preparing' CHECK(state IN
   ('preparing','sending','accepted','delivered','failed','uncertain','skipped','bounced','complained')),
  provider_id text CHECK(length(provider_id)<=200), created_at timestamptz NOT NULL DEFAULT now(),
@@ -52,21 +53,22 @@ END $body$;
 
 -- Called ONLY by prepareResultsEmail immediately before the provider handoff.
 -- Re-check cancellation, consent, current destination and the deletion lock.
-CREATE OR REPLACE FUNCTION pack1_results_admit_delivery(p_delivery uuid,p_auth uuid,p_hash text,p_email text)
+CREATE OR REPLACE FUNCTION pack1_results_admit_delivery(p_delivery uuid,p_auth uuid,p_hash text,p_email text,p_config text)
 RETURNS uuid LANGUAGE plpgsql VOLATILE AS $body$
 DECLARE admission uuid; campaign uuid;
 BEGIN
- IF NOT pack1_identity_attachment_allowed(p_auth) THEN RETURN NULL; END IF;
+ IF p_config IS NULL OR p_config !~ '^[a-f0-9]{64}$' OR NOT pack1_identity_attachment_allowed(p_auth) THEN RETURN NULL; END IF;
  SELECT campaign_id INTO campaign FROM results_email_deliveries
   WHERE id=p_delivery AND auth_user_id=p_auth AND state='preparing' FOR UPDATE;
  IF NOT FOUND THEN RETURN NULL; END IF;
  PERFORM 1 FROM results_email_campaigns c JOIN results_preferences p ON p.auth_user_id=p_auth
   WHERE c.id=campaign AND c.state='approved' AND c.approved_at<=now() AND c.expires_at>now()
+   AND (c.target_auth_user_id IS NULL OR c.target_auth_user_id=p_auth)
    AND p.changed_at<=c.approved_at FOR SHARE OF c;
  IF NOT FOUND THEN RETURN NULL; END IF;
  admission:=pack1_results_admit(p_auth,p_hash,p_email);
  IF admission IS NULL THEN RETURN NULL; END IF;
- UPDATE results_email_deliveries SET admission_id=admission,state='sending',updated_at=now() WHERE id=p_delivery;
+ UPDATE results_email_deliveries SET admission_id=admission,config_hash=p_config,state='sending',updated_at=now() WHERE id=p_delivery;
  RETURN admission;
 END $body$;
 
@@ -89,7 +91,7 @@ BEGIN
   UPDATE results_email_runtime SET verified_at=coalesce(verified_at,now())
    WHERE singleton AND config_hash=p_config AND EXISTS(
     SELECT 1 FROM results_email_deliveries d JOIN results_email_campaigns c ON c.id=d.campaign_id
-    WHERE d.admission_id=p_admission AND d.state='delivered' AND c.target_auth_user_id=owner AND c.campaign_key LIKE 'check:%');
+    WHERE d.admission_id=p_admission AND d.state='delivered' AND d.config_hash=p_config AND c.target_auth_user_id=owner AND c.campaign_key LIKE 'check:%');
  END IF;
  RETURN FOUND;
 END $body$;
@@ -108,5 +110,5 @@ CREATE TRIGGER results_preferences_delete_deliveries BEFORE DELETE ON results_pr
 
 REVOKE ALL ON results_email_runtime,results_email_campaigns,results_email_deliveries FROM PUBLIC;
 REVOKE ALL ON FUNCTION pack1_results_claim_delivery(uuid,uuid),
- pack1_results_admit_delivery(uuid,uuid,text,text),pack1_results_delivery_event(uuid,text,text,text,text),
+ pack1_results_admit_delivery(uuid,uuid,text,text,text),pack1_results_delivery_event(uuid,text,text,text,text),
  pack1_results_delete_delivery_rows() FROM PUBLIC;

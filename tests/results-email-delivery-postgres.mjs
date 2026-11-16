@@ -24,10 +24,10 @@ async function campaign(){
  const row=(await query("INSERT INTO results_email_campaigns(campaign_key,kind,state,subject,body,approved_at,expires_at) VALUES($1,'news','approved','Synthetic news','A synthetic message.',now(),now()+interval '1 day') RETURNING *",['fixture:'+randomUUID()])).rows[0];return row;
 }
 async function test(label,fn){await fn();passed++;console.log('PASS '+label);}
-async function event(envelope,type,provider='fixture-provider'){
+async function event(envelope,type,provider='fixture-provider',config=env){
  const raw=JSON.stringify({type,data:{to:envelope.to,tags:envelope.tags,email_id:provider}}),id='event_'+randomBytes(8).toString('hex'),time=String(Math.floor(Date.now()/1000));
  const mac=createHmac('sha256',Buffer.from(env.PACK1_RESULTS_RESEND_WEBHOOK_SECRET.slice(6),'base64')).update(id+'.'+time+'.'+raw).digest('base64');
- return resultsRoute(new Request('https://fixture.invalid/v1/results/provider-event',{method:'POST',body:raw,headers:{'svix-id':id,'svix-timestamp':time,'svix-signature':'v1,'+mac}}),{query,json:Response.json,env});
+ return resultsRoute(new Request('https://fixture.invalid/v1/results/provider-event',{method:'POST',body:raw,headers:{'svix-id':id,'svix-timestamp':time,'svix-signature':'v1,'+mac}}),{query,json:Response.json,env:config});
 }
 try{
  await query("UPDATE results_launch SET launch_at=now()-interval '1 second'");
@@ -93,8 +93,12 @@ try{
   const a=await resultsCampaignAdmin(query,owner.id,{action:'check',id:nonce},{env,fetcher});assert.equal(a.check.state,'accepted');assert.equal(a.verified,false);
   await resultsCampaignAdmin(query,owner.id,{action:'check',id:nonce},{env,fetcher});assert.equal(calls,1);
   assert.equal((await query('SELECT count(*)::int n FROM results_email_deliveries WHERE campaign_id=$1::uuid',[a.check.id])).rows[0].n,'1');
+  const changed={...env,PACK1_RESULTS_POSTAL_ADDRESS:'Changed synthetic footer'};
+  assert.equal((await resultsCampaignAdmin(query,owner.id,null,{env:changed})).active,false);
+  await event(envelope,'email.delivered','fixture-check',changed);
+  assert.equal((await resultsCampaignAdmin(query,owner.id,null,{env:changed})).active,false,'a delayed event from the old footer cannot verify the new sender configuration');
+  await resultsCampaignAdmin(query,owner.id,null,{env});
   await event(envelope,'email.delivered','fixture-check');assert.equal((await resultsCampaignAdmin(query,owner.id,null,{env})).active,true);
-  assert.equal((await resultsCampaignAdmin(query,owner.id,null,{env:{...env,PACK1_RESULTS_POSTAL_ADDRESS:'Changed synthetic footer'}})).active,false);
  });
  await test('weekly digests reuse the live standings and give hidden profiles their own private summary without a public rank',async()=>{
   const a=await account();
