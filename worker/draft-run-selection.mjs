@@ -104,7 +104,7 @@ export const decisionKey=p=>`${p.source_draft_hash}:${Number(p.pick_number)}`;
 // sets, not the whole archive, and either applies the rule for the entire run
 // or uses the existing band draw. A partly scored set never gets partial stakes.
 // The clear-Easy rule has the same all-or-nothing guard over its own columns
-// (migration 0075): one row scored before them keeps every Easy round of the
+// (migration 0077): one row scored before them keeps every Easy round of the
 // Daily on the previous uniform draw, while stakes still rank contested rounds.
 async function dailyStakesReady(query,version,setIds) {
   const sets=[...new Set(setIds)];
@@ -120,7 +120,7 @@ async function dailyStakesReady(query,version,setIds) {
     let rows;
     try {rows=(await counts(true)).rows;}
     catch(error) {
-      // Undefined column: the database predates migration 0075.
+      // Undefined column: the database predates migration 0077.
       if(code(error)!=='42703')throw error;
       console.warn('Clear-Easy rule unavailable: selection feature columns missing.');
       return {stakes:complete((await counts(false)).rows,'scored'),clearEasy:false};

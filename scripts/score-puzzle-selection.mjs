@@ -9,7 +9,7 @@
 // at a time (a sequential TID range read; four stripes in parallel), and
 // scores each puzzle that has no row for the current feature version, whose
 // row used a different strength table than the checked-in one, or whose row
-// predates the clear-Easy features (migration 0075). --rescore
+// predates the clear-Easy features (migration 0077). --rescore
 // recomputes every puzzle in scope. Rows are written only when a value
 // changes. Payloads, ratings and grading are never touched. The run fails if
 // any puzzle in scope is still unscored at the end (for example, a row that
@@ -62,7 +62,7 @@ function setInputs(setId,strengthDir) {
 }
 
 export async function selectionFeaturesAvailable(query) {
-  // The table (migration 0068) with the clear-Easy columns (migration 0075).
+  // The table (migration 0068) with the clear-Easy columns (migration 0077).
   const {present}=(await query(`SELECT to_regclass('draft_run_puzzle_selection_features') IS NOT NULL
     AND (SELECT count(*)=2 FROM information_schema.columns WHERE table_schema='public'
       AND table_name='draft_run_puzzle_selection_features' AND column_name IN ('trophy_strength_margin','trophy_off_colour')) present`)).rows[0];
@@ -94,14 +94,14 @@ async function writeFeatures(query,features) {
 
 // Loaders: score the exact puzzles of one inserted batch from memory. A
 // database without the features table (migration 0068) or its clear-Easy
-// columns (migration 0075) is skipped with one message, never failed, so
+// columns (migration 0077) is skipped with one message, never failed, so
 // release plans that predate them can still load puzzles; the Daily keeps the
 // band draw until its set is scored.
 const tablePresent=new WeakMap();
 export async function scoreImportedPuzzles(query,puzzles,{strengthDir=STRENGTH_DIR,log=console.log}={}) {
   if(!tablePresent.has(query)) {
     tablePresent.set(query,selectionFeaturesAvailable(query).then(present=>{
-      if(!present)log('Puzzle selection features skipped: migrations 0068 and 0075 are not both applied. Run scripts/score-puzzle-selection.mjs after they are.');
+      if(!present)log('Puzzle selection features skipped: migrations 0068 and 0077 are not both applied. Run scripts/score-puzzle-selection.mjs after they are.');
       return present;
     }));
   }
@@ -191,7 +191,7 @@ export async function unscoredPuzzles(query,{setIds=null,strengthDir=STRENGTH_DI
 // features table. Returns {sets, remaining}: one summary per set scored (and
 // per requested set), and the number of puzzles in scope still unscored.
 export async function scorePuzzleSelection(query,{setIds=null,rescore=false,strengthDir=STRENGTH_DIR,log=console.log,stripes=STRIPES}={}) {
-  if(!await selectionFeaturesAvailable(query))throw Error('Apply migrations 0068 and 0075 before scoring puzzle selection features.');
+  if(!await selectionFeaturesAvailable(query))throw Error('Apply migrations 0068 and 0077 before scoring puzzle selection features.');
   const current=currentStrength(strengthDir),totals=new Map();
   const tally=setId=>{
     if(!totals.has(setId))totals.set(setId,{set_id:setId,scored:0,written:0,strength:current[setId]?.[1].slice(0,12)??null,decklists:Object.hasOwn(catalogLoaders,setId)});

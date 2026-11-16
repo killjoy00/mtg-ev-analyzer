@@ -1,0 +1,33 @@
+name: Results privacy live acceptance
+on:
+  pull_request:
+    paths:
+      - 'migrations/0075_results_privacy_launch.sql'
+      - 'scripts/verify-results-launch.mjs'
+      - '.github/workflows/results-privacy-live-acceptance.yml'
+permissions:
+  contents: read
+jobs:
+  public-launch-state:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify public state before the reviewed activation
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$BASE_SHA" =~ ^[a-f0-9]{40}$ ]]
+          if git cat-file -e "$BASE_SHA:migrations/0075_results_privacy_launch.sql" 2>/dev/null; then
+            node scripts/verify-results-launch.mjs --expect-active
+          else
+            node scripts/verify-results-launch.mjs --expect-inactive
+          fi

@@ -66,7 +66,7 @@ an input, and keeps roughly 40 to 75% of each Easy pool.
 - **Selection features:** `draft_run_puzzle_selection_features` (migration
   0068), one row per puzzle: stakes points, credible-option count, whether the
   trophy pick made the main deck (null without a decklist) and whether it is a
-  land. Migration 0075 adds the clear-Easy features: the trophy pick's strength
+  land. Migration 0077 adds the clear-Easy features: the trophy pick's strength
   margin over the strongest other rated card (null without a table or a
   rating) and whether it is off-colour. Every loader scores each batch as it inserts it
   (`scripts/score-puzzle-selection.mjs`); `tests/puzzle-selection.test.mjs`
@@ -88,18 +88,18 @@ or any other value leaves it enabled. Main Daily's `selection_rule` is
 recorded independently, and **existing schedules are never rewritten**.
 
 The clear-Easy rule has its own guard on top of the stakes guard: every
-serving P1P1–P1P8 puzzle of the planned sets must carry the 0075 features. A
-row scored before 0075, or a database without those columns, keeps the stakes
+serving P1P1–P1P8 puzzle of the planned sets must carry the 0077 features. A
+row scored before 0077, or a database without those columns, keeps the stakes
 rule for contested rounds and returns **every Easy round of that Daily** to
 the uniform easy draw; the schedule then records the `-v1` rule.
 `PACK1_DAILY_CLEAR_EASY=off` does the same on purpose, for both Dailies.
 
 ## Release steps (clear-Easy rule)
 
-1. Merge. Until the release applies 0075, workflows that run
+1. Merge. Until the release applies 0077, workflows that run
    `scripts/verify-neon-schema.mjs` against a database without it stop at that
    check, as they did for 0068.
-2. Release through `secure-auth-release`, which applies 0075 (two nullable
+2. Release through `secure-auth-release`, which applies 0077 (two nullable
    columns) and deploys. Dailies keep the `-v1` behaviour: existing feature
    rows predate the new columns.
 3. Run **Score puzzle selection** with `target=development` and `sets` empty,

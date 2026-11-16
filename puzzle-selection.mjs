@@ -11,7 +11,7 @@ export const LATEST_DAILY_RULE='latest-stakes-v1';
 export const MIXED_DAILY_RULE='mixed-stakes-v1';
 // The same stakes rule plus the clear-Easy rule below. A schedule records these
 // when every serving puzzle of its planned sets carries the clear-Easy features
-// (migration 0075); until then it records the v1 rule and draws Easy as before.
+// (migration 0077); until then it records the v1 rule and draws Easy as before.
 export const LATEST_DAILY_CLEAR_EASY_RULE='latest-stakes-v2';
 export const MIXED_DAILY_CLEAR_EASY_RULE='mixed-stakes-v2';
 

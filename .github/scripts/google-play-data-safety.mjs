@@ -154,7 +154,7 @@ const specs=[
   {
     name:'Email address',
     optional:true,
-    purposes:['PSL_APP_FUNCTIONALITY','PSL_ACCOUNT_MANAGEMENT'],
+    purposes:['PSL_APP_FUNCTIONALITY','PSL_ACCOUNT_MANAGEMENT','PSL_DEVELOPER_COMMUNICATIONS','PSL_ADVERTISING'],
   },
   {
     name:'Personal identifiers',
@@ -200,8 +200,13 @@ if(enabledTypes.length!==specs.length)throw Error(`Expected ${specs.length} enab
 const sharedRows=rows.filter(r=>r[COL_V]==='TRUE'&&(r[COL_R]==='PSL_DATA_USAGE_ONLY_SHARED'||String(r[COL_Q]).endsWith('DATA_USAGE_SHARING_PURPOSE')));
 if(sharedRows.length)throw Error(`Unexpected sharing declarations: ${JSON.stringify(sharedRows)}`);
 
-const advertisingRows=rows.filter(r=>r[COL_V]==='TRUE'&&r[COL_R]==='PSL_ADVERTISING');
-if(advertisingRows.length)throw Error('Advertising/marketing purpose must not be selected.');
+// Results, news and optional offers use the verified account email only.
+// Do not extend these purposes to names, identifiers, gameplay or sharing.
+const emailPurposeQuestion=`PSL_DATA_USAGE_RESPONSES:${selected.find(item=>item.name==='Email address').token}:DATA_USAGE_COLLECTION_PURPOSE`;
+for(const purpose of ['PSL_ADVERTISING','PSL_DEVELOPER_COMMUNICATIONS']){
+  const active=rows.filter(r=>r[COL_V]==='TRUE'&&r[COL_R]===purpose);
+  if(active.length!==1||active[0][COL_Q]!==emailPurposeQuestion)throw Error('Results/news email purposes must be limited to Email address.');
+}
 
 const unresolvedRequired=rows.filter(r=>r[COL_REQ]==='REQUIRED'&&!String(r[COL_V]).trim());
 if(unresolvedRequired.length)throw Error(`Unresolved REQUIRED rows: ${JSON.stringify(unresolvedRequired.slice(0,40))}`);

@@ -5,7 +5,9 @@ let epoch=0,invitation=null,pending=null;
 function clear(){epoch++;invitation=null;pending=null;document.querySelectorAll('[data-results-ui]').forEach(el=>el.replaceChildren());}
 globalThis.addEventListener?.('packone-account-changed',clear);
 globalThis.addEventListener?.('storage',e=>{if(e.key===ACCOUNT_SIGNAL_KEY||e.key===null)clear();});
-export const resultsSettingsMarkup=()=>'<section data-results-ui id="results-settings" hidden></section>';
+export const emailPreferencesMarkup=content=>'<section class="profile-email-preferences" aria-labelledby="email-preferences-heading"><h2 id="email-preferences-heading">'+esc(copy.emailTitle)+'</h2>'+content+'</section>';
+export const resultsSettingsMarkup=()=>'<section class="settings-row profile-settings-group" data-results-ui id="results-settings" aria-labelledby="results-email-heading" hidden></section>';
+export const resultsPublicationsMarkup=()=>'<section class="settings-row profile-settings-group" data-results-ui id="results-publications-settings" aria-labelledby="results-publications-heading" hidden></section>';
 async function owner(){return (await getAuthSession())?.user?.id;}
 async function save(id,action,version){
  if(version!==epoch||await owner()!==id)throw Error('Account changed. Reload Account settings.');
@@ -13,15 +15,17 @@ async function save(id,action,version){
  if(version!==epoch||await owner()!==id)throw Error('Account changed. Reload Account settings.');
  return result;
 }
-function bindActions(mount,id,version,onSaved){
+function disableControls(roots,disabled){for(const root of roots)root?.querySelectorAll('button,input').forEach(el=>el.disabled=disabled);}
+function bindActions(mount,id,version,onSaved,related=[]){
  mount.querySelectorAll('[data-results-action]').forEach(button=>button.addEventListener('click',async()=>{
-  mount.querySelectorAll('button,input').forEach(el=>el.disabled=true);
+  disableControls([mount,...related],true);
+  const feedback=mount.querySelector('[role="status"]');if(feedback)feedback.textContent='Saving…';
   try{const value=await save(id,button.dataset.resultsAction,version);if(mount.isConnected)onSaved(value,button.dataset.resultsAction);}
-  catch(error){if(version===epoch&&mount.isConnected){mount.querySelector('[role="status"]').textContent=error.message;mount.querySelectorAll('button,input').forEach(el=>el.disabled=false);}}
+  catch(error){if(version===epoch&&mount.isConnected){mount.querySelector('[role="status"]').textContent=error.message;disableControls([mount,...related],false);}}
  }));
 }
 export async function bindResultsSettings(){
- const mount=document.querySelector('#results-settings'),version=epoch;if(!mount)return;
+ const mount=document.querySelector('#results-settings'),publications=document.querySelector('#results-publications-settings'),version=epoch;if(!mount)return;
  let launched=false;
  try{
   const id=await owner();if(!id)return;
@@ -31,16 +35,22 @@ export async function bindResultsSettings(){
   if(version!==epoch||!mount.isConnected)return;
   mount.hidden=false;
   const render=value=>{
-   mount.innerHTML=(kind?'<aside>'+invitationMarkup(kind)+'</aside>':'')+'<h3>'+copy.emailTitle+'</h3><h4>'+copy.emailLabel+'</h4><p>'+copy.emailBody+'</p><div role="group" aria-label="Results and news">'+
-    ['on','off'].map(v=>'<button type="button" class="button secondary" data-results-action="settings:'+v+'" aria-pressed="'+(v==='on'?value.emailState==='on':value.emailState!=='on')+'">'+(v==='on'?'On':'Off')+'</button>').join(' ')+'</div><p>'+copy.emailFoot+'</p><h3>'+copy.publishedTitle+'</h3><label><input type="checkbox" id="results-exclude" '+(value.excludePublications?'checked':'')+'> '+copy.exclude+'</label><p>'+copy.publishedFoot+'</p><p role="status" aria-live="polite"></p>';
-   bindActions(mount,id,version,(updated,action)=>{if(/^(prompt|notice|settings):/.test(action)){kind=null;invitation={id,kind:null};}render(updated);});
-   mount.querySelector('#results-exclude').addEventListener('change',async e=>{
-    const box=e.currentTarget,previous=!box.checked;box.disabled=true;
+   const enabled=value.emailState==='on';
+   mount.innerHTML='<div class="settings-row-label"><h3 id="results-email-heading">'+esc(copy.emailLabel)+'</h3><p class="profile-settings-intro">'+esc(copy.emailBody)+'</p></div><div class="settings-row-body">'+
+    (kind?'<aside class="results-invitation">'+invitationMarkup(kind)+'</aside>':'')+
+    '<div class="reminder-summary"><p class="reminder-status"><span class="reminder-state'+(enabled?' is-on':'')+'">'+(enabled?'On':'Off')+'</span></p><div class="reminder-actions"><button type="button" class="button secondary" data-results-action="settings:'+(enabled?'off':'on')+'">'+(enabled?'Turn off':'Turn on')+'</button></div></div>'+
+    '<p class="reminder-note">'+esc(copy.emailFoot)+'</p><p class="profile-settings-status" role="status" aria-live="polite"></p></div>';
+   bindActions(mount,id,version,(updated,action)=>{if(/^(prompt|notice|settings):/.test(action)){kind=null;invitation={id,kind:null};}render(updated);if(action.startsWith('settings:'))mount.querySelector('.profile-settings-status').textContent=updated.emailState==='on'?'Results and news emails turned on.':'Results and news emails turned off.';},[publications]);
+   if(!publications?.isConnected)return;
+   publications.hidden=false;
+   publications.innerHTML='<div class="settings-row-label"><h3 id="results-publications-heading">'+esc(copy.publishedTitle)+'</h3></div><div class="settings-row-body"><label class="profile-toggle"><input type="checkbox" id="results-exclude" '+(value.excludePublications?'checked':'')+'><span>'+esc(copy.exclude)+'</span></label><p class="reminder-note">'+esc(copy.publishedFoot)+'</p><p class="profile-settings-status" role="status" aria-live="polite"></p></div>';
+   publications.querySelector('#results-exclude').addEventListener('change',async e=>{
+    const box=e.currentTarget,previous=!box.checked;disableControls([mount,publications],true);
     try{render(await save(id,'exclude:'+(box.checked?'on':'off'),version));}
-    catch(error){if(version===epoch&&mount.isConnected){box.checked=previous;box.disabled=false;mount.querySelector('[role="status"]').textContent=error.message;}}
+    catch(error){if(version===epoch&&publications.isConnected){box.checked=previous;disableControls([mount,publications],false);publications.querySelector('[role="status"]').textContent=error.message;}}
    });
   };render(state);
- }catch{if(launched&&version===epoch&&mount.isConnected){mount.hidden=false;mount.innerHTML='<p role="status">Could not load results preferences.</p><button type="button" class="button secondary">Retry</button>';mount.querySelector('button').onclick=()=>void bindResultsSettings();}}
+ }catch{if(launched&&version===epoch&&mount.isConnected){mount.hidden=false;mount.innerHTML='<div class="settings-row-label"><h3 id="results-email-heading">'+esc(copy.emailLabel)+'</h3></div><div class="settings-row-body"><p role="status">Could not load results preferences.</p><button type="button" class="button secondary">Retry</button></div>';mount.querySelector('button').onclick=()=>void bindResultsSettings();}}
 }
 function invitationMarkup(kind){
  const prompt=kind==='prompt';

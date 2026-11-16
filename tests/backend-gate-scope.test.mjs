@@ -105,7 +105,6 @@ test('neutral files are removed before backend classification and mixed PR noise
 test('modules behind the full-path function routers select only their owning domain', () => {
   for (const [path, domain] of [
     ['worker/capabilities.mjs', 'subscriptions'],
-    ['worker/draft-run-season.mjs', 'seasons'],
     ['worker/account-deletion.mjs', 'account'],
     ['worker/patreon.mjs', 'subscriptions'],
     ['worker/public-identity-safety.mjs', 'account'],
@@ -117,6 +116,9 @@ test('modules behind the full-path function routers select only their owning dom
 });
 
 test('a module imported by several domains selects each of them without broadening to full', () => {
+  const standings=classifyBackendChanges(['worker/draft-run-season.mjs'],{map});
+  assert.equal(standings.fullSuite,false);
+  assert.deepEqual(standings.domains,['account','seasons'],'private results delivery and season standings both use the ranking helper');
   const result = classifyBackendChanges(['worker/account-session.mjs'], { map });
   assert.equal(result.fullSuite, false);
   assert.deepEqual(result.domains, ['account', 'draft_run', 'subscriptions']);

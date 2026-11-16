@@ -52,7 +52,7 @@ try {
  const first=await applyReleaseMigrations(client,{baseline});
  // Every release migration after the frozen baseline executes once.
  const afterBaseline=manifest.release_paths['secure-auth-release'].migrations.filter(m=>!Object.hasOwn(baseline.migrations,m));
- assert.deepEqual(afterBaseline,['0067_restore_serving_invalidation.sql','0068_puzzle_selection_features.sql','0069_v6_colour_components.sql','0070_v6_bridge_baseline_membership.sql','0071_habits_completed_covering_index.sql','0072_admin_trends_completed_covering_index.sql','0073_habits_acquisition_first_touch_idx.sql','0074_results_privacy_controls.sql','0075_clear_easy_features.sql']);
+ assert.deepEqual(afterBaseline,['0067_restore_serving_invalidation.sql','0068_puzzle_selection_features.sql','0069_v6_colour_components.sql','0070_v6_bridge_baseline_membership.sql','0071_habits_completed_covering_index.sql','0072_admin_trends_completed_covering_index.sql','0073_habits_acquisition_first_touch_idx.sql','0074_results_privacy_controls.sql','0075_results_privacy_launch.sql','0076_results_email_delivery.sql','0077_clear_easy_features.sql']);
  assert.equal(first.applied,afterBaseline.length);
  assert.equal((await q("SELECT count(*)::int n FROM pg_trigger WHERE tgname='pack1_results_on_deletion' AND tgenabled='O'")).rows[0].n,1,'Reviewed release restores the deletion publication-removal guard');
  assert.deepEqual(await applyReleaseMigrations(client,{baseline}),{applied:0,skipped:manifest.release_paths['secure-auth-release'].migrations.length});

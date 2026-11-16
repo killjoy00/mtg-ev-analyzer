@@ -147,7 +147,7 @@ test('import scoring skips a database without the features table',async()=>{
   assert.equal(await scoreImportedPuzzles(query,[{puzzle_id:'p'}],{log:m=>messages.push(m)}),0);
   assert.equal(await scoreImportedPuzzles(query,[{puzzle_id:'q'}],{log:m=>messages.push(m)}),0);
   assert.equal(sql.length,1,'the table check runs once per database adapter');
-  assert.match(messages.join('\n'),/migrations 0068 and 0075 are not both applied/);
+  assert.match(messages.join('\n'),/migrations 0068 and 0077 are not both applied/);
 });
 
 test('completed feature backfill avoids reading the entire puzzle corpus again',async()=>{
