@@ -11,7 +11,7 @@ const git=(cwd,args)=>{
   assert.equal(result.status,0,result.stderr);
 };
 
-function withRepository(fn) {
+async function withRepository(fn) {
   const cwd=mkdtempSync(join(tmpdir(),'pack1-tracked-syntax-'));
   try {
     git(cwd,['init','-q']);
@@ -25,7 +25,7 @@ function withRepository(fn) {
     writeFileSync(join(cwd,'README.md'),'test\n');
     git(cwd,['add','nested/newly-added.mjs','.github/scripts/helper.cjs','root.js','generated/asset.js','README.md']);
     writeFileSync(join(cwd,'untracked.js'),'BROKEN(()\n');
-    return fn(cwd);
+    return await fn(cwd);
   } finally {rmSync(cwd,{recursive:true,force:true});}
 }
 
@@ -41,8 +41,8 @@ test('null-delimited Git index discovers nested source and newly tracked JS, not
   assert.throws(()=>selectTrackedJavaScript('README.md\0'),/No tracked/);
 });
 
-test('real Git index includes new tracked file without requiring a hand-maintained list',()=>{
-  withRepository(cwd=>{
+test('real Git index includes new tracked file without requiring a hand-maintained list',async()=>{
+  await withRepository(cwd=>{
     const files=listTrackedJavaScript({cwd});
     assert.deepEqual(files,['.github/scripts/helper.cjs','nested/newly-added.mjs','root.js']);
     assert(!files.includes('untracked.js'));
