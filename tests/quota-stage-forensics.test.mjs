@@ -184,3 +184,28 @@ test('successful sampled quota requests are only an observational log-capture co
   assert.equal(summary.failed_quota_phase.not_observed,1);
   assert.doesNotMatch(JSON.stringify(summary),/aaaaaaaa|bbbbbbbb|secret|trace/);
 });
+
+
+test('failed pre-origin slow quota errors bucket only existing fixed gateway failure indicators',()=>{
+  const failures=[
+    gateway('a',2200,{status:503,upstream_calls:0,quota_handler_ms:null,
+      quota_transport_wait_ms:null,quota_provider_reset:true,quota_failure_code:'transport_reset'}),
+    gateway('b',2200,{status:503,upstream_calls:0,quota_handler_ms:null,
+      quota_transport_wait_ms:null,quota_timeout:true}),
+    gateway('c',2200,{status:503,upstream_calls:0,quota_handler_ms:null,
+      quota_transport_wait_ms:null,quota_overloaded:true}),
+    gateway('d',2200,{status:503,upstream_calls:0,quota_handler_ms:null,
+      quota_transport_wait_ms:null,quota_failure_code:'provider_internal'}),
+    gateway('e',2200,{status:503,upstream_calls:0,quota_handler_ms:null,
+      quota_transport_wait_ms:null,quota_failure_code:'UNTRUSTED_ERROR_TEXT'}),
+    gateway('f',2200,{status:503,upstream_calls:1,quota_handler_ms:null,
+      quota_transport_wait_ms:null,quota_provider_reset:true}),
+    gateway('0',900,{status:503,upstream_calls:0,quota_handler_ms:null,
+      quota_transport_wait_ms:null,quota_provider_reset:true}),
+  ];
+  const s=summarizeQuotaStages(failures,[],[]);
+  assert.equal(s.failed_quota_without_timing,5);
+  assert.deepEqual(s.failed_quota_failure_signals,{
+    provider_reset:1,timeout_or_abort:1,overloaded:1,provider_internal:1,other_or_unknown:1});
+  assert.doesNotMatch(JSON.stringify(s),/UNTRUSTED_ERROR_TEXT|trace|network|secret/);
+});
