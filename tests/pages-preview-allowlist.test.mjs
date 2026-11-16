@@ -5,7 +5,7 @@ import {mkdir,mkdtemp,readFile,stat,rm} from 'node:fs/promises';
 import {join} from 'node:path';
 import {
   REQUIRED_SITE_PATHS,isPublicSitePath,planPublicSite,
-  trackedSitePaths,verifyStaticReferences,buildPublicSitePreview
+  trackedSitePaths,verifyStaticReferences,verifyBrowserModuleReferences,buildPublicSitePreview
 } from '../scripts/build-pages-preview.mjs';
 
 const forbidden=[
@@ -24,6 +24,7 @@ test('site allowlist refuses non-site source and future unreviewed root files',(
 test('public routes, auth associations, ads and versioned game assets remain eligible',()=>{
   for(const file of REQUIRED_SITE_PATHS)assert.equal(isPublicSitePath(file),true,file);
   for(const file of [
+    'assets/fonts/barlowcondensed-OFL.txt','assets/fonts/sourcesans3-OFL.txt',
     'sets/fra/guide/index.html','sets/guides/data/fra.json',
     'creator/realityfracture/creator-card.png','creator/canary-daily-69af6b03/index.html',
     'go/tcg/index.html','share/daily/latest/index.html','d/c/index.html',
@@ -49,6 +50,8 @@ test('tracked main/PR site plan is reproducible and HTML/CSS static links resolv
   assert.ok(plan.included.includes('index.html'));
   for(const f of forbidden)assert.equal(plan.included.includes(f),false,f);
   await verifyStaticReferences(plan.included);
+  const modules=await verifyBrowserModuleReferences(plan.included);
+  assert.ok(modules.checked>=50,'browser-reachable modules were not followed');
 });
 test('real-byte staging copies only approved files with verifiable checksums',async()=>{
   const artifacts=join(process.cwd(),'artifacts');
