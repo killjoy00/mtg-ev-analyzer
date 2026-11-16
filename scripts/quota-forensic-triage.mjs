@@ -76,6 +76,18 @@ const normalQuotaLogCoverage=window=>{
   if(start*4<total&&completion*4<total)return 'normal_path_missing';
   return 'partial';
 };
+// Gateway already records only fixed failure flags / allowlisted codes.
+// Publish one low-resolution category if >=3 errors and >=2/3 agree;
+// all other evidence stays private, and the category is NOT a root cause.
+const gatewayQuotaFailureSignal=window=>{
+  const total=count(window?.failed_quota_without_timing);
+  const fields=['provider_reset','timeout_or_abort','overloaded','provider_internal','other_or_unknown'];
+  const values=fields.map(k=>count(window?.failed_quota_failure_signals?.[k]));
+  if(total===null||total<3||values.some(v=>v===null)||
+    values.reduce((sum,n)=>sum+n,0)!==total)return 'unverified';
+  const stage=stageChoice(fields.map((key,i)=>[key,values[i]]));
+  return stage==='other_or_unknown'?'unverified':stage;
+};
 const failedQuotaPhaseSignal=window=>{
   const total=count(window?.failed_quota_without_timing),phases=window?.failed_quota_phase||{};
   const names=['transaction','durability','complete','handler_other','started_no_completion','not_observed'];
@@ -131,6 +143,7 @@ function classifyQuotaWindow(window) {
       denial_missing_timing:'inspect_quota_denial_timing_header',
       error_missing_timing:'inspect_quota_error_timing_header'};
     const error_stage=timing_gap==='error_missing_timing'?failedQuotaPhaseSignal(window):undefined;
+    const failure_signal=timing_gap==='error_missing_timing'?gatewayQuotaFailureSignal(window):undefined;
     // This is an observed handler-log stage, NOT an explanation of why the
     // provider returned an error or whether the debit was committed.
     const phaseActions={handler_transaction_error:'inspect_quota_storage_transaction',
@@ -140,11 +153,17 @@ function classifyQuotaWindow(window) {
       no_correlated_handler_logs:'verify_quota_start_log_coverage'};
     const normal_path_logs=error_stage==='no_correlated_handler_logs'?
       normalQuotaLogCoverage(window):undefined;
-    const next_action=normal_path_logs==='normal_path_correlated'?
-      'inspect_error_dispatch_or_provider_log_gaps':
+    const lead={provider_reset:'inspect_quota_provider_reset_signal',
+      timeout_or_abort:'inspect_quota_timeout_or_abort_signal',
+      overloaded:'inspect_quota_overload_signal',
+      provider_internal:'inspect_quota_provider_internal_signal'};
+    const next_action=normal_path_logs==='normal_path_correlated'&&
+      error_stage==='no_correlated_handler_logs'?
+      (lead[failure_signal]||'inspect_error_dispatch_or_provider_log_gaps'):
       phaseActions[error_stage]||actions[timing_gap]||'verify_quota_handler_timing';
     return {...base,outcome:'stage_coverage_incomplete',timing_gap,
       ...(error_stage===undefined?{}:{error_stage}),
+      ...(failure_signal===undefined?{}:{failure_signal}),
       ...(normal_path_logs===undefined?{}:{normal_path_logs}),
       next_action};
   }
