@@ -22,7 +22,7 @@ import {
 } from './growth-api.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
 import { trackEvent } from './retention-events.mjs';
-import { nextMilestones } from './progression.mjs?v=10';
+import { nextMilestones } from './progression.mjs?v=11';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { eliteSource } from './membership-source.mjs';
 import { renderAccount, renderDeletionState } from './growth.mjs?v=35';
