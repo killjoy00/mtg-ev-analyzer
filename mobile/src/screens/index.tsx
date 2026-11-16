@@ -140,7 +140,7 @@ export default function HomeScreen() {
     }
   };
   const displayNameAttention = ['username_taken', 'username_required', 'name_not_allowed'].includes(rankingReason || '');
-  const nativeAdMobEnabled = Platform.OS === 'ios' ? config.adMob?.iosEnabled === true : config.adMob?.androidEnabled === true;
+  const nativeAdMobEnabled = Platform?.OS === 'ios' ? config.adMob?.iosEnabled === true : config.adMob?.androidEnabled === true;
   const promotion = dailyHomePromotion(promotionAllowed, nativeAdMobEnabled);
 
   return (

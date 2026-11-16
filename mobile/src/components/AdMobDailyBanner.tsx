@@ -11,8 +11,8 @@ type AdsSdk = typeof import('react-native-google-mobile-ads');
  * (or the player is a guest). The parent unmounts this on a session change.
  */
 export function AdMobDailyBanner({ eligible }: { eligible: boolean }) {
-  const enabled = Platform.OS === 'ios' ? config.adMob?.iosEnabled : config.adMob?.androidEnabled;
-  const unitId = Platform.OS === 'ios' ? config.adMob?.iosBannerUnitId : config.adMob?.androidBannerUnitId;
+  const enabled = Platform?.OS === 'ios' ? config.adMob?.iosEnabled : config.adMob?.androidEnabled;
+  const unitId = Platform?.OS === 'ios' ? config.adMob?.iosBannerUnitId : config.adMob?.androidBannerUnitId;
   const [sdk, setSdk] = useState<AdsSdk | null>(null);
   const [privacyRequired, setPrivacyRequired] = useState(false);
   const [failed, setFailed] = useState(false);

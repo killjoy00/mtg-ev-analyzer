@@ -21,6 +21,7 @@ async function fixture(t, { consent, eligible = false } = {}) {
   const native = {
     Platform: { OS: 'ios' },
     Pressable: host('Pressable'),
+    Text: host('Text'),
     View: host('View'),
     StyleSheet: { create: x => x },
   };

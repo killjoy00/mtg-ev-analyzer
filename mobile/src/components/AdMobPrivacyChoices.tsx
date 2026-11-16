@@ -6,7 +6,7 @@ import { colors, spacing } from '@/src/theme';
 
 /** A UMP privacy-options entry point on the Account screen, including for guests. */
 export function AdMobPrivacyChoices() {
-  const enabled = Platform.OS === 'ios' ? config.adMob?.iosEnabled : config.adMob?.androidEnabled;
+  const enabled = Platform?.OS === 'ios' ? config.adMob?.iosEnabled : config.adMob?.androidEnabled;
   const [required, setRequired] = useState(false);
   const [message, setMessage] = useState('');
 

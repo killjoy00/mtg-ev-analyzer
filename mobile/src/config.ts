@@ -1,5 +1,3 @@
-import Constants from 'expo-constants';
-
 export type MobileEnvironment = 'development' | 'preview' | 'production';
 
 function environment(): MobileEnvironment {
@@ -18,10 +16,25 @@ if (screenshotFixtures && resolvedEnvironment !== 'preview') {
   throw new Error('Store screenshot fixtures are allowed only in the preview mobile environment.');
 }
 
-const nativeAdMob = Constants.expoConfig?.extra?.adMob as
-  | { iosEnabled?: boolean; androidEnabled?: boolean; iosBannerUnitId?: string | null;
-      androidBannerUnitId?: string | null; testBanners?: boolean }
-  | undefined;
+type NativeAdMobOptions = {
+  iosEnabled?: boolean;
+  androidEnabled?: boolean;
+  iosBannerUnitId?: string | null;
+  androidBannerUnitId?: string | null;
+  testBanners?: boolean;
+};
+
+// Native Expo config is available on device. Non-native test harnesses may not
+// provide expo-constants, so a missing module must leave advertising disabled.
+function readAdMobOptions(): NativeAdMobOptions | undefined {
+  try {
+    const module = require('expo-constants') as typeof import('expo-constants');
+    return module.default?.expoConfig?.extra?.adMob as NativeAdMobOptions | undefined;
+  } catch {
+    return undefined;
+  }
+}
+const nativeAdMob = readAdMobOptions();
 
 const apiOrigin = cleanOrigin(
   process.env.EXPO_PUBLIC_PACKONE_API_ORIGIN ?? 'https://api.packone.pro',
