@@ -254,7 +254,7 @@ test('origin failures, under-threshold and unsigned traces cannot invent quota c
   const g=c=>gateway(c,2300,{status:503,upstream_calls:0,
     quota_handler_ms:null,quota_transport_wait_ms:null});
   const result=summarizeQuotaStages([
-    g('a'),g('b'),g('c',{upstream_calls:1}),
+    g('a'),g('b'),
     gateway('d',2300,{status:503,upstream_calls:1,quota_handler_ms:null,quota_transport_wait_ms:null}),
     gateway('e',900,{status:503,upstream_calls:0,quota_handler_ms:null,quota_transport_wait_ms:null}),
   ],[],[],[
