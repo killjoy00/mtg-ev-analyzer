@@ -99,8 +99,9 @@ test('fail closed on vote coverage, ties, broken model probability, and oversize
 });
 
 test('case endpoints are separately GET allowlisted and behind the same authenticated Admin gate',async()=>{
-  assert.equal(adminPath('/v1/admin/measurements/research-cases','GET'),true);
-  assert.equal(adminPath('/v1/admin/measurements/research-cases','POST'),false);
+  assert.equal(adminPath('/v1/admin/measurements/reviews','GET'),true);
+  assert.equal(adminPath('/v1/admin/measurements/research-cases','GET'),false);
+  assert.equal(adminPath('/v1/admin/measurements/reviews','POST'),false);
   let count=0;
   const query=async(sql,params=[])=>{
     if(sql.includes('FROM neon_auth.session s'))return {rows:[{user_id:'11111111-1111-4111-8111-111111111111'}]};
