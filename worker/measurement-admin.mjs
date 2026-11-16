@@ -8,7 +8,7 @@ import {handleCreatorChallengeAdmin} from './creator-challenges.mjs';
 import {handleDashboardAdmin} from './admin-dashboard.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {PLAYER_MODEL_AUDIT_SQL,PLAYER_MODEL_AUDIT_MIN_CHOICES,playerModelAuditWindow} from './player-choice-model-audit.mjs';
-import {RESEARCH_CORPUS,RESEARCH_MIN_CHOICES,RESEARCH_CASES_SQL,buildModelResearchCases} from './player-model-research-cases.mjs';
+import {RESEARCH_CORPUS,RESEARCH_MIN_CHOICES,RESEARCH_CASES_SQL,buildModelResearchCases,assertResearchCorpus} from './player-model-research-cases.mjs';
 import {gameDateKey} from '../game-date.mjs';
 const fail=(message,status=400)=>{throw Object.assign(Error(message),{status});};
 const jsonArray=value=>Array.isArray(value)?value:(typeof value==='string'?JSON.parse(value):[]);
@@ -234,6 +234,7 @@ export async function handleAdmin(request,query,readJson) {
     return youtubeReport().catch(error=>({configured:true,error:String(error?.message||'YouTube results are unavailable.')}));
   const filters=reportFilters(url);
   if(url.pathname==='/v1/admin/measurements/reviews'&&url.searchParams.has('research')) {
+    assertResearchCorpus();
     const view=url.searchParams.get('research');
     if(!['blind','diagnosis'].includes(view))fail('Invalid research view.');
     // Never include an unfinished Daily: selection and reviewer blinding should
