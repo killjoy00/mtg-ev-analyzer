@@ -1,0 +1,80 @@
+name: Activate reviewed results Android 100970 Internal Testing
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/results-android-internal-request.json']
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+concurrency:
+  group: pack-one-results-android-internal
+  cancel-in-progress: false
+
+jobs:
+  activate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify exact current reviewed main and pinned request
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';import assert from 'node:assert/strict';
+          const r=JSON.parse(fs.readFileSync('.github/results-android-internal-request.json','utf8'));
+          assert.deepEqual(Object.keys(r).sort(),['operation','preserve_closed_version_code','reason','source_run_id','source_sha','version_code']);
+          assert.equal(r.operation,'activate-results-android-internal');assert.equal(r.version_code,'100970');
+          assert.equal(r.source_run_id,43925032404);assert.equal(r.source_sha,'c1d838cacb27027913be01cc968a78bf3b1ac522');
+          assert.equal(r.preserve_closed_version_code,'100963');assert.ok(typeof r.reason==='string'&&r.reason.trim());
+          JS
+      - name: Verify successful protected signed upload and unchanged native inputs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/43925032404" > "$RUNNER_TEMP/signed-source.json"
+          jq -e '.name=="Android internal testing" and .event=="push" and .head_branch=="main" and .head_sha=="c1d838cacb27027913be01cc968a78bf3b1ac522" and .status=="completed" and .conclusion=="success"' "$RUNNER_TEMP/signed-source.json" >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/43925032404/artifacts" > "$RUNNER_TEMP/signed-audits.json"
+          jq -e '.artifacts|any(.id==14257451908 and .name=="pack-one-android-internal-native-audit" and .expired==false)' "$RUNNER_TEMP/signed-audits.json" >/dev/null
+          gh api "repos/$GITHUB_REPOSITORY/compare/c1d838cacb27027913be01cc968a78bf3b1ac522...$GITHUB_SHA" > "$RUNNER_TEMP/native-compare.json"
+          jq -e '[.files[].filename|select(startswith("mobile/") or .=="package.json" or .=="package-lock.json" or startswith(".github/actions/mobile-validate/") or .==".github/workflows/android-internal-testing.yml")]|length==0' "$RUNNER_TEMP/native-compare.json" >/dev/null
+      - name: Exercise activation rejection and track preservation contracts
+        run: node --test tests/results-android-internal.test.mjs
+      - id: auth
+        name: Authenticate to existing protected Play connection
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093
+        with:
+          project_id: pack-one
+          workload_identity_provider: projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer
+          service_account: packone-play-ci@pack-one.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+      - name: Activate and independently verify only Internal Testing 100970
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/activate-results-android-internal.mjs 100970 > "$RUNNER_TEMP/results-android-activation.json"
+          cat "$RUNNER_TEMP/results-android-activation.json"
+          jq -e '.versionCode=="100970" and .track=="internal" and .releaseStatus=="completed" and .closedTrackPreserved==true and .otherTracksPreserved==true' "$RUNNER_TEMP/results-android-activation.json" >/dev/null
+      - name: Retain sanitized exact-version delivery proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: results-android-internal-100970-proof
+          path: ${{ runner.temp }}/results-android-activation.json
+          if-no-files-found: error
+          retention-days: 30
