@@ -16,8 +16,8 @@ export function bindModelResearch(root,request,queryString) {
   if(!load||!reveal||!copy||!output||!status)return;
   let packet=null,key=null,index=0,busy=false;
   const annotations=new Map();
-  const statement=view=>'/v1/admin/measurements/research-cases?'+
-    (queryString?queryString+'&':'')+'view='+encodeURIComponent(view);
+  const statement=view=>'/v1/admin/measurements/reviews?'+
+    (queryString?queryString+'&':'')+'research='+encodeURIComponent(view);
   function record() {
     const item=packet?.cases?.[index];if(!item)return;
     const best=output.querySelector('input[name="model-research-best"]:checked')?.value||null;
