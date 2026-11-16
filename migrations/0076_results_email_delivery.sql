@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS results_email_campaigns (
  state text NOT NULL DEFAULT 'draft' CHECK(state IN ('draft','approved','cancelled')),
  subject text NOT NULL CHECK(length(subject) BETWEEN 1 AND 160),
  body text NOT NULL DEFAULT '' CHECK(length(body)<=10000),
- target_auth_user_id uuid REFERENCES neon_auth."user"(id) ON DELETE CASCADE,
+ target_auth_user_id uuid REFERENCES results_preferences(auth_user_id) ON DELETE CASCADE,
  start_date date, end_date date, created_at timestamptz NOT NULL DEFAULT now(),
  approved_at timestamptz, expires_at timestamptz,
  CHECK((kind='news' AND start_date IS NULL AND end_date IS NULL) OR
@@ -19,7 +19,7 @@ CREATE TABLE IF NOT EXISTS results_email_campaigns (
 CREATE TABLE IF NOT EXISTS results_email_deliveries (
  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
  campaign_id uuid NOT NULL REFERENCES results_email_campaigns(id) ON DELETE CASCADE,
- auth_user_id uuid NOT NULL REFERENCES neon_auth."user"(id) ON DELETE CASCADE,
+ auth_user_id uuid NOT NULL REFERENCES results_preferences(auth_user_id) ON DELETE CASCADE,
  admission_id uuid REFERENCES results_email_admissions(id) ON DELETE CASCADE,
  config_hash text CHECK(config_hash ~ '^[a-f0-9]{64}$'),
  state text NOT NULL DEFAULT 'preparing' CHECK(state IN
@@ -96,19 +96,9 @@ BEGIN
  RETURN FOUND;
 END $body$;
 
--- Account-deletion commitment already deletes admissions. Their cascade must
--- remove even preparing/skipped ledger rows before later identity cleanup.
-CREATE OR REPLACE FUNCTION pack1_results_delete_delivery_rows()
-RETURNS trigger LANGUAGE plpgsql AS $body$
-BEGIN
- DELETE FROM results_email_deliveries WHERE auth_user_id=OLD.auth_user_id;
- RETURN OLD;
-END $body$;
-DROP TRIGGER IF EXISTS results_preferences_delete_deliveries ON results_preferences;
-CREATE TRIGGER results_preferences_delete_deliveries BEFORE DELETE ON results_preferences
- FOR EACH ROW EXECUTE FUNCTION pack1_results_delete_delivery_rows();
-
+-- Existing deletion commitment removes results_preferences. Its cascading
+-- foreign keys erase every ledger row (including preparing/skipped rows) and
+-- targeted check campaign immediately, with no new operational trigger.
 REVOKE ALL ON results_email_runtime,results_email_campaigns,results_email_deliveries FROM PUBLIC;
 REVOKE ALL ON FUNCTION pack1_results_claim_delivery(uuid,uuid),
- pack1_results_admit_delivery(uuid,uuid,text,text,text),pack1_results_delivery_event(uuid,text,text,text,text),
- pack1_results_delete_delivery_rows() FROM PUBLIC;
+ pack1_results_admit_delivery(uuid,uuid,text,text,text),pack1_results_delivery_event(uuid,text,text,text,text) FROM PUBLIC;

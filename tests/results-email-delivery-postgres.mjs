@@ -68,10 +68,17 @@ try{
  });
  await test('deletion commitment erases all delivery/admission rows and no publication cutoff is moved',async()=>{
   const a=await account(),c=await campaign();await deliverResultsEmail(query,c,a.id,{env,fetcher:async()=>Response.json({id:'fixture-provider'})});
+  const preparing=await campaign(),skipped=await campaign();
+  await query('SELECT pack1_results_claim_delivery($1::uuid,$2::uuid)',[preparing.id,a.id]);
+  const skipId=(await query('SELECT pack1_results_claim_delivery($1::uuid,$2::uuid) id',[skipped.id,a.id])).rows[0].id;
+  await query("UPDATE results_email_deliveries SET state='skipped' WHERE id=$1::uuid",[skipId]);
+  const targeted=await campaign();await query('UPDATE results_email_campaigns SET target_auth_user_id=$2::uuid WHERE id=$1::uuid',[targeted.id,a.id]);
+  assert.equal((await query('SELECT count(*)::int n FROM results_email_deliveries WHERE auth_user_id=$1::uuid',[a.id])).rows[0].n,'3');
   const before=(await query('SELECT launch_at::text FROM results_launch')).rows[0].launch_at;
   await beginDeletion(query,{authUserId:a.id});
   assert.equal((await query('SELECT count(*)::int n FROM results_email_deliveries WHERE auth_user_id=$1::uuid',[a.id])).rows[0].n,'0');
   assert.equal((await query('SELECT count(*)::int n FROM results_email_admissions WHERE auth_user_id=$1::uuid',[a.id])).rows[0].n,'0');
+  assert.equal((await query('SELECT count(*)::int n FROM results_email_campaigns WHERE id=$1::uuid',[targeted.id])).rows[0].n,'0');
   assert.equal((await query('SELECT launch_at::text FROM results_launch')).rows[0].launch_at,before);
   await assert.rejects(recordResultsPublication(query,{authId:(await account()).id,channel:'email',link:'https://example.invalid/results'}));
  });
