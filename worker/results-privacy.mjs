@@ -140,8 +140,11 @@ export async function resultsAdmin(query,authId,{action,target,value,task}={}){
   count(*) FILTER(WHERE p.email_state='on')::int "on",count(*) FILTER(WHERE p.email_state='off')::int off,
   count(*) FILTER(WHERE p.notice_shown_at IS NOT NULL)::int shown,
   count(*) FILTER(WHERE p.notice_outcome='turned on')::int turned_on,count(*) FILTER(WHERE p.notice_outcome='dismissed')::int dismissed,
-  count(*) FILTER(WHERE p.exclude_publications)::int exclusions
-  FROM neon_auth."user" u LEFT JOIN results_preferences p ON p.auth_user_id=u.id`)).rows[0];
+  count(*) FILTER(WHERE p.exclude_publications)::int exclusions,
+  count(*) FILTER(WHERE (u."createdAt">=launch.launch_at OR p.prompt_shown_at IS NOT NULL OR p.reconsent) AND p.prompt_answer IS NULL)::int prompt_unanswered,
+  count(*) FILTER(WHERE p.prompt_answer='on')::int prompt_on,
+  count(*) FILTER(WHERE p.prompt_answer='off')::int prompt_off
+  FROM neon_auth."user" u CROSS JOIN results_launch launch LEFT JOIN results_preferences p ON p.auth_user_id=u.id WHERE launch.singleton`)).rows[0];
  const tasks=(await query(`SELECT t.id,t.due_at,p.channel,p.link,p.name_to_remove FROM results_removal_tasks t
   JOIN results_publications p ON p.id=t.publication_id ORDER BY t.due_at LIMIT 200`)).rows;
  const contact=target?(await query('SELECT do_not_contact_at FROM results_preferences WHERE auth_user_id=$1::uuid',[target])).rows[0]?.do_not_contact_at||null:null;

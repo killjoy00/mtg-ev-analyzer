@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS results_preferences (
  destination_hash text CHECK(destination_hash ~ '^[a-f0-9]{64}$'),
  changed_at timestamptz, source text CHECK(source IN ('prompt','notice','settings','unsubscribe link','email change')),
  prompt_shown_at timestamptz, notice_shown_at timestamptz,
+ prompt_answer text CHECK(prompt_answer IN ('on','off')),
  notice_outcome text CHECK(notice_outcome IN ('turned on','dismissed')),
  reconsent boolean NOT NULL DEFAULT false,
  exclude_publications boolean NOT NULL DEFAULT false,
@@ -70,7 +71,7 @@ BEGIN
  -- Even an unverified replacement address invalidates the previous opt-in.
  IF p_action<>'unsubscribe' AND prefs.email_state='on' AND prefs.destination_hash IS DISTINCT FROM p_hash THEN
    UPDATE results_preferences SET email_state='unanswered',destination_hash=p_hash,
-    changed_at=now(),source='email change',prompt_shown_at=NULL,reconsent=true WHERE auth_user_id=p_auth;
+    changed_at=now(),source='email change',prompt_shown_at=NULL,prompt_answer=NULL,reconsent=true WHERE auth_user_id=p_auth;
    INSERT INTO results_email_changes(auth_user_id,state,source,destination_hash) VALUES(p_auth,'unanswered','email change',p_hash);
    SELECT * INTO prefs FROM results_preferences WHERE auth_user_id=p_auth;
  END IF;
@@ -117,6 +118,7 @@ BEGIN
  END IF;
  UPDATE results_preferences SET email_state=target,destination_hash=CASE WHEN target='on' THEN p_hash ELSE destination_hash END,
   changed_at=now(),source=origin,reconsent=false,
+  prompt_answer=CASE WHEN origin='prompt' THEN target ELSE prompt_answer END,
   notice_outcome=CASE WHEN origin='settings' AND notice_shown_at IS NOT NULL AND notice_outcome IS NULL
    THEN CASE WHEN target='on' THEN 'turned on' ELSE 'dismissed' END ELSE notice_outcome END WHERE auth_user_id=p_auth;
  INSERT INTO results_email_changes(auth_user_id,state,source,destination_hash)

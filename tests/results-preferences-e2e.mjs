@@ -9,7 +9,7 @@ let account=a,active=true,presentation='prompt',state='unanswered',exclude=false
 const edits=[];
 const server=http.createServer(async(req,res)=>{
  if(req.url==='/fixture'){
-  res.setHeader('content-type','text/html');res.end('<!doctype html><html><head><script>window.PACK1_API={firstParty:true,growthUrl:location.origin+"/growth"};</script></head><body><main><button id="play">Play now</button><aside data-results-ui data-results-invitation hidden></aside><section data-results-ui id="results-settings" hidden></section></main><script type="module">import {bindResultsInvitation,bindResultsSettings} from "/results-settings.mjs";window.bindInvitation=bindResultsInvitation;window.bindSettings=bindResultsSettings;window.ready=true;</script></body></html>');return;
+  res.setHeader('content-type','text/html');res.end('<!doctype html><html><head><script>window.PACK1_API={firstParty:true,growthUrl:"https://api.results.invalid/growth"};</script></head><body><main><button id="play">Play now</button><aside data-results-ui data-results-invitation hidden></aside><section data-results-ui id="results-settings" hidden></section></main><script type="module">import {bindResultsInvitation,bindResultsSettings} from "/results-settings.mjs";window.bindInvitation=bindResultsInvitation;window.bindSettings=bindResultsSettings;window.ready=true;</script></body></html>');return;
  }
  try{const file=path.resolve(root,'.'+new URL(req.url,'http://local').pathname);if(!file.startsWith(root+path.sep))throw Error();const bytes=await fs.readFile(file);res.setHeader('content-type',file.endsWith('.json')?'application/json':'text/javascript');res.end(bytes);}catch{res.statusCode=404;res.end();}
 });
@@ -35,7 +35,7 @@ try{
     }
    }else value=snapshot();
   }
-  await route.fulfill({json:value});
+  await route.fulfill({json:value,headers:{'access-control-allow-origin':base,'access-control-allow-credentials':'true','access-control-allow-headers':'content-type,x-pack1-csrf','access-control-allow-methods':'GET,POST,PATCH,OPTIONS'}});
  });
  const open=async()=>{await page.goto(base+'/fixture');await page.waitForFunction(()=>window.ready);};
  await open();await page.evaluate(()=>window.bindInvitation());

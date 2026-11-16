@@ -15,16 +15,18 @@ export function ResultsPreferences({settings=false}:{settings?:boolean}){
  useFocusEffect(useCallback(()=>{
   let active=true;
   const load=async()=>{
+   let launched=false;
    const version=++generation.current;setState(null);setKind(null);setMessage('');setSaving(false);owner.current=null;
    try{
     const session=await readSession();if(!session?.accountToken||!active||version!==generation.current)return;
     owner.current=session;
     const snapshot=await resultsRequest(session);
     if(!active||version!==generation.current||!snapshot.active)return;
+    launched=true;
     setState(snapshot);
     const shown=await resultsRequest(session,'present');
     if(active&&version===generation.current)setKind(shown.presentation||null);
-   }catch{if(active&&version===generation.current&&settings)setMessage('Could not load results preferences.');}
+   }catch{if(launched&&active&&version===generation.current&&settings)setMessage('Could not load results preferences.');}
   };
   void load();const unsubscribe=subscribeSession(()=>{void load();});
   return ()=>{active=false;generation.current++;owner.current=null;unsubscribe();};

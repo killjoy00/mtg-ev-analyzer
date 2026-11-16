@@ -138,13 +138,15 @@ try{
   assert.equal((await query('SELECT count(*)::int n FROM results_removal_tasks t JOIN results_publications p ON p.id=t.publication_id WHERE p.link IN ($1,$2)',['https://example.invalid/results','https://example.invalid/feature'])).rows[0].n,'2');
  });
  await test('owner contact flag, aggregates and retained-account removal use the same queue; completing scrubs evidence',async()=>{
-  const owner=await account(),admin=await account(),a=await account();
-  await query("INSERT INTO pack1_admins(auth_user_id,role) VALUES($1::uuid,'owner'),($2::uuid,'admin')",[owner.user_id,admin.user_id]);
+  const existingOwner=(await query("SELECT auth_user_id FROM pack1_admins WHERE role='owner'")).rows[0];
+  const owner=existingOwner?{user_id:existingOwner.auth_user_id}:await account(),admin=await account(),a=await account();
+  if(!existingOwner)await query("INSERT INTO pack1_admins(auth_user_id,role) VALUES($1::uuid,'owner')",[owner.user_id]);
+  await query("INSERT INTO pack1_admins(auth_user_id,role) VALUES($1::uuid,'admin')",[admin.user_id]);
   await assert.rejects(resultsAdmin(query,admin.user_id,{action:'contact',target:a.user_id,value:true}),/Owner/);
   assert.ok((await resultsAdmin(query,owner.user_id,{action:'contact',target:a.user_id,value:true})).doNotContactAt);
   assert.equal((await resultsAdmin(query,owner.user_id,{action:'contact',target:a.user_id,value:false})).doNotContactAt,null);
   const publication=await recordResultsPublication(query,{authId:a.user_id,channel:'website',link:'https://example.invalid/removal'});
-  const state=await resultsAdmin(query,owner.user_id,{action:'request-removal',target:a.user_id});assert.ok(Object.hasOwn(state.counts,'unanswered'));
+  const state=await resultsAdmin(query,owner.user_id,{action:'request-removal',target:a.user_id});assert.ok(Object.hasOwn(state.counts,'unanswered'));assert.ok(Number(state.counts.prompt_on)>0);assert.ok(Number(state.counts.prompt_off)>0);
   const task=(await query('SELECT id,due_at FROM results_removal_tasks WHERE publication_id=$1::uuid',[publication])).rows[0];
   await resultsAdmin(query,owner.user_id,{action:'request-removal',target:a.user_id});assert.equal((await query('SELECT due_at FROM results_removal_tasks WHERE id=$1::uuid',[task.id])).rows[0].due_at,task.due_at);
   await resultsAdmin(query,owner.user_id,{action:'complete',task:task.id});assert.equal((await query('SELECT 1 FROM results_publications WHERE id=$1::uuid',[publication])).rows.length,0);

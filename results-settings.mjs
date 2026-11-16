@@ -22,9 +22,11 @@ function bindActions(mount,id,version,onSaved){
 }
 export async function bindResultsSettings(){
  const mount=document.querySelector('#results-settings'),version=epoch;if(!mount)return;
+ let launched=false;
  try{
   const id=await owner();if(!id)return;
   const state=await loadResultsPreferences();if(version!==epoch||!mount.isConnected||await owner()!==id||!state.active)return;
+  launched=true;
   let kind=invitation?.id===id?invitation.kind:(await save(id,'present',version)).presentation;
   if(version!==epoch||!mount.isConnected)return;
   mount.hidden=false;
@@ -38,7 +40,7 @@ export async function bindResultsSettings(){
     catch(error){if(version===epoch&&mount.isConnected){box.checked=previous;box.disabled=false;mount.querySelector('[role="status"]').textContent=error.message;}}
    });
   };render(state);
- }catch{if(version===epoch&&mount.isConnected){mount.hidden=false;mount.innerHTML='<p role="status">Could not load results preferences.</p><button type="button" class="button secondary">Retry</button>';mount.querySelector('button').onclick=()=>void bindResultsSettings();}}
+ }catch{if(launched&&version===epoch&&mount.isConnected){mount.hidden=false;mount.innerHTML='<p role="status">Could not load results preferences.</p><button type="button" class="button secondary">Retry</button>';mount.querySelector('button').onclick=()=>void bindResultsSettings();}}
 }
 function invitationMarkup(kind){
  const prompt=kind==='prompt';
