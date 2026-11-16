@@ -8,6 +8,7 @@ import {handleCreatorChallengeAdmin} from './creator-challenges.mjs';
 import {handleDashboardAdmin} from './admin-dashboard.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {PLAYER_MODEL_AUDIT_SQL,PLAYER_MODEL_AUDIT_MIN_CHOICES,playerModelAuditWindow} from './player-choice-model-audit.mjs';
+import {RESEARCH_CORPUS,RESEARCH_MIN_CHOICES,RESEARCH_CASES_SQL,buildModelResearchCases} from './player-model-research-cases.mjs';
 import {gameDateKey} from '../game-date.mjs';
 const fail=(message,status=400)=>{throw Object.assign(Error(message),{status});};
 const jsonArray=value=>Array.isArray(value)?value:(typeof value==='string'?JSON.parse(value):[]);
@@ -232,6 +233,27 @@ export async function handleAdmin(request,query,readJson) {
   if(url.pathname==='/v1/admin/youtube')
     return youtubeReport().catch(error=>({configured:true,error:String(error?.message||'YouTube results are unavailable.')}));
   const filters=reportFilters(url);
+  if(url.pathname==='/v1/admin/measurements/research-cases') {
+    const view=url.searchParams.get('view')||'blind';
+    if(!['blind','diagnosis'].includes(view))fail('Invalid research view.');
+    // Never include an unfinished Daily: selection and reviewer blinding should
+    // not change simply because more players answered during the current day.
+    const today=gameDateKey(new Date());
+    const mature=new Date(today+'T12:00:00Z');
+    mature.setUTCDate(mature.getUTCDate()-1);
+    const completedThrough=mature.toISOString().slice(0,10);
+    const to=filters.end<completedThrough?filters.end:completedThrough;
+    if(filters.start>to)return {
+      generated_at:new Date().toISOString(),corpus_version:RESEARCH_CORPUS,
+      view,window:{from:filters.start,to,completed_through:completedThrough},
+      qualified_puzzles:0,review_cases:0,cases:[],
+    };
+    const window=playerModelAuditWindow(filters.start,to);
+    const results=await timedAdminQuery(query,'model_research','review_cases',RESEARCH_CASES_SQL,
+      [window.from,window.to,RESEARCH_MIN_CHOICES,RESEARCH_CORPUS]);
+    return {generated_at:new Date().toISOString(),window:{...window,completed_through:completedThrough},
+      ...buildModelResearchCases(results.rows,{view})};
+  }
   if(url.pathname==='/v1/admin/measurements/habits') {
     const habitMetrics=await timedAdminQuery(query,'measurements_habits','habit_metrics',HABIT_METRICS_SQL,[filters.start,filters.end]);
     const habit=habitMetrics.rows[0]||{};
