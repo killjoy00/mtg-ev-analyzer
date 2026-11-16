@@ -324,7 +324,7 @@ function AppleElitePanel({
   return (
     <View style={styles.panel}>
       <Text style={styles.heading}>Pack One Elite</Text>
-      <Text style={styles.body}>Choose one set or combine several for unlimited practice. Play unlimited Powered Cube. Browse without display ads or TCGplayer promotions.</Text>
+      <Text style={styles.body}>Choose one set or combine several for unlimited practice. Play unlimited Powered Cube. Browse without display ads.</Text>
       {appleActive ? (
         <Text style={styles.body}>Your Apple subscription is active{status?.subscription.expiresAt
           ? ` through ${new Date(status.subscription.expiresAt).toLocaleDateString()}`
@@ -452,7 +452,7 @@ export default function MembershipScreen() {
               <Text style={styles.body}>Regular Draft Run practice: included</Text>
               <Text style={styles.body}>Powered Cube practice: {current.account_capabilities.includes('unlimited_cube_practice') ? 'available' : 'not currently included'}</Text>
               <Text style={styles.body}>Custom-set practice: {current.account_capabilities.includes('custom_corpus') ? 'available' : 'not currently included'}</Text>
-              <Text style={styles.body}>Display ads and TCGplayer promotions: {hasAccountElite || current.ad_free ? 'hidden' : 'may appear'}</Text>
+              <Text style={styles.body}>Display ads and promotions: {hasAccountElite || current.ad_free ? 'hidden' : 'may appear'}</Text>
               {hasAccountElite ? <Text style={styles.help}>{current.apple_subscription_active ? 'Billed through Apple.' : current.capabilities.includes('custom_corpus') ? 'Billed through Patreon.' : 'Elite is available on this account.'}</Text> : null}
               <Text style={styles.help}>Elite works the same whether it comes from Apple or Patreon.</Text>
             </>
@@ -480,7 +480,7 @@ export default function MembershipScreen() {
                 ? 'Elite from Patreon is active.'
                 : current.capabilities.length
                   ? 'Some Pack One benefits from Patreon are active.'
-                  : (current.patreon_ad_free === true || (current.ad_free && !current.apple_subscription_active)) ? 'Supporter is active. Display ads and TCGplayer promotions are hidden.'
+                  : (current.patreon_ad_free === true || (current.ad_free && !current.apple_subscription_active)) ? 'Supporter is active. Display ads and promotions are hidden.'
                     : 'Patreon is connected. No paid membership is active.'}</Text>
             ) : null}
             {readableTimestamp(current.membership?.last_synced_at) ? <Text style={styles.help}>Last Patreon sync: {readableTimestamp(current.membership?.last_synced_at)}</Text> : null}

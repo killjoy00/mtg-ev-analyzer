@@ -7,7 +7,6 @@ import {
   AccessibilityInfo,
   ActivityIndicator,
   KeyboardAvoidingView,
-  Linking,
   Modal,
   Platform,
   Pressable,
@@ -58,8 +57,6 @@ import { useAppResume } from '@/src/hooks/useAppResume';
 import { clearPracticeIdempotencyKey, practiceIdempotencyKey } from '@/src/storage/idempotency';
 import { readSession, subscribeSession, type MobileSession } from '@/src/storage/session';
 import type { SharedRunSurface } from '@/src/state/sharedRunSurface';
-import { useCardCommerce } from '@/src/hooks/useCardCommerce';
-import { tcgplayerUrl } from '@/src/tcgplayer';
 import { colors, spacing } from '@/src/theme';
 import { trophyDrafterFacts, trophyDrafterSentences } from '@/src/trophyDrafter';
 import {
@@ -352,21 +349,16 @@ function TrophyDrafterDetails({ answer, onOpenDeck }: { answer: DraftRunAnswer; 
   );
 }
 
-// Expanded analysis: every card by model support, plus the affiliate links
-// for the revealed cards. The links stay inside this expanded section, the
-// reviewed native placement, with their disclosure.
+// Expanded analysis: every card by model support. Card names still enlarge;
+// no marketplace links or affiliate disclosures appear in the revealed pack.
 function CompareAllCards({
   answer,
   shares,
   onZoom,
-  onAffiliatePress,
-  commerceAllowed,
 }: {
   answer: DraftRunAnswer;
   shares: CardShares;
   onZoom: (card: DraftRunCard) => void;
-  onAffiliatePress: (card: DraftRunCard) => void;
-  commerceAllowed: boolean;
 }) {
   const byId = new Map(answer.puzzle.candidates.map((card) => [card.id, card]));
   // Every scored answer carries a ranking; an older one without it still
@@ -375,7 +367,6 @@ function CompareAllCards({
   const ranking = ranked.length ? ranked : answer.puzzle.candidates.map((card) => ({
     id: card.id, name: card.name, support: undefined as number | undefined, score: revealChoiceScore(answer, card.id),
   }));
-  const revealed = revealCardChoices(answer).map((choice) => byId.get(choice.id)).filter((card): card is DraftRunCard => Boolean(card));
   return (
     <View style={styles.analysisPanel}>
       <Text style={styles.modelNote}>
@@ -405,22 +396,6 @@ function CompareAllCards({
           </View>
         );
       })}
-      {commerceAllowed ? <View style={styles.shopLinks}>
-        {revealed.map((card) => (
-          <Pressable
-            key={`shop-${card.id}`}
-            accessibilityRole="link"
-            accessibilityLabel={`Find ${card.name} on TCGplayer, affiliate link`}
-            onPress={() => onAffiliatePress(card)}
-            style={styles.shopLink}
-          >
-            <Text style={styles.shopLinkText}>Find {card.name} on TCGplayer (affiliate link)</Text>
-          </Pressable>
-        ))}
-        <Text style={styles.affiliateDisclosure}>
-          Affiliate links. Pack One may earn a commission from eligible TCGplayer purchases at no added cost to you.
-        </Text>
-      </View> : null}
     </View>
   );
 }
@@ -577,8 +552,6 @@ export default function DraftRunScreen({
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
-  const [affiliateError, setAffiliateError] = useState<string | null>(null);
-  const commerceAllowed = useCardCommerce();
   const [zoomedCard, setZoomedCard] = useState<DraftRunCard | null>(null);
   const [reviewIndex, setReviewIndex] = useState<number | null>(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
@@ -835,7 +808,6 @@ export default function DraftRunScreen({
     if (busy || mode !== 'pick') return;
     setSelected(id);
     setActionError(null);
-    setAffiliateError(null);
     void Haptics.selectionAsync();
   };
 
@@ -957,21 +929,6 @@ export default function DraftRunScreen({
     }
   };
 
-  const openAffiliateCard = (card: DraftRunCard) => {
-    if (!commerceAllowed) return;
-    setAffiliateError(null);
-    let url: string;
-    try {
-      url = tcgplayerUrl(card.name);
-    } catch {
-      setAffiliateError('This card could not be opened on TCGplayer.');
-      return;
-    }
-    void Linking.openURL(url).catch(() => {
-      setAffiliateError('Could not open TCGplayer. You can try the affiliate link again.');
-    });
-  };
-
   const shareResult = async () => {
     if (state.status !== 'ready' || !state.run.complete || sharing) return;
     const resultRun = state.run;
@@ -1038,7 +995,6 @@ export default function DraftRunScreen({
     setShowAnalysis(false);
     setShowPackReview(false);
     setDeckOpen(false);
-    setAffiliateError(null);
     if (state.run.complete) {
       setMode('result');
     } else {
@@ -1053,7 +1009,6 @@ export default function DraftRunScreen({
     setShowAnalysis(false);
     setShowPackReview(false);
     setDeckOpen(false);
-    setAffiliateError(null);
     setSelected(null);
     setMode('feedback');
     scroll.current?.scrollTo({ y: 0, animated: true });
@@ -1382,12 +1337,7 @@ export default function DraftRunScreen({
               >
                 <Text style={styles.disclosureText}>{showAnalysis ? 'Hide all cards' : `Compare all ${answer.ranking?.length || answer.puzzle.candidates.length} cards`}</Text>
               </Pressable>
-              {showAnalysis ? (
-                <>
-                  <CompareAllCards commerceAllowed={commerceAllowed} answer={answer} shares={cardShares} onAffiliatePress={openAffiliateCard} onZoom={setZoomedCard} />
-                  {commerceAllowed && affiliateError ? <Text accessibilityRole="alert" style={styles.actionError}>{affiliateError}</Text> : null}
-                </>
-              ) : null}
+              {showAnalysis ? <CompareAllCards answer={answer} shares={cardShares} onZoom={setZoomedCard} /> : null}
 
               <Pressable
                 accessibilityRole="button"
@@ -1720,7 +1670,6 @@ const styles = StyleSheet.create({
   inlineLinkText: { color: colors.accentDark, fontSize: 14, lineHeight: 20, fontWeight: '800', textDecorationLine: 'underline' },
   trophyRecord: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.sm, gap: spacing.xs },
   trophyRecordLead: { color: colors.ink, fontSize: 15, lineHeight: 22, fontWeight: '700' },
-  shopLinks: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.sm, gap: 0 },
   sharePanel: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: spacing.md, gap: spacing.sm },
   setComplete: { borderWidth: 1, borderColor: colors.line, borderLeftWidth: 3, borderLeftColor: colors.accent, backgroundColor: colors.surface, padding: spacing.md, gap: spacing.sm },
   cardKicker: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
@@ -1745,9 +1694,6 @@ const styles = StyleSheet.create({
   },
   disclosureText: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
   feedbackCardZoom: { gap: spacing.xs },
-  shopLink: { minHeight: 44, justifyContent: 'center', paddingVertical: spacing.xs },
-  shopLinkText: { color: colors.accentDark, fontSize: 12, lineHeight: 16, fontWeight: '800', textDecorationLine: 'underline' },
-  affiliateDisclosure: { color: colors.muted, fontSize: 11, lineHeight: 16 },
   analysisPanel: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: spacing.lg, gap: spacing.md },
   analysisLead: { color: colors.ink, fontSize: 15, lineHeight: 22, fontWeight: '700' },
   analysisTitle: { color: colors.ink, fontSize: 18, lineHeight: 23, fontWeight: '800' },

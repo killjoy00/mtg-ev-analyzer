@@ -141,7 +141,7 @@ export default function HomeScreen() {
   };
   const displayNameAttention = ['username_taken', 'username_required', 'name_not_allowed'].includes(rankingReason || '');
   const nativeAdMobEnabled = Platform?.OS === 'ios' ? config.adMob?.iosEnabled === true : config.adMob?.androidEnabled === true;
-  const promotion = dailyHomePromotion(promotionAllowed, nativeAdMobEnabled);
+  const promotion = dailyHomePromotion(promotionAllowed, nativeAdMobEnabled, Platform?.OS === 'ios' ? 'ios' : 'android');
 
   return (
     <SafeAreaView style={styles.safe}>
