@@ -1,0 +1,36 @@
+name: Pages post-deployment public allowlist
+on:
+  # Run immediately if this checker itself changes; the site was already
+  # published by the earlier release, so there is no publish race.
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/pages-post-deploy-verify.yml'
+      - 'scripts/verify-pages-production.mjs'
+  workflow_run:
+    # Built-in dynamic Pages runs do not reliably emit workflow_run hooks.
+    # Use the repo-owned successful Jekyll parity workflow, which itself
+    # runs on main after each public-site change and finishes after build.
+    workflows: ["Pages release parity"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-post-deploy-verify
+  cancel-in-progress: false
+
+jobs:
+  live-pages:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify live public routes and private source exclusions
+        run: node scripts/verify-pages-production.mjs --enforce

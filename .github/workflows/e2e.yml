@@ -155,6 +155,20 @@ jobs:
           echo $! > /tmp/pack1-pages-preview.pid
           curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 http://127.0.0.1:4174/ -o /dev/null
           node tests/pages-preview-browser-smoke.mjs
+          # Exercise real browser contracts against the candidate, not repo root.
+          # Existing fixture routes + the preload guard prevent production API calls.
+          export PACK1_E2E_URL=http://127.0.0.1:4174
+          for spec in \
+            tests/e2e.mjs \
+            tests/sets-e2e.mjs \
+            tests/practice-hub-e2e.mjs \
+            tests/account-e2e.mjs \
+            tests/ads-e2e.mjs \
+            tests/profile-e2e.mjs; do
+            echo "::group::Pages preview functional acceptance: ${spec}"
+            node --import ./tests/e2e-production-guard.mjs "$spec"
+            echo "::endgroup::"
+          done
       - name: Run focused publication browser smoke
         if: steps.scope.outputs.browser_plan == 'publication'
         env:
