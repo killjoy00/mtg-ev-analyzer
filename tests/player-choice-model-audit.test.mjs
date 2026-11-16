@@ -51,7 +51,7 @@ test('existing authenticated reviews route and deferred Insights UI keep the aud
   assert.match(backend,/if\(!role\)fail\('This account does not have administrator access\.',403\)/);
   const reviews=backend.slice(backend.indexOf("if(url.pathname==='/v1/admin/measurements/reviews')"),backend.indexOf("if(url.pathname==='/v1/admin/measurements')"));
   assert.match(reviews,/PLAYER_MODEL_AUDIT_SQL/);
-  assert.match(reviews,/player_model_audit:\{window:auditWindow,min_choices:PLAYER_MODEL_AUDIT_MIN_CHOICES,rows:modelAudit\.rows\}/);
+  assert.match(reviews,/player_model_audit:\{window:auditWindow,min_choices:PLAYER_MODEL_AUDIT_MIN_CHOICES,rows:modelAudit\.rows,unavailable:!!modelAudit\.unavailable\}/);
   assert.match(frontend,/modelAuditMarkup\(data\.player_model_audit\)/);
   assert.match(frontend,/id="player-model-audit"/);
   assert.doesNotMatch(reviews,/console\.(log|info|warn)\(/,'never log private data');
