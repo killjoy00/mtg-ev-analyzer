@@ -63,9 +63,10 @@ test('blinded packet omits every model, player-choice, outcome and hypothesis fi
   assert.deepEqual(blind.cases.map(c=>c.review_id),key.cases.map(c=>c.review_id));
   assert.ok(key.cases.some(c=>c.tags.includes('pool-color-tension')));
   assert.ok(key.cases.some(c=>c.player_favorite_trophy));
+  assert.deepEqual(new Set(key.cases.map(c=>c.selection_group)),new Set(['targeted','control']));
   assert.ok(blind.cases.every(c=>c.prior_picks.length===3&&c.candidates.length===3));
   const text=JSON.stringify(blind);
-  for(const forbidden of ['model_probability','historical_pick_id','trophy_pick','votes','player_favorite','model_favorite','wilson_lower','tags','cohort','sample_size','supportGap','source_draft_hash']){
+  for(const forbidden of ['model_probability','historical_pick_id','trophy_pick','votes','player_favorite','model_favorite','wilson_lower','tags','cohort','sample_size','supportGap','source_draft_hash','selection_group']){
     assert.ok(!text.includes('"'+forbidden+'"'),forbidden+' must not appear in blind packet');
   }
   assert.notDeepEqual(blind.cases[0]?.candidates?.[0]?.model_probability,0.55);
