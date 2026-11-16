@@ -32,7 +32,7 @@ export function AdMobDailyBanner({ eligible }: { eligible: boolean }) {
         setPrivacyRequired(consent.privacyOptionsRequirementStatus === 'REQUIRED');
         if (!consent.canRequestAds) return;
         // Keep the first release contextual, without requesting personalized ads.
-        await ads.default().setRequestConfiguration({ maxAdContentRating: 'G' });
+        await ads.default().setRequestConfiguration({ maxAdContentRating: ads.MaxAdContentRating.G });
         if (!active) return;
         await ads.default().initialize();
         if (active) setSdk(ads);

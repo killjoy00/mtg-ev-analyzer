@@ -1,6 +1,21 @@
-# November 16, 2026 parity review: latest web vs iOS 1.1/101002
+# November 16, 2026 parity review: approved 1.0 and TestFlight 1.1 versus web
 
-The source used for signed iOS **1.1/101002** is `c1d838cacb27027913be01cc968a78bf3b1ac522`. As of `b04c87a9b8c04304bd13ae9dccf729dff23f2191` on November 16, compare shows **no intervening native source/config/build changes**. Exact-main RC 43902562499 and signed iOS run 43925032542 passed; Apple internal TestFlight distribution was confirmed. The owner subsequently reported App Store approval; repository records alone do not establish which binary was made public.
+**Apple approved iOS 1.0 on November 16 and reported Ready for Distribution.**
+The last repository-verified 1.0 App Store attachment is **100505**, built from
+`747478440400e242aae32469d6ed18f1785b591d` (October 4). Apple’s approval
+email identifies **1.0**, not the build number; recheck App Store Connect before
+attributing an exact binary to the approval.
+
+**Approved 1.0 is not at feature parity with the November 16 website.** It
+predates native Beat the Creator (#985/#1001), October 7 native About/Support/
+Privacy/Terms and Account parity (#1057), Insights (#1156), the comprehensive
+November 7 reveal/share/trophy-deck and Daily update (#1499), the newer ad-free
+membership copy/affiliate rules (#1523), and November 16 native results/news
+preferences and policies (#1590). These features are present in the newer
+**1.1/101002 TestFlight** source, but **that build has not been approved for
+public App Store distribution**.
+
+The source used for signed iOS **1.1/101002** is `c1d838cacb27027913be01cc968a78bf3b1ac522`. As of `b04c87a9b8c04304bd13ae9dccf729dff23f2191` on November 16, compare shows **no intervening native source/config/build changes**. Exact-main RC 43902562499 and signed iOS run 43925032542 passed; Apple internal TestFlight distribution was confirmed. Apple approval notifications separately confirm only public version 1.0; they do not provide its exact binary build number.
 
 ## Source-level web parity since November 7
 

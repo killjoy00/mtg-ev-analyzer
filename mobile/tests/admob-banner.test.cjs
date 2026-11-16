@@ -29,6 +29,7 @@ async function fixture(t, { consent, eligible = false } = {}) {
     __esModule: true,
     BannerAd: host('BannerAd'),
     BannerAdSize: { BANNER: 'BANNER' },
+    MaxAdContentRating: { G: 'G' },
     AdsConsent: {
       gatherConsent: async () => {
         calls.push('consent');

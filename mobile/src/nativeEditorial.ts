@@ -133,7 +133,7 @@ export const privacySections: ArticleSection[] = [
   {
     title: 'Pack One apps',
     body: [
-      'The Pack One apps use the same Pack One accounts and backend services as the website, so the rest of this page applies to them. The apps do not include third-party analytics or crash-reporting SDKs; builds that enable an AdMob banner include Google’s advertising SDK. When you play, the apps send picks and run results to Pack One’s servers for scoring and recordkeeping, and the servers record gameplay events linked to the Pack One player identifier.',
+      'The Pack One apps use the same Pack One accounts and backend services as the website, so the rest of this page applies to them. The apps do not include third-party analytics or crash-reporting SDKs. Builds prepared for AdMob include Google’s advertising SDK, but do not request a Google ad unless the banner is enabled and the player is eligible. When you play, the apps send picks and run results to Pack One’s servers for scoring and recordkeeping, and the servers record gameplay events linked to the Pack One player identifier.',
       'Connecting Patreon from the apps opens Patreon in your browser. The apps’ Daily home can show either a TCGplayer promotion or a Google AdMob banner, never both. TCGplayer links open in the browser through the same Impact affiliate routes. The apps do not separately record those outbound clicks. Apple subscriptions are offered only in the iOS app.',
     ],
   },
