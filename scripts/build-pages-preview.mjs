@@ -96,6 +96,46 @@ export async function verifyStaticReferences(included,{cwd=process.cwd()}={}){
   }
   if(broken.length)throw Error('Missing preview static resources:\n'+broken.slice(0,30).join('\n'));
 }
+// Follow the literal import graph of modules actually reachable from HTML.
+// Does not parse computed dynamic imports or perform network/auth browser tests.
+export async function verifyBrowserModuleReferences(included,{cwd=process.cwd()}={}){
+  const files=new Set(included),pending=[],visited=new Set(),missing=[];
+  function references(content,source){
+    const patterns=[
+      /\b(?:import|export)\s+(?:[^"';]*?\bfrom\s+)?["']([^"']+)["']/g,
+      /\bimport\s*\(\s*["']([^"']+)["']/g,
+      /\bnew\s+URL\s*\(\s*["']([^"']+)["']/g
+    ];
+    for(const pattern of patterns)for(const match of content.matchAll(pattern)){
+      const target=localResource(match[1],source);
+      if(!target)continue;
+      if(!files.has(target))missing.push(source+' -> '+target);
+      else if(/\.(?:mjs|js)$/.test(target))pending.push(target);
+    }
+  }
+  for(const source of included){
+    if(!source.endsWith('.html'))continue;
+    const html=await readFile(resolve(cwd,source),'utf8');
+    for(const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)){
+      const attrs=match[1],src=/\bsrc\s*=\s*["']([^"']+)["']/i.exec(attrs);
+      if(src){
+        const target=localResource(src[1],source);
+        if(target&&!files.has(target))missing.push(source+' -> '+target);
+        else if(target&&/\.(?:mjs|js)$/.test(target))pending.push(target);
+      }else if(/\btype\s*=\s*["']module["']/i.test(attrs)){
+        references(match[2],source);
+      }
+    }
+  }
+  while(pending.length){
+    const source=pending.pop();
+    if(visited.has(source))continue;
+    visited.add(source);
+    references(await readFile(resolve(cwd,source),'utf8'),source);
+  }
+  if(missing.length)throw Error('Missing browser module dependencies:\n'+missing.slice(0,30).join('\n'));
+  return {checked:visited.size};
+}
 // Fail closed: never merge files into a stale output directory and never write
 // outside the repository's ignored artifacts/ directory.
 export async function buildPublicSitePreview({cwd=process.cwd(),outDir='artifacts/pages-preview'}={}){
@@ -103,6 +143,7 @@ export async function buildPublicSitePreview({cwd=process.cwd(),outDir='artifact
   if(!dest.startsWith(artifactRoot+sep))throw Error('Preview destination must be beneath artifacts/');
   const plan=planPublicSite(trackedSitePaths({cwd:root}));
   await verifyStaticReferences(plan.included,{cwd:root});
+  await verifyBrowserModuleReferences(plan.included,{cwd:root});
   await mkdir(dirname(dest),{recursive:true});
   await mkdir(dest); // EEXIST deliberately fails: a stale file must not survive.
   const manifest=[];
@@ -123,6 +164,7 @@ async function main(){
   if(args.length===0||(args.length===1&&args[0]==='--check')){
     const plan=planPublicSite(trackedSitePaths());
     await verifyStaticReferences(plan.included);
+    await verifyBrowserModuleReferences(plan.included);
     console.log('Safe site preview: '+plan.included.length+' included, '+plan.excluded.length+' excluded; checked HTML/CSS assets (no publication).');
     return;
   }
