@@ -52,3 +52,47 @@ ad/auth URLs, injected frames, Web Workers or external script behavior.
 
 This audit sends no requests to production auth, Neon, ad networks or
 Vercel. It does not change public-site delivery.
+
+
+## Real-header local Report-Only experiment (#1584)
+
+This is an **offline, localhost-only** trial. It does not change Pack One's
+production GitHub Pages headers or the Jekyll publishing allowlist.
+
+`scripts/csp-report-only-preview-server.mjs` serves a copy produced by
+`build-pages-preview.mjs`, restricted to `127.0.0.1:4175`. Every HTML response
+includes a **real HTTP** `Content-Security-Policy-Report-Only` header with a
+deliberately strict trial policy (same-origin scripts, styles, connections,
+frames, fonts and images; `data:` images allowed; `object-src 'none'` and
+`base-uri 'self'`). The exact policy lives in that server script. It is a
+**hypothesis to measure**, not a recommended enforced policy.
+
+The `report-uri` endpoint receives browser CSP reports locally. It
+**discards** raw document URLs, query strings, paths, cookies, tokens, source
+files, full request bodies and user identifiers. It retains only directive,
+blocked origin (or inline/eval/data/opaque category), and count. Reports are
+limited to 16 KiB and never sent to production. CI uploads an aggregate JSON
+summary, not a raw browser trace or raw violation payload. All Playwright
+browser contexts block traffic to external hosts, and preexisting browser
+fixtures use the production API guard.
+
+The dedicated workflow covers Chromium and WebKit browsing of representative
+pages plus existing account, ads, gameplay, Practice, sets and profile
+fixture suites against the exact staged site.
+
+### Go / no-go criteria
+
+- **Go to an enforcement proposal only if** violations are classified by
+  feature and origin, expected inline redirects are refactored or hashed,
+  legitimate auth/ads/connect/frame sources are accounted for, and both
+  browsers pass functional testing. Then separately review the headers and
+  rollback plan.
+- **No-go for enforcement** while any required script, auth request, ad
+  frame or font/image source would be blocked. Fix narrowly and repeat
+  Report-Only. The trial intentionally starts strict to reveal dependencies.
+- A local fixture pass **cannot validate live Google ad creatives, external
+  auth popups, or a genuine user login**. Those remain explicitly unverified.
+  They require a separate controlled and reversible release acceptance.
+- This workflow is intentionally scoped to CSP/critical UI changes and
+  manual dispatch, rather than replay data or daily generated publications,
+  to keep CI proportional. It uses no Vercel.
