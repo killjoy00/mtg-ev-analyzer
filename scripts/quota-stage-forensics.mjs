@@ -312,7 +312,7 @@ export function incidentReplayWindow(issue,number,condition,now) {
   if(!marker)throw Error('Missing launch incident state');
   let state;
   try {state=JSON.parse(marker[1]);} catch {throw Error('Invalid launch incident state');}
-  if(state?.version!==1||state?.condition!==condition||!['active','recovered'].includes(state.status))
+  if(state?.version!==1||state?.condition!==condition||!['active','recovering','recovered'].includes(state.status))
     throw Error('Mismatched launch incident condition');
   const seen=parseCanonicalTime(state.last_seen),checked=parseCanonicalTime(state.checked_through);
   if(!Number.isSafeInteger(seen)||!Number.isSafeInteger(checked)||seen<=0||seen>checked||
