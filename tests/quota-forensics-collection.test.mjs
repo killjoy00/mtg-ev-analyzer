@@ -231,3 +231,45 @@ test('public failure categories retain stages and HTTP status but never arbitrar
     ['telemetry_http_400',async url=>url.endsWith('/domains/managed')?Response.json({success:true,result:{enabled:false}}):url.endsWith('/domains/custom')?Response.json({success:true,result:{domains:[]}}):new Response('private provider payload',{status:400})],
   ])await assert.rejects(publishQuotaForensics({now,env:trustedEnv,fetcher}),error=>quotaForensicsFailureCode(error)===stage&&!error.message.includes('private provider payload'));
 });
+
+
+test('account-wide fallback rescues failed 5xx handler/start traces despite unrelated scoped rows',async()=>{
+  const chars=['a','b','c'],normals=['d','e','f','0'],queries=[];
+  const tr=c=>c.repeat(32),eventRow=(name,c,data)=>({
+    $metadata:{id:name+'-'+c},source:{event:name,trace:tr(c),...data},
+  });
+  const failed=chars.map(c=>eventRow('gateway_request',c,{
+    status:503,upstream_calls:0,quota_ms:2100,quota_attempts:1,sample_rate:1,
+    quota_handler_ms:null,quota_transport_wait_ms:null}));
+  const ordinary=normals.map(c=>eventRow('gateway_request',c,{
+    status:200,upstream_calls:1,quota_ms:120,quota_attempts:1,sample_rate:.1,
+    quota_handler_ms:40,quota_transport_wait_ms:80}));
+  const hFailed=chars.map(c=>eventRow('quota_handler',c,{attempt:1,status:503,phase:'transaction'}));
+  const hNormal=normals.map(c=>eventRow('quota_handler',c,{attempt:1,status:204,phase:'complete'}));
+  const starts=chars.concat(normals).map(c=>eventRow('quota_handler_start',c,{attempt:1}));
+  const env={CLOUDFLARE_EDGE_TOKEN:token,
+    PACK1_QUOTA_FORENSICS_FROM:'2026-10-29T18:30:00Z',
+    PACK1_QUOTA_FORENSICS_TO:'2026-10-29T18:55:00Z'};
+  const report=await runQuotaForensics({now,env,fetcher:async(url,request)=>{
+    if(url.includes('/zones?'))return Response.json({success:true,result:[{
+      name:'packone.pro',status:'active',account:{id:account}}]});
+    const q=JSON.parse(request.body);queries.push(q);
+    const event=q.parameters.filters.find(f=>f.key==='event')?.value;
+    const scoped=q.parameters.filters.some(f=>f.key==='$metadata.service');
+    if(event==='gateway_request')return page([...failed,...ordinary]);
+    if(event==='quota_handler')return page(scoped?hNormal:[...hNormal,...hFailed]);
+    if(event==='quota_handler_start')return page(scoped?starts.slice(chars.length):starts);
+    throw Error('Unexpected provider query');
+  }});
+  const w=report.windows[0];
+  assert.equal(queries.length,5,'three scoped queries plus independent account-wide error trace checks');
+  assert.equal(queries.filter(q=>!q.parameters.filters.some(f=>f.key==='$metadata.service')).length,2);
+  assert.equal(w.failed_quota_without_timing,3);
+  assert.equal(w.failed_quota_phase.transaction,3);
+  assert.equal(w.failed_quota_phase.not_observed,0);
+  assert.deepEqual(w.sampled_success_log_coverage,
+    {observed:4,with_start:4,with_completion:4});
+  assert.ok(w.query_coverage.handlers_account_wide);
+  assert.ok(w.query_coverage.starts_account_wide);
+  assert.doesNotMatch(JSON.stringify(report),/aaaaaaaa|bbbbbbbb|secret|quota-tag|private-token/);
+});

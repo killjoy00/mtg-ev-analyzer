@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {summarizeQuotaStages,summarizeSlowRequestStages} from '../scripts/quota-stage-forensics.mjs';
+import {summarizeQuotaStages,summarizeSlowRequestStages,quotaLogFallbackNeeds} from '../scripts/quota-stage-forensics.mjs';
 const trace=c=>c.repeat(32);
 const row=(event,p,id)=>({$metadata:{id},source:{event,...p}});
 const gateway=(c,ms,extra={})=>row('gateway_request',{trace:trace(c),quota_ms:ms,
@@ -149,4 +149,38 @@ test('slow pre-origin quota errors correlate only with matched Durable Object ph
   });
   assert.equal(summary.slow_gateway_quota,9);
   assert.doesNotMatch(JSON.stringify(summary),/aaaaaaaa|bbbbbbbb|secret/);
+});
+
+
+test('partial service results do not mask missing quota failure traces',()=>{
+  const errors=['a','b','c'].map(c=>gateway(c,2100,{status:503,upstream_calls:0,
+    quota_handler_ms:null,quota_transport_wait_ms:null}));
+  const present=[handler('d')],starts=[row('quota_handler_start',{trace:trace('d')},'sd')];
+  assert.deepEqual(quotaLogFallbackNeeds(errors,present,starts),{handlers:true,starts:true});
+  const matching=[handler('a',{status:503,phase:'transaction'}),
+    handler('b',{status:503,phase:'transaction'}),
+    handler('c',{status:503,phase:'transaction'})];
+  const matchingStarts=['a','b','c'].map(c=>row('quota_handler_start',{trace:trace(c)},'s'+c));
+  assert.deepEqual(quotaLogFallbackNeeds(errors,[...present,...matching],[...starts,...matchingStarts]),
+    {handlers:false,starts:false});
+  assert.deepEqual(quotaLogFallbackNeeds([
+    gateway('a',2100,{status:200,upstream_calls:1,quota_handler_ms:null,quota_transport_wait_ms:null}),
+    gateway('b',2100,{status:503,upstream_calls:1,quota_handler_ms:null,quota_transport_wait_ms:null}),
+    gateway('c',900,{status:503,upstream_calls:0,quota_handler_ms:null,quota_transport_wait_ms:null}),
+  ],[],[]),{handlers:false,starts:false},
+  'ordinary successes, origin 5xx and subthreshold quota calls must not expand account-wide provider queries');
+});
+
+test('successful sampled quota requests are only an observational log-capture control',()=>{
+  const normal=['a','b','c','d'].map(c=>gateway(c,100,{
+    status:200,upstream_calls:1,quota_attempts:1,sample_rate:.1}));
+  const failed=gateway('e',2300,{status:503,upstream_calls:0,
+    quota_handler_ms:null,quota_transport_wait_ms:null,quota_attempts:1});
+  const handlerRows=['a','b','c','d'].map(c=>handler(c));
+  const startRows=['a','b','c'].map(c=>row('quota_handler_start',{trace:trace(c)},'s'+c));
+  const summary=summarizeQuotaStages([...normal,failed],handlerRows,startRows);
+  assert.deepEqual(summary.sampled_success_log_coverage,
+    {observed:4,with_start:3,with_completion:4});
+  assert.equal(summary.failed_quota_phase.not_observed,1);
+  assert.doesNotMatch(JSON.stringify(summary),/aaaaaaaa|bbbbbbbb|secret|trace/);
 });
