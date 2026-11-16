@@ -191,7 +191,7 @@ export async function cleanupProbe({env=process.env,fetcher=fetch}={}) {
   console.log('Synthetic quota Worker cleanup verified.');
 }
 export async function runProbe(env=process.env,collect=options=>compareQuota({...options,extended:true}),label='SYNTHETIC_QUOTA_COMPARISON') {
-  assert(['SYNTHETIC_QUOTA_COMPARISON','SYNTHETIC_QUOTA_CONFIRMATION'].includes(label),'invalid_report_profile');
+  assert(['SYNTHETIC_QUOTA_COMPARISON','SYNTHETIC_QUOTA_CONFIRMATION','SYNTHETIC_QUOTA_TIMEOUT_REPRO'].includes(label),'invalid_report_profile');
   const receipt=context(env),nonce=randomBytes(5).toString('hex');
   const name=probeName(env.GITHUB_RUN_ID,env.GITHUB_RUN_ATTEMPT,nonce),owner=env.GITHUB_RUN_ID+'-'+env.GITHUB_RUN_ATTEMPT+'-'+nonce;
   const cf=(url,options={})=>controlRequest(API+url,{provider:'Cloudflare',token:env.CLOUDFLARE_EDGE_TOKEN,...options});
