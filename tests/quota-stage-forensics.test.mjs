@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {summarizeQuotaStages,summarizeSlowRequestStages,quotaLogFallbackNeeds} from '../scripts/quota-stage-forensics.mjs';
+import {summarizeQuotaStages,summarizeSlowRequestStages,quotaLogFallbackNeeds,quotaCommitProbeNeeded} from '../scripts/quota-stage-forensics.mjs';
 const trace=c=>c.repeat(32);
 const row=(event,p,id)=>({$metadata:{id},source:{event,...p}});
 const gateway=(c,ms,extra={})=>row('gateway_request',{trace:trace(c),quota_ms:ms,
@@ -208,4 +208,59 @@ test('failed pre-origin slow quota errors bucket only existing fixed gateway fai
   assert.deepEqual(s.failed_quota_failure_signals,{
     provider_reset:1,timeout_or_abort:1,overloaded:1,provider_internal:1,other_or_unknown:1});
   assert.doesNotMatch(JSON.stringify(s),/UNTRUSTED_ERROR_TEXT|trace|network|secret/);
+});
+
+
+test('account-wide commit query runs only for retained slow pre-origin 5xx lacking timings',()=>{
+  const good=[gateway('a',2000,{status:503,upstream_calls:0,
+    quota_handler_ms:null,quota_transport_wait_ms:null,sample_rate:1})];
+  assert.equal(quotaCommitProbeNeeded(good),true);
+  const notEligible=[
+    gateway('a',2100,{status:503,upstream_calls:1,quota_handler_ms:null,quota_transport_wait_ms:null}),
+    gateway('b',2100,{status:503,upstream_calls:0,quota_handler_ms:null,quota_transport_wait_ms:null,sample_rate:.1}),
+    gateway('c',900,{status:503,upstream_calls:0,quota_handler_ms:null,quota_transport_wait_ms:null}),
+    gateway('d',2100,{status:429,upstream_calls:0,quota_handler_ms:null,quota_transport_wait_ms:null}),
+    gateway('e',2100,{status:503,upstream_calls:0,quota_handler_ms:500,quota_transport_wait_ms:1600}),
+  ];
+  assert.equal(quotaCommitProbeNeeded(notEligible),false);
+});
+
+test('a timed-out gateway 5xx can positively correlate with a completed durable quota debit',()=>{
+  const g=c=>gateway(c,5100,{status:503,upstream_calls:0,quota_timeout:true,
+    quota_attempts:1,quota_handler_ms:null,quota_transport_wait_ms:null});
+  const cases=['a','b','c','d','e','f'];
+  const handlers=[handler('a'),handler('b',{status:429}),handler('f',{status:503,phase:'transaction',durability_confirmed:false})];
+  const starts=['a','b','c','d','f'].map(c=>row('quota_handler_start',{trace:trace(c),attempt:1},'s'+c));
+  const commit=[
+    row('quota_commit_wait',{trace:trace('a'),attempt:1,decision_status:204,secret:'private'},'wa'),
+    row('quota_commit_wait',{trace:trace('b'),attempt:1,decision_status:429},'wb'),
+    row('quota_commit_wait',{trace:trace('c'),attempt:1,decision_status:204},'wc'),
+    row('quota_commit_wait',{trace:trace('e'),attempt:99,decision_status:204},'invalid-attempt'),
+    row('quota_commit_wait',{trace:trace('d'),attempt:1,decision_status:999},'invalid-decision'),
+  ];
+  const result=summarizeQuotaStages(cases.map(g),handlers,starts,commit);
+  assert.equal(result.failed_quota_without_timing,6);
+  assert.deepEqual(result.failed_quota_commit_stages,{
+    confirmed_admission:1,confirmed_denial:1,commit_wait_only:1,
+    handler_seen_without_commit:2,no_correlated_stage:1});
+  assert.equal(result.commit_wait_records,3);
+  // A commit-wait is BEFORE storage.sync(), so its bucket must never be
+  // misrepresented as a confirmed debit or an all-clear.
+  assert.equal(result.failed_quota_commit_stages.confirmed_admission,1);
+  assert.doesNotMatch(JSON.stringify(result),/aaaaaaaa|bbbbbbbb|private|secret|trace|quota-tag/);
+});
+
+test('origin failures, under-threshold and unsigned traces cannot invent quota commit evidence',()=>{
+  const g=c=>gateway(c,2300,{status:503,upstream_calls:0,
+    quota_handler_ms:null,quota_transport_wait_ms:null});
+  const result=summarizeQuotaStages([
+    g('a'),g('b'),g('c',{upstream_calls:1}),
+    gateway('d',2300,{status:503,upstream_calls:1,quota_handler_ms:null,quota_transport_wait_ms:null}),
+    gateway('e',900,{status:503,upstream_calls:0,quota_handler_ms:null,quota_transport_wait_ms:null}),
+  ],[],[],[
+    row('quota_commit_wait',{trace:trace('d'),attempt:1,decision_status:204},'c1'),
+    row('quota_commit_wait',{trace:'malformed',attempt:1,decision_status:204},'c2'),
+  ]);
+  assert.equal(result.failed_quota_without_timing,2);
+  assert.equal(result.failed_quota_commit_stages.no_correlated_stage,2);
 });
