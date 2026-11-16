@@ -12,6 +12,14 @@ const blank=(issue,reason='not_collected')=>({
   issue,outcome:reason,sample_band:'unknown',suspected_stage:'unknown',
   evidence:'insufficient',next_action:'await_verified_incident_evidence',
 });
+// Public skipped-window reasons must use this fixed, non-sensitive vocabulary.
+const skippedWindow=(issue,window)=>{
+  const reason=window?.reason;
+  const labels={incident_closed:'incident_closed',
+    outside_configured_retention:'outside_retention',not_settled:'not_settled'};
+  return {...blank(issue),outcome:'not_collected',
+    skip_reason:Object.hasOwn(labels,reason)?labels[reason]:'unverified'};
+};
 const stageChoice=(entries)=>{
   const sorted=[...entries].sort((a,b)=>b[1]-a[1]);
   const total=sorted.reduce((sum,[,value])=>sum+value,0);
@@ -121,7 +129,7 @@ const failedQuotaPhaseSignal=window=>{
 };
 function classifyRequestWindow(window) {
   const issue=1272;
-  if(window?.status==='skipped')return {...blank(issue),'outcome':'not_collected'};
+  if(window?.status==='skipped')return skippedWindow(issue,window);
   if(window?.status!=='collected')return blank(issue);
   const slow=window.slow_request_stages;
   const total=count(slow?.slow_retained);
@@ -146,7 +154,7 @@ function classifyRequestWindow(window) {
 }
 function classifyQuotaWindow(window) {
   const issue=1273;
-  if(window?.status==='skipped')return {...blank(issue),outcome:'not_collected'};
+  if(window?.status==='skipped')return skippedWindow(issue,window);
   if(window?.status!=='collected')return blank(issue);
   const total=count(window.slow_gateway_quota),matched=count(window.matched_slow),
     handler=count(window.slow_handler_dominant),wait=count(window.slow_residual_dominant);
