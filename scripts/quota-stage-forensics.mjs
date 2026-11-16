@@ -85,6 +85,29 @@ export function summarizeSlowRequestStages(gatewayRows) {
   };
 }
 
+// Only a retained >1s pre-origin quota 5xx with missing timing can motivate
+// a broader log lookup. A service query containing *unrelated* handler rows
+// does not establish that the failed request's own start/completion was seen.
+// Return booleans only: traces are never put in the private report or output.
+export function quotaLogFallbackNeeds(gatewayRows,handlerRows,startRows) {
+  const targets=new Set(),complete=new Set(),started=new Set();
+  for(const row of gatewayRows) {
+    const p=payload(row,'gateway_request'),t=key(p?.trace);
+    if(t&&p.status>=500&&p.status<=599&&p.upstream_calls===0&&p.sample_rate===1&&
+      timing(p.quota_ms)>1000&&
+      (timing(p.quota_handler_ms)===null||timing(p.quota_transport_wait_ms)===null))
+      targets.add(t);
+  }
+  for(const row of handlerRows) {
+    const t=key(payload(row,'quota_handler')?.trace);if(t)complete.add(t);
+  }
+  for(const row of startRows) {
+    const t=key(payload(row,'quota_handler_start')?.trace);if(t)started.add(t);
+  }
+  return {handlers:[...targets].some(t=>!complete.has(t)),
+    starts:[...targets].some(t=>!started.has(t))};
+}
+
 export function summarizeQuotaStages(gatewayRows,handlerRows,startRows){
   const handlers=new Map(),starts=new Set(),slow=[],layout={current:0,legacy:0,empty:0,unread:0,other:0},
     phases={complete:0,transaction:0,durability:0,other:0};
@@ -94,11 +117,22 @@ export function summarizeQuotaStages(gatewayRows,handlerRows,startRows){
   }
   for(const row of startRows){const p=payload(row,'quota_handler_start'),t=key(p?.trace);if(t)starts.add(t);}
   let gatewayRecords=0,errors=0,preOriginErrors=0;
+  const sampled_success_log_coverage={observed:0,with_start:0,with_completion:0};
   for(const row of gatewayRows){
     const p=payload(row,'gateway_request');
     if(!p||!Number.isInteger(p.status)||p.status<100||p.status>599)continue;
     gatewayRecords++;
     if(p.status>=500){errors++;if(p.upstream_calls===0)preOriginErrors++;}
+    // Ordinary successes are sampled. Use only their *observed* records as
+    // same-window controls for provider log capture; never assert an SLO.
+    const t=key(p.trace);
+    if(t&&p.status>=200&&p.status<400&&p.upstream_calls>=1&&
+      attempt(p.quota_attempts)!==null&&timing(p.quota_ms)!==null&&
+      typeof p.sample_rate==='number'&&p.sample_rate>0&&p.sample_rate<=1) {
+      sampled_success_log_coverage.observed++;
+      if(starts.has(t))sampled_success_log_coverage.with_start++;
+      if(handlers.has(t))sampled_success_log_coverage.with_completion++;
+    }
     if(timing(p.quota_ms)>1000&&p.sample_rate===1)slow.push(p);
   }
   // Evidence for whether the transport-dominant cohort completed normally
@@ -158,6 +192,7 @@ export function summarizeQuotaStages(gatewayRows,handlerRows,startRows){
   }
   return {
     gateway_records:gatewayRecords,handler_records:handlers.size,handler_start_records:starts.size,
+    sampled_success_log_coverage,
     gateway_5xx:errors,gateway_5xx_before_upstream:preOriginErrors,
     slow_gateway_quota:slow.length,matched_slow:matched.length,
     slow_route_groups,slow_outcomes,missing_gateway_timing_outcomes,
@@ -288,16 +323,25 @@ export async function runQuotaForensics({fetcher=fetch,env=process.env,now=Date.
     const gateway=await query('gateway_request','pack1-gateway');
     let handlers=await query('quota_handler','pack1-gateway');
     let starts=await query('quota_handler_start','pack1-gateway');
-    // DO logs may be under a different provider service; if so, correlate
-    // account-wide candidates by random trace, not by anonymous object tag.
-    if(!handlers.rows.length&&gateway.rows.some(r=>timing(payload(r,'gateway_request')?.quota_ms)>1000)){
-      handlers=await query('quota_handler',null);
-      starts=await query('quota_handler_start',null);
-    }
+    // A different provider service can hold a DO record even if this
+    // service-scoped query returned OTHER DO records. Check correlation for
+    // each slow pre-origin 5xx rather than treating nonempty arrays as proof.
+    const missing=quotaLogFallbackNeeds(gateway.rows,handlers.rows,starts.rows);
+    const slowQuota=gateway.rows.some(r=>timing(payload(r,'gateway_request')?.quota_ms)>1000);
+    const legacyFallback=slowQuota&&!handlers.rows.length;
+    const handlersAccount=(missing.handlers||legacyFallback)?await query('quota_handler',null):null;
+    const startsAccount=(missing.starts||legacyFallback)?await query('quota_handler_start',null):null;
+    // Preserve both verified scopes; matching uses the random request trace,
+    // with no trace or provider rows ever included in the report.
+    const allHandlers=handlersAccount?[...handlers.rows,...handlersAccount.rows]:handlers.rows;
+    const allStarts=startsAccount?[...starts.rows,...startsAccount.rows]:starts.rows;
+    const sources={gateway,handlers,starts,
+      ...(handlersAccount?{handlers_account_wide:handlersAccount}:{}),
+      ...(startsAccount?{starts_account_wide:startsAccount}:{})};
     summaries.push({window:name,status:'collected',from,to,
-      ...summarizeQuotaStages(gateway.rows,handlers.rows,starts.rows),
+      ...summarizeQuotaStages(gateway.rows,allHandlers,allStarts),
       slow_request_stages:summarizeSlowRequestStages(gateway.rows),
-      query_coverage:Object.fromEntries(Object.entries({gateway,handlers,starts}).map(([key,value])=>[key,{requests:value.requests,partitions:value.coverage}]))});
+      query_coverage:Object.fromEntries(Object.entries(sources).map(([key,value])=>[key,{requests:value.requests,partitions:value.coverage}]))});
   }
   return {version:2,source:'cloudflare_read_only_telemetry',windows:summaries,
     limitation:'Verified query partitions do not establish complete log retention. Missing records are not proof of nonexecution. Replayed incident intervals come from bounded machine-managed last-breach markers, not a guarantee of complete log retention. Ordinary successes are sampled; full-tail slow-response counts need tail_sampling_version 1. Gateway timings end when the response is constructed, not when the client receives the body. Stage dominance is diagnostic, not proof of root cause.'};
