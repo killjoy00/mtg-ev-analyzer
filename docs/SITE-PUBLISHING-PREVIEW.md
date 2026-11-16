@@ -28,6 +28,14 @@ the tracked inventory, mandatory website/auth/deep-link paths, selected
 HTML/CSS local references, literal browser-module import dependencies,
 output checksums, font license notices, and denied paths.
 
+CI also exercises the candidate at http://127.0.0.1:4174 with the existing
+home, set guides, Practice, account/login, ads and profile Playwright
+contracts. These tests use local fixtures and the production API guard. They
+cover realistic dynamic imports and browser UI behavior while deliberately
+avoiding live auth, ad networks and Neon traffic; they are **not** proof of
+actual third-party login/ad integration or content delivery parity. The
+existing 4173 root regression suite remains intact and runs separately.
+
 The allowed output includes public data/corpus packages intentionally. Do
 not blindly exclude these; site/client dependencies must be evaluated
 before further reduction. This is a publication-surface reduction, not a
