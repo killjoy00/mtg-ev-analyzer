@@ -120,7 +120,7 @@ need to run commands locally.
 - Choose the launch date after production controls are proven; approve the
   activation migration and final dated policy commit in that order.
 - Provide the sender postal address privately before any later email project.
-  No email delivery is implemented or activated by this work.
+  The initial controls release did not implement delivery. The separately guarded sender is documented in [Results and news delivery](RESULTS-EMAIL-DELIVERY.md).
 - Make the email-use console changes in `mobile-store-submission.md`. App-store
   builds, submissions and tracks remain a separate authorized task.
 - Use private synthetic acceptance accounts to verify notice vs prompt, both

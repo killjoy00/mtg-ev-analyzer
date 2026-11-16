@@ -79,7 +79,8 @@
     "0072_admin_trends_completed_covering_index.sql",
     "0073_habits_acquisition_first_touch_idx.sql",
     "0074_results_privacy_controls.sql",
-    "0075_results_privacy_launch.sql"
+    "0075_results_privacy_launch.sql",
+    "0076_results_email_delivery.sql"
   ],
   "same_prefix_order": {
     "0037": [
@@ -215,7 +216,8 @@
         "0072_admin_trends_completed_covering_index.sql",
         "0073_habits_acquisition_first_touch_idx.sql",
         "0074_results_privacy_controls.sql",
-        "0075_results_privacy_launch.sql"
+        "0075_results_privacy_launch.sql",
+        "0076_results_email_delivery.sql"
       ]
     },
     "daily-calendar": {
@@ -285,7 +287,8 @@
         "0072_admin_trends_completed_covering_index.sql",
         "0073_habits_acquisition_first_touch_idx.sql",
         "0074_results_privacy_controls.sql",
-        "0075_results_privacy_launch.sql"
+        "0075_results_privacy_launch.sql",
+        "0076_results_email_delivery.sql"
       ]
     },
     "launch-load": {
@@ -330,7 +333,8 @@
         "0072_admin_trends_completed_covering_index.sql",
         "0073_habits_acquisition_first_touch_idx.sql",
         "0074_results_privacy_controls.sql",
-        "0075_results_privacy_launch.sql"
+        "0075_results_privacy_launch.sql",
+        "0076_results_email_delivery.sql"
       ]
     },
     "launch-distributed": {
@@ -377,7 +381,8 @@
         "0072_admin_trends_completed_covering_index.sql",
         "0073_habits_acquisition_first_touch_idx.sql",
         "0074_results_privacy_controls.sql",
-        "0075_results_privacy_launch.sql"
+        "0075_results_privacy_launch.sql",
+        "0076_results_email_delivery.sql"
       ]
     },
     "practice-performance": {

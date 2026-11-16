@@ -1,4 +1,5 @@
 import {gameDateKey} from '../game-date.mjs';
+import {renderResultsEmailCampaigns} from './results-email-campaigns.mjs?v=1';
 
 const esc=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;");
 const fmt=value=>value==null?'N/A':Number(value).toLocaleString(undefined,{maximumFractionDigits:1});
@@ -67,6 +68,7 @@ export async function renderUsers(root,request,growthRequest=request,viewerRole=
       sorting=next.sort||sorting;
       render();
       void refreshResultsAdmin();
+      void renderResultsEmailCampaigns(root.querySelector('#results-email-campaigns'),{owner:viewerRole==='owner',growthRequest});
     } catch(error) {
       if(serial!==loadSerial)return;
       if(!data)throw error;
@@ -136,6 +138,7 @@ function render() {
       <header class="users-heading"><div><p class="users-kicker">PACK ONE ADMINISTRATION</p><h1>Users</h1><p class="muted">Authenticated Pack One accounts only. Anonymous and guest gameplay identities are intentionally not listed here.</p></div></header>
       <section class="play-activity" aria-labelledby="play-activity-heading">${playActivity()}</section>
       <section id="results-admin-summary" class="user-section" aria-label="Results privacy"></section>
+      ${viewerRole==='owner'?'<section id="results-email-campaigns" class="user-section" aria-label="Results and news campaigns"></section>':''}
       <section class="user-directory" aria-labelledby="user-directory-heading">
         <div class="users-section-heading"><div><p class="users-kicker">ACCOUNT MANAGEMENT</p><h2 id="user-directory-heading">Account directory</h2><p class="muted">Search and account status filters apply only to this directory, not to the activity report above. Totals below describe all authenticated accounts.</p></div></div>
         <div class="cards user-cards">

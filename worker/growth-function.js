@@ -1,4 +1,5 @@
 import {resultsRoute} from './results-privacy.mjs';
+import {resultsEmailRoute,resultsDeliveryConfiguration} from './results-email-delivery.mjs';
 import { RETIRED_MODES_MESSAGE } from './retired-modes.mjs';
 import {observedRoute,tagBackendResponse,observedDatabaseCall} from './backend-diagnostics.mjs';
 import {createHmac} from 'node:crypto';
@@ -2441,9 +2442,11 @@ async function handleProfileLookup(request) {
 async function route(request) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(request) });
   const url = new URL(request.url);
-  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, profiles: true, account_deletion_enabled:deletionEnabled(), verification_sweep_enabled:verificationSweepEnabled(), deletion_email_configured:deletionEmailConfigured(), launch_watcher_recovery_configured:launchWatcherRecoveryConfigured(), campaign_link_publish_configured:campaignLinkPublishConfigured(), apple_sign_in_configured:appleConfigured(), reminder_delivery_active:reminderReadiness().emailActive||reminderReadiness().pushActive, reminder_delivery_ready:reminderReadiness().emailReady, reminder_email_active:reminderReadiness().emailActive, reminder_push_active:reminderReadiness().pushActive, reminder_push_ready:reminderReadiness().pushReady });
+  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, results_email_ready:resultsDeliveryConfiguration().ready, results_email_enabled:resultsDeliveryConfiguration().active, profiles: true, account_deletion_enabled:deletionEnabled(), verification_sweep_enabled:verificationSweepEnabled(), deletion_email_configured:deletionEmailConfigured(), launch_watcher_recovery_configured:launchWatcherRecoveryConfigured(), campaign_link_publish_configured:campaignLinkPublishConfigured(), apple_sign_in_configured:appleConfigured(), reminder_delivery_active:reminderReadiness().emailActive||reminderReadiness().pushActive, reminder_delivery_ready:reminderReadiness().emailReady, reminder_email_active:reminderReadiness().emailActive, reminder_push_active:reminderReadiness().pushActive, reminder_push_ready:reminderReadiness().pushReady });
   if (url.pathname === '/internal/account-deletion-maintenance') return handleDeletionMaintenance(request);
   if (url.pathname === '/internal/daily-social-dispatch') return handleDailySocialDispatch(request);
+  if (url.pathname === '/internal/results-email'||url.pathname === '/v1/admin/results-campaigns')
+    return resultsEmailRoute(request,{query,json,readJson,authAdmin:adminAccountIdentity,trigger:verifyNeonScheduleTrigger});
   if (url.pathname === '/internal/account-deletion-maintenance-status') return handleDeletionMaintenanceStatus(request);
   if (/^\/v1\/(?:mobile\/)?account\/results$/.test(url.pathname)||/^\/v1\/results\/(?:launch|unsubscribe|provider-event)$/.test(url.pathname)||url.pathname==='/v1/admin/results')
     return resultsRoute(request,{query,json,readJson,authBrowser:r=>authSession(r,{required:true,allowLegacy:false,csrf:false}),authMutation:accountMutationAuth,authMobile:mobileAccountIdentity,authAdmin:adminAccountIdentity});
@@ -2545,7 +2548,7 @@ async function route(request) {
 
 export default {
   async fetch(request) {
-    const internalMaintenance=new Set(['/internal/account-deletion-maintenance','/internal/account-deletion-maintenance-status','/internal/daily-reminders','/internal/daily-social-dispatch']).has(new URL(request.url).pathname);
+    const internalMaintenance=new Set(['/internal/account-deletion-maintenance','/internal/account-deletion-maintenance-status','/internal/daily-reminders','/internal/daily-social-dispatch','/internal/results-email']).has(new URL(request.url).pathname);
     if(!internalMaintenance){const denied=guardIngress(request);if(denied)return denied;}
     try {
       return withCors(await observedRoute(request,'growth',route), request);
