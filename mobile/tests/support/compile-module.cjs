@@ -19,6 +19,9 @@ function compileModule(relative, mocks, { resolve, cache = new Map() } = {}) {
     if (request === '@/src/components/Text') return { Text: mocks['react-native'].Text };
     if (request === '@/src/components/ScreenArea') return { ScreenArea: mocks['react-native-safe-area-context'].SafeAreaView };
     if (Object.prototype.hasOwnProperty.call(mocks, request)) return mocks[request];
+    // Expo Constants loads native TypeScript sources outside a device runtime.
+    // Mounted component tests with no Expo manifest should see an empty manifest.
+    if (request === 'expo-constants') return { __esModule: true, default: { expoConfig: undefined } };
     if (request.endsWith('.png')) {
       const asset = path.resolve(path.dirname(filename), request);
       assert.equal(fs.readFileSync(asset).subarray(0, 8).toString('hex'), '89504e470d0a1a0a', 'native asset must be a real PNG');

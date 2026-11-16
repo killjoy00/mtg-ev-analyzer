@@ -6,12 +6,12 @@ import { colors, spacing } from '@/src/theme';
 
 /** A UMP privacy-options entry point on the Account screen, including for guests. */
 export function AdMobPrivacyChoices() {
-  const enabled = Platform.OS === 'ios' ? config.adMob.iosEnabled : config.adMob.androidEnabled;
+  const enabled = Platform.OS === 'ios' ? config.adMob?.iosEnabled : config.adMob?.androidEnabled;
   const [required, setRequired] = useState(false);
   const [message, setMessage] = useState('');
 
   useEffect(() => {
-    if (!enabled || config.screenshots.fixtures) return;
+    if (!enabled || config.screenshots?.fixtures) return;
     let active = true;
     void (async () => {
       try {
@@ -34,7 +34,7 @@ export function AdMobPrivacyChoices() {
       setRequired(info.privacyOptionsRequirementStatus === 'REQUIRED');
     } catch { setMessage('Could not open ad privacy choices. Please try again.'); }
   };
-  if (!enabled || !required || config.screenshots.fixtures) return null;
+  if (!enabled || !required || config.screenshots?.fixtures) return null;
   return <>
     <Pressable accessibilityRole="button" accessibilityLabel="Ad privacy choices"
       style={styles.button} onPress={() => void open()}>
