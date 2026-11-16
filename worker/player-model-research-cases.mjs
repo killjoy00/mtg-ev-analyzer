@@ -1,7 +1,14 @@
+import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
+
 // Private, read-only research sampler for source-distinct Pack One decisions.
 // Only aggregate votes are read; no player identity or production mutation.
 // This is NOT a scoring model, correctness oracle or independently adjudicated benchmark.
-export const RESEARCH_CORPUS='elite-trophy-colour-stage-v10';
+export const RESEARCH_CORPUS=DRAFT_RUN_CORPUS_VERSION;
+export const RESEARCH_PINNED_GENERATION=10;
+export function assertResearchCorpus() {
+  if(!RESEARCH_CORPUS.endsWith('-v'+RESEARCH_PINNED_GENERATION))
+    throw Error('Corpus release changed. Freeze a new model research protocol before sampling.');
+}
 export const RESEARCH_MIN_CHOICES=50;
 export const RESEARCH_MAX_PUZZLES=1000;
 export const RESEARCH_CASES_SQL=`
@@ -154,6 +161,7 @@ function sampleCases(valid) {
     -stableHash(b.environment+':'+b.puzzleId)||a.puzzleId.localeCompare(b.puzzleId));
 }
 export function buildModelResearchCases(rows,{view='blind'}={}) {
+  assertResearchCorpus();
   if(!['blind','diagnosis'].includes(view))throw Error('Invalid research view');
   if(!Array.isArray(rows)||rows.length>RESEARCH_MAX_PUZZLES)throw Error('Research window exceeds the 1000-puzzle safety limit; narrow the dates');
   const valid=rows.filter(r=>r.corpus_version===RESEARCH_CORPUS).map(completeCase).filter(Boolean);
