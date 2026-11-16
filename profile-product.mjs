@@ -1,4 +1,4 @@
-import {resultsSettingsMarkup,bindResultsSettings} from './results-settings.mjs?v=1';
+import {emailPreferencesMarkup,resultsSettingsMarkup,resultsPublicationsMarkup,bindResultsSettings} from './results-settings.mjs?v=2';
 import { escapeHtml as esc } from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
 import {
@@ -25,7 +25,7 @@ import { trackEvent } from './retention-events.mjs';
 import { nextMilestones } from './progression.mjs?v=10';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { eliteSource } from './membership-source.mjs';
-import { renderAccount, renderDeletionState } from './growth.mjs?v=34';
+import { renderAccount, renderDeletionState } from './growth.mjs?v=35';
 import {dailyReminderSettingsMarkup,bindDailyReminderSettings} from './daily-reminder-settings.mjs?v=5';
 import {
   bestPercentile,
@@ -57,7 +57,7 @@ function ensureProfileStyles() {
   if (document.querySelector('link[data-pack1-profile-css]')) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = new URL('./profile.css?v=18', import.meta.url).href;
+  link.href = new URL('./profile.css?v=19', import.meta.url).href;
   link.dataset.pack1ProfileCss = '1';
   document.head.appendChild(link);
 }
@@ -270,8 +270,8 @@ function settingsMarkup(profile, progress, account, patreon) {
           : `<p><strong>Password</strong><br><span>${account?.credentials?.apple?'This account signs in with Apple and does not have a Pack One password to change.':account?.credentials?.google?'This account signs in with Google and does not have a Pack One password to change.':'This account does not have a password to change.'}</span></p>`}
       </div>
     </section>`:''}
-    ${dailyReminderSettingsMarkup({signedIn:Boolean(account?.user)})}
-    ${account?.user?resultsSettingsMarkup():''}
+    ${emailPreferencesMarkup(dailyReminderSettingsMarkup({signedIn:Boolean(account?.user)})+(account?.user?resultsSettingsMarkup():''))}
+    ${account?.user?resultsPublicationsMarkup():''}
     ${account?.user?`<section class="settings-row profile-credentials profile-danger profile-settings-group" aria-labelledby="delete-account-title">
       <div class="settings-row-label"><h3 class="profile-delete-title" id="delete-account-title">Delete account</h3><p class="profile-settings-intro">Permanently deletes your Pack One account and profile and signs you out everywhere. This cannot be undone.</p></div>
       <div class="settings-row-body">${deletionControlMarkup(account,patreon)}</div>
