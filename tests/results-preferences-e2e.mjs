@@ -46,7 +46,7 @@ try{
  await no.click();await page.waitForFunction(()=>!document.querySelector('[data-results-invitation]').textContent);assert.equal(state,'off');
  await open();await page.evaluate(()=>window.bindInvitation());assert.equal(await page.getByRole('heading',{name:'Get your results by email?'}).count(),0);
  await page.evaluate(()=>window.bindSettings());await page.getByRole('button',{name:'On',exact:true}).click();await page.waitForFunction(()=>document.querySelector('[data-results-action="settings:on"]').getAttribute('aria-pressed')==='true');assert.equal(state,'on');
- await page.getByRole('checkbox').check();await page.waitForFunction(()=>document.querySelector('#results-exclude').checked);assert.equal(exclude,true);
+ await page.getByRole('checkbox').check();await page.waitForFunction(()=>document.querySelector('#results-exclude').checked&&!document.querySelector('#results-exclude').disabled);assert.equal(exclude,true);
  // Existing players get only the notice, and the action stays on the page.
  presentation='notice';state='unanswered';await open();await page.evaluate(()=>window.bindInvitation());
  const url=page.url();await page.getByRole('button',{name:'Turn on emails'}).click();await page.waitForFunction(()=>!document.querySelector('[data-results-invitation]').textContent);assert.equal(state,'on');assert.equal(page.url(),url);
