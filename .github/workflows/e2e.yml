@@ -149,6 +149,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          trap 'rm -rf artifacts/pages-preview' EXIT
           node scripts/build-pages-preview.mjs --out artifacts/pages-preview
           nohup python -m http.server 4174 --directory artifacts/pages-preview >/tmp/pack1-pages-preview-http.log 2>&1 &
           echo $! > /tmp/pack1-pages-preview.pid
