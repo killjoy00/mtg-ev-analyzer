@@ -74,3 +74,5 @@ jobs:
       - name: Verify native results account isolation
         working-directory: mobile
         run: node --require ./tests/setup.cjs --test ./tests/results-api.test.cjs
+      - name: Verify actual-time privacy launch and replay safeguards
+        run: node tests/results-launch-postgres.mjs
