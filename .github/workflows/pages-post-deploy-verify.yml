@@ -1,7 +1,10 @@
 name: Pages post-deployment public allowlist
 on:
   workflow_run:
-    workflows: ["pages build and deployment"]
+    # Built-in dynamic Pages runs do not reliably emit workflow_run hooks.
+    # Use the repo-owned successful Jekyll parity workflow, which itself
+    # runs on main after each public-site change and finishes after build.
+    workflows: ["Pages release parity"]
     types: [completed]
   workflow_dispatch:
 
