@@ -146,7 +146,7 @@ Native Pack One has no ad SDK, no third-party analytics SDK, no location permiss
 
 Declare data collected by Pack One as follows, subject to final App Store Connect wording:
 - Contact Info -> Name: collected for account/profile functionality; linked to the user; not used for tracking.
-- Contact Info -> Email Address: collected for account, verification, recovery, and deletion; linked to the user; not used for tracking.
+- Contact Info -> Email Address: collected for account, verification, recovery, deletion, optional results and news emails, and individual non-promotional contact; linked to the user; not used for tracking.
 - Identifiers -> User ID: Pack One player/account identifiers are collected for app functionality and analytics; linked when signed in; not used for tracking.
 - Purchases -> Purchase History: Apple subscription transaction/entitlement identifiers and state are collected for app functionality and account management; linked to the signed-in Pack One account; not used for tracking.
 - Usage Data -> Product Interaction: gameplay starts, choices, scores, completions, and related product events are collected for app functionality and product analytics; may be linked to the Pack One player/account; not used for tracking.
@@ -255,7 +255,7 @@ Security:
 
 Collected data:
 - Personal info -> Name: optional account/profile data; app functionality/account management.
-- Personal info -> Email address: optional account/authentication data; account management, verification, recovery, deletion.
+- Personal info -> Email address: optional account/authentication data; account management, verification, recovery, deletion, optional results and news emails, and individual non-promotional contact.
 - App activity -> App interactions: game starts, picks, scores, completions and related usage; app functionality and analytics.
 - Device or other IDs -> User IDs: Pack One player/account identifiers; app functionality and analytics.
 
@@ -365,3 +365,23 @@ Reviewer notes should state the following safeguards exactly:
 
 Moderation operations and response procedure are documented in `docs/PUBLIC-IDENTITY-SAFETY.md`.
 
+
+
+### Results and news launch: email-use console updates
+
+Apply these email-use changes with the approved launch. No other declaration changes.
+
+- App Store Connect → App Privacy → Contact Info → Email Address: keep collected,
+  linked to user, and no tracking. Keep App Functionality for account and individual
+  non-promotional contact, and add Developer’s Advertising or Marketing for optional
+  results, news, and offers. Review the current console labels before submitting.
+- Google Play Console → App content → Data safety → Personal info → Email address:
+  keep optional collection, account management, and no sale. Add Developer
+  communications for results, news, and individual non-promotional contact, and
+  Advertising or marketing for the optional offers. Preserve existing sharing,
+  encryption, deletion, and other answers.
+- Publish the matching privacy/terms update only after production backend and
+  controls are verified. This change does not create a build or submit a console form.
+
+Console purpose references: [Apple App Privacy Details](https://developer.apple.com/app-store/app-privacy-details/)
+and [Google Play Data safety purposes](https://support.google.com/googleplay/android-developer/answer/10787469).

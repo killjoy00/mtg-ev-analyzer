@@ -1,3 +1,4 @@
+import {resultsRoute} from './results-privacy.mjs';
 import { RETIRED_MODES_MESSAGE } from './retired-modes.mjs';
 import {observedRoute,tagBackendResponse,observedDatabaseCall} from './backend-diagnostics.mjs';
 import {createHmac} from 'node:crypto';
@@ -118,7 +119,7 @@ function dbError(status, text) {
   try { detail = JSON.parse(text) || {}; } catch {}
   const constraint=detail.constraint||detail.constraint_name||
     String(detail.message||'').match(/\bunique constraint "([A-Za-z_][A-Za-z0-9_$]{0,62})"/)?.[1]||null;
-  const reason=reminderDatabaseReason(detail.message)||
+  const reason=reminderDatabaseReason(detail.message)||(['RESULTS_EMAIL_UNVERIFIED','RESULTS_EMAIL_SUPPRESSED','RESULTS_NOTICE_PERIOD'].includes(detail.message)?detail.message:null)||
     (detail.message==='Pick removal history is append-only'?'Pick removal history is append-only':
       typeof detail.message==='string'&&detail.message.startsWith('Latest Set Daily on ')&&detail.message.includes(' references unvalidated regular set ')
         ?'Latest Set Daily references unvalidated regular set.':null);
@@ -2444,6 +2445,8 @@ async function route(request) {
   if (url.pathname === '/internal/account-deletion-maintenance') return handleDeletionMaintenance(request);
   if (url.pathname === '/internal/daily-social-dispatch') return handleDailySocialDispatch(request);
   if (url.pathname === '/internal/account-deletion-maintenance-status') return handleDeletionMaintenanceStatus(request);
+  if (/^\/v1\/(?:mobile\/)?account\/results$/.test(url.pathname)||/^\/v1\/results\/(?:launch|unsubscribe|provider-event)$/.test(url.pathname)||url.pathname==='/v1/admin/results')
+    return resultsRoute(request,{query,json,readJson,authBrowser:r=>authSession(r,{required:true,allowLegacy:false,csrf:false}),authMutation:accountMutationAuth,authMobile:mobileAccountIdentity,authAdmin:adminAccountIdentity});
   if (url.pathname === '/internal/daily-reminders' || url.pathname === '/v1/reminders/unsubscribe' || url.pathname === '/v1/reminders/provider-event' || /^\/v1\/(?:mobile\/)?account\/reminders(?:\/devices)?$/.test(url.pathname))
     return reminderRoute(request,{query,json,readJson,authBrowser:(r)=>authSession(r,{required:true,allowLegacy:false,csrf:false}),authMutation:accountMutationAuth,authMobile:mobileAccountIdentity,trigger:verifyNeonScheduleTrigger,pacificDay:gameDateKey()});
   if (request.method === 'GET' && url.pathname === '/v1/account/google/callback') return handleGoogleCallback(request);
@@ -2547,6 +2550,10 @@ export default {
     try {
       return withCors(await observedRoute(request,'growth',route), request);
     } catch (error) {
+      if(new URL(request.url).pathname.includes('/results')) {
+        const status=error?.resultsSafe?Number(error.status||400):[401,403].includes(Number(error?.status))?Number(error.status):503;
+        return withCors(json({error:error?.resultsSafe?error.message:status===401?'Sign in to manage these choices.':'Results preferences are temporarily unavailable.'},status),request);
+      }
       if(new URL(request.url).pathname.includes('reminders')) {
         const status=error?.reminderSafe?Number(error.status||400):[401,403].includes(Number(error?.status))?Number(error.status):503;
         console.error(JSON.stringify({event:'reminder_request_rejected',status,code:error?.reminderSafe?String(error.code||'REMINDER_REQUEST'):'REMINDER_UNAVAILABLE'}));

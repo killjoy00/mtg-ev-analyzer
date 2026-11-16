@@ -1,3 +1,4 @@
+import {bindResultsInvitation} from './results-settings.mjs?v=1';
 import { loadDailyStatus } from './growth-api.mjs';
 import { todayStatus, gameDateKey } from './today-status.mjs';
 import { dailyResetCue } from './game-date.mjs';
@@ -39,6 +40,7 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), state = 'ready') {
       ? `<div><p class="eyebrow">Dailies complete</p><h2>Want another eight picks?</h2><p>Keep playing regular Draft Runs, or any sets with Pack One Elite.</p></div><a class="button primary" href="/practice/">Go to Practice</a>`
       : `<p class="eyebrow">Dailies complete</p><h2>Want another eight picks?</h2><p>A free account adds unlimited regular Draft Runs.</p><button class="button primary" data-home-account>Create a free account</button>`}</section>` : ''}
     ${unavailable ? '<div class="daily-home-unavailable" role="status"><span>Couldn’t load your Daily progress. Play now will still pick up where you left off.</span><button class="text-button" type="button" data-home-retry>Retry</button></div>' : ''}
+    <aside data-results-ui data-results-invitation hidden></aside>
   </section>`;
 }
 
@@ -49,10 +51,11 @@ export function renderDailyHome(profile = null, state = 'ready') {
   }
   lastDay = gameDateKey();
   document.querySelector('#app').innerHTML = dailyHomeMarkup(profile, lastDay, state);
-  document.querySelector('[data-home-account]')?.addEventListener('click', async () => (await import('./growth.mjs?v=33')).renderAccount());
+  void bindResultsInvitation();
+  document.querySelector('[data-home-account]')?.addEventListener('click', async () => (await import('./growth.mjs?v=34')).renderAccount());
   document.querySelector('[data-home-username]')?.addEventListener('click', async () => {
-    if(!profile?.player?.claimed){await (await import('./growth.mjs?v=33')).renderAccount({notice:'Choose a display name to join Daily leaderboards.'});return;}
-    const profiles=await import('./profile-product.mjs?v=24');
+    if(!profile?.player?.claimed){await (await import('./growth.mjs?v=34')).renderAccount({notice:'Choose a display name to join Daily leaderboards.'});return;}
+    const profiles=await import('./profile-product.mjs?v=25');
     await profiles.renderMyProfile();
     document.querySelector('#profile-account-tab')?.click();
     document.querySelector('#profile-account input[name="displayName"]')?.focus();

@@ -4,6 +4,8 @@
 # compare the actual Jekyll output against the public allowlist.
 include:
   - ".well-known"
+  - "results-copy.json"
+  - "results-settings.mjs"
 exclude:
   # Private / development source trees (regardless of extension).
   - ".devcontainer"

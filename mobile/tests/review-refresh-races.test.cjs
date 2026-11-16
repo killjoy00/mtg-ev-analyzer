@@ -48,15 +48,19 @@ function renderedText(node) {
 }
 
 function focusControl() {
-  let callback = null;
+  // Navigation focuses every mounted subscriber, including child settings panels.
+  const callbacks = new Set();
   return {
     useFocusEffect(next) {
-      callback = next;
-      React.useEffect(() => next(), [next]);
+      React.useEffect(() => {
+        callbacks.add(next);
+        const cleanup = next();
+        return () => { callbacks.delete(next); cleanup?.(); };
+      }, [next]);
     },
     trigger() {
-      if (!callback) throw new Error('focus callback not mounted');
-      return callback();
+      if (!callbacks.size) throw new Error('focus callback not mounted');
+      for (const callback of callbacks) callback();
     },
   };
 }

@@ -1,3 +1,4 @@
+import {resultsSettingsMarkup,bindResultsSettings} from './results-settings.mjs?v=1';
 import { escapeHtml as esc } from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
 import {
@@ -24,7 +25,7 @@ import { trackEvent } from './retention-events.mjs';
 import { nextMilestones } from './progression.mjs?v=10';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { eliteSource } from './membership-source.mjs';
-import { renderAccount, renderDeletionState } from './growth.mjs?v=33';
+import { renderAccount, renderDeletionState } from './growth.mjs?v=34';
 import {dailyReminderSettingsMarkup,bindDailyReminderSettings} from './daily-reminder-settings.mjs?v=5';
 import {
   bestPercentile,
@@ -270,6 +271,7 @@ function settingsMarkup(profile, progress, account, patreon) {
       </div>
     </section>`:''}
     ${dailyReminderSettingsMarkup({signedIn:Boolean(account?.user)})}
+    ${account?.user?resultsSettingsMarkup():''}
     ${account?.user?`<section class="settings-row profile-credentials profile-danger profile-settings-group" aria-labelledby="delete-account-title">
       <div class="settings-row-label"><h3 class="profile-delete-title" id="delete-account-title">Delete account</h3><p class="profile-settings-intro">Permanently deletes your Pack One account and profile and signs you out everywhere. This cannot be undone.</p></div>
       <div class="settings-row-body">${deletionControlMarkup(account,patreon)}</div>
@@ -366,6 +368,7 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
   document.querySelector('#profile-home')?.addEventListener('click', () => { window.location.href = './'; });
   document.querySelector('#account-status-retry')?.addEventListener('click',()=>void renderMyProfile());
   void bindDailyReminderSettings();
+  void bindResultsSettings();
   document.querySelector('#account-signout')?.addEventListener('click',async e=>{e.currentTarget.disabled=true;await signOutAccount();track('auth_sign_out');await renderAccount();});
   const passwordToggle=document.querySelector('#account-password-toggle'),passwordForm=document.querySelector('#account-password-change');
   const showPasswordForm=open=>{
