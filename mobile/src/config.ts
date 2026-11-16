@@ -28,6 +28,7 @@ type NativeAdMobOptions = {
 // provide expo-constants, so a missing module must leave advertising disabled.
 function readAdMobOptions(): NativeAdMobOptions | undefined {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- test-only runtimes may lack Expo native modules.
     const module = require('expo-constants') as typeof import('expo-constants');
     return module.default?.expoConfig?.extra?.adMob as NativeAdMobOptions | undefined;
   } catch {

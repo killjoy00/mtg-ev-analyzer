@@ -19,9 +19,8 @@ export function AdMobDailyBanner({ eligible }: { eligible: boolean }) {
 
   useEffect(() => {
     let active = true;
-    setSdk(null);
-    setPrivacyRequired(false);
-    setFailed(false);
+    // The Home screen unmounts this slot on any loss of ad eligibility.
+    // State only changes in asynchronous UMP/SDK callbacks.
     if (!eligible || !enabled || !unitId || config.screenshots?.fixtures) return () => { active = false; };
     void (async () => {
       try {

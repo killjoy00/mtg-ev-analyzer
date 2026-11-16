@@ -6,7 +6,7 @@ const { compileModule } = require('./support/compile-module.cjs');
 const { act } = Renderer;
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const drain = () => new Promise(resolve => setImmediate(resolve));
-const host = name => props => React.createElement(name, props, props.children);
+const host = name => function MockNativeHost(props) { return React.createElement(name, props, props.children); };
 
 test('Daily-home monetization is mutually exclusive and fails closed', () => {
   const { dailyHomePromotion } = compileModule('src/ads/placement.ts', {});
