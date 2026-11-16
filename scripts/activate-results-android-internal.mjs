@@ -2,6 +2,7 @@
 // staging a draft or rebuilding the app. The existing internal 100925
 // testers remain on their completed release if any check fails before commit.
 import assert from 'node:assert/strict';
+import {isDeepStrictEqual} from 'node:util';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -118,7 +119,7 @@ export async function activateResultsInternal970({
       },
     });
     const staged = await req(prefix + '/tracks');
-    assert.ok(JSON.stringify(otherTracks(staged))===JSON.stringify(beforeOther),
+    assert.ok(isDeepStrictEqual(otherTracks(staged),beforeOther),
       'A non-internal Play track changed in the release edit; refusing commit.');
     assertClosed(staged);
     const stagedInternal = staged.tracks.find((track) => track.track === INTERNAL);
@@ -136,7 +137,7 @@ export async function activateResultsInternal970({
     verifyId = await newEdit();
     const prefix = '/edits/' + verifyId;
     const inventory = await req(prefix + '/tracks');
-    assert.ok(JSON.stringify(otherTracks(inventory))===JSON.stringify(beforeOther),
+    assert.ok(isDeepStrictEqual(otherTracks(inventory),beforeOther),
       'A non-internal Play track changed after commit. Inspect Google Play immediately.');
     assertClosed(inventory);
     const internal = await req(prefix + '/tracks/' + INTERNAL);
