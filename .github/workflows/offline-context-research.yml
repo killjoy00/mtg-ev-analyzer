@@ -1,0 +1,33 @@
+name: Offline mana context research
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/offline_context_model.py'
+      - 'tests/test_offline_context_model.py'
+      - 'research/OFFLINE-CONTEXT-MODEL.md'
+      - '.github/workflows/offline-context-research.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  offline-context:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Focused safety and source-separation contracts
+        run: python -m unittest discover -s tests -p 'test_offline_context_model.py' -v
+      - name: Research-only evaluation of frozen public Cube corpus
+        run: |
+          python scripts/offline_context_model.py \
+            --input corpus/draft-run/powered-cube.json.gz \
+            --display-preview \
+            --output "$RUNNER_TEMP/offline-context-aggregate.json"
+      - name: Print aggregate-only results
+        run: |
+          python -c 'import json,os; p=json.load(open(os.environ["RUNNER_TEMP"]+"/offline-context-aggregate.json")); print(json.dumps({k:p[k] for k in ("status","features","learned_weights","partitions","excluded_puzzles_by_reason")},sort_keys=True,indent=2))'
