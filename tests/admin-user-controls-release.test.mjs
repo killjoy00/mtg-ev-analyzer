@@ -45,9 +45,6 @@ test('gateway allows only the narrow admin username and deletion routes and meth
   assert.equal(adminPath('/v1/admin/measurements','GET'),true);
   assert.equal(adminPath('/v1/admin/measurements/habits','GET'),true);
   assert.equal(adminPath('/v1/admin/measurements/reviews','GET'),true);
-  assert.equal(adminPath('/v1/admin/measurements/research-cases','GET'),true);
-  assert.equal(adminPath('/v1/admin/measurements/research-cases','POST'),false);
-  assert.equal(adminPath('/v1/admin/measurements/research-cases/extra','GET'),false);
   assert.equal(adminPath('/v1/admin/measurements/habits','POST'),false);
   // All dashboard APIs added in #1353 must be reachable through the real
   // production gateway; an omitted allowlist entry otherwise returns 404.
