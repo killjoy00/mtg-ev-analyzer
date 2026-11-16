@@ -6,6 +6,7 @@ import {renderAdminTeam} from './team.mjs?v=20261024-subpages';
 import {renderCampaignLinks} from './campaign-links.mjs?v=20261024-dashboard';
 import {renderPlayerReports} from './player-reports.mjs?v=20261024-subpages';
 import {renderPuzzleReview} from './puzzle-review.mjs?v=20261026-puzzle-review-v3';
+import {bindModelResearch} from './model-research.mjs?v=20261115-research-v1';
 import {ADMIN_API_VERSION} from '../admin-api-contract.mjs';
 import {accountCsrfToken,firstPartyAuthEnabled,getAuthSession,storedAccountToken,signOutAccount} from '../growth-api.mjs';
 import {sanitizeAdminDestination} from './admin-return.mjs';
@@ -311,6 +312,11 @@ function render() {
     </section><section class="subpage-section" aria-labelledby="insights-breakdowns-heading"><h2 id="insights-breakdowns-heading">Decision breakdowns</h2><p class="subpage-help">Open a breakdown to compare outcomes for that dimension. Sections with few answers should be treated as exploratory.</p><div class="insights-breakdowns">
     ${[['difficulty','By difficulty'],['pick','By real draft pick'],['round','By game position'],['set','By set'],['source_event','By source event'],['trophy_support','How strongly the model supports the trophy pick'],['version','By scoring and selection version']].map(([dimension,title])=>`<details class="insights-breakdown" ${['difficulty','pick'].includes(dimension)?'open':''}><summary>${title}</summary>${dimension==='trophy_support'?'<p class="subpage-help">Brackets show the trophy card’s model-implied credit (rounded 95 × trophy support / top-card support), not the points earned by players. Current puzzles must have at least 20 implied points to be served; the maximum implied value is 95. Below-floor or unrated historical decisions appear separately if present.</p>':''}${table(dimension==='trophy_support'?supportBracketRows(report.groups.filter(r=>r.dimension===dimension)):report.groups.filter(r=>r.dimension===dimension).sort((a,b)=>dimension==='difficulty'?['easy','medium','hard','unrated'].indexOf(a.label)-['easy','medium','hard','unrated'].indexOf(b.label):a.label.localeCompare(b.label,undefined,{numeric:true})),dimension==='trophy_support'?'Implied points':'Group')}</details>`).join('')}</div></section>
     <section class="subpage-section" aria-labelledby="insights-model-heading"><h2 id="insights-model-heading">Player choices vs. model</h2><p class="subpage-help">How often is the model favorite also the player favorite? Exploratory evidence, not a measure of drafting correctness.</p><div id="player-model-audit"><p class="muted">Comparing first-time answers with saved model predictions…</p></div></section>
+    <section class="subpage-section" aria-labelledby="model-research-heading"><h2 id="model-research-heading">Research the disagreements</h2>
+    <p class="subpage-help">A source-distinct review sample from v10 mixes unusually large player/model disagreements with randomly ordered controls across pick stages. Review the pack without vote counts, the model recommendation, or the trophy pick; reveal the diagnosis only after making your choices. This is a research aid, not a new scoring system.</p>
+    <div class="actions"><button type="button" id="model-research-load">Open blind review</button><button type="button" class="secondary" id="model-research-reveal" disabled>Reveal diagnosis</button><button type="button" class="secondary" id="model-research-copy" disabled>Copy review choices</button></div>
+    <p id="model-research-status" role="status" class="subpage-help"></p>
+    <div id="model-research-detail"></div></section>
     <section class="subpage-section" aria-labelledby="insights-quality-heading"><h2 id="insights-quality-heading">Puzzle quality watchlist</h2><div id="quality-watch"><p class="muted">Checking puzzle quality signals…</p></div></section>
     <section class="subpage-section" aria-labelledby="insights-reviews-heading"><h2 id="insights-reviews-heading">Decisions to review</h2>
     <details class="insights-note-details"><summary>Alternative-credit distribution</summary><p>${[['0–24',s.partial_0_24],['25–49',s.partial_25_49],['50–74',s.partial_50_74],['75–95',s.partial_75_95]].map(([label,n])=>`${label} points: <strong>${fmt(n)}</strong>`).join(' · ')}</p>
@@ -322,6 +328,7 @@ function render() {
     const blob=new Blob([[keys,...rows.map(r=>keys.map(k=>r[k]))].map(row=>row.map(cell).join(',')).join('\r\n')],{type:'text/csv'});
     const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`pack-one-decisions-${f.start}-${f.end}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
   };
+  bindModelResearch(root,request,reportQuery(f));
 }
 // Report refresh does not reset the authorized shell or remove filters while a
 // previous report request is in flight. In particular, a second refresh must
