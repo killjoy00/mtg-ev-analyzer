@@ -234,7 +234,7 @@ test('public failure categories retain stages and HTTP status but never arbitrar
 
 
 test('account-wide fallback rescues failed 5xx handler/start traces despite unrelated scoped rows',async()=>{
-  const chars=['a','b','c'],normals=['d','e','f','g'],queries=[];
+  const chars=['a','b','c'],normals=['d','e','f','0'],queries=[];
   const tr=c=>c.repeat(32),eventRow=(name,c,data)=>({
     $metadata:{id:name+'-'+c},source:{event:name,trace:tr(c),...data},
   });
