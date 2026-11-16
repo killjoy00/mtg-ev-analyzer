@@ -39,7 +39,7 @@ export function adminPath(path,method) {
   if(method==='POST'&&path==='/v1/admin/team/invitations')return true;
   if(method==='POST'&&/^\/v1\/admin\/team\/invitations\/[a-f0-9-]{36}\/revoke$/.test(path))return true;
   if(method==='POST'&&/^\/v1\/admin\/team\/members\/[a-f0-9-]{36}\/revoke$/.test(path))return true;
-  if(method==='GET'&&/^\/v1\/admin\/measurements(?:\/(?:habits|reviews))?$/.test(path))return true;
+  if(method==='GET'&&/^\/v1\/admin\/measurements(?:\/(?:habits|reviews|research-cases))?$/.test(path))return true;
   // These four read-only dashboard endpoints are protected by the same
   // backend account/Admin membership checks as the other draft Admin routes.
   if(method==='GET'&&/^\/v1\/admin\/(?:overview\/(?:trends|health)|insights\/quality-watch|campaign-performance)$/.test(path))return true;
