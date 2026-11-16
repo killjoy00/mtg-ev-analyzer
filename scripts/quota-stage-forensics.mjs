@@ -108,7 +108,18 @@ export function quotaLogFallbackNeeds(gatewayRows,handlerRows,startRows) {
     starts:[...targets].some(t=>!started.has(t))};
 }
 
-export function summarizeQuotaStages(gatewayRows,handlerRows,startRows){
+// Only a retained >1s pre-origin quota 5xx with no handler timing triggers
+// another bounded account-wide search. Absent logs never prove a debit state.
+export function quotaCommitProbeNeeded(gatewayRows) {
+  return gatewayRows.some(row=>{
+    const p=payload(row,'gateway_request');
+    return p&&p.status>=500&&p.status<=599&&p.upstream_calls===0&&
+      p.sample_rate===1&&timing(p.quota_ms)>1000&&
+      (timing(p.quota_handler_ms)===null||timing(p.quota_transport_wait_ms)===null);
+  });
+}
+
+export function summarizeQuotaStages(gatewayRows,handlerRows,startRows,commitRows=[]){
   const handlers=new Map(),starts=new Set(),slow=[],layout={current:0,legacy:0,empty:0,unread:0,other:0},
     phases={complete:0,transaction:0,durability:0,other:0};
   for(const row of handlerRows){
@@ -116,6 +127,16 @@ export function summarizeQuotaStages(gatewayRows,handlerRows,startRows){
     if(t&&(!handlers.has(t)||(attempt(p.attempt)||0)>(attempt(handlers.get(t).attempt)||0)))handlers.set(t,p);
   }
   for(const row of startRows){const p=payload(row,'quota_handler_start'),t=key(p?.trace);if(t)starts.add(t);}
+  // Commit wait precedes storage.sync(): positive durability-stage evidence,
+  // not proof that the transaction was durably committed.
+  const commitWaits=new Map();
+  for(const row of commitRows){
+    const p=payload(row,'quota_commit_wait'),t=key(p?.trace);
+    if(t&&attempt(p.attempt)!==null&&[204,429].includes(p.decision_status)){
+      const entry=commitWaits.get(t)||new Set();entry.add(p.decision_status);
+      commitWaits.set(t,entry);
+    }
+  }
   let gatewayRecords=0,errors=0,preOriginErrors=0;
   const sampled_success_log_coverage={observed:0,with_start:0,with_completion:0};
   for(const row of gatewayRows){
@@ -169,6 +190,10 @@ export function summarizeQuotaStages(gatewayRows,handlerRows,startRows){
   // They describe exception classification, not the underlying root cause.
   const failed_quota_failure_signals={provider_reset:0,timeout_or_abort:0,
     overloaded:0,provider_internal:0,other_or_unknown:0};
+  // A matched finished 204 with confirmed durability is evidence of admission.
+  // A commit-wait without completion is ambiguous; missing logs are unknown.
+  const failed_quota_commit_stages={confirmed_admission:0,confirmed_denial:0,
+    commit_wait_only:0,handler_seen_without_commit:0,no_correlated_stage:0};
   let failed_quota_without_timing=0;
   for(const p of slow){
     if(p.status<500||p.upstream_calls!==0||
@@ -185,6 +210,12 @@ export function summarizeQuotaStages(gatewayRows,handlerRows,startRows){
       failed_quota_failure_signals.provider_internal++;
     else failed_quota_failure_signals.other_or_unknown++;
     const t=key(p.trace),h=t?handlers.get(t):null;
+    const decision=h?.durability_confirmed===true&&h?.phase==='complete'?h.status:null;
+    if(decision===204)failed_quota_commit_stages.confirmed_admission++;
+    else if(decision===429)failed_quota_commit_stages.confirmed_denial++;
+    else if(t&&commitWaits.has(t))failed_quota_commit_stages.commit_wait_only++;
+    else if(h||(t&&starts.has(t)))failed_quota_commit_stages.handler_seen_without_commit++;
+    else failed_quota_commit_stages.no_correlated_stage++;
     if(h&&h.status===503){
       if(h.phase==='transaction')failed_quota_phase.transaction++;
       else if(h.phase==='durability')failed_quota_phase.durability++;
@@ -211,6 +242,7 @@ export function summarizeQuotaStages(gatewayRows,handlerRows,startRows){
     slow_gateway_quota:slow.length,matched_slow:matched.length,
     slow_route_groups,slow_outcomes,missing_gateway_timing_outcomes,
     failed_quota_without_timing,failed_quota_phase,failed_quota_failure_signals,
+    failed_quota_commit_stages,commit_wait_records:commitWaits.size,
     missing_handler_completion:missing.length,missing_handler_with_start:missing.filter(x=>x.start).length,
     slow_handler_dominant:slow.filter(p=>timing(p.quota_handler_ms)!==null&&timing(p.quota_transport_wait_ms)!==null&&p.quota_handler_ms>=p.quota_transport_wait_ms).length,
     slow_residual_dominant:slow.filter(p=>timing(p.quota_handler_ms)!==null&&timing(p.quota_transport_wait_ms)!==null&&p.quota_transport_wait_ms>p.quota_handler_ms).length,
@@ -345,20 +377,25 @@ export async function runQuotaForensics({fetcher=fetch,env=process.env,now=Date.
     const legacyFallback=slowQuota&&!handlers.rows.length;
     const handlersAccount=(missing.handlers||legacyFallback)?await query('quota_handler',null):null;
     const startsAccount=(missing.starts||legacyFallback)?await query('quota_handler_start',null):null;
+    // Use the same provider partition/sampling and request budgets. Never
+    // issue this additional account-wide search for ordinary healthy calls.
+    const commitWaitAccount=quotaCommitProbeNeeded(gateway.rows)?
+      await query('quota_commit_wait',null):null;
     // Preserve both verified scopes; matching uses the random request trace,
     // with no trace or provider rows ever included in the report.
     const allHandlers=handlersAccount?[...handlers.rows,...handlersAccount.rows]:handlers.rows;
     const allStarts=startsAccount?[...starts.rows,...startsAccount.rows]:starts.rows;
     const sources={gateway,handlers,starts,
       ...(handlersAccount?{handlers_account_wide:handlersAccount}:{}),
-      ...(startsAccount?{starts_account_wide:startsAccount}:{})};
+      ...(startsAccount?{starts_account_wide:startsAccount}:{}),
+      ...(commitWaitAccount?{commit_wait_account_wide:commitWaitAccount}:{})};
     summaries.push({window:name,status:'collected',from,to,
-      ...summarizeQuotaStages(gateway.rows,allHandlers,allStarts),
+      ...summarizeQuotaStages(gateway.rows,allHandlers,allStarts,commitWaitAccount?.rows||[]),
       slow_request_stages:summarizeSlowRequestStages(gateway.rows),
       query_coverage:Object.fromEntries(Object.entries(sources).map(([key,value])=>[key,{requests:value.requests,partitions:value.coverage}]))});
   }
   return {version:2,source:'cloudflare_read_only_telemetry',windows:summaries,
-    limitation:'Verified query partitions do not establish complete log retention. Missing records are not proof of nonexecution. Replayed incident intervals come from bounded machine-managed last-breach markers, not a guarantee of complete log retention. Ordinary successes are sampled; full-tail slow-response counts need tail_sampling_version 1. Gateway timings end when the response is constructed, not when the client receives the body. Stage dominance is diagnostic, not proof of root cause.'};
+    limitation:'Verified query partitions do not establish complete log retention. Missing records are not proof of nonexecution or a missing debit. A commit-wait event precedes storage.sync() and does not confirm durability. A matched completed 204 with confirmed durability is stronger positive evidence of admission, not a provider-wide ledger. Replayed incident intervals come from bounded machine-managed last-breach markers, not a guarantee of complete log retention. Ordinary successes are sampled; full-tail slow-response counts need tail_sampling_version 1. Gateway timings end when the response is constructed, not when the client receives the body. Stage dominance is diagnostic, not proof of root cause.'};
 }
 export async function publishQuotaForensics({fetcher=fetch,env=process.env,now=Date.now()}={}){
   let stage='trusted_context';
