@@ -1,0 +1,50 @@
+name: Results policy live acceptance
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/results-policy-live-acceptance.yml'
+      - 'scripts/prepare-results-policies.mjs'
+      - 'docs/releases/results-policy-copy.json'
+      - 'privacy/index.html'
+      - 'terms/index.html'
+      - 'mobile/src/nativeEditorial.ts'
+      - 'mobile/app/privacy.tsx'
+      - 'mobile/app/terms.tsx'
+
+permissions:
+  contents: read
+
+jobs:
+  first-publication:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify live activation before first policy publication
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          node --input-type=module <<'JS'
+          import assert from 'node:assert/strict';
+          import fs from 'node:fs';
+          import {execFileSync} from 'node:child_process';
+          const base=process.env.BASE_SHA;
+          assert.match(base,/^[a-f0-9]{40}$/);
+          const marker=/^export const resultsPolicyReleaseDate = ("[^"\n]+");$/m;
+          const before=execFileSync('git',['show',base+':mobile/src/nativeEditorial.ts'],{encoding:'utf8'});
+          if(marker.test(before)){
+            console.log('Initial results policy publication was already completed.');
+          }else{
+            const current=fs.readFileSync('mobile/src/nativeEditorial.ts','utf8').match(marker);
+            assert.ok(current,'First policy publication needs the shared release date');
+            const date=JSON.parse(current[1]);
+            execFileSync(process.execPath,['scripts/prepare-results-policies.mjs',date,'--apply'],{stdio:'inherit'});
+            execFileSync('git',['diff','--exit-code','--','privacy/index.html','terms/index.html','mobile/src/nativeEditorial.ts','mobile/app/privacy.tsx','mobile/app/terms.tsx'],{stdio:'inherit'});
+          }
+          JS
