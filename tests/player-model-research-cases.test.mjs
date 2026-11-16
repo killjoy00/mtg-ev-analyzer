@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {adminPath} from '../edge/gateway.mjs';
+import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {handleAdmin} from '../worker/measurement-admin.mjs';
 import {
-  RESEARCH_CASES_SQL,RESEARCH_CORPUS,RESEARCH_MIN_CHOICES,RESEARCH_MAX_PUZZLES,
+  RESEARCH_CASES_SQL,RESEARCH_CORPUS,RESEARCH_MIN_CHOICES,RESEARCH_MAX_PUZZLES,assertResearchCorpus,RESEARCH_PINNED_GENERATION,
   buildModelResearchCases,simpleCastColors,strongPoolColour,wilsonLower95,stageForPick,
 } from '../worker/player-model-research-cases.mjs';
 
@@ -30,6 +31,9 @@ test('read-only SQL uses the original first-time daily cohort and bounded public
   assert.match(RESEARCH_CASES_SQL,/HAVING sum\(votes\)>=\$3::int/);
   assert.match(RESEARCH_CASES_SQL,/p.corpus_version=\$4::text/);
   assert.match(RESEARCH_CASES_SQL,/LIMIT 1001/);
+  assert.equal(RESEARCH_CORPUS,DRAFT_RUN_CORPUS_VERSION);
+  assert.equal(RESEARCH_PINNED_GENERATION,10);
+  assert.doesNotThrow(assertResearchCorpus);
   assert.equal(RESEARCH_MIN_CHOICES,50);
   assert.equal(RESEARCH_MAX_PUZZLES,1000);
   assert.doesNotMatch(RESEARCH_CASES_SQL,/\b(?:INSERT|UPDATE|DELETE|ALTER|DROP)\b/i);
