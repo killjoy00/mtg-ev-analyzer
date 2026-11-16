@@ -249,7 +249,7 @@ jobs:
             curl --silent --fail http://127.0.0.1:4173/ -o /dev/null && break
             sleep 1
           done
-      - name: Render the recorded November 14 pick
+      - name: Render the recorded November 8 cube pick
         run: node tests/reddit-cube-nov08-p1p2-capture.mjs
       - name: Upload authentic UI screenshots
         if: always()
