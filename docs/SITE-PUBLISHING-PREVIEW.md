@@ -57,3 +57,46 @@ claim of confidential data removal: the repository itself is public.
    change with a rollback plan and protected release acceptance.
 
 This source-only PR must not be mistaken for a published security fix.
+## Reversible Jekyll publication candidate (PR #1578)
+
+The existing site uses the branch-root Jekyll publisher; GitHub Pages
+cannot consume the copied preview directly without changing repository
+Pages-source settings. The candidate keeps that publishing mechanism and
+instead adds explicit `_config.yml` exclusions for non-site source trees,
+package metadata, reports and internal Markdown. This changes **live Pages
+output** once merged; merely opening the PR does not deploy it.
+
+The dedicated `Pages release parity` CI workflow runs GitHub's actual
+`jekyll-build-pages` action **without deploying**, then verifies the result
+with `scripts/check-pages-jekyll-parity.mjs`. All tracked public files must
+be present with byte-for-byte identical contents; all other output is
+rejected except an explicitly reviewed Jekyll theme-generated CSS file.
+It then validates the actual Jekyll site with the existing isolated browser
+and account/ads/Practice fixtures. No production Neon or ad-provider calls
+occur in those tests. The PR also probes existing public URLs with
+`scripts/verify-pages-production.mjs --baseline` (read-only).
+
+On each successful GitHub Pages deployment, `Pages post-deployment public
+allowlist` probes public mobile associations, ads.txt, site/legal/auth
+routes and the denylist of development-source URLs. If any denied file is
+still publicly served or a required path disappears, the check fails.
+The underlying GitHub repository remains publicly accessible; this is a
+Pages publication-surface reduction, **not removal of repository access**.
+
+### Rollback and limitations
+
+If the new Pages output causes a regression, revert the release PR's
+`_config.yml` exclusion additions (restoring `include: [\".well-known\"]`)
+and allow GitHub Pages to rebuild from main. Confirm Pages deploy, the
+production smoke job and public mobile/ads routes. During rollback the
+post-deploy allowlist verification may intentionally fail because the old
+publisher serves development files: treat that alarm as expected until the
+new exclusions are safely restored. Preserve `CNAME` and `.well-known`
+content throughout.
+
+Byte-identical assets and isolated browser fixtures substantially constrain
+risk but **cannot authenticate a real user with third-party providers or
+render live advertisements in this isolated CI**. Actual sign-in and ad
+partner behavior must remain covered by production monitoring and any
+future controlled real-account review. Artifact file-size reductions are
+not measured CDN cache or transfer-cost reductions.
