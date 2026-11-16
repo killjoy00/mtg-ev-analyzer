@@ -56,4 +56,4 @@ For predictive secondary checks, reuse checksum-pinned public 17Lands evaluation
 
 ## Operational safety
 
-No migrations or production writes, no Vercel deployments, no automated promotion, no rebuilding user scores, and no raw data in public CI. The protected Admin routes must fail closed for unauthenticated callers. Run the repository's existing required CI, backend gate and signed-in/unsigned-in smoke tests before any guarded Admin release. 
+No migrations or production writes, no Vercel deployments, no automated promotion, no rebuilding user scores, and no raw data in public CI. The protected Admin routes must fail closed for unauthenticated callers. Run the repository's existing required CI, backend gate and signed-in/unsigned-in smoke tests before any guarded Admin release.
