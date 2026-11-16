@@ -165,11 +165,25 @@ export function summarizeQuotaStages(gatewayRows,handlerRows,startRows){
   // All trace-level correspondence stays in this private function.
   const failed_quota_phase={transaction:0,durability:0,complete:0,
     handler_other:0,started_no_completion:0,not_observed:0};
+  // Disjoint fixed buckets from ALREADY-RETAINED gateway failure indicators.
+  // They describe exception classification, not the underlying root cause.
+  const failed_quota_failure_signals={provider_reset:0,timeout_or_abort:0,
+    overloaded:0,provider_internal:0,other_or_unknown:0};
   let failed_quota_without_timing=0;
   for(const p of slow){
     if(p.status<500||p.upstream_calls!==0||
       (timing(p.quota_handler_ms)!==null&&timing(p.quota_transport_wait_ms)!==null))continue;
     failed_quota_without_timing++;
+    const code=p.quota_failure_code;
+    if(p.quota_provider_reset===true||code==='storage_reset'||code==='transport_reset')
+      failed_quota_failure_signals.provider_reset++;
+    else if(p.quota_timeout===true||p.quota_aborted===true)
+      failed_quota_failure_signals.timeout_or_abort++;
+    else if(p.quota_overloaded===true)
+      failed_quota_failure_signals.overloaded++;
+    else if(code==='provider_internal'||code==='sqlite_out_of_memory')
+      failed_quota_failure_signals.provider_internal++;
+    else failed_quota_failure_signals.other_or_unknown++;
     const t=key(p.trace),h=t?handlers.get(t):null;
     if(h&&h.status===503){
       if(h.phase==='transaction')failed_quota_phase.transaction++;
@@ -196,7 +210,7 @@ export function summarizeQuotaStages(gatewayRows,handlerRows,startRows){
     gateway_5xx:errors,gateway_5xx_before_upstream:preOriginErrors,
     slow_gateway_quota:slow.length,matched_slow:matched.length,
     slow_route_groups,slow_outcomes,missing_gateway_timing_outcomes,
-    failed_quota_without_timing,failed_quota_phase,
+    failed_quota_without_timing,failed_quota_phase,failed_quota_failure_signals,
     missing_handler_completion:missing.length,missing_handler_with_start:missing.filter(x=>x.start).length,
     slow_handler_dominant:slow.filter(p=>timing(p.quota_handler_ms)!==null&&timing(p.quota_transport_wait_ms)!==null&&p.quota_handler_ms>=p.quota_transport_wait_ms).length,
     slow_residual_dominant:slow.filter(p=>timing(p.quota_handler_ms)!==null&&timing(p.quota_transport_wait_ms)!==null&&p.quota_transport_wait_ms>p.quota_handler_ms).length,

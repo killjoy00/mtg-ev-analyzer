@@ -286,3 +286,31 @@ test('verified normal-path log controls distinguish error-only gaps without clai
     assert.doesNotMatch(JSON.stringify(g),/trace|network|\\d{4}-\\d{2}-\\d{2}/);
   }
 });
+
+
+test('quota 5xx failure signal is disjoint, privacy-safe and requires a corroborated majority',()=>{
+  const phase={transaction:0,durability:0,complete:0,handler_other:0,
+    started_no_completion:0,not_observed:9};
+  const base={missing_gateway_timing_outcomes:{success:0,denied_429:0,failed_5xx:9,other:0},
+    failed_quota_without_timing:9,failed_quota_phase:phase,
+    sampled_success_log_coverage:{observed:8,with_start:8,with_completion:8}};
+  const signals=['provider_reset','timeout_or_abort','overloaded','provider_internal','other_or_unknown'];
+  const actions=['inspect_quota_provider_reset_signal','inspect_quota_timeout_or_abort_signal',
+    'inspect_quota_overload_signal','inspect_quota_provider_internal_signal',
+    'inspect_error_dispatch_or_provider_log_gaps'];
+  for(let i=0;i<signals.length;i++){
+    const evidence=Object.fromEntries(signals.map((k,j)=>[k,i===j?9:0]));
+    const f=read([quotaWindow(9,0,0,0,{...base,failed_quota_failure_signals:evidence})])[1];
+    assert.equal(f.error_stage,'no_correlated_handler_logs');
+    assert.equal(f.normal_path_logs,'normal_path_correlated');
+    assert.equal(f.failure_signal,i===4?'unverified':signals[i]);
+    assert.equal(f.next_action,actions[i]);
+    assert.doesNotMatch(JSON.stringify(f),/private|secret|trace|network|\\d{4}-\\d\\d-\\d\\d/);
+  }
+  const sparse=read([quotaWindow(9,0,0,0,{...base,failed_quota_failure_signals:
+    {provider_reset:2,timeout_or_abort:2,overloaded:2,provider_internal:2,other_or_unknown:1}})])[1];
+  assert.equal(sparse.failure_signal,'mixed');
+  const inconsistent=read([quotaWindow(9,0,0,0,{...base,failed_quota_failure_signals:
+    {provider_reset:20,timeout_or_abort:0,overloaded:0,provider_internal:0,other_or_unknown:0}})])[1];
+  assert.equal(inconsistent.failure_signal,'unverified');
+});
