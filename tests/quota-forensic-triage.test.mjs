@@ -74,6 +74,11 @@ test('skipped, duplicated and absent windows never read as recovered or dominant
   const skip=read([{window:'slow_requests_last_breach',status:'skipped',reason:'outside_configured_retention'},
     {window:'slow_quota_last_breach',status:'skipped',reason:'incident_closed'}]);
   assert.ok(skip.every(f=>f.outcome==='not_collected'));
+  assert.deepEqual(skip.map(f=>f.skip_reason),['outside_retention','incident_closed']);
+  const unavailable=read([{window:'slow_quota_last_breach',status:'skipped',
+    reason:'PRIVATE_PROVIDER_TOKEN_123'}])[1];
+  assert.equal(unavailable.skip_reason,'unverified');
+  assert.doesNotMatch(JSON.stringify(unavailable),/PRIVATE_PROVIDER_TOKEN_123/);
   const missing=read([]);
   assert.ok(missing.every(f=>f.outcome==='missing_or_duplicate_window'));
   const duplicate=read([requestWindow(3,{quota:3,origin:0,gateway_or_unmeasured:0}),
