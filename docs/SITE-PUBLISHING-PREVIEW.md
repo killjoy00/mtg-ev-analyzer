@@ -25,7 +25,8 @@ The output directory must not already exist, so stale files cannot survive
 a later allowlist change. All approved source bytes are copied unchanged
 and SHA-256 checked in the return manifest. The regression tests verify
 the tracked inventory, mandatory website/auth/deep-link paths, selected
-HTML and CSS local references, output checksums, and denied paths.
+HTML/CSS local references, literal browser-module import dependencies,
+output checksums, font license notices, and denied paths.
 
 The allowed output includes public data/corpus packages intentionally. Do
 not blindly exclude these; site/client dependencies must be evaluated
@@ -40,8 +41,8 @@ claim of confidential data removal: the repository itself is public.
    that directory, including anonymous play, login/redirect, ads, Elite,
    Admin, Practice, historic and current shares, creator/campaign paths,
    set guides, mobile universal links, and public puzzle/image downloads.
-   Dynamic JS imports and authenticated/network dependencies require
-   runtime tests; HTML/CSS static-reference checks alone are not enough.
+   Computed JS imports and authenticated/network dependencies require
+   runtime tests; static reference and literal import checks alone are not enough.
 3. Review publication manifest deltas and sample HTTP responses; record
    exact paths, total bytes, and measurable request/cache outcomes.
 4. Only then make a separately reversible Pages source/configuration
