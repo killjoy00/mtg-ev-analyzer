@@ -12,6 +12,12 @@ const ADMOB_DEMO = {
   iosBannerId: 'ca-app-pub-3940256099942544/2934735716',
   androidBannerId: 'ca-app-pub-3940256099942544/6300978111',
 } as const;
+// Public AdMob identifiers for Pack One's registered iOS app. These are not
+// credentials. Ad requests remain disabled unless the release gate is enabled.
+const ADMOB_IOS_PRODUCTION = {
+  appId: 'ca-app-pub-1217971050094766~3792911821',
+  bannerUnitId: 'ca-app-pub-1217971050094766/8989398185',
+} as const;
 const ADMOB_APP_ID = /^ca-app-pub-\d{16}~\d{10}$/;
 const ADMOB_UNIT_ID = /^ca-app-pub-\d{16}\/\d{10}$/;
 
@@ -23,10 +29,14 @@ function adMobPlatformConfig(
   testBanners: boolean,
   demoAppId: string,
   demoBannerId: string,
+  defaultProductionAppId: string = demoAppId,
+  defaultProductionBannerId: string = demoBannerId,
 ) {
   const enabled = production ? process.env[enabledName] === '1' : testBanners;
-  const appId = enabled && production ? process.env[appIdName]?.trim() : demoAppId;
-  const bannerUnitId = enabled && production ? process.env[bannerName]?.trim() : demoBannerId;
+  // A disabled iOS App Store build still embeds its registered AdMob App ID;
+  // no ad requests can run until enabled. Non-production uses only demo IDs.
+  const appId = production ? (process.env[appIdName]?.trim() || defaultProductionAppId) : demoAppId;
+  const bannerUnitId = production ? (process.env[bannerName]?.trim() || defaultProductionBannerId) : demoBannerId;
   if (enabled && production && (!appId || !ADMOB_APP_ID.test(appId)
     || !bannerUnitId || !ADMOB_UNIT_ID.test(bannerUnitId)
     || appId === demoAppId || bannerUnitId === demoBannerId
@@ -112,7 +122,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const iosAds = adMobPlatformConfig(production,
     'PACKONE_ADMOB_IOS_ENABLED', 'PACKONE_ADMOB_IOS_APP_ID',
     'PACKONE_ADMOB_IOS_BANNER_ID', testBanners,
-    ADMOB_DEMO.iosAppId, ADMOB_DEMO.iosBannerId);
+    ADMOB_DEMO.iosAppId, ADMOB_DEMO.iosBannerId,
+    ADMOB_IOS_PRODUCTION.appId, ADMOB_IOS_PRODUCTION.bannerUnitId);
   const androidAds = adMobPlatformConfig(production,
     'PACKONE_ADMOB_ANDROID_ENABLED', 'PACKONE_ADMOB_ANDROID_APP_ID',
     'PACKONE_ADMOB_ANDROID_BANNER_ID', testBanners,

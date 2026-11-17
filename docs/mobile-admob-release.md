@@ -31,16 +31,47 @@ remains unmerged and unsigned as a public App Store update.
 - All card-specific shopping links are gone from native Draft Run and set
   archives; website card-specific links are removed in separate PR #1602.
 
-## What the owner must set up in AdMob
+## AdMob identifiers supplied and implemented (November 16)
+
+The owner created the iOS AdMob app and ad unit. No further IDs are needed:
+
+- **iOS App ID:** `ca-app-pub-1217971050094766~3792911821`
+- **Daily-home Banner Ad Unit ID:** `ca-app-pub-1217971050094766/8989398185`
+- **Authorized seller:** `google.com, pub-1217971050094766, DIRECT, f08c47fec0942fa0`
+- **Published route:** https://packone.pro/app-ads.txt (fixed in #1604; the live Pages verification passed)
+
+Both public SDK identifiers are now the iOS production defaults in
+`mobile/app.config.ts`. The registered App ID appears in the native iOS
+configuration even while ads are disabled. The banner ad unit is used only in
+an explicitly enabled build. No GitHub secrets or environment variables for
+these two identifiers are required. **Live ads remain disabled by default**;
+turning on `PACKONE_ADMOB_IOS_ENABLED=1` requires policy clearance and a new
+signed build. The mobile test configuration continues using Google's sample IDs.
+
+## Remaining account steps (owner action)
+
+1. In AdMob → Apps → Pack One → app-ads.txt, run **Check for updates** and verify
+   that the seller record is approved; ensure App Store Connect's Marketing URL
+   is `https://packone.pro/`.
+2. In AdMob → **Privacy & messaging**, configure and publish required GDPR/EEA/UK
+   and relevant US state notices. Test their choices through UMP. Do not turn on
+   an IDFA/ATT message without implementing and disclosing the resulting tracking.
+3. In App Store Connect → Pack One → **App Privacy**, review SDK/UMP data and
+   possible tracking disclosures. Create marketing version **1.2**, if not done.
+4. Test iPhone/iPad with **sample ads** and UMP test geography before enabling
+   production banners; verify no banners on paid/ad-free accounts, correct
+   AdChoices/reporting, purchase restore and no ad requests on consent failure.
+5. Android advertising is a separate later setup; it remains disabled.
+
+## Original AdMob setup steps (completed or superseded)
 
 1. At https://apps.admob.com/, add **Pack One (iOS)** using the App Store listing
    and bundle ID `pro.packone.app`. Obtain its **App ID**
    (`ca-app-pub-...~...`). It is **not** the web AdSense publisher ID.
 2. Create a **Banner** ad unit for that iOS app and copy its **ad unit ID**
    (`ca-app-pub-.../...`). Ad units and app IDs are not interchangeable.
-3. In AdMob, copy its authorized-sellers `app-ads.txt` line (using the
-   **AdMob** publisher ID, not an assumed AdSense ID). Pack One has web
-   `ads.txt` but **no app-ads.txt yet**. Publish the verified line at
+3. In AdMob, copy its authorized-sellers `app-ads.txt` line. Pack One now has
+   both the web `ads.txt` and the published `app-ads.txt`. Publish the verified line at
    `https://packone.pro/app-ads.txt`, confirm the App Store listing
    has `https://packone.pro/` as its Developer Website/Marketing URL,
    and run AdMob's **Verify app** and app readiness review. Do not infer approval
@@ -58,13 +89,12 @@ remains unmerged and unsigned as a public App Store update.
    by `PACKONE_ADMOB_ANDROID_ENABLED=1`. Update Google Play **Contains ads**
    and Data Safety before any Android production release.
 
-Without the explicit enabled flag, **production has no AdMob requests**, even
-though its compiled SDK uses Google's official demo App IDs (required to avoid
-startup crashes in a disabled/test build). Non-production preview/dev builds
-use the same official sample IDs, and show test banners ONLY when
+Without the explicit enabled flag, **production has no AdMob requests**. The
+production iOS SDK embeds the real Pack One App ID. Android uses Google's
+sample App ID while Android ads are disabled. Preview/dev builds continue to
+use Google's official sample IDs and show test banners ONLY when
 `PACKONE_ADMOB_TEST_BANNERS=1`. These are test creatives, never live inventory.
-An enabled production build refuses missing/mismatched/demo publisher and unit IDs.
-Do not ship a production build with the sample IDs in an active ad placement.
+An enabled production build rejects mismatched or demo IDs.
 
 ## App Store and privacy requirements
 

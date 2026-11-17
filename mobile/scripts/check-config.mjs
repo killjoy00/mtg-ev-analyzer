@@ -93,18 +93,29 @@ assert.equal(production.android.edgeToEdgeEnabled, undefined);
 assert.equal(production.extra.buildProfile, 'production');
 assert.equal(production.extra.adMob.iosEnabled, false, 'production AdMob is opt-in');
 assert.equal(production.extra.adMob.androidEnabled, false, 'production AdMob is opt-in');
+const productionAdsPlugin = production.plugins.find(plugin =>
+  Array.isArray(plugin) && plugin[0] === 'react-native-google-mobile-ads');
+assert.equal(productionAdsPlugin?.[1]?.iosAppId, 'ca-app-pub-1217971050094766~3792911821',
+  'iOS native Info.plist must use Pack One, not the Google sample App ID');
+assert.equal(productionAdsPlugin?.[1]?.androidAppId, 'ca-app-pub-3940256099942544~3347511713',
+  'Android AdMob remains disabled and uses Google's sample ID');
+assert.equal(production.extra.adMob.iosBannerUnitId, null,
+  'disabled production builds must never expose an active banner unit');
+assert.equal(readFileSync(new URL('../../app-ads.txt', import.meta.url), 'utf8').trim(),
+  'google.com, pub-1217971050094766, DIRECT, f08c47fec0942fa0',
+  'Pack One app-ads.txt must match the registered iOS AdMob publisher');
 const testAdsPreview = loadConfig('preview', { PACKONE_ADMOB_TEST_BANNERS: '1' });
 assert.equal(testAdsPreview.extra.adMob.testBanners, true);
 assert.equal(testAdsPreview.extra.adMob.iosEnabled, true);
 assert.match(testAdsPreview.extra.adMob.iosBannerUnitId, /^ca-app-pub-3940256099942544\//);
-const liveIos = loadConfig('production', {
-  PACKONE_ADMOB_IOS_ENABLED: '1',
-  PACKONE_ADMOB_IOS_APP_ID: 'ca-app-pub-1234567890123456~1234567890',
-  PACKONE_ADMOB_IOS_BANNER_ID: 'ca-app-pub-1234567890123456/1234567890',
-});
+const liveIos = loadConfig('production', { PACKONE_ADMOB_IOS_ENABLED: '1' });
 assert.equal(liveIos.extra.adMob.iosEnabled, true);
 assert.equal(liveIos.extra.adMob.androidEnabled, false);
-assert.equal(liveIos.extra.adMob.iosBannerUnitId, 'ca-app-pub-1234567890123456/1234567890');
+assert.equal(liveIos.extra.adMob.iosBannerUnitId, 'ca-app-pub-1217971050094766/8989398185');
+assert.equal(liveIos.plugins.find(plugin => Array.isArray(plugin)
+  && plugin[0] === 'react-native-google-mobile-ads')?.[1]?.iosAppId,
+  'ca-app-pub-1217971050094766~3792911821');
+assert.equal(liveIos.extra.adMob.testBanners, false);
 assert.equal(production.plugins.some(plugin => Array.isArray(plugin)
   && plugin[0] === 'react-native-google-mobile-ads'
   && plugin[1].delayAppMeasurementInit === true), true);
