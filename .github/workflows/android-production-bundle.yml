@@ -1,17 +1,7 @@
 name: Android production bundle
 
+# Android development is paused. Run manually only when the owner resumes it.
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
-    paths:
-      - 'mobile/**'
-      - '.github/actions/mobile-validate/**'
-      - 'scripts/audit-android-manifest.py'
-      - '.github/workflows/android-production-bundle.yml'
-  push:
-    branches: [main]
-    paths:
-      - '.github/android-production-bundle-request.json'
   workflow_dispatch:
 
 permissions:

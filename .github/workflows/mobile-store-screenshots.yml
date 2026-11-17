@@ -265,7 +265,9 @@ jobs:
   android:
     name: capture Android phone
     needs: validate
-    if: needs.validate.outputs.capture_required == 'true'
+    # Android is paused for automatic PR and main captures. An explicit
+    # android_only manual/reusable invocation may still run this job.
+    if: needs.validate.outputs.capture_required == 'true' && (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.android_only
     # The full 28+ scenario native acceptance suite consistently reaches the
     # final account-switch scenario just as the old 45-minute cap expires.
     timeout-minutes: 60

@@ -7,10 +7,13 @@ on:
       - 'mobile/**'
       - '.github/workflows/mobile.yml'
       - '.github/workflows/ios-testflight.yml'
-      - '.github/workflows/android-internal-testing.yml'
-      - '.github/workflows/android-production-bundle.yml'
       - '.github/workflows/mobile-exact-main-rc.yml'
   workflow_dispatch:
+    inputs:
+      include_android:
+        description: Run the paused Android production-bundle smoke job
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -53,7 +56,7 @@ jobs:
   ios-archive:
     name: build unsigned iOS RC archive
     # The validate job proves this run started on exact main. If main moves after
-    # validation, both native builds may finish, but the manifest job treats them
+    # validation, any native builds may finish, but the manifest job treats them
     # as stale evidence and emits no exact-main RC manifest.
     needs: validate
     runs-on: macos-latest
@@ -122,6 +125,8 @@ jobs:
   android-bundle:
     name: build Android RC bundle
     needs: validate
+    # Expensive Android work is paused on main pushes; explicit manual opt-in only.
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.include_android }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -253,10 +258,13 @@ jobs:
   manifest:
     name: record RC evidence
     needs: [validate, ios-archive, android-bundle]
+    # Record iOS evidence even when Android was intentionally skipped; never
+    # conceal a failed manually requested Android build.
+    if: ${{ !cancelled() && needs.validate.result == 'success' && needs.ios-archive.result == 'success' && (needs.android-bundle.result == 'success' || needs.android-bundle.result == 'skipped') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Reconfirm exact current main after both builds
+      - name: Reconfirm exact current main after selected builds
         id: freshness
         shell: bash
         run: |
@@ -274,6 +282,8 @@ jobs:
           echo "Reconfirmed exact current main after native builds: $head_sha"
       - name: Write exact-main RC manifest
         if: steps.freshness.outputs.current == 'true'
+        env:
+          INCLUDE_ANDROID: ${{ inputs.include_android }}
         shell: bash
         run: |
           set -euo pipefail
@@ -290,7 +300,9 @@ jobs:
             play_version_name: release.playVersionName,
             publication: 'none',
             ios_artifact: 'unsigned archive; not installable/store-published',
-            android_artifact: 'production bundle smoke; not Play-published'
+            android_artifact: process.env.GITHUB_EVENT_NAME === 'workflow_dispatch' && process.env.INCLUDE_ANDROID === 'true'
+              ? 'production bundle smoke; not Play-published'
+              : 'not built; Android CI paused'
           };
           fs.writeFileSync('rc-evidence/mobile-exact-main-rc.json', JSON.stringify(out, null, 2) + '\n');
           NODE
