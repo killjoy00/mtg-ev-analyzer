@@ -31,6 +31,20 @@ export function AdMobDailyBanner({ eligible }: { eligible: boolean }) {
         if (!active) return;
         setPrivacyRequired(consent.privacyOptionsRequirementStatus === 'REQUIRED');
         if (!consent.canRequestAds) return;
+        // Google's bundled iOS manifest declares tracked Device ID. Only
+        // initialize the advertising SDK after Apple's ATT authorization.
+        // UMP may already have shown an ATT prompt; never show it twice.
+        // A declined/restricted permission leaves play unaffected and ad-free.
+        if (Platform.OS === 'ios') {
+          const tracking = await import('expo-tracking-transparency');
+          if (!active) return;
+          let permission = await tracking.getTrackingPermissionsAsync();
+          if (!active) return;
+          if (permission.status === tracking.PermissionStatus.UNDETERMINED) {
+            permission = await tracking.requestTrackingPermissionsAsync();
+          }
+          if (!active || !permission.granted) return;
+        }
         // Keep the first release contextual, without requesting personalized ads.
         await ads.default().setRequestConfiguration({ maxAdContentRating: ads.MaxAdContentRating.G });
         if (!active) return;
