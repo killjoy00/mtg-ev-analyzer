@@ -142,6 +142,12 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         androidAppId: androidAds.appId,
         delayAppMeasurementInit: true,
       }],
+      // The bundled Google Ads SDK declares Device ID tracking. Always include
+      // ATT authorization and its truthful system explanation in iOS builds;
+      // AdMobDailyBanner will fail closed unless authorization is granted.
+      ['expo-tracking-transparency', {
+        userTrackingPermission: 'Allow Pack One to use your device identifier for advertising measurement across apps and websites.',
+      }],
     ] as ExpoConfig['plugins'],
     ...(iosMarketingVersion ? { version: iosMarketingVersion } : {}),
     description: 'Practice real draft decisions, compare trophy picks, and track your Pack One career.',
