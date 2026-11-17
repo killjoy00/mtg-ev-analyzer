@@ -1,4 +1,40 @@
-# Pack One iOS 1.2: native AdMob release checklist
+# Pack One iOS AdMob release status
+
+## iOS 1.3 live-AdMob TestFlight candidate — November 17, 2026
+
+**Owner-confirmed:** Google approved the Pack One iOS AdMob app, and the
+App Store Connect App Privacy disclosure is done. This is a statement from
+the owner, not a new readback of AdMob or App Store Connect account settings.
+
+The previous iOS **1.2 / 101034** build was uploaded, processed
+`VALID`, and verified available in internal TestFlight with live ads
+**disabled**. The reviewed **1.3** candidate uses the same registered
+iOS App ID and Daily banner unit already specified below, but explicitly
+sets `PACKONE_ADMOB_IOS_ENABLED=1` in the unsigned iOS archive check and
+in the protected signing job. The release workflow fails before signing
+if the effective version is not 1.3, the approved app/banner identifiers
+are absent, the ATT plugin is missing, or Android ads are unexpectedly
+enabled. The App Store Connect distribution still requires exact-main,
+signed privacy audit, Apple processing and internal beta-group verification.
+
+**No public release is authorized.** Leave manual release and existing
+TestFlight groups unchanged. The new binary may request live, non-personalized,
+G-rated Daily-home banner inventory only after eligibility, Google UMP
+consent, and Apple ATT authorization. If consent is declined or ATT is
+denied, the game remains ad-free and fully playable.
+
+**Device acceptance for public launch, not a precondition to an internal
+TestFlight upload:** exercise guest/free versus Supporter/Elite,
+ATT granted/denied/restricted, applicable UMP notices and privacy options,
+ad load/failure, Apple subscription restore, VoiceOver and iPad layout.
+Confirm Google's AdChoices/report controls in the real rendered ad before
+App Review. If App Store Connect version 1.3 is not safely editable, the
+TestFlight finalizer may verify internal testing without attaching the new
+build to a public App Store version; it must not modify 1.2 as a workaround.
+
+---
+
+## Previous iOS 1.2 integration notes (historical)
 
 Prepared November 16, 2026. Apple approved **iOS 1.0** and marked it
 Ready for Distribution on November 16. The repository's last documented build
