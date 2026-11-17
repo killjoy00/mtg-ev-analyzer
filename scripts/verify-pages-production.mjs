@@ -15,6 +15,7 @@ const live=[
   ['/.well-known/assetlinks.json', 'android'],
   ['/.well-known/apple-app-site-association', 'ios'],
   ['/ads.txt', 'ads'],
+  ['/app-ads.txt', 'appads'],
   ['/robots.txt', 'txt'],
   ['/sitemap.xml', 'txt'],
   ['/data/catalog.json', 'json'],
@@ -32,6 +33,11 @@ async function collect(){
   for(const [path,kind] of live){
     try{
       const response=await fetch(origin+path,{signal:AbortSignal.timeout(20000),cache:'no-store'});
+      // Before publication, the candidate's new route legitimately returns 404.
+      // Post-deployment enforcement must still require the actual file.
+      if(mode==='--baseline'&&path==='/app-ads.txt'&&response.status===404){
+        results.push([path,response.status,response.headers.get('content-type')]);continue;
+      }
       if(response.status!==200){
         failures.push(path+' expected HTTP 200, got '+response.status);
         results.push([path,response.status,response.headers.get('content-type')]);continue;
@@ -48,6 +54,7 @@ async function collect(){
         ok=Array.isArray(association.applinks?.details)&&association.applinks.details.length>0;
       }
       if(kind==='ads')ok=data.includes('google.com, pub-1217971050094766');
+      if(kind==='appads')ok=data.trim()==='google.com, pub-1217971050094766, DIRECT, f08c47fec0942fa0';
       if(kind==='json')JSON.parse(data);
       if(!ok)failures.push(path+' returned unexpected '+kind+' content');
       results.push([path,response.status,response.headers.get('content-type')]);

@@ -77,3 +77,9 @@ test('real-byte staging copies only approved files with verifiable checksums',as
       'a second build must reject a stale output tree rather than leave excluded files behind');
   }finally{await rm(dir,{recursive:true,force:true});}
 });
+
+test('app-ads.txt exactly matches the AdMob publisher record and is publicly allowed',async()=>{
+  const data=await readFile(join(process.cwd(),'app-ads.txt'),'utf8');
+  assert.equal(data,'google.com, pub-1217971050094766, DIRECT, f08c47fec0942fa0\n');
+  assert.equal(isPublicSitePath('app-ads.txt'),true);
+});

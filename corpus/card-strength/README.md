@@ -1,8 +1,9 @@
 # Card strength tables
 
 One table per set with a Premier Draft trophy archive in
-`corpus/trophy-decks/coverage.json` (31 sets). The latest-set Daily uses them
-to rank contested decisions by stakes (`puzzle-selection.mjs`,
+`corpus/trophy-decks/coverage.json` (31 sets). The Latest Set and Main Dailies
+use them to rank contested decisions by stakes and to check that an Easy
+answer is the strongest rated card in its pack (`puzzle-selection.mjs`,
 `docs/LATEST-DAILY-SELECTION.md`).
 
 ## Measure
