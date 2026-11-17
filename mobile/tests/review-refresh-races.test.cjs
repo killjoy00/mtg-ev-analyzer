@@ -694,8 +694,7 @@ test('Learn exposes a visible retry message when the canonical browser handoff f
 });
 
 
-test('published set archive renders current editorial evidence and exact disclosed TCGplayer links', async () => {
-  const opened = [];
+test('published set archive preserves evidence with no card commerce', async () => {
   const archive = {
     setId: 'msh', replaySeats: 300, trainingDrafts: 5000, trainingPicks: 209999,
     experiencedCohortDrafts: 40480, winRateCutoff: '60%', averageTopSupport: '48.8%',
@@ -708,7 +707,7 @@ test('published set archive renders current editorial evidence and exact disclos
     'expo-image': { Image: host('Image') },
     'expo-router': { router: { replace() {}, push() {} }, useLocalSearchParams: () => ({ setId: 'msh' }) },
     'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
-      Linking: { openURL: async (url) => { opened.push(url); } },
+      Linking: { openURL: async () => { throw new Error('should not open'); } },
       Pressable: host('Pressable'), ScrollView, StyleSheet: { create: (value) => value },
       Text: host('Text'), View: host('View'),
     },
@@ -726,15 +725,13 @@ test('published set archive renders current editorial evidence and exact disclos
   assert.match(text, /48.8%/);
   assert.match(text, /Cosmic Cube/);
   assert.match(text, /37\.7%\s+support/);
-  assert.match(text, /Affiliate disclosure/);
-  const link = root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Find Cosmic Cube on TCGplayer, affiliate link')[0];
-  assert.ok(link);
-  await act(async () => { link.props.onPress(); await Promise.resolve(); });
-  assert.deepEqual(opened, ['https://partner.example/?card=Cosmic%20Cube']);
+  assert.doesNotMatch(text, /Affiliate disclosure|TCGplayer/);
+  assert.equal(root.root.findAll(node => node.type === 'Pressable' && node.props.accessibilityRole === 'link').length, 0);
+  assert.equal(root.root.findAll(node => node.type === 'Image' && node.props.accessibilityLabel === 'Cosmic Cube').length, 1);
   await act(async () => root.unmount());
 });
 
-test('published set archive keeps the analysis mounted when affiliate browser handoff fails', async () => {
+test('published set archive does not attempt any card link or browser handoff', async () => {
   const archive = {
     setId: 'msh', replaySeats: 300, trainingDrafts: 5000, trainingPicks: 209999,
     experiencedCohortDrafts: 40480, winRateCutoff: '60%', averageTopSupport: '48.8%',
@@ -758,9 +755,8 @@ test('published set archive keeps the analysis mounted when affiliate browser ha
   const Screen = compileScreen('app/set-archive.tsx', mocks);
   let root;
   await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); });
-  const link = root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityRole === 'link')[0];
-  await act(async () => { link.props.onPress(); await Promise.resolve(); await Promise.resolve(); });
-  assert.match(renderedText(root.toJSON()), /Could not open TCGplayer for Cosmic Cube\. Try the affiliate link again\./);
+  assert.equal(root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityRole === 'link').length, 0);
+  assert.doesNotMatch(renderedText(root.toJSON()), /TCGplayer|affiliate/i);
   assert.match(renderedText(root.toJSON()), /MSH\s+Pack One archive/);
   await act(async () => root.unmount());
 });
@@ -774,7 +770,7 @@ test('published set web URLs rewrite only the four reviewed archives into native
 });
 
 
-test('Daily home shows the disclosed TCGplayer fallback to guests without a membership lookup', async () => {
+test('Android Daily home keeps the disclosed affiliate fallback for guests', async () => {
   const focus = focusControl();
   let membershipCalls = 0;
   const opened = [];
@@ -895,7 +891,7 @@ test('Daily home rejects late promotion eligibility from a previous signed-in ac
   await act(async () => root.unmount());
 });
 
-test('Daily home keeps the promo mounted and reports a retryable error when TCGplayer handoff fails', async () => {
+test('Android Daily home shows a retryable error when its affiliate handoff fails', async () => {
   const focus = focusControl();
   const mocks = {
     '@/src/hooks/useCardCommerce': { useCardCommerce: () => true },

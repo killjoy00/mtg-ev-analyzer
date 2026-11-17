@@ -71,12 +71,48 @@ def main():
     failures = []
     if info.get("ITSAppUsesNonExemptEncryption") is not False:
         failures.append("ITSAppUsesNonExemptEncryption must remain false")
-    if usage_keys:
-        failures.append("unexpected privacy usage-description keys: " + ", ".join(usage_keys))
+    # ATT is the only permitted usage-description permission in this app.
+    # Its existence does NOT itself authorize ads: JavaScript gates the SDK
+    # behind UMP consent and an explicit ATT "granted" result.
+    unexpected_usage = [key for key in usage_keys if key != "NSUserTrackingUsageDescription"]
+    if unexpected_usage:
+        failures.append("unexpected privacy usage-description keys: " + ", ".join(unexpected_usage))
+    att_usage = info.get("NSUserTrackingUsageDescription")
+    if att_usage is not None and (not isinstance(att_usage, str) or not att_usage.strip()):
+        failures.append("NSUserTrackingUsageDescription must be a meaningful nonempty string")
     if info.get("UIBackgroundModes"):
         failures.append("unexpected iOS background modes: " + ", ".join(info.get("UIBackgroundModes") or []))
     if any(item.get("tracking") for item in report["privacy_manifests"] if "tracking" in item):
         failures.append("a bundled privacy manifest declares tracking")
+    # Google Mobile Ads declares tracked Device ID in its bundled manifest
+    # even when the bundle's top-level tracking flag is false. A blanket
+    # rejection hides this nuance and prevents consent-gated TestFlight QA.
+    # Allow ONLY this reviewed type from THIS SDK, with ATT declared in Info.plist.
+    # Any extra tracked SDK/type remains a release-blocking audit failure.
+    tracked_data_types = [
+        {
+            "path": item.get("path", "unknown"),
+            "data_type": data_type.get("NSPrivacyCollectedDataType", "unknown"),
+        }
+        for item in report["privacy_manifests"]
+        for data_type in item.get("collected_data_types", [])
+        if isinstance(data_type, dict) and data_type.get("NSPrivacyCollectedDataTypeTracking") is True
+    ]
+    report["tracking_data_types"] = [
+        f"{item['path']}: {item['data_type']}" for item in tracked_data_types
+    ]
+    unapproved_tracking = [
+        item for item in tracked_data_types
+        if "GoogleMobileAdsResources" not in item["path"]
+        or item["data_type"] != "NSPrivacyCollectedDataTypeDeviceID"
+    ]
+    if unapproved_tracking:
+        failures.append("unreviewed tracked data in bundled SDK manifests: "
+                        + ", ".join(f"{item['path']}: {item['data_type']}"
+                                    for item in unapproved_tracking))
+    if tracked_data_types and (not isinstance(att_usage, str) or not att_usage.strip()):
+        failures.append("Google Mobile Ads tracks Device ID; the signed app must "
+                        "declare NSUserTrackingUsageDescription and gate ads on ATT")
 
     if failures:
         for failure in failures:

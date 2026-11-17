@@ -304,20 +304,18 @@ test('the decklist link opens only when the server reports a deck, and loads tha
   } finally { await screen.close(); }
 });
 
-test('TCGplayer affiliate destinations stay hidden until all cards are expanded', async () => {
+test('expanded card analysis keeps model scores and zoom, without any marketplace links', async () => {
   const completedPick = { ...runZero(), revision: 5, round: 1, answers: [answer(0, 'a', 88)], current: puzzle(1) };
   const screen = await fixture({ submitPick: async () => completedPick });
-  const affiliate = () => screen.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityRole === 'link'
-    && String(node.props.accessibilityLabel).includes('TCGplayer'));
   try {
-    assert.doesNotMatch(screen.text(), /TCGplayer/);
     await screen.chooseAndConfirm();
-    assert.doesNotMatch(screen.text(), /TCGplayer/, 'the visible reveal must not contain affiliate links');
-    const all = pressable(screen, 'Compare all');
-    assert.ok(all);
-    await act(async () => all.props.onPress());
-    assert.equal(affiliate().length, 2, 'one link per revealed card');
-    assert.match(screen.text(), /Affiliate links\. Pack One may earn a commission/);
+    await act(async () => pressable(screen, 'Compare all').props.onPress());
+    assert.match(screen.text(), /Model support/);
+    assert.match(screen.text(), /Score/);
+    assert.match(screen.text(), /Hide all cards/);
+    assert.doesNotMatch(screen.text(), /TCGplayer|Affiliate links|commission/);
+    assert.equal(screen.root.root.findAll(node => node.type === 'Pressable'
+      && String(node.props.accessibilityLabel).includes('TCGplayer')).length, 0);
   } finally { await screen.close(); }
 });
 
@@ -381,49 +379,11 @@ test('decision report submits successfully without an optional comment', async (
   } finally { await screen.close(); }
 });
 
-test('revealed-card affiliate link opens the approved card-specific Impact destination', async () => {
-  const opened = [];
-  const custom = puzzle(0);
-  custom.candidates = [{ id: 'a', name: 'Black Lotus & Co' }, { id: 'b', name: 'Mox Pearl' }];
-  const selected = { ...answer(0, 'a', 88), selectedName: 'Black Lotus & Co', historicalName: 'Mox Pearl', puzzle: custom };
-  const completedPick = { ...runZero(), revision: 5, round: 1, answers: [selected], current: puzzle(1) };
-  const screen = await fixture({ submitPick: async () => completedPick, openURL: async (url) => { opened.push(url); } });
-  try {
-    await screen.chooseAndConfirm();
-    const all = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Compare all'))[0];
-    await act(async () => all.props.onPress());
-    const link = screen.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Find Black Lotus & Co on TCGplayer, affiliate link')[0];
-    assert.ok(link);
-    await act(async () => { link.props.onPress(); await flush(); });
-    assert.equal(opened.length, 1);
-    assert.equal(opened[0], 'https://partner.tcgplayer.com/c/7742974/1780961/21018?u=https%3A%2F%2Fwww.tcgplayer.com%2Fsearch%2Fmagic%2Fproduct%3Fq%3DBlack%2520Lotus%2520%2526%2520Co%26view%3Dgrid');
-  } finally { await screen.close(); }
+test('native card archive exposes only the Android Daily-home shop destination', () => {
+  const { tcgplayerMagicUrl, tcgplayerUrl } = compileModule('src/tcgplayer.ts', {});
+  assert.equal(tcgplayerUrl, undefined, 'card destinations are retired, including for Android');
+  assert.match(tcgplayerMagicUrl(), /^https:\/\/partner\.tcgplayer\.com\//);
 });
-
-test('failed revealed-card affiliate handoff stays in the expanded cards and offers a retryable error', async () => {
-  const completedPick = { ...runZero(), revision: 5, round: 1, answers: [answer(0, 'a', 88)], current: puzzle(1) };
-  const screen = await fixture({ submitPick: async () => completedPick, openURL: async () => { throw new Error('no handler'); } });
-  try {
-    await screen.chooseAndConfirm();
-    const all = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Compare all'))[0];
-    await act(async () => all.props.onPress());
-    const link = screen.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Find Card A on TCGplayer, affiliate link')[0];
-    await act(async () => { link.props.onPress(); await flush(); });
-    assert.match(screen.text(), /Could not open TCGplayer\. You can try the affiliate link again\./);
-    assert.match(screen.text(), /Hide all cards/);
-  } finally { await screen.close(); }
-});
-
-
-test('TCGplayer helper rejects blank names and preserves the approved nested card destination', () => {
-  const compiled = { exports: compileModule('src/tcgplayer.ts', {}) };
-  assert.throws(() => compiled.exports.tcgplayerUrl('   '), /Invalid TCGplayer card name/);
-  assert.equal(
-    compiled.exports.tcgplayerUrl('Black Lotus & Co'),
-    'https://partner.tcgplayer.com/c/7742974/1780961/21018?u=https%3A%2F%2Fwww.tcgplayer.com%2Fsearch%2Fmagic%2Fproduct%3Fq%3DBlack%2520Lotus%2520%2526%2520Co%26view%3Dgrid',
-  );
-});
-
 
 test('account switching invalidates mounted gameplay and discards a delayed pick', async () => {
   const pending = deferred();
@@ -439,7 +399,7 @@ test('account switching invalidates mounted gameplay and discards a delayed pick
 });
 
 
-test('paid membership hides every card promotion even after Compare all is expanded', async () => {
+test('paid membership also has no card commerce in the expanded comparison', async () => {
   const completedPick = { ...runZero(), revision: 5, round: 1, answers: [answer(0, 'a', 88)], current: puzzle(1) };
   const screen = await fixture({ commerceAllowed: false, submitPick: async () => completedPick });
   try {

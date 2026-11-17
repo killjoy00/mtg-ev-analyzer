@@ -1,8 +1,10 @@
 import { ResultsPreferences } from '@/src/components/ResultsPreferences';
+import { AdMobDailyBanner } from '@/src/components/AdMobDailyBanner';
+import { dailyHomePromotion } from '@/src/ads/placement';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { Linking, Platform, Pressable, ScrollView, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { Text } from '@/src/components/Text';
 import { config } from '@/src/config';
 
@@ -138,6 +140,8 @@ export default function HomeScreen() {
     }
   };
   const displayNameAttention = ['username_taken', 'username_required', 'name_not_allowed'].includes(rankingReason || '');
+  const nativeAdMobEnabled = Platform?.OS === 'ios' ? config.adMob?.iosEnabled === true : config.adMob?.androidEnabled === true;
+  const promotion = dailyHomePromotion(promotionAllowed, nativeAdMobEnabled, Platform?.OS === 'ios' ? 'ios' : 'android');
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -249,7 +253,8 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        {promotionAllowed ? (
+        {promotion === 'admob' ? <AdMobDailyBanner eligible={promotionAllowed === true} /> : null}
+        {promotion === 'affiliate' ? (
           <View style={styles.affiliatePromo}>
             <Pressable
               accessibilityRole="link"

@@ -240,9 +240,11 @@ assert.match(disclosureRedirect, /http-equiv="refresh" content="0; url=\/terms\/
 assert.match(disclosureRedirect, /rel="canonical" href="https:\/\/packone\.pro\/terms\/#advertising-and-affiliates"/i);
 assert.match(disclosureRedirect, /location\.replace\('\/terms\/#advertising-and-affiliates'\)/i);
 const privacy = await readFile('privacy/index.html','utf8');
-assert.match(privacy, /Google advertising is currently disabled, so Pack One does not currently load Google display ads/i);
-assert.match(privacy, /TCGplayer links are routed through Impact/i);
-assert.match(privacy, /records outbound TCGplayer clicks/i);
+assert.match(privacy, /Google advertising is currently disabled on the website/i);
+assert.match(privacy, /TCGplayer promotion through Impact affiliate links/i);
+assert.match(privacy, /Google AdMob banner on the Daily home/i);
+assert.match(privacy, /verified Supporter or Elite membership prevents Google ad requests/i);
+assert.match(privacy, /records outbound clicks on the website promotion/i);
 assert.match(privacy, /first-party cookies for player and account sessions and request security/i);
 assert.match(privacy, /Email\/password signup requires email verification/i);
 assert.match(privacy, /Resend for account and optional emails/i);

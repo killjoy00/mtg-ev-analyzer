@@ -23,9 +23,11 @@ The `packone://` custom URL scheme remains unchanged for the current native auth
 
 ## Marketing version
 
-The **first public App Store/Play release target remains 1.0**, with its approval/qualification tracked in #575. TestFlight already has a newer **iOS 1.1 build 100733**; this does **not** indicate a public iOS 1.1 release or an Android 1.1 version.
+Apple approved public **iOS 1.0** on November 16; the next app update targets
+**iOS 1.2**. The previously processed **iOS 1.1/101002** remains a TestFlight
+candidate, not a public iOS 1.1 release. Android stays on **version 1.0**.
 
-`mobile/app.json` still provides the Expo base `version: 1.0`. The explicit platform targets in `mobile/store-release.json` currently specify `appStoreVersion: 1.1` and `playVersionName: 1.0`. Production Expo config and CI validate **each platform against its own target**: iOS generated `CFBundleShortVersionString=1.1`, Android generated `versionName=1.0`. Never require the two platforms to share a marketing version; the base Expo value is not evidence of the signed iOS version. See [iOS 1.1 exact-build feature and release inventory](mobile-ios-1.1-testflight-inventory-2026-10-10.md).
+`mobile/app.json` still provides the Expo base `version: 1.0`. The explicit platform targets in `mobile/store-release.json` now specify `appStoreVersion: 1.2` and `playVersionName: 1.0`. Production Expo config and CI validate **each platform against its own target**: iOS generated `CFBundleShortVersionString=1.2`, Android generated `versionName=1.0`. Never require the two platforms to share a marketing version; the base Expo value is not evidence of the signed iOS version. See [iOS 1.1 exact-build feature and release inventory](mobile-ios-1.1-testflight-inventory-2026-10-10.md).
 
 ## Native generation and local builds
 

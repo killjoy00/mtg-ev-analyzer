@@ -14,6 +14,24 @@ Guests may see the affiliate promotion without a membership lookup. Signed-in ac
 
 Account, Patreon-connect/disconnect and Elite-activation flows emit a nonce-only localStorage signal plus a same-tab event. An open tab clears any rendered Google or affiliate promotion on those signals and never refills it before a full reload. Changes made directly on patreon.com or by backend webhooks/scheduled reconciliation do not pass through a Pack One tab, so an already-open tab can retain its existing promotion until reload.
 
+## Native Google AdMob: iOS-first draft (November 16)
+
+A separate native AdMob banner integration is staged in draft PR #1601.
+It is not the website's AdSense publisher, slot or approval. The native
+Daily-home banner is the **only** iOS Daily-home promotion, never stacked
+with or replaced by TCGplayer. If AdMob is disabled or unavailable on iOS,
+there is no fallback promotion. Android keeps its separate Daily-home
+TCGplayer fallback until Android AdMob is authorized. No banner appears
+during gameplay or result review.
+Supporter, Elite, stale/unknown and failed membership states remain ad-free.
+Non-personalized, G-rated requests wait for Google UMP consent.
+
+Production stays off unless a new signed build explicitly enables the platform
+with `PACKONE_ADMOB_IOS_ENABLED=1` or `PACKONE_ADMOB_ANDROID_ENABLED=1`
+and a matching Pack One-specific App ID and banner unit ID. App Store
+privacy disclosures, UMP messages, device tests, privacy-manifest review and
+a new App Review remain mandatory. See `docs/mobile-admob-release.md`.
+
 ## Google AdSense: deferred
 
 `ad-config.js` remains `enabled: false`. The public client is `ca-pub-1217971050094766` and the dormant Daily-home unit is `1543495960`; `articleTop` remains empty and Auto Ads are not used. Publisher verification metadata and `ads.txt` remain in place. With the release gate disabled, the loader makes no membership request and no Google advertising request. Static ad placeholders remain hidden even with JavaScript disabled, and `?adpreview=1` cannot bypass the disabled release gate.
@@ -32,9 +50,11 @@ No ad activation or Google account change was performed.
 
 ## TCGplayer / Impact: active affiliate trial
 
-TCGplayer approved Pack One's Impact referral application on September 19, 2026. Draft Run's revealed-card comparison links live inside the optional `Why this score?` analysis rather than the compact default reveal; selected set articles continue to use the same card-search links. Both route through the approved referral URL using the Impact deep-link form `https://partner.tcgplayer.com/c/7742974/1780961/21018?u={url}`. Pack One preserves the card-specific TCGplayer destination by URL-encoding it into `{url}`.
+TCGplayer approved Pack One's Impact referral application on September 19, 2026. **All card-specific storefront links were retired on November 16, 2026**, including Draft Run result analysis and the four published set archives, on both the website and native apps. Card imagery, enlarged views, scores and model support remain.
 
-The code continues to record `tcgplayer_click` with card, set (when supplied), surface and affiliate-active status. Applicable links use `rel="sponsored noopener"`, and visible copy identifies them as affiliate links or places an affiliate disclosure directly beside the link group. Pack One may earn a commission from eligible purchases at no added cost to the buyer.
+The website's optional Daily-home affiliate promotion stays active while web AdSense remains disabled. Android retains its separate native Daily-home affiliate promotion. iOS 1.2 removes the native TCGplayer promotion entirely, regardless of whether AdMob is enabled.
+
+The Daily-home route uses the approved Impact deep-link template `https://partner.tcgplayer.com/c/7742974/1780961/21018?u={url}`, with the fixed Magic shopping destination encoded into `{url}`. Web affiliate clicks are tracked by the `daily_home_banner` surface. Pack One may earn a commission from eligible purchases at no added cost to the buyer.
 
 The Daily-home fallback is the one approved expansion of this experiment. It uses the official TCGplayer logo asset on a neutral Pack One surface, routes the CTA through the approved Impact deep-link template to TCGplayer's Magic category, carries the visible disclosure “Affiliate link. Pack One may earn a commission from purchases.”, and records the surface as `daily_home_banner`. The logo is served locally; no TCGplayer or Impact script/pixel loads merely because the banner is displayed.
 

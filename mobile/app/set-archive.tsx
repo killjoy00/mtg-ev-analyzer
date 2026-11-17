@@ -1,14 +1,11 @@
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Text } from '@/src/components/Text';
 
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
 
 import { setArchive } from '@/src/content/setArchives';
-import { useCardCommerce } from '@/src/hooks/useCardCommerce';
-import { tcgplayerUrl } from '@/src/tcgplayer';
 import { colors, spacing } from '@/src/theme';
 
 function formatNumber(value: number) {
@@ -19,8 +16,6 @@ export default function SetArchiveScreen() {
   const params = useLocalSearchParams<{ setId?: string }>();
   const setId = typeof params.setId === 'string' ? params.setId.toLowerCase() : '';
   const archive = setArchive(setId);
-  const commerceAllowed = useCardCommerce();
-  const [affiliateError, setAffiliateError] = useState<string | null>(null);
 
   if (!archive) {
     return (
@@ -38,16 +33,6 @@ export default function SetArchiveScreen() {
   }
 
   const code = archive.setId.toUpperCase();
-  const openCard = async (name: string) => {
-    if (!commerceAllowed) return;
-    setAffiliateError(null);
-    try {
-      await Linking.openURL(tcgplayerUrl(name));
-    } catch {
-      setAffiliateError(`Could not open TCGplayer for ${name}. Try the affiliate link again.`);
-    }
-  };
-
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.page}>
@@ -88,17 +73,9 @@ export default function SetArchiveScreen() {
               <View key={card.name} style={styles.marketCard}>
                 <Image source={card.imageUrl} style={styles.cardImage} contentFit="cover" cachePolicy="memory-disk" accessibilityLabel={card.name} />
                 <Text style={styles.cardName}>{card.name}</Text>
-                {commerceAllowed ? <Pressable accessibilityRole="link" accessibilityLabel={`Find ${card.name} on TCGplayer, affiliate link`}
-                  onPress={() => void openCard(card.name)} style={styles.shopLink}>
-                  <Text style={styles.shopLinkText}>TCGplayer (affiliate link)</Text>
-                </Pressable> : null}
               </View>
             ))}
           </View>
-          {commerceAllowed ? <Text style={styles.disclosure}>
-            Affiliate disclosure: Pack One may earn a commission from eligible purchases through these TCGplayer affiliate links, at no added cost to the buyer.
-          </Text> : null}
-          {commerceAllowed && affiliateError ? <Text accessibilityRole="alert" style={styles.error}>{affiliateError}</Text> : null}
         </View>
 
         <View style={styles.section}>
@@ -158,10 +135,6 @@ const styles = StyleSheet.create({
   marketCard: { width: 166, maxWidth: '48%', flexGrow: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.sm, gap: spacing.xs },
   cardImage: { width: '100%', aspectRatio: 0.716, backgroundColor: colors.surfaceSoft },
   cardName: { color: colors.ink, fontSize: 13, lineHeight: 18, fontWeight: '800' },
-  shopLink: { minHeight: 44, justifyContent: 'center' },
-  shopLinkText: { color: colors.accentDark, fontSize: 12, lineHeight: 16, fontWeight: '800', textDecorationLine: 'underline' },
-  disclosure: { color: colors.muted, fontSize: 11, lineHeight: 17 },
-  error: { color: colors.danger, fontSize: 13, lineHeight: 19 },
   closeList: { gap: spacing.xs },
   closeRow: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: spacing.md, borderBottomWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: spacing.md },
   closeIndex: { width: 24, color: colors.accentDark, fontSize: 16, fontWeight: '800' },
