@@ -37,7 +37,7 @@ function runAudit(t, { att = true, bundle = 'GoogleMobileAdsResources.bundle', d
     'a = json.loads(sys.stdin.read())',
     'for name, contents in a:',
     '    with open(name, "wb") as f: plistlib.dump(contents, f)',
-  ].join('\\n')], {
+  ].join('\n')], {
     input: JSON.stringify([[path.join(app, 'Info.plist'), info], [manifestPath, manifest]]),
     encoding: 'utf8',
   });
