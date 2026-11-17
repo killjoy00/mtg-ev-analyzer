@@ -177,11 +177,12 @@ test('expensive PR jobs stay cancellable and no job-level condition uses always(
 test('Android native CI is manual-only; iOS PR and normal screenshot coverage remain active', () => {
   const android = readFileSync('.github/workflows/android-production-bundle.yml', 'utf8');
   const internal = readFileSync('.github/workflows/android-internal-testing.yml', 'utf8');
+  const baseline = readFileSync('.github/workflows/mobile-native-baseline.yml', 'utf8');
   const ios = readFileSync('.github/workflows/ios-testflight.yml', 'utf8');
   const screenshots = readFileSync('.github/workflows/mobile-store-screenshots.yml', 'utf8');
   const rc = readFileSync('.github/workflows/mobile-exact-main-rc.yml', 'utf8');
 
-  for (const [name, flow] of [['production', android], ['internal', internal]]) {
+  for (const [name, flow] of [['production', android], ['internal', internal], ['historical baseline', baseline]]) {
     const triggers = flow.split('permissions:')[0];
     assert.match(triggers, /workflow_dispatch:/, name);
     assert.doesNotMatch(triggers, /\n  (?:push|pull_request):/, name + ' must not run automatically');
