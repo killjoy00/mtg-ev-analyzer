@@ -77,6 +77,19 @@ def main():
         failures.append("unexpected iOS background modes: " + ", ".join(info.get("UIBackgroundModes") or []))
     if any(item.get("tracking") for item in report["privacy_manifests"] if "tracking" in item):
         failures.append("a bundled privacy manifest declares tracking")
+    # SDKs can mark individual data types as tracked even when the top-level
+    # NSPrivacyTracking value is false. Audit those flags too; App Privacy/ATT
+    # decisions must be reviewed before a production AdMob archive can ship.
+    tracked_data_types = [
+        f"{Path(item.get('path', 'unknown')).name}: {data_type.get('NSPrivacyCollectedDataType', 'unknown')}"
+        for item in report["privacy_manifests"]
+        for data_type in item.get("collected_data_types", [])
+        if isinstance(data_type, dict) and data_type.get("NSPrivacyCollectedDataTypeTracking") is True
+    ]
+    report["tracking_data_types"] = tracked_data_types
+    if tracked_data_types:
+        failures.append("a bundled privacy manifest declares per-data-type tracking; "
+                        "resolve App Privacy and ATT policy before release: " + ", ".join(tracked_data_types))
 
     if failures:
         for failure in failures:
