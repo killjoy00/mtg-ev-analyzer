@@ -1,6 +1,6 @@
 # Pack One monetization
 
-Updated September 23, 2026. Google ads remain disabled at the owner's direction while approval is pending. Public Patreon linking and the Elite post-purchase activation flow are active.
+Updated November 17, 2026. Website Google AdSense remains disabled. The owner confirms that native iOS AdMob is approved and App Privacy disclosures are complete; the separately gated iOS 1.3 TestFlight candidate will enable AdMob. Public Patreon linking and the Elite post-purchase activation flow remain active.
 
 ## Membership
 
@@ -14,23 +14,30 @@ Guests may see the affiliate promotion without a membership lookup. Signed-in ac
 
 Account, Patreon-connect/disconnect and Elite-activation flows emit a nonce-only localStorage signal plus a same-tab event. An open tab clears any rendered Google or affiliate promotion on those signals and never refills it before a full reload. Changes made directly on patreon.com or by backend webhooks/scheduled reconciliation do not pass through a Pack One tab, so an already-open tab can retain its existing promotion until reload.
 
-## Native Google AdMob: iOS-first draft (November 16)
+## Native Google AdMob: iOS 1.3 TestFlight (November 17)
 
-A separate native AdMob banner integration is staged in draft PR #1601.
-It is not the website's AdSense publisher, slot or approval. The native
-Daily-home banner is the **only** iOS Daily-home promotion, never stacked
-with or replaced by TCGplayer. If AdMob is disabled or unavailable on iOS,
-there is no fallback promotion. Android keeps its separate Daily-home
-TCGplayer fallback until Android AdMob is authorized. No banner appears
-during gameplay or result review.
-Supporter, Elite, stale/unknown and failed membership states remain ad-free.
-Non-personalized, G-rated requests wait for Google UMP consent.
+The owner has confirmed approval of the registered Pack One iOS AdMob
+application and completion of Apple App Privacy disclosures. iOS 1.2 build
+101034 was delivered to internal TestFlight testers with live ad requests
+disabled. The **new iOS 1.3 TestFlight candidate** explicitly sets
+`PACKONE_ADMOB_IOS_ENABLED=1` in both unsigned PR validation and the
+protected signed iOS release workflow. Both archive paths must verify
+the effective production Expo configuration has iOS AdMob enabled,
+the production app and Daily banner IDs, and Android ads disabled.
 
-Production stays off unless a new signed build explicitly enables the platform
-with `PACKONE_ADMOB_IOS_ENABLED=1` or `PACKONE_ADMOB_ANDROID_ENABLED=1`
-and a matching Pack One-specific App ID and banner unit ID. App Store
-privacy disclosures, UMP messages, device tests, privacy-manifest review and
-a new App Review remain mandatory. See `docs/mobile-admob-release.md`.
+Only the Daily home, after the Dailies, may show a native Google banner.
+iOS has no TCGplayer fallback. No ads during picks, reveal, or editorial
+views. Guest/free accounts may receive a banner; confirmed Supporter/Elite
+or unknown/stale membership accounts never request ads. Google UMP must
+allow requests, then iOS ATT must be granted *before* the Google SDK is
+initialized; all ad requests are non-personalized and G-rated.
+
+This is a **TestFlight-only release**. Do not submit to App Review or
+publicly publish in this workflow. Real-device consent/ATT, ad rendering,
+privacy choices, membership and subscription transitions still need
+acceptance before public launch. The current implementation intentionally
+shows no banner when UMP consent or ATT authorization does not permit it.
+See `docs/mobile-admob-release.md`.
 
 ## Google AdSense: deferred
 
