@@ -98,7 +98,7 @@ const productionAdsPlugin = production.plugins.find(plugin =>
 assert.equal(productionAdsPlugin?.[1]?.iosAppId, 'ca-app-pub-1217971050094766~3792911821',
   'iOS native Info.plist must use Pack One, not the Google sample App ID');
 assert.equal(productionAdsPlugin?.[1]?.androidAppId, 'ca-app-pub-3940256099942544~3347511713',
-  'Android AdMob remains disabled and uses Google's sample ID');
+  'Android AdMob remains disabled and uses the Google sample ID');
 assert.equal(production.extra.adMob.iosBannerUnitId, null,
   'disabled production builds must never expose an active banner unit');
 assert.equal(readFileSync(new URL('../../app-ads.txt', import.meta.url), 'utf8').trim(),
