@@ -47,11 +47,13 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
       assert.match(workflow, /- name: Revoke the development certificate this runner created\s+if: always\(\)\s+continue-on-error: true\s+run: node \.\.\/\.github\/scripts\/app-store-runner-certificates\.mjs revoke/, path);
     } else if (path === '.github/workflows/android-internal-testing.yml') {
       assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
-      assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/android-internal-release-request\.json'/s, path);
+      assert.match(workflow.split('permissions:')[0], /workflow_dispatch:/, path);
+      assert.doesNotMatch(workflow.split('permissions:')[0], /\n  (?:push|pull_request):/, path);
       assert.match(workflow, /request\.get\('operation'\) != 'upload-android-internal'/, path);
     } else if (path === '.github/workflows/android-production-bundle.yml') {
       assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
-      assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/android-production-bundle-request\.json'/s, path);
+      assert.match(workflow.split('permissions:')[0], /workflow_dispatch:/, path);
+      assert.doesNotMatch(workflow.split('permissions:')[0], /\n  (?:push|pull_request):/, path);
       assert.match(workflow, /request\.get\('operation'\) != 'build-play-signed-aab'/, path);
       assert.match(workflow, /packone-android-upload-keystore-b64/, path);
       assert.match(workflow, /configure-android-upload-signing\.mjs/, path);
