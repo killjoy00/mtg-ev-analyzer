@@ -154,8 +154,10 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       adMob: {
         iosEnabled: iosAds.enabled,
         androidEnabled: androidAds.enabled,
-        iosBannerUnitId: iosAds.enabled ? iosAds.bannerUnitId : null,
-        androidBannerUnitId: androidAds.enabled ? androidAds.bannerUnitId : null,
+        // Omit inactive ad units. Expo's public-config JSON otherwise turns
+        // a null value into an empty object, which is misleading on device.
+        ...(iosAds.enabled ? { iosBannerUnitId: iosAds.bannerUnitId } : {}),
+        ...(androidAds.enabled ? { androidBannerUnitId: androidAds.bannerUnitId } : {}),
         testBanners: !production && testBanners,
       },
     },

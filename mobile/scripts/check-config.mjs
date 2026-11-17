@@ -99,8 +99,10 @@ assert.equal(productionAdsPlugin?.[1]?.iosAppId, 'ca-app-pub-1217971050094766~37
   'iOS native Info.plist must use Pack One, not the Google sample App ID');
 assert.equal(productionAdsPlugin?.[1]?.androidAppId, 'ca-app-pub-3940256099942544~3347511713',
   'Android AdMob remains disabled and uses the Google sample ID');
-assert.equal(production.extra.adMob.iosBannerUnitId, null,
-  'disabled production builds must never expose an active banner unit');
+assert.equal(production.extra.adMob.iosBannerUnitId, undefined,
+  'disabled production builds must not publish any iOS banner unit');
+assert.equal(production.extra.adMob.androidBannerUnitId, undefined,
+  'disabled production builds must not publish any Android banner unit');
 assert.equal(readFileSync(new URL('../../app-ads.txt', import.meta.url), 'utf8').trim(),
   'google.com, pub-1217971050094766, DIRECT, f08c47fec0942fa0',
   'Pack One app-ads.txt must match the registered iOS AdMob publisher');
