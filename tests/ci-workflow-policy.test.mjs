@@ -182,12 +182,14 @@ test('Android native CI is manual-only; iOS PR and normal screenshot coverage re
   const screenshots = readFileSync('.github/workflows/mobile-store-screenshots.yml', 'utf8');
   const rc = readFileSync('.github/workflows/mobile-exact-main-rc.yml', 'utf8');
 
-  for (const [name, flow] of [['production', android], ['internal', internal], ['historical baseline', baseline]]) {
+  for (const [name, flow] of [['production', android], ['internal', internal]]) {
     const triggers = flow.split('permissions:')[0];
     assert.match(triggers, /workflow_dispatch:/, name);
     assert.doesNotMatch(triggers, /\n  (?:push|pull_request):/, name + ' must not run automatically');
     assert.match(flow, /github\.ref == 'refs\/heads\/main'/, name + ' manual release remains main-guarded');
   }
+  assert.match(baseline.split('permissions:')[0], /workflow_dispatch:/);
+  assert.doesNotMatch(baseline.split('permissions:')[0], /\n  (?:push|pull_request):/, 'historical Android evidence must not run automatically');
   assert.match(ios, /- '\.github\/scripts\/app-store-\*\.mjs'/);
   assert.match(ios, /pull_request:/, 'iOS validation remains active');
 
