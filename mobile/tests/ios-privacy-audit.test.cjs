@@ -5,7 +5,7 @@ const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 
-const audit = path.resolve(__dirname, '../scripts/audit-ios-archive.py');
+const audit = path.resolve(process.cwd(), 'scripts/audit-ios-archive.py');
 const trackingDeviceId = {
   NSPrivacyCollectedDataType: 'NSPrivacyCollectedDataTypeDeviceID',
   NSPrivacyCollectedDataTypeTracking: true,
