@@ -174,13 +174,28 @@ test('expensive PR jobs stay cancellable and no job-level condition uses always(
   }
 });
 
-test('native PR workflows trigger for root helpers they consume', () => {
+test('Android native CI is manual-only; iOS PR and normal screenshot coverage remain active', () => {
   const android = readFileSync('.github/workflows/android-production-bundle.yml', 'utf8');
   const internal = readFileSync('.github/workflows/android-internal-testing.yml', 'utf8');
   const ios = readFileSync('.github/workflows/ios-testflight.yml', 'utf8');
-  assert.match(android, /- 'scripts\/audit-android-manifest\.py'/);
-  assert.match(internal, /- 'scripts\/audit-android-manifest\.py'/);
+  const screenshots = readFileSync('.github/workflows/mobile-store-screenshots.yml', 'utf8');
+  const rc = readFileSync('.github/workflows/mobile-exact-main-rc.yml', 'utf8');
+
+  for (const [name, flow] of [['production', android], ['internal', internal]]) {
+    const triggers = flow.split('permissions:')[0];
+    assert.match(triggers, /workflow_dispatch:/, name);
+    assert.doesNotMatch(triggers, /\n  (?:push|pull_request):/, name + ' must not run automatically');
+    assert.match(flow, /github\.ref == 'refs\/heads\/main'/, name + ' manual release remains main-guarded');
+  }
   assert.match(ios, /- '\.github\/scripts\/app-store-\*\.mjs'/);
+  assert.match(ios, /pull_request:/, 'iOS validation remains active');
+
+  assert.ok(screenshots.includes("if: needs.validate.outputs.capture_required == 'true' && (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.android_only"), 'Android screenshot job requires explicit manual/reusable opt-in');
+  assert.match(screenshots, /pull_request:/, 'iOS screenshot checks still run');
+  assert.match(rc, /github\.event_name == 'workflow_dispatch' && inputs\.include_android/, 'Android RC bundles require manual opt-in');
+  assert.match(rc, /needs\.android-bundle\.result == 'skipped'/, 'iOS RC manifest must survive skipped Android');
+  assert.match(rc, /needs\.android-bundle\.result == 'success'/, 'requested Android build must succeed to record RC');
+  assert.match(rc, /not built; Android CI paused/, 'do not claim nonexistent Android artifact');
 });
 
 test('backend full path fans out by domain and aggregates fail closed', () => {
