@@ -28,6 +28,15 @@ remains unmerged and unsigned as a public App Store update.
   banner and the Account screen.
 - Consent failure or ad load failure leaves a blank slot on iOS; neither
   blocks play, adds an interstitial, nor falls back to TCGplayer.
+- **ATT gate (iOS 1.2):** The bundled Google Mobile Ads manifest marks Device ID
+  as tracked. After Google UMP consent and **before Google SDK initialization**,
+  Expo TrackingTransparency checks Apple's system authorization and prompts once
+  only if undetermined. Denied, restricted, or unavailable authorization
+  suppresses all Google ad initialization/requests without blocking the game.
+  Even non-personalized advertising may use IDs for reporting, so the app's
+  permission copy describes advertising measurement rather than personalized ads.
+  An AdMob ATT explainer message is optional; UMP and the app should not present
+  duplicate system prompts. Configure and test this on physical devices.
 - All card-specific shopping links are gone from native Draft Run and set
   archives; website card-specific links are removed in separate PR #1602.
 
@@ -55,7 +64,8 @@ signed build. The mobile test configuration continues using Google's sample IDs.
    is `https://packone.pro/`.
 2. In AdMob → **Privacy & messaging**, configure and publish required GDPR/EEA/UK
    and relevant US state notices. Test their choices through UMP. Do not turn on
-   an IDFA/ATT message without implementing and disclosing the resulting tracking.
+   an additional IDFA/ATT explainer without verifying that the app's Expo ATT
+   permission flow and UMP don't double-prompt.
 3. In App Store Connect → Pack One → **App Privacy**, review SDK/UMP data and
    possible tracking disclosures. Create marketing version **1.2**, if not done.
 4. Test iPhone/iPad with **sample ads** and UMP test geography before enabling
@@ -98,18 +108,22 @@ An enabled production build rejects mismatched or demo IDs.
 
 ## App Store and privacy requirements
 
-**Before merging/building/releasing an AdMob binary:** verify and publish the
-updated Pack One privacy policy and matching native copy, and update App Store Connect's
-**App Privacy** responses for the Google Mobile Ads SDK and any UMP data. Use
-Google's current SDK data/Privacy Manifest descriptions to review identifiers,
-usage data, diagnostics, third-party advertising, possible tracking and ATT.
-Do not copy the existing "no third-party advertising SDK" declaration into a
-binary that includes AdMob. Recheck third-party SDK privacy manifests and
-`mobile/scripts/audit-ios-archive.py`: the existing no-tracking assertion is
-a **real blocker** if a bundled manifest declares tracking, not a check to
-silently delete. Add ATT if the actual approved integration will perform
-cross-app tracking; non-personalized delivery alone is not a substitute for
-an accurate App Store privacy declaration.
+**Before signing TestFlight 1.2:** require a green unsigned-archive privacy
+audit, mobile tests and a reviewed current-main source. The known bundled
+Google Mobile Ads Device ID tracking declaration is allowed **only** with the
+ATT usage description present and permission-gated Google SDK initialization.
+The archive audit must still fail for any unreviewed tracked SDK/data type,
+missing ATT explanation, top-level tracking declaration, or unrelated sensitive
+permission. Unit tests cover UMP and ATT grant/denial paths. Non-personalized
+ads are not automatically exempt from tracking disclosures.
+
+**Before enabling live AdMob or submitting 1.2 to public App Review:** verify
+the published Pack One privacy policy, its native copy, all current App Privacy
+answers, real-device UMP + ATT dialogs and denial behavior, Apple Elite/ad-free
+membership transitions and AdMob account/app-ads.txt readiness. Never treat a
+TestFlight upload as public approval. The default production configuration
+has live AdMob disabled; this TestFlight candidate can establish binary parity
+while native ad-device acceptance continues.
 
 App Review guideline 2.5.18 requires ad reporting and age-appropriate ads.
 Verify Google's rendered AdChoices/report affordance on real iPhone/iPad,
