@@ -10,6 +10,8 @@ native builds and screenshots are paused**.
 - **Android internal testing** and **Android production bundle** workflows:
   only GitHub's explicit **Run workflow** action can start them. Pull requests
   and release-request file pushes no longer start Android jobs.
+- **Native UX baseline evidence**: the old-Android-baseline reproduction job is
+  also manual-only. It no longer starts on PRs that change its workflow/script.
 - **Mobile store screenshots**: PR, main, and ordinary automated requests
   continue running iPhone/iPad capture where selected. The Android emulator
   capture only runs when explicitly requested using the existing
