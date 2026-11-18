@@ -747,12 +747,15 @@ export default function DraftRunScreen({
         setRolloverNotice('Yesterday’s Daily closed at midnight Pacific. Here are today’s picks.');
         lastObservedDecision.current = null;
         setReportOpen(false);
+        setReportSending(false);
         setReportReason(null);
         setReportComment('');
         setReportError(null);
         setReportedDecision(null);
         setActionError(null);
         setShareError(null);
+        setSharing(false);
+        setShareScope('run');
         setZoomedCard(null);
         setReviewIndex(null);
         setDailyPeers(null);
@@ -1373,7 +1376,7 @@ export default function DraftRunScreen({
           <Text style={styles.eyebrow}>
             {practice || shared ? surfaceMeta.eyebrow : `${dailyMeta.eyebrow} · ${run.day ?? 'TODAY'}`}
           </Text>
-          {rolloverNotice && run.day ? (
+          {rolloverNotice && run.day && run.answers.length === 0 ? (
             <Text accessibilityRole="alert" style={styles.rolloverNotice}>{rolloverNotice}</Text>
           ) : null}
           <Text style={styles.title}>
