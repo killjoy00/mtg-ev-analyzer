@@ -111,6 +111,7 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
   let startCalls = 0;
   let resumeCallback = null;
   const observed = [];
+  const pickTiming = [];
   const focusHandlers = new Set();
   const appListeners = new Set();
   let focused = false;
@@ -189,7 +190,7 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
         return startCalls === 1 ? runZero() : startCalls === 2 ? oldRefresh.promise : nextDaily;
       },
       startPracticeDraftRun: async () => runZero(),
-      submitDraftRunPick: async () => runAfterPick(),
+      submitDraftRunPick: async (...args) => { pickTiming.push(args[3]); return runAfterPick(); },
     },
     '@/src/dailyClock': { pacificDay: () => clockDay, dailyResetCue: () => 'New Dailies tomorrow' },
     '@/src/hooks/useAppResume': {
@@ -275,6 +276,8 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
   });
 
   assert.match(renderedText(root.toJSON()), /88/, 'successful pick should enter feedback');
+  assert.equal(typeof pickTiming[0], 'number', 'mounted native pick forwards a measured foreground duration');
+  assert.ok(pickTiming[0] >= 0 && pickTiming[0] <= 1_800_000);
 
   await act(async () => {
     oldRefresh.resolve(runZero());
