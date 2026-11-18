@@ -582,7 +582,7 @@ export default function DraftRunScreen({
   const decisionTimer = useRef(createForegroundDecisionTimer());
   const mountedPacificDay = useRef(pacificDay());
   const refreshInFlight = useRef(false);
-  const refreshRunRef = useRef<() => Promise<void>>(async () => {});
+  const refreshRunRef = useRef<(openCompletedDaily?: boolean) => Promise<void>>(async () => {});
   const [screenFocused, setScreenFocused] = useState(false);
   const [appActive, setAppActive] = useState(AppState.currentState === 'active');
 
