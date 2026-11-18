@@ -589,7 +589,6 @@ export default function DraftRunScreen({
     const subscription = AppState.addEventListener('change', next => {
       setAppActive(next === 'active');
     });
-    setAppActive(AppState.currentState === 'active');
     return () => subscription.remove();
   }, []);
 
