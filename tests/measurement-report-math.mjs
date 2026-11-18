@@ -49,15 +49,15 @@ try {
    await query("INSERT INTO players(id,display_name) VALUES($1::uuid,'Report DB fixture')",[player]);
    return player;
  };
- const addSyntheticSession=async(player,answers=[],environment='mixed')=>{
+ const addSyntheticSession=async(player,answers=[],environment='mixed',puzzles=puzzleIds)=>{
    const id=crypto.randomUUID();reportExtraSessions.push(id);
-   await query("INSERT INTO draft_run_sessions(id,player_id,seed,corpus_version,scoring_version,puzzle_ids,seen_sources,environment,difficulty_version,selection_version,answers) SELECT $1::uuid,$2::uuid,$1::text,corpus_version,scoring_version,puzzle_ids,'[]'::jsonb,$6,difficulty_version,$3,$4::jsonb FROM draft_run_sessions WHERE id=$5::uuid",
-     [id,player,syntheticVersion,JSON.stringify(answers),source.id,environment]);
+   await query("INSERT INTO draft_run_sessions(id,player_id,seed,corpus_version,scoring_version,puzzle_ids,seen_sources,environment,difficulty_version,selection_version,answers) SELECT $1::uuid,$2::uuid,$1::text,corpus_version,scoring_version,$7::jsonb,'[]'::jsonb,$6,difficulty_version,$3,$4::jsonb FROM draft_run_sessions WHERE id=$5::uuid",
+     [id,player,syntheticVersion,JSON.stringify(answers),source.id,environment,JSON.stringify(puzzles)]);
    return id;
  };
- const addSyntheticObservation=async(id,{observed=false,outcome='pick'}={})=>{
+ const addSyntheticObservation=async(id,{observed=false,outcome='pick',puzzleId=puzzleIds[0]}={})=>{
    await query("INSERT INTO draft_run_decision_observations(session_id,revision,round,puzzle_id,observed,outcome,answered_at,score,trophy_match) VALUES($1::uuid,0,1,$2,$3::boolean,$4::text,CASE WHEN $4='pick' THEN now() ELSE NULL END,CASE WHEN $4='pick' THEN 70 ELSE NULL END,CASE WHEN $4='pick' THEN false ELSE NULL END)",
-     [id,puzzleIds[0],observed,outcome]);
+     [id,puzzleId,observed,outcome]);
  };
  const todayTrend=rows=>rows.find(row=>row.kind==='day'&&row.label===today);
  const trendBefore=todayTrend((await query(ADMIN_TRENDS_SQL,[today])).rows);
@@ -88,25 +88,46 @@ try {
  const mixedScope=await handleAdmin(new Request('https://packone.pro/v1/admin/measurements?version='+syntheticVersion+'&environment=mixed',{headers:{'x-pack1-auth-session':token}}),query,readJson);
  assert.equal(Number(mixedScope.summary.answers),2,'Latest answers do not bleed into Regular results');
 
- // Twelve old pending observations: four left, eight returned. Watching only
- // first_seen_at would incorrectly consider all twelve abandoned.
+ // Use a verified puzzle with no recent observations; this avoids inheriting
+ // unrelated production/fixture viewers or exhausting the watchlist's LIMIT 20.
+ const qualityPuzzle=(await query(`SELECT p.puzzle_id FROM draft_run_verified_puzzles p
+   WHERE p.corpus_version=$1 AND NOT EXISTS (
+     SELECT 1 FROM draft_run_decision_observations o
+     WHERE o.puzzle_id=p.puzzle_id AND o.first_seen_at>=now()-interval '30 days'
+   ) LIMIT 1`,[DRAFT_RUN_CORPUS_VERSION])).rows[0]?.puzzle_id;
+ assert.ok(qualityPuzzle,'requires an unused verified puzzle for isolated quality metrics');
+ const qualityPuzzles=[qualityPuzzle,...puzzleIds.slice(1)];
  const agedIds=[];
  for(let i=0;i<12;i++){
-   const id=await addSyntheticSession(await addSyntheticPlayer());
+   const id=await addSyntheticSession(await addSyntheticPlayer(),[],'mixed',qualityPuzzles);
    agedIds.push(id);
-   await addSyntheticObservation(id,{observed:true,outcome:null});
+   await addSyntheticObservation(id,{observed:true,outcome:null,puzzleId:qualityPuzzle});
    await query("UPDATE draft_run_decision_observations SET first_seen_at=now()-interval '26 hours',last_seen_at=CASE WHEN $2::boolean THEN now()-interval '26 hours' ELSE now() END WHERE session_id=$1::uuid",[id,i<4]);
    await query("UPDATE draft_run_sessions SET updated_at=now()-interval '26 hours' WHERE id=$1::uuid",[id]);
  }
- const watched=(await query(ADMIN_QUALITY_SQL,[DRAFT_RUN_CORPUS_VERSION])).rows.find(row=>row.puzzle_id===puzzleIds[0]);
+ // The quality watch includes actual picks even without the optional /view.
+ for(let i=0;i<2;i++){
+   const id=await addSyntheticSession(await addSyntheticPlayer(),[{puzzle:{puzzle_id:qualityPuzzle}}],'mixed',qualityPuzzles);
+   await addSyntheticObservation(id,{observed:false,outcome:'pick',puzzleId:qualityPuzzle});
+ }
+ // Evaluate the production SQL with candidate rows restricted to this unique
+ // puzzle. The additional WHERE predicate only isolates test data; the
+ // watchlist's real aggregation, thresholds and abandonment logic all execute.
+ const isolatedQualitySql=ADMIN_QUALITY_SQL.replace(
+   "WHERE o.first_seen_at>=now()-interval '30 days'",
+   "WHERE o.puzzle_id=$2 AND o.first_seen_at>=now()-interval '30 days'");
+ assert.notEqual(isolatedQualitySql,ADMIN_QUALITY_SQL,'the test must scope the actual quality query');
+ const watchRows=()=>query(isolatedQualitySql,[DRAFT_RUN_CORPUS_VERSION,qualityPuzzle]).then(r=>r.rows);
+ const watched=(await watchRows()).find(row=>row.puzzle_id===qualityPuzzle);
  assert.ok(watched,'four abandoned out of twelve mature choices should be flagged');
  assert.ok(watched.high_abandonment===true||watched.high_abandonment==='t',
    'PostgreSQL boolean true is returned as t by the raw CI client');
+ assert.equal(Number(watched.mature_views),12,'only the twelve aged views count as mature');
  assert.equal(Number(watched.likely_left),4,'eight resumed views must no longer be counted abandoned');
- assert.ok(Number(watched.answers)>=7,'native/web answers without view pings are included in quality review');
+ assert.equal(Number(watched.answers),2,'native/web answers without view pings appear in quality review');
  await query("UPDATE draft_run_decision_observations SET last_seen_at=now() WHERE session_id=ANY($1::uuid[])",['{'+agedIds.join(',')+'}']);
- const afterReturn=(await query(ADMIN_QUALITY_SQL,[DRAFT_RUN_CORPUS_VERSION])).rows.find(row=>row.puzzle_id===puzzleIds[0]);
- assert.equal(Number(afterReturn?.likely_left||0),0,'the four remaining visitors leave the abandonment count after resuming');
+ const afterReturn=(await watchRows()).find(row=>row.puzzle_id===qualityPuzzle);
+ assert.equal(afterReturn,undefined,'returning players clear the abandonment watchlist for this puzzle');
 
  // Launch habit metrics: authoritative Daily sessions, shared exclusions, person
  // collapsing, first-touch attribution, Pacific day bucketing and maturity.
