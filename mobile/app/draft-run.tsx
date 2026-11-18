@@ -783,9 +783,10 @@ export default function DraftRunScreen({
       refreshInFlight.current = false;
     }
   };
+  // Updated after every committed render; keep timers pointed at current state.
   useEffect(() => {
     refreshRunRef.current = refreshMountedRun;
-  }, [refreshMountedRun]);
+  });
   useAppResume(refreshMountedRun);
 
   // A foregrounded game can remain on screen across Pacific midnight without
