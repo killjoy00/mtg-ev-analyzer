@@ -102,7 +102,17 @@ export function createDailyScheduleEnsurer(build=buildDailySchedule) {
     }
   };
 }
-const sharedDailyScheduleEnsurer=createDailyScheduleEnsurer();
+// Main must publish before Latest reads repeat history, including when two
+// separate worker processes receive simultaneous starts. Main's unique DB key
+// still coalesces any competing writers across processes.
+export function createOrderedDailyScheduleEnsurer(build=buildDailySchedule) {
+  const ensure=createDailyScheduleEnsurer(build);
+  return async (query,day,environment) => {
+    if(environment==='latest')await ensure(query,day,'mixed');
+    return ensure(query,day,environment);
+  };
+}
+const sharedDailyScheduleEnsurer=createOrderedDailyScheduleEnsurer();
 export async function ensureDailySchedule(query,day,environment) {
   return sharedDailyScheduleEnsurer(query,day,environment);
 }
