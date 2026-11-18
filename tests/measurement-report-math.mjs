@@ -94,6 +94,9 @@ try {
    WHERE p.corpus_version=$1 AND NOT EXISTS (
      SELECT 1 FROM draft_run_decision_observations o
      WHERE o.puzzle_id=p.puzzle_id AND o.first_seen_at>=now()-interval '30 days'
+   ) AND NOT EXISTS (
+     SELECT 1 FROM draft_run_decision_reports r
+     WHERE r.puzzle_id=p.puzzle_id AND r.review_status='open'
    ) LIMIT 1`,[DRAFT_RUN_CORPUS_VERSION])).rows[0]?.puzzle_id;
  assert.ok(qualityPuzzle,'requires an unused verified puzzle for isolated quality metrics');
  const qualityPuzzles=[qualityPuzzle,...puzzleIds.slice(1)];
