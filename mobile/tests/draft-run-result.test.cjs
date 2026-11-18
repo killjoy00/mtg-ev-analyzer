@@ -57,6 +57,7 @@ async function fixture({ environment = 'mixed', guest = false, dailyStatus = sta
     '@/src/api/guest': { ensureGuestSession: async () => session },
     '@/src/storage/session': { readSession: async () => session, subscribeSession: () => () => {} },
     '@/src/api/draftRun': {
+      recordDraftRunView: async () => ({ ok: true }),
       createDraftRunShare: async () => ({ id: 'a'.repeat(24) }),
       loadDailyPeerStats: async () => ({ available: false }),
       DAILY_ENVIRONMENT_META: { mixed: { eyebrow: 'DAILY DRAFT RUN', resultTitle: 'Your Draft Run.' },
