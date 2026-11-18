@@ -72,3 +72,16 @@ test('Trends prefilters only completed non-QA sessions for its unchanged three c
   assert.doesNotMatch(sessions,/\bs\.complete\b/);
   assert.match(sessions,/s\.report_day BETWEEN \$1::date-13 AND \$1::date/);
 });
+
+test('native answers are included in Trends and quality watch; returned views are not abandoned',async()=>{
+  const {ADMIN_TRENDS_SQL,ADMIN_QUALITY_SQL}=await import('../worker/admin-dashboard.mjs');
+  assert.match(ADMIN_TRENDS_SQL,/\(o\.observed OR o\.outcome='pick'\)/,
+    'a submitted native answer is proof of exposure even without a view ping');
+  assert.match(ADMIN_QUALITY_SQL,/\(o\.observed OR o\.outcome='pick'\)/,
+    'quality review must count the same confirmed answers as Insights');
+  assert.match(ADMIN_QUALITY_SQL,/o\.last_seen_at/,
+    'the quality watchlist must read the latest observation activity');
+  assert.match(ADMIN_QUALITY_SQL,/greatest\(updated_at,last_seen_at\)/,
+    'a returning player is not abandoned just because first_seen_at is old');
+  assert.doesNotMatch(ADMIN_QUALITY_SQL,/greatest\(updated_at,first_seen_at\)/);
+});
