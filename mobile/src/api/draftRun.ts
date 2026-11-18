@@ -457,8 +457,8 @@ function newDraftRunViewId(): string {
 // Keep the same observation identity on a resumed view of the same pick.
 // The server updates last_seen_at and only trusts timing when the ID agrees.
 const decisionViewIds = new Map<string, string>();
-export function recordDraftRunView(run: DraftRunState, session: MobileSession) {
-  if (!run.current) return Promise.resolve({ ok: false });
+function decisionViewId(run: DraftRunState): string | null {
+  if (!run.current) return null;
   const key = `${run.id}:${run.revision}:${run.current.puzzle_id}`;
   let viewId = decisionViewIds.get(key);
   if (!viewId) {
@@ -469,6 +469,12 @@ export function recordDraftRunView(run: DraftRunState, session: MobileSession) {
       if (oldest) decisionViewIds.delete(oldest);
     }
   }
+  return viewId;
+}
+
+export function recordDraftRunView(run: DraftRunState, session: MobileSession) {
+  const viewId = decisionViewId(run);
+  if (!viewId) return Promise.resolve({ ok: false });
   return requestJson<{ ok: boolean }>(`/draft/v1/runs/${encodeURIComponent(run.id)}/view`, {
     method: 'POST',
     mobileSessionToken: session.playerToken,
@@ -482,8 +488,10 @@ export function submitDraftRunPick(
   run: DraftRunState,
   cardId: string,
   session: MobileSession,
+  activeMs: number | null = null,
 ) {
   if (!run.current) throw new Error('This run is already complete.');
+  const validTiming = Number.isInteger(activeMs) && activeMs !== null && activeMs >= 0 && activeMs <= 1_800_000;
   return requestJson<DraftRunState>(`/draft/v1/runs/${encodeURIComponent(run.id)}/pick`, {
     method: 'POST',
     mobileSessionToken: session.playerToken,
@@ -493,6 +501,7 @@ export function submitDraftRunPick(
       revision: run.revision,
       round: run.answers.length,
       puzzleId: run.current.puzzle_id,
+      ...(validTiming ? { viewId: decisionViewId(run), activeMs } : {}),
     },
     timeoutMs: 30_000,
   });
