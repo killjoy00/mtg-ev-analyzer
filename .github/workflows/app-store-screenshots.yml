@@ -53,8 +53,8 @@ jobs:
           if not isinstance(head_sha, str) or not re.fullmatch(r'[0-9a-f]{40}', head_sha):
               raise SystemExit('screenshotHeadSha must be a full lowercase commit SHA.')
           version = request.get('versionString')
-          if version != '1.0':
-              raise SystemExit('This guarded workflow is currently restricted to Pack One iOS 1.0.')
+          if version not in ('1.0', '1.4'):
+              raise SystemExit('Only a reviewed Pack One 1.0 or 1.4 screenshot upload is permitted.')
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               output.write(f'run_id={run_id}\n')
               output.write(f'head_sha={head_sha}\n')

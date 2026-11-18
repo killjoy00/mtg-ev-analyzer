@@ -98,7 +98,13 @@ function validateJpeg(path, accepted) {
   return { path, buffer, width, height };
 }
 
-const productNames = [
+const productNames = versionString === '1.4' ? [
+  '01-daily-decision.jpg',
+  '02-reveal-comparison.jpg',
+  '03-daily-hub.jpg',
+  '04-leaderboard.jpg',
+  '05-practice.jpg',
+] : [
   '01-daily-decision.jpg',
   '02-reveal-comparison.jpg',
   '03-daily-hub.jpg',
@@ -391,11 +397,11 @@ console.log(JSON.stringify({
 
 const iphoneScreenshotIds = await replaceScreenshotSet(iphoneSet.id, iphoneFiles);
 const ipadScreenshotIds = await replaceScreenshotSet(ipadSet.id, ipadFiles);
-const subscription = await findSubscription();
-const subscriptionReviewScreenshotId = await replaceSubscriptionReviewScreenshot(
-  subscription.id,
-  subscriptionReviewFile,
-);
+// Product listing refresh must not replace the separately approved Elite review screenshot.
+const subscription = versionString === '1.4' ? null : await findSubscription();
+const subscriptionReviewScreenshotId = subscription
+  ? await replaceSubscriptionReviewScreenshot(subscription.id, subscriptionReviewFile)
+  : null;
 
 console.log(JSON.stringify({
   uploaded: true,
@@ -417,7 +423,7 @@ console.log(JSON.stringify({
   },
   subscription: {
     productId,
-    subscriptionId: subscription.id,
+    subscriptionId: subscription?.id ?? null,
     reviewScreenshotId: subscriptionReviewScreenshotId,
   },
 }, null, 2));

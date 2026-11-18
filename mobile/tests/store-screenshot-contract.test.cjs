@@ -81,6 +81,13 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   assert.match(iosCapture, /stat -f%z/);
   assert.match(iosCapture, /sips -s format jpeg[\s\S]*\.jpg/);
   assert.match(iosCapture, /iphone:1320x2868/);
+  assert.match(iosCapture, /capture "04-leaderboard" "leaderboard"/);
+  assert.match(iosCapture, /capture "05-practice" "practice"/);
+  const composer = read('mobile/scripts/compose-store-screenshots-ios.swift');
+  for (const heading of ['What would you pick?', 'See what the trophy drafter took', 'Three new Dailies every day', 'Same picks. Compare scores.', 'Practice between Dailies']) {
+    assert.ok(composer.includes(heading));
+  }
+  assert.match(workflow, /Compose reviewed iOS 1\.4 caption layouts/);
   assert.match(iosCapture, /ipad:2064x2752/);
   assert.doesNotMatch(iosCapture, /simctl openurl/);
   assert.doesNotMatch(iosCapture, /schemeapproval/);
@@ -215,6 +222,8 @@ test('App Store screenshot upload is protected, source-pinned, and non-submittin
   assert.match(workflow, /capture iPhone and iPad/);
   assert.match(workflow, /pack-one-ios-store-screenshots/);
   assert.match(uploader, /APP_IPHONE_67/);
+  assert.match(uploader, /versionString === '1.4'/);
+  assert.match(uploader, /04-leaderboard\.jpg/);
   assert.match(uploader, /APP_IPAD_PRO_3GEN_129/);
   assert.match(uploader, /iap-review-membership\.jpg/);
   assert.match(uploader, /PREPARE_FOR_SUBMISSION/);
