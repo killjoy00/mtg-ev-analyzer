@@ -118,6 +118,7 @@ async function fixture(options = {}) {
     },
     '@/src/api/guest': { ensureGuestSession: async () => sessionApi.readSession() },
     '@/src/api/draftRun': {
+      recordDraftRunView: async () => ({ ok: true }),
       DAILY_ENVIRONMENT_META: Object.fromEntries(['mixed', 'powered-cube', 'latest'].map((id) => [id, { title: id, eyebrow: id, description: id, resultTitle: id }])),
       isDailyEnvironment: (value) => ['mixed', 'powered-cube', 'latest'].includes(value),
       loadDailyStatus: async () => { throw new Error('Home enrichment offline.'); },
