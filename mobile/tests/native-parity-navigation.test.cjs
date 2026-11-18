@@ -263,22 +263,22 @@ test('Daily preserves loaded completion and zero scores through refresh failure,
   try {
     assert.doesNotMatch(h.text(), /\d\/3 complete/);
     assert.match(h.text(), /Complete · 0\/100/);
-    assert.match(h.text(), /0-day streak/);
+    assert.doesNotMatch(h.text(), /0-day streak/, 'zero streak is intentionally omitted to match the website');
     assert.match(h.text(), /Create a free account/);
     const pending = deferred(); h.readDaily(() => pending.promise);
     await h.resume();
     assert.match(h.text(), /Complete · 100\/100/);
     assert.doesNotMatch(h.text(), /\d\/3 complete/);
     await act(async () => { pending.reject(Error('offline')); await flush(); });
-    assert.match(h.text(), /last loaded progress/);
+    assert.match(h.text(), /Couldn’t load your Daily progress\. Play now will still pick up where you left off\./);
     assert.match(h.text(), /Complete · 100\/100/);
     h.readDaily(async () => status([87]));
     await h.press('Retry');
     assert.match(h.text(), /Complete · 87\/100/);
     assert.doesNotMatch(h.text(), /\d\/3 complete/);
     assert.doesNotMatch(h.text(), /temporarily unavailable/);
-    const dailyCards = h.root.root.findAllByType('Pressable').filter(node => /(?:Play|View) .+ Daily/.test(node.props.accessibilityLabel || ''));
-    assert.deepEqual(dailyCards.map(node => node.props.accessibilityLabel), ['View result for mixed Daily', 'Play powered-cube Daily', 'Play latest Daily']);
+    const dailyCards = h.root.root.findAllByType('Pressable').filter(node => /^(?:Play Daily |View result for Daily )/.test(node.props.accessibilityLabel || ''));
+    assert.deepEqual(dailyCards.map(node => node.props.accessibilityLabel), ['View result for Daily Draft Run', 'Play Daily Powered Cube', 'Play Daily Latest Set']);
   } finally { await h.close(); }
 });
 
@@ -288,9 +288,9 @@ test('unknown progress is never zero and account B cannot retain A completion on
     const pending = deferred(); h.readDaily(() => pending.promise);
     await h.write(session('B'));
     assert.doesNotMatch(h.text(), /87\/100|0\/3 complete|0-day streak|Start here/);
-    assert.match(h.text(), /Checking Daily progress/);
+    assert.match(h.text(), /Checking streak…/);
     await act(async () => { pending.reject(Error('offline')); await flush(); });
-    assert.match(h.text(), /Streak unavailable/);
+    assert.match(h.text(), /Couldn’t load your Daily progress\. Play now will still pick up where you left off\./);
     assert.doesNotMatch(h.text(), /87\/100|0\/3 complete/);
   } finally { await h.close(); }
 });

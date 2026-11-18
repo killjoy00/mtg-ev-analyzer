@@ -143,7 +143,7 @@ test('iOS 1.4 TestFlight enables only approved production AdMob with a fail-clos
   assert.equal(release.playVersionName, '1.0');
   assert.equal(request.operation, 'upload-testflight-app-store-eligible');
   assert.match(request.reason, /iOS 1\.4/);
-  assert.match(request.reason, /DO NOT submit App Review/);
+  assert.match(request.reason, /\bdo not submit (?:to )?App Review\b/i, 'explicit no-App-Review release boundary must remain');
   assert.equal((ios.match(/PACKONE_ADMOB_IOS_ENABLED: '1'/g) || []).length, 2,
     'both unsigned archive and protected signing must explicitly enable live iOS ads');
   assert.equal((ios.match(/Verify reviewed iOS 1\.4 live-AdMob release configuration/g) || []).length, 2,

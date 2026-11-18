@@ -1,8 +1,7 @@
 /* Daily tournament sheet. */
 .daily-home{max-width:var(--entry-content);margin:0 auto 12px}
 .daily-home-heading{padding:14px 0 0;margin-bottom:0}
-.daily-home-heading .eyebrow{font-size:12px;letter-spacing:.12em;margin:0 0 14px}
-.daily-home-heading>p:not(.eyebrow){font-size:18px;color:var(--muted);margin:0 0 32px}
+.daily-home-heading>p{font-size:18px;color:var(--muted);margin:0 0 32px}
 .daily-home-heading time{display:block;padding:13px 0;border-top:2px solid var(--ink);border-bottom:1px solid var(--line);font-size:14px;font-weight:600;letter-spacing:.025em}
 .daily-home-status{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;border-bottom:1px solid var(--line);font-size:16px;line-height:1.35}
 .daily-home-status>strong{font-size:17px;font-weight:800}
@@ -55,7 +54,7 @@
 .app:has(> .daily-home)+.ad-slot[data-ad-slot="home"]{margin-top:8px}
 @media(max-width:600px){
  .daily-home{margin-bottom:8px}.app:has(> .daily-home){padding-bottom:10px}.daily-home-heading{padding-top:4px}
- .daily-home-heading>p:not(.eyebrow){font-size:16px;margin-bottom:24px;max-width:30ch}
+ .daily-home-heading>p{font-size:16px;margin-bottom:24px;max-width:30ch}
  .daily-home-heading h1{font-size:48px;max-width:11ch}
  .daily-home-heading time{font-size:14px}
  .daily-home-status{align-items:flex-start;flex-direction:column;padding:12px 0}.daily-home-status>strong{font-size:16px}.daily-home-streak{min-height:30px}
@@ -85,7 +84,7 @@
 /* Phones: each Daily is one compact row with Play on the right, so all three
    fit on the first screen. */
 @media(max-width:600px){
- .daily-home-heading>p:not(.eyebrow){margin-bottom:18px}
+ .daily-home-heading>p{margin-bottom:18px}
  .daily-home-heading time{padding:10px 10px 10px 0;font-size:13px}
  .daily-home>.daily-home-status{flex-direction:row;align-items:center;gap:6px 10px;padding:10px 0}
  .daily-home>.daily-home-status>strong{font-size:14px}
@@ -104,4 +103,4 @@
 }
 /* The Dailies use the full shared page width: rows start under the logo and end under the menu. */
 .daily-home{max-width:none;margin-left:0}
-.daily-home-heading>p:not(.eyebrow){max-width:68ch}
+.daily-home-heading>p{max-width:68ch}
