@@ -167,7 +167,7 @@ async function fixture(options = {}) {
       },
       async deleteItemAsync(key) { store.delete(key); },
     },
-    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
+    'react-native': { AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) }, useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       AccessibilityInfo: { announceForAccessibility: (value) => calls.push(['announce', value]) },
       ActivityIndicator: host('ActivityIndicator'),
       Modal: (props) => props.visible ? React.createElement('Modal', props, props.children) : null,

@@ -108,8 +108,9 @@ async function fixture(options = {}) {
     'expo-router': {
       router: { push() {}, replace() {} },
       useLocalSearchParams: () => params,
+      useFocusEffect(callback) { React.useEffect(callback, [callback]); },
     },
-    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
+    'react-native': { AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) }, useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       AccessibilityInfo: { announceForAccessibility() {} },
       ActivityIndicator: host('ActivityIndicator'), KeyboardAvoidingView: host('KeyboardAvoidingView'), Modal: host('Modal'),
       Platform: { OS: 'ios' }, Pressable: host('Pressable'), ScrollView, Share: { share: async () => {} },

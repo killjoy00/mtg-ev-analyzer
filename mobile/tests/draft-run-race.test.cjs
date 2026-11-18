@@ -111,6 +111,23 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
   let startCalls = 0;
   let resumeCallback = null;
   const observed = [];
+  const focusHandlers = new Set();
+  const appListeners = new Set();
+  let focused = false;
+  const appState = { currentState: 'background',
+    addEventListener(_event, callback) {
+      appListeners.add(callback);
+      return { remove() { appListeners.delete(callback); } };
+    },
+  };
+  const setFocused = value => {
+    focused = value;
+    for (const entry of focusHandlers) {
+      entry.cleanup?.();
+      entry.cleanup = null;
+      if (focused) entry.cleanup = entry.callback();
+    }
+  };
   const nextDaily = { ...runZero(), id: '99999999-9999-4999-8999-999999999999', day: '2026-09-27', revision: 0, current: puzzle('next-day', 1) };
 
   const Image = host('Image');
@@ -129,8 +146,16 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
     'expo-router': {
       router: { push() {}, replace() {} },
       useLocalSearchParams: () => ({ environment: 'mixed' }),
+      useFocusEffect(callback) {
+        React.useEffect(() => {
+          const entry = { callback, cleanup: null };
+          focusHandlers.add(entry);
+          if (focused) entry.cleanup = callback();
+          return () => { focusHandlers.delete(entry); entry.cleanup?.(); };
+        }, [callback]);
+      },
     },
-    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
+    'react-native': { AppState: appState, useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       AccessibilityInfo: { announceForAccessibility() {} },
       ActivityIndicator: host('ActivityIndicator'),
       KeyboardAvoidingView: host('KeyboardAvoidingView'),
@@ -195,6 +220,18 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
 
   assert.equal(startCalls, 1);
   assert.ok(root.toJSON(), 'initial Draft Run should render');
+  assert.deepEqual(observed, [], 'loading in background must not count a view');
+  await act(async () => { setFocused(true); await Promise.resolve(); });
+  assert.deepEqual(observed, [], 'focused but backgrounded must not count a view');
+  await act(async () => {
+    setFocused(false);
+    appState.currentState = 'active';
+    for (const listener of appListeners) listener('active');
+    await Promise.resolve();
+  });
+  assert.deepEqual(observed, [], 'active but not focused must not count a view');
+  await act(async () => { setFocused(true); await Promise.resolve(); });
+  assert.deepEqual(observed, [runZero().id], 'only the visible foreground pick counts as a view');
 
   let refreshPromise;
   await act(async () => {
@@ -274,8 +311,9 @@ test('a committed pick with a lost response is reconciled into feedback', async 
     'expo-router': {
       router: { push() {}, replace() {} },
       useLocalSearchParams: () => ({ environment: 'mixed' }),
+      useFocusEffect(callback) { React.useEffect(callback, [callback]); },
     },
-    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
+    'react-native': { AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) }, useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       AccessibilityInfo: { announceForAccessibility() {} },
       ActivityIndicator: host('ActivityIndicator'),
       KeyboardAvoidingView: host('KeyboardAvoidingView'),

@@ -78,7 +78,7 @@ async function fixture(options = {}) {
   });
   const mocks = {
     react: React,
-    'react-native': { ActivityIndicator: host('Spinner'), Pressable: host('Pressable'), ScrollView, View: host('View'), TextInput: host('TextInput'),
+    'react-native': { AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) }, ActivityIndicator: host('Spinner'), Pressable: host('Pressable'), ScrollView, View: host('View'), TextInput: host('TextInput'),
       Modal: props => props.visible ? React.createElement('Modal', props, props.children) : null,
       StyleSheet: { create: value => value }, Platform: { OS: 'android' },
       useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
