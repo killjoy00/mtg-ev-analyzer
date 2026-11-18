@@ -474,7 +474,7 @@ function decisionViewId(run: DraftRunState): string | null {
 
 export function recordDraftRunView(run: DraftRunState, session: MobileSession) {
   const viewId = decisionViewId(run);
-  if (!viewId) return Promise.resolve({ ok: false });
+  if (!viewId || !run.current) return Promise.resolve({ ok: false });
   return requestJson<{ ok: boolean }>(`/draft/v1/runs/${encodeURIComponent(run.id)}/view`, {
     method: 'POST',
     mobileSessionToken: session.playerToken,
