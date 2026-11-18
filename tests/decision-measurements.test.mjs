@@ -179,13 +179,13 @@ test('habits query keeps first-Daily attribution and rolling seven-day math with
   assert.match(sql,/NOT EXISTS \(\s*SELECT 1 FROM account_links admin_link/);
 });
 
-test('Insights supports Latest Set Daily and exposes answered-without-view coverage',()=>{
+test('Latest Daily is accepted as a real Insights filter; coverage copy describes included first encounters',async()=>{
   const latest=reportFilters(new URL('https://test/?environment=latest'));
   assert.equal(latest.environment,'latest');
   assert.equal(latest.params[2],'latest');
-  const backend=fs.readFileSync('worker/measurement-admin.mjs','utf8');
-  const ui=fs.readFileSync('admin/admin.mjs','utf8');
-  assert.match(backend,/answered_without_view/);
-  assert.match(ui,/\['latest','Latest Set'\]/);
-  assert.match(ui,/c\.answered_without_view/);
+  const {missingViewCoverageText}=await import('../admin/insights-coverage.mjs');
+  assert.equal(missingViewCoverageText(2),'View coverage: 2 first-encounter answers without a recorded view, across web and native (included in answer totals).');
+  assert.equal(missingViewCoverageText(1200).includes('1,200 first-encounter'),true);
+  // SQL coverage, repeat exclusion and Latest-scoped aggregates run against
+  // PostgreSQL in tests/measurement-report-math.mjs, not source regexes.
 });
