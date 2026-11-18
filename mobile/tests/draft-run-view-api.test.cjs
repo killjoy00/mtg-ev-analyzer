@@ -18,6 +18,7 @@ test('native Draft Run view ID survives refocus without compromising timing', as
   const run = {
     id: '11111111-1111-4111-8111-111111111111',
     revision: 0,
+    answers: [],
     current: { puzzle_id: 'first-pick' },
   };
   await api.recordDraftRunView(run, session);
