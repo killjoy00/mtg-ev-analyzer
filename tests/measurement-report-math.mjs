@@ -40,6 +40,66 @@ try {
  assert.equal(detail.choices.reduce((n,r)=>n+Number(r.answers),0),5);
  const empty=await handleAdmin(new Request('https://packone.pro/v1/admin/measurements?version='+version+'&difficulty=invalid',{headers:{'x-pack1-auth-session':token}}),query,readJson).catch(e=>e.status);assert.equal(empty,400);
 
+
+ // Real PostgreSQL assertions cover the actual reporting queries and metrics.
+ // No source-string matching can substitute for the observed output here.
+ const syntheticVersion='coverage-'+crypto.randomUUID().replaceAll('-','').slice(0,8);
+ const addSyntheticPlayer=async()=>{
+   const player=crypto.randomUUID();reportExtraPlayers.push(player);
+   await query("INSERT INTO players(id,display_name) VALUES($1::uuid,'Reporting integration player')",[player]);
+   return player;
+ };
+ const addSyntheticSession=async(player,answers=[])=>{
+   const id=crypto.randomUUID();reportExtraSessions.push(id);
+   await query("INSERT INTO draft_run_sessions(id,player_id,seed,corpus_version,scoring_version,puzzle_ids,seen_sources,environment,difficulty_version,selection_version,answers) SELECT $1::uuid,$2::uuid,$1::text,corpus_version,scoring_version,puzzle_ids,'[]'::jsonb,'mixed',difficulty_version,$3,$4::jsonb FROM draft_run_sessions WHERE id=$5::uuid",
+     [id,player,syntheticVersion,JSON.stringify(answers),source.id]);
+   return id;
+ };
+ const addSyntheticObservation=async(id,{observed=false,outcome='pick'}={})=>{
+   await query("INSERT INTO draft_run_decision_observations(session_id,revision,round,puzzle_id,observed,outcome,answered_at,score,trophy_match) VALUES($1::uuid,0,1,$2,$3::boolean,$4::text,CASE WHEN $4='pick' THEN now() ELSE NULL END,CASE WHEN $4='pick' THEN 70 ELSE NULL END,CASE WHEN $4='pick' THEN false ELSE NULL END)",
+     [id,puzzleIds[0],observed,outcome]);
+ };
+ const todayTrend=rows=>rows.find(row=>row.kind==='day'&&row.label===today);
+ const trendBefore=todayTrend((await query(ADMIN_TRENDS_SQL,[today])).rows);
+ const native=await addSyntheticPlayer(),failedWeb=await addSyntheticPlayer();
+ const firstNoView=await addSyntheticSession(native,[{puzzle:{puzzle_id:puzzleIds[0]}}]);
+ await addSyntheticObservation(firstNoView); // simulated native answer
+ const webNoView=await addSyntheticSession(failedWeb,[{puzzle:{puzzle_id:puzzleIds[0]}}]);
+ await addSyntheticObservation(webNoView); // simulated failed web /view
+ const repeatNoView=await addSyntheticSession(native);
+ await addSyntheticObservation(repeatNoView);
+ const flags=(await query("SELECT session_id,first_encounter FROM draft_run_source_measurements WHERE session_id=ANY($1::uuid[])",['{'+[firstNoView,webNoView,repeatNoView].join(',')+'}'])).rows;
+ const first=id=>{const row=flags.find(r=>r.session_id===id);return row?.first_encounter===true||row?.first_encounter==='t';};
+ assert.equal(first(firstNoView),true,'native pick without /view is a first encounter');
+ assert.equal(first(webNoView),true,'a web pick with failed /view is a first encounter');
+ assert.equal(first(repeatNoView),false,'a repeated native answer is excluded');
+ const coverage=await handleAdmin(new Request('https://packone.pro/v1/admin/measurements?version='+syntheticVersion,{headers:{'x-pack1-auth-session':token}}),query,readJson);
+ assert.equal(Number(coverage.summary.answers),2,'Insights counts two eligible first-encounter picks');
+ assert.equal(Number(coverage.coverage.answered_without_view),2,'missing-view coverage excludes the repeat');
+ assert.equal(Number(coverage.coverage.repeats_excluded),1,'repeat picks without views are excluded from Insights');
+ const trendAfter=todayTrend((await query(ADMIN_TRENDS_SQL,[today])).rows);
+ assert.equal(Number(trendAfter.answers)-Number(trendBefore.answers),3,'Trends counts both first and repeated submitted answers even without a view');
+ assert.equal(Number(trendAfter.observed_players)-Number(trendBefore.observed_players),2,'two new players appear in Trends');
+
+ // Twelve old pending observations: four left, eight returned. Watching only
+ // first_seen_at would incorrectly consider all twelve abandoned.
+ const agedIds=[];
+ for(let i=0;i<12;i++){
+   const id=await addSyntheticSession(await addSyntheticPlayer());
+   agedIds.push(id);
+   await addSyntheticObservation(id,{observed:true,outcome:null});
+   await query("UPDATE draft_run_decision_observations SET first_seen_at=now()-interval '26 hours',last_seen_at=CASE WHEN $2::boolean THEN now()-interval '26 hours' ELSE now() END WHERE session_id=$1::uuid",[id,i<4]);
+   await query("UPDATE draft_run_sessions SET updated_at=now()-interval '26 hours' WHERE id=$1::uuid",[id]);
+ }
+ const watched=(await query(ADMIN_QUALITY_SQL,[DRAFT_RUN_CORPUS_VERSION])).rows.find(row=>row.puzzle_id===puzzleIds[0]);
+ assert.ok(watched,'four abandoned out of twelve mature choices should be flagged');
+ assert.equal(watched.high_abandonment,true);
+ assert.equal(Number(watched.likely_left),4,'eight resumed views must no longer be counted abandoned');
+ assert.ok(Number(watched.answers)>=7,'native/web answers without view pings are included in quality review');
+ await query("UPDATE draft_run_decision_observations SET last_seen_at=now() WHERE session_id=ANY($1::uuid[])",['{'+agedIds.join(',')+'}']);
+ const afterReturn=(await query(ADMIN_QUALITY_SQL,[DRAFT_RUN_CORPUS_VERSION])).rows.find(row=>row.puzzle_id===puzzleIds[0]);
+ assert.equal(Number(afterReturn?.likely_left||0),0,'the four remaining visitors leave the abandonment count after resuming');
+
  // Launch habit metrics: authoritative Daily sessions, shared exclusions, person
  // collapsing, first-touch attribution, Pacific day bucketing and maturity.
  const isoDay=(value,offset=0)=>{const d=new Date(value+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+offset);return d.toISOString().slice(0,10);};
@@ -182,6 +242,12 @@ try {
 
  console.log('PASS: decision math plus launch habit cohorts, exclusions, attribution, maturity, Pacific bucketing and person counting.');
 } finally {
+ if(reportExtraSessions.length){
+   const names='{'+reportExtraSessions.join(',')+'}';
+   await query('DELETE FROM draft_run_decision_observations WHERE session_id=ANY($1::uuid[])',[names]);
+   await query('DELETE FROM draft_run_sessions WHERE id=ANY($1::uuid[])',[names]);
+ }
+ if(reportExtraPlayers.length)await query('DELETE FROM players WHERE id=ANY($1::uuid[])',['{'+reportExtraPlayers.join(',')+'}']);
  if(players.length)await query('DELETE FROM analytics_events WHERE player_id=ANY($1::uuid[])',['{'+players.join(',')+'}']);
  if(ids.length)await query('UPDATE draft_run_sessions SET measurement_qa=true WHERE id=ANY($1::uuid[])',['{'+ids.join(',')+'}']);
  if(habitPlayers.length)await query('DELETE FROM analytics_events WHERE player_id=ANY($1::uuid[])',['{'+habitPlayers.join(',')+'}']);
