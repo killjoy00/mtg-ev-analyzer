@@ -31,8 +31,8 @@ export function AdMobDailyBanner({ eligible }: { eligible: boolean }) {
         if (!active) return;
         setPrivacyRequired(consent.privacyOptionsRequirementStatus === 'REQUIRED');
         if (!consent.canRequestAds) return;
-        // Google's bundled iOS manifest declares tracked Device ID. Only
-        // initialize the advertising SDK after Apple's ATT authorization.
+        // The bundled iOS manifest declares tracked Device ID. Check ATT
+        // before SDK initialization so Google's SDK can omit IDFA if denied.
         // ATT controls the advertising identifier, not whether eligible players
         // can see a non-personalized ad. Google's iOS SDK omits IDFA when ATT is
         // denied/restricted. Resolve the permission before initializing the SDK;
@@ -40,10 +40,10 @@ export function AdMobDailyBanner({ eligible }: { eligible: boolean }) {
         if (Platform.OS === 'ios') {
           const tracking = await import('expo-tracking-transparency');
           if (!active) return;
-          let permission = await tracking.getTrackingPermissionsAsync();
+          const permission = await tracking.getTrackingPermissionsAsync();
           if (!active) return;
           if (permission.status === tracking.PermissionStatus.UNDETERMINED) {
-            permission = await tracking.requestTrackingPermissionsAsync();
+            await tracking.requestTrackingPermissionsAsync();
           }
           if (!active) return;
           // Denied/restricted ATT must not suppress a consent-eligible banner.

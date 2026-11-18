@@ -35,6 +35,9 @@ upload, or change to the already approved 101036 binary.
 
 ## iOS 1.3 live-AdMob TestFlight candidate — November 17, 2026 (historical)
 
+The notes in this section describe the original build 101036, not the
+updated denied-ATT policy proposed above.
+
 **Owner-confirmed:** Google approved the Pack One iOS AdMob app, and the
 App Store Connect App Privacy disclosure is done. This is a statement from
 the owner, not a new readback of AdMob or App Store Connect account settings.
