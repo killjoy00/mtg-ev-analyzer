@@ -102,22 +102,22 @@ export function createDailyScheduleEnsurer(build=buildDailySchedule) {
     }
   };
 }
-// Main must publish before Latest reads repeat history, including when two
-// separate worker processes receive simultaneous starts. Main's unique DB key
-// still coalesces any competing writers across processes.
+// Coalesce the saved-Latest lookup as well as generation. Running this read
+// outside the ensurer caused simultaneous requests for one saved Daily to
+// issue one database query per caller instead of a single shared query.
+// For a NEW Latest, Main must publish before repeat history is read; the
+// same ensurer coalesces Main starts, and the DB unique key covers processes.
 export function createOrderedDailyScheduleEnsurer(build=buildDailySchedule) {
-  const ensure=createDailyScheduleEnsurer(build);
-  return async (query,day,environment) => {
+  const ensure=createDailyScheduleEnsurer(async(query,day,environment)=>{
     if(environment==='latest') {
-      // Existing Latest schedules are authoritative even when Main can no
-      // longer be generated (e.g. an archive with fewer than four Live sets).
-      // Only a NEW Latest generation depends on Main's repeat history.
+      // Saved Latest remains available even when Main cannot generate.
       const saved=(await query(DAILY_SCHEDULE_SELECT,[day,environment])).rows[0];
-      if(saved)return {schedule:structuredClone(saved),created:false};
+      if(saved)return {schedule:saved,created:false};
       await ensure(query,day,'mixed');
     }
-    return ensure(query,day,environment);
-  };
+    return build(query,day,environment);
+  });
+  return ensure;
 }
 const sharedDailyScheduleEnsurer=createOrderedDailyScheduleEnsurer();
 export async function ensureDailySchedule(query,day,environment) {

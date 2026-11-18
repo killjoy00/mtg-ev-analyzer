@@ -99,6 +99,36 @@ test('an already saved Latest Daily is returned even if Main cannot generate',as
     'no Main generation should happen when Latest is already saved');
 });
 
+test('50 concurrent reads of an already-saved Latest coalesce into one database query',async()=>{
+  const day='2041-06-15',saved={puzzle_ids:['saved-latest'],scoring_version:'pinned'};
+  let releaseLookup,lookups=0,generated=0;
+  const lookupGate=new Promise(resolve=>{releaseLookup=resolve;});
+  const query=async(sql,params)=>{
+    assert.equal(sql,'SELECT puzzle_ids,corpus_version,scoring_version,difficulty_version,selection_version,daily_featured_sets,serving_policy_version FROM draft_run_schedules WHERE day=$1::date AND environment=$2');
+    assert.deepEqual(params,[day,'latest']);
+    lookups++;
+    await lookupGate;
+    return {rows:[saved]};
+  };
+  const ensure=createOrderedDailyScheduleEnsurer(async()=>{
+    generated++;
+    throw Object.assign(new Error('Main cannot build'),{status:503});
+  });
+  const requests=Array.from({length:50},()=>ensure(query,day,'latest'));
+  await Promise.resolve();
+  assert.equal(lookups,1,'the saved Latest lookup must be inside the coalescer');
+  releaseLookup();
+  const results=await Promise.all(requests);
+  assert.equal(lookups,1);
+  assert.equal(generated,0,'a saved Latest must not attempt to build Main');
+  assert.ok(results.every(result=>result.created===false));
+  assert.ok(results.every(result=>result.schedule.puzzle_ids[0]==='saved-latest'));
+  results[0].schedule.puzzle_ids.push('mutation');
+  assert.deepEqual(results[1].schedule,saved,'each concurrent caller gets its own cloned schedule');
+  await ensure(query,day,'latest');
+  assert.equal(lookups,2,'completed requests are not permanently cached');
+});
+
 test('native answers remain in first-encounter puzzle quality even without a view ping',()=>{
   const source=readFileSync(new URL('../worker/measurement-admin.mjs',import.meta.url),'utf8');
   assert.equal((source.match(/\(observed OR outcome='pick'\) AND NOT is_qa AND first_encounter/g)||[]).length,3,
