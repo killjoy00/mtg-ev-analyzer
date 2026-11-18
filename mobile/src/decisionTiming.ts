@@ -21,6 +21,7 @@ export function createForegroundDecisionTimer(now: () => number = () => performa
       if (!key || !visible) pause();
       else if (started === null) started = now();
     },
+    pause,
     sample(decisionKey: string): number | null {
       if (!key || key !== decisionKey) return null;
       const ms = elapsed + (started === null ? 0 : Math.max(0, now() - started));
