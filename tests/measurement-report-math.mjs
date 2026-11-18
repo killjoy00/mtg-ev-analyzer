@@ -100,7 +100,8 @@ try {
  }
  const watched=(await query(ADMIN_QUALITY_SQL,[DRAFT_RUN_CORPUS_VERSION])).rows.find(row=>row.puzzle_id===puzzleIds[0]);
  assert.ok(watched,'four abandoned out of twelve mature choices should be flagged');
- assert.equal(watched.high_abandonment,true);
+ assert.ok(watched.high_abandonment===true||watched.high_abandonment==='t',
+   'PostgreSQL boolean true is returned as t by the raw CI client');
  assert.equal(Number(watched.likely_left),4,'eight resumed views must no longer be counted abandoned');
  assert.ok(Number(watched.answers)>=7,'native/web answers without view pings are included in quality review');
  await query("UPDATE draft_run_decision_observations SET last_seen_at=now() WHERE session_id=ANY($1::uuid[])",['{'+agedIds.join(',')+'}']);
