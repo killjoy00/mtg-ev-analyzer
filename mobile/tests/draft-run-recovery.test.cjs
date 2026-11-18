@@ -120,6 +120,7 @@ async function fixture(options = {}) {
     '@/src/api/guest': { ensureGuestSession: async () => session },
     '@/src/storage/session': { readSession: async () => session, subscribeSession: callback => { sessionListeners.add(callback); return () => sessionListeners.delete(callback); } },
     '@/src/api/draftRun': {
+      recordDraftRunView: async () => ({ ok: true }),
       createDraftRunShare: async () => ({ id: 'a'.repeat(24) }),
       loadDailyPeerStats: async () => ({ available: false }),
       DAILY_ENVIRONMENT_META: {
