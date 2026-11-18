@@ -1,6 +1,39 @@
 # Pack One iOS AdMob release status
 
-## iOS 1.3 live-AdMob TestFlight candidate — November 17, 2026
+## Upcoming fix: non-personalized Daily banner with ATT denied (not yet shipped)
+
+The App Store-approved iOS 1.3 build **101036** was signed with live AdMob
+enabled and an overly restrictive ATT check. For visitors with Apple's global
+tracking switch off, that build never initializes the Google SDK, even if the
+guest is eligible and Google's separate UMP consent allows ad requests.
+
+This follow-up permits **non-personalized, G-rated** Daily-home banner requests
+when ATT is denied or restricted. Google documents that its iOS SDK does not
+send IDFA when ATT is denied:
+https://developers.google.com/admob/ios/privacy/idfa
+
+The flow still waits for fresh guest/account ad eligibility and Google UMP
+consent. ATT remains checked (prompting only when undetermined) **before** SDK
+initialization, but a denied/restricted result no longer suppresses an
+otherwise-consented request. App Tracking Transparency is not consent for
+Google's separate privacy requirements; failed or disallowed UMP stays closed.
+Supporter/Elite accounts, stale membership state, and gameplay never get ads.
+The app's ad request continues to set
+`requestNonPersonalizedAdsOnly: true` regardless of ATT status.
+
+**Privacy:** The bundled Google Ads SDK can collect other data besides IDFA.
+Retain the ATT usage description and strict signed-archive privacy manifest
+audit; don't falsely claim that non-personalized ads eliminate all data
+collection. Review App Store Connect's privacy answers against the signed
+SDK manifest before public submission. Test on a real iPhone with the global
+tracking switch off as well as ATT granted/denied/restricted, UMP allowed and
+disallowed, guest/free vs ad-free accounts, ad load/no-fill, and AdChoices.
+
+This is code review only, not an App Store submission, signed TestFlight
+upload, or change to the already approved 101036 binary.
+
+
+## iOS 1.3 live-AdMob TestFlight candidate — November 17, 2026 (historical)
 
 **Owner-confirmed:** Google approved the Pack One iOS AdMob app, and the
 App Store Connect App Privacy disclosure is done. This is a statement from
@@ -64,7 +97,7 @@ remains unmerged and unsigned as a public App Store update.
   banner and the Account screen.
 - Consent failure or ad load failure leaves a blank slot on iOS; neither
   blocks play, adds an interstitial, nor falls back to TCGplayer.
-- **ATT gate (iOS 1.2):** The bundled Google Mobile Ads manifest marks Device ID
+- **ATT gate in approved build 101036 (historical, corrected above):** The bundled Google Mobile Ads manifest marks Device ID
   as tracked. After Google UMP consent and **before Google SDK initialization**,
   Expo TrackingTransparency checks Apple's system authorization and prompts once
   only if undetermined. Denied, restricted, or unavailable authorization

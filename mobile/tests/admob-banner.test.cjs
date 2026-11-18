@@ -42,7 +42,10 @@ async function fixture(t, { consent, eligible = false, att = 'granted', attReque
       getConsentInfo: async () => ({ canRequestAds: true, privacyOptionsRequirementStatus: 'NOT_REQUIRED' }),
     },
     default: () => ({
-      setRequestConfiguration: async () => { calls.push('configure'); },
+      setRequestConfiguration: async options => {
+        assert.equal(options.maxAdContentRating, 'G');
+        calls.push('configure');
+      },
       initialize: async () => { calls.push('initialize'); },
     }),
   };
@@ -120,18 +123,24 @@ test('privacy-options requirement is visible alongside eligible ads', async t =>
   assert.ok(h.calls.includes('privacy'));
 });
 
-test('iOS ATT denied or restricted: free play continues but no SDK or ad request', async t => {
-  const h = await fixture(t, { eligible: true, att: 'denied' });
-  await act(async () => { await drain(); await drain(); });
-  assert.deepEqual(h.calls, ['consent', 'att-check']);
-  assert.equal(h.root.root.findAllByType('BannerAd').length, 0);
-});
+for (const att of ['denied', 'restricted']) {
+  test(`iOS ATT ${att}: UMP-eligible guests get a non-personalized banner without an ATT prompt`, async t => {
+    const h = await fixture(t, { eligible: true, att });
+    await act(async () => { await drain(); await drain(); });
+    assert.deepEqual(h.calls, ['consent', 'att-check', 'configure', 'initialize']);
+    const banners = h.root.root.findAllByType('BannerAd');
+    assert.equal(banners.length, 1);
+    assert.equal(banners[0].props.requestOptions.requestNonPersonalizedAdsOnly, true);
+  });
+}
 
-test('undetermined ATT prompts once; denied choice blocks ad initialization', async t => {
+test('undetermined ATT prompts once; a denied choice still allows non-personalized ads', async t => {
   const h = await fixture(t, { eligible: true, att: 'undetermined', attRequest: 'denied' });
   await act(async () => { await drain(); await drain(); });
-  assert.deepEqual(h.calls, ['consent', 'att-check', 'att-request']);
-  assert.equal(h.root.root.findAllByType('BannerAd').length, 0);
+  assert.deepEqual(h.calls, ['consent', 'att-check', 'att-request', 'configure', 'initialize']);
+  const banners = h.root.root.findAllByType('BannerAd');
+  assert.equal(banners.length, 1);
+  assert.equal(banners[0].props.requestOptions.requestNonPersonalizedAdsOnly, true);
 });
 
 test('undetermined ATT granted allows only non-personalized G-rated ads', async t => {

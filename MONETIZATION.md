@@ -1,5 +1,22 @@
 # Pack One monetization
 
+## November 18, 2026: ATT-denied iOS banner correction (code review only)
+
+The owner reports that iOS 1.3 build **101036** was approved in the App Store
+and AdMob shows the Pack One app as **Verified / Ready**. The signed build
+has production AdMob enabled, but the current component suppresses all ads
+when the iPhone's tracking permission is denied. Google's iOS SDK documentation
+explicitly permits non-personalized ad requests without IDFA in that case.
+
+The reviewed follow-up allows Google UMP-eligible guest/free users to request
+a non-personalized Daily-home banner without ATT authorization. It retains
+Google consent, membership exclusions, privacy manifest/usage auditing,
+G-rated requests and the single Daily-home placement. This change is **not
+present in approved build 101036** until a new binary is tested and released.
+Privacy disclosures and physical-device acceptance must be reviewed before
+a new public App Store submission.
+
+
 Updated November 17, 2026. Website Google AdSense remains disabled. The owner confirms that native iOS AdMob is approved and App Privacy disclosures are complete; the separately gated iOS 1.3 TestFlight candidate will enable AdMob. Public Patreon linking and the Elite post-purchase activation flow remain active.
 
 ## Membership
