@@ -70,7 +70,11 @@ export function requiredSetRounds(groups,bands,windows,random,required=[]) {
   if(!required.length)return new Map();
   for(let i=slots.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[slots[i],slots[j]]=[slots[j],slots[i]];}
   const assignment=new Map();
-  const available=(set,round)=>groups.some(g=>g.set_id===set&&g.n>0&&g.band===bands[round]&&g.pick_number>=windows[round][0]&&g.pick_number<=windows[round][1]);
+  // Mirror the selector's Easy-to-Medium fallback when assigning required sets.
+  // Otherwise a fully qualified custom set with no Easy puzzles cannot start.
+  const available=(set,round)=>groups.some(g=>g.set_id===set&&g.n>0
+    &&(g.band===bands[round]||(bands[round]==='easy'&&g.band==='medium'))
+    &&g.pick_number>=windows[round][0]&&g.pick_number<=windows[round][1]);
   const place=i=>{
     if(i===required.length)return true;
     for(const round of slots)if(!assignment.has(round)&&available(required[i],round)){
