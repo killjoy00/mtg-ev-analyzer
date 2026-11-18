@@ -49,10 +49,10 @@ try {
    await query("INSERT INTO players(id,display_name) VALUES($1::uuid,'Reporting integration player')",[player]);
    return player;
  };
- const addSyntheticSession=async(player,answers=[])=>{
+ const addSyntheticSession=async(player,answers=[],environment='mixed')=>{
    const id=crypto.randomUUID();reportExtraSessions.push(id);
-   await query("INSERT INTO draft_run_sessions(id,player_id,seed,corpus_version,scoring_version,puzzle_ids,seen_sources,environment,difficulty_version,selection_version,answers) SELECT $1::uuid,$2::uuid,$1::text,corpus_version,scoring_version,puzzle_ids,'[]'::jsonb,'mixed',difficulty_version,$3,$4::jsonb FROM draft_run_sessions WHERE id=$5::uuid",
-     [id,player,syntheticVersion,JSON.stringify(answers),source.id]);
+   await query("INSERT INTO draft_run_sessions(id,player_id,seed,corpus_version,scoring_version,puzzle_ids,seen_sources,environment,difficulty_version,selection_version,answers) SELECT $1::uuid,$2::uuid,$1::text,corpus_version,scoring_version,puzzle_ids,'[]'::jsonb,$6,difficulty_version,$3,$4::jsonb FROM draft_run_sessions WHERE id=$5::uuid",
+     [id,player,syntheticVersion,JSON.stringify(answers),source.id,environment]);
    return id;
  };
  const addSyntheticObservation=async(id,{observed=false,outcome='pick'}={})=>{
@@ -80,6 +80,13 @@ try {
  const trendAfter=todayTrend((await query(ADMIN_TRENDS_SQL,[today])).rows);
  assert.equal(Number(trendAfter.answers)-Number(trendBefore.answers),3,'Trends counts both first and repeated submitted answers even without a view');
  assert.equal(Number(trendAfter.observed_players)-Number(trendBefore.observed_players),2,'two new players appear in Trends');
+ const latestPlayer=await addSyntheticPlayer();
+ const latestSession=await addSyntheticSession(latestPlayer,[{puzzle:{puzzle_id:puzzleIds[0]}}],'latest');
+ await addSyntheticObservation(latestSession);
+ const latestScope=await handleAdmin(new Request('https://packone.pro/v1/admin/measurements?version='+syntheticVersion+'&environment=latest',{headers:{'x-pack1-auth-session':token}}),query,readJson);
+ assert.equal(Number(latestScope.summary.answers),1,'Latest filter selects the Latest Daily answer');
+ const mixedScope=await handleAdmin(new Request('https://packone.pro/v1/admin/measurements?version='+syntheticVersion+'&environment=mixed',{headers:{'x-pack1-auth-session':token}}),query,readJson);
+ assert.equal(Number(mixedScope.summary.answers),2,'Latest answers do not bleed into Regular results');
 
  // Twelve old pending observations: four left, eight returned. Watching only
  // first_seen_at would incorrectly consider all twelve abandoned.
