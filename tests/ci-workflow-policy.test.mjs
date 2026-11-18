@@ -55,7 +55,7 @@ test('browser dependency image matches the locked Playwright version and avoids 
   assert.equal(image[1], playwright, 'image and installed package versions must match');
   assert.match(browser, /options: --ipc=host/);
   assert.match(browser, /defaults:\n\s+run:\n\s+shell: bash/, 'container steps use Bash, not the default sh');
-  assert.match(browser, /git config --global --add safe\\.directory "\\$GITHUB_WORKSPACE"/,
+  assert.match(browser, /git config --global --add safe\.directory "\$GITHUB_WORKSPACE"/,
     'container must trust only its checked-out workspace for Git-backed preview validation');
   assert.match(browser, /timeout-minutes: 30/);
   const install = browser.split('      - name: Verify preinstalled Playwright browsers and install JS dependencies')[1]
