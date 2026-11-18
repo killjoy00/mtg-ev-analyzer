@@ -89,6 +89,19 @@ test('a rejected verification leaves the transaction unfinished and never throws
   assert.deepEqual(h.finished, []);
 });
 
+test('failed Elite verification is retried after connectivity returns without a six-hour wait', async () => {
+  const h = harness({ verifyError: new Error('offline') });
+  assert.equal(await h.sync.resyncAppleSubscription(session(), 1_000), 0);
+  h.verifyError = null;
+  assert.equal(await h.sync.resyncAppleSubscription(session(), 61_000), 1);
+  assert.equal(h.reads.length, 2);
+  assert.equal(h.verified.length, 2);
+  assert.deepEqual(h.finished, ['2000001']);
+  // Only a successfully completed scan starts the normal six-hour throttle.
+  assert.equal(await h.sync.resyncAppleSubscription(session(), 62_000), 0);
+  assert.equal(h.reads.length, 2);
+});
+
 test('a StoreKit read failure is swallowed', async () => {
   const h = harness();
   h.available = null;
