@@ -190,25 +190,11 @@ try {
   await query("UPDATE draft_run_puzzle_selection_features SET strength_sha256=repeat('0',64) WHERE puzzle_id=$1",[victim]);
   check((await scorePuzzleSelection(query,{setIds:[setId],log:()=>{}})).sets[0].written===1,'A stale strength table is rescored');
 
-  // The schedule records the rule that chose it, and the rule draws after the
-  // Daily repeat window. Earlier suites may have generated today's Dailies, so
-  // the expected run uses the same exclusion, read before this schedule exists.
+  // Main is now published first, even when Latest is requested first from
+  // another worker. Both deterministic rule checks use the repeat history
+  // visible when their own schedule is created.
   const day='2026-11-20';
-  const recent=(await query(RECENT_DAILY_DECISIONS,[day,DAILY_REPEAT_WINDOW_DAYS.decision-1,DAILY_REPEAT_WINDOW_DAYS.source-1])).rows;
-  const exclusion=dailyRepeatExclusion(recent);
-  const report={};
-  const expected=await selectDailyWithoutRepeats(exclude=>selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed(day),'latest',{daily:true,day,exclude,report}),
-    exclusion,{environment:'latest',day,warn:()=>{}});
-  check(report.selectionRule===LATEST_DAILY_CLEAR_EASY_RULE,'The stakes and clear-Easy rules still apply with the repeat window');
-  check(!expected.some(p=>exclusion.decisions.includes(decisionKey(p))),'The rule never repeats a decision from the repeat window');
   try {
-    const {schedule,created}=await ensureDailySchedule(query,day,'latest');
-    check(created,'The latest-set Daily schedule is created');
-    const stored=(await query("SELECT selection_rule FROM draft_run_schedules WHERE day=$1::date AND environment='latest'",[day])).rows[0];
-    check(stored.selection_rule===LATEST_DAILY_CLEAR_EASY_RULE,'The schedule records the rule that chose it');
-    check(JSON.parse(schedule.puzzle_ids).join()===expected.map(p=>p.puzzle_id).join(),'The schedule holds the rule selection');
-    // Main Daily's schedule is generated after Latest Set and uses the same
-    // cross-environment repeat exclusions, without changing its set mix.
     const mixedRecent=(await query(RECENT_DAILY_DECISIONS,[day,DAILY_REPEAT_WINDOW_DAYS.decision-1,DAILY_REPEAT_WINDOW_DAYS.source-1])).rows;
     const mixedReport={};
     const mixedExpected=await selectDailyWithoutRepeats(exclude=>selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,
@@ -220,8 +206,23 @@ try {
       'Main Daily records its own selection rule');
     check(JSON.parse(mixedSchedule.puzzle_ids).join()===mixedExpected.map(p=>p.puzzle_id).join(),
       "Main Daily's scheduled decisions match the deterministic stakes draw");
-    // The forward check's queries run on the real schema: they find the Easy
-    // puzzles of these -v2 schedules once the day is over, and only then.
+
+    const recent=(await query(RECENT_DAILY_DECISIONS,[day,DAILY_REPEAT_WINDOW_DAYS.decision-1,DAILY_REPEAT_WINDOW_DAYS.source-1])).rows;
+    const exclusion=dailyRepeatExclusion(recent);
+    const report={};
+    const expected=await selectDailyWithoutRepeats(exclude=>selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed(day),'latest',
+      {daily:true,day,exclude,report}),
+      exclusion,{environment:'latest',day,warn:()=>{}});
+    check(report.selectionRule===LATEST_DAILY_CLEAR_EASY_RULE,'Latest uses stakes and clear-Easy after Main has published');
+    check(!expected.some(p=>exclusion.decisions.includes(decisionKey(p))),'Latest does not repeat Main decisions');
+    const {schedule,created}=await ensureDailySchedule(query,day,'latest');
+    check(created,'The latest-set Daily schedule is created');
+    const stored=(await query("SELECT selection_rule FROM draft_run_schedules WHERE day=$1::date AND environment='latest'",[day])).rows[0];
+    check(stored.selection_rule===LATEST_DAILY_CLEAR_EASY_RULE,'The schedule records the rule that chose it');
+    check(JSON.parse(schedule.puzzle_ids).join()===expected.map(p=>p.puzzle_id).join(),'Latest uses the repeat-aware rule selection');
+
+    // The forward check queries real schema and includes both Daily schedules
+    // only when the day is over, not while today's picks are still in progress.
     const during=await loadForwardCheck(query,day),after=await loadForwardCheck(query,'2026-11-21');
     check(after.rows.length>during.rows.length&&after.rows.every(row=>Number.isInteger(row.answers)&&Number.isInteger(row.under_50)),
       'The forward check reads Easy puzzles of -v2 schedules and leaves out the unfinished day');
