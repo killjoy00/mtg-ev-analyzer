@@ -1211,7 +1211,7 @@ export default function DraftRunScreen({
             : surfaceMeta.resultTitle
       : surfaceMeta.resultTitle;
     const realDaily = Boolean(run.day) && !shared;
-    const dailyStatus = realDaily && resultStatus?.runId === run.id ? resultStatus.status : null;
+    const dailyStatus = realDaily && !newDailyAvailable && resultStatus?.runId === run.id ? resultStatus.status : null;
     // Only an authoritative current-day status can turn the safe fallback into
     // a direct next Daily or show the guest handoff (today-status.mjs).
     const nextDaily = realDaily ? nextUnfinishedDaily(dailyStatus, run.day, run.environment) : null;
@@ -1219,6 +1219,7 @@ export default function DraftRunScreen({
     const guest = !state.session.accountToken;
     const daySet = realDaily && dailySet?.runId === run.id ? dailySet.runs : null;
     const shareDay = Boolean(daySet) && shareScope === 'day';
+    const dayShareLabel = newDailyAvailable ? 'Share the completed Dailies' : 'Share today’s Dailies';
     const streak = Number(dailyStatus?.daily_streak || 0);
     const back = creatorChallenge || realDaily
       ? { label: 'Back to Dailies', go: () => router.dismissTo('/') }
@@ -1271,8 +1272,8 @@ export default function DraftRunScreen({
             </Text>
           ) : null}
           {realDaily ? (
-            <View accessibilityLabel={shareDay ? 'Share today’s Dailies' : 'Share your result'} style={styles.sharePanel}>
-              <Text accessibilityRole="header" style={styles.analysisSubhead}>{shareDay ? 'Share today’s Dailies' : 'Share your result'}</Text>
+            <View accessibilityLabel={shareDay ? dayShareLabel : 'Share your result'} style={styles.sharePanel}>
+              <Text accessibilityRole="header" style={styles.analysisSubhead}>{shareDay ? dayShareLabel : 'Share your result'}</Text>
               <Text style={styles.resultBody}>
                 {shareDay
                   ? 'All three scores and colored squares in one message, not the cards.'
