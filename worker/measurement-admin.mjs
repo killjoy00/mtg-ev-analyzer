@@ -26,7 +26,7 @@ export function reportFilters(url,now=new Date()) {
   const environment=url.searchParams.get('environment')||'all',type=url.searchParams.get('type')||'all',set=url.searchParams.get('set')||'all';
   const version=url.searchParams.get('version')||'all';
   const band=url.searchParams.get('difficulty')||'all',pick=url.searchParams.get('pick')||'all';
-  if(!['all','mixed','powered-cube'].includes(environment)||!['all','daily','practice','challenge'].includes(type)||!/^([a-z0-9-]{2,40}|all)$/.test(set)||!/^([a-z0-9-]{1,60}|all)$/.test(version))fail('Invalid report filter.');
+  if(!['all','mixed','powered-cube','latest'].includes(environment)||!['all','daily','practice','challenge'].includes(type)||!/^([a-z0-9-]{2,40}|all)$/.test(set)||!/^([a-z0-9-]{1,60}|all)$/.test(version))fail('Invalid report filter.');
   if(!['all','easy','medium','hard'].includes(band)||!['all',...Array.from({length:12},(_,i)=>String(i+1))].includes(pick))fail('Invalid difficulty or pick filter.');
   // Decision-quality reports default to the current parent corpus because the
   // model and ratings change with it. Player counts (Overview) pass corpus=all.
