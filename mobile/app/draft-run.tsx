@@ -976,7 +976,7 @@ export default function DraftRunScreen({
     const current = stateRef.current;
     if (current.status !== 'ready' || !selected || !current.run.current || busy) return;
     const today = pacificDay();
-    if (current.run.day && current.run.day < today) {
+    if (current.run.day && mountedPacificDay.current !== today && current.run.day < today) {
       // The pick did not reach the server. If refresh fails or we're offline,
       // keep an actionable explanation rather than silently dropping the tap.
       setActionError('This Daily ended at midnight Pacific. Your pick was not submitted. Check your connection; today’s Daily will load when available.');
