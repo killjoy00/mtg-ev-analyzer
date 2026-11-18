@@ -90,7 +90,15 @@ let replay=await call('/v1/runs',{challenge:shared.id},peer);
 assert.equal(replay.serving_policy_version,run.serving_policy_version);assert.deepEqual(replay.rerolls,{set:0,pack:0});assert.equal(replay.comparison.exact,true);
 assert.equal(replay.current.puzzle_id,run.answers[0].puzzle.puzzle_id);
 await call(`/v1/runs/${replay.id}/reroll`,{revision:replay.revision,round:0,puzzleId:replay.current.puzzle_id,type:'pack'},peer,409);
+// Deliberately choose differently so the original's score cannot accidentally
+// satisfy the third player's friend-score comparison contract.
+const firstPuzzle=parse((await query('SELECT payload FROM draft_run_verified_puzzles WHERE puzzle_id=$1',[replay.current.puzzle_id])).rows[0].payload);
+const different=firstPuzzle.candidates.find(card=>card.id!==firstPuzzle.historical_pick_id);
+assert.ok(different,'A replay puzzle must allow a distinct answer');
+replay=await call(`/v1/runs/${replay.id}/pick`,{revision:replay.revision,round:replay.round-1,
+  puzzleId:replay.current.puzzle_id,cardId:different.id},peer);
 replay=await finish(replay,peer);
+assert.notEqual(replay.score,run.score,'The friend must have a different score to exercise score binding');
 const friendShare=await call(`/v1/runs/${replay.id}/share`,{},peer);
 assert.notEqual(friendShare.id,shared.id,'The friend needs a distinct score-bound challenge link');
 assert.equal((await call(`/v1/runs/${replay.id}/share`,{},peer)).id,friendShare.id,
