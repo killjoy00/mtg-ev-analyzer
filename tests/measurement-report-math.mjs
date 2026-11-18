@@ -5,7 +5,8 @@ process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 const {query,readJson}=await import('../worker/growth-function.js');
 const {handleAdmin}=await import('../worker/measurement-admin.mjs');
 const {DRAFT_RUN_CORPUS_VERSION}=await import('../draft-run.mjs');
-const user=crypto.randomUUID(),token=crypto.randomUUID(),version='math-'+crypto.randomUUID().slice(0,8);let ids=[],players=[],habitSessionIds=[],habitPlayers=[],habitUsers=[];
+const {ADMIN_TRENDS_SQL,ADMIN_QUALITY_SQL}=await import('../worker/admin-dashboard.mjs');
+const user=crypto.randomUUID(),token=crypto.randomUUID(),version='math-'+crypto.randomUUID().slice(0,8);let ids=[],players=[],habitSessionIds=[],habitPlayers=[],habitUsers=[],reportExtraSessions=[],reportExtraPlayers=[];
 try {
  await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,false)',[user,'QA report math',`qa-math-${user}@example.invalid`]);
  await query('INSERT INTO neon_auth.session(id,"userId",token,"updatedAt","expiresAt") VALUES($1::uuid,$2::uuid,$3,now(),now()+interval \'1 hour\')',[crypto.randomUUID(),user,token]);
