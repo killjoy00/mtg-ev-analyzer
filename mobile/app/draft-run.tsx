@@ -590,10 +590,14 @@ export default function DraftRunScreen({
   // while backgrounded is not an observed decision.
   useFocusEffect(useCallback(() => {
     setScreenFocused(true);
-    return () => setScreenFocused(false);
+    return () => {
+      decisionTimer.current.pause();
+      setScreenFocused(false);
+    };
   }, []));
   useEffect(() => {
     const subscription = AppState.addEventListener('change', next => {
+      if (next !== 'active') decisionTimer.current.pause();
       setAppActive(next === 'active');
     });
     return () => subscription.remove();
