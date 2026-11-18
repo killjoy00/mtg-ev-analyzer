@@ -70,6 +70,8 @@ const METRICS=`count(*)::int exposures,count(DISTINCT player_id)::int players,
   count(active_ms) FILTER(WHERE outcome='pick')::int timed_answers,
   round((percentile_cont(.5) WITHIN GROUP(ORDER BY active_ms) FILTER(WHERE outcome='pick'))::numeric/1000,1) median_seconds,
   round((percentile_cont(.9) WITHIN GROUP(ORDER BY active_ms) FILTER(WHERE outcome='pick'))::numeric/1000,1) p90_seconds`;
+// A submitted pick proves exposure, including older native clients without /view.
+// Only a recorded view supplies foreground timing or abandoned exposure.
 // Daily habits count completed Dailies on every corpus version, so a player's
 // first Daily is their first-ever Daily and cohorts survive corpus releases.
 const HABIT_METRICS_SQL=`WITH eligible_daily_sessions AS (
@@ -238,7 +240,7 @@ export async function handleAdmin(request,query,readJson) {
       habit_metrics:{cohorts:jsonArray(habit.cohorts),daily_health:jsonArray(habit.daily_health)}};
   }
   if(url.pathname==='/v1/admin/measurements/reviews') {
-    const scope=`WITH scoped AS (SELECT * ${SCOPE}), primary_data AS (SELECT * FROM scoped WHERE observed AND NOT is_qa AND first_encounter)`;
+    const scope=`WITH scoped AS (SELECT * ${SCOPE}), primary_data AS (SELECT * FROM scoped WHERE (observed OR outcome='pick') AND NOT is_qa AND first_encounter)`;
     const reviews=await timedAdminQuery(query,'measurements_reviews','reviews',`${scope}, chosen AS (SELECT puzzle_id,${METRICS},bool_or(model_disagreement) model_disagreement
       FROM primary_data GROUP BY puzzle_id HAVING count(*) FILTER(WHERE outcome='pick')>=5
       ORDER BY bool_or(model_disagreement) DESC,count(*) FILTER(WHERE outcome='pick') DESC LIMIT 30)
@@ -254,9 +256,10 @@ export async function handleAdmin(request,query,readJson) {
     // snapshot; summary and grouped metrics reuse the eligible subset.
     const [aggregates,options,shareFunnel]=await Promise.all([
       timedAdminQuery(query,'measurements','core_aggregates',`WITH scoped AS MATERIALIZED (SELECT * ${SCOPE}),
-        primary_data AS MATERIALIZED (SELECT * FROM scoped WHERE observed AND NOT is_qa AND first_encounter),
+        primary_data AS MATERIALIZED (SELECT * FROM scoped WHERE (observed OR outcome='pick') AND NOT is_qa AND first_encounter),
         coverage AS (SELECT count(*)::int recorded,count(*) FILTER(WHERE is_qa)::int qa_excluded,
-          count(*) FILTER(WHERE NOT observed AND NOT is_qa)::int unobserved_excluded,
+          count(*) FILTER(WHERE NOT observed AND outcome IS DISTINCT FROM 'pick' AND NOT is_qa)::int unobserved_excluded,
+          count(*) FILTER(WHERE NOT observed AND outcome='pick' AND NOT is_qa)::int answered_without_view,
           count(*) FILTER(WHERE observed AND NOT is_qa AND NOT first_encounter)::int repeats_excluded,
           min(first_seen_at) collection_started FROM scoped),
         summary AS (SELECT ${METRICS},count(DISTINCT session_id)::int runs,
@@ -326,14 +329,14 @@ export async function handleAdmin(request,query,readJson) {
     ]);
     return {generated_at:new Date().toISOString(),corpus_version:filters.corpus_version,filters:{...filters,params:undefined},coverage:jsonObject(aggregates.rows[0]?.coverage),summary:jsonObject(aggregates.rows[0]?.summary),share_funnel:shareFunnel.rows[0],
       groups:jsonArray(aggregates.rows[0]?.groups),sets:options.rows.map(r=>r.set_id),reviews_deferred:true,habit_metrics_deferred:true,
-      definitions:{scope:'Decision and review metrics are scoped to sessions on the current parent corpus unless corpus=all is requested, because the model and ratings change with each corpus. Historical measurements remain stored. Result-share and Daily habit metrics count players on every corpus version, so corpus releases do not reset them.',primary:'First recorded encounter per player and puzzle inside the selected corpus scope; observed in the browser; QA excluded.',abandonment:'Unfinished run with an open viewed decision and no activity for 24 hours. A return removes this classification.',timing:'Client-reported foreground time; missing for reloads, multiple tabs, old clients, or invalid timing. This is not a trusted gameplay score.',sample:'Fewer than 30 answers is an early signal, not a calibrated difficulty estimate.',review:'Decisions with at least five first-encounter answers; model disagreement first, then sample size.',habit_person:'Habit metrics count linked accounts as one person after identity merges; guests remain one browser/player identity.',habit_completion:'A Daily day is one or more completed Mixed, Powered Cube, or Latest Set sessions on the stored Pacific Daily date. Multiple Dailies on one date count once.',habit_exclusions:'All habit metrics exclude measurement-QA sessions, QA-pattern display names, and players linked to Pack One admin accounts.',habit_maturity:'Next-day, 7-day, and 3-in-7 rates include only cohorts whose full measurement window has closed; immature cohort counts are shown separately.',habit_attribution:'First touch is the earliest acquisition event for the merged player. Earlier product activity is pre_tracking; missing post-launch attribution is direct. Campaign is (none) when absent.',habit_ever:'Ever 3-in-7 is a lifetime observed status as of report generation, not a fixed-horizon cohort rate. Daily health counts people with 3+ distinct Daily days in each trailing seven-day window.'}};
+      definitions:{scope:'Decision and review metrics are scoped to sessions on the current parent corpus unless corpus=all is requested, because the model and ratings change with each corpus. Historical measurements remain stored. Result-share and Daily habit metrics count players on every corpus version, so corpus releases do not reset them.',primary:'First recorded encounter per player and puzzle in the selected corpus; viewed on web/native or confirmed by a submitted pick; QA excluded. Timing requires a recorded view.',abandonment:'Unfinished run with an open viewed decision and no activity for 24 hours. A return removes this classification.',timing:'Client-reported foreground time; missing for reloads, multiple tabs, old clients, or invalid timing. This is not a trusted gameplay score.',sample:'Fewer than 30 answers is an early signal, not a calibrated difficulty estimate.',review:'Decisions with at least five first-encounter answers; model disagreement first, then sample size.',habit_person:'Habit metrics count linked accounts as one person after identity merges; guests remain one browser/player identity.',habit_completion:'A Daily day is one or more completed Mixed, Powered Cube, or Latest Set sessions on the stored Pacific Daily date. Multiple Dailies on one date count once.',habit_exclusions:'All habit metrics exclude measurement-QA sessions, QA-pattern display names, and players linked to Pack One admin accounts.',habit_maturity:'Next-day, 7-day, and 3-in-7 rates include only cohorts whose full measurement window has closed; immature cohort counts are shown separately.',habit_attribution:'First touch is the earliest acquisition event for the merged player. Earlier product activity is pre_tracking; missing post-launch attribution is direct. Campaign is (none) when absent.',habit_ever:'Ever 3-in-7 is a lifetime observed status as of report generation, not a fixed-horizon cohort rate. Daily health counts people with 3+ distinct Daily days in each trailing seven-day window.'}};
   }
   const match=url.pathname.match(/^\/v1\/admin\/decisions\/([a-f0-9]{32})$/);
   if(match) {
     const [p,choices]=await Promise.all([
       query('SELECT payload FROM draft_run_verified_puzzles WHERE puzzle_id=$1',[match[1]]),
       query(`SELECT selected_id,count(*)::int answers,round(avg(score),1) average_score ${SCOPE}
-        AND observed AND NOT is_qa AND first_encounter AND outcome='pick' AND puzzle_id=$10 GROUP BY selected_id ORDER BY count(*) DESC`,[...filters.params,match[1]])
+        AND (observed OR outcome='pick') AND NOT is_qa AND first_encounter AND outcome='pick' AND puzzle_id=$10 GROUP BY selected_id ORDER BY count(*) DESC`,[...filters.params,match[1]])
     ]);
     if(!p.rows[0])fail('Decision not found.',404);
     return {puzzle:typeof p.rows[0].payload==='string'?JSON.parse(p.rows[0].payload):p.rows[0].payload,choices:choices.rows};
