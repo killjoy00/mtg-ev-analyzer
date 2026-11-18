@@ -54,6 +54,7 @@ test('browser dependency image matches the locked Playwright version and avoids 
   assert.ok(image, 'browser job must use the official Noble Playwright image');
   assert.equal(image[1], playwright, 'image and installed package versions must match');
   assert.match(browser, /options: --ipc=host/);
+  assert.match(browser, /defaults:\n\s+run:\n\s+shell: bash/, 'container steps use Bash, not the default sh');
   assert.match(browser, /timeout-minutes: 30/);
   const install = browser.split('      - name: Verify preinstalled Playwright browsers and install JS dependencies')[1]
     ?.split('      - name: Start static site')[0] || '';
