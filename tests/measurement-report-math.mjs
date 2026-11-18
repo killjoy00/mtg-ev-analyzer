@@ -46,7 +46,7 @@ try {
  const syntheticVersion='coverage-'+crypto.randomUUID().replaceAll('-','').slice(0,8);
  const addSyntheticPlayer=async()=>{
    const player=crypto.randomUUID();reportExtraPlayers.push(player);
-   await query("INSERT INTO players(id,display_name) VALUES($1::uuid,'Reporting integration player')",[player]);
+   await query("INSERT INTO players(id,display_name) VALUES($1::uuid,'Report DB fixture')",[player]);
    return player;
  };
  const addSyntheticSession=async(player,answers=[],environment='mixed')=>{
