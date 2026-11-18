@@ -38,8 +38,17 @@ function run(environment, { complete = false, day = TODAY } = {}) {
 const status = (environments) => ({ day: TODAY, capabilities: [], player: { claimed: false }, daily_streak: 3,
   daily_history: environments.map((environment) => ({ date: TODAY, set_id: environment, mode: 'draft_run', score: 70, run_id: IDS[environment] })) });
 
-async function fixture({ environment = 'mixed', guest = false, dailyStatus = status(['mixed']), day = TODAY } = {}) {
-  const calls = { share: [], replace: [], push: [], runs: [] };
+async function fixture({ environment = 'mixed', guest = false, dailyStatus = status(['mixed']), day = TODAY, simulateRollover = false, stopBeforeConfirm = false, offlineRollover = false } = {}) {
+  const calls = { share: [], replace: [], push: [], runs: [], starts: [] };
+  let clockDay = day;
+  let resumeCallback = null;
+  const ticks = new Set();
+  const realSetInterval = globalThis.setInterval;
+  const realClearInterval = globalThis.clearInterval;
+  if (simulateRollover) {
+    globalThis.setInterval = callback => { ticks.add(callback); return callback; };
+    globalThis.clearInterval = callback => { ticks.delete(callback); };
+  }
   const session = { playerToken: `p1_${IDS.mixed}.${'A'.repeat(43)}`, ...(guest ? {} : { accountToken: 'B'.repeat(43) }) };
   const Image = host('Image');
   Image.prefetch = async () => {};
@@ -63,7 +72,13 @@ async function fixture({ environment = 'mixed', guest = false, dailyStatus = sta
       DAILY_ENVIRONMENT_META: { mixed: { eyebrow: 'DAILY DRAFT RUN', resultTitle: 'Your Draft Run.' },
         latest: { eyebrow: 'LATEST SET DAILY', resultTitle: 'Your Latest Set Run.' }, 'powered-cube': { eyebrow: 'POWERED CUBE DAILY', resultTitle: 'Your Cube Run.' } },
       isDailyEnvironment: (value) => Object.hasOwn(IDS, value),
-      startDailyDraftRun: async (_session, env) => run(env, { day }),
+      startDailyDraftRun: async (_session, env) => {
+        calls.starts.push(env);
+        if (calls.starts.length === 1) return run(env, { day });
+        if (offlineRollover) throw Error('offline');
+        return { ...run(env, { day: clockDay }), id: '99999999-9999-4999-8999-999999999999',
+          answers: [], round: 0, revision: 0, complete: false, current: puzzle(0), score: null };
+      },
       startPracticeDraftRun: async () => { throw new Error('not used'); },
       loadDraftRun: async (id) => { calls.runs.push(id); return run(Object.keys(IDS).find((key) => IDS[key] === id), { complete: true }); },
       submitDraftRunPick: async () => run(environment, { complete: true, day }),
@@ -72,11 +87,12 @@ async function fixture({ environment = 'mixed', guest = false, dailyStatus = sta
       loadDailyStatus: async () => dailyStatus,
       loadTrophyDeck: async () => { throw new Error('not used'); },
     },
-    '@/src/hooks/useAppResume': { useAppResume() {} },
+    '@/src/hooks/useAppResume': { useAppResume(callback) { resumeCallback = callback; } },
     '@/src/storage/idempotency': { clearPracticeIdempotencyKey: async () => {}, practiceIdempotencyKey: async () => 'k' },
     '@/src/tcgplayer': { tcgplayerUrl: (name) => `https://example.test/${encodeURIComponent(name)}` },
     '@/src/theme': { colors: new Proxy({}, { get: () => '#000' }), spacing: new Proxy({}, { get: () => 8 }) },
   };
+  if (simulateRollover) mocks['@/src/dailyClock'] = { pacificDay: () => clockDay, dailyResetCue: () => 'New Dailies tomorrow' };
   const Screen = compileModule('app/draft-run.tsx', mocks, { resolve: (request) => {
     if (request === '@/src/config') return { config: { screenshots: { fixtures: false } } };
   } }).default;
@@ -87,9 +103,22 @@ async function fixture({ environment = 'mixed', guest = false, dailyStatus = sta
   const press = async (label) => { const node = find(label); assert.ok(node, `missing ${label}`); await act(async () => { node.props.onPress(); await flush(); }); };
   // Finish the eighth pick and open the result.
   await press('Pick Card A');
-  await press('Confirm pick');
-  await press('See result');
-  return { root, calls, press, find, text: () => rendered(root.toJSON()), close: () => act(async () => root.unmount()) };
+  if (!stopBeforeConfirm) {
+    await press('Confirm pick');
+    await press('See result');
+  }
+  const advanceDay = async (days = 1) => {
+    const date = new Date(clockDay+'T12:00:00Z');
+    date.setUTCDate(date.getUTCDate()+days);
+    clockDay = date.toISOString().slice(0,10);
+    await act(async () => { for (const tick of [...ticks]) tick(); await flush(); });
+  };
+  const resume = async () => act(async () => { await resumeCallback?.(); await flush(); });
+  const close = async () => {
+    try { await act(async () => root.unmount()); }
+    finally { if (simulateRollover) { globalThis.setInterval = realSetInterval; globalThis.clearInterval = realClearInterval; } }
+  };
+  return { root, calls, press, find, advanceDay, resume, text: () => rendered(root.toJSON()), close };
 }
 
 test('a Daily result shares a dated message and the short Daily link, never a "beat it" challenge', async () => {
