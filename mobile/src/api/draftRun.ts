@@ -444,6 +444,27 @@ export function loadDraftRun(id: string, session: MobileSession) {
   });
 }
 
+// Native observations are best-effort telemetry, never a gameplay prerequisite.
+function newDraftRunViewId(): string {
+  if (typeof globalThis.crypto?.randomUUID === 'function') return globalThis.crypto.randomUUID();
+  const bytes = Array.from({ length: 16 }, () => Math.floor(Math.random() * 256));
+  bytes[6] = ((bytes[6] ?? 0) & 15) | 64;
+  bytes[8] = ((bytes[8] ?? 0) & 63) | 128;
+  const hex = bytes.map(value => value.toString(16).padStart(2, '0')).join('');
+  return [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join('-');
+}
+
+export function recordDraftRunView(run: DraftRunState, session: MobileSession) {
+  if (!run.current) return Promise.resolve({ ok: false });
+  return requestJson<{ ok: boolean }>(`/draft/v1/runs/${encodeURIComponent(run.id)}/view`, {
+    method: 'POST',
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    body: { revision: run.revision, puzzleId: run.current.puzzle_id, viewId: newDraftRunViewId() },
+    timeoutMs: 15_000,
+  });
+}
+
 export function submitDraftRunPick(
   run: DraftRunState,
   cardId: string,
