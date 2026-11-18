@@ -1,5 +1,22 @@
 # Pack One monetization
 
+## November 18, 2026: ATT-denied iOS banner correction (code review only)
+
+The owner reports that iOS 1.3 build **101036** was approved in the App Store
+and AdMob shows the Pack One app as **Verified / Ready**. The signed build
+has production AdMob enabled, but the current component suppresses all ads
+when the iPhone's tracking permission is denied. Google's iOS SDK documentation
+explicitly permits non-personalized ad requests without IDFA in that case.
+
+The reviewed follow-up allows Google UMP-eligible guest/free users to request
+a non-personalized Daily-home banner without ATT authorization. It retains
+Google consent, membership exclusions, privacy manifest/usage auditing,
+G-rated requests and the single Daily-home placement. This change is **not
+present in approved build 101036** until a new binary is tested and released.
+Privacy disclosures and physical-device acceptance must be reviewed before
+a new public App Store submission.
+
+
 Updated November 17, 2026. Website Google AdSense remains disabled. The owner confirms that native iOS AdMob is approved and App Privacy disclosures are complete; the separately gated iOS 1.3 TestFlight candidate will enable AdMob. Public Patreon linking and the Elite post-purchase activation flow remain active.
 
 ## Membership
@@ -14,7 +31,7 @@ Guests may see the affiliate promotion without a membership lookup. Signed-in ac
 
 Account, Patreon-connect/disconnect and Elite-activation flows emit a nonce-only localStorage signal plus a same-tab event. An open tab clears any rendered Google or affiliate promotion on those signals and never refills it before a full reload. Changes made directly on patreon.com or by backend webhooks/scheduled reconciliation do not pass through a Pack One tab, so an already-open tab can retain its existing promotion until reload.
 
-## Native Google AdMob: iOS 1.3 TestFlight (November 17)
+## Native Google AdMob: iOS 1.3 TestFlight (November 17; historical build 101036)
 
 The owner has confirmed approval of the registered Pack One iOS AdMob
 application and completion of Apple App Privacy disclosures. iOS 1.2 build
@@ -32,7 +49,9 @@ or unknown/stale membership accounts never request ads. Google UMP must
 allow requests, then iOS ATT must be granted *before* the Google SDK is
 initialized; all ad requests are non-personalized and G-rated.
 
-This is a **TestFlight-only release**. Do not submit to App Review or
+This section documents the **original TestFlight candidate for build 101036**
+and is superseded by the November 18 correction above. At the time, it was
+a **TestFlight-only release**. Do not submit to App Review or
 publicly publish in this workflow. Real-device consent/ATT, ad rendering,
 privacy choices, membership and subscription transitions still need
 acceptance before public launch. The current implementation intentionally

@@ -72,8 +72,9 @@ def main():
     if info.get("ITSAppUsesNonExemptEncryption") is not False:
         failures.append("ITSAppUsesNonExemptEncryption must remain false")
     # ATT is the only permitted usage-description permission in this app.
-    # Its existence does NOT itself authorize ads: JavaScript gates the SDK
-    # behind UMP consent and an explicit ATT "granted" result.
+    # Its existence does NOT authorize ads by itself: JavaScript gates SDK
+    # initialization behind UMP and membership eligibility. The SDK excludes
+    # IDFA for ATT-denied users while permitting non-personalized requests.
     unexpected_usage = [key for key in usage_keys if key != "NSUserTrackingUsageDescription"]
     if unexpected_usage:
         failures.append("unexpected privacy usage-description keys: " + ", ".join(unexpected_usage))
@@ -112,7 +113,7 @@ def main():
                                     for item in unapproved_tracking))
     if tracked_data_types and (not isinstance(att_usage, str) or not att_usage.strip()):
         failures.append("Google Mobile Ads tracks Device ID; the signed app must "
-                        "declare NSUserTrackingUsageDescription and gate ads on ATT")
+                        "declare NSUserTrackingUsageDescription and honor ATT for IDFA")
 
     if failures:
         for failure in failures:

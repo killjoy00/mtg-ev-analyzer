@@ -31,19 +31,23 @@ export function AdMobDailyBanner({ eligible }: { eligible: boolean }) {
         if (!active) return;
         setPrivacyRequired(consent.privacyOptionsRequirementStatus === 'REQUIRED');
         if (!consent.canRequestAds) return;
-        // Google's bundled iOS manifest declares tracked Device ID. Only
-        // initialize the advertising SDK after Apple's ATT authorization.
-        // UMP may already have shown an ATT prompt; never show it twice.
-        // A declined/restricted permission leaves play unaffected and ad-free.
+        // The bundled iOS manifest declares tracked Device ID. Check ATT
+        // before SDK initialization so Google's SDK can omit IDFA if denied.
+        // ATT controls the advertising identifier, not whether eligible players
+        // can see a non-personalized ad. Google's iOS SDK omits IDFA when ATT is
+        // denied/restricted. Resolve the permission before initializing the SDK;
+        // never bypass the separate UMP consent or membership checks.
         if (Platform.OS === 'ios') {
           const tracking = await import('expo-tracking-transparency');
           if (!active) return;
-          let permission = await tracking.getTrackingPermissionsAsync();
+          const permission = await tracking.getTrackingPermissionsAsync();
           if (!active) return;
           if (permission.status === tracking.PermissionStatus.UNDETERMINED) {
-            permission = await tracking.requestTrackingPermissionsAsync();
+            await tracking.requestTrackingPermissionsAsync();
           }
-          if (!active || !permission.granted) return;
+          if (!active) return;
+          // Denied/restricted ATT must not suppress a consent-eligible banner.
+          // BannerAd always requests non-personalized inventory below.
         }
         // Keep the first release contextual, without requesting personalized ads.
         await ads.default().setRequestConfiguration({ maxAdContentRating: ads.MaxAdContentRating.G });
