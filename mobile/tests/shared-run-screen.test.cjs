@@ -188,6 +188,7 @@ async function fixture(options = {}) {
     },
     '@/src/api/career': { loadMobileCareer: async () => { throw new Error('Career enrichment offline.'); } },
     '@/src/api/draftRun': {
+      recordDraftRunView: async () => ({ ok: true }),
       DAILY_ENVIRONMENT_META: {
         mixed: { eyebrow: 'DAILY DRAFT RUN', resultTitle: 'Daily complete.' },
         latest: { eyebrow: 'LATEST SET DAILY', resultTitle: 'Latest complete.' },
