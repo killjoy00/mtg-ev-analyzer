@@ -199,10 +199,10 @@ test('midnight preserves a completed Daily result until the player explicitly st
   try {
     assert.equal(screen.calls.starts.length,1);
     assert.match(screen.text(),/70/);
-    assert.match(screen.text(),/Your 8 picks/);
+    assert.match(screen.text(),/Your\s+8\s+picks/);
     await screen.advanceDay(3); // same behavior after several missed days
     assert.equal(screen.calls.starts.length,1,'midnight must not create a Daily session or funnel start');
-    assert.match(screen.text(),/Your 8 picks/,'yesterday’s completed analysis remains visible');
+    assert.match(screen.text(),/Your\s+8\s+picks/,'yesterday’s completed analysis remains visible');
     assert.match(screen.text(),/Today’s Daily is ready/);
     assert.doesNotMatch(screen.text(),/Yesterday’s Daily closed/);
     await screen.resume();
@@ -210,7 +210,7 @@ test('midnight preserves a completed Daily result until the player explicitly st
     await screen.press("Play today's Daily");
     assert.equal(screen.calls.starts.length,2,'only the explicit tap starts the new Daily');
     assert.ok(screen.find('Pick Card A'),'the new Daily becomes playable');
-    assert.doesNotMatch(screen.text(),/Your 8 picks/);
+    assert.doesNotMatch(screen.text(),/Your\s+8\s+picks/);
   } finally { await screen.close(); }
 });
 
