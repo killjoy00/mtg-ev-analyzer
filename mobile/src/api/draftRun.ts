@@ -454,13 +454,32 @@ function newDraftRunViewId(): string {
   return [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join('-');
 }
 
+// Keep the same observation identity on a resumed view of the same pick.
+// The server updates last_seen_at and only trusts timing when the ID agrees.
+const decisionViewIds = new Map<string, string>();
+function decisionViewId(run: DraftRunState): string | null {
+  if (!run.current) return null;
+  const key = `${run.id}:${run.revision}:${run.current.puzzle_id}`;
+  let viewId = decisionViewIds.get(key);
+  if (!viewId) {
+    viewId = newDraftRunViewId();
+    decisionViewIds.set(key, viewId);
+    if (decisionViewIds.size > 64) {
+      const oldest = decisionViewIds.keys().next().value;
+      if (oldest) decisionViewIds.delete(oldest);
+    }
+  }
+  return viewId;
+}
+
 export function recordDraftRunView(run: DraftRunState, session: MobileSession) {
-  if (!run.current) return Promise.resolve({ ok: false });
+  const viewId = decisionViewId(run);
+  if (!viewId || !run.current) return Promise.resolve({ ok: false });
   return requestJson<{ ok: boolean }>(`/draft/v1/runs/${encodeURIComponent(run.id)}/view`, {
     method: 'POST',
     mobileSessionToken: session.playerToken,
     mobileAccountToken: session.accountToken,
-    body: { revision: run.revision, puzzleId: run.current.puzzle_id, viewId: newDraftRunViewId() },
+    body: { revision: run.revision, puzzleId: run.current.puzzle_id, viewId },
     timeoutMs: 15_000,
   });
 }
@@ -469,8 +488,10 @@ export function submitDraftRunPick(
   run: DraftRunState,
   cardId: string,
   session: MobileSession,
+  activeMs: number | null = null,
 ) {
   if (!run.current) throw new Error('This run is already complete.');
+  const validTiming = Number.isInteger(activeMs) && activeMs !== null && activeMs >= 0 && activeMs <= 1_800_000;
   return requestJson<DraftRunState>(`/draft/v1/runs/${encodeURIComponent(run.id)}/pick`, {
     method: 'POST',
     mobileSessionToken: session.playerToken,
@@ -480,6 +501,7 @@ export function submitDraftRunPick(
       revision: run.revision,
       round: run.answers.length,
       puzzleId: run.current.puzzle_id,
+      ...(validTiming ? { viewId: decisionViewId(run), activeMs } : {}),
     },
     timeoutMs: 30_000,
   });

@@ -72,3 +72,13 @@ test('Trends prefilters only completed non-QA sessions for its unchanged three c
   assert.doesNotMatch(sessions,/\bs\.complete\b/);
   assert.match(sessions,/s\.report_day BETWEEN \$1::date-13 AND \$1::date/);
 });
+
+test('quality watchlist returns its measured counts and flags without inventing a diagnosis',async()=>{
+  const result=await handleAdmin(request('/v1/admin/insights/quality-watch'),queryFixture,async()=>({}));
+  assert.equal(result.rows.length,1);
+  assert.equal(result.rows[0].puzzle_id,'a'.repeat(32));
+  assert.equal(result.rows[0].answers,15);
+  assert.equal(result.rows[0].unexpected_choices,true);
+  // SQL semantics are tested with actual first-encounter and returning-view
+  // rows in the isolated PostgreSQL measurement-report-math suite.
+});

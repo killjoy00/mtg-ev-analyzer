@@ -7,6 +7,7 @@ const pct=value=>value==null?'N/A':`${fmt(value)}%`;
 const dateTime=value=>value?new Intl.DateTimeFormat(undefined,{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(value)):'N/A';
 const dateOnly=value=>value?new Intl.DateTimeFormat(undefined,{year:'numeric',month:'short',day:'numeric'}).format(new Date(value)):'N/A';
 const capabilityLabel=value=>({unlimited_cube_practice:'Cube practice',custom_corpus:'Custom sets'})[value]||value;
+export const runEnvironmentLabel=environment=>({mixed:'Regular','powered-cube':'Powered Cube',latest:'Latest Set'})[environment]||String(environment||'Unknown');
 const badge=(label,kind='')=>`<span class="user-badge ${esc(kind)}">${esc(label)}</span>`;
 const props=value=>{
   const entries=Object.entries(value||{}).slice(0,4);
@@ -366,7 +367,7 @@ function render() {
           ${entitlements.length?`<div class="scroll"><table><thead><tr><th>Capability</th><th>Provider</th><th>Status</th><th>Granted</th><th>Expires</th></tr></thead><tbody>${entitlements.map(item=>`<tr><td>${esc(capabilityLabel(item.capability))}</td><td>${esc(item.provider)}</td><td>${item.active?badge('Active','live'):badge('Inactive','blocked')}</td><td>${esc(dateOnly(item.granted_at))}</td><td>${esc(dateOnly(item.expires_at))}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No paid entitlements. Regular practice is included with the account.</p>'}
         </section>
         <section class="user-section"><h3>Recent runs</h3>
-          ${runs.length?`<div class="scroll"><table class="user-runs"><thead><tr><th>When</th><th>Type</th><th>Environment</th><th>Progress</th><th>Score</th></tr></thead><tbody>${runs.map(run=>`<tr><td>${esc(dateTime(run.updated_at))}</td><td>${esc(run.run_type)}</td><td>${esc(run.environment==='powered-cube'?'Powered Cube':'Regular')}</td><td>${fmt(run.answered)}/${fmt(run.total)}</td><td>${fmt(run.score)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No Draft Runs linked to this account yet.</p>'}
+          ${runs.length?`<div class="scroll"><table class="user-runs"><thead><tr><th>When</th><th>Type</th><th>Environment</th><th>Progress</th><th>Score</th></tr></thead><tbody>${runs.map(run=>`<tr><td>${esc(dateTime(run.updated_at))}</td><td>${esc(run.run_type)}</td><td>${esc(runEnvironmentLabel(run.environment))}</td><td>${fmt(run.answered)}/${fmt(run.total)}</td><td>${fmt(run.score)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No Draft Runs linked to this account yet.</p>'}
         </section>
         <section class="user-section"><h3>Recent activity</h3>
           ${events.length?`<div class="scroll"><table class="user-events"><thead><tr><th>When</th><th>Event</th><th>Context</th></tr></thead><tbody>${events.map(event=>`<tr><td>${esc(dateTime(event.created_at))}</td><td>${esc(event.event_name)}</td><td><small>${props(event.event_props)}</small></td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No recent tracked activity for this account.</p>'}

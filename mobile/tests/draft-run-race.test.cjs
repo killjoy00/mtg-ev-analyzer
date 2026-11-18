@@ -111,9 +111,11 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
   let startCalls = 0;
   let resumeCallback = null;
   const observed = [];
+  const pickTiming = [];
   const focusHandlers = new Set();
   const appListeners = new Set();
   let focused = false;
+  let clockDay = '2026-09-26';
   const appState = { currentState: 'background',
     addEventListener(_event, callback) {
       appListeners.add(callback);
@@ -188,8 +190,9 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
         return startCalls === 1 ? runZero() : startCalls === 2 ? oldRefresh.promise : nextDaily;
       },
       startPracticeDraftRun: async () => runZero(),
-      submitDraftRunPick: async () => runAfterPick(),
+      submitDraftRunPick: async (...args) => { pickTiming.push(args[3]); return runAfterPick(); },
     },
+    '@/src/dailyClock': { pacificDay: () => clockDay, dailyResetCue: () => 'New Dailies tomorrow' },
     '@/src/hooks/useAppResume': {
       useAppResume(callback) {
         resumeCallback = callback;
@@ -211,7 +214,12 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
 
   const DraftRunScreen = compileDraftRunScreen(mocks);
   let root;
-
+  const ticks = new Set();
+  const realSetInterval = globalThis.setInterval;
+  const realClearInterval = globalThis.clearInterval;
+  globalThis.setInterval = callback => { ticks.add(callback); return callback; };
+  globalThis.clearInterval = callback => { ticks.delete(callback); };
+  try {
   await act(async () => {
     root = TestRenderer.create(React.createElement(DraftRunScreen));
     await Promise.resolve();
@@ -232,6 +240,10 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
   assert.deepEqual(observed, [], 'active but not focused must not count a view');
   await act(async () => { setFocused(true); await Promise.resolve(); });
   assert.deepEqual(observed, [runZero().id], 'only the visible foreground pick counts as a view');
+  await act(async () => { setFocused(false); await Promise.resolve(); });
+  await act(async () => { setFocused(true); await Promise.resolve(); });
+  assert.deepEqual(observed, [runZero().id, runZero().id],
+    'returning to the same visible pack renews the observation');
 
   let refreshPromise;
   await act(async () => {
@@ -264,6 +276,8 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
   });
 
   assert.match(renderedText(root.toJSON()), /88/, 'successful pick should enter feedback');
+  assert.equal(typeof pickTiming[0], 'number', 'mounted native pick forwards a measured foreground duration');
+  assert.ok(pickTiming[0] >= 0 && pickTiming[0] <= 1_800_000);
 
   await act(async () => {
     oldRefresh.resolve(runZero());
@@ -275,17 +289,32 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
   assert.match(renderedText(root.toJSON()), /88/, 'successful feedback must remain authoritative');
   assert.ok(observed.includes(runZero().id), 'native first pack must be recorded as observed');
 
+  // Keep yesterday's decision report open while midnight passes. Neither the
+  // modal nor the feedback may survive replacing the expired Daily.
+  const report = root.root.findAll(node => node.type === 'Pressable' && node.props.accessibilityLabel === 'Does something look wrong? Let me know.')[0];
+  assert.ok(report, 'the feedback report action must be present');
+  await act(async () => { report.props.onPress(); await Promise.resolve(); });
+  assert.ok(root.root.findAll(node => node.type === 'Modal' && node.props.visible === true).length,
+    'yesterday’s report is open before midnight');
   await act(async () => {
-    await resumeCallback();
+    clockDay = '2026-09-27';
+    for (const tick of [...ticks]) tick();
+    await Promise.resolve();
     await Promise.resolve();
   });
-  assert.equal(startCalls, 3, 'foreground refresh must request the new Pacific Daily');
+  assert.equal(startCalls, 3, 'crossing midnight while focused requests the new Pacific Daily without app resume');
   assert.doesNotMatch(renderedText(root.toJSON()), /88/, 'yesterday\'s revealed score must disappear');
+  assert.equal(root.root.findAll(node => node.type === 'Modal' && node.props.visible === true).length, 0,
+    'yesterday’s report dialog must close on rollover');
+  assert.match(renderedText(root.toJSON()), /The previous unfinished Daily expired/, 'new Daily explains the reset');
   assert.ok(root.root.findAll(node => node.type === 'Pressable' && node.props.accessibilityLabel === 'Pick Card A').length,
     'a fresh Daily must be playable rather than marooned on the closed run');
   assert.ok(observed.includes(nextDaily.id), 'the new Daily pack must be observed too');
-
-  await act(async () => root.unmount());
+  } finally {
+    if (root) await act(async () => root.unmount());
+    globalThis.setInterval = realSetInterval;
+    globalThis.clearInterval = realClearInterval;
+  }
 });
 
 

@@ -43,7 +43,7 @@ days AS (
   JOIN players p ON p.id=s.player_id
   WHERE o.first_seen_at>= (($1::date-13)::timestamp AT TIME ZONE 'America/Los_Angeles')
     AND o.first_seen_at< (($1::date+1)::timestamp AT TIME ZONE 'America/Los_Angeles')
-    AND o.observed
+    AND (o.observed OR o.outcome='pick')
     AND NOT s.measurement_qa
     AND NOT coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
 ), observation_metrics AS (
@@ -131,7 +131,7 @@ export const ADMIN_HEALTH_ATTENTION_SQL=`SELECT
 // the observation window; this is not the scoring model or serving policy.
 export const ADMIN_QUALITY_SQL=`WITH candidate_views AS MATERIALIZED (
   SELECT o.puzzle_id,o.session_id,s.player_id,o.first_seen_at,o.revision,
-    o.outcome,o.trophy_match,s.updated_at,s.answers,s.puzzle_ids,
+    o.outcome,o.trophy_match,o.last_seen_at,s.updated_at,s.answers,s.puzzle_ids,
     v.set_id,v.pick_number,r.target_support_ratio,
     row_number() OVER(PARTITION BY s.player_id,o.puzzle_id
       ORDER BY o.first_seen_at,o.session_id,o.revision) encounter
@@ -142,7 +142,7 @@ export const ADMIN_QUALITY_SQL=`WITH candidate_views AS MATERIALIZED (
   LEFT JOIN draft_run_puzzle_ratings r ON r.puzzle_id=o.puzzle_id
     AND r.difficulty_version='support-ratio-v1'
   WHERE o.first_seen_at>=now()-interval '30 days'
-    AND s.corpus_version=$1 AND o.observed AND NOT s.measurement_qa
+    AND s.corpus_version=$1 AND (o.observed OR o.outcome='pick') AND NOT s.measurement_qa
     AND NOT coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
 ), decision_metrics AS (
   SELECT puzzle_id,max(set_id) set_id,max(pick_number) pick_number,
@@ -153,7 +153,7 @@ export const ADMIN_QUALITY_SQL=`WITH candidate_views AS MATERIALIZED (
     count(*) FILTER(WHERE first_seen_at<now()-interval '24 hours')::int mature_views,
     count(*) FILTER(WHERE outcome IS NULL
       AND jsonb_array_length(answers)<jsonb_array_length(puzzle_ids)
-      AND greatest(updated_at,first_seen_at)<now()-interval '24 hours')::int likely_left
+      AND greatest(updated_at,last_seen_at)<now()-interval '24 hours')::int likely_left
   FROM candidate_views
   WHERE encounter=1
   GROUP BY puzzle_id

@@ -26,7 +26,7 @@ export function reportFilters(url,now=new Date()) {
   const environment=url.searchParams.get('environment')||'all',type=url.searchParams.get('type')||'all',set=url.searchParams.get('set')||'all';
   const version=url.searchParams.get('version')||'all';
   const band=url.searchParams.get('difficulty')||'all',pick=url.searchParams.get('pick')||'all';
-  if(!['all','mixed','powered-cube'].includes(environment)||!['all','daily','practice','challenge'].includes(type)||!/^([a-z0-9-]{2,40}|all)$/.test(set)||!/^([a-z0-9-]{1,60}|all)$/.test(version))fail('Invalid report filter.');
+  if(!['all','mixed','powered-cube','latest'].includes(environment)||!['all','daily','practice','challenge'].includes(type)||!/^([a-z0-9-]{2,40}|all)$/.test(set)||!/^([a-z0-9-]{1,60}|all)$/.test(version))fail('Invalid report filter.');
   if(!['all','easy','medium','hard'].includes(band)||!['all',...Array.from({length:12},(_,i)=>String(i+1))].includes(pick))fail('Invalid difficulty or pick filter.');
   // Decision-quality reports default to the current parent corpus because the
   // model and ratings change with it. Player counts (Overview) pass corpus=all.
@@ -259,8 +259,8 @@ export async function handleAdmin(request,query,readJson) {
         primary_data AS MATERIALIZED (SELECT * FROM scoped WHERE (observed OR outcome='pick') AND NOT is_qa AND first_encounter),
         coverage AS (SELECT count(*)::int recorded,count(*) FILTER(WHERE is_qa)::int qa_excluded,
           count(*) FILTER(WHERE NOT observed AND outcome IS DISTINCT FROM 'pick' AND NOT is_qa)::int unobserved_excluded,
-          count(*) FILTER(WHERE NOT observed AND outcome='pick' AND NOT is_qa)::int answered_without_view,
-          count(*) FILTER(WHERE observed AND NOT is_qa AND NOT first_encounter)::int repeats_excluded,
+          count(*) FILTER(WHERE NOT observed AND outcome='pick' AND NOT is_qa AND first_encounter)::int answered_without_view,
+          count(*) FILTER(WHERE (observed OR outcome='pick') AND NOT is_qa AND NOT first_encounter)::int repeats_excluded,
           min(first_seen_at) collection_started FROM scoped),
         summary AS (SELECT ${METRICS},count(DISTINCT session_id)::int runs,
           count(DISTINCT session_id) FILTER(WHERE run_complete)::int completed_runs FROM primary_data),
