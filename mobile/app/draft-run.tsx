@@ -939,7 +939,8 @@ export default function DraftRunScreen({
   const confirm = async () => {
     const current = stateRef.current;
     if (current.status !== 'ready' || !selected || !current.run.current || busy) return;
-    if (current.run.day && current.run.day < pacificDay()) {
+    const today = pacificDay();
+    if (current.run.day && mountedPacificDay.current !== today && current.run.day < today) {
       // Avoid offering a stale pick to the server while the midnight poll races.
       void refreshRunRef.current();
       return;
