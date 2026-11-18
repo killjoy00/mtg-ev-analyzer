@@ -57,7 +57,7 @@ test('native answers remain in first-encounter puzzle quality even without a vie
   assert.match(source,/answered_without_view/);
 });
 
-test('Home active streak allows yesterday when today's Daily is unfinished',()=>{
+test("Home active streak allows yesterday when today's Daily is unfinished",()=>{
   const source=readFileSync(new URL('../worker/draft-run-function.mjs',import.meta.url),'utf8');
   assert.match(source,/EXISTS\(SELECT 1 FROM completed_days WHERE day=\$2::date\)/);
   assert.match(source,/THEN \$2::date ELSE \$2::date-1 END\)-day_offset/);
