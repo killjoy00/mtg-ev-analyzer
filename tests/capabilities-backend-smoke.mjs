@@ -91,7 +91,19 @@ assert.equal(replay.serving_policy_version,run.serving_policy_version);assert.de
 assert.equal(replay.current.puzzle_id,run.answers[0].puzzle.puzzle_id);
 await call(`/v1/runs/${replay.id}/reroll`,{revision:replay.revision,round:0,puzzleId:replay.current.puzzle_id,type:'pack'},peer,409);
 replay=await finish(replay,peer);
-assert.equal((await call(`/v1/runs/${replay.id}/share`,{},peer)).id,shared.id,'Sharing a replay preserves the original run identity');
+const friendShare=await call(`/v1/runs/${replay.id}/share`,{},peer);
+assert.notEqual(friendShare.id,shared.id,'The friend needs a distinct score-bound challenge link');
+assert.equal((await call(`/v1/runs/${replay.id}/share`,{},peer)).id,friendShare.id,
+  'Sharing the same completed friend run remains idempotent');
+const advertised=await call('/v1/shared-runs/'+friendShare.id);
+assert.equal(advertised.score,replay.score,'The shared score belongs to the friend');
+const third=await call('/v1/session',{displayName:'QA friend reshare recipient'});
+const friendChallenge=await call('/v1/runs',{challenge:friendShare.id},third);
+assert.equal(friendChallenge.comparison.kind,'friend');
+assert.equal(friendChallenge.comparison.exact,true);
+assert.equal(friendChallenge.comparison.score,replay.score,
+  'A third player challenges the friend, not the original run owner');
+assert.equal(friendChallenge.current.puzzle_id,replay.answers[0].puzzle.puzzle_id);
 assert.equal((await call('/v1/shared-runs/'+shared.id)).scores.length,2);
 // A friend's shared run is guest-playable, while a guest's own practice stays gated.
 const guest=await call('/v1/session',{displayName:'QA shared guest'});

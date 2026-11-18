@@ -30,6 +30,25 @@ test('50 custom practice seeds can assign a set with Medium and Hard but no Easy
   }
 });
 
+test('custom required-set assignment preserves the available Easy pick across 50 seeds',()=>{
+  const groups=Array.from({length:8},(_,i)=>i+1).flatMap(pick_number=>[
+    ...['easy','medium','hard'].map(band=>({set_id:'easy-set',pick_number,band,n:20})),
+    ...['medium','hard'].map(band=>({set_id:'other-set',pick_number,band,n:20})),
+  ]);
+  const windows=Array.from({length:8},(_,i)=>[i+1,i+1]);
+  for(let seed=0;seed<50;seed++) {
+    const random=seededRandom('exact-before-fallback:'+seed);
+    const bands=runDifficultyBands(random);
+    const required=balancedSetPlan(['easy-set','other-set'],random);
+    const assignment=requiredSetRounds(groups,bands,windows,random,required);
+    assert.equal(assignment.size,8);
+    const easyRound=bands.indexOf('easy');
+    assert.ok(easyRound>=0);
+    assert.equal(assignment.get(easyRound),'easy-set',
+      'an exact Easy assignment exists and must win over a fallback for seed '+seed);
+  }
+});
+
 test('required-set assignment never falls back from Hard to Medium',()=>{
   const groups=[{set_id:'fixture',pick_number:4,band:'medium',n:20}];
   assert.throws(()=>requiredSetRounds(groups,['hard'],[[4,4]],()=>0,['fixture']),error=>error.status===503);
@@ -38,7 +57,7 @@ test('required-set assignment never falls back from Hard to Medium',()=>{
 test('Latest always waits for Main Daily publication before selecting',async()=>{
   let publishMain;
   const gate=new Promise(resolve=>{publishMain=resolve;});
-  const calls=[],query=()=>{},day='2041-06-15';
+  const calls=[],query=async()=>({rows:[]}),day='2041-06-15';
   let mainFinished=false;
   const ensure=createOrderedDailyScheduleEnsurer(async(_query,_day,environment)=>{
     calls.push(environment);
@@ -56,6 +75,27 @@ test('Latest always waits for Main Daily publication before selecting',async()=>
   assert.deepEqual(latestResult.schedule.puzzle_ids,['latest']);
   assert.deepEqual(mainResult.schedule.puzzle_ids,['mixed']);
   assert.equal(mainResult.created,false,'the overlapping Main request coalesces with prepublication');
+});
+
+test('an already saved Latest Daily is returned even if Main cannot generate',async()=>{
+  const saved={puzzle_ids:['saved-latest'],scoring_version:'pinned'};
+  const calls=[];
+  const query=async(sql,params)=>{
+    assert.match(sql,/FROM draft_run_schedules/);
+    calls.push(['lookup',params[1]]);
+    return {rows:params[1]==='latest'?[saved]:[]};
+  };
+  const ensure=createOrderedDailyScheduleEnsurer(async(_query,_day,environment)=>{
+    calls.push(['generate',environment]);
+    throw Object.assign(new Error('Main requires four Live sets'),{status:503});
+  });
+  const first=await ensure(query,'2041-06-15','latest');
+  assert.deepEqual(first,{schedule:saved,created:false});
+  first.schedule.puzzle_ids.push('caller-mutated');
+  assert.deepEqual((await ensure(query,'2041-06-15','latest')).schedule,saved,
+    'saved schedules must be cloned for each caller');
+  assert.deepEqual(calls,[['lookup','latest'],['lookup','latest']],
+    'no Main generation should happen when Latest is already saved');
 });
 
 test('native answers remain in first-encounter puzzle quality even without a view ping',()=>{

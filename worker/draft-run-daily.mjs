@@ -108,7 +108,14 @@ export function createDailyScheduleEnsurer(build=buildDailySchedule) {
 export function createOrderedDailyScheduleEnsurer(build=buildDailySchedule) {
   const ensure=createDailyScheduleEnsurer(build);
   return async (query,day,environment) => {
-    if(environment==='latest')await ensure(query,day,'mixed');
+    if(environment==='latest') {
+      // Existing Latest schedules are authoritative even when Main can no
+      // longer be generated (e.g. an archive with fewer than four Live sets).
+      // Only a NEW Latest generation depends on Main's repeat history.
+      const saved=(await query(DAILY_SCHEDULE_SELECT,[day,environment])).rows[0];
+      if(saved)return {schedule:structuredClone(saved),created:false};
+      await ensure(query,day,'mixed');
+    }
     return ensure(query,day,environment);
   };
 }
