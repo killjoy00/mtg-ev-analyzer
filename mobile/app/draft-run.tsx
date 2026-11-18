@@ -80,7 +80,7 @@ import {
   draftRunShareText,
   nextUnfinishedDaily,
 } from '@/src/dailyShare';
-import { dailyResetCue } from '@/src/dailyClock';
+import { dailyResetCue, pacificDay } from '@/src/dailyClock';
 import { setGuideUrl } from '@/src/setGuides';
 import setDisplayNames from '../../data/set-display-names.json';
 
@@ -553,6 +553,7 @@ export default function DraftRunScreen({
   const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [rolloverNotice, setRolloverNotice] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
   const [zoomedCard, setZoomedCard] = useState<DraftRunCard | null>(null);
   const [reviewIndex, setReviewIndex] = useState<number | null>(null);
@@ -576,6 +577,9 @@ export default function DraftRunScreen({
   const dailySetDefaulted = useRef<string | null>(null);
   const scroll = useRef<ScrollView>(null);
   const lastObservedDecision = useRef<string | null>(null);
+  const mountedPacificDay = useRef(pacificDay());
+  const refreshInFlight = useRef(false);
+  const refreshRunRef = useRef<() => Promise<void>>(async () => {});
   const [screenFocused, setScreenFocused] = useState(false);
   const [appActive, setAppActive] = useState(AppState.currentState === 'active');
 
@@ -600,7 +604,12 @@ export default function DraftRunScreen({
   // Only a visible pick screen counts as a native exposure. Do not delay
   // gameplay if the best-effort telemetry request fails.
   useEffect(() => {
-    if (!screenFocused || !appActive || state.status !== 'ready' || mode !== 'pick' || !state.run.current) return;
+    if (!screenFocused || !appActive) {
+      // A later visit must renew last_seen_at for abandonment calculations.
+      lastObservedDecision.current = null;
+      return;
+    }
+    if (state.status !== 'ready' || mode !== 'pick' || !state.run.current) return;
     const key = `${state.run.id}:${state.run.revision}`;
     if (lastObservedDecision.current === key) return;
     lastObservedDecision.current = key;
@@ -718,9 +727,10 @@ export default function DraftRunScreen({
       && (!run || (run.id === token.runId && run.revision >= token.revision));
   };
 
-  useAppResume(async () => {
+  const refreshMountedRun = async () => {
     const current = stateRef.current;
-    if (current.status !== 'ready' || busy) return;
+    if (current.status !== 'ready' || busy || refreshInFlight.current) return;
+    refreshInFlight.current = true;
     const token = beginRefresh(current);
     try {
       const previousRun = current.run;
@@ -731,7 +741,19 @@ export default function DraftRunScreen({
           : await startDailyDraftRun(current.session, environment);
       if (!refreshStillCurrent(token, run, !shared && !practice)) return;
       if (run.id !== previousRun.id) {
-        // The Pacific Daily rolled over: yesterday's feedback is no longer current.
+        // Only replace a Daily after the server confirms its newer date.
+        // Clear any overlays, errors and old result data bound to yesterday.
+        mountedPacificDay.current = pacificDay();
+        setRolloverNotice('Yesterday’s Daily closed at midnight Pacific. Here are today’s picks.');
+        lastObservedDecision.current = null;
+        setReportOpen(false);
+        setReportReason(null);
+        setReportComment('');
+        setReportError(null);
+        setReportedDecision(null);
+        setActionError(null);
+        setShareError(null);
+        setZoomedCard(null);
         setReviewIndex(null);
         setDailyPeers(null);
         setResultStatus(null);
@@ -739,6 +761,7 @@ export default function DraftRunScreen({
         setShowAnalysis(false);
         setShowPackReview(false);
         setDeckOpen(false);
+        deckCache.current.clear();
       }
       commitState({ status: 'ready', run, session: current.session });
       setSelected((selection) => (
@@ -756,8 +779,31 @@ export default function DraftRunScreen({
       });
     } catch {
       // Keep the last server-authoritative state visible if foreground refresh fails.
+    } finally {
+      refreshInFlight.current = false;
     }
-  });
+  };
+  refreshRunRef.current = refreshMountedRun;
+  useAppResume(refreshMountedRun);
+
+  // A foregrounded game can remain on screen across Pacific midnight without
+  // triggering AppState resume. Poll the local calendar, not the game server;
+  // contact the server only after the date actually changes. Retry after a
+  // transient failure, and never overwrite an in-flight answer.
+  useEffect(() => {
+    if (practice || shared || !screenFocused || !appActive) return;
+    const checkForRollover = () => {
+      const today = pacificDay();
+      if (today === mountedPacificDay.current) return;
+      const current = stateRef.current;
+      if (current.status !== 'ready' || !current.run.day) return;
+      if (current.run.day < today) void refreshRunRef.current();
+      else mountedPacificDay.current = today;
+    };
+    checkForRollover();
+    const timer = setInterval(checkForRollover, 15_000);
+    return () => clearInterval(timer);
+  }, [practice, shared, screenFocused, appActive, state.status]);
 
   useEffect(() => {
     let active = true;
@@ -893,6 +939,11 @@ export default function DraftRunScreen({
   const confirm = async () => {
     const current = stateRef.current;
     if (current.status !== 'ready' || !selected || !current.run.current || busy) return;
+    if (current.run.day && current.run.day < pacificDay()) {
+      // Avoid offering a stale pick to the server while the midnight poll races.
+      void refreshRunRef.current();
+      return;
+    }
     const token = beginMutation(current);
     setBusy(true);
     try {
@@ -1318,6 +1369,9 @@ export default function DraftRunScreen({
           <Text style={styles.eyebrow}>
             {practice || shared ? surfaceMeta.eyebrow : `${dailyMeta.eyebrow} · ${run.day ?? 'TODAY'}`}
           </Text>
+          {rolloverNotice && run.day ? (
+            <Text accessibilityRole="alert" style={styles.rolloverNotice}>{rolloverNotice}</Text>
+          ) : null}
           <Text style={styles.title}>
             {puzzle.set_id.toUpperCase()} <Text style={styles.titleMeta}>· Pack 1 · Pick {puzzle.pick_number}</Text>
           </Text>
@@ -1580,6 +1634,7 @@ const styles = StyleSheet.create({
   page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md, alignSelf: 'center', width: '100%', maxWidth: 980 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
   loadingText: { color: colors.muted, fontSize: 15 },
+  rolloverNotice: { color: colors.ink, fontSize: 14, lineHeight: 20, padding: spacing.md, backgroundColor: colors.surfaceSoft, borderLeftWidth: 3, borderLeftColor: colors.accent },
   errorTitle: { color: colors.ink, fontSize: 24, fontWeight: '800', textAlign: 'center' },
   errorBody: { color: colors.muted, fontSize: 15, lineHeight: 22, textAlign: 'center' },
   eyebrow: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.3 },
