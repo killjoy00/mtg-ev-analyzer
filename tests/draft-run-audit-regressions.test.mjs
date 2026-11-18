@@ -74,7 +74,8 @@ test('Latest always waits for Main Daily publication before selecting',async()=>
   assert.deepEqual(calls,['mixed','latest']);
   assert.deepEqual(latestResult.schedule.puzzle_ids,['latest']);
   assert.deepEqual(mainResult.schedule.puzzle_ids,['mixed']);
-  assert.equal(mainResult.created,false,'the overlapping Main request coalesces with prepublication');
+  assert.equal(calls.filter(environment=>environment==='mixed').length,1,
+    'overlapping Main and Latest starts generate Main only once');
 });
 
 test('an already saved Latest Daily is returned even if Main cannot generate',async()=>{
