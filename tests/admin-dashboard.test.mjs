@@ -73,15 +73,12 @@ test('Trends prefilters only completed non-QA sessions for its unchanged three c
   assert.match(sessions,/s\.report_day BETWEEN \$1::date-13 AND \$1::date/);
 });
 
-test('native answers are included in Trends and quality watch; returned views are not abandoned',async()=>{
-  const {ADMIN_TRENDS_SQL,ADMIN_QUALITY_SQL}=await import('../worker/admin-dashboard.mjs');
-  assert.match(ADMIN_TRENDS_SQL,/\(o\.observed OR o\.outcome='pick'\)/,
-    'a submitted native answer is proof of exposure even without a view ping');
-  assert.match(ADMIN_QUALITY_SQL,/\(o\.observed OR o\.outcome='pick'\)/,
-    'quality review must count the same confirmed answers as Insights');
-  assert.match(ADMIN_QUALITY_SQL,/o\.last_seen_at/,
-    'the quality watchlist must read the latest observation activity');
-  assert.match(ADMIN_QUALITY_SQL,/greatest\(updated_at,last_seen_at\)/,
-    'a returning player is not abandoned just because first_seen_at is old');
-  assert.doesNotMatch(ADMIN_QUALITY_SQL,/greatest\(updated_at,first_seen_at\)/);
+test('quality watchlist returns its measured counts and flags without inventing a diagnosis',async()=>{
+  const result=await handleAdmin(request('/v1/admin/insights/quality-watch'),queryFixture,async()=>({}));
+  assert.equal(result.rows.length,1);
+  assert.equal(result.rows[0].puzzle_id,'a'.repeat(32));
+  assert.equal(result.rows[0].answers,15);
+  assert.equal(result.rows[0].unexpected_choices,true);
+  // SQL semantics are tested with actual first-encounter and returning-view
+  // rows in the isolated PostgreSQL measurement-report-math suite.
 });
