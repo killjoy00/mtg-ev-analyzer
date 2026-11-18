@@ -192,13 +192,13 @@ Card artwork can contain fantasy combat/violence. Review a representative curren
 The repository includes a deterministic store-screenshot harness that renders the **real native Pack One screens and components** with review-safe fixture data. It runs only under the isolated `pro.packone.preview` bundle/package IDs; `EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES=1` is explicitly rejected when `EXPO_PUBLIC_PACKONE_ENV=production`.
 
 The guarded `Mobile store screenshots` workflow captures:
-1. Daily decision screen — What would you pick?
-2. Reveal/comparison screen — See what the trophy drafter took
-3. Daily hub — Three new Dailies every day
-4. Leaderboard — Same picks. Compare scores.
-5. Practice — Practice between Dailies
+1. Daily decision screen — `Eight decisions. One score.`
+2. Reveal/comparison screen — `Compare with a real trophy draft.`
+3. Daily hub — `Three fresh Dailies.`
+4. Practice screen — `Keep drafting between Dailies.`
+5. Career/leaderboard — `Track your Pack One career.`
 
-The iOS 1.4 capture pipeline frames the real isolated native screen captures in branded caption layouts. Original 1.0 product screenshots remain release-attributed. Upload iOS 1.4 assets only after the latest native home-copy change (#1616) is merged and the exact screenshot artifact is verified.
+For the new iOS 1.4 marketing screenshot order and captions, see [APP-STORE-1.4-PAGE.md](APP-STORE-1.4-PAGE.md). Do not rewrite the archived approved 1.0 captions.
 6. iOS Membership purchase state for the App Store subscription review screenshot.
 
 Capture outputs are generated for iPhone, iPad, and Android from the same production screen implementation. Before upload, visually compare the generated scenes against the accepted 1.0 RC and recapture any scene whose production layout or copy has materially changed. #910 changes Daily, Practice, Career, typography and feedback, so the earlier screenshot set is not evidence for this candidate. Only passing native captures identified in the repair ledger may replace those store assets; failed diagnostic captures must not be uploaded.
