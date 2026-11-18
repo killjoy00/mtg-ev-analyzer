@@ -110,6 +110,8 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
   };
   let startCalls = 0;
   let resumeCallback = null;
+  const observed = [];
+  const nextDaily = { ...runZero(), id: '99999999-9999-4999-8999-999999999999', day: '2026-09-27', revision: 0, current: puzzle('next-day', 1) };
 
   const Image = host('Image');
   Image.prefetch = async () => {};
@@ -145,7 +147,7 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
     'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
     '@/src/api/guest': { ensureGuestSession: async () => session },
     '@/src/api/draftRun': {
-      recordDraftRunView: async () => ({ ok: true }),
+      recordDraftRunView: async (run) => { observed.push(run.id); return { ok: true }; },
       createDraftRunShare: async () => ({ id: 'a'.repeat(24) }),
       loadDailyPeerStats: async () => ({ available: false }),
       DAILY_ENVIRONMENT_META: {
@@ -158,7 +160,7 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
       rerollDraftRun: async () => runZero(),
       startDailyDraftRun: async () => {
         startCalls += 1;
-        return startCalls === 1 ? runZero() : oldRefresh.promise;
+        return startCalls === 1 ? runZero() : startCalls === 2 ? oldRefresh.promise : nextDaily;
       },
       startPracticeDraftRun: async () => runZero(),
       submitDraftRunPick: async () => runAfterPick(),
@@ -234,6 +236,17 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
 
   assert.ok(root.toJSON(), 'old foreground response must not blank the mounted screen');
   assert.match(renderedText(root.toJSON()), /88/, 'successful feedback must remain authoritative');
+  assert.ok(observed.includes(runZero().id), 'native first pack must be recorded as observed');
+
+  await act(async () => {
+    await resumeCallback();
+    await Promise.resolve();
+  });
+  assert.equal(startCalls, 3, 'foreground refresh must request the new Pacific Daily');
+  assert.doesNotMatch(renderedText(root.toJSON()), /88/, 'yesterday\'s revealed score must disappear');
+  assert.ok(root.root.findAll(node => node.type === 'Pressable' && node.props.accessibilityLabel === 'Pick Card A').length,
+    'a fresh Daily must be playable rather than marooned on the closed run');
+  assert.ok(observed.includes(nextDaily.id), 'the new Daily pack must be observed too');
 
   await act(async () => root.unmount());
 });
