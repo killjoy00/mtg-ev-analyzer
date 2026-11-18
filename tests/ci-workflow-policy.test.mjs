@@ -50,7 +50,7 @@ test('scoped presentation validation preserves native editorial parity for canon
 
 test('browser dependency image matches the locked Playwright version and avoids apt mirror downloads', () => {
   const playwright = JSON.parse(readFileSync('package.json', 'utf8')).devDependencies.playwright;
-  const image = browser.match(/image: mcr\\.microsoft\\.com\\/playwright:v([\\d.]+)-noble/);
+  const image = browser.match(/image: mcr\.microsoft\.com\/playwright:v([\d.]+)-noble/);
   assert.ok(image, 'browser job must use the official Noble Playwright image');
   assert.equal(image[1], playwright, 'image and installed package versions must match');
   assert.match(browser, /options: --ipc=host/);
@@ -59,12 +59,12 @@ test('browser dependency image matches the locked Playwright version and avoids 
     ?.split('      - name: Start static site')[0] || '';
   assert.match(install, /npm ci --no-audit --no-fund/);
   assert.match(install, /BROWSER_GROUPS/);
-  assert.match(install, /groups\\.includes\\(',account,'\\)/);
-  assert.match(install, /groups\\.includes\\(',admin,'\\)/);
+  assert.match(install, /groups\.includes\(',account,'\)/);
+  assert.match(install, /groups\.includes\(',admin,'\)/);
   assert.match(install, /chromium, webkit/);
-  assert.match(install, /browser\\.executablePath\\(\\)/);
-  assert.match(install, /accessSync\\(executable, constants\\.X_OK\\)/);
-  assert.doesNotMatch(install, /--with-deps|sudo dpkg|apt-get\\s+(?:install|update)/);
+  assert.match(install, /browser\.executablePath\(\)/);
+  assert.match(install, /accessSync\(executable, constants\.X_OK\)/);
+  assert.doesNotMatch(install, /--with-deps|sudo dpkg|apt-get\s+(?:install|update)/);
 });
 
 test('required checks cannot pass by silently skipping their selected validation', () => {
