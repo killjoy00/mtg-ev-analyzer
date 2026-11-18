@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {seededRandom} from '../gameplay.mjs';
 import {runDifficultyBands,requiredSetRounds} from '../draft-run-policy.mjs';
-import {customPracticeCoverage,customRunShape} from '../worker/draft-run-selection.mjs';
+import {balancedSetPlan} from '../daily-selection.mjs';
+import {customPracticeCoverage,customRunShape,currentPracticeBatchPlan} from '../worker/draft-run-selection.mjs';
 import {createOrderedDailyScheduleEnsurer} from '../worker/draft-run-daily.mjs';
 
 test('50 custom practice seeds can assign a set with Medium and Hard but no Easy inventory',()=>{
@@ -16,8 +17,16 @@ test('50 custom practice seeds can assign a set with Medium and Hard but no Easy
   for(let seed=0;seed<50;seed++){
     const random=seededRandom('fixture:'+seed);
     const bands=runDifficultyBands(random);
-    const assignment=requiredSetRounds(shape.groups,bands,shape.windows,random,['fixture']);
-    assert.deepEqual([...assignment.values()],['fixture'], 'seed '+seed+' should assign the required set');
+    const required=balancedSetPlan(['fixture'],random);
+    const assignment=requiredSetRounds(shape.groups,bands,shape.windows,random,required);
+    assert.equal(assignment.size,8,'seed '+seed+' must reserve every custom-set round');
+    assert.ok([...assignment.values()].every(value=>value==='fixture'));
+    const {plan}=currentPracticeBatchPlan({groups,metadata:[
+      {set_id:'fixture',status:'Live',regular_run:true,release_date:'2041-01-01',set_name:'Fixture'}
+    ]},'fixture:'+seed,'mixed',{day:'2041-06-15',setIds:['fixture']});
+    assert.equal(plan.forced.length,8);
+    assert.deepEqual(plan.forced,Array(8).fill('fixture'),
+      'the production batched planner must generate all eight decisions for seed '+seed);
   }
 });
 
