@@ -1,11 +1,12 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
+  AppState,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -575,6 +576,22 @@ export default function DraftRunScreen({
   const dailySetDefaulted = useRef<string | null>(null);
   const scroll = useRef<ScrollView>(null);
   const lastObservedDecision = useRef<string | null>(null);
+  const [screenFocused, setScreenFocused] = useState(false);
+  const [appActive, setAppActive] = useState(AppState.currentState === 'active');
+
+  // A mounted route can remain obscured by another screen. Loading a pack
+  // while backgrounded is not an observed decision.
+  useFocusEffect(useCallback(() => {
+    setScreenFocused(true);
+    return () => setScreenFocused(false);
+  }, []));
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', next => {
+      setAppActive(next === 'active');
+    });
+    setAppActive(AppState.currentState === 'active');
+    return () => subscription.remove();
+  }, []);
 
   const commitState = (next: LoadState) => {
     stateRef.current = next;
@@ -584,14 +601,14 @@ export default function DraftRunScreen({
   // Only a visible pick screen counts as a native exposure. Do not delay
   // gameplay if the best-effort telemetry request fails.
   useEffect(() => {
-    if (state.status !== 'ready' || mode !== 'pick' || !state.run.current) return;
+    if (!screenFocused || !appActive || state.status !== 'ready' || mode !== 'pick' || !state.run.current) return;
     const key = `${state.run.id}:${state.run.revision}`;
     if (lastObservedDecision.current === key) return;
     lastObservedDecision.current = key;
     void recordDraftRunView(state.run, state.session).catch(() => {
       if (lastObservedDecision.current === key) lastObservedDecision.current = null;
     });
-  }, [state, mode]);
+  }, [state, mode, screenFocused, appActive]);
 
   useEffect(() => {
     if (state.status !== 'ready' || !state.run.day || mode !== 'feedback' || reviewIndex === null) return;
