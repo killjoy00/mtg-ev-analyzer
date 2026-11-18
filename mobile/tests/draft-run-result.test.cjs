@@ -39,7 +39,7 @@ const status = (environments) => ({ day: TODAY, capabilities: [], player: { clai
   daily_history: environments.map((environment) => ({ date: TODAY, set_id: environment, mode: 'draft_run', score: 70, run_id: IDS[environment] })) });
 
 async function fixture({ environment = 'mixed', guest = false, dailyStatus = status(['mixed']), day = TODAY, simulateRollover = false, stopBeforeConfirm = false, offlineRollover = false } = {}) {
-  const calls = { share: [], replace: [], push: [], runs: [], starts: [] };
+  const calls = { share: [], replace: [], push: [], runs: [], starts: [], picks: 0 };
   let clockDay = day;
   let resumeCallback = null;
   const ticks = new Set();
@@ -81,7 +81,7 @@ async function fixture({ environment = 'mixed', guest = false, dailyStatus = sta
       },
       startPracticeDraftRun: async () => { throw new Error('not used'); },
       loadDraftRun: async (id) => { calls.runs.push(id); return run(Object.keys(IDS).find((key) => IDS[key] === id), { complete: true }); },
-      submitDraftRunPick: async () => run(environment, { complete: true, day }),
+      submitDraftRunPick: async () => { calls.picks++; return run(environment, { complete: true, day }); },
       submitDraftRunDecisionReport: async () => ({ ok: true }),
       rerollDraftRun: async () => { throw new Error('not used'); },
       loadDailyStatus: async () => dailyStatus,
@@ -107,11 +107,11 @@ async function fixture({ environment = 'mixed', guest = false, dailyStatus = sta
     await press('Confirm pick');
     await press('See result');
   }
-  const advanceDay = async (days = 1) => {
+  const advanceDay = async (days = 1, tick = true) => {
     const date = new Date(clockDay+'T12:00:00Z');
     date.setUTCDate(date.getUTCDate()+days);
     clockDay = date.toISOString().slice(0,10);
-    await act(async () => { for (const tick of [...ticks]) tick(); await flush(); });
+    if (tick) await act(async () => { for (const check of [...ticks]) check(); await flush(); });
   };
   const resume = async () => act(async () => { await resumeCallback?.(); await flush(); });
   const close = async () => {
@@ -192,4 +192,36 @@ test('a guest sees the sign-in handoff only once all three Dailies are complete'
   try {
     assert.doesNotMatch(member.text(), /FINISHED ALL 3 FREE DAILIES/, 'signed-in players never see the guest handoff');
   } finally { await member.close(); }
+});
+
+test('midnight preserves a completed Daily result until the player explicitly starts again',async()=>{
+  const screen=await fixture({simulateRollover:true});
+  try {
+    assert.equal(screen.calls.starts.length,1);
+    assert.match(screen.text(),/70/);
+    assert.match(screen.text(),/Your 8 picks/);
+    await screen.advanceDay(3); // same behavior after several missed days
+    assert.equal(screen.calls.starts.length,1,'midnight must not create a Daily session or funnel start');
+    assert.match(screen.text(),/Your 8 picks/,'yesterday’s completed analysis remains visible');
+    assert.match(screen.text(),/Today’s Daily is ready/);
+    assert.doesNotMatch(screen.text(),/Yesterday’s Daily closed/);
+    await screen.resume();
+    assert.equal(screen.calls.starts.length,1,'resuming days later must not start an unrequested Daily');
+    await screen.press("Play today's Daily");
+    assert.equal(screen.calls.starts.length,2,'only the explicit tap starts the new Daily');
+    assert.ok(screen.find('Pick Card A'),'the new Daily becomes playable');
+    assert.doesNotMatch(screen.text(),/Your 8 picks/);
+  } finally { await screen.close(); }
+});
+
+test('an offline midnight pick shows a useful error rather than silently dropping the tap',async()=>{
+  const screen=await fixture({simulateRollover:true,stopBeforeConfirm:true,offlineRollover:true});
+  try {
+    await screen.advanceDay(1,false); // beat the 15-second periodic rollover check
+    await screen.press('Confirm pick');
+    assert.equal(screen.calls.picks,0,'expired picks never reach the mutation endpoint');
+    assert.equal(screen.calls.starts.length,2,'client attempts recovery once');
+    assert.match(screen.text(),/Your pick was not submitted/);
+    assert.match(screen.text(),/Check your connection/);
+  } finally { await screen.close(); }
 });
