@@ -454,13 +454,26 @@ function newDraftRunViewId(): string {
   return [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join('-');
 }
 
+// Keep the same observation identity on a resumed view of the same pick.
+// The server updates last_seen_at and only trusts timing when the ID agrees.
+const decisionViewIds = new Map<string, string>();
 export function recordDraftRunView(run: DraftRunState, session: MobileSession) {
   if (!run.current) return Promise.resolve({ ok: false });
+  const key = `${run.id}:${run.revision}:${run.current.puzzle_id}`;
+  let viewId = decisionViewIds.get(key);
+  if (!viewId) {
+    viewId = newDraftRunViewId();
+    decisionViewIds.set(key, viewId);
+    if (decisionViewIds.size > 64) {
+      const oldest = decisionViewIds.keys().next().value;
+      if (oldest) decisionViewIds.delete(oldest);
+    }
+  }
   return requestJson<{ ok: boolean }>(`/draft/v1/runs/${encodeURIComponent(run.id)}/view`, {
     method: 'POST',
     mobileSessionToken: session.playerToken,
     mobileAccountToken: session.accountToken,
-    body: { revision: run.revision, puzzleId: run.current.puzzle_id, viewId: newDraftRunViewId() },
+    body: { revision: run.revision, puzzleId: run.current.puzzle_id, viewId },
     timeoutMs: 15_000,
   });
 }
