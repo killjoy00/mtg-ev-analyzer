@@ -306,7 +306,7 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
   assert.doesNotMatch(renderedText(root.toJSON()), /88/, 'yesterday\'s revealed score must disappear');
   assert.equal(root.root.findAll(node => node.type === 'Modal' && node.props.visible === true).length, 0,
     'yesterday’s report dialog must close on rollover');
-  assert.match(renderedText(root.toJSON()), /Yesterday’s Daily closed/, 'new Daily explains the reset');
+  assert.match(renderedText(root.toJSON()), /The previous unfinished Daily expired/, 'new Daily explains the reset');
   assert.ok(root.root.findAll(node => node.type === 'Pressable' && node.props.accessibilityLabel === 'Pick Card A').length,
     'a fresh Daily must be playable rather than marooned on the closed run');
   assert.ok(observed.includes(nextDaily.id), 'the new Daily pack must be observed too');
