@@ -81,6 +81,7 @@ import {
   nextUnfinishedDaily,
 } from '@/src/dailyShare';
 import { dailyResetCue, pacificDay } from '@/src/dailyClock';
+import { createForegroundDecisionTimer } from '@/src/decisionTiming';
 import { setGuideUrl } from '@/src/setGuides';
 import setDisplayNames from '../../data/set-display-names.json';
 
@@ -554,6 +555,7 @@ export default function DraftRunScreen({
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [rolloverNotice, setRolloverNotice] = useState<string | null>(null);
+  const [newDailyAvailable, setNewDailyAvailable] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
   const [zoomedCard, setZoomedCard] = useState<DraftRunCard | null>(null);
   const [reviewIndex, setReviewIndex] = useState<number | null>(null);
@@ -577,6 +579,7 @@ export default function DraftRunScreen({
   const dailySetDefaulted = useRef<string | null>(null);
   const scroll = useRef<ScrollView>(null);
   const lastObservedDecision = useRef<string | null>(null);
+  const decisionTimer = useRef(createForegroundDecisionTimer());
   const mountedPacificDay = useRef(pacificDay());
   const refreshInFlight = useRef(false);
   const refreshRunRef = useRef<() => Promise<void>>(async () => {});
@@ -600,6 +603,14 @@ export default function DraftRunScreen({
     stateRef.current = next;
     setState(next);
   };
+
+  // Stop timing while backgrounded, on another route, on a reveal or while
+  // submitting; each new decision receives a fresh foreground clock.
+  useEffect(() => {
+    const key = state.status === 'ready' && state.run.current
+      ? `${state.run.id}:${state.run.revision}:${state.run.current.puzzle_id}` : null;
+    decisionTimer.current.sync(key, Boolean(key && screenFocused && appActive && mode === 'pick' && !busy));
+  }, [state, mode, screenFocused, appActive, busy]);
 
   // Only a visible pick screen counts as a native exposure. Do not delay
   // gameplay if the best-effort telemetry request fails.
@@ -727,9 +738,18 @@ export default function DraftRunScreen({
       && (!run || (run.id === token.runId && run.revision >= token.revision));
   };
 
-  const refreshMountedRun = async () => {
+  const refreshMountedRun = async (openCompletedDaily = false) => {
     const current = stateRef.current;
     if (current.status !== 'ready' || busy || refreshInFlight.current) return;
+    // A finished run is a review screen, not an invitation to start tomorrow.
+    // Show a button; do not create a Daily session or change the screen until
+    // the player explicitly chooses to open today's run.
+    if (!shared && !practice && current.run.complete && current.run.day
+      && current.run.day < pacificDay() && !openCompletedDaily) {
+      mountedPacificDay.current = pacificDay();
+      setNewDailyAvailable(true);
+      return;
+    }
     refreshInFlight.current = true;
     const token = beginRefresh(current);
     try {
@@ -744,7 +764,8 @@ export default function DraftRunScreen({
         // Only replace a Daily after the server confirms its newer date.
         // Clear any overlays, errors and old result data bound to yesterday.
         mountedPacificDay.current = pacificDay();
-        setRolloverNotice('Yesterday’s Daily closed at midnight Pacific. Here are today’s picks.');
+        setRolloverNotice(previousRun.complete ? null : 'The previous unfinished Daily expired. Here are today’s picks.');
+        setNewDailyAvailable(false);
         lastObservedDecision.current = null;
         setReportOpen(false);
         setReportSending(false);
@@ -782,6 +803,7 @@ export default function DraftRunScreen({
       });
     } catch {
       // Keep the last server-authoritative state visible if foreground refresh fails.
+      if (openCompletedDaily) setActionError('Today’s Daily could not be opened. Check your connection and try again.');
     } finally {
       refreshInFlight.current = false;
     }
@@ -803,8 +825,12 @@ export default function DraftRunScreen({
       if (today === mountedPacificDay.current) return;
       const current = stateRef.current;
       if (current.status !== 'ready' || !current.run.day) return;
-      if (current.run.day < today) void refreshRunRef.current();
-      else mountedPacificDay.current = today;
+      if (current.run.day < today) {
+        if (current.run.complete) {
+          mountedPacificDay.current = today;
+          setNewDailyAvailable(true);
+        } else void refreshRunRef.current();
+      } else mountedPacificDay.current = today;
     };
     checkForRollover();
     const timer = setInterval(checkForRollover, 15_000);
@@ -946,17 +972,22 @@ export default function DraftRunScreen({
     const current = stateRef.current;
     if (current.status !== 'ready' || !selected || !current.run.current || busy) return;
     const today = pacificDay();
-    if (current.run.day && mountedPacificDay.current !== today && current.run.day < today) {
-      // Avoid offering a stale pick to the server while the midnight poll races.
+    if (current.run.day && current.run.day < today) {
+      // The pick did not reach the server. If refresh fails or we're offline,
+      // keep an actionable explanation rather than silently dropping the tap.
+      setActionError('This Daily ended at midnight Pacific. Your pick was not submitted. Check your connection; today’s Daily will load when available.');
       void refreshRunRef.current();
       return;
     }
+    const decisionKey = `${current.run.id}:${current.run.revision}:${current.run.current.puzzle_id}`;
+    const activeMs = decisionTimer.current.sample(decisionKey);
+    decisionTimer.current.sync(decisionKey, false);
     const token = beginMutation(current);
     setBusy(true);
     try {
       const run = shared
         ? await shared.submitPick(current.run, selected)
-        : await submitDraftRunPick(current.run, selected, current.session);
+        : await submitDraftRunPick(current.run, selected, current.session, activeMs);
       if (!mutationStillCurrent(token, run)) return;
       await showCommittedPick(run, current.session, current.run.answers.length, token);
     } catch (error: unknown) {
@@ -1198,6 +1229,16 @@ export default function DraftRunScreen({
         <ScrollView contentContainerStyle={styles.resultPage}>
           <Text style={styles.eyebrow}>{surfaceMeta.eyebrow} COMPLETE</Text>
           <Text style={styles.title}>{resultTitle}</Text>
+          {realDaily && newDailyAvailable ? (
+            <View style={styles.dailyAvailableBanner}>
+              <Text style={styles.resultBody}>Today’s Daily is ready. Your finished result is still here to review.</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="Play today's Daily"
+                onPress={() => void refreshRunRef.current(true)} style={styles.primaryButton}>
+                <Text style={styles.primaryButtonText}>Play today’s Daily</Text>
+              </Pressable>
+              {actionError ? <Text accessibilityRole="alert" style={styles.actionError}>{actionError}</Text> : null}
+            </View>
+          ) : null}
           <View style={styles.scoreBlock}>
             <Text style={styles.score}>{run.score ?? 0}</Text>
             <Text style={styles.scoreMeta}>/100 · {creator
@@ -1642,6 +1683,7 @@ const styles = StyleSheet.create({
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
   loadingText: { color: colors.muted, fontSize: 15 },
   rolloverNotice: { color: colors.ink, fontSize: 14, lineHeight: 20, padding: spacing.md, backgroundColor: colors.surfaceSoft, borderLeftWidth: 3, borderLeftColor: colors.accent },
+  dailyAvailableBanner: { gap: spacing.md, padding: spacing.md, backgroundColor: colors.surfaceSoft, borderRadius: 8 },
   errorTitle: { color: colors.ink, fontSize: 24, fontWeight: '800', textAlign: 'center' },
   errorBody: { color: colors.muted, fontSize: 15, lineHeight: 22, textAlign: 'center' },
   eyebrow: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.3 },
