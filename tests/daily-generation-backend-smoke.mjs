@@ -125,7 +125,7 @@ function independentAdapter() {
   let first=true;
   return async(sql,params)=>{
     const result=await query(sql,params);
-    if(first&&sql===DAILY_SCHEDULE_SELECT) {
+    if(first&&sql===DAILY_SCHEDULE_SELECT&&params?.[1]==='latest') {
       first=false;assert.equal(result.rows.length,0);
       if(++arrivals===2)release();
       await initialReads;

@@ -152,31 +152,39 @@ async function stakesRound(query,where,params,{setId,band,draw,clearEasy=false,r
   const clear=`r.band='easy' AND r.target_support_ratio>=${Number(EASY_RULE.min_trophy_support_ratio)}::float8
       AND f.trophy_strength_margin>=${Number(EASY_RULE.min_strength_margin)}::real
       AND (p.pick_number<${Number(EASY_RULE.colour_fit_from_pick)} OR f.trophy_off_colour IS FALSE)`;
-  // extra: values for placeholders after the rule's own, used only by `kind`.
-  const counted=async(kind,extra=[])=>{
-    const values=[...rule,...extra];
+  // Count and draw from the SAME materialized eligible pool. The prior
+  // implementation scanned this expensive serving/feature join twice for
+  // each attempt (once for COUNT, once for LIMIT/OFFSET), making a cold Main
+  // Daily exceed the unchanged 30s start SLA on the isolated corpus.
+  // SQL uses the exact original C order, stakes rank, top-quarter size and
+  // JavaScript RNG draw. A missing pool returns no row for the same fallback.
+  const picked=async(kind,extra=[])=>{
+    const values=[...rule,...extra,draw];
     const pool=`${from} JOIN draft_run_puzzle_selection_features f ON f.puzzle_id=p.puzzle_id AND f.feature_version=$${n-3}
-    WHERE ${where} AND p.set_id=$${n-2}
-      AND ${kind}
-      AND NOT (p.pick_number>=$${n-1}::int AND f.trophy_is_land) AND (p.pick_number<$${n}::int OR f.trophy_in_main_deck IS TRUE)`;
-    return {pool,values,count:Number((await query(`SELECT count(*)::int n ${pool}`,values)).rows[0].n)};
+      WHERE ${where} AND p.set_id=$${n-2} AND ${kind}
+      AND NOT (p.pick_number>=$${n-1}::int AND f.trophy_is_land)
+      AND (p.pick_number<$${n}::int OR f.trophy_in_main_deck IS TRUE)`;
+    const poolSize=contested
+      ?`LEAST(s.n,GREATEST(${STAKES_RULE.min_top_pool},CEIL(s.n*${Number(STAKES_RULE.top_share)}::float8)::int))`
+      :'s.n';
+    const result=await query(`WITH eligible AS MATERIALIZED (
+      SELECT p.puzzle_id,p.source_draft_hash,f.stakes_points ${pool}
+    ), pool_size AS (SELECT count(*)::int n FROM eligible),
+    chosen AS (
+      SELECT e.puzzle_id,e.source_draft_hash FROM eligible e
+      ORDER BY ${contested?'e.stakes_points DESC,':''}e.puzzle_id COLLATE "C"
+      LIMIT 1 OFFSET (SELECT FLOOR($${values.length}::float8 * ${poolSize})::int FROM pool_size s)
+    ) SELECT ${columns},chosen.puzzle_id selected_id ${from}
+      JOIN chosen ON chosen.source_draft_hash=p.source_draft_hash WHERE ${servingBase}`,values);
+    return result.rows.length?result:null;
   };
-  let chosen;
-  if(contested)chosen=await counted("r.band IN ('medium','hard') AND f.credible_count>=2 AND f.stakes_points IS NOT NULL");
-  else {
-    if(clearEasy&&recentEasyAnswers.length)
-      chosen=await counted(`${clear} AND (p.set_id||':'||coalesce(f.trophy_card_id,''))<>ALL($${n+1}::text[])`,[toPgArray(recentEasyAnswers)]);
-    if(clearEasy&&!chosen?.count)chosen=await counted(clear);
-    if(!chosen?.count)chosen=await counted("r.band='easy'");
-  }
-  const {pool,values,count}=chosen;
-  if(!count)return null;
-  const offset=Math.floor(draw*(contested?stakesTopPoolSize(count):count));
-  return query(`WITH chosen AS (
-      SELECT p.puzzle_id,p.source_draft_hash ${pool}
-      ORDER BY ${contested?'f.stakes_points DESC,':''}p.puzzle_id COLLATE "C" LIMIT 1 OFFSET $${values.length+1}::int
-    ) SELECT ${columns},chosen.puzzle_id selected_id ${from} JOIN chosen ON chosen.source_draft_hash=p.source_draft_hash WHERE ${servingBase}`,
-    [...values,offset]);
+  if(contested)return picked("r.band IN ('medium','hard') AND f.credible_count>=2 AND f.stakes_points IS NOT NULL");
+  let chosen=null;
+  if(clearEasy&&recentEasyAnswers.length)
+    chosen=await picked(`${clear} AND (p.set_id||':'||coalesce(f.trophy_card_id,''))<>ALL($${n+1}::text[])`,[toPgArray(recentEasyAnswers)]);
+  if(clearEasy&&!chosen)chosen=await picked(clear);
+  if(!chosen)chosen=await picked("r.band='easy'");
+  return chosen;
 }
 
 // Answer cards ("set:card id") that were the trophy pick of an easy-band

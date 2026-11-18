@@ -17,9 +17,9 @@ export function resyncAppleSubscription(session: MobileSession | null, now = Dat
   if (!session || !accountId) return Promise.resolve(0);
   if (running) return running.then(() => resyncAppleSubscription(session, now));
   if (last?.accountId === accountId && now - last.at < APPLE_RESYNC_INTERVAL_MS) return Promise.resolve(0);
-  last = { accountId, at: now };
   running = (async () => {
     let verified = 0;
+    let hadFailure = false;
     const purchases = await getAvailableApplePurchases({ onlyIncludeActiveItemsIOS: true });
     for (const purchase of purchases) {
       // Only this account's own subscription; another account's is never sent.
@@ -31,9 +31,12 @@ export function resyncAppleSubscription(session: MobileSession | null, now = Dat
         await finishApplePurchase(purchase);
         verified += 1;
       } catch {
-        // Background work: the membership screen reports errors when the user is there.
+        hadFailure = true;
+        // Failed verification or finishing must be retried when connectivity
+        // recovers, not suppressed by a six-hour cooldown.
       }
     }
+    if (!hadFailure) last = { accountId, at: now };
     return verified;
   })().catch(() => 0).finally(() => { running = null; });
   return running;

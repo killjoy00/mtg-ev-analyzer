@@ -492,7 +492,8 @@ async function createShare(request,id) {
     const info=publicCreatorChallenge(state.challenge);
     return json({creator:true,id:state.challenge.id,slug:state.challenge.slug,url:info.public_url});
   }
-  if(s.challenge_id){const original=await share(s.challenge_id);if(JSON.stringify(original.puzzle_ids)===JSON.stringify(s.puzzle_ids))return json({id:original.id});}
+  // A friend who completes a shared run should create their own challenge:
+  // reusing the original link would compare recipients against the wrong score.
   const name=(await linkedPlayerIdentity(query,owner))?.display_name||'A friend';
   const key=crypto.randomUUID().replaceAll('-','').slice(0,24);
   const r=await query(`INSERT INTO draft_run_shares(id,session_id,display_name,score,puzzle_ids) VALUES($1,$2::uuid,$3,$4::int,$5::jsonb) ON CONFLICT(session_id) DO UPDATE SET session_id=EXCLUDED.session_id RETURNING id`,[key,id,name,s.score,JSON.stringify(s.puzzle_ids)]);
@@ -522,7 +523,9 @@ async function dailyStatus(request) {
       )
       SELECT
         COALESCE((SELECT jsonb_agg(to_jsonb(h)) FROM history h),'[]'::jsonb) daily_history,
-        (SELECT count(*)::int FROM ordered WHERE day=$2::date-day_offset) streak,
+        (SELECT count(*)::int FROM ordered WHERE day=
+          (CASE WHEN EXISTS(SELECT 1 FROM completed_days WHERE day=$2::date)
+            THEN $2::date ELSE $2::date-1 END)-day_offset) streak,
         COALESCE((SELECT jsonb_agg(DISTINCT capability ORDER BY capability)
           FROM entitlement_grants
           WHERE $3::uuid IS NOT NULL AND auth_user_id=$3::uuid

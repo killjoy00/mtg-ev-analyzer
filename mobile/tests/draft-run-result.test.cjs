@@ -48,8 +48,8 @@ async function fixture({ environment = 'mixed', guest = false, dailyStatus = sta
     'expo-web-browser': { openBrowserAsync: async () => ({ type: 'dismiss' }) },
     'expo-haptics': { selectionAsync: async () => {}, notificationAsync: async () => {}, NotificationFeedbackType: { Success: 'success' } },
     'expo-image': { Image },
-    'expo-router': { router: { push: (value) => calls.push.push(value), replace: (value) => calls.replace.push(value), dismissTo() {} }, useLocalSearchParams: () => ({ environment }) },
-    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }), AccessibilityInfo: { announceForAccessibility() {} },
+    'expo-router': { router: { push: (value) => calls.push.push(value), replace: (value) => calls.replace.push(value), dismissTo() {} }, useLocalSearchParams: () => ({ environment }), useFocusEffect(callback) { React.useEffect(callback, [callback]); } },
+    'react-native': { AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) }, useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }), AccessibilityInfo: { announceForAccessibility() {} },
       ActivityIndicator: host('ActivityIndicator'), KeyboardAvoidingView: host('KeyboardAvoidingView'), Modal: host('Modal'), Platform: { OS: 'android' },
       Pressable: host('Pressable'), ScrollView, Share: { share: async (value) => { calls.share.push(value.message); } }, Linking: { openURL: async () => {} },
       StyleSheet: { create: (value) => value, absoluteFill: {} }, Text: host('Text'), TextInput: host('TextInput'), View: host('View') },
@@ -57,6 +57,7 @@ async function fixture({ environment = 'mixed', guest = false, dailyStatus = sta
     '@/src/api/guest': { ensureGuestSession: async () => session },
     '@/src/storage/session': { readSession: async () => session, subscribeSession: () => () => {} },
     '@/src/api/draftRun': {
+      recordDraftRunView: async () => ({ ok: true }),
       createDraftRunShare: async () => ({ id: 'a'.repeat(24) }),
       loadDailyPeerStats: async () => ({ available: false }),
       DAILY_ENVIRONMENT_META: { mixed: { eyebrow: 'DAILY DRAFT RUN', resultTitle: 'Your Draft Run.' },

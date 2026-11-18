@@ -78,7 +78,7 @@ async function fixture(options = {}) {
   });
   const mocks = {
     react: React,
-    'react-native': { ActivityIndicator: host('Spinner'), Pressable: host('Pressable'), ScrollView, View: host('View'), TextInput: host('TextInput'),
+    'react-native': { AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) }, ActivityIndicator: host('Spinner'), Pressable: host('Pressable'), ScrollView, View: host('View'), TextInput: host('TextInput'),
       Modal: props => props.visible ? React.createElement('Modal', props, props.children) : null,
       StyleSheet: { create: value => value }, Platform: { OS: 'android' },
       useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
@@ -100,6 +100,7 @@ async function fixture(options = {}) {
     '@/src/hooks/useAppResume': { useAppResume() {} },
     './draft-run': { __esModule: true, default: props => { surface = props.shared; return React.createElement('Gameplay', { surface }, surface.kind === 'source' ? `${surface.sourceType} source ready` : 'Creator replay ready'); } },
     '@/src/api/draftRun': {
+      recordDraftRunView: async () => ({ ok: true }),
       DAILY_ENVIRONMENT_META: { mixed: {}, latest: {}, 'powered-cube': {} },
       isDailyEnvironment: value => ['mixed', 'latest', 'powered-cube'].includes(value),
       loadCreatorChallengeInfo: async (id, session) => { calls.push(['info', id, session]); return options.loadInfo ? options.loadInfo(id, session) : info; },

@@ -70,14 +70,22 @@ export function requiredSetRounds(groups,bands,windows,random,required=[]) {
   if(!required.length)return new Map();
   for(let i=slots.length-1;i>0;i--){const j=Math.floor(random()*(i+1));[slots[i],slots[j]]=[slots[j],slots[i]];}
   const assignment=new Map();
-  const available=(set,round)=>groups.some(g=>g.set_id===set&&g.n>0&&g.band===bands[round]&&g.pick_number>=windows[round][0]&&g.pick_number<=windows[round][1]);
-  const place=i=>{
+  // First reserve an exact difficulty assignment. An Easy-to-Medium fallback
+  // is legal only if the full requested assignment cannot be made exactly.
+  // Keep the shuffled slot order (and RNG consumption) identical in both passes.
+  const available=(set,round,allowFallback)=>groups.some(g=>g.set_id===set&&g.n>0
+    &&(g.band===bands[round]||(allowFallback&&bands[round]==='easy'&&g.band==='medium'))
+    &&g.pick_number>=windows[round][0]&&g.pick_number<=windows[round][1]);
+  const place=(i,allowFallback)=>{
     if(i===required.length)return true;
-    for(const round of slots)if(!assignment.has(round)&&available(required[i],round)){
-      assignment.set(round,required[i]);if(place(i+1))return true;assignment.delete(round);
+    for(const round of slots)if(!assignment.has(round)&&available(required[i],round,allowFallback)){
+      assignment.set(round,required[i]);if(place(i+1,allowFallback))return true;assignment.delete(round);
     }
     return false;
   };
-  if(!place(0))throw Object.assign(new Error('The latest released sets cannot form a complete Daily. Please try again later.'),{status:503});
+  if(!place(0,false)) {
+    assignment.clear();
+    if(!place(0,true))throw Object.assign(new Error('The latest released sets cannot form a complete Daily. Please try again later.'),{status:503});
+  }
   return assignment;
 }

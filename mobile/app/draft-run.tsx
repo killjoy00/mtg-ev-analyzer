@@ -1,11 +1,12 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
+  AppState,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -38,6 +39,7 @@ import {
   loadDraftRun,
   loadTrophyDeck,
   rerollDraftRun,
+  recordDraftRunView,
   startDailyDraftRun,
   startPracticeDraftRun,
   submitDraftRunDecisionReport,
@@ -573,11 +575,39 @@ export default function DraftRunScreen({
   const [sharing, setSharing] = useState(false);
   const dailySetDefaulted = useRef<string | null>(null);
   const scroll = useRef<ScrollView>(null);
+  const lastObservedDecision = useRef<string | null>(null);
+  const [screenFocused, setScreenFocused] = useState(false);
+  const [appActive, setAppActive] = useState(AppState.currentState === 'active');
+
+  // A mounted route can remain obscured by another screen. Loading a pack
+  // while backgrounded is not an observed decision.
+  useFocusEffect(useCallback(() => {
+    setScreenFocused(true);
+    return () => setScreenFocused(false);
+  }, []));
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', next => {
+      setAppActive(next === 'active');
+    });
+    return () => subscription.remove();
+  }, []);
 
   const commitState = (next: LoadState) => {
     stateRef.current = next;
     setState(next);
   };
+
+  // Only a visible pick screen counts as a native exposure. Do not delay
+  // gameplay if the best-effort telemetry request fails.
+  useEffect(() => {
+    if (!screenFocused || !appActive || state.status !== 'ready' || mode !== 'pick' || !state.run.current) return;
+    const key = `${state.run.id}:${state.run.revision}`;
+    if (lastObservedDecision.current === key) return;
+    lastObservedDecision.current = key;
+    void recordDraftRunView(state.run, state.session).catch(() => {
+      if (lastObservedDecision.current === key) lastObservedDecision.current = null;
+    });
+  }, [state, mode, screenFocused, appActive]);
 
   useEffect(() => {
     if (state.status !== 'ready' || !state.run.day || mode !== 'feedback' || reviewIndex === null) return;
@@ -654,7 +684,7 @@ export default function DraftRunScreen({
     revision: current.run.revision,
   });
 
-  const refreshStillCurrent = (token: RunResponseToken, run: DraftRunState) => {
+  const refreshStillCurrent = (token: RunResponseToken, run: DraftRunState, allowNewDaily = false) => {
     const current = stateRef.current;
     return current.status === 'ready'
       && token.request === refreshGeneration.current
@@ -662,8 +692,9 @@ export default function DraftRunScreen({
       && mobileSessionIdentity(current.session) === token.session
       && current.run.id === token.runId
       && current.run.revision === token.revision
-      && run.id === token.runId
-      && run.revision >= token.revision;
+      && ((run.id === token.runId && run.revision >= token.revision)
+        || (allowNewDaily && Boolean(current.run.day) && Boolean(run.day)
+          && run.day! > current.run.day! && run.environment === current.run.environment));
   };
 
   const beginMutation = (current: ReadyState): RunResponseToken => {
@@ -698,10 +729,20 @@ export default function DraftRunScreen({
         : practice
           ? await loadDraftRun(previousRun.id, current.session)
           : await startDailyDraftRun(current.session, environment);
-      if (!refreshStillCurrent(token, run)) return;
+      if (!refreshStillCurrent(token, run, !shared && !practice)) return;
+      if (run.id !== previousRun.id) {
+        // The Pacific Daily rolled over: yesterday's feedback is no longer current.
+        setReviewIndex(null);
+        setDailyPeers(null);
+        setResultStatus(null);
+        setDailySet(null);
+        setShowAnalysis(false);
+        setShowPackReview(false);
+        setDeckOpen(false);
+      }
       commitState({ status: 'ready', run, session: current.session });
       setSelected((selection) => (
-        run.current?.puzzle_id === previousRun.current?.puzzle_id ? selection : null
+        run.id === previousRun.id && run.current?.puzzle_id === previousRun.current?.puzzle_id ? selection : null
       ));
       setMode((currentMode) => {
         if (

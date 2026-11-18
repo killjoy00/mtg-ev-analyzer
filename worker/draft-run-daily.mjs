@@ -50,7 +50,28 @@ export async function selectDailyWithoutRepeats(select,exclusion,{environment,da
   }
 }
 
+// Diagnostic-only timing for a Daily whose selector exceeds the start SLA.
+// Log the query *kind*, never SQL parameters, puzzle IDs or account details.
+function timedDailyQuery(query,environment) {
+  if(process.env.PACK1_CAPACITY_DIAGNOSTICS!=='1')return query;
+  return async(sql,params)=>{
+    const begin=performance.now();
+    const kind=sql===DAILY_SCHEDULE_SELECT?'schedule_read':
+      sql===RECENT_DAILY_DECISIONS?'repeat_history':
+      sql.startsWith('SELECT p.set_id,p.release_date')?'live_sets':
+      sql.includes('GROUP BY p.set_id,p.pick_number,r.band')?'round_inventory':
+      sql.startsWith('SELECT p.set_id,count(*)')?'stakes_readiness':
+      sql.startsWith('SELECT DISTINCT p.set_id,f.trophy_card_id')?'recent_easy_answers':
+      sql.startsWith('SELECT count(*)::int n')?'round_count':
+      sql.startsWith('WITH chosen AS')?'round_pick':
+      sql.startsWith('INSERT INTO draft_run_schedules')?'schedule_write':'other';
+    try{return await query(sql,params);}
+    finally{console.log(JSON.stringify({event:'daily_schedule_query_timing',environment,kind,duration_ms:Math.round(performance.now()-begin)}));}
+  };
+}
+
 async function buildDailySchedule(query,day,environment) {
+  query=timedDailyQuery(query,environment);
   let schedule=(await query(DAILY_SCHEDULE_SELECT,[day,environment])).rows[0];
   if(schedule)return {schedule,created:false};
   let featuredSets=environment!=='powered-cube'
@@ -102,7 +123,24 @@ export function createDailyScheduleEnsurer(build=buildDailySchedule) {
     }
   };
 }
-const sharedDailyScheduleEnsurer=createDailyScheduleEnsurer();
+// Coalesce the saved-Latest lookup as well as generation. Running this read
+// outside the ensurer caused simultaneous requests for one saved Daily to
+// issue one database query per caller instead of a single shared query.
+// For a NEW Latest, Main must publish before repeat history is read; the
+// same ensurer coalesces Main starts, and the DB unique key covers processes.
+export function createOrderedDailyScheduleEnsurer(build=buildDailySchedule) {
+  const ensure=createDailyScheduleEnsurer(async(query,day,environment)=>{
+    if(environment==='latest') {
+      // Saved Latest remains available even when Main cannot generate.
+      const saved=(await query(DAILY_SCHEDULE_SELECT,[day,environment])).rows[0];
+      if(saved)return {schedule:saved,created:false};
+      await ensure(query,day,'mixed');
+    }
+    return build(query,day,environment);
+  });
+  return ensure;
+}
+const sharedDailyScheduleEnsurer=createOrderedDailyScheduleEnsurer();
 export async function ensureDailySchedule(query,day,environment) {
   return sharedDailyScheduleEnsurer(query,day,environment);
 }

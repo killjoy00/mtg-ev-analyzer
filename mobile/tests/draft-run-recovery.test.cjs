@@ -108,8 +108,9 @@ async function fixture(options = {}) {
     'expo-router': {
       router: { push() {}, replace() {} },
       useLocalSearchParams: () => params,
+      useFocusEffect(callback) { React.useEffect(callback, [callback]); },
     },
-    'react-native': { useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
+    'react-native': { AppState: { currentState: 'active', addEventListener: () => ({ remove() {} }) }, useWindowDimensions: () => ({ width: 390, height: 844, fontScale: 1 }),
       AccessibilityInfo: { announceForAccessibility() {} },
       ActivityIndicator: host('ActivityIndicator'), KeyboardAvoidingView: host('KeyboardAvoidingView'), Modal: host('Modal'),
       Platform: { OS: 'ios' }, Pressable: host('Pressable'), ScrollView, Share: { share: async () => {} },
@@ -120,6 +121,7 @@ async function fixture(options = {}) {
     '@/src/api/guest': { ensureGuestSession: async () => session },
     '@/src/storage/session': { readSession: async () => session, subscribeSession: callback => { sessionListeners.add(callback); return () => sessionListeners.delete(callback); } },
     '@/src/api/draftRun': {
+      recordDraftRunView: async () => ({ ok: true }),
       createDraftRunShare: async () => ({ id: 'a'.repeat(24) }),
       loadDailyPeerStats: async () => ({ available: false }),
       DAILY_ENVIRONMENT_META: {
