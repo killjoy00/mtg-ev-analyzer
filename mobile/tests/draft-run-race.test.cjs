@@ -145,6 +145,7 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
     'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
     '@/src/api/guest': { ensureGuestSession: async () => session },
     '@/src/api/draftRun': {
+      recordDraftRunView: async () => ({ ok: true }),
       createDraftRunShare: async () => ({ id: 'a'.repeat(24) }),
       loadDailyPeerStats: async () => ({ available: false }),
       DAILY_ENVIRONMENT_META: {
@@ -278,6 +279,7 @@ test('a committed pick with a lost response is reconciled into feedback', async 
     'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
     '@/src/api/guest': { ensureGuestSession: async () => session },
     '@/src/api/draftRun': {
+      recordDraftRunView: async () => ({ ok: true }),
       createDraftRunShare: async () => ({ id: 'a'.repeat(24) }),
       loadDailyPeerStats: async () => ({ available: false }),
       DAILY_ENVIRONMENT_META: {
