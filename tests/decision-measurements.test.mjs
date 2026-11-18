@@ -178,3 +178,14 @@ test('habits query keeps first-Daily attribution and rolling seven-day math with
   assert.match(sql,/NOT s\.measurement_qa/);
   assert.match(sql,/NOT EXISTS \(\s*SELECT 1 FROM account_links admin_link/);
 });
+
+test('Insights supports Latest Set Daily and exposes answered-without-view coverage',()=>{
+  const latest=reportFilters(new URL('https://test/?environment=latest'));
+  assert.equal(latest.environment,'latest');
+  assert.equal(latest.params[2],'latest');
+  const backend=fs.readFileSync('worker/measurement-admin.mjs','utf8');
+  const ui=fs.readFileSync('admin/admin.mjs','utf8');
+  assert.match(backend,/answered_without_view/);
+  assert.match(ui,/\['latest','Latest Set'\]/);
+  assert.match(ui,/c\.answered_without_view/);
+});
