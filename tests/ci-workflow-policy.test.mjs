@@ -134,23 +134,23 @@ test('signed and publishing mobile jobs remain unreachable from pull-request exe
   assert.match(publishIos, /environment: pack-one-mobile-release/);
 });
 
-test('iOS 1.3 TestFlight enables only approved production AdMob with a fail-closed config audit', () => {
+test('iOS 1.4 TestFlight enables only approved production AdMob with a fail-closed config audit', () => {
   const release = JSON.parse(readFileSync('mobile/store-release.json', 'utf8'));
   const request = JSON.parse(readFileSync('.github/testflight-release-request.json', 'utf8'));
   const ios = readFileSync('.github/workflows/ios-testflight.yml', 'utf8');
-  assert.equal(release.appStoreVersion, '1.3');
+  assert.equal(release.appStoreVersion, '1.4');
   assert.equal(release.playVersionName, '1.0');
   assert.equal(request.operation, 'upload-testflight-app-store-eligible');
-  assert.match(request.reason, /iOS 1\.3/);
-  assert.match(request.reason, /do not submit (?:to )?App Review/i);
+  assert.match(request.reason, /iOS 1\.4/);
+  assert.match(request.reason, /\bdo not submit (?:to )?App Review\b/i, 'explicit no-App-Review release boundary must remain');
   assert.equal((ios.match(/PACKONE_ADMOB_IOS_ENABLED: '1'/g) || []).length, 2,
     'both unsigned archive and protected signing must explicitly enable live iOS ads');
-  assert.equal((ios.match(/Verify reviewed iOS 1\.3 live-AdMob release configuration/g) || []).length, 2,
+  assert.equal((ios.match(/Verify reviewed iOS 1\.4 live-AdMob release configuration/g) || []).length, 2,
     'both jobs must check the generated public Expo config before archiving');
   assert.match(ios, /ad\?\.iosEnabled !== true \|\| ad\?\.androidEnabled !== false/);
   assert.match(ios, /ad\?\.iosBannerUnitId !== 'ca-app-pub-1217971050094766\/8989398185'/);
   assert.match(ios, /expo-tracking-transparency/);
-  assert.match(ios, /version\.appStoreVersion !== '1\.3'/);
+  assert.match(ios, /version\.appStoreVersion !== '1\.4'/);
   assert.match(ios, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/);
 });
 

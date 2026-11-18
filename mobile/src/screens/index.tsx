@@ -50,8 +50,10 @@ function completed(status: DailyStatus | null, environment: DailyEnvironment) {
   ));
 }
 
-// Card labels from daily-home.mjs.
-const HOME_LABELS: Record<string, string> = { mixed: 'A MIX OF SETS', 'powered-cube': 'POWERED CUBE PICKS', latest: 'ONLY THE NEWEST SET' };
+// Website daily-home.mjs is the source of truth for Daily-home copy.
+// Keep home-only titles separate from gameplay, profile, and leaderboard labels.
+const HOME_LABELS: Record<DailyEnvironment, string> = { mixed: 'A MIX OF SETS', 'powered-cube': 'POWERED CUBE PICKS', latest: 'ONLY THE NEWEST SET' };
+const HOME_TITLES: Record<DailyEnvironment, string> = { mixed: 'Daily Draft Run', 'powered-cube': 'Daily Powered Cube', latest: 'Daily Latest Set' };
 
 export default function HomeScreen() {
   const accountState = useNavigationSession();
@@ -150,7 +152,6 @@ export default function HomeScreen() {
         <View onLayout={event => recordBrandLayout('row', event)} style={styles.brandRow}><Brand /></View>
 
         <View style={styles.hero}>
-          <Text style={styles.eyebrow}>THE DAILY DRAFT</Text>
           <Text style={styles.title}>Eight picks. What would you take?</Text>
           <Text style={styles.lede}>
             These picks come from real trophy drafts.{'\n'}You decide what you&apos;d take, then see what the drafter chose.
@@ -163,12 +164,12 @@ export default function HomeScreen() {
         </Pressable> : accountState.status === 'checking' ? <Text style={styles.statusText}>Checking account…</Text> : null}
         <View style={styles.statusStrip} accessibilityLabel="Daily reset and streak">
           <Text style={styles.resetCue}>{dailyResetCue(now)}</Text>
-          <Text style={styles.statusText}>{currentStatus ? `${currentStatus.daily_streak}-day streak` : phase === 'unavailable' ? 'Streak unavailable' : 'Checking streak…'}</Text>
-          <Text style={styles.statusText}>Resets at midnight Pacific</Text>
+          {phase === 'ready' && currentStatus && currentStatus.daily_streak > 0
+            ? <Text style={styles.statusText}>{currentStatus.daily_streak}-day streak</Text>
+            : phase === 'checking' ? <Text style={styles.statusText}>Checking streak…</Text> : null}
         </View>
-        {phase === 'checking' ? <Text style={styles.statusText}>{currentStatus ? 'Refreshing Daily progress…' : 'Checking Daily progress…'}</Text> : null}
         {phase === 'unavailable' ? <View style={styles.warning}>
-          <Text accessibilityRole="alert" style={styles.warningBody}>Daily progress is temporarily unavailable. Play now still resumes your saved attempt.{currentStatus ? ' Showing your last loaded progress.' : ''}</Text>
+          <Text accessibilityRole="alert" style={styles.warningBody}>Couldn’t load your Daily progress. Play now will still pick up where you left off.</Text>
           <Pressable accessibilityRole="button" onPress={() => void refresh()} style={styles.helpLink}><Text style={styles.cardAction}>Retry</Text></Pressable>
         </View> : null}
 
@@ -186,14 +187,13 @@ export default function HomeScreen() {
                   : 'Choose a display name before playing a Daily.'}
             </Text>
             <Text style={styles.warningBody}>
-              Until you choose an available display name, Daily results will not appear on the leaderboard.
+              Pick a display name that isn’t taken, or your Daily scores won’t show on the leaderboard.
             </Text>
-            <Text style={styles.cardAction}>Change display name →</Text>
+            <Text style={styles.cardAction}>Change display name</Text>
           </Pressable>
         ) : null}
 
         <View style={styles.dailySection}>
-          <Text style={styles.sectionLabel}>PLAY TODAY</Text>
           {dailies.map((environment, index) => {
             const meta = DAILY_ENVIRONMENT_META[environment];
             const isComplete = completed(currentStatus, environment);
@@ -209,14 +209,13 @@ export default function HomeScreen() {
               >
                 <View style={styles.cardHeading}>
                   <Text style={styles.cardKicker}>{startHere ? 'Start here' : HOME_LABELS[environment]}</Text>
-                  {isComplete ? <Text style={styles.completeBadge}>COMPLETE</Text> : null}
                 </View>
-                <Text style={index === 0 && !isComplete ? styles.cardTitle : styles.dailyTitle}>{meta.title}</Text>
+                <Text style={index === 0 && !isComplete ? styles.cardTitle : styles.dailyTitle}>{HOME_TITLES[environment]}</Text>
                 <Text style={styles.cardBody}>{isComplete ? `Complete · ${result?.score}/100` : meta.description}</Text>
                 <View style={styles.dailyAction}>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={`${isComplete ? 'View result for' : 'Play'} ${meta.title} Daily`}
+                    accessibilityLabel={`${isComplete ? 'View result for' : 'Play'} ${HOME_TITLES[environment]}`}
                     onPress={() => router.push({ pathname: '/draft-run', params: { environment } })}
                     style={({ pressed }) => [
                       isComplete ? styles.secondaryButton : styles.primaryButton,
@@ -241,7 +240,7 @@ export default function HomeScreen() {
             <Text style={styles.cardBody}>
               {claimed
                 ? 'Keep playing regular Draft Runs, or any sets with Pack One Elite.'
-                : 'A free account adds unlimited regular Draft Run practice.'}
+                : 'A free account adds unlimited regular Draft Runs.'}
             </Text>
             <Pressable
               accessibilityRole="button"
@@ -301,12 +300,10 @@ const styles = StyleSheet.create({
   brandName: { color: colors.ink, fontSize: 26, fontWeight: '600', letterSpacing: 0.39, flexShrink: 1, minWidth: 0 },
   removedBrandSub: { color: colors.muted, fontSize: 9, fontWeight: '800', letterSpacing: 1.2, marginTop: 2 },
   hero: { gap: spacing.sm, paddingTop: spacing.sm },
-  eyebrow: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
   title: { color: colors.ink, fontSize: 38, lineHeight: 40, fontWeight: '800', letterSpacing: -1.2 },
   lede: { color: colors.muted, fontSize: 16, lineHeight: 23, maxWidth: 640 },
   today: { color: colors.muted, fontSize: 13, fontWeight: '800' },
   dailySection: { gap: spacing.md },
-  sectionLabel: { color: colors.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1.3 },
   primaryCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -325,7 +322,6 @@ const styles = StyleSheet.create({
   },
   completeCard: { opacity: 0.86 },
   cardHeading: { flexWrap: 'wrap', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
-  completeBadge: { color: colors.accentDark, fontSize: 10, fontWeight: '900', letterSpacing: 1.1 },
   pressed: { opacity: 0.78 },
   warning: {
     backgroundColor: colors.surface,

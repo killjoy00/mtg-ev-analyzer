@@ -97,7 +97,7 @@ jobs:
     name: capture iPhone and iPad
     needs: validate
     if: needs.validate.outputs.capture_required == 'true' && !inputs.android_only
-    timeout-minutes: 45
+    timeout-minutes: 75
     runs-on: macos-latest
     env:
       EXPO_PUBLIC_PACKONE_ENV: preview

@@ -148,6 +148,45 @@ test('approved editorial copy is consistent across web and native app',()=>{
  assert.ok(completed.includes('<h2>Want another eight picks?</h2>'));
 });
 
+
+test('Daily-home copy follows website markup across native cards and states', () => {
+ const native=fs.readFileSync('mobile/src/screens/index.tsx','utf8');
+ const modes=fs.readFileSync('mobile/src/api/draftRun.ts','utf8');
+ const guest=dailyHomeMarkup(null,day);
+ const signed=dailyHomeMarkup({player:{claimed:true},capabilities:['account'],daily_history:[]},day);
+
+ // An obsolete eyebrow and a native-only section heading should not reappear.
+ assert.doesNotMatch(guest, /The daily draft/i);
+ assert.doesNotMatch(native, /THE DAILY DRAFT|PLAY TODAY/);
+ assert.ok(!guest.includes('<p class="eyebrow">'));
+
+ const rows=[...signed.matchAll(/data-environment="([^"]+)"[\s\S]*?<p class="daily-home-label">([^<]+)<\/p><h2>([^<]+)<\/h2><p>([^<]+)<\/p>/g)];
+ assert.equal(rows.length,3,'website should be authoritative for three Daily cards');
+ for(const [,environment,label,title,description] of rows){
+  const key=environment.includes('-')?`'${environment}'`:`${environment}`;
+  assert.ok(native.includes(`${key}: '${title}'`),`native home title must match website: ${environment}`);
+  assert.ok(native.includes(`${key}: '${label.toUpperCase()}'`),`native card label must match website: ${environment}`);
+  assert.ok(modes.includes(`description: '${description}'`),`native Daily description must match website: ${environment}`);
+ }
+ for(const phrase of [
+  'Eight picks. What would you take?', 'You decide what you',
+  'Start here', 'Free · No account required', 'Play now', 'View result',
+  'Want another eight picks?', 'DAILIES COMPLETE',
+  'Keep playing regular Draft Runs, or any sets with Pack One Elite.',
+  'A free account adds unlimited regular Draft Runs.',
+  'Create a free account', 'Go to Practice',
+  'Couldn’t load your Daily progress. Play now will still pick up where you left off.',
+  'Pick a display name that isn’t taken, or your Daily scores won’t show on the leaderboard.',
+  'Change display name',
+ ]) assert.ok(native.includes(phrase),`native copy missing website phrase: ${phrase}`);
+ assert.ok(guest.includes('Free · No account required'));
+ assert.ok(guest.includes('Start here'));
+ const completedGuest=dailyHomeMarkup({daily_history:['mixed','powered-cube','latest'].map(row),player:{claimed:false}},day);
+ assert.ok(completedGuest.includes('A free account adds unlimited regular Draft Runs.'));
+ assert.ok(completedGuest.includes('Create a free account'));
+ assert.ok(signed.includes('A mix of sets'));
+});
+
 test('Daily descriptions reinforce trophy-draft provenance',()=>{
  const html=dailyHomeMarkup(null,day);
  assert.match(html,/Eight picks from real trophy drafts\./);
