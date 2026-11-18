@@ -100,6 +100,7 @@ async function fixture(options = {}) {
     '@/src/hooks/useAppResume': { useAppResume() {} },
     './draft-run': { __esModule: true, default: props => { surface = props.shared; return React.createElement('Gameplay', { surface }, surface.kind === 'source' ? `${surface.sourceType} source ready` : 'Creator replay ready'); } },
     '@/src/api/draftRun': {
+      recordDraftRunView: async () => ({ ok: true }),
       DAILY_ENVIRONMENT_META: { mixed: {}, latest: {}, 'powered-cube': {} },
       isDailyEnvironment: value => ['mixed', 'latest', 'powered-cube'].includes(value),
       loadCreatorChallengeInfo: async (id, session) => { calls.push(['info', id, session]); return options.loadInfo ? options.loadInfo(id, session) : info; },
