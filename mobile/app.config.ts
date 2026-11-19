@@ -45,11 +45,10 @@ function adMobPlatformConfig(
   }
   return { enabled, appId: appId!, bannerUnitId: bannerUnitId! };
 }
-// Added by the React Native template (dev overlays), expo-secure-store
-// (biometric unlock) and the iOS-only Google Mobile Ads dependency. Android
-// builds have no live AdMob or advertising ID use: suppress SDK-merged AD_ID.
+// Block unrelated native permissions in every production build. The Google
+// Mobile Ads SDK can contribute AD_ID to Android manifests; keep it blocked
+// unless a separately reviewed Android AdMob production build is enabled.
 const PRODUCTION_BLOCKED_PERMISSIONS = [
-  'com.google.android.gms.permission.AD_ID',
   'android.permission.SYSTEM_ALERT_WINDOW',
   'android.permission.USE_BIOMETRIC',
   'android.permission.USE_FINGERPRINT',
@@ -192,6 +191,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         ? {
             blockedPermissions: [
               ...(config.android?.blockedPermissions || []),
+              ...(androidAds.enabled ? [] : ['com.google.android.gms.permission.AD_ID']),
               ...PRODUCTION_BLOCKED_PERMISSIONS,
             ],
             // Glyph sized inside the 66dp adaptive-icon safe zone, on the website's brand blue.
