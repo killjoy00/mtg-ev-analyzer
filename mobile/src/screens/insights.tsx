@@ -1,8 +1,8 @@
 import { CardFaceViewer } from '@/src/components/CardFaceViewer';
 import { cardFaceIndicator } from '../../../card-faces.mjs';
-import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, View, Settings, type LayoutChangeEvent } from 'react-native';
 import {safeCardImageUrl} from '../../../card-image-policy.mjs';
 import { Text } from '@/src/components/Text';
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
@@ -450,15 +450,14 @@ function InsightSections({data,onReview,onLoadMore,morePhase,onCaptureLayout}:{
 }
 
 export default function InsightsScreen() {
-  const params = useLocalSearchParams<{ screenshot?: string }>();
   const screenshotScroll = useRef<ScrollView>(null);
   const screenshotPositioned = useRef(false);
   const focusOnReview = useCallback((y:number) => {
-    if (!config.screenshots.fixtures || params.screenshot !== 'picks' || screenshotPositioned.current) return;
+    if (!config.screenshots.fixtures || Settings?.get?.('packoneScreenshotScene') !== 'acceptance:member-insights:insights' || screenshotPositioned.current) return;
     screenshotPositioned.current = true;
     requestAnimationFrame(() => screenshotScroll.current?.scrollTo({ y: Math.max(0, y - 20), animated: false }));
     console.info('PACKONE_SCREENSHOT_FOCUS', JSON.stringify({ scene: 'real-insights-review', y }));
-  }, [params.screenshot]);
+  }, []);
   const [environment, setEnvironment] = useState<InsightsEnvironment>('mixed');
   const [period, setPeriod] = useState<InsightsPeriod>('all');
   const [data, setData] = useState<DraftInsights | null>(null);
