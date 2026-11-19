@@ -42,7 +42,7 @@ test('Daily is a compact numbered scorecard with a wrapping side action', () => 
   assert.match(style('src/screens/index.tsx', 'secondaryButton'), /minHeight: 48/);
   assert.match(style('src/screens/index.tsx', 'dailyHeading'), /flexWrap: 'wrap'/);
   assert.match(src, /showHomeStatus = phase === 'ready' && claimed && Boolean\(currentStatus\?\.player\?\.claimed\) && completedCount === 3/);
-  assert.match(src, /Make your pick\. See what the drafter chose\./);
+  assert.match(src, /Make your pick\. See what the trophy drafter chose\./);
   assert.doesNotMatch(src, /Checking streak/);
   assert.match(src, /Free · No account required/);
   assert.match(src, /View result/);
