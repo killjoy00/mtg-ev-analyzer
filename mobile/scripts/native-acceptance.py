@@ -254,19 +254,10 @@ def measure_tabs(logs):
     return result
 
 
-def measure_header(logs):
-    boxes = {}
-    for line in logs.splitlines():
-        if 'PACKONE_HEADER' in line:
-            raw = line.split('PACKONE_HEADER', 1)[1]
-            record = json.loads(raw[raw.find('{'):raw.rfind('}')+1])
-            boxes[record['label']] = record
-    require('row' in boxes and 'title' in boxes, 'Missing native tab header row/title measurement')
-    require('help' not in boxes, 'Legacy Help control is still present in the native tab header')
-    box, row = boxes['title'], boxes['row']
-    require(box['x'] >= -1 and box['x']+box['width'] <= row['width']+1, 'Header title overflows horizontally')
-    require(box['y'] >= -1 and box['y']+box['height'] <= row['height']+1, 'Header title overflows vertically')
-    return boxes
+def assert_no_duplicate_tab_header(logs):
+    # Native tab pages own their headings and ScreenArea owns the safe inset.
+    # A second navigator title row would waste the height recovered here.
+    require('PACKONE_HEADER' not in logs, 'Redundant native tab header was mounted')
 
 
 def measure_brand(logs):
@@ -719,8 +710,10 @@ elif platform == 'ios':
                                         'PACKONE_CAREER_READY' in logs if screen == 'career' else
                                         'PACKONE_INSIGHTS_READY' in logs if screen == 'insights' else
                                         'PACKONE_ACCOUNT_READY' in logs if screen == 'account' else
-                                        'PACKONE_ARTICLE_READY' in logs if screen in ['how-to','about','support','privacy','terms','terms-licenses']
-                                        else 'PACKONE_HEADER' in logs)
+                                        'PACKONE_LEADERS_READY' in logs if screen == 'leaders' else
+                                        'PACKONE_LEARN_READY' in logs if screen == 'learn' and scenario != 'guest' else
+                                        'PACKONE_ARTICLE_READY' in logs if screen in ['learn','how-to','about','support','privacy','terms','terms-licenses']
+                                        else False)
                         if screen not in ['feedback','insights'] and setting != 'large':
                             layout_ready = layout_ready and '"kind":"bar"' in logs
                         ready = scene_ready and 'PACKONE_FONTS' in logs and layout_ready
@@ -735,8 +728,9 @@ elif platform == 'ios':
                     require((out / f'{name}.png').stat().st_size > 120000, 'Native capture is blank or incomplete')
                     scene = {'name': name, 'text_setting': setting,
                              'observed_text_setting': command('xcrun', 'simctl', 'ui', udid, 'content_size')}
-                    if screen in ['learn', 'career']:
-                        scene['header_metrics'] = measure_header(logs)
+                    if screen in ['learn', 'career', 'leaders']:
+                        assert_no_duplicate_tab_header(logs)
+                        scene['headerless_tab'] = True
                     if screen == 'home':
                         scene['brand_metrics'] = measure_brand(logs)
                     if screen not in ['feedback','insights'] and setting != 'large':
