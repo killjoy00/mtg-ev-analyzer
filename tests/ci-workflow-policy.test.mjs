@@ -161,7 +161,7 @@ test('iOS archives embed the production AdMob configuration rather than only pas
   const workflow = readFileSync('.github/workflows/ios-testflight.yml', 'utf8');
   for (const stepName of ['Archive iPhone device build without signing', 'Archive signed Pack One app']) {
     const block = workflow.split(`      - name: ${stepName}\n`)[1]?.split('\n      - name: ')[0] ?? '';
-    assert.match(block, /\n        env:\n          PACKONE_BUILD_PROFILE: production\n/,
+    assert.match(block, /(?:^|\n)        env:\n          PACKONE_BUILD_PROFILE: production\n/,
       `${stepName} must propagate the production profile to Xcode's Expo config build phase`);
   }
   assert.equal((workflow.match(/run: node \.\/scripts\/check-ios-admob-archive\.mjs "\$RUNNER_TEMP\/PackOne\.xcarchive"/g) || []).length, 2,
