@@ -1466,7 +1466,7 @@ export default function DraftRunScreen({
           {mode === 'feedback' && answer ? (
             <>
               <View testID="pick-feedback" onLayout={(event) => { setFeedbackWidth(event.nativeEvent.layout.width); recordLayout('feedback', event); }} style={[styles.feedback, answer.historicalMatch && styles.feedbackMatch]}>
-                <View style={[styles.feedbackSummary, !compactFeedback && styles.feedbackSummaryStack]}>
+                <View onLayout={(event) => recordLayout('summary', event)} style={[styles.feedbackSummary, !compactFeedback && styles.feedbackSummaryStack]}>
                   <Text testID="feedback-score" onLayout={(event) => recordLayout('score', event)} onTextLayout={(event) => recordText('score', event)} style={[styles.feedbackScoreNumber, compactFeedback && styles.feedbackScoreCompact]}>{answer.score}<Text style={styles.feedbackScoreSuffix}>/100</Text></Text>
                   <View testID="feedback-copy" onLayout={(event) => recordLayout('copy', event)} style={styles.feedbackCopy}>
                     <Text testID="feedback-title" onLayout={(event) => recordLayout('title', event)} onTextLayout={(event) => recordText('title', event)} style={styles.feedbackTitle}>
