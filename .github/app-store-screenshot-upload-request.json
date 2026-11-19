@@ -1,7 +1,7 @@
 {
   "operation": "upload-pack-one-app-store-screenshots",
-  "reason": "Upload final Pack One iOS 1.4 product-page iPhone/iPad screenshots from successful reviewed main-source native capture run 44431864618 at a925ff424197cba276439839f372307d6f87e119 only after inspecting the exact final images and confirming readable, authentic five-screen compositions. Keep the Elite subscription review image unchanged. Do not submit App Review, upload a TestFlight binary, or release publicly.",
-  "screenshotRunId": 44431864618,
-  "screenshotHeadSha": "a925ff424197cba276439839f372307d6f87e119",
+  "reason": "Upload Pack One iOS 1.4 real native screenshot set from PR #1642's reviewed iPhone/iPad capture (source pinned to exact PR head and successful iOS job), replacing screenshot 4 with real Insights and revising screenshot 5 Practice caption, while preserving existing unchanged screenshots 1-3 and the Elite subscription review image. No review submission or public release.",
+  "screenshotRunId": 44530732460,
+  "screenshotHeadSha": "2b0a8d4b45f4a6eb832cca334451bb19275b062b",
   "versionString": "1.4"
 }
