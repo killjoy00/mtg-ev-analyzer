@@ -157,6 +157,51 @@ test('iOS 1.4 TestFlight enables only approved production AdMob with a fail-clos
   assert.match(ios, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/);
 });
 
+test('iOS archives embed the production AdMob configuration rather than only passing preflight', () => {
+  const workflow = readFileSync('.github/workflows/ios-testflight.yml', 'utf8');
+  for (const stepName of ['Archive iPhone device build without signing', 'Archive signed Pack One app']) {
+    const block = workflow.split(`      - name: ${stepName}\n`)[1]?.split('\n      - name: ')[0] ?? '';
+    assert.match(block, /(?:^|\n)        env:\n          PACKONE_BUILD_PROFILE: production\n/,
+      `${stepName} must propagate the production profile to Xcode's Expo config build phase`);
+  }
+  assert.equal((workflow.match(/run: node \.\/scripts\/check-ios-admob-archive\.mjs "\$RUNNER_TEMP\/PackOne\.xcarchive"/g) || []).length, 2,
+    'both unsigned PR and signed release archives must validate embedded Expo app.config');
+
+  const archive = mkdtempSync(path.join(tmpdir(), 'packone-embedded-admob-'));
+  const embedded = path.join(archive, 'Products', 'Applications', 'PackOne.app', 'EXConstants.bundle', 'app.config');
+  const config = {
+    version: '1.4',
+    ios: { bundleIdentifier: 'pro.packone.app' },
+    extra: {
+      buildProfile: 'production',
+      adMob: {
+        iosEnabled: true,
+        androidEnabled: false,
+        testBanners: false,
+        iosBannerUnitId: 'ca-app-pub-1217971050094766/8989398185',
+      },
+    },
+  };
+  const run = () => spawnSync(process.execPath, ['mobile/scripts/check-ios-admob-archive.mjs', archive], { encoding: 'utf8' });
+  try {
+    mkdirSync(path.dirname(embedded), { recursive: true });
+    writeFileSync(embedded, JSON.stringify(config));
+    assert.equal(run().status, 0, 'correctly packaged live iOS AdMob must pass');
+    for (const [label, broken] of [
+      ['development profile', { ...config, extra: { ...config.extra, buildProfile: 'development' } }],
+      ['ads disabled', { ...config, extra: { ...config.extra, adMob: { ...config.extra.adMob, iosEnabled: false } } }],
+      ['missing unit', { ...config, extra: { ...config.extra, adMob: { ...config.extra.adMob, iosBannerUnitId: null } } }],
+    ]) {
+      writeFileSync(embedded, JSON.stringify(broken));
+      assert.notEqual(run().status, 0, `${label} must fail archived app validation`);
+    }
+    rmSync(embedded);
+    assert.notEqual(run().status, 0, 'missing embedded app.config must fail, not silently disable ads');
+  } finally {
+    rmSync(archive, { recursive: true, force: true });
+  }
+});
+
 test('unsigned Gradle cache is main-seeded, PR-read-only, and excludes signing material', () => {
   const mainRc = readFileSync('.github/workflows/mobile-exact-main-rc.yml','utf8');
   const android = readFileSync('.github/workflows/android-production-bundle.yml','utf8');
