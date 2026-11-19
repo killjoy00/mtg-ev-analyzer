@@ -369,7 +369,7 @@ const styles = StyleSheet.create({
   dailyCardContent: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, alignItems: 'center' },
   dailyCardCopy: { flex: 1, minWidth: 150, gap: spacing.xs },
   dailyButton: { minWidth: 92, flexGrow: 1, alignSelf: 'center' },
-  cardIndex: { width: 26, flexShrink: 0, color: colors.accentDark, fontSize: 24, fontWeight: '700' },
+  cardIndex: { minWidth: 26, flexShrink: 0, color: colors.accentDark, fontSize: 24, fontWeight: '700' },
   cardIndexCube: { color: '#976822' },
   cardIndexLatest: { color: '#8c4b36' },
   cubeAccent: { borderLeftColor: '#976822' },
