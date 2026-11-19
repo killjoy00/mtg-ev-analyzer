@@ -34,7 +34,7 @@ try{
   }else{
     // This is an uncommitted, throwaway edit. Never commit a probe.
     try{
-      await api(basePath+'/tracks/production',{method:'PUT',body:{track:'production',releases:[{name:'Pack One production-readiness validation ONLY (not committed)',status:'draft',versionCodes:[candidate]}]}});
+      await api(basePath+'/tracks/production',{method:'PUT',body:{track:'production',releases:[{name:'Pack One production readiness probe',status:'draft',versionCodes:[candidate]}]}});
       await api(basePath+':validate',{method:'POST',body:{}});
       console.log('PLAY_PRODUCTION_DRY_RUN '+JSON.stringify({status:'validated-ephemerally',versionCode:candidate,committed:false,note:'Console approval and policy checks must still be confirmed before production publication'}));
     }catch(err){
