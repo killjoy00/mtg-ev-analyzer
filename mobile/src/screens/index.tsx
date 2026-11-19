@@ -1,6 +1,7 @@
 import { ResultsPreferences } from '@/src/components/ResultsPreferences';
 import { AdMobDailyBanner, type AdDiagnostic } from '@/src/components/AdMobDailyBanner';
 import { dailyHomePromotion } from '@/src/ads/placement';
+import { isTestFlightEnvironment } from '@/src/ads/isTestFlight';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -77,8 +78,15 @@ export default function HomeScreen() {
   const [promotionAllowed, setPromotionAllowed] = useState<boolean | null>(null);
   const [promotionError, setPromotionError] = useState<string | null>(null);
   const [adStatusOpen, setAdStatusOpen] = useState(false);
+  const [showAdDiagnostics, setShowAdDiagnostics] = useState(false);
   const [adDiagnostic, setAdDiagnostic] = useState<AdDiagnostic>({ stage: 'starting' });
   const onAdStatus = useCallback((event: AdDiagnostic) => setAdDiagnostic(previous => ({ ...previous, ...event })), []);
+  useEffect(() => {
+    if (Platform?.OS !== 'ios' || config.screenshots?.fixtures) return;
+    let active = true;
+    void isTestFlightEnvironment().then(allowed => { if (active) setShowAdDiagnostics(allowed); });
+    return () => { active = false; };
+  }, []);
   const [phase, setPhase] = useState<'checking' | 'ready' | 'unavailable'>('checking');
   const [now, setNow] = useState(() => new Date());
   const [claimed, setClaimed] = useState(false);
@@ -299,7 +307,7 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        {Platform?.OS === 'ios' && !config.screenshots?.fixtures ? (
+        {showAdDiagnostics && Platform?.OS === 'ios' && !config.screenshots?.fixtures ? (
           <View style={styles.adSupport}>
             <Pressable
               accessibilityRole="button"
