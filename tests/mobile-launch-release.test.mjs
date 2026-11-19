@@ -152,7 +152,9 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
       assert.match(workflow, /app-store-build-status\.mjs "\$\{\{ steps\.request\.outputs\.build_number \}\}"/, path);
       assert.doesNotMatch(workflow, /pull_request:|app-store-finalize-release-candidate|app-store-upload|xcodebuild/, path);
       const request = JSON.parse(read('.github/testflight-status-request.json'));
-      assert.deepEqual(Object.keys(request).sort(), ['build_number', 'operation', 'reason']);
+      assert.deepEqual(Object.keys(request).sort(), ['build_number', 'crash_scope', 'operation', 'reason']);
+      assert.ok(['exact', 'all_builds'].includes(request.crash_scope));
+      assert.match(workflow, /Invalid read-only crash scope/);
       assert.equal(request.operation, 'read-pack-one-testflight-status');
       assert.match(request.build_number, /^[1-9][0-9]*$/);
       assert.ok(request.reason.trim());
