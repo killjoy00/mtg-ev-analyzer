@@ -186,6 +186,8 @@ jobs:
           echo "Verified generated production iOS metadata without compiling an archive."
       - name: Archive iPhone device build without signing
         if: env.NATIVE_FULL == 'true'
+        env:
+          PACKONE_BUILD_PROFILE: production
         shell: bash
         run: |
           set -euo pipefail
@@ -213,6 +215,9 @@ jobs:
           }
           python3 -c 'import plistlib,sys; data=plistlib.load(open(sys.argv[1], "rb")); value=data.get("ITSAppUsesNonExemptEncryption"); assert value is False, f"Expected ITSAppUsesNonExemptEncryption=false, got {value!r}"' "$archive_plist"
           echo "Verified unsigned Pack One archive build, marketing version, and export-compliance declaration."
+      - name: Check archived iOS runtime AdMob config
+        if: env.NATIVE_FULL == 'true'
+        run: node ./scripts/check-ios-admob-archive.mjs "$RUNNER_TEMP/PackOne.xcarchive"
       - name: Audit PR iOS privacy surface
         if: env.NATIVE_FULL == 'true'
         shell: bash
@@ -373,6 +378,8 @@ jobs:
           PACKONE_BUILD_PROFILE: production
         run: npx expo prebuild --platform ios --clean
       - name: Archive signed Pack One app
+        env:
+          PACKONE_BUILD_PROFILE: production
         shell: bash
         run: |
           set -euo pipefail
@@ -417,6 +424,8 @@ jobs:
           python3 -c 'import plistlib,sys; data=plistlib.load(open(sys.argv[1], "rb")); value=data.get("ITSAppUsesNonExemptEncryption"); assert value is False, f"Expected ITSAppUsesNonExemptEncryption=false, got {value!r}"' "$archive_plist"
           echo "Verified signed Pack One archive export-compliance declaration: ITSAppUsesNonExemptEncryption=false"
           echo "PACKONE_ARCHIVED_BUILD_NUMBER=$archived_build_number" >> "$GITHUB_ENV"
+      - name: Check signed iOS runtime AdMob config
+        run: node ./scripts/check-ios-admob-archive.mjs "$RUNNER_TEMP/PackOne.xcarchive"
       - name: Audit signed iOS privacy surface
         shell: bash
         run: |
