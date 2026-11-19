@@ -19,20 +19,19 @@ export function SharedRunRecovery() {
   const refresh = useCallback(async () => {
     const id = ++generation.current;
     setState({ kind: 'checking' });
-    let savedCheckpointPresent = false;
     try {
       const session = await readSession();
       const saved = session ? await readLatestSharedRunContinuation(session) : null;
       if (id !== generation.current) return;
       if (!session?.accountToken || !saved) { setState({ kind: 'empty' }); return; }
-      savedCheckpointPresent = true;
       const run = await loadDraftRun(saved.runId, session);
       if (id !== generation.current || identity(session) !== identity(await readSession())) return;
       if (run.id !== saved.runId) throw new Error('Unexpected saved run.');
       setState({ kind: 'ready', complete: run.complete });
     } catch {
-      // Don't render a speculative "Shared activity" panel without a known checkpoint.
-      if (id === generation.current) setState({ kind: savedCheckpointPresent ? 'error' : 'empty' });
+      // A locked or unavailable secure store may still contain a real run:
+      // offer an explicit retry rather than silently abandoning the checkpoint.
+      if (id === generation.current) setState({ kind: 'error' });
     }
   }, []);
   useFocusEffect(useCallback(() => { void refresh(); return () => { generation.current += 1; }; }, [refresh]));
