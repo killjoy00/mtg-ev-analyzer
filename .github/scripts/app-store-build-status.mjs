@@ -150,8 +150,25 @@ function safeCrashSignature(logText) {
     if (!/^[\w.$:+<>()\-\s]{1,180}$/.test(symbol)) return [];
     return [{ image: match[1], symbol }];
   }).slice(0, 12);
+  const diagnosticLines = lines.filter((line) =>
+    /Unhandled JS Exception|RCTFatalException|Terminating app due to uncaught exception|Exception Reason|Application Specific Information|(?:TypeError|ReferenceError|RangeError|Invariant Violation):/i.test(line));
+  const sanitize = (line) => {
+    // The repository and its Actions logs are public. Preserve exception class
+    // and property names but remove user/device info, full paths and tokens.
+    const marker = line.search(/Unhandled JS Exception|RCTFatalException|Terminating app due to uncaught exception|Exception Reason|Application Specific Information|(?:TypeError|ReferenceError|RangeError|Invariant Violation):/i);
+    return line.slice(Math.max(0, marker))
+      .replace(/https?:\/\/\S+/gi, '[url]')
+      .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[email]')
+      .replace(/\/(?:Users|private|var|home|data)\/[^\s,]+/gi, '[path]')
+      .replace(/[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}/gi, '[uuid]')
+      .replace(/\bp1_[\w.-]+/gi, '[session]')
+      .replace(/[A-Za-z0-9_+\/=-]{30,}/g, '[redacted]')
+      .replace(/[^\x20-\x7e]/g, ' ').trim().slice(0, 250);
+  };
+  const exceptionClues = [...new Set(diagnosticLines.map(sanitize))].filter(Boolean).slice(0, 8);
   return {
     hash: createHash('sha256').update(logText).digest('hex').slice(0, 16),
+    exceptionClues,
     exceptionType: field('Exception Type'),
     exceptionCodes: field('Exception Codes'),
     terminationReason: field('Termination Reason'),
