@@ -1,4 +1,26 @@
-# Pack One iOS AdMob release status
+# Pack One native AdMob release status
+
+## Android Daily-home banner — November 19, 2026 (prepared, NOT live)
+
+The native app already shares the iOS AdMob/UMP component. This change adds an **anchored adaptive Android banner** on the Daily home only, after the three Daily cards. The existing Android TCGplayer affiliate promotion is shown only when Android AdMob is disabled; they are never stacked. Gameplay, results, practice and shared runs remain ad-free surfaces. Guests are eligible, and signed-in players need a fresh `ads_allowed: true` / `ad_free: false` membership result; Supporter and Elite accounts see neither promotion.
+
+Android requests **G-rated, non-personalized ads** only after Google's UMP consent says `canRequestAds`. It does not request iOS ATT. On denial, offline/no consent or SDK failure, no Google ad loads and gameplay continues; required privacy options remain available. Preview builds can enable Google's **sample test banners** with `PACKONE_ADMOB_TEST_BANNERS=1`. The existing signed Android 1.0/101042 Closed Testing build is unchanged and has **no live AdMob**.
+
+**Do not turn on the production Android flag yet.** A separate registered Android AdMob app ID (`ca-app-pub-...~...`) and Android banner ad unit (`ca-app-pub-.../...`) are still missing. The iOS IDs are not interchangeable. The code rejects sample/mismatched IDs and keeps Android's `AD_ID` permission removed unless production Android ads are explicitly opted in. When enabled, the signed manifest audit requires the real registered Android App ID and the SDK-merged `AD_ID` permission; this changes Google Play disclosures and must be reviewed first.
+
+**Before any live signed Android upload:**
+
+1. Create or locate the Pack One **Android** app (`pro.packone.app`) in AdMob and a **Banner** ad unit. Confirm app status, `app-ads.txt` and applicable UMP privacy messages; provide both public IDs to the release configuration. The Google test IDs are preview-only.
+2. In Play Console > Policy and programs > App content, set **Ads = Yes** before rollout. Review the Advertising ID declaration for a manifest including `com.google.android.gms.permission.AD_ID` and update Play **Data safety** accurately for Google's Mobile Ads SDK; the existing data-safety generator was written for an ad-disabled Android build and must be revised before use. Google lists identifiers, ad interactions and diagnostics among SDK data disclosures. Confirm the live privacy policy matches.
+3. Activate `PACKONE_ADMOB_ANDROID_ENABLED=1` with the two reviewed matching Android IDs **only in a separately approved Android release**. Verify production Expo config, merged manifest audit, actual AAB signer/permissions, Google Play declarations and app-ads.txt.
+4. Exercise Android native test ads on an emulator and a real device: guest/free vs ad-free, UMP allow/decline/unavailable, privacy options, no-fill, screen/font sizes, background/foreground, session transitions and ad placement. Confirm no ads during gameplay or results and Google AdChoices reporting before public rollout.
+5. Use the existing protected signed-AAB → exact-AAB Internal + `production-access` Closed Testing pipeline. Do not change public Production until separately authorized. Reconcile Google Play policy reviews before turning on live ads.
+
+Google docs: https://developers.google.com/admob/android/quick-start ; https://developers.google.com/admob/android/privacy/play-data-disclosure ; https://support.google.com/googleplay/android-developer/answer/9859455
+
+---
+
+## iOS AdMob history
 
 ## Upcoming fix: non-personalized Daily banner with ATT denied (not yet shipped)
 
