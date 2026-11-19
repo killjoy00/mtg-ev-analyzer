@@ -145,6 +145,8 @@ test('guest/member navigation changes with persisted identity and keeps public r
   try {
     assert.deepEqual(h.visibleTabs(), ['Daily', 'How to Play', 'Sign in']);
     assert.equal(h.root.root.findByType('Tabs').props.backBehavior, 'history');
+    assert.equal(h.root.root.findByType('Tabs').props.screenOptions.headerShown, false,
+      'Primary tabs should not add a redundant navigator title row above their own heading');
     await h.write(session('A'));
     assert.deepEqual(h.visibleTabs(), ['Daily', 'Practice', 'Leaders', 'Learn', 'My Pack One']);
     await h.write(session('B'));
