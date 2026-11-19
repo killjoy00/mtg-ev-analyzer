@@ -78,6 +78,18 @@ test('Android store identity, target SDK baseline and Play-billing separation re
   assert.match(workflow, /name: Validate production mobile config[\s\S]*run: npm test/);
   assert.match(workflow, /name: Build signed production bundle/);
   assert.match(workflow, /name: Audit protected Android privacy surface/);
+  assert.match(workflow, /PACKONE_BUILD_PROFILE: production[\\s\\S]*EXPO_PUBLIC_PACKONE_ENV: production/,
+    'Android Gradle jobs must inherit production Expo environment, not only prebuild');
+  assert.match(workflow, /name: Verify signed AAB embeds reviewed Production Android AdMob runtime config/,
+    'Protected signed AAB must check actual embedded Expo runtime AdMob flag');
+  assert.match(workflow, /name: Verify PR embedded Android runtime AdMob settings/,
+    'Full native PR smoke must inspect actual embedded Expo runtime AdMob config');
+  const exactRelease = read('.github/workflows/android-exact-aab-production.yml');
+  assert.match(exactRelease, /name: Reject exact AAB without enabled embedded Android AdMob runtime config/,
+    'Production upload must fail closed when signed AAB has runtime ads disabled');
+  const internalWorkflow = read('.github/workflows/android-internal-testing.yml');
+  assert.match(internalWorkflow, /name: Verify signed internal Android AAB embeds production and ad-disabled runtime config/,
+    'Internal release must not accidentally embed development runtime settings');
 });
 
 test('Android includes web Draft Run observation/timing and removes per-card shopping links', () => {
