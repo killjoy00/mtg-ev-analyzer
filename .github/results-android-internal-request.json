@@ -1,8 +1,0 @@
-{
-  "operation": "activate-results-android-internal",
-  "version_code": "100970",
-  "source_run_id": 43925032404,
-  "source_sha": "c1d838cacb27027913be01cc968a78bf3b1ac522",
-  "preserve_closed_version_code": "100963",
-  "reason": "Complete the owner-authorized native results/privacy release from #1594 by activating only the exact signed Android 1.0/100970 bundle already uploaded as draft to existing Internal Testing. The protected source run passed signing, privacy audit, expected version and bundle upload. Verify its successful exact source before store access. Preserve production-access Closed Testing 100963, every non-internal track, existing testers, groups, countries, qualification continuity and public Production. Use one validated edit and a fresh post-commit verification; never report a draft as delivered. No rebuild, new track, Closed Testing promotion or public release. Physical-device acceptance remains separate."
-}

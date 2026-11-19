@@ -1,6 +1,0 @@
-{
-  "operation": "dispatch-launch-distributed-once",
-  "reviewed_fix_sha": "4d7d6f646befa358ef207ee3c8de38d196a41c25",
-  "reason": "Dispatch the single owner-approved 25→50 main capacity proof after PR #879 merged the Daily-status fanout fix.",
-  "provenance": "OpenAI ChatGPT (GPT-5.6 Sol), connected GitHub workspace, acting on owner approval in chat on 2026-10-02."
-}

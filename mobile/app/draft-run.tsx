@@ -172,8 +172,10 @@ function CardTile({
   disabled,
   onPress,
   onZoom,
+  tablet = false,
 }: {
   card: DraftRunCard;
+  tablet?: boolean;
   selected: boolean;
   disabled: boolean;
   onPress: () => void;
@@ -189,7 +191,7 @@ function CardTile({
       disabled={disabled}
       onLongPress={onZoom}
       onPress={onPress}
-      style={[styles.card, selected && styles.cardSelected]}
+      style={[styles.card, tablet && styles.tabletPickCard, selected && styles.cardSelected]}
     >
       {card.image_url ? (
         <CardArtwork key={card.image_url} uri={card.image_url} name={card.name} style={styles.cardImage} />
@@ -542,6 +544,9 @@ export default function DraftRunScreen({
         }
       : dailyMeta;
   const { width: windowWidth, fontScale } = useWindowDimensions();
+  // A three-column grid keeps all five choices visible on full-width iPads.
+  // This is the actual tablet gameplay layout, not a screenshot composite.
+  const tabletPickGrid = windowWidth >= 840 && fontScale <= 1.35;
   const [feedbackWidth, setFeedbackWidth] = useState(0);
   const wideFeedback = feedbackWidth >= 520 * fontScale;
   const stackComparison = windowWidth < 360 || fontScale > 1.35;
@@ -1598,6 +1603,7 @@ export default function DraftRunScreen({
                   <CardTile
                     key={card.id}
                     card={card}
+                    tablet={tabletPickGrid}
                     selected={selected === card.id}
                     disabled={busy}
                     onPress={() => choose(card.id)}
@@ -1740,6 +1746,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     padding: 3,
   },
+  tabletPickCard: { width: '32%' },
   cardSelected: { borderColor: colors.accent },
   reviewYourPick: { borderColor: colors.accent },
   reviewTrophyPick: { borderColor: colors.lineStrong },

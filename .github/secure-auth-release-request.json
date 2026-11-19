@@ -1,4 +1,0 @@
-{
-  "operation": "deploy-secure-auth",
-  "reason": "Owner-approved release of merged PR #1609 to development and then production through the existing protected secure-auth release workflow. The reviewed changes fix seven Draft Run defects, Native Draft Run observation/focus, Latest saved-schedule concurrency, and Main Daily generation latency (isolated full-corpus start reduced from 38.76s to 24.06s with unchanged 30s gate). All 13 PR workflows passed and no schema migration is added by #1609. Keep existing results notices, reminder consent, account deletion, Apple/Patreon settings, monitored gateway, current triggers, and all existing release gates. Do not regenerate or rewrite existing Daily schedules or modify player data outside the normal guarded deployment. Do not deploy to Vercel, submit native builds in this backend workflow, or change public App Store availability. If development acceptance fails, do not promote to production."
-}

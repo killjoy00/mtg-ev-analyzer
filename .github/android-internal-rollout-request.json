@@ -1,7 +1,0 @@
-{
-  "operation": "rollout-android-internal",
-  "reason": "Owner requested completion of Pack One double-sided-card native internal distribution from #1274/#1277. Activate only exact Android 1.0 versionCode 100925, signed by protected Android production bundle workflow 39661127682 (artifact 12375542620, source e76119e14181f63fe4216163d32dd9195f97562d), safely uploaded into Google Play bundle library without track assignment by successful workflow 39699790263 and guarded activation implementation PR #1287. Replace only existing completed Internal Testing 100858 in one validated Play edit, never publish a draft, require fresh post-commit verification, preserve production-access Closed Testing 100772 and production qualification continuity, every other Play track, testers, groups, countries and public Production. Physical-device acceptance and public store release remain separate.",
-  "track": "internal",
-  "version_code": "100925",
-  "preserve_closed_version_code": "100772"
-}

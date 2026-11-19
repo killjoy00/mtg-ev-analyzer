@@ -36,6 +36,16 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   assert.match(versionGate, /if \(config\.screenshots\.fixtures\) return <>\{children\}<\/>;/);
   assert.match(workflow, /EXPO_PUBLIC_PACKONE_ENV: preview/);
   assert.match(workflow, /EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES: '1'/);
+  assert.match(appConfig, /production \|\| screenshotFixtures\s*\? 'Pack One'/);
+  // Screenshot-only sample scoring must agree with the product's 100/95 scoring rule.
+  assert.match(screenshotFixtures, /selected\.id === 'hero-in-training' \? 95/);
+  assert.match(screenshotFixtures, /id: 'hero-in-training', name: 'Hero in Training', support: 0\.46, score: 95/);
+  assert.match(screenshotFixtures, /id: 'web-up', name: 'Web Up', support: 0\.24, score: 100/);
+  assert.match(draftRun, /tabletPickGrid = windowWidth >= 840/);
+  assert.match(draftRun, /tabletPickCard: \{ width: '32%' \}/);
+  const practiceScreen = read('mobile/src/screens/practice.tsx');
+  assert.match(practiceScreen, /tabletOptionCard: \{/);
+  assert.match(practiceScreen, /contentOffset=\{screenshotFocusModes && !tablet/);
   assert.match(workflow, /PACKONE_BUILD_PROFILE: preview/);
   assert.doesNotMatch(
     workflow.slice(0, workflow.indexOf('jobs:')),

@@ -1,9 +1,0 @@
-{
-  "operation": "upload-pack-one-14-header-and-search",
-  "appId": "6814318676",
-  "bundleId": "pro.packone.app",
-  "versionString": "1.4",
-  "locale": "en-US",
-  "headerSha256": "fc679dea328ffc6889acf7cc014aedf6ed3d9297eba2da9ca699be4a2fb00ec6",
-  "searchSha256": "01b90cb507eab9a79593814b7c74e89cf047fa121b73de0628c4f61557d81f38"
-}

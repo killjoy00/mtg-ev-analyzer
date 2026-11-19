@@ -1,1 +1,0 @@
-{"operation":"deploy-qa","reason":"2026-09-21: Restore the QA recovery Worker to normal delivery mode after retry/failure acceptance passed.","commit":"370f5bce9d629cc1b07c233df61fc9e7f10edbfc"}

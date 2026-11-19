@@ -1,4 +1,0 @@
-{
-  "operation": "generate-mobile-store-screenshots",
-  "reason": "Generate final iPhone and iPad screenshot evidence for Pack One iOS 1.4 from reviewed main after merged PR #1618. Capture five authentic Store scenes with updated branded captions; do not submit App Review, change signed binaries, alter the Elite subscription review image, or publicly release 1.4. The resulting artifact must be inspected before a separate version-pinned upload request."
-}

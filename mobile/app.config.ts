@@ -112,7 +112,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
 
   const production = profile === 'production';
   const identifier = production ? STORE_IDENTIFIER : NON_STORE_IDENTIFIERS[profile];
-  const displayName = production
+  // Store marketing captures must show the same visible app name as the real release.
+  const displayName = production || screenshotFixtures
     ? 'Pack One'
     : profile === 'preview'
       ? 'Pack One Preview'
