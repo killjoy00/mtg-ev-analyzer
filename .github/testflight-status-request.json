@@ -1,5 +1,5 @@
 {
   "operation": "read-pack-one-testflight-status",
-  "reason": "Read-only post-upload reconciliation for Pack One iOS 1.1 build 100926, successfully uploaded and VALID / APP_STORE_ELIGIBLE during protected workflow 39661277574 attempt 2. Its immediate finalizer observed READY_FOR_BETA_TESTING rather than IN_BETA_TESTING. Check exact Apple processing, current TestFlight internal state and existing beta-group association without uploading again or modifying groups, testers, App Store versions, app metadata, signing credentials, review submission or public release. This verifies the merged double-sided-card native candidate from source 07fd37cabfe1be072f2035ba920ea84e226be2fc.",
-  "build_number": "100926"
+  "reason": "Read-only post-upload reconciliation for the exact Pack One iOS 1.4 design-parity build 101164 from protected main release commit 62e7939f1ec75ad548cb4100c7580e97658b4c93, signed and uploaded in workflow 44569393626. Apple processing was VALID / APP_STORE_ELIGIBLE; the immediate finalizer saw READY_FOR_BETA_TESTING, not yet IN_BETA_TESTING. Check current Apple processing, internal distribution state and existing beta-group association without reupload, signing, modifying testers/groups, store metadata or review/public-release status.",
+  "build_number": "101164"
 }
