@@ -234,6 +234,7 @@ jobs:
           xcrun simctl bootstatus '${{ steps.simulators.outputs.phone_udid }}' -b
           xcrun simctl install '${{ steps.simulators.outputs.phone_udid }}' "$SCREENSHOT_IOS_APP"
       - name: Capture iPhone screenshots
+        id: capture_iphone
         timeout-minutes: 10
         shell: bash
         run: bash ./scripts/capture-store-screenshots-ios.sh '${{ steps.simulators.outputs.phone_udid }}' iphone "$GITHUB_WORKSPACE/store-screenshots"
@@ -243,7 +244,10 @@ jobs:
         run: python3 ./scripts/native-acceptance.py ios "$GITHUB_WORKSPACE/native-acceptance/iphone" '${{ steps.simulators.outputs.phone_udid }}' iphone
       - name: Switch from iPhone to iPad simulator
         if: always() && env.SCREENSHOT_IOS_APP != ''
-        timeout-minutes: 10
+        # The simulator bootstatus command can overrun even when the app is usable.
+        # The following mandatory capture still fails if the iPad did not boot/install.
+        continue-on-error: true
+        timeout-minutes: 12
         shell: bash
         run: |
           set -euo pipefail
@@ -252,6 +256,7 @@ jobs:
           xcrun simctl bootstatus '${{ steps.simulators.outputs.ipad_udid }}' -b
           xcrun simctl install '${{ steps.simulators.outputs.ipad_udid }}' "$SCREENSHOT_IOS_APP"
       - name: Capture iPad screenshots
+        id: capture_ipad
         if: always() && env.SCREENSHOT_IOS_APP != ''
         timeout-minutes: 10
         shell: bash
@@ -261,7 +266,9 @@ jobs:
         timeout-minutes: 25
         run: python3 ./scripts/native-acceptance.py ios "$GITHUB_WORKSPACE/native-acceptance/ipad" '${{ steps.simulators.outputs.ipad_udid }}' ipad
       - name: Compose reviewed iOS 1.4 caption layouts
-        if: success()
+        # Never drop authentic screenshots because the handoff step timed out;
+        # require actual native captures on both target devices.
+        if: always() && steps.capture_iphone.outcome == 'success' && steps.capture_ipad.outcome == 'success'
         shell: bash
         working-directory: .
         run: |
