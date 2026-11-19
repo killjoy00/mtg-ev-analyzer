@@ -183,15 +183,15 @@ export default function HomeScreen() {
         <View style={styles.hero}>
           <Text style={styles.title}>Eight picks. What would you take?</Text>
           <Text style={styles.lede}>
-            These picks come from real trophy drafts.{'\n'}You decide what you&apos;d take, then see what the drafter chose.
+            These picks come from real trophy drafts. You decide what you&apos;d take, then see what the drafter chose.
           </Text>
-          <Text style={styles.today}>{dailyDate(pacificDay(now))}’s Daily Runs</Text>
         </View>
 
         {accountState.message ? <Pressable accessibilityRole="button" onPress={() => void accountState.refresh()} style={styles.warning}>
           <Text style={styles.warningBody}>{accountState.message}</Text><Text style={styles.cardAction}>Retry account check</Text>
         </Pressable> : accountState.status === 'checking' ? <Text style={styles.statusText}>Checking account…</Text> : null}
-        <View style={styles.statusStrip} accessibilityLabel="Daily reset and streak">
+        <View style={styles.statusStrip} accessibilityLabel="Daily date, reset and streak">
+          <Text style={styles.today}>{dailyDate(pacificDay(now))}’s Daily Runs</Text>
           <Text style={styles.resetCue}>{dailyResetCue(now)}</Text>
           {phase === 'ready' && currentStatus && currentStatus.daily_streak > 0
             ? <Text style={styles.statusText}>{currentStatus.daily_streak}-day streak</Text>
@@ -236,17 +236,22 @@ export default function HomeScreen() {
                   isComplete && styles.completeCard,
                 ]}
               >
-                <View style={styles.cardHeading}>
-                  <Text style={styles.cardKicker}>{startHere ? 'Start here' : HOME_LABELS[environment]}</Text>
-                </View>
-                <Text style={index === 0 && !isComplete ? styles.cardTitle : styles.dailyTitle}>{HOME_TITLES[environment]}</Text>
-                <Text style={styles.cardBody}>{isComplete ? `Complete · ${result?.score}/100` : meta.description}</Text>
-                <View style={styles.dailyAction}>
+                <View style={styles.dailyCardContent}>
+                  <View style={styles.dailyCardCopy}>
+                    <View style={styles.cardHeading}>
+                      <Text style={styles.cardIndex}>{String(index + 1).padStart(2, '0')}</Text>
+                      <Text style={styles.cardKicker}>{startHere ? 'START HERE · ' : ''}{HOME_LABELS[environment]}</Text>
+                    </View>
+                    <Text style={index === 0 && !isComplete ? styles.cardTitle : styles.dailyTitle}>{HOME_TITLES[environment]}</Text>
+                    <Text style={styles.cardBody}>{isComplete ? `Complete · ${result?.score}/100` : meta.description}</Text>
+                    {startHere ? <Text style={styles.statusText}>Free · No account required</Text> : null}
+                  </View>
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={`${isComplete ? 'View result for' : 'Play'} ${HOME_TITLES[environment]}`}
                     onPress={() => router.push({ pathname: '/draft-run', params: { environment } })}
                     style={({ pressed }) => [
+                      styles.dailyButton,
                       isComplete ? styles.secondaryButton : styles.primaryButton,
                       pressed && styles.pressed,
                     ]}
@@ -255,7 +260,6 @@ export default function HomeScreen() {
                       {isComplete ? 'View result' : 'Play now'}
                     </Text>
                   </Pressable>
-                  {startHere ? <Text style={styles.statusText}>Free · No account required</Text> : null}
                 </View>
               </View>
             );
@@ -340,41 +344,45 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
   helpLink: { minHeight: 44, justifyContent: 'center' },
-  statusStrip: { padding: spacing.md, backgroundColor: colors.accentSoft, flexDirection: 'row', flexWrap: 'wrap', columnGap: spacing.md, rowGap: spacing.xs },
+  statusStrip: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.line, paddingVertical: spacing.sm, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: spacing.md, rowGap: spacing.xs },
   statusText: { color: colors.muted, fontSize: 14, lineHeight: 20 },
   safe: { flex: 1, backgroundColor: colors.page },
-  page: { padding: 20, paddingBottom: spacing.xxl, gap: spacing.md, alignSelf: 'center', width: '100%', maxWidth: 860 },
-  brand: { flexDirection: 'row', alignItems: 'center', gap: 10, flexShrink: 1, minWidth: 0, maxWidth: '100%' },
+  page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: 12, alignSelf: 'center', width: '100%', maxWidth: 860 },
+  brand: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexShrink: 1, minWidth: 0, maxWidth: '100%' },
   brandMark: {
-    width: 36,
-    height: 40,
+    width: 30,
+    height: 32,
     flexShrink: 0,
   },
-  brandMarkImage: { width: 36, height: 40 },
-  brandName: { color: colors.ink, fontSize: 26, fontWeight: '600', letterSpacing: 0.39, flexShrink: 1, minWidth: 0 },
+  brandMarkImage: { width: 30, height: 32 },
+  brandName: { color: colors.ink, fontSize: 22, fontWeight: '600', letterSpacing: 0.2, flexShrink: 1, minWidth: 0 },
   removedBrandSub: { color: colors.muted, fontSize: 9, fontWeight: '800', letterSpacing: 1.2, marginTop: 2 },
-  hero: { gap: spacing.sm, paddingTop: spacing.sm },
-  title: { color: colors.ink, fontSize: 38, lineHeight: 40, fontWeight: '800', letterSpacing: -1.2 },
-  lede: { color: colors.muted, fontSize: 16, lineHeight: 23, maxWidth: 640 },
+  hero: { gap: spacing.xs },
+  title: { color: colors.ink, fontSize: 32, lineHeight: 35, fontWeight: '800', letterSpacing: -0.8 },
+  lede: { color: colors.muted, fontSize: 14, lineHeight: 20, maxWidth: 640 },
   today: { color: colors.muted, fontSize: 13, fontWeight: '800' },
-  dailySection: { gap: spacing.md },
+  dailySection: { gap: spacing.sm },
+  dailyCardContent: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, alignItems: 'center' },
+  dailyCardCopy: { flex: 1, minWidth: 175, gap: spacing.xs },
+  dailyButton: { minWidth: 112, alignSelf: 'center' },
+  cardIndex: { color: colors.accentDark, fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
   primaryCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderTopWidth: 3,
     borderColor: colors.line,
     borderTopColor: colors.accent,
-    padding: spacing.lg,
-    gap: spacing.sm,
+    padding: spacing.md,
+    gap: spacing.xs,
   },
   dailyCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.line,
-    padding: spacing.lg,
-    gap: spacing.sm,
+    padding: spacing.md,
+    gap: spacing.xs,
   },
-  completeCard: { opacity: 0.86 },
+  completeCard: { backgroundColor: colors.surfaceSoft },
   cardHeading: { flexWrap: 'wrap', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   pressed: { opacity: 0.78 },
   warning: {
@@ -396,7 +404,7 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.sm,
   },
-  resetCue: { width: '100%', color: colors.accentDark, fontSize: 13, fontWeight: '800' },
+  resetCue: { color: colors.accentDark, fontSize: 13, fontWeight: '800', flexShrink: 1 },
   affiliatePromo: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.md, gap: spacing.xs },
   affiliateLink: { minHeight: 72, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.md },
   affiliateLogo: { width: 92, height: 42 },
@@ -418,14 +426,13 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   utilityTitle: { color: colors.ink, fontSize: 22, fontWeight: '800' },
-  cardKicker: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.3 },
-  cardTitle: { color: colors.ink, fontSize: 28, fontWeight: '800' },
-  dailyTitle: { color: colors.ink, fontSize: 22, fontWeight: '800' },
-  cardBody: { color: colors.muted, fontSize: 15, lineHeight: 22 },
+  cardKicker: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 0.8, flexShrink: 1 },
+  cardTitle: { color: colors.ink, fontSize: 23, fontWeight: '800' },
+  dailyTitle: { color: colors.ink, fontSize: 21, fontWeight: '800' },
+  cardBody: { color: colors.muted, fontSize: 14, lineHeight: 20 },
   cardAction: { color: colors.accentDark, fontSize: 15, fontWeight: '800', marginTop: spacing.sm },
-  dailyAction: { alignItems: 'stretch', gap: spacing.xs, marginTop: spacing.sm },
   primaryButton: {
-    minHeight: 50,
+    minHeight: 48,
     backgroundColor: colors.accent,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
@@ -433,7 +440,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: { color: '#fff', fontSize: 15, lineHeight: 21, fontWeight: '800', textAlign: 'center' },
   secondaryButton: {
-    minHeight: 50,
+    minHeight: 48,
     borderWidth: 1,
     borderColor: colors.accent,
     paddingHorizontal: spacing.lg,
