@@ -31,9 +31,10 @@ jobs:
           node - <<'NODE'
           const fs=require('fs');
           const r=JSON.parse(fs.readFileSync('.github/google-play-data-safety-request.json','utf8'));
-          if(JSON.stringify(Object.keys(r).sort())!==JSON.stringify(['mode','operation','reason']))throw Error('Invalid request keys.');
+          if(JSON.stringify(Object.keys(r).sort())!==JSON.stringify(['android_admob','mode','operation','reason']))throw Error('Invalid request keys.');
           if(r.operation!=='configure-google-play-data-safety')throw Error('Invalid operation.');
           if(!['dry-run','submit'].includes(r.mode))throw Error('Invalid Data Safety mode.');
+          if(r.android_admob!=='enabled')throw Error('Android AdMob data disclosure is required.');
           if(typeof r.reason!=='string'||!r.reason.trim())throw Error('Reason required.');
           fs.appendFileSync(process.env.GITHUB_OUTPUT,'mode='+r.mode+'\n');
           NODE
@@ -62,6 +63,7 @@ jobs:
       - name: Generate and validate current Data Safety declaration
         env:
           DATA_SAFETY_MODE: ${{ steps.request.outputs.mode }}
+          PACKONE_PLAY_DATA_SAFETY_ADMOB: '1'
           PLAY_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
         run: node .github/scripts/google-play-data-safety.mjs
 
