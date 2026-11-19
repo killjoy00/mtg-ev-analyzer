@@ -290,7 +290,7 @@ test('unknown progress is never zero and account B cannot retain A completion on
     const pending = deferred(); h.readDaily(() => pending.promise);
     await h.write(session('B'));
     assert.doesNotMatch(h.text(), /87\/100|0\/3 complete|0-day streak|Start here/);
-    assert.match(h.text(), /Checking streak…/);
+    assert.doesNotMatch(h.text(), /Checking streak|day streak|New Dailies/i, 'unknown progress must not leak streak or reset info');
     await act(async () => { pending.reject(Error('offline')); await flush(); });
     assert.match(h.text(), /Couldn’t load your Daily progress\. Play now will still pick up where you left off\./);
     assert.doesNotMatch(h.text(), /87\/100|0\/3 complete/);
@@ -430,4 +430,22 @@ for (const fails of [false, true]) test(`deletion ${fails ? 'failure retains the
     if (fails) assert.match(text(root.toJSON()), /Delete unavailable/);
     else { assert.equal(stack.state().routes[0].state, stack.tabs); assert.equal(stack.state().routes[0].params.screen, 'index'); }
   } finally { await act(async () => root.unmount()); }
+});
+
+test('native Daily countdown and streak require signed-in completion of all three runs', async () => {
+  const cases = [
+    ['signed account 0/3', session('A'), [], true, false],
+    ['signed account 2/3', session('A'), [90, 80], true, false],
+    ['guest 3/3', session('guest'), [90, 80, 85], false, false],
+    ['signed account 3/3', session('A'), [90, 80, 85], true, true],
+  ];
+  for (const [description, user, scores, claimed, shouldShow] of cases) {
+    const today = { ...status(scores, claimed), daily_streak: 9 };
+    const h = await fixture({ session: user, daily: today });
+    try {
+      assert.match(h.text(), /Daily Runs/, description);
+      assert.equal(/New Dailies/.test(h.text()), shouldShow, description + ': reset cue');
+      assert.equal(/9-day streak/.test(h.text()), shouldShow, description + ': streak cue');
+    } finally { await h.close(); }
+  }
 });
