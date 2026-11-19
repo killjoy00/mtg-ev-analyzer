@@ -233,13 +233,17 @@ export default function HomeScreen() {
                 key={environment}
                 style={[
                   index === 0 && !isComplete ? styles.primaryCard : styles.dailyCard,
+                  environment === 'powered-cube' && styles.cubeAccent,
+                  environment === 'latest' && styles.latestAccent,
                   isComplete && styles.completeCard,
                 ]}
               >
                 <View style={styles.dailyCardContent}>
+                  <Text style={[styles.cardIndex, environment === 'powered-cube' && styles.cardIndexCube, environment === 'latest' && styles.cardIndexLatest]}>
+                    {String(index + 1).padStart(2, '0')}
+                  </Text>
                   <View style={styles.dailyCardCopy}>
                     <View style={styles.cardHeading}>
-                      <Text style={styles.cardIndex}>{String(index + 1).padStart(2, '0')}</Text>
                       <Text style={styles.cardKicker}>{startHere ? 'START HERE · ' : ''}{HOME_LABELS[environment]}</Text>
                     </View>
                     <Text style={index === 0 && !isComplete ? styles.cardTitle : styles.dailyTitle}>{HOME_TITLES[environment]}</Text>
@@ -362,27 +366,35 @@ const styles = StyleSheet.create({
   lede: { color: colors.muted, fontSize: 14, lineHeight: 20, maxWidth: 640 },
   today: { color: colors.muted, fontSize: 13, fontWeight: '800' },
   dailySection: { gap: spacing.sm },
-  dailyCardContent: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md, alignItems: 'center' },
-  dailyCardCopy: { flex: 1, minWidth: 175, gap: spacing.xs },
-  dailyButton: { minWidth: 112, alignSelf: 'center' },
-  cardIndex: { color: colors.accentDark, fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
+  dailyCardContent: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, alignItems: 'center' },
+  dailyCardCopy: { flex: 1, minWidth: 150, gap: spacing.xs },
+  dailyButton: { minWidth: 92, flexGrow: 1, alignSelf: 'center' },
+  cardIndex: { width: 26, flexShrink: 0, color: colors.accentDark, fontSize: 24, fontWeight: '700' },
+  cardIndexCube: { color: '#976822' },
+  cardIndexLatest: { color: '#8c4b36' },
+  cubeAccent: { borderLeftColor: '#976822' },
+  latestAccent: { borderLeftColor: '#8c4b36' },
   primaryCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderTopWidth: 3,
+    borderLeftWidth: 3,
     borderColor: colors.line,
     borderTopColor: colors.accent,
+    borderLeftColor: colors.accent,
     padding: spacing.md,
     gap: spacing.xs,
   },
   dailyCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
+    borderLeftWidth: 3,
     borderColor: colors.line,
+    borderLeftColor: colors.accent,
     padding: spacing.md,
     gap: spacing.xs,
   },
-  completeCard: { backgroundColor: colors.surfaceSoft },
+  completeCard: { backgroundColor: colors.surfaceSoft, borderLeftColor: colors.lineStrong },
   cardHeading: { flexWrap: 'wrap', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   pressed: { opacity: 0.78 },
   warning: {
