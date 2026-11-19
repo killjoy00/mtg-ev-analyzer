@@ -83,17 +83,13 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   assert.match(iosCapture, /iphone:1320x2868/);
   assert.match(iosCapture, /capture "04-leaderboard" "acceptance:member-insights:insights"/);
   assert.match(iosCapture, /capture "05-practice" "acceptance:elite:practice"/);
-  assert.match(layout, /screenshot: 'cards'/);
-  assert.match(draftRun, /screenshotFocusCards = config\.screenshots\.fixtures && params\.screenshot === 'cards'/);
+  assert.match(draftRun, /screenshotFocusCards = config\.screenshots\.fixtures && Settings\?\.get\?\.\('packoneScreenshotScene'\)/);
   assert.match(draftRun, /PACKONE_SCREENSHOT_FOCUS/);
-  const nativeEntry = read('mobile/app/native-acceptance.tsx');
   const insights = read('mobile/src/screens/insights.tsx');
   const practice = read('mobile/src/screens/practice.tsx');
-  assert.match(nativeEntry, /scenario === 'member-insights'[\s\S]*screenshot: 'picks'/);
-  assert.match(nativeEntry, /scenario === 'elite'[\s\S]*screenshot: 'modes'/);
-  assert.match(insights, /config\.screenshots\.fixtures \|\| params\.screenshot !== 'picks'/);
+  assert.match(insights, /Settings\?\.get\?\.\('packoneScreenshotScene'\) !== 'acceptance:member-insights:insights'/);
   assert.match(insights, /onCaptureLayout=\{focusOnReview\}/);
-  assert.match(practice, /screenshotFocusModes = config\.screenshots\.fixtures && params\.screenshot === 'modes'/);
+  assert.match(practice, /screenshotFocusModes = config\.screenshots\.fixtures && Settings\?\.get\?\.\('packoneScreenshotScene'\)/);
   assert.match(practice, /contentOffset=\{screenshotFocusModes/);
   const composer = read('mobile/scripts/compose-store-screenshots-ios.swift');
   for (const heading of ['What would you pick?', 'See what the trophy drafter took', 'Three new Dailies every day', 'Find the picks to revisit.', 'More drafts. More reps.']) {
