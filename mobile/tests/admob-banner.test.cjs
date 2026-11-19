@@ -19,8 +19,10 @@ test('Daily-home monetization is mutually exclusive and fails closed', () => {
   assert.equal(dailyHomePromotion(false, false, 'android'), 'none');
 });
 
-async function fixture(t, { consent, eligible = false, att = 'granted', attRequest = 'granted' } = {}) {
+async function fixture(t, { consent, storedConsent, eligible = false, enabled = true, initError, att = 'granted', attRequest = 'granted' } = {}) {
   const calls = [];
+  const diagnostics = [];
+  const onStatus = event => diagnostics.push(event);
   const native = {
     Platform: { OS: 'ios' },
     Pressable: host('Pressable'),
@@ -39,14 +41,14 @@ async function fixture(t, { consent, eligible = false, att = 'granted', attReque
         return consent ? consent() : { canRequestAds: true, privacyOptionsRequirementStatus: 'NOT_REQUIRED' };
       },
       showPrivacyOptionsForm: async () => { calls.push('privacy'); },
-      getConsentInfo: async () => ({ canRequestAds: true, privacyOptionsRequirementStatus: 'NOT_REQUIRED' }),
+      getConsentInfo: async () => { calls.push('cached-consent'); return storedConsent ? storedConsent() : { canRequestAds: true, privacyOptionsRequirementStatus: 'NOT_REQUIRED' }; },
     },
     default: () => ({
       setRequestConfiguration: async options => {
         assert.equal(options.maxAdContentRating, 'G');
         calls.push('configure');
       },
-      initialize: async () => { calls.push('initialize'); },
+      initialize: async () => { calls.push('initialize'); if (initError) throw initError; },
     }),
   };
   const { AdMobDailyBanner } = compileModule('src/components/AdMobDailyBanner.tsx', {
@@ -64,17 +66,17 @@ async function fixture(t, { consent, eligible = false, att = 'granted', attReque
       },
     },
     '@/src/components/Text': { Text: host('Text') },
-    '@/src/config': { config: { adMob: { iosEnabled: true, androidEnabled: false,
+    '@/src/config': { config: { adMob: { iosEnabled: enabled, androidEnabled: false,
       iosBannerUnitId: 'ca-app-pub-3940256099942544/2934735716' }, screenshots: { fixtures: false } } },
     '@/src/theme': { colors: {}, spacing: { sm: 8, md: 16 } },
   });
   let root;
-  await act(async () => { root = Renderer.create(React.createElement(AdMobDailyBanner, { eligible })); await drain(); });
+  await act(async () => { root = Renderer.create(React.createElement(AdMobDailyBanner, { eligible, onStatus })); await drain(); });
   t.after(async () => { await act(async () => root.unmount()); });
   return {
-    calls, root,
+    calls, diagnostics, root,
     async setEligible(value) {
-      await act(async () => { root.update(React.createElement(AdMobDailyBanner, { eligible: value })); await drain(); await drain(); });
+      await act(async () => { root.update(React.createElement(AdMobDailyBanner, { eligible: value, onStatus })); await drain(); await drain(); });
     },
   };
 }
@@ -150,4 +152,69 @@ test('undetermined ATT granted allows only non-personalized G-rated ads', async 
   const banners = h.root.root.findAllByType('BannerAd');
   assert.equal(banners.length, 1);
   assert.equal(banners[0].props.requestOptions.requestNonPersonalizedAdsOnly, true);
+});
+
+test('UMP refresh failure reuses only previously permitted consent', async t => {
+  const h = await fixture(t, {
+    eligible: true,
+    consent: async () => { throw Error('offline'); },
+    storedConsent: async () => ({ canRequestAds: true, privacyOptionsRequirementStatus: 'NOT_REQUIRED' }),
+  });
+  await act(async () => { await drain(); await drain(); });
+  assert.deepEqual(h.calls, ['consent', 'cached-consent', 'att-check', 'configure', 'initialize']);
+  assert.equal(h.root.root.findAllByType('BannerAd').length, 1);
+  assert.ok(h.diagnostics.some(event => event.consent === 'reused'));
+});
+
+test('UMP refresh failure cannot bypass missing or denied previous consent', async t => {
+  const h = await fixture(t, {
+    eligible: true,
+    consent: async () => { throw Error('offline'); },
+    storedConsent: async () => ({ canRequestAds: false, privacyOptionsRequirementStatus: 'NOT_REQUIRED' }),
+  });
+  await act(async () => { await drain(); await drain(); });
+  assert.deepEqual(h.calls, ['consent', 'cached-consent']);
+  assert.equal(h.root.root.findAllByType('BannerAd').length, 0);
+  assert.equal(h.diagnostics.at(-1).stage, 'consent-error');
+});
+
+test('AdMob initialization failure is diagnosed without exposing raw error messages', async t => {
+  const h = await fixture(t, {
+    eligible: true, initError: { code: 'googleMobileAds/error-code-internal', message: 'personal-data-must-not-leak' },
+  });
+  await act(async () => { await drain(); await drain(); });
+  assert.equal(h.root.root.findAllByType('BannerAd').length, 0);
+  assert.equal(h.diagnostics.at(-1).stage, 'sdk-error');
+  assert.equal(h.diagnostics.at(-1).code, 'googleMobileAds/error-code-internal');
+  assert.doesNotMatch(JSON.stringify(h.diagnostics), /personal-data-must-not-leak/);
+});
+
+test('Google no-fill and banner load states are visible without duplicate ad requests', async t => {
+  const h = await fixture(t, { eligible: true });
+  await act(async () => { await drain(); await drain(); });
+  const banner = h.root.root.findByType('BannerAd');
+  await act(async () => { banner.props.onAdLoaded(); });
+  assert.equal(h.diagnostics.at(-1).stage, 'banner-loaded');
+  await act(async () => { banner.props.onAdFailedToLoad({ code: 'googleMobileAds/error-code-no-fill', message: 'sensitive-data' }); });
+  assert.equal(h.diagnostics.at(-1).stage, 'banner-no-fill');
+  assert.equal(h.diagnostics.at(-1).code, 'googleMobileAds/error-code-no-fill');
+  assert.equal(h.root.root.findAllByType('BannerAd').length, 0);
+  assert.doesNotMatch(JSON.stringify(h.diagnostics), /sensitive-data/);
+  assert.equal(h.calls.filter(call => call === 'initialize').length, 1);
+});
+
+test('unknown ad failure formats are redacted in diagnostics', async t => {
+  const h = await fixture(t, { eligible: true });
+  await act(async () => { await drain(); await drain(); });
+  const banner = h.root.root.findByType('BannerAd');
+  await act(async () => { banner.props.onAdFailedToLoad({ code: 'private:user@mail.com' }); });
+  assert.equal(h.diagnostics.at(-1).stage, 'banner-error');
+  assert.equal(h.diagnostics.at(-1).code, 'unknown');
+});
+
+test('disabled AdMob never starts UMP or the SDK', async t => {
+  const h = await fixture(t, { eligible: true, enabled: false });
+  await act(async () => { await drain(); await drain(); });
+  assert.deepEqual(h.calls, []);
+  assert.equal(h.root.toJSON(), null);
 });
