@@ -1,0 +1,43 @@
+name: Pack One iOS 1.4 Header and Search Results
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/app-store-creative-upload-request.json'
+      - '.github/scripts/app-store-upload-creatives-1.4.mjs'
+      - '.github/workflows/app-store-creatives-1.4.yml'
+      - 'assets/app-store/pack-one-14-header.jpg'
+      - 'assets/app-store/pack-one-14-search.jpg'
+permissions:
+  contents: read
+concurrency:
+  group: pack-one-app-store-creative-1-4
+  cancel-in-progress: false
+jobs:
+  update:
+    if: github.ref == 'refs/heads/main'
+    name: Upload only 1.4 Header and Search Results
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Require exact current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+      - name: Check exact target and JavaScript syntax
+        shell: bash
+        run: |
+          node --check .github/scripts/app-store-upload-creatives-1.4.mjs
+          node -e "const a=require('./.github/app-store-creative-upload-request.json'); if(a.versionString!=='1.4'||a.appId!=='6814318676') process.exit(1)"
+      - name: Upload, assign, and verify both 1.4 creatives
+        run: node .github/scripts/app-store-upload-creatives-1.4.mjs
