@@ -132,3 +132,15 @@ test('native reveal uses a compact hierarchy without hiding full comparison card
   assert.match(draft, /<Progress run=\{run\}/);
   assert.match(draft, /Next pick/);
 });
+
+
+test('native acceptance measures nested reveal score within its real parent', () => {
+  const draft = read('app/draft-run.tsx');
+  const acceptance = read('scripts/native-acceptance.py');
+  assert.match(draft, /recordLayout\('summary', event\)/);
+  assert.match(acceptance, /\('summary', 'feedback'\)/);
+  assert.match(acceptance, /\('score', 'summary'\)/);
+  assert.match(acceptance, /\('copy', 'summary'\)/);
+  assert.match(acceptance, /path = \['summary', 'score'\] if label == 'score' else \['summary', 'copy', label\]/);
+  assert.doesNotMatch(acceptance, /\('score', 'feedback'\)/);
+});
