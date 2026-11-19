@@ -12,6 +12,7 @@ AD_ID_PERMISSION = "com.google.android.gms.permission.AD_ID"
 ADMOB_APP_ID = re.compile(r"^ca-app-pub-([0-9]{16})~[0-9]{10}$")
 ADMOB_BANNER_ID = re.compile(r"^ca-app-pub-([0-9]{16})/[0-9]{10}$")
 GOOGLE_SAMPLE_PUBLISHER = "3940256099942544"
+PACKONE_IOS_APP_ID = "ca-app-pub-1217971050094766~3792911821"
 
 FORBIDDEN_PERMISSIONS = {
     "android.permission.CAMERA",
@@ -138,6 +139,8 @@ def main():
                 app_match.group(1) != banner_match.group(1) or
                 app_match.group(1) == GOOGLE_SAMPLE_PUBLISHER):
             admob_errors.append("Android AdMob requires matching non-demo App ID and banner unit")
+        if app_id == PACKONE_IOS_APP_ID:
+            admob_errors.append("Android AdMob App ID must not reuse the iOS App ID")
         if native_app_id != app_id:
             admob_errors.append("Native Android AdMob App ID does not match the reviewed production App ID")
         if AD_ID_PERMISSION not in permissions:
