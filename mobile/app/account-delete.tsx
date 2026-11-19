@@ -230,12 +230,12 @@ export default function AccountDeleteScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
-  page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.lg, alignSelf: 'center', width: '100%', maxWidth: 760 },
+  page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: spacing.md, alignSelf: 'center', width: '100%', maxWidth: 760 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md, padding: spacing.lg },
   eyebrow: { color: colors.danger, fontSize: 10, fontWeight: '800', letterSpacing: 1.4 },
   title: { color: colors.ink, fontSize: 30, lineHeight: 35, fontWeight: '800' },
   body: { color: colors.muted, fontSize: 15, lineHeight: 22 },
-  panel: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.lg, gap: spacing.md },
+  panel: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.md, gap: spacing.md },
   input: { minHeight: 52, borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.surface, color: colors.ink, paddingHorizontal: spacing.md, fontSize: 16 },
   warning: { borderWidth: 1, borderColor: colors.lineStrong, padding: spacing.md, gap: spacing.md },
   warningText: { color: colors.ink, fontSize: 14, lineHeight: 21, fontWeight: '700' },
