@@ -4,8 +4,9 @@ type BuildProfile = 'development' | 'preview' | 'production';
 
 const STORE_IDENTIFIER = 'pro.packone.app';
 
-// Google's publicly documented sample App IDs are used ONLY for disabled production
-// builds and opt-in test builds. A live banner requires this app's own AdMob IDs.
+// Google's publicly documented sample App IDs are used for preview/test builds.
+// Production embeds the registered platform-specific IDs even while requests
+// are disabled. Only an explicitly enabled, reviewed build requests live ads.
 const ADMOB_DEMO = {
   iosAppId: 'ca-app-pub-3940256099942544~1458002511',
   androidAppId: 'ca-app-pub-3940256099942544~3347511713',
@@ -17,6 +18,12 @@ const ADMOB_DEMO = {
 const ADMOB_IOS_PRODUCTION = {
   appId: 'ca-app-pub-1217971050094766~3792911821',
   bannerUnitId: 'ca-app-pub-1217971050094766/8989398185',
+} as const;
+// Registered Pack One Android app and Daily-home banner: these are public SDK
+// identifiers, not credentials. Google AdMob app review may still limit fill.
+const ADMOB_ANDROID_PRODUCTION = {
+  appId: 'ca-app-pub-1217971050094766~5084711148',
+  bannerUnitId: 'ca-app-pub-1217971050094766/8963799298',
 } as const;
 const ADMOB_APP_ID = /^ca-app-pub-\d{16}~\d{10}$/;
 const ADMOB_UNIT_ID = /^ca-app-pub-\d{16}\/\d{10}$/;
@@ -33,8 +40,9 @@ function adMobPlatformConfig(
   defaultProductionBannerId: string = demoBannerId,
 ) {
   const enabled = production ? process.env[enabledName] === '1' : testBanners;
-  // A disabled iOS App Store build still embeds its registered AdMob App ID;
-  // no ad requests can run until enabled. Non-production uses only demo IDs.
+  // Production always embeds the registered native App ID. Runtime cannot
+  // request an ad until the independently reviewed enabled gate is set.
+  // Development/preview uses Google's demo IDs only.
   const appId = production ? (process.env[appIdName]?.trim() || defaultProductionAppId) : demoAppId;
   const bannerUnitId = production ? (process.env[bannerName]?.trim() || defaultProductionBannerId) : demoBannerId;
   if (enabled && production && (!appId || !ADMOB_APP_ID.test(appId)
@@ -128,7 +136,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   const androidAds = adMobPlatformConfig(production,
     'PACKONE_ADMOB_ANDROID_ENABLED', 'PACKONE_ADMOB_ANDROID_APP_ID',
     'PACKONE_ADMOB_ANDROID_BANNER_ID', testBanners,
-    ADMOB_DEMO.androidAppId, ADMOB_DEMO.androidBannerId);
+    ADMOB_DEMO.androidAppId, ADMOB_DEMO.androidBannerId,
+    ADMOB_ANDROID_PRODUCTION.appId, ADMOB_ANDROID_PRODUCTION.bannerUnitId);
   if (production && androidAds.enabled && androidAds.appId === ADMOB_IOS_PRODUCTION.appId) {
     throw new Error('The Android AdMob App ID must not reuse Pack One\'s registered iOS App ID.');
   }
