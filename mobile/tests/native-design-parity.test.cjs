@@ -63,7 +63,7 @@ test('app surfaces share phone gutters and keep bounded tablet width', () => {
     ['src/screens/practice.tsx', 860],
     ['src/screens/learn.tsx', 980],
     ['src/screens/insights.tsx', 980],
-    ['components/ArticleScreen.tsx', 840],
+    ['src/components/ArticleScreen.tsx', 840],
     ['app/draft-run.tsx', 980],
     ['app/account.tsx', 760],
     ['app/account-profile.tsx', 760],
