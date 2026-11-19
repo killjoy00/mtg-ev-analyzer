@@ -1440,29 +1440,28 @@ export default function DraftRunScreen({
       <View style={styles.shell}>
         <ScrollView ref={scroll} contentContainerStyle={styles.page}>
           <View style={styles.runContext}>
-          <Text style={styles.eyebrow}>
-            {practice || shared ? surfaceMeta.eyebrow : `${dailyMeta.eyebrow} · ${run.day ?? 'TODAY'}`}
-          </Text>
-          {rolloverNotice && run.day && run.answers.length === 0 ? (
-            <Text accessibilityRole="alert" style={styles.rolloverNotice}>{rolloverNotice}</Text>
-          ) : null}
-          <View style={styles.runContextRow}>
-            <Text style={[styles.title, styles.runContextTitle]}>
-            {puzzle.set_id.toUpperCase()} <Text style={styles.titleMeta}>· Pack 1 · Pick {puzzle.pick_number}</Text>
-          </Text>
-            {guideUrl ? (
-            <Pressable
-              accessibilityRole="link"
-              accessibilityLabel={`Set refresher for ${resultSetName(puzzle.set_id)}, opens packone.pro`}
-              onPress={() => { void WebBrowser.openBrowserAsync(guideUrl).catch(() => undefined); }}
-              style={styles.inlineLink}
-            >
-              <Text style={styles.inlineLinkText}>Set refresher ↗</Text>
-            </Pressable>
+            <Text style={styles.eyebrow}>
+              {practice || shared ? surfaceMeta.eyebrow : `${dailyMeta.eyebrow} · ${run.day ?? 'TODAY'}`}
+            </Text>
+            {rolloverNotice && run.day && run.answers.length === 0 ? (
+              <Text accessibilityRole="alert" style={styles.rolloverNotice}>{rolloverNotice}</Text>
             ) : null}
-          </View>
-          <Progress run={run} />
-
+            <View style={styles.runContextRow}>
+              <Text style={[styles.title, styles.runContextTitle]}>
+                {puzzle.set_id.toUpperCase()} <Text style={styles.titleMeta}>· Pack 1 · Pick {puzzle.pick_number}</Text>
+              </Text>
+              {guideUrl ? (
+                <Pressable
+                  accessibilityRole="link"
+                  accessibilityLabel={`Set refresher for ${resultSetName(puzzle.set_id)}, opens packone.pro`}
+                  onPress={() => { void WebBrowser.openBrowserAsync(guideUrl).catch(() => undefined); }}
+                  style={styles.inlineLink}
+                >
+                  <Text style={styles.inlineLinkText}>Set refresher ↗</Text>
+                </Pressable>
+              ) : null}
+            </View>
+            <Progress run={run} />
           </View>
           {mode === 'feedback' && answer ? (
             <>
