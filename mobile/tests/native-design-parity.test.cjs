@@ -6,7 +6,7 @@ const path = require('node:path');
 
 // Guard the principles, not a screenshot pixel-for-pixel contract.
 // iOS and Android share this React Native implementation.
-const read = (file) => fs.readFileSync(path.join(__dirname, '..', file), 'utf8');
+const read = (file) => fs.readFileSync(path.join(process.cwd(), file), 'utf8');
 const style = (file, name) => {
   const text = read(file);
   const match = text.match(new RegExp('\\b' + name + ':\\s*\\{([^}]*)\\}'));
@@ -106,7 +106,7 @@ test('content sections avoid excessive stacked cards without reducing form contr
 });
 
 test('simulator readiness uses real screen layout rather than a removed tab header', () => {
-  const acceptance = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'native-acceptance.py'), 'utf8');
+  const acceptance = fs.readFileSync(path.join(process.cwd(), 'scripts', 'native-acceptance.py'), 'utf8');
   assert.match(acceptance, /PACKONE_LEARN_READY/);
   assert.match(acceptance, /PACKONE_LEADERS_READY/);
   assert.match(acceptance, /assert_no_duplicate_tab_header/);
