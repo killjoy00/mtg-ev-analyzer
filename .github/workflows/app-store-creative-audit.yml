@@ -1,0 +1,34 @@
+name: Audit App Store Header and Search Results assets
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/app-store-creative-audit.yml'
+      - '.github/scripts/audit-app-store-creative-assets.mjs'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inspect:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Read-only Apple creative placement and asset inspection
+        run: node .github/scripts/audit-app-store-creative-assets.mjs
+      - name: Save limited creative audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-header-search-audit
+          path: app-store-creative-audit/
+          if-no-files-found: warn
+          retention-days: 3
