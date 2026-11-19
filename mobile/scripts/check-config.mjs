@@ -79,6 +79,16 @@ assert.equal(preview.ios.bundleIdentifier, 'pro.packone.preview');
 assert.equal(preview.android.package, 'pro.packone.preview');
 
 const production = loadConfig('production');
+const productionBuildProperties = production.plugins.find(plugin =>
+  Array.isArray(plugin) && plugin[0] === 'expo-build-properties');
+assert.equal(productionBuildProperties?.[1]?.android?.enableMinifyInReleaseBuilds, true,
+  'Android Production must enable R8 obfuscation for Play DEX optimization');
+assert.equal(productionBuildProperties?.[1]?.android?.enableShrinkResourcesInReleaseBuilds, true,
+  'Android Production must shrink resources with R8');
+const previewBuildProperties = preview.plugins.find(plugin =>
+  Array.isArray(plugin) && plugin[0] === 'expo-build-properties');
+assert.equal(previewBuildProperties?.[1]?.android?.enableMinifyInReleaseBuilds, undefined,
+  'R8 should not slow down preview or make native diagnostics opaque');
 assert.equal(production.name, 'Pack One');
 assert.equal(production.version, storeRelease.playVersionName);
 assert.equal(production.ios.bundleIdentifier, 'pro.packone.app');
