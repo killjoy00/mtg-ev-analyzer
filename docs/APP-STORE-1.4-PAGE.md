@@ -6,7 +6,7 @@ A path-scoped GitHub Action applies the localized product information to the spe
 
 ## Native App Store images
 
-iOS five-image order: What would you pick?; See what the trophy drafter took; Three new Dailies every day; Same picks. Compare scores.; Practice between Dailies.
+iOS five-image order: What would you pick?; See what the trophy drafter took; Three new Dailies every day; Review picks with Insights; More drafts. More reps.
 All five use actual preview-mode native screenshots, captioned with a deterministic Swift compositor. iPhone and iPad screenshot sizes remain unchanged. The Elite subscription review image is not modified for 1.4.
 
 The guarded screenshot upload job can accept a separate 1.4 request naming a successful, source-pinned capture run. Do not create that request until reviewing generated captures on the merged main containing the separate home-copy PR #1616.
