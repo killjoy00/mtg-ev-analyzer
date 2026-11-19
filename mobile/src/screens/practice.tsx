@@ -1,9 +1,10 @@
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
   ScrollView,
+  Settings,
   StyleSheet,
   View,
 } from 'react-native';
@@ -30,8 +31,7 @@ type PracticeState =
   | { status: 'error'; message: string };
 
 export default function PracticeScreen() {
-  const params = useLocalSearchParams<{ screenshot?: string }>();
-  const screenshotFocusModes = config.screenshots.fixtures && params.screenshot === 'modes';
+  const screenshotFocusModes = config.screenshots.fixtures && Settings?.get?.('packoneScreenshotScene') === 'acceptance:elite:practice';
   const [state, setState] = useState<PracticeState>({ status: 'loading' });
   const [selectedSets, setSelectedSets] = useState<string[]>([]);
   const [refreshError, setRefreshError] = useState<string | null>(null);
