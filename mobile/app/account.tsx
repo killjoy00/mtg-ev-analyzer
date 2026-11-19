@@ -489,7 +489,7 @@ export default function AccountScreen() {
               <Pressable accessibilityRole="button" onPress={() => router.push('/account-reminders')} style={styles.row}>
                 <View style={styles.rowCopy}>
                   <Text style={styles.rowTitle}>Daily reminders</Text>
-                  <Text style={styles.fieldHelp}>Email and push consent, local time and weekdays</Text>
+                  <Text style={styles.fieldHelp}>One daily email, on or off</Text>
                 </View>
                 <Text style={styles.rowArrow}>›</Text>
               </Pressable>
