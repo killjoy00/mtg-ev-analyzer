@@ -1,9 +1,18 @@
 import {execFileSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
+// Keep these in sync with the native PR workflow path triggers and required gate.
+const rootNativeInputs = [
+  /^card-faces\\.(?:mjs|d\\.mts)$/,
+  /^\\.github\\/actions\\/mobile-validate\\//,
+  /^\\.github\\/workflows\\/(?:mobile|mobile-store-screenshots|android-internal-testing|android-production-bundle|ios-testflight|mobile-exact-main-rc)\\.yml$/,
+  /^\\.github\\/android-(?:internal-release|production-bundle)-request\\.json$/,
+];
+
 export function needsNativeScreenshots(paths,{packageBefore,packageAfter}={}) {
   if(!paths.length)return true;
   for(const path of paths) {
-    if(/^mobile\/tests\//.test(path)||/^docs\//.test(path)||path==='.github/actions/mobile-validate/action.yml'||path==='mobile/scripts/run-unit-tests.mjs')continue;
+    if(rootNativeInputs.some(rule => rule.test(path)))return true;
+    if(/^mobile\/tests\//.test(path)||/^docs\//.test(path)||path==='mobile/scripts/run-unit-tests.mjs')continue;
     if(path==='mobile/package.json'&&packageBefore&&packageAfter) {
       const before={...packageBefore},after={...packageAfter};delete before.scripts;delete after.scripts;
       if(JSON.stringify(before)===JSON.stringify(after))continue;
