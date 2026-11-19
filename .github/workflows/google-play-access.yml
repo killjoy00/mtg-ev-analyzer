@@ -103,6 +103,11 @@ jobs:
 
           echo "Verified temporary-edit and track-read access for $PACKAGE_NAME."
 
+      - name: Inspect production track and validate without publishing
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: node .github/scripts/play-production-readiness.mjs
+
       - name: Discover Play app-signing fingerprints
         env:
           PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
