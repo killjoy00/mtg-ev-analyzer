@@ -11,7 +11,8 @@ const cards:InsightCard[]=[
     'https://cards.scryfall.io/normal/front/1/0/105a937b-289c-47b5-96a4-654c697bbb7d.jpg?1783902973'},
   {id:'web',name:'Web Up',rarity:'uncommon',type_line:'Instant',image_url:
     'https://cards.scryfall.io/normal/front/9/a/9a1b057b-229c-4f65-ba4e-12dd342238de.jpg?1783902964'},
-  {id:'vision',name:'The Vision',rarity:'rare',type_line:'Creature',image_url:null},
+  {id:'vision',name:'The Vision',rarity:'rare',type_line:'Legendary Artifact Creature — Robot Hero',image_url:
+    'https://cards.scryfall.io/normal/front/2/9/2961cf20-33c8-4e66-9d0f-6daca8ea7880.jpg?1783902887'},
   {id:'cube',name:'Cosmic Cube',rarity:'mythic',type_line:'Artifact',image_url:null},
   {id:'thor',name:'The Mighty Thor, Jane Foster',rarity:'rare',type_line:'Creature',image_url:null},
 ];
@@ -45,7 +46,7 @@ const best:InsightHighlight[]=[
     'The original model awarded this non-trophy pick 90/100.','hard-rated decisions'),
 ];
 const misses:InsightHighlight[]=[
-  highlight(5,fourth,first,32,'low-scored-alternative',
+  highlight(5,second,first,32,'low-scored-alternative',
     'Your original non-trophy choice earned 32/100 in this saved puzzle.','easy-rated decisions'),
   highlight(6,third,second,38,'low-scored-alternative',
     'Your original non-trophy choice earned 38/100 in this saved puzzle.','hard-rated decisions'),
