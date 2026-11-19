@@ -1,0 +1,12 @@
+{
+  "operation": "upload-exact-android-aab-production",
+  "reason": "User explicitly approved PUBLIC Google Play Production release of Pack One Android AdMob on 2026-11-19; do not update Closed Testing. Promote exactly the verified Play-signed AAB from protected main after the submitted AdMob Data Safety declaration, preserving current production countries.",
+  "source_run_id": 44562043017,
+  "source_artifact_id": 14552390983,
+  "source_sha": "21c4835a7db2c95286a5abe2a24eb37cd1b77644",
+  "artifact_name": "pack-one-play-signed-aab",
+  "artifact_digest": "sha256:1d3789c493c20be38d82bbeacf01b71a70ed47bc63fffcbf3aaba51ace831c7f",
+  "version_code": "101058",
+  "track": "production",
+  "data_safety_run_id": 44561910073
+}
