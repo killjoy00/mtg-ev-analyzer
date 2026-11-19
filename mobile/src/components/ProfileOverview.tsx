@@ -221,7 +221,7 @@ export function ProfileOverview({ profile, publicView = false }: { profile: Care
 }
 
 const styles = StyleSheet.create({
-  root: { gap: spacing.lg },
+  root: { gap: spacing.md },
   activityButton: { minHeight: 48, borderWidth: 1, borderColor: colors.accent, padding: spacing.md, justifyContent: 'center', alignItems: 'center' },
   activityButtonText: { color: colors.accentDark, fontSize: 14, fontWeight: '800', textAlign: 'center' },
   hero: { gap: spacing.xs },
@@ -232,7 +232,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.line,
-    padding: spacing.lg,
+    padding: spacing.md,
     gap: spacing.md,
   },
   sectionTitle: { color: colors.ink, fontSize: 19, fontWeight: '800' },

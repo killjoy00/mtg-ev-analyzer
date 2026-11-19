@@ -655,11 +655,11 @@ export default function AccountScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
-  page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.lg, alignSelf: 'center', width: '100%', maxWidth: 760 },
+  page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: spacing.md, alignSelf: 'center', width: '100%', maxWidth: 760 },
   eyebrow: { color: colors.accent, fontSize: 12, fontWeight: '800', letterSpacing: 0.8 },
-  title: { color: colors.ink, fontSize: 34, lineHeight: 38, fontWeight: '800', letterSpacing: -0.8 },
+  title: { color: colors.ink, fontSize: 30, lineHeight: 35, fontWeight: '800', letterSpacing: -0.8 },
   body: { color: colors.muted, fontSize: 15, lineHeight: 22 },
-  panel: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.lg, gap: spacing.md },
+  panel: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.md, gap: spacing.md },
   panelTitle: { color: colors.ink, fontSize: 17, fontWeight: '800' },
   appleButton: { width: '100%', height: 52 },
   appleWebButton: { minHeight: 52, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
@@ -697,7 +697,7 @@ const styles = StyleSheet.create({
   linkText: { color: colors.accentDark, fontSize: 13, fontWeight: '700', textDecorationLine: 'underline' },
   textButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   textButtonText: { color: colors.accentDark, fontSize: 14, fontWeight: '800', textDecorationLine: 'underline' },
-  row: { minHeight: 68, borderTopWidth: 1, borderColor: colors.line, paddingVertical: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  row: { minHeight: 60, borderTopWidth: 1, borderColor: colors.line, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   rowCopy: { flex: 1, gap: 4 },
   rowTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
   rowArrow: { color: colors.muted, fontSize: 26, lineHeight: 30 },

@@ -209,12 +209,12 @@ export default function SetsScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
-  page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.xl, alignSelf: 'center', width: '100%', maxWidth: 980 },
+  page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: 20, alignSelf: 'center', width: '100%', maxWidth: 980 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
   hero: { gap: spacing.sm },
   kicker: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.3 },
-  title: { color: colors.ink, fontSize: 36, lineHeight: 40, fontWeight: '800', letterSpacing: -0.8, textAlign: 'left' },
-  deck: { color: colors.muted, fontSize: 17, lineHeight: 25 },
+  title: { color: colors.ink, fontSize: 32, lineHeight: 36, fontWeight: '800', letterSpacing: -0.8, textAlign: 'left' },
+  deck: { color: colors.muted, fontSize: 16, lineHeight: 23 },
   body: { color: colors.muted, fontSize: 15, lineHeight: 22 },
   summary: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   summaryItem: {
@@ -236,7 +236,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.line,
-    padding: spacing.lg,
+    padding: spacing.md,
     gap: spacing.sm,
   },
   cardTitle: { color: colors.ink, fontSize: 20, fontWeight: '800' },

@@ -9,6 +9,7 @@ import { useNavigationSession } from '@/src/navigation/session';
 import HowToScreen from '@/src/screens/how-to';
 import { canonicalContentUrl, type CanonicalContentKey } from '@/src/contentLinks';
 import { colors, spacing } from '@/src/theme';
+import { config } from '@/src/config';
 
 const nativeLinks = [
   { kicker: 'START HERE', title: 'How to Play', body: 'Choose a Daily, make your picks, and see what the trophy drafters took.', route: '/how-to' as const },
@@ -42,7 +43,7 @@ export default function LearnScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.page}>
-        <View style={styles.hero}>
+        <View style={styles.hero} onLayout={() => { if (config.screenshots.fixtures) console.info('PACKONE_LEARN_READY'); }}>
           <Text style={styles.eyebrow}>LEARN</Text>
           <Text style={styles.title}>How Pack One works.</Text>
           <Text style={styles.lede}>Want to know where a pick came from or why it scored the way it did? Here&apos;s where you&apos;ll find the rules, scoring details, supported sets, and a few drafting guides.</Text>
@@ -86,15 +87,15 @@ const styles = StyleSheet.create({
   playButton: { minHeight: 52, padding: spacing.md, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.accent },
   playText: { color: colors.surface, fontWeight: '700', fontSize: 16 },
   safe: { flex: 1, backgroundColor: colors.page },
-  page: { width: '100%', maxWidth: 980, alignSelf: 'center', padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.lg },
-  hero: { gap: spacing.sm, paddingTop: spacing.sm },
-  eyebrow: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.4 },
-  title: { color: colors.ink, fontSize: 34, lineHeight: 39, fontWeight: '800', letterSpacing: -0.8 },
-  lede: { color: colors.muted, fontSize: 16, lineHeight: 24, maxWidth: 720 },
+  page: { width: '100%', maxWidth: 980, alignSelf: 'center', padding: spacing.md, paddingBottom: spacing.xxl, gap: spacing.md },
+  hero: { gap: spacing.xs },
+  eyebrow: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+  title: { color: colors.ink, fontSize: 30, lineHeight: 34, fontWeight: '800', letterSpacing: -0.8 },
+  lede: { color: colors.muted, fontSize: 14, lineHeight: 21, maxWidth: 720 },
   sectionTitle: { color: colors.ink, fontSize: 20, fontWeight: '800', marginTop: spacing.sm },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
-  card: { flexBasis: 280, minWidth: 0, flexGrow: 1, flexShrink: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.lg, gap: spacing.sm },
-  kicker: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  card: { flexBasis: 280, minWidth: 0, flexGrow: 1, flexShrink: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.md, gap: spacing.sm },
+  kicker: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
   cardTitle: { color: colors.ink, fontSize: 19, lineHeight: 24, fontWeight: '800' },
   body: { color: colors.muted, fontSize: 14, lineHeight: 21 },
   action: { color: colors.accentDark, fontSize: 14, fontWeight: '800', marginTop: spacing.xs },

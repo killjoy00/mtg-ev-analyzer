@@ -118,12 +118,12 @@ export default function SetArchiveScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
-  page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.xl, alignSelf: 'center', width: '100%', maxWidth: 980 },
+  page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: 20, alignSelf: 'center', width: '100%', maxWidth: 980 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
   hero: { gap: spacing.sm },
   kicker: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.4 },
-  title: { color: colors.ink, fontSize: 36, lineHeight: 40, fontWeight: '800', letterSpacing: -0.8 },
-  deck: { color: colors.muted, fontSize: 17, lineHeight: 25, maxWidth: 760 },
+  title: { color: colors.ink, fontSize: 32, lineHeight: 36, fontWeight: '800', letterSpacing: -0.8 },
+  deck: { color: colors.muted, fontSize: 16, lineHeight: 23, maxWidth: 760 },
   section: { gap: spacing.md },
   sectionTitle: { color: colors.ink, fontSize: 22, lineHeight: 28, fontWeight: '800' },
   body: { color: colors.muted, fontSize: 15, lineHeight: 23 },
@@ -131,7 +131,7 @@ const styles = StyleSheet.create({
   metric: { flexGrow: 1, flexBasis: '30%', minWidth: 150, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.md, gap: spacing.xs },
   metricValue: { color: colors.ink, fontSize: 25, fontWeight: '800' },
   metricLabel: { color: colors.muted, fontSize: 12, lineHeight: 17, fontWeight: '700' },
-  cardGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.md },
+  cardGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   marketCard: { width: 166, maxWidth: '48%', flexGrow: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.sm, gap: spacing.xs },
   cardImage: { width: '100%', aspectRatio: 0.716, backgroundColor: colors.surfaceSoft },
   cardName: { color: colors.ink, fontSize: 13, lineHeight: 18, fontWeight: '800' },
@@ -143,7 +143,7 @@ const styles = StyleSheet.create({
   closeMeta: { color: colors.muted, fontSize: 12 },
   closeVersus: { color: colors.muted, fontSize: 12, lineHeight: 17 },
   gap: { color: colors.ink, fontSize: 13, fontWeight: '800' },
-  cta: { backgroundColor: colors.accentSoft, borderLeftWidth: 3, borderLeftColor: colors.accent, padding: spacing.lg, gap: spacing.sm },
+  cta: { backgroundColor: colors.accentSoft, borderLeftWidth: 3, borderLeftColor: colors.accent, padding: spacing.md, gap: spacing.sm },
   primaryButton: { minHeight: 48, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.lg, alignSelf: 'flex-start' },
   primaryButtonText: { color: '#fff', fontSize: 15, fontWeight: '800' },
 });

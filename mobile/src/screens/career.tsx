@@ -312,8 +312,8 @@ export default function CareerScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   list: { paddingBottom: spacing.xxl, alignSelf: 'center', width: '100%', maxWidth: 980 },
-  header: { padding: spacing.lg, gap: spacing.lg },
-  firstRunCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.xl, gap: spacing.md },
+  header: { padding: spacing.md, gap: 12 },
+  firstRunCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.md, gap: spacing.md },
   firstRunTitle: { color: colors.ink, fontSize: 28, lineHeight: 33, fontWeight: '800', letterSpacing: -0.5 },
   firstRunBody: { color: colors.muted, fontSize: 15, lineHeight: 22 },
   center: { flex: 1, padding: spacing.xl, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
   body: { color: colors.muted, fontSize: 15, lineHeight: 22, textAlign: 'center' },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   sectionTitle: { color: colors.ink, fontSize: 19, fontWeight: '800' },
-  historyRow: { minHeight: 68, marginHorizontal: spacing.lg, borderBottomWidth: 1, borderColor: colors.line,
+  historyRow: { minHeight: 60, marginHorizontal: spacing.md, borderBottomWidth: 1, borderColor: colors.line,
     backgroundColor: colors.surface, flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.md, gap: spacing.md },
   historyCopy: { flex: 1, gap: 3 },
   historyDate: { color: colors.ink, fontSize: 15, fontWeight: '700' },
@@ -335,5 +335,5 @@ const styles = StyleSheet.create({
   error: { color: colors.danger, fontSize: 13 },
   refreshing: { color: colors.muted, fontSize: 12, fontWeight: '700' },
   empty: { color: colors.muted, fontSize: 15, textAlign: 'center', padding: spacing.xl },
-  footer: { padding: spacing.lg, gap: spacing.md },
+  footer: { padding: spacing.md, gap: spacing.md },
 });

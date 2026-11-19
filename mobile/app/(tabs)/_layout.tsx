@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { StyleSheet, View, useWindowDimensions, type ColorValue, type LayoutChangeEvent } from 'react-native';
+import { StyleSheet, View, useWindowDimensions, type ColorValue } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/src/components/Text';
@@ -7,7 +7,6 @@ import { TabIcon } from '@/src/components/TabIcon';
 import { AdaptiveTabBar } from '@/src/components/AdaptiveTabBar';
 import { useNavigationSession } from '@/src/navigation/session';
 import { colors } from '@/src/theme';
-import { config } from '@/src/config';
 
 // URL paths remain /, /practice, /leaderboard, /learn, /career and /how-to.
 // Hidden guest tabs are still public routes; this is navigation, not authorization.
@@ -19,16 +18,15 @@ export default function TabLayout() {
   const icon = (name: 'daily' | 'practice' | 'leaders' | 'learn' | 'account') => function Icon({ color }: { color: ColorValue }) { return <TabIcon name={name} color={color} />; };
   return <View style={styles.shell}>
     <Tabs backBehavior="history" tabBar={props => <AdaptiveTabBar {...props} />} screenOptions={{
-      header: ({ options }) => <View style={{ backgroundColor: colors.surface, paddingTop: insets.top, paddingLeft: Math.max(insets.left, 16), paddingRight: Math.max(insets.right, 16) }}>
-        <View style={styles.headerRow} onLayout={event => recordHeader('row', options.title, event)}>
-          <Text accessibilityRole="header" style={styles.headerTitle} onLayout={event => recordHeader('title', options.title, event)}>{options.title}</Text>
-        </View>
-      </View>,
+      // The tab screens already contain their own page heading. The redundant
+      // navigator header costs a row of vertical space on every phone.
+      // ScreenArea handles the top safe inset for headerless tab screens.
+      headerShown: false,
       tabBarActiveTintColor: colors.accentDark, tabBarInactiveTintColor: colors.muted,
       tabBarLabelPosition: 'below-icon',
       tabBarLabel: ({ color, children }) => <Text style={{ color, fontSize: 12, fontWeight: '600', textAlign: 'center', width: '100%', flexShrink: 1 }}>{children}</Text>,
       tabBarItemStyle: { paddingHorizontal: 2 },
-      tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.line, height: 70 + Math.max(insets.bottom, 8) + Math.max(0, fontScale - 1) * 64, paddingBottom: Math.max(insets.bottom, 8), paddingTop: 6 },
+      tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.line, height: 60 + Math.max(insets.bottom, 8) + Math.max(0, fontScale - 1) * 64, paddingBottom: Math.max(insets.bottom, 8), paddingTop: 6 },
       tabBarActiveBackgroundColor: colors.accentSoft, tabBarHideOnKeyboard: true,
     }}>
       <Tabs.Screen name="index" options={{ title: 'Daily', headerShown: false, tabBarIcon: icon('daily') }} />
@@ -40,12 +38,6 @@ export default function TabLayout() {
     </Tabs>
   </View>;
 }
-function recordHeader(label: string, title: string | undefined, event: LayoutChangeEvent) {
-  if (config.screenshots.fixtures) console.info('PACKONE_HEADER', JSON.stringify({ label, title, ...event.nativeEvent.layout }));
-}
 const styles = StyleSheet.create({
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: 16, paddingVertical: 8, minHeight: 56 },
-  headerTitle: { color: colors.ink, fontSize: 24, fontWeight: '700', flex: 1, minWidth: 0 },
   shell: { flex: 1, backgroundColor: colors.page },
-  checking: { color: colors.muted, padding: 8, fontSize: 14 },
 });

@@ -275,7 +275,7 @@ export default function SharedRunScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
-  page: { alignSelf: 'center', width: '100%', maxWidth: 760, padding: spacing.lg, gap: spacing.lg },
+  page: { alignSelf: 'center', width: '100%', maxWidth: 760, padding: spacing.md, gap: spacing.md },
   eyebrow: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 },
   title: { color: colors.ink, fontSize: 28, lineHeight: 34, fontWeight: '800' },
   body: { color: colors.muted, fontSize: 15, lineHeight: 23, flexShrink: 1 },

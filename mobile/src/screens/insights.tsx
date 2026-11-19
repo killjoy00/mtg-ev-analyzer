@@ -619,9 +619,9 @@ export default function InsightsScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
-  page: { width: '100%', maxWidth: 980, alignSelf: 'center', padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.lg },
+  page: { width: '100%', maxWidth: 980, alignSelf: 'center', padding: spacing.md, paddingBottom: spacing.xxl, gap: spacing.md },
   eyebrow: { color: colors.accent, fontWeight: '800', fontSize: 11, letterSpacing: 1.2 },
-  heading: { color: colors.ink, fontSize: 30, lineHeight: 34, fontWeight: '800' },
+  heading: { color: colors.ink, fontSize: 28, lineHeight: 32, fontWeight: '800' },
   intro: { color: colors.muted, fontSize: 14, lineHeight: 20, marginTop: -12 },
   filters: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.md, gap: spacing.md },
   choiceGroup: { gap: spacing.xs },
@@ -631,7 +631,7 @@ const styles = StyleSheet.create({
   choiceActive: { backgroundColor: colors.accentSoft, borderColor: colors.accent },
   choiceText: { color: colors.muted, fontSize: 13, fontWeight: '700' },
   choiceTextActive: { color: colors.accentDark },
-  section: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.lg, gap: spacing.md },
+  section: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.md, gap: spacing.md },
   sectionTitle: { fontSize: 19, fontWeight: '800', color: colors.ink },
   caption: { fontSize: 13, lineHeight: 19, color: colors.muted },
   body: { fontSize: 14, lineHeight: 21, color: colors.ink },
