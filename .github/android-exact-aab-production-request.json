@@ -1,12 +1,12 @@
 {
   "operation": "upload-exact-android-aab-production",
-  "reason": "Owner approved Pack One Android AdMob update to public Google Play Production. Signed protected-main AAB build passed native AdMob audit, and Google Play Data Safety declaration was submitted successfully.",
-  "source_run_id": 44562043017,
-  "source_artifact_id": 14552390983,
-  "source_sha": "21c4835a7db2c95286a5abe2a24eb37cd1b77644",
+  "reason": "Owner authorized public Google Play Production follow-up to correct Pack One Android 101058 0% DEX obfuscation warning. Protected current-main signed R8 optimized 101070 AAB passed build, embedded R8 mapping check, AdMob manifest audit, upload signer check, and submitted Google Play Data safety. Publish exact artifact and preserve Production US/CA countries.",
+  "source_run_id": 44586673796,
+  "source_artifact_id": 14563947806,
+  "source_sha": "5e93f0a75b6330887a56dc8a44130a04043e3bb4",
   "artifact_name": "pack-one-play-signed-aab",
-  "artifact_digest": "sha256:1d3789c493c20be38d82bbeacf01b71a70ed47bc63fffcbf3aaba51ace831c7f",
-  "version_code": 101058,
+  "artifact_digest": "sha256:0aee1bee4e5c0993bb7dbd46fdf3cfce976d9f1ff474755b7ab013045a90af4f",
+  "version_code": 101070,
   "track": "production",
   "data_safety_run_id": 44561910073
 }
