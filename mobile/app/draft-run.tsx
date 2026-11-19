@@ -510,6 +510,7 @@ export default function DraftRunScreen({
   const params = useLocalSearchParams<{ environment?: string; mode?: string; setIds?: string; screenshot?: string }>();
   const screenshotFeedback = config.screenshots.fixtures
     && (screenshotFeedbackOverride || params.screenshot === 'feedback');
+  const screenshotFocusCards = config.screenshots.fixtures && params.screenshot === 'cards';
   const practice = !shared && params.mode === 'practice';
   const requestedEnvironment = shared?.initialRun.environment
     ?? (typeof params.environment === 'string' ? params.environment : 'mixed');
@@ -579,6 +580,7 @@ export default function DraftRunScreen({
   const [sharing, setSharing] = useState(false);
   const dailySetDefaulted = useRef<string | null>(null);
   const scroll = useRef<ScrollView>(null);
+  const screenshotCardPositioned = useRef(false);
   const lastObservedDecision = useRef<string | null>(null);
   const decisionTimer = useRef(createForegroundDecisionTimer());
   const mountedPacificDay = useRef(pacificDay());
@@ -1583,7 +1585,14 @@ export default function DraftRunScreen({
 
               <Text style={styles.sectionTitle}>Choose one</Text>
               <Text style={styles.sectionBody}>{puzzle.candidates.length} cards in this pack. Tap to choose. Press and hold a card to zoom.</Text>
-              <View style={styles.grid}>
+              <View style={styles.grid} onLayout={screenshotFocusCards ? (event) => {
+                // Scroll the real app's choice grid into view only in isolated screenshot builds.
+                if (screenshotCardPositioned.current) return;
+                screenshotCardPositioned.current = true;
+                const y = event.nativeEvent.layout.y;
+                requestAnimationFrame(() => scroll.current?.scrollTo({ y: Math.max(0, y - 54), animated: false }));
+                console.info('PACKONE_SCREENSHOT_FOCUS', JSON.stringify({ scene: 'real-draft-cards', y }));
+              } : undefined}>
                 {puzzle.candidates.map((card) => (
                   <CardTile
                     key={card.id}
