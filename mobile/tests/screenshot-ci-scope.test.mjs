@@ -12,3 +12,16 @@ test('screen, native, fixture, dependency and unknown mobile changes retain devi
   assert.equal(needsNativeScreenshots([]),true);
   assert.equal(needsNativeScreenshots(['mobile/tests/fake.test.cjs','mobile/app/index.tsx']),true);
 });
+
+test('root card/CI and release-config inputs always require actual native screenshots',()=>{
+  for(const path of [
+    'card-faces.mjs', 'card-faces.d.mts',
+    '.github/actions/mobile-validate/action.yml',
+    '.github/workflows/mobile.yml',
+    '.github/workflows/android-internal-testing.yml',
+    '.github/workflows/android-production-bundle.yml',
+    '.github/workflows/ios-testflight.yml',
+    '.github/android-internal-release-request.json',
+    '.github/android-production-bundle-request.json',
+  ]) assert.equal(needsNativeScreenshots([path]),true,path);
+});
