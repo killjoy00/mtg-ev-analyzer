@@ -1,5 +1,6 @@
 {
   "operation": "configure-google-play-data-safety",
-  "mode": "submit",
-  "reason": "Owner-approved results/news privacy launch follow-up: submit the existing Google Play Data Safety declaration with only two additional Email address collection purposes, Developer communications and Advertising or marketing, for optional results/news emails, offers and individual non-promotional contact. Preserve App functionality and Account management for email and all existing declarations for other data types, collection/sharing, optionality, encryption and account deletion. The generator must restrict the two new purposes to Email address. Do not change builds, app submissions, testing tracks, rollouts, countries, listing copy or graphics, or send email or publish named results."
+  "mode": "dry-run",
+  "android_admob": "enabled",
+  "reason": "Owner approved Pack One Android first public Production release with real Google AdMob banner. Generate and validate, but DO NOT SUBMIT YET, the upgraded Play Data safety CSV describing Google Mobile Ads SDK collection and sharing: approximate location inferred from IP, app interactions, diagnostics, and device/advertising identifiers for advertising, analytics and fraud prevention. Preserve previous first-party gameplay, login, email, security and deletion disclosures. User has already set Contains ads = Yes and AdMob UMP consent messages. This is a review-only Data Safety dry run; publishing requires a separate submit request after schema validation and owner-account production eligibility check."
 }
