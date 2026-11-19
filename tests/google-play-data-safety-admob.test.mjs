@@ -11,7 +11,7 @@ test('Android AdMob Data safety is an explicit, reviewable collected-and-shared 
   assert.equal(req.android_admob,'enabled');
   assert.match(workflow,/PACKONE_PLAY_DATA_SAFETY_ADMOB: '1'/);
   assert.match(generator,/if\(mode==='submit'&&!admobEnabled\)throw Error/);
-  for(const type of ['Approximate location','App interactions','Diagnostics','Device or other IDs']){
+  for(const type of ['Approximate location','Page views and taps in app','Diagnostics','Device or other identifiers']){
     assert.ok(generator.includes(type), 'missing Google Mobile Ads SDK data class: '+type);
   }
   for(const purpose of ['PSL_ADVERTISING','PSL_ANALYTICS','PSL_FRAUD_PREVENTION_SECURITY']){
