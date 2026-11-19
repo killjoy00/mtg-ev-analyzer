@@ -77,10 +77,11 @@ export async function loadNativeReminders(session: MobileSession) {
   await assertReminderAccount(session);
   return requestJson<ReminderSnapshot>('/growth/v1/mobile/account/reminders',authentication(session));
 }
-export async function saveNativeReminders(session:MobileSession,channel:ReminderChannel,enabled:boolean,schedule:ReminderSchedule) {
+export async function saveNativeReminders(session:MobileSession,channel:ReminderChannel,enabled:boolean) {
   await assertReminderAccount(session);
+  // The backend is the sole authority for the one shared send schedule.
   return requestJson<ReminderSnapshot>('/growth/v1/mobile/account/reminders',{
-    ...authentication(session),method:'PATCH',body:{channel,enabled,...schedule,expectedAccountId:session.accountUser?.id},
+    ...authentication(session),method:'PATCH',body:{channel,enabled,expectedAccountId:session.accountUser?.id},
   });
 }
 export async function reminderDeviceEnabled(session:MobileSession) {
