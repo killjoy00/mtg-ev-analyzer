@@ -677,7 +677,7 @@ elif platform == 'ios':
             command('xcrun', 'simctl', 'ui', udid, 'content_size', setting)
             scenes = [('guest','home'), ('guest','learn'), ('member','learn'), ('member-new','career'),
                       ('member-long','feedback'), ('member-match','feedback'), ('member-zero','feedback'),
-                      ('member-perfect-result','result')]
+                      ('guest-perfect-result','result')]
             if setting == 'large':
                 scenes += [('member-insights-sparse','insights'),
                            ('member-insights-versions','insights')]
