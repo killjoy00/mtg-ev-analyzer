@@ -59,7 +59,7 @@ const definitions=[
   {type:'PRODUCT_PAGE_HEADER_ASSET',file:root+'/pack-one-14-header.png',sourceFile:root+'/pack-one-14-header.jpg',sourceSha:request.headerSha256,
    width:3840,height:1646,name:'pack_one_appstore_header_v5_1_4.png'},
   {type:'APP_STORE_SEARCH_RESULTS_ASSET',file:root+'/pack-one-14-search.png',sourceFile:root+'/pack-one-14-search.jpg',sourceSha:request.searchSha256,
-   width:1920,height:1280,name:'pack_one_appstore_search_results_v5_1_4.png'},
+   width:3840,height:2560,name:'pack_one_appstore_search_results_v5_1_4.png'},
 ];
 for(const x of definitions) {
   const source=readFileSync(x.sourceFile);
