@@ -959,7 +959,7 @@ export default function DraftRunScreen({
   ) => {
     if (run.current) {
       const urls = run.current.candidates.map((card) => card.image_url).filter((url): url is string => Boolean(url));
-      if (urls.length) void Image.prefetch(urls);
+      if (urls.length) void Image.prefetch(urls, 'disk');
     }
     if (run.complete && practice) {
       await clearPracticeIdempotencyKey().catch(() => undefined);
@@ -1126,7 +1126,7 @@ export default function DraftRunScreen({
       if (!mutationStillCurrent(token, run)) return;
       if (run.current) {
         const urls = run.current.candidates.map((card) => card.image_url).filter((url): url is string => Boolean(url));
-        if (urls.length) void Image.prefetch(urls);
+        if (urls.length) void Image.prefetch(urls, 'disk');
       }
       commitState({ status: 'ready', run, session: current.session });
       void Haptics.selectionAsync();
