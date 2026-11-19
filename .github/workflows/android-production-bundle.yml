@@ -1,7 +1,17 @@
 name: Android production bundle
 
-# Android development is paused. Run manually only when the owner resumes it.
+# Routine Android builds remain paused. Only an explicitly reviewed release
+# request on protected main (or a manual dispatch) can build a signed AAB.
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/android-production-bundle-request.json'
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - '.github/android-production-bundle-request.json'
+      - '.github/workflows/android-production-bundle.yml'
   workflow_dispatch:
 
 permissions:
