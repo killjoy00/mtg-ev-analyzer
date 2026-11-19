@@ -948,7 +948,7 @@ export default function DraftRunScreen({
     if (busy || mode !== 'pick') return;
     setSelected(id);
     setActionError(null);
-    void Haptics.selectionAsync();
+    void Haptics.selectionAsync().catch(() => undefined);
   };
 
   const showCommittedPick = async (
@@ -959,7 +959,7 @@ export default function DraftRunScreen({
   ) => {
     if (run.current) {
       const urls = run.current.candidates.map((card) => card.image_url).filter((url): url is string => Boolean(url));
-      if (urls.length) void Image.prefetch(urls);
+      if (urls.length) void Image.prefetch(urls).catch(() => undefined);
     }
     if (run.complete && practice) {
       await clearPracticeIdempotencyKey().catch(() => undefined);
@@ -985,7 +985,7 @@ export default function DraftRunScreen({
         `${latestAnswer.score} out of 100. ${trophyRevealSentence(latestAnswer)}`,
       );
     }
-    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
     scroll.current?.scrollTo({ y: 0, animated: true });
   };
 
@@ -1126,10 +1126,10 @@ export default function DraftRunScreen({
       if (!mutationStillCurrent(token, run)) return;
       if (run.current) {
         const urls = run.current.candidates.map((card) => card.image_url).filter((url): url is string => Boolean(url));
-        if (urls.length) void Image.prefetch(urls);
+        if (urls.length) void Image.prefetch(urls).catch(() => undefined);
       }
       commitState({ status: 'ready', run, session: current.session });
-      void Haptics.selectionAsync();
+      void Haptics.selectionAsync().catch(() => undefined);
       scroll.current?.scrollTo({ y: 0, animated: true });
     } catch (error: unknown) {
       if (mutationStillCurrent(token)) {
