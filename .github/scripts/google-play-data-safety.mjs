@@ -2,6 +2,10 @@ const sampleUrl='https://storage.googleapis.com/support-kms-prod/b5v9It2EgwrgyY1
 const packageName='pro.packone.app';
 const mode=process.env.DATA_SAFETY_MODE?.trim();
 const playToken=process.env.PLAY_ACCESS_TOKEN?.trim();
+const admobEnabled=process.env.PACKONE_PLAY_DATA_SAFETY_ADMOB==='1';
+// A public AdMob-enabled Android app must not be reverted to the historical
+// ad-disabled Data safety declaration by a later accidental submit request.
+if(mode==='submit'&&!admobEnabled)throw Error('Refusing to replace AdMob-enabled Google Play Data safety with the old ad-disabled declaration.');
 
 if(!['dry-run','submit'].includes(mode))throw Error('DATA_SAFETY_MODE must be dry-run or submit.');
 if(mode==='submit'&&!playToken)throw Error('PLAY_ACCESS_TOKEN is required for submit mode.');
@@ -145,6 +149,7 @@ ensureChoiceGroup(rows,'PSL_SUPPORT_DATA_DELETION_BY_USER',[
   {id:'DATA_DELETION_NO_AUTO_DELETED',label:'Can users request deletion of some or all data without deleting the account? / No, but data is automatically deleted within 90 days'},
 ],['DATA_DELETION_NO']);
 
+const sdkPurposes=['PSL_ADVERTISING','PSL_ANALYTICS','PSL_FRAUD_PREVENTION_SECURITY'];
 const specs=[
   {
     name:'Name',
@@ -166,6 +171,12 @@ const specs=[
     optional:false,
     purposes:['PSL_APP_FUNCTIONALITY','PSL_ANALYTICS'],
   },
+  // Google Mobile Ads SDK collects and shares IP-derived approximate location,
+  // app interactions, diagnostics and device/advertising IDs. The SDK does not
+  // stop processing these solely because Pack One requests non-personalized ads.
+  ...(admobEnabled?[
+    'Approximate location','App interactions','Diagnostics','Device or other IDs',
+  ].map(name=>({name,optional:false,shared:true,purposes:sdkPurposes})):[]),
 ];
 
 const typeRows=rows.filter(r=>String(r[COL_Q]).includes('PSL_DATA_TYPES'));
@@ -178,7 +189,15 @@ for(const spec of specs){
   typeRow[COL_V]='TRUE';
 
   const prefix=`PSL_DATA_USAGE_RESPONSES:${token}:`;
-  setChoice(rows,prefix+'PSL_DATA_USAGE_COLLECTION_AND_SHARING','PSL_DATA_USAGE_ONLY_COLLECTED');
+  // This is a multi-choice form: the AdMob SDK transfers data to Google, so
+  // both "Collected" and "Shared" must be represented on SDK data types.
+  const transfer=exactRows(rows,prefix+'PSL_DATA_USAGE_COLLECTION_AND_SHARING');
+  for(const row of transfer)row[COL_V]=(
+    row[COL_R]==='PSL_DATA_USAGE_ONLY_COLLECTED'
+    ||(spec.shared&&row[COL_R]==='PSL_DATA_USAGE_ONLY_SHARED')
+  )?'TRUE':'';
+  if(!transfer.some(row=>row[COL_R]==='PSL_DATA_USAGE_ONLY_COLLECTED'))throw Error('Missing collected choice '+spec.name);
+  if(spec.shared&&!transfer.some(row=>row[COL_R]==='PSL_DATA_USAGE_ONLY_SHARED'))throw Error('Missing shared choice '+spec.name);
   setBoolean(rows,prefix+'PSL_DATA_USAGE_EPHEMERAL',false);
   setChoice(
     rows,
@@ -186,27 +205,38 @@ for(const spec of specs){
     spec.optional?'PSL_DATA_USAGE_USER_CONTROL_OPTIONAL':'PSL_DATA_USAGE_USER_CONTROL_REQUIRED',
   );
   setPurposes(rows,prefix+'DATA_USAGE_COLLECTION_PURPOSE',spec.purposes);
-  // Nothing is declared shared. Service providers and user-initiated provider flows are handled under Google's sharing exclusions.
-  const sharing=rows.filter(r=>r[COL_Q]===prefix+'DATA_USAGE_SHARING_PURPOSE');
-  for(const row of sharing)row[COL_V]='';
+  // Non-SDK data remains first-party/service-provider usage. The Google
+  // Mobile Ads SDK explicitly documents third-party collection AND sharing.
+  setPurposes(rows,prefix+'DATA_USAGE_SHARING_PURPOSE',spec.shared?sdkPurposes:[]);
 
-  selected.push({name:spec.name,token,optional:spec.optional,purposes:spec.purposes});
+  selected.push({name:spec.name,token,optional:spec.optional,shared:Boolean(spec.shared),purposes:spec.purposes});
 }
 
 // Fail closed if the schema mapping selects anything unexpected.
 const enabledTypes=typeRows.filter(r=>r[COL_V]==='TRUE').map(r=>({responseId:r[COL_R],label:normalizeLabel(r[COL_LABEL])}));
 if(enabledTypes.length!==specs.length)throw Error(`Expected ${specs.length} enabled data types, found ${enabledTypes.length}: ${JSON.stringify(enabledTypes)}`);
 
-const sharedRows=rows.filter(r=>r[COL_V]==='TRUE'&&(r[COL_R]==='PSL_DATA_USAGE_ONLY_SHARED'||String(r[COL_Q]).endsWith('DATA_USAGE_SHARING_PURPOSE')));
-if(sharedRows.length)throw Error(`Unexpected sharing declarations: ${JSON.stringify(sharedRows)}`);
-
-// Results, news and optional offers use the verified account email only.
-// Do not extend these purposes to names, identifiers, gameplay or sharing.
+// Results/news communications stay limited to the verified email. Advertising
+// is also used by exactly the four declared Google Mobile Ads SDK data types.
 const emailPurposeQuestion=`PSL_DATA_USAGE_RESPONSES:${selected.find(item=>item.name==='Email address').token}:DATA_USAGE_COLLECTION_PURPOSE`;
-for(const purpose of ['PSL_ADVERTISING','PSL_DEVELOPER_COMMUNICATIONS']){
-  const active=rows.filter(r=>r[COL_V]==='TRUE'&&r[COL_R]===purpose);
-  if(active.length!==1||active[0][COL_Q]!==emailPurposeQuestion)throw Error('Results/news email purposes must be limited to Email address.');
+const developerCommunications=rows.filter(r=>r[COL_V]==='TRUE'&&r[COL_R]==='PSL_DEVELOPER_COMMUNICATIONS');
+if(developerCommunications.length!==1||developerCommunications[0][COL_Q]!==emailPurposeQuestion)throw Error('Developer communications must be limited to Email address.');
+const allowedAdvertisingQuestions=new Set([emailPurposeQuestion]);
+for(const item of selected.filter(x=>x.shared)){
+  const prefix=`PSL_DATA_USAGE_RESPONSES:${item.token}:`;
+  allowedAdvertisingQuestions.add(prefix+'DATA_USAGE_COLLECTION_PURPOSE');
+  allowedAdvertisingQuestions.add(prefix+'DATA_USAGE_SHARING_PURPOSE');
 }
+const advertising=rows.filter(r=>r[COL_V]==='TRUE'&&r[COL_R]==='PSL_ADVERTISING');
+if(advertising.length!==allowedAdvertisingQuestions.size||advertising.some(r=>!allowedAdvertisingQuestions.has(r[COL_Q])))throw Error('Unexpected advertising purpose declarations.');
+const allowedSharingQuestions=new Set(selected.filter(x=>x.shared).flatMap(item=>{
+  const prefix=`PSL_DATA_USAGE_RESPONSES:${item.token}:`;
+  return [prefix+'PSL_DATA_USAGE_COLLECTION_AND_SHARING',prefix+'DATA_USAGE_SHARING_PURPOSE'];
+}));
+const unexpectedShared=rows.filter(r=>r[COL_V]==='TRUE'&&(
+  r[COL_R]==='PSL_DATA_USAGE_ONLY_SHARED'||String(r[COL_Q]).endsWith('DATA_USAGE_SHARING_PURPOSE')
+)).filter(r=>!allowedSharingQuestions.has(r[COL_Q]));
+if(unexpectedShared.length)throw Error(`Unexpected sharing declarations: ${JSON.stringify(unexpectedShared)}`);
 
 const unresolvedRequired=rows.filter(r=>r[COL_REQ]==='REQUIRED'&&!String(r[COL_V]).trim());
 if(unresolvedRequired.length)throw Error(`Unresolved REQUIRED rows: ${JSON.stringify(unresolvedRequired.slice(0,40))}`);
@@ -223,7 +253,11 @@ for(const item of selected){
   const prefix=`PSL_DATA_USAGE_RESPONSES:${item.token}:`;
   const collected=exactRows(rows,prefix+'PSL_DATA_USAGE_COLLECTION_AND_SHARING');
   if(!collected.some(r=>r[COL_R]==='PSL_DATA_USAGE_ONLY_COLLECTED'&&r[COL_V]==='TRUE'))throw Error(`${item.name}: collected not selected.`);
-  if(collected.some(r=>r[COL_R]==='PSL_DATA_USAGE_ONLY_SHARED'&&r[COL_V]==='TRUE'))throw Error(`${item.name}: shared unexpectedly selected.`);
+  const selectedShared=collected.some(r=>r[COL_R]==='PSL_DATA_USAGE_ONLY_SHARED'&&r[COL_V]==='TRUE');
+  if(selectedShared!==item.shared)throw Error(`${item.name}: shared data declaration does not match SDK.`);
+  const sharingPurposes=exactRows(rows,prefix+'DATA_USAGE_SHARING_PURPOSE').filter(r=>r[COL_V]==='TRUE').map(r=>r[COL_R]).sort();
+  const expectedSharing=(item.shared?sdkPurposes:[]).slice().sort();
+  if(JSON.stringify(sharingPurposes)!==JSON.stringify(expectedSharing))throw Error(`${item.name}: shared purposes mismatch.`);
   const ephemeral=exactRows(rows,prefix+'PSL_DATA_USAGE_EPHEMERAL');
   if(ephemeral.length!==1||ephemeral[0][COL_V]!=='FALSE')throw Error(`${item.name}: ephemeral must be FALSE.`);
   const control=exactRows(rows,prefix+'DATA_USAGE_USER_CONTROL').filter(r=>r[COL_V]==='TRUE');
@@ -242,6 +276,7 @@ const maybeBlank=rows.filter(r=>r[COL_REQ]==='MAYBE_REQUIRED'&&!String(r[COL_V])
 
 console.log(JSON.stringify({
   mode,
+  androidAdMobSdkDisclosed:admobEnabled,
   sampleRows:rows.length,
   selected,
   enabledTypes,
