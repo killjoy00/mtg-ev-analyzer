@@ -56,7 +56,7 @@ test('playing and grading preserve cards, progress, fixed action and touch size'
   assert.match(style('app/draft-run.tsx', 'primaryButton'), /minHeight: 52/);
   assert.match(style('app/draft-run.tsx', 'resultPage'), /paddingTop: spacing\.md/);
   assert.match(style('app/draft-run.tsx', 'scoreBlock'), /padding: spacing\.md/);
-  assert.match(draft, /\$\{item\.puzzle \? "Review" : "Saved"\} pick \$\{index \+ 1\}/);
+  assert.match(draft, /\$\{canReview \? "Review" : "Saved"\} pick \$\{index \+ 1\}/);
 });
 
 test('app surfaces share phone gutters and keep bounded tablet width', () => {
