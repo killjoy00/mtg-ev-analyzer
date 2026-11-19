@@ -38,7 +38,7 @@ const native = [
 ];
 const screenshot = '.github/workflows/mobile-store-screenshots.yml';
 
-export function requiredWorkflows(paths) {
+export function requiredWorkflows(paths, packageDiff = {}) {
   if (!Array.isArray(paths) || paths.length === 0 ||
     paths.some(path => typeof path !== 'string' || !path)) {
     throw new Error('Cannot identify complete PR change set; refusing to pass required gate.');
@@ -46,7 +46,7 @@ export function requiredWorkflows(paths) {
   const required = basic.map(spec => ({...spec, jobs: [...spec.jobs]}));
   if (!paths.some(isMobilePrInput)) return required;
   required.push(...native.map(spec => ({...spec, jobs: [...spec.jobs]})));
-  const capture = needsNativeScreenshots(paths) ||
+  const capture = needsNativeScreenshots(paths, packageDiff) ||
     paths.some(path => isMobilePrInput(path) && !path.startsWith('mobile/'));
   required.push({
     path: screenshot,
@@ -124,7 +124,25 @@ export async function runGate({ github, context, core }) {
     { owner, repo, pull_number: prNumber, per_page: 100 });
   // GitHub exposes a maximum of 3,000 PR files: refuse incomplete scopes.
   if (changed.length >= 3000) throw new Error('PR changed-file listing may be truncated.');
-  const required = requiredWorkflows(changed.map(file => file.filename));
+  const filenames = changed.map(file => file.filename);
+  const packageDiff = {};
+  // Preserve the screenshot workflow's fast path for package.json scripts-only edits.
+  if (filenames.includes('mobile/package.json')) {
+    const readPackage = async ref => {
+      const { data } = await github.rest.repos.getContent(
+        { owner, repo, path: 'mobile/package.json', ref });
+      if (data.type !== 'file' || !data.content) throw new Error('Missing package JSON.');
+      return JSON.parse(Buffer.from(data.content, 'base64').toString('utf8'));
+    };
+    try {
+      packageDiff.packageBefore = await readPackage(context.payload.pull_request.base.sha);
+      packageDiff.packageAfter = await readPackage(headSha);
+    } catch (error) {
+      // Unavailable manifests force native capture, just like screenshot-ci-scope.
+      core.warning('Could not compare mobile package manifests; requiring capture: ' + error.message);
+    }
+  }
+  const required = requiredWorkflows(filenames, packageDiff);
   core.info('Required current-head evidence: ' +
     required.map(spec => spec.path + ' [' + spec.jobs.join(', ') + ']').join('; '));
 
