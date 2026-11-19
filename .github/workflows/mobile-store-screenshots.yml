@@ -247,6 +247,13 @@ jobs:
         if: always() && env.SCREENSHOT_IOS_APP != ''
         timeout-minutes: 25
         run: python3 ./scripts/native-acceptance.py ios "$GITHUB_WORKSPACE/native-acceptance/ipad" '${{ steps.simulators.outputs.ipad_udid }}' ipad
+      - name: Compose reviewed iOS 1.4 caption layouts
+        if: success()
+        shell: bash
+        working-directory: .
+        run: |
+          set -euo pipefail
+          swift mobile/scripts/compose-store-screenshots-ios.swift "$GITHUB_WORKSPACE/store-screenshots"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

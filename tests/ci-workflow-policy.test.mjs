@@ -48,24 +48,26 @@ test('scoped presentation validation preserves native editorial parity for canon
   }
 });
 
-test('scoped account and admin browser validation installs WebKit for dual-engine contracts', () => {
-  assert.match(browser,/BROWSER_GROUPS/);
-  assert.match(browser,/\*,account,\*/);
-  assert.match(browser,/\*,admin,\*/);
-  assert.match(browser,/playwright install --with-deps chromium webkit/);
-});
-
-test('browser dependency installs are bounded and retried once on another mirror', () => {
-  assert.match(browser,/playwright_install npx playwright install --with-deps chromium webkit/);
-  assert.match(browser,/playwright_install npx playwright install --with-deps chromium\n/);
-  assert.match(browser,/timeout --kill-after=30 480 "\$@" && return 0/);
-  const retry=browser.split('timeout --kill-after=30 480')[1]?.split('timeout --kill-after=30 600')[0]||'';
-  assert.ok(retry.indexOf('sudo pkill -KILL -x apt-get')>=0&&retry.indexOf('sudo pkill -KILL -x apt-get')<retry.indexOf('sudo dpkg --configure -a'),
-    'the retry stops the first attempt\'s apt-get before touching dpkg');
-  assert.match(retry,/pgrep -x 'apt-get\|dpkg'/);
-  assert.match(browser,/s#azure\\\.archive\\\.ubuntu\\\.com#archive\.ubuntu\.com#g/);
-  assert.match(browser,/timeout --kill-after=30 600 "\$@"/);
-  assert.match(browser,/timeout-minutes: 30/);
+test('browser dependency image matches the locked Playwright version and avoids apt mirror downloads', () => {
+  const playwright = JSON.parse(readFileSync('package.json', 'utf8')).devDependencies.playwright;
+  const image = browser.match(/image: mcr\.microsoft\.com\/playwright:v([\d.]+)-noble/);
+  assert.ok(image, 'browser job must use the official Noble Playwright image');
+  assert.equal(image[1], playwright, 'image and installed package versions must match');
+  assert.match(browser, /options: --ipc=host/);
+  assert.match(browser, /defaults:\n\s+run:\n\s+shell: bash/, 'container steps use Bash, not the default sh');
+  assert.match(browser, /git config --global --add safe\.directory "\$GITHUB_WORKSPACE"/,
+    'container must trust only its checked-out workspace for Git-backed preview validation');
+  assert.match(browser, /timeout-minutes: 30/);
+  const install = browser.split('      - name: Verify preinstalled Playwright browsers and install JS dependencies')[1]
+    ?.split('      - name: Start static site')[0] || '';
+  assert.match(install, /npm ci --no-audit --no-fund/);
+  assert.match(install, /BROWSER_GROUPS/);
+  assert.match(install, /groups\.includes\(',account,'\)/);
+  assert.match(install, /groups\.includes\(',admin,'\)/);
+  assert.match(install, /chromium, webkit/);
+  assert.match(install, /browser\.executablePath\(\)/);
+  assert.match(install, /accessSync\(executable, constants\.X_OK\)/);
+  assert.doesNotMatch(install, /--with-deps|sudo dpkg|apt-get\s+(?:install|update)/);
 });
 
 test('required checks cannot pass by silently skipping their selected validation', () => {

@@ -197,6 +197,8 @@ The guarded `Mobile store screenshots` workflow captures:
 3. Daily hub — `Three fresh Dailies.`
 4. Practice screen — `Keep drafting between Dailies.`
 5. Career/leaderboard — `Track your Pack One career.`
+
+For the new iOS 1.4 marketing screenshot order and captions, see [APP-STORE-1.4-PAGE.md](APP-STORE-1.4-PAGE.md). Do not rewrite the archived approved 1.0 captions.
 6. iOS Membership purchase state for the App Store subscription review screenshot.
 
 Capture outputs are generated for iPhone, iPad, and Android from the same production screen implementation. Before upload, visually compare the generated scenes against the accepted 1.0 RC and recapture any scene whose production layout or copy has materially changed. #910 changes Daily, Practice, Career, typography and feedback, so the earlier screenshot set is not evidence for this candidate. Only passing native captures identified in the repair ledger may replace those store assets; failed diagnostic captures must not be uploaded.

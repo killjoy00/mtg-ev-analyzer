@@ -55,6 +55,7 @@ import {
   type TrophyDeck,
 } from '@/src/api/draftRun';
 import { config } from '@/src/config';
+import { maybeRequestPackOneRating } from '@/src/ratingPrompt';
 import { useAppResume } from '@/src/hooks/useAppResume';
 import { clearPracticeIdempotencyKey, practiceIdempotencyKey } from '@/src/storage/idempotency';
 import { readSession, subscribeSession, type MobileSession } from '@/src/storage/session';
@@ -672,6 +673,22 @@ export default function DraftRunScreen({
       .catch(() => undefined);
     return () => { current = false; };
   }, [state, mode, shared]);
+
+  // Only consider the system StoreKit review prompt after repeat real Daily
+  // completions, with the result visible and the app active for several seconds.
+  // Never request a rating during a pick, reveal, shared run or screenshot capture.
+  const ratingRun = state.status === 'ready' && state.run.complete
+    && state.run.day === pacificDay() && !shared && !practice && mode === 'result'
+    ? { id: state.run.id, day: state.run.day } : null;
+  const ratingRunId = ratingRun?.id ?? null;
+  const ratingDay = ratingRun?.day ?? null;
+  useEffect(() => {
+    if (!ratingRunId || !ratingDay || !screenFocused || !appActive || config.screenshots.fixtures) return;
+    const timer = setTimeout(() => {
+      void maybeRequestPackOneRating(ratingRunId, ratingDay);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [ratingRunId, ratingDay, screenFocused, appActive]);
 
   const openTrophyDeck = useCallback(() => setDeckOpen(true), []);
   const loadDeckForReview = useCallback(() => {

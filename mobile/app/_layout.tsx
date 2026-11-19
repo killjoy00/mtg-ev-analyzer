@@ -47,6 +47,8 @@ function ScreenshotFixtureEntry() {
       return;
     } else if (scene === 'practice') {
       router.replace('/practice');
+    } else if (scene === 'leaderboard') {
+      router.replace('/leaderboard');
     } else if (scene === 'career') {
       router.replace('/career');
     } else if (scene === 'membership') {

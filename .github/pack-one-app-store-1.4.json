@@ -1,0 +1,15 @@
+{
+  "appId": "6814318676",
+  "bundleId": "pro.packone.app",
+  "platform": "IOS",
+  "version": "1.4",
+  "locale": "en-US",
+  "name": "Pack One",
+  "subtitle": "Daily Limited Draft Challenge",
+  "promotionalText": "Three daily challenges. Eight draft picks each. Compare your choices with trophy drafters and see how you stack up against other players.",
+  "keywords": "booster,pick,trophy,cube,leaderboard,practice,puzzle,deckbuilding,training,decision",
+  "description": "Would you make the same pick as a trophy drafter?\n\nPack One turns real trophy drafts into a daily draft challenge. Make your picks, see what the original drafter chose, and find out what the model thinks.\n\nEvery run has eight decisions taken from real trophy drafts. You'll see the pack and the cards the drafter had already picked. Make your choice before the reveal.\n\nThree new challenges every day\n\nDaily Draft Run, Daily Powered Cube, and Daily Latest Set. Everyone plays the same decisions, so you can compare your score with other players on the leaderboards.\n\nThe trophy drafter isn't always right\n\nMatching the trophy pick earns full points, but strong alternatives can earn partial credit. Review your decisions and see where you agreed - or disagreed - with the drafter and the model.\n\nKeep drafting\n\nPlay regular practice runs between Dailies, follow your results over time, and see how your drafting compares with other players.\n\nAll three Dailies are free, with no account required. A free account adds leaderboards, career history, and synchronization across iPhone, iPad, and packone.pro. Optional Elite membership unlocks additional practice options.\n\nPack One is unofficial Fan Content permitted under the Wizards Fan Content Policy and is not approved or endorsed by Wizards. Card metadata and images are sourced from Scryfall. Attribution and source-license details are available at https://packone.pro/terms/.\n\nTerms of Use (EULA): https://www.apple.com/legal/internet-services/itunes/dev/stdeula/\nPack One Terms: https://packone.pro/terms/\nPrivacy Policy: https://packone.pro/privacy/",
+  "whatsNew": "Finished a Daily at the reset? Your result now stays put until you choose to play the new Daily. We've also improved pick timing and recovery when a Daily expires.",
+  "supportUrl": "https://packone.pro/contact/",
+  "marketingUrl": "https://packone.pro/"
+}

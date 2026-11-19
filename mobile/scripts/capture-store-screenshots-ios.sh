@@ -58,8 +58,8 @@ capture() {
 capture "01-daily-decision" "daily-decision"
 capture "02-reveal-comparison" "reveal-comparison"
 capture "03-daily-hub" "daily-hub"
-capture "04-practice" "practice"
-capture "05-career" "career"
+capture "04-leaderboard" "leaderboard"
+capture "05-practice" "practice"
 capture "iap-review-membership" "membership"
 
 count=0
