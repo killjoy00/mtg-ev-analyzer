@@ -676,7 +676,8 @@ elif platform == 'ios':
         for setting in ['large', 'accessibility-extra-extra-extra-large']:
             command('xcrun', 'simctl', 'ui', udid, 'content_size', setting)
             scenes = [('guest','home'), ('guest','learn'), ('member','learn'), ('member-new','career'),
-                      ('member-long','feedback'), ('member-match','feedback'), ('member-zero','feedback')]
+                      ('member-long','feedback'), ('member-match','feedback'), ('member-zero','feedback'),
+                      ('member-perfect-result','result')]
             if setting == 'large':
                 scenes += [('member-insights-sparse','insights'),
                            ('member-insights-versions','insights')]
@@ -708,13 +709,14 @@ elif platform == 'ios':
                         layout_ready = (feedback_label in logs if screen == 'feedback' else
                                         'PACKONE_BRAND' in logs if screen == 'home' else
                                         'PACKONE_CAREER_READY' in logs if screen == 'career' else
+                                        'PACKONE_RESULT_READY' in logs if screen == 'result' else
                                         'PACKONE_INSIGHTS_READY' in logs if screen == 'insights' else
                                         'PACKONE_ACCOUNT_READY' in logs if screen == 'account' else
                                         'PACKONE_LEADERS_READY' in logs if screen == 'leaders' else
                                         'PACKONE_LEARN_READY' in logs if screen == 'learn' and scenario != 'guest' else
                                         'PACKONE_ARTICLE_READY' in logs if screen in ['learn','how-to','about','support','privacy','terms','terms-licenses']
                                         else False)
-                        if screen not in ['feedback','insights'] and setting != 'large':
+                        if screen not in ['feedback','insights','result'] and setting != 'large':
                             layout_ready = layout_ready and '"kind":"bar"' in logs
                         ready = scene_ready and 'PACKONE_FONTS' in logs and layout_ready
                         if ready:
@@ -733,7 +735,7 @@ elif platform == 'ios':
                         scene['headerless_tab'] = True
                     if screen == 'home':
                         scene['brand_metrics'] = measure_brand(logs)
-                    if screen not in ['feedback','insights'] and setting != 'large':
+                    if screen not in ['feedback','insights','result'] and setting != 'large':
                         scene['tab_metrics'] = measure_tabs(logs)
                         if label == 'iphone':
                             require(scene['tab_metrics']['bar']['layoutMode'] == 'horizontal-scroll',
@@ -745,6 +747,11 @@ elif platform == 'ios':
                     if screen == 'feedback':
                         scene['metrics'] = measure(logs, match='match' in scenario)
                         ios_metrics[(scenario, setting)] = scene['metrics']
+                    if screen == 'result':
+                        require('PACKONE_RESULT_READY' in logs, 'Completed result did not render natively')
+                        require('"score":100' in logs and '"answers":8' in logs and '"complete":true' in logs,
+                                'Perfect eight-pick result is not the expected saved server-shaped state')
+                        scene['complete_run'] = {'score': 100, 'answers': 8, 'simulated': True}
                     manifest['scenes'].append(scene)
                 attempt(name, ios_scene)
         def ios_text_growth():
