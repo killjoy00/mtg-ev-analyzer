@@ -19,12 +19,12 @@ test('Daily-home monetization is mutually exclusive and fails closed', () => {
   assert.equal(dailyHomePromotion(false, false, 'android'), 'none');
 });
 
-async function fixture(t, { consent, storedConsent, eligible = false, enabled = true, initError, att = 'granted', attRequest = 'granted' } = {}) {
+async function fixture(t, { consent, storedConsent, eligible = false, enabled = true, initError, att = 'granted', attRequest = 'granted', platform = 'ios' } = {}) {
   const calls = [];
   const diagnostics = [];
   const onStatus = event => diagnostics.push(event);
   const native = {
-    Platform: { OS: 'ios' },
+    Platform: { OS: platform },
     Pressable: host('Pressable'),
     Text: host('Text'),
     View: host('View'),
@@ -33,7 +33,7 @@ async function fixture(t, { consent, storedConsent, eligible = false, enabled = 
   const ads = {
     __esModule: true,
     BannerAd: host('BannerAd'),
-    BannerAdSize: { BANNER: 'BANNER' },
+    BannerAdSize: { BANNER: 'BANNER', ANCHORED_ADAPTIVE_BANNER: 'ANCHORED_ADAPTIVE_BANNER' },
     MaxAdContentRating: { G: 'G' },
     AdsConsent: {
       gatherConsent: async () => {
@@ -66,8 +66,9 @@ async function fixture(t, { consent, storedConsent, eligible = false, enabled = 
       },
     },
     '@/src/components/Text': { Text: host('Text') },
-    '@/src/config': { config: { adMob: { iosEnabled: enabled, androidEnabled: false,
-      iosBannerUnitId: 'ca-app-pub-3940256099942544/2934735716' }, screenshots: { fixtures: false } } },
+    '@/src/config': { config: { adMob: { iosEnabled: enabled && platform === 'ios', androidEnabled: enabled && platform === 'android',
+      iosBannerUnitId: 'ca-app-pub-3940256099942544/2934735716',
+      androidBannerUnitId: 'ca-app-pub-3940256099942544/6300978111' }, screenshots: { fixtures: false } } },
     '@/src/theme': { colors: {}, spacing: { sm: 8, md: 16 } },
   });
   let root;
@@ -217,4 +218,89 @@ test('disabled AdMob never starts UMP or the SDK', async t => {
   await act(async () => { await drain(); await drain(); });
   assert.deepEqual(h.calls, []);
   assert.equal(h.root.toJSON(), null);
+});
+
+
+test('Android banner uses adaptive sizing and consent, without iOS ATT', async t => {
+  const h = await fixture(t, { eligible: true, platform: 'android' });
+  await act(async () => { await drain(); await drain(); });
+  assert.deepEqual(h.calls, ['consent', 'configure', 'initialize']);
+  const banner = h.root.root.findByType('BannerAd');
+  assert.equal(banner.props.size, 'ANCHORED_ADAPTIVE_BANNER');
+  assert.equal(banner.props.unitId, 'ca-app-pub-3940256099942544/6300978111');
+  assert.equal(banner.props.requestOptions.requestNonPersonalizedAdsOnly, true);
+  await h.setEligible(false);
+  assert.equal(h.root.root.findAllByType('BannerAd').length, 0,
+    'ad-free account changes must immediately unmount the Android ad');
+});
+
+test('Android denied consent and disabled flag never start Google ads', async t => {
+  const denied = await fixture(t, {
+    platform: 'android', eligible: true,
+    consent: async () => ({ canRequestAds: false, privacyOptionsRequirementStatus: 'NOT_REQUIRED' }),
+  });
+  await act(async () => { await drain(); await drain(); });
+  assert.deepEqual(denied.calls, ['consent']);
+  assert.equal(denied.root.root.findAllByType('BannerAd').length, 0);
+  const disabled = await fixture(t, { platform: 'android', eligible: true, enabled: false });
+  assert.deepEqual(disabled.calls, []);
+  assert.equal(disabled.root.toJSON(), null);
+});
+
+test('Android live AdMob manifest audit requires opted-in real IDs and advertising ID disclosure', () => {
+  const { spawnSync } = require('node:child_process');
+  const { mkdtempSync, writeFileSync, readFileSync, rmSync } = require('node:fs');
+  const { tmpdir } = require('node:os');
+  const { join } = require('node:path');
+  const dir = mkdtempSync(join(tmpdir(), 'packone-android-admob-'));
+  const appId = 'ca-app-pub-1234567890123456~0123456789';
+  const bannerId = 'ca-app-pub-1234567890123456/0123456789';
+  const runAudit = ({ enabled = false, adId = false, manifestAppId = appId, envAppId = appId, envBannerId = bannerId }) => {
+    const manifest = [
+      '<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="pro.packone.app">',
+      adId ? '  <uses-permission android:name="com.google.android.gms.permission.AD_ID" />' : '',
+      '  <application>',
+      '    <meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="' + manifestAppId + '" />',
+      '  </application>',
+      '</manifest>',
+    ].join('\n');
+    const manifestPath = join(dir, 'AndroidManifest.xml');
+    const reportPath = join(dir, 'audit.json');
+    writeFileSync(manifestPath, manifest);
+    const env = { ...process.env, PACKONE_ADMOB_ANDROID_ENABLED: enabled ? '1' : '0',
+      PACKONE_ADMOB_ANDROID_APP_ID: envAppId, PACKONE_ADMOB_ANDROID_BANNER_ID: envBannerId };
+    const result = spawnSync('python3', ['scripts/audit-android-manifest.py', manifestPath, '--output', reportPath], {
+      cwd: process.cwd(), env, encoding: 'utf8',
+    });
+    return { result, report: JSON.parse(readFileSync(reportPath, 'utf8')) };
+  };
+  try {
+    const disabled = runAudit({ enabled: false });
+    assert.equal(disabled.result.status, 0, disabled.result.stderr);
+    assert.equal(disabled.report.android_admob_enabled, false);
+    const undeclared = runAudit({ enabled: false, adId: true });
+    assert.notEqual(undeclared.result.status, 0);
+    assert.ok(undeclared.report.forbidden_permissions_present.includes('com.google.android.gms.permission.AD_ID'));
+
+    const enabled = runAudit({ enabled: true, adId: true });
+    assert.equal(enabled.result.status, 0, enabled.result.stderr);
+    assert.equal(enabled.report.android_admob_enabled, true);
+    assert.equal(enabled.report.android_admob_app_id_matches, true);
+    assert.deepEqual(enabled.report.android_admob_policy_errors, []);
+
+    const wrongApp = runAudit({ enabled: true, adId: true, manifestAppId: 'ca-app-pub-3940256099942544~3347511713' });
+    assert.notEqual(wrongApp.result.status, 0);
+    assert.match(wrongApp.result.stderr, /App ID does not match/);
+    const missingAdId = runAudit({ enabled: true, adId: false });
+    assert.notEqual(missingAdId.result.status, 0);
+    assert.match(missingAdId.result.stderr, /missing the expected AD_ID/);
+    const demoIds = runAudit({ enabled: true, adId: true,
+      envAppId: 'ca-app-pub-3940256099942544~3347511713',
+      envBannerId: 'ca-app-pub-3940256099942544/6300978111',
+      manifestAppId: 'ca-app-pub-3940256099942544~3347511713' });
+    assert.notEqual(demoIds.result.status, 0);
+    assert.match(demoIds.result.stderr, /non-demo App ID/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
