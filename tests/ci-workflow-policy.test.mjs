@@ -206,29 +206,29 @@ test('Android routine CI stays paused; only an explicit reviewed AAB release req
 
   const releaseTriggers = android.split('permissions:')[0];
   assert.match(releaseTriggers, /workflow_dispatch:/);
-  assert.match(releaseTriggers, /push:\\n    branches: \\[main\\]\\n    paths:\\n      - '\\.github\\/android-production-bundle-request\\.json'/,
+  assert.match(releaseTriggers, /push:\n    branches: \[main\]\n    paths:\n      - '\.github\/android-production-bundle-request\.json'/,
     'Only the reviewed AAB request can trigger a protected Android build on main');
-  assert.match(releaseTriggers, /pull_request:\\n    types: \\[opened, synchronize, reopened\\]\\n    paths:\\n      - '\\.github\\/android-production-bundle-request\\.json'\\n      - '\\.github\\/workflows\\/android-production-bundle\\.yml'/,
+  assert.match(releaseTriggers, /pull_request:\n    types: \[opened, synchronize, reopened\]\n    paths:\n      - '\.github\/android-production-bundle-request\.json'\n      - '\.github\/workflows\/android-production-bundle\.yml'/,
     'Only Android release controls can trigger non-publishing PR smoke');
-  assert.doesNotMatch(releaseTriggers, /- 'mobile\\/\\*\\*'/,
+  assert.doesNotMatch(releaseTriggers, /- 'mobile\/\*\*'/,
     'Ordinary mobile source changes must not automatically run Android Gradle');
-  assert.match(android, /github\\.ref == 'refs\\/heads\\/main'/);
+  assert.match(android, /github\.ref == 'refs\/heads\/main'/);
   assert.match(android, /environment: pack-one-mobile-release/);
-  assert.match(android, /github\\.event_name == 'push'/);
+  assert.match(android, /github\.event_name == 'push'/);
 
   for (const [name, flow] of [['internal', internal], ['historical baseline', baseline]]) {
     const triggers = flow.split('permissions:')[0];
     assert.match(triggers, /workflow_dispatch:/, name);
-    assert.doesNotMatch(triggers, /\\n  (?:push|pull_request):/, name + ' remains manual-only');
+    assert.doesNotMatch(triggers, /\n  (?:push|pull_request):/, name + ' remains manual-only');
   }
-  assert.match(ios, /- '\\.github\\/scripts\\/app-store-\\*\\.mjs'/);
+  assert.match(ios, /- '\.github\/scripts\/app-store-\*\.mjs'/);
   assert.match(ios, /pull_request:/, 'iOS validation remains active');
 
   assert.ok(screenshots.includes("if: needs.validate.outputs.capture_required == 'true' && (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.android_only"), 'Android screenshot job requires explicit manual/reusable opt-in');
   assert.match(screenshots, /pull_request:/, 'iOS screenshot checks still run');
-  assert.match(rc, /github\\.event_name == 'workflow_dispatch' && inputs\\.include_android/, 'Android RC bundles require manual opt-in');
-  assert.match(rc, /needs\\.android-bundle\\.result == 'skipped'/, 'iOS RC manifest must survive skipped Android');
-  assert.match(rc, /needs\\.android-bundle\\.result == 'success'/, 'requested Android build must succeed to record RC');
+  assert.match(rc, /github\.event_name == 'workflow_dispatch' && inputs\.include_android/, 'Android RC bundles require manual opt-in');
+  assert.match(rc, /needs\.android-bundle\.result == 'skipped'/, 'iOS RC manifest must survive skipped Android');
+  assert.match(rc, /needs\.android-bundle\.result == 'success'/, 'requested Android build must succeed to record RC');
   assert.match(rc, /not built; Android CI paused/, 'do not claim nonexistent Android artifact');
 });
 
