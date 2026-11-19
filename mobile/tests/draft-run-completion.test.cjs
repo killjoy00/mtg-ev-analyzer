@@ -128,7 +128,7 @@ test('the eighth native Daily pick advances to a readable saved result, even wit
       await Promise.resolve();
     });
     assert.match(renderedText(root.toJSON()), /Your Draft Run/);
-    assert.match(renderedText(root.toJSON()), /Your 8 picks/);
+    assert.match(renderedText(root.toJSON()), /Your\s+8\s+picks/);
     const rows = root.root.findAll(node => node.type === 'Pressable' &&
       /^(Review|Saved) pick [1-8],/.test(node.props.accessibilityLabel || ''));
     assert.equal(rows.length, 8, 'all eight saved picks remain represented on the result');
