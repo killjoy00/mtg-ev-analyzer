@@ -2,7 +2,9 @@
 
 **Scope:** shared React Native iOS + Android UI, compared with the website's November site-wide cleanup (#1423, #1428, #1430–#1433), its source-of-truth [design system](DESIGN-SYSTEM.md), and latest native sources on `main`. This audit compares **decisions and principles**, not pixel positions. The site, iOS and Android should look like one product, but use the interaction model best suited to each platform.
 
-**Updated baseline:** includes the November 19 iOS email-reminder parity changes and Android advertising work already in main; this PR changes only their UI spacing, not reminder, permissions, billing, or ad behavior.\n\n**Baseline finding:** the November 7 [mobile parity inventory](mobile-parity-inventory.md) correctly marked the web's new page frame, phone menu and compact Daily layout as *web-only*. Content and features were synchronized afterward (#1499, #1616, #1628), but not the native page geometry. Native pages still used 24px outer gutters, 24–32px panel padding, and stacked 24–32px spacing; the tab navigator also rendered a separate title row above each content title. On small screens, these independent choices compounded into excessive white space.
+**Updated baseline:** includes the November 19 iOS email-reminder parity changes and Android advertising work already in main; this PR changes only their UI spacing, not reminder, permissions, billing, or ad behavior.
+
+**Baseline finding:** the November 7 [mobile parity inventory](mobile-parity-inventory.md) correctly marked the web's new page frame, phone menu and compact Daily layout as *web-only*. Content and features were synchronized afterward (#1499, #1616, #1628), but not the native page geometry. Native pages still used 24px outer gutters, 24–32px panel padding, and stacked 24–32px spacing; the tab navigator also rendered a separate title row above each content title. On small screens, these independent choices compounded into excessive white space.
 
 ## Design rules applied
 
