@@ -1,6 +1,7 @@
 import { ResultsPreferences } from '@/src/components/ResultsPreferences';
-import { AdMobDailyBanner } from '@/src/components/AdMobDailyBanner';
+import { AdMobDailyBanner, type AdDiagnostic } from '@/src/components/AdMobDailyBanner';
 import { dailyHomePromotion } from '@/src/ads/placement';
+import { isTestFlightEnvironment } from '@/src/ads/isTestFlight';
 import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -55,11 +56,37 @@ function completed(status: DailyStatus | null, environment: DailyEnvironment) {
 const HOME_LABELS: Record<DailyEnvironment, string> = { mixed: 'A MIX OF SETS', 'powered-cube': 'POWERED CUBE PICKS', latest: 'ONLY THE NEWEST SET' };
 const HOME_TITLES: Record<DailyEnvironment, string> = { mixed: 'Daily Draft Run', 'powered-cube': 'Daily Powered Cube', latest: 'Daily Latest Set' };
 
+const AD_STATUS_LABELS: Record<AdDiagnostic['stage'], string> = {
+  starting: 'Waiting for ad eligibility',
+  'consent-checking': 'Checking Google consent',
+  'consent-ready': 'Google consent allows an ad request',
+  'consent-blocked': 'Google consent does not allow an ad request',
+  'consent-error': 'Google consent could not be verified',
+  'tracking-checked': 'Checking advertising setup',
+  'tracking-error': 'Could not check iOS tracking preference',
+  'sdk-initializing': 'Starting Google ads',
+  'sdk-error': 'Google ads could not start',
+  'banner-requested': 'Banner requested; waiting for Google',
+  'banner-loaded': 'Banner loaded',
+  'banner-no-fill': 'Google returned no ad for this request',
+  'banner-error': 'Google could not load the banner',
+};
+
 export default function HomeScreen() {
   const accountState = useNavigationSession();
   const [status, setStatus] = useState<DailyStatus | null>(null);
   const [promotionAllowed, setPromotionAllowed] = useState<boolean | null>(null);
   const [promotionError, setPromotionError] = useState<string | null>(null);
+  const [adStatusOpen, setAdStatusOpen] = useState(false);
+  const [showAdDiagnostics, setShowAdDiagnostics] = useState(false);
+  const [adDiagnostic, setAdDiagnostic] = useState<AdDiagnostic>({ stage: 'starting' });
+  const onAdStatus = useCallback((event: AdDiagnostic) => setAdDiagnostic(previous => ({ ...previous, ...event })), []);
+  useEffect(() => {
+    if (Platform?.OS !== 'ios' || config.screenshots?.fixtures) return;
+    let active = true;
+    void isTestFlightEnvironment().then(allowed => { if (active) setShowAdDiagnostics(allowed); });
+    return () => { active = false; };
+  }, []);
   const [phase, setPhase] = useState<'checking' | 'ready' | 'unavailable'>('checking');
   const [now, setNow] = useState(() => new Date());
   const [claimed, setClaimed] = useState(false);
@@ -74,6 +101,7 @@ export default function HomeScreen() {
     setNow(new Date());
     setPhase('checking');
     setPromotionAllowed(null);
+    setAdDiagnostic({ stage: 'starting' });
     try {
       const session = await ensureGuestSession();
       if (id !== requestId.current) return;
@@ -117,6 +145,7 @@ export default function HomeScreen() {
     setStatus(null);
     setPromotionAllowed(null);
     setPromotionError(null);
+    setAdDiagnostic({ stage: 'starting' });
     void refresh();
   }), [refresh]);
   useAppResume(refresh);
@@ -252,7 +281,7 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
-        {promotion === 'admob' ? <AdMobDailyBanner eligible={promotionAllowed === true} /> : null}
+        {promotion === 'admob' ? <AdMobDailyBanner eligible={promotionAllowed === true} onStatus={onAdStatus} /> : null}
         {promotion === 'affiliate' ? (
           <View style={styles.affiliatePromo}>
             <Pressable
@@ -275,6 +304,31 @@ export default function HomeScreen() {
             </Pressable>
             <Text style={styles.affiliateDisclosure}>Affiliate link. Pack One may earn a commission from purchases.</Text>
             {promotionError ? <Text accessibilityRole="alert" style={styles.promotionError}>{promotionError}</Text> : null}
+          </View>
+        ) : null}
+
+        {showAdDiagnostics && Platform?.OS === 'ios' && !config.screenshots?.fixtures ? (
+          <View style={styles.adSupport}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Check ad status"
+              accessibilityState={{ expanded: adStatusOpen }}
+              onPress={() => setAdStatusOpen(open => !open)}
+              style={styles.adStatusButton}
+            >
+              <Text style={styles.adStatusLink}>Check ad status</Text>
+            </Pressable>
+            {adStatusOpen ? <View style={styles.adStatusDetails}>
+              <Text style={styles.statusText}>Ad configuration: {nativeAdMobEnabled ? 'enabled' : 'unavailable'}</Text>
+              <Text style={styles.statusText}>Account eligibility: {promotionAllowed === null ? 'checking' : promotionAllowed ? 'allowed' : 'not allowed or unavailable'}</Text>
+              {promotionAllowed === true && nativeAdMobEnabled ? <>
+                <Text style={styles.statusText}>Google: {AD_STATUS_LABELS[adDiagnostic.stage]}</Text>
+                {adDiagnostic.consent ? <Text style={styles.statusText}>Consent: {adDiagnostic.consent}</Text> : null}
+                {adDiagnostic.tracking ? <Text style={styles.statusText}>iOS tracking: {adDiagnostic.tracking}</Text> : null}
+                {adDiagnostic.code ? <Text style={styles.statusText}>Error code: {adDiagnostic.code}</Text> : null}
+              </> : null}
+              <Text style={styles.statusText}>No personal details or consent strings are shown.</Text>
+            </View> : null}
           </View>
         ) : null}
 
@@ -352,6 +406,10 @@ const styles = StyleSheet.create({
   affiliateAction: { color: colors.accentDark, fontSize: 12, fontWeight: '800' },
   affiliateDisclosure: { color: colors.muted, fontSize: 12, lineHeight: 18 },
   promotionError: { color: colors.danger, fontSize: 12, lineHeight: 17 },
+  adSupport: { paddingTop: spacing.sm, paddingBottom: spacing.lg },
+  adStatusButton: { minHeight: 44, alignItems: 'center', justifyContent: 'center' },
+  adStatusLink: { color: colors.muted, fontSize: 13, textDecorationLine: 'underline' },
+  adStatusDetails: { padding: spacing.md, gap: spacing.sm, backgroundColor: colors.surfaceSoft, borderRadius: 6 },
   utilityCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
