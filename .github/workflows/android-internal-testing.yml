@@ -71,6 +71,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NATIVE_FULL: ${{ needs.native-scope.result != 'success' || needs.native-scope.outputs.native_full != 'false' }}
+      PACKONE_BUILD_PROFILE: production
+      EXPO_PUBLIC_PACKONE_ENV: production
     defaults:
       run:
         working-directory: mobile
@@ -157,6 +159,9 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    env:
+      PACKONE_BUILD_PROFILE: production
+      EXPO_PUBLIC_PACKONE_ENV: production
     defaults:
       run:
         working-directory: mobile
@@ -296,6 +301,9 @@ jobs:
       - name: Build signed production bundle
         working-directory: mobile/android
         run: ./gradlew :app:bundleRelease --no-daemon
+
+      - name: Verify signed internal Android AAB embeds production and ad-disabled runtime config
+        run: node ./scripts/check-android-admob-bundle.mjs android/app/build/outputs/bundle/release/app-release.aab disabled
 
       - name: Audit signed Android privacy surface
         working-directory: mobile/android
