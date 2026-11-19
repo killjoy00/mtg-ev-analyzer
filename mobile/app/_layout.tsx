@@ -35,7 +35,7 @@ function ScreenshotFixtureEntry() {
       const [, scenario, screen] = scene.split(':');
       router.replace({ pathname: '/native-acceptance', params: { scenario: scenario || 'member', destination: screen || 'home' } });
     } else if (scene === 'daily-decision') {
-      router.replace({ pathname: '/draft-run', params: { environment: 'mixed' } });
+      router.replace({ pathname: '/draft-run', params: { environment: 'mixed', screenshot: 'cards' } });
     } else if (scene === 'reveal-comparison') {
       // Use the dedicated fixture-only route instead of replacing into the
       // draft-run query shape during cold startup. This avoids a transient
