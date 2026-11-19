@@ -111,7 +111,8 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   assert.match(nativeAcceptance, /'member','leaders'/);
   assert.match(nativeAcceptance, /'member','account'/);
   assert.match(nativeAcceptance, /'guest','terms-licenses'/);
-  assert.match(nativeAcceptance, /require\('help' not in boxes, 'Legacy Help control is still present in the native tab header'\)/);
+  assert.match(nativeAcceptance, /assert_no_duplicate_tab_header\(logs\)/);
+  assert.match(nativeAcceptance, /Redundant native tab header was mounted/);
   assert.match(nativeAcceptance, /require\('help' not in boxes, 'Legacy Help control is still present in the Home brand row'\)/);
   assert.doesNotMatch(nativeAcceptance, /\['title', 'help'\]/);
   assert.doesNotMatch(nativeAcceptance, /\('help', 'row'\)/);
