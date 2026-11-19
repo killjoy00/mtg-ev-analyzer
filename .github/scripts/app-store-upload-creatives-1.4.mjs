@@ -56,14 +56,15 @@ function jpegSize(buffer) {
   throw Error('Missing JPEG dimensions');
 }
 const definitions=[
-  {type:'PRODUCT_PAGE_HEADER_ASSET',file:root+'/pack-one-14-header.png',sha:request.headerSha256,
+  {type:'PRODUCT_PAGE_HEADER_ASSET',file:root+'/pack-one-14-header.png',sourceFile:root+'/pack-one-14-header.jpg',sourceSha:request.headerSha256,
    width:3840,height:1646,name:'pack_one_appstore_header_v5_1_4.png'},
-  {type:'APP_STORE_SEARCH_RESULTS_ASSET',file:root+'/pack-one-14-search.png',sha:request.searchSha256,
+  {type:'APP_STORE_SEARCH_RESULTS_ASSET',file:root+'/pack-one-14-search.png',sourceFile:root+'/pack-one-14-search.jpg',sourceSha:request.searchSha256,
    width:1920,height:1280,name:'pack_one_appstore_search_results_v5_1_4.png'},
 ];
 for(const x of definitions) {
+  const source=readFileSync(x.sourceFile);
+  if(createHash('sha256').update(source).digest('hex')!==x.sourceSha)throw Error('Unreviewed creative source bytes: '+x.sourceFile);
   x.buffer=readFileSync(x.file);
-  if(createHash('sha256').update(x.buffer).digest('hex')!==x.sha)throw Error('Unreviewed creative bytes: '+x.file);
   const [h,w]=imageSize(x.buffer);
   if(w!==x.width||h!==x.height)throw Error('Bad Apple creative dimensions '+x.file+' '+w+'x'+h);
 }

@@ -34,11 +34,11 @@ test('Pack One 1.4 creative images are byte-pinned and exact Apple dimensions',(
  assert.equal(manifest.locale,'en-US');
  for(const [basename,hash,dimensions] of [
   ['header',manifest.headerSha256,[3840,1646]],
-  ['search',manifest.searchSha256,[1920,1280]],
+  ['search',manifest.searchSha256,[3840,2560]],
  ]) {
-  const data=readFileSync('.github/app-store-creative-assets/pack-one-14-'+basename+'.png');
+  const data=readFileSync('.github/app-store-creative-assets/pack-one-14-'+basename+'.jpg');
   assert.equal(createHash('sha256').update(data).digest('hex'),hash);
-  assert.deepEqual(pngDimensions(data),dimensions);
+  assert.deepEqual(jpegDimensions(data),dimensions);
  }
 });
 test('Apple creative uploader is syntax-valid, version-scoped, and does not release or submit',()=>{
