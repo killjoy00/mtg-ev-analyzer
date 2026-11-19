@@ -144,3 +144,13 @@ test('native acceptance measures nested reveal score within its real parent', ()
   assert.match(acceptance, /path = \['summary', 'score'\] if label == 'score' else \['summary', 'copy', label\]/);
   assert.doesNotMatch(acceptance, /\('score', 'feedback'\)/);
 });
+
+test('reveal comparison shares iPad row width without clipping third card; stacked accessibility cards stay full width', () => {
+  const draft = read('app/draft-run.tsx');
+  assert.match(draft, /style=\{\[styles\.feedbackComparison, stack && \{ flexDirection: 'column' \}\]\}/);
+  assert.match(draft, /style=\{\[styles\.feedbackCard, !stack && styles\.feedbackCardRowItem, toneStyle\]\}/);
+  assert.match(draft, /<RevealChoiceCard[\s\S]*?stack=\{stack\}/);
+  assert.match(style('app/draft-run.tsx', 'feedbackCardRowItem'), /flexBasis:\s*0/);
+  assert.match(style('app/draft-run.tsx', 'feedbackCardRowItem'), /width:\s*0/);
+  assert.match(style('app/draft-run.tsx', 'feedbackCard'), /width:\s*'100%'/);
+});
