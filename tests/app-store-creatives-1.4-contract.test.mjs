@@ -8,6 +8,11 @@ const scriptPath='.github/scripts/app-store-upload-creatives-1.4.mjs';
 const workflow=readFileSync('.github/workflows/app-store-creatives-1.4.yml','utf8');
 const source=readFileSync(scriptPath,'utf8');
 const manifest=JSON.parse(readFileSync('.github/app-store-creative-upload-request.json','utf8'));
+function pngDimensions(bytes) {
+ assert.equal(bytes.subarray(0,8).toString('hex'),'89504e470d0a1a0a');
+ assert.equal(bytes[25],2);
+ return [bytes.readUInt32BE(16),bytes.readUInt32BE(20)];
+}
 function jpegDimensions(bytes) {
  let p=2;
  while(p+12<bytes.length) {
@@ -29,11 +34,11 @@ test('Pack One 1.4 creative images are byte-pinned and exact Apple dimensions',(
  assert.equal(manifest.locale,'en-US');
  for(const [basename,hash,dimensions] of [
   ['header',manifest.headerSha256,[3840,1646]],
-  ['search',manifest.searchSha256,[3840,2560]],
+  ['search',manifest.searchSha256,[1920,1280]],
  ]) {
-  const data=readFileSync('.github/app-store-creative-assets/pack-one-14-'+basename+'.jpg');
+  const data=readFileSync('.github/app-store-creative-assets/pack-one-14-'+basename+'.png');
   assert.equal(createHash('sha256').update(data).digest('hex'),hash);
-  assert.deepEqual(jpegDimensions(data),dimensions);
+  assert.deepEqual(pngDimensions(data),dimensions);
  }
 });
 test('Apple creative uploader is syntax-valid, version-scoped, and does not release or submit',()=>{
