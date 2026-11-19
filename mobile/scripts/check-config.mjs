@@ -121,6 +121,34 @@ assert.equal(liveIos.extra.adMob.testBanners, false);
 assert.equal(production.plugins.some(plugin => Array.isArray(plugin)
   && plugin[0] === 'react-native-google-mobile-ads'
   && plugin[1].delayAppMeasurementInit === true), true);
+
+const fakeAndroidAppId = 'ca-app-pub-1234567890123456~0123456789';
+const fakeAndroidBannerId = 'ca-app-pub-1234567890123456/0123456789';
+const androidAds = loadConfig('production', {
+  PACKONE_ADMOB_ANDROID_ENABLED: '1',
+  PACKONE_ADMOB_ANDROID_APP_ID: fakeAndroidAppId,
+  PACKONE_ADMOB_ANDROID_BANNER_ID: fakeAndroidBannerId,
+});
+assert.equal(androidAds.extra.adMob.androidEnabled, true);
+assert.equal(androidAds.extra.adMob.iosEnabled, false);
+assert.equal(androidAds.extra.adMob.androidBannerUnitId, fakeAndroidBannerId);
+assert.equal(androidAds.extra.adMob.iosBannerUnitId, undefined);
+assert.equal(androidAds.extra.adMob.testBanners, false);
+assert.equal(androidAds.plugins.find(plugin => Array.isArray(plugin)
+  && plugin[0] === 'react-native-google-mobile-ads')?.[1]?.androidAppId, fakeAndroidAppId);
+assert.equal(androidAds.android.blockedPermissions.includes('com.google.android.gms.permission.AD_ID'), false,
+  'Google advertising ID is permitted only in explicitly enabled Android AdMob builds');
+assert.equal(production.android.blockedPermissions.includes('com.google.android.gms.permission.AD_ID'), true);
+assert.throws(() => loadConfig('production', { PACKONE_ADMOB_ANDROID_ENABLED: '1' }),
+  /Live AdMob requires matching, non-demo/, 'never ship a live AdMob build with sample IDs');
+assert.throws(() => loadConfig('production', {
+  PACKONE_ADMOB_ANDROID_ENABLED: '1',
+  PACKONE_ADMOB_ANDROID_APP_ID: fakeAndroidAppId,
+  PACKONE_ADMOB_ANDROID_BANNER_ID: 'ca-app-pub-9999999999999999/0123456789',
+}), /Live AdMob requires matching, non-demo/, 'App and banner must share a publisher');
+assert.equal(testAdsPreview.extra.adMob.androidEnabled, true);
+assert.equal(testAdsPreview.extra.adMob.androidBannerUnitId, 'ca-app-pub-3940256099942544/6300978111');
+
 assert.equal(production.extra?.eas?.projectId, undefined);
 assert.deepEqual(
   new Set(production.android.blockedPermissions || []),
@@ -147,4 +175,4 @@ const iosProduction = loadConfig('production', {
 assert.equal(iosProduction.version, storeRelease.appStoreVersion);
 assert.equal(production.version, storeRelease.playVersionName);
 
-console.log('Expo native release config checks passed with platform-specific store marketing versions, iOS-only IAP autolinking and without EAS project linkage.');
+console.log('Expo native release config checks passed with platform-specific AdMob privacy gates, store marketing versions, iOS-only IAP autolinking and without EAS project linkage.');
