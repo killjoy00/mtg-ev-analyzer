@@ -390,7 +390,10 @@ jobs:
         run: node ./scripts/configure-android-upload-signing.mjs
       - name: Build signed production bundle
         working-directory: mobile/android
-        run: ./gradlew :app:bundleRelease --no-daemon
+        # The default generated Gradle daemon has only 2 GiB heap and 512 MiB
+        # metaspace; R8 exhausted its heap on the post-#1681 signed build.
+        # Keep this override scoped to the protected signed release job.
+        run: ./gradlew :app:bundleRelease --no-daemon --max-workers=2 '-Dorg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=768m -Dfile.encoding=UTF-8'
 
       - name: Verify signed AAB embeds reviewed Production Android AdMob runtime config
         run: |
