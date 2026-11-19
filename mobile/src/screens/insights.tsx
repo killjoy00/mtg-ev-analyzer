@@ -1,8 +1,8 @@
 import { CardFaceViewer } from '@/src/components/CardFaceViewer';
 import { cardFaceIndicator } from '../../../card-faces.mjs';
-import { router, Stack, useFocusEffect } from 'expo-router';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import {safeCardImageUrl} from '../../../card-image-policy.mjs';
 import { Text } from '@/src/components/Text';
 import { ScreenArea as SafeAreaView } from '@/src/components/ScreenArea';
@@ -80,7 +80,7 @@ function ChoiceRow<T extends string>({ name, values, selected, onChange }: {
 }
 
 function Section({ title, caption, children, compact=false, onLayout }: {
-  title:string;caption?:string;children:React.ReactNode;compact?:boolean;onLayout?:()=>void;
+  title:string;caption?:string;children:React.ReactNode;compact?:boolean;onLayout?:(event:LayoutChangeEvent)=>void;
 }) {
   return <View style={[styles.section,compact&&styles.dnaSection]} onLayout={onLayout}>
     <Text accessibilityRole="header" style={styles.sectionTitle}>{title}</Text>
@@ -248,9 +248,10 @@ function SavedDecisionDetail({detail,onClose}: {detail:InsightDecision;onClose:(
     </Pressable>
   </View>;
 }
-function HighlightsStory({highlights,finding,onReview,onLoadMore,morePhase}:{
+function HighlightsStory({highlights,finding,onReview,onLoadMore,morePhase,onCaptureLayout}:{
   highlights:InsightHighlights;finding?:{id:string;text:string}|null;
   onReview:(item:InsightHighlight)=>void;onLoadMore:()=>void;morePhase:'idle'|'loading'|'error';
+  onCaptureLayout?:(y:number)=>void;
 }) {
   const [selected,setSelected]=useState<'best'|'misses'>(highlights.misses?.length?'misses':'best');
   const [expanded,setExpanded]=useState(false);
@@ -258,7 +259,10 @@ function HighlightsStory({highlights,finding,onReview,onLoadMore,morePhase}:{
   const rows=selected==='best'?highlights.best:highlights.misses;
   const show=expanded?rows:(rows||[]).slice(0,3);
   return <Section title="Picks to review" caption="We count each puzzle once, even if you play it again."
-    onLayout={config.screenshots.fixtures?()=>console.info('PACKONE_INSIGHTS_READY'):undefined}>
+    onLayout={config.screenshots.fixtures?(event)=>{
+      console.info('PACKONE_INSIGHTS_READY');
+      onCaptureLayout?.(event.nativeEvent.layout.y);
+    }:undefined}>
     {finding?<Text style={styles.reportLead}>{finding.text} Individual examples illustrate the comparison, not its cause.</Text>:
       <Text style={styles.caption}>Open a pick to see the full pack and the trophy drafter’s earlier picks.</Text>}
     <View style={styles.choices}>
@@ -383,9 +387,10 @@ function LegacyJourney({progress,months}:{
       </Pressable>:null}</>:null}
   </Section>;
 }
-function InsightSections({data,onReview,onLoadMore,morePhase}:{
+function InsightSections({data,onReview,onLoadMore,morePhase,onCaptureLayout}:{
   data:DraftInsights;onReview:(item:InsightDecisionLocator)=>void;
   onLoadMore:()=>void;morePhase:'idle'|'loading'|'error';
+  onCaptureLayout?:(y:number)=>void;
 }) {
   const [explore,setExplore]=useState(false);
   // DNA and qualifying card-choice counts are all-history, not filtered-view data.
@@ -409,7 +414,7 @@ function InsightSections({data,onReview,onLoadMore,morePhase}:{
     ?(data.observations||[]).filter(row=>['progress','pick-depth'].includes(row.id)&&row.id!==finding?.id):[];
   return <>
     {data.highlights?<HighlightsStory highlights={data.highlights} finding={finding}
-      onReview={onReview} onLoadMore={onLoadMore} morePhase={morePhase}/>:
+      onReview={onReview} onLoadMore={onLoadMore} morePhase={morePhase} onCaptureLayout={onCaptureLayout}/>:
       <Section title="Picks to review"><Text style={styles.caption}>Pick examples aren’t available from this version yet.</Text></Section>}
     {dnaSection}
     {data.journey?<JourneyStory journey={data.journey} progress={data.progress} months={data.months||[]}/>:
@@ -445,6 +450,15 @@ function InsightSections({data,onReview,onLoadMore,morePhase}:{
 }
 
 export default function InsightsScreen() {
+  const params = useLocalSearchParams<{ screenshot?: string }>();
+  const screenshotScroll = useRef<ScrollView>(null);
+  const screenshotPositioned = useRef(false);
+  const focusOnReview = useCallback((y:number) => {
+    if (!config.screenshots.fixtures || params.screenshot !== 'picks' || screenshotPositioned.current) return;
+    screenshotPositioned.current = true;
+    requestAnimationFrame(() => screenshotScroll.current?.scrollTo({ y: Math.max(0, y - 20), animated: false }));
+    console.info('PACKONE_SCREENSHOT_FOCUS', JSON.stringify({ scene: 'real-insights-review', y }));
+  }, [params.screenshot]);
   const [environment, setEnvironment] = useState<InsightsEnvironment>('mixed');
   const [period, setPeriod] = useState<InsightsPeriod>('all');
   const [data, setData] = useState<DraftInsights | null>(null);
@@ -569,7 +583,7 @@ export default function InsightsScreen() {
 
   return <SafeAreaView style={styles.safe}>
     <Stack.Screen options={{ title: 'My Pack One' }} />
-    <ScrollView contentContainerStyle={styles.page}>
+    <ScrollView ref={screenshotScroll} contentContainerStyle={styles.page}>
       <Text style={styles.eyebrow}>MY PACK ONE</Text>
       <MyPackSectionTabs active="insights" />
       <Text accessibilityRole="header" style={styles.heading}>Your picks</Text>
@@ -590,7 +604,7 @@ export default function InsightsScreen() {
       {phase === 'ready' && data ? <>
         <Text style={styles.summary}>{num(data.eligible_decisions)} picks included · {data.environment==='mixed'?'Mixed sets':data.environment_label} · {periods.find(p => p.value === period)?.label}</Text>
         <InsightSections key={environment+'|'+period} data={data} onReview={reviewDetail}
-          onLoadMore={()=>void loadMore()} morePhase={morePhase}/>
+          onLoadMore={()=>void loadMore()} morePhase={morePhase} onCaptureLayout={focusOnReview}/>
       </> : null}
     </ScrollView>
     {detailPhase!=='idle'?<Modal visible animationType="slide" onRequestClose={closeDetail}
