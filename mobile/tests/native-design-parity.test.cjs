@@ -34,6 +34,8 @@ test('Daily is a compact numbered scorecard with a wrapping side action', () => 
   assert.match(style('src/screens/index.tsx', 'dailyCardCopy'), /minWidth: 150/);
   assert.match(style('src/screens/index.tsx', 'dailyButton'), /minWidth: 92/);
   assert.match(style('src/screens/index.tsx', 'dailyButton'), /flexGrow: 1/);
+  assert.match(style('src/screens/index.tsx', 'cardIndex'), /minWidth: 26/);
+  assert.doesNotMatch(style('src/screens/index.tsx', 'cardIndex'), /(?:^|\s)width:/);
   assert.match(style('src/screens/index.tsx', 'cubeAccent'), /#976822/);
   assert.match(style('src/screens/index.tsx', 'latestAccent'), /#8c4b36/);
   assert.match(style('src/screens/index.tsx', 'primaryButton'), /minHeight: 48/);
