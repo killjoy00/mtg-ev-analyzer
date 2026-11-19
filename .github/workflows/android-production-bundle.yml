@@ -75,6 +75,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NATIVE_FULL: ${{ needs.native-scope.result != 'success' || needs.native-scope.outputs.native_full != 'false' }}
+      PACKONE_BUILD_PROFILE: production
+      EXPO_PUBLIC_PACKONE_ENV: production
     defaults:
       run:
         working-directory: mobile
@@ -188,6 +190,12 @@ jobs:
         if: env.NATIVE_FULL == 'true'
         working-directory: mobile/android
         run: ./gradlew :app:bundleRelease --no-daemon --build-cache
+      - name: Verify PR embedded Android runtime AdMob settings
+        if: env.NATIVE_FULL == 'true'
+        run: |
+          expected="$(node -p "require('../.github/android-production-bundle-request.json').android_admob || 'disabled'")"
+          node ./scripts/check-android-admob-bundle.mjs android/app/build/outputs/bundle/release/app-release.aab "$expected"
+
       - name: Verify PR smoke bundle exists
         if: env.NATIVE_FULL == 'true'
         working-directory: mobile/android
@@ -233,6 +241,9 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    env:
+      PACKONE_BUILD_PROFILE: production
+      EXPO_PUBLIC_PACKONE_ENV: production
     defaults:
       run:
         working-directory: mobile
@@ -380,6 +391,11 @@ jobs:
       - name: Build signed production bundle
         working-directory: mobile/android
         run: ./gradlew :app:bundleRelease --no-daemon
+
+      - name: Verify signed AAB embeds reviewed Production Android AdMob runtime config
+        run: |
+          expected="$(node -p "require('../.github/android-production-bundle-request.json').android_admob || 'disabled'")"
+          node ./scripts/check-android-admob-bundle.mjs android/app/build/outputs/bundle/release/app-release.aab "$expected"
 
       - name: Verify R8 mapping in signed Play bundle
         shell: bash
