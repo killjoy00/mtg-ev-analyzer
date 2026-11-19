@@ -342,3 +342,22 @@ test('Daily reset and streak appear only after all three Dailies are complete fo
  assert.match(complete,/data-daily-reset/);
  assert.match(complete,/9-day streak/);
 });
+
+test('Leaderboards keep website-authored explanations and game names in the native app', () => {
+ const web=fs.readFileSync('draft-run-product.mjs','utf8');
+ const native=fs.readFileSync('mobile/src/screens/leaderboard.tsx','utf8');
+ for(const text of [
+   'First attempts only. Everyone gets the same packs.',
+   'Season rating uses every first-attempt Daily score, with a larger deduction when you have played fewer days.',
+   'You rank after your first Daily; missed days do not count as zero.',
+   'Average of your best ',
+   'days not played count as 0. Days played are shown alongside.',
+ ]) {
+   assert.ok(web.includes(text),'website missing approved board explanation: '+text);
+   assert.ok(native.includes(text),'native is out of sync with web: '+text);
+ }
+ for(const old of ['See how the field drafted.', 'Ranked scores come from Pack One Daily runs validated to an eligible account.']) {
+   assert.ok(!native.includes(old),'unapproved native-only leaderboard copy: '+old);
+ }
+ assert.match(native,/mixed: 'Draft Run', 'powered-cube': 'Cube', latest: 'Latest Set'/);
+});
