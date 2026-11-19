@@ -44,9 +44,12 @@ behavior.
   Play App Signing certificate/hosted `assetlinks.json` match. Never generate
   a new Android signing identity for this release.
 - The new `react-native-google-mobile-ads` dependency is present for iOS
-  but **Android live AdMob is disabled**. Audit the actual Android merged manifest
-  for SDK-added permissions and advertising ID disclosures and reconcile any
-  changed Google Play Data safety/Ads declarations before public submission.
+  but **Android live AdMob is disabled**. Google's SDK can add its advertising ID
+  permission to Android anyway. The production Expo config explicitly blocks
+  `com.google.android.gms.permission.AD_ID`, and the signed-manifest audit now
+  rejects it if merged back in. Verify the real AAB permission output and
+  SDK behavior, plus Play's Advertising ID, Ads and Data safety declarations,
+  before claiming this Android build collects no advertising ID.
 - Play Console setup previously included App access, target audience/content,
   content rating, Data safety, ads and US/Canada countries. Those are historical
   confirmations: recheck the live forms, app availability, policy warnings
