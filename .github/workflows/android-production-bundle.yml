@@ -220,7 +220,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import json
+          import json, os
           from pathlib import Path
           request=json.loads(Path('../.github/android-production-bundle-request.json').read_text())
           allowed = ({'operation','reason'}, {'operation','reason','android_admob'})
