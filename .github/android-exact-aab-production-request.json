@@ -1,12 +1,12 @@
 {
   "operation": "upload-exact-android-aab-production",
-  "reason": "Owner-approved corrected Android Production release after 101070 shipped with the AdMob banner runtime switch disabled. PR #1689 fixed Gradle Expo environment propagation and adds an AAB embedded-config gate at signed-build and exact-upload stages. Protected main signed run 44607534274 built version 101089 from unchanged source e118f0861880d859e72f8d3cc03cdc066559e164; logs explicitly verify AAB base/assets/app.config production profile and enabled registered Android banner, R8 mapping, native advertising policy, and registered Play upload certificate. Release this exact verified artifact to existing Google Play Production track; preserve countries and submitted Data Safety.",
-  "source_run_id": 44607534274,
-  "source_artifact_id": 14570689639,
-  "source_sha": "e118f0861880d859e72f8d3cc03cdc066559e164",
+  "reason": "Owner explicitly approved publishing the NEW Pack One Android candidate to Google Play Production when verified (November 19, 2026). This pins post-#1703 signed version 101100 from protected main run 44623339621 at source 9b17f6b147da9c4287432716fe8c954668140bd6, including compact Draft Run #1681, iPad fix #1700, iOS crash fix #1694 and Android AdMob fix #1689. Actual signed AAB check verified production runtime with enabled registered AdMob Daily banner ca-app-pub-1217971050094766/8963799298, real R8 mapping in AAB, no native advertising policy errors, and registered Google Play upload signer. Never use previously cancelled 101089 artifact. Preserve existing Production countries and previously submitted Android AdMob Data Safety; independently recheck exact digest, signer, runtime and source freshness before Play upload.",
+  "source_run_id": 44623339621,
+  "source_artifact_id": 14579955793,
+  "source_sha": "9b17f6b147da9c4287432716fe8c954668140bd6",
   "artifact_name": "pack-one-play-signed-aab",
-  "artifact_digest": "sha256:342ae5eb61748cd431a02973f33c3c3511200867b92151915fc75333b89998ab",
-  "version_code": 101089,
+  "artifact_digest": "sha256:2f5ea02fccfeb6b1d71fa3c542ead1b4a3de94f2dbffa30343b23012d2869ec3",
+  "version_code": 101100,
   "track": "production",
   "data_safety_run_id": 44561910073
 }
