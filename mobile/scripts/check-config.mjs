@@ -148,6 +148,11 @@ assert.throws(() => loadConfig('production', {
 }), /Live AdMob requires matching, non-demo/, 'App and banner must share a publisher');
 assert.equal(testAdsPreview.extra.adMob.androidEnabled, true);
 assert.equal(testAdsPreview.extra.adMob.androidBannerUnitId, 'ca-app-pub-3940256099942544/6300978111');
+assert.throws(() => loadConfig('production', {
+  PACKONE_ADMOB_ANDROID_ENABLED: '1',
+  PACKONE_ADMOB_ANDROID_APP_ID: 'ca-app-pub-1217971050094766~3792911821',
+  PACKONE_ADMOB_ANDROID_BANNER_ID: 'ca-app-pub-1217971050094766/8989398185',
+}), /Android AdMob App ID must not reuse/, 'a native Android app needs its own AdMob App ID');
 
 assert.equal(production.extra?.eas?.projectId, undefined);
 assert.deepEqual(
