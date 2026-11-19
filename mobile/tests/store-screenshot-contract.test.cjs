@@ -81,10 +81,10 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   assert.match(iosCapture, /stat -f%z/);
   assert.match(iosCapture, /sips -s format jpeg[\s\S]*\.jpg/);
   assert.match(iosCapture, /iphone:1320x2868/);
-  assert.match(iosCapture, /capture "04-leaderboard" "leaderboard"/);
+  assert.match(iosCapture, /capture "04-leaderboard" "acceptance:member-insights:insights"/);
   assert.match(iosCapture, /capture "05-practice" "practice"/);
   const composer = read('mobile/scripts/compose-store-screenshots-ios.swift');
-  for (const heading of ['What would you pick?', 'See what the trophy drafter took', 'Three new Dailies every day', 'Same picks. Compare scores.', 'Practice between Dailies']) {
+  for (const heading of ['What would you pick?', 'See what the trophy drafter took', 'Three new Dailies every day', 'Find the picks to revisit.', 'More drafts. More reps.']) {
     assert.ok(composer.includes(heading));
   }
   assert.match(workflow, /Compose reviewed iOS 1\.4 caption layouts/);
