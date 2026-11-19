@@ -83,7 +83,10 @@ test('season leaderboard renders rating, average and one-day eligibility while r
         assert.match(rendered,/Avg\s+40.0/);
         assert.match(rendered,/You rank after your first Daily/);
         assert.ok(root.root.findAllByType('View').some(node=>/rating 34.6, average 40.0, 1 day/.test(node.props.accessibilityLabel||'')));
-      } else assert.match(rendered,/SCORE/);
+      } else {
+        assert.match(rendered,/SCORE/);
+        assert.match(rendered,/this season/,'legacy season leaderboard must not accidentally say this week');
+      }
     } finally {if(root)await act(async()=>root.unmount());}
   }
 });
