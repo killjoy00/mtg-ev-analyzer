@@ -270,7 +270,7 @@ test('Android live AdMob manifest audit requires opted-in real IDs and advertisi
     const env = { ...process.env, PACKONE_ADMOB_ANDROID_ENABLED: enabled ? '1' : '0',
       PACKONE_ADMOB_ANDROID_APP_ID: envAppId, PACKONE_ADMOB_ANDROID_BANNER_ID: envBannerId };
     const result = spawnSync('python3', ['scripts/audit-android-manifest.py', manifestPath, '--output', reportPath], {
-      cwd: join(__dirname, '..'), env, encoding: 'utf8',
+      cwd: process.cwd(), env, encoding: 'utf8',
     });
     return { result, report: JSON.parse(readFileSync(reportPath, 'utf8')) };
   };
