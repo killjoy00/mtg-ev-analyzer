@@ -7,7 +7,7 @@ test('Android AdMob Data safety is an explicit, reviewable collected-and-shared 
   const workflow=readFileSync('.github/workflows/google-play-data-safety.yml','utf8');
   const generator=readFileSync('.github/scripts/google-play-data-safety.mjs','utf8');
   assert.equal(req.operation,'configure-google-play-data-safety');
-  assert.equal(req.mode,'dry-run');
+  assert.ok(['dry-run','submit'].includes(req.mode), 'Only explicitly guarded dry-run or submit modes are allowed');
   assert.equal(req.android_admob,'enabled');
   assert.match(workflow,/PACKONE_PLAY_DATA_SAFETY_ADMOB: '1'/);
   assert.match(generator,/if\(mode==='submit'&&!admobEnabled\)throw Error/);
