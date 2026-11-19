@@ -542,6 +542,7 @@ export default function DraftRunScreen({
   const { width: windowWidth, fontScale } = useWindowDimensions();
   const [feedbackWidth, setFeedbackWidth] = useState(0);
   const wideFeedback = feedbackWidth >= 520 * fontScale;
+  const compactFeedback = wideFeedback || (windowWidth >= 350 && fontScale <= 1.3);
   const stackComparison = windowWidth < 360 || fontScale > 1.35;
   useEffect(() => {
     if (config.screenshots.fixtures) console.info('PACKONE_WINDOW', JSON.stringify({ width: windowWidth, fontScale }));
@@ -1436,16 +1437,18 @@ export default function DraftRunScreen({
     <SafeAreaView style={styles.safe}>
       <View style={styles.shell}>
         <ScrollView ref={scroll} contentContainerStyle={styles.page}>
+          <View style={styles.runContext}>
           <Text style={styles.eyebrow}>
             {practice || shared ? surfaceMeta.eyebrow : `${dailyMeta.eyebrow} · ${run.day ?? 'TODAY'}`}
           </Text>
           {rolloverNotice && run.day && run.answers.length === 0 ? (
             <Text accessibilityRole="alert" style={styles.rolloverNotice}>{rolloverNotice}</Text>
           ) : null}
-          <Text style={styles.title}>
+          <View style={styles.runContextRow}>
+            <Text style={[styles.title, styles.runContextTitle]}>
             {puzzle.set_id.toUpperCase()} <Text style={styles.titleMeta}>· Pack 1 · Pick {puzzle.pick_number}</Text>
           </Text>
-          {guideUrl ? (
+            {guideUrl ? (
             <Pressable
               accessibilityRole="link"
               accessibilityLabel={`Set refresher for ${resultSetName(puzzle.set_id)}, opens packone.pro`}
@@ -1454,26 +1457,30 @@ export default function DraftRunScreen({
             >
               <Text style={styles.inlineLinkText}>Set refresher ↗</Text>
             </Pressable>
-          ) : null}
+            ) : null}
+          </View>
           <Progress run={run} />
 
+          </View>
           {mode === 'feedback' && answer ? (
             <>
-              <View testID="pick-feedback" onLayout={(event) => { setFeedbackWidth(event.nativeEvent.layout.width); recordLayout('feedback', event); }} style={[styles.feedback, wideFeedback && styles.feedbackWide, answer.historicalMatch && styles.feedbackMatch]}>
-                <Text testID="feedback-score" onLayout={(event) => recordLayout('score', event)} onTextLayout={(event) => recordText('score', event)} style={styles.feedbackScoreNumber}>{answer.score}<Text style={styles.feedbackScoreSuffix}>/100</Text></Text>
-                <View testID="feedback-copy" onLayout={(event) => recordLayout('copy', event)} style={[styles.feedbackCopy, wideFeedback && styles.feedbackCopyWide]}>
-                  <Text testID="feedback-title" onLayout={(event) => recordLayout('title', event)} onTextLayout={(event) => recordText('title', event)} style={styles.feedbackTitle}>
-                    {trophyRevealSentence(answer)}
-                  </Text>
-                  {compactSentence ? (
-                    <Text testID="feedback-choice" onLayout={(event) => recordLayout('choice', event)} onTextLayout={(event) => recordText('choice', event)} style={styles.feedbackBody}>{compactSentence}</Text>
-                  ) : null}
-                  {peersForReview ? (
-                    <Text accessibilityRole="text" style={styles.dailyPeerStats}>
-                      {peersForReview.matching_pick_pct}% of players picked this · {peersForReview.trophy_pick_pct}% matched the trophy drafter ({peersForReview.players} players)
+              <View testID="pick-feedback" onLayout={(event) => { setFeedbackWidth(event.nativeEvent.layout.width); recordLayout('feedback', event); }} style={[styles.feedback, answer.historicalMatch && styles.feedbackMatch]}>
+                <View style={[styles.feedbackSummary, !compactFeedback && styles.feedbackSummaryStack]}>
+                  <Text testID="feedback-score" onLayout={(event) => recordLayout('score', event)} onTextLayout={(event) => recordText('score', event)} style={[styles.feedbackScoreNumber, compactFeedback && styles.feedbackScoreCompact]}>{answer.score}<Text style={styles.feedbackScoreSuffix}>/100</Text></Text>
+                  <View testID="feedback-copy" onLayout={(event) => recordLayout('copy', event)} style={styles.feedbackCopy}>
+                    <Text testID="feedback-title" onLayout={(event) => recordLayout('title', event)} onTextLayout={(event) => recordText('title', event)} style={styles.feedbackTitle}>
+                      {trophyRevealSentence(answer)}
                     </Text>
-                  ) : null}
+                    {compactSentence ? (
+                      <Text testID="feedback-choice" onLayout={(event) => recordLayout('choice', event)} onTextLayout={(event) => recordText('choice', event)} style={styles.feedbackBody}>{compactSentence}</Text>
+                    ) : null}
+                  </View>
                 </View>
+                {peersForReview ? (
+                  <Text accessibilityRole="text" style={styles.dailyPeerStats}>
+                    {peersForReview.matching_pick_pct}% picked this · {peersForReview.trophy_pick_pct}% matched the trophy drafter · {peersForReview.players} players
+                  </Text>
+                ) : null}
               </View>
 
               <View style={styles.revealSection}>
@@ -1701,6 +1708,9 @@ export default function DraftRunScreen({
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   shell: { flex: 1 },
+  runContext: { gap: spacing.xs },
+  runContextRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, alignItems: 'center' },
+  runContextTitle: { flexGrow: 1, flexShrink: 1, minWidth: 150 },
   page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: 12, alignSelf: 'center', width: '100%', maxWidth: 980 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
   loadingText: { color: colors.muted, fontSize: 15 },
@@ -1775,26 +1785,29 @@ const styles = StyleSheet.create({
   primaryButtonDisabled: { opacity: 0.42 },
   primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '800', textAlign: 'center' },
   feedback: {
-    marginTop: spacing.xs,
-    padding: spacing.md,
+    marginTop: 0,
+    padding: 12,
     borderWidth: 1,
     borderTopWidth: 3,
     borderColor: colors.line,
     borderTopColor: colors.accent,
     backgroundColor: colors.surface,
     flexDirection: 'column',
-    gap: spacing.md,
+    gap: spacing.sm,
   },
+  feedbackSummary: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md },
+  feedbackSummaryStack: { flexDirection: 'column', gap: spacing.xs },
+  feedbackScoreCompact: { fontSize: 36, lineHeight: 40 },
   feedbackWide: { flexDirection: 'row', alignItems: 'center' },
   feedbackCopyWide: { flex: 1 },
   feedbackScore: { flexDirection: 'row', alignItems: 'baseline' },
   feedbackScoreNumber: { flexShrink: 1, color: colors.ink, fontSize: 40, lineHeight: 44, fontWeight: '800' },
   feedbackScoreSuffix: { color: colors.muted, fontSize: 14, fontWeight: '700' },
-  feedbackCopy: { minWidth: 0, flexShrink: 1, gap: spacing.sm, justifyContent: 'center' },
+  feedbackCopy: { flex: 1, minWidth: 0, gap: spacing.xs, justifyContent: 'center' },
   feedbackTitle: { color: colors.ink, fontSize: 17, lineHeight: 22, fontWeight: '800' },
   feedbackBody: { color: colors.muted, fontSize: 14, lineHeight: 20 },
-  dailyPeerStats: { color: colors.accent, fontSize: 13, lineHeight: 20, fontWeight: '700', marginTop: spacing.sm, marginBottom: spacing.sm },
-  feedbackComparison: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
+  dailyPeerStats: { color: colors.accent, fontSize: 13, lineHeight: 19, fontWeight: '700' },
+  feedbackComparison: { flexDirection: 'row', gap: spacing.sm, alignItems: 'flex-start' },
   feedbackCard: {
     flexGrow: 1,
     flexShrink: 1,
@@ -1805,7 +1818,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.line,
     backgroundColor: colors.surface,
-    padding: spacing.sm,
+    padding: 6,
     gap: spacing.xs,
   },
   feedbackCardLabel: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
@@ -1832,7 +1845,7 @@ const styles = StyleSheet.create({
   choiceScore: { color: colors.ink, fontSize: 26, lineHeight: 30, fontWeight: '800' },
   choiceStatRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: 4 },
   choiceStatValue: { color: colors.ink, fontSize: 13, lineHeight: 18, fontWeight: '700' },
-  revealSection: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: spacing.md, gap: spacing.sm },
+  revealSection: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: 12, gap: spacing.sm },
   inlineLink: { minHeight: 44, justifyContent: 'center', alignSelf: 'flex-start' },
   inlineLinkText: { color: colors.accentDark, fontSize: 14, lineHeight: 20, fontWeight: '800', textDecorationLine: 'underline' },
   trophyRecord: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.sm, gap: spacing.xs },
