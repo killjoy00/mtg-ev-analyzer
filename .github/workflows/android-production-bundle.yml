@@ -10,6 +10,8 @@ on:
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
+      - '.github/android-production-bundle-request.json'
+      - '.github/workflows/android-production-bundle.yml'
       - 'mobile/**'
       - 'card-faces.mjs'
       - 'card-faces.d.mts'
@@ -17,11 +19,10 @@ on:
       - '.github/workflows/mobile.yml'
       - '.github/workflows/mobile-store-screenshots.yml'
       - '.github/workflows/android-internal-testing.yml'
-      - '.github/workflows/android-production-bundle.yml'
       - '.github/workflows/ios-testflight.yml'
       - '.github/workflows/mobile-exact-main-rc.yml'
       - '.github/android-internal-release-request.json'
-      - '.github/android-production-bundle-request.json'
+
   workflow_dispatch:
 
 permissions:
