@@ -359,3 +359,17 @@ test('backend Neon branches are capped, sampled, gated on local contracts and sw
   assert.ok(summary > 0 && summary < domain.indexOf('name: Delete isolated Neon branch'));
   assert.match(domain.slice(summary), /^name: Summarize Neon compute allocation\n        if: always\(\) && env\.NEON_SAMPLER_PID != ''\n        continue-on-error: true\n/);
 });
+
+test('store screenshot sweeps are explicit release evidence, not a routine PR gate', () => {
+  const workflow = readFileSync('.github/workflows/mobile-store-screenshots.yml', 'utf8');
+  const header = workflow.split('\npermissions:')[0];
+  assert.match(header, /workflow_dispatch:/, 'owner can request fresh store screenshots');
+  assert.match(header, /workflow_call:/, 'reviewed native fixture capture can be reused');
+  assert.match(header, /\.github\/store-screenshot-request\.json/, 'reviewed main request still starts capture');
+  assert.match(workflow, /  validate:\n(?:[^\n]*\n)*?    if: github\.event_name != 'pull_request'/,
+    'skip all expensive screenshot jobs on pull requests');
+  assert.match(workflow, /  ios:[\s\S]*?needs: validate/);
+  assert.match(workflow, /  android:[\s\S]*?needs: validate/);
+  assert.match(mobile, /uses: \.\/\.github\/actions\/mobile-validate/,
+    'fast native type, lint and config validation remains on PRs');
+});
