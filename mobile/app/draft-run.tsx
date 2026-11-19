@@ -1355,15 +1355,18 @@ export default function DraftRunScreen({
             {run.answers.map((item, index) => {
               const candidates = Array.isArray(item.puzzle?.candidates) ? item.puzzle.candidates : [];
               const byId = new Map(candidates.map((card) => [card.id, card]));
+              // A saved legacy answer without its selected card metadata can
+              // still display the recap but cannot reopen a valid reveal.
+              const canReview = Boolean(item.puzzle && byId.has(item.selectedId));
               const mine = byId.get(item.selectedId);
               const trophy = item.historicalMatch || !item.historicalId ? null : byId.get(item.historicalId) ?? null;
               return (
                 <Pressable
                   key={`${item.puzzle?.puzzle_id ?? `saved-${index + 1}`}-result-review`}
                   accessibilityRole="button"
-                  accessibilityLabel={`${item.puzzle ? "Review" : "Saved"} pick ${index + 1}, ${item.selectedName}, ${item.score} points`}
-                  disabled={!item.puzzle}
-                  onPress={() => { if (item.puzzle) reviewAnswer(index); }}
+                  accessibilityLabel={`${canReview ? "Review" : "Saved"} pick ${index + 1}, ${item.selectedName}, ${item.score} points`}
+                  disabled={!canReview}
+                  onPress={() => { if (canReview) reviewAnswer(index); }}
                   style={styles.resultReviewRow}
                 >
                   <Text style={styles.resultReviewIndex}>{index + 1}</Text>
