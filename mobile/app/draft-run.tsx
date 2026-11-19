@@ -238,6 +238,7 @@ function RevealChoiceCard({
   support,
   players,
   onZoom,
+  stack = false,
 }: {
   card: DraftRunCard;
   label: string;
@@ -246,11 +247,12 @@ function RevealChoiceCard({
   support: string;
   players: string | null;
   onZoom: (card: DraftRunCard) => void;
+  stack?: boolean;
 }) {
   const toneStyle = tone === 'match' ? styles.choiceMatch : tone === 'trophy' ? styles.choiceTrophy : tone === 'mine' ? styles.choiceMine : null;
   const labelStyle = tone === 'match' ? styles.choiceLabelMatch : tone === 'trophy' ? styles.choiceLabelTrophy : tone === 'mine' ? styles.choiceLabelMine : null;
   return (
-    <View style={[styles.feedbackCard, toneStyle]}>
+    <View style={[styles.feedbackCard, !stack && styles.feedbackCardRowItem, toneStyle]}>
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`${label}: ${card.name}. Open enlarged card.`}
@@ -324,6 +326,7 @@ function RevealComparison({
               support={modelSupportLabel(ranked?.support, answer.consensusSupport, trophy)}
               players={peerShare(shares, card.id)}
               onZoom={onZoom}
+              stack={stack}
             />
           );
         })}
@@ -1842,6 +1845,9 @@ const styles = StyleSheet.create({
     padding: 6,
     gap: spacing.xs,
   },
+  // Row cards share available width. The base 100%-width style must apply only
+  // to stacked/narrow or large-font layouts, not the wide iPad row.
+  feedbackCardRowItem: { flexBasis: 0, width: 0 },
   feedbackCardLabel: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
   feedbackCardImage: { width: '100%', aspectRatio: 0.716, backgroundColor: colors.surfaceSoft },
   feedbackCardFallback: {
