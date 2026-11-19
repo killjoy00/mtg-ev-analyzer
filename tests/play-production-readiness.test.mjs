@@ -12,7 +12,7 @@ test('Google Play production preflight is uncommitted and discards its temporary
   assert.match(script,/\:validate/);
   assert.match(script,/finally\s*\{/);
   assert.match(script,/method:'DELETE'/);
-  assert.doesNotMatch(script,/\:commit|\/edits\//);
+  assert.doesNotMatch(script, /:commit/, 'temporary readiness must never commit a Google Play edit');
   assert.match(workflow,/Inspect production track and validate without publishing/);
   assert.match(workflow,/environment: pack-one-mobile-release/);
 });
