@@ -176,7 +176,13 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   assert.ok(androidRequest.reason.trim().length > 0);
 
   const androidBundleRequest = JSON.parse(read('.github/android-production-bundle-request.json'));
-  assert.deepEqual(Object.keys(androidBundleRequest).sort(), ['operation','reason']);
+  const androidBundleKeys = Object.keys(androidBundleRequest).sort();
+  assert.ok([
+    JSON.stringify(['operation','reason']),
+    JSON.stringify(['android_admob','operation','reason']),
+  ].includes(JSON.stringify(androidBundleKeys)), 'Android AdMob requires an explicitly reviewed opt-in');
+  assert.ok(androidBundleRequest.android_admob === undefined || androidBundleRequest.android_admob === 'enabled',
+    'Android AdMob request must be explicit or absent');
   assert.equal(androidBundleRequest.operation, 'build-play-signed-aab');
   assert.equal(typeof androidBundleRequest.reason, 'string');
   assert.ok(androidBundleRequest.reason.trim().length > 0);
