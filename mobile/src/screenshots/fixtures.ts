@@ -265,6 +265,26 @@ export async function configureScreenshotScenario(scenario: string) {
   await SecureStore.deleteItemAsync(RUN_KEY);
   await SecureStore.deleteItemAsync('packone.mobile.shared-run.v1');
   await SecureStore.deleteItemAsync('packone.mobile.practice.idempotency.v2');
+  if (scenario === 'member-perfect-result') {
+    // Preview-only diagnostic state. Eight locked trophy matches, never shown
+    // as a real player result or used in store screenshots / production.
+    const answers = Array.from({ length: 8 }, (_, index): DraftRunAnswer => ({
+      ...clone(feedbackRun('web-up').answers[0]!),
+      pickNumber: index + 1,
+      puzzle: { ...puzzle(index), pick_number: index + 1 },
+    }));
+    const run: DraftRunState = {
+      ...clone(initialRun),
+      day: pacificDay(),
+      revision: 8,
+      round: 8,
+      complete: true,
+      score: 100,
+      answers,
+      current: null,
+    };
+    await SecureStore.setItemAsync(RUN_KEY, JSON.stringify(run));
+  }
 }
 
 export async function requestScreenshotFixture<T>(
