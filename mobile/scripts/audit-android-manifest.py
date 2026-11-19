@@ -8,6 +8,9 @@ from pathlib import Path
 ANDROID = "{http://schemas.android.com/apk/res/android}"
 
 FORBIDDEN_PERMISSIONS = {
+    # iOS includes a Google Ads SDK; Android ads are disabled. The linked Android
+    # SDK must not silently enable advertising ID access on Google Play.
+    "com.google.android.gms.permission.AD_ID",
     "android.permission.CAMERA",
     "android.permission.RECORD_AUDIO",
     "android.permission.READ_CONTACTS",
