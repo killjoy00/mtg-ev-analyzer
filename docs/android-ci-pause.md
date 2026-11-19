@@ -1,4 +1,4 @@
-# Android CI paused — November 16, 2026
+# Android routine CI paused — November 16, 2026; scoped release lane resumed November 18
 
 Pack One is prioritizing the iOS app. The repository retains all Android
 source, Google Play credentials/configuration, version history, signed-release
@@ -7,9 +7,15 @@ native builds and screenshots are paused**.
 
 ## Default CI behavior
 
-- **Android internal testing** and **Android production bundle** workflows:
-  only GitHub's explicit **Run workflow** action can start them. Pull requests
-  and release-request file pushes no longer start Android jobs.
+- **Android Internal Testing** remains manual-only. A routine mobile
+  source or documentation change cannot start its native or Play upload jobs.
+- **Android production bundle** can start by explicit **Run workflow** or by a
+  reviewed change to `.github/android-production-bundle-request.json` merged
+  into protected `main`. The only automatic Android PR smoke is scoped to
+  that release request or its own workflow, and has no signing credentials.
+  Routine mobile PRs and pushes still do not start Android Gradle. The protected
+  bundle job signs and audits an AAB but does **not** upload it to Google Play;
+  the separate exact-artifact release request is required for any track change.
 - **Native UX baseline evidence**: the old-Android-baseline reproduction job is
   also manual-only. It no longer starts on PRs that change its workflow/script.
 - **Mobile store screenshots**: PR, main, and ordinary automated requests
@@ -28,8 +34,10 @@ native builds and screenshots are paused**.
 
 This change does **not** unpublish Android, alter Google Play tester groups,
 start releases, delete code, or modify the iOS 1.2 TestFlight request.
-Other Google Play release-request workflows remain separately protected and
-dormant unless a reviewed request file is intentionally changed.
+Google Play release-request workflows remain separately protected; the
+exact-artifact import/promotion must independently pin the signed source SHA,
+artifact ID, digest and version code, then target only the existing Closed
+Testing track. Public Production must not be changed by this workflow.
 
 ## Resuming Android
 
