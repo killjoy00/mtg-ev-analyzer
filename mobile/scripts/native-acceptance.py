@@ -201,9 +201,13 @@ def measure(logs, match=False):
             target[record['label']] = record
     # A trophy match has no "You picked" line, as on the web reveal.
     labels = ['score', 'title'] + ([] if match else ['choice'])
-    for label in ['feedback', 'copy'] + labels:
+    for label in ['feedback', 'summary', 'copy'] + labels:
         require(label in layouts, f'Missing native layout measurement: {label}')
-    for child, parent in [('copy', 'feedback'), ('score', 'feedback'), ('title', 'copy')] + ([] if match else [('choice', 'copy')]):
+    # The score and the explanatory copy now share a responsive summary wrapper.
+    # onLayout coordinates are relative to their immediate parent, not feedback.
+    parents = [('summary', 'feedback'), ('score', 'summary'), ('copy', 'summary'),
+               ('title', 'copy')] + ([] if match else [('choice', 'copy')])
+    for child, parent in parents:
         box, container = layouts[child], layouts[parent]
         require(box['x'] >= -1 and box['x']+box['width'] <= container['width']+1,
                 f'{child} overflows {parent} horizontally: {box} / {container}')
@@ -211,10 +215,11 @@ def measure(logs, match=False):
                 f'{child} overflows {parent} vertically: {box} / {container}')
     for label in labels:
         require(label in texts and texts[label]['lines'], f'Missing real text metrics: {label}')
-        # Native line widths can include trailing whitespace and fractional
-        # glyph overhang. Check their actual extent against the feedback border,
-        # while the layout checks above separately contain every text frame.
-        offset = layouts[label]['x'] + (layouts['copy']['x'] if label != 'score' else 0)
+        # Measure each line in feedback-panel coordinates. A line's own x/y
+        # starts at its Text frame; every nested ancestor contributes an offset.
+        # Continue rejecting real glyph overflow at normal and Dynamic Type sizes.
+        path = ['summary', 'score'] if label == 'score' else ['summary', 'copy', label]
+        offset = sum(layouts[part]['x'] for part in path)
         for line in texts[label]['lines']:
             left = offset + line.get('x', 0)
             require(left >= 1 and left + line['width'] <= layouts['feedback']['width'] - 1,
