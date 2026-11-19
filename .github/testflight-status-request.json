@@ -1,5 +1,5 @@
 {
   "operation": "read-pack-one-testflight-status",
-  "reason": "Read-only post-upload reconciliation for the exact Pack One iOS 1.4 design-parity build 101164 from protected main release commit 62e7939f1ec75ad548cb4100c7580e97658b4c93, signed and uploaded in workflow 44569393626. Apple processing was VALID / APP_STORE_ELIGIBLE; the immediate finalizer saw READY_FOR_BETA_TESTING, not yet IN_BETA_TESTING. Check current Apple processing, internal distribution state and existing beta-group association without reupload, signing, modifying testers/groups, store metadata or review/public-release status.",
+  "reason": "Read-only November 19 2026 12:49 PM America/Chicago iOS TestFlight recap crash investigation (#1679): player submitted the iPhone system crash-report feedback after Pack One terminated while viewing a saved 8/8, 100/100 Daily result. Check whether Apple has received a betaFeedbackCrashSubmission for previously distributed Pack One build 101164 and retrieve symbolicated logs if supplied. Do not upload, sign, deploy, create or modify tester groups, submit for review, or change any store release settings.",
   "build_number": "101164"
 }
