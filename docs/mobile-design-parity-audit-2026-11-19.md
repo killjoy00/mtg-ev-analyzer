@@ -9,7 +9,7 @@
 ## Design rules applied
 
 1. **One hierarchy per screen.** Main tabs own their page headings. Do not repeat a navigator title above a headline; keep the native back header on push/modal routes.
-2. **Show the game choices early.** Compact, numbered Daily scorecard rows; short supporting copy; CTA alongside content where it fits and below it naturally when narrow or font-scaled. Do not hide the third Daily or use a carousel.
+2. **Show the game choices early.** Compact, numbered Daily scorecard rows, with blue / Cube gold / Latest Set rust left rules; short supporting copy; CTA alongside content where it fits and below it naturally when narrow or font-scaled. Do not hide the third Daily or use a carousel.
 3. **Use consistent rhythm, not the same CSS.** Standard phone gutter 16dp; regular vertical groups 8–20dp; ordinary surface padding 16dp. Retain narrow readable max widths on tablets and generous bottom scroll padding.
 4. **Card art remains the product.** Don't reduce card image aspect ratio, collapse the earlier-picks context, hide progress, or sacrifice the fixed Lock/Next pick dock to win pixels.
 5. **Native navigation is intentional.** Bottom tabs, safe-area handling, large-text adaptive tabs, back affordances, and native purchase/consent controls are not copied from the browser.
@@ -21,7 +21,7 @@
 | Surface | Earlier native gap vs website | Implementation / intentional difference |
 | --- | --- | --- |
 | Main tab shell | Duplicated top header/title on Practice, Leaders, Learn, My Pack One | Remove redundant tab headers; keep bottom tabs + safe top inset and nested-route back headers. Normal bottom bar trimmed 10dp; large-text adaptive bar retained. |
-| Daily home (guest/member/complete) | 3 large vertical cards; full-width action under each card; date and reset stacked; large top branding | Numbered compact rows with action alongside flexible text; reduced brand/hero space; date/reset/streak in a wrapping ruled row. Completed rows use a tinted surface instead of lowering text contrast. Keep all three choices, member/guest prompts, promotion eligibility and diagnostics. |
+| Daily home (guest/member/complete) | 3 large vertical cards; full-width action under each card; date and reset stacked; large top branding | Numbered compact rows with a dedicated number column, per-environment colored rule and action alongside flexible text; reduced brand/hero space; date/reset/streak in a wrapping ruled row. Completed rows use a tinted surface instead of lowering text contrast. Keep all three choices, member/guest prompts, promotion eligibility and diagnostics. |
 | Draft Run decision | More page, progress, pool, card-row spacing than website's A2 layout | Tighten header/progress/pool/card-row gaps and fixed action dock, but preserve full card art, prior-pick scroll, pack labels and button height. No gameplay or scoring changes. |
 | Reveal/score explanation | Large outer frame and separate feedback panels | Compact feedback score panel, comparison and optional analysis spacing. Preserve reveal role colors, deck/source links, zoom, report flow and next-pick dock. |
 | Completed result | 48dp top gap, 32dp score card padding, 24dp page sections | 16dp top/gutter/score padding and smaller—but still emphatic—score number. Keep complete eight-pick thumbnail recap, sharing and recovery actions. |
