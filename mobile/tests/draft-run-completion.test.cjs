@@ -30,7 +30,11 @@ function answer(n) {
 }
 function run(complete, missingHistoricPuzzle) {
   const answers = Array.from({ length: complete ? 8 : 7 }, (_unused, i) => answer(i + 1));
-  if (missingHistoricPuzzle) answers[2].puzzle = null;
+  if (missingHistoricPuzzle) {
+    answers[2].puzzle = null;
+    // Another legacy response can retain the puzzle shell but omit its cards.
+    answers[3].puzzle = { puzzle_id: 'legacy-4', set_id: 'hob', pick_number: 4 };
+  }
   return { id: '11111111-1111-4111-8111-111111111111', environment: 'mixed',
     day: today, run_length: 8, revision: complete ? 9 : 8,
     round: complete ? 8 : 7, complete, score: complete ? 100 : null,
@@ -133,7 +137,10 @@ test('the eighth native Daily pick advances to a readable saved result, even wit
       /^(Review|Saved) pick [1-8],/.test(node.props.accessibilityLabel || ''));
     assert.equal(rows.length, 8, 'all eight saved picks remain represented on the result');
     assert.equal(rows[2].props.disabled, true, 'a legacy answer with no pack cannot open a blank review');
+    assert.equal(rows[3].props.disabled, true, 'a legacy answer with a puzzle but no cards cannot open invalid reveal');
+    assert.equal(rows[4].props.disabled, false, 'a valid saved card remains reviewable');
     assert.match(renderedText(root.toJSON()), /Saved pick/);
+    assert.match(rows[3].props.accessibilityLabel, /^Saved pick 4,/);
   } finally {
     if (root) await act(async () => root.unmount());
   }
