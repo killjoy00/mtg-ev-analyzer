@@ -97,8 +97,8 @@ const productionAdsPlugin = production.plugins.find(plugin =>
   Array.isArray(plugin) && plugin[0] === 'react-native-google-mobile-ads');
 assert.equal(productionAdsPlugin?.[1]?.iosAppId, 'ca-app-pub-1217971050094766~3792911821',
   'iOS native Info.plist must use Pack One, not the Google sample App ID');
-assert.equal(productionAdsPlugin?.[1]?.androidAppId, 'ca-app-pub-3940256099942544~3347511713',
-  'Android AdMob remains disabled and uses the Google sample ID');
+assert.equal(productionAdsPlugin?.[1]?.androidAppId, 'ca-app-pub-1217971050094766~5084711148',
+  'Android production embeds the verified Android App ID, even while live ads are disabled');
 assert.equal(production.extra.adMob.iosBannerUnitId, undefined,
   'disabled production builds must not publish any iOS banner unit');
 assert.equal(production.extra.adMob.androidBannerUnitId, undefined,
@@ -139,8 +139,22 @@ assert.equal(androidAds.plugins.find(plugin => Array.isArray(plugin)
 assert.equal(androidAds.android.blockedPermissions.includes('com.google.android.gms.permission.AD_ID'), false,
   'Google advertising ID is permitted only in explicitly enabled Android AdMob builds');
 assert.equal(production.android.blockedPermissions.includes('com.google.android.gms.permission.AD_ID'), true);
-assert.throws(() => loadConfig('production', { PACKONE_ADMOB_ANDROID_ENABLED: '1' }),
-  /Live AdMob requires matching, non-demo/, 'never ship a live AdMob build with sample IDs');
+const registeredAndroid = loadConfig('production', { PACKONE_ADMOB_ANDROID_ENABLED: '1' });
+assert.equal(registeredAndroid.extra.adMob.androidEnabled, true);
+assert.equal(registeredAndroid.extra.adMob.iosEnabled, false);
+assert.equal(registeredAndroid.extra.adMob.androidBannerUnitId,
+  'ca-app-pub-1217971050094766/8963799298',
+  'enabled Android production uses the owner-registered banner unit');
+assert.equal(registeredAndroid.plugins.find(plugin => Array.isArray(plugin)
+  && plugin[0] === 'react-native-google-mobile-ads')?.[1]?.androidAppId,
+  'ca-app-pub-1217971050094766~5084711148');
+assert.equal(registeredAndroid.android.blockedPermissions.includes('com.google.android.gms.permission.AD_ID'), false);
+assert.throws(() => loadConfig('production', {
+  PACKONE_ADMOB_ANDROID_ENABLED: '1',
+  PACKONE_ADMOB_ANDROID_APP_ID: 'ca-app-pub-3940256099942544~3347511713',
+  PACKONE_ADMOB_ANDROID_BANNER_ID: 'ca-app-pub-3940256099942544/6300978111',
+}), /Live AdMob requires matching, non-demo/,
+'production must never use Google test AdMob IDs');
 assert.throws(() => loadConfig('production', {
   PACKONE_ADMOB_ANDROID_ENABLED: '1',
   PACKONE_ADMOB_ANDROID_APP_ID: fakeAndroidAppId,
