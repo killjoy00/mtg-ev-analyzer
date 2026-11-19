@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { createAscTokenProvider } from './app-store-asset-upload-helpers.mjs';
 
-const root = 'assets/app-store';
+const root = '.github/app-store-creative-assets';
 const request = JSON.parse(readFileSync('.github/app-store-creative-upload-request.json', 'utf8'));
 const expectedKeys = ['operation', 'appId', 'bundleId', 'versionString', 'locale', 'headerSha256', 'searchSha256'];
 if (JSON.stringify(Object.keys(request).sort()) !== JSON.stringify(expectedKeys.sort())) throw Error('Unexpected creative request keys');

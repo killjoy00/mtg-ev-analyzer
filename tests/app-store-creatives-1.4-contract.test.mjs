@@ -31,7 +31,7 @@ test('Pack One 1.4 creative images are byte-pinned and exact Apple dimensions',(
   ['header',manifest.headerSha256,[3840,1646]],
   ['search',manifest.searchSha256,[3840,2560]],
  ]) {
-  const data=readFileSync('assets/app-store/pack-one-14-'+basename+'.jpg');
+  const data=readFileSync('.github/app-store-creative-assets/pack-one-14-'+basename+'.jpg');
   assert.equal(createHash('sha256').update(data).digest('hex'),hash);
   assert.deepEqual(jpegDimensions(data),dimensions);
  }
