@@ -255,9 +255,10 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   assert.doesNotMatch(appAvailabilityScript, /appStoreVersionReleaseRequests/);
 
   const dataSafetyRequest = JSON.parse(read('.github/google-play-data-safety-request.json'));
-  assert.deepEqual(Object.keys(dataSafetyRequest).sort(), ['mode','operation','reason']);
+  assert.deepEqual(Object.keys(dataSafetyRequest).sort(), ['android_admob','mode','operation','reason']);
   assert.equal(dataSafetyRequest.operation, 'configure-google-play-data-safety');
-  assert.equal(dataSafetyRequest.mode, 'submit');
+  assert.equal(dataSafetyRequest.mode, 'dry-run');
+  assert.equal(dataSafetyRequest.android_admob, 'enabled');
   assert.equal(typeof dataSafetyRequest.reason, 'string');
   assert.ok(dataSafetyRequest.reason.trim().length > 0);
 
@@ -274,9 +275,13 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   assert.match(dataSafetyScript, /PSL_SUPPORT_DATA_DELETION_BY_USER/);
   assert.match(dataSafetyScript, /DATA_DELETION_NO/);
   assert.match(dataSafetyScript, /Unexpected sharing declarations/);
-  assert.match(dataSafetyScript, /for\(const purpose of \['PSL_ADVERTISING','PSL_DEVELOPER_COMMUNICATIONS'\]\)/);
-  assert.match(dataSafetyScript, /active\.length!==1\|\|active\[0\]\[COL_Q\]!==emailPurposeQuestion/);
-  assert.match(dataSafetyScript, /Results\/news email purposes must be limited to Email address/);
+  assert.match(dataSafetyScript, /const sdkPurposes=/);
+  for (const type of ['Approximate location','App interactions','Diagnostics','Device or other IDs']) {
+    assert.ok(dataSafetyScript.includes(type), 'Google Mobile Ads data type '+type);
+  }
+  assert.match(dataSafetyScript, /Unexpected advertising purpose declarations/);
+  assert.match(dataSafetyScript, /Developer communications must be limited to Email address/);
+  assert.match(dataSafetyScript, /Refusing to replace AdMob-enabled Google Play Data safety/);
 
   const playFeatureRequest = JSON.parse(read('.github/google-play-feature-graphic-request.json'));
   assert.deepEqual(Object.keys(playFeatureRequest).sort(), ['language','operation','reason','source_png_sha256']);
