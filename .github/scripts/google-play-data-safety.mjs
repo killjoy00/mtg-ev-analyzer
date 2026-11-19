@@ -175,7 +175,7 @@ const specs=[
   // app interactions, diagnostics and device/advertising IDs. The SDK does not
   // stop processing these solely because Pack One requests non-personalized ads.
   ...(admobEnabled?[
-    'Approximate location','App interactions','Diagnostics','Device or other IDs',
+    'Approximate location','Page views and taps in app','Diagnostics','Device or other identifiers',
   ].map(name=>({name,optional:false,shared:true,purposes:sdkPurposes})):[]),
 ];
 

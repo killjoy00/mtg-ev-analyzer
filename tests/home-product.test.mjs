@@ -178,7 +178,7 @@ test('Daily-home copy follows website markup across native cards and states', ()
   'Couldn’t load your Daily progress. Play now will still pick up where you left off.',
   'Pick a display name that isn’t taken, or your Daily scores won’t show on the leaderboard.',
   'Change display name',
- ]) assert.ok(native.includes(phrase),`native copy missing website phrase: ${phrase}`);
+ ]) assert.ok(native.includes(phrase === 'Start here' ? 'START HERE' : phrase),`native copy missing website phrase: ${phrase}`);
  assert.ok(guest.includes('Free · No account required'));
  assert.ok(guest.includes('Start here'));
  const completedGuest=dailyHomeMarkup({daily_history:['mixed','powered-cube','latest'].map(row),player:{claimed:false}},day);

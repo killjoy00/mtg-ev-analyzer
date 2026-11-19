@@ -276,7 +276,7 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   assert.match(dataSafetyScript, /DATA_DELETION_NO/);
   assert.match(dataSafetyScript, /Unexpected sharing declarations/);
   assert.match(dataSafetyScript, /const sdkPurposes=/);
-  for (const type of ['Approximate location','App interactions','Diagnostics','Device or other IDs']) {
+  for (const type of ['Approximate location','Page views and taps in app','Diagnostics','Device or other identifiers']) {
     assert.ok(dataSafetyScript.includes(type), 'Google Mobile Ads data type '+type);
   }
   assert.match(dataSafetyScript, /Unexpected advertising purpose declarations/);

@@ -183,7 +183,7 @@ export default function HomeScreen() {
         <View style={styles.hero}>
           <Text style={styles.title}>Eight picks. What would you take?</Text>
           <Text style={styles.lede}>
-            These picks come from real trophy drafts. You decide what you&apos;d take, then see what the drafter chose.
+            These picks come from real trophy drafts.{'\n'}You decide what you&apos;d take, then see what the drafter chose.
           </Text>
         </View>
 
