@@ -285,9 +285,10 @@ jobs:
   android:
     name: capture Android phone
     needs: validate
-    # Android is paused for automatic PR and main captures. An explicit
-    # android_only manual/reusable invocation may still run this job.
-    if: needs.validate.outputs.capture_required == 'true' && (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call') && inputs.android_only
+    # Android stays paused on normal PR/main pushes. A deliberately scoped
+    # ci/android-fixture-* branch may call this workflow with android_only=true;
+    # GitHub preserves the caller's push event across a reusable workflow.
+    if: needs.validate.outputs.capture_required == 'true' && inputs.android_only && (github.event_name == 'workflow_dispatch' || github.event_name == 'workflow_call' || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/ci/android-fixture-')))
     # The full 28+ scenario native acceptance suite consistently reaches the
     # final account-switch scenario just as the old 45-minute cap expires.
     timeout-minutes: 60
