@@ -4,7 +4,9 @@ import {
   ActivityIndicator,
   Pressable,
   ScrollView,
+  Settings,
   StyleSheet,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { Text } from '@/src/components/Text';
@@ -21,6 +23,7 @@ import { readSession, subscribeSession } from '@/src/storage/session';
 import { SharedRunRecovery } from '@/src/components/SharedRunRecovery';
 import { useAppResume } from '@/src/hooks/useAppResume';
 import { colors, spacing } from '@/src/theme';
+import { config } from '@/src/config';
 
 type PracticeState =
   | { status: 'loading' }
@@ -29,6 +32,9 @@ type PracticeState =
   | { status: 'error'; message: string };
 
 export default function PracticeScreen() {
+  const { width: windowWidth, fontScale } = useWindowDimensions();
+  const tablet = windowWidth >= 840 && fontScale <= 1.35;
+  const screenshotFocusModes = config.screenshots.fixtures && Settings?.get?.('packoneScreenshotScene') === 'acceptance:elite:practice';
   const [state, setState] = useState<PracticeState>({ status: 'loading' });
   const [selectedSets, setSelectedSets] = useState<string[]>([]);
   const [refreshError, setRefreshError] = useState<string | null>(null);
@@ -123,20 +129,21 @@ export default function PracticeScreen() {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.page}>
-        <View style={styles.hero}>
+      <ScrollView contentContainerStyle={[styles.page, tablet && styles.tabletPage]}
+        contentOffset={screenshotFocusModes && !tablet ? { x: 0, y: 150 } : undefined}>
+        <View style={[styles.hero, tablet && styles.tabletHero]}>
           <Text style={styles.eyebrow}>PRACTICE</Text>
-          <Text style={styles.title}>Want another eight picks?</Text>
-          <Text style={styles.body}>
+          <Text style={[styles.title, tablet && styles.tabletTitle]}>Want another eight picks?</Text>
+          <Text style={[styles.body, tablet && styles.tabletBody]}>
             A free account lets you play unlimited regular Draft Runs. With Elite, you can also practice Powered Cube or choose your sets, including just the newest one.
           </Text>
         </View>
 
         {guest ? (
-          <View style={styles.optionCard}>
+          <View style={[styles.optionCard, tablet && styles.tabletOptionCard]}>
             <Text style={styles.cardKicker}>FREE ACCOUNT</Text>
-            <Text style={styles.cardTitle}>Regular Draft Run</Text>
-            <Text style={styles.body}>Unlimited eight-pick runs from real trophy drafts.</Text>
+            <Text style={[styles.cardTitle, tablet && styles.tabletCardTitle]}>Regular Draft Run</Text>
+            <Text style={[styles.body, tablet && styles.tabletBody]}>Unlimited eight-pick runs from real trophy drafts.</Text>
             <Pressable accessibilityRole="button" onPress={signIn} style={styles.primaryButton}>
               <Text style={styles.primaryButtonText}>Sign in to practice</Text>
             </Pressable>
@@ -153,13 +160,14 @@ export default function PracticeScreen() {
             })}
             style={({ pressed }) => [
               styles.optionCard,
+              tablet && styles.tabletOptionCard,
               !regularUnlocked && styles.lockedCard,
               pressed && regularUnlocked && styles.pressed,
             ]}
           >
             <Text style={styles.cardKicker}>FREE ACCOUNT</Text>
-            <Text style={styles.cardTitle}>Regular Draft Run</Text>
-            <Text style={styles.body}>Unlimited eight-pick runs from real trophy drafts.</Text>
+            <Text style={[styles.cardTitle, tablet && styles.tabletCardTitle]}>Regular Draft Run</Text>
+            <Text style={[styles.body, tablet && styles.tabletBody]}>Unlimited eight-pick runs from real trophy drafts.</Text>
             <Text style={regularUnlocked ? styles.cardAction : styles.lockedText}>
               {regularUnlocked ? 'Start Draft Run →' : 'Sign in again to refresh access'}
             </Text>
@@ -182,17 +190,17 @@ export default function PracticeScreen() {
           ]}
         >
           <Text style={styles.cardKicker}>PACK ONE ELITE</Text>
-          <Text style={styles.cardTitle}>Powered Cube</Text>
-          <Text style={styles.body}>Eight picks from Powered Cube trophy drafts, whenever you want another run.</Text>
+          <Text style={[styles.cardTitle, tablet && styles.tabletCardTitle]}>Powered Cube</Text>
+          <Text style={[styles.body, tablet && styles.tabletBody]}>Eight picks from Powered Cube trophy drafts, whenever you want another run.</Text>
           <Text style={cubeUnlocked ? styles.cardAction : styles.lockedText}>
             {cubeUnlocked ? 'Start Powered Cube →' : 'Pack One Elite required'}
           </Text>
         </Pressable>
 
-        <View style={[styles.optionCard, !customUnlocked && styles.lockedCard]}>
+        <View style={[styles.optionCard, tablet && styles.tabletCustomCard, !customUnlocked && styles.lockedCard]}>
           <Text style={styles.cardKicker}>PACK ONE ELITE</Text>
-          <Text style={styles.cardTitle}>Choose your sets</Text>
-          <Text style={styles.body}>Pick the sets you want and play as many eight-pick practice runs as you like. Want to focus on the newest set? You can practice just that one.</Text>
+          <Text style={[styles.cardTitle, tablet && styles.tabletCardTitle]}>Choose your sets</Text>
+          <Text style={[styles.body, tablet && styles.tabletBody]}>Pick the sets you want and play as many eight-pick practice runs as you like. Want to focus on the newest set? You can practice just that one.</Text>
 
           {customUnlocked ? (
             <>
@@ -241,7 +249,7 @@ export default function PracticeScreen() {
         </View>
 
         {guest ? null : <SharedRunRecovery />}
-        {refreshError ? <Pressable accessibilityRole="button" onPress={() => void refresh()} style={styles.note}><Text style={styles.body}>{refreshError}</Text><Text style={styles.cardAction}>Retry</Text></Pressable> : null}
+        {refreshError ? <Pressable accessibilityRole="button" onPress={() => void refresh()} style={styles.note}><Text style={[styles.body, tablet && styles.tabletBody]}>{refreshError}</Text><Text style={styles.cardAction}>Retry</Text></Pressable> : null}
         <View style={styles.note}>
           <Text style={styles.noteTitle}>Your practice access</Text>
           <Text accessibilityRole="text" style={styles.body}>
@@ -264,6 +272,13 @@ const styles = StyleSheet.create({
   page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: 12, alignSelf: 'center', width: '100%', maxWidth: 860 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
   hero: { gap: spacing.xs },
+  tabletPage: { maxWidth: 980, padding: spacing.lg, gap: spacing.md },
+  tabletHero: { gap: spacing.sm, paddingVertical: spacing.sm },
+  tabletTitle: { fontSize: 34, lineHeight: 40 },
+  tabletBody: { fontSize: 16, lineHeight: 23 },
+  tabletCardTitle: { fontSize: 26 },
+  tabletOptionCard: { minHeight: 188, padding: spacing.lg, gap: spacing.md, justifyContent: 'center' },
+  tabletCustomCard: { padding: spacing.lg, gap: spacing.md },
   eyebrow: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
   title: { color: colors.ink, fontSize: 30, lineHeight: 34, fontWeight: '800', letterSpacing: -0.7 },
   centerTitle: { color: colors.ink, fontSize: 30, lineHeight: 34, fontWeight: '800', textAlign: 'center' },

@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
+  Settings,
   Pressable,
   ScrollView,
   Share,
@@ -171,8 +172,10 @@ function CardTile({
   disabled,
   onPress,
   onZoom,
+  tablet = false,
 }: {
   card: DraftRunCard;
+  tablet?: boolean;
   selected: boolean;
   disabled: boolean;
   onPress: () => void;
@@ -188,7 +191,7 @@ function CardTile({
       disabled={disabled}
       onLongPress={onZoom}
       onPress={onPress}
-      style={[styles.card, selected && styles.cardSelected]}
+      style={[styles.card, tablet && styles.tabletPickCard, selected && styles.cardSelected]}
     >
       {card.image_url ? (
         <CardArtwork key={card.image_url} uri={card.image_url} name={card.name} style={styles.cardImage} />
@@ -510,6 +513,7 @@ export default function DraftRunScreen({
   const params = useLocalSearchParams<{ environment?: string; mode?: string; setIds?: string; screenshot?: string }>();
   const screenshotFeedback = config.screenshots.fixtures
     && (screenshotFeedbackOverride || params.screenshot === 'feedback');
+  const screenshotFocusCards = config.screenshots.fixtures && Settings?.get?.('packoneScreenshotScene') === 'daily-decision';
   const practice = !shared && params.mode === 'practice';
   const requestedEnvironment = shared?.initialRun.environment
     ?? (typeof params.environment === 'string' ? params.environment : 'mixed');
@@ -540,6 +544,9 @@ export default function DraftRunScreen({
         }
       : dailyMeta;
   const { width: windowWidth, fontScale } = useWindowDimensions();
+  // A three-column grid keeps all five choices visible on full-width iPads.
+  // This is the actual tablet gameplay layout, not a screenshot composite.
+  const tabletPickGrid = windowWidth >= 840 && fontScale <= 1.35;
   const [feedbackWidth, setFeedbackWidth] = useState(0);
   const wideFeedback = feedbackWidth >= 520 * fontScale;
   const stackComparison = windowWidth < 360 || fontScale > 1.35;
@@ -579,6 +586,7 @@ export default function DraftRunScreen({
   const [sharing, setSharing] = useState(false);
   const dailySetDefaulted = useRef<string | null>(null);
   const scroll = useRef<ScrollView>(null);
+  const screenshotCardPositioned = useRef(false);
   const lastObservedDecision = useRef<string | null>(null);
   const decisionTimer = useRef(createForegroundDecisionTimer());
   const mountedPacificDay = useRef(pacificDay());
@@ -1583,11 +1591,19 @@ export default function DraftRunScreen({
 
               <Text style={styles.sectionTitle}>Choose one</Text>
               <Text style={styles.sectionBody}>{puzzle.candidates.length} cards in this pack. Tap to choose. Press and hold a card to zoom.</Text>
-              <View style={styles.grid}>
+              <View style={styles.grid} onLayout={screenshotFocusCards ? (event) => {
+                // Scroll the real app's choice grid into view only in isolated screenshot builds.
+                if (screenshotCardPositioned.current) return;
+                screenshotCardPositioned.current = true;
+                const y = event.nativeEvent.layout.y;
+                requestAnimationFrame(() => scroll.current?.scrollTo({ y: Math.max(0, y - 54), animated: false }));
+                console.info('PACKONE_SCREENSHOT_FOCUS', JSON.stringify({ scene: 'real-draft-cards', y }));
+              } : undefined}>
                 {puzzle.candidates.map((card) => (
                   <CardTile
                     key={card.id}
                     card={card}
+                    tablet={tabletPickGrid}
                     selected={selected === card.id}
                     disabled={busy}
                     onPress={() => choose(card.id)}
@@ -1730,6 +1746,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     padding: 3,
   },
+  tabletPickCard: { width: '32%' },
   cardSelected: { borderColor: colors.accent },
   reviewYourPick: { borderColor: colors.accent },
   reviewTrophyPick: { borderColor: colors.lineStrong },

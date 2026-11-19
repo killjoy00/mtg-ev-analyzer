@@ -89,7 +89,7 @@ function feedbackRun(selectedId: string): DraftRunState {
   const selected = current.candidates.find((item) => item.id === selectedId) ?? current.candidates[0];
   const historical = current.candidates.find((item) => item.id === 'web-up');
   if (!selected || !historical) throw new Error('Store screenshot draft fixture is incomplete.');
-  const score = selected.id === historical.id ? 100 : selected.id === 'cosmic-cube' ? 0 : selected.id === 'hero-in-training' ? 96 : 78;
+  const score = selected.id === historical.id ? 100 : selected.id === 'cosmic-cube' ? 0 : selected.id === 'hero-in-training' ? 95 : 78;
   const answer: DraftRunAnswer = {
     score,
     selectedId: selected.id,
@@ -108,8 +108,8 @@ function feedbackRun(selectedId: string): DraftRunState {
     modelTargetDisagreement: selected.id !== historical.id,
     deckAvailable: true,
     ranking: [
-      { id: 'hero-in-training', name: 'Hero in Training', support: 0.46, score: 100 },
-      { id: 'web-up', name: 'Web Up', support: 0.24, score: 96 },
+      { id: 'hero-in-training', name: 'Hero in Training', support: 0.46, score: 95 },
+      { id: 'web-up', name: 'Web Up', support: 0.24, score: 100 },
       { id: 'the-vision', name: 'The Vision', support: 0.11, score: 84 },
       { id: 'cosmic-cube', name: 'Cosmic Cube', support: 0.08, score: 79 },
     ],
