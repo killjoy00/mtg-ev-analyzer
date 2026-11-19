@@ -1,12 +1,12 @@
 {
   "operation": "upload-exact-android-aab-production",
-  "reason": "Owner authorized public Google Play Production follow-up to correct Pack One Android 101058 0% DEX obfuscation warning. Protected current-main signed R8 optimized 101070 AAB passed build, embedded R8 mapping check, AdMob manifest audit, upload signer check, and submitted Google Play Data safety. Publish exact artifact and preserve Production US/CA countries.",
-  "source_run_id": 44586673796,
-  "source_artifact_id": 14563947806,
-  "source_sha": "5e93f0a75b6330887a56dc8a44130a04043e3bb4",
+  "reason": "Owner-approved corrected Android Production release after 101070 shipped with the AdMob banner runtime switch disabled. PR #1689 fixed Gradle Expo environment propagation and adds an AAB embedded-config gate at signed-build and exact-upload stages. Protected main signed run 44607534274 built version 101089 from unchanged source e118f0861880d859e72f8d3cc03cdc066559e164; logs explicitly verify AAB base/assets/app.config production profile and enabled registered Android banner, R8 mapping, native advertising policy, and registered Play upload certificate. Release this exact verified artifact to existing Google Play Production track; preserve countries and submitted Data Safety.",
+  "source_run_id": 44607534274,
+  "source_artifact_id": 14570689639,
+  "source_sha": "e118f0861880d859e72f8d3cc03cdc066559e164",
   "artifact_name": "pack-one-play-signed-aab",
-  "artifact_digest": "sha256:0aee1bee4e5c0993bb7dbd46fdf3cfce976d9f1ff474755b7ab013045a90af4f",
-  "version_code": 101070,
+  "artifact_digest": "sha256:342ae5eb61748cd431a02973f33c3c3511200867b92151915fc75333b89998ab",
+  "version_code": 101089,
   "track": "production",
   "data_safety_run_id": 44561910073
 }
