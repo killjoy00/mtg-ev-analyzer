@@ -45,9 +45,11 @@ function adMobPlatformConfig(
   }
   return { enabled, appId: appId!, bannerUnitId: bannerUnitId! };
 }
-// Added by the React Native template (dev overlays) and expo-secure-store (biometric
-// unlock, which Pack One does not use). Store builds never need them.
+// Added by the React Native template (dev overlays), expo-secure-store
+// (biometric unlock) and the iOS-only Google Mobile Ads dependency. Android
+// builds have no live AdMob or advertising ID use: suppress SDK-merged AD_ID.
 const PRODUCTION_BLOCKED_PERMISSIONS = [
+  'com.google.android.gms.permission.AD_ID',
   'android.permission.SYSTEM_ALERT_WINDOW',
   'android.permission.USE_BIOMETRIC',
   'android.permission.USE_FINGERPRINT',
