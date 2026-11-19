@@ -40,7 +40,10 @@ test('Daily is a compact numbered scorecard with a wrapping side action', () => 
   assert.match(style('src/screens/index.tsx', 'latestAccent'), /#8c4b36/);
   assert.match(style('src/screens/index.tsx', 'primaryButton'), /minHeight: 48/);
   assert.match(style('src/screens/index.tsx', 'secondaryButton'), /minHeight: 48/);
-  assert.match(style('src/screens/index.tsx', 'statusStrip'), /flexWrap: 'wrap'/);
+  assert.match(style('src/screens/index.tsx', 'dailyHeading'), /flexWrap: 'wrap'/);
+  assert.match(src, /showHomeStatus = phase === 'ready' && claimed && Boolean\(currentStatus\?\.player\?\.claimed\) && completedCount === 3/);
+  assert.match(src, /Make your pick\. See what the trophy drafter chose\./);
+  assert.doesNotMatch(src, /Checking streak/);
   assert.match(src, /Free · No account required/);
   assert.match(src, /View result/);
   assert.doesNotMatch(style('src/screens/index.tsx', 'completeCard'), /opacity:/);
@@ -153,4 +156,21 @@ test('reveal comparison shares iPad row width without clipping third card; stack
   assert.match(style('app/draft-run.tsx', 'feedbackCardRowItem'), /flexBasis:\s*0/);
   assert.match(style('app/draft-run.tsx', 'feedbackCardRowItem'), /width:\s*0/);
   assert.match(style('app/draft-run.tsx', 'feedbackCard'), /width:\s*'100%'/);
+});
+
+test('native Leaderboard copies the website board labels instead of inventing an introduction', () => {
+  const board = read('src/screens/leaderboard.tsx');
+  assert.match(board, /mixed: 'Draft Run', 'powered-cube': 'Cube', latest: 'Latest Set'/);
+  assert.match(board, /First attempts only\. Everyone gets the same packs\./);
+  assert.match(board, /Season rating uses every first-attempt Daily score/);
+  assert.doesNotMatch(board, /See how the field drafted|Ranked scores come from Pack One/);
+  assert.doesNotMatch(board, />LEADERBOARD</);
+});
+
+test('Practice hides the shared activity recovery widget when no valid checkpoint is present', () => {
+  const practice = read('src/screens/practice.tsx');
+  const recovery = read('src/components/SharedRunRecovery.tsx');
+  assert.match(practice, /<SharedRunRecovery \/>/);
+  assert.match(recovery, /state\.kind === 'checking' \|\| state\.kind === 'empty'\) return null/);
+  assert.match(recovery, /state\.kind === 'error' \?/);
 });

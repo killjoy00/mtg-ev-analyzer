@@ -29,19 +29,22 @@ export function SharedRunRecovery() {
       if (run.id !== saved.runId) throw new Error('Unexpected saved run.');
       setState({ kind: 'ready', complete: run.complete });
     } catch {
+      // A locked or unavailable secure store may still contain a real run:
+      // offer an explicit retry rather than silently abandoning the checkpoint.
       if (id === generation.current) setState({ kind: 'error' });
     }
   }, []);
   useFocusEffect(useCallback(() => { void refresh(); return () => { generation.current += 1; }; }, [refresh]));
   useEffect(() => subscribeSession(() => { generation.current += 1; setState({ kind: 'checking' }); void refresh(); }), [refresh]);
   useAppResume(refresh);
+  // Normal Practice has no shared-run panel; surface it only for a real saved
+  // continuation or a retryable failure after the checkpoint was found.
+  if (state.kind === 'checking' || state.kind === 'empty') return null;
   return <View style={styles.panel}>
     <Text style={styles.title}>Shared activity</Text>
     <Text style={styles.body}>{state.kind === 'ready'
       ? 'Saved on this device for your account. Visit My Pack One for your account activity.'
-      : state.kind === 'empty' ? 'No shared run is saved for this account on this device. Open a friend’s invitation to play.'
-        : state.kind === 'checking' ? 'Checking this device’s saved shared run…'
-          : 'Could not check your saved shared run. Your checkpoint is retained; retry to reopen the same attempt.'}</Text>
+      : 'Could not check your saved shared run. Your checkpoint is retained; retry to reopen the same attempt.'}</Text>
     {state.kind === 'ready' ? <Pressable accessibilityRole="button" onPress={() => router.push('/resume-shared-run')} style={styles.button}>
       <Text style={styles.action}>{state.complete ? 'View shared result' : 'Continue shared run'}</Text>
     </Pressable> : null}

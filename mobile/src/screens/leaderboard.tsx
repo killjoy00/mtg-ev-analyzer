@@ -27,6 +27,9 @@ import { useAppResume } from '@/src/hooks/useAppResume';
 import { colors, spacing } from '@/src/theme';
 import { config } from '@/src/config';
 
+// Match the website's game headings and filter labels, not the Daily-home titles.
+const boardLabels: Record<DailyEnvironment, string> = { mixed: 'Draft Run', 'powered-cube': 'Cube', latest: 'Latest Set' };
+
 const periods: { id: LeaderboardPeriod; label: string }[] = [
   { id: 'daily', label: 'Today' },
   { id: 'week', label: 'This week' },
@@ -205,18 +208,15 @@ export default function LeaderboardScreen() {
 
   const header = (
     <View style={styles.header} onLayout={() => { if (config.screenshots.fixtures) console.info('PACKONE_LEADERS_READY'); }}>
-      <Text style={styles.eyebrow}>LEADERBOARD</Text>
-      <Text style={styles.title}>See how the field drafted.</Text>
-      <Text style={styles.body}>Ranked scores come from Pack One Daily runs validated to an eligible account.</Text>
+      <Text style={styles.title}>{boardLabels[environment]}</Text>
 
       <View style={styles.filterGroup}>
-        <Text style={styles.filterLabel}>RUN</Text>
-        <View style={styles.filterRow}>
+        <View style={styles.filterRow} accessibilityLabel="Leaderboard game">
           {DAILY_ENVIRONMENTS.map((id) => (
             <FilterButton
               key={id}
               active={environment === id}
-              label={DAILY_ENVIRONMENT_META[id].title}
+              label={boardLabels[id]}
               onPress={() => selectEnvironment(id)}
             />
           ))}
@@ -224,8 +224,7 @@ export default function LeaderboardScreen() {
       </View>
 
       <View style={styles.filterGroup}>
-        <Text style={styles.filterLabel}>PERIOD</Text>
-        <View style={styles.filterRow}>
+        <View style={styles.filterRow} accessibilityLabel="Leaderboard period">
           {periods.map((item) => (
             <FilterButton
               key={item.id}
@@ -245,12 +244,11 @@ export default function LeaderboardScreen() {
               {state.data.season.end_date ? `–${shortDate(state.data.season.end_date)}` : '–present'}
             </Text>
           ) : null}
-          {seasonRating ? <Text style={styles.body}>Season rating uses every first-attempt Daily score, with a larger deduction when you have played fewer days. You rank after your first Daily; missed days do not count as zero.</Text> : null}
-          <Text style={styles.range}>
-            {!state.data.start ? '' : state.data.start === state.data.today
-              ? state.data.today
-              : `${state.data.start} – ${state.data.today}`}
-          </Text>
+          <Text style={styles.body}>{seasonRating
+            ? 'Season rating uses every first-attempt Daily score, with a larger deduction when you have played fewer days. You rank after your first Daily; missed days do not count as zero.'
+            : period === 'daily'
+              ? 'First attempts only. Everyone gets the same packs.'
+              : `Average of your best ${state.data.best_of ?? (period === 'week' ? 3 : 10)} first-attempt Daily scores ${period === 'week' ? 'this week' : 'this season'}; days not played count as 0. Days played are shown alongside.`}</Text>
           <View style={styles.tableHeader}>
             <Text style={styles.rankHeader}>#</Text>
             <Text style={styles.playerHeader}>PLAYER</Text>
@@ -313,11 +311,9 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   list: { paddingBottom: spacing.xxl, alignSelf: 'center', width: '100%', maxWidth: 980 },
   header: { padding: spacing.md, gap: 12 },
-  eyebrow: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
   title: { color: colors.ink, fontSize: 32, lineHeight: 36, fontWeight: '800', letterSpacing: -0.7 },
   body: { color: colors.muted, fontSize: 15, lineHeight: 22 },
   filterGroup: { gap: spacing.xs },
-  filterLabel: { color: colors.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
   filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   filterButton: {
     minHeight: 44,

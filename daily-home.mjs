@@ -20,9 +20,11 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), state = 'ready') {
   const rankingReason=ready?profile?.ranking_identity?.reason:null;
   const displayNameAttention=['username_taken','username_required','name_not_allowed'].includes(rankingReason);
   const dailyStreak=ready?Number(profile?.daily_streak||0):0;
-  return `<section class="daily-home" data-daily-home data-home-state="${state}" data-completed="${ready?status.completed:'pending'}">
-    <header class="daily-home-heading"><h1>Eight picks. What would you take?</h1><p>These picks come from real trophy drafts.<br>You decide what you'd take, then see what the drafter chose.</p><time datetime="${day}">${dailyDate}’s Daily Runs</time></header>
-    <div class="daily-home-status" role="status" aria-label="Daily reset and streak"><strong data-daily-reset>${dailyResetCue()}</strong>${ready&&dailyStreak>0?`<span class="daily-home-streak">${dailyStreak}-day streak</span>`:checking?'<span class="daily-home-streak is-loading">Checking streak…</span>':''}</div>
+  // Reset and streak are post-completion information, not pre-play prompts.
+  const showHomeStatus=ready&&claimed&&status.completed===3;
+  return `<section class="daily-home${showHomeStatus?' has-home-status':''}" data-daily-home data-home-state="${state}" data-completed="${ready?status.completed:'pending'}">
+    <header class="daily-home-heading"><h1>Eight picks. What would you take?</h1><p>These picks come from real trophy drafts.<br>Make your pick. See what the trophy drafter chose.</p><time datetime="${day}">${dailyDate}’s Daily Runs</time></header>
+    ${showHomeStatus?`<div class="daily-home-status" role="status" aria-label="Daily reset and streak"><strong data-daily-reset>${dailyResetCue()}</strong>${dailyStreak>0?`<span class="daily-home-streak">${dailyStreak}-day streak</span>`:''}</div>`:''}
     ${displayNameAttention?`<aside class="daily-home-identity-warning" role="alert"><div><strong>${rankingReason==='name_not_allowed'?'That display name is not allowed. Choose another to join Daily leaderboards.':rankingReason==='username_taken'?'Choose a different display name. That one is already taken.':'Choose a display name before playing a Daily.'}</strong><p>Pick a display name that isn’t taken, or your Daily scores won’t show on the leaderboard.</p></div><button class="button secondary" type="button" data-home-username>Change display name</button></aside>`:''}
     <div class="daily-home-games">${games.map(game => {
       const result = status[game.key];
@@ -47,7 +49,7 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), state = 'ready') {
 export function renderDailyHome(profile = null, state = 'ready') {
   if (!document.querySelector('[data-daily-home-style]')) {
     const link = document.createElement('link'); link.rel = 'stylesheet';
-    link.href = './daily-home.css?v=13'; link.dataset.dailyHomeStyle = '1'; document.head.append(link);
+    link.href = './daily-home.css?v=14'; link.dataset.dailyHomeStyle = '1'; document.head.append(link);
   }
   lastDay = gameDateKey();
   document.querySelector('#app').innerHTML = dailyHomeMarkup(profile, lastDay, state);

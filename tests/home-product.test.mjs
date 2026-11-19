@@ -110,10 +110,10 @@ test('share assets are complete PNGs with genuinely shallow banner dimensions',(
 test('Daily hero tagline and second-line invitation match website and mobile',()=>{
  const html=dailyHomeMarkup(null,day);
  assert.ok(html.includes("<h1>Eight picks. What would you take?</h1>"),'web hero heading');
- assert.ok(html.includes("These picks come from real trophy drafts.<br>You decide what you'd take, then see what the drafter chose."),'web invitation starts on a new line');
+ assert.ok(html.includes("These picks come from real trophy drafts.<br>Make your pick. See what the trophy drafter chose."),'web invitation starts on a new line');
  const native=fs.readFileSync('mobile/src/screens/index.tsx','utf8');
  assert.ok(native.includes("<Text style={styles.title}>Eight picks. What would you take?</Text>"),'native hero heading');
- assert.ok(native.includes("These picks come from real trophy drafts.{'\\n'}You decide what you&apos;d take, then see what the drafter chose."),'native invitation starts on a new line');
+ assert.ok(native.includes("These picks come from real trophy drafts.{'\\n'}Make your pick. See what the trophy drafter chose."),'native invitation starts on a new line');
  assert.ok(!html.includes('and how your pick scored.'),'web hero should not mention scoring');
  assert.ok(!native.includes('and how your pick scored.'),'native hero should not mention scoring');
 });
@@ -126,7 +126,7 @@ test('approved editorial copy is consistent across web and native app',()=>{
   'scoring/index.html':'<h2>What if the model disagrees?</h2>',
   'sets/index.html':'<h1>Which sets are available?</h1>',
   'mobile/src/screens/index.tsx':'<Text style={styles.utilityTitle}>Want another eight picks?</Text>',
-  'mobile/src/screens/practice.tsx':'<Text style={styles.title}>Want another eight picks?</Text>',
+  'mobile/src/screens/practice.tsx':'<Text style={[styles.title, tablet && styles.tabletTitle]}>Want another eight picks?</Text>',
   'mobile/src/screens/learn.tsx':'<Text style={styles.title}>How Pack One works.</Text>',
   'mobile/app/scoring.tsx':"title: 'What if the model disagrees?'",
   'mobile/app/sets.tsx':'<Text style={styles.title}>Which sets are available?</Text>',
@@ -169,7 +169,7 @@ test('Daily-home copy follows website markup across native cards and states', ()
   assert.ok(modes.includes(`description: '${description}'`),`native Daily description must match website: ${environment}`);
  }
  for(const phrase of [
-  'Eight picks. What would you take?', 'You decide what you',
+  'Eight picks. What would you take?', 'Make your pick. See what the trophy drafter chose.',
   'Start here', 'Free · No account required', 'Play now', 'View result',
   'Want another eight picks?', 'DAILIES COMPLETE',
   'Keep playing regular Draft Runs, or any sets with Pack One Elite.',
@@ -319,4 +319,45 @@ test('membership level does not change the unfinished Daily home',()=>{
   const html=dailyHomeMarkup(profile,day);
   assert.doesNotMatch(html,/Free practice|Elite practice|Become Elite|Upgrade to Elite|Choose your sets|Practice a Draft Run/);
  }
+});
+
+test('Daily reset and streak appear only after all three Dailies are complete for a signed-in account', () => {
+ const entries=['mixed','powered-cube','latest'];
+ const markup=(environments,claimed,state='ready')=>dailyHomeMarkup({
+   player:{claimed},daily_streak:9,daily_history:environments.map(row)
+ },day,state);
+ const assertHidden=(html,scenario)=>{
+   assert.doesNotMatch(html,/data-daily-reset|daily-home-streak|Checking streak/i,scenario);
+   assert.doesNotMatch(html,/has-home-status/,scenario);
+   assert.match(html,/daily-home-heading[^]*?Daily Runs/,scenario);
+ };
+ for(const count of [0,1,2]){
+   assertHidden(markup(entries.slice(0,count),true),`signed in, ${count} finished`);
+ }
+ assertHidden(markup(entries,false),'guest completed all 3');
+ assertHidden(markup(entries,true,'checking'),'still checking');
+ assertHidden(markup(entries,true,'unavailable'),'progress unavailable');
+ const complete=markup(entries,true);
+ assert.match(complete,/class="daily-home has-home-status"/);
+ assert.match(complete,/data-daily-reset/);
+ assert.match(complete,/9-day streak/);
+});
+
+test('Leaderboards keep website-authored explanations and game names in the native app', () => {
+ const web=fs.readFileSync('draft-run-product.mjs','utf8');
+ const native=fs.readFileSync('mobile/src/screens/leaderboard.tsx','utf8');
+ for(const text of [
+   'First attempts only. Everyone gets the same packs.',
+   'Season rating uses every first-attempt Daily score, with a larger deduction when you have played fewer days.',
+   'You rank after your first Daily; missed days do not count as zero.',
+   'Average of your best ',
+   'days not played count as 0. Days played are shown alongside.',
+ ]) {
+   assert.ok(web.includes(text),'website missing approved board explanation: '+text);
+   assert.ok(native.includes(text),'native is out of sync with web: '+text);
+ }
+ for(const old of ['See how the field drafted.', 'Ranked scores come from Pack One Daily runs validated to an eligible account.']) {
+   assert.ok(!native.includes(old),'unapproved native-only leaderboard copy: '+old);
+ }
+ assert.match(native,/mixed: 'Draft Run', 'powered-cube': 'Cube', latest: 'Latest Set'/);
 });

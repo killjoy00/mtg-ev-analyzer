@@ -161,6 +161,7 @@ export default function HomeScreen() {
   const dailies = dailyEnvironments;
   const currentStatus = status?.day === pacificDay(now) ? status : null;
   const completedCount = currentStatus ? dailyEnvironments.filter((environment) => completed(currentStatus, environment)).length : null;
+  const showHomeStatus = phase === 'ready' && claimed && Boolean(currentStatus?.player?.claimed) && completedCount === 3;
   const rankingReason = currentStatus?.ranking_identity?.reason;
   const openPromotion = async () => {
     setPromotionError(null);
@@ -183,20 +184,13 @@ export default function HomeScreen() {
         <View style={styles.hero}>
           <Text style={styles.title}>Eight picks. What would you take?</Text>
           <Text style={styles.lede}>
-            These picks come from real trophy drafts.{'\n'}You decide what you&apos;d take, then see what the drafter chose.
+            These picks come from real trophy drafts.{'\n'}Make your pick. See what the trophy drafter chose.
           </Text>
         </View>
 
         {accountState.message ? <Pressable accessibilityRole="button" onPress={() => void accountState.refresh()} style={styles.warning}>
           <Text style={styles.warningBody}>{accountState.message}</Text><Text style={styles.cardAction}>Retry account check</Text>
         </Pressable> : accountState.status === 'checking' ? <Text style={styles.statusText}>Checking account…</Text> : null}
-        <View style={styles.statusStrip} accessibilityLabel="Daily date, reset and streak">
-          <Text style={styles.today}>{dailyDate(pacificDay(now))}’s Daily Runs</Text>
-          <Text style={styles.resetCue}>{dailyResetCue(now)}</Text>
-          {phase === 'ready' && currentStatus && currentStatus.daily_streak > 0
-            ? <Text style={styles.statusText}>{currentStatus.daily_streak}-day streak</Text>
-            : phase === 'checking' ? <Text style={styles.statusText}>Checking streak…</Text> : null}
-        </View>
         {phase === 'unavailable' ? <View style={styles.warning}>
           <Text accessibilityRole="alert" style={styles.warningBody}>Couldn’t load your Daily progress. Play now will still pick up where you left off.</Text>
           <Pressable accessibilityRole="button" onPress={() => void refresh()} style={styles.helpLink}><Text style={styles.cardAction}>Retry</Text></Pressable>
@@ -223,6 +217,14 @@ export default function HomeScreen() {
         ) : null}
 
         <View style={styles.dailySection}>
+          <View style={styles.dailyHeading} accessibilityLabel="Daily date and progress">
+            <Text style={styles.today}>{dailyDate(pacificDay(now))}’s Daily Runs</Text>
+            {showHomeStatus ? <View style={styles.dailyCue}>
+              <Text style={styles.resetCue}>{dailyResetCue(now)}</Text>
+              {currentStatus && currentStatus.daily_streak > 0
+                ? <Text style={styles.statusText}>{currentStatus.daily_streak}-day streak</Text> : null}
+            </View> : null}
+          </View>
           {dailies.map((environment, index) => {
             const meta = DAILY_ENVIRONMENT_META[environment];
             const isComplete = completed(currentStatus, environment);
@@ -348,7 +350,8 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   brandRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md },
   helpLink: { minHeight: 44, justifyContent: 'center' },
-  statusStrip: { borderTopWidth: 1, borderBottomWidth: 1, borderColor: colors.line, paddingVertical: spacing.sm, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'baseline', columnGap: spacing.md, rowGap: spacing.xs },
+  dailyHeading: { borderTopWidth: 2, borderBottomWidth: 1, borderColor: colors.lineStrong, paddingVertical: spacing.sm, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', columnGap: spacing.md, rowGap: spacing.xs },
+  dailyCue: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.sm },
   statusText: { color: colors.muted, fontSize: 14, lineHeight: 20 },
   safe: { flex: 1, backgroundColor: colors.page },
   page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: 12, alignSelf: 'center', width: '100%', maxWidth: 860 },
@@ -365,7 +368,7 @@ const styles = StyleSheet.create({
   title: { color: colors.ink, fontSize: 32, lineHeight: 35, fontWeight: '800', letterSpacing: -0.8 },
   lede: { color: colors.muted, fontSize: 14, lineHeight: 20, maxWidth: 640 },
   today: { color: colors.muted, fontSize: 13, fontWeight: '800' },
-  dailySection: { gap: spacing.sm },
+  dailySection: { gap: 0 },
   dailyCardContent: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, alignItems: 'center' },
   dailyCardCopy: { flex: 1, minWidth: 150, gap: spacing.xs },
   dailyButton: { minWidth: 92, flexGrow: 1, alignSelf: 'center' },

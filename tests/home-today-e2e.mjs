@@ -23,9 +23,10 @@ await page.route('**/*.neon.tech/**',async route=>{
 async function progress(expected){await page.waitForFunction(text=>document.querySelector('[data-daily-home]')?.dataset.completed===text,expected);}
 try{
  await page.goto(process.env.PACK1_E2E_URL||'http://127.0.0.1:4173');await progress('0');
- assert.equal((await page.locator('.daily-home-status [data-daily-reset]').innerText()).trim(),'New Dailies in 15h');
- assert.equal(await page.locator('.daily-home-status .daily-home-streak').count(),0,'no streak badge is rendered for a real zero streak');
+ assert.equal(await page.locator('.daily-home-status').count(),0,'pre-play visitors should not see countdown or streak');
+ assert.equal(await page.locator('[data-daily-reset]').count(),0);
  complete=true;await page.evaluate(()=>document.dispatchEvent(new CustomEvent('pack1:result-completed')));await progress('1');
+ assert.equal(await page.locator('.daily-home-status').count(),0,'one Daily is not the full-set completion gate');
  // A slow older profile response must not undo a newer completed-result refresh.
  complete=false;holdNext=true;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
  for(let tries=0;!held&&tries<500;tries++)await new Promise(resolve=>setTimeout(resolve,10));
@@ -33,6 +34,7 @@ try{
  complete=true;await page.evaluate(()=>document.dispatchEvent(new CustomEvent('pack1:result-completed')));await progress('1');
  held();await page.waitForTimeout(100);await progress('1');
  both=true;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await progress('3');
+ assert.equal(await page.locator('.daily-home-status').count(),1,'signed-in three-Daily completion unlocks reset and streak');
  assert.ok(await page.getByRole('link',{name:'Go to Practice',exact:true}).isVisible());
  assert.equal((await page.locator('.daily-home-status [data-daily-reset]').innerText()).trim(),'New Dailies in 15h','Daily reset countdown stays visible at the top of the Daily section');
  assert.equal((await page.locator('.daily-home-status .daily-home-streak').innerText()).trim(),'3-day streak','current streak stays beside the reset countdown');
@@ -40,6 +42,7 @@ try{
  for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:`artifacts/ui-dailies-complete-${width}.png`,fullPage:true});}
  both=false;
  await page.evaluate(()=>{window.__todayNow=Date.parse('2026-09-15T07:00:00Z');window.dispatchEvent(new Event('focus'));});await progress('0');
+ assert.equal(await page.locator('.daily-home-status').count(),0,'next date hides prior-day streak until new set complete');
  assert.equal(await page.locator('.daily-home time').getAttribute('datetime'),'2026-09-15');
  fail=true;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByText('Couldn’t load your Daily progress.',{exact:false}).waitFor();
  assert.equal(starts,0,'Reading Today must never reserve a ranked Daily');

@@ -19,6 +19,7 @@ export type DraftRunLeaderboard = {
   environment: DailyEnvironment;
   start: string | null;
   scoring?: { version: string } | null;
+  best_of?: number | null;
   today: string;
   rows: LeaderboardRow[];
   season?: {

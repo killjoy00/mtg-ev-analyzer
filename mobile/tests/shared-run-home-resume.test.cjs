@@ -178,7 +178,7 @@ for (const saved of [null, 'malformed checkpoint']) {
     const h = await fixture({ saved });
     try {
       assert.equal(h.hasButton('Continue shared run'), false);
-      assert.match(h.text(), /No shared run is saved for this account/);
+      assert.doesNotMatch(h.text(), /Shared activity|No shared run is saved for this account/, 'empty Practice should not show a speculative shared-activity panel');
       assert.equal(h.calls.some(([kind]) => ['get', 'start', 'replace'].includes(kind)), false);
     } finally { await h.close(); }
   });
@@ -188,7 +188,7 @@ test('another account cannot discover the previous account checkpoint from Pract
   const h = await fixture({ session: session(OTHER) });
   try {
     assert.equal(h.hasButton('Continue shared run'), false);
-    assert.match(h.text(), /No shared run is saved for this account/);
+    assert.doesNotMatch(h.text(), /Shared activity|No shared run is saved for this account/, 'empty Practice should not show a speculative shared-activity panel');
     assert.equal(h.calls.some(([kind]) => kind === 'get' || kind === 'replace'), false);
     assert.equal(h.store.get(SAVED), checkpoint());
   } finally { await h.close(); }
@@ -214,7 +214,7 @@ test('an identity change during discovery cannot route to the previous account r
     await h.writeSession(session(OTHER));
     await act(async () => { read.resolve(checkpoint()); await flush(); });
     assert.equal(h.calls.some(([kind]) => kind === 'replace' || kind === 'get'), false);
-    assert.match(h.text(), /No shared run is saved for this account/);
+    assert.doesNotMatch(h.text(), /Shared activity|No shared run is saved for this account/, 'empty Practice should not show a speculative shared-activity panel');
   } finally { await h.close(); }
 });
 
@@ -236,7 +236,7 @@ test('a player-token and subject mismatch cannot discover a checkpoint', async (
   const h = await fixture({ session: { ...session(), subjectId: OTHER } });
   try {
     assert.equal(h.hasButton('Continue shared run'), false);
-    assert.match(h.text(), /No shared run is saved for this account/);
+    assert.doesNotMatch(h.text(), /Shared activity|No shared run is saved for this account/, 'empty Practice should not show a speculative shared-activity panel');
     assert.equal(h.calls.some(([kind]) => kind === 'get' || kind === 'replace'), false);
   } finally { await h.close(); }
 });

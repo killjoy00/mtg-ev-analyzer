@@ -104,3 +104,6 @@
 /* The Dailies use the full shared page width: rows start under the logo and end under the menu. */
 .daily-home{max-width:none;margin-left:0}
 .daily-home-heading>p{max-width:68ch}
+
+/* With no earned reset/streak cue, the date owns the full ruled row. */
+.daily-home:not(.has-home-status) .daily-home-heading time{grid-column:1/-1;padding-right:0}

@@ -29,6 +29,10 @@ concurrency:
 jobs:
   validate:
     name: validate screenshot fixture build
+    # Native unit/type/config checks already run in the fast 'mobile' workflow.
+    # Full store captures and native device sweeps are opt-in, not a PR merge gate.
+    # Keep the PR event to report a skipped, nonblocking screenshot check.
+    if: github.event_name != 'pull_request'
     timeout-minutes: 10
     outputs:
       capture_required: ${{ steps.capture.outputs.capture_required }}
