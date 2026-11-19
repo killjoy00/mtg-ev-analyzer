@@ -137,6 +137,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ...(config.plugins?.map(plugin => Array.isArray(plugin)&&plugin[0]==='expo-notifications'
         ? [plugin[0], {...plugin[1], mode:production?'production':'development', enableBackgroundRemoteNotifications:false}]
         : plugin) || []),
+      // iOS 27 requires UIKit scenes; SDK 57 uses an explicit, supported opt-in.
+      ['expo-build-properties', { ios: { enableSceneSupport: true } }],
       ['react-native-google-mobile-ads', {
         iosAppId: iosAds.appId,
         androidAppId: androidAds.appId,
