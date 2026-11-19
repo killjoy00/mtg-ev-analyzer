@@ -1,11 +1,11 @@
 {
   "operation": "upload-promote-existing-android-aab",
-  "reason": "Owner-authorized release of the exact post-#837 Pack One Android 1.0 candidate already built and signed in run 36957485029. Upload that unchanged AAB as versionCode 100444 to Google Play Internal Testing, then promote the same version unchanged to the existing production-access Closed Testing track. Do not rebuild the bundle or publish to Production.",
-  "source_run_id": 36957485029,
-  "source_artifact_id": 11206639352,
-  "source_sha": "fa588b40bc380946735385abfac0ff52586e1873",
+  "reason": "Owner-requested Pack One Android 1.0 web-parity release. Promote the exact protected Play-signed versionCode 101042 bundle built from merged PR #1628 (main e608122300a77c8b91ed67b3e13c42bc85621d45, successful run 44456266296), uploading first to Internal Testing then to the existing production-access Closed Testing track. Preserve closed-test enrollment, country availability, and public Production; do not rebuild or release publicly.",
+  "source_run_id": 44456266296,
+  "source_artifact_id": 14497699978,
+  "source_sha": "e608122300a77c8b91ed67b3e13c42bc85621d45",
   "artifact_name": "pack-one-play-signed-aab",
-  "artifact_digest": "sha256:9aa25360201435a68facc6ed25c21d965e883bcd1ae42204b2b7e4e0d219c20d",
-  "version_code": "100444",
+  "artifact_digest": "sha256:5444136e43921b217aec918c97e905d98a763e1c2fe6dfbc57678914128b462e",
+  "version_code": "101042",
   "track": "production-access"
 }
