@@ -1,6 +1,6 @@
-/** iOS 1.2 has only AdMob on the Daily home. Android retains its existing
- * affiliate promotion until Android AdMob is separately authorized.
- * Neither platform shows promos during gameplay, card review, or results. */
+/** Only one promotion on the Daily home: AdMob when explicitly enabled,
+ * otherwise Android's existing affiliate placement. No ads on gameplay,
+ * card review, results, or for users without fresh ad eligibility. */
 export type DailyPromotion = 'none' | 'admob' | 'affiliate';
 
 export function dailyHomePromotion(
