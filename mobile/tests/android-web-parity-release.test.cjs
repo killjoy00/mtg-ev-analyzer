@@ -55,6 +55,7 @@ test('Android store identity, target SDK baseline and Play-billing separation re
   const toolchain = JSON.parse(read('mobile/android-toolchain.json'));
   const placement = read('mobile/src/ads/placement.ts');
   const config = read('mobile/app.config.ts');
+  const manifestAudit = read('mobile/scripts/audit-android-manifest.py');
   const workflow = read('.github/workflows/android-production-bundle.yml');
   assert.equal(app.android.package, 'pro.packone.app');
   assert.equal(release.playVersionName, '1.0');
@@ -62,6 +63,11 @@ test('Android store identity, target SDK baseline and Play-billing separation re
   assert.ok(pkg.dependencies.expo.startsWith('~57.'), 'Expo SDK 57 targets Android API 36');
   assert.ok(pkg.expo.autolinking.android.exclude.includes('expo-iap'), 'No unapproved Google Play Billing path');
   assert.match(config, /PACKONE_ADMOB_ANDROID_ENABLED/);
+  // The iOS-only Mobile Ads dependency must not change Android's historical
+  // no-advertising-ID Google Play disclosure. Verify both the Expo removal
+  // and the fail-closed audit on the merged signed manifest.
+  assert.ok(config.includes("'com.google.android.gms.permission.AD_ID'"));
+  assert.ok(manifestAudit.includes('"com.google.android.gms.permission.AD_ID"'));
   assert.match(placement, /return platform === 'android' \? 'affiliate' : 'none'/);
   assert.doesNotMatch(workflow, /PACKONE_ADMOB_ANDROID_ENABLED: '1'/);
   assert.match(workflow, /name: Validate production mobile config[\s\S]*run: npm test/);
