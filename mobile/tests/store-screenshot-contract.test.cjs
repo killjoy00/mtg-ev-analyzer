@@ -231,7 +231,10 @@ test('App Store screenshot upload is protected, source-pinned, and non-submittin
   assert.match(uploader, /subscriptionAppStoreReviewScreenshots/);
   assert.doesNotMatch(uploader, /reviewSubmissions/);
   assert.equal(request.operation, 'upload-pack-one-app-store-screenshots');
-  assert.equal(request.versionString, '1.0');
-  assert.equal(request.screenshotRunId, 37244011193);
-  assert.equal(request.screenshotHeadSha, '3a8244eb0568769c133365ea2821d512c62a3515');
+  // The App Store target version changes independently of Android and capture runs.
+  // Validate an immutable, explicit source pin without hardcoding an obsolete upload.
+  const storeRelease = JSON.parse(read('mobile/store-release.json'));
+  assert.equal(request.versionString, storeRelease.appStoreVersion);
+  assert.ok(Number.isSafeInteger(request.screenshotRunId) && request.screenshotRunId > 0);
+  assert.match(request.screenshotHeadSha, /^[a-f0-9]{40}$/);
 });
