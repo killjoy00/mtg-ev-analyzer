@@ -151,7 +151,18 @@ export default ({ config }: ConfigContext): ExpoConfig => {
         ? [plugin[0], {...plugin[1], mode:production?'production':'development', enableBackgroundRemoteNotifications:false}]
         : plugin) || []),
       // iOS 27 requires UIKit scenes; SDK 57 uses an explicit, supported opt-in.
-      ['expo-build-properties', { ios: { enableSceneSupport: true } }],
+      // Google Play Android vitals requires real DEX obfuscation. Expo's
+      // config plugin sets the generated release Gradle flags; keep preview
+      // and development builds unchanged so native QA remains debuggable.
+      ['expo-build-properties', {
+        ...(production
+          ? { android: {
+              enableMinifyInReleaseBuilds: true,
+              enableShrinkResourcesInReleaseBuilds: true,
+            } }
+          : {}),
+        ios: { enableSceneSupport: true },
+      }],
       ['react-native-google-mobile-ads', {
         iosAppId: iosAds.appId,
         androidAppId: androidAds.appId,
