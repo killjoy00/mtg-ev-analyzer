@@ -133,7 +133,7 @@ export function AdMobDailyBanner({ eligible, onStatus }: { eligible: boolean; on
       <Text style={styles.label}>Advertisement</Text>
       <Banner
         unitId={unitId}
-        size={sdk!.BannerAdSize.BANNER}
+        size={Platform.OS === 'android' ? sdk!.BannerAdSize.ANCHORED_ADAPTIVE_BANNER : sdk!.BannerAdSize.BANNER}
         requestOptions={{ requestNonPersonalizedAdsOnly: true }}
         onAdLoaded={() => report({ stage: 'banner-loaded' })}
         onAdFailedToLoad={(error) => {
