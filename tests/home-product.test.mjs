@@ -110,10 +110,10 @@ test('share assets are complete PNGs with genuinely shallow banner dimensions',(
 test('Daily hero tagline and second-line invitation match website and mobile',()=>{
  const html=dailyHomeMarkup(null,day);
  assert.ok(html.includes("<h1>Eight picks. What would you take?</h1>"),'web hero heading');
- assert.ok(html.includes("These picks come from real trophy drafts.<br>You decide what you'd take, then see what the drafter chose."),'web invitation starts on a new line');
+ assert.ok(html.includes("These picks come from real trophy drafts.<br>Make your pick. See what the trophy drafter chose."),'web invitation starts on a new line');
  const native=fs.readFileSync('mobile/src/screens/index.tsx','utf8');
  assert.ok(native.includes("<Text style={styles.title}>Eight picks. What would you take?</Text>"),'native hero heading');
- assert.ok(native.includes("These picks come from real trophy drafts.{'\\n'}You decide what you&apos;d take, then see what the drafter chose."),'native invitation starts on a new line');
+ assert.ok(native.includes("These picks come from real trophy drafts.{'\\n'}Make your pick. See what the trophy drafter chose."),'native invitation starts on a new line');
  assert.ok(!html.includes('and how your pick scored.'),'web hero should not mention scoring');
  assert.ok(!native.includes('and how your pick scored.'),'native hero should not mention scoring');
 });
@@ -126,7 +126,7 @@ test('approved editorial copy is consistent across web and native app',()=>{
   'scoring/index.html':'<h2>What if the model disagrees?</h2>',
   'sets/index.html':'<h1>Which sets are available?</h1>',
   'mobile/src/screens/index.tsx':'<Text style={styles.utilityTitle}>Want another eight picks?</Text>',
-  'mobile/src/screens/practice.tsx':'<Text style={styles.title}>Want another eight picks?</Text>',
+  'mobile/src/screens/practice.tsx':'<Text style={[styles.title, tablet && styles.tabletTitle]}>Want another eight picks?</Text>',
   'mobile/src/screens/learn.tsx':'<Text style={styles.title}>How Pack One works.</Text>',
   'mobile/app/scoring.tsx':"title: 'What if the model disagrees?'",
   'mobile/app/sets.tsx':'<Text style={styles.title}>Which sets are available?</Text>',
@@ -169,7 +169,7 @@ test('Daily-home copy follows website markup across native cards and states', ()
   assert.ok(modes.includes(`description: '${description}'`),`native Daily description must match website: ${environment}`);
  }
  for(const phrase of [
-  'Eight picks. What would you take?', 'Make your pick. See what the drafter chose.',
+  'Eight picks. What would you take?', 'Make your pick. See what the trophy drafter chose.',
   'Start here', 'Free · No account required', 'Play now', 'View result',
   'Want another eight picks?', 'DAILIES COMPLETE',
   'Keep playing regular Draft Runs, or any sets with Pack One Elite.',
