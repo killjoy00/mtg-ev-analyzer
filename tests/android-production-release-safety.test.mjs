@@ -10,6 +10,9 @@ test('exact AAB Android Production flow is protected, pinned and distinct from c
   assert.match(workflow,/environment: pack-one-mobile-release/);
   assert.match(workflow,/Require current approved main and unchanged mobile source/);
   assert.match(workflow,/Verify pinned GitHub artifact metadata/);
+  assert.match(workflow,/The signed source build did not opt in to live Android AdMob/);
+  assert.match(workflow,/run\.get\('event'\) != 'push'/);
+  assert.match(workflow,/run\.get\('head_branch'\) != 'main'/);
   assert.match(workflow,/Download and verify exact signed AAB/);
   assert.match(workflow,/Upload exact AAB to Google Play Internal Testing/);
   assert.match(workflow,/Verify live links and Google Play app signing/);
