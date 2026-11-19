@@ -98,7 +98,7 @@ jobs:
     needs: validate
     if: needs.validate.outputs.capture_required == 'true' && !inputs.android_only
     timeout-minutes: 75
-    runs-on: macos-latest
+    runs-on: xcode-27
     env:
       EXPO_PUBLIC_PACKONE_ENV: preview
       EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES: '1'
@@ -118,6 +118,14 @@ jobs:
         run: |
           node ./scripts/check-build-toolchain.mjs
           npm ci --no-audit --no-fund
+      - name: Reject pre-iOS 27 build toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          sdk="$(xcrun --sdk iphoneos --show-sdk-version)"
+          major="${sdk%%.*}"
+          if (( major < 27 )); then echo "::error::App Store uploads require iOS 27 SDK or later; found $sdk"; exit 1; fi
       - name: Generate preview iOS project
         env:
           CI: '1'

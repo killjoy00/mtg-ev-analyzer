@@ -68,7 +68,7 @@ jobs:
     name: production iOS archive structure
     needs: native-scope
     if: ${{ !cancelled() && github.event_name == 'pull_request' }}
-    runs-on: ${{ (needs.native-scope.result == 'success' && needs.native-scope.outputs.native_full == 'false') && 'ubuntu-latest' || 'macos-latest' }}
+    runs-on: ${{ (needs.native-scope.result == 'success' && needs.native-scope.outputs.native_full == 'false') && 'ubuntu-latest' || 'xcode-27' }}
     env:
       NATIVE_FULL: ${{ needs.native-scope.result != 'success' || needs.native-scope.outputs.native_full != 'false' }}
       # Owner-approved live iOS ad gate for the 1.4 TestFlight candidate.
@@ -139,6 +139,15 @@ jobs:
           CI: '1'
           PACKONE_BUILD_PROFILE: production
         run: npx expo export --platform ios --output-dir "$RUNNER_TEMP/pack-one-ios-export"
+      - name: Reject pre-iOS 27 build toolchain
+        if: env.NATIVE_FULL == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          sdk="$(xcrun --sdk iphoneos --show-sdk-version)"
+          major="${sdk%%.*}"
+          if (( major < 27 )); then echo "::error::App Store uploads require iOS 27 SDK or later; found $sdk"; exit 1; fi
       - name: Generate production iOS project
         env:
           CI: '1'
@@ -189,6 +198,9 @@ jobs:
           xcodebuild             -workspace "$workspace"             -scheme "$scheme"             -configuration Release             -destination 'generic/platform=iOS'             -archivePath "$RUNNER_TEMP/PackOne.xcarchive"             CURRENT_PROJECT_VERSION="$PACKONE_IOS_BUILD_NUMBER"             MARKETING_VERSION="$expected_marketing_version"             CODE_SIGNING_ALLOWED=NO             CODE_SIGNING_REQUIRED=NO             archive
           archive_plist="$RUNNER_TEMP/PackOne.xcarchive/Products/Applications/PackOne.app/Info.plist"
           test -f "$archive_plist"
+          # Xcode 27 builds without a real UIKit scene configuration can compile
+          # successfully but terminate at launch on iOS 27.
+          python3 -c 'import plistlib,sys; d=plistlib.load(open(sys.argv[1], "rb")); scenes=d.get("UIApplicationSceneManifest",{}).get("UISceneConfigurations",{}).get("UIWindowSceneSessionRoleApplication",[]); assert scenes, "Missing UIKit UIWindowScene configuration for iOS 27"' "$archive_plist"
           archived_build_number="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$archive_plist")"
           archived_marketing_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$archive_plist")"
           [[ "$archived_marketing_version" == "$expected_marketing_version" ]] || {
@@ -219,7 +231,7 @@ jobs:
   testflight:
     name: sign and upload App Store-eligible TestFlight build
     if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') }}
-    runs-on: macos-latest
+    runs-on: xcode-27
     environment: pack-one-mobile-release
     defaults:
       run:
@@ -347,6 +359,14 @@ jobs:
       - name: Snapshot team signing certificates before automatic signing
         continue-on-error: true
         run: node ../.github/scripts/app-store-runner-certificates.mjs snapshot "$RUNNER_TEMP/asc-certificates-before.json"
+      - name: Reject pre-iOS 27 build toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -version
+          sdk="$(xcrun --sdk iphoneos --show-sdk-version)"
+          major="${sdk%%.*}"
+          if (( major < 27 )); then echo "::error::App Store uploads require iOS 27 SDK or later; found $sdk"; exit 1; fi
       - name: Generate production iOS project
         env:
           CI: '1'
@@ -380,6 +400,9 @@ jobs:
 
           archive_plist="$RUNNER_TEMP/PackOne.xcarchive/Products/Applications/PackOne.app/Info.plist"
           test -f "$archive_plist"
+          # Xcode 27 builds without a real UIKit scene configuration can compile
+          # successfully but terminate at launch on iOS 27.
+          python3 -c 'import plistlib,sys; d=plistlib.load(open(sys.argv[1], "rb")); scenes=d.get("UIApplicationSceneManifest",{}).get("UISceneConfigurations",{}).get("UIWindowSceneSessionRoleApplication",[]); assert scenes, "Missing UIKit UIWindowScene configuration for iOS 27"' "$archive_plist"
           archived_build_number="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$archive_plist")"
           archived_marketing_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$archive_plist")"
           [[ "$archived_marketing_version" == "$expected_marketing_version" ]] || {
