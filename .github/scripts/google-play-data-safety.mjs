@@ -207,7 +207,9 @@ for(const spec of specs){
   setPurposes(rows,prefix+'DATA_USAGE_COLLECTION_PURPOSE',spec.purposes);
   // Non-SDK data remains first-party/service-provider usage. The Google
   // Mobile Ads SDK explicitly documents third-party collection AND sharing.
-  setPurposes(rows,prefix+'DATA_USAGE_SHARING_PURPOSE',spec.shared?sdkPurposes:[]);
+  const sharing=rows.filter(r=>r[COL_Q]===prefix+'DATA_USAGE_SHARING_PURPOSE');
+  if(spec.shared)setPurposes(rows,prefix+'DATA_USAGE_SHARING_PURPOSE',sdkPurposes);
+  else for(const row of sharing)row[COL_V]='';
 
   selected.push({name:spec.name,token,optional:spec.optional,shared:Boolean(spec.shared),purposes:spec.purposes});
 }
@@ -255,7 +257,7 @@ for(const item of selected){
   if(!collected.some(r=>r[COL_R]==='PSL_DATA_USAGE_ONLY_COLLECTED'&&r[COL_V]==='TRUE'))throw Error(`${item.name}: collected not selected.`);
   const selectedShared=collected.some(r=>r[COL_R]==='PSL_DATA_USAGE_ONLY_SHARED'&&r[COL_V]==='TRUE');
   if(selectedShared!==item.shared)throw Error(`${item.name}: shared data declaration does not match SDK.`);
-  const sharingPurposes=exactRows(rows,prefix+'DATA_USAGE_SHARING_PURPOSE').filter(r=>r[COL_V]==='TRUE').map(r=>r[COL_R]).sort();
+  const sharingPurposes=rows.filter(r=>r[COL_Q]===prefix+'DATA_USAGE_SHARING_PURPOSE'&&r[COL_V]==='TRUE').map(r=>r[COL_R]).sort();
   const expectedSharing=(item.shared?sdkPurposes:[]).slice().sort();
   if(JSON.stringify(sharingPurposes)!==JSON.stringify(expectedSharing))throw Error(`${item.name}: shared purposes mismatch.`);
   const ephemeral=exactRows(rows,prefix+'PSL_DATA_USAGE_EPHEMERAL');
