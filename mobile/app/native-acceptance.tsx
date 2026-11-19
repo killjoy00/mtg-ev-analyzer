@@ -24,6 +24,7 @@ export default function NativeAcceptanceScreen() {
       console.info('PACKONE_SCENE', JSON.stringify({ scenario, destination: screen }));
       if (screen === 'shared') { router.replace({ pathname: '/shared-run', params: { shared: 'aaaaaaaaaaaaaaaaaaaaaaaa' } }); return; }
       if (screen === 'feedback') router.replace('/store-screenshot-feedback');
+      else if (screen === 'result' && scenario === 'member-perfect-result') router.replace({ pathname: '/draft-run', params: { environment: 'mixed' } });
       else if (screen === 'practice') router.dismissTo('/practice');
       else if (screen === 'learn') router.dismissTo('/learn');
       else if (screen === 'career') router.dismissTo('/career');
