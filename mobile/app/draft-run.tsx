@@ -1261,7 +1261,18 @@ export default function DraftRunScreen({
               {actionError ? <Text accessibilityRole="alert" style={styles.actionError}>{actionError}</Text> : null}
             </View>
           ) : null}
-          <View style={styles.scoreBlock}>
+          <View
+            style={styles.scoreBlock}
+            onLayout={() => {
+              // Preview-only native smoke marker: no player telemetry or
+              // production-side behavior, and no synthetic store imagery.
+              if (config.screenshots.fixtures) {
+                console.info('PACKONE_RESULT_READY', JSON.stringify({
+                  score: run.score, answers: run.answers.length, complete: run.complete,
+                }));
+              }
+            }}
+          >
             <Text style={styles.score}>{run.score ?? 0}</Text>
             <Text style={styles.scoreMeta}>/100 · {creator
               ? `${Number(creator.creator_matches ?? 0)}/${run.run_length} creator picks · ${Number(creator.trophy_matches ?? matches)}/${run.run_length} trophy picks`
