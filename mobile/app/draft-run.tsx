@@ -10,6 +10,7 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
+  Settings,
   Pressable,
   ScrollView,
   Share,
@@ -510,7 +511,7 @@ export default function DraftRunScreen({
   const params = useLocalSearchParams<{ environment?: string; mode?: string; setIds?: string; screenshot?: string }>();
   const screenshotFeedback = config.screenshots.fixtures
     && (screenshotFeedbackOverride || params.screenshot === 'feedback');
-  const screenshotFocusCards = config.screenshots.fixtures && params.screenshot === 'cards';
+  const screenshotFocusCards = config.screenshots.fixtures && Settings?.get?.('packoneScreenshotScene') === 'daily-decision';
   const practice = !shared && params.mode === 'practice';
   const requestedEnvironment = shared?.initialRun.environment
     ?? (typeof params.environment === 'string' ? params.environment : 'mixed');
