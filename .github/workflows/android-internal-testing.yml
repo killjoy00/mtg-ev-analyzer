@@ -10,8 +10,14 @@ on:
       - 'card-faces.mjs'
       - 'card-faces.d.mts'
       - '.github/actions/mobile-validate/**'
-      - '.github/android-internal-release-request.json'
+      - '.github/workflows/mobile.yml'
+      - '.github/workflows/mobile-store-screenshots.yml'
       - '.github/workflows/android-internal-testing.yml'
+      - '.github/workflows/android-production-bundle.yml'
+      - '.github/workflows/ios-testflight.yml'
+      - '.github/workflows/mobile-exact-main-rc.yml'
+      - '.github/android-internal-release-request.json'
+      - '.github/android-production-bundle-request.json'
   workflow_dispatch:
 
 permissions:
