@@ -76,7 +76,7 @@ test('app surfaces share phone gutters and keep bounded tablet width', () => {
     const p = style(file, 'page');
     assert.match(p, /padding:\s*spacing\.md/, file + ' should use a 16pt phone gutter');
     assert.match(p, new RegExp('maxWidth\\s*:\\s*' + max), file + ' keeps its readable tablet width');
-    assert.match(p, /alignSelf:\\s*'center'/);
+    assert.match(p, /alignSelf:\s*'center'/);
   }
 });
 
@@ -92,8 +92,8 @@ test('content sections avoid excessive stacked cards without reducing form contr
   // The November email-reminder parity release removed schedule picker chips.
   // Keep its enable/disable and existing push opt-out controls usable.
   const reminders = read('app/account-reminders.tsx');
-  assert.match(style('app/account-reminders.tsx', 'button'), /minHeight:\\s*50/);
-  assert.match(style('app/account-reminders.tsx', 'secondary'), /minHeight:\\s*45/);
+  assert.match(style('app/account-reminders.tsx', 'button'), /minHeight:\s*50/);
+  assert.match(style('app/account-reminders.tsx', 'secondary'), /minHeight:\s*45/);
   assert.match(reminders, /Previously enabled push reminders/);
   assert.doesNotMatch(reminders, /Enable push on this device/);
   const fonts = read('src/components/Text.tsx');
