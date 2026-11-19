@@ -1,4 +1,4 @@
 {
   "operation": "check-google-play-access",
-  "reason": "Owner explicitly authorized Pack One Android first public Production release. Inspect real Google Play release tracks, production/closed country availability, bundle inventory, and exercise a noncommitted Production draft-validation using a temporary edit that must be deleted. Do NOT upload an app, create an active release, modify tester tracks/groups/countries, or publish to Production. Surface any Console-only access/application blocker and ensure release parity (US/Canada) and review prerequisites before separate production submission."
+  "reason": "Owner has authorized the public Pack One Android AdMob Production update. Rerun the noncommitted Google Play Production edit validation with the shortened Play-compliant draft release name after #1666 fixed the probe. Read current Production release, bundle and country availability (US, Canada). Always DELETE the edit; do not upload, publish, alter existing testing tracks or change countries. Report Play API validation failures precisely."
 }
