@@ -17,7 +17,19 @@ on:
         type: boolean
         default: false
   pull_request:
-    paths: ['mobile/**', '.github/actions/mobile-validate/**', '.github/workflows/mobile-store-screenshots.yml']
+    paths:
+      - 'mobile/**'
+      - 'card-faces.mjs'
+      - 'card-faces.d.mts'
+      - '.github/actions/mobile-validate/**'
+      - '.github/workflows/mobile.yml'
+      - '.github/workflows/mobile-store-screenshots.yml'
+      - '.github/workflows/android-internal-testing.yml'
+      - '.github/workflows/android-production-bundle.yml'
+      - '.github/workflows/ios-testflight.yml'
+      - '.github/workflows/mobile-exact-main-rc.yml'
+      - '.github/android-internal-release-request.json'
+      - '.github/android-production-bundle-request.json'
 
 permissions:
   contents: read
