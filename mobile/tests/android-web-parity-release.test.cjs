@@ -78,7 +78,7 @@ test('Android store identity, target SDK baseline and Play-billing separation re
   assert.match(workflow, /name: Validate production mobile config[\s\S]*run: npm test/);
   assert.match(workflow, /name: Build signed production bundle/);
   assert.match(workflow, /name: Audit protected Android privacy surface/);
-  assert.match(workflow, /PACKONE_BUILD_PROFILE: production[\\s\\S]*EXPO_PUBLIC_PACKONE_ENV: production/,
+  assert.ok(workflow.includes('      PACKONE_BUILD_PROFILE: production\n      EXPO_PUBLIC_PACKONE_ENV: production'),
     'Android Gradle jobs must inherit production Expo environment, not only prebuild');
   assert.match(workflow, /name: Verify signed AAB embeds reviewed Production Android AdMob runtime config/,
     'Protected signed AAB must check actual embedded Expo runtime AdMob flag');
