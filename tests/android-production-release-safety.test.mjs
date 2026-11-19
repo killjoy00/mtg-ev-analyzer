@@ -1,0 +1,30 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+
+test('exact AAB Android Production flow is protected, pinned and distinct from closed testing',()=>{
+  const workflow=readFileSync('.github/workflows/android-exact-aab-production.yml','utf8');
+  const script=readFileSync('mobile/scripts/play-production-release.mjs','utf8');
+  assert.match(workflow,/branches: \[main\]/);
+  assert.match(workflow,/\.github\/android-exact-aab-production-request\.json/);
+  assert.match(workflow,/environment: pack-one-mobile-release/);
+  assert.match(workflow,/Require current approved main and unchanged mobile source/);
+  assert.match(workflow,/Verify pinned GitHub artifact metadata/);
+  assert.match(workflow,/Download and verify exact signed AAB/);
+  assert.match(workflow,/Upload exact AAB to Google Play Internal Testing/);
+  assert.match(workflow,/Verify live links and Google Play app signing/);
+  assert.match(workflow,/Verify submitted AdMob Data safety run is from protected main/);
+  assert.match(workflow,/mode'\)!='submit'/);
+  assert.match(workflow,/run\.get\('conclusion'\)!='success'/);
+  assert.match(workflow,/upload-exact-android-aab-production/);
+  assert.match(workflow,/str\(r\.get\('track'\)\) != 'production'/);
+  assert.match(script,/PACKONE_PRODUCTION_RELEASE_APPROVED/);
+  assert.match(script,/status:'completed'/);
+  assert.match(script,/countryAvailability\/production/);
+  assert.match(script,/if\(!countryCodes\.has\('US'\)\|\|!countryCodes\.has\('CA'\)\)/);
+  assert.match(script,/\:validate/);
+  assert.match(script,/\:commit/);
+  assert.match(script,/finally\s*\{/);
+  assert.match(script,/method:'DELETE'/);
+  assert.doesNotMatch(script,/production-access/);
+});
