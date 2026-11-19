@@ -1,0 +1,12 @@
+{
+  "operation": "upload-exact-android-aab-production",
+  "reason": "Owner approved Pack One Android AdMob update to public Google Play Production. Signed protected-main AAB build passed native AdMob audit, and Google Play Data Safety declaration was submitted successfully.",
+  "source_run_id": 44562043017,
+  "source_artifact_id": 14552390983,
+  "source_sha": "21c4835a7db2c95286a5abe2a24eb37cd1b77644",
+  "artifact_name": "pack-one-play-signed-aab",
+  "artifact_digest": "sha256:1d3789c493c20be38d82bbeacf01b71a70ed47bc63fffcbf3aaba51ace831c7f",
+  "version_code": 101058,
+  "track": "production",
+  "data_safety_run_id": 44561910073
+}
