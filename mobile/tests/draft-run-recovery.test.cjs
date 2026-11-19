@@ -95,13 +95,14 @@ async function fixture(options = {}) {
   };
   const sessionListeners = new Set();
   const Image = host('Image');
-  Image.prefetch = async () => {};
+  Image.prefetch = options.prefetch ?? (async () => {});
   const mocks = {
     '@/src/hooks/useCardCommerce': { useCardCommerce: () => options.commerceAllowed ?? true },
     'expo-application': { nativeApplicationVersion: '1.0', nativeBuildVersion: '1' },
     'expo-web-browser': { openBrowserAsync: async () => ({ type: 'dismiss' }) },
     'expo-haptics': {
-      selectionAsync: async () => {}, notificationAsync: async () => {},
+      selectionAsync: options.selectionAsync ?? (async () => {}),
+      notificationAsync: options.notificationAsync ?? (async () => {}),
       NotificationFeedbackType: { Success: 'success' },
     },
     'expo-image': { Image },
@@ -410,4 +411,30 @@ test('paid membership also has no card commerce in the expanded comparison', asy
     assert.doesNotMatch(screen.text(), /TCGplayer|Affiliate links|commission/);
     assert.equal(screen.root.root.findAll(node => node.type === 'Pressable' && String(node.props.accessibilityLabel).includes('TCGplayer')).length, 0);
   } finally { await screen.close(); }
+});
+
+
+test('best-effort native prefetch and haptics rejection never terminates a committed Daily reveal', async () => {
+  const nativeReject = () => Promise.reject(new Error('Injected native module failure'));
+  const screen = await fixture({
+    prefetch: nativeReject,
+    selectionAsync: nativeReject,
+    notificationAsync: nativeReject,
+    submitPick: async () => ({
+      ...runZero(),
+      revision: 5,
+      round: 1,
+      answers: [answer(0, 'a', 100)],
+      current: puzzle(1),
+    }),
+  });
+  try {
+    await screen.chooseAndConfirm();
+    await flush();
+    // Give rejected promises one event-loop turn to reveal an unhandled error.
+    await new Promise(resolve => setImmediate(resolve));
+    assert.match(screen.text(), /Next pick/);
+  } finally {
+    await screen.close();
+  }
 });
