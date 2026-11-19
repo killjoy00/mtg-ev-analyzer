@@ -75,12 +75,12 @@ export function ArticleScreen({
 }
 
 export const articleStyles = StyleSheet.create({
-  linkGrid: { gap: spacing.md },
+  linkGrid: { gap: spacing.sm },
   linkCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.line,
-    padding: spacing.lg,
+    padding: spacing.md,
     gap: spacing.sm,
   },
   linkKicker: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.3 },
@@ -100,12 +100,12 @@ export const articleStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
-  page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.xl, alignSelf: 'center', width: '100%', maxWidth: 840 },
-  header: { gap: spacing.sm, paddingTop: spacing.sm },
-  kicker: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.4 },
-  title: { color: colors.ink, fontSize: 36, lineHeight: 40, fontWeight: '800', letterSpacing: -0.8 },
-  deck: { color: colors.muted, fontSize: 17, lineHeight: 25 },
-  prose: { gap: spacing.xl },
+  page: { padding: spacing.md, paddingBottom: spacing.xxl, gap: 20, alignSelf: 'center', width: '100%', maxWidth: 840 },
+  header: { gap: spacing.sm },
+  kicker: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1 },
+  title: { color: colors.ink, fontSize: 32, lineHeight: 36, fontWeight: '800', letterSpacing: -0.8 },
+  deck: { color: colors.muted, fontSize: 16, lineHeight: 23 },
+  prose: { gap: 20 },
   section: { gap: spacing.sm },
   sectionTitle: { color: colors.ink, fontSize: 21, lineHeight: 27, fontWeight: '800' },
   body: { color: colors.muted, fontSize: 15, lineHeight: 23 },
