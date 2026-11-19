@@ -1,7 +1,7 @@
 name: Android production bundle
 
-# Routine Android builds remain paused. Only an explicitly reviewed release
-# request on protected main (or a manual dispatch) can build a signed AAB.
+# PRs run unsigned Android smoke. Only a reviewed release request on protected
+# main or an explicit manual dispatch can build a Play-signed AAB.
 on:
   push:
     branches: [main]
@@ -12,6 +12,10 @@ on:
     paths:
       - '.github/android-production-bundle-request.json'
       - '.github/workflows/android-production-bundle.yml'
+      - 'mobile/**'
+      - 'card-faces.mjs'
+      - 'card-faces.d.mts'
+      - '.github/actions/mobile-validate/**'
   workflow_dispatch:
 
 permissions:

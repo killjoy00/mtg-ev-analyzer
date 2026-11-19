@@ -11,9 +11,9 @@ on:
   workflow_dispatch:
     inputs:
       include_android:
-        description: Run the paused Android production-bundle smoke job
+        description: Include Android RC bundle (enabled by default; manual runs may opt out)
         type: boolean
-        default: false
+        default: true
 
 permissions:
   contents: read
@@ -133,8 +133,8 @@ jobs:
   android-bundle:
     name: build Android RC bundle
     needs: validate
-    # Expensive Android work is paused on main pushes; explicit manual opt-in only.
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.include_android }}
+    # Test both native platforms on main; manual runs can explicitly omit Android.
+    if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.include_android) }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -266,9 +266,9 @@ jobs:
   manifest:
     name: record RC evidence
     needs: [validate, ios-archive, android-bundle]
-    # Record iOS evidence even when Android was intentionally skipped; never
-    # conceal a failed manually requested Android build.
-    if: ${{ !cancelled() && needs.validate.result == 'success' && needs.ios-archive.result == 'success' && (needs.android-bundle.result == 'success' || needs.android-bundle.result == 'skipped') }}
+    # Both platforms must pass on main pushes. Only explicit manual opt-out
+    # may yield iOS-only evidence; an unexpected Android skip cannot pass.
+    if: ${{ !cancelled() && needs.validate.result == 'success' && needs.ios-archive.result == 'success' && (needs.android-bundle.result == 'success' || (github.event_name == 'workflow_dispatch' && !inputs.include_android && needs.android-bundle.result == 'skipped')) }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -291,7 +291,7 @@ jobs:
       - name: Write exact-main RC manifest
         if: steps.freshness.outputs.current == 'true'
         env:
-          INCLUDE_ANDROID: ${{ inputs.include_android }}
+          INCLUDE_ANDROID: ${{ github.event_name == 'push' || inputs.include_android }}
         shell: bash
         run: |
           set -euo pipefail
@@ -308,9 +308,9 @@ jobs:
             play_version_name: release.playVersionName,
             publication: 'none',
             ios_artifact: 'unsigned archive; not installable/store-published',
-            android_artifact: process.env.GITHUB_EVENT_NAME === 'workflow_dispatch' && process.env.INCLUDE_ANDROID === 'true'
+            android_artifact: process.env.INCLUDE_ANDROID === 'true'
               ? 'production bundle smoke; not Play-published'
-              : 'not built; Android CI paused'
+              : 'not built; manual RC explicitly excluded Android'
           };
           fs.writeFileSync('rc-evidence/mobile-exact-main-rc.json', JSON.stringify(out, null, 2) + '\n');
           NODE

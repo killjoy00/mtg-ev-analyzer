@@ -1,7 +1,17 @@
 name: Android internal testing
 
-# Android development is paused. Run manually only when the owner resumes it.
+# PR checks are unsigned signing-config smoke; protected Google Play uploads
+# remain manually dispatched and must never run for untrusted pull requests.
 on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'mobile/**'
+      - 'card-faces.mjs'
+      - 'card-faces.d.mts'
+      - '.github/actions/mobile-validate/**'
+      - '.github/android-internal-release-request.json'
+      - '.github/workflows/android-internal-testing.yml'
   workflow_dispatch:
 
 permissions:

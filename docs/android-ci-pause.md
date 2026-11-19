@@ -1,49 +1,60 @@
-# Android routine CI paused — November 16, 2026; scoped release lane resumed November 18
+# Android CI reactivated — November 19, 2026
 
-Pack One is prioritizing the iOS app. The repository retains all Android
-source, Google Play credentials/configuration, version history, signed-release
-guards, and test scripts for a possible future restart, but **automatic Android
-native builds and screenshots are paused**.
+The owner confirmed Pack One's Android app is live, so routine native Android
+testing has resumed alongside iOS. This file retains its original name because
+existing release audits link to it. The pause ran from November 16 until this
+reactivation; a narrowly scoped signed-AAB request path had already resumed
+on November 18.
 
-## Default CI behavior
+## Automatic validation now enabled
 
-- **Android Internal Testing** remains manual-only. A routine mobile
-  source or documentation change cannot start its native or Play upload jobs.
-- **Android production bundle** can start by explicit **Run workflow** or by a
-  reviewed change to `.github/android-production-bundle-request.json` merged
-  into protected `main`. The only automatic Android PR smoke is scoped to
-  that release request or its own workflow, and has no signing credentials.
-  Routine mobile PRs and pushes still do not start Android Gradle. The protected
-  bundle job signs and audits an AAB but does **not** upload it to Google Play;
-  the separate exact-artifact release request is required for any track change.
-- **Native UX baseline evidence**: the old-Android-baseline reproduction job is
-  also manual-only. It no longer starts on PRs that change its workflow/script.
-- **Mobile store screenshots**: PR, main, and ordinary automated requests
-  continue running iPhone/iPad capture where selected. The Android emulator
-  capture only runs when explicitly requested using the existing
-  `android_only: true` input in a manual or reusable invocation.
-- **Mobile exact-main RC smoke**: current-main validation and unsigned iOS
-  archive still run. The Android Gradle bundle, manifest audit, and unsigned
-  cache population are skipped by default, including on main pushes. A manual
-  invocation with `include_android: true` restores that Android job. The
-  resulting RC evidence explicitly records whether Android was built and still
-  fails closed if a manually requested build fails.
-- **Shared mobile/unit tests, iOS TestFlight, browser checks, and iOS native
-  screenshots are unchanged.** Some fast shared tests mention Android or
-  validate Android release-control source without building an Android app.
+- **Android internal testing**: Android upload-signing configuration smoke
+  runs on pull requests that change shared native code, assets, dependencies,
+  mobile validation, or its own workflow. It uses validation-only signing
+  values; **pull requests do not authenticate to Google Play**. The separate
+  protected internal publisher remains explicitly manual, with no automatic
+  `push` trigger.
+- **Android production bundle**: routine native PRs run unsigned Android
+  prebuild/Gradle smoke and merged-manifest privacy checks, using the
+  existing fast/full classifier. On `main`, only the reviewed
+  `.github/android-production-bundle-request.json` change or manual dispatch
+  can start the protected Play-upload-key signing job. That signed build
+  produces an AAB artifact; it **does not upload to Google Play**.
+- **Mobile store screenshots**: Android emulator screenshots and full
+  `native-acceptance.py` run automatically alongside iPhone/iPad capture on
+  screenshot-relevant pull requests and reviewed screenshot requests on
+  `main`. Manual and reusable calls still support `android_only: true`.
+  Fixture captures are preview builds; they do not change Play tracks.
+- **Mobile exact-main RC smoke**: relevant native pushes to protected `main`
+  build and audit both unsigned iOS and Android RC artifacts. Manual dispatch
+  includes Android by default, but may explicitly opt out using
+  `include_android: false`. A failed or unexpectedly skipped Android build
+  must not yield a passing cross-platform RC evidence manifest. Both release
+  candidate artifacts remain **non-publishing**.
+- **Shared mobile lint, typecheck, tests, iOS/TestFlight, and browser checks**
+  remain intact. PR-native scope filtering prevents irrelevant non-mobile PRs
+  from starting expensive Android jobs.
+- **Native UX baseline evidence** still runs manually only: it recreates a
+  historical 2026 Android build, not current live-app acceptance. It is not a
+  routine test and should not be reenabled for every PR.
 
-This change does **not** unpublish Android, alter Google Play tester groups,
-start releases, delete code, or modify the iOS 1.2 TestFlight request.
-Google Play release-request workflows remain separately protected; the
-exact-artifact import/promotion must independently pin the signed source SHA,
-artifact ID, digest and version code, then target only the existing Closed
-Testing track. Public Production must not be changed by this workflow.
+## Publication safety
 
-## Resuming Android
+Reactivating CI **does not** deploy a website, enable Android ads, build a
+Play production release, promote a testing track, reset a testing clock, alter
+tester groups, or change App Store Connect or Play Console settings.
 
-When Android development is again a priority, explicitly reinstate the PR
-triggers on both dedicated Android workflows, automatic Android screenshot
-capture, and automatic Android bundle coverage in the exact-main RC workflow;
-review the current Play SDK/target API and app-privacy requirements before
-signing or publishing a new binary. Keep the existing branch-protection and
-signed-release controls intact.
+The protected signing/build request and the separately reviewed exact-artifact
+release/import/promotion workflow retain their independent safeguards. Before
+any subsequent Android update is distributed, review target SDK, Play Console
+privacy and advertising declarations, physical device acceptance, source
+identity, signing and version codes. The fact that Android testing is active
+is not authorization to publish another binary.
+
+## Historical pause (November 16–18)
+
+Android native compilation, PR smoke, and emulator captures were deliberately
+paused while iOS release work was prioritized. The November 18 scoped
+signed-AAB release-request path stayed available for explicit reviewed work.
+The November 19 reactivation reverses the **routine CI pause**, not the
+store-release protections.
