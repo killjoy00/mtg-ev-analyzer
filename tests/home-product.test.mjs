@@ -169,7 +169,7 @@ test('Daily-home copy follows website markup across native cards and states', ()
   assert.ok(modes.includes(`description: '${description}'`),`native Daily description must match website: ${environment}`);
  }
  for(const phrase of [
-  'Eight picks. What would you take?', 'You decide what you',
+  'Eight picks. What would you take?', 'Make your pick. See what the drafter chose.',
   'Start here', 'Free · No account required', 'Play now', 'View result',
   'Want another eight picks?', 'DAILIES COMPLETE',
   'Keep playing regular Draft Runs, or any sets with Pack One Elite.',
@@ -319,4 +319,26 @@ test('membership level does not change the unfinished Daily home',()=>{
   const html=dailyHomeMarkup(profile,day);
   assert.doesNotMatch(html,/Free practice|Elite practice|Become Elite|Upgrade to Elite|Choose your sets|Practice a Draft Run/);
  }
+});
+
+test('Daily reset and streak appear only after all three Dailies are complete for a signed-in account', () => {
+ const entries=['mixed','powered-cube','latest'];
+ const markup=(environments,claimed,state='ready')=>dailyHomeMarkup({
+   player:{claimed},daily_streak:9,daily_history:environments.map(row)
+ },day,state);
+ const assertHidden=(html,scenario)=>{
+   assert.doesNotMatch(html,/data-daily-reset|daily-home-streak|Checking streak/i,scenario);
+   assert.doesNotMatch(html,/has-home-status/,scenario);
+   assert.match(html,/daily-home-heading[^]*?Daily Runs/,scenario);
+ };
+ for(const count of [0,1,2]){
+   assertHidden(markup(entries.slice(0,count),true),`signed in, ${count} finished`);
+ }
+ assertHidden(markup(entries,false),'guest completed all 3');
+ assertHidden(markup(entries,true,'checking'),'still checking');
+ assertHidden(markup(entries,true,'unavailable'),'progress unavailable');
+ const complete=markup(entries,true);
+ assert.match(complete,/class="daily-home has-home-status"/);
+ assert.match(complete,/data-daily-reset/);
+ assert.match(complete,/9-day streak/);
 });
