@@ -112,3 +112,15 @@ test('simulator readiness uses real screen layout rather than a removed tab head
   assert.match(acceptance, /assert_no_duplicate_tab_header/);
   assert.doesNotMatch(acceptance, /measure_header\(logs\)/);
 });
+
+
+test('Draft Run prefetches next packs to disk without growing a memory-disk prefetch cache', () => {
+  const src = read('app/draft-run.tsx');
+  // The pick-confirmation and reroll paths each prefetch only the upcoming pack.
+  const diskPrefetches = src.match(/Image\.prefetch\(urls, 'disk'\)/g) ?? [];
+  assert.equal(diskPrefetches.length, 2);
+  assert.doesNotMatch(src, /Image\.prefetch\(urls\)/);
+  assert.match(src, /const urls = run\.current\.candidates\.map/);
+  // The visible card components remain unchanged. This tests an exposure
+  // mitigation, not a verified cause of the TestFlight recap crash.
+});
