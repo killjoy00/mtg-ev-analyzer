@@ -6,8 +6,8 @@ let headlines: [(String, String)] = [
   ("01-daily-decision.jpg", "What would you pick?"),
   ("02-reveal-comparison.jpg", "See what the trophy drafter took"),
   ("03-daily-hub.jpg", "Three new Dailies every day"),
-  ("04-leaderboard.jpg", "Same picks. Compare scores."),
-  ("05-practice.jpg", "Practice between Dailies")
+  ("04-leaderboard.jpg", "Find the picks to revisit."),
+  ("05-practice.jpg", "More drafts. More reps.")
 ]
 guard CommandLine.arguments.count == 2 else { fatalError("Need screenshot root") }
 let root = URL(fileURLWithPath: CommandLine.arguments[1], isDirectory: true)
