@@ -44,16 +44,18 @@ jobs:
           node --input-type=module <<'NODE'
           import { readFileSync, appendFileSync } from 'node:fs';
           const request = JSON.parse(readFileSync('.github/testflight-status-request.json', 'utf8'));
-          const keys = ['build_number', 'operation', 'reason'];
+          const keys = ['build_number', 'crash_scope', 'operation', 'reason'];
           if (JSON.stringify(Object.keys(request).sort()) !== JSON.stringify(keys)) throw Error('Invalid status request keys.');
           if (request.operation !== 'read-pack-one-testflight-status') throw Error('Invalid status operation.');
+          if (!['exact', 'all_builds'].includes(request.crash_scope)) throw Error('Invalid read-only crash scope.');
           if (!/^[1-9][0-9]*$/.test(request.build_number)) throw Error('Invalid build number.');
           if (typeof request.reason !== 'string' || !request.reason.trim()) throw Error('Status reason required.');
-          appendFileSync(process.env.GITHUB_OUTPUT, `build_number=${request.build_number}\n`);
+          appendFileSync(process.env.GITHUB_OUTPUT, `build_number=${request.build_number}\nscan_all_builds=${request.crash_scope === 'all_builds' ? '1' : '0'}\n`);
           NODE
       - name: Read exact Pack One TestFlight availability
         env:
           PACKONE_STATUS_OUTPUT: ${{ runner.temp }}/pack-one-testflight-status.json
+          PACKONE_CRASH_SCAN_ALL_BUILDS: ${{ steps.request.outputs.scan_all_builds }}
         run: node .github/scripts/app-store-build-status.mjs "${{ steps.request.outputs.build_number }}"
       - name: Retain read-only distribution evidence
         if: always()
