@@ -129,6 +129,9 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     'PACKONE_ADMOB_ANDROID_ENABLED', 'PACKONE_ADMOB_ANDROID_APP_ID',
     'PACKONE_ADMOB_ANDROID_BANNER_ID', testBanners,
     ADMOB_DEMO.androidAppId, ADMOB_DEMO.androidBannerId);
+  if (production && androidAds.enabled && androidAds.appId === ADMOB_IOS_PRODUCTION.appId) {
+    throw new Error('The Android AdMob App ID must not reuse Pack One\'s registered iOS App ID.');
+  }
 
   return {
     ...config,
